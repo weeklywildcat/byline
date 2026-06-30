@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Headless
  * Description: Headless CMS extensions for Weekly Wildcat sports schedules, scores, and school events.
- * Version: 0.1.2
+ * Version: 0.1.4
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -14,6 +14,18 @@ if (!defined('ABSPATH')) {
 const WWH_SPORTS_GAME_POST_TYPE = 'ww_sports_game';
 const WWH_SCHOOL_EVENT_POST_TYPE = 'ww_school_event';
 const WWH_REST_NAMESPACE = 'weekly-wildcat/v1';
+
+function wwh_author_social_fields(): array
+{
+    return [
+        'website' => 'Website',
+        'email' => 'Email',
+        'instagram' => 'Instagram',
+        'tiktok' => 'TikTok',
+        'linkedin' => 'LinkedIn',
+        'x' => 'X',
+    ];
+}
 
 function wwh_register_update_checker(): void
 {
@@ -469,11 +481,156 @@ function wwh_save_school_event(int $post_id): void
 }
 add_action('save_post_' . WWH_SCHOOL_EVENT_POST_TYPE, 'wwh_save_school_event');
 
+function wwh_author_meta_value(int $user_id, string $key, string $default = ''): string
+{
+    $value = get_user_meta($user_id, $key, true);
+
+    return is_string($value) && $value !== '' ? $value : $default;
+}
+
+function wwh_author_profile_photo(int $attachment_id): array
+{
+    if ($attachment_id <= 0) {
+        return [
+            'id' => 0,
+            'url' => '',
+            'alt' => '',
+            'width' => null,
+            'height' => null,
+        ];
+    }
+
+    $image = wp_get_attachment_image_src($attachment_id, 'medium');
+    $full_image = wp_get_attachment_image_src($attachment_id, 'full');
+    $source = $image ?: $full_image;
+
+    if (!$source) {
+        return [
+            'id' => 0,
+            'url' => '',
+            'alt' => '',
+            'width' => null,
+            'height' => null,
+        ];
+    }
+
+    return [
+        'id' => $attachment_id,
+        'url' => esc_url_raw((string) $source[0]),
+        'alt' => get_post_meta($attachment_id, '_wp_attachment_image_alt', true),
+        'width' => isset($source[1]) ? absint($source[1]) : null,
+        'height' => isset($source[2]) ? absint($source[2]) : null,
+    ];
+}
+
+function wwh_render_author_profile_fields(WP_User $user): void
+{
+    $photo_id = absint(get_user_meta($user->ID, '_ww_author_photo_id', true));
+    $photo = wwh_author_profile_photo($photo_id);
+
+    ?>
+    <h2>Weekly Wildcat Profile</h2>
+    <table class="form-table wwh-author-profile" role="presentation">
+        <tr>
+            <th><label for="ww_author_role">Role</label></th>
+            <td><input type="text" class="regular-text" id="ww_author_role" name="ww_author_role" value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_role')); ?>"></td>
+        </tr>
+        <tr>
+            <th><label for="ww_author_pronouns">Pronouns</label></th>
+            <td><input type="text" class="regular-text" id="ww_author_pronouns" name="ww_author_pronouns" value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_pronouns')); ?>"></td>
+        </tr>
+        <tr>
+            <th><label for="ww_author_photo_id">Profile Photo</label></th>
+            <td>
+                <input type="hidden" id="ww_author_photo_id" name="ww_author_photo_id" value="<?php echo esc_attr((string) $photo_id); ?>">
+                <img class="wwh-author-photo-preview" src="<?php echo esc_url($photo['url']); ?>" alt="" <?php echo $photo['url'] === '' ? 'hidden' : ''; ?>>
+                <p>
+                    <button type="button" class="button wwh-author-photo-select">Select Profile Photo</button>
+                    <button type="button" class="button wwh-author-photo-remove" <?php echo $photo['url'] === '' ? 'hidden' : ''; ?>>Remove Photo</button>
+                </p>
+                <p class="description">Use a WordPress Media Library image instead of Gravatar.</p>
+            </td>
+        </tr>
+        <tr>
+            <th>Founder Badge</th>
+            <td>
+                <label>
+                    <input type="checkbox" name="ww_author_founder" value="1" <?php checked(wwh_author_meta_value($user->ID, '_ww_author_founder'), '1'); ?>>
+                    Show Founder badge on this author profile
+                </label>
+            </td>
+        </tr>
+        <?php foreach (wwh_author_social_fields() as $key => $label) : ?>
+            <tr>
+                <th><label for="ww_author_social_<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></label></th>
+                <td>
+                    <input
+                        type="<?php echo $key === 'email' ? 'email' : 'url'; ?>"
+                        class="regular-text"
+                        id="ww_author_social_<?php echo esc_attr($key); ?>"
+                        name="ww_author_social_<?php echo esc_attr($key); ?>"
+                        value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_social_' . $key)); ?>"
+                    >
+                </td>
+            </tr>
+        <?php endforeach; ?>
+    </table>
+    <?php
+}
+add_action('show_user_profile', 'wwh_render_author_profile_fields');
+add_action('edit_user_profile', 'wwh_render_author_profile_fields');
+
+function wwh_save_author_profile_fields(int $user_id): void
+{
+    if (!current_user_can('edit_user', $user_id)) {
+        return;
+    }
+
+    wwh_update_user_meta($user_id, '_ww_author_role', wwh_request_value('ww_author_role'));
+    wwh_update_user_meta($user_id, '_ww_author_pronouns', wwh_request_value('ww_author_pronouns'));
+    wwh_update_user_meta($user_id, '_ww_author_founder', isset($_POST['ww_author_founder']) ? '1' : '');
+
+    $photo_id = isset($_POST['ww_author_photo_id']) ? absint($_POST['ww_author_photo_id']) : 0;
+    wwh_update_user_meta($user_id, '_ww_author_photo_id', $photo_id > 0 ? (string) $photo_id : '');
+
+    foreach (wwh_author_social_fields() as $key => $_label) {
+        $field = 'ww_author_social_' . $key;
+        $value = $key === 'email' ? sanitize_email(wwh_request_value($field)) : esc_url_raw(wwh_request_value($field));
+        wwh_update_user_meta($user_id, '_ww_author_social_' . $key, $value);
+    }
+}
+add_action('personal_options_update', 'wwh_save_author_profile_fields');
+add_action('edit_user_profile_update', 'wwh_save_author_profile_fields');
+
+function wwh_update_user_meta(int $user_id, string $key, string $value): void
+{
+    if ($value === '') {
+        delete_user_meta($user_id, $key);
+        return;
+    }
+
+    update_user_meta($user_id, $key, $value);
+}
+
+function wwh_enqueue_author_profile_assets(string $hook): void
+{
+    if (!in_array($hook, ['profile.php', 'user-edit.php'], true)) {
+        return;
+    }
+
+    wp_enqueue_media();
+    wp_add_inline_script(
+        'jquery-core',
+        "document.addEventListener('click',function(event){var selectButton=event.target.closest('.wwh-author-photo-select');var removeButton=event.target.closest('.wwh-author-photo-remove');if(selectButton){event.preventDefault();var wrap=selectButton.closest('td');var input=wrap.querySelector('#ww_author_photo_id');var preview=wrap.querySelector('.wwh-author-photo-preview');var remove=wrap.querySelector('.wwh-author-photo-remove');var frame=wp.media({title:'Select author profile photo',button:{text:'Use this photo'},multiple:false});frame.on('select',function(){var attachment=frame.state().get('selection').first().toJSON();input.value=attachment.id;preview.src=(attachment.sizes&&attachment.sizes.medium?attachment.sizes.medium.url:attachment.url);preview.hidden=false;remove.hidden=false;});frame.open();}if(removeButton){event.preventDefault();var removeWrap=removeButton.closest('td');removeWrap.querySelector('#ww_author_photo_id').value='';var removePreview=removeWrap.querySelector('.wwh-author-photo-preview');removePreview.removeAttribute('src');removePreview.hidden=true;removeButton.hidden=true;}});"
+    );
+}
+add_action('admin_enqueue_scripts', 'wwh_enqueue_author_profile_assets');
+
 function wwh_admin_styles(): void
 {
     $screen = get_current_screen();
 
-    if (!$screen || !in_array($screen->post_type, [WWH_SPORTS_GAME_POST_TYPE, WWH_SCHOOL_EVENT_POST_TYPE], true)) {
+    if (!$screen || (!in_array($screen->post_type, [WWH_SPORTS_GAME_POST_TYPE, WWH_SCHOOL_EVENT_POST_TYPE], true) && !in_array($screen->id, ['profile', 'user-edit'], true))) {
         return;
     }
 
@@ -485,6 +642,7 @@ function wwh_admin_styles(): void
         .wwh-field input:not([type="checkbox"]), .wwh-field select, .wwh-field textarea { max-width: 100%; width: 100%; }
         .wwh-field textarea, .wwh-checkbox { grid-column: 1 / -1; }
         .wwh-checkbox label, .wwh-checkbox span { display: inline; }
+        .wwh-author-photo-preview { background: #f0f0f1; display: block; height: 96px; margin-bottom: 10px; object-fit: cover; width: 96px; }
         @media (max-width: 782px) { .wwh-fields { grid-template-columns: 1fr; } }
     </style>';
 }
@@ -515,8 +673,36 @@ function wwh_register_rest_routes(): void
         'callback' => 'wwh_rest_school_events',
         'permission_callback' => '__return_true',
     ]);
+
+    register_rest_field('user', 'weeklyWildcatProfile', [
+        'get_callback' => 'wwh_rest_author_profile',
+        'schema' => [
+            'description' => 'Weekly Wildcat author profile fields.',
+            'type' => 'object',
+            'context' => ['view', 'edit'],
+        ],
+    ]);
 }
 add_action('rest_api_init', 'wwh_register_rest_routes');
+
+function wwh_rest_author_profile(array $user): array
+{
+    $user_id = isset($user['id']) ? absint($user['id']) : 0;
+    $photo_id = absint(get_user_meta($user_id, '_ww_author_photo_id', true));
+    $socials = [];
+
+    foreach (wwh_author_social_fields() as $key => $_label) {
+        $socials[$key] = wwh_author_meta_value($user_id, '_ww_author_social_' . $key);
+    }
+
+    return [
+        'pronouns' => wwh_author_meta_value($user_id, '_ww_author_pronouns'),
+        'role' => wwh_author_meta_value($user_id, '_ww_author_role'),
+        'founder' => wwh_author_meta_value($user_id, '_ww_author_founder') === '1',
+        'profilePhoto' => wwh_author_profile_photo($photo_id),
+        'socials' => $socials,
+    ];
+}
 
 function wwh_rest_limit(WP_REST_Request $request): int
 {
@@ -723,15 +909,19 @@ function wwh_format_sports_game(WP_Post $post): array
     $opponent_score = wwh_meta_value($post->ID, '_ww_opponent_score');
     $show_score = $status === 'final' && $wildcats_score !== '' && $opponent_score !== '';
     $matchup = $opponent !== '' ? sprintf('Wildcats %s %s', $site === 'away' ? 'at' : 'vs.', $opponent) : get_the_title($post);
+    $sport = $sport_option['sport'] ?? wwh_meta_value($post->ID, '_ww_sport');
+    $level = $sport_option['level'] ?? wwh_meta_value($post->ID, '_ww_level');
+    $sport_level = trim(implode(' · ', array_filter([$sport, $level])));
+    $opponent_label = $opponent !== '' ? $opponent : 'Opponent';
 
     return [
         'id' => $post->ID,
         'title' => get_the_title($post),
         'slug' => $post->post_name,
         'sportKey' => $sport_key,
-        'sport' => $sport_option['sport'] ?? wwh_meta_value($post->ID, '_ww_sport'),
+        'sport' => $sport,
         'sportLabel' => $sport_option['label'] ?? wwh_meta_value($post->ID, '_ww_sport'),
-        'level' => $sport_option['level'] ?? wwh_meta_value($post->ID, '_ww_level'),
+        'level' => $level,
         'teamLabel' => $sport_option['teamLabel'] ?? wwh_meta_value($post->ID, '_ww_team_label'),
         'opponent' => $opponent,
         'site' => $site,
@@ -753,6 +943,17 @@ function wwh_format_sports_game(WP_Post $post): array
             'location' => $location_name !== '' ? $location_name : $location_address,
             'status' => wwh_label_from_value($status),
             'score' => $show_score ? sprintf('Wildcats %d, %s %d', absint($wildcats_score), $opponent !== '' ? $opponent : 'Opponent', absint($opponent_score)) : null,
+            'sportLevel' => $sport_level,
+            'scoreboard' => [
+                'wildcats' => [
+                    'label' => 'Wildcats',
+                    'score' => $show_score ? absint($wildcats_score) : null,
+                ],
+                'opponent' => [
+                    'label' => $opponent_label,
+                    'score' => $show_score ? absint($opponent_score) : null,
+                ],
+            ],
         ],
     ];
 }
