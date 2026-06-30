@@ -24,11 +24,28 @@ Upload the `weekly-wildcat-headless` folder to `wp-content/plugins/`, then activ
 
 For the first install, zip this folder and upload it in WordPress admin under Plugins > Add Plugin > Upload Plugin.
 
-For repeat deploys, pull this repository or upload the folder contents to:
+After the plugin is active, WordPress checks GitHub releases from:
 
-`wp-content/plugins/weekly-wildcat-headless`
+`https://github.com/weeklywildcat/byline-plugin`
 
-Then confirm the plugin is active in WordPress admin.
+Enable auto-updates for **Weekly Wildcat Headless** in WordPress admin if you want future releases installed automatically.
+
+## Release Updates
+
+Only tagged releases are used for WordPress updates. Normal pushes to `main` do not deploy to the CMS.
+
+To publish an update:
+
+1. Update the `Version:` header in `weekly-wildcat-headless.php`.
+2. Commit and push the change to `main`.
+3. Create and push a matching tag, for example:
+
+   ```sh
+   git tag v0.1.2
+   git push origin v0.1.2
+   ```
+
+GitHub Actions packages `weekly-wildcat-headless.zip` and publishes it as a release asset. WordPress uses that release asset for plugin updates.
 
 ## Notes
 
@@ -37,4 +54,4 @@ Then confirm the plugin is active in WordPress admin.
 - Sports Games expose `sportKey`, `sportLabel`, location name, address, latitude, longitude, and optional Apple Maps place ID.
 - Scores are returned publicly only when a game status is `final`.
 - School Events support scheduled and canceled statuses.
-- The Next.js frontend has typed helpers ready in `lib/headless.ts`, but these endpoints are not rendered on the homepage yet.
+- The Next.js frontend has typed helpers in `lib/headless.ts`.

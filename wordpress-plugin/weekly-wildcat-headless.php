@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Headless
  * Description: Headless CMS extensions for Weekly Wildcat sports schedules, scores, and school events.
- * Version: 0.1.1
+ * Version: 0.1.2
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -14,6 +14,29 @@ if (!defined('ABSPATH')) {
 const WWH_SPORTS_GAME_POST_TYPE = 'ww_sports_game';
 const WWH_SCHOOL_EVENT_POST_TYPE = 'ww_school_event';
 const WWH_REST_NAMESPACE = 'weekly-wildcat/v1';
+
+function wwh_register_update_checker(): void
+{
+    $update_checker_path = __DIR__ . '/plugin-update-checker/plugin-update-checker.php';
+
+    if (!is_readable($update_checker_path)) {
+        return;
+    }
+
+    require_once $update_checker_path;
+
+    $update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+        'https://github.com/weeklywildcat/byline-plugin/',
+        __FILE__,
+        'weekly-wildcat-headless'
+    );
+
+    $update_checker->getVcsApi()->enableReleaseAssets(
+        '/^weekly-wildcat-headless\.zip$/i',
+        \YahnisElsts\PluginUpdateChecker\v5p7\Vcs\Api::REQUIRE_RELEASE_ASSETS
+    );
+}
+wwh_register_update_checker();
 
 function wwh_sports_team_options(): array
 {
