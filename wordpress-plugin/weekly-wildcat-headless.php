@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Headless
  * Description: Headless CMS extensions for Weekly Wildcat sports schedules, scores, and school events.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -14,6 +14,53 @@ if (!defined('ABSPATH')) {
 const WWH_SPORTS_GAME_POST_TYPE = 'ww_sports_game';
 const WWH_SCHOOL_EVENT_POST_TYPE = 'ww_school_event';
 const WWH_REST_NAMESPACE = 'weekly-wildcat/v1';
+
+function wwh_sports_team_options(): array
+{
+    return [
+        'baseball-varsity' => ['sport' => 'Baseball', 'level' => 'Varsity', 'teamLabel' => 'Baseball', 'label' => 'Baseball - Varsity'],
+        'baseball-jv' => ['sport' => 'Baseball', 'level' => 'JV', 'teamLabel' => 'Baseball', 'label' => 'Baseball - JV'],
+        'baseball-c-team' => ['sport' => 'Baseball', 'level' => 'C-Team', 'teamLabel' => 'Baseball', 'label' => 'Baseball - C-Team'],
+        'boys-basketball-varsity' => ['sport' => 'Boys Basketball', 'level' => 'Varsity', 'teamLabel' => 'Boys', 'label' => 'Boys Basketball - Varsity'],
+        'boys-basketball-jv' => ['sport' => 'Boys Basketball', 'level' => 'JV', 'teamLabel' => 'Boys', 'label' => 'Boys Basketball - JV'],
+        'boys-soccer' => ['sport' => 'Boys Soccer', 'level' => 'Varsity', 'teamLabel' => 'Boys', 'label' => 'Boys Soccer'],
+        'cheer-competition' => ['sport' => 'Cheer', 'level' => 'Competition', 'teamLabel' => 'Cheer', 'label' => 'Cheer - Competition'],
+        'cheer-sideline' => ['sport' => 'Cheer', 'level' => 'Sideline', 'teamLabel' => 'Cheer', 'label' => 'Cheer - Sideline'],
+        'cross-country' => ['sport' => 'Cross Country', 'level' => 'Varsity', 'teamLabel' => 'Cross Country', 'label' => 'Cross Country'],
+        'football-varsity' => ['sport' => 'Football', 'level' => 'Varsity', 'teamLabel' => 'Football', 'label' => 'Football - Varsity'],
+        'football-jv' => ['sport' => 'Football', 'level' => 'JV', 'teamLabel' => 'Football', 'label' => 'Football - JV'],
+        'girls-basketball-varsity' => ['sport' => 'Girls Basketball', 'level' => 'Varsity', 'teamLabel' => 'Girls', 'label' => 'Girls Basketball - Varsity'],
+        'girls-basketball-jv' => ['sport' => 'Girls Basketball', 'level' => 'JV', 'teamLabel' => 'Girls', 'label' => 'Girls Basketball - JV'],
+        'girls-soccer' => ['sport' => 'Girls Soccer', 'level' => 'Varsity', 'teamLabel' => 'Girls', 'label' => 'Girls Soccer'],
+        'golf' => ['sport' => 'Golf', 'level' => 'Varsity', 'teamLabel' => 'Golf', 'label' => 'Golf'],
+        'softball-jv' => ['sport' => 'Softball', 'level' => 'JV', 'teamLabel' => 'Softball', 'label' => 'Softball - JV'],
+        'softball-varsity' => ['sport' => 'Softball', 'level' => 'Varsity', 'teamLabel' => 'Softball', 'label' => 'Softball - Varsity'],
+        'track-and-field' => ['sport' => 'Track and Field', 'level' => 'Varsity', 'teamLabel' => 'Track and Field', 'label' => 'Track and Field'],
+        'volleyball-varsity' => ['sport' => 'Volleyball', 'level' => 'Varsity', 'teamLabel' => 'Volleyball', 'label' => 'Volleyball - Varsity'],
+        'volleyball-jv' => ['sport' => 'Volleyball', 'level' => 'JV', 'teamLabel' => 'Volleyball', 'label' => 'Volleyball - JV'],
+        'wrestling' => ['sport' => 'Wrestling', 'level' => 'Varsity', 'teamLabel' => 'Wrestling', 'label' => 'Wrestling'],
+    ];
+}
+
+function wwh_infer_sport_key(string $sport, string $level): string
+{
+    $sport = strtolower(trim($sport));
+    $level = strtolower(trim($level));
+
+    foreach (wwh_sports_team_options() as $key => $option) {
+        if (strtolower($option['sport']) === $sport && strtolower($option['level']) === $level) {
+            return $key;
+        }
+    }
+
+    foreach (wwh_sports_team_options() as $key => $option) {
+        if (strtolower($option['sport']) === $sport) {
+            return $key;
+        }
+    }
+
+    return '';
+}
 
 function wwh_register_post_types(): void
 {
@@ -70,12 +117,18 @@ add_action('init', 'wwh_register_post_types');
 function wwh_register_post_meta(): void
 {
     $sports_keys = [
+        '_ww_sport_key',
         '_ww_sport',
         '_ww_level',
         '_ww_team_label',
         '_ww_opponent',
         '_ww_site',
         '_ww_location',
+        '_ww_location_name',
+        '_ww_location_address',
+        '_ww_location_latitude',
+        '_ww_location_longitude',
+        '_ww_location_apple_maps_id',
         '_ww_start_datetime',
         '_ww_game_status',
         '_ww_wildcats_score',
@@ -199,18 +252,28 @@ function wwh_select(string $label, string $name, string $value, array $options):
 function wwh_render_sports_game_meta_box(WP_Post $post): void
 {
     wp_nonce_field('wwh_save_sports_game', 'wwh_sports_game_nonce');
+    $sport_key = wwh_meta_value($post->ID, '_ww_sport_key');
+    $sport_key = $sport_key !== '' ? $sport_key : wwh_infer_sport_key(wwh_meta_value($post->ID, '_ww_sport'), wwh_meta_value($post->ID, '_ww_level'));
+    $sport_key = $sport_key !== '' ? $sport_key : wwh_infer_sport_key(wwh_meta_value($post->ID, '_ww_sport'), wwh_meta_value($post->ID, '_ww_level'));
+    $team_options = ['' => 'Select a sport / team'];
+
+    foreach (wwh_sports_team_options() as $key => $option) {
+        $team_options[$key] = $option['label'];
+    }
 
     echo '<div class="wwh-fields">';
-    wwh_field('Sport', 'ww_sport', wwh_meta_value($post->ID, '_ww_sport'), 'text', ['placeholder' => 'Football']);
-    wwh_field('Level', 'ww_level', wwh_meta_value($post->ID, '_ww_level'), 'text', ['placeholder' => 'Varsity']);
-    wwh_field('Gender / Team Label', 'ww_team_label', wwh_meta_value($post->ID, '_ww_team_label'), 'text', ['placeholder' => 'Girls']);
+    wwh_select('Sport / Team', 'ww_sport_key', $sport_key, $team_options);
     wwh_field('Opponent', 'ww_opponent', wwh_meta_value($post->ID, '_ww_opponent'));
     wwh_select('Home / Away / Neutral', 'ww_site', wwh_meta_value($post->ID, '_ww_site', 'home'), [
         'home' => 'Home',
         'away' => 'Away',
         'neutral' => 'Neutral',
     ]);
-    wwh_field('Location', 'ww_location', wwh_meta_value($post->ID, '_ww_location'));
+    wwh_field('Location Name', 'ww_location_name', wwh_meta_value($post->ID, '_ww_location_name', wwh_meta_value($post->ID, '_ww_location')));
+    wwh_field('Location Address', 'ww_location_address', wwh_meta_value($post->ID, '_ww_location_address'), 'text', ['placeholder' => '640 South Cambridge Street, Ninety Six, SC']);
+    wwh_field('Latitude', 'ww_location_latitude', wwh_meta_value($post->ID, '_ww_location_latitude'), 'text', ['inputmode' => 'decimal', 'placeholder' => '34.1750']);
+    wwh_field('Longitude', 'ww_location_longitude', wwh_meta_value($post->ID, '_ww_location_longitude'), 'text', ['inputmode' => 'decimal', 'placeholder' => '-82.0240']);
+    wwh_field('Apple Maps Place ID', 'ww_location_apple_maps_id', wwh_meta_value($post->ID, '_ww_location_apple_maps_id'));
     wwh_field('Start Date / Time', 'ww_start_datetime', wwh_meta_value($post->ID, '_ww_start_datetime'), 'datetime-local');
     wwh_select('Status', 'ww_game_status', wwh_meta_value($post->ID, '_ww_game_status', 'upcoming'), [
         'upcoming' => 'Upcoming',
@@ -294,6 +357,28 @@ function wwh_sanitize_datetime(string $value): string
     return '';
 }
 
+function wwh_sanitize_sport_key(string $value): string
+{
+    return array_key_exists($value, wwh_sports_team_options()) ? $value : '';
+}
+
+function wwh_sanitize_coordinate(string $value, float $min, float $max): string
+{
+    $value = trim(sanitize_text_field($value));
+
+    if ($value === '' || !is_numeric($value)) {
+        return '';
+    }
+
+    $coordinate = (float) $value;
+
+    if ($coordinate < $min || $coordinate > $max) {
+        return '';
+    }
+
+    return rtrim(rtrim(sprintf('%.7F', $coordinate), '0'), '.');
+}
+
 function wwh_update_meta(int $post_id, string $key, string $value): void
 {
     if ($value === '') {
@@ -320,12 +405,21 @@ function wwh_save_sports_game(int $post_id): void
         return;
     }
 
-    wwh_update_meta($post_id, '_ww_sport', wwh_request_value('ww_sport'));
-    wwh_update_meta($post_id, '_ww_level', wwh_request_value('ww_level'));
-    wwh_update_meta($post_id, '_ww_team_label', wwh_request_value('ww_team_label'));
+    $sport_key = wwh_sanitize_sport_key(wwh_request_value('ww_sport_key'));
+    $sport_option = $sport_key !== '' ? wwh_sports_team_options()[$sport_key] : null;
+
+    wwh_update_meta($post_id, '_ww_sport_key', $sport_key);
+    wwh_update_meta($post_id, '_ww_sport', $sport_option['sport'] ?? '');
+    wwh_update_meta($post_id, '_ww_level', $sport_option['level'] ?? '');
+    wwh_update_meta($post_id, '_ww_team_label', $sport_option['teamLabel'] ?? '');
     wwh_update_meta($post_id, '_ww_opponent', wwh_request_value('ww_opponent'));
     wwh_update_meta($post_id, '_ww_site', wwh_sanitize_choice(wwh_request_value('ww_site'), ['home', 'away', 'neutral'], 'home'));
-    wwh_update_meta($post_id, '_ww_location', wwh_request_value('ww_location'));
+    wwh_update_meta($post_id, '_ww_location_name', wwh_request_value('ww_location_name'));
+    wwh_update_meta($post_id, '_ww_location', wwh_request_value('ww_location_name'));
+    wwh_update_meta($post_id, '_ww_location_address', wwh_request_value('ww_location_address'));
+    wwh_update_meta($post_id, '_ww_location_latitude', wwh_sanitize_coordinate(wwh_request_value('ww_location_latitude'), -90, 90));
+    wwh_update_meta($post_id, '_ww_location_longitude', wwh_sanitize_coordinate(wwh_request_value('ww_location_longitude'), -180, 180));
+    wwh_update_meta($post_id, '_ww_location_apple_maps_id', wwh_request_value('ww_location_apple_maps_id'));
     wwh_update_meta($post_id, '_ww_start_datetime', wwh_sanitize_datetime(wwh_request_value('ww_start_datetime')));
     wwh_update_meta($post_id, '_ww_game_status', wwh_sanitize_choice(wwh_request_value('ww_game_status'), ['upcoming', 'final', 'postponed', 'canceled'], 'upcoming'));
     wwh_update_score_meta($post_id, '_ww_wildcats_score', wwh_request_value('ww_wildcats_score'));
@@ -426,12 +520,20 @@ function wwh_game_query_args(WP_REST_Request $request, array $overrides = []): a
     ];
 
     $status = sanitize_text_field((string) $request->get_param('status'));
+    $sport_key = sanitize_text_field((string) ($request->get_param('sport_key') ?: $request->get_param('sportKey')));
     $meta_query = [];
 
     if ($status !== '' && in_array($status, ['upcoming', 'final', 'postponed', 'canceled'], true)) {
         $meta_query[] = [
             'key' => '_ww_game_status',
             'value' => $status,
+        ];
+    }
+
+    if ($sport_key !== '' && array_key_exists($sport_key, wwh_sports_team_options())) {
+        $meta_query[] = [
+            'key' => '_ww_sport_key',
+            'value' => $sport_key,
         ];
     }
 
@@ -586,7 +688,13 @@ function wwh_format_sports_game(WP_Post $post): array
 {
     $status = wwh_sanitize_choice(wwh_meta_value($post->ID, '_ww_game_status', 'upcoming'), ['upcoming', 'final', 'postponed', 'canceled'], 'upcoming');
     $site = wwh_sanitize_choice(wwh_meta_value($post->ID, '_ww_site', 'home'), ['home', 'away', 'neutral'], 'home');
+    $sport_key = wwh_meta_value($post->ID, '_ww_sport_key');
+    $sport_option = array_key_exists($sport_key, wwh_sports_team_options()) ? wwh_sports_team_options()[$sport_key] : null;
     $opponent = wwh_meta_value($post->ID, '_ww_opponent');
+    $location_name = wwh_meta_value($post->ID, '_ww_location_name', wwh_meta_value($post->ID, '_ww_location'));
+    $location_address = wwh_meta_value($post->ID, '_ww_location_address');
+    $latitude = wwh_meta_value($post->ID, '_ww_location_latitude');
+    $longitude = wwh_meta_value($post->ID, '_ww_location_longitude');
     $start = wwh_meta_value($post->ID, '_ww_start_datetime');
     $wildcats_score = wwh_meta_value($post->ID, '_ww_wildcats_score');
     $opponent_score = wwh_meta_value($post->ID, '_ww_opponent_score');
@@ -597,12 +705,19 @@ function wwh_format_sports_game(WP_Post $post): array
         'id' => $post->ID,
         'title' => get_the_title($post),
         'slug' => $post->post_name,
-        'sport' => wwh_meta_value($post->ID, '_ww_sport'),
-        'level' => wwh_meta_value($post->ID, '_ww_level'),
-        'teamLabel' => wwh_meta_value($post->ID, '_ww_team_label'),
+        'sportKey' => $sport_key,
+        'sport' => $sport_option['sport'] ?? wwh_meta_value($post->ID, '_ww_sport'),
+        'sportLabel' => $sport_option['label'] ?? wwh_meta_value($post->ID, '_ww_sport'),
+        'level' => $sport_option['level'] ?? wwh_meta_value($post->ID, '_ww_level'),
+        'teamLabel' => $sport_option['teamLabel'] ?? wwh_meta_value($post->ID, '_ww_team_label'),
         'opponent' => $opponent,
         'site' => $site,
-        'location' => wwh_meta_value($post->ID, '_ww_location'),
+        'location' => $location_name,
+        'locationName' => $location_name,
+        'locationAddress' => $location_address,
+        'latitude' => $latitude !== '' ? (float) $latitude : null,
+        'longitude' => $longitude !== '' ? (float) $longitude : null,
+        'appleMapsId' => wwh_meta_value($post->ID, '_ww_location_apple_maps_id'),
         'startDate' => $start,
         'status' => $status,
         'wildcatsScore' => $show_score ? absint($wildcats_score) : null,
@@ -612,6 +727,7 @@ function wwh_format_sports_game(WP_Post $post): array
         'display' => [
             'matchup' => $matchup,
             'date' => wwh_format_date_text($start),
+            'location' => $location_name !== '' ? $location_name : $location_address,
             'status' => wwh_label_from_value($status),
             'score' => $show_score ? sprintf('Wildcats %d, %s %d', absint($wildcats_score), $opponent !== '' ? $opponent : 'Opponent', absint($opponent_score)) : null,
         ],
