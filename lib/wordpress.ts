@@ -240,6 +240,12 @@ export async function getAllAuthors() {
   });
 }
 
+export async function getAuthorById(authorId: number) {
+  const { data } = await wpFetch<WordPressAuthor>(`/users/${authorId}`);
+
+  return data ?? null;
+}
+
 export async function getAuthorBySlug(slug: string) {
   const { data } = await wpFetch<WordPressAuthor[]>("/users", {
     slug,
@@ -280,6 +286,20 @@ export async function getPostsByAuthor(authorId: number) {
 
 export function getPostAuthor(post: WordPressPost) {
   return post._embedded?.author?.[0] ?? null;
+}
+
+export async function getPostAuthorWithProfile(post: WordPressPost) {
+  const embeddedAuthor = getPostAuthor(post);
+
+  if (!embeddedAuthor) {
+    return null;
+  }
+
+  if (embeddedAuthor.weeklyWildcatProfile) {
+    return embeddedAuthor;
+  }
+
+  return (await getAuthorById(embeddedAuthor.id)) ?? embeddedAuthor;
 }
 
 export function getPostCategories(post: WordPressPost) {
