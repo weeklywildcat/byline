@@ -488,6 +488,31 @@ img {
   font-size: 1.12rem;
 }
 
+.article-athlete-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.article-athlete-meta span {
+  border: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 7px 9px;
+  text-transform: uppercase;
+}
+
+.article-athlete-meta span:first-child {
+  background: #171a21;
+  border-color: #171a21;
+  color: #ffffff;
+}
+
 .article-meta-block {
   border-top: 1px solid var(--rule);
   display: grid;

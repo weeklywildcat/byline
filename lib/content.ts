@@ -1,6 +1,6 @@
 import { stripHtml } from "@/lib/format";
 import { FOCUS_SECTION_SLUGS, PUBLIC_SECTION_SLUGS } from "@/lib/sections";
-import { getPostCategories, getPostTags, type WordPressCategory, type WordPressPost } from "@/lib/wordpress";
+import { getPostCategories, getPostTags, type WordPressCategory, type WordPressPost, type WordPressTag } from "@/lib/wordpress";
 
 const HIDDEN_CATEGORY_SLUGS = new Set(["uncategorized"]);
 const HIDDEN_POST_SLUGS = new Set(["hello-world"]);
@@ -8,6 +8,12 @@ const HIDDEN_POST_TITLES = new Set(["hey there!"]);
 export const SPECIAL_COVERAGE_TAG_SLUG = "special-coverage";
 export const ATHLETE_SPOTLIGHT_TAG_SLUG = "athlete-of-the-week";
 export const ATHLETE_OF_THE_MONTH_TAG_SLUG = "athlete-of-the-month";
+
+const EDITORIAL_FLAG_TAG_SLUGS = new Set([
+  SPECIAL_COVERAGE_TAG_SLUG,
+  ATHLETE_SPOTLIGHT_TAG_SLUG,
+  ATHLETE_OF_THE_MONTH_TAG_SLUG
+]);
 
 export function isHiddenCategory(category: WordPressCategory | null | undefined) {
   return Boolean(category && HIDDEN_CATEGORY_SLUGS.has(category.slug));
@@ -39,6 +45,51 @@ export function isSpecialCoveragePost(post: WordPressPost) {
 
 export function isAthleteSpotlightPost(post: WordPressPost) {
   return hasPostTag(post, ATHLETE_SPOTLIGHT_TAG_SLUG) || hasPostTag(post, ATHLETE_OF_THE_MONTH_TAG_SLUG);
+}
+
+export function isEditorialFlagTag(tag: WordPressTag) {
+  return EDITORIAL_FLAG_TAG_SLUGS.has(tag.slug);
+}
+
+export function getPublicTopicTags(post: WordPressPost) {
+  return getPostTags(post).filter((tag) => !isEditorialFlagTag(tag));
+}
+
+export function getAthleteSpotlightLabel(post: WordPressPost) {
+  if (hasPostTag(post, ATHLETE_SPOTLIGHT_TAG_SLUG)) {
+    return "Athlete of the Week";
+  }
+
+  if (hasPostTag(post, ATHLETE_OF_THE_MONTH_TAG_SLUG)) {
+    return "Athlete of the Month";
+  }
+
+  const title = stripHtml(post.title.rendered);
+
+  if (/^athlete\s+of\s+the\s+week\b/i.test(title)) {
+    return "Athlete of the Week";
+  }
+
+  if (/^athlete\s+of\s+the\s+month\b/i.test(title)) {
+    return "Athlete of the Month";
+  }
+
+  return "Athlete Spotlight";
+}
+
+function getCleanSportTagName(tag: WordPressTag) {
+  return stripHtml(tag.name).replace(/^sport\s*:\s*/i, "").trim();
+}
+
+function isSportTag(tag: WordPressTag) {
+  return tag.slug.startsWith("sport-") || /^sport\s*:/i.test(stripHtml(tag.name));
+}
+
+export function getAthleteSportLabel(post: WordPressPost) {
+  const topicTags = getPublicTopicTags(post);
+  const sportTag = topicTags.find(isSportTag) ?? topicTags[0];
+
+  return sportTag ? getCleanSportTagName(sportTag) : null;
 }
 
 export function isVisibleContentPost(post: WordPressPost) {

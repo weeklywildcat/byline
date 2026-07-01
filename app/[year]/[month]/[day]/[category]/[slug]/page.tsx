@@ -4,7 +4,15 @@ import { ArticleShareActions } from "@/components/ArticleShareActions";
 import { AuthorBadge } from "@/components/AuthorBadge";
 import { FeaturedImage } from "@/components/FeaturedImage";
 import { StoryTeaser } from "@/components/StoryTeaser";
-import { getPrimaryVisibleCategory, isHiddenCategory, isVisibleContentPost } from "@/lib/content";
+import {
+  getAthleteSportLabel,
+  getAthleteSpotlightLabel,
+  getPrimaryVisibleCategory,
+  getPublicTopicTags,
+  isAthleteSpotlightPost,
+  isHiddenCategory,
+  isVisibleContentPost
+} from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { absoluteUrl, getNewsArticleSchema, serializeJsonLd } from "@/lib/seo";
 import {
@@ -234,13 +242,16 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const author = await getPostAuthorWithProfile(post);
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
-  const tags = getPostTags(post);
-  const topicTerms = tags.length > 0 ? tags : getPostCategories(post).filter((postCategory) => !isHiddenCategory(postCategory));
+  const topicTags = getPublicTopicTags(post);
+  const topicTerms = topicTags.length > 0 ? topicTags : getPostCategories(post).filter((postCategory) => !isHiddenCategory(postCategory));
   const excerpt = post.excerpt.rendered.trim();
   const content = post.content.rendered.trim();
   const title = stripHtml(post.title.rendered);
   const articleUrl = absoluteUrl(getPostHref(post));
   const updated = hasUpdatedDate(post);
+  const athleteSpotlight = isAthleteSpotlightPost(post);
+  const athleteSpotlightLabel = athleteSpotlight ? getAthleteSpotlightLabel(post) : null;
+  const athleteSport = athleteSpotlight ? getAthleteSportLabel(post) : null;
   const visiblePosts = allPosts.filter(isVisibleContentPost);
   const authorPosts = author ? visiblePosts.filter((candidate) => candidate.author === author.id) : [];
   const relatedPosts = getRelatedPosts(post, visiblePosts);
@@ -266,6 +277,12 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           ) : null}
           <h1 dangerouslySetInnerHTML={{ __html: post.title.rendered }} />
           {excerpt ? <div className="article-excerpt" dangerouslySetInnerHTML={{ __html: excerpt }} /> : null}
+          {athleteSpotlightLabel || athleteSport ? (
+            <div className="article-athlete-meta" aria-label="Athlete spotlight details">
+              {athleteSpotlightLabel ? <span>{athleteSpotlightLabel}</span> : null}
+              {athleteSport ? <span>{athleteSport}</span> : null}
+            </div>
+          ) : null}
 
           <div className="article-meta-block">
             <p className="article-author-line">
