@@ -468,6 +468,14 @@ function wwh_attachment_fields_to_edit(array $form_fields, WP_Post $post): array
 {
     foreach (wwh_image_credit_fields() as $key => $label) {
         $is_url = wwh_string_ends_with($key, '_url');
+        $help = '';
+
+        if ($key === 'credit_text') {
+            $help = 'Example: Gibson Bell for Weekly Wildcat. This appears over the image on the public site.';
+        } elseif (in_array($key, ['copyright_notice', 'license_url', 'acquire_license_url'], true)) {
+            $help = 'Leave blank to use the sitewide Weekly Wildcat image license default.';
+        }
+
         $form_fields['ww_image_' . $key] = [
             'label' => $label,
             'input' => 'html',
@@ -477,7 +485,7 @@ function wwh_attachment_fields_to_edit(array $form_fields, WP_Post $post): array
                 $post->ID,
                 esc_attr($key),
                 esc_attr(wwh_image_meta_value($post->ID, $key)),
-                $key === 'credit_text' ? '<p class="help">Example: Gibson Bell for Weekly Wildcat. This appears over the image on the public site.</p>' : ''
+                $help !== '' ? sprintf('<p class="help">%s</p>', esc_html($help)) : ''
             ),
             'helps' => $key === 'creator' ? 'Usually the photographer or organization that created the image.' : '',
         ];
