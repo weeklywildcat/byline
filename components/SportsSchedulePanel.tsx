@@ -99,7 +99,6 @@ function LatestResultCard({ game }: { game: SportsGame }) {
 
   return (
     <article className="field-game field-game-latest">
-      <div className="field-card-label">Latest Result</div>
       <div className="field-game-topline">
         <span>{getSportLevel(game)}</span>
         <span>{game.display.status || "Final"}</span>
@@ -147,12 +146,11 @@ function NextUpCard({ game }: { game: SportsGame }) {
   const location = getGameLocation(game);
   const siteLabel = getSiteLabel(game);
   const context = getEditorialContext(game);
-  const href = game.recapUrl || "/category/sports/";
+  const href = game.recapUrl || "/sports/schedule/";
   const linkText = game.recapUrl ? "Preview matchup →" : "View schedule →";
 
   return (
     <article className="field-game field-game-next">
-      <div className="field-card-label">Next Up</div>
       <div className="field-game-topline">
         <span>{getSportLevel(game)}</span>
         <span>{game.display.status || "Upcoming"}</span>
@@ -204,7 +202,7 @@ export function SportsSchedulePanel({ recentScores, upcomingGames }: SportsSched
     <aside className="field-schedule" aria-labelledby="field-schedule-heading">
       <div className="field-schedule-header">
         <h3 id="field-schedule-heading">SCORES &amp; SCHEDULE</h3>
-        <a href="/category/sports/">FULL SCHEDULE →</a>
+        <a href="/sports/schedule/">FULL SCHEDULE →</a>
       </div>
 
       <div className={`field-schedule-layout field-schedule-layout-${columnCount}`}>
