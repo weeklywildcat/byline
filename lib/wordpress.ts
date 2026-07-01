@@ -97,6 +97,13 @@ export type WordPressMedia = {
       credit?: string;
     };
   };
+  weeklyWildcatImage?: {
+    creator: string;
+    creditText: string;
+    copyrightNotice: string;
+    licenseUrl: string;
+    acquireLicensePage: string;
+  };
   source_url: string;
 };
 

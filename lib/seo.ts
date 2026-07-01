@@ -232,6 +232,7 @@ function getArticleImageSchema(image: WordPressMedia | null) {
     return [
       {
         "@type": "ImageObject",
+        contentUrl: absoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
         url: absoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
         width: DEFAULT_SOCIAL_IMAGE_WIDTH,
         height: DEFAULT_SOCIAL_IMAGE_HEIGHT
@@ -239,13 +240,32 @@ function getArticleImageSchema(image: WordPressMedia | null) {
     ];
   }
 
+  const imageCredit = image.weeklyWildcatImage;
+  const creator = imageCredit?.creator;
+  const copyrightNotice =
+    imageCredit?.copyrightNotice || stripHtml(image.media_details?.image_meta?.copyright ?? "");
+  const creditText =
+    imageCredit?.creditText ||
+    stripHtml(image.media_details?.image_meta?.credit || image.media_details?.image_meta?.copyright || "");
+
   return [
     {
       "@type": "ImageObject",
+      contentUrl: image.source_url,
       url: image.source_url,
       width: image.media_details?.width,
       height: image.media_details?.height,
-      caption: stripHtml(image.caption?.rendered ?? image.media_details?.image_meta?.caption ?? "") || undefined
+      caption: stripHtml(image.caption?.rendered ?? image.media_details?.image_meta?.caption ?? "") || undefined,
+      creator: creator
+        ? {
+            "@type": "Person",
+            name: creator
+          }
+        : undefined,
+      creditText: creditText || undefined,
+      copyrightNotice: copyrightNotice || undefined,
+      license: imageCredit?.licenseUrl || undefined,
+      acquireLicensePage: imageCredit?.acquireLicensePage || undefined
     }
   ];
 }
