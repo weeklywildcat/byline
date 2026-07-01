@@ -1,4 +1,5 @@
 import { HomepageStory } from "@/components/HomepageStory";
+import { SiteIcon } from "@/components/SiteIcon";
 import { SportsAthleteFeature } from "@/components/SportsAthleteFeature";
 import { SportsSchedulePanel } from "@/components/SportsSchedulePanel";
 import { filterPublicHomepagePosts, isAthleteSpotlightPost, isSpecialCoveragePost } from "@/lib/content";
@@ -142,7 +143,7 @@ export default async function HomePage() {
 
             {rightNowPosts.length > 0 ? (
               <aside className="top-stories-rail" aria-labelledby="right-now-heading">
-                <h2 id="right-now-heading">Right Now</h2>
+                <h2 id="right-now-heading">The Latest</h2>
                 <div className="right-now-list">
                   {rightNowPosts.map((post) => (
                     <HomepageStory key={post.id} post={post} variant="briefing" showAuthor />
@@ -299,17 +300,23 @@ export default async function HomePage() {
             <aside className="more-utility-rail" aria-label="Weekly Wildcat links">
               <p className="more-rail-label">Weekly Wildcat</p>
               <div className="more-utility-block">
-                <h3>Join the Staff</h3>
+                <div className="more-utility-block-heading">
+                  <SiteIcon name="ph:pencil-line" width={18} height={18} />
+                  <h3>Join the Staff</h3>
+                </div>
                 <p>Write, photograph, design, or help shape student journalism at NSHS.</p>
                 <a href="/join/">Learn More →</a>
               </div>
               <div className="more-utility-block">
-                <h3>Stay Connected</h3>
+                <div className="more-utility-block-heading">
+                  <SiteIcon name="ph:chat-circle-dots" width={18} height={18} />
+                  <h3>Stay Connected</h3>
+                </div>
                 <nav className="more-connect-links" aria-label="Stay connected">
                   <a href="https://www.instagram.com/theweeklywildcat" target="_blank" rel="noreferrer">
                     Instagram
                   </a>
-                  <a href="https://www.tiktok.com/@theweeklywildcat" target="_blank" rel="noreferrer">
+                  <a href="https://www.tiktok.com/@weeklywildcat" target="_blank" rel="noreferrer">
                     TikTok
                   </a>
                   <a href="/contact/">Email / Newsletter</a>

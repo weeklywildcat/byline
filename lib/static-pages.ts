@@ -25,37 +25,55 @@ export const STATIC_PAGES: StaticPage[] = [
     title: "About Us",
     eyebrow: "Weekly Wildcat",
     description:
-      "Weekly Wildcat is Ninety Six High School's official student newspaper, built by students to cover the people, events, ideas and moments that shape campus life.",
+      "Weekly Wildcat is Ninety Six High School's student newspaper, created to tell the stories of our school with care, curiosity and a local voice.",
     sections: [
       {
-        title: "Our Mission",
+        title: "What We Do",
         body:
-          "We publish student-centered reporting that is accurate, useful and rooted in the Ninety Six community. Our coverage includes school news, sports, opinion, features, arts and culture, and the everyday stories that make the school feel alive."
+          "We cover the people, events, teams, clubs, decisions and everyday moments that shape life at Ninety Six High School. Some stories are big campus updates. Others are smaller pieces that help readers understand what students are doing, building, debating and celebrating."
       },
       {
-        title: "How We Work",
+        title: "A Student Newsroom",
         body:
-          "The newsroom is designed as a learning space for student writers, editors, photographers and designers. Stories are edited for clarity, fairness and accuracy before publication."
+          "Weekly Wildcat is written, photographed, edited and designed by students. The newsroom is a place to learn by doing: asking better questions, checking facts, revising drafts, meeting deadlines and paying attention to the community around us."
+      },
+      {
+        title: "Our Standards",
+        body:
+          "We want our work to be fair, accurate and useful. That means listening closely, giving people a chance to respond, correcting mistakes when they happen and making sure opinion pieces are clearly presented as opinion."
+      },
+      {
+        title: "Be Part of It",
+        body:
+          "Readers can help by sending story ideas, sharing photos, pointing us toward events or joining the staff. A stronger school newspaper starts with more people noticing what deserves to be covered."
       }
     ],
-    actions: [{ label: "Meet Our Writers", href: "/authors/" }]
+    actions: [
+      { label: "Meet Our Writers", href: "/authors/" },
+      { label: "Join the Staff", href: "/join/" }
+    ]
   },
   {
     slug: "advertise",
     title: "Advertise with Us",
     eyebrow: "Partnerships",
     description:
-      "Weekly Wildcat offers a local way to reach students, families, staff and community members who follow Ninety Six High School news.",
+      "Reach families, students, staff and local readers who care about Ninety Six High School and the community around it.",
     sections: [
       {
-        title: "Who We Reach",
+        title: "A Local Audience",
         body:
-          "Our audience includes students, parents, alumni, faculty, local businesses and community supporters who care about school news and student life."
+          "Weekly Wildcat is read by people who are already paying attention to school life: parents checking updates, students following campus news, alumni keeping up with Ninety Six, and community members who want to support local student work."
       },
       {
-        title: "Advertising Approach",
+        title: "What Advertising Supports",
         body:
-          "Advertising and sponsorship opportunities should support the publication while respecting the editorial independence of the student newsroom."
+          "Advertising helps us keep building a better student newspaper. It supports reporting, photography, design tools, web costs and the everyday work that goes into publishing stories by and for students."
+      },
+      {
+        title: "Let’s Talk",
+        body:
+          "If your business, organization or group is interested in advertising with Weekly Wildcat, reach out and tell us what you have in mind. We can talk through options that fit the publication and make sense for your audience."
       }
     ],
     actions: [{ label: "Contact Us", href: "/contact/" }]
@@ -65,17 +83,27 @@ export const STATIC_PAGES: StaticPage[] = [
     title: "Join Our Team",
     eyebrow: "Newsroom",
     description:
-      "Weekly Wildcat is open to students interested in writing, photography, design, editing, sports coverage, opinion, social media or campus storytelling.",
+      "Weekly Wildcat is open to students who want to report, write, photograph, edit, design, make videos, cover sports or help tell the story of Ninety Six High School.",
     sections: [
       {
-        title: "Who Should Join",
+        title: "You Don’t Have to Be an Expert",
         body:
-          "You do not need to be a perfect writer to contribute. Curiosity, reliability, fairness and a willingness to revise are the qualities that matter most."
+          "You do not need to show up as a perfect writer, photographer or designer. Good staff members are curious, reliable, willing to listen and open to revision. If you care about the school and want to learn, there is a place for you."
       },
       {
-        title: "Ways to Contribute",
+        title: "Ways to Help",
         body:
-          "Students can report news, write columns, photograph events, cover games, build multimedia packages, pitch story ideas or help shape the look and feel of the publication."
+          "Students can report news, write features, cover games, take photos, make graphics, edit stories, create social videos, write opinion pieces, interview classmates or help run the website. You can start small and take on more as you get comfortable."
+      },
+      {
+        title: "What You’ll Learn",
+        body:
+          "Staff members practice interviewing, writing clearly, working with deadlines, editing for accuracy, using photos responsibly and building confidence with real published work. The goal is not just to make a newspaper; it is to help students become sharper communicators."
+      },
+      {
+        title: "How to Start",
+        body:
+          "Send us a note, talk to a current staff member or bring us a story idea. If you are not sure what you want to do yet, that is fine too. We can help you find a role that fits your interests."
       }
     ],
     actions: [{ label: "Get in Touch", href: "/contact/" }]
@@ -85,20 +113,33 @@ export const STATIC_PAGES: StaticPage[] = [
     title: "Leadership",
     eyebrow: "Newsroom",
     description:
-      "Weekly Wildcat leadership helps guide coverage, edit stories, support contributors and keep the publication focused on useful student journalism.",
+      "Weekly Wildcat leadership helps guide the newsroom, support student contributors and keep the publication focused on fair, useful student journalism.",
     sections: [
       {
-        title: "Editorial Responsibility",
+        title: "How Leadership Works",
         body:
-          "Editors and student leaders are responsible for helping stories become clear, fair and ready for publication while encouraging new voices across campus."
+          "Student leaders help decide what needs coverage, organize story assignments, review drafts and make sure work is ready for readers. Leadership is less about having the loudest voice and more about helping the newsroom do its best work."
       },
       {
-        title: "Staff Development",
+        title: "What Editors Do",
         body:
-          "Leadership is also about teaching: helping students learn interviewing, reporting, editing, photography, design, ethics and deadline habits."
+          "Editors help writers sharpen ideas, strengthen reporting, check details and make stories easier to follow. They also help with headlines, photos, layout, publishing decisions and the many small choices that shape how a story appears."
+      },
+      {
+        title: "Supporting New Voices",
+        body:
+          "A good student publication should make room for more than one kind of student. Weekly Wildcat leaders are expected to welcome new contributors, explain the process clearly and help students build confidence as they learn."
+      },
+      {
+        title: "Accountability",
+        body:
+          "Leadership also means taking responsibility when something needs to be fixed. If a story has an error, misses important context or raises a concern, we want to hear about it and review it carefully."
       }
     ],
-    actions: [{ label: "Join the Staff", href: "/join/" }]
+    actions: [
+      { label: "Join the Staff", href: "/join/" },
+      { label: "Contact Us", href: "/contact/" }
+    ]
   },
   {
     slug: "diversity-inclusion",
@@ -142,40 +183,145 @@ export const STATIC_PAGES: StaticPage[] = [
     title: "Terms of Service",
     eyebrow: "Policies",
     description:
-      "These terms describe the basic expectations for using the Weekly Wildcat website and its published content.",
+      "These terms explain how readers may use the Weekly Wildcat website and what to expect from our published content.",
     sections: [
       {
-        title: "Use of the Site",
+        title: "Effective Date",
+        body: "These terms are effective July 1, 2026. By using weeklywildcat.com, you agree to use the site in a lawful and respectful way."
+      },
+      {
+        title: "About This Site",
         body:
-          "Weekly Wildcat content is provided for school news, information and community engagement. Readers should not misuse the site, attempt to disrupt it or republish full articles without permission."
+          "Weekly Wildcat is a student newspaper serving Ninety Six High School and its community. The site publishes school news, sports coverage, features, opinion, photos and other student-produced journalism."
       },
       {
         title: "Editorial Content",
+        body: [
+          "We work to publish information that is accurate, fair and useful at the time it appears. News stories, features, photos, headlines and other editorial content may be updated, corrected or removed when needed.",
+          "Opinion pieces reflect the views of the credited writers. They do not necessarily represent every student, staff member, adviser, administrator or reader."
+        ]
+      },
+      {
+        title: "Corrections and Concerns",
         body:
-          "Articles, photos and other editorial materials are published for informational purposes. Opinions belong to the credited writers and do not necessarily represent every member of the school community."
+          "If you believe something on the site is inaccurate, incomplete, unfair or raises a privacy concern, contact us with the story title, the issue and any helpful context. We will review good-faith concerns and correct the record when appropriate."
+      },
+      {
+        title: "Using Our Work",
+        body:
+          "Unless otherwise noted, Weekly Wildcat articles, photos, graphics, logos and page designs may not be copied, republished, sold or used in full without permission. Sharing links to our stories is welcome. Short excerpts may be used with clear credit and a link back to the original story."
+      },
+      {
+        title: "Reader Submissions",
+        body:
+          "When you send us a story idea, correction, photo, tip, letter, comment, advertising inquiry or other message, you give Weekly Wildcat permission to review it and follow up. Submitting something does not guarantee that it will be published."
+      },
+      {
+        title: "Advertising and Sponsorships",
+        body:
+          "Advertising and sponsorships help support the publication, but advertisers do not control our editorial coverage. Weekly Wildcat may decline advertising that is inappropriate for a school community or does not fit the publication."
+      },
+      {
+        title: "External Links",
+        body:
+          "The site may link to outside websites, social platforms, forms, maps, videos or other services. Those sites are controlled by their own owners and policies. Weekly Wildcat is not responsible for their content, security or privacy practices."
+      },
+      {
+        title: "Prohibited Use",
+        body:
+          "Do not use the site to harass others, attempt to break into systems, scrape content at scale, upload harmful code, impersonate someone else, interfere with site operation or violate any law or school rule."
+      },
+      {
+        title: "No Guarantee",
+        body:
+          "We try to keep the site available and accurate, but we cannot promise that every page will always be current, complete, uninterrupted or error-free. The site is provided as a student publication and community information resource."
+      },
+      {
+        title: "Changes to These Terms",
+        body:
+          "We may update these terms as the publication and website grow. The newest version will be posted on this page."
       }
     ],
-    actions: [{ label: "Privacy Policy", href: "/privacy/" }]
+    actions: [
+      { label: "Privacy Policy", href: "/privacy/" },
+      { label: "Contact Us", href: "/contact/" }
+    ]
   },
   {
     slug: "privacy",
     title: "Privacy Policy",
     eyebrow: "Policies",
     description:
-      "Weekly Wildcat keeps the website simple and avoids unnecessary collection of reader information.",
+      "Weekly Wildcat keeps the website simple and avoids collecting personal information we do not need.",
     sections: [
       {
-        title: "Information We Use",
-        body:
-          "The public website is designed for reading school news. Basic analytics, hosting logs or embedded media providers may process standard technical information such as browser, device and page request data."
+        title: "Effective Date",
+        body: "This privacy policy is effective July 1, 2026. It explains what information may be collected when you visit weeklywildcat.com or contact Weekly Wildcat."
       },
       {
-        title: "Student Privacy",
+        title: "Information We Collect",
+        body: [
+          "You can read Weekly Wildcat without creating an account. The site does not offer public comments, reader profiles or user logins.",
+          "Like most websites, our hosting provider may automatically process basic technical information such as IP address, browser type, device information, referring page, pages requested and the time of a visit. This helps the site load, stay secure and troubleshoot problems."
+        ]
+      },
+      {
+        title: "Information You Send Us",
         body:
-          "Because Weekly Wildcat serves a school community, student privacy and careful publishing judgment matter. Concerns about published information should be sent to the newsroom for review."
+          "If you contact us, send a tip, request a correction, submit a photo, ask about advertising or join the staff, we may receive the name, email address, message and any files or details you choose to provide. We use that information to respond, review the request and run the publication."
+      },
+      {
+        title: "Student Names, Photos and Stories",
+        body: [
+          "Weekly Wildcat publishes student journalism about school life. Stories may include names, photos, quotes, teams, clubs, activities, awards, events and other information that is appropriate for publication in a school newspaper.",
+          "We try to use careful judgment, especially when coverage involves sensitive topics, younger students, discipline, health, safety or private family matters. If you have a concern about published student information, contact us so we can review it."
+        ]
+      },
+      {
+        title: "Cookies and Analytics",
+        body:
+          "The site is designed to work without reader accounts or advertising trackers. Some hosting, security, analytics, font, media or embedded services may use cookies or similar technologies to provide their services, measure traffic or protect the site."
+      },
+      {
+        title: "Outside Services",
+        body:
+          "Weekly Wildcat uses a WordPress CMS, static website hosting, local media assets and links to outside services such as social platforms, email, maps, videos or forms. When you follow an outside link or load third-party content, that service may collect information under its own privacy policy."
+      },
+      {
+        title: "How We Share Information",
+        body:
+          "We do not sell reader personal information. We may share information when needed to operate the site, respond to a request, work with school staff or advisers, protect safety, address misuse, comply with law or handle a correction or privacy concern."
+      },
+      {
+        title: "How Long We Keep Information",
+        body:
+          "Published stories may remain online as part of the public record of the student newspaper. Messages, tips, corrections, advertising inquiries and staff-interest notes may be kept as long as needed for newsroom, school, technical or recordkeeping purposes."
+      },
+      {
+        title: "Children’s Privacy",
+        body:
+          "Weekly Wildcat is a school newspaper website for a general school and community audience. We do not knowingly ask children under 13 to create accounts or provide personal information through the public site. If you believe a child has sent personal information that should be removed, contact us."
+      },
+      {
+        title: "Your Choices",
+        body:
+          "You may ask us to review a privacy concern, correct inaccurate information, remove certain submitted information or explain how a message you sent was used. Some published material may be retained when there is a legitimate editorial, school or recordkeeping reason."
+      },
+      {
+        title: "Security",
+        body:
+          "No website can guarantee perfect security, but we try to keep the public site simple and limit the information we collect. Do not send passwords, private account numbers, medical details or other sensitive information unless we specifically ask for it."
+      },
+      {
+        title: "Changes to This Policy",
+        body:
+          "We may update this privacy policy as the website, publication tools or school needs change. The newest version will be posted on this page."
       }
     ],
-    actions: [{ label: "Contact Us", href: "/contact/" }]
+    actions: [
+      { label: "Contact Us", href: "/contact/" },
+      { label: "Terms of Service", href: "/terms/" }
+    ]
   },
   {
     slug: "contact",

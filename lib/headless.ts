@@ -1,5 +1,12 @@
 import { getWordPressApiUrl } from "@/lib/wordpress";
 
+const HEADLESS_FETCH_CACHE_KEY =
+  process.env.WORDPRESS_FETCH_CACHE_KEY ||
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  process.env.CF_PAGES_COMMIT_SHA ||
+  process.env.NETLIFY_COMMIT_REF ||
+  String(Date.now());
+
 type QueryValue = string | number | boolean | undefined | null;
 
 export type SportsGameStatus = "upcoming" | "final" | "postponed" | "canceled";
@@ -93,6 +100,8 @@ async function headlessFetch<T>(path: string, query: Record<string, QueryValue> 
       url.searchParams.set(key, String(value));
     }
   });
+
+  url.searchParams.set("_ww_static_build", HEADLESS_FETCH_CACHE_KEY);
 
   const response = await fetch(url, {
     headers: {
