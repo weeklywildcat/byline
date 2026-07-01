@@ -179,6 +179,40 @@ export const STATIC_PAGES: StaticPage[] = [
     ]
   },
   {
+    slug: "image-license",
+    title: "Image License",
+    eyebrow: "Licensing",
+    description:
+      "Original Weekly Wildcat images are available under the Creative Commons Attribution 4.0 International license unless otherwise noted.",
+    sections: [
+      {
+        title: "Default Image License",
+        body:
+          "Unless a caption, credit line or image detail page says otherwise, original photographs and images published by Weekly Wildcat are licensed under the Creative Commons Attribution 4.0 International license."
+      },
+      {
+        title: "How to Credit Us",
+        body:
+          "When you reuse an image, include the credited creator when one is listed, name Weekly Wildcat, link back to the original story or image page when practical, and note if you changed the image."
+      },
+      {
+        title: "What CC BY 4.0 Allows",
+        body:
+          "CC BY 4.0 allows others to share and adapt licensed material, including for commercial purposes, as long as they give appropriate credit, link to the license and indicate if changes were made.",
+        actions: [{ label: "Read CC BY 4.0", href: "https://creativecommons.org/licenses/by/4.0/" }]
+      },
+      {
+        title: "Exceptions",
+        body:
+          "Some images may come from outside sources, school partners, public agencies, stock libraries or submitted materials. Those images may have different rights or restrictions. Follow the specific credit, caption or source note attached to that image."
+      }
+    ],
+    actions: [
+      { label: "Read CC BY 4.0", href: "https://creativecommons.org/licenses/by/4.0/" },
+      { label: "Contact Us", href: "/contact/" }
+    ]
+  },
+  {
     slug: "terms",
     title: "Terms of Service",
     eyebrow: "Policies",
