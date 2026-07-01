@@ -28,9 +28,9 @@ export function SiteHeader() {
         <span>Ninety Six, S.C.</span>
         <time dateTime={dateTime}>{headerDate}</time>
         <div className="header-tools" aria-label="Site tools">
-          <button className="search-button" type="button" aria-label="Search">
+          <a className="search-button" href="/search/" aria-label="Search">
             <SiteIcon name="ph:magnifying-glass" width={17} height={17} />
-          </button>
+          </a>
         </div>
       </div>
 
