@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Headless
  * Description: Headless CMS extensions for Weekly Wildcat sports schedules, scores, and school events.
- * Version: 0.1.4
+ * Version: 0.1.5
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -25,6 +25,22 @@ function wwh_author_social_fields(): array
         'linkedin' => 'LinkedIn',
         'x' => 'X',
     ];
+}
+
+function wwh_image_credit_fields(): array
+{
+    return [
+        'creator' => 'Image Creator',
+        'credit_text' => 'Credit Text',
+        'copyright_notice' => 'Copyright Notice',
+        'license_url' => 'License URL',
+        'acquire_license_url' => 'Acquire License URL',
+    ];
+}
+
+function wwh_string_ends_with(string $value, string $suffix): bool
+{
+    return $suffix === '' || substr($value, -strlen($suffix)) === $suffix;
 }
 
 function wwh_register_update_checker(): void
@@ -210,6 +226,23 @@ function wwh_register_post_meta(): void
     }
 }
 add_action('init', 'wwh_register_post_meta');
+
+function wwh_register_attachment_meta(): void
+{
+    foreach (array_keys(wwh_image_credit_fields()) as $key) {
+        register_post_meta(
+            'attachment',
+            '_ww_image_' . $key,
+            [
+                'single' => true,
+                'type' => 'string',
+                'show_in_rest' => false,
+                'auth_callback' => static fn() => current_user_can('upload_files'),
+            ]
+        );
+    }
+}
+add_action('init', 'wwh_register_attachment_meta');
 
 function wwh_add_meta_boxes(): void
 {
@@ -423,6 +456,55 @@ function wwh_update_meta(int $post_id, string $key, string $value): void
 
     update_post_meta($post_id, $key, $value);
 }
+
+function wwh_image_meta_value(int $attachment_id, string $key): string
+{
+    $value = get_post_meta($attachment_id, '_ww_image_' . $key, true);
+
+    return is_string($value) ? $value : '';
+}
+
+function wwh_attachment_fields_to_edit(array $form_fields, WP_Post $post): array
+{
+    foreach (wwh_image_credit_fields() as $key => $label) {
+        $is_url = wwh_string_ends_with($key, '_url');
+        $form_fields['ww_image_' . $key] = [
+            'label' => $label,
+            'input' => 'html',
+            'html' => sprintf(
+                '<input type="%s" class="text" name="attachments[%d][ww_image_%s]" value="%s">%s',
+                $is_url ? 'url' : 'text',
+                $post->ID,
+                esc_attr($key),
+                esc_attr(wwh_image_meta_value($post->ID, $key)),
+                $key === 'credit_text' ? '<p class="help">Example: Gibson Bell for Weekly Wildcat. This appears over the image on the public site.</p>' : ''
+            ),
+            'helps' => $key === 'creator' ? 'Usually the photographer or organization that created the image.' : '',
+        ];
+    }
+
+    return $form_fields;
+}
+add_filter('attachment_fields_to_edit', 'wwh_attachment_fields_to_edit', 10, 2);
+
+function wwh_attachment_fields_to_save(array $post, array $attachment): array
+{
+    if (!isset($post['ID'])) {
+        return $post;
+    }
+
+    $attachment_id = absint($post['ID']);
+
+    foreach (wwh_image_credit_fields() as $key => $_label) {
+        $field = 'ww_image_' . $key;
+        $value = isset($attachment[$field]) ? (string) $attachment[$field] : '';
+        $value = wwh_string_ends_with($key, '_url') ? esc_url_raw($value) : sanitize_text_field($value);
+        wwh_update_meta($attachment_id, '_ww_image_' . $key, $value);
+    }
+
+    return $post;
+}
+add_filter('attachment_fields_to_save', 'wwh_attachment_fields_to_save', 10, 2);
 
 function wwh_update_score_meta(int $post_id, string $key, string $value): void
 {
@@ -682,8 +764,30 @@ function wwh_register_rest_routes(): void
             'context' => ['view', 'edit'],
         ],
     ]);
+
+    register_rest_field('attachment', 'weeklyWildcatImage', [
+        'get_callback' => 'wwh_rest_image_credit',
+        'schema' => [
+            'description' => 'Weekly Wildcat image credit and license metadata.',
+            'type' => 'object',
+            'context' => ['view', 'edit'],
+        ],
+    ]);
 }
 add_action('rest_api_init', 'wwh_register_rest_routes');
+
+function wwh_rest_image_credit(array $attachment): array
+{
+    $attachment_id = isset($attachment['id']) ? absint($attachment['id']) : 0;
+
+    return [
+        'creator' => wwh_image_meta_value($attachment_id, 'creator'),
+        'creditText' => wwh_image_meta_value($attachment_id, 'credit_text'),
+        'copyrightNotice' => wwh_image_meta_value($attachment_id, 'copyright_notice'),
+        'licenseUrl' => wwh_image_meta_value($attachment_id, 'license_url'),
+        'acquireLicensePage' => wwh_image_meta_value($attachment_id, 'acquire_license_url'),
+    ];
+}
 
 function wwh_rest_author_profile(array $user): array
 {
