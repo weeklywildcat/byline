@@ -5,7 +5,8 @@ const WORDPRESS_FETCH_CACHE_KEY =
   process.env.VERCEL_GIT_COMMIT_SHA ||
   process.env.CF_PAGES_COMMIT_SHA ||
   process.env.NETLIFY_COMMIT_REF ||
-  String(Date.now());
+  "";
+const WORDPRESS_FETCH_USER_AGENT = "Weekly Wildcat Static Site Builder (https://weeklywildcat.com)";
 
 type QueryValue = string | number | boolean | undefined | null;
 
@@ -157,14 +158,23 @@ async function wpFetch<T>(path: string, query: Record<string, QueryValue> = {}) 
     }
   });
 
-  url.searchParams.set("_ww_static_build", WORDPRESS_FETCH_CACHE_KEY);
+  if (WORDPRESS_FETCH_CACHE_KEY) {
+    url.searchParams.set("_ww_static_build", WORDPRESS_FETCH_CACHE_KEY);
+  }
 
-  const response = await fetch(url, {
+  const fetchOptions: RequestInit = {
     headers: {
-      Accept: "application/json"
+      Accept: "application/json",
+      "User-Agent": WORDPRESS_FETCH_USER_AGENT
     },
     cache: process.env.NODE_ENV === "development" ? "no-store" : "force-cache"
-  });
+  };
+  let response = await fetch(url, fetchOptions);
+
+  if (response.status === 403 && url.searchParams.has("_ww_static_build")) {
+    url.searchParams.delete("_ww_static_build");
+    response = await fetch(url, fetchOptions);
+  }
 
   if (!response.ok) {
     throw new Error(`WordPress request failed: ${response.status} ${response.statusText} (${url})`);
