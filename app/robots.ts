@@ -11,6 +11,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/"
     },
     host: getSiteUrl(),
-    sitemap: absoluteUrl("/sitemap.xml")
+    sitemap: [absoluteUrl("/sitemap.xml"), absoluteUrl("/news-sitemap.xml")]
   };
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";
-import { getOrganizationSchema, serializeJsonLd } from "@/lib/seo";
+import { getOrganizationSchema, SEO_ROBOTS_PREVIEW, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
 import { getSiteUrl } from "@/lib/wordpress";
 
 export const metadata: Metadata = {
@@ -11,7 +11,16 @@ export const metadata: Metadata = {
     default: "Weekly Wildcat",
     template: "%s | Weekly Wildcat"
   },
-  description: "Student journalism from the Weekly Wildcat newsroom."
+  description: SITE_DESCRIPTION,
+  robots: SEO_ROBOTS_PREVIEW,
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" }
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
+  }
 };
 
 export default async function RootLayout({

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AuthorBadge } from "@/components/AuthorBadge";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
+import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import {
   getAllAuthors,
   getAuthorHref,
@@ -12,8 +13,11 @@ import {
 } from "@/lib/wordpress";
 
 export const metadata: Metadata = {
-  title: "Authors",
-  description: "Meet the Weekly Wildcat writers and contributors."
+  ...buildPageMetadata({
+    title: "Authors",
+    description: "Meet the Weekly Wildcat writers and contributors.",
+    path: "/authors/"
+  })
 };
 
 async function getAuthorCards() {
@@ -59,9 +63,18 @@ function AuthorCard({ author, storyCount }: { author: WordPressAuthor; storyCoun
 
 export default async function AuthorsPage() {
   const authorCards = await getAuthorCards();
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: "Authors", path: "/authors/" }
+  ]);
 
   return (
     <main className="section-page-shell authors-page-shell">
+      <script
+        id="authors-breadcrumb-json-ld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
+      />
       <header className="section-heading">
         <div>
           <h1>Authors</h1>

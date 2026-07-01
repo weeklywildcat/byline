@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { absoluteUrl, serializeJsonLd } from "@/lib/seo";
+import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getStaticPage, STATIC_PAGES } from "@/lib/static-pages";
 
 type StaticPageProps = {
@@ -29,13 +29,11 @@ export async function generateMetadata({ params }: StaticPageProps): Promise<Met
     return {};
   }
 
-  return {
+  return buildPageMetadata({
     title: page.title,
     description: page.description,
-    alternates: {
-      canonical: `/${page.slug}/`
-    }
-  };
+    path: `/${page.slug}/`
+  });
 }
 
 export default async function StaticPage({ params }: StaticPageProps) {
@@ -53,6 +51,10 @@ export default async function StaticPage({ params }: StaticPageProps) {
     description: page.description,
     url: absoluteUrl(`/${page.slug}/`)
   };
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: page.title, path: `/${page.slug}/` }
+  ]);
 
   return (
     <main className="static-page-shell">
@@ -60,6 +62,11 @@ export default async function StaticPage({ params }: StaticPageProps) {
         id="static-page-json-ld"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(pageSchema) }}
+      />
+      <script
+        id="static-page-breadcrumb-json-ld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
       />
       <article className="static-page">
         <header className="static-page-header">
