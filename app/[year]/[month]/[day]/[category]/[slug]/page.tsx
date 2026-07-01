@@ -14,9 +14,9 @@ import {
   getAuthorProfile,
   getAuthorSocialLinks,
   getFeaturedMedia,
-  getPostAuthor,
   getPostBySlug,
   getPostCategories,
+  getPostAuthorWithProfile,
   getPostHref,
   getPostRouteParts,
   getPostTags,
@@ -231,7 +231,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     notFound();
   }
 
-  const author = getPostAuthor(post);
+  const author = await getPostAuthorWithProfile(post);
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
   const tags = getPostTags(post);
