@@ -115,12 +115,7 @@ export const STATIC_PAGES: StaticPage[] = [
       {
         title: "Accessibility",
         body:
-          "Our website should be readable and usable for as many people as possible. We aim for clear typography, strong contrast, useful image alt text, captions or transcripts when possible, mobile-friendly pages and a clear way to report accessibility barriers when something is not working."
-      },
-      {
-        title: "Inclusive Coverage Standards",
-        body:
-          "Writers should use people's stated names and pronouns, verify terminology when needed, avoid unnecessary identifiers and let people speak for themselves rather than being spoken about. Details about identity should appear when they are relevant to the story, not as decoration or assumption."
+          "Readers should be able to follow Weekly Wildcat without fighting the page. If something is hard to read, hard to navigate, missing useful context or not working well on your device, we want to hear about it so we can make the site better."
       },
       {
         title: "Help Us Do Better",
@@ -139,11 +134,6 @@ export const STATIC_PAGES: StaticPage[] = [
         ],
         tone: "featured",
         actions: [{ label: "Join the Newsroom", href: "/join/" }]
-      },
-      {
-        title: "Progress & Accountability",
-        body:
-          "This page is meant to grow with the newsroom. Each year, we can update it with coverage goals, accessibility improvements, newsroom policy changes and areas where Weekly Wildcat still needs to improve."
       }
     ]
   },
