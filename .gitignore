@@ -4,6 +4,7 @@
 .next/
 out/
 node_modules/
+wordpress/
 *.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
