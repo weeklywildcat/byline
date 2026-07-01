@@ -19,6 +19,8 @@ export const ORGANIZATION_LOGO_HEIGHT = 1024;
 export const DEFAULT_SOCIAL_IMAGE_PATH = "/social-default.png";
 export const DEFAULT_SOCIAL_IMAGE_WIDTH = 1200;
 export const DEFAULT_SOCIAL_IMAGE_HEIGHT = 630;
+export const DEFAULT_IMAGE_LICENSE_PATH = "/image-license/";
+export const DEFAULT_IMAGE_COPYRIGHT_NOTICE = "© Weekly Wildcat";
 export const SEO_ROBOTS_PREVIEW: Metadata["robots"] = {
   googleBot: {
     index: true,
@@ -235,7 +237,10 @@ function getArticleImageSchema(image: WordPressMedia | null) {
         contentUrl: absoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
         url: absoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
         width: DEFAULT_SOCIAL_IMAGE_WIDTH,
-        height: DEFAULT_SOCIAL_IMAGE_HEIGHT
+        height: DEFAULT_SOCIAL_IMAGE_HEIGHT,
+        copyrightNotice: DEFAULT_IMAGE_COPYRIGHT_NOTICE,
+        license: absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH),
+        acquireLicensePage: absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH)
       }
     ];
   }
@@ -243,7 +248,9 @@ function getArticleImageSchema(image: WordPressMedia | null) {
   const imageCredit = image.weeklyWildcatImage;
   const creator = imageCredit?.creator;
   const copyrightNotice =
-    imageCredit?.copyrightNotice || stripHtml(image.media_details?.image_meta?.copyright ?? "");
+    imageCredit?.copyrightNotice ||
+    stripHtml(image.media_details?.image_meta?.copyright ?? "") ||
+    DEFAULT_IMAGE_COPYRIGHT_NOTICE;
   const creditText =
     imageCredit?.creditText ||
     stripHtml(image.media_details?.image_meta?.credit || image.media_details?.image_meta?.copyright || "");
@@ -263,9 +270,9 @@ function getArticleImageSchema(image: WordPressMedia | null) {
           }
         : undefined,
       creditText: creditText || undefined,
-      copyrightNotice: copyrightNotice || undefined,
-      license: imageCredit?.licenseUrl || undefined,
-      acquireLicensePage: imageCredit?.acquireLicensePage || undefined
+      copyrightNotice,
+      license: imageCredit?.licenseUrl || absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH),
+      acquireLicensePage: imageCredit?.acquireLicensePage || absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH)
     }
   ];
 }
