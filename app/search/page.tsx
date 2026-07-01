@@ -2,13 +2,18 @@ import type { Metadata } from "next";
 import { SearchPageClient, type SearchIndexItem } from "@/components/SearchPageClient";
 import { filterVisibleContentPosts, getPrimaryVisibleCategory, getPublicTopicTags } from "@/lib/content";
 import { formatDisplayDate, stripHtml } from "@/lib/format";
+import { buildPageMetadata } from "@/lib/seo";
 import { getAllPosts, getPostAuthor, getPostHref } from "@/lib/wordpress";
 
 export const dynamic = "force-static";
 
 export const metadata: Metadata = {
-  title: "Search",
-  description: "Search Weekly Wildcat stories by headline, author, section, or topic."
+  ...buildPageMetadata({
+    title: "Search",
+    description: "Search Weekly Wildcat stories by headline, author, section, or topic.",
+    path: "/search/",
+    noIndex: true
+  })
 };
 
 function getSearchExcerpt(value: string) {

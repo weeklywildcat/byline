@@ -4,7 +4,7 @@ import { AuthorBadge } from "@/components/AuthorBadge";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
-import { absoluteUrl, serializeJsonLd } from "@/lib/seo";
+import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import {
   getAllAuthors,
   getAuthorBySlug,
@@ -42,14 +42,15 @@ export async function generateMetadata({ params }: AuthorPageProps): Promise<Met
   const description = author.description
     ? stripHtml(author.description)
     : `Stories by ${author.name} for Weekly Wildcat.`;
+  const photo = getAuthorPhoto(author);
 
-  return {
+  return buildPageMetadata({
     title: author.name,
     description,
-    alternates: {
-      canonical: getAuthorHref(author)
-    }
-  };
+    path: getAuthorHref(author),
+    type: "profile",
+    image: photo ? { url: photo.url, width: photo.width, height: photo.height, alt: author.name } : undefined
+  });
 }
 
 function getWordCount(value: string) {
@@ -87,6 +88,11 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
       sameAs: socialLinks.filter((link) => !link.href.startsWith("mailto:")).map((link) => link.href)
     }
   };
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: "Authors", path: "/authors/" },
+    { name: author.name, path: getAuthorHref(author) }
+  ]);
 
   return (
     <main className="section-page-shell author-page-shell">
@@ -94,6 +100,11 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
         id="author-json-ld"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(authorSchema) }}
+      />
+      <script
+        id="author-breadcrumb-json-ld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
       />
       <header className="author-profile">
         {photo ? (

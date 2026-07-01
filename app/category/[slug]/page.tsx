@@ -4,6 +4,7 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import { filterVisibleContentPosts, isHiddenCategory } from "@/lib/content";
 import { decodeHtml, stripHtml } from "@/lib/format";
+import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getAllCategories, getCategoryBySlug, getPostsByCategory } from "@/lib/wordpress";
 
 type CategoryPageProps = {
@@ -32,10 +33,11 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
   const categoryName = decodeHtml(category.name);
 
-  return {
+  return buildPageMetadata({
     title: categoryName,
-    description: category.description ? stripHtml(category.description) : `Latest ${categoryName} stories.`
-  };
+    description: category.description ? stripHtml(category.description) : `Latest ${categoryName} stories from Weekly Wildcat.`,
+    path: `/category/${category.slug}/`
+  });
 }
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
@@ -55,9 +57,18 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const categoryName = decodeHtml(category.name);
   const categoryDescription = category.description ? stripHtml(category.description) : `${posts.length} published stories`;
   const hasStoryList = remainingPosts.length > 0;
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: categoryName, path: `/category/${category.slug}/` }
+  ]);
 
   return (
     <main className="section-page-shell">
+      <script
+        id="category-breadcrumb-json-ld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
+      />
       <SectionHeader title={categoryName} description={categoryDescription} level={1} />
 
       {leadPost ? (

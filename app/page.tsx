@@ -1,10 +1,18 @@
+import type { Metadata } from "next";
 import { HomepageStory } from "@/components/HomepageStory";
 import { SiteIcon } from "@/components/SiteIcon";
 import { SportsAthleteFeature } from "@/components/SportsAthleteFeature";
 import { SportsSchedulePanel } from "@/components/SportsSchedulePanel";
 import { filterPublicHomepagePosts, isAthleteSpotlightPost, isSpecialCoveragePost } from "@/lib/content";
 import { getRecentSportsGames, getUpcomingSportsGames, type SportsGame } from "@/lib/headless";
+import { buildPageMetadata, getWebsiteSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
 import { getFeaturedMedia, getAllPosts, getPostCategories, type WordPressPost } from "@/lib/wordpress";
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Weekly Wildcat",
+  description: SITE_DESCRIPTION,
+  path: "/"
+});
 
 function hasCategory(post: WordPressPost, slugs: string[]) {
   const slugSet = new Set(slugs);
@@ -87,6 +95,7 @@ async function getHomepageSportsSchedule() {
 
 export default async function HomePage() {
   const [allPosts, sportsSchedule] = await Promise.all([getAllPosts(), getHomepageSportsSchedule()]);
+  const websiteSchema = getWebsiteSchema();
   const posts = filterPublicHomepagePosts(allPosts);
   const usedPostIds = new Set<number>();
   const athleteSpotlightPost = posts.find(isAthleteSpotlightPost) ?? null;
@@ -128,6 +137,11 @@ export default async function HomePage() {
 
   return (
     <main className="live-home-shell">
+      <script
+        id="website-json-ld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteSchema) }}
+      />
       {leadPost ? (
         <section
           className={rightNowPosts.length > 0 ? "top-stories" : "top-stories top-stories-single"}

@@ -14,7 +14,7 @@ import {
   isVisibleContentPost
 } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
-import { absoluteUrl, getNewsArticleSchema, serializeJsonLd } from "@/lib/seo";
+import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, getNewsArticleSchema, serializeJsonLd } from "@/lib/seo";
 import {
   getAllPosts,
   getAuthorHref,
@@ -24,6 +24,7 @@ import {
   getFeaturedMedia,
   getPostBySlug,
   getPostCategories,
+  getPostAuthor,
   getPostAuthorWithProfile,
   getPostHref,
   getPostRouteParts,
@@ -61,21 +62,27 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
 
   const image = getFeaturedMedia(post);
   const title = stripHtml(post.title.rendered);
-  const description = stripHtml(post.excerpt.rendered || post.content.rendered).slice(0, 155);
+  const category = getPrimaryVisibleCategory(post);
+  const author = getPostAuthor(post);
+  const tags = getPublicTopicTags(post).map((tag) => stripHtml(tag.name));
+  const metadata = buildPageMetadata({
+    title,
+    description: post.excerpt.rendered || post.content.rendered,
+    path: getPostHref(post),
+    type: "article",
+    image
+  });
 
   return {
-    title,
-    description,
-    alternates: {
-      canonical: getPostHref(post)
-    },
+    ...metadata,
     openGraph: {
-      title,
-      description,
+      ...metadata.openGraph,
       type: "article",
       publishedTime: post.date,
       modifiedTime: post.modified,
-      images: image?.source_url ? [{ url: image.source_url }] : undefined
+      authors: author ? [author.name] : undefined,
+      section: category ? decodeHtml(category.name) : undefined,
+      tags
     }
   };
 }
@@ -260,6 +267,11 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     .filter((candidate) => candidate.id !== post.id && !relatedPostIds.has(candidate.id))
     .slice(0, 3);
   const newsArticleSchema = getNewsArticleSchema(post);
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    ...(category ? [{ name: decodeHtml(category.name), path: `/category/${category.slug}/` }] : []),
+    { name: title, path: getPostHref(post) }
+  ]);
 
   return (
     <main className="article-shell">
@@ -267,6 +279,11 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         id="newsarticle-json-ld"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(newsArticleSchema) }}
+      />
+      <script
+        id="article-breadcrumb-json-ld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
       />
       <article className="article-story">
         <header className="article-header">

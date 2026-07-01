@@ -63,12 +63,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7
     },
     {
-      url: absoluteUrl("/search/"),
-      lastModified: latestModified,
-      changeFrequency: "daily",
-      priority: 0.5
-    },
-    {
       url: absoluteUrl("/sports/schedule/"),
       lastModified: latestModified,
       changeFrequency: "daily",
