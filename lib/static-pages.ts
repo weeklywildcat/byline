@@ -5,7 +5,9 @@ export type StaticPageAction = {
 
 export type StaticPageSection = {
   title: string;
-  body: string;
+  body: string | string[];
+  tone?: "featured";
+  actions?: StaticPageAction[];
 };
 
 export type StaticPage = {
@@ -103,20 +105,47 @@ export const STATIC_PAGES: StaticPage[] = [
     title: "Diversity & Inclusion",
     eyebrow: "Standards",
     description:
-      "Weekly Wildcat aims to reflect the full Ninety Six High School community with fairness, care and respect.",
+      "Weekly Wildcat believes every student deserves to see their school and community represented accurately, fairly and fully. We want our newsroom to include voices, experiences and stories that are often overlooked.",
     sections: [
       {
-        title: "Coverage Commitment",
+        title: "What This Means in Practice",
         body:
-          "Student journalism is strongest when it includes many voices. We want our coverage to represent different grades, activities, teams, interests, backgrounds and perspectives."
+          "We will look beyond the easiest voices to quote and the most visible clubs, teams and leadership groups. That means seeking a range of perspectives, covering issues that affect different groups of students, avoiding stereotypes or tokenism, and making room for students whose stories are not always treated as front-page stories."
       },
       {
-        title: "Corrections and Care",
+        title: "Accessibility",
         body:
-          "When a story misses context or needs correction, readers are encouraged to contact the newsroom so we can review the concern and improve the work."
+          "Our website should be readable and usable for as many people as possible. We aim for clear typography, strong contrast, useful image alt text, captions or transcripts when possible, mobile-friendly pages and a clear way to report accessibility barriers when something is not working."
+      },
+      {
+        title: "Inclusive Coverage Standards",
+        body:
+          "Writers should use people's stated names and pronouns, verify terminology when needed, avoid unnecessary identifiers and let people speak for themselves rather than being spoken about. Details about identity should appear when they are relevant to the story, not as decoration or assumption."
+      },
+      {
+        title: "Help Us Do Better",
+        body: [
+          "Readers can suggest stories, flag coverage that felt inaccurate or exclusionary, request a correction, report an accessibility issue or share a concern without attaching their name.",
+          "When you reach out, tell us what happened and how you would like your name handled. We will take the concern seriously, review it carefully and correct the record when needed."
+        ],
+        tone: "featured",
+        actions: [{ label: "Share Feedback", href: "/contact/" }]
+      },
+      {
+        title: "Join the Newsroom",
+        body: [
+          "Weekly Wildcat is open to students of any background or experience level. We need writers, photographers, designers, illustrators, video creators, social media contributors and students with story ideas.",
+          "You do not have to arrive as an expert; you just have to be curious, fair and willing to learn."
+        ],
+        tone: "featured",
+        actions: [{ label: "Join the Newsroom", href: "/join/" }]
+      },
+      {
+        title: "Progress & Accountability",
+        body:
+          "This page is meant to grow with the newsroom. Each year, we can update it with coverage goals, accessibility improvements, newsroom policy changes and areas where Weekly Wildcat still needs to improve."
       }
-    ],
-    actions: [{ label: "Contact the Newsroom", href: "/contact/" }]
+    ]
   },
   {
     slug: "terms",

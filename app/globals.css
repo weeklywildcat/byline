@@ -1297,12 +1297,26 @@ img {
   gap: 0;
 }
 
-.static-page-content section {
+.static-page-section {
   border-bottom: 1px solid var(--rule);
   display: grid;
   gap: 24px;
   grid-template-columns: minmax(160px, 0.35fr) minmax(0, 1fr);
   padding: 22px 0;
+}
+
+.static-page-section > div {
+  display: grid;
+  gap: 12px;
+}
+
+.static-page-section-featured {
+  background: #171a21;
+  border-bottom: 0;
+  color: #fff;
+  gap: 28px;
+  margin: 20px 0;
+  padding: 24px;
 }
 
 .static-page-content h2 {
@@ -1320,6 +1334,37 @@ img {
   font-size: 1.02rem;
   line-height: 1.58;
   margin: 0;
+}
+
+.static-page-section-featured h2 {
+  color: #fff;
+}
+
+.static-page-section-featured p {
+  color: #eee8e1;
+  font-size: 1.08rem;
+}
+
+.static-page-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.static-page-section-actions a {
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 10px 12px;
+  text-transform: uppercase;
+}
+
+.static-page-section-actions a:hover {
+  background: #fff;
+  color: #171a21;
 }
 
 .static-page-actions {
@@ -3165,7 +3210,7 @@ p.home-story-deck {
 	  .field-layout,
 	  .schedule-game-card,
 	  .author-card-grid,
-	  .static-page-content section {
+	  .static-page-section {
 	    grid-template-columns: 1fr;
 	  }
 
@@ -3506,9 +3551,15 @@ p.home-story-deck {
     font-size: 1.02rem;
   }
 
-  .static-page-content section {
+  .static-page-section {
     gap: 9px;
     padding: 18px 0;
+  }
+
+  .static-page-section-featured {
+    gap: 14px;
+    margin: 16px 0;
+    padding: 18px;
   }
 
   .story-teaser-lead h2 {

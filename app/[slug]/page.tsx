@@ -17,6 +17,10 @@ export function generateStaticParams() {
   }));
 }
 
+function getSectionBody(body: string | string[]) {
+  return Array.isArray(body) ? body : [body];
+}
+
 export async function generateMetadata({ params }: StaticPageProps): Promise<Metadata> {
   const { slug } = await params;
   const page = getStaticPage(slug);
@@ -66,9 +70,27 @@ export default async function StaticPage({ params }: StaticPageProps) {
 
         <div className="static-page-content">
           {page.sections.map((section) => (
-            <section key={section.title}>
+            <section
+              className={
+                section.tone ? `static-page-section static-page-section-${section.tone}` : "static-page-section"
+              }
+              key={section.title}
+            >
               <h2>{section.title}</h2>
-              <p>{section.body}</p>
+              <div>
+                {getSectionBody(section.body).map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+                {section.actions?.length ? (
+                  <div className="static-page-section-actions">
+                    {section.actions.map((action) => (
+                      <a key={action.href} href={action.href}>
+                        {action.label}
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </section>
           ))}
         </div>
