@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Headless
  * Description: Headless CMS extensions for Weekly Wildcat sports schedules, scores, and school events.
- * Version: 0.1.9
+ * Version: 0.1.10
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -1926,7 +1926,7 @@ function wwh_rest_limit(WP_REST_Request $request): int
 {
     $limit = absint($request->get_param('per_page') ?: 20);
 
-    return min(100, max(1, $limit));
+    return max(1, $limit);
 }
 
 function wwh_now_local(): string
