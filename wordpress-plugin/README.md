@@ -13,8 +13,9 @@ Plain PHP WordPress plugin for Weekly Wildcat headless data.
   - `/wp-json/weekly-wildcat/v1/sports-games/upcoming`
   - `/wp-json/weekly-wildcat/v1/sports-games/recent`
   - `/wp-json/weekly-wildcat/v1/school-events`
+  - `/wp-json/weekly-wildcat/v1/authors`
 - WordPress user profile fields for author profiles:
-  - role, pronouns, Media Library profile photo, Founder badge, and social links
+  - role, pronouns, Media Library profile photo, Founder badge, author directory visibility, and social links
 
 The plugin does not render anything on the WordPress frontend. Editing stays inside the normal WordPress admin.
 
@@ -58,3 +59,4 @@ GitHub Actions packages `weekly-wildcat-headless.zip` and publishes it as a rele
 - School Events support scheduled and canceled statuses.
 - The Next.js frontend has typed helpers in `lib/headless.ts`.
 - Author profile data is exposed on public user REST responses as `weeklyWildcatProfile`.
+- Authors are exposed through `/weekly-wildcat/v1/authors` so contributors can appear before publishing a story. The author directory visibility checkbox is enabled by default and can be unchecked per user.

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Headless
  * Description: Headless CMS extensions for Weekly Wildcat sports schedules, scores, and school events.
- * Version: 0.1.11
+ * Version: 0.1.12
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -1752,6 +1752,16 @@ function wwh_render_author_profile_fields(WP_User $user): void
                 </label>
             </td>
         </tr>
+        <tr>
+            <th>Author Directory</th>
+            <td>
+                <label>
+                    <input type="checkbox" name="ww_author_show_in_directory" value="1" <?php checked(wwh_author_visible_in_directory($user->ID)); ?>>
+                    Show in author directory
+                </label>
+                <p class="description">Enabled by default so new contributors can appear before their first story is published.</p>
+            </td>
+        </tr>
         <?php foreach (wwh_author_social_fields() as $key => $label) : ?>
             <tr>
                 <th><label for="ww_author_social_<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></label></th>
@@ -1781,6 +1791,7 @@ function wwh_save_author_profile_fields(int $user_id): void
     wwh_update_user_meta($user_id, '_ww_author_role', wwh_request_value('ww_author_role'));
     wwh_update_user_meta($user_id, '_ww_author_pronouns', wwh_request_value('ww_author_pronouns'));
     wwh_update_user_meta($user_id, '_ww_author_founder', isset($_POST['ww_author_founder']) ? '1' : '');
+    update_user_meta($user_id, '_ww_author_show_in_directory', isset($_POST['ww_author_show_in_directory']) ? '1' : '0');
 
     $photo_id = isset($_POST['ww_author_photo_id']) ? absint($_POST['ww_author_photo_id']) : 0;
     wwh_update_user_meta($user_id, '_ww_author_photo_id', $photo_id > 0 ? (string) $photo_id : '');
@@ -1793,6 +1804,11 @@ function wwh_save_author_profile_fields(int $user_id): void
 }
 add_action('personal_options_update', 'wwh_save_author_profile_fields');
 add_action('edit_user_profile_update', 'wwh_save_author_profile_fields');
+
+function wwh_author_visible_in_directory(int $user_id): bool
+{
+    return get_user_meta($user_id, '_ww_author_show_in_directory', true) !== '0';
+}
 
 function wwh_update_user_meta(int $user_id, string $key, string $value): void
 {
@@ -1876,6 +1892,12 @@ function wwh_register_rest_routes(): void
         'permission_callback' => '__return_true',
     ]);
 
+    register_rest_route(WWH_REST_NAMESPACE, '/authors', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'wwh_rest_authors',
+        'permission_callback' => '__return_true',
+    ]);
+
     register_rest_field('user', 'weeklyWildcatProfile', [
         'get_callback' => 'wwh_rest_author_profile',
         'schema' => [
@@ -1923,14 +1945,51 @@ function wwh_rest_author_profile(array $user): array
         'pronouns' => wwh_author_meta_value($user_id, '_ww_author_pronouns'),
         'role' => wwh_author_meta_value($user_id, '_ww_author_role'),
         'founder' => wwh_author_meta_value($user_id, '_ww_author_founder') === '1',
+        'showInDirectory' => wwh_author_visible_in_directory($user_id),
         'profilePhoto' => wwh_author_profile_photo($photo_id),
         'socials' => $socials,
     ];
 }
 
+function wwh_rest_authors(): WP_REST_Response
+{
+    $users = get_users([
+        'orderby' => 'display_name',
+        'order' => 'ASC',
+        'fields' => 'all',
+    ]);
+    $authors = [];
+
+    foreach ($users as $user) {
+        if (!$user instanceof WP_User || !wwh_author_visible_in_directory((int) $user->ID)) {
+            continue;
+        }
+
+        $author = [
+            'id' => (int) $user->ID,
+            'name' => $user->display_name,
+            'slug' => $user->user_nicename,
+            'description' => get_user_meta((int) $user->ID, 'description', true),
+            'url' => $user->user_url,
+            'link' => get_author_posts_url((int) $user->ID, $user->user_nicename),
+            'weeklyWildcatProfile' => wwh_rest_author_profile(['id' => (int) $user->ID]),
+        ];
+
+        $authors[] = $author;
+    }
+
+    return rest_ensure_response($authors);
+}
+
 function wwh_rest_limit(WP_REST_Request $request): int
 {
-    $limit = absint($request->get_param('per_page') ?: 20);
+    $raw_limit = (string) $request->get_param('per_page');
+
+    if ($raw_limit === 'all' || $raw_limit === '-1') {
+        return -1;
+    }
+
+    $limit = absint($raw_limit ?: 20);
 
     return max(1, $limit);
 }
@@ -2143,7 +2202,7 @@ function wwh_rest_sports_game_facets(): WP_REST_Response
         'years' => $year_values,
         'sports' => array_values($sports),
         'summaries' => $summaries,
-        'dataUrl' => add_query_arg(['per_page' => 100, 'page' => 1], rest_url(WWH_REST_NAMESPACE . '/sports-games')),
+        'dataUrl' => add_query_arg(['per_page' => 'all', 'page' => 1], rest_url(WWH_REST_NAMESPACE . '/sports-games')),
     ]);
 }
 
