@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Headless
  * Description: Headless CMS extensions for Weekly Wildcat sports schedules, scores, and school events.
- * Version: 0.1.10
+ * Version: 0.1.11
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -1852,6 +1852,12 @@ function wwh_register_rest_routes(): void
         'permission_callback' => '__return_true',
     ]);
 
+    register_rest_route(WWH_REST_NAMESPACE, '/sports-games/facets', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'wwh_rest_sports_game_facets',
+        'permission_callback' => '__return_true',
+    ]);
+
     register_rest_route(WWH_REST_NAMESPACE, '/sports-games/upcoming', [
         'methods' => WP_REST_Server::READABLE,
         'callback' => 'wwh_rest_upcoming_sports_games',
@@ -1929,6 +1935,11 @@ function wwh_rest_limit(WP_REST_Request $request): int
     return max(1, $limit);
 }
 
+function wwh_rest_page(WP_REST_Request $request): int
+{
+    return max(1, absint($request->get_param('page') ?: 1));
+}
+
 function wwh_now_local(): string
 {
     return wp_date('Y-m-d\TH:i', null, wp_timezone());
@@ -1940,13 +1951,15 @@ function wwh_game_query_args(WP_REST_Request $request, array $overrides = []): a
         'post_type' => WWH_SPORTS_GAME_POST_TYPE,
         'post_status' => 'publish',
         'posts_per_page' => wwh_rest_limit($request),
+        'paged' => wwh_rest_page($request),
         'orderby' => 'meta_value',
         'meta_key' => '_ww_start_datetime',
         'order' => 'DESC',
-        'no_found_rows' => true,
+        'no_found_rows' => false,
     ];
 
     $status = sanitize_text_field((string) $request->get_param('status'));
+    $year = absint($request->get_param('year'));
     $sport_key = sanitize_text_field((string) ($request->get_param('sport_key') ?: $request->get_param('sportKey')));
     $meta_query = [];
 
@@ -1961,6 +1974,18 @@ function wwh_game_query_args(WP_REST_Request $request, array $overrides = []): a
         $meta_query[] = [
             'key' => '_ww_sport_key',
             'value' => $sport_key,
+        ];
+    }
+
+    if ($year >= 1900 && $year <= 2200) {
+        $meta_query[] = [
+            'key' => '_ww_start_datetime',
+            'value' => [
+                sprintf('%04d-01-01T00:00', $year),
+                sprintf('%04d-01-01T00:00', $year + 1),
+            ],
+            'compare' => 'BETWEEN',
+            'type' => 'CHAR',
         ];
     }
 
@@ -1982,10 +2007,11 @@ function wwh_event_query_args(WP_REST_Request $request): array
         'post_type' => WWH_SCHOOL_EVENT_POST_TYPE,
         'post_status' => 'publish',
         'posts_per_page' => wwh_rest_limit($request),
+        'paged' => wwh_rest_page($request),
         'orderby' => 'meta_value',
         'meta_key' => '_ww_event_start_datetime',
         'order' => 'ASC',
-        'no_found_rows' => true,
+        'no_found_rows' => false,
         'meta_query' => [
             [
                 'key' => '_ww_event_start_datetime',
@@ -2010,7 +2036,115 @@ function wwh_event_query_args(WP_REST_Request $request): array
 
 function wwh_rest_sports_games(WP_REST_Request $request): WP_REST_Response
 {
-    return rest_ensure_response(wwh_map_posts(new WP_Query(wwh_game_query_args($request)), 'wwh_format_sports_game'));
+    return wwh_rest_query_response(new WP_Query(wwh_game_query_args($request)), 'wwh_format_sports_game');
+}
+
+function wwh_summary_key(string $year = 'all', string $sport = 'all'): string
+{
+    return $year . '::' . $sport;
+}
+
+function wwh_empty_game_summary(): array
+{
+    return [
+        'games' => 0,
+        'upcoming' => 0,
+        'finals' => 0,
+        'wins' => 0,
+        'losses' => 0,
+        'ties' => 0,
+    ];
+}
+
+function wwh_add_game_to_summary(array &$summaries, string $key, string $status, ?int $wildcats_score, ?int $opponent_score): void
+{
+    if (!isset($summaries[$key])) {
+        $summaries[$key] = wwh_empty_game_summary();
+    }
+
+    $summaries[$key]['games']++;
+
+    if ($status === 'upcoming') {
+        $summaries[$key]['upcoming']++;
+    }
+
+    if ($status === 'final') {
+        $summaries[$key]['finals']++;
+
+        if ($wildcats_score !== null && $opponent_score !== null) {
+            if ($wildcats_score > $opponent_score) {
+                $summaries[$key]['wins']++;
+            } elseif ($wildcats_score < $opponent_score) {
+                $summaries[$key]['losses']++;
+            } else {
+                $summaries[$key]['ties']++;
+            }
+        }
+    }
+}
+
+function wwh_rest_sports_game_facets(): WP_REST_Response
+{
+    $query = new WP_Query([
+        'post_type' => WWH_SPORTS_GAME_POST_TYPE,
+        'post_status' => 'publish',
+        'posts_per_page' => -1,
+        'fields' => 'ids',
+        'no_found_rows' => true,
+        'orderby' => 'meta_value',
+        'meta_key' => '_ww_start_datetime',
+        'order' => 'DESC',
+    ]);
+    $years = [];
+    $sports = [];
+    $summaries = [];
+
+    foreach ($query->posts as $post_id) {
+        $post_id = absint($post_id);
+        $start = wwh_meta_value($post_id, '_ww_start_datetime');
+        $year = substr($start, 0, 4);
+        $sport_key = wwh_meta_value($post_id, '_ww_sport_key');
+        $sport_option = array_key_exists($sport_key, wwh_sports_team_options()) ? wwh_sports_team_options()[$sport_key] : null;
+        $sport_label = $sport_option['label'] ?? wwh_meta_value($post_id, '_ww_sport', $sport_key);
+        $status = wwh_effective_game_status(wwh_meta_value($post_id, '_ww_game_status', 'upcoming'), $start);
+        $wildcats_score_raw = wwh_meta_value($post_id, '_ww_wildcats_score');
+        $opponent_score_raw = wwh_meta_value($post_id, '_ww_opponent_score');
+        $show_score = $status === 'final' && $wildcats_score_raw !== '' && $opponent_score_raw !== '';
+        $wildcats_score = $show_score ? absint($wildcats_score_raw) : null;
+        $opponent_score = $show_score ? absint($opponent_score_raw) : null;
+
+        if ($year !== '') {
+            $years[$year] = true;
+        }
+
+        if ($sport_key !== '') {
+            $sports[$sport_key] = [
+                'value' => $sport_key,
+                'label' => $sport_label !== '' ? $sport_label : $sport_key,
+            ];
+        }
+
+        foreach ([
+            wwh_summary_key(),
+            wwh_summary_key($year !== '' ? $year : 'all', 'all'),
+            wwh_summary_key('all', $sport_key !== '' ? $sport_key : 'all'),
+            wwh_summary_key($year !== '' ? $year : 'all', $sport_key !== '' ? $sport_key : 'all'),
+        ] as $summary_key) {
+            wwh_add_game_to_summary($summaries, $summary_key, $status, $wildcats_score, $opponent_score);
+        }
+    }
+
+    wp_reset_postdata();
+    $year_values = array_keys($years);
+    rsort($year_values, SORT_STRING);
+    usort($sports, static fn(array $left, array $right): int => strcasecmp($left['label'], $right['label']));
+
+    return rest_ensure_response([
+        'years' => $year_values,
+        'sports' => array_values($sports),
+        'summaries' => $summaries,
+        'dataUrl' => add_query_arg(['per_page' => 100, 'page' => 1], rest_url(WWH_REST_NAMESPACE . '/sports-games')),
+    ]);
 }
 
 function wwh_rest_upcoming_sports_games(WP_REST_Request $request): WP_REST_Response
@@ -2031,7 +2165,7 @@ function wwh_rest_upcoming_sports_games(WP_REST_Request $request): WP_REST_Respo
         ],
     ]);
 
-    return rest_ensure_response(wwh_map_posts(new WP_Query($args), 'wwh_format_sports_game'));
+    return wwh_rest_query_response(new WP_Query($args), 'wwh_format_sports_game');
 }
 
 function wwh_rest_recent_sports_games(WP_REST_Request $request): WP_REST_Response
@@ -2059,12 +2193,22 @@ function wwh_rest_recent_sports_games(WP_REST_Request $request): WP_REST_Respons
         ],
     ]);
 
-    return rest_ensure_response(wwh_map_posts(new WP_Query($args), 'wwh_format_sports_game'));
+    return wwh_rest_query_response(new WP_Query($args), 'wwh_format_sports_game');
 }
 
 function wwh_rest_school_events(WP_REST_Request $request): WP_REST_Response
 {
-    return rest_ensure_response(wwh_map_posts(new WP_Query(wwh_event_query_args($request)), 'wwh_format_school_event'));
+    return wwh_rest_query_response(new WP_Query(wwh_event_query_args($request)), 'wwh_format_school_event');
+}
+
+function wwh_rest_query_response(WP_Query $query, callable $formatter): WP_REST_Response
+{
+    $response = rest_ensure_response(wwh_map_posts($query, $formatter));
+
+    $response->header('X-WP-Total', (string) $query->found_posts);
+    $response->header('X-WP-TotalPages', (string) max(1, (int) $query->max_num_pages));
+
+    return $response;
 }
 
 function wwh_map_posts(WP_Query $query, callable $formatter): array
