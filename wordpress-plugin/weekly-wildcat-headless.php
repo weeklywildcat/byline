@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Headless
  * Description: Headless CMS extensions for Weekly Wildcat sports schedules, scores, and school events.
- * Version: 0.1.7
+ * Version: 0.1.8
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -186,6 +186,11 @@ function wwh_register_post_meta(): void
         '_ww_opponent_score',
         '_ww_recap_url',
         '_ww_notes',
+        '_ww_import_key',
+        '_ww_import_season',
+        '_ww_import_date',
+        '_ww_import_time',
+        '_ww_import_game_type',
     ];
 
     foreach ($sports_keys as $key) {
@@ -237,8 +242,18 @@ function wwh_register_admin_pages(): void
         'wwh-sports-import',
         'wwh_render_sports_import_page'
     );
+
+    add_submenu_page(
+        'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE,
+        'Export Sports Games',
+        'Export Games',
+        'edit_posts',
+        'wwh-sports-export',
+        'wwh_render_sports_export_page'
+    );
 }
 add_action('admin_menu', 'wwh_register_admin_pages');
+add_action('admin_post_wwh_export_sports_games', 'wwh_export_sports_games');
 
 function wwh_sports_game_admin_columns(array $columns): array
 {
@@ -1061,6 +1076,184 @@ function wwh_render_sports_import_page(): void
     <?php
 }
 
+function wwh_render_sports_export_page(): void
+{
+    if (!current_user_can('edit_posts')) {
+        wp_die(esc_html__('Sorry, you are not allowed to export sports games.', 'weekly-wildcat-headless'));
+    }
+
+    $export_url = wp_nonce_url(
+        admin_url('admin-post.php?action=wwh_export_sports_games'),
+        'wwh_export_sports_games',
+        'wwh_sports_export_nonce'
+    );
+
+    ?>
+    <div class="wrap wwh-export-page">
+        <h1>Export Sports Games</h1>
+        <p>Download every sports game as a CSV file. The first columns match the importer format so the file can be edited and imported again.</p>
+        <p>
+            <a class="button button-primary" href="<?php echo esc_url($export_url); ?>">Download All Games CSV</a>
+        </p>
+    </div>
+    <?php
+}
+
+function wwh_export_sports_games(): void
+{
+    if (!current_user_can('edit_posts')) {
+        wp_die(esc_html__('Sorry, you are not allowed to export sports games.', 'weekly-wildcat-headless'));
+    }
+
+    check_admin_referer('wwh_export_sports_games', 'wwh_sports_export_nonce');
+
+    $filename = 'weekly-wildcat-sports-games-' . wp_date('Y-m-d') . '.csv';
+
+    nocache_headers();
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+    $output = fopen('php://output', 'w');
+
+    if (!$output) {
+        exit;
+    }
+
+    fputcsv($output, wwh_sports_export_columns());
+
+    $query = new WP_Query([
+        'post_type' => WWH_SPORTS_GAME_POST_TYPE,
+        'post_status' => ['publish', 'draft', 'pending', 'private', 'future'],
+        'posts_per_page' => -1,
+        'orderby' => 'title',
+        'order' => 'ASC',
+        'no_found_rows' => true,
+    ]);
+
+    foreach ($query->posts as $post) {
+        fputcsv($output, wwh_sports_export_row($post));
+    }
+
+    wp_reset_postdata();
+    fclose($output);
+    exit;
+}
+
+function wwh_sports_export_columns(): array
+{
+    return [
+        'Season',
+        'Date',
+        'Time',
+        'Site',
+        'Opponent',
+        'Result',
+        'Ninety Six Score',
+        'Opponent Score',
+        'Game Type',
+        'Watch Replay',
+        'Sport Key',
+        'Sport / Team',
+        'Status',
+        'Location Name',
+        'Location Address',
+        'Recap URL',
+        'Notes',
+        'Post ID',
+        'Post Status',
+    ];
+}
+
+function wwh_sports_export_row(WP_Post $post): array
+{
+    $sport_key = wwh_meta_value($post->ID, '_ww_sport_key');
+    $sport_option = array_key_exists($sport_key, wwh_sports_team_options()) ? wwh_sports_team_options()[$sport_key] : null;
+    $start = wwh_meta_value($post->ID, '_ww_start_datetime');
+    $date_time = wwh_export_date_time($post->ID, $start);
+    $wildcats_score = wwh_meta_value($post->ID, '_ww_wildcats_score');
+    $opponent_score = wwh_meta_value($post->ID, '_ww_opponent_score');
+    $recap_url = wwh_meta_value($post->ID, '_ww_recap_url');
+
+    return [
+        wwh_meta_value($post->ID, '_ww_import_season'),
+        $date_time['date'],
+        $date_time['time'],
+        wwh_label_from_value(wwh_meta_value($post->ID, '_ww_site', 'home')),
+        wwh_meta_value($post->ID, '_ww_opponent'),
+        wwh_export_result(wwh_meta_value($post->ID, '_ww_game_status', 'upcoming'), $wildcats_score, $opponent_score),
+        $wildcats_score,
+        $opponent_score,
+        wwh_meta_value($post->ID, '_ww_import_game_type'),
+        $recap_url !== '' ? $recap_url : wwh_export_note_value(wwh_meta_value($post->ID, '_ww_notes'), 'Watch replay'),
+        $sport_key,
+        $sport_option['label'] ?? wwh_meta_value($post->ID, '_ww_sport'),
+        wwh_label_from_value(wwh_meta_value($post->ID, '_ww_game_status', 'upcoming')),
+        wwh_meta_value($post->ID, '_ww_location_name', wwh_meta_value($post->ID, '_ww_location')),
+        wwh_meta_value($post->ID, '_ww_location_address'),
+        $recap_url,
+        wwh_meta_value($post->ID, '_ww_notes'),
+        (string) $post->ID,
+        $post->post_status,
+    ];
+}
+
+function wwh_export_date_time(int $post_id, string $start): array
+{
+    if ($start === '') {
+        return [
+            'date' => wwh_meta_value($post_id, '_ww_import_date', 'TBA'),
+            'time' => wwh_meta_value($post_id, '_ww_import_time', 'TBA'),
+        ];
+    }
+
+    $timestamp = strtotime(str_replace('T', ' ', $start));
+
+    if (!$timestamp) {
+        return [
+            'date' => $start,
+            'time' => '',
+        ];
+    }
+
+    return [
+        'date' => wp_date('Y-m-d', $timestamp, wp_timezone()),
+        'time' => wp_date('g:i A', $timestamp, wp_timezone()),
+    ];
+}
+
+function wwh_export_result(string $status, string $wildcats_score, string $opponent_score): string
+{
+    if ($status !== 'final' || $wildcats_score === '' || $opponent_score === '') {
+        return '';
+    }
+
+    $wildcats_score = absint($wildcats_score);
+    $opponent_score = absint($opponent_score);
+
+    if ($wildcats_score > $opponent_score) {
+        return 'W';
+    }
+
+    if ($wildcats_score < $opponent_score) {
+        return 'L';
+    }
+
+    return 'T';
+}
+
+function wwh_export_note_value(string $notes, string $label): string
+{
+    foreach (preg_split('/\r\n|\r|\n/', $notes) ?: [] as $line) {
+        $prefix = $label . ':';
+
+        if (stripos((string) $line, $prefix) === 0) {
+            return trim(substr((string) $line, strlen($prefix)));
+        }
+    }
+
+    return '';
+}
+
 function wwh_import_sports_games(string $sport_key, string $raw_data): array
 {
     $result = [
@@ -1219,7 +1412,8 @@ function wwh_import_sports_game_row(string $sport_key, array $row)
     $status = wwh_import_status((string) $row['result'], $wildcats_score, $opponent_score);
     $recap_url = wwh_import_recap_url((string) $row['watch_replay']);
     $notes = wwh_import_notes($row, $recap_url);
-    $post_id = wwh_find_existing_sports_game($sport_key, $start_datetime, $opponent);
+    $import_key = wwh_import_row_key($row);
+    $post_id = wwh_find_existing_sports_game($sport_key, $start_datetime, $opponent, $import_key);
     $title = wwh_import_game_title($sport_option['sport'], $site, $opponent);
     $post_data = [
         'post_type' => WWH_SPORTS_GAME_POST_TYPE,
@@ -1254,6 +1448,11 @@ function wwh_import_sports_game_row(string $sport_key, array $row)
     wwh_update_score_meta($saved_post_id, '_ww_opponent_score', $opponent_score);
     wwh_update_meta($saved_post_id, '_ww_recap_url', $recap_url);
     wwh_update_meta($saved_post_id, '_ww_notes', $notes);
+    wwh_update_meta($saved_post_id, '_ww_import_key', $import_key);
+    wwh_update_meta($saved_post_id, '_ww_import_season', (string) $row['season']);
+    wwh_update_meta($saved_post_id, '_ww_import_date', (string) $row['date']);
+    wwh_update_meta($saved_post_id, '_ww_import_time', (string) $row['time']);
+    wwh_update_meta($saved_post_id, '_ww_import_game_type', (string) $row['game_type']);
 
     return $mode;
 }
@@ -1402,7 +1601,29 @@ function wwh_import_notes(array $row, string $recap_url): string
     return implode("\n", $notes);
 }
 
-function wwh_find_existing_sports_game(string $sport_key, string $start_datetime, string $opponent): int
+function wwh_import_row_key(array $row): string
+{
+    $parts = [
+        (string) $row['season'],
+        (string) $row['date'],
+        (string) $row['time'],
+        (string) $row['site'],
+        (string) $row['opponent'],
+        (string) $row['game_type'],
+    ];
+
+    return md5(implode('|', array_map('wwh_normalize_import_key_part', $parts)));
+}
+
+function wwh_normalize_import_key_part(string $value): string
+{
+    $value = strtolower(trim($value));
+    $value = preg_replace('/\s+/', ' ', $value);
+
+    return is_string($value) ? $value : '';
+}
+
+function wwh_find_existing_sports_game(string $sport_key, string $start_datetime, string $opponent, string $import_key): int
 {
     $meta_query = [
         [
@@ -1419,6 +1640,11 @@ function wwh_find_existing_sports_game(string $sport_key, string $start_datetime
         $meta_query[] = [
             'key' => '_ww_start_datetime',
             'value' => $start_datetime,
+        ];
+    } else {
+        $meta_query[] = [
+            'key' => '_ww_import_key',
+            'value' => $import_key,
         ];
     }
 
