@@ -217,14 +217,26 @@ export function getWebsiteSchema() {
 }
 
 export function getBreadcrumbSchema(items: BreadcrumbItem[]) {
+  const breadcrumbItems = items
+    .map((item) => ({
+      name: item.name.trim(),
+      path: item.path
+    }))
+    .filter((item) => item.name && item.path);
+
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: items.map((item, index) => ({
+    name: "Breadcrumbs",
+    itemListElement: breadcrumbItems.map((item, index) => ({
       "@type": "ListItem",
       position: index + 1,
       name: item.name,
-      item: absoluteUrl(item.path)
+      item: {
+        "@type": "WebPage",
+        "@id": absoluteUrl(item.path),
+        name: item.name
+      }
     }))
   };
 }

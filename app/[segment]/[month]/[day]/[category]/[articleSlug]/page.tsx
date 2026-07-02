@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArticleShareActions } from "@/components/ArticleShareActions";
 import { AuthorBadge } from "@/components/AuthorBadge";
 import { FeaturedImage } from "@/components/FeaturedImage";
+import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import {
   getAthleteSportLabel,
@@ -31,16 +32,24 @@ import {
   getPostTags,
   type WordPressAuthor,
   type WordPressCategory,
-  type WordPressPost,
-  type PostRouteParts
+  type WordPressPost
 } from "@/lib/wordpress";
 
+type ArticleRouteParams = {
+  segment: string;
+  month: string;
+  day: string;
+  category: string;
+  articleSlug: string;
+};
+
 type ArticlePageProps = {
-  params: Promise<PostRouteParts>;
+  params: Promise<ArticleRouteParams>;
 };
 
 export const dynamicParams = false;
 const WORDS_PER_MINUTE = 225;
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 export async function generateStaticParams() {
   const posts = await getAllPosts();
@@ -48,13 +57,23 @@ export async function generateStaticParams() {
   return posts.filter(isVisibleContentPost).flatMap((post) => {
     const route = getPostRouteParts(post);
 
-    return route ? [route] : [];
+    return route
+      ? [
+          {
+            segment: route.year,
+            month: route.month,
+            day: route.day,
+            category: route.category,
+            articleSlug: route.slug
+          }
+        ]
+      : [];
   });
 }
 
 export async function generateMetadata({ params }: ArticlePageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const post = await getPostBySlug(slug);
+  const { articleSlug } = await params;
+  const post = await getPostBySlug(articleSlug);
 
   if (!post) {
     return {};
@@ -224,7 +243,7 @@ function AboutWriter({
 
 export default async function ArticlePage({ params }: ArticlePageProps) {
   const routeParams = await params;
-  const [post, allPosts] = await Promise.all([getPostBySlug(routeParams.slug), getAllPosts()]);
+  const [post, allPosts] = await Promise.all([getPostBySlug(routeParams.articleSlug), getAllPosts()]);
 
   if (!post) {
     notFound();
@@ -238,7 +257,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   if (
     !route ||
-    route.year !== routeParams.year ||
+    route.year !== routeParams.segment ||
     route.month !== routeParams.month ||
     route.day !== routeParams.day ||
     route.category !== routeParams.category
@@ -344,6 +363,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             <p>This story was updated after initial publication on {formatDisplayDate(post.modified)}.</p>
           </aside>
         ) : null}
+
+        <NewsletterSignupForm sourceTitle={title} sourceUrl={articleUrl} turnstileSiteKey={turnstileSiteKey} />
       </article>
 
       <div className="article-after">

@@ -5,7 +5,7 @@ import { getStaticPage, STATIC_PAGES } from "@/lib/static-pages";
 
 type StaticPageProps = {
   params: Promise<{
-    slug: string;
+    segment: string;
   }>;
 };
 
@@ -13,7 +13,7 @@ export const dynamicParams = false;
 
 export function generateStaticParams() {
   return STATIC_PAGES.map((page) => ({
-    slug: page.slug
+    segment: page.slug
   }));
 }
 
@@ -22,8 +22,8 @@ function getSectionBody(body: string | string[]) {
 }
 
 export async function generateMetadata({ params }: StaticPageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const page = getStaticPage(slug);
+  const { segment } = await params;
+  const page = getStaticPage(segment);
 
   if (!page) {
     return {};
@@ -37,8 +37,8 @@ export async function generateMetadata({ params }: StaticPageProps): Promise<Met
 }
 
 export default async function StaticPage({ params }: StaticPageProps) {
-  const { slug } = await params;
-  const page = getStaticPage(slug);
+  const { segment } = await params;
+  const page = getStaticPage(segment);
 
   if (!page) {
     notFound();
