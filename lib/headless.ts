@@ -1,3 +1,4 @@
+import { mirrorWordPressMediaInValue } from "@/lib/media";
 import { getWordPressApiUrl } from "@/lib/wordpress";
 
 const HEADLESS_FETCH_CACHE_KEY =
@@ -114,7 +115,7 @@ async function headlessFetch<T>(path: string, query: Record<string, QueryValue> 
     throw new Error(`Weekly Wildcat headless request failed: ${response.status} ${response.statusText} (${url})`);
   }
 
-  return (await response.json()) as T;
+  return mirrorWordPressMediaInValue((await response.json()) as T);
 }
 
 export function getSportsGames(query?: number | SportsGameQuery) {

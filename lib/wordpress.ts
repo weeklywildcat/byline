@@ -1,3 +1,5 @@
+import { mirrorWordPressMediaInValue } from "@/lib/media";
+
 const DEFAULT_WP_API_URL = "https://cms.weeklywildcat.com/wp-json/wp/v2";
 const DEFAULT_SITE_URL = "https://weeklywildcat.com";
 const WORDPRESS_FETCH_CACHE_KEY =
@@ -181,7 +183,7 @@ async function wpFetch<T>(path: string, query: Record<string, QueryValue> = {}) 
   }
 
   return {
-    data: (await response.json()) as T,
+    data: await mirrorWordPressMediaInValue((await response.json()) as T),
     totalPages: Number(response.headers.get("x-wp-totalpages") || "1")
   };
 }
