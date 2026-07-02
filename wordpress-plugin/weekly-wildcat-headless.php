@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Headless
  * Description: Headless CMS extensions for Weekly Wildcat sports schedules, scores, and school events.
- * Version: 0.1.5
+ * Version: 0.1.6
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -226,6 +226,19 @@ function wwh_register_post_meta(): void
     }
 }
 add_action('init', 'wwh_register_post_meta');
+
+function wwh_register_admin_pages(): void
+{
+    add_submenu_page(
+        'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE,
+        'Import Sports Games',
+        'Import Games',
+        'edit_posts',
+        'wwh-sports-import',
+        'wwh_render_sports_import_page'
+    );
+}
+add_action('admin_menu', 'wwh_register_admin_pages');
 
 function wwh_register_attachment_meta(): void
 {
@@ -571,6 +584,442 @@ function wwh_save_school_event(int $post_id): void
 }
 add_action('save_post_' . WWH_SCHOOL_EVENT_POST_TYPE, 'wwh_save_school_event');
 
+function wwh_render_sports_import_page(): void
+{
+    if (!current_user_can('edit_posts')) {
+        wp_die(esc_html__('Sorry, you are not allowed to import sports games.', 'weekly-wildcat-headless'));
+    }
+
+    $result = null;
+    $selected_sport_key = '';
+    $import_data = '';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wwh_sports_import_action'])) {
+        check_admin_referer('wwh_import_sports_games', 'wwh_sports_import_nonce');
+
+        $selected_sport_key = wwh_sanitize_sport_key(wwh_request_value('ww_sport_key'));
+        $import_data = isset($_POST['wwh_import_data']) ? (string) wp_unslash($_POST['wwh_import_data']) : '';
+
+        if (trim($import_data) === '' && isset($_FILES['wwh_import_file']['tmp_name'], $_FILES['wwh_import_file']['error']) && $_FILES['wwh_import_file']['error'] === UPLOAD_ERR_OK) {
+            $uploaded = file_get_contents((string) $_FILES['wwh_import_file']['tmp_name']);
+            $import_data = is_string($uploaded) ? $uploaded : '';
+        }
+
+        $result = wwh_import_sports_games($selected_sport_key, $import_data);
+    }
+
+    $team_options = ['' => 'Select a sport / team'];
+
+    foreach (wwh_sports_team_options() as $key => $option) {
+        $team_options[$key] = $option['label'];
+    }
+
+    ?>
+    <div class="wrap wwh-import-page">
+        <h1>Import Sports Games</h1>
+        <?php if (is_array($result)) : ?>
+            <div class="notice <?php echo $result['errors'] === [] ? 'notice-success' : 'notice-warning'; ?> is-dismissible">
+                <p>
+                    <strong><?php echo esc_html(sprintf('Imported %d games and updated %d games.', $result['created'], $result['updated'])); ?></strong>
+                    <?php if ($result['skipped'] > 0) : ?>
+                        <?php echo esc_html(sprintf('Skipped %d rows.', $result['skipped'])); ?>
+                    <?php endif; ?>
+                </p>
+                <?php if ($result['errors'] !== []) : ?>
+                    <ul>
+                        <?php foreach ($result['errors'] as $error) : ?>
+                            <li><?php echo esc_html($error); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
+        <form method="post" enctype="multipart/form-data">
+            <?php wp_nonce_field('wwh_import_sports_games', 'wwh_sports_import_nonce'); ?>
+            <input type="hidden" name="wwh_sports_import_action" value="import">
+
+            <table class="form-table" role="presentation">
+                <tr>
+                    <th scope="row"><label for="ww_sport_key">Sport / Team</label></th>
+                    <td>
+                        <select id="ww_sport_key" name="ww_sport_key" required>
+                            <?php foreach ($team_options as $option_value => $option_label) : ?>
+                                <option value="<?php echo esc_attr((string) $option_value); ?>" <?php selected($selected_sport_key, (string) $option_value); ?>>
+                                    <?php echo esc_html((string) $option_label); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="description">Every imported row will use this sport/team.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="wwh_import_file">Upload CSV or TSV</label></th>
+                    <td>
+                        <input type="file" id="wwh_import_file" name="wwh_import_file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain">
+                        <p class="description">You can upload a spreadsheet export, or paste rows below.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="wwh_import_data">Paste Data</label></th>
+                    <td>
+                        <textarea id="wwh_import_data" name="wwh_import_data" rows="12" class="large-text code" placeholder="Season	Date	Time	Site	Opponent	Result	Ninety Six Score	Opponent Score	Game Type	Watch Replay"><?php echo esc_textarea($import_data); ?></textarea>
+                        <p class="description">Expected columns: Season, Date, Time, Site, Opponent, Result, Ninety Six Score, Opponent Score, Game Type, Watch Replay.</p>
+                    </td>
+                </tr>
+            </table>
+
+            <?php submit_button('Import Games'); ?>
+        </form>
+    </div>
+    <?php
+}
+
+function wwh_import_sports_games(string $sport_key, string $raw_data): array
+{
+    $result = [
+        'created' => 0,
+        'updated' => 0,
+        'skipped' => 0,
+        'errors' => [],
+    ];
+
+    if ($sport_key === '') {
+        $result['errors'][] = 'Choose a sport/team before importing.';
+        return $result;
+    }
+
+    $parsed = wwh_parse_sports_import_rows($raw_data);
+
+    if ($parsed['errors'] !== []) {
+        $result['errors'] = array_merge($result['errors'], $parsed['errors']);
+        return $result;
+    }
+
+    foreach ($parsed['rows'] as $index => $row) {
+        $line_number = $index + 2;
+        $imported = wwh_import_sports_game_row($sport_key, $row);
+
+        if (is_wp_error($imported)) {
+            $result['skipped']++;
+            $result['errors'][] = sprintf('Row %d: %s', $line_number, $imported->get_error_message());
+            continue;
+        }
+
+        $result[$imported]++;
+    }
+
+    return $result;
+}
+
+function wwh_parse_sports_import_rows(string $raw_data): array
+{
+    $raw_data = trim($raw_data);
+
+    if ($raw_data === '') {
+        return [
+            'rows' => [],
+            'errors' => ['Paste schedule data or upload a CSV/TSV file.'],
+        ];
+    }
+
+    $lines = preg_split('/\r\n|\r|\n/', $raw_data);
+
+    if (!is_array($lines) || count($lines) < 2) {
+        return [
+            'rows' => [],
+            'errors' => ['The import needs a header row and at least one game row.'],
+        ];
+    }
+
+    $header_line = array_shift($lines);
+    $delimiter = wwh_import_delimiter((string) $header_line);
+    $headers = str_getcsv((string) $header_line, $delimiter);
+    $header_map = wwh_import_header_map($headers);
+    $missing = [];
+
+    foreach (['date', 'opponent'] as $required_header) {
+        if (!array_key_exists($required_header, $header_map)) {
+            $missing[] = $required_header === 'date' ? 'Date' : 'Opponent';
+        }
+    }
+
+    if ($missing !== []) {
+        return [
+            'rows' => [],
+            'errors' => [sprintf('Missing required column: %s.', implode(', ', $missing))],
+        ];
+    }
+
+    $rows = [];
+
+    foreach ($lines as $line) {
+        if (trim((string) $line) === '') {
+            continue;
+        }
+
+        $columns = str_getcsv((string) $line, $delimiter);
+        $rows[] = [
+            'season' => wwh_import_cell($columns, $header_map, 'season'),
+            'date' => wwh_import_cell($columns, $header_map, 'date'),
+            'time' => wwh_import_cell($columns, $header_map, 'time'),
+            'site' => wwh_import_cell($columns, $header_map, 'site'),
+            'opponent' => wwh_import_cell($columns, $header_map, 'opponent'),
+            'result' => wwh_import_cell($columns, $header_map, 'result'),
+            'wildcats_score' => wwh_import_cell($columns, $header_map, 'ninetysixscore'),
+            'opponent_score' => wwh_import_cell($columns, $header_map, 'opponentscore'),
+            'game_type' => wwh_import_cell($columns, $header_map, 'gametype'),
+            'watch_replay' => wwh_import_cell($columns, $header_map, 'watchreplay'),
+        ];
+    }
+
+    return [
+        'rows' => $rows,
+        'errors' => [],
+    ];
+}
+
+function wwh_import_delimiter(string $header_line): string
+{
+    return substr_count($header_line, "\t") >= substr_count($header_line, ',') ? "\t" : ',';
+}
+
+function wwh_import_header_map(array $headers): array
+{
+    $map = [];
+
+    foreach ($headers as $index => $header) {
+        $header = preg_replace('/^\xEF\xBB\xBF/', '', (string) $header);
+        $normalized = strtolower(trim((string) $header));
+        $normalized = preg_replace('/[^a-z0-9]+/', '', $normalized);
+
+        if (is_string($normalized) && $normalized !== '') {
+            $map[$normalized] = $index;
+        }
+    }
+
+    return $map;
+}
+
+function wwh_import_cell(array $columns, array $header_map, string $header): string
+{
+    if (!array_key_exists($header, $header_map)) {
+        return '';
+    }
+
+    $index = $header_map[$header];
+
+    return isset($columns[$index]) ? sanitize_text_field((string) $columns[$index]) : '';
+}
+
+function wwh_import_sports_game_row(string $sport_key, array $row)
+{
+    $sport_option = wwh_sports_team_options()[$sport_key];
+    $opponent = trim((string) $row['opponent']);
+    $start_datetime = wwh_import_datetime((string) $row['date'], (string) $row['time']);
+
+    if ($opponent === '') {
+        return new WP_Error('wwh_import_missing_opponent', 'Opponent is required.');
+    }
+
+    if ($start_datetime === '') {
+        return new WP_Error('wwh_import_invalid_date', 'Date or time could not be read.');
+    }
+
+    $site = wwh_import_site((string) $row['site']);
+    $wildcats_score = wwh_import_score((string) $row['wildcats_score']);
+    $opponent_score = wwh_import_score((string) $row['opponent_score']);
+    $status = wwh_import_status((string) $row['result'], $wildcats_score, $opponent_score);
+    $recap_url = wwh_import_recap_url((string) $row['watch_replay']);
+    $notes = wwh_import_notes($row, $recap_url);
+    $post_id = wwh_find_existing_sports_game($sport_key, $start_datetime, $opponent);
+    $title = wwh_import_game_title($sport_option['sport'], $site, $opponent);
+    $post_data = [
+        'post_type' => WWH_SPORTS_GAME_POST_TYPE,
+        'post_status' => 'publish',
+        'post_title' => $title,
+    ];
+
+    if ($post_id > 0) {
+        $post_data['ID'] = $post_id;
+        $saved_post_id = wp_update_post($post_data, true);
+        $mode = 'updated';
+    } else {
+        $saved_post_id = wp_insert_post($post_data, true);
+        $mode = 'created';
+    }
+
+    if (is_wp_error($saved_post_id)) {
+        return $saved_post_id;
+    }
+
+    $saved_post_id = absint($saved_post_id);
+
+    wwh_update_meta($saved_post_id, '_ww_sport_key', $sport_key);
+    wwh_update_meta($saved_post_id, '_ww_sport', $sport_option['sport']);
+    wwh_update_meta($saved_post_id, '_ww_level', $sport_option['level']);
+    wwh_update_meta($saved_post_id, '_ww_team_label', $sport_option['teamLabel']);
+    wwh_update_meta($saved_post_id, '_ww_opponent', $opponent);
+    wwh_update_meta($saved_post_id, '_ww_site', $site);
+    wwh_update_meta($saved_post_id, '_ww_start_datetime', $start_datetime);
+    wwh_update_meta($saved_post_id, '_ww_game_status', $status);
+    wwh_update_score_meta($saved_post_id, '_ww_wildcats_score', $wildcats_score);
+    wwh_update_score_meta($saved_post_id, '_ww_opponent_score', $opponent_score);
+    wwh_update_meta($saved_post_id, '_ww_recap_url', $recap_url);
+    wwh_update_meta($saved_post_id, '_ww_notes', $notes);
+
+    return $mode;
+}
+
+function wwh_import_datetime(string $date, string $time): string
+{
+    $date = trim($date);
+    $time = trim($time);
+
+    if ($date === '') {
+        return '';
+    }
+
+    $value = trim($date . ' ' . $time);
+    $timezone = wp_timezone();
+    $formats = [
+        'Y-m-d g:i A',
+        'Y-m-d h:i A',
+        'Y-m-d H:i',
+        'Y-m-d',
+        'm/d/Y g:i A',
+        'm/d/Y h:i A',
+        'm/d/Y H:i',
+        'm/d/Y',
+        'n/j/Y g:i A',
+        'n/j/Y h:i A',
+        'n/j/Y H:i',
+        'n/j/Y',
+    ];
+
+    foreach ($formats as $format) {
+        $datetime = DateTimeImmutable::createFromFormat('!' . $format, $value, $timezone);
+        $errors = DateTimeImmutable::getLastErrors();
+        $has_errors = is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0);
+
+        if ($datetime instanceof DateTimeImmutable && !$has_errors) {
+            return $datetime->format('Y-m-d\TH:i');
+        }
+    }
+
+    $timestamp = strtotime($value);
+
+    return $timestamp ? wp_date('Y-m-d\TH:i', $timestamp, $timezone) : '';
+}
+
+function wwh_import_site(string $site): string
+{
+    $site = strtolower(trim($site));
+
+    if (in_array($site, ['away', 'a'], true)) {
+        return 'away';
+    }
+
+    if (in_array($site, ['neutral', 'n'], true)) {
+        return 'neutral';
+    }
+
+    return 'home';
+}
+
+function wwh_import_score(string $score): string
+{
+    $score = trim($score);
+
+    if ($score === '' || $score === '-') {
+        return '';
+    }
+
+    return is_numeric($score) ? (string) max(0, absint($score)) : '';
+}
+
+function wwh_import_status(string $result, string $wildcats_score, string $opponent_score): string
+{
+    $result = strtolower(trim($result));
+
+    if (in_array($result, ['postponed', 'ppd'], true)) {
+        return 'postponed';
+    }
+
+    if (in_array($result, ['canceled', 'cancelled'], true)) {
+        return 'canceled';
+    }
+
+    if (in_array($result, ['w', 'win', 'l', 'loss', 't', 'tie'], true) || ($wildcats_score !== '' && $opponent_score !== '')) {
+        return 'final';
+    }
+
+    return 'upcoming';
+}
+
+function wwh_import_recap_url(string $watch_replay): string
+{
+    $watch_replay = trim($watch_replay);
+
+    return filter_var($watch_replay, FILTER_VALIDATE_URL) ? esc_url_raw($watch_replay) : '';
+}
+
+function wwh_import_notes(array $row, string $recap_url): string
+{
+    $notes = [];
+
+    if ((string) $row['season'] !== '') {
+        $notes[] = 'Season: ' . (string) $row['season'];
+    }
+
+    if ((string) $row['game_type'] !== '') {
+        $notes[] = 'Game type: ' . (string) $row['game_type'];
+    }
+
+    if ((string) $row['watch_replay'] !== '' && $recap_url === '') {
+        $notes[] = 'Watch replay: ' . (string) $row['watch_replay'];
+    }
+
+    return implode("\n", $notes);
+}
+
+function wwh_find_existing_sports_game(string $sport_key, string $start_datetime, string $opponent): int
+{
+    $query = new WP_Query([
+        'post_type' => WWH_SPORTS_GAME_POST_TYPE,
+        'post_status' => ['publish', 'draft', 'pending', 'private'],
+        'posts_per_page' => 1,
+        'fields' => 'ids',
+        'no_found_rows' => true,
+        'meta_query' => [
+            [
+                'key' => '_ww_sport_key',
+                'value' => $sport_key,
+            ],
+            [
+                'key' => '_ww_start_datetime',
+                'value' => $start_datetime,
+            ],
+            [
+                'key' => '_ww_opponent',
+                'value' => $opponent,
+            ],
+        ],
+    ]);
+
+    $post_id = isset($query->posts[0]) ? absint($query->posts[0]) : 0;
+    wp_reset_postdata();
+
+    return $post_id;
+}
+
+function wwh_import_game_title(string $sport, string $site, string $opponent): string
+{
+    $preposition = $site === 'away' ? 'at' : 'vs.';
+
+    return trim(sprintf('%s %s %s', $sport, $preposition, $opponent));
+}
+
 function wwh_author_meta_value(int $user_id, string $key, string $default = ''): string
 {
     $value = get_user_meta($user_id, $key, true);
@@ -719,8 +1168,9 @@ add_action('admin_enqueue_scripts', 'wwh_enqueue_author_profile_assets');
 function wwh_admin_styles(): void
 {
     $screen = get_current_screen();
+    $is_import_page = $screen && $screen->id === WWH_SPORTS_GAME_POST_TYPE . '_page_wwh-sports-import';
 
-    if (!$screen || (!in_array($screen->post_type, [WWH_SPORTS_GAME_POST_TYPE, WWH_SCHOOL_EVENT_POST_TYPE], true) && !in_array($screen->id, ['profile', 'user-edit'], true))) {
+    if (!$screen || (!$is_import_page && !in_array($screen->post_type, [WWH_SPORTS_GAME_POST_TYPE, WWH_SCHOOL_EVENT_POST_TYPE], true) && !in_array($screen->id, ['profile', 'user-edit'], true))) {
         return;
     }
 
@@ -733,6 +1183,9 @@ function wwh_admin_styles(): void
         .wwh-field textarea, .wwh-checkbox { grid-column: 1 / -1; }
         .wwh-checkbox label, .wwh-checkbox span { display: inline; }
         .wwh-author-photo-preview { background: #f0f0f1; display: block; height: 96px; margin-bottom: 10px; object-fit: cover; width: 96px; }
+        .wwh-import-page textarea.code { min-height: 240px; white-space: pre; }
+        .wwh-import-page select { min-width: 260px; }
+        .wwh-import-page .notice ul { list-style: disc; margin-left: 20px; }
         @media (max-width: 782px) { .wwh-fields { grid-template-columns: 1fr; } }
     </style>';
 }
