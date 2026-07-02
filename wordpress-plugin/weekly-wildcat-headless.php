@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Headless
  * Description: Headless CMS extensions for Weekly Wildcat sports schedules, scores, and school events.
- * Version: 0.1.8
+ * Version: 0.1.9
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -75,6 +75,7 @@ function wwh_sports_team_options(): array
         'boys-basketball-varsity' => ['sport' => 'Boys Basketball', 'level' => 'Varsity', 'teamLabel' => 'Boys', 'label' => 'Boys Basketball - Varsity'],
         'boys-basketball-jv' => ['sport' => 'Boys Basketball', 'level' => 'JV', 'teamLabel' => 'Boys', 'label' => 'Boys Basketball - JV'],
         'boys-soccer' => ['sport' => 'Boys Soccer', 'level' => 'Varsity', 'teamLabel' => 'Boys', 'label' => 'Boys Soccer'],
+        'boys-soccer-jv' => ['sport' => 'Boys Soccer', 'level' => 'JV', 'teamLabel' => 'Boys', 'label' => 'Boys Soccer - JV'],
         'cheer-competition' => ['sport' => 'Cheer', 'level' => 'Competition', 'teamLabel' => 'Cheer', 'label' => 'Cheer - Competition'],
         'cheer-sideline' => ['sport' => 'Cheer', 'level' => 'Sideline', 'teamLabel' => 'Cheer', 'label' => 'Cheer - Sideline'],
         'cross-country' => ['sport' => 'Cross Country', 'level' => 'Varsity', 'teamLabel' => 'Cross Country', 'label' => 'Cross Country'],
@@ -83,6 +84,7 @@ function wwh_sports_team_options(): array
         'girls-basketball-varsity' => ['sport' => 'Girls Basketball', 'level' => 'Varsity', 'teamLabel' => 'Girls', 'label' => 'Girls Basketball - Varsity'],
         'girls-basketball-jv' => ['sport' => 'Girls Basketball', 'level' => 'JV', 'teamLabel' => 'Girls', 'label' => 'Girls Basketball - JV'],
         'girls-soccer' => ['sport' => 'Girls Soccer', 'level' => 'Varsity', 'teamLabel' => 'Girls', 'label' => 'Girls Soccer'],
+        'girls-soccer-jv' => ['sport' => 'Girls Soccer', 'level' => 'JV', 'teamLabel' => 'Girls', 'label' => 'Girls Soccer - JV'],
         'golf' => ['sport' => 'Golf', 'level' => 'Varsity', 'teamLabel' => 'Golf', 'label' => 'Golf'],
         'softball-jv' => ['sport' => 'Softball', 'level' => 'JV', 'teamLabel' => 'Softball', 'label' => 'Softball - JV'],
         'softball-varsity' => ['sport' => 'Softball', 'level' => 'Varsity', 'teamLabel' => 'Softball', 'label' => 'Softball - Varsity'],
@@ -323,7 +325,7 @@ function wwh_render_sports_game_admin_column(string $column, int $post_id): void
     }
 
     if ($column === 'wwh_status') {
-        echo esc_html(wwh_label_from_value(wwh_meta_value($post_id, '_ww_game_status', 'upcoming')));
+        echo esc_html(wwh_label_from_value(wwh_effective_game_status(wwh_meta_value($post_id, '_ww_game_status', 'upcoming'), wwh_meta_value($post_id, '_ww_start_datetime'))));
         return;
     }
 
@@ -1173,6 +1175,7 @@ function wwh_sports_export_row(WP_Post $post): array
     $wildcats_score = wwh_meta_value($post->ID, '_ww_wildcats_score');
     $opponent_score = wwh_meta_value($post->ID, '_ww_opponent_score');
     $recap_url = wwh_meta_value($post->ID, '_ww_recap_url');
+    $status = wwh_effective_game_status(wwh_meta_value($post->ID, '_ww_game_status', 'upcoming'), $start);
 
     return [
         wwh_meta_value($post->ID, '_ww_import_season'),
@@ -1180,14 +1183,14 @@ function wwh_sports_export_row(WP_Post $post): array
         $date_time['time'],
         wwh_label_from_value(wwh_meta_value($post->ID, '_ww_site', 'home')),
         wwh_meta_value($post->ID, '_ww_opponent'),
-        wwh_export_result(wwh_meta_value($post->ID, '_ww_game_status', 'upcoming'), $wildcats_score, $opponent_score),
+        wwh_export_result($status, $wildcats_score, $opponent_score),
         $wildcats_score,
         $opponent_score,
         wwh_meta_value($post->ID, '_ww_import_game_type'),
         $recap_url !== '' ? $recap_url : wwh_export_note_value(wwh_meta_value($post->ID, '_ww_notes'), 'Watch replay'),
         $sport_key,
         $sport_option['label'] ?? wwh_meta_value($post->ID, '_ww_sport'),
-        wwh_label_from_value(wwh_meta_value($post->ID, '_ww_game_status', 'upcoming')),
+        wwh_label_from_value($status),
         wwh_meta_value($post->ID, '_ww_location_name', wwh_meta_value($post->ID, '_ww_location')),
         wwh_meta_value($post->ID, '_ww_location_address'),
         $recap_url,
@@ -1409,7 +1412,7 @@ function wwh_import_sports_game_row(string $sport_key, array $row)
     $site = wwh_import_site((string) $row['site']);
     $wildcats_score = wwh_import_score((string) $row['wildcats_score']);
     $opponent_score = wwh_import_score((string) $row['opponent_score']);
-    $status = wwh_import_status((string) $row['result'], $wildcats_score, $opponent_score);
+    $status = wwh_import_status((string) $row['result'], $wildcats_score, $opponent_score, $start_datetime);
     $recap_url = wwh_import_recap_url((string) $row['watch_replay']);
     $notes = wwh_import_notes($row, $recap_url);
     $import_key = wwh_import_row_key($row);
@@ -1540,7 +1543,7 @@ function wwh_import_score(string $score): string
     return is_numeric($score) ? (string) max(0, absint($score)) : '';
 }
 
-function wwh_import_status(string $result, string $wildcats_score, string $opponent_score): string
+function wwh_import_status(string $result, string $wildcats_score, string $opponent_score, string $start_datetime): string
 {
     $result = strtolower(trim($result));
 
@@ -1556,7 +1559,7 @@ function wwh_import_status(string $result, string $wildcats_score, string $oppon
         return 'final';
     }
 
-    return 'upcoming';
+    return wwh_effective_game_status('upcoming', $start_datetime);
 }
 
 function wwh_import_recap_url(string $watch_replay): string
@@ -2037,14 +2040,21 @@ function wwh_rest_recent_sports_games(WP_REST_Request $request): WP_REST_Respons
         'order' => 'DESC',
         'meta_query' => [
             [
-                'key' => '_ww_game_status',
-                'value' => 'final',
-            ],
-            [
                 'key' => '_ww_start_datetime',
                 'value' => wwh_now_local(),
                 'compare' => '<=',
                 'type' => 'CHAR',
+            ],
+            [
+                'relation' => 'OR',
+                [
+                    'key' => '_ww_game_status',
+                    'value' => 'final',
+                ],
+                [
+                    'key' => '_ww_game_status',
+                    'value' => 'upcoming',
+                ],
             ],
         ],
     ]);
@@ -2108,9 +2118,36 @@ function wwh_label_from_value(string $value): string
     return ucwords(str_replace(['_', '-'], ' ', $value));
 }
 
+function wwh_effective_game_status(string $status, string $start): string
+{
+    $status = wwh_sanitize_choice($status, ['upcoming', 'final', 'postponed', 'canceled'], 'upcoming');
+
+    if ($status === 'upcoming' && wwh_game_start_has_passed($start)) {
+        return 'final';
+    }
+
+    return $status;
+}
+
+function wwh_game_start_has_passed(string $start): bool
+{
+    if ($start === '') {
+        return false;
+    }
+
+    $start_datetime = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $start, wp_timezone());
+    $errors = DateTimeImmutable::getLastErrors();
+    $has_errors = is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0);
+
+    if (!$start_datetime || $has_errors) {
+        return false;
+    }
+
+    return $start_datetime < new DateTimeImmutable('now', wp_timezone());
+}
+
 function wwh_format_sports_game(WP_Post $post): array
 {
-    $status = wwh_sanitize_choice(wwh_meta_value($post->ID, '_ww_game_status', 'upcoming'), ['upcoming', 'final', 'postponed', 'canceled'], 'upcoming');
     $site = wwh_sanitize_choice(wwh_meta_value($post->ID, '_ww_site', 'home'), ['home', 'away', 'neutral'], 'home');
     $sport_key = wwh_meta_value($post->ID, '_ww_sport_key');
     $sport_option = array_key_exists($sport_key, wwh_sports_team_options()) ? wwh_sports_team_options()[$sport_key] : null;
@@ -2120,6 +2157,7 @@ function wwh_format_sports_game(WP_Post $post): array
     $latitude = wwh_meta_value($post->ID, '_ww_location_latitude');
     $longitude = wwh_meta_value($post->ID, '_ww_location_longitude');
     $start = wwh_meta_value($post->ID, '_ww_start_datetime');
+    $status = wwh_effective_game_status(wwh_meta_value($post->ID, '_ww_game_status', 'upcoming'), $start);
     $wildcats_score = wwh_meta_value($post->ID, '_ww_wildcats_score');
     $opponent_score = wwh_meta_value($post->ID, '_ww_opponent_score');
     $show_score = $status === 'final' && $wildcats_score !== '' && $opponent_score !== '';
