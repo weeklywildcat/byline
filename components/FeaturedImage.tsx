@@ -20,7 +20,7 @@ export function FeaturedImage({ image, priority = false, showCaption = true }: F
       image.media_details?.image_meta?.copyright ||
       ""
   );
-  const hasCaptionDetails = Boolean(caption || fallbackCaption);
+  const hasCaptionDetails = Boolean(caption || fallbackCaption || credit);
   const width = image.media_details?.width;
   const height = image.media_details?.height;
   const alt = image.alt_text || stripHtml(image.title?.rendered ?? "");
@@ -35,15 +35,17 @@ export function FeaturedImage({ image, priority = false, showCaption = true }: F
           height={height}
           loading={priority ? "eager" : "lazy"}
         />
-        {showCaption && credit ? <span className="image-credit-overlay">{credit}</span> : null}
       </div>
       {showCaption && hasCaptionDetails ? (
         <figcaption>
-          {caption ? (
-            <div className="featured-image-caption" dangerouslySetInnerHTML={{ __html: caption }} />
-          ) : fallbackCaption ? (
-            <div className="featured-image-caption">{fallbackCaption}</div>
-          ) : null}
+          <div className="featured-image-caption-row">
+            {caption ? (
+              <div className="featured-image-caption" dangerouslySetInnerHTML={{ __html: caption }} />
+            ) : fallbackCaption ? (
+              <div className="featured-image-caption">{fallbackCaption}</div>
+            ) : null}
+            {credit ? <p className="photo-credit">Credit: {credit}</p> : null}
+          </div>
         </figcaption>
       ) : null}
     </figure>

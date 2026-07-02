@@ -1,11 +1,20 @@
 import type { Metadata } from "next";
 import { HomepageStory } from "@/components/HomepageStory";
+import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
+import { PollWidget } from "@/components/PollWidget";
 import { SiteIcon } from "@/components/SiteIcon";
 import { SportsAthleteFeature } from "@/components/SportsAthleteFeature";
 import { SportsSchedulePanel } from "@/components/SportsSchedulePanel";
+import { ThisWeekCard } from "@/components/ThisWeekCard";
 import { filterPublicHomepagePosts, isAthleteSpotlightPost, isSpecialCoveragePost } from "@/lib/content";
-import { getRecentSportsGames, getUpcomingSportsGames, type SportsGame } from "@/lib/headless";
-import { buildPageMetadata, getWebsiteSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
+import {
+  getRecentSportsGames,
+  getSchoolEvents,
+  getUpcomingSportsGames,
+  type SchoolEvent,
+  type SportsGame
+} from "@/lib/headless";
+import { absoluteUrl, buildPageMetadata, getWebsiteSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
 import { getFeaturedMedia, getAllPosts, getPostCategories, type WordPressPost } from "@/lib/wordpress";
 
 export const metadata: Metadata = buildPageMetadata({
@@ -13,6 +22,8 @@ export const metadata: Metadata = buildPageMetadata({
   description: SITE_DESCRIPTION,
   path: "/"
 });
+
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 function hasCategory(post: WordPressPost, slugs: string[]) {
   const slugSet = new Set(slugs);
@@ -85,12 +96,13 @@ function takeDiverseUnused(
 }
 
 async function getHomepageSportsSchedule() {
-  const [recentScores, upcomingGames] = await Promise.all([
+  const [recentScores, upcomingGames, schoolEvents] = await Promise.all([
     getRecentSportsGames(3).catch((): SportsGame[] => []),
-    getUpcomingSportsGames(5).catch((): SportsGame[] => [])
+    getUpcomingSportsGames(8).catch((): SportsGame[] => []),
+    getSchoolEvents(12).catch((): SchoolEvent[] => [])
   ]);
 
-  return { recentScores, upcomingGames };
+  return { recentScores, upcomingGames, schoolEvents };
 }
 
 export default async function HomePage() {
@@ -125,7 +137,7 @@ export default async function HomePage() {
   const morePosts = takeDiverseUnused(posts, usedPostIds, 4, ["news", "features", "culture", "opinion", "sports"]);
   const moreLeadPost = morePosts[0] ?? null;
   const moreRailPosts = morePosts.slice(1, 4);
-  const rightNowPosts = takeUnused(posts, usedPostIds, 3);
+  const rightNowPosts = takeUnused(posts, usedPostIds, 4);
   const briefPosts = takeUnused(posts, usedPostIds, 4);
   const briefLeadPost = briefPosts[0] ?? null;
   const briefRailPosts = briefPosts.slice(1);
@@ -149,10 +161,7 @@ export default async function HomePage() {
         >
           <div className="top-stories-layout">
             <div className="live-lead">
-              <div className="live-package-label" id="lead-heading">
-                The Lead
-              </div>
-              <HomepageStory post={leadPost} variant="lead" showAuthor showDeck showReadingTime priority />
+              <HomepageStory post={leadPost} variant="lead" showDeck priority />
             </div>
 
             {rightNowPosts.length > 0 ? (
@@ -165,6 +174,11 @@ export default async function HomePage() {
                 </div>
               </aside>
             ) : null}
+
+            <aside className="top-stories-left-rail" aria-label="Poll and school calendar">
+              <PollWidget />
+              <ThisWeekCard schoolEvents={sportsSchedule.schoolEvents} sportsGames={sportsSchedule.upcomingGames} />
+            </aside>
           </div>
         </section>
       ) : (
@@ -315,31 +329,58 @@ export default async function HomePage() {
               <p className="more-rail-label">Weekly Wildcat</p>
               <div className="more-utility-block">
                 <div className="more-utility-block-heading">
-                  <SiteIcon name="ph:pencil-line" width={18} height={18} />
+                  <SiteIcon name="ph:newspaper-clipping" width={18} height={18} />
                   <h3>Join the Staff</h3>
                 </div>
-                <p>Write, photograph, design, or help shape student journalism at NSHS.</p>
-                <a href="/join/">Learn More →</a>
+                <p>Report games, photograph campus life, design pages, or help edit the next story package.</p>
+                <div className="more-action-links">
+                  <a href="/join/">
+                    <SiteIcon name="ph:pencil-line" width={16} height={16} />
+                    Join the newsroom
+                  </a>
+                  <a href="/about/">
+                    <SiteIcon name="ph:users-three" width={16} height={16} />
+                    Meet the staff
+                  </a>
+                </div>
               </div>
               <div className="more-utility-block">
                 <div className="more-utility-block-heading">
                   <SiteIcon name="ph:chat-circle-dots" width={18} height={18} />
                   <h3>Stay Connected</h3>
                 </div>
+                <p>Follow daily posts, send a tip, or bring Weekly Wildcat into your inbox.</p>
                 <nav className="more-connect-links" aria-label="Stay connected">
                   <a href="https://www.instagram.com/theweeklywildcat" target="_blank" rel="noreferrer">
+                    <SiteIcon name="ph:instagram-logo" width={17} height={17} />
                     Instagram
                   </a>
                   <a href="https://www.tiktok.com/@weeklywildcat" target="_blank" rel="noreferrer">
+                    <SiteIcon name="ph:tiktok-logo" width={17} height={17} />
                     TikTok
                   </a>
-                  <a href="/contact/">Email / Newsletter</a>
+                  <a href="/contact/">
+                    <SiteIcon name="ph:envelope-simple" width={17} height={17} />
+                    Contact
+                  </a>
+                  <a href="#home-newsletter">
+                    <SiteIcon name="ph:paper-plane-tilt" width={17} height={17} />
+                    Newsletter
+                  </a>
                 </nav>
               </div>
             </aside>
           </div>
         </section>
       ) : null}
+
+      <section id="home-newsletter" className="home-newsletter-section" aria-label="Newsletter signup">
+        <NewsletterSignupForm
+          sourceTitle="Weekly Wildcat homepage"
+          sourceUrl={absoluteUrl("/")}
+          turnstileSiteKey={turnstileSiteKey}
+        />
+      </section>
     </main>
   );
 }
