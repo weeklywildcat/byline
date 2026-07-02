@@ -11,6 +11,15 @@
     "html_handling": "auto-trailing-slash"
   },
 
+  "d1_databases": [
+    {
+      "binding": "POLLS_DB",
+      "database_name": "weekly-wildcat-polls",
+      "database_id": "92921f36-aa48-4070-8d0e-5c3ef686a0de",
+      "migrations_dir": "./migrations"
+    }
+  ],
+
   "observability": {
     "enabled": false,
     "head_sampling_rate": 1,

@@ -88,7 +88,7 @@ img {
   .author-profile h1,
   .search-page-header h1,
   .static-page-header h1,
-  .schedule-archive-hero h1,
+  .schedule-archive > .section-heading h1,
   .not-found h1 {
     animation: page-heading-enter 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
@@ -1913,11 +1913,16 @@ p.home-story-deck {
 }
 
 .top-stories-left-rail {
-  align-content: start;
+  align-content: stretch;
+  align-items: stretch;
   display: grid;
   gap: 14px;
   grid-column: 1;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: var(--top-stories-hero-height, auto);
+  min-height: 0;
   order: -1;
+  overflow: hidden;
 }
 
 .homepage-poll-card {
@@ -2125,6 +2130,20 @@ p.home-story-deck {
 .this-week-list {
   display: grid;
   gap: 0;
+}
+
+.top-stories-left-rail .this-week-card {
+  align-content: start;
+  align-self: stretch;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.top-stories-left-rail .this-week-list {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .this-week-item {
@@ -2853,10 +2872,12 @@ p.home-story-deck {
 }
 
 .field-schedule {
-  background: #101217;
-  color: #f8f4ed;
+  background: transparent;
+  border-bottom: 1px solid var(--rule-strong);
+  border-top: 2px solid var(--rule-strong);
+  color: var(--ink);
   margin-top: 24px;
-  padding: 18px;
+  padding: 12px 0 14px;
 }
 
 .field-schedule-header {
@@ -2864,22 +2885,24 @@ p.home-story-deck {
   display: flex;
   gap: 16px;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--rule);
 }
 
 .field-schedule-header h3 {
-  color: #ffffff;
+  color: var(--accent-dark);
   font-family: var(--font-ui);
   font-size: 0.8rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   line-height: 1;
   margin: 0;
   text-transform: uppercase;
 }
 
 .field-schedule-header a {
-  color: #d8d2cb;
+  color: var(--muted);
   font-family: var(--font-ui);
   font-size: 0.68rem;
   font-weight: 800;
@@ -2888,10 +2911,10 @@ p.home-story-deck {
 }
 
 .field-schedule-layout {
-  align-items: stretch;
+  align-items: start;
   display: grid;
-  gap: 14px;
-  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: 18px;
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
 }
 
 .field-schedule-layout-1 {
@@ -2899,100 +2922,110 @@ p.home-story-deck {
 }
 
 .field-schedule-layout-2 {
-  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
 }
 
-.field-schedule-group {
-  background: rgba(255, 255, 255, 0.07);
-  border-top: 2px solid rgba(255, 255, 255, 0.16);
+.field-schedule-result,
+.field-schedule-upcoming {
   display: grid;
-  gap: 12px;
+  gap: 9px;
   min-width: 0;
-  padding: 14px;
 }
 
-.field-schedule-group > h4 {
-  color: #ff5a5f;
+.field-schedule-result > h4,
+.field-schedule-upcoming > h4 {
+  color: var(--accent);
   font-family: var(--font-ui);
   font-size: 0.64rem;
   font-weight: 800;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   line-height: 1;
   margin: 0;
   text-transform: uppercase;
 }
 
-.field-game-list {
-  border-top: 1px solid rgba(255, 255, 255, 0.16);
-  display: grid;
-  gap: 0;
-  margin-top: 2px;
+.field-schedule-upcoming {
+  border-left: 1px solid var(--rule);
+  padding-left: 18px;
 }
 
-.field-game {
+.field-game-list {
+  display: grid;
+  gap: 0;
+}
+
+.field-result-card {
   display: grid;
   gap: 8px;
   min-width: 0;
 }
 
-.field-game-topline {
+.field-result-summary {
   align-items: center;
-  color: #d8d2cb;
   display: flex;
-  flex-wrap: wrap;
+  gap: 12px;
+  min-width: 0;
+}
+
+.field-result-summary > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field-card-label {
+  color: var(--muted);
   font-family: var(--font-ui);
   font-size: 0.68rem;
   font-weight: 800;
-  gap: 7px;
   line-height: 1.25;
+  margin: 0;
   text-transform: uppercase;
 }
 
-.field-game-topline > * + *::before {
-  color: #7f766d;
-  content: "/";
-  margin-right: 7px;
+.field-sport-icon {
+  align-items: center;
+  border-right: 2px solid var(--accent);
+  color: var(--accent);
+  flex: 0 0 34px;
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  padding-right: 8px;
+  width: 34px;
 }
 
-.field-game-topline span {
-  color: #ff5a5f;
-}
-
-.field-game-topline span + span {
-  color: #ffffff;
-}
-
-.field-game h4 {
-  color: #ffffff;
-  font-family: var(--font-display);
-  font-size: clamp(1.9rem, 3.5vw, 3rem);
+.field-result-card h4 {
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1.08rem;
   font-weight: 800;
   letter-spacing: 0;
-  line-height: 0.88;
-  margin: 1px 0 0;
-  text-transform: uppercase;
+  line-height: 1.12;
+  margin: 0;
 }
 
-.field-game-score {
-  align-items: end;
+.field-scoreboard {
+  border-top: 1px solid var(--rule);
   display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(0, 1fr) minmax(44px, auto) minmax(0, 1fr);
-  margin-top: 8px;
+  gap: 0;
+  margin-top: 2px;
 }
 
 .field-score-team {
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-  display: grid;
-  gap: 7px;
+  align-items: baseline;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
   min-width: 0;
-  padding-top: 8px;
+  padding: 8px 0;
 }
 
 .field-score-team span {
-  color: #d8d2cb;
+  color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   font-weight: 800;
   line-height: 1.1;
   overflow: hidden;
@@ -3002,74 +3035,89 @@ p.home-story-deck {
 }
 
 .field-score-team strong {
-  color: #ffffff;
+  color: var(--ink);
   font-family: var(--font-display);
-  font-size: clamp(4.1rem, 8vw, 6.7rem);
+  font-size: clamp(2.3rem, 4vw, 3.45rem);
   font-weight: 800;
   letter-spacing: 0;
-  line-height: 0.78;
+  line-height: 0.82;
 }
 
 .field-score-team-winner {
-  border-top-color: #ff5a5f;
+  border-left: 3px solid var(--accent);
+  padding-left: 9px;
 }
 
-.field-score-team-winner span,
-.field-score-team-winner strong {
-  color: #ffffff;
-}
-
-.field-score-divider {
-  align-self: center;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #d8d2cb;
-  font-family: var(--font-ui);
-  font-size: 0.58rem;
-  font-weight: 800;
-  line-height: 1;
-  padding: 7px 8px;
-  text-transform: uppercase;
-}
-
-.field-game-context,
-.field-result-verdict,
-.field-game-location {
-  color: #d8d2cb;
-  font-family: var(--font-body);
-  font-size: 0.9rem;
-  line-height: 1.35;
-  margin: 0;
-}
-
-.field-result-verdict {
-  color: #ffffff;
-  font-family: var(--font-ui);
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.field-next-details {
-  border-top: 1px solid rgba(255, 255, 255, 0.16);
-  display: grid;
-  gap: 9px;
-  margin: 4px 0 0;
-  padding-top: 12px;
-}
-
-.field-next-details div {
+.field-result-footer {
   align-items: baseline;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: 88px minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
 }
 
-.field-next-details dt,
-.field-game-mini p,
-.field-game-mini time,
-.field-game-mini span {
-  color: #a9a197;
+.field-result-footer p,
+.field-result-footer span {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.field-result-footer p {
+  color: var(--ink);
+}
+
+.field-result-footer span::before {
+  color: var(--soft-muted);
+  content: "/";
+  margin-right: 7px;
+}
+
+.field-game-link {
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 800;
+  justify-self: start;
+  margin-top: 1px;
+  text-transform: uppercase;
+}
+
+.field-upcoming-game {
+  align-items: start;
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
+  padding: 9px 0;
+}
+
+.field-upcoming-game:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.field-upcoming-empty {
+  align-items: center;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  display: flex;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0;
+  min-height: 78px;
+  text-transform: uppercase;
+}
+
+.field-upcoming-main p,
+.field-upcoming-date time,
+.field-upcoming-date span {
+  color: var(--muted);
   font-family: var(--font-ui);
   font-size: 0.62rem;
   font-weight: 800;
@@ -3078,47 +3126,25 @@ p.home-story-deck {
   text-transform: uppercase;
 }
 
-.field-next-details dd {
-  color: #ffffff;
+.field-upcoming-main h5 {
+  color: var(--ink);
   font-family: var(--font-body);
-  font-size: 0.9rem;
-  font-weight: 700;
-  line-height: 1.25;
-  margin: 0;
-}
-
-.field-game-link {
-  color: #ff5a5f;
-  font-family: var(--font-ui);
-  font-size: 0.7rem;
-  font-weight: 800;
-  justify-self: start;
-  margin-top: 2px;
-  text-transform: uppercase;
-}
-
-.field-game-mini {
-  align-items: start;
-  display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
-  padding: 11px 0;
-}
-
-.field-game-mini + .field-game-mini {
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.field-game-mini h5 {
-  color: #ffffff;
-  font-family: var(--font-body);
-  font-size: 0.9rem;
+  font-size: 0.94rem;
   font-weight: 800;
   line-height: 1.12;
   margin: 3px 0 0;
 }
 
-.field-game-mini > div:last-child {
+.field-upcoming-main > span {
+  color: var(--muted);
+  display: block;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  line-height: 1.25;
+  margin-top: 3px;
+}
+
+.field-upcoming-date {
   display: grid;
   gap: 4px;
   justify-items: end;
@@ -3126,72 +3152,57 @@ p.home-story-deck {
 }
 
 .schedule-page-shell {
-  background: var(--paper);
+  background: var(--page);
   min-height: 100vh;
 }
 
 .schedule-archive {
   margin: 0 auto;
   max-width: 1180px;
-  padding: 34px 22px 56px;
+  padding: 28px 20px 56px;
 }
 
-.schedule-archive-hero {
-  background: #101217;
-  border-top: 4px solid #ff5a5f;
-  color: #ffffff;
-  display: grid;
-  gap: 14px;
-  padding: 26px;
+.schedule-archive > .section-heading {
+  align-items: baseline;
+  margin-bottom: 0;
+  padding: 15px 0 16px;
 }
 
-.schedule-archive-hero p {
-  color: #ff5a5f;
-  font-family: var(--font-ui);
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  line-height: 1;
-  margin: 0;
-  text-transform: uppercase;
-}
-
-.schedule-archive-hero h1 {
+.schedule-archive > .section-heading h1 {
   font-family: var(--font-display);
-  font-size: clamp(3.2rem, 8vw, 7rem);
+  font-size: 3.25rem;
   font-weight: 800;
-  letter-spacing: 0;
-  line-height: 0.84;
-  margin: 0;
-  text-transform: uppercase;
+  line-height: 0.96;
+  text-transform: none;
 }
 
 .schedule-archive-stats {
   align-items: center;
+  border-bottom: 1px solid var(--rule);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: start;
+  padding: 10px 0;
 }
 
 .schedule-archive-stats span {
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  color: #d8d2cb;
+  border-left: 1px solid var(--rule);
+  color: var(--muted);
   font-family: var(--font-ui);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 800;
   line-height: 1;
-  padding: 7px 9px;
+  padding-left: 9px;
   text-transform: uppercase;
 }
 
 .schedule-filter-bar {
   align-items: end;
-  background: #171a21;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(2, minmax(180px, 240px)) minmax(0, 1fr);
-  padding: 16px 18px;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(170px, 220px)) minmax(0, 1fr);
+  padding: 14px 0;
 }
 
 .schedule-filter-bar label {
@@ -3200,7 +3211,7 @@ p.home-story-deck {
 }
 
 .schedule-filter-bar span {
-  color: #d8d2cb;
+  color: var(--muted);
   font-family: var(--font-ui);
   font-size: 0.64rem;
   font-weight: 800;
@@ -3210,39 +3221,38 @@ p.home-story-deck {
 
 .schedule-filter-bar select {
   appearance: none;
-  background: #101217;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: var(--paper);
+  border: 1px solid var(--rule);
   border-radius: 0;
-  color: #ffffff;
+  color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
-  min-height: 40px;
-  padding: 0 10px;
+  min-height: 34px;
+  padding: 0 28px 0 9px;
   text-transform: uppercase;
 }
 
 .schedule-archive-sections {
-  background: #101217;
   display: grid;
-  gap: 26px;
-  padding: 20px;
+  gap: 30px;
+  padding-top: 24px;
 }
 
 .schedule-section-heading {
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  border-bottom: 1px solid var(--rule-strong);
   display: flex;
   gap: 12px;
   justify-content: space-between;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
+  margin-bottom: 0;
+  padding-bottom: 8px;
 }
 
 .schedule-section-heading h2 {
-  color: #ffffff;
+  color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 0.86rem;
+  font-size: 0.82rem;
   font-weight: 800;
   line-height: 1;
   margin: 0;
@@ -3250,7 +3260,7 @@ p.home-story-deck {
 }
 
 .schedule-section-heading span {
-  color: #ff5a5f;
+  color: var(--accent);
   font-family: var(--font-ui);
   font-size: 0.72rem;
   font-weight: 800;
@@ -3259,26 +3269,49 @@ p.home-story-deck {
 
 .schedule-game-list {
   display: grid;
-  gap: 12px;
 }
 
 .schedule-game-card {
-  background: rgba(255, 255, 255, 0.07);
-  border-top: 2px solid rgba(255, 255, 255, 0.16);
-  color: #ffffff;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
   display: grid;
-  gap: 18px;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.52fr);
-  padding: 16px;
+  gap: 16px;
+  grid-template-columns: 116px minmax(0, 1fr) minmax(170px, 0.34fr);
+  padding: 14px 0;
 }
 
 .schedule-game-card-final {
-  border-top-color: #ff5a5f;
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+}
+
+.schedule-game-date {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+}
+
+.schedule-game-date time {
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.18;
+  text-transform: uppercase;
+}
+
+.schedule-game-date span {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .schedule-game-main {
   display: grid;
-  gap: 10px;
+  gap: 7px;
   min-width: 0;
 }
 
@@ -3286,49 +3319,45 @@ p.home-story-deck {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 6px 9px;
 }
 
 .schedule-game-meta span {
-  color: #d8d2cb;
+  color: var(--muted);
   font-family: var(--font-ui);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 800;
   line-height: 1.2;
   text-transform: uppercase;
 }
 
 .schedule-game-meta span:first-child {
-  color: #ff5a5f;
+  color: var(--accent);
 }
 
 .schedule-game-card h3 {
-  color: #ffffff;
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 4vw, 3.4rem);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: clamp(1.05rem, 2vw, 1.42rem);
   font-weight: 800;
   letter-spacing: 0;
-  line-height: 0.88;
+  line-height: 1.05;
   margin: 0;
-  text-transform: uppercase;
 }
 
 .schedule-game-details {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 14px;
   margin: 0;
 }
 
 .schedule-game-details div {
-  border-top: 1px solid rgba(255, 255, 255, 0.16);
-  display: grid;
-  gap: 4px;
-  padding-top: 8px;
+  display: contents;
 }
 
 .schedule-game-details dt {
-  color: #a9a197;
+  color: var(--soft-muted);
   font-family: var(--font-ui);
   font-size: 0.62rem;
   font-weight: 800;
@@ -3337,43 +3366,48 @@ p.home-story-deck {
 }
 
 .schedule-game-details dd {
-  color: #ffffff;
+  color: var(--muted);
   font-family: var(--font-body);
-  font-size: 0.9rem;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 600;
   line-height: 1.25;
   margin: 0;
 }
 
 .schedule-game-result {
-  align-content: space-between;
+  align-content: start;
   display: grid;
-  gap: 12px;
+  gap: 9px;
+  justify-items: end;
 }
 
 .schedule-score {
-  align-items: end;
+  align-items: center;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  width: 100%;
 }
 
 .schedule-score-team {
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
   display: grid;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
-  padding-top: 8px;
+  text-align: right;
 }
 
 .schedule-score-winner {
-  border-top-color: #ff5a5f;
+  color: var(--accent);
+}
+
+.schedule-score-team:last-child {
+  text-align: left;
 }
 
 .schedule-score-team span {
-  color: #d8d2cb;
+  color: var(--muted);
   font-family: var(--font-ui);
-  font-size: 0.66rem;
+  font-size: 0.58rem;
   font-weight: 800;
   line-height: 1.1;
   overflow: hidden;
@@ -3383,54 +3417,89 @@ p.home-story-deck {
 }
 
 .schedule-score-team strong {
-  color: #ffffff;
-  font-family: var(--font-display);
-  font-size: clamp(3.4rem, 7vw, 5.4rem);
+  color: currentColor;
+  font-family: var(--font-body);
+  font-size: 1.7rem;
   font-weight: 800;
   letter-spacing: 0;
-  line-height: 0.78;
+  line-height: 0.92;
 }
 
 .schedule-score-divider {
   align-self: center;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #d8d2cb;
+  color: var(--soft-muted);
   font-family: var(--font-ui);
-  font-size: 0.54rem;
+  font-size: 0.56rem;
   font-weight: 800;
   line-height: 1;
-  padding: 6px 7px;
   text-transform: uppercase;
 }
 
 .schedule-game-status {
   align-self: start;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  font-family: var(--font-display);
-  font-size: clamp(2.4rem, 5vw, 4.4rem);
+  border: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0;
-  line-height: 0.86;
+  line-height: 1;
   margin: 0;
-  padding: 12px;
+  padding: 7px 8px;
   text-transform: uppercase;
 }
 
 .schedule-game-result a {
-  color: #ff5a5f;
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 800;
+  justify-self: end;
+  text-transform: uppercase;
+}
+
+.schedule-load-more {
+  appearance: none;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
+  cursor: pointer;
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 18px auto 0;
+  min-height: 38px;
+  padding: 0 18px;
+  text-transform: uppercase;
+}
+
+.schedule-load-more:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.schedule-load-more:disabled {
+  color: var(--soft-muted);
+  cursor: wait;
+}
+
+.schedule-load-error {
+  color: var(--accent);
   font-family: var(--font-ui);
   font-size: 0.72rem;
   font-weight: 800;
-  justify-self: start;
+  margin: 12px 0 0;
+  text-align: center;
   text-transform: uppercase;
 }
 
 .schedule-empty {
-  background: #101217;
-  color: #ffffff;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
   margin: 0;
-  padding: 18px;
+  padding: 18px 0;
 }
 
 .more-weekly {
@@ -3799,7 +3868,15 @@ p.home-story-deck {
   }
 
   .top-stories-left-rail {
+    grid-template-rows: none;
+    height: auto;
     order: 2;
+    overflow: visible;
+  }
+
+  .top-stories-left-rail .this-week-card,
+  .top-stories-left-rail .this-week-list {
+    overflow: visible;
   }
 
   .home-story-lead {
@@ -3853,13 +3930,9 @@ p.home-story-deck {
 	    flex-direction: column;
 	  }
 
-	  .schedule-filter-bar {
-	    grid-template-columns: repeat(2, minmax(0, 1fr));
-	  }
-
-	  .schedule-game-details {
-	    grid-template-columns: 1fr;
-	  }
+  .schedule-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
   .author-profile {
     align-items: start;
@@ -4015,8 +4088,15 @@ p.home-story-deck {
     padding: 16px;
   }
 
+  .field-schedule-upcoming {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+    padding-left: 0;
+    padding-top: 14px;
+  }
+
   .field-score-team strong {
-    font-size: 3.5rem;
+    font-size: 3rem;
   }
 
   .home-story-field {
@@ -4102,40 +4182,46 @@ p.home-story-deck {
 	    padding-right: 16px;
 	  }
 
-	  .schedule-archive {
-	    padding: 22px 16px 42px;
-	  }
+  .schedule-archive {
+    padding: 22px 16px 42px;
+  }
 
-	  .schedule-archive-hero,
-	  .schedule-archive-sections {
-	    padding: 16px;
-	  }
+  .schedule-archive-stats {
+    justify-content: start;
+  }
 
-	  .schedule-filter-bar {
-	    grid-template-columns: 1fr;
-	    padding: 14px 16px;
-	  }
+  .schedule-filter-bar {
+    grid-template-columns: 1fr;
+  }
 
-	  .schedule-game-card {
-	    padding: 13px;
-	  }
+  .schedule-game-card {
+    gap: 10px;
+    grid-template-columns: 1fr;
+    padding: 13px 0;
+  }
 
-	  .schedule-score {
-	    gap: 8px;
-	  }
+  .schedule-game-card-final {
+    border-left: 0;
+    padding-left: 0;
+  }
 
-	  .schedule-score-team span {
-	    white-space: normal;
-	  }
+  .schedule-game-date {
+    align-items: baseline;
+    display: flex;
+    justify-content: space-between;
+  }
 
-	  .schedule-score-team strong {
-	    font-size: 3rem;
-	  }
+  .schedule-game-result {
+    justify-items: start;
+  }
 
-	  .schedule-score-divider {
-	    font-size: 0.5rem;
-	    padding: 6px;
-	  }
+  .schedule-score {
+    max-width: 280px;
+  }
+
+  .schedule-score-team span {
+    white-space: normal;
+  }
 
   .section-heading {
     align-items: flex-start;
@@ -4342,38 +4428,20 @@ p.home-story-deck {
     padding: 14px;
   }
 
-  .field-schedule-layout {
-    gap: 10px;
-    grid-template-columns: 1fr;
-  }
-
-  .field-schedule-group {
-    gap: 10px;
-    padding: 12px;
-  }
-
-  .field-game-topline {
+  .field-schedule-header {
     align-items: flex-start;
     flex-direction: column;
-    gap: 3px;
-  }
-
-  .field-game-topline > * + *::before {
-    content: none;
-    margin-right: 0;
-  }
-
-  .field-game h4 {
-    font-size: 1.75rem;
-    line-height: 0.92;
-  }
-
-  .field-game-score {
     gap: 8px;
   }
 
+  .field-schedule-layout {
+    gap: 14px;
+    grid-template-columns: 1fr;
+  }
+
   .field-score-team {
-    gap: 5px;
+    align-items: end;
+    gap: 10px;
   }
 
   .field-score-team span {
@@ -4381,24 +4449,20 @@ p.home-story-deck {
   }
 
   .field-score-team strong {
-    font-size: 3.15rem;
+    font-size: 2.7rem;
   }
 
-  .field-score-divider {
-    font-size: 0.54rem;
-    padding: 6px;
-  }
-
-  .field-next-details div {
-    gap: 2px;
+  .field-upcoming-game {
+    gap: 6px;
     grid-template-columns: 1fr;
   }
 
-  .field-game-mini {
-    grid-template-columns: 1fr;
+  .field-upcoming-empty {
+    min-height: 0;
+    padding-top: 8px;
   }
 
-  .field-game-mini > div:last-child {
+  .field-upcoming-date {
     justify-items: start;
     text-align: left;
   }

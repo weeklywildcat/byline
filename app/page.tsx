@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
 import { HomepageStory } from "@/components/HomepageStory";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { PollWidget } from "@/components/PollWidget";
@@ -159,8 +160,9 @@ export default async function HomePage() {
           className={rightNowPosts.length > 0 ? "top-stories" : "top-stories top-stories-single"}
           aria-labelledby="lead-heading"
         >
-          <div className="top-stories-layout">
-            <div className="live-lead">
+          <div className="top-stories-layout" data-homepage-top-stories>
+            <HomepageHeroRailLimiter />
+            <div className="live-lead" data-homepage-lead>
               <HomepageStory post={leadPost} variant="lead" showDeck priority />
             </div>
 
@@ -177,7 +179,7 @@ export default async function HomePage() {
 
             <aside className="top-stories-left-rail" aria-label="Poll and school calendar">
               <PollWidget />
-              <ThisWeekCard schoolEvents={sportsSchedule.schoolEvents} sportsGames={sportsSchedule.upcomingGames} />
+              <ThisWeekCard maxVisibleItems={3} schoolEvents={sportsSchedule.schoolEvents} sportsGames={sportsSchedule.upcomingGames} />
             </aside>
           </div>
         </section>

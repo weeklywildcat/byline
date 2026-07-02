@@ -32,6 +32,7 @@ export type WordPressAuthorProfile = {
   pronouns: string;
   role: string;
   founder: boolean;
+  showInDirectory?: boolean;
   profilePhoto?: {
     id: number;
     url: string;
@@ -151,6 +152,10 @@ export function getSiteUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL).replace(/\/$/, "");
 }
 
+function getHeadlessApiUrl() {
+  return getWordPressApiUrl().replace(/\/wp\/v2$/, "/weekly-wildcat/v1");
+}
+
 async function wpFetch<T>(path: string, query: Record<string, QueryValue> = {}) {
   const url = new URL(`${getWordPressApiUrl()}/${path.replace(/^\//, "")}`);
 
@@ -212,6 +217,34 @@ async function wpFetchCollection<T>(path: string, query: Record<string, QueryVal
   return [...firstPage.data, ...remainingPages.flatMap((page) => page.data)];
 }
 
+async function headlessWpFetch<T>(path: string, query: Record<string, QueryValue> = {}) {
+  const url = new URL(`${getHeadlessApiUrl()}/${path.replace(/^\//, "")}`);
+
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  if (WORDPRESS_FETCH_CACHE_KEY) {
+    url.searchParams.set("_ww_static_build", WORDPRESS_FETCH_CACHE_KEY);
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": WORDPRESS_FETCH_USER_AGENT
+    },
+    cache: process.env.NODE_ENV === "development" ? "no-store" : "force-cache"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Weekly Wildcat headless request failed: ${response.status} ${response.statusText} (${url})`);
+  }
+
+  return mirrorWordPressMediaInValue((await response.json()) as T);
+}
+
 export async function getLatestPosts(count = 12) {
   const { data } = await wpFetch<WordPressPost[]>("/posts", {
     _embed: 1,
@@ -253,10 +286,14 @@ export async function getAllCategories() {
 }
 
 export async function getAllAuthors() {
-  return wpFetchCollection<WordPressAuthor>("/users", {
-    orderby: "name",
-    order: "asc"
-  });
+  try {
+    return await headlessWpFetch<WordPressAuthor[]>("/authors");
+  } catch {
+    return wpFetchCollection<WordPressAuthor>("/users", {
+      orderby: "name",
+      order: "asc"
+    });
+  }
 }
 
 export async function getAuthorById(authorId: number) {
@@ -266,6 +303,13 @@ export async function getAuthorById(authorId: number) {
 }
 
 export async function getAuthorBySlug(slug: string) {
+  const authors = await getAllAuthors();
+  const publicAuthor = authors.find((author) => author.slug === slug);
+
+  if (publicAuthor) {
+    return publicAuthor;
+  }
+
   const { data } = await wpFetch<WordPressAuthor[]>("/users", {
     slug,
     per_page: 100

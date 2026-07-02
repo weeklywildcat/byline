@@ -59,7 +59,9 @@ export type SportsGame = {
 
 type SportsGameQuery = {
   limit?: number;
+  page?: number;
   sportKey?: string;
+  year?: string | number;
 };
 
 function normalizeSportsGameQuery(query: number | SportsGameQuery | undefined, defaultLimit: number) {
@@ -67,8 +69,33 @@ function normalizeSportsGameQuery(query: number | SportsGameQuery | undefined, d
     return { limit: query };
   }
 
-  return { limit: query?.limit ?? defaultLimit, sportKey: query?.sportKey };
+  return {
+    limit: query?.limit ?? defaultLimit,
+    page: query?.page,
+    sportKey: query?.sportKey,
+    year: query?.year
+  };
 }
+
+export type SportsGameFacets = {
+  years: string[];
+  sports: Array<{
+    label: string;
+    value: string;
+  }>;
+  summaries: Record<
+    string,
+    {
+      games: number;
+      upcoming: number;
+      finals: number;
+      wins: number;
+      losses: number;
+      ties: number;
+    }
+  >;
+  dataUrl?: string;
+};
 
 export type SchoolEvent = {
   id: number;
@@ -94,6 +121,12 @@ function getHeadlessApiUrl() {
 }
 
 async function headlessFetch<T>(path: string, query: Record<string, QueryValue> = {}) {
+  const { data } = await headlessFetchPage<T>(path, query);
+
+  return data;
+}
+
+async function headlessFetchPage<T>(path: string, query: Record<string, QueryValue> = {}) {
   const url = new URL(`${getHeadlessApiUrl()}/${path.replace(/^\//, "")}`);
 
   Object.entries(query).forEach(([key, value]) => {
@@ -108,20 +141,32 @@ async function headlessFetch<T>(path: string, query: Record<string, QueryValue> 
     headers: {
       Accept: "application/json"
     },
-    cache: "force-cache"
+    cache: process.env.NODE_ENV === "development" ? "no-store" : "force-cache"
   });
 
   if (!response.ok) {
     throw new Error(`Weekly Wildcat headless request failed: ${response.status} ${response.statusText} (${url})`);
   }
 
-  return mirrorWordPressMediaInValue((await response.json()) as T);
+  return {
+    data: await mirrorWordPressMediaInValue((await response.json()) as T),
+    totalPages: Number(response.headers.get("x-wp-totalpages") || "1")
+  };
 }
 
 export function getSportsGames(query?: number | SportsGameQuery) {
   const normalizedQuery = normalizeSportsGameQuery(query, 20);
 
-  return headlessFetch<SportsGame[]>("/sports-games", { per_page: normalizedQuery.limit, sportKey: normalizedQuery.sportKey });
+  return headlessFetch<SportsGame[]>("/sports-games", {
+    per_page: normalizedQuery.limit,
+    page: normalizedQuery.page,
+    sportKey: normalizedQuery.sportKey,
+    year: normalizedQuery.year
+  });
+}
+
+export function getSportsGameFacets() {
+  return headlessFetch<SportsGameFacets>("/sports-games/facets");
 }
 
 export function getUpcomingSportsGames(query?: number | SportsGameQuery) {
