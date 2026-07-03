@@ -1,4 +1,5 @@
 import type { SportsGame } from "@/lib/headless";
+import { SiteIcon } from "./SiteIcon";
 
 type SportsSchedulePanelProps = {
   recentScores: SportsGame[];
@@ -15,6 +16,25 @@ function getGameLocation(game: SportsGame) {
 
 function getSportLevel(game: SportsGame) {
   return game.display.sportLevel || [game.sport, game.level].filter(Boolean).join(" · ") || game.sportLabel || "Sports";
+}
+
+function getSportIconName(game: SportsGame) {
+  const sport = [game.sportKey, game.sport, game.sportLabel, game.teamLabel].filter(Boolean).join(" ").toLowerCase();
+
+  if (sport.includes("baseball")) return "mdi:baseball";
+  if (sport.includes("softball")) return "mdi:baseball";
+  if (sport.includes("basketball")) return "mdi:basketball";
+  if (sport.includes("football")) return "mdi:football";
+  if (sport.includes("soccer")) return "mdi:soccer";
+  if (sport.includes("volleyball")) return "mdi:volleyball";
+  if (sport.includes("tennis")) return "mdi:tennis-ball";
+  if (sport.includes("golf")) return "mdi:golf";
+  if (sport.includes("track") || sport.includes("cross country")) return "mdi:run-fast";
+  if (sport.includes("wrestling")) return "mdi:boxing-glove";
+  if (sport.includes("cheer")) return "mdi:bullhorn";
+  if (sport.includes("swim")) return "mdi:swim";
+
+  return "mdi:whistle";
 }
 
 function getSiteLabel(game: SportsGame) {
@@ -98,27 +118,30 @@ function LatestResultCard({ game }: { game: SportsGame }) {
   const opponentWon = game.wildcatsScore !== null && game.opponentScore !== null && game.opponentScore > game.wildcatsScore;
 
   return (
-    <article className="field-game field-game-latest">
-      <div className="field-game-topline">
-        <span>{getSportLevel(game)}</span>
-        <span>{game.display.status || "Final"}</span>
+    <article className="field-result-card">
+      <div className="field-result-summary">
+        <span className="field-sport-icon">
+          <SiteIcon name={getSportIconName(game)} width={28} height={28} />
+        </span>
+        <div>
+          <p className="field-card-label">{getSportLevel(game)}</p>
+          <h4>{game.display.matchup || game.title}</h4>
+        </div>
       </div>
-      <h4>{game.display.matchup || game.title}</h4>
-      {context ? <p className="field-game-context">{context}</p> : null}
-      <div className="field-game-score" aria-label={game.display.score || undefined}>
+      <div className="field-scoreboard" aria-label={game.display.score || undefined}>
         <div className={`field-score-team${wildcatsWon ? " field-score-team-winner" : ""}`}>
           <span>{scoreboard.wildcats.label}</span>
           <strong>{scoreboard.wildcats.score ?? "—"}</strong>
         </div>
-        <span className="field-score-divider" aria-hidden="true">
-          Final
-        </span>
         <div className={`field-score-team${opponentWon ? " field-score-team-winner" : ""}`}>
           <span>{scoreboard.opponent.label}</span>
           <strong>{scoreboard.opponent.score ?? "—"}</strong>
         </div>
       </div>
-      {verdict ? <p className="field-result-verdict">{verdict}</p> : null}
+      <div className="field-result-footer">
+        <p>{verdict || game.display.status || "Final"}</p>
+        {context ? <span>{context}</span> : null}
+      </div>
       {game.recapUrl ? (
         <a className="field-game-link" href={game.recapUrl}>
           Read recap →
@@ -128,61 +151,21 @@ function LatestResultCard({ game }: { game: SportsGame }) {
   );
 }
 
-function ScheduleMetaRow({ label, value }: { label: string; value: string }) {
-  if (!value) {
-    return null;
-  }
-
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
-  );
-}
-
-function NextUpCard({ game }: { game: SportsGame }) {
+function UpcomingGameRow({ game }: { game: SportsGame }) {
   const date = getGameDate(game);
   const location = getGameLocation(game);
   const siteLabel = getSiteLabel(game);
-  const context = getEditorialContext(game);
-  const href = game.recapUrl || "/sports/schedule/";
-  const linkText = game.recapUrl ? "Preview matchup →" : "View schedule →";
 
   return (
-    <article className="field-game field-game-next">
-      <div className="field-game-topline">
-        <span>{getSportLevel(game)}</span>
-        <span>{game.display.status || "Upcoming"}</span>
-      </div>
-      <h4>{game.display.matchup || game.title}</h4>
-      {context ? <p className="field-game-context">{context}</p> : null}
-      <dl className="field-next-details">
-        <ScheduleMetaRow label="Date / Time" value={date} />
-        <ScheduleMetaRow label="Opponent" value={getGameOpponent(game)} />
-        <ScheduleMetaRow label="Location" value={location} />
-        <ScheduleMetaRow label="Site" value={siteLabel} />
-      </dl>
-      <a className="field-game-link" href={href}>
-        {linkText}
-      </a>
-    </article>
-  );
-}
-
-function UpcomingMiniCard({ game }: { game: SportsGame }) {
-  const date = getGameDate(game);
-  const siteLabel = getSiteLabel(game);
-
-  return (
-    <article className="field-game-mini">
-      <div>
-        <p>{getSportLevel(game)}</p>
-        <h5>{game.display.matchup || game.title}</h5>
-      </div>
-      <div>
+    <article className="field-upcoming-game">
+      <div className="field-upcoming-date">
         {date ? <time dateTime={game.startDate}>{date}</time> : null}
         {siteLabel ? <span>{siteLabel}</span> : null}
+      </div>
+      <div className="field-upcoming-main">
+        <p>{getSportLevel(game)}</p>
+        <h5>{game.display.matchup || game.title}</h5>
+        {location ? <span>{location}</span> : null}
       </div>
     </article>
   );
@@ -194,9 +177,10 @@ export function SportsSchedulePanel({ recentScores, upcomingGames }: SportsSched
   }
 
   const latestResult = recentScores[0] ?? null;
-  const nextUp = upcomingGames[0] ?? null;
-  const additionalUpcoming = upcomingGames.slice(1, 4);
-  const columnCount = [latestResult, nextUp].filter(Boolean).length;
+  const visibleUpcomingGames = upcomingGames.slice(0, 4);
+  const hasUpcomingGames = visibleUpcomingGames.length > 0;
+  const showUpcomingColumn = hasUpcomingGames || Boolean(latestResult);
+  const columnCount = [latestResult, showUpcomingColumn].filter(Boolean).length;
 
   return (
     <aside className="field-schedule" aria-labelledby="field-schedule-heading">
@@ -207,23 +191,24 @@ export function SportsSchedulePanel({ recentScores, upcomingGames }: SportsSched
 
       <div className={`field-schedule-layout field-schedule-layout-${columnCount}`}>
         {latestResult ? (
-          <section className="field-schedule-group" aria-labelledby="recent-scores-heading">
-            <h4 id="recent-scores-heading">Latest Result</h4>
+          <section className="field-schedule-result" aria-labelledby="recent-scores-heading">
+            <h4 id="recent-scores-heading">Final</h4>
             <LatestResultCard game={latestResult} />
           </section>
         ) : null}
 
-        {nextUp ? (
-          <section className="field-schedule-group" aria-labelledby="upcoming-games-heading">
-            <h4 id="upcoming-games-heading">Next Up</h4>
-            <NextUpCard game={nextUp} />
-            {additionalUpcoming.length > 0 ? (
-              <div className="field-game-list" aria-label="More upcoming games">
-                {additionalUpcoming.map((game) => (
-                  <UpcomingMiniCard key={game.id} game={game} />
+        {showUpcomingColumn ? (
+          <section className="field-schedule-upcoming" aria-labelledby="upcoming-games-heading">
+            <h4 id="upcoming-games-heading">Upcoming</h4>
+            {hasUpcomingGames ? (
+              <div className="field-game-list">
+                {visibleUpcomingGames.map((game) => (
+                  <UpcomingGameRow key={game.id} game={game} />
                 ))}
               </div>
-            ) : null}
+            ) : (
+              <p className="field-upcoming-empty">No upcoming games</p>
+            )}
           </section>
         ) : null}
       </div>

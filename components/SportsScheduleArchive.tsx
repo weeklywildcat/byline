@@ -1,11 +1,31 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { SectionHeader } from "@/components/SectionHeader";
 import type { SportsGame } from "@/lib/headless";
 
 type SportsScheduleArchiveProps = {
+  apiBaseUrl?: string;
+  dataUrl?: string;
   games: SportsGame[];
+  sports?: Array<{
+    label: string;
+    value: string;
+  }>;
+  summaries?: Record<string, ScheduleSummary>;
+  years?: string[];
 };
+
+type ScheduleSummary = {
+  games: number;
+  upcoming: number;
+  finals: number;
+  wins: number;
+  losses: number;
+  ties: number;
+};
+
+const SCHEDULE_PAGE_SIZE = 25;
 
 function getYear(game: SportsGame) {
   return game.startDate.slice(0, 4);
@@ -13,6 +33,10 @@ function getYear(game: SportsGame) {
 
 function getSportLabel(game: SportsGame) {
   return game.sport || game.sportLabel || game.sportKey || "Sports";
+}
+
+function getSportValue(game: SportsGame) {
+  return game.sportKey || getSportLabel(game);
 }
 
 function getSportLevel(game: SportsGame) {
@@ -68,16 +92,138 @@ function getGameStatusLabel(game: SportsGame) {
   return game.display.status || game.status;
 }
 
-function sortByDateAscending(left: SportsGame, right: SportsGame) {
-  return new Date(left.startDate).getTime() - new Date(right.startDate).getTime();
-}
-
 function sortByDateDescending(left: SportsGame, right: SportsGame) {
   return new Date(right.startDate).getTime() - new Date(left.startDate).getTime();
 }
 
 function formatStat(value: number, singular: string, plural = `${singular}s`) {
   return `${value} ${value === 1 ? singular : plural}`;
+}
+
+function formatRecord(summary: ScheduleSummary) {
+  const decidedFinals = summary.wins + summary.losses + summary.ties;
+
+  if (decidedFinals === 0) {
+    return "";
+  }
+
+  return summary.ties > 0 ? `${summary.wins}-${summary.losses}-${summary.ties}` : `${summary.wins}-${summary.losses}`;
+}
+
+function getSummaryKey(year = "all", sport = "all") {
+  return `${year}::${sport}`;
+}
+
+function createSummary(): ScheduleSummary {
+  return {
+    games: 0,
+    upcoming: 0,
+    finals: 0,
+    wins: 0,
+    losses: 0,
+    ties: 0
+  };
+}
+
+function addGameToSummary(summary: ScheduleSummary, game: SportsGame) {
+  summary.games += 1;
+
+  if (game.status === "upcoming") {
+    summary.upcoming += 1;
+  }
+
+  if (game.status === "final") {
+    summary.finals += 1;
+
+    if (game.wildcatsScore !== null && game.opponentScore !== null) {
+      if (game.wildcatsScore > game.opponentScore) {
+        summary.wins += 1;
+      } else if (game.wildcatsScore < game.opponentScore) {
+        summary.losses += 1;
+      } else {
+        summary.ties += 1;
+      }
+    }
+  }
+}
+
+function buildFallbackMetadata(games: SportsGame[]) {
+  const yearSet = new Set<string>();
+  const sportMap = new Map<string, string>();
+  const summaries: Record<string, ScheduleSummary> = {};
+
+  games.forEach((game) => {
+    const year = getYear(game);
+    const sport = getSportValue(game);
+
+    if (year) {
+      yearSet.add(year);
+    }
+
+    if (sport) {
+      sportMap.set(sport, getSportLabel(game));
+    }
+
+    [
+      getSummaryKey(),
+      getSummaryKey(year || "all", "all"),
+      getSummaryKey("all", sport || "all"),
+      getSummaryKey(year || "all", sport || "all")
+    ].forEach((key) => {
+      summaries[key] ??= createSummary();
+      addGameToSummary(summaries[key], game);
+    });
+  });
+
+  return {
+    sports: [...sportMap.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((left, right) => left.label.localeCompare(right.label)),
+    summaries,
+    years: [...yearSet].sort((left, right) => right.localeCompare(left))
+  };
+}
+
+function getHeadlessApiUrl(apiBaseUrl: string) {
+  return apiBaseUrl.replace(/\/$/, "").replace(/\/wp\/v2$/, "/weekly-wildcat/v1");
+}
+
+async function fetchScheduleGames({
+  apiBaseUrl,
+  page,
+  sport,
+  year
+}: {
+  apiBaseUrl: string;
+  page: number;
+  sport: string;
+  year: string;
+}) {
+  const url = new URL(`${getHeadlessApiUrl(apiBaseUrl)}/sports-games`);
+
+  url.searchParams.set("per_page", String(SCHEDULE_PAGE_SIZE));
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("_ww_static_build", String(Date.now()));
+
+  if (year !== "all") {
+    url.searchParams.set("year", year);
+  }
+
+  if (sport !== "all") {
+    url.searchParams.set("sportKey", sport);
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Schedule request failed: ${response.status}`);
+  }
+
+  return (await response.json()) as SportsGame[];
 }
 
 function ScheduleScore({ game }: { game: SportsGame }) {
@@ -96,7 +242,7 @@ function ScheduleScore({ game }: { game: SportsGame }) {
         <strong>{scoreboard.wildcats.score ?? "—"}</strong>
       </div>
       <span className="schedule-score-divider" aria-hidden="true">
-        Final
+        at
       </span>
       <div className={opponentWon ? "schedule-score-team schedule-score-winner" : "schedule-score-team"}>
         <span>{scoreboard.opponent.label}</span>
@@ -109,11 +255,13 @@ function ScheduleScore({ game }: { game: SportsGame }) {
 function ScheduleGameCard({ game }: { game: SportsGame }) {
   const siteLabel = getSiteLabel(game);
   const location = getLocation(game);
-  const linkHref = game.recapUrl || "/category/sports/";
-  const linkText = game.status === "final" ? "Recap" : "Preview";
 
   return (
     <article className={`schedule-game-card schedule-game-card-${game.status}`}>
+      <div className="schedule-game-date">
+        <time dateTime={game.startDate}>{game.display.date || game.startDate}</time>
+        {siteLabel ? <span>{siteLabel}</span> : null}
+      </div>
       <div className="schedule-game-main">
         <div className="schedule-game-meta">
           <span>{getSportLevel(game)}</span>
@@ -121,12 +269,6 @@ function ScheduleGameCard({ game }: { game: SportsGame }) {
         </div>
         <h3>{game.display.matchup || game.title}</h3>
         <dl className="schedule-game-details">
-          <div>
-            <dt>Date</dt>
-            <dd>
-              <time dateTime={game.startDate}>{game.display.date || game.startDate}</time>
-            </dd>
-          </div>
           <div>
             <dt>Opponent</dt>
             <dd>{getOpponent(game)}</dd>
@@ -137,63 +279,100 @@ function ScheduleGameCard({ game }: { game: SportsGame }) {
               <dd>{location}</dd>
             </div>
           ) : null}
-          {siteLabel ? (
-            <div>
-              <dt>Site</dt>
-              <dd>{siteLabel}</dd>
-            </div>
-          ) : null}
         </dl>
       </div>
       <div className="schedule-game-result">
         <ScheduleScore game={game} />
-        <a href={linkHref}>{linkText} →</a>
+        {game.recapUrl ? <a href={game.recapUrl}>{game.status === "final" ? "Recap" : "Preview"}</a> : null}
       </div>
     </article>
   );
 }
 
-export function SportsScheduleArchive({ games }: SportsScheduleArchiveProps) {
+export function SportsScheduleArchive({ apiBaseUrl, dataUrl, games, sports, summaries, years }: SportsScheduleArchiveProps) {
   const [year, setYear] = useState("all");
   const [sport, setSport] = useState("all");
+  const [loadedGames, setLoadedGames] = useState(games);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const fallbackMetadata = useMemo(() => buildFallbackMetadata(games), [games]);
+  const apiUrl = apiBaseUrl || process.env.NEXT_PUBLIC_WP_API_URL || "https://cms.weeklywildcat.com/wp-json/wp/v2";
+  const filterYears = years ?? fallbackMetadata.years;
+  const filterSports = sports ?? fallbackMetadata.sports;
+  const scheduleSummaries = summaries ?? fallbackMetadata.summaries;
+  const summary = scheduleSummaries[getSummaryKey(year, sport)] ?? {
+    games: loadedGames.length,
+    upcoming: 0,
+    finals: 0,
+    wins: 0,
+    losses: 0,
+    ties: 0
+  };
+  const visibleGames = useMemo(() => [...loadedGames].sort(sortByDateDescending), [loadedGames]);
+  const hasMoreGames = loadedGames.length < summary.games;
+  const record = formatRecord(summary);
 
-  const years = useMemo(() => [...new Set(games.map(getYear).filter(Boolean))].sort((left, right) => right.localeCompare(left)), [games]);
-  const sports = useMemo(
-    () => [...new Set(games.map(getSportLabel).filter(Boolean))].sort((left, right) => left.localeCompare(right)),
-    [games]
-  );
-  const filteredGames = useMemo(
-    () =>
-      games.filter((game) => {
-        const matchesYear = year === "all" || getYear(game) === year;
-        const matchesSport = sport === "all" || getSportLabel(game) === sport;
+  async function loadGames(nextPage: number, nextYear = year, nextSport = sport, append = false) {
+    setIsLoading(true);
+    setLoadError("");
 
-        return matchesYear && matchesSport;
-      }),
-    [games, sport, year]
-  );
-  const upcomingGames = filteredGames.filter((game) => game.status === "upcoming").sort(sortByDateAscending);
-  const historyGames = filteredGames.filter((game) => game.status !== "upcoming").sort(sortByDateDescending);
-  const finalCount = filteredGames.filter((game) => game.status === "final").length;
+    if (!append) {
+      setLoadedGames([]);
+      setCurrentPage(1);
+    }
+
+    try {
+      const nextGames = await fetchScheduleGames({
+        apiBaseUrl: apiUrl,
+        page: nextPage,
+        sport: nextSport,
+        year: nextYear
+      });
+
+      setLoadedGames((currentGames) => {
+        if (!append) {
+          return nextGames;
+        }
+
+        const seenIds = new Set(currentGames.map((game) => game.id));
+
+        return [...currentGames, ...nextGames.filter((game) => !seenIds.has(game.id))];
+      });
+      setCurrentPage(nextPage);
+    } catch {
+      setLoadError("The schedule could not load more games right now.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   return (
     <section className="schedule-archive" aria-labelledby="schedule-archive-heading">
-      <header className="schedule-archive-hero">
-        <p>Sports Center</p>
-        <h1 id="schedule-archive-heading">Game History &amp; Schedule</h1>
-        <div className="schedule-archive-stats" aria-label="Schedule summary">
-          <span>{formatStat(filteredGames.length, "game")}</span>
-          <span>{formatStat(upcomingGames.length, "upcoming", "upcoming")}</span>
-          <span>{formatStat(finalCount, "final")}</span>
-        </div>
-      </header>
+      <SectionHeader
+        actionLabel="Data"
+        href={dataUrl}
+        id="schedule-archive-heading"
+        title="Schedule"
+        description="Scores and upcoming games from Weekly Wildcat sports coverage."
+        level={1}
+      />
 
       <div className="schedule-filter-bar" aria-label="Schedule filters">
         <label>
           <span>Year</span>
-          <select aria-label="Year" value={year} onChange={(event) => setYear(event.target.value)}>
+          <select
+            aria-label="Year"
+            value={year}
+            onChange={(event) => {
+              const nextYear = event.target.value;
+
+              setYear(nextYear);
+              void loadGames(1, nextYear, sport);
+            }}
+          >
             <option value="all">All Years</option>
-            {years.map((yearOption) => (
+            {filterYears.map((yearOption) => (
               <option key={yearOption} value={yearOption}>
                 {yearOption}
               </option>
@@ -202,46 +381,59 @@ export function SportsScheduleArchive({ games }: SportsScheduleArchiveProps) {
         </label>
         <label>
           <span>Sport</span>
-          <select aria-label="Sport" value={sport} onChange={(event) => setSport(event.target.value)}>
+          <select
+            aria-label="Sport"
+            value={sport}
+            onChange={(event) => {
+              const nextSport = event.target.value;
+
+              setSport(nextSport);
+              void loadGames(1, year, nextSport);
+            }}
+          >
             <option value="all">All Sports</option>
-            {sports.map((sportOption) => (
-              <option key={sportOption} value={sportOption}>
-                {sportOption}
+            {filterSports.map((sportOption) => (
+              <option key={sportOption.value} value={sportOption.value}>
+                {sportOption.label}
               </option>
             ))}
           </select>
         </label>
       </div>
 
-      {filteredGames.length > 0 ? (
-        <div className="schedule-archive-sections">
-          {upcomingGames.length > 0 ? (
-            <section className="schedule-archive-section" aria-labelledby="schedule-upcoming-heading">
-              <div className="schedule-section-heading">
-                <h2 id="schedule-upcoming-heading">Upcoming Games</h2>
-                <span>{upcomingGames.length}</span>
-              </div>
-              <div className="schedule-game-list">
-                {upcomingGames.map((game) => (
-                  <ScheduleGameCard key={game.id} game={game} />
-                ))}
-              </div>
-            </section>
-          ) : null}
+      <div className="schedule-archive-stats" aria-label="Schedule summary">
+        <span>{formatStat(summary.games, "game")}</span>
+        <span>{formatStat(summary.upcoming, "upcoming", "upcoming")}</span>
+        <span>{formatStat(summary.finals, "final")}</span>
+        {record ? <span>{record}</span> : null}
+      </div>
 
-          {historyGames.length > 0 ? (
-            <section className="schedule-archive-section" aria-labelledby="schedule-history-heading">
-              <div className="schedule-section-heading">
-                <h2 id="schedule-history-heading">Game History</h2>
-                <span>{historyGames.length}</span>
-              </div>
-              <div className="schedule-game-list">
-                {historyGames.map((game) => (
-                  <ScheduleGameCard key={game.id} game={game} />
-                ))}
-              </div>
-            </section>
-          ) : null}
+      {summary.games > 0 ? (
+        <div className="schedule-archive-sections">
+          <section className="schedule-archive-section" aria-labelledby="schedule-games-heading">
+            <div className="schedule-section-heading">
+              <h2 id="schedule-games-heading">Games</h2>
+              <span>
+                Showing {loadedGames.length} of {summary.games}
+              </span>
+            </div>
+            <div className="schedule-game-list">
+              {visibleGames.map((game) => (
+                <ScheduleGameCard key={game.id} game={game} />
+              ))}
+            </div>
+            {hasMoreGames ? (
+              <button
+                className="schedule-load-more"
+                type="button"
+                onClick={() => void loadGames(currentPage + 1, year, sport, true)}
+                disabled={isLoading}
+              >
+                {isLoading ? "Loading..." : "Load More"}
+              </button>
+            ) : null}
+            {loadError ? <p className="schedule-load-error">{loadError}</p> : null}
+          </section>
         </div>
       ) : (
         <p className="empty-state schedule-empty">No games match those filters yet.</p>

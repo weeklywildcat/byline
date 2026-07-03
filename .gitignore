@@ -8,6 +8,7 @@
 out/
 node_modules/
 wordpress/
+public/_wordpress-media/
 *.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*

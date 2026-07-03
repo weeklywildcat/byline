@@ -258,6 +258,7 @@ function getArticleImageSchema(image: WordPressMedia | null) {
   }
 
   const imageCredit = image.weeklyWildcatImage;
+  const imageUrl = absoluteUrl(image.source_url);
   const creator = imageCredit?.creator;
   const copyrightNotice =
     imageCredit?.copyrightNotice ||
@@ -270,8 +271,8 @@ function getArticleImageSchema(image: WordPressMedia | null) {
   return [
     {
       "@type": "ImageObject",
-      contentUrl: image.source_url,
-      url: image.source_url,
+      contentUrl: imageUrl,
+      url: imageUrl,
       width: image.media_details?.width,
       height: image.media_details?.height,
       caption: stripHtml(image.caption?.rendered ?? image.media_details?.image_meta?.caption ?? "") || undefined,

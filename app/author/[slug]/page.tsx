@@ -84,7 +84,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
       description,
       jobTitle: profile?.role || undefined,
       url: absoluteUrl(getAuthorHref(author)),
-      image: photo?.url || undefined,
+      image: photo?.url ? absoluteUrl(photo.url) : undefined,
       sameAs: socialLinks.filter((link) => !link.href.startsWith("mailto:")).map((link) => link.href)
     }
   };

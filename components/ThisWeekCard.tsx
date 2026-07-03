@@ -2,6 +2,7 @@ import type { SchoolEvent, SportsGame } from "@/lib/headless";
 import { SiteIcon } from "./SiteIcon";
 
 type ThisWeekCardProps = {
+  maxVisibleItems?: number;
   schoolEvents: SchoolEvent[];
   sportsGames: SportsGame[];
 };
@@ -83,11 +84,11 @@ function toWeekItems(schoolEvents: SchoolEvent[], sportsGames: SportsGame[]) {
   );
 }
 
-export function ThisWeekCard({ schoolEvents, sportsGames }: ThisWeekCardProps) {
+export function ThisWeekCard({ maxVisibleItems = MAX_VISIBLE_ITEMS, schoolEvents, sportsGames }: ThisWeekCardProps) {
   const { start, end } = getWeekWindow();
   const allItems = toWeekItems(schoolEvents, sportsGames);
   const weekItems = allItems.filter((item) => isInWeek(item.dateTime, start, end));
-  const visibleItems = (weekItems.length > 0 ? weekItems : allItems).slice(0, MAX_VISIBLE_ITEMS);
+  const visibleItems = (weekItems.length > 0 ? weekItems : allItems).slice(0, maxVisibleItems);
 
   return (
     <section className="this-week-card" aria-labelledby="this-week-heading">
