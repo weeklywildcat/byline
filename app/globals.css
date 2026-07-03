@@ -2789,8 +2789,8 @@ p.home-story-deck {
   border-bottom: 1px solid var(--rule-strong);
   border-top: 2px solid var(--rule-strong);
   color: var(--ink);
-  margin-top: 24px;
-  padding: 12px 0 14px;
+  margin-top: 20px;
+  padding: 10px 0 12px;
 }
 
 .field-schedule-header {
@@ -2798,8 +2798,8 @@ p.home-story-deck {
   display: flex;
   gap: 16px;
   justify-content: space-between;
-  margin-bottom: 10px;
-  padding-bottom: 9px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--rule);
 }
 
@@ -2826,8 +2826,8 @@ p.home-story-deck {
 .field-schedule-layout {
   align-items: start;
   display: grid;
-  gap: 18px;
-  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+  gap: 16px;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
 }
 
 .field-schedule-layout-1 {
@@ -2835,13 +2835,13 @@ p.home-story-deck {
 }
 
 .field-schedule-layout-2 {
-  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
 }
 
 .field-schedule-result,
 .field-schedule-upcoming {
   display: grid;
-  gap: 9px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -2859,7 +2859,7 @@ p.home-story-deck {
 
 .field-schedule-upcoming {
   border-left: 1px solid var(--rule);
-  padding-left: 18px;
+  padding-left: 16px;
 }
 
 .field-game-list {
@@ -2867,16 +2867,29 @@ p.home-story-deck {
   gap: 0;
 }
 
+.field-result-list {
+  display: grid;
+  gap: 7px;
+}
+
+.field-result-list .field-result-card + .field-result-card {
+  border-top: 1px solid var(--rule);
+  padding-top: 7px;
+}
+
 .field-result-card {
   display: grid;
-  gap: 8px;
+  column-gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(112px, 0.38fr);
+  row-gap: 5px;
   min-width: 0;
 }
 
 .field-result-summary {
   align-items: center;
   display: flex;
-  gap: 12px;
+  gap: 10px;
+  grid-column: 1;
   min-width: 0;
 }
 
@@ -2889,7 +2902,7 @@ p.home-story-deck {
 .field-card-label {
   color: var(--muted);
   font-family: var(--font-ui);
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 800;
   line-height: 1.25;
   margin: 0;
@@ -2898,20 +2911,18 @@ p.home-story-deck {
 
 .field-sport-icon {
   align-items: center;
-  border-right: 2px solid var(--accent);
   color: var(--accent);
-  flex: 0 0 34px;
+  flex: 0 0 24px;
   display: inline-flex;
-  height: 36px;
+  height: 32px;
   justify-content: center;
-  padding-right: 8px;
-  width: 34px;
+  width: 24px;
 }
 
 .field-result-card h4 {
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 1.08rem;
+  font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1.12;
@@ -2919,26 +2930,27 @@ p.home-story-deck {
 }
 
 .field-scoreboard {
-  border-top: 1px solid var(--rule);
+  border-top: 0;
   display: grid;
+  grid-column: 2;
+  grid-row: 1 / span 3;
   gap: 0;
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .field-score-team {
   align-items: baseline;
-  border-bottom: 1px solid var(--rule);
   display: flex;
-  gap: 12px;
+  gap: 8px;
   justify-content: space-between;
   min-width: 0;
-  padding: 8px 0;
+  padding: 2px 0;
 }
 
 .field-score-team span {
-  color: var(--ink);
+  color: currentColor;
   font-family: var(--font-ui);
-  font-size: 0.76rem;
+  font-size: 0.62rem;
   font-weight: 800;
   line-height: 1.1;
   overflow: hidden;
@@ -2948,17 +2960,16 @@ p.home-story-deck {
 }
 
 .field-score-team strong {
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: clamp(2.3rem, 4vw, 3.45rem);
+  color: currentColor;
+  font-family: var(--font-body);
+  font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: 0;
-  line-height: 0.82;
+  line-height: 0.9;
 }
 
 .field-score-team-winner {
-  border-left: 3px solid var(--accent);
-  padding-left: 9px;
+  color: var(--accent-dark);
 }
 
 .field-result-footer {
@@ -2966,6 +2977,7 @@ p.home-story-deck {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+  grid-column: 1;
 }
 
 .field-result-footer p,
@@ -2992,20 +3004,22 @@ p.home-story-deck {
 .field-game-link {
   color: var(--accent);
   font-family: var(--font-ui);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 800;
+  grid-column: 1;
   justify-self: start;
   margin-top: 1px;
   text-transform: uppercase;
 }
 
 .field-upcoming-game {
-  align-items: start;
+  align-items: center;
   border-top: 1px solid var(--rule);
   display: grid;
-  gap: 14px;
-  grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
-  padding: 9px 0;
+  gap: 10px;
+  grid-template-columns: minmax(148px, 0.32fr) minmax(0, 1fr);
+  min-height: 48px;
+  padding: 7px 0;
 }
 
 .field-upcoming-game:first-child {
@@ -3039,29 +3053,42 @@ p.home-story-deck {
   text-transform: uppercase;
 }
 
+.field-upcoming-main {
+  display: grid;
+  min-width: 0;
+}
+
 .field-upcoming-main h5 {
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 0.94rem;
+  font-size: 0.88rem;
   font-weight: 800;
   line-height: 1.12;
   margin: 3px 0 0;
+  overflow-wrap: anywhere;
 }
 
 .field-upcoming-main > span {
   color: var(--muted);
   display: block;
   font-family: var(--font-body);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   line-height: 1.25;
   margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .field-upcoming-date {
+  align-content: center;
+  border-right: 1px solid var(--rule);
   display: grid;
-  gap: 4px;
-  justify-items: end;
-  text-align: right;
+  gap: 3px;
+  justify-items: start;
+  min-height: 34px;
+  padding-right: 10px;
+  text-align: left;
 }
 
 .schedule-page-shell {
@@ -4001,6 +4028,10 @@ p.home-story-deck {
     padding: 16px;
   }
 
+  .field-result-card {
+    grid-template-columns: minmax(0, 1fr) minmax(104px, 0.34fr);
+  }
+
   .field-schedule-upcoming {
     border-left: 0;
     border-top: 1px solid var(--rule);
@@ -4009,7 +4040,7 @@ p.home-story-deck {
   }
 
   .field-score-team strong {
-    font-size: 3rem;
+    font-size: 1.65rem;
   }
 
   .home-story-field {
@@ -4348,6 +4379,17 @@ p.home-story-deck {
     grid-template-columns: 1fr;
   }
 
+  .field-result-card {
+    grid-template-columns: 1fr;
+  }
+
+  .field-scoreboard {
+    border-top: 1px solid var(--rule);
+    grid-column: 1;
+    grid-row: auto;
+    margin-top: 2px;
+  }
+
   .field-score-team {
     align-items: end;
     gap: 10px;
@@ -4358,12 +4400,13 @@ p.home-story-deck {
   }
 
   .field-score-team strong {
-    font-size: 2.7rem;
+    font-size: 2rem;
   }
 
   .field-upcoming-game {
     gap: 6px;
     grid-template-columns: 1fr;
+    min-height: 0;
   }
 
   .field-upcoming-empty {
@@ -4372,7 +4415,10 @@ p.home-story-deck {
   }
 
   .field-upcoming-date {
+    border-right: 0;
     justify-items: start;
+    min-height: 0;
+    padding-right: 0;
     text-align: left;
   }
 

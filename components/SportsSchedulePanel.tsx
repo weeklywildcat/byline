@@ -112,7 +112,6 @@ function getResultVerdict(game: SportsGame) {
 
 function LatestResultCard({ game }: { game: SportsGame }) {
   const scoreboard = getScoreboard(game);
-  const date = getGameDate(game);
   const context = getEditorialContext(game);
   const verdict = getResultVerdict(game);
   const wildcatsWon = game.wildcatsScore !== null && game.opponentScore !== null && game.wildcatsScore > game.opponentScore;
@@ -141,7 +140,6 @@ function LatestResultCard({ game }: { game: SportsGame }) {
       </div>
       <div className="field-result-footer">
         <p>{verdict || game.display.status || "Final"}</p>
-        {date ? <span>{date}</span> : null}
         {context ? <span>{context}</span> : null}
       </div>
       {game.recapUrl ? (
@@ -178,11 +176,12 @@ export function SportsSchedulePanel({ recentScores, upcomingGames }: SportsSched
     return null;
   }
 
-  const latestResult = recentScores[0] ?? null;
-  const visibleUpcomingGames = upcomingGames.slice(0, 4);
+  const visibleRecentScores = recentScores.slice(0, 2);
+  const visibleUpcomingGames = upcomingGames.slice(0, 3);
   const hasUpcomingGames = visibleUpcomingGames.length > 0;
-  const showUpcomingColumn = hasUpcomingGames || Boolean(latestResult);
-  const columnCount = [latestResult, showUpcomingColumn].filter(Boolean).length;
+  const hasRecentScores = visibleRecentScores.length > 0;
+  const showUpcomingColumn = hasUpcomingGames || hasRecentScores;
+  const columnCount = [hasRecentScores, showUpcomingColumn].filter(Boolean).length;
 
   return (
     <aside className="field-schedule" aria-labelledby="field-schedule-heading">
@@ -192,10 +191,14 @@ export function SportsSchedulePanel({ recentScores, upcomingGames }: SportsSched
       </div>
 
       <div className={`field-schedule-layout field-schedule-layout-${columnCount}`}>
-        {latestResult ? (
+        {hasRecentScores ? (
           <section className="field-schedule-result" aria-labelledby="recent-scores-heading">
-            <h4 id="recent-scores-heading">Final</h4>
-            <LatestResultCard game={latestResult} />
+            <h4 id="recent-scores-heading">Finals</h4>
+            <div className="field-result-list">
+              {visibleRecentScores.map((game) => (
+                <LatestResultCard key={game.id} game={game} />
+              ))}
+            </div>
           </section>
         ) : null}
 
