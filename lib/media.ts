@@ -9,7 +9,6 @@ const WORDPRESS_MEDIA_PATH_PREFIX = "/wp-content/uploads/";
 const WORDPRESS_MEDIA_PUBLIC_ROUTE = "/_wordpress-media";
 const WORDPRESS_MEDIA_PUBLIC_DIR = path.join(process.cwd(), "public", WORDPRESS_MEDIA_PUBLIC_ROUTE);
 const WORDPRESS_MEDIA_USER_AGENT = "Weekly Wildcat Static Site Builder (https://weeklywildcat.com)";
-const MISSING_WORDPRESS_MEDIA_FALLBACK_PATH = "/social-default.png";
 const ABSOLUTE_URL_PATTERN = /https?:\/\/[^\s"'<>),]+/gi;
 const downloadPromises = new Map<string, Promise<void>>();
 const attachmentUrlPromises = new Map<string, Promise<string[]>>();
@@ -198,14 +197,14 @@ async function mirrorAttachmentMediaUrl(value: string, attachmentId: string, ori
   throw originalError;
 }
 
-function warnMissingWordPressMedia(value: string, error: unknown) {
+function warnMissingWordPressMedia(value: string, fallbackUrl: string, error: unknown) {
   if (missingMediaWarnings.has(value)) {
     return;
   }
 
   missingMediaWarnings.add(value);
   console.warn(
-    `WordPress media could not be mirrored and will use ${MISSING_WORDPRESS_MEDIA_FALLBACK_PATH}: ${value}`,
+    `WordPress media could not be mirrored and will use the CMS URL instead: ${fallbackUrl}`,
     error instanceof Error ? error.message : error
   );
 }
@@ -232,15 +231,15 @@ export async function mirrorWordPressMediaUrl(value: string, attachmentId?: stri
       try {
         return await mirrorAttachmentMediaUrl(value, attachmentId, error);
       } catch (attachmentError) {
-        warnMissingWordPressMedia(value, attachmentError);
+        warnMissingWordPressMedia(value, media.cacheUrl, attachmentError);
 
-        return MISSING_WORDPRESS_MEDIA_FALLBACK_PATH;
+        return media.cacheUrl;
       }
     }
 
-    warnMissingWordPressMedia(value, error);
+    warnMissingWordPressMedia(value, media.cacheUrl, error);
 
-    return MISSING_WORDPRESS_MEDIA_FALLBACK_PATH;
+    return media.cacheUrl;
   }
 
   return mirrored.publicPath;
