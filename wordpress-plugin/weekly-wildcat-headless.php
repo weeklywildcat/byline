@@ -18,6 +18,7 @@ const WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION = 'wwh_cloudflare_deploy_hook_url';
 const WWH_CLOUDFLARE_DEPLOY_LAST_TRIGGERED_OPTION = 'wwh_cloudflare_deploy_last_triggered_at';
 const WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION = 'wwh_cloudflare_deploy_last_status';
 const WWH_CLOUDFLARE_DEPLOY_EVENT = 'wwh_trigger_cloudflare_deploy';
+const WWH_HOMEPAGE_OPINION_TREATMENT_META = '_ww_homepage_opinion_treatment';
 
 function wwh_author_social_fields(): array
 {
@@ -337,6 +338,17 @@ add_action('init', 'wwh_register_post_types');
 
 function wwh_register_post_meta(): void
 {
+    register_post_meta(
+        'post',
+        WWH_HOMEPAGE_OPINION_TREATMENT_META,
+        [
+            'single' => true,
+            'type' => 'string',
+            'show_in_rest' => false,
+            'auth_callback' => static fn() => current_user_can('edit_posts'),
+        ]
+    );
+
     $sports_keys = [
         '_ww_sport_key',
         '_ww_sport',
@@ -957,6 +969,15 @@ add_action('init', 'wwh_register_attachment_meta');
 function wwh_add_meta_boxes(): void
 {
     add_meta_box(
+        'wwh_homepage_treatment',
+        'Weekly Wildcat Homepage',
+        'wwh_render_homepage_treatment_meta_box',
+        'post',
+        'side',
+        'default'
+    );
+
+    add_meta_box(
         'wwh_sports_game_details',
         'Game Details',
         'wwh_render_sports_game_meta_box',
@@ -1025,6 +1046,17 @@ function wwh_select(string $label, string $name, string $value, array $options):
     }
 
     echo '</select></label></p>';
+}
+
+function wwh_render_homepage_treatment_meta_box(WP_Post $post): void
+{
+    wp_nonce_field('wwh_save_homepage_treatment', 'wwh_homepage_treatment_nonce');
+
+    printf(
+        '<p class="wwh-field wwh-checkbox"><label><input type="checkbox" name="ww_homepage_opinion_treatment" value="1"%s> <span>Use opinion lead treatment when this post is The Lead</span></label></p>',
+        checked(wwh_meta_value($post->ID, WWH_HOMEPAGE_OPINION_TREATMENT_META), '1', false)
+    );
+    echo '<p class="description">Applies the italic serif headline and warm opinion accent on the homepage lead only.</p>';
 }
 
 function wwh_render_sports_game_meta_box(WP_Post $post): void
@@ -1233,6 +1265,16 @@ function wwh_update_score_meta(int $post_id, string $key, string $value): void
 
     update_post_meta($post_id, $key, (string) max(0, absint($value)));
 }
+
+function wwh_save_homepage_treatment(int $post_id): void
+{
+    if (!wwh_can_save_post($post_id, 'wwh_homepage_treatment_nonce', 'wwh_save_homepage_treatment')) {
+        return;
+    }
+
+    wwh_update_meta($post_id, WWH_HOMEPAGE_OPINION_TREATMENT_META, isset($_POST['ww_homepage_opinion_treatment']) ? '1' : '');
+}
+add_action('save_post_post', 'wwh_save_homepage_treatment');
 
 function wwh_save_sports_game(int $post_id): void
 {
@@ -2209,8 +2251,32 @@ function wwh_register_rest_routes(): void
             'context' => ['view', 'edit'],
         ],
     ]);
+
+    register_rest_field('post', 'weeklyWildcat', [
+        'get_callback' => 'wwh_rest_post_settings',
+        'schema' => [
+            'description' => 'Weekly Wildcat post display settings.',
+            'type' => 'object',
+            'context' => ['view', 'edit'],
+            'properties' => [
+                'homepageOpinionTreatment' => [
+                    'type' => 'boolean',
+                    'description' => 'Whether to apply the opinion treatment when this post is the homepage lead.',
+                ],
+            ],
+        ],
+    ]);
 }
 add_action('rest_api_init', 'wwh_register_rest_routes');
+
+function wwh_rest_post_settings(array $post): array
+{
+    $post_id = isset($post['id']) ? absint($post['id']) : 0;
+
+    return [
+        'homepageOpinionTreatment' => get_post_meta($post_id, WWH_HOMEPAGE_OPINION_TREATMENT_META, true) === '1',
+    ];
+}
 
 function wwh_rest_image_credit(array $attachment): array
 {
