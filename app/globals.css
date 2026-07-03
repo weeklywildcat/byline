@@ -941,9 +941,9 @@ img {
 }
 
 .article-newsletter-turnstile {
-  max-width: 100%;
-  min-height: 65px;
-  min-width: 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .newsletter-signup-trap {

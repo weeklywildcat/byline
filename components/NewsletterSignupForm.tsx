@@ -134,8 +134,6 @@ export function NewsletterSignupForm({ sourceTitle, sourceUrl, turnstileSiteKey 
             className="cf-turnstile article-newsletter-turnstile"
             data-sitekey={turnstileSiteKey}
             data-action="newsletter"
-            data-theme="auto"
-            data-size="normal"
           />
         ) : null}
         <p
