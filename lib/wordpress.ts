@@ -129,6 +129,9 @@ export type WordPressPost = {
   categories: number[];
   tags: number[];
   sticky: boolean;
+  weeklyWildcat?: {
+    homepageOpinionTreatment?: boolean;
+  };
   _embedded?: {
     author?: WordPressAuthor[];
     "wp:featuredmedia"?: WordPressMedia[];

@@ -27,6 +27,7 @@ type HomepageStoryProps = {
   post: WordPressPost;
   variant: HomepageStoryVariant;
   cleanDeck?: boolean;
+  homepageTreatment?: "opinion";
   showAuthor?: boolean;
   showDeck?: boolean;
   showReadingTime?: boolean;
@@ -66,6 +67,7 @@ export function HomepageStory({
   post,
   variant,
   cleanDeck = false,
+  homepageTreatment,
   showAuthor = false,
   showDeck = false,
   showReadingTime = false,
@@ -79,7 +81,14 @@ export function HomepageStory({
   const href = getPostHref(post);
   const excerpt = cleanDeck ? getCleanDeck(post) : post.excerpt.rendered.trim();
   const hasImage = Boolean(image?.source_url);
-  const className = `home-story home-story-${variant}${hasImage ? "" : " home-story-no-image"}`;
+  const className = [
+    "home-story",
+    `home-story-${variant}`,
+    homepageTreatment === "opinion" ? "home-story-homepage-opinion" : "",
+    hasImage ? "" : "home-story-no-image"
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <article className={className}>
