@@ -161,7 +161,13 @@ export default async function HomePage() {
           <div className="top-stories-layout" data-homepage-top-stories>
             <HomepageHeroRailLimiter />
             <div className="live-lead" data-homepage-lead>
-              <HomepageStory post={leadPost} variant="lead" showDeck priority />
+              <HomepageStory
+                post={leadPost}
+                variant="lead"
+                homepageTreatment={leadPost.weeklyWildcat?.homepageOpinionTreatment ? "opinion" : undefined}
+                showDeck
+                priority
+              />
             </div>
 
             {rightNowPosts.length > 0 ? (

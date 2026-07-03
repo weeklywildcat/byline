@@ -2176,6 +2176,52 @@ p.home-story-deck {
   text-align: center;
 }
 
+.home-story-lead.home-story-homepage-opinion h2 {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+  padding-top: 22px;
+  position: relative;
+  z-index: 0;
+}
+
+.home-story-lead.home-story-homepage-opinion h2 a {
+  position: relative;
+  z-index: 1;
+}
+
+.home-story-lead.home-story-homepage-opinion h2::before {
+  background: linear-gradient(
+    90deg,
+    rgba(239, 151, 70, 0),
+    rgba(239, 151, 70, 0.92) 22%,
+    rgba(255, 219, 172, 0.96) 50%,
+    rgba(239, 151, 70, 0.92) 78%,
+    rgba(239, 151, 70, 0)
+  );
+  content: "";
+  height: 2px;
+  left: 50%;
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  width: min(360px, 70%);
+  z-index: 0;
+}
+
+.home-story-lead.home-story-homepage-opinion h2::after {
+  background: linear-gradient(180deg, rgba(246, 166, 88, 0.26), rgba(246, 166, 88, 0));
+  content: "";
+  height: 58px;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  width: min(440px, 82%);
+  z-index: 0;
+}
+
 .home-story-lead .home-story-meta {
   display: none;
 }
