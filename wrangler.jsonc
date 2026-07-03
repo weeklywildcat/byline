@@ -2,6 +2,7 @@
   "name": "byline",
   "main": "src/worker.js",
   "compatibility_date": "2026-06-30",
+  "keep_vars": true,
 
   "assets": {
     "directory": "./out",
