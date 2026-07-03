@@ -145,9 +145,10 @@ export default async function HomePage() {
     Boolean(athleteSpotlightPost) ||
     sportsSchedule.recentScores.length > 0 ||
     sportsSchedule.upcomingGames.length > 0;
+  const leadHasOpinionTreatment = Boolean(leadPost?.weeklyWildcat?.homepageOpinionTreatment);
 
   return (
-    <main className="live-home-shell">
+    <main className={leadHasOpinionTreatment ? "live-home-shell live-home-shell-opinion-lead" : "live-home-shell"}>
       <script
         id="website-json-ld"
         type="application/ld+json"
@@ -164,7 +165,7 @@ export default async function HomePage() {
               <HomepageStory
                 post={leadPost}
                 variant="lead"
-                homepageTreatment={leadPost.weeklyWildcat?.homepageOpinionTreatment ? "opinion" : undefined}
+                homepageTreatment={leadHasOpinionTreatment ? "opinion" : undefined}
                 showDeck
                 priority
               />
