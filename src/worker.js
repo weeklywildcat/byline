@@ -118,7 +118,9 @@ async function handleSubscribe(request, env) {
     return json({ ok: false, error: "Enter a valid email address." }, 400);
   }
 
-  if (!env.TURNSTILE_SECRET_KEY) {
+  const config = getSubscribeConfig(env);
+
+  if (!config.turnstileSecretKey) {
     return json({ ok: false, error: "Newsletter signup security is not configured yet." }, 500);
   }
 
@@ -126,7 +128,7 @@ async function handleSubscribe(request, env) {
     return json({ ok: false, error: "Complete the security check to sign up." }, 400);
   }
 
-  const turnstileResult = await verifyTurnstile(turnstileToken, request, env);
+  const turnstileResult = await verifyTurnstile(turnstileToken, request, config.turnstileSecretKey);
 
   if (!turnstileResult.success) {
     console.warn("Turnstile verification failed", {
@@ -144,15 +146,15 @@ async function handleSubscribe(request, env) {
     return json({ ok: false, error: "The security check could not be verified." }, 400);
   }
 
-  if (!env.KIT_API_KEY || !env.KIT_FORM_ID) {
+  if (!config.kitApiKey || !config.kitFormId) {
     return json({ ok: false, error: "Newsletter signup is not configured yet." }, 500);
   }
 
-  const kitResponse = await fetch(`${KIT_API_BASE}/forms/${encodeURIComponent(env.KIT_FORM_ID)}/subscribers`, {
+  const kitResponse = await fetch(`${KIT_API_BASE}/forms/${encodeURIComponent(config.kitFormId)}/subscribers`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Kit-Api-Key": env.KIT_API_KEY
+      "X-Kit-Api-Key": config.kitApiKey
     },
     body: JSON.stringify({
       email_address: email,
@@ -182,14 +184,39 @@ async function handleSubscribe(request, env) {
   );
 }
 
-async function verifyTurnstile(token, request, env) {
+function getSubscribeConfig(env) {
+  return {
+    turnstileSecretKey: getWorkerEnvString(env, "TURNSTILE_SECRET_KEY"),
+    kitApiKey: getWorkerEnvString(env, "KIT_API_KEY"),
+    kitFormId: getWorkerEnvString(env, "KIT_FORM_ID")
+  };
+}
+
+function getWorkerEnvString(env, name) {
+  if (!env || typeof env !== "object") {
+    return "";
+  }
+
+  const value = env[name];
+
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  const matchingEntry = Object.entries(env).find(([key]) => key.trim() === name);
+  const matchingValue = matchingEntry ? matchingEntry[1] : "";
+
+  return typeof matchingValue === "string" ? matchingValue.trim() : "";
+}
+
+async function verifyTurnstile(token, request, secretKey) {
   const response = await fetch(TURNSTILE_VERIFY_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      secret: env.TURNSTILE_SECRET_KEY,
+      secret: secretKey,
       response: token,
       remoteip: request.headers.get("CF-Connecting-IP") || undefined
     })
