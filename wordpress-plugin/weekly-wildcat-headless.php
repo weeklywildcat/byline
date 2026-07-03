@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: Weekly Wildcat Headless
- * Description: Headless CMS extensions for Weekly Wildcat sports schedules, scores, and school events.
- * Version: 0.1.12
+ * Plugin Name: Weekly Wildcat Bridge
+ * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
+ * Version: 0.1.13
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -14,6 +14,10 @@ if (!defined('ABSPATH')) {
 const WWH_SPORTS_GAME_POST_TYPE = 'ww_sports_game';
 const WWH_SCHOOL_EVENT_POST_TYPE = 'ww_school_event';
 const WWH_REST_NAMESPACE = 'weekly-wildcat/v1';
+const WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION = 'wwh_cloudflare_deploy_hook_url';
+const WWH_CLOUDFLARE_DEPLOY_LAST_TRIGGERED_OPTION = 'wwh_cloudflare_deploy_last_triggered_at';
+const WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION = 'wwh_cloudflare_deploy_last_status';
+const WWH_CLOUDFLARE_DEPLOY_EVENT = 'wwh_trigger_cloudflare_deploy';
 
 function wwh_author_social_fields(): array
 {
@@ -65,6 +69,170 @@ function wwh_register_update_checker(): void
     );
 }
 wwh_register_update_checker();
+
+function wwh_register_settings(): void
+{
+    register_setting(
+        'wwh_settings',
+        WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION,
+        [
+            'type' => 'string',
+            'sanitize_callback' => 'wwh_sanitize_cloudflare_deploy_hook_url',
+            'default' => '',
+            'show_in_rest' => false,
+        ]
+    );
+
+    add_settings_section(
+        'wwh_cloudflare_deploy_section',
+        'Cloudflare Builds',
+        '__return_false',
+        'wwh-settings'
+    );
+
+    add_settings_field(
+        WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION,
+        'Cloudflare Deploy Hook URL',
+        'wwh_render_cloudflare_deploy_hook_field',
+        'wwh-settings',
+        'wwh_cloudflare_deploy_section'
+    );
+}
+add_action('admin_init', 'wwh_register_settings');
+
+function wwh_sanitize_cloudflare_deploy_hook_url($value): string
+{
+    if (!current_user_can('manage_options')) {
+        return (string) get_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '');
+    }
+
+    if (isset($_POST['wwh_cloudflare_deploy_hook_clear'])) {
+        return '';
+    }
+
+    if (!is_string($value)) {
+        return (string) get_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '');
+    }
+
+    $value = trim($value);
+
+    if ($value === '') {
+        return (string) get_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '');
+    }
+
+    $url = esc_url_raw($value, ['https']);
+
+    if ($url === '' || wp_parse_url($url, PHP_URL_SCHEME) !== 'https') {
+        add_settings_error(
+            WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION,
+            'wwh_cloudflare_deploy_hook_invalid',
+            'Enter a valid HTTPS deploy hook URL.',
+            'error'
+        );
+
+        return (string) get_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '');
+    }
+
+    return $url;
+}
+
+function wwh_render_cloudflare_deploy_hook_field(): void
+{
+    $has_url = wwh_cloudflare_deploy_hook_url() !== '';
+
+    ?>
+    <input
+        type="password"
+        id="<?php echo esc_attr(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION); ?>"
+        name="<?php echo esc_attr(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION); ?>"
+        value=""
+        class="regular-text"
+        autocomplete="new-password"
+        placeholder="<?php echo esc_attr($has_url ? 'Saved. Enter a new URL to replace it.' : 'https://...'); ?>"
+    >
+    <p class="description">
+        <?php echo esc_html($has_url ? 'A deploy hook URL is saved. Leave this blank to keep it unchanged.' : 'Paste the private Cloudflare Workers Builds deploy hook URL.'); ?>
+    </p>
+    <?php if ($has_url) : ?>
+        <label>
+            <input type="checkbox" name="wwh_cloudflare_deploy_hook_clear" value="1">
+            Remove the saved deploy hook URL
+        </label>
+    <?php endif; ?>
+    <?php
+}
+
+function wwh_render_settings_page(): void
+{
+    if (!current_user_can('manage_options')) {
+        wp_die(esc_html__('Sorry, you are not allowed to manage these settings.', 'weekly-wildcat-headless'));
+    }
+
+    ?>
+    <div class="wrap wwh-settings-page">
+        <h1>Weekly Wildcat Bridge Settings</h1>
+        <form method="post" action="options.php">
+            <?php
+            settings_fields('wwh_settings');
+            do_settings_sections('wwh-settings');
+            submit_button('Save Settings');
+            ?>
+        </form>
+
+        <h2>Cloudflare Build Status</h2>
+        <table class="widefat striped" role="presentation">
+            <tbody>
+                <tr>
+                    <th scope="row">Last trigger time</th>
+                    <td><?php echo esc_html(wwh_cloudflare_deploy_last_trigger_time_label()); ?></td>
+                </tr>
+                <tr>
+                    <th scope="row">Last response status</th>
+                    <td><?php echo esc_html(wwh_cloudflare_deploy_last_status_label()); ?></td>
+                </tr>
+                <tr>
+                    <th scope="row">Pending trigger</th>
+                    <td><?php echo esc_html(wwh_cloudflare_deploy_pending_label()); ?></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <?php
+}
+
+function wwh_cloudflare_deploy_hook_url(): string
+{
+    return (string) get_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '');
+}
+
+function wwh_cloudflare_deploy_last_trigger_time_label(): string
+{
+    $timestamp = absint(get_option(WWH_CLOUDFLARE_DEPLOY_LAST_TRIGGERED_OPTION, 0));
+
+    if ($timestamp <= 0) {
+        return 'Never';
+    }
+
+    return wp_date('M j, Y g:i A T', $timestamp, wp_timezone());
+}
+
+function wwh_cloudflare_deploy_last_status_label(): string
+{
+    $status = (string) get_option(WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION, '');
+
+    return $status !== '' ? $status : 'Not triggered yet';
+}
+
+function wwh_cloudflare_deploy_pending_label(): string
+{
+    $timestamp = wp_next_scheduled(WWH_CLOUDFLARE_DEPLOY_EVENT);
+
+    if (!$timestamp) {
+        return 'No';
+    }
+
+    return 'Scheduled for ' . wp_date('M j, Y g:i A T', (int) $timestamp, wp_timezone());
+}
 
 function wwh_sports_team_options(): array
 {
@@ -253,9 +421,135 @@ function wwh_register_admin_pages(): void
         'wwh-sports-export',
         'wwh_render_sports_export_page'
     );
+
+    add_options_page(
+        'Weekly Wildcat Bridge Settings',
+        'Weekly Wildcat Bridge',
+        'manage_options',
+        'wwh-settings',
+        'wwh_render_settings_page'
+    );
 }
 add_action('admin_menu', 'wwh_register_admin_pages');
 add_action('admin_post_wwh_export_sports_games', 'wwh_export_sports_games');
+
+function wwh_cloudflare_deploy_post_types(): array
+{
+    $post_types = ['post', 'page', WWH_SPORTS_GAME_POST_TYPE, WWH_SCHOOL_EVENT_POST_TYPE];
+
+    foreach (get_post_types(['public' => true], 'names') as $post_type) {
+        if ($post_type !== 'attachment') {
+            $post_types[] = $post_type;
+        }
+    }
+
+    $post_types = array_values(array_unique($post_types));
+
+    return apply_filters('wwh_cloudflare_deploy_post_types', $post_types);
+}
+
+function wwh_is_cloudflare_deploy_content_post(WP_Post $post): bool
+{
+    if ($post->post_type === 'attachment') {
+        return false;
+    }
+
+    if (wp_is_post_revision($post->ID) || wp_is_post_autosave($post->ID)) {
+        return false;
+    }
+
+    return in_array($post->post_type, wwh_cloudflare_deploy_post_types(), true);
+}
+
+function wwh_maybe_schedule_cloudflare_deploy_for_transition(string $new_status, string $old_status, WP_Post $post): void
+{
+    if (!wwh_is_cloudflare_deploy_content_post($post)) {
+        return;
+    }
+
+    if ($new_status === 'publish' && $old_status !== 'publish') {
+        wwh_schedule_cloudflare_deploy();
+        return;
+    }
+
+    if ($new_status === 'publish' && $old_status === 'publish') {
+        wwh_schedule_cloudflare_deploy();
+        return;
+    }
+
+    if ($old_status === 'publish' && $new_status !== 'publish') {
+        wwh_schedule_cloudflare_deploy();
+    }
+}
+add_action('transition_post_status', 'wwh_maybe_schedule_cloudflare_deploy_for_transition', 10, 3);
+
+function wwh_maybe_schedule_cloudflare_deploy_for_delete(int $post_id): void
+{
+    $post = get_post($post_id);
+
+    if (!$post instanceof WP_Post || $post->post_status !== 'publish' || !wwh_is_cloudflare_deploy_content_post($post)) {
+        return;
+    }
+
+    wwh_schedule_cloudflare_deploy();
+}
+add_action('before_delete_post', 'wwh_maybe_schedule_cloudflare_deploy_for_delete');
+
+function wwh_schedule_cloudflare_deploy(): void
+{
+    if (wwh_cloudflare_deploy_hook_url() === '' || wp_next_scheduled(WWH_CLOUDFLARE_DEPLOY_EVENT)) {
+        return;
+    }
+
+    $scheduled = wp_schedule_single_event(time() + 60, WWH_CLOUDFLARE_DEPLOY_EVENT);
+
+    if (!$scheduled) {
+        error_log('Weekly Wildcat Bridge: Cloudflare deploy trigger could not be scheduled.');
+    }
+}
+
+function wwh_trigger_cloudflare_deploy(): void
+{
+    $url = wwh_cloudflare_deploy_hook_url();
+
+    if ($url === '') {
+        update_option(WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION, 'Not configured', false);
+        return;
+    }
+
+    $response = wp_remote_post($url, [
+        'blocking' => true,
+        'headers' => [
+            'User-Agent' => 'Weekly Wildcat Bridge',
+        ],
+        'redirection' => 0,
+        'timeout' => 10,
+    ]);
+
+    update_option(WWH_CLOUDFLARE_DEPLOY_LAST_TRIGGERED_OPTION, (string) time(), false);
+
+    if (is_wp_error($response)) {
+        update_option(WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION, 'Request failed', false);
+        error_log('Weekly Wildcat Bridge: Cloudflare deploy hook request failed.');
+        return;
+    }
+
+    $code = (int) wp_remote_retrieve_response_code($response);
+    $status = $code > 0 ? sprintf('HTTP %d', $code) : 'No HTTP status';
+
+    update_option(WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION, $status, false);
+
+    if ($code < 200 || $code >= 300) {
+        error_log(sprintf('Weekly Wildcat Bridge: Cloudflare deploy hook returned HTTP %d.', $code));
+    }
+}
+add_action(WWH_CLOUDFLARE_DEPLOY_EVENT, 'wwh_trigger_cloudflare_deploy');
+
+function wwh_clear_scheduled_cloudflare_deploy(): void
+{
+    wp_clear_scheduled_hook(WWH_CLOUDFLARE_DEPLOY_EVENT);
+}
+register_deactivation_hook(__FILE__, 'wwh_clear_scheduled_cloudflare_deploy');
 
 function wwh_sports_game_admin_columns(array $columns): array
 {

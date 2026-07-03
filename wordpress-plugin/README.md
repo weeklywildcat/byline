@@ -1,6 +1,6 @@
-# Weekly Wildcat Headless
+# Weekly Wildcat Bridge
 
-Plain PHP WordPress plugin for Weekly Wildcat headless data.
+Plain PHP WordPress plugin for Weekly Wildcat content bridge data.
 
 ## What It Adds
 
@@ -21,7 +21,7 @@ The plugin does not render anything on the WordPress frontend. Editing stays ins
 
 ## Install
 
-Upload the `weekly-wildcat-headless` folder to `wp-content/plugins/`, then activate **Weekly Wildcat Headless** in WordPress.
+Upload the `weekly-wildcat-headless` folder to `wp-content/plugins/`, then activate **Weekly Wildcat Bridge** in WordPress.
 
 ## Deploy
 
@@ -31,7 +31,7 @@ After the plugin is active, WordPress checks GitHub releases from:
 
 `https://github.com/weeklywildcat/byline-plugin`
 
-Enable auto-updates for **Weekly Wildcat Headless** in WordPress admin if you want future releases installed automatically.
+Enable auto-updates for **Weekly Wildcat Bridge** in WordPress admin if you want future releases installed automatically.
 
 ## Release Updates
 

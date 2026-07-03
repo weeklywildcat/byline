@@ -57,4 +57,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             "build/weekly-wildcat-headless.zip#weekly-wildcat-headless.zip" \
             --title "$GITHUB_REF_NAME" \
-            --notes "Weekly Wildcat Headless $PLUGIN_VERSION"
+            --notes "Weekly Wildcat Bridge $PLUGIN_VERSION"
