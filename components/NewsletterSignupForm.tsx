@@ -34,13 +34,7 @@ export function NewsletterSignupForm() {
         <p>Catch the newest stories, scores, and campus updates when they publish.</p>
       </div>
 
-      <div className="article-newsletter-kit">
-        <div className="article-newsletter-kit-note">
-          <strong>Get the Weekly Wildcat in your inbox.</strong>
-          <span>Sign up for new stories, scores, and campus updates from the newsroom.</span>
-        </div>
-        <div ref={embedRef} />
-      </div>
+      <div className="article-newsletter-kit" ref={embedRef} />
     </aside>
   );
 }

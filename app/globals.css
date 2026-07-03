@@ -879,33 +879,10 @@ img {
 
 .article-newsletter-kit {
   align-self: center;
-  display: grid;
-  gap: 10px;
 }
 
 .article-newsletter-kit > * {
   max-width: 100%;
-}
-
-.article-newsletter-kit-note {
-  border: 1px solid rgba(240, 187, 182, 0.34);
-  display: grid;
-  gap: 5px;
-  padding: 11px 12px;
-}
-
-.article-newsletter-kit-note strong {
-  color: #ffffff;
-  font-family: var(--font-body);
-  font-size: 1rem;
-  line-height: 1.15;
-}
-
-.article-newsletter-kit-note span {
-  color: #d7d1c8;
-  font-family: var(--font-body);
-  font-size: 0.88rem;
-  line-height: 1.35;
 }
 
 .article-after {
