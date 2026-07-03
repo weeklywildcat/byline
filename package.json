@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node scripts/copy-wordpress-media-to-out.mjs",
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {

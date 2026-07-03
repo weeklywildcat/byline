@@ -19,6 +19,9 @@ type ActivePoll = {
 
 type PollState = "loading" | "ready" | "results" | "empty" | "error";
 
+const MIN_RESULTS_VOTES = 5;
+const LOW_RESPONSE_MESSAGE = "Thanks for your response. We use this to improve our coverage.";
+
 function hasVotedCookie(pollId: string) {
   if (typeof document === "undefined") {
     return false;
@@ -119,12 +122,14 @@ export function PollWidget() {
         setPoll(payload as ActivePoll);
       }
 
+      const nextPoll = "poll" in payload && payload.poll ? payload.poll : response.ok ? (payload as ActivePoll) : null;
+
       if (response.status === 409) {
-        setMessage("You already voted. Here is where things stand.");
+        setMessage(nextPoll && nextPoll.totalVotes >= MIN_RESULTS_VOTES ? "You already voted. Here is where things stand." : "");
       } else if (!response.ok) {
         setMessage("We could not record that vote right now.");
       } else {
-        setMessage("Vote counted.");
+        setMessage(nextPoll && nextPoll.totalVotes >= MIN_RESULTS_VOTES ? "Vote counted." : "");
       }
 
       setState("results");
@@ -155,29 +160,30 @@ export function PollWidget() {
         <>
           <p className="homepage-poll-question">{poll.question}</p>
           {state === "results" ? (
-            <div className="homepage-poll-results" aria-live="polite">
-              {poll.options.map((option) => {
-                const percent = poll.totalVotes > 0 ? Math.round((option.votes / poll.totalVotes) * 100) : 0;
+            poll.totalVotes >= MIN_RESULTS_VOTES ? (
+              <div className="homepage-poll-results" aria-live="polite">
+                {poll.options.map((option) => {
+                  const percent = poll.totalVotes > 0 ? Math.round((option.votes / poll.totalVotes) * 100) : 0;
 
-                return (
-                  <div className="homepage-poll-result" key={option.id}>
-                    <div>
-                      <span>{option.label}</span>
-                      <strong>{percent}%</strong>
+                  return (
+                    <div className="homepage-poll-result" key={option.id}>
+                      <div>
+                        <span>{option.label}</span>
+                        <strong>{percent}%</strong>
+                      </div>
+                      <span className="homepage-poll-bar" aria-hidden="true">
+                        <span
+                          className={option.id === leadingOptionId ? "homepage-poll-bar-fill homepage-poll-bar-fill-leading" : "homepage-poll-bar-fill"}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </span>
                     </div>
-                    <span className="homepage-poll-bar" aria-hidden="true">
-                      <span
-                        className={option.id === leadingOptionId ? "homepage-poll-bar-fill homepage-poll-bar-fill-leading" : "homepage-poll-bar-fill"}
-                        style={{ width: `${percent}%` }}
-                      />
-                    </span>
-                  </div>
-                );
-              })}
-              <p className="homepage-poll-total">
-                {poll.totalVotes.toLocaleString()} {poll.totalVotes === 1 ? "vote" : "votes"}
-              </p>
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="homepage-poll-note" aria-live="polite">{LOW_RESPONSE_MESSAGE}</p>
+            )
           ) : (
             <form onSubmit={handleSubmit}>
               <div className="homepage-poll-options">
