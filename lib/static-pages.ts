@@ -317,17 +317,6 @@ export const STATIC_PAGES: StaticPage[] = [
           "The site is designed to work without reader accounts or advertising trackers. Some hosting, security, analytics, font, media or embedded services may use cookies or similar technologies to provide their services, measure traffic or protect the site."
       },
       {
-        title: "Newsletter Security Check",
-        body:
-          "When you sign up for the newsletter, Weekly Wildcat uses Cloudflare Turnstile to help distinguish people from bots and protect the form from abuse. Cloudflare may process security signals such as IP address, browser information and sitekey details for bot detection and related security purposes.",
-        actions: [
-          {
-            label: "Cloudflare Turnstile Privacy Addendum",
-            href: "https://www.cloudflare.com/en-gb/turnstile-privacy-policy/"
-          }
-        ]
-      },
-      {
         title: "Outside Services",
         body:
           "Weekly Wildcat uses a WordPress CMS, static website hosting, local media assets and links to outside services such as social platforms, email, maps, videos or forms. When you follow an outside link or load third-party content, that service may collect information under its own privacy policy."

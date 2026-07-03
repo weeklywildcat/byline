@@ -24,8 +24,6 @@ export const metadata: Metadata = buildPageMetadata({
   path: "/"
 });
 
-const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-
 function hasCategory(post: WordPressPost, slugs: string[]) {
   const slugSet = new Set(slugs);
 
@@ -377,11 +375,7 @@ export default async function HomePage() {
       ) : null}
 
       <section id="home-newsletter" className="home-newsletter-section" aria-label="Newsletter signup">
-        <NewsletterSignupForm
-          sourceTitle="Weekly Wildcat homepage"
-          sourceUrl={absoluteUrl("/")}
-          turnstileSiteKey={turnstileSiteKey}
-        />
+        <NewsletterSignupForm />
       </section>
     </main>
   );

@@ -112,6 +112,7 @@ function getResultVerdict(game: SportsGame) {
 
 function LatestResultCard({ game }: { game: SportsGame }) {
   const scoreboard = getScoreboard(game);
+  const date = getGameDate(game);
   const context = getEditorialContext(game);
   const verdict = getResultVerdict(game);
   const wildcatsWon = game.wildcatsScore !== null && game.opponentScore !== null && game.wildcatsScore > game.opponentScore;
@@ -140,6 +141,7 @@ function LatestResultCard({ game }: { game: SportsGame }) {
       </div>
       <div className="field-result-footer">
         <p>{verdict || game.display.status || "Final"}</p>
+        {date ? <span>{date}</span> : null}
         {context ? <span>{context}</span> : null}
       </div>
       {game.recapUrl ? (
