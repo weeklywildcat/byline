@@ -49,7 +49,6 @@ type ArticlePageProps = {
 
 export const dynamicParams = false;
 const WORDS_PER_MINUTE = 225;
-const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 export async function generateStaticParams() {
   const posts = await getAllPosts();
@@ -364,7 +363,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </aside>
         ) : null}
 
-        <NewsletterSignupForm sourceTitle={title} sourceUrl={articleUrl} turnstileSiteKey={turnstileSiteKey} />
+        <NewsletterSignupForm />
       </article>
 
       <div className="article-after">

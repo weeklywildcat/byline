@@ -1,4 +1,1 @@
-KIT_API_KEY=your_kit_api_key
-KIT_FORM_ID=your_numeric_kit_form_id
-TURNSTILE_SECRET_KEY=your_turnstile_secret_key
 POLL_COOKIE_SECRET=replace_with_a_long_random_poll_cookie_secret

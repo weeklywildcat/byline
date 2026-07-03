@@ -1,5 +1,3 @@
-const KIT_API_BASE = "https://api.kit.com/v4";
-const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const VOTER_COOKIE_NAME = "ww_voter_id";
 const POLL_VOTED_COOKIE_PREFIX = "ww_poll_voted_";
 const VOTER_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
@@ -14,10 +12,6 @@ export default {
 
     if (url.pathname === "/api/polls/vote") {
       return handlePollVote(request, env);
-    }
-
-    if (url.pathname === "/api/subscribe") {
-      return handleSubscribe(request, env);
     }
 
     return env.ASSETS.fetch(request);
@@ -87,148 +81,6 @@ async function handlePollVote(request, env) {
   return json(body, result.ok ? 200 : result.status, {}, result.setCookies || []);
 }
 
-async function handleSubscribe(request, env) {
-  if (request.method === "OPTIONS") {
-    return json({ ok: true });
-  }
-
-  if (request.method !== "POST") {
-    return json({ ok: false, error: "Method not allowed." }, 405, {
-      Allow: "POST, OPTIONS"
-    });
-  }
-
-  let payload;
-
-  try {
-    payload = await readPayload(request);
-  } catch {
-    return json({ ok: false, error: "Send a valid signup request." }, 400);
-  }
-
-  const email = normalizeString(payload.email || payload.email_address).toLowerCase();
-  const trap = normalizeString(payload.company || payload.website || payload.trap);
-  const turnstileToken = normalizeString(payload.turnstileToken || payload["cf-turnstile-response"]);
-
-  if (trap) {
-    return json({ ok: true });
-  }
-
-  if (!isValidEmail(email)) {
-    return json({ ok: false, error: "Enter a valid email address." }, 400);
-  }
-
-  const config = getSubscribeConfig(env);
-
-  if (!config.turnstileSecretKey) {
-    return json({ ok: false, error: "Newsletter signup security is not configured yet." }, 500);
-  }
-
-  if (!turnstileToken) {
-    return json({ ok: false, error: "Complete the security check to sign up." }, 400);
-  }
-
-  const turnstileResult = await verifyTurnstile(turnstileToken, request, config.turnstileSecretKey);
-
-  if (!turnstileResult.success) {
-    console.warn("Turnstile verification failed", {
-      errors: turnstileResult["error-codes"] || [],
-      hostname: turnstileResult.hostname,
-      action: turnstileResult.action
-    });
-    return json({ ok: false, error: "The security check expired. Please try again." }, 400);
-  }
-
-  if (turnstileResult.action && turnstileResult.action !== "newsletter") {
-    console.warn("Turnstile action mismatch", {
-      action: turnstileResult.action
-    });
-    return json({ ok: false, error: "The security check could not be verified." }, 400);
-  }
-
-  if (!config.kitApiKey || !config.kitFormId) {
-    return json({ ok: false, error: "Newsletter signup is not configured yet." }, 500);
-  }
-
-  const kitResponse = await fetch(`${KIT_API_BASE}/forms/${encodeURIComponent(config.kitFormId)}/subscribers`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Kit-Api-Key": config.kitApiKey
-    },
-    body: JSON.stringify({
-      email_address: email,
-      referrer: getReferrer(payload.source, request)
-    })
-  });
-
-  if (kitResponse.ok) {
-    return json({ ok: true });
-  }
-
-  const responseText = await kitResponse.text().catch(() => "");
-  console.error("Kit signup failed", {
-    status: kitResponse.status,
-    response: responseText.slice(0, 500)
-  });
-
-  return json(
-    {
-      ok: false,
-      error:
-        kitResponse.status === 422
-          ? "Kit could not accept that email address."
-          : "We could not add that email right now."
-    },
-    kitResponse.status === 422 ? 400 : 502
-  );
-}
-
-function getSubscribeConfig(env) {
-  return {
-    turnstileSecretKey: getWorkerEnvString(env, "TURNSTILE_SECRET_KEY"),
-    kitApiKey: getWorkerEnvString(env, "KIT_API_KEY"),
-    kitFormId: getWorkerEnvString(env, "KIT_FORM_ID")
-  };
-}
-
-function getWorkerEnvString(env, name) {
-  if (!env || typeof env !== "object") {
-    return "";
-  }
-
-  const value = env[name];
-
-  if (typeof value === "string") {
-    return value.trim();
-  }
-
-  const matchingEntry = Object.entries(env).find(([key]) => key.trim() === name);
-  const matchingValue = matchingEntry ? matchingEntry[1] : "";
-
-  return typeof matchingValue === "string" ? matchingValue.trim() : "";
-}
-
-async function verifyTurnstile(token, request, secretKey) {
-  const response = await fetch(TURNSTILE_VERIFY_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      secret: secretKey,
-      response: token,
-      remoteip: request.headers.get("CF-Connecting-IP") || undefined
-    })
-  });
-
-  if (!response.ok) {
-    return { success: false, "error-codes": ["siteverify-request-failed"] };
-  }
-
-  return response.json();
-}
-
 async function readPayload(request) {
   const contentType = request.headers.get("content-type") || "";
 
@@ -238,25 +90,6 @@ async function readPayload(request) {
 
   const formData = await request.formData();
   return Object.fromEntries(formData.entries());
-}
-
-function getReferrer(source, request) {
-  const fallback = request.headers.get("referer") || request.url;
-  const value = normalizeString(source) || fallback;
-
-  try {
-    return new URL(value, request.url).toString().slice(0, 500);
-  } catch {
-    return new URL(fallback, request.url).toString().slice(0, 500);
-  }
-}
-
-function normalizeString(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
 }
 
 function getPollDatabase(env) {
