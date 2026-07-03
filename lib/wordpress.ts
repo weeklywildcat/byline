@@ -7,6 +7,7 @@ const WORDPRESS_FETCH_CACHE_KEY =
   process.env.VERCEL_GIT_COMMIT_SHA ||
   process.env.CF_PAGES_COMMIT_SHA ||
   process.env.NETLIFY_COMMIT_REF ||
+  (process.env.NODE_ENV === "production" ? `local-build-${Date.now()}` : "") ||
   "";
 const WORDPRESS_FETCH_USER_AGENT = "Weekly Wildcat Static Site Builder (https://weeklywildcat.com)";
 
