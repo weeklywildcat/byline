@@ -68,6 +68,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.7
     },
+    {
+      url: absoluteUrl("/media-kit/"),
+      lastModified: latestModified,
+      changeFrequency: "monthly",
+      priority: 0.5
+    },
     ...STATIC_PAGES.map((page) => ({
       url: absoluteUrl(`/${page.slug}/`),
       lastModified: latestModified,
