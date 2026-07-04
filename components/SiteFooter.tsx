@@ -20,6 +20,7 @@ const footerGroups = [
     title: "About",
     links: [
       { name: "About us", href: "/about/" },
+      { name: "Media Kit", href: "/media-kit/" },
       { name: "Advertise with Us", href: "/advertise/" },
       { name: "Join our team", href: "/join/" },
       { name: "Leadership", href: "/leadership/" },
