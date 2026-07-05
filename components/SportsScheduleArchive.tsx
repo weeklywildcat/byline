@@ -255,9 +255,10 @@ function ScheduleScore({ game }: { game: SportsGame }) {
 function ScheduleGameCard({ game }: { game: SportsGame }) {
   const siteLabel = getSiteLabel(game);
   const location = getLocation(game);
+  const gameCenterHref = `/sports/schedule/#game-${game.id}`;
 
   return (
-    <article className={`schedule-game-card schedule-game-card-${game.status}`}>
+    <article id={`game-${game.id}`} className={`schedule-game-card schedule-game-card-${game.status}`}>
       <div className="schedule-game-date">
         <time dateTime={game.startDate}>{game.display.date || game.startDate}</time>
         {siteLabel ? <span>{siteLabel}</span> : null}
@@ -283,6 +284,7 @@ function ScheduleGameCard({ game }: { game: SportsGame }) {
       </div>
       <div className="schedule-game-result">
         <ScheduleScore game={game} />
+        <a href={gameCenterHref}>Game Center</a>
         {game.recapUrl ? <a href={game.recapUrl}>{game.status === "final" ? "Recap" : "Preview"}</a> : null}
       </div>
     </article>

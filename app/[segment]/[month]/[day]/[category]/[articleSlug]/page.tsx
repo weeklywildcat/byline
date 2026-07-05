@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ArticleShareActions } from "@/components/ArticleShareActions";
+import { ArticleGameCard } from "@/components/ArticleGameCard";
 import { AuthorBadge } from "@/components/AuthorBadge";
 import { FeaturedImage } from "@/components/FeaturedImage";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, getNewsArticleSchema, serializeJsonLd } from "@/lib/seo";
+import { getSportsGameById } from "@/lib/headless";
 import {
   getAllPosts,
   getAuthorHref,
@@ -28,6 +30,7 @@ import {
   getPostAuthor,
   getPostAuthorWithProfile,
   getPostHref,
+  getPostPrimaryGameId,
   getPostRouteParts,
   getPostTags,
   type WordPressAuthor,
@@ -265,6 +268,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   }
 
   const author = await getPostAuthorWithProfile(post);
+  const primaryGameId = getPostPrimaryGameId(post);
+  const primaryGame = primaryGameId ? await getSportsGameById(primaryGameId) : null;
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
   const topicTags = getPublicTopicTags(post);
@@ -338,6 +343,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <ArticleShareActions title={title} url={articleUrl} />
           <FeaturedImage image={image} priority />
         </header>
+
+        {primaryGame ? <ArticleGameCard game={primaryGame} className="article-primary-game-card" /> : null}
 
         {content ? (
           <div className="article-body" dangerouslySetInnerHTML={{ __html: content }} />
