@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.15
+ * Version: 0.1.16
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -591,7 +591,7 @@ add_action('init', 'wwh_register_post_meta');
 function wwh_register_game_embed_block(): void
 {
     $asset_path = __DIR__ . '/assets/game-linking.js';
-    $version = file_exists($asset_path) ? (string) filemtime($asset_path) : '0.1.15';
+    $version = file_exists($asset_path) ? (string) filemtime($asset_path) : '0.1.16';
 
     wp_register_script(
         'wwh-game-linking-editor',
