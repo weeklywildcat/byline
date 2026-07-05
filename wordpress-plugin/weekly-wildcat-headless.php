@@ -19,6 +19,9 @@ const WWH_CLOUDFLARE_DEPLOY_LAST_TRIGGERED_OPTION = 'wwh_cloudflare_deploy_last_
 const WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION = 'wwh_cloudflare_deploy_last_status';
 const WWH_CLOUDFLARE_DEPLOY_EVENT = 'wwh_trigger_cloudflare_deploy';
 const WWH_HOMEPAGE_OPINION_TREATMENT_META = '_ww_homepage_opinion_treatment';
+const WWH_SPORTS_TEAM_SETTINGS_OPTION = 'wwh_sports_team_settings';
+// Stores only the selected Sports Game post ID for the automatic article game card.
+const WWH_PRIMARY_GAME_META = 'weekly_wildcat_primary_game_id';
 
 function wwh_author_social_fields(): array
 {
@@ -201,6 +204,115 @@ function wwh_render_settings_page(): void
     <?php
 }
 
+function wwh_render_team_media_field(string $team_key, string $field, string $label, int $attachment_id): void
+{
+    $image = wwh_media_image($attachment_id, $field === 'logoId' ? 'medium' : 'large');
+    $field_id = 'wwh_team_' . sanitize_key($team_key) . '_' . sanitize_key($field);
+
+    ?>
+    <div class="wwh-team-media-field">
+        <input type="hidden" id="<?php echo esc_attr($field_id); ?>" name="teams[<?php echo esc_attr($team_key); ?>][<?php echo esc_attr($field); ?>]" value="<?php echo esc_attr((string) $attachment_id); ?>">
+        <span><?php echo esc_html($label); ?></span>
+        <img class="wwh-team-media-preview <?php echo esc_attr($field === 'logoId' ? 'wwh-team-logo-preview' : ''); ?>" src="<?php echo esc_url($image['url']); ?>" alt="" <?php echo $image['url'] === '' ? 'hidden' : ''; ?>>
+        <p>
+            <button type="button" class="button wwh-team-media-select" data-title="<?php echo esc_attr('Select ' . strtolower($label)); ?>" data-button-text="Use image">Select</button>
+            <button type="button" class="button wwh-team-media-remove" <?php echo $image['url'] === '' ? 'hidden' : ''; ?>>Remove</button>
+        </p>
+    </div>
+    <?php
+}
+
+function wwh_render_sports_team_settings_page(): void
+{
+    if (!current_user_can('edit_posts')) {
+        wp_die(esc_html__('Sorry, you are not allowed to manage sports team settings.', 'weekly-wildcat-headless'));
+    }
+
+    $settings = wwh_sports_team_settings();
+
+    ?>
+    <div class="wrap wwh-sports-team-settings-page">
+        <h1>Sports Team Settings</h1>
+        <p>Upload team header images and optional marks for the public Weekly Wildcat team hub pages. These settings are keyed to the existing controlled team list and do not create duplicate game records.</p>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <?php wp_nonce_field('wwh_save_sports_team_settings', 'wwh_sports_team_settings_nonce'); ?>
+            <input type="hidden" name="action" value="wwh_save_sports_team_settings">
+            <div class="wwh-team-settings-grid">
+                <?php foreach (wwh_sports_team_options() as $team_key => $team) : ?>
+                    <?php
+                    $team_settings = is_array($settings[$team_key] ?? null) ? $settings[$team_key] : [];
+                    $header_id = absint($team_settings['headerImageId'] ?? 0);
+                    $logo_id = absint($team_settings['logoId'] ?? 0);
+                    $accent_color = sanitize_hex_color((string) ($team_settings['accentColor'] ?? '')) ?: '';
+                    ?>
+                    <section class="wwh-team-settings-card">
+                        <h2><?php echo esc_html($team['label']); ?></h2>
+                        <p class="description"><?php echo esc_html($team_key); ?></p>
+                        <div class="wwh-team-media-fields">
+                            <?php wwh_render_team_media_field($team_key, 'headerImageId', 'Header Image', $header_id); ?>
+                            <?php wwh_render_team_media_field($team_key, 'logoId', 'Logo / Mark', $logo_id); ?>
+                        </div>
+                        <label class="wwh-team-accent-field" for="wwh_team_<?php echo esc_attr(sanitize_key($team_key)); ?>_accent">
+                            <span>Accent Color</span>
+                            <input
+                                type="text"
+                                id="wwh_team_<?php echo esc_attr(sanitize_key($team_key)); ?>_accent"
+                                name="teams[<?php echo esc_attr($team_key); ?>][accentColor]"
+                                value="<?php echo esc_attr($accent_color ?: ''); ?>"
+                                placeholder="#7b1f2a"
+                                pattern="#[0-9a-fA-F]{6}"
+                            >
+                        </label>
+                    </section>
+                <?php endforeach; ?>
+            </div>
+            <?php submit_button('Save Team Settings'); ?>
+        </form>
+    </div>
+    <?php
+}
+
+function wwh_save_sports_team_settings(): void
+{
+    if (!current_user_can('edit_posts')) {
+        wp_die(esc_html__('Sorry, you are not allowed to manage sports team settings.', 'weekly-wildcat-headless'));
+    }
+
+    check_admin_referer('wwh_save_sports_team_settings', 'wwh_sports_team_settings_nonce');
+
+    $raw_teams = isset($_POST['teams']) && is_array($_POST['teams']) ? wp_unslash($_POST['teams']) : [];
+    $settings = [];
+
+    foreach (wwh_sports_team_options() as $team_key => $_team) {
+        $raw_team = isset($raw_teams[$team_key]) && is_array($raw_teams[$team_key]) ? $raw_teams[$team_key] : [];
+        $header_id = absint($raw_team['headerImageId'] ?? 0);
+        $logo_id = absint($raw_team['logoId'] ?? 0);
+        $accent_color = sanitize_hex_color((string) ($raw_team['accentColor'] ?? '')) ?: '';
+        $team_settings = [];
+
+        if ($header_id > 0) {
+            $team_settings['headerImageId'] = $header_id;
+        }
+
+        if ($logo_id > 0) {
+            $team_settings['logoId'] = $logo_id;
+        }
+
+        if ($accent_color !== '') {
+            $team_settings['accentColor'] = $accent_color;
+        }
+
+        if ($team_settings !== []) {
+            $settings[$team_key] = $team_settings;
+        }
+    }
+
+    update_option(WWH_SPORTS_TEAM_SETTINGS_OPTION, $settings, false);
+    wwh_schedule_cloudflare_deploy();
+    wp_safe_redirect(add_query_arg(['post_type' => WWH_SPORTS_GAME_POST_TYPE, 'page' => 'wwh-sports-team-settings', 'updated' => 'true'], admin_url('edit.php')));
+    exit;
+}
+
 function wwh_cloudflare_deploy_hook_url(): string
 {
     return (string) get_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '');
@@ -233,6 +345,56 @@ function wwh_cloudflare_deploy_pending_label(): string
     }
 
     return 'Scheduled for ' . wp_date('M j, Y g:i A T', (int) $timestamp, wp_timezone());
+}
+
+function wwh_sports_team_settings(): array
+{
+    $settings = get_option(WWH_SPORTS_TEAM_SETTINGS_OPTION, []);
+
+    return is_array($settings) ? $settings : [];
+}
+
+function wwh_sports_team_setting(string $team_key, string $field): string
+{
+    $settings = wwh_sports_team_settings();
+    $value = $settings[$team_key][$field] ?? '';
+
+    return is_scalar($value) ? (string) $value : '';
+}
+
+function wwh_media_image(int $attachment_id, string $size = 'large'): array
+{
+    if ($attachment_id <= 0) {
+        return [
+            'id' => 0,
+            'url' => '',
+            'alt' => '',
+            'width' => null,
+            'height' => null,
+        ];
+    }
+
+    $image = wp_get_attachment_image_src($attachment_id, $size);
+    $full_image = wp_get_attachment_image_src($attachment_id, 'full');
+    $source = $image ?: $full_image;
+
+    if (!$source) {
+        return [
+            'id' => 0,
+            'url' => '',
+            'alt' => '',
+            'width' => null,
+            'height' => null,
+        ];
+    }
+
+    return [
+        'id' => $attachment_id,
+        'url' => esc_url_raw((string) $source[0]),
+        'alt' => get_post_meta($attachment_id, '_wp_attachment_image_alt', true),
+        'width' => isset($source[1]) ? absint($source[1]) : null,
+        'height' => isset($source[2]) ? absint($source[2]) : null,
+    ];
 }
 
 function wwh_sports_team_options(): array
@@ -340,6 +502,18 @@ function wwh_register_post_meta(): void
 {
     register_post_meta(
         'post',
+        WWH_PRIMARY_GAME_META,
+        [
+            'single' => true,
+            'type' => 'integer',
+            'sanitize_callback' => 'absint',
+            'show_in_rest' => true,
+            'auth_callback' => static fn() => current_user_can('edit_posts'),
+        ]
+    );
+
+    register_post_meta(
+        'post',
         WWH_HOMEPAGE_OPINION_TREATMENT_META,
         [
             'single' => true,
@@ -414,6 +588,61 @@ function wwh_register_post_meta(): void
 }
 add_action('init', 'wwh_register_post_meta');
 
+function wwh_register_game_embed_block(): void
+{
+    $asset_path = __DIR__ . '/assets/game-linking.js';
+    $version = file_exists($asset_path) ? (string) filemtime($asset_path) : '0.1.13';
+
+    wp_register_script(
+        'wwh-game-linking-editor',
+        plugins_url('assets/game-linking.js', __FILE__),
+        [
+            'wp-api-fetch',
+            'wp-block-editor',
+            'wp-blocks',
+            'wp-components',
+            'wp-data',
+            'wp-edit-post',
+            'wp-element',
+            'wp-i18n',
+            'wp-plugins',
+        ],
+        $version,
+        true
+    );
+
+    wp_localize_script(
+        'wwh-game-linking-editor',
+        'wwhGameLinking',
+        [
+            'primaryGameMetaKey' => WWH_PRIMARY_GAME_META,
+            'restNamespace' => WWH_REST_NAMESPACE,
+        ]
+    );
+
+    register_block_type('weekly-wildcat/game-embed', [
+        'api_version' => 2,
+        'title' => 'Weekly Wildcat Game Embed',
+        'category' => 'widgets',
+        'icon' => 'awards',
+        'description' => 'Embed a live Weekly Wildcat sports game card by storing only the selected game ID.',
+        'editor_script' => 'wwh-game-linking-editor',
+        'render_callback' => 'wwh_render_game_embed_block',
+        'attributes' => [
+            // The block stores only the existing Sports Game ID; all display data is looked up when rendered.
+            'gameId' => [
+                'type' => 'integer',
+                'default' => 0,
+            ],
+            'display' => [
+                'type' => 'string',
+                'default' => 'full',
+            ],
+        ],
+    ]);
+}
+add_action('init', 'wwh_register_game_embed_block');
+
 function wwh_register_admin_pages(): void
 {
     add_submenu_page(
@@ -434,6 +663,15 @@ function wwh_register_admin_pages(): void
         'wwh_render_sports_export_page'
     );
 
+    add_submenu_page(
+        'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE,
+        'Sports Team Settings',
+        'Team Settings',
+        'edit_posts',
+        'wwh-sports-team-settings',
+        'wwh_render_sports_team_settings_page'
+    );
+
     add_options_page(
         'Weekly Wildcat Bridge Settings',
         'Weekly Wildcat Bridge',
@@ -444,6 +682,7 @@ function wwh_register_admin_pages(): void
 }
 add_action('admin_menu', 'wwh_register_admin_pages');
 add_action('admin_post_wwh_export_sports_games', 'wwh_export_sports_games');
+add_action('admin_post_wwh_save_sports_team_settings', 'wwh_save_sports_team_settings');
 
 function wwh_cloudflare_deploy_post_types(): array
 {
@@ -2018,37 +2257,7 @@ function wwh_author_meta_value(int $user_id, string $key, string $default = ''):
 
 function wwh_author_profile_photo(int $attachment_id): array
 {
-    if ($attachment_id <= 0) {
-        return [
-            'id' => 0,
-            'url' => '',
-            'alt' => '',
-            'width' => null,
-            'height' => null,
-        ];
-    }
-
-    $image = wp_get_attachment_image_src($attachment_id, 'medium');
-    $full_image = wp_get_attachment_image_src($attachment_id, 'full');
-    $source = $image ?: $full_image;
-
-    if (!$source) {
-        return [
-            'id' => 0,
-            'url' => '',
-            'alt' => '',
-            'width' => null,
-            'height' => null,
-        ];
-    }
-
-    return [
-        'id' => $attachment_id,
-        'url' => esc_url_raw((string) $source[0]),
-        'alt' => get_post_meta($attachment_id, '_wp_attachment_image_alt', true),
-        'width' => isset($source[1]) ? absint($source[1]) : null,
-        'height' => isset($source[2]) ? absint($source[2]) : null,
-    ];
+    return wwh_media_image($attachment_id, 'medium');
 }
 
 function wwh_render_author_profile_fields(WP_User $user): void
@@ -2158,14 +2367,16 @@ function wwh_update_user_meta(int $user_id, string $key, string $value): void
 
 function wwh_enqueue_author_profile_assets(string $hook): void
 {
-    if (!in_array($hook, ['profile.php', 'user-edit.php'], true)) {
+    $is_team_settings_page = $hook === WWH_SPORTS_GAME_POST_TYPE . '_page_wwh-sports-team-settings';
+
+    if (!in_array($hook, ['profile.php', 'user-edit.php'], true) && !$is_team_settings_page) {
         return;
     }
 
     wp_enqueue_media();
     wp_add_inline_script(
         'jquery-core',
-        "document.addEventListener('click',function(event){var selectButton=event.target.closest('.wwh-author-photo-select');var removeButton=event.target.closest('.wwh-author-photo-remove');if(selectButton){event.preventDefault();var wrap=selectButton.closest('td');var input=wrap.querySelector('#ww_author_photo_id');var preview=wrap.querySelector('.wwh-author-photo-preview');var remove=wrap.querySelector('.wwh-author-photo-remove');var frame=wp.media({title:'Select author profile photo',button:{text:'Use this photo'},multiple:false});frame.on('select',function(){var attachment=frame.state().get('selection').first().toJSON();input.value=attachment.id;preview.src=(attachment.sizes&&attachment.sizes.medium?attachment.sizes.medium.url:attachment.url);preview.hidden=false;remove.hidden=false;});frame.open();}if(removeButton){event.preventDefault();var removeWrap=removeButton.closest('td');removeWrap.querySelector('#ww_author_photo_id').value='';var removePreview=removeWrap.querySelector('.wwh-author-photo-preview');removePreview.removeAttribute('src');removePreview.hidden=true;removeButton.hidden=true;}});"
+        "document.addEventListener('click',function(event){var selectButton=event.target.closest('.wwh-author-photo-select');var removeButton=event.target.closest('.wwh-author-photo-remove');var teamSelectButton=event.target.closest('.wwh-team-media-select');var teamRemoveButton=event.target.closest('.wwh-team-media-remove');if(selectButton){event.preventDefault();var wrap=selectButton.closest('td');var input=wrap.querySelector('#ww_author_photo_id');var preview=wrap.querySelector('.wwh-author-photo-preview');var remove=wrap.querySelector('.wwh-author-photo-remove');var frame=wp.media({title:'Select author profile photo',button:{text:'Use this photo'},multiple:false});frame.on('select',function(){var attachment=frame.state().get('selection').first().toJSON();input.value=attachment.id;preview.src=(attachment.sizes&&attachment.sizes.medium?attachment.sizes.medium.url:attachment.url);preview.hidden=false;remove.hidden=false;});frame.open();}if(removeButton){event.preventDefault();var removeWrap=removeButton.closest('td');removeWrap.querySelector('#ww_author_photo_id').value='';var removePreview=removeWrap.querySelector('.wwh-author-photo-preview');removePreview.removeAttribute('src');removePreview.hidden=true;removeButton.hidden=true;}if(teamSelectButton){event.preventDefault();var teamWrap=teamSelectButton.closest('.wwh-team-media-field');var teamInput=teamWrap.querySelector('input[type=\"hidden\"]');var teamPreview=teamWrap.querySelector('.wwh-team-media-preview');var teamRemove=teamWrap.querySelector('.wwh-team-media-remove');var teamFrame=wp.media({title:teamSelectButton.dataset.title||'Select team image',button:{text:teamSelectButton.dataset.buttonText||'Use image'},multiple:false});teamFrame.on('select',function(){var attachment=teamFrame.state().get('selection').first().toJSON();teamInput.value=attachment.id;teamPreview.src=(attachment.sizes&&attachment.sizes.medium_large?attachment.sizes.medium_large.url:(attachment.sizes&&attachment.sizes.large?attachment.sizes.large.url:attachment.url));teamPreview.hidden=false;teamRemove.hidden=false;});teamFrame.open();}if(teamRemoveButton){event.preventDefault();var teamRemoveWrap=teamRemoveButton.closest('.wwh-team-media-field');teamRemoveWrap.querySelector('input[type=\"hidden\"]').value='';var teamRemovePreview=teamRemoveWrap.querySelector('.wwh-team-media-preview');teamRemovePreview.removeAttribute('src');teamRemovePreview.hidden=true;teamRemoveButton.hidden=true;}});"
     );
 }
 add_action('admin_enqueue_scripts', 'wwh_enqueue_author_profile_assets');
@@ -2174,8 +2385,9 @@ function wwh_admin_styles(): void
 {
     $screen = get_current_screen();
     $is_import_page = $screen && $screen->id === WWH_SPORTS_GAME_POST_TYPE . '_page_wwh-sports-import';
+    $is_team_settings_page = $screen && $screen->id === WWH_SPORTS_GAME_POST_TYPE . '_page_wwh-sports-team-settings';
 
-    if (!$screen || (!$is_import_page && !in_array($screen->post_type, [WWH_SPORTS_GAME_POST_TYPE, WWH_SCHOOL_EVENT_POST_TYPE], true) && !in_array($screen->id, ['profile', 'user-edit'], true))) {
+    if (!$screen || (!$is_import_page && !$is_team_settings_page && !in_array($screen->post_type, ['post', WWH_SPORTS_GAME_POST_TYPE, WWH_SCHOOL_EVENT_POST_TYPE], true) && !in_array($screen->id, ['profile', 'user-edit'], true))) {
         return;
     }
 
@@ -2191,7 +2403,26 @@ function wwh_admin_styles(): void
         .wwh-import-page textarea.code { min-height: 240px; white-space: pre; }
         .wwh-import-page select { min-width: 260px; }
         .wwh-import-page .notice ul { list-style: disc; margin-left: 20px; }
-        @media (max-width: 782px) { .wwh-fields { grid-template-columns: 1fr; } }
+        .wwh-team-settings-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
+        .wwh-team-settings-card { background: #fff; border: 1px solid #dcdcde; display: grid; gap: 12px; padding: 14px; }
+        .wwh-team-settings-card h2 { font-size: 16px; margin: 0; }
+        .wwh-team-settings-card .description { margin: 0; }
+        .wwh-team-media-fields { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .wwh-team-media-field span, .wwh-team-accent-field span { display: block; font-weight: 600; margin-bottom: 6px; }
+        .wwh-team-media-preview { background: #f0f0f1; display: block; height: 92px; margin-bottom: 8px; object-fit: cover; width: 100%; }
+        .wwh-team-logo-preview { object-fit: contain; }
+        .wwh-team-accent-field input { max-width: 140px; width: 100%; }
+        .wwh-game-picker { display: grid; gap: 10px; }
+        .wwh-game-picker-label, .wwh-game-picker-error { margin: 0; }
+        .wwh-game-picker-label { color: #50575e; }
+        .wwh-game-picker-error { color: #b32d2e; }
+        .wwh-game-picker-preview, .wwh-game-picker-result { border: 1px solid #dcdcde; display: grid; gap: 4px; padding: 10px; text-align: left; width: 100%; }
+        .wwh-game-picker-preview { background: #f6f7f7; }
+        .wwh-game-picker-preview strong, .wwh-game-picker-result strong { color: #1d2327; line-height: 1.2; }
+        .wwh-game-picker-preview span, .wwh-game-picker-result span { color: #646970; display: block; font-size: 12px; line-height: 1.25; white-space: normal; }
+        .wwh-game-picker-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .wwh-game-picker-results { display: grid; gap: 8px; max-height: 320px; overflow: auto; }
+        @media (max-width: 782px) { .wwh-fields, .wwh-team-settings-grid, .wwh-team-media-fields { grid-template-columns: 1fr; } }
     </style>';
 }
 add_action('admin_head', 'wwh_admin_styles');
@@ -2202,6 +2433,25 @@ function wwh_register_rest_routes(): void
         'methods' => WP_REST_Server::READABLE,
         'callback' => 'wwh_rest_sports_games',
         'permission_callback' => '__return_true',
+    ]);
+
+    register_rest_route(WWH_REST_NAMESPACE, '/sports-games/search', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'wwh_rest_search_sports_games',
+        'permission_callback' => static fn() => current_user_can('edit_posts'),
+    ]);
+
+    register_rest_route(WWH_REST_NAMESPACE, '/sports-games/(?P<id>\d+)', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'wwh_rest_sports_game',
+        'permission_callback' => '__return_true',
+        'args' => [
+            'id' => [
+                'type' => 'integer',
+                'required' => true,
+                'sanitize_callback' => 'absint',
+            ],
+        ],
     ]);
 
     register_rest_route(WWH_REST_NAMESPACE, '/sports-games/facets', [
@@ -2219,6 +2469,12 @@ function wwh_register_rest_routes(): void
     register_rest_route(WWH_REST_NAMESPACE, '/sports-games/recent', [
         'methods' => WP_REST_Server::READABLE,
         'callback' => 'wwh_rest_recent_sports_games',
+        'permission_callback' => '__return_true',
+    ]);
+
+    register_rest_route(WWH_REST_NAMESPACE, '/sports-teams', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'wwh_rest_sports_teams',
         'permission_callback' => '__return_true',
     ]);
 
@@ -2263,6 +2519,10 @@ function wwh_register_rest_routes(): void
                     'type' => 'boolean',
                     'description' => 'Whether to apply the opinion treatment when this post is the homepage lead.',
                 ],
+                'primaryGameId' => [
+                    'type' => 'integer',
+                    'description' => 'Selected Sports Game post ID for the automatic article game card.',
+                ],
             ],
         ],
     ]);
@@ -2275,6 +2535,7 @@ function wwh_rest_post_settings(array $post): array
 
     return [
         'homepageOpinionTreatment' => get_post_meta($post_id, WWH_HOMEPAGE_OPINION_TREATMENT_META, true) === '1',
+        'primaryGameId' => absint(get_post_meta($post_id, WWH_PRIMARY_GAME_META, true)),
     ];
 }
 
@@ -2458,6 +2719,72 @@ function wwh_rest_sports_games(WP_REST_Request $request): WP_REST_Response
     return wwh_rest_query_response(new WP_Query(wwh_game_query_args($request)), 'wwh_format_sports_game');
 }
 
+function wwh_rest_sports_game(WP_REST_Request $request)
+{
+    $game_id = absint($request->get_param('id'));
+    $post = get_post($game_id);
+
+    if (!$post instanceof WP_Post || $post->post_type !== WWH_SPORTS_GAME_POST_TYPE || $post->post_status !== 'publish') {
+        return new WP_Error('wwh_game_not_found', 'Sports game not found.', ['status' => 404]);
+    }
+
+    return rest_ensure_response(wwh_format_sports_game($post));
+}
+
+function wwh_rest_search_sports_games(WP_REST_Request $request): WP_REST_Response
+{
+    $search = sanitize_text_field((string) $request->get_param('search'));
+    $limit = min(25, max(1, wwh_rest_limit($request)));
+    $args = [
+        'post_type' => WWH_SPORTS_GAME_POST_TYPE,
+        'post_status' => 'publish',
+        'posts_per_page' => $limit,
+        'orderby' => 'meta_value',
+        'meta_key' => '_ww_start_datetime',
+        'order' => 'DESC',
+        'no_found_rows' => true,
+    ];
+
+    if ($search !== '') {
+        // Editor search matches the stable schedule fields writers recognize without exposing private admin data.
+        $args['meta_query'] = [
+            'relation' => 'OR',
+            [
+                'key' => '_ww_sport',
+                'value' => $search,
+                'compare' => 'LIKE',
+            ],
+            [
+                'key' => '_ww_level',
+                'value' => $search,
+                'compare' => 'LIKE',
+            ],
+            [
+                'key' => '_ww_sport_key',
+                'value' => $search,
+                'compare' => 'LIKE',
+            ],
+            [
+                'key' => '_ww_opponent',
+                'value' => $search,
+                'compare' => 'LIKE',
+            ],
+            [
+                'key' => '_ww_start_datetime',
+                'value' => $search,
+                'compare' => 'LIKE',
+            ],
+            [
+                'key' => '_ww_location_name',
+                'value' => $search,
+                'compare' => 'LIKE',
+            ],
+        ];
+    }
+
+    return wwh_rest_query_response(new WP_Query($args), 'wwh_format_sports_game');
+}
+
 function wwh_summary_key(string $year = 'all', string $sport = 'all'): string
 {
     return $year . '::' . $sport;
@@ -2564,6 +2891,35 @@ function wwh_rest_sports_game_facets(): WP_REST_Response
         'summaries' => $summaries,
         'dataUrl' => add_query_arg(['per_page' => 'all', 'page' => 1], rest_url(WWH_REST_NAMESPACE . '/sports-games')),
     ]);
+}
+
+function wwh_format_sports_team(string $team_key, array $team): array
+{
+    $header_id = absint(wwh_sports_team_setting($team_key, 'headerImageId'));
+    $logo_id = absint(wwh_sports_team_setting($team_key, 'logoId'));
+    $accent_color = sanitize_hex_color(wwh_sports_team_setting($team_key, 'accentColor'));
+
+    return [
+        'key' => $team_key,
+        'sport' => (string) ($team['sport'] ?? ''),
+        'level' => (string) ($team['level'] ?? ''),
+        'teamLabel' => (string) ($team['teamLabel'] ?? ''),
+        'label' => (string) ($team['label'] ?? $team_key),
+        'headerImage' => wwh_media_image($header_id, 'large'),
+        'logo' => wwh_media_image($logo_id, 'medium'),
+        'accentColor' => $accent_color ?: '',
+    ];
+}
+
+function wwh_rest_sports_teams(): WP_REST_Response
+{
+    $teams = [];
+
+    foreach (wwh_sports_team_options() as $team_key => $team) {
+        $teams[] = wwh_format_sports_team($team_key, $team);
+    }
+
+    return rest_ensure_response($teams);
 }
 
 function wwh_rest_upcoming_sports_games(WP_REST_Request $request): WP_REST_Response
@@ -2739,6 +3095,7 @@ function wwh_format_sports_game(WP_Post $post): array
         'sportLabel' => $sport_option['label'] ?? wwh_meta_value($post->ID, '_ww_sport'),
         'level' => $level,
         'teamLabel' => $sport_option['teamLabel'] ?? wwh_meta_value($post->ID, '_ww_team_label'),
+        'team' => $sport_option ? wwh_format_sports_team($sport_key, $sport_option) : null,
         'opponent' => $opponent,
         'site' => $site,
         'location' => $location_name,
@@ -2772,6 +3129,102 @@ function wwh_format_sports_game(WP_Post $post): array
             ],
         ],
     ];
+}
+
+function wwh_public_site_url(): string
+{
+    return untrailingslashit((string) apply_filters('wwh_public_site_url', 'https://weeklywildcat.com'));
+}
+
+function wwh_game_center_url(int $game_id): string
+{
+    return wwh_public_site_url() . '/sports/schedule/#game-' . absint($game_id);
+}
+
+function wwh_render_game_embed_block(array $attributes): string
+{
+    $game_id = absint($attributes['gameId'] ?? 0);
+    $post = $game_id > 0 ? get_post($game_id) : null;
+
+    if (!$post instanceof WP_Post || $post->post_type !== WWH_SPORTS_GAME_POST_TYPE || $post->post_status !== 'publish') {
+        return '';
+    }
+
+    $display = wwh_sanitize_choice((string) ($attributes['display'] ?? 'full'), ['compact', 'full', 'score-only'], 'full');
+
+    return wwh_render_game_card_html(wwh_format_sports_game($post), $display);
+}
+
+function wwh_render_game_card_html(array $game, string $display): string
+{
+    $status = (string) ($game['status'] ?? 'upcoming');
+    $scoreboard = $game['display']['scoreboard'] ?? [];
+    $wildcats = $scoreboard['wildcats'] ?? ['label' => 'Wildcats', 'score' => null];
+    $opponent = $scoreboard['opponent'] ?? ['label' => 'Opponent', 'score' => null];
+    $wildcats_score = $wildcats['score'];
+    $opponent_score = $opponent['score'];
+    $has_score = $status === 'final' && $wildcats_score !== null && $opponent_score !== null;
+    $wildcats_won = $has_score && (int) $wildcats_score > (int) $opponent_score;
+    $opponent_won = $has_score && (int) $opponent_score > (int) $wildcats_score;
+    $classes = trim('article-game-card article-game-card-inline article-game-card-' . $display . ' article-game-card-' . $status);
+    $date = (string) ($game['display']['date'] ?? $game['startDate'] ?? '');
+    $location = (string) ($game['display']['location'] ?? $game['locationName'] ?? $game['locationAddress'] ?? '');
+    $sport_level = (string) ($game['display']['sportLevel'] ?? $game['sportLabel'] ?? 'Sports');
+    $status_label = (string) ($game['display']['status'] ?? wwh_label_from_value($status));
+    $matchup = (string) ($game['display']['matchup'] ?? $game['title'] ?? 'Weekly Wildcat game');
+    $game_url = wwh_game_center_url(absint($game['id'] ?? 0));
+
+    ob_start();
+    ?>
+    <aside class="<?php echo esc_attr($classes); ?>" aria-label="Linked game">
+        <div class="article-game-card-meta">
+            <span><?php echo esc_html($sport_level); ?></span>
+            <span><?php echo esc_html($status_label); ?></span>
+        </div>
+
+        <?php if ($display !== 'score-only') : ?>
+            <h2><?php echo esc_html($matchup); ?></h2>
+        <?php endif; ?>
+
+        <?php if ($has_score) : ?>
+            <div class="article-game-scoreboard" aria-label="<?php echo esc_attr((string) ($game['display']['score'] ?? 'Final score')); ?>">
+                <div class="<?php echo esc_attr($wildcats_won ? 'article-game-team article-game-team-winner' : 'article-game-team'); ?>">
+                    <span><?php echo esc_html((string) ($wildcats['label'] ?? 'Wildcats')); ?></span>
+                    <strong><?php echo esc_html((string) $wildcats_score); ?></strong>
+                </div>
+                <div class="<?php echo esc_attr($opponent_won ? 'article-game-team article-game-team-winner' : 'article-game-team'); ?>">
+                    <span><?php echo esc_html((string) ($opponent['label'] ?? 'Opponent')); ?></span>
+                    <strong><?php echo esc_html((string) $opponent_score); ?></strong>
+                </div>
+            </div>
+        <?php else : ?>
+            <p class="article-game-status"><?php echo esc_html($status_label); ?></p>
+        <?php endif; ?>
+
+        <?php if ($display === 'full') : ?>
+            <dl class="article-game-details">
+                <?php if ($date !== '') : ?>
+                    <div>
+                        <dt>Date</dt>
+                        <dd><?php echo esc_html($date); ?></dd>
+                    </div>
+                <?php endif; ?>
+                <?php if ($location !== '') : ?>
+                    <div>
+                        <dt>Location</dt>
+                        <dd><?php echo esc_html($location); ?></dd>
+                    </div>
+                <?php endif; ?>
+            </dl>
+        <?php elseif ($date !== '') : ?>
+            <p class="article-game-date"><?php echo esc_html($date); ?></p>
+        <?php endif; ?>
+
+        <a class="article-game-link" href="<?php echo esc_url($game_url); ?>">View Game Center &rarr;</a>
+    </aside>
+    <?php
+
+    return trim((string) ob_get_clean());
 }
 
 function wwh_format_school_event(WP_Post $post): array
