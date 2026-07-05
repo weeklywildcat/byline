@@ -1927,6 +1927,8 @@ function wwh_parse_sports_import_rows(string $raw_data): array
             'opponent_score' => wwh_import_cell($columns, $header_map, 'opponentscore'),
             'game_type' => wwh_import_cell($columns, $header_map, 'gametype'),
             'watch_replay' => wwh_import_cell($columns, $header_map, 'watchreplay'),
+            'sport_key' => wwh_import_cell($columns, $header_map, 'sportkey'),
+            'sport_team' => wwh_import_cell($columns, $header_map, 'sportteam'),
         ];
     }
 
@@ -1972,6 +1974,24 @@ function wwh_import_cell(array $columns, array $header_map, string $header): str
 function wwh_import_sports_game_row(string $sport_key, array $row)
 {
     $sport_option = wwh_sports_team_options()[$sport_key];
+    $row_sport_key = wwh_import_row_sport_key($row);
+
+    if (is_wp_error($row_sport_key)) {
+        return $row_sport_key;
+    }
+
+    if ($row_sport_key !== '' && $row_sport_key !== $sport_key) {
+        $row_sport_option = wwh_sports_team_options()[$row_sport_key] ?? null;
+        return new WP_Error(
+            'wwh_import_sport_key_mismatch',
+            sprintf(
+                'The row is marked as %s, but the import is set to %s. Choose the matching sport/team or remove the mismatched row.',
+                $row_sport_option['label'] ?? $row_sport_key,
+                $sport_option['label']
+            )
+        );
+    }
+
     $opponent = trim((string) $row['opponent']);
     $start_unknown = wwh_import_has_unknown_datetime((string) $row['date'], (string) $row['time']);
     $start_datetime = wwh_import_datetime((string) $row['date'], (string) $row['time']);
@@ -1992,6 +2012,23 @@ function wwh_import_sports_game_row(string $sport_key, array $row)
     $notes = wwh_import_notes($row, $recap_url);
     $import_key = wwh_import_row_key($row);
     $post_id = wwh_find_existing_sports_game($sport_key, $start_datetime, $opponent, $import_key);
+
+    if ($post_id === 0) {
+        $duplicate_sport_key = wwh_find_cross_sport_duplicate($sport_key, $start_datetime, $opponent, $import_key);
+
+        if ($duplicate_sport_key !== '') {
+            $duplicate_option = wwh_sports_team_options()[$duplicate_sport_key] ?? null;
+            return new WP_Error(
+                'wwh_import_cross_sport_duplicate',
+                sprintf(
+                    'A matching game already exists for %s. This row was not imported as %s.',
+                    $duplicate_option['label'] ?? $duplicate_sport_key,
+                    $sport_option['label']
+                )
+            );
+        }
+    }
+
     $title = wwh_import_game_title($sport_option['sport'], $site, $opponent);
     $post_data = [
         'post_type' => WWH_SPORTS_GAME_POST_TYPE,
@@ -2179,6 +2216,59 @@ function wwh_import_notes(array $row, string $recap_url): string
     return implode("\n", $notes);
 }
 
+function wwh_import_row_sport_key(array $row)
+{
+    $raw_sport_key = trim((string) ($row['sport_key'] ?? ''));
+
+    if ($raw_sport_key !== '') {
+        $sport_key = wwh_sanitize_sport_key(strtolower($raw_sport_key));
+
+        if ($sport_key === '') {
+            return new WP_Error(
+                'wwh_import_unknown_sport_key',
+                sprintf('The row uses an unknown Sport Key: %s.', $raw_sport_key)
+            );
+        }
+
+        return $sport_key;
+    }
+
+    $sport_team = trim((string) ($row['sport_team'] ?? ''));
+
+    if ($sport_team === '') {
+        return '';
+    }
+
+    $sport_team_normalized = wwh_normalize_import_sport_label($sport_team);
+
+    foreach (wwh_sports_team_options() as $key => $option) {
+        $labels = [
+            $key,
+            (string) ($option['label'] ?? ''),
+            trim(implode(' ', array_filter([(string) ($option['sport'] ?? ''), (string) ($option['level'] ?? '')]))),
+        ];
+
+        foreach ($labels as $label) {
+            if ($label !== '' && wwh_normalize_import_sport_label($label) === $sport_team_normalized) {
+                return $key;
+            }
+        }
+    }
+
+    return new WP_Error(
+        'wwh_import_unknown_sport_team',
+        sprintf('The row uses an unknown Sport / Team value: %s.', $sport_team)
+    );
+}
+
+function wwh_normalize_import_sport_label(string $value): string
+{
+    $value = strtolower(trim($value));
+    $value = preg_replace('/[^a-z0-9]+/', '', $value);
+
+    return is_string($value) ? $value : '';
+}
+
 function wwh_import_row_key(array $row): string
 {
     $parts = [
@@ -2239,6 +2329,50 @@ function wwh_find_existing_sports_game(string $sport_key, string $start_datetime
     wp_reset_postdata();
 
     return $post_id;
+}
+
+function wwh_find_cross_sport_duplicate(string $sport_key, string $start_datetime, string $opponent, string $import_key): string
+{
+    $meta_query = [
+        [
+            'key' => '_ww_opponent',
+            'value' => $opponent,
+        ],
+    ];
+
+    if ($start_datetime !== '') {
+        $meta_query[] = [
+            'key' => '_ww_start_datetime',
+            'value' => $start_datetime,
+        ];
+    } else {
+        $meta_query[] = [
+            'key' => '_ww_import_key',
+            'value' => $import_key,
+        ];
+    }
+
+    $query = new WP_Query([
+        'post_type' => WWH_SPORTS_GAME_POST_TYPE,
+        'post_status' => ['publish', 'draft', 'pending', 'private'],
+        'posts_per_page' => 10,
+        'fields' => 'ids',
+        'no_found_rows' => true,
+        'meta_query' => $meta_query,
+    ]);
+
+    foreach ($query->posts as $post_id) {
+        $duplicate_sport_key = wwh_meta_value(absint($post_id), '_ww_sport_key');
+
+        if ($duplicate_sport_key !== '' && $duplicate_sport_key !== $sport_key) {
+            wp_reset_postdata();
+            return $duplicate_sport_key;
+        }
+    }
+
+    wp_reset_postdata();
+
+    return '';
 }
 
 function wwh_import_game_title(string $sport, string $site, string $opponent): string
