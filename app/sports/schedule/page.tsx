@@ -141,7 +141,7 @@ export default async function SportsSchedulePage() {
   const rawDataLimit = Math.max(scheduleMetadata.summaries[getSummaryKey()]?.games ?? 0, DEFAULT_RAW_DATA_LIMIT);
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", path: "/" },
-    { name: "Sports", path: "/category/sports/" },
+    { name: "Sports", path: "/sports/" },
     { name: "Game History & Schedule", path: "/sports/schedule/" }
   ]);
 

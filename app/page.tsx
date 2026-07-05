@@ -282,7 +282,7 @@ export default async function HomePage() {
         <section className="from-field" aria-labelledby="field-heading">
           <div className="section-header-row">
             <h2 id="field-heading">Sports</h2>
-            <a href="/category/sports/">All Sports →</a>
+            <a href="/sports/">All Sports →</a>
           </div>
           {fieldPosts.length > 0 || athleteSpotlightPost ? (
             <div className="field-layout">
@@ -345,7 +345,7 @@ export default async function HomePage() {
                     <SiteIcon name="ph:pencil-line" width={16} height={16} />
                     Join the newsroom
                   </a>
-                  <a href="/about/">
+                  <a href="/authors/">
                     <SiteIcon name="ph:users-three" width={16} height={16} />
                     Meet the staff
                   </a>

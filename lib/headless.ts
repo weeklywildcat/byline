@@ -14,6 +14,25 @@ export type SportsGameStatus = "upcoming" | "final" | "postponed" | "canceled";
 export type SchoolEventStatus = "scheduled" | "canceled";
 export type GameSite = "home" | "away" | "neutral";
 
+export type HeadlessImage = {
+  id: number;
+  url: string;
+  alt: string;
+  width: number | null;
+  height: number | null;
+};
+
+export type SportsTeamMedia = {
+  key: string;
+  sport: string;
+  level: string;
+  teamLabel: string;
+  label: string;
+  headerImage: HeadlessImage;
+  logo: HeadlessImage;
+  accentColor: string;
+};
+
 export type SportsGame = {
   id: number;
   title: string;
@@ -23,6 +42,7 @@ export type SportsGame = {
   sportLabel: string;
   level: string;
   teamLabel: string;
+  team?: SportsTeamMedia | null;
   opponent: string;
   site: GameSite;
   location: string;
@@ -58,7 +78,7 @@ export type SportsGame = {
 };
 
 type SportsGameQuery = {
-  limit?: number;
+  limit?: number | "all";
   page?: number;
   sportKey?: string;
   year?: string | number;
@@ -165,8 +185,56 @@ export function getSportsGames(query?: number | SportsGameQuery) {
   });
 }
 
+// Sports archive pages build team hubs and season URLs from the canonical
+// ww_sports_game records, so a game edit updates every dependent static page on
+// the next WordPress-triggered rebuild without duplicating schedule data.
+export async function getAllSportsGames() {
+  const firstPage = await headlessFetchPage<SportsGame[]>("/sports-games", {
+    per_page: 100,
+    page: 1
+  });
+
+  if (firstPage.totalPages <= 1) {
+    return firstPage.data;
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
+      headlessFetchPage<SportsGame[]>("/sports-games", {
+        per_page: 100,
+        page: index + 2
+      })
+    )
+  );
+
+  return [...firstPage.data, ...remainingPages.flatMap((page) => page.data)];
+}
+
+export function getGameCenterHref(game: Pick<SportsGame, "id">) {
+  return `/sports/schedule/#game-${game.id}`;
+}
+
+export async function getSportsGameById(gameId: number | string) {
+  const id = Number(gameId);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return null;
+  }
+
+  try {
+    // Single-game lookups keep article cards tied to the canonical schedule record.
+    return await headlessFetch<SportsGame>(`/sports-games/${id}`);
+  } catch {
+    return null;
+  }
+}
+
 export function getSportsGameFacets() {
   return headlessFetch<SportsGameFacets>("/sports-games/facets");
+}
+
+export function getSportsTeams() {
+  return headlessFetch<SportsTeamMedia[]>("/sports-teams");
 }
 
 export function getUpcomingSportsGames(query?: number | SportsGameQuery) {

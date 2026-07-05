@@ -6,7 +6,7 @@ const footerGroups = [
       { name: "Features", href: "/category/features/" },
       { name: "Opinion", href: "/category/opinion/" },
       { name: "Arts & Culture", href: "/category/culture/" },
-      { name: "Sports", href: "/category/sports/" }
+      { name: "Sports", href: "/sports/" }
     ]
   },
   {

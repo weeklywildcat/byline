@@ -6,7 +6,7 @@ export type PublicSection = {
 
 export const PUBLIC_SECTIONS: PublicSection[] = [
   { name: "News", slug: "news", href: "/category/news/" },
-  { name: "Sports", slug: "sports", href: "/category/sports/" },
+  { name: "Sports", slug: "sports", href: "/sports/" },
   { name: "Opinion", slug: "opinion", href: "/category/opinion/" },
   { name: "Features", slug: "features", href: "/category/features/" },
 ];

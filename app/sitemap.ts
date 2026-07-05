@@ -2,6 +2,8 @@ import type { MetadataRoute } from "next";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { PUBLIC_SECTIONS } from "@/lib/sections";
 import { absoluteUrl } from "@/lib/seo";
+import { getAllSportsGames } from "@/lib/headless";
+import { buildTeams, getSeasonHref, getTeamHubHref } from "@/lib/sports";
 import { STATIC_PAGES } from "@/lib/static-pages";
 import { getAllAuthors, getAllPosts, getAuthorHref, getPostHref, type WordPressPost } from "@/lib/wordpress";
 
@@ -23,8 +25,9 @@ function getPostSitemapDate(post: Pick<WordPressPost, "modified" | "modified_gmt
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [allPosts, authors] = await Promise.all([getAllPosts(), getAllAuthors()]);
+  const [allPosts, authors, sportsGames] = await Promise.all([getAllPosts(), getAllAuthors(), getAllSportsGames().catch(() => [])]);
   const posts = filterVisibleContentPosts(allPosts);
+  const sportsTeams = buildTeams(sportsGames);
   const latestModifiedPost = posts.reduce<(typeof posts)[number] | undefined>((latestPost, post) => {
     if (!latestPost) {
       return post;
@@ -96,5 +99,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6
   }));
 
-  return [...staticPages, ...articlePages, ...authorPages];
+  const sportsPages: MetadataRoute.Sitemap = sportsTeams.flatMap((team) => [
+    {
+      url: absoluteUrl(getTeamHubHref(team)),
+      lastModified: latestModified,
+      changeFrequency: "daily" as const,
+      priority: 0.7
+    },
+    ...team.seasons.map((year) => ({
+      url: absoluteUrl(getSeasonHref(team, year)),
+      lastModified: latestModified,
+      changeFrequency: year === team.latestSeason ? ("daily" as const) : ("monthly" as const),
+      priority: year === team.latestSeason ? 0.65 : 0.45
+    }))
+  ]);
+
+  return [...staticPages, ...sportsPages, ...articlePages, ...authorPages];
 }

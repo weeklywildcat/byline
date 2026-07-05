@@ -132,6 +132,7 @@ export type WordPressPost = {
   sticky: boolean;
   weeklyWildcat?: {
     homepageOpinionTreatment?: boolean;
+    primaryGameId?: number;
   };
   _embedded?: {
     author?: WordPressAuthor[];
@@ -458,4 +459,8 @@ export function getAuthorSocialLinks(author: WordPressAuthor) {
     { label: "LinkedIn", href: socials.linkedin },
     { label: "X", href: socials.x }
   ].filter((link) => link.href);
+}
+
+export function getPostPrimaryGameId(post: WordPressPost) {
+  return post.weeklyWildcat?.primaryGameId && post.weeklyWildcat.primaryGameId > 0 ? post.weeklyWildcat.primaryGameId : null;
 }
