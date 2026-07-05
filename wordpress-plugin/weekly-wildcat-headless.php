@@ -1569,21 +1569,29 @@ function wwh_render_sports_import_page(): void
     }
 
     $result = null;
+    $reset_result = null;
     $selected_sport_key = '';
     $import_data = '';
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wwh_sports_import_action'])) {
-        check_admin_referer('wwh_import_sports_games', 'wwh_sports_import_nonce');
+        $action = sanitize_text_field(wp_unslash((string) $_POST['wwh_sports_import_action']));
 
-        $selected_sport_key = wwh_sanitize_sport_key(wwh_request_value('ww_sport_key'));
-        $import_data = isset($_POST['wwh_import_data']) ? (string) wp_unslash($_POST['wwh_import_data']) : '';
+        if ($action === 'reset') {
+            check_admin_referer('wwh_reset_sports_games', 'wwh_sports_reset_nonce');
+            $reset_result = wwh_reset_sports_games();
+        } else {
+            check_admin_referer('wwh_import_sports_games', 'wwh_sports_import_nonce');
 
-        if (trim($import_data) === '' && isset($_FILES['wwh_import_file']['tmp_name'], $_FILES['wwh_import_file']['error']) && $_FILES['wwh_import_file']['error'] === UPLOAD_ERR_OK) {
-            $uploaded = file_get_contents((string) $_FILES['wwh_import_file']['tmp_name']);
-            $import_data = is_string($uploaded) ? $uploaded : '';
+            $selected_sport_key = wwh_sanitize_sport_key(wwh_request_value('ww_sport_key'));
+            $import_data = isset($_POST['wwh_import_data']) ? (string) wp_unslash($_POST['wwh_import_data']) : '';
+
+            if (trim($import_data) === '' && isset($_FILES['wwh_import_file']['tmp_name'], $_FILES['wwh_import_file']['error']) && $_FILES['wwh_import_file']['error'] === UPLOAD_ERR_OK) {
+                $uploaded = file_get_contents((string) $_FILES['wwh_import_file']['tmp_name']);
+                $import_data = is_string($uploaded) ? $uploaded : '';
+            }
+
+            $result = wwh_import_sports_games($selected_sport_key, $import_data);
         }
-
-        $result = wwh_import_sports_games($selected_sport_key, $import_data);
     }
 
     $team_options = ['' => 'Select a sport / team'];
@@ -1606,6 +1614,20 @@ function wwh_render_sports_import_page(): void
                 <?php if ($result['errors'] !== []) : ?>
                     <ul>
                         <?php foreach ($result['errors'] as $error) : ?>
+                            <li><?php echo esc_html($error); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+        <?php if (is_array($reset_result)) : ?>
+            <div class="notice <?php echo $reset_result['errors'] === [] ? 'notice-success' : 'notice-warning'; ?> is-dismissible">
+                <p>
+                    <strong><?php echo esc_html(sprintf('Moved %d sports games to Trash.', $reset_result['trashed'])); ?></strong>
+                </p>
+                <?php if ($reset_result['errors'] !== []) : ?>
+                    <ul>
+                        <?php foreach ($reset_result['errors'] as $error) : ?>
                             <li><?php echo esc_html($error); ?></li>
                         <?php endforeach; ?>
                     </ul>
@@ -1649,8 +1671,69 @@ function wwh_render_sports_import_page(): void
 
             <?php submit_button('Import Games'); ?>
         </form>
+
+        <hr>
+
+        <h2>Reset Sports Games</h2>
+        <p>Move every sports game record to Trash so the schedule database can be rebuilt from a clean import. This does not permanently delete trashed posts.</p>
+        <form method="post">
+            <?php wp_nonce_field('wwh_reset_sports_games', 'wwh_sports_reset_nonce'); ?>
+            <input type="hidden" name="wwh_sports_import_action" value="reset">
+            <table class="form-table" role="presentation">
+                <tr>
+                    <th scope="row"><label for="wwh_reset_confirm">Confirm reset</label></th>
+                    <td>
+                        <input id="wwh_reset_confirm" name="wwh_reset_confirm" type="text" class="regular-text" autocomplete="off">
+                        <p class="description">Type <code>TRASH GAMES</code> to move all sports games to Trash.</p>
+                    </td>
+                </tr>
+            </table>
+            <?php submit_button('Move All Sports Games to Trash', 'delete'); ?>
+        </form>
     </div>
     <?php
+}
+
+function wwh_reset_sports_games(): array
+{
+    $result = [
+        'trashed' => 0,
+        'errors' => [],
+    ];
+
+    if (!current_user_can('edit_posts')) {
+        $result['errors'][] = 'You are not allowed to reset sports games.';
+        return $result;
+    }
+
+    $confirmation = isset($_POST['wwh_reset_confirm']) ? sanitize_text_field(wp_unslash((string) $_POST['wwh_reset_confirm'])) : '';
+
+    if ($confirmation !== 'TRASH GAMES') {
+        $result['errors'][] = 'Type TRASH GAMES to confirm the reset.';
+        return $result;
+    }
+
+    $query = new WP_Query([
+        'post_type' => WWH_SPORTS_GAME_POST_TYPE,
+        'post_status' => ['publish', 'draft', 'pending', 'private', 'future'],
+        'posts_per_page' => -1,
+        'fields' => 'ids',
+        'no_found_rows' => true,
+    ]);
+
+    foreach ($query->posts as $post_id) {
+        $trashed = wp_trash_post(absint($post_id));
+
+        if ($trashed) {
+            $result['trashed']++;
+        } else {
+            $result['errors'][] = sprintf('Could not trash sports game post ID %d.', absint($post_id));
+        }
+    }
+
+    wp_reset_postdata();
+
+    return $result;
 }
 
 function wwh_render_sports_export_page(): void
