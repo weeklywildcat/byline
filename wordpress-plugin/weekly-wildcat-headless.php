@@ -1942,7 +1942,7 @@ function wwh_import_sports_games(string $sport_key, string $raw_data): array
 
         if (is_wp_error($imported)) {
             $result['skipped']++;
-            $result['errors'][] = sprintf('Row %d: %s', $line_number, $imported->get_error_message());
+            $result['errors'][] = sprintf('Row %d skipped: %s', $line_number, $imported->get_error_message());
             continue;
         }
 
@@ -2094,23 +2094,7 @@ function wwh_import_sports_game_row(string $sport_key, array $row)
     $recap_url = wwh_import_recap_url((string) $row['watch_replay']);
     $notes = wwh_import_notes($row, $recap_url);
     $import_key = wwh_import_row_key($row);
-    $post_id = wwh_find_existing_sports_game($sport_key, $start_datetime, $opponent, $import_key);
-
-    if ($post_id === 0) {
-        $duplicate_sport_key = wwh_find_cross_sport_duplicate($sport_key, $start_datetime, $opponent, $import_key);
-
-        if ($duplicate_sport_key !== '') {
-            $duplicate_option = wwh_sports_team_options()[$duplicate_sport_key] ?? null;
-            return new WP_Error(
-                'wwh_import_cross_sport_duplicate',
-                sprintf(
-                    'A matching game already exists for %s. This row was not imported as %s.',
-                    $duplicate_option['label'] ?? $duplicate_sport_key,
-                    $sport_option['label']
-                )
-            );
-        }
-    }
+    $post_id = wwh_find_existing_sports_game($sport_key, $row, $start_datetime, $opponent);
 
     $title = wwh_import_game_title($sport_option['sport'], $site, $opponent);
     $post_data = [
@@ -2374,88 +2358,125 @@ function wwh_normalize_import_key_part(string $value): string
     return is_string($value) ? $value : '';
 }
 
-function wwh_find_existing_sports_game(string $sport_key, string $start_datetime, string $opponent, string $import_key): int
+function wwh_normalize_import_date_key(string $value): string
+{
+    $value = trim($value);
+
+    if ($value === '' || wwh_import_is_unknown_value($value)) {
+        return '';
+    }
+
+    $timezone = wp_timezone();
+    $formats = ['Y-m-d', 'm/d/Y', 'n/j/Y', 'm/d/y', 'n/j/y'];
+
+    foreach ($formats as $format) {
+        $date = DateTimeImmutable::createFromFormat('!' . $format, $value, $timezone);
+        $errors = DateTimeImmutable::getLastErrors();
+        $has_errors = is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0);
+
+        if ($date instanceof DateTimeImmutable && !$has_errors) {
+            return $date->format('Y-m-d');
+        }
+    }
+
+    $timestamp = strtotime($value);
+
+    return $timestamp ? wp_date('Y-m-d', $timestamp, $timezone) : wwh_normalize_import_key_part($value);
+}
+
+function wwh_normalize_import_time_key(string $value): string
+{
+    $value = trim($value);
+
+    if ($value === '' || wwh_import_is_unknown_value($value)) {
+        return '';
+    }
+
+    $timezone = wp_timezone();
+    $formats = ['g:i A', 'h:i A', 'g:iA', 'h:iA', 'H:i'];
+
+    foreach ($formats as $format) {
+        $time = DateTimeImmutable::createFromFormat('!' . $format, $value, $timezone);
+        $errors = DateTimeImmutable::getLastErrors();
+        $has_errors = is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0);
+
+        if ($time instanceof DateTimeImmutable && !$has_errors) {
+            return $time->format('H:i');
+        }
+    }
+
+    $timestamp = strtotime($value);
+
+    return $timestamp ? wp_date('H:i', $timestamp, $timezone) : wwh_normalize_import_key_part($value);
+}
+
+function wwh_existing_sports_game_identity_matches(int $post_id, array $row, string $start_datetime, string $opponent): bool
+{
+    $existing_start_datetime = wwh_meta_value($post_id, '_ww_start_datetime');
+    $existing_date = wwh_meta_value($post_id, '_ww_import_date');
+    $existing_time = wwh_meta_value($post_id, '_ww_import_time');
+
+    if ($existing_date === '' && $existing_start_datetime !== '') {
+        $existing_date = substr($existing_start_datetime, 0, 10);
+    }
+
+    if ($existing_time === '' && $existing_start_datetime !== '') {
+        $existing_time = substr($existing_start_datetime, 11, 5);
+    }
+
+    $row_time = (string) $row['time'];
+    $row_has_time = !wwh_import_is_unknown_value($row_time);
+    $existing_has_time = !wwh_import_is_unknown_value($existing_time);
+
+    if (wwh_normalize_import_key_part(wwh_meta_value($post_id, '_ww_import_season')) !== wwh_normalize_import_key_part((string) $row['season'])) {
+        return false;
+    }
+
+    if (wwh_normalize_import_date_key($existing_date) !== wwh_normalize_import_date_key((string) $row['date'])) {
+        return false;
+    }
+
+    if (wwh_normalize_import_key_part(wwh_meta_value($post_id, '_ww_opponent')) !== wwh_normalize_import_key_part($opponent)) {
+        return false;
+    }
+
+    if (($row_has_time || $existing_has_time) && wwh_normalize_import_time_key($existing_time) !== wwh_normalize_import_time_key($row_time)) {
+        return false;
+    }
+
+    return $start_datetime === '' || $existing_start_datetime === '' || $existing_start_datetime === $start_datetime;
+}
+
+function wwh_find_existing_sports_game(string $sport_key, array $row, string $start_datetime, string $opponent): int
 {
     $meta_query = [
         [
             'key' => '_ww_sport_key',
             'value' => $sport_key,
         ],
-        [
-            'key' => '_ww_opponent',
-            'value' => $opponent,
-        ],
     ];
-
-    if ($start_datetime !== '') {
-        $meta_query[] = [
-            'key' => '_ww_start_datetime',
-            'value' => $start_datetime,
-        ];
-    } else {
-        $meta_query[] = [
-            'key' => '_ww_import_key',
-            'value' => $import_key,
-        ];
-    }
 
     $query = new WP_Query([
         'post_type' => WWH_SPORTS_GAME_POST_TYPE,
         'post_status' => ['publish', 'draft', 'pending', 'private'],
-        'posts_per_page' => 1,
-        'fields' => 'ids',
-        'no_found_rows' => true,
-        'meta_query' => $meta_query,
-    ]);
-
-    $post_id = isset($query->posts[0]) ? absint($query->posts[0]) : 0;
-    wp_reset_postdata();
-
-    return $post_id;
-}
-
-function wwh_find_cross_sport_duplicate(string $sport_key, string $start_datetime, string $opponent, string $import_key): string
-{
-    $meta_query = [
-        [
-            'key' => '_ww_opponent',
-            'value' => $opponent,
-        ],
-    ];
-
-    if ($start_datetime !== '') {
-        $meta_query[] = [
-            'key' => '_ww_start_datetime',
-            'value' => $start_datetime,
-        ];
-    } else {
-        $meta_query[] = [
-            'key' => '_ww_import_key',
-            'value' => $import_key,
-        ];
-    }
-
-    $query = new WP_Query([
-        'post_type' => WWH_SPORTS_GAME_POST_TYPE,
-        'post_status' => ['publish', 'draft', 'pending', 'private'],
-        'posts_per_page' => 10,
+        'posts_per_page' => -1,
         'fields' => 'ids',
         'no_found_rows' => true,
         'meta_query' => $meta_query,
     ]);
 
     foreach ($query->posts as $post_id) {
-        $duplicate_sport_key = wwh_meta_value(absint($post_id), '_ww_sport_key');
+        $post_id = absint($post_id);
 
-        if ($duplicate_sport_key !== '' && $duplicate_sport_key !== $sport_key) {
+        if (wwh_existing_sports_game_identity_matches($post_id, $row, $start_datetime, $opponent)) {
             wp_reset_postdata();
-            return $duplicate_sport_key;
+            return $post_id;
         }
     }
 
     wp_reset_postdata();
 
-    return '';
+    return 0;
 }
 
 function wwh_import_game_title(string $sport, string $site, string $opponent): string
