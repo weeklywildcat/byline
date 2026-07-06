@@ -51,8 +51,27 @@ const SPORT_METADATA: Record<string, SportMetadata> = {
 // Team and season archive URLs are derived from the existing sports game records.
 // Varsity sport keys use the clean team hub slug, while JV/C-team keys remain
 // complete identities such as football-jv or girls-basketball-jv.
-export function getGameYear(game: SportsGame) {
-  return /^\d{4}/.test(game.startDate) ? game.startDate.slice(0, 4) : "";
+function getSeasonFromDate(startDate: string) {
+  const match = /^(\d{4})-(\d{2})-\d{2}T/.exec(startDate);
+
+  if (!match) {
+    return "";
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month)) {
+    return "";
+  }
+
+  const startYear = month >= 7 ? year : year - 1;
+
+  return `${startYear}-${String(startYear + 1).slice(-2)}`;
+}
+
+export function getGameSeason(game: SportsGame) {
+  return game.season || getSeasonFromDate(game.startDate);
 }
 
 export function getTeamSlug(game: SportsGame) {
@@ -103,7 +122,7 @@ export function buildTeams(games: SportsGame[]) {
 
   games.forEach((game) => {
     const slug = getTeamSlug(game);
-    const year = getGameYear(game);
+    const year = getGameSeason(game);
 
     if (!slug || !year) {
       return;
@@ -188,7 +207,7 @@ export function groupTeamsByLatestSeason(teams: TeamSummary[]) {
 }
 
 export function getTeamSeasonGames(team: TeamSummary, year: string) {
-  return team.games.filter((game) => getGameYear(game) === year).sort(sortGamesAscending);
+  return team.games.filter((game) => getGameSeason(game) === year).sort(sortGamesAscending);
 }
 
 export function getTeamLatestGames(team: TeamSummary, limit = 5) {

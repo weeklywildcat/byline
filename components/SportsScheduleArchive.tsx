@@ -27,8 +27,27 @@ type ScheduleSummary = {
 
 const SCHEDULE_PAGE_SIZE = 25;
 
-function getYear(game: SportsGame) {
-  return game.startDate.slice(0, 4);
+function getSeasonFromDate(startDate: string) {
+  const match = /^(\d{4})-(\d{2})-\d{2}T/.exec(startDate);
+
+  if (!match) {
+    return "";
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month)) {
+    return "";
+  }
+
+  const startYear = month >= 7 ? year : year - 1;
+
+  return `${startYear}-${String(startYear + 1).slice(-2)}`;
+}
+
+function getSeason(game: SportsGame) {
+  return game.season || getSeasonFromDate(game.startDate);
 }
 
 function getSportLabel(game: SportsGame) {
@@ -153,7 +172,7 @@ function buildFallbackMetadata(games: SportsGame[]) {
   const summaries: Record<string, ScheduleSummary> = {};
 
   games.forEach((game) => {
-    const year = getYear(game);
+    const year = getSeason(game);
     const sport = getSportValue(game);
 
     if (year) {
@@ -206,7 +225,7 @@ async function fetchScheduleGames({
   url.searchParams.set("_ww_static_build", String(Date.now()));
 
   if (year !== "all") {
-    url.searchParams.set("year", year);
+    url.searchParams.set("season", year);
   }
 
   if (sport !== "all") {
@@ -362,9 +381,9 @@ export function SportsScheduleArchive({ apiBaseUrl, dataUrl, games, sports, summ
 
       <div className="schedule-filter-bar" aria-label="Schedule filters">
         <label>
-          <span>Year</span>
+          <span>Season</span>
           <select
-            aria-label="Year"
+            aria-label="Season"
             value={year}
             onChange={(event) => {
               const nextYear = event.target.value;
@@ -373,7 +392,7 @@ export function SportsScheduleArchive({ apiBaseUrl, dataUrl, games, sports, summ
               void loadGames(1, nextYear, sport);
             }}
           >
-            <option value="all">All Years</option>
+            <option value="all">All Seasons</option>
             {filterYears.map((yearOption) => (
               <option key={yearOption} value={yearOption}>
                 {yearOption}

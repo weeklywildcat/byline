@@ -16,8 +16,27 @@ type ScheduleSummary = {
   ties: number;
 };
 
-function getYear(game: SportsGame) {
-  return game.startDate.slice(0, 4);
+function getSeasonFromDate(startDate: string) {
+  const match = /^(\d{4})-(\d{2})-\d{2}T/.exec(startDate);
+
+  if (!match) {
+    return "";
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month)) {
+    return "";
+  }
+
+  const startYear = month >= 7 ? year : year - 1;
+
+  return `${startYear}-${String(startYear + 1).slice(-2)}`;
+}
+
+function getSeason(game: SportsGame) {
+  return game.season || getSeasonFromDate(game.startDate);
 }
 
 function getSportLabel(game: SportsGame) {
@@ -71,7 +90,7 @@ function buildScheduleMetadata(games: SportsGame[]) {
   const summaries: Record<string, ScheduleSummary> = {};
 
   games.forEach((game) => {
-    const year = getYear(game);
+    const year = getSeason(game);
     const sport = getSportValue(game);
 
     if (year) {

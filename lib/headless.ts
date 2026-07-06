@@ -52,6 +52,7 @@ export type SportsGame = {
   longitude: number | null;
   appleMapsId: string;
   startDate: string;
+  season: string;
   status: SportsGameStatus;
   wildcatsScore: number | null;
   opponentScore: number | null;
@@ -81,6 +82,7 @@ type SportsGameQuery = {
   limit?: number | "all";
   page?: number;
   sportKey?: string;
+  season?: string;
   year?: string | number;
 };
 
@@ -93,6 +95,7 @@ function normalizeSportsGameQuery(query: number | SportsGameQuery | undefined, d
     limit: query?.limit ?? defaultLimit,
     page: query?.page,
     sportKey: query?.sportKey,
+    season: query?.season,
     year: query?.year
   };
 }
@@ -181,6 +184,7 @@ export function getSportsGames(query?: number | SportsGameQuery) {
     per_page: normalizedQuery.limit,
     page: normalizedQuery.page,
     sportKey: normalizedQuery.sportKey,
+    season: normalizedQuery.season,
     year: normalizedQuery.year
   });
 }

@@ -169,6 +169,10 @@ function getTeamDisplayName(season: SeasonSummary) {
 }
 
 function getSchoolYearLabel(year: string) {
+  if (/^\d{4}-\d{2}$/.test(year)) {
+    return year;
+  }
+
   const numericYear = Number(year);
 
   if (!Number.isInteger(numericYear)) {
