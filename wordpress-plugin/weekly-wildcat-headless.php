@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.17
+ * Version: 0.1.18
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -3237,15 +3237,30 @@ function wwh_map_posts(WP_Query $query, callable $formatter): array
     return $items;
 }
 
+function wwh_parse_local_datetime(string $value): ?DateTimeImmutable
+{
+    $value = trim($value);
+
+    if ($value === '') {
+        return null;
+    }
+
+    $datetime = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $value, wp_timezone());
+    $errors = DateTimeImmutable::getLastErrors();
+    $has_errors = is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0);
+
+    return $datetime instanceof DateTimeImmutable && !$has_errors ? $datetime : null;
+}
+
 function wwh_format_date_text(string $value): string
 {
     if ($value === '') {
         return '';
     }
 
-    $timestamp = strtotime(str_replace('T', ' ', $value));
+    $datetime = wwh_parse_local_datetime($value);
 
-    return $timestamp ? wp_date('M j, Y g:i A', $timestamp, wp_timezone()) : $value;
+    return $datetime ? wp_date('M j, Y g:i A', $datetime->getTimestamp(), wp_timezone()) : $value;
 }
 
 function wwh_format_time_text(string $start, string $end, bool $all_day): string
@@ -3254,20 +3269,20 @@ function wwh_format_time_text(string $start, string $end, bool $all_day): string
         return 'All day';
     }
 
-    $start_timestamp = $start !== '' ? strtotime(str_replace('T', ' ', $start)) : false;
-    $end_timestamp = $end !== '' ? strtotime(str_replace('T', ' ', $end)) : false;
+    $start_datetime = wwh_parse_local_datetime($start);
+    $end_datetime = wwh_parse_local_datetime($end);
 
-    if (!$start_timestamp) {
+    if (!$start_datetime) {
         return '';
     }
 
-    $start_text = wp_date('g:i A', $start_timestamp, wp_timezone());
+    $start_text = wp_date('g:i A', $start_datetime->getTimestamp(), wp_timezone());
 
-    if (!$end_timestamp) {
+    if (!$end_datetime) {
         return $start_text;
     }
 
-    return sprintf('%s-%s', $start_text, wp_date('g:i A', $end_timestamp, wp_timezone()));
+    return sprintf('%s-%s', $start_text, wp_date('g:i A', $end_datetime->getTimestamp(), wp_timezone()));
 }
 
 function wwh_label_from_value(string $value): string
