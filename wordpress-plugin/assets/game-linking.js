@@ -1,9 +1,10 @@
 (function (wp) {
-  const { apiFetch, blockEditor, blocks, components, data, editPost, element, i18n, plugins } = wp;
+  const { apiFetch, blockEditor, blocks, components, coreData, data, editPost, element, i18n, plugins } = wp;
   const { InspectorControls } = blockEditor;
   const { Button, PanelBody, Placeholder, SelectControl, Spinner, TextControl } = components;
-  const { useEntityProp, useSelect } = data;
-  const { PluginDocumentSettingPanel } = editPost;
+  const { useEntityProp } = coreData || {};
+  const { useSelect } = data;
+  const { PluginDocumentSettingPanel } = editPost || {};
   const { createElement: el, Fragment, useEffect, useMemo, useState } = element;
   const { __ } = i18n;
   const config = window.wwhGameLinking || {};
@@ -193,14 +194,9 @@
     );
   }
 
-  function PrimaryGamePanel() {
-    const postType = useSelect((select) => select("core/editor").getCurrentPostType(), []);
+  function PrimaryGameMetaPanel({ postType }) {
     const [meta, setMeta] = useEntityProp("postType", postType, "meta");
     const selectedGameId = meta?.[PRIMARY_GAME_META_KEY] || 0;
-
-    if (postType !== "post") {
-      return null;
-    }
 
     return el(
       PluginDocumentSettingPanel,
@@ -212,9 +208,19 @@
       el(GamePicker, {
         label: __("Choose one schedule game for the automatic article card.", "weekly-wildcat-headless"),
         selectedGameId,
-        onSelect: (game) => setMeta({ ...meta, [PRIMARY_GAME_META_KEY]: game ? game.id : 0 }),
+        onSelect: (game) => setMeta({ ...(meta || {}), [PRIMARY_GAME_META_KEY]: game ? game.id : 0 }),
       })
     );
+  }
+
+  function PrimaryGamePanel() {
+    const postType = useSelect((select) => select("core/editor").getCurrentPostType(), []);
+
+    if (postType !== "post" || typeof useEntityProp !== "function" || !PluginDocumentSettingPanel) {
+      return null;
+    }
+
+    return el(PrimaryGameMetaPanel, { postType });
   }
 
   function GameEmbedEdit({ attributes, setAttributes }) {
@@ -252,9 +258,11 @@
     );
   }
 
-  plugins.registerPlugin("weekly-wildcat-primary-game", {
-    render: PrimaryGamePanel,
-  });
+  if (PluginDocumentSettingPanel) {
+    plugins.registerPlugin("weekly-wildcat-primary-game", {
+      render: PrimaryGamePanel,
+    });
+  }
 
   blocks.registerBlockType("weekly-wildcat/game-embed", {
     apiVersion: 2,

@@ -601,6 +601,7 @@ function wwh_register_game_embed_block(): void
             'wp-block-editor',
             'wp-blocks',
             'wp-components',
+            'wp-core-data',
             'wp-data',
             'wp-edit-post',
             'wp-element',
