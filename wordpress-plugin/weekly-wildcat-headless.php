@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.18
+ * Version: 0.1.19
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -49,6 +49,22 @@ function wwh_image_credit_fields(): array
 function wwh_string_ends_with(string $value, string $suffix): bool
 {
     return $suffix === '' || substr($value, -strlen($suffix)) === $suffix;
+}
+
+function wwh_sports_game_status_options(): array
+{
+    return [
+        'upcoming' => 'Upcoming',
+        'final' => 'Final',
+        'postponed' => 'Postponed',
+        'canceled' => 'Canceled',
+        'forfeit' => 'Forfeit',
+    ];
+}
+
+function wwh_sports_game_status_values(): array
+{
+    return array_keys(wwh_sports_game_status_options());
 }
 
 function wwh_register_update_checker(): void
@@ -961,7 +977,7 @@ add_action('restrict_manage_posts', 'wwh_render_admin_filters');
 function wwh_render_sports_game_admin_filters(): void
 {
     $sport_key = wwh_sanitize_sport_key(wwh_admin_filter_value('wwh_sport_key'));
-    $status = wwh_sanitize_choice(wwh_admin_filter_value('wwh_game_status'), ['upcoming', 'final', 'postponed', 'canceled'], '');
+    $status = wwh_sanitize_choice(wwh_admin_filter_value('wwh_game_status'), wwh_sports_game_status_values(), '');
     $site = wwh_sanitize_choice(wwh_admin_filter_value('wwh_site'), ['home', 'away', 'neutral'], '');
     $date_state = wwh_sanitize_choice(wwh_admin_filter_value('wwh_date_state'), ['known', 'unknown'], '');
 
@@ -977,12 +993,7 @@ function wwh_render_sports_game_admin_filters(): void
     }
     echo '</select>';
 
-    wwh_admin_filter_select('wwh_game_status', $status, 'All statuses', [
-        'upcoming' => 'Upcoming',
-        'final' => 'Final',
-        'postponed' => 'Postponed',
-        'canceled' => 'Canceled',
-    ]);
+    wwh_admin_filter_select('wwh_game_status', $status, 'All statuses', wwh_sports_game_status_options());
 
     wwh_admin_filter_select('wwh_site', $site, 'All sites', [
         'home' => 'Home',
@@ -1081,7 +1092,7 @@ function wwh_filter_sports_game_admin_posts(WP_Query $query): void
 {
     $meta_query = wwh_admin_meta_query($query);
     $sport_key = wwh_sanitize_sport_key(wwh_admin_filter_value('wwh_sport_key'));
-    $status = wwh_sanitize_choice(wwh_admin_filter_value('wwh_game_status'), ['upcoming', 'final', 'postponed', 'canceled'], '');
+    $status = wwh_sanitize_choice(wwh_admin_filter_value('wwh_game_status'), wwh_sports_game_status_values(), '');
     $site = wwh_sanitize_choice(wwh_admin_filter_value('wwh_site'), ['home', 'away', 'neutral'], '');
     $date_state = wwh_sanitize_choice(wwh_admin_filter_value('wwh_date_state'), ['known', 'unknown'], '');
 
@@ -1325,12 +1336,7 @@ function wwh_render_sports_game_meta_box(WP_Post $post): void
     wwh_field('Longitude', 'ww_location_longitude', wwh_meta_value($post->ID, '_ww_location_longitude'), 'text', ['inputmode' => 'decimal', 'placeholder' => '-82.0240']);
     wwh_field('Apple Maps Place ID', 'ww_location_apple_maps_id', wwh_meta_value($post->ID, '_ww_location_apple_maps_id'));
     wwh_field('Start Date / Time', 'ww_start_datetime', wwh_meta_value($post->ID, '_ww_start_datetime'), 'datetime-local');
-    wwh_select('Status', 'ww_game_status', wwh_meta_value($post->ID, '_ww_game_status', 'upcoming'), [
-        'upcoming' => 'Upcoming',
-        'final' => 'Final',
-        'postponed' => 'Postponed',
-        'canceled' => 'Canceled',
-    ]);
+    wwh_select('Status', 'ww_game_status', wwh_meta_value($post->ID, '_ww_game_status', 'upcoming'), wwh_sports_game_status_options());
     wwh_field('Wildcats Score', 'ww_wildcats_score', wwh_meta_value($post->ID, '_ww_wildcats_score'), 'number', ['min' => '0']);
     wwh_field('Opponent Score', 'ww_opponent_score', wwh_meta_value($post->ID, '_ww_opponent_score'), 'number', ['min' => '0']);
     wwh_field('Recap URL', 'ww_recap_url', wwh_meta_value($post->ID, '_ww_recap_url'), 'url');
@@ -1538,7 +1544,7 @@ function wwh_save_sports_game(int $post_id): void
     wwh_update_meta($post_id, '_ww_location_longitude', wwh_sanitize_coordinate(wwh_request_value('ww_location_longitude'), -180, 180));
     wwh_update_meta($post_id, '_ww_location_apple_maps_id', wwh_request_value('ww_location_apple_maps_id'));
     wwh_update_meta($post_id, '_ww_start_datetime', wwh_sanitize_datetime(wwh_request_value('ww_start_datetime')));
-    wwh_update_meta($post_id, '_ww_game_status', wwh_sanitize_choice(wwh_request_value('ww_game_status'), ['upcoming', 'final', 'postponed', 'canceled'], 'upcoming'));
+    wwh_update_meta($post_id, '_ww_game_status', wwh_sanitize_choice(wwh_request_value('ww_game_status'), wwh_sports_game_status_values(), 'upcoming'));
     wwh_update_score_meta($post_id, '_ww_wildcats_score', wwh_request_value('ww_wildcats_score'));
     wwh_update_score_meta($post_id, '_ww_opponent_score', wwh_request_value('ww_opponent_score'));
     wwh_update_meta($post_id, '_ww_recap_url', esc_url_raw(wwh_request_value('ww_recap_url')));
@@ -1885,6 +1891,10 @@ function wwh_export_date_time(int $post_id, string $start): array
 
 function wwh_export_result(string $status, string $wildcats_score, string $opponent_score): string
 {
+    if ($status === 'forfeit') {
+        return 'Forfeit';
+    }
+
     if ($status !== 'final' || $wildcats_score === '' || $opponent_score === '') {
         return '';
     }
@@ -2233,6 +2243,10 @@ function wwh_import_status(string $result, string $wildcats_score, string $oppon
 
     if (in_array($result, ['canceled', 'cancelled'], true)) {
         return 'canceled';
+    }
+
+    if (in_array($result, ['forfeit', 'forfeited', 'ff'], true)) {
+        return 'forfeit';
     }
 
     if (in_array($result, ['w', 'win', 'l', 'loss', 't', 'tie'], true) || ($wildcats_score !== '' && $opponent_score !== '')) {
@@ -2882,7 +2896,7 @@ function wwh_game_query_args(WP_REST_Request $request, array $overrides = []): a
     $sport_key = sanitize_text_field((string) ($request->get_param('sport_key') ?: $request->get_param('sportKey')));
     $meta_query = [];
 
-    if ($status !== '' && in_array($status, ['upcoming', 'final', 'postponed', 'canceled'], true)) {
+    if ($status !== '' && in_array($status, wwh_sports_game_status_values(), true)) {
         $meta_query[] = [
             'key' => '_ww_game_status',
             'value' => $status,
@@ -3035,6 +3049,7 @@ function wwh_empty_game_summary(): array
         'games' => 0,
         'upcoming' => 0,
         'finals' => 0,
+        'forfeits' => 0,
         'wins' => 0,
         'losses' => 0,
         'ties' => 0,
@@ -3065,6 +3080,10 @@ function wwh_add_game_to_summary(array &$summaries, string $key, string $status,
                 $summaries[$key]['ties']++;
             }
         }
+    }
+
+    if ($status === 'forfeit') {
+        $summaries[$key]['forfeits']++;
     }
 }
 
@@ -3201,6 +3220,10 @@ function wwh_rest_recent_sports_games(WP_REST_Request $request): WP_REST_Respons
                 ],
                 [
                     'key' => '_ww_game_status',
+                    'value' => 'forfeit',
+                ],
+                [
+                    'key' => '_ww_game_status',
                     'value' => 'upcoming',
                 ],
             ],
@@ -3293,7 +3316,7 @@ function wwh_label_from_value(string $value): string
 
 function wwh_effective_game_status(string $status, string $start): string
 {
-    $status = wwh_sanitize_choice($status, ['upcoming', 'final', 'postponed', 'canceled'], 'upcoming');
+    $status = wwh_sanitize_choice($status, wwh_sports_game_status_values(), 'upcoming');
 
     if ($status === 'upcoming' && wwh_game_start_has_passed($start)) {
         return 'final';

@@ -74,4 +74,19 @@ if ($time !== '6:00 PM') {
     exit(1);
 }
 
+if (wwh_import_status('forfeit', '', '', '') !== 'forfeit') {
+    fwrite(STDERR, "Expected imported forfeit results to save as forfeit status.\n");
+    exit(1);
+}
+
+if (wwh_effective_game_status('forfeit', '2026-04-24T18:00') !== 'forfeit') {
+    fwrite(STDERR, "Expected forfeit status to remain stable after the game start time.\n");
+    exit(1);
+}
+
+if (wwh_export_result('forfeit', '', '') !== 'Forfeit') {
+    fwrite(STDERR, "Expected exported forfeit games to round-trip through the Result column.\n");
+    exit(1);
+}
+
 echo "Sports game local time display regression passed.\n";

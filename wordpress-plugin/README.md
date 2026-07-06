@@ -52,10 +52,10 @@ GitHub Actions packages `weekly-wildcat-headless.zip` and publishes it as a rele
 
 ## Notes
 
-- Sports Games use one record for scheduled games and final scores.
+- Sports Games use one record for scheduled games, final scores, forfeits, postponements, and cancellations.
 - Sports Games include a controlled Sport / Team dropdown for stable frontend filtering.
 - Sports Games expose `sportKey`, `sportLabel`, location name, address, latitude, longitude, and optional Apple Maps place ID.
-- Scores are returned publicly only when a game status is `final`.
+- Scores are returned publicly only when a game status is `final`; forfeits are exposed as status-only results.
 - School Events support scheduled and canceled statuses.
 - The Next.js frontend has typed helpers in `lib/headless.ts`.
 - Author profile data is exposed on public user REST responses as `weeklyWildcatProfile`.
