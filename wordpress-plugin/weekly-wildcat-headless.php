@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.19
+ * Version: 0.1.20
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -2878,6 +2878,85 @@ function wwh_now_local(): string
     return wp_date('Y-m-d\TH:i', null, wp_timezone());
 }
 
+function wwh_normalize_sports_season_value(string $value): string
+{
+    $value = trim($value);
+
+    if (!preg_match('/^(\d{4})\s*[-\/]\s*(\d{2}|\d{4})$/', $value, $matches)) {
+        return '';
+    }
+
+    $start_year = (int) $matches[1];
+    $end_value = $matches[2];
+    $expected_end_year = $start_year + 1;
+
+    if ($start_year < 1900 || $start_year > 2200) {
+        return '';
+    }
+
+    if (strlen($end_value) === 4) {
+        if ((int) $end_value !== $expected_end_year) {
+            return '';
+        }
+    } elseif ((int) $end_value !== $expected_end_year % 100) {
+        return '';
+    }
+
+    return sprintf('%04d-%02d', $start_year, $expected_end_year % 100);
+}
+
+function wwh_sports_game_season(int $post_id, string $start_datetime): string
+{
+    $imported_season = wwh_normalize_sports_season_value(wwh_meta_value($post_id, '_ww_import_season'));
+
+    if ($imported_season !== '') {
+        return $imported_season;
+    }
+
+    $datetime = wwh_parse_local_datetime($start_datetime);
+
+    if (!$datetime) {
+        return '';
+    }
+
+    $year = (int) $datetime->format('Y');
+    $month = (int) $datetime->format('n');
+    $start_year = $month >= 7 ? $year : $year - 1;
+
+    return sprintf('%04d-%02d', $start_year, ($start_year + 1) % 100);
+}
+
+function wwh_sports_season_post_ids(string $season): array
+{
+    $season = wwh_normalize_sports_season_value($season);
+
+    if ($season === '') {
+        return [];
+    }
+
+    $query = new WP_Query([
+        'post_type' => WWH_SPORTS_GAME_POST_TYPE,
+        'post_status' => 'publish',
+        'posts_per_page' => -1,
+        'fields' => 'ids',
+        'no_found_rows' => true,
+    ]);
+    $post_ids = [];
+
+    foreach ($query->posts as $post_id) {
+        $post_id = absint($post_id);
+        $start = wwh_meta_value($post_id, '_ww_start_datetime');
+
+        if (wwh_sports_game_season($post_id, $start) === $season) {
+            $post_ids[] = $post_id;
+        }
+    }
+
+    wp_reset_postdata();
+
+    return $post_ids;
+}
+
 function wwh_game_query_args(WP_REST_Request $request, array $overrides = []): array
 {
     $args = [
@@ -2892,7 +2971,9 @@ function wwh_game_query_args(WP_REST_Request $request, array $overrides = []): a
     ];
 
     $status = sanitize_text_field((string) $request->get_param('status'));
-    $year = absint($request->get_param('year'));
+    $raw_year = sanitize_text_field((string) $request->get_param('year'));
+    $season = wwh_normalize_sports_season_value(sanitize_text_field((string) ($request->get_param('season') ?: $raw_year)));
+    $year = $season === '' ? absint($raw_year) : 0;
     $sport_key = sanitize_text_field((string) ($request->get_param('sport_key') ?: $request->get_param('sportKey')));
     $meta_query = [];
 
@@ -2910,14 +2991,19 @@ function wwh_game_query_args(WP_REST_Request $request, array $overrides = []): a
         ];
     }
 
-    if ($year >= 1900 && $year <= 2200) {
+    if ($season !== '') {
+        $args['post__in'] = wwh_sports_season_post_ids($season) ?: [0];
+    } elseif ($year >= 1900 && $year <= 2200) {
         $meta_query[] = [
             'key' => '_ww_start_datetime',
-            'value' => [
-                sprintf('%04d-01-01T00:00', $year),
-                sprintf('%04d-01-01T00:00', $year + 1),
-            ],
-            'compare' => 'BETWEEN',
+            'value' => sprintf('%04d-01-01T00:00', $year),
+            'compare' => '>=',
+            'type' => 'CHAR',
+        ];
+        $meta_query[] = [
+            'key' => '_ww_start_datetime',
+            'value' => sprintf('%04d-01-01T00:00', $year + 1),
+            'compare' => '<',
             'type' => 'CHAR',
         ];
     }
@@ -3106,7 +3192,7 @@ function wwh_rest_sports_game_facets(): WP_REST_Response
     foreach ($query->posts as $post_id) {
         $post_id = absint($post_id);
         $start = wwh_meta_value($post_id, '_ww_start_datetime');
-        $year = substr($start, 0, 4);
+        $year = wwh_sports_game_season($post_id, $start);
         $sport_key = wwh_meta_value($post_id, '_ww_sport_key');
         $sport_option = array_key_exists($sport_key, wwh_sports_team_options()) ? wwh_sports_team_options()[$sport_key] : null;
         $sport_label = $sport_option['label'] ?? wwh_meta_value($post_id, '_ww_sport', $sport_key);
@@ -3382,6 +3468,7 @@ function wwh_format_sports_game(WP_Post $post): array
         'longitude' => $longitude !== '' ? (float) $longitude : null,
         'appleMapsId' => wwh_meta_value($post->ID, '_ww_location_apple_maps_id'),
         'startDate' => $start,
+        'season' => wwh_sports_game_season($post->ID, $start),
         'status' => $status,
         'wildcatsScore' => $show_score ? absint($wildcats_score) : null,
         'opponentScore' => $show_score ? absint($opponent_score) : null,
