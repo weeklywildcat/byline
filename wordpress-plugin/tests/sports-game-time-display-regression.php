@@ -89,4 +89,12 @@ if (wwh_export_result('forfeit', '', '') !== 'Forfeit') {
     exit(1);
 }
 
+if (wwh_normalize_focal_coordinate(-12) !== 0.0
+    || wwh_normalize_focal_coordinate(112) !== 100.0
+    || wwh_normalize_focal_coordinate('not-a-number') !== 50.0
+    || wwh_normalize_focal_coordinate('37.456') !== 37.46) {
+    fwrite(STDERR, "Expected sports team focal coordinates to be normalized to percentages.\n");
+    exit(1);
+}
+
 echo "Sports game local time display regression passed.\n";
