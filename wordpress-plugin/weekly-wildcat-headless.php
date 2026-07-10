@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.20
+ * Version: 0.1.21
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -12,6 +12,7 @@ if (!defined('ABSPATH')) {
 }
 
 const WWH_SPORTS_GAME_POST_TYPE = 'ww_sports_game';
+const WWH_SPORTS_ROSTER_POST_TYPE = 'ww_sports_roster';
 const WWH_SCHOOL_EVENT_POST_TYPE = 'ww_school_event';
 const WWH_REST_NAMESPACE = 'weekly-wildcat/v1';
 const WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION = 'wwh_cloudflare_deploy_hook_url';
@@ -3733,3 +3734,5 @@ function wwh_format_school_event(WP_Post $post): array
         ],
     ];
 }
+
+require_once __DIR__ . '/includes/sports-rosters.php';
