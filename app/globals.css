@@ -152,6 +152,67 @@ body:has(.live-home-shell-opinion-lead) .site-header::after {
   top: 100%;
 }
 
+body:has(.article-custom-hero) .site-header {
+  border-bottom-color: var(--article-immersive-rule);
+  color: var(--article-immersive-ink);
+  isolation: isolate;
+}
+
+body:has(.article-custom-hero) .site-header::before {
+  background: var(--article-immersive-background, #171a21);
+  bottom: 0;
+  content: "";
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  width: 100vw;
+  z-index: 0;
+}
+
+body:has(.article-custom-hero) .site-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+body:has(.article-custom-hero-text-light) {
+  --article-immersive-ink: #ffffff;
+  --article-immersive-muted: rgba(255, 255, 255, 0.76);
+  --article-immersive-rule: rgba(255, 255, 255, 0.34);
+}
+
+body:has(.article-custom-hero-text-dark) {
+  --article-immersive-ink: #151515;
+  --article-immersive-muted: rgba(21, 21, 21, 0.72);
+  --article-immersive-rule: rgba(21, 21, 21, 0.28);
+}
+
+body:has(.article-custom-hero) .site-utility,
+body:has(.article-custom-hero) .search-button {
+  color: var(--article-immersive-muted);
+}
+
+body:has(.article-custom-hero) .site-utility,
+body:has(.article-custom-hero) .section-nav {
+  border-color: var(--article-immersive-rule);
+}
+
+body:has(.article-custom-hero) .section-nav a,
+body:has(.article-custom-hero) .search-button:hover,
+body:has(.article-custom-hero) .search-button:focus-visible {
+  color: var(--article-immersive-ink);
+}
+
+body:has(.article-custom-hero) .search-button:hover,
+body:has(.article-custom-hero) .search-button:focus-visible {
+  border-color: var(--article-immersive-rule);
+}
+
+body:has(.article-custom-hero-text-light) .masthead-logo img {
+  filter: brightness(0) invert(1);
+}
+
 .site-utility {
   align-items: center;
   border-bottom: 1px solid var(--rule);
@@ -589,13 +650,18 @@ body:has(.live-home-shell-opinion-lead) .site-header::after {
   padding: 38px 20px 72px;
 }
 
+body:has(.article-custom-hero) .article-shell {
+  max-width: none;
+  padding: 0 0 72px;
+}
+
 .article-story {
   margin: 0 auto;
   max-width: var(--article-width);
 }
 
 .article-story-custom-hero {
-  max-width: 1040px;
+  max-width: none;
 }
 
 .article-story-content {
@@ -614,6 +680,18 @@ body:has(.live-home-shell-opinion-lead) .site-header::after {
   grid-template-areas: "content media";
   margin-bottom: 30px;
   overflow: hidden;
+}
+
+.article-custom-hero-image-contain .article-custom-hero-media {
+  align-content: center;
+  background: var(--article-hero-background, #171a21);
+  display: grid;
+}
+
+.article-custom-hero-image-contain .article-custom-hero-media img {
+  height: auto;
+  min-height: 0;
+  object-fit: contain;
 }
 
 .article-custom-hero-text-right {
@@ -764,6 +842,11 @@ body:has(.live-home-shell-opinion-lead) .site-header::after {
 
 .article-custom-hero-overlay .article-custom-hero-media img {
   min-height: 590px;
+}
+
+.article-custom-hero-overlay.article-custom-hero-image-contain .article-custom-hero-media img {
+  height: 590px;
+  object-fit: contain;
 }
 
 .article-custom-hero-overlay .article-custom-hero-media figcaption {
@@ -1277,6 +1360,14 @@ body:has(.live-home-shell-opinion-lead) .site-header::after {
   display: grid;
   gap: 28px;
   margin-top: 46px;
+}
+
+body:has(.article-custom-hero) .article-after {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 1040px;
+  padding-left: 20px;
+  padding-right: 20px;
 }
 
 .article-after-section {
@@ -5904,6 +5995,16 @@ p.home-story-deck {
     min-height: 300px;
   }
 
+  body:has(.article-custom-hero) .article-shell {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  body:has(.article-custom-hero) .article-after {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
   .article-custom-hero-caption-row {
     display: grid;
     gap: 5px;
@@ -5921,6 +6022,10 @@ p.home-story-deck {
 
   .article-custom-hero-overlay .article-custom-hero-media img {
     min-height: 540px;
+  }
+
+  .article-custom-hero-overlay.article-custom-hero-image-contain .article-custom-hero-media img {
+    height: 540px;
   }
 
   .article-game-card {
