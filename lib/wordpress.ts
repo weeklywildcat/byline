@@ -127,6 +127,7 @@ export type WordPressArticleHero = {
   backgroundColor: string;
   textColor: "light" | "dark";
   layout: "text-left" | "text-right" | "overlay";
+  imageFit: "cover" | "contain";
   imageSource: "featured" | "custom";
   image: WordPressArticleHeroImage | null;
 };

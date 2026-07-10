@@ -98,59 +98,63 @@ export function ArticleHero({
 }: ArticleHeroProps) {
   const layout = ["text-left", "text-right", "overlay"].includes(hero.layout) ? hero.layout : "text-left";
   const textColor = hero.textColor === "dark" ? "dark" : "light";
+  const imageFit = hero.imageFit === "contain" ? "contain" : "cover";
   const backgroundColor = /^#[0-9a-f]{6}$/i.test(hero.backgroundColor) ? hero.backgroundColor : "#171a21";
   const caption = image.caption.trim();
   const credit = stripHtml(image.credit).trim();
 
   return (
-    <header
-      className={`article-custom-hero article-custom-hero-${layout} article-custom-hero-text-${textColor}`}
-      style={{ "--article-hero-background": backgroundColor } as CSSProperties}
-    >
-      <figure className="article-custom-hero-media">
-        <img
-          src={image.url}
-          alt={image.alt}
-          width={image.width ?? undefined}
-          height={image.height ?? undefined}
-          loading="eager"
-        />
-        {caption || credit ? (
-          <figcaption>
-            <div className="article-custom-hero-caption-row">
-              {caption ? <div dangerouslySetInnerHTML={{ __html: caption }} /> : null}
-              {credit ? <p>Credit: {credit}</p> : null}
-            </div>
-          </figcaption>
-        ) : null}
-      </figure>
+    <>
+      <style>{`body:has(.article-custom-hero) { --article-immersive-background: ${backgroundColor}; }`}</style>
+      <header
+        className={`article-custom-hero article-custom-hero-${layout} article-custom-hero-text-${textColor} article-custom-hero-image-${imageFit}`}
+        style={{ "--article-hero-background": backgroundColor } as CSSProperties}
+      >
+        <figure className="article-custom-hero-media">
+          <img
+            src={image.url}
+            alt={image.alt}
+            width={image.width ?? undefined}
+            height={image.height ?? undefined}
+            loading="eager"
+          />
+          {caption || credit ? (
+            <figcaption>
+              <div className="article-custom-hero-caption-row">
+                {caption ? <div dangerouslySetInnerHTML={{ __html: caption }} /> : null}
+                {credit ? <p>Credit: {credit}</p> : null}
+              </div>
+            </figcaption>
+          ) : null}
+        </figure>
 
-      <div className="article-custom-hero-content">
-        {category ? (
-          <a className="article-section-label" href={`/category/${category.slug}/`}>
-            {decodeHtml(category.name)}
-          </a>
-        ) : null}
-        <h1 dangerouslySetInnerHTML={{ __html: titleHtml }} />
-        {excerptHtml ? <div className="article-excerpt" dangerouslySetInnerHTML={{ __html: excerptHtml }} /> : null}
-        {athleteSpotlightLabel || athleteSport ? (
-          <div className="article-athlete-meta" aria-label="Athlete spotlight details">
-            {athleteSpotlightLabel ? <span>{athleteSpotlightLabel}</span> : null}
-            {athleteSport ? <span>{athleteSport}</span> : null}
+        <div className="article-custom-hero-content">
+          {category ? (
+            <a className="article-section-label" href={`/category/${category.slug}/`}>
+              {decodeHtml(category.name)}
+            </a>
+          ) : null}
+          <h1 dangerouslySetInnerHTML={{ __html: titleHtml }} />
+          {excerptHtml ? <div className="article-excerpt" dangerouslySetInnerHTML={{ __html: excerptHtml }} /> : null}
+          {athleteSpotlightLabel || athleteSport ? (
+            <div className="article-athlete-meta" aria-label="Athlete spotlight details">
+              {athleteSpotlightLabel ? <span>{athleteSpotlightLabel}</span> : null}
+              {athleteSport ? <span>{athleteSport}</span> : null}
+            </div>
+          ) : null}
+          <div className="article-meta-block">
+            <p className="article-author-line">
+              By {authorHref ? <a href={authorHref}>{authorName}</a> : <span>{authorName}</span>}
+            </p>
+            <div className="article-timing">
+              <time dateTime={publishedDate}>Published {publishedLabel}</time>
+              {updatedDate && updatedLabel ? <time dateTime={updatedDate}>Updated {updatedLabel}</time> : null}
+              <span>{readingTime}</span>
+            </div>
           </div>
-        ) : null}
-        <div className="article-meta-block">
-          <p className="article-author-line">
-            By {authorHref ? <a href={authorHref}>{authorName}</a> : <span>{authorName}</span>}
-          </p>
-          <div className="article-timing">
-            <time dateTime={publishedDate}>Published {publishedLabel}</time>
-            {updatedDate && updatedLabel ? <time dateTime={updatedDate}>Updated {updatedLabel}</time> : null}
-            <span>{readingTime}</span>
-          </div>
+          <ArticleShareActions title={title} url={articleUrl} />
         </div>
-        <ArticleShareActions title={title} url={articleUrl} />
-      </div>
-    </header>
+      </header>
+    </>
   );
 }
