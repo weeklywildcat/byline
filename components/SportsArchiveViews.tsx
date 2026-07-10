@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { SectionHeader } from "@/components/SectionHeader";
 import { SiteIcon } from "@/components/SiteIcon";
+import { SportsSeasonSelector } from "@/components/SportsSeasonSelector";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import type { SportsGame, SportsTeamMedia } from "@/lib/headless";
 import { formatDisplayDate } from "@/lib/format";
@@ -234,10 +235,12 @@ function TeamHeader({
   const accentColor = teamMedia?.accentColor || metadata.color;
   const logo = teamMedia?.logo?.url || "/brand/weekly-wildcat-logo.svg";
   const record = formatRecord(season.record);
+  const focalPoint = teamMedia?.headerImageFocalPoint;
+  const imagePosition = `${focalPoint?.x ?? 50}% ${focalPoint?.y ?? 50}%`;
 
   return (
     <section className="team-hub-header" style={{ "--sport-accent": accentColor } as CSSProperties} aria-labelledby="team-heading">
-      <img className="team-hub-header-image" src={getTeamHeroImage(team, teamMedia)} alt="" />
+      <img className="team-hub-header-image" src={getTeamHeroImage(team, teamMedia)} alt="" style={{ objectPosition: imagePosition }} />
       <div className="team-hub-header-shade" />
       <div className="team-hub-header-content">
         <div className="team-hub-mark">
@@ -246,18 +249,9 @@ function TeamHeader({
         <div className="team-hub-title">
           <p>Ninety Six Wildcats</p>
           <h1 id="team-heading">{getTeamDisplayName(season)}</h1>
-          <span>Ninety Six, South Carolina</span>
-        </div>
-        <div className="team-hub-season-card">
-          <span>{getSchoolYearLabel(season.year)} Season</span>
-          <strong>{record || "Record pending"}</strong>
-          <nav aria-label={`${team.name} seasons`}>
-            {team.seasons.map((year) => (
-              <a className={year === season.year ? "sports-season-current" : ""} href={getSeasonHref(team, year)} key={year}>
-                {getSchoolYearLabel(year)}
-              </a>
-            ))}
-          </nav>
+          <span>
+            Ninety Six, South Carolina · {getSchoolYearLabel(season.year)} · {record || "Record pending"}
+          </span>
         </div>
       </div>
       <TeamTabs activeTab={activeTab} season={season} team={team} />
@@ -265,12 +259,28 @@ function TeamHeader({
   );
 }
 
-function TeamTabs({ activeTab, season, team }: { activeTab: "home" | "schedule"; season: SeasonSummary; team: TeamSummary }) {
+function TeamTabs({
+  activeTab,
+  season,
+  team
+}: {
+  activeTab: "home" | "schedule";
+  season: SeasonSummary;
+  team: TeamSummary;
+}) {
   const homeHref = getTeamHubHref(team);
   const scheduleHref = getSeasonHref(team, season.year);
 
   return (
     <nav className="team-hub-tabs" aria-label={`${team.name} team sections`}>
+      <SportsSeasonSelector
+        currentYear={season.year}
+        seasons={team.seasons.map((year) => ({
+          href: getSeasonHref(team, year),
+          label: getSchoolYearLabel(year),
+          year
+        }))}
+      />
       <a aria-current={activeTab === "home" ? "page" : undefined} href={homeHref}>
         Home
       </a>

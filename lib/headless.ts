@@ -29,6 +29,10 @@ export type SportsTeamMedia = {
   teamLabel: string;
   label: string;
   headerImage: HeadlessImage;
+  headerImageFocalPoint?: {
+    x: number;
+    y: number;
+  };
   logo: HeadlessImage;
   accentColor: string;
 };
