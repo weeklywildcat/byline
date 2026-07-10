@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.21
+ * Version: 0.1.22
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -20,6 +20,12 @@ const WWH_CLOUDFLARE_DEPLOY_LAST_TRIGGERED_OPTION = 'wwh_cloudflare_deploy_last_
 const WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION = 'wwh_cloudflare_deploy_last_status';
 const WWH_CLOUDFLARE_DEPLOY_EVENT = 'wwh_trigger_cloudflare_deploy';
 const WWH_HOMEPAGE_OPINION_TREATMENT_META = '_ww_homepage_opinion_treatment';
+const WWH_ARTICLE_HERO_ENABLED_META = '_ww_article_hero_enabled';
+const WWH_ARTICLE_HERO_BACKGROUND_COLOR_META = '_ww_article_hero_background_color';
+const WWH_ARTICLE_HERO_TEXT_COLOR_META = '_ww_article_hero_text_color';
+const WWH_ARTICLE_HERO_LAYOUT_META = '_ww_article_hero_layout';
+const WWH_ARTICLE_HERO_IMAGE_SOURCE_META = '_ww_article_hero_image_source';
+const WWH_ARTICLE_HERO_IMAGE_ID_META = '_ww_article_hero_image_id';
 const WWH_SPORTS_TEAM_SETTINGS_OPTION = 'wwh_sports_team_settings';
 // Stores only the selected Sports Game post ID for the automatic article game card.
 const WWH_PRIMARY_GAME_META = 'weekly_wildcat_primary_game_id';
@@ -578,6 +584,26 @@ function wwh_register_post_meta(): void
             'auth_callback' => static fn() => current_user_can('edit_posts'),
         ]
     );
+
+    foreach ([
+        WWH_ARTICLE_HERO_ENABLED_META,
+        WWH_ARTICLE_HERO_BACKGROUND_COLOR_META,
+        WWH_ARTICLE_HERO_TEXT_COLOR_META,
+        WWH_ARTICLE_HERO_LAYOUT_META,
+        WWH_ARTICLE_HERO_IMAGE_SOURCE_META,
+        WWH_ARTICLE_HERO_IMAGE_ID_META,
+    ] as $key) {
+        register_post_meta(
+            'post',
+            $key,
+            [
+                'single' => true,
+                'type' => $key === WWH_ARTICLE_HERO_IMAGE_ID_META ? 'integer' : 'string',
+                'show_in_rest' => false,
+                'auth_callback' => static fn() => current_user_can('edit_posts'),
+            ]
+        );
+    }
 
     $sports_keys = [
         '_ww_sport_key',
@@ -1269,6 +1295,15 @@ function wwh_add_meta_boxes(): void
     );
 
     add_meta_box(
+        'wwh_article_hero',
+        'Weekly Wildcat Article Hero',
+        'wwh_render_article_hero_meta_box',
+        'post',
+        'side',
+        'high'
+    );
+
+    add_meta_box(
         'wwh_sports_game_details',
         'Game Details',
         'wwh_render_sports_game_meta_box',
@@ -1348,6 +1383,56 @@ function wwh_render_homepage_treatment_meta_box(WP_Post $post): void
         checked(wwh_meta_value($post->ID, WWH_HOMEPAGE_OPINION_TREATMENT_META), '1', false)
     );
     echo '<p class="description">Applies the italic serif headline and warm opinion accent on the homepage lead only.</p>';
+}
+
+function wwh_render_article_hero_meta_box(WP_Post $post): void
+{
+    wp_nonce_field('wwh_save_article_hero', 'wwh_article_hero_nonce');
+
+    $background_color = sanitize_hex_color(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_BACKGROUND_COLOR_META)) ?: '#171a21';
+    $text_color = wwh_sanitize_choice(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_TEXT_COLOR_META, 'light'), ['light', 'dark'], 'light');
+    $layout = wwh_sanitize_choice(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_LAYOUT_META, 'text-left'), ['text-left', 'text-right', 'overlay'], 'text-left');
+    $image_source = wwh_sanitize_choice(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_IMAGE_SOURCE_META, 'featured'), ['featured', 'custom'], 'featured');
+    $image_id = absint(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_IMAGE_ID_META));
+    $image = wwh_media_image($image_id, 'medium');
+    ?>
+    <div class="wwh-article-hero-settings">
+        <p class="wwh-field wwh-checkbox">
+            <label><input type="checkbox" name="ww_article_hero_enabled" value="1"<?php echo checked(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_ENABLED_META), '1', false); ?>> <span>Use a custom article hero</span></label>
+        </p>
+        <p class="description">Uses the article title, dek, byline, and share controls in a custom image-and-color treatment. Leave off to keep the standard article header.</p>
+        <p class="wwh-field">
+            <label for="ww_article_hero_background_color"><span>Background color</span><input type="color" id="ww_article_hero_background_color" name="ww_article_hero_background_color" value="<?php echo esc_attr($background_color); ?>"></label>
+        </p>
+        <p class="wwh-field">
+            <label for="ww_article_hero_text_color"><span>Text color</span><select id="ww_article_hero_text_color" name="ww_article_hero_text_color">
+                <option value="light"<?php echo selected($text_color, 'light', false); ?>>Light</option>
+                <option value="dark"<?php echo selected($text_color, 'dark', false); ?>>Dark</option>
+            </select></label>
+        </p>
+        <p class="wwh-field">
+            <label for="ww_article_hero_layout"><span>Layout</span><select id="ww_article_hero_layout" name="ww_article_hero_layout">
+                <option value="text-left"<?php echo selected($layout, 'text-left', false); ?>>Text left, image right</option>
+                <option value="text-right"<?php echo selected($layout, 'text-right', false); ?>>Image left, text right</option>
+                <option value="overlay"<?php echo selected($layout, 'overlay', false); ?>>Image-led text overlay</option>
+            </select></label>
+        </p>
+        <p class="wwh-field">
+            <label for="ww_article_hero_image_source"><span>Hero image</span><select id="ww_article_hero_image_source" name="ww_article_hero_image_source">
+                <option value="featured"<?php echo selected($image_source, 'featured', false); ?>>Use featured image</option>
+                <option value="custom"<?php echo selected($image_source, 'custom', false); ?>>Choose a separate image</option>
+            </select></label>
+        </p>
+        <div class="wwh-article-hero-image-field"<?php echo $image_source === 'custom' ? '' : ' hidden'; ?>>
+            <input type="hidden" name="ww_article_hero_image_id" value="<?php echo esc_attr((string) $image_id); ?>">
+            <img class="wwh-article-hero-image-preview" src="<?php echo esc_url($image['url']); ?>" alt=""<?php echo $image['url'] === '' ? ' hidden' : ''; ?>>
+            <p>
+                <button type="button" class="button wwh-article-hero-image-select">Select image</button>
+                <button type="button" class="button wwh-article-hero-image-remove"<?php echo $image['url'] === '' ? ' hidden' : ''; ?>>Remove</button>
+            </p>
+        </div>
+    </div>
+    <?php
 }
 
 function wwh_render_sports_game_meta_box(WP_Post $post): void
@@ -1561,6 +1646,28 @@ function wwh_save_homepage_treatment(int $post_id): void
     wwh_update_meta($post_id, WWH_HOMEPAGE_OPINION_TREATMENT_META, isset($_POST['ww_homepage_opinion_treatment']) ? '1' : '');
 }
 add_action('save_post_post', 'wwh_save_homepage_treatment');
+
+function wwh_save_article_hero(int $post_id): void
+{
+    if (!wwh_can_save_post($post_id, 'wwh_article_hero_nonce', 'wwh_save_article_hero')) {
+        return;
+    }
+
+    $enabled = isset($_POST['ww_article_hero_enabled']);
+    $background_color = sanitize_hex_color(wwh_request_value('ww_article_hero_background_color')) ?: '#171a21';
+    $text_color = wwh_sanitize_choice(wwh_request_value('ww_article_hero_text_color'), ['light', 'dark'], 'light');
+    $layout = wwh_sanitize_choice(wwh_request_value('ww_article_hero_layout'), ['text-left', 'text-right', 'overlay'], 'text-left');
+    $image_source = wwh_sanitize_choice(wwh_request_value('ww_article_hero_image_source'), ['featured', 'custom'], 'featured');
+    $image_id = isset($_POST['ww_article_hero_image_id']) ? absint($_POST['ww_article_hero_image_id']) : 0;
+
+    wwh_update_meta($post_id, WWH_ARTICLE_HERO_ENABLED_META, $enabled ? '1' : '');
+    wwh_update_meta($post_id, WWH_ARTICLE_HERO_BACKGROUND_COLOR_META, $enabled ? $background_color : '');
+    wwh_update_meta($post_id, WWH_ARTICLE_HERO_TEXT_COLOR_META, $enabled ? $text_color : '');
+    wwh_update_meta($post_id, WWH_ARTICLE_HERO_LAYOUT_META, $enabled ? $layout : '');
+    wwh_update_meta($post_id, WWH_ARTICLE_HERO_IMAGE_SOURCE_META, $enabled ? $image_source : '');
+    wwh_update_meta($post_id, WWH_ARTICLE_HERO_IMAGE_ID_META, $enabled && $image_source === 'custom' && $image_id > 0 ? (string) $image_id : '');
+}
+add_action('save_post_post', 'wwh_save_article_hero');
 
 function wwh_save_sports_game(int $post_id): void
 {
@@ -2661,8 +2768,10 @@ function wwh_update_user_meta(int $user_id, string $key, string $value): void
 function wwh_enqueue_author_profile_assets(string $hook): void
 {
     $is_team_settings_page = $hook === WWH_SPORTS_GAME_POST_TYPE . '_page_wwh-sports-team-settings';
+    $screen = get_current_screen();
+    $is_article_editor = $screen && $screen->post_type === 'post' && in_array($hook, ['post.php', 'post-new.php'], true);
 
-    if (!in_array($hook, ['profile.php', 'user-edit.php'], true) && !$is_team_settings_page) {
+    if (!in_array($hook, ['profile.php', 'user-edit.php'], true) && !$is_team_settings_page && !$is_article_editor) {
         return;
     }
 
@@ -2732,6 +2841,63 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 JS
     );
+
+    if ($is_article_editor) {
+        wp_add_inline_script(
+            'jquery-core',
+            <<<'JS'
+document.addEventListener('DOMContentLoaded', function () {
+    var source = document.querySelector('#ww_article_hero_image_source');
+    var customImageField = document.querySelector('.wwh-article-hero-image-field');
+
+    function updateCustomImageVisibility() {
+        if (source && customImageField) {
+            customImageField.hidden = source.value !== 'custom';
+        }
+    }
+
+    if (source) {
+        source.addEventListener('change', updateCustomImageVisibility);
+        updateCustomImageVisibility();
+    }
+
+    document.addEventListener('click', function (event) {
+        var selectButton = event.target.closest('.wwh-article-hero-image-select');
+        var removeButton = event.target.closest('.wwh-article-hero-image-remove');
+
+        if (selectButton) {
+            event.preventDefault();
+            var field = selectButton.closest('.wwh-article-hero-image-field');
+            var input = field.querySelector('input[type="hidden"]');
+            var preview = field.querySelector('.wwh-article-hero-image-preview');
+            var remove = field.querySelector('.wwh-article-hero-image-remove');
+            var frame = wp.media({ title: 'Select article hero image', button: { text: 'Use this image' }, multiple: false });
+
+            frame.on('select', function () {
+                var attachment = frame.state().get('selection').first().toJSON();
+                input.value = attachment.id;
+                preview.src = (attachment.sizes && attachment.sizes.medium_large ? attachment.sizes.medium_large.url : (attachment.sizes && attachment.sizes.large ? attachment.sizes.large.url : attachment.url));
+                preview.hidden = false;
+                remove.hidden = false;
+            });
+
+            frame.open();
+        }
+
+        if (removeButton) {
+            event.preventDefault();
+            var removeField = removeButton.closest('.wwh-article-hero-image-field');
+            removeField.querySelector('input[type="hidden"]').value = '';
+            var removePreview = removeField.querySelector('.wwh-article-hero-image-preview');
+            removePreview.removeAttribute('src');
+            removePreview.hidden = true;
+            removeButton.hidden = true;
+        }
+    });
+});
+JS
+        );
+    }
 }
 add_action('admin_enqueue_scripts', 'wwh_enqueue_author_profile_assets');
 
@@ -2786,6 +2952,11 @@ function wwh_admin_styles(): void
         .wwh-game-picker-preview span, .wwh-game-picker-result span { color: #646970; display: block; font-size: 12px; line-height: 1.25; white-space: normal; }
         .wwh-game-picker-actions { display: flex; flex-wrap: wrap; gap: 8px; }
         .wwh-game-picker-results { display: grid; gap: 8px; max-height: 320px; overflow: auto; }
+        .wwh-article-hero-settings { display: grid; gap: 12px; }
+        .wwh-article-hero-settings .wwh-field { margin: 0; }
+        .wwh-article-hero-settings input[type="color"] { height: 36px; max-width: 100%; padding: 2px; width: 100%; }
+        .wwh-article-hero-image-field { border-top: 1px solid #dcdcde; padding-top: 12px; }
+        .wwh-article-hero-image-preview { background: #f0f0f1; display: block; height: 130px; margin-bottom: 8px; object-fit: cover; width: 100%; }
         @media (max-width: 782px) { .wwh-fields, .wwh-team-settings-grid, .wwh-team-media-fields { grid-template-columns: 1fr; } }
     </style>';
 }
@@ -2887,6 +3058,10 @@ function wwh_register_rest_routes(): void
                     'type' => 'integer',
                     'description' => 'Selected Sports Game post ID for the automatic article game card.',
                 ],
+                'articleHero' => [
+                    'type' => 'object',
+                    'description' => 'Optional per-article custom hero settings.',
+                ],
             ],
         ],
     ]);
@@ -2896,10 +3071,56 @@ add_action('rest_api_init', 'wwh_register_rest_routes');
 function wwh_rest_post_settings(array $post): array
 {
     $post_id = isset($post['id']) ? absint($post['id']) : 0;
+    $hero_enabled = get_post_meta($post_id, WWH_ARTICLE_HERO_ENABLED_META, true) === '1';
+    $hero_image_source = wwh_sanitize_choice((string) get_post_meta($post_id, WWH_ARTICLE_HERO_IMAGE_SOURCE_META, true), ['featured', 'custom'], 'featured');
+    $hero_image_id = absint(get_post_meta($post_id, WWH_ARTICLE_HERO_IMAGE_ID_META, true));
 
     return [
         'homepageOpinionTreatment' => get_post_meta($post_id, WWH_HOMEPAGE_OPINION_TREATMENT_META, true) === '1',
         'primaryGameId' => absint(get_post_meta($post_id, WWH_PRIMARY_GAME_META, true)),
+        'articleHero' => [
+            'enabled' => $hero_enabled,
+            'backgroundColor' => sanitize_hex_color((string) get_post_meta($post_id, WWH_ARTICLE_HERO_BACKGROUND_COLOR_META, true)) ?: '#171a21',
+            'textColor' => wwh_sanitize_choice((string) get_post_meta($post_id, WWH_ARTICLE_HERO_TEXT_COLOR_META, true), ['light', 'dark'], 'light'),
+            'layout' => wwh_sanitize_choice((string) get_post_meta($post_id, WWH_ARTICLE_HERO_LAYOUT_META, true), ['text-left', 'text-right', 'overlay'], 'text-left'),
+            'imageSource' => $hero_image_source,
+            'image' => $hero_image_source === 'custom' ? wwh_rest_article_hero_image($hero_image_id) : null,
+        ],
+    ];
+}
+
+function wwh_rest_article_hero_image(int $attachment_id): ?array
+{
+    if ($attachment_id <= 0 || !wp_attachment_is_image($attachment_id)) {
+        return null;
+    }
+
+    $image = wwh_media_image($attachment_id, 'large');
+
+    if ($image['url'] === '') {
+        return null;
+    }
+
+    $metadata = wp_get_attachment_metadata($attachment_id);
+    $image_meta = is_array($metadata) && is_array($metadata['image_meta'] ?? null) ? $metadata['image_meta'] : [];
+    $credit = wwh_image_meta_value($attachment_id, 'credit_text');
+
+    if ($credit === '') {
+        $credit = is_string($image_meta['credit'] ?? null) ? $image_meta['credit'] : '';
+    }
+
+    if ($credit === '') {
+        $credit = is_string($image_meta['copyright'] ?? null) ? $image_meta['copyright'] : '';
+    }
+
+    return [
+        'id' => $image['id'],
+        'sourceUrl' => $image['url'],
+        'alt' => $image['alt'],
+        'width' => $image['width'],
+        'height' => $image['height'],
+        'caption' => wp_kses_post((string) wp_get_attachment_caption($attachment_id)),
+        'creditText' => wp_strip_all_tags($credit),
     ];
 }
 
