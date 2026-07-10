@@ -667,6 +667,8 @@ body:has(.article-custom-hero) .article-shell {
 .article-story-content {
   margin: 0 auto;
   max-width: var(--article-width);
+  min-width: 0;
+  width: min(var(--article-width), calc(100% - 32px));
 }
 
 .article-custom-hero {
@@ -789,12 +791,13 @@ body:has(.article-custom-hero) .article-shell {
 }
 
 .article-custom-hero-media figcaption {
-  background: var(--page);
-  color: var(--muted);
+  background: transparent;
+  color: #ffffff;
   font-family: var(--font-ui);
   font-size: 0.76rem;
   line-height: 1.4;
-  padding: 8px 12px 10px;
+  padding: 7px 12px 9px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.42);
 }
 
 .article-custom-hero-caption-row {
@@ -809,7 +812,7 @@ body:has(.article-custom-hero) .article-shell {
 }
 
 .article-custom-hero-caption-row p {
-  color: var(--soft-muted);
+  color: rgba(255, 255, 255, 0.88);
   flex: 0 0 auto;
   font-weight: 800;
   max-width: 42%;
@@ -850,7 +853,7 @@ body:has(.article-custom-hero) .article-shell {
 }
 
 .article-custom-hero-overlay .article-custom-hero-media figcaption {
-  background: rgba(21, 21, 21, 0.78);
+  background: transparent;
   bottom: 0;
   color: #ffffff;
   left: 0;
@@ -861,7 +864,7 @@ body:has(.article-custom-hero) .article-shell {
 }
 
 .article-custom-hero-overlay .article-custom-hero-caption-row p {
-  color: rgba(255, 255, 255, 0.74);
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .article-custom-hero-overlay .article-custom-hero-content {
