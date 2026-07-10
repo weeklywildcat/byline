@@ -12,6 +12,7 @@ Plain PHP WordPress plugin for Weekly Wildcat content bridge data.
   - `/wp-json/weekly-wildcat/v1/sports-games`
   - `/wp-json/weekly-wildcat/v1/sports-games/upcoming`
   - `/wp-json/weekly-wildcat/v1/sports-games/recent`
+  - `/wp-json/weekly-wildcat/v1/sports-teams`
   - `/wp-json/weekly-wildcat/v1/school-events`
   - `/wp-json/weekly-wildcat/v1/authors`
 - WordPress user profile fields for author profiles:
@@ -55,6 +56,7 @@ GitHub Actions packages `weekly-wildcat-headless.zip` and publishes it as a rele
 - Sports Games use one record for scheduled games, final scores, forfeits, postponements, and cancellations.
 - Sports Games include a controlled Sport / Team dropdown for stable frontend filtering.
 - Sports Games expose `sportKey`, `sportLabel`, location name, address, latitude, longitude, and optional Apple Maps place ID.
+- Sports Team Settings support a click-to-position header image focal point. The sports team endpoint exposes it as `headerImageFocalPoint.x` and `headerImageFocalPoint.y` percentages for CSS `object-position`.
 - Scores are returned publicly only when a game status is `final`; forfeits are exposed as status-only results.
 - School Events support scheduled and canceled statuses.
 - The Next.js frontend has typed helpers in `lib/headless.ts`.

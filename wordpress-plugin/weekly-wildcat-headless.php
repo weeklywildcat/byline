@@ -220,16 +220,38 @@ function wwh_render_settings_page(): void
     <?php
 }
 
-function wwh_render_team_media_field(string $team_key, string $field, string $label, int $attachment_id): void
+function wwh_render_team_media_field(string $team_key, string $field, string $label, int $attachment_id, array $focal_point = []): void
 {
     $image = wwh_media_image($attachment_id, $field === 'logoId' ? 'medium' : 'large');
     $field_id = 'wwh_team_' . sanitize_key($team_key) . '_' . sanitize_key($field);
+    $is_header_image = $field === 'headerImageId';
+    $focal_x = wwh_normalize_focal_coordinate($focal_point['x'] ?? 50);
+    $focal_y = wwh_normalize_focal_coordinate($focal_point['y'] ?? 50);
 
     ?>
-    <div class="wwh-team-media-field">
+    <div class="wwh-team-media-field <?php echo $is_header_image ? 'wwh-team-header-media-field' : ''; ?>">
         <input type="hidden" id="<?php echo esc_attr($field_id); ?>" name="teams[<?php echo esc_attr($team_key); ?>][<?php echo esc_attr($field); ?>]" value="<?php echo esc_attr((string) $attachment_id); ?>">
         <span><?php echo esc_html($label); ?></span>
-        <img class="wwh-team-media-preview <?php echo esc_attr($field === 'logoId' ? 'wwh-team-logo-preview' : ''); ?>" src="<?php echo esc_url($image['url']); ?>" alt="" <?php echo $image['url'] === '' ? 'hidden' : ''; ?>>
+        <?php if ($is_header_image) : ?>
+            <button
+                type="button"
+                class="wwh-team-focal-preview"
+                aria-label="Set header image focal point"
+                <?php echo $image['url'] === '' ? 'hidden' : ''; ?>
+            >
+                <img class="wwh-team-media-preview" src="<?php echo esc_url($image['url']); ?>" alt="">
+                <i class="wwh-team-focal-marker" style="left: <?php echo esc_attr((string) $focal_x); ?>%; top: <?php echo esc_attr((string) $focal_y); ?>%;" aria-hidden="true"></i>
+            </button>
+            <input class="wwh-team-focal-x" type="hidden" name="teams[<?php echo esc_attr($team_key); ?>][headerFocalX]" value="<?php echo esc_attr((string) $focal_x); ?>">
+            <input class="wwh-team-focal-y" type="hidden" name="teams[<?php echo esc_attr($team_key); ?>][headerFocalY]" value="<?php echo esc_attr((string) $focal_y); ?>">
+            <div class="wwh-team-focal-controls" <?php echo $image['url'] === '' ? 'hidden' : ''; ?>>
+                <output class="wwh-team-focal-output"><?php echo esc_html(sprintf('%s%% horizontal · %s%% vertical', $focal_x, $focal_y)); ?></output>
+                <button type="button" class="button-link wwh-team-focal-center">Center</button>
+            </div>
+            <p class="description wwh-team-focal-help" <?php echo $image['url'] === '' ? 'hidden' : ''; ?>>Click the image to keep that point visible when the header is cropped.</p>
+        <?php else : ?>
+            <img class="wwh-team-media-preview wwh-team-logo-preview" src="<?php echo esc_url($image['url']); ?>" alt="" <?php echo $image['url'] === '' ? 'hidden' : ''; ?>>
+        <?php endif; ?>
         <p>
             <button type="button" class="button wwh-team-media-select" data-title="<?php echo esc_attr('Select ' . strtolower($label)); ?>" data-button-text="Use image">Select</button>
             <button type="button" class="button wwh-team-media-remove" <?php echo $image['url'] === '' ? 'hidden' : ''; ?>>Remove</button>
@@ -260,12 +282,16 @@ function wwh_render_sports_team_settings_page(): void
                     $header_id = absint($team_settings['headerImageId'] ?? 0);
                     $logo_id = absint($team_settings['logoId'] ?? 0);
                     $accent_color = sanitize_hex_color((string) ($team_settings['accentColor'] ?? '')) ?: '';
+                    $header_focal_point = [
+                        'x' => wwh_normalize_focal_coordinate($team_settings['headerFocalX'] ?? 50),
+                        'y' => wwh_normalize_focal_coordinate($team_settings['headerFocalY'] ?? 50),
+                    ];
                     ?>
                     <section class="wwh-team-settings-card">
                         <h2><?php echo esc_html($team['label']); ?></h2>
                         <p class="description"><?php echo esc_html($team_key); ?></p>
                         <div class="wwh-team-media-fields">
-                            <?php wwh_render_team_media_field($team_key, 'headerImageId', 'Header Image', $header_id); ?>
+                            <?php wwh_render_team_media_field($team_key, 'headerImageId', 'Header Image', $header_id, $header_focal_point); ?>
                             <?php wwh_render_team_media_field($team_key, 'logoId', 'Logo / Mark', $logo_id); ?>
                         </div>
                         <label class="wwh-team-accent-field" for="wwh_team_<?php echo esc_attr(sanitize_key($team_key)); ?>_accent">
@@ -304,10 +330,14 @@ function wwh_save_sports_team_settings(): void
         $header_id = absint($raw_team['headerImageId'] ?? 0);
         $logo_id = absint($raw_team['logoId'] ?? 0);
         $accent_color = sanitize_hex_color((string) ($raw_team['accentColor'] ?? '')) ?: '';
+        $header_focal_x = wwh_normalize_focal_coordinate($raw_team['headerFocalX'] ?? 50);
+        $header_focal_y = wwh_normalize_focal_coordinate($raw_team['headerFocalY'] ?? 50);
         $team_settings = [];
 
         if ($header_id > 0) {
             $team_settings['headerImageId'] = $header_id;
+            $team_settings['headerFocalX'] = $header_focal_x;
+            $team_settings['headerFocalY'] = $header_focal_y;
         }
 
         if ($logo_id > 0) {
@@ -368,6 +398,15 @@ function wwh_sports_team_settings(): array
     $settings = get_option(WWH_SPORTS_TEAM_SETTINGS_OPTION, []);
 
     return is_array($settings) ? $settings : [];
+}
+
+function wwh_normalize_focal_coordinate($value): float
+{
+    if (!is_numeric($value)) {
+        return 50.0;
+    }
+
+    return round(max(0.0, min(100.0, (float) $value)), 2);
 }
 
 function wwh_sports_team_setting(string $team_key, string $field): string
@@ -2629,7 +2668,68 @@ function wwh_enqueue_author_profile_assets(string $hook): void
     wp_enqueue_media();
     wp_add_inline_script(
         'jquery-core',
-        "document.addEventListener('click',function(event){var selectButton=event.target.closest('.wwh-author-photo-select');var removeButton=event.target.closest('.wwh-author-photo-remove');var teamSelectButton=event.target.closest('.wwh-team-media-select');var teamRemoveButton=event.target.closest('.wwh-team-media-remove');if(selectButton){event.preventDefault();var wrap=selectButton.closest('td');var input=wrap.querySelector('#ww_author_photo_id');var preview=wrap.querySelector('.wwh-author-photo-preview');var remove=wrap.querySelector('.wwh-author-photo-remove');var frame=wp.media({title:'Select author profile photo',button:{text:'Use this photo'},multiple:false});frame.on('select',function(){var attachment=frame.state().get('selection').first().toJSON();input.value=attachment.id;preview.src=(attachment.sizes&&attachment.sizes.medium?attachment.sizes.medium.url:attachment.url);preview.hidden=false;remove.hidden=false;});frame.open();}if(removeButton){event.preventDefault();var removeWrap=removeButton.closest('td');removeWrap.querySelector('#ww_author_photo_id').value='';var removePreview=removeWrap.querySelector('.wwh-author-photo-preview');removePreview.removeAttribute('src');removePreview.hidden=true;removeButton.hidden=true;}if(teamSelectButton){event.preventDefault();var teamWrap=teamSelectButton.closest('.wwh-team-media-field');var teamInput=teamWrap.querySelector('input[type=\"hidden\"]');var teamPreview=teamWrap.querySelector('.wwh-team-media-preview');var teamRemove=teamWrap.querySelector('.wwh-team-media-remove');var teamFrame=wp.media({title:teamSelectButton.dataset.title||'Select team image',button:{text:teamSelectButton.dataset.buttonText||'Use image'},multiple:false});teamFrame.on('select',function(){var attachment=teamFrame.state().get('selection').first().toJSON();teamInput.value=attachment.id;teamPreview.src=(attachment.sizes&&attachment.sizes.medium_large?attachment.sizes.medium_large.url:(attachment.sizes&&attachment.sizes.large?attachment.sizes.large.url:attachment.url));teamPreview.hidden=false;teamRemove.hidden=false;});teamFrame.open();}if(teamRemoveButton){event.preventDefault();var teamRemoveWrap=teamRemoveButton.closest('.wwh-team-media-field');teamRemoveWrap.querySelector('input[type=\"hidden\"]').value='';var teamRemovePreview=teamRemoveWrap.querySelector('.wwh-team-media-preview');teamRemovePreview.removeAttribute('src');teamRemovePreview.hidden=true;teamRemoveButton.hidden=true;}});"
+        "document.addEventListener('click',function(event){var selectButton=event.target.closest('.wwh-author-photo-select');var removeButton=event.target.closest('.wwh-author-photo-remove');var teamSelectButton=event.target.closest('.wwh-team-media-select');var teamRemoveButton=event.target.closest('.wwh-team-media-remove');if(selectButton){event.preventDefault();var wrap=selectButton.closest('td');var input=wrap.querySelector('#ww_author_photo_id');var preview=wrap.querySelector('.wwh-author-photo-preview');var remove=wrap.querySelector('.wwh-author-photo-remove');var frame=wp.media({title:'Select author profile photo',button:{text:'Use this photo'},multiple:false});frame.on('select',function(){var attachment=frame.state().get('selection').first().toJSON();input.value=attachment.id;preview.src=(attachment.sizes&&attachment.sizes.medium?attachment.sizes.medium.url:attachment.url);preview.hidden=false;remove.hidden=false;});frame.open();}if(removeButton){event.preventDefault();var removeWrap=removeButton.closest('td');removeWrap.querySelector('#ww_author_photo_id').value='';var removePreview=removeWrap.querySelector('.wwh-author-photo-preview');removePreview.removeAttribute('src');removePreview.hidden=true;removeButton.hidden=true;}if(teamSelectButton){event.preventDefault();var teamWrap=teamSelectButton.closest('.wwh-team-media-field');var teamInput=teamWrap.querySelector('input[type=\"hidden\"]');var teamPreview=teamWrap.querySelector('.wwh-team-media-preview');var teamRemove=teamWrap.querySelector('.wwh-team-media-remove');var teamFrame=wp.media({title:teamSelectButton.dataset.title||'Select team image',button:{text:teamSelectButton.dataset.buttonText||'Use image'},multiple:false});teamFrame.on('select',function(){var attachment=teamFrame.state().get('selection').first().toJSON();input.value=attachment.id;teamPreview.src=(attachment.sizes&&attachment.sizes.medium_large?attachment.sizes.medium_large.url:(attachment.sizes&&attachment.sizes.large?attachment.sizes.large.url:attachment.url));teamPreview.hidden=false;teamRemove.hidden=false;var focalPreview=teamWrap.querySelector('.wwh-team-focal-preview');var focalControls=teamWrap.querySelector('.wwh-team-focal-controls');var focalHelp=teamWrap.querySelector('.wwh-team-focal-help');if(focalPreview){focalPreview.hidden=false;}if(focalControls){focalControls.hidden=false;}if(focalHelp){focalHelp.hidden=false;}});teamFrame.open();}if(teamRemoveButton){event.preventDefault();var teamRemoveWrap=teamRemoveButton.closest('.wwh-team-media-field');teamRemoveWrap.querySelector('input[type=\"hidden\"]').value='';var teamRemovePreview=teamRemoveWrap.querySelector('.wwh-team-media-preview');teamRemovePreview.removeAttribute('src');teamRemovePreview.hidden=true;teamRemoveButton.hidden=true;var focalPreview=teamRemoveWrap.querySelector('.wwh-team-focal-preview');var focalControls=teamRemoveWrap.querySelector('.wwh-team-focal-controls');var focalHelp=teamRemoveWrap.querySelector('.wwh-team-focal-help');if(focalPreview){focalPreview.hidden=true;}if(focalControls){focalControls.hidden=true;}if(focalHelp){focalHelp.hidden=true;}}});"
+    );
+    wp_add_inline_script(
+        'jquery-core',
+        <<<'JS'
+document.addEventListener('DOMContentLoaded', function () {
+    function updateFocalPoint(field, x, y) {
+        var normalizedX = Math.max(0, Math.min(100, Math.round(x * 100) / 100));
+        var normalizedY = Math.max(0, Math.min(100, Math.round(y * 100) / 100));
+        var xInput = field.querySelector('.wwh-team-focal-x');
+        var yInput = field.querySelector('.wwh-team-focal-y');
+        var marker = field.querySelector('.wwh-team-focal-marker');
+        var output = field.querySelector('.wwh-team-focal-output');
+
+        xInput.value = normalizedX;
+        yInput.value = normalizedY;
+        marker.style.left = normalizedX + '%';
+        marker.style.top = normalizedY + '%';
+        output.textContent = normalizedX + '% horizontal · ' + normalizedY + '% vertical';
+    }
+
+    document.addEventListener('click', function (event) {
+        var preview = event.target.closest('.wwh-team-focal-preview');
+        var centerButton = event.target.closest('.wwh-team-focal-center');
+
+        if (preview && event.detail !== 0) {
+            event.preventDefault();
+            var rect = preview.getBoundingClientRect();
+            updateFocalPoint(
+                preview.closest('.wwh-team-media-field'),
+                ((event.clientX - rect.left) / rect.width) * 100,
+                ((event.clientY - rect.top) / rect.height) * 100
+            );
+        }
+
+        if (centerButton) {
+            event.preventDefault();
+            updateFocalPoint(centerButton.closest('.wwh-team-media-field'), 50, 50);
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        var preview = event.target.closest('.wwh-team-focal-preview');
+
+        if (!preview || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+            return;
+        }
+
+        event.preventDefault();
+        var field = preview.closest('.wwh-team-media-field');
+        var x = parseFloat(field.querySelector('.wwh-team-focal-x').value) || 50;
+        var y = parseFloat(field.querySelector('.wwh-team-focal-y').value) || 50;
+        var step = event.shiftKey ? 5 : 1;
+
+        if (event.key === 'ArrowLeft') x -= step;
+        if (event.key === 'ArrowRight') x += step;
+        if (event.key === 'ArrowUp') y -= step;
+        if (event.key === 'ArrowDown') y += step;
+        updateFocalPoint(field, x, y);
+    });
+});
+JS
     );
 }
 add_action('admin_enqueue_scripts', 'wwh_enqueue_author_profile_assets');
@@ -2664,6 +2764,16 @@ function wwh_admin_styles(): void
         .wwh-team-media-field span, .wwh-team-accent-field span { display: block; font-weight: 600; margin-bottom: 6px; }
         .wwh-team-media-preview { background: #f0f0f1; display: block; height: 92px; margin-bottom: 8px; object-fit: cover; width: 100%; }
         .wwh-team-logo-preview { object-fit: contain; }
+        .wwh-team-focal-preview { background: #f0f0f1; border: 0; cursor: crosshair; display: block; margin: 0 0 8px; padding: 0; position: relative; width: 100%; }
+        .wwh-team-focal-preview:focus { box-shadow: 0 0 0 2px #2271b1; outline: 2px solid transparent; }
+        .wwh-team-focal-preview .wwh-team-media-preview { margin: 0; pointer-events: none; }
+        .wwh-team-focal-marker { background: #fff; border: 2px solid #1d2327; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,.8); height: 14px; pointer-events: none; position: absolute; transform: translate(-50%, -50%); width: 14px; }
+        .wwh-team-focal-marker::before, .wwh-team-focal-marker::after { background: #1d2327; content: ""; left: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); }
+        .wwh-team-focal-marker::before { height: 2px; width: 22px; }
+        .wwh-team-focal-marker::after { height: 22px; width: 2px; }
+        .wwh-team-focal-controls { align-items: center; display: flex; flex-wrap: wrap; font-size: 12px; gap: 8px; justify-content: space-between; }
+        .wwh-team-focal-output { color: #50575e; }
+        .wwh-team-focal-help { margin-top: 6px !important; }
         .wwh-team-accent-field input { max-width: 140px; width: 100%; }
         .wwh-game-picker { display: grid; gap: 10px; }
         .wwh-game-picker-label, .wwh-game-picker-error { margin: 0; }
@@ -3242,6 +3352,8 @@ function wwh_format_sports_team(string $team_key, array $team): array
     $header_id = absint(wwh_sports_team_setting($team_key, 'headerImageId'));
     $logo_id = absint(wwh_sports_team_setting($team_key, 'logoId'));
     $accent_color = sanitize_hex_color(wwh_sports_team_setting($team_key, 'accentColor'));
+    $header_focal_x = wwh_normalize_focal_coordinate(wwh_sports_team_setting($team_key, 'headerFocalX'));
+    $header_focal_y = wwh_normalize_focal_coordinate(wwh_sports_team_setting($team_key, 'headerFocalY'));
 
     return [
         'key' => $team_key,
@@ -3250,6 +3362,10 @@ function wwh_format_sports_team(string $team_key, array $team): array
         'teamLabel' => (string) ($team['teamLabel'] ?? ''),
         'label' => (string) ($team['label'] ?? $team_key),
         'headerImage' => wwh_media_image($header_id, 'large'),
+        'headerImageFocalPoint' => [
+            'x' => $header_focal_x,
+            'y' => $header_focal_y,
+        ],
         'logo' => wwh_media_image($logo_id, 'medium'),
         'accentColor' => $accent_color ?: '',
     ];
