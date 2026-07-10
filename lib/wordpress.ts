@@ -112,6 +112,25 @@ export type WordPressMedia = {
   source_url: string;
 };
 
+export type WordPressArticleHeroImage = {
+  id: number;
+  sourceUrl: string;
+  alt: string;
+  width: number | null;
+  height: number | null;
+  caption: string;
+  creditText: string;
+};
+
+export type WordPressArticleHero = {
+  enabled: boolean;
+  backgroundColor: string;
+  textColor: "light" | "dark";
+  layout: "text-left" | "text-right" | "overlay";
+  imageSource: "featured" | "custom";
+  image: WordPressArticleHeroImage | null;
+};
+
 export type WordPressPost = {
   id: number;
   date: string;
@@ -133,6 +152,7 @@ export type WordPressPost = {
   weeklyWildcat?: {
     homepageOpinionTreatment?: boolean;
     primaryGameId?: number;
+    articleHero?: WordPressArticleHero;
   };
   _embedded?: {
     author?: WordPressAuthor[];
