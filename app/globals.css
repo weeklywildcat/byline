@@ -4310,6 +4310,103 @@ p.home-story-deck {
   text-transform: uppercase;
 }
 
+.team-roster-content {
+  display: grid;
+  gap: 28px;
+}
+
+.team-roster-table-wrap {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.team-roster-table {
+  border-collapse: collapse;
+  min-width: 560px;
+  width: 100%;
+}
+
+.team-roster-table th,
+.team-roster-table td {
+  border-bottom: 1px solid var(--rule);
+  padding: 12px 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.team-roster-table thead th {
+  color: var(--soft-muted);
+  font-family: var(--font-ui);
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.team-roster-table tbody th {
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.team-roster-table tbody td {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.team-roster-table tbody td:first-child {
+  color: var(--accent);
+  width: 64px;
+}
+
+.team-roster-staff {
+  border-top: 2px solid var(--ink);
+  padding-top: 16px;
+}
+
+.team-roster-staff h3 {
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  font-weight: 800;
+  margin: 0 0 12px;
+  text-transform: uppercase;
+}
+
+.team-roster-staff-list {
+  display: grid;
+  gap: 0 22px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.team-roster-staff-list > div {
+  border-bottom: 1px solid var(--rule);
+  display: grid;
+  gap: 4px;
+  padding: 11px 0;
+}
+
+.team-roster-staff-list strong {
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.94rem;
+  line-height: 1.15;
+}
+
+.team-roster-staff-list span {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .sports-archive-empty {
   margin: 0;
 }
@@ -5451,6 +5548,14 @@ p.home-story-deck {
 
   .sports-team-link-grid,
   .sports-coverage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-roster-table {
+    min-width: 500px;
+  }
+
+  .team-roster-staff-list {
     grid-template-columns: 1fr;
   }
 

@@ -3,7 +3,7 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { SiteIcon } from "@/components/SiteIcon";
 import { SportsSeasonSelector } from "@/components/SportsSeasonSelector";
 import { StoryTeaser } from "@/components/StoryTeaser";
-import type { SportsGame, SportsTeamMedia } from "@/lib/headless";
+import type { SportsGame, SportsRoster, SportsTeamMedia } from "@/lib/headless";
 import { formatDisplayDate } from "@/lib/format";
 import {
   calculateRecord,
@@ -270,6 +270,7 @@ function TeamTabs({
 }) {
   const homeHref = getTeamHubHref(team);
   const scheduleHref = getSeasonHref(team, season.year);
+  const rosterHref = `${activeTab === "schedule" ? scheduleHref : homeHref}#team-roster`;
 
   return (
     <nav className="team-hub-tabs" aria-label={`${team.name} team sections`}>
@@ -288,7 +289,7 @@ function TeamTabs({
       <a aria-current={activeTab === "schedule" ? "page" : undefined} href={scheduleHref}>
         Schedule
       </a>
-      <a href={`${homeHref}#team-roster`}>Roster</a>
+      <a href={rosterHref}>Roster</a>
       <a href={`${homeHref}#team-photos`}>Photos</a>
     </nav>
   );
@@ -343,6 +344,69 @@ function RecentScoresList({ games }: { games: SportsGame[] }) {
         </article>
       ))}
     </div>
+  );
+}
+
+function TeamRoster({ roster, season, teamName }: { roster: SportsRoster | null; season: string; teamName: string }) {
+  const players = roster?.players ?? [];
+  const staff = roster?.staff ?? [];
+  const showNumber = players.some((player) => player.number !== "");
+  const showPosition = players.some((player) => player.position !== "");
+  const showGrade = players.some((player) => player.grade !== "");
+
+  return (
+    <section className="sports-archive-section team-roster-section" id="team-roster" aria-labelledby="team-roster-heading">
+      <SectionHeader
+        id="team-roster-heading"
+        title={`${getSchoolYearLabel(season)} Roster`}
+        description={`Student-athletes and staff for ${teamName}.`}
+      />
+
+      {players.length === 0 && staff.length === 0 ? (
+        <p className="empty-state sports-archive-empty">No roster has been published for this school year.</p>
+      ) : (
+        <div className="team-roster-content">
+          {players.length > 0 ? (
+            <div className="team-roster-table-wrap">
+              <table className="team-roster-table">
+                <thead>
+                  <tr>
+                    {showNumber ? <th scope="col">No.</th> : null}
+                    <th scope="col">Student-Athlete</th>
+                    {showPosition ? <th scope="col">Position / Event</th> : null}
+                    {showGrade ? <th scope="col">Grade</th> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {players.map((player, index) => (
+                    <tr key={`${player.name}-${player.number}-${index}`}>
+                      {showNumber ? <td>{player.number || "—"}</td> : null}
+                      <th scope="row">{player.name}</th>
+                      {showPosition ? <td>{player.position || "—"}</td> : null}
+                      {showGrade ? <td>{player.grade || "—"}</td> : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          {staff.length > 0 ? (
+            <section className="team-roster-staff" aria-labelledby="team-roster-staff-heading">
+              <h3 id="team-roster-staff-heading">Team Staff</h3>
+              <div className="team-roster-staff-list">
+                {staff.map((member, index) => (
+                  <div key={`${member.name}-${member.role}-${index}`}>
+                    <strong>{member.name}</strong>
+                    <span>{member.role || "Staff"}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -435,20 +499,16 @@ export function TeamHubView({ team, season, teamMedia, coverage }: TeamHubProps)
         <SeasonScheduleTable games={schedulePreview} />
       </section>
 
+      <TeamRoster roster={season.roster} season={season.year} teamName={team.name} />
+
       <section className="sports-archive-section" id="team-news" aria-labelledby="team-coverage-heading">
         <SectionHeader id="team-coverage-heading" title="Latest Team News" description="Weekly Wildcat coverage connected to this team." />
         <CoverageGrid posts={coverage} />
       </section>
 
-      <section className="team-placeholder-grid" aria-label="Team extras">
-        <section className="sports-archive-section" id="team-roster" aria-labelledby="team-roster-heading">
-          <SectionHeader id="team-roster-heading" title="Roster" description="Roster data is not connected yet." />
-          <p className="empty-state sports-archive-empty">Roster information will appear here when it becomes available.</p>
-        </section>
-        <section className="sports-archive-section" id="team-photos" aria-labelledby="team-photos-heading">
-          <SectionHeader id="team-photos-heading" title="Photos" description="Related team galleries will appear here." />
-          <p className="empty-state sports-archive-empty">No team photo galleries are available yet.</p>
-        </section>
+      <section className="sports-archive-section" id="team-photos" aria-labelledby="team-photos-heading">
+        <SectionHeader id="team-photos-heading" title="Photos" description="Related team galleries will appear here." />
+        <p className="empty-state sports-archive-empty">No team photo galleries are available yet.</p>
       </section>
     </div>
   );
@@ -474,6 +534,8 @@ export function SeasonArchiveView({ season, teamMedia, coverage }: SeasonPagePro
         />
         <SeasonScheduleTable games={season.games} />
       </section>
+
+      <TeamRoster roster={season.roster} season={season.year} teamName={season.team.name} />
 
       <section className="sports-archive-section" aria-labelledby="season-coverage-heading">
         <SectionHeader id="season-coverage-heading" title="Related Coverage" description="Stories linked to this team, season or game." />

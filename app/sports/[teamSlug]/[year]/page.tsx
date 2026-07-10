@@ -43,8 +43,8 @@ export async function generateMetadata({ params }: SeasonPageProps): Promise<Met
   }
 
   return buildPageMetadata({
-    title: `${season.team.name} ${season.year} Schedule and Results`,
-    description: `${season.year} ${season.team.name} schedule, scores, results and related Weekly Wildcat coverage.`,
+    title: `${season.team.name} ${season.year} Season`,
+    description: `${season.year} ${season.team.name} schedule, roster, scores, results and related Weekly Wildcat coverage.`,
     path: getSeasonHref(season.team, season.year)
   });
 }

@@ -1,4 +1,4 @@
-import { getGameCenterHref, type SportsGame } from "@/lib/headless";
+import { getGameCenterHref, type SportsGame, type SportsRoster } from "@/lib/headless";
 import { stripHtml } from "@/lib/format";
 import { getPostCategories, getPostPrimaryGameId, getPostTags, type WordPressPost } from "@/lib/wordpress";
 
@@ -10,6 +10,7 @@ export type TeamSummary = {
   latestSeason: string;
   seasons: string[];
   games: SportsGame[];
+  rosters: SportsRoster[];
 };
 
 export type SeasonSummary = {
@@ -17,6 +18,7 @@ export type SeasonSummary = {
   year: string;
   games: SportsGame[];
   record: TeamRecord | null;
+  roster: SportsRoster | null;
 };
 
 export type TeamRecord = {
@@ -48,7 +50,7 @@ const SPORT_METADATA: Record<string, SportMetadata> = {
   sports: { family: "sports", label: "Sports", icon: "ph:trophy", color: "#7b1f2a" }
 };
 
-// Team and season archive URLs are derived from the existing sports game records.
+// Team and season archive URLs are derived from published game and roster records.
 // Varsity sport keys use the clean team hub slug, while JV/C-team keys remain
 // complete identities such as football-jv or girls-basketball-jv.
 function getSeasonFromDate(startDate: string) {
@@ -84,6 +86,16 @@ export function getTeamName(game: SportsGame) {
   return label.replace(/\s+-\s+Varsity$/i, "").replace(/\s+-\s+/g, " ");
 }
 
+export function getRosterTeamSlug(roster: Pick<SportsRoster, "teamKey">) {
+  return roster.teamKey.replace(/-varsity$/, "").toLowerCase();
+}
+
+export function getRosterTeamName(roster: SportsRoster) {
+  const label = roster.team.label || [roster.team.sport, roster.team.level].filter(Boolean).join(" - ") || roster.teamKey;
+
+  return label.replace(/\s+-\s+Varsity$/i, "").replace(/\s+-\s+/g, " ");
+}
+
 export function getTeamShortName(team: Pick<TeamSummary, "name">) {
   return team.name.replace(/\s+Varsity$/i, "");
 }
@@ -108,16 +120,18 @@ export function getSeasonByTeamAndYear(teams: TeamSummary[], teamSlug: string, y
   }
 
   const games = getTeamSeasonGames(team, year);
+  const roster = getTeamSeasonRoster(team, year);
 
   return {
     team,
     year,
     games,
-    record: calculateRecord(games)
+    record: calculateRecord(games),
+    roster
   };
 }
 
-export function buildTeams(games: SportsGame[]) {
+export function buildTeams(games: SportsGame[], rosters: SportsRoster[] = []) {
   const teams = new Map<string, TeamSummary>();
 
   games.forEach((game) => {
@@ -150,7 +164,43 @@ export function buildTeams(games: SportsGame[]) {
       shortName: name,
       latestSeason: year,
       seasons: [year],
-      games: [game]
+      games: [game],
+      rosters: []
+    });
+  });
+
+  rosters.forEach((roster) => {
+    const slug = getRosterTeamSlug(roster);
+    const season = roster.season;
+
+    if (!slug || !season) {
+      return;
+    }
+
+    const current = teams.get(slug);
+
+    if (current) {
+      current.rosters.push(roster);
+      if (!current.sportKeys.includes(roster.teamKey)) {
+        current.sportKeys.push(roster.teamKey);
+      }
+      if (!current.seasons.includes(season)) {
+        current.seasons.push(season);
+      }
+      return;
+    }
+
+    const name = getRosterTeamName(roster);
+
+    teams.set(slug, {
+      slug,
+      sportKeys: [roster.teamKey],
+      name,
+      shortName: name,
+      latestSeason: season,
+      seasons: [season],
+      games: [],
+      rosters: [roster]
     });
   });
 
@@ -208,6 +258,10 @@ export function groupTeamsByLatestSeason(teams: TeamSummary[]) {
 
 export function getTeamSeasonGames(team: TeamSummary, year: string) {
   return team.games.filter((game) => getGameSeason(game) === year).sort(sortGamesAscending);
+}
+
+export function getTeamSeasonRoster(team: TeamSummary, year: string) {
+  return team.rosters.find((roster) => roster.season === year) ?? null;
 }
 
 export function getTeamLatestGames(team: TeamSummary, limit = 5) {

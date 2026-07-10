@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: TeamPageProps): Promise<Metad
 
   return buildPageMetadata({
     title: `${team.name} Sports Hub`,
-    description: `Scores, schedules, season archives and Weekly Wildcat coverage for ${team.name}.`,
+    description: `Scores, schedules, rosters, season archives and Weekly Wildcat coverage for ${team.name}.`,
     path: getTeamHubHref(team)
   });
 }

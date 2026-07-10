@@ -37,6 +37,33 @@ export type SportsTeamMedia = {
   accentColor: string;
 };
 
+export type SportsRosterPlayer = {
+  name: string;
+  number: string;
+  position: string;
+  grade: string;
+};
+
+export type SportsRosterStaffMember = {
+  name: string;
+  role: string;
+};
+
+export type SportsRoster = {
+  id: number;
+  teamKey: string;
+  season: string;
+  team: {
+    key: string;
+    sport: string;
+    level: string;
+    teamLabel: string;
+    label: string;
+  };
+  players: SportsRosterPlayer[];
+  staff: SportsRosterStaffMember[];
+};
+
 export type SportsGame = {
   id: number;
   title: string;
@@ -243,6 +270,28 @@ export function getSportsGameFacets() {
 
 export function getSportsTeams() {
   return headlessFetch<SportsTeamMedia[]>("/sports-teams");
+}
+
+export async function getAllSportsRosters() {
+  const firstPage = await headlessFetchPage<SportsRoster[]>("/sports-rosters", {
+    per_page: 100,
+    page: 1
+  });
+
+  if (firstPage.totalPages <= 1) {
+    return firstPage.data;
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
+      headlessFetchPage<SportsRoster[]>("/sports-rosters", {
+        per_page: 100,
+        page: index + 2
+      })
+    )
+  );
+
+  return [...firstPage.data, ...remainingPages.flatMap((page) => page.data)];
 }
 
 export function getUpcomingSportsGames(query?: number | SportsGameQuery) {
