@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { ArticleShareActions } from "@/components/ArticleShareActions";
 import { ArticleHero, getArticleHeroImage } from "@/components/ArticleHero";
@@ -106,6 +106,21 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
       section: category ? decodeHtml(category.name) : undefined,
       tags
     }
+  };
+}
+
+export async function generateViewport({ params }: ArticlePageProps): Promise<Viewport> {
+  const { articleSlug } = await params;
+  const post = await getPostBySlug(articleSlug);
+  const hero = post?.weeklyWildcat?.articleHero;
+  const heroImage = post ? getArticleHeroImage(hero, getFeaturedMedia(post)) : null;
+  const backgroundColor = hero?.backgroundColor;
+
+  return {
+    themeColor:
+      hero?.enabled && heroImage && backgroundColor && /^#[0-9a-f]{6}$/i.test(backgroundColor)
+        ? backgroundColor
+        : "#fbfaf7"
   };
 }
 
