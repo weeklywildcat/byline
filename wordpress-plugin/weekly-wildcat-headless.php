@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.22
+ * Version: 0.1.23
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -24,6 +24,7 @@ const WWH_ARTICLE_HERO_ENABLED_META = '_ww_article_hero_enabled';
 const WWH_ARTICLE_HERO_BACKGROUND_COLOR_META = '_ww_article_hero_background_color';
 const WWH_ARTICLE_HERO_TEXT_COLOR_META = '_ww_article_hero_text_color';
 const WWH_ARTICLE_HERO_LAYOUT_META = '_ww_article_hero_layout';
+const WWH_ARTICLE_HERO_IMAGE_FIT_META = '_ww_article_hero_image_fit';
 const WWH_ARTICLE_HERO_IMAGE_SOURCE_META = '_ww_article_hero_image_source';
 const WWH_ARTICLE_HERO_IMAGE_ID_META = '_ww_article_hero_image_id';
 const WWH_SPORTS_TEAM_SETTINGS_OPTION = 'wwh_sports_team_settings';
@@ -590,6 +591,7 @@ function wwh_register_post_meta(): void
         WWH_ARTICLE_HERO_BACKGROUND_COLOR_META,
         WWH_ARTICLE_HERO_TEXT_COLOR_META,
         WWH_ARTICLE_HERO_LAYOUT_META,
+        WWH_ARTICLE_HERO_IMAGE_FIT_META,
         WWH_ARTICLE_HERO_IMAGE_SOURCE_META,
         WWH_ARTICLE_HERO_IMAGE_ID_META,
     ] as $key) {
@@ -1392,6 +1394,7 @@ function wwh_render_article_hero_meta_box(WP_Post $post): void
     $background_color = sanitize_hex_color(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_BACKGROUND_COLOR_META)) ?: '#171a21';
     $text_color = wwh_sanitize_choice(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_TEXT_COLOR_META, 'light'), ['light', 'dark'], 'light');
     $layout = wwh_sanitize_choice(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_LAYOUT_META, 'text-left'), ['text-left', 'text-right', 'overlay'], 'text-left');
+    $image_fit = wwh_sanitize_choice(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_IMAGE_FIT_META, 'cover'), ['cover', 'contain'], 'cover');
     $image_source = wwh_sanitize_choice(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_IMAGE_SOURCE_META, 'featured'), ['featured', 'custom'], 'featured');
     $image_id = absint(wwh_meta_value($post->ID, WWH_ARTICLE_HERO_IMAGE_ID_META));
     $image = wwh_media_image($image_id, 'medium');
@@ -1415,6 +1418,12 @@ function wwh_render_article_hero_meta_box(WP_Post $post): void
                 <option value="text-left"<?php echo selected($layout, 'text-left', false); ?>>Text left, image right</option>
                 <option value="text-right"<?php echo selected($layout, 'text-right', false); ?>>Image left, text right</option>
                 <option value="overlay"<?php echo selected($layout, 'overlay', false); ?>>Image-led text overlay</option>
+            </select></label>
+        </p>
+        <p class="wwh-field">
+            <label for="ww_article_hero_image_fit"><span>Image display</span><select id="ww_article_hero_image_fit" name="ww_article_hero_image_fit">
+                <option value="cover"<?php echo selected($image_fit, 'cover', false); ?>>Crop to fill the layout</option>
+                <option value="contain"<?php echo selected($image_fit, 'contain', false); ?>>Show the entire image</option>
             </select></label>
         </p>
         <p class="wwh-field">
@@ -1657,6 +1666,7 @@ function wwh_save_article_hero(int $post_id): void
     $background_color = sanitize_hex_color(wwh_request_value('ww_article_hero_background_color')) ?: '#171a21';
     $text_color = wwh_sanitize_choice(wwh_request_value('ww_article_hero_text_color'), ['light', 'dark'], 'light');
     $layout = wwh_sanitize_choice(wwh_request_value('ww_article_hero_layout'), ['text-left', 'text-right', 'overlay'], 'text-left');
+    $image_fit = wwh_sanitize_choice(wwh_request_value('ww_article_hero_image_fit'), ['cover', 'contain'], 'cover');
     $image_source = wwh_sanitize_choice(wwh_request_value('ww_article_hero_image_source'), ['featured', 'custom'], 'featured');
     $image_id = isset($_POST['ww_article_hero_image_id']) ? absint($_POST['ww_article_hero_image_id']) : 0;
 
@@ -1664,6 +1674,7 @@ function wwh_save_article_hero(int $post_id): void
     wwh_update_meta($post_id, WWH_ARTICLE_HERO_BACKGROUND_COLOR_META, $enabled ? $background_color : '');
     wwh_update_meta($post_id, WWH_ARTICLE_HERO_TEXT_COLOR_META, $enabled ? $text_color : '');
     wwh_update_meta($post_id, WWH_ARTICLE_HERO_LAYOUT_META, $enabled ? $layout : '');
+    wwh_update_meta($post_id, WWH_ARTICLE_HERO_IMAGE_FIT_META, $enabled ? $image_fit : '');
     wwh_update_meta($post_id, WWH_ARTICLE_HERO_IMAGE_SOURCE_META, $enabled ? $image_source : '');
     wwh_update_meta($post_id, WWH_ARTICLE_HERO_IMAGE_ID_META, $enabled && $image_source === 'custom' && $image_id > 0 ? (string) $image_id : '');
 }
@@ -3083,6 +3094,7 @@ function wwh_rest_post_settings(array $post): array
             'backgroundColor' => sanitize_hex_color((string) get_post_meta($post_id, WWH_ARTICLE_HERO_BACKGROUND_COLOR_META, true)) ?: '#171a21',
             'textColor' => wwh_sanitize_choice((string) get_post_meta($post_id, WWH_ARTICLE_HERO_TEXT_COLOR_META, true), ['light', 'dark'], 'light'),
             'layout' => wwh_sanitize_choice((string) get_post_meta($post_id, WWH_ARTICLE_HERO_LAYOUT_META, true), ['text-left', 'text-right', 'overlay'], 'text-left'),
+            'imageFit' => wwh_sanitize_choice((string) get_post_meta($post_id, WWH_ARTICLE_HERO_IMAGE_FIT_META, true), ['cover', 'contain'], 'cover'),
             'imageSource' => $hero_image_source,
             'image' => $hero_image_source === 'custom' ? wwh_rest_article_hero_image($hero_image_id) : null,
         ],
