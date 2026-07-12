@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.32
+ * Version: 0.1.33
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -64,6 +64,12 @@ function wwh_login_logo_text(): string
     return 'Weekly Wildcat';
 }
 add_filter('login_headertext', 'wwh_login_logo_text');
+
+function wwh_login_site_html_link(string $link): string
+{
+    return '<a href="https://weeklywildcat.com/">&larr; Go to Weekly Wildcat</a>';
+}
+add_filter('login_site_html_link', 'wwh_login_site_html_link');
 
 function wwh_unsplash_access_key(): string
 {
