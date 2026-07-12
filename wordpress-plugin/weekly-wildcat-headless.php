@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.27
+ * Version: 0.1.28
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -19,6 +19,7 @@ const WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION = 'wwh_cloudflare_deploy_hook_url';
 const WWH_CLOUDFLARE_DEPLOY_LAST_TRIGGERED_OPTION = 'wwh_cloudflare_deploy_last_triggered_at';
 const WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION = 'wwh_cloudflare_deploy_last_status';
 const WWH_CLOUDFLARE_DEPLOY_EVENT = 'wwh_trigger_cloudflare_deploy';
+const WWH_UNSPLASH_ACCESS_KEY_OPTION = 'wwh_unsplash_access_key';
 const WWH_HOMEPAGE_OPINION_TREATMENT_META = '_ww_homepage_opinion_treatment';
 const WWH_ARTICLE_HERO_ENABLED_META = '_ww_article_hero_enabled';
 const WWH_ARTICLE_HERO_BACKGROUND_COLOR_META = '_ww_article_hero_background_color';
@@ -66,11 +67,19 @@ add_filter('login_headertext', 'wwh_login_logo_text');
 
 function wwh_unsplash_access_key(): string
 {
-    $value = defined('WWH_UNSPLASH_ACCESS_KEY')
-        ? constant('WWH_UNSPLASH_ACCESS_KEY')
-        : getenv('WWH_UNSPLASH_ACCESS_KEY');
+    if (defined('WWH_UNSPLASH_ACCESS_KEY')) {
+        $value = constant('WWH_UNSPLASH_ACCESS_KEY');
+        if (is_string($value) && trim($value) !== '') {
+            return trim($value);
+        }
+    }
 
-    return is_string($value) ? trim($value) : '';
+    $value = getenv('WWH_UNSPLASH_ACCESS_KEY');
+    if (is_string($value) && trim($value) !== '') {
+        return trim($value);
+    }
+
+    return trim((string) get_option(WWH_UNSPLASH_ACCESS_KEY_OPTION, ''));
 }
 
 function wwh_unsplash_login_photos(): array
@@ -611,6 +620,17 @@ function wwh_register_settings(): void
 {
     register_setting(
         'wwh_settings',
+        WWH_UNSPLASH_ACCESS_KEY_OPTION,
+        [
+            'type' => 'string',
+            'sanitize_callback' => 'wwh_sanitize_unsplash_access_key',
+            'default' => '',
+            'show_in_rest' => false,
+        ]
+    );
+
+    register_setting(
+        'wwh_settings',
         WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION,
         [
             'type' => 'string',
@@ -618,6 +638,21 @@ function wwh_register_settings(): void
             'default' => '',
             'show_in_rest' => false,
         ]
+    );
+
+    add_settings_section(
+        'wwh_login_background_section',
+        'Login Background',
+        '__return_false',
+        'wwh-settings'
+    );
+
+    add_settings_field(
+        WWH_UNSPLASH_ACCESS_KEY_OPTION,
+        'Unsplash Access Key',
+        'wwh_render_unsplash_access_key_field',
+        'wwh-settings',
+        'wwh_login_background_section'
     );
 
     add_settings_section(
@@ -636,6 +671,80 @@ function wwh_register_settings(): void
     );
 }
 add_action('admin_init', 'wwh_register_settings');
+
+function wwh_sanitize_unsplash_access_key($value): string
+{
+    $current = (string) get_option(WWH_UNSPLASH_ACCESS_KEY_OPTION, '');
+    delete_transient('wwh_unsplash_login_photos');
+
+    if (!current_user_can('manage_options')) {
+        return $current;
+    }
+
+    if (isset($_POST['wwh_unsplash_access_key_clear'])) {
+        return '';
+    }
+
+    if (!is_string($value) || trim($value) === '') {
+        return $current;
+    }
+
+    $value = trim($value);
+    if (strlen($value) < 20 || strlen($value) > 100 || preg_match('/^[A-Za-z0-9_-]+$/', $value) !== 1) {
+        add_settings_error(
+            WWH_UNSPLASH_ACCESS_KEY_OPTION,
+            'wwh_unsplash_access_key_invalid',
+            'Enter a valid Unsplash access key.',
+            'error'
+        );
+        return $current;
+    }
+
+    return $value;
+}
+
+function wwh_render_unsplash_access_key_field(): void
+{
+    $saved_key = (string) get_option(WWH_UNSPLASH_ACCESS_KEY_OPTION, '');
+    $external_key = '';
+    if (defined('WWH_UNSPLASH_ACCESS_KEY') && is_string(constant('WWH_UNSPLASH_ACCESS_KEY'))) {
+        $external_key = trim((string) constant('WWH_UNSPLASH_ACCESS_KEY'));
+    }
+    if ($external_key === '') {
+        $environment_key = getenv('WWH_UNSPLASH_ACCESS_KEY');
+        $external_key = is_string($environment_key) ? trim($environment_key) : '';
+    }
+    $has_saved_key = $saved_key !== '';
+
+    ?>
+    <input
+        type="password"
+        id="<?php echo esc_attr(WWH_UNSPLASH_ACCESS_KEY_OPTION); ?>"
+        name="<?php echo esc_attr(WWH_UNSPLASH_ACCESS_KEY_OPTION); ?>"
+        value=""
+        class="regular-text"
+        autocomplete="new-password"
+        placeholder="<?php echo esc_attr($has_saved_key ? 'Saved. Enter a new key to replace it.' : 'Unsplash access key'); ?>"
+    >
+    <p class="description">
+        <?php
+        echo esc_html(
+            $external_key !== ''
+                ? 'A constant or Docker environment variable is active and overrides a saved key.'
+                : ($has_saved_key
+                    ? 'An access key is saved. Leave this blank to keep it unchanged.'
+                    : 'Used only by WordPress to load rotating login backgrounds from the Unsplash Wallpapers topic.')
+        );
+        ?>
+    </p>
+    <?php if ($has_saved_key) : ?>
+        <label>
+            <input type="checkbox" name="wwh_unsplash_access_key_clear" value="1">
+            Remove the saved Unsplash access key
+        </label>
+    <?php endif; ?>
+    <?php
+}
 
 function wwh_sanitize_cloudflare_deploy_hook_url($value): string
 {
