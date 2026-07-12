@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.29
+ * Version: 0.1.30
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -285,10 +285,12 @@ function wwh_google_login_button(string $message): string
         'wwh_google_login_start',
         admin_url('admin-post.php')
     );
+    $button_image_url = plugin_dir_url(__FILE__) . 'assets/google-signin-light.png';
 
     $button = sprintf(
-        '<div class="wwh-google-login"><a class="button button-large" href="%s">Sign in with Google</a><span>Use your @weeklywildcat.com account.</span><button type="button" class="wwh-password-login-toggle" aria-expanded="false">Use a password or reset it</button></div>',
-        esc_url($login_url)
+        '<div class="wwh-google-login"><a class="wwh-google-signin-button" href="%s"><img src="%s" alt="Sign in with Google" width="360" height="80"></a><span>Use your @weeklywildcat.com account.</span><button type="button" class="wwh-password-login-toggle" aria-expanded="false">Use a password or reset it</button></div>',
+        esc_url($login_url),
+        esc_url($button_image_url)
     );
 
     return $message . $button;
@@ -303,7 +305,18 @@ function wwh_google_login_styles(): void
     ?>
     <style>
         .wwh-google-login { margin: 0 0 20px; text-align: center; }
-        .wwh-google-login .button { display: block; padding: 4px 16px; width: 100%; }
+        .wwh-google-signin-button {
+            border-radius: 4px;
+            display: block;
+            margin: 0 auto;
+            max-width: 270px;
+            transition: box-shadow .15s ease;
+            width: 100%;
+        }
+        .wwh-google-signin-button:hover,
+        .wwh-google-signin-button:focus { box-shadow: 0 1px 3px 1px rgba(60, 64, 67, .3); }
+        .wwh-google-signin-button:focus { outline: 2px solid #1a73e8; outline-offset: 2px; }
+        .wwh-google-signin-button img { display: block; height: auto; width: 100%; }
         .wwh-google-login span { color: #646970; display: block; font-size: 12px; margin-top: 8px; }
         .wwh-password-login-toggle {
             background: none;
