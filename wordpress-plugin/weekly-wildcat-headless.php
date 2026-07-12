@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.31
+ * Version: 0.1.32
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -3328,6 +3328,48 @@ function wwh_author_profile_photo(int $attachment_id): array
 {
     return wwh_media_image($attachment_id, 'medium');
 }
+
+function wwh_author_avatar_data(array $args, $id_or_email): array
+{
+    if (!empty($args['force_default'])) {
+        return $args;
+    }
+
+    $user = null;
+    if ($id_or_email instanceof WP_User) {
+        $user = $id_or_email;
+    } elseif ($id_or_email instanceof WP_Comment) {
+        $user = $id_or_email->user_id > 0
+            ? get_user_by('id', $id_or_email->user_id)
+            : get_user_by('email', $id_or_email->comment_author_email);
+    } elseif ($id_or_email instanceof WP_Post) {
+        $user = get_user_by('id', $id_or_email->post_author);
+    } elseif (is_numeric($id_or_email)) {
+        $user = get_user_by('id', absint($id_or_email));
+    } elseif (is_string($id_or_email) && is_email($id_or_email)) {
+        $user = get_user_by('email', $id_or_email);
+    }
+
+    if (!$user instanceof WP_User) {
+        return $args;
+    }
+
+    $photo_id = absint(get_user_meta($user->ID, '_ww_author_photo_id', true));
+    if ($photo_id <= 0) {
+        return $args;
+    }
+
+    $size = max(1, absint($args['size'] ?? 96));
+    $photo_url = wp_get_attachment_image_url($photo_id, [$size, $size]);
+    if (!is_string($photo_url) || $photo_url === '') {
+        return $args;
+    }
+
+    $args['url'] = $photo_url;
+    $args['found_avatar'] = true;
+    return $args;
+}
+add_filter('get_avatar_data', 'wwh_author_avatar_data', 10, 2);
 
 function wwh_render_author_profile_fields(WP_User $user): void
 {
