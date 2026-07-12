@@ -71,6 +71,24 @@ function absint($maybeint): int
 
 require __DIR__ . '/../weekly-wildcat-headless.php';
 
+putenv('WWH_GOOGLE_CLIENT_ID');
+putenv('WWH_GOOGLE_CLIENT_SECRET');
+if (wwh_google_client_id() !== '' || wwh_google_client_secret() !== '' || wwh_google_login_is_configured()) {
+    fwrite(STDERR, "Expected unavailable Google OAuth environment variables to be handled safely.\n");
+    exit(1);
+}
+
+putenv('WWH_GOOGLE_CLIENT_ID=test-client-id.apps.googleusercontent.com');
+putenv('WWH_GOOGLE_CLIENT_SECRET=test-client-secret');
+if (wwh_google_client_id() !== 'test-client-id.apps.googleusercontent.com'
+    || wwh_google_client_secret() !== 'test-client-secret'
+    || !wwh_google_login_is_configured()) {
+    fwrite(STDERR, "Expected Google OAuth credentials to fall back to environment variables.\n");
+    exit(1);
+}
+putenv('WWH_GOOGLE_CLIENT_ID');
+putenv('WWH_GOOGLE_CLIENT_SECRET');
+
 $date = wwh_format_date_text('2026-04-24T18:00');
 $time = wwh_format_time_text('2026-04-24T18:00', '', false);
 

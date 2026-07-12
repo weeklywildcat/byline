@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.24
+ * Version: 0.1.25
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -69,13 +69,50 @@ function wwh_google_login_redirect_uri(): string
     return admin_url('admin-post.php?action=wwh_google_login_callback');
 }
 
+function wwh_google_client_id(): string
+{
+    $value = defined('WWH_GOOGLE_CLIENT_ID')
+        ? constant('WWH_GOOGLE_CLIENT_ID')
+        : getenv('WWH_GOOGLE_CLIENT_ID');
+
+    return is_string($value) ? trim($value) : '';
+}
+
+function wwh_google_client_secret(): string
+{
+    $value = defined('WWH_GOOGLE_CLIENT_SECRET')
+        ? constant('WWH_GOOGLE_CLIENT_SECRET')
+        : getenv('WWH_GOOGLE_CLIENT_SECRET');
+
+    return is_string($value) ? trim($value) : '';
+}
+
 function wwh_google_login_is_configured(): bool
 {
-    return defined('WWH_GOOGLE_CLIENT_ID')
-        && defined('WWH_GOOGLE_CLIENT_SECRET')
-        && WWH_GOOGLE_CLIENT_ID !== ''
-        && WWH_GOOGLE_CLIENT_SECRET !== '';
+    return wwh_google_client_id() !== '' && wwh_google_client_secret() !== '';
 }
+
+function wwh_google_login_configuration_notice(): void
+{
+    if (!current_user_can('manage_options') || wwh_google_login_is_configured()) {
+        return;
+    }
+
+    $missing = [];
+    if (wwh_google_client_id() === '') {
+        $missing[] = 'WWH_GOOGLE_CLIENT_ID';
+    }
+    if (wwh_google_client_secret() === '') {
+        $missing[] = 'WWH_GOOGLE_CLIENT_SECRET';
+    }
+
+    printf(
+        '<div class="notice notice-error"><p><strong>Weekly Wildcat Google sign-in is not configured.</strong> Set the missing Docker environment variable%s: <code>%s</code>.</p></div>',
+        count($missing) === 1 ? '' : 's',
+        esc_html(implode(', ', $missing))
+    );
+}
+add_action('admin_notices', 'wwh_google_login_configuration_notice');
 
 function wwh_google_login_button(string $message): string
 {
@@ -128,13 +165,14 @@ function wwh_google_login_start(): void
         wwh_google_login_fail('Google sign-in is not configured.');
     }
 
+    $google_client_id = wwh_google_client_id();
     $state = wp_generate_password(48, false, false);
     $nonce = wp_generate_password(48, false, false);
     set_transient('wwh_google_login_' . hash('sha256', $state), ['nonce' => $nonce], 10 * MINUTE_IN_SECONDS);
 
     $authorization_url = add_query_arg(
         [
-            'client_id' => WWH_GOOGLE_CLIENT_ID,
+            'client_id' => $google_client_id,
             'redirect_uri' => wwh_google_login_redirect_uri(),
             'response_type' => 'code',
             'scope' => 'openid email profile',
@@ -164,6 +202,11 @@ function wwh_google_base64url_decode(string $value): string
 
 function wwh_google_id_token_claims(string $id_token, string $expected_nonce): array
 {
+    $google_client_id = wwh_google_client_id();
+    if ($google_client_id === '') {
+        return [];
+    }
+
     $parts = explode('.', $id_token);
     if (count($parts) !== 3) {
         return [];
@@ -205,10 +248,10 @@ function wwh_google_id_token_claims(string $id_token, string $expected_nonce): a
     $valid_issuer = $issuer === 'https://accounts.google.com' || $issuer === 'accounts.google.com';
     $audience = $claims['aud'] ?? '';
     $valid_audience = is_array($audience)
-        ? in_array(WWH_GOOGLE_CLIENT_ID, $audience, true)
-        : hash_equals((string) WWH_GOOGLE_CLIENT_ID, (string) $audience);
+        ? in_array($google_client_id, $audience, true)
+        : hash_equals($google_client_id, (string) $audience);
     $valid_authorized_party = !is_array($audience)
-        || hash_equals((string) WWH_GOOGLE_CLIENT_ID, (string) ($claims['azp'] ?? ''));
+        || hash_equals($google_client_id, (string) ($claims['azp'] ?? ''));
 
     if (
         !$valid_issuer
@@ -233,6 +276,8 @@ function wwh_google_login_callback(): void
         wwh_google_login_fail('Google sign-in is not configured.');
     }
 
+    $google_client_id = wwh_google_client_id();
+    $google_client_secret = wwh_google_client_secret();
     $state = isset($_GET['state']) ? sanitize_text_field(wp_unslash($_GET['state'])) : '';
     $code = isset($_GET['code']) ? sanitize_text_field(wp_unslash($_GET['code'])) : '';
     $transient_key = 'wwh_google_login_' . hash('sha256', $state);
@@ -249,8 +294,8 @@ function wwh_google_login_callback(): void
             'timeout' => 15,
             'body' => [
                 'code' => $code,
-                'client_id' => WWH_GOOGLE_CLIENT_ID,
-                'client_secret' => WWH_GOOGLE_CLIENT_SECRET,
+                'client_id' => $google_client_id,
+                'client_secret' => $google_client_secret,
                 'redirect_uri' => wwh_google_login_redirect_uri(),
                 'grant_type' => 'authorization_code',
             ],
