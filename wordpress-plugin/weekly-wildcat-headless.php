@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.23
+ * Version: 0.1.24
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -30,6 +30,266 @@ const WWH_ARTICLE_HERO_IMAGE_ID_META = '_ww_article_hero_image_id';
 const WWH_SPORTS_TEAM_SETTINGS_OPTION = 'wwh_sports_team_settings';
 // Stores only the selected Sports Game post ID for the automatic article game card.
 const WWH_PRIMARY_GAME_META = 'weekly_wildcat_primary_game_id';
+
+/**
+ * Replace the WordPress mark on the sign-in screen with the Weekly Wildcat logo.
+ */
+function wwh_login_logo_styles(): void
+{
+    $logo_url = plugin_dir_url(__FILE__) . 'assets/weekly-wildcat-logo.svg';
+    ?>
+    <style>
+        #login h1 a,
+        .login h1 a {
+            background-image: url('<?php echo esc_url($logo_url); ?>');
+            background-position: center;
+            background-size: contain;
+            height: 102px;
+            width: 320px;
+        }
+    </style>
+    <?php
+}
+add_action('login_enqueue_scripts', 'wwh_login_logo_styles');
+
+function wwh_login_logo_url(): string
+{
+    return 'https://weeklywildcat.com';
+}
+add_filter('login_headerurl', 'wwh_login_logo_url');
+
+function wwh_login_logo_text(): string
+{
+    return 'Weekly Wildcat';
+}
+add_filter('login_headertext', 'wwh_login_logo_text');
+
+function wwh_google_login_redirect_uri(): string
+{
+    return admin_url('admin-post.php?action=wwh_google_login_callback');
+}
+
+function wwh_google_login_is_configured(): bool
+{
+    return defined('WWH_GOOGLE_CLIENT_ID')
+        && defined('WWH_GOOGLE_CLIENT_SECRET')
+        && WWH_GOOGLE_CLIENT_ID !== ''
+        && WWH_GOOGLE_CLIENT_SECRET !== '';
+}
+
+function wwh_google_login_button(string $message): string
+{
+    if (!wwh_google_login_is_configured()) {
+        return $message;
+    }
+
+    $login_url = add_query_arg(
+        'action',
+        'wwh_google_login_start',
+        admin_url('admin-post.php')
+    );
+
+    $button = sprintf(
+        '<p class="wwh-google-login"><a class="button button-large" href="%s">Sign in with Google</a><span>Use your @weeklywildcat.com account.</span></p>',
+        esc_url($login_url)
+    );
+
+    return $message . $button;
+}
+add_filter('login_message', 'wwh_google_login_button');
+
+function wwh_google_login_styles(): void
+{
+    if (!wwh_google_login_is_configured()) {
+        return;
+    }
+    ?>
+    <style>
+        .wwh-google-login { margin: 0 0 20px; text-align: center; }
+        .wwh-google-login .button { display: block; padding: 4px 16px; width: 100%; }
+        .wwh-google-login span { color: #646970; display: block; font-size: 12px; margin-top: 8px; }
+    </style>
+    <?php
+}
+add_action('login_enqueue_scripts', 'wwh_google_login_styles');
+
+function wwh_google_login_fail(string $message): void
+{
+    wp_die(
+        esc_html($message),
+        esc_html__('Google sign-in failed', 'weekly-wildcat-headless'),
+        ['response' => 403, 'back_link' => true]
+    );
+}
+
+function wwh_google_login_start(): void
+{
+    if (!wwh_google_login_is_configured()) {
+        wwh_google_login_fail('Google sign-in is not configured.');
+    }
+
+    $state = wp_generate_password(48, false, false);
+    $nonce = wp_generate_password(48, false, false);
+    set_transient('wwh_google_login_' . hash('sha256', $state), ['nonce' => $nonce], 10 * MINUTE_IN_SECONDS);
+
+    $authorization_url = add_query_arg(
+        [
+            'client_id' => WWH_GOOGLE_CLIENT_ID,
+            'redirect_uri' => wwh_google_login_redirect_uri(),
+            'response_type' => 'code',
+            'scope' => 'openid email profile',
+            'state' => $state,
+            'nonce' => $nonce,
+            'hd' => 'weeklywildcat.com',
+            'prompt' => 'select_account',
+        ],
+        'https://accounts.google.com/o/oauth2/v2/auth'
+    );
+
+    wp_redirect($authorization_url);
+    exit;
+}
+add_action('admin_post_nopriv_wwh_google_login_start', 'wwh_google_login_start');
+
+function wwh_google_base64url_decode(string $value): string
+{
+    $remainder = strlen($value) % 4;
+    if ($remainder !== 0) {
+        $value .= str_repeat('=', 4 - $remainder);
+    }
+
+    $decoded = base64_decode(strtr($value, '-_', '+/'), true);
+    return is_string($decoded) ? $decoded : '';
+}
+
+function wwh_google_id_token_claims(string $id_token, string $expected_nonce): array
+{
+    $parts = explode('.', $id_token);
+    if (count($parts) !== 3) {
+        return [];
+    }
+
+    $header = json_decode(wwh_google_base64url_decode($parts[0]), true);
+    $claims = json_decode(wwh_google_base64url_decode($parts[1]), true);
+    $signature = wwh_google_base64url_decode($parts[2]);
+    if (!is_array($header) || !is_array($claims) || ($header['alg'] ?? '') !== 'RS256' || empty($header['kid']) || $signature === '') {
+        return [];
+    }
+
+    $certificates = get_transient('wwh_google_signing_certificates');
+    if (!is_array($certificates) || empty($certificates)) {
+        $response = wp_remote_get('https://www.googleapis.com/oauth2/v1/certs', ['timeout' => 10]);
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+            return [];
+        }
+
+        $certificates = json_decode(wp_remote_retrieve_body($response), true);
+        if (!is_array($certificates)) {
+            return [];
+        }
+
+        set_transient('wwh_google_signing_certificates', $certificates, HOUR_IN_SECONDS);
+    }
+
+    $certificate = $certificates[$header['kid']] ?? '';
+    if (!is_string($certificate) || $certificate === '' || !function_exists('openssl_verify')) {
+        return [];
+    }
+
+    $verified = openssl_verify($parts[0] . '.' . $parts[1], $signature, $certificate, OPENSSL_ALGO_SHA256);
+    if ($verified !== 1) {
+        return [];
+    }
+
+    $issuer = $claims['iss'] ?? '';
+    $valid_issuer = $issuer === 'https://accounts.google.com' || $issuer === 'accounts.google.com';
+    $audience = $claims['aud'] ?? '';
+    $valid_audience = is_array($audience)
+        ? in_array(WWH_GOOGLE_CLIENT_ID, $audience, true)
+        : hash_equals((string) WWH_GOOGLE_CLIENT_ID, (string) $audience);
+    $valid_authorized_party = !is_array($audience)
+        || hash_equals((string) WWH_GOOGLE_CLIENT_ID, (string) ($claims['azp'] ?? ''));
+
+    if (
+        !$valid_issuer
+        || !$valid_audience
+        || !$valid_authorized_party
+        || (int) ($claims['exp'] ?? 0) < time()
+        || !hash_equals($expected_nonce, (string) ($claims['nonce'] ?? ''))
+        || !hash_equals('weeklywildcat.com', strtolower((string) ($claims['hd'] ?? '')))
+        || ($claims['email_verified'] ?? false) !== true
+        || empty($claims['sub'])
+        || empty($claims['email'])
+    ) {
+        return [];
+    }
+
+    return $claims;
+}
+
+function wwh_google_login_callback(): void
+{
+    if (!wwh_google_login_is_configured()) {
+        wwh_google_login_fail('Google sign-in is not configured.');
+    }
+
+    $state = isset($_GET['state']) ? sanitize_text_field(wp_unslash($_GET['state'])) : '';
+    $code = isset($_GET['code']) ? sanitize_text_field(wp_unslash($_GET['code'])) : '';
+    $transient_key = 'wwh_google_login_' . hash('sha256', $state);
+    $login_attempt = $state !== '' ? get_transient($transient_key) : false;
+    delete_transient($transient_key);
+
+    if ($code === '' || !is_array($login_attempt) || empty($login_attempt['nonce'])) {
+        wwh_google_login_fail('The Google sign-in request expired or was invalid. Please try again.');
+    }
+
+    $response = wp_remote_post(
+        'https://oauth2.googleapis.com/token',
+        [
+            'timeout' => 15,
+            'body' => [
+                'code' => $code,
+                'client_id' => WWH_GOOGLE_CLIENT_ID,
+                'client_secret' => WWH_GOOGLE_CLIENT_SECRET,
+                'redirect_uri' => wwh_google_login_redirect_uri(),
+                'grant_type' => 'authorization_code',
+            ],
+        ]
+    );
+
+    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+        wwh_google_login_fail('Google could not complete the sign-in request.');
+    }
+
+    $token_response = json_decode(wp_remote_retrieve_body($response), true);
+    $id_token = is_array($token_response) ? (string) ($token_response['id_token'] ?? '') : '';
+    $claims = wwh_google_id_token_claims($id_token, (string) $login_attempt['nonce']);
+    if (empty($claims)) {
+        wwh_google_login_fail('Google returned an invalid identity.');
+    }
+
+    $email = strtolower(sanitize_email((string) $claims['email']));
+    $user = get_user_by('email', $email);
+    if (!$user instanceof WP_User) {
+        wwh_google_login_fail('No existing WordPress user matches this Weekly Wildcat account.');
+    }
+
+    $google_subject = (string) $claims['sub'];
+    $saved_subject = (string) get_user_meta($user->ID, '_wwh_google_subject', true);
+    if ($saved_subject !== '' && !hash_equals($saved_subject, $google_subject)) {
+        wwh_google_login_fail('This WordPress user is linked to a different Google account.');
+    }
+    if ($saved_subject === '') {
+        update_user_meta($user->ID, '_wwh_google_subject', $google_subject);
+    }
+
+    wp_set_current_user($user->ID);
+    wp_set_auth_cookie($user->ID, false, is_ssl());
+    do_action('wp_login', $user->user_login, $user);
+    wp_safe_redirect(admin_url());
+    exit;
+}
+add_action('admin_post_nopriv_wwh_google_login_callback', 'wwh_google_login_callback');
 
 function wwh_author_social_fields(): array
 {
@@ -67,12 +327,18 @@ function wwh_sports_game_status_options(): array
         'postponed' => 'Postponed',
         'canceled' => 'Canceled',
         'forfeit' => 'Forfeit',
+        'tie' => 'Tie',
     ];
 }
 
 function wwh_sports_game_status_values(): array
 {
     return array_keys(wwh_sports_game_status_options());
+}
+
+function wwh_sports_game_status_shows_score(string $status): bool
+{
+    return in_array($status, ['final', 'tie'], true);
 }
 
 function wwh_register_update_checker(): void
@@ -2053,7 +2319,11 @@ function wwh_export_result(string $status, string $wildcats_score, string $oppon
         return 'Forfeit';
     }
 
-    if ($status !== 'final' || $wildcats_score === '' || $opponent_score === '') {
+    if ($status === 'tie') {
+        return 'T';
+    }
+
+    if (!wwh_sports_game_status_shows_score($status) || $wildcats_score === '' || $opponent_score === '') {
         return '';
     }
 
@@ -2407,8 +2677,16 @@ function wwh_import_status(string $result, string $wildcats_score, string $oppon
         return 'forfeit';
     }
 
-    if (in_array($result, ['w', 'win', 'l', 'loss', 't', 'tie'], true) || ($wildcats_score !== '' && $opponent_score !== '')) {
+    if (in_array($result, ['t', 'tie'], true)) {
+        return 'tie';
+    }
+
+    if (in_array($result, ['w', 'win', 'l', 'loss'], true)) {
         return 'final';
+    }
+
+    if ($wildcats_score !== '' && $opponent_score !== '') {
+        return absint($wildcats_score) === absint($opponent_score) ? 'tie' : 'final';
     }
 
     return wwh_effective_game_status('upcoming', $start_datetime);
@@ -3498,10 +3776,12 @@ function wwh_add_game_to_summary(array &$summaries, string $key, string $status,
         $summaries[$key]['upcoming']++;
     }
 
-    if ($status === 'final') {
+    if (wwh_sports_game_status_shows_score($status)) {
         $summaries[$key]['finals']++;
 
-        if ($wildcats_score !== null && $opponent_score !== null) {
+        if ($status === 'tie') {
+            $summaries[$key]['ties']++;
+        } elseif ($wildcats_score !== null && $opponent_score !== null) {
             if ($wildcats_score > $opponent_score) {
                 $summaries[$key]['wins']++;
             } elseif ($wildcats_score < $opponent_score) {
@@ -3660,6 +3940,10 @@ function wwh_rest_recent_sports_games(WP_REST_Request $request): WP_REST_Respons
                 ],
                 [
                     'key' => '_ww_game_status',
+                    'value' => 'tie',
+                ],
+                [
+                    'key' => '_ww_game_status',
                     'value' => 'upcoming',
                 ],
             ],
@@ -3792,7 +4076,7 @@ function wwh_format_sports_game(WP_Post $post): array
     $status = wwh_effective_game_status(wwh_meta_value($post->ID, '_ww_game_status', 'upcoming'), $start);
     $wildcats_score = wwh_meta_value($post->ID, '_ww_wildcats_score');
     $opponent_score = wwh_meta_value($post->ID, '_ww_opponent_score');
-    $show_score = $status === 'final' && $wildcats_score !== '' && $opponent_score !== '';
+    $show_score = wwh_sports_game_status_shows_score($status) && $wildcats_score !== '' && $opponent_score !== '';
     $matchup = $opponent !== '' ? sprintf('Wildcats %s %s', $site === 'away' ? 'at' : 'vs.', $opponent) : get_the_title($post);
     $sport = $sport_option['sport'] ?? wwh_meta_value($post->ID, '_ww_sport');
     $level = $sport_option['level'] ?? wwh_meta_value($post->ID, '_ww_level');
@@ -3877,7 +4161,7 @@ function wwh_render_game_card_html(array $game, string $display): string
     $opponent = $scoreboard['opponent'] ?? ['label' => 'Opponent', 'score' => null];
     $wildcats_score = $wildcats['score'];
     $opponent_score = $opponent['score'];
-    $has_score = $status === 'final' && $wildcats_score !== null && $opponent_score !== null;
+    $has_score = wwh_sports_game_status_shows_score($status) && $wildcats_score !== null && $opponent_score !== null;
     $wildcats_won = $has_score && (int) $wildcats_score > (int) $opponent_score;
     $opponent_won = $has_score && (int) $opponent_score > (int) $wildcats_score;
     $classes = trim('article-game-card article-game-card-inline article-game-card-' . $display . ' article-game-card-' . $status);

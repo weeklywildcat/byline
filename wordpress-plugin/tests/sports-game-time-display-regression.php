@@ -64,6 +64,11 @@ function sanitize_text_field($value): string
     return trim(strip_tags((string) $value));
 }
 
+function absint($maybeint): int
+{
+    return abs((int) $maybeint);
+}
+
 require __DIR__ . '/../weekly-wildcat-headless.php';
 
 $date = wwh_format_date_text('2026-04-24T18:00');
@@ -137,6 +142,26 @@ if ($parsed_roster['errors'] !== []
 
 if (!in_array(WWH_SPORTS_ROSTER_POST_TYPE, wwh_roster_cloudflare_post_types(['post']), true)) {
     fwrite(STDERR, "Expected published roster changes to participate in Cloudflare deploy triggers.\n");
+    exit(1);
+}
+
+if (wwh_import_status('tie', '', '', '') !== 'tie') {
+    fwrite(STDERR, "Expected imported tie results to save as tie status.\n");
+    exit(1);
+}
+
+if (wwh_import_status('', '7', '7', '') !== 'tie') {
+    fwrite(STDERR, "Expected equal imported scores to save as tie status.\n");
+    exit(1);
+}
+
+if (wwh_effective_game_status('tie', '2026-04-24T18:00') !== 'tie') {
+    fwrite(STDERR, "Expected tie status to remain stable after the game start time.\n");
+    exit(1);
+}
+
+if (wwh_export_result('tie', '', '') !== 'T') {
+    fwrite(STDERR, "Expected exported tie games to round-trip through the Result column.\n");
     exit(1);
 }
 
