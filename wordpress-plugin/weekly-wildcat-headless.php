@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.26
+ * Version: 0.1.27
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -63,6 +63,150 @@ function wwh_login_logo_text(): string
     return 'Weekly Wildcat';
 }
 add_filter('login_headertext', 'wwh_login_logo_text');
+
+function wwh_unsplash_access_key(): string
+{
+    $value = defined('WWH_UNSPLASH_ACCESS_KEY')
+        ? constant('WWH_UNSPLASH_ACCESS_KEY')
+        : getenv('WWH_UNSPLASH_ACCESS_KEY');
+
+    return is_string($value) ? trim($value) : '';
+}
+
+function wwh_unsplash_login_photos(): array
+{
+    $cached = get_transient('wwh_unsplash_login_photos');
+    if (is_array($cached)) {
+        return $cached;
+    }
+
+    $access_key = wwh_unsplash_access_key();
+    if ($access_key === '') {
+        return [];
+    }
+
+    $url = add_query_arg(
+        [
+            'topics' => 'wallpapers',
+            'orientation' => 'landscape',
+            'content_filter' => 'high',
+            'count' => 10,
+        ],
+        'https://api.unsplash.com/photos/random'
+    );
+    $response = wp_remote_get(
+        $url,
+        [
+            'timeout' => 10,
+            'headers' => [
+                'Authorization' => 'Client-ID ' . $access_key,
+                'Accept-Version' => 'v1',
+            ],
+        ]
+    );
+
+    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+        set_transient('wwh_unsplash_login_photos', [], 15 * MINUTE_IN_SECONDS);
+        return [];
+    }
+
+    $results = json_decode(wp_remote_retrieve_body($response), true);
+    $photos = [];
+    if (is_array($results)) {
+        foreach ($results as $photo) {
+            $image_url = $photo['urls']['raw'] ?? '';
+            $photographer = $photo['user']['name'] ?? '';
+            $photographer_url = $photo['user']['links']['html'] ?? '';
+            $photo_url = $photo['links']['html'] ?? '';
+            if (!is_string($image_url) || !is_string($photographer) || !is_string($photographer_url) || !is_string($photo_url)
+                || $image_url === '' || $photographer === '' || $photographer_url === '' || $photo_url === '') {
+                continue;
+            }
+
+            $photos[] = [
+                'imageUrl' => add_query_arg(['w' => 2400, 'q' => 85, 'fit' => 'max'], $image_url),
+                'photographer' => $photographer,
+                'photographerUrl' => add_query_arg(['utm_source' => 'weekly_wildcat_cms', 'utm_medium' => 'referral'], $photographer_url),
+                'photoUrl' => add_query_arg(['utm_source' => 'weekly_wildcat_cms', 'utm_medium' => 'referral'], $photo_url),
+            ];
+        }
+    }
+
+    set_transient('wwh_unsplash_login_photos', $photos, $photos === [] ? 15 * MINUTE_IN_SECONDS : 12 * HOUR_IN_SECONDS);
+    return $photos;
+}
+
+function wwh_unsplash_login_photo(): array
+{
+    static $selected = null;
+    if (is_array($selected)) {
+        return $selected;
+    }
+
+    $photos = wwh_unsplash_login_photos();
+    $selected = $photos === [] ? [] : $photos[array_rand($photos)];
+    return $selected;
+}
+
+function wwh_login_background_styles(): void
+{
+    $photo = wwh_unsplash_login_photo();
+    if ($photo === []) {
+        return;
+    }
+    ?>
+    <style>
+        body.login {
+            background-color: #202124;
+            background-image: linear-gradient(rgba(0, 0, 0, .42), rgba(0, 0, 0, .58)), url('<?php echo esc_url($photo['imageUrl']); ?>');
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: cover;
+            min-height: 100vh;
+        }
+        body.login #login {
+            background: rgba(255, 255, 255, .96);
+            border: 1px solid rgba(255, 255, 255, .45);
+            border-radius: 16px;
+            box-shadow: 0 24px 70px rgba(0, 0, 0, .34);
+            box-sizing: border-box;
+            margin: 6vh auto 48px;
+            padding: 28px 30px 30px;
+            width: min(380px, calc(100% - 32px));
+        }
+        body.login #login h1 a { max-width: 100%; }
+        .wwh-unsplash-credit {
+            background: rgba(0, 0, 0, .48);
+            border-radius: 4px;
+            bottom: 12px;
+            color: rgba(255, 255, 255, .86);
+            font-size: 11px;
+            padding: 5px 8px;
+            position: fixed;
+            right: 12px;
+            z-index: 10;
+        }
+        .wwh-unsplash-credit a { color: #fff; }
+    </style>
+    <?php
+}
+add_action('login_enqueue_scripts', 'wwh_login_background_styles');
+
+function wwh_login_background_credit(): void
+{
+    $photo = wwh_unsplash_login_photo();
+    if ($photo === []) {
+        return;
+    }
+
+    printf(
+        '<div class="wwh-unsplash-credit">Photo by <a href="%s" target="_blank" rel="noopener noreferrer">%s</a> on <a href="%s" target="_blank" rel="noopener noreferrer">Unsplash</a></div>',
+        esc_url($photo['photographerUrl']),
+        esc_html($photo['photographer']),
+        esc_url($photo['photoUrl'])
+    );
+}
+add_action('login_footer', 'wwh_login_background_credit');
 
 function wwh_google_login_redirect_uri(): string
 {
