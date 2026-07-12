@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.30
+ * Version: 0.1.31
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -304,19 +304,27 @@ function wwh_google_login_styles(): void
     }
     ?>
     <style>
-        .wwh-google-login { margin: 0 0 20px; text-align: center; }
+        .wwh-google-login {
+            align-items: center;
+            display: flex;
+            flex-direction: column;
+            margin: 0 0 20px;
+            text-align: center;
+            width: 100%;
+        }
         .wwh-google-signin-button {
             border-radius: 4px;
             display: block;
-            margin: 0 auto;
-            max-width: 270px;
+            flex: 0 0 auto;
+            height: 40px;
+            margin: 0;
             transition: box-shadow .15s ease;
-            width: 100%;
+            width: 180px;
         }
         .wwh-google-signin-button:hover,
         .wwh-google-signin-button:focus { box-shadow: 0 1px 3px 1px rgba(60, 64, 67, .3); }
         .wwh-google-signin-button:focus { outline: 2px solid #1a73e8; outline-offset: 2px; }
-        .wwh-google-signin-button img { display: block; height: auto; width: 100%; }
+        .wwh-google-signin-button img { display: block; height: 40px; width: 180px; }
         .wwh-google-login span { color: #646970; display: block; font-size: 12px; margin-top: 8px; }
         .wwh-password-login-toggle {
             background: none;
