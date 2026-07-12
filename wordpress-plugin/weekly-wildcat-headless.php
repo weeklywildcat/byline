@@ -99,7 +99,8 @@ function wwh_unsplash_login_photos(): array
             'topics' => 'wallpapers',
             'orientation' => 'landscape',
             'content_filter' => 'high',
-            'count' => 10,
+            // One API request returns the full hourly rotation pool.
+            'count' => 25,
         ],
         'https://api.unsplash.com/photos/random'
     );
@@ -141,7 +142,7 @@ function wwh_unsplash_login_photos(): array
         }
     }
 
-    set_transient('wwh_unsplash_login_photos', $photos, $photos === [] ? 15 * MINUTE_IN_SECONDS : 12 * HOUR_IN_SECONDS);
+    set_transient('wwh_unsplash_login_photos', $photos, $photos === [] ? 15 * MINUTE_IN_SECONDS : HOUR_IN_SECONDS);
     return $photos;
 }
 
@@ -179,8 +180,14 @@ function wwh_login_background_styles(): void
             border-radius: 16px;
             box-shadow: 0 24px 70px rgba(0, 0, 0, .34);
             box-sizing: border-box;
-            margin: 6vh auto 48px;
+            left: 50%;
+            margin: 0;
+            max-height: calc(100vh - 32px);
+            overflow-y: auto;
             padding: 28px 30px 30px;
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
             width: min(380px, calc(100% - 32px));
         }
         body.login #login h1 a { max-width: 100%; }
