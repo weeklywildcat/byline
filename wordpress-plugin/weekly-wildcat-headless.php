@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.25
+ * Version: 0.1.26
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -127,7 +127,7 @@ function wwh_google_login_button(string $message): string
     );
 
     $button = sprintf(
-        '<p class="wwh-google-login"><a class="button button-large" href="%s">Sign in with Google</a><span>Use your @weeklywildcat.com account.</span></p>',
+        '<div class="wwh-google-login"><a class="button button-large" href="%s">Sign in with Google</a><span>Use your @weeklywildcat.com account.</span><button type="button" class="wwh-password-login-toggle" aria-expanded="false">Use a password or reset it</button></div>',
         esc_url($login_url)
     );
 
@@ -145,10 +145,64 @@ function wwh_google_login_styles(): void
         .wwh-google-login { margin: 0 0 20px; text-align: center; }
         .wwh-google-login .button { display: block; padding: 4px 16px; width: 100%; }
         .wwh-google-login span { color: #646970; display: block; font-size: 12px; margin-top: 8px; }
+        .wwh-password-login-toggle {
+            background: none;
+            border: 0;
+            color: #50575e;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 12px;
+            padding: 0;
+            text-decoration: underline;
+        }
+        .wwh-password-login-toggle:hover,
+        .wwh-password-login-toggle:focus { color: #135e96; }
+        body.wwh-google-primary #loginform,
+        body.wwh-google-primary #lostpasswordform,
+        body.wwh-google-primary #resetpassform,
+        body.wwh-google-primary #nav { display: none; }
     </style>
     <?php
 }
 add_action('login_enqueue_scripts', 'wwh_google_login_styles');
+
+function wwh_google_login_toggle_script(): void
+{
+    if (!wwh_google_login_is_configured()) {
+        return;
+    }
+    ?>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var toggle = document.querySelector('.wwh-password-login-toggle');
+            var form = document.querySelector('#loginform, #lostpasswordform, #resetpassform');
+
+            if (!toggle || !form) {
+                return;
+            }
+
+            if (!document.getElementById('login_error')) {
+                document.body.classList.add('wwh-google-primary');
+            } else {
+                toggle.hidden = true;
+                return;
+            }
+
+            toggle.addEventListener('click', function () {
+                document.body.classList.remove('wwh-google-primary');
+                toggle.setAttribute('aria-expanded', 'true');
+                toggle.hidden = true;
+
+                var firstField = form.querySelector('input:not([type="hidden"])');
+                if (firstField) {
+                    firstField.focus();
+                }
+            });
+        });
+    </script>
+    <?php
+}
+add_action('login_footer', 'wwh_google_login_toggle_script');
 
 function wwh_google_login_fail(string $message): void
 {
