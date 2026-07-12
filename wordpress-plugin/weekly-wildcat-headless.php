@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.28
+ * Version: 0.1.29
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
