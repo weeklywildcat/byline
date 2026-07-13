@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.34
+ * Version: 0.1.35
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -27,10 +27,104 @@ function wwh_redirect_cms_frontend(): void
         exit;
     }
 
-    wp_redirect('https://weeklywildcat.com/', 302, 'Weekly Wildcat Bridge');
+    if (is_user_logged_in()) {
+        wp_redirect('https://weeklywildcat.com/', 302, 'Weekly Wildcat Bridge');
+        exit;
+    }
+
+    wwh_render_cms_redirect_page();
     exit;
 }
 add_action('template_redirect', 'wwh_redirect_cms_frontend', 1);
+
+function wwh_render_cms_redirect_page(): void
+{
+    $public_url = 'https://weeklywildcat.com/';
+    $login_url = wp_login_url(admin_url());
+    $logo_url = plugin_dir_url(__FILE__) . 'assets/weekly-wildcat-logo.svg';
+
+    status_header(200);
+    nocache_headers();
+    header('X-Robots-Tag: noindex, nofollow', true);
+    ?>
+    <!doctype html>
+    <html <?php language_attributes(); ?>>
+    <head>
+        <meta charset="<?php bloginfo('charset'); ?>">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noindex, nofollow">
+        <meta http-equiv="refresh" content="5;url=<?php echo esc_url($public_url); ?>">
+        <title>Weekly Wildcat CMS</title>
+        <style>
+            * { box-sizing: border-box; }
+            body {
+                align-items: center;
+                background: #f3f4f6;
+                color: #18181b;
+                display: flex;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                justify-content: center;
+                margin: 0;
+                min-height: 100vh;
+                padding: 24px;
+            }
+            main {
+                background: #fff;
+                border: 1px solid #e4e4e7;
+                border-radius: 16px;
+                box-shadow: 0 20px 55px rgba(24, 24, 27, .1);
+                max-width: 520px;
+                padding: 38px;
+                text-align: center;
+                width: 100%;
+            }
+            .logo { display: block; height: auto; margin: 0 auto 28px; max-width: 260px; width: 100%; }
+            h1 { font-size: 25px; line-height: 1.25; margin: 0 0 14px; }
+            p { color: #52525b; font-size: 16px; line-height: 1.55; margin: 0 0 20px; }
+            .countdown { color: #18181b; font-weight: 600; }
+            .login-link {
+                background: #18181b;
+                border-radius: 7px;
+                color: #fff;
+                display: inline-block;
+                font-size: 15px;
+                font-weight: 600;
+                padding: 12px 18px;
+                text-decoration: none;
+            }
+            .login-link:hover, .login-link:focus { background: #3f3f46; }
+            .public-link { display: block; font-size: 13px; margin-top: 20px; }
+            .public-link a { color: #52525b; }
+            @media (max-width: 520px) { main { padding: 30px 22px; } }
+        </style>
+    </head>
+    <body>
+        <main>
+            <img class="logo" src="<?php echo esc_url($logo_url); ?>" alt="Weekly Wildcat">
+            <h1>Weekly Wildcat CMS is for contributors only</h1>
+            <p class="countdown" aria-live="polite">You’ll be redirected to Weekly Wildcat in <span id="wwh-countdown">5</span> seconds.</p>
+            <p>If you’re a contributor, sign in to manage Weekly Wildcat content.</p>
+            <a class="login-link" href="<?php echo esc_url($login_url); ?>">Sign in to Weekly Wildcat CMS</a>
+            <span class="public-link"><a href="<?php echo esc_url($public_url); ?>">Continue to Weekly Wildcat now</a></span>
+        </main>
+        <script>
+            (function () {
+                var remaining = 5;
+                var output = document.getElementById('wwh-countdown');
+                var timer = window.setInterval(function () {
+                    remaining -= 1;
+                    output.textContent = String(Math.max(remaining, 0));
+                    if (remaining <= 0) {
+                        window.clearInterval(timer);
+                        window.location.replace(<?php echo wp_json_encode($public_url); ?>);
+                    }
+                }, 1000);
+            }());
+        </script>
+    </body>
+    </html>
+    <?php
+}
 
 const WWH_SPORTS_GAME_POST_TYPE = 'ww_sports_game';
 const WWH_SPORTS_ROSTER_POST_TYPE = 'ww_sports_roster';
