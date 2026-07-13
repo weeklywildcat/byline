@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.38
+ * Version: 0.1.39
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -346,7 +346,6 @@ function wwh_unsplash_login_photos(): array
     for ($batch = 0; $batch < 3; $batch++) {
         $url = add_query_arg(
             [
-                'topics' => 'wallpapers',
                 'orientation' => 'landscape',
                 'content_filter' => 'high',
                 'count' => 30,
