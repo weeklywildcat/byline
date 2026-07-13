@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.35
+ * Version: 0.1.36
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -42,6 +42,7 @@ function wwh_render_cms_redirect_page(): void
     $public_url = 'https://weeklywildcat.com/';
     $login_url = wp_login_url(admin_url());
     $logo_url = plugin_dir_url(__FILE__) . 'assets/weekly-wildcat-logo.svg';
+    $photo = wwh_unsplash_login_photo();
 
     status_header(200);
     nocache_headers();
@@ -59,7 +60,13 @@ function wwh_render_cms_redirect_page(): void
             * { box-sizing: border-box; }
             body {
                 align-items: center;
-                background: #f3f4f6;
+                background-color: #27272a;
+                <?php if ($photo !== []) : ?>
+                background-image: linear-gradient(rgba(0, 0, 0, .42), rgba(0, 0, 0, .58)), url('<?php echo esc_url($photo['imageUrl']); ?>');
+                background-position: center;
+                background-repeat: no-repeat;
+                background-size: cover;
+                <?php endif; ?>
                 color: #18181b;
                 display: flex;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -79,8 +86,8 @@ function wwh_render_cms_redirect_page(): void
                 width: 100%;
             }
             .logo { display: block; height: auto; margin: 0 auto 28px; max-width: 260px; width: 100%; }
-            h1 { font-size: 25px; line-height: 1.25; margin: 0 0 14px; }
-            p { color: #52525b; font-size: 16px; line-height: 1.55; margin: 0 0 20px; }
+            h1 { font-size: 25px; line-height: 1.25; margin: 0 0 10px; }
+            p { color: #52525b; font-size: 15px; line-height: 1.5; margin: 0 0 24px; }
             .countdown { color: #18181b; font-weight: 600; }
             .login-link {
                 background: #18181b;
@@ -93,20 +100,30 @@ function wwh_render_cms_redirect_page(): void
                 text-decoration: none;
             }
             .login-link:hover, .login-link:focus { background: #3f3f46; }
-            .public-link { display: block; font-size: 13px; margin-top: 20px; }
-            .public-link a { color: #52525b; }
+            .photo-credit {
+                background: rgba(0, 0, 0, .48);
+                border-radius: 4px;
+                bottom: 12px;
+                color: rgba(255, 255, 255, .86);
+                font-size: 11px;
+                padding: 5px 8px;
+                position: fixed;
+                right: 12px;
+            }
+            .photo-credit a { color: #fff; }
             @media (max-width: 520px) { main { padding: 30px 22px; } }
         </style>
     </head>
     <body>
         <main>
             <img class="logo" src="<?php echo esc_url($logo_url); ?>" alt="Weekly Wildcat">
-            <h1>Weekly Wildcat CMS is for contributors only</h1>
-            <p class="countdown" aria-live="polite">You’ll be redirected to Weekly Wildcat in <span id="wwh-countdown">5</span> seconds.</p>
-            <p>If you’re a contributor, sign in to manage Weekly Wildcat content.</p>
-            <a class="login-link" href="<?php echo esc_url($login_url); ?>">Sign in to Weekly Wildcat CMS</a>
-            <span class="public-link"><a href="<?php echo esc_url($public_url); ?>">Continue to Weekly Wildcat now</a></span>
+            <h1>Weekly Wildcat CMS</h1>
+            <p class="countdown" aria-live="polite">Contributors only · Redirecting in <span id="wwh-countdown">5</span> seconds</p>
+            <a class="login-link" href="<?php echo esc_url($login_url); ?>">Contributor sign in</a>
         </main>
+        <?php if ($photo !== []) : ?>
+            <div class="photo-credit">Photo by <a href="<?php echo esc_url($photo['photographerUrl']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($photo['photographer']); ?></a> on <a href="<?php echo esc_url($photo['photoUrl']); ?>" target="_blank" rel="noopener noreferrer">Unsplash</a></div>
+        <?php endif; ?>
         <script>
             (function () {
                 var remaining = 5;
