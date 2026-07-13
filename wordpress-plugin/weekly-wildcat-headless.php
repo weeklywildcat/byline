@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.37
+ * Version: 0.1.38
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -174,7 +174,7 @@ function wwh_render_cms_redirect_page(): void
         <main>
             <img class="logo" src="<?php echo esc_url($logo_url); ?>" alt="Weekly Wildcat">
             <h1>This site is for contributors only</h1>
-            <p class="countdown" aria-live="polite">Contributors only · Redirecting in <span id="wwh-countdown">5</span> seconds</p>
+            <p class="countdown" aria-live="polite">Redirecting in <span id="wwh-countdown">5</span> seconds</p>
             <a class="login-link" href="<?php echo esc_url($login_url); ?>">Contributor sign in</a>
         </main>
         <?php if ($photo !== []) : ?>
@@ -342,36 +342,38 @@ function wwh_unsplash_login_photos(): array
         return [];
     }
 
-    $url = add_query_arg(
-        [
-            'topics' => 'wallpapers',
-            'orientation' => 'landscape',
-            'content_filter' => 'high',
-            // One API request returns the full hourly rotation pool.
-            'count' => 25,
-        ],
-        'https://api.unsplash.com/photos/random'
-    );
-    $response = wp_remote_get(
-        $url,
-        [
-            'timeout' => 10,
-            'headers' => [
-                'Authorization' => 'Client-ID ' . $access_key,
-                'Accept-Version' => 'v1',
+    $photos_by_id = [];
+    for ($batch = 0; $batch < 3; $batch++) {
+        $url = add_query_arg(
+            [
+                'topics' => 'wallpapers',
+                'orientation' => 'landscape',
+                'content_filter' => 'high',
+                'count' => 30,
             ],
-        ]
-    );
+            'https://api.unsplash.com/photos/random'
+        );
+        $response = wp_remote_get(
+            $url,
+            [
+                'timeout' => 10,
+                'headers' => [
+                    'Authorization' => 'Client-ID ' . $access_key,
+                    'Accept-Version' => 'v1',
+                ],
+            ]
+        );
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+            continue;
+        }
 
-    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-        set_transient('wwh_unsplash_login_photos', [], 15 * MINUTE_IN_SECONDS);
-        return [];
-    }
+        $results = json_decode(wp_remote_retrieve_body($response), true);
+        if (!is_array($results)) {
+            continue;
+        }
 
-    $results = json_decode(wp_remote_retrieve_body($response), true);
-    $photos = [];
-    if (is_array($results)) {
         foreach ($results as $photo) {
+            $photo_id = $photo['id'] ?? '';
             $image_url = $photo['urls']['raw'] ?? '';
             $photographer = $photo['user']['name'] ?? '';
             $photographer_url = $photo['user']['links']['html'] ?? '';
@@ -381,7 +383,11 @@ function wwh_unsplash_login_photos(): array
                 continue;
             }
 
-            $photos[] = [
+            if (!is_string($photo_id) || $photo_id === '') {
+                $photo_id = md5($image_url);
+            }
+
+            $photos_by_id[$photo_id] = [
                 'imageUrl' => add_query_arg(['w' => 2400, 'q' => 85, 'fit' => 'max'], $image_url),
                 'photographer' => $photographer,
                 'photographerUrl' => add_query_arg(['utm_source' => 'weekly_wildcat_cms', 'utm_medium' => 'referral'], $photographer_url),
@@ -390,6 +396,7 @@ function wwh_unsplash_login_photos(): array
         }
     }
 
+    $photos = array_values($photos_by_id);
     set_transient('wwh_unsplash_login_photos', $photos, $photos === [] ? 15 * MINUTE_IN_SECONDS : HOUR_IN_SECONDS);
     return $photos;
 }
