@@ -2,13 +2,64 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.36
+ * Version: 0.1.37
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
 
 if (!defined('ABSPATH')) {
     exit;
+}
+
+const WWH_CONTRIBUTOR_COOKIE = 'wwh_contributor_seen';
+
+function wwh_auth_cookie_expiration(int $length, int $user_id, bool $remember): int
+{
+    return DAY_IN_SECONDS;
+}
+add_filter('auth_cookie_expiration', 'wwh_auth_cookie_expiration', 10, 3);
+
+function wwh_contributor_cookie_value(int $issued_at): string
+{
+    return $issued_at . '.' . hash_hmac('sha256', (string) $issued_at, wp_salt('auth'));
+}
+
+function wwh_mark_successful_contributor_login(string $user_login, WP_User $user): void
+{
+    $issued_at = time();
+    $value = wwh_contributor_cookie_value($issued_at);
+    setcookie(
+        WWH_CONTRIBUTOR_COOKIE,
+        $value,
+        [
+            'expires' => $issued_at + YEAR_IN_SECONDS,
+            'path' => COOKIEPATH ?: '/',
+            'domain' => COOKIE_DOMAIN,
+            'secure' => is_ssl(),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]
+    );
+    $_COOKIE[WWH_CONTRIBUTOR_COOKIE] = $value;
+}
+add_action('wp_login', 'wwh_mark_successful_contributor_login', 10, 2);
+
+function wwh_has_contributor_cookie(): bool
+{
+    $value = isset($_COOKIE[WWH_CONTRIBUTOR_COOKIE])
+        ? sanitize_text_field(wp_unslash($_COOKIE[WWH_CONTRIBUTOR_COOKIE]))
+        : '';
+    if ($value === '' || preg_match('/^(\d+)\.([a-f0-9]{64})$/', $value, $matches) !== 1) {
+        return false;
+    }
+
+    $issued_at = (int) $matches[1];
+    if ($issued_at <= 0 || $issued_at > time() + MINUTE_IN_SECONDS || $issued_at < time() - YEAR_IN_SECONDS) {
+        return false;
+    }
+
+    $expected = wwh_contributor_cookie_value($issued_at);
+    return hash_equals($expected, $value);
 }
 
 function wwh_redirect_cms_frontend(): void
@@ -32,6 +83,11 @@ function wwh_redirect_cms_frontend(): void
         exit;
     }
 
+    if (wwh_has_contributor_cookie()) {
+        wp_safe_redirect(wp_login_url(admin_url()));
+        exit;
+    }
+
     wwh_render_cms_redirect_page();
     exit;
 }
@@ -42,7 +98,7 @@ function wwh_render_cms_redirect_page(): void
     $public_url = 'https://weeklywildcat.com/';
     $login_url = wp_login_url(admin_url());
     $logo_url = plugin_dir_url(__FILE__) . 'assets/weekly-wildcat-logo.svg';
-    $photo = wwh_unsplash_login_photo();
+    $photo = wwh_unsplash_photo('ZeGQ22v9Zhk');
 
     status_header(200);
     nocache_headers();
@@ -117,7 +173,7 @@ function wwh_render_cms_redirect_page(): void
     <body>
         <main>
             <img class="logo" src="<?php echo esc_url($logo_url); ?>" alt="Weekly Wildcat">
-            <h1>Weekly Wildcat CMS</h1>
+            <h1>This site is for contributors only</h1>
             <p class="countdown" aria-live="polite">Contributors only · Redirecting in <span id="wwh-countdown">5</span> seconds</p>
             <a class="login-link" href="<?php echo esc_url($login_url); ?>">Contributor sign in</a>
         </main>
@@ -218,6 +274,60 @@ function wwh_unsplash_access_key(): string
     }
 
     return trim((string) get_option(WWH_UNSPLASH_ACCESS_KEY_OPTION, ''));
+}
+
+function wwh_unsplash_photo_cache_key(string $photo_id): string
+{
+    return 'wwh_unsplash_photo_' . md5($photo_id);
+}
+
+function wwh_unsplash_photo(string $photo_id): array
+{
+    $cache_key = wwh_unsplash_photo_cache_key($photo_id);
+    $cached = get_transient($cache_key);
+    if (is_array($cached)) {
+        return $cached;
+    }
+
+    $access_key = wwh_unsplash_access_key();
+    if ($access_key === '') {
+        return [];
+    }
+
+    $response = wp_remote_get(
+        'https://api.unsplash.com/photos/' . rawurlencode($photo_id),
+        [
+            'timeout' => 10,
+            'headers' => [
+                'Authorization' => 'Client-ID ' . $access_key,
+                'Accept-Version' => 'v1',
+            ],
+        ]
+    );
+    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+        set_transient($cache_key, [], 15 * MINUTE_IN_SECONDS);
+        return [];
+    }
+
+    $photo = json_decode(wp_remote_retrieve_body($response), true);
+    $image_url = is_array($photo) ? ($photo['urls']['raw'] ?? '') : '';
+    $photographer = is_array($photo) ? ($photo['user']['name'] ?? '') : '';
+    $photographer_url = is_array($photo) ? ($photo['user']['links']['html'] ?? '') : '';
+    $photo_url = is_array($photo) ? ($photo['links']['html'] ?? '') : '';
+    if (!is_string($image_url) || !is_string($photographer) || !is_string($photographer_url) || !is_string($photo_url)
+        || $image_url === '' || $photographer === '' || $photographer_url === '' || $photo_url === '') {
+        set_transient($cache_key, [], 15 * MINUTE_IN_SECONDS);
+        return [];
+    }
+
+    $result = [
+        'imageUrl' => add_query_arg(['w' => 2400, 'q' => 85, 'fit' => 'max'], $image_url),
+        'photographer' => $photographer,
+        'photographerUrl' => add_query_arg(['utm_source' => 'weekly_wildcat_cms', 'utm_medium' => 'referral'], $photographer_url),
+        'photoUrl' => add_query_arg(['utm_source' => 'weekly_wildcat_cms', 'utm_medium' => 'referral'], $photo_url),
+    ];
+    set_transient($cache_key, $result, 7 * DAY_IN_SECONDS);
+    return $result;
 }
 
 function wwh_unsplash_login_photos(): array
@@ -842,6 +952,7 @@ function wwh_sanitize_unsplash_access_key($value): string
 {
     $current = (string) get_option(WWH_UNSPLASH_ACCESS_KEY_OPTION, '');
     delete_transient('wwh_unsplash_login_photos');
+    delete_transient(wwh_unsplash_photo_cache_key('ZeGQ22v9Zhk'));
 
     if (!current_user_can('manage_options')) {
         return $current;
