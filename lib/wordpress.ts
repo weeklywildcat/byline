@@ -477,8 +477,7 @@ export function getAuthorSocialLinks(author: WordPressAuthor) {
     { label: "Email", href: socials.email ? `mailto:${socials.email}` : "" },
     { label: "Instagram", href: socials.instagram },
     { label: "TikTok", href: socials.tiktok },
-    { label: "LinkedIn", href: socials.linkedin },
-    { label: "X", href: socials.x }
+    { label: "LinkedIn", href: socials.linkedin }
   ].filter((link) => link.href);
 }
 

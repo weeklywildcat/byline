@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AuthorBadge } from "@/components/AuthorBadge";
 import { StoryTeaser } from "@/components/StoryTeaser";
-import { filterVisibleContentPosts } from "@/lib/content";
-import { stripHtml } from "@/lib/format";
+import { filterVisibleContentPosts, getPrimaryPublicCategory, getPrimaryVisibleCategory } from "@/lib/content";
+import { decodeHtml, stripHtml } from "@/lib/format";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import {
   getAllAuthors,
@@ -12,7 +12,8 @@ import {
   getAuthorPhoto,
   getAuthorProfile,
   getAuthorSocialLinks,
-  getPostsByAuthor
+  getPostsByAuthor,
+  type WordPressPost
 } from "@/lib/wordpress";
 
 type AuthorPageProps = {
@@ -53,12 +54,47 @@ export async function generateMetadata({ params }: AuthorPageProps): Promise<Met
   });
 }
 
-function getWordCount(value: string) {
-  return stripHtml(value).split(/\s+/).filter(Boolean).length;
-}
-
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
+}
+
+function getAuthorBeats(posts: WordPressPost[], limit = 2) {
+  const counts = new Map<string, number>();
+
+  for (const post of posts) {
+    const category = getPrimaryPublicCategory(post) ?? getPrimaryVisibleCategory(post);
+
+    if (!category) {
+      continue;
+    }
+
+    const name = decodeHtml(category.name);
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([name]) => name);
+}
+
+function getFirstBylineLabel(posts: WordPressPost[]) {
+  const [earliest] = posts
+    .map((post) => post.date)
+    .filter(Boolean)
+    .sort();
+
+  if (!earliest) {
+    return null;
+  }
+
+  const [year, month] = earliest.split("T")[0].split("-").map(Number);
+
+  if (!year || !month) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(year, month - 1, 1));
 }
 
 export default async function AuthorPage({ params }: AuthorPageProps) {
@@ -74,7 +110,8 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
   const photo = getAuthorPhoto(author);
   const socialLinks = getAuthorSocialLinks(author);
   const description = author.description ? stripHtml(author.description) : "Weekly Wildcat contributor";
-  const wordCount = posts.reduce((total, post) => total + getWordCount(post.content.rendered), 0);
+  const beats = getAuthorBeats(posts);
+  const firstByline = getFirstBylineLabel(posts);
   const authorSchema = {
     "@context": "https://schema.org",
     "@type": "ProfilePage",
@@ -133,10 +170,18 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
               <dt>Stories</dt>
               <dd>{formatNumber(posts.length)}</dd>
             </div>
-            <div>
-              <dt>Words Written</dt>
-              <dd>{formatNumber(wordCount)}</dd>
-            </div>
+            {beats.length > 0 ? (
+              <div>
+                <dt>{beats.length === 1 ? "Beat" : "Beats"}</dt>
+                <dd>{beats.join(", ")}</dd>
+              </div>
+            ) : null}
+            {firstByline ? (
+              <div>
+                <dt>First Byline</dt>
+                <dd>{firstByline}</dd>
+              </div>
+            ) : null}
           </dl>
           {socialLinks.length > 0 ? (
             <div className="author-social-links" aria-label={`${author.name} social links`}>
@@ -154,7 +199,6 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
         <div className="section-heading">
           <div>
             <h2 id="author-stories-heading">Latest Stories</h2>
-            <p>{posts.length === 1 ? "1 published story" : `${posts.length} published stories`}</p>
           </div>
         </div>
 
