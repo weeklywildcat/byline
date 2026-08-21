@@ -140,9 +140,10 @@ Module design notes:
   - pronouns;
   - role;
   - WordPress bio/description;
-  - social links;
+  - social links (Website, Email, Instagram, TikTok, LinkedIn);
   - Founder badge with star and tooltip;
-  - story count and words written.
+  - story count, beats, and first byline month.
+- Author pages use one rule per boundary; do not add rules that double up with the site header or the story-list rules.
 - Do not depend on Gravatar for author images.
 
 ## Headless WordPress Plugin
