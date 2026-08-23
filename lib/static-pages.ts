@@ -80,10 +80,10 @@ export const STATIC_PAGES: StaticPage[] = [
   },
   {
     slug: "join",
-    title: "Join Our Team",
-    eyebrow: "Newsroom",
+    title: "Join the Weekly Wildcat",
+    eyebrow: "Come as you are",
     description:
-      "Weekly Wildcat is open to students who want to report, write, photograph, edit, design, make videos, cover sports or help tell the story of Ninety Six High School.",
+      "Write, photograph, design, cover sports, make social content or help build the Weekly Wildcat website.",
     sections: [
       {
         title: "You Don’t Have to Be an Expert",

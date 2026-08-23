@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { JoinPageContent } from "@/components/JoinPageContent";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getStaticPage, STATIC_PAGES } from "@/lib/static-pages";
 
@@ -32,7 +33,16 @@ export async function generateMetadata({ params }: StaticPageProps): Promise<Met
   return buildPageMetadata({
     title: page.title,
     description: page.description,
-    path: `/${page.slug}/`
+    path: `/${page.slug}/`,
+    image:
+      page.slug === "join"
+        ? {
+            url: absoluteUrl("/join/sideline-photographer.jpg"),
+            width: 1800,
+            height: 1200,
+            alt: "A Weekly Wildcat student photographer with her camera in the school gym"
+          }
+        : undefined
   });
 }
 
@@ -55,6 +65,24 @@ export default async function StaticPage({ params }: StaticPageProps) {
     { name: "Home", path: "/" },
     { name: page.title, path: `/${page.slug}/` }
   ]);
+
+  if (page.slug === "join") {
+    return (
+      <main className="join-page-shell">
+        <script
+          id="join-page-json-ld"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(pageSchema) }}
+        />
+        <script
+          id="join-page-breadcrumb-json-ld"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
+        />
+        <JoinPageContent />
+      </main>
+    );
+  }
 
   return (
     <main className="static-page-shell">
