@@ -1,0 +1,22 @@
+{
+  "name": "weekly-wildcat-discord-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run tests",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "discord.js": "14.27.0",
+    "pino": "10.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}

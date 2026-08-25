@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Weekly Wildcat Bridge
  * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.39
+ * Version: 0.1.40
  * Author: Weekly Wildcat
  * License: GPL-2.0-or-later
  */
@@ -1125,6 +1125,7 @@ function wwh_render_settings_page(): void
                 </tr>
             </tbody>
         </table>
+        <?php do_action('wwh_settings_page_after'); ?>
     </div>
     <?php
 }
@@ -4930,3 +4931,4 @@ function wwh_format_school_event(WP_Post $post): array
 }
 
 require_once __DIR__ . '/includes/sports-rosters.php';
+require_once __DIR__ . '/includes/discord-integration.php';

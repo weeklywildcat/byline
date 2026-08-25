@@ -41,7 +41,14 @@ jobs:
 
           rsync -a ./ build/weekly-wildcat-headless/ \
             --exclude '.git' \
+            --exclude '.gitignore' \
             --exclude '.github' \
+            --exclude 'discord-bot' \
+            --exclude 'node_modules' \
+            --exclude '.env' \
+            --exclude '.env.*' \
+            --exclude 'tests' \
+            --exclude 'README.md' \
             --exclude 'build' \
             --exclude '*.zip' \
             --exclude '.DS_Store'
@@ -49,6 +56,14 @@ jobs:
           cd build
           zip -qr weekly-wildcat-headless.zip weekly-wildcat-headless
           unzip -l weekly-wildcat-headless.zip | grep 'weekly-wildcat-headless/weekly-wildcat-headless.php'
+          if unzip -l weekly-wildcat-headless.zip | grep -q 'weekly-wildcat-headless/discord-bot/'; then
+            echo "Discord bot must not be included in the WordPress plugin archive."
+            exit 1
+          fi
+          if unzip -l weekly-wildcat-headless.zip | grep -q '/node_modules/'; then
+            echo "node_modules must not be included in the WordPress plugin archive."
+            exit 1
+          fi
 
       - name: Create GitHub release
         env:

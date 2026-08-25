@@ -1,3 +1,5 @@
 .DS_Store
 build/
 *.zip
+discord-bot/node_modules/
+discord-bot/dist/
