@@ -23,11 +23,18 @@ export type HeadlessImage = {
 };
 
 export type SportsTeamMedia = {
+  id?: string;
   key: string;
   sport: string;
   level: string;
   teamLabel: string;
   label: string;
+  displayName?: string;
+  shortName?: string;
+  scoreboardName?: string;
+  genderDivision?: string;
+  slug?: string;
+  active?: boolean;
   headerImage: HeadlessImage;
   headerImageFocalPoint?: {
     x: number;
@@ -86,6 +93,7 @@ export type SportsGame = {
   season: string;
   status: SportsGameStatus;
   wildcatsScore: number | null;
+  teamScore?: number | null;
   opponentScore: number | null;
   recapUrl: string;
   notes: string;
@@ -97,6 +105,10 @@ export type SportsGame = {
     score: string | null;
     sportLevel?: string;
     scoreboard?: {
+      team?: {
+        label: string;
+        score: number | null;
+      };
       wildcats: {
         label: string;
         score: number | null;
@@ -181,6 +193,9 @@ async function headlessFetch<T>(path: string, query: Record<string, QueryValue> 
 }
 
 async function headlessFetchPage<T>(path: string, query: Record<string, QueryValue> = {}) {
+  if (process.env.BYLINE_CONTENT_MODE === "empty") {
+    return { data: [] as T, totalPages: 1 };
+  }
   const url = new URL(`${getHeadlessApiUrl()}/${path.replace(/^\//, "")}`);
 
   Object.entries(query).forEach(([key, value]) => {
@@ -199,7 +214,7 @@ async function headlessFetchPage<T>(path: string, query: Record<string, QueryVal
   });
 
   if (!response.ok) {
-    throw new Error(`Weekly Wildcat headless request failed: ${response.status} ${response.statusText} (${url})`);
+    throw new Error(`Byline headless request failed: ${response.status} ${response.statusText} (${url})`);
   }
 
   return {

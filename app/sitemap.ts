@@ -5,7 +5,8 @@ import { absoluteUrl } from "@/lib/seo";
 import { getAllSportsGames } from "@/lib/headless";
 import { buildTeams, getSeasonHref, getTeamHubHref } from "@/lib/sports";
 import { STATIC_PAGES } from "@/lib/static-pages";
-import { getAllAuthors, getAllPosts, getAuthorHref, getPostHref, type WordPressPost } from "@/lib/wordpress";
+import { getPublicationConfig } from "@/lib/publication";
+import { getAllAuthors, getAllPages, getAllPosts, getAuthorHref, getPostHref, type WordPressPost } from "@/lib/wordpress";
 
 export const dynamic = "force-static";
 
@@ -25,7 +26,8 @@ function getPostSitemapDate(post: Pick<WordPressPost, "modified" | "modified_gmt
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [allPosts, authors, sportsGames] = await Promise.all([getAllPosts(), getAllAuthors(), getAllSportsGames().catch(() => [])]);
+  const publication = getPublicationConfig();
+  const [allPosts, authors, sportsGames, wordpressPages] = await Promise.all([getAllPosts(), getAllAuthors(), publication.features.sports ? getAllSportsGames().catch(() => []) : [], getAllPages()]);
   const posts = filterVisibleContentPosts(allPosts);
   const sportsTeams = buildTeams(sportsGames);
   const latestModifiedPost = posts.reduce<(typeof posts)[number] | undefined>((latestPost, post) => {
@@ -44,10 +46,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     {
       url: absoluteUrl("/"),
       lastModified: latestModified,
-      changeFrequency: "daily",
+      changeFrequency: "daily" as const,
       priority: 1
     },
-    ...PUBLIC_SECTIONS.map((section) => ({
+    ...PUBLIC_SECTIONS.filter((section) => section.slug !== "sports" || publication.features.sports).map((section) => ({
       url: absoluteUrl(section.href),
       lastModified: latestModified,
       changeFrequency: "daily" as const,
@@ -56,29 +58,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     {
       url: absoluteUrl("/authors/"),
       lastModified: latestModified,
-      changeFrequency: "weekly",
+      changeFrequency: "weekly" as const,
       priority: 0.6
     },
     {
       url: absoluteUrl("/stories/"),
       lastModified: latestModified,
-      changeFrequency: "daily",
+      changeFrequency: "daily" as const,
       priority: 0.7
     },
-    {
+    ...(publication.features.sports ? [{
       url: absoluteUrl("/sports/schedule/"),
       lastModified: latestModified,
-      changeFrequency: "daily",
+      changeFrequency: "daily" as const,
       priority: 0.7
-    },
+    }] : []),
     {
       url: absoluteUrl("/media-kit/"),
       lastModified: latestModified,
-      changeFrequency: "monthly",
+      changeFrequency: "monthly" as const,
       priority: 0.5
     },
-    ...STATIC_PAGES.map((page) => ({
-      url: absoluteUrl(`/${page.slug}/`),
+    ...(publication.appearance.theme === "weekly-wildcat" ? STATIC_PAGES.map((page) => page.slug) : wordpressPages.map((page) => page.slug)).map((slug) => ({
+      url: absoluteUrl(`/${slug}/`),
       lastModified: latestModified,
       changeFrequency: "monthly" as const,
       priority: 0.5

@@ -18,7 +18,17 @@
     "paths": {
       "@/*": [
         "./*"
-      ]
+      ],
+      "@byline/core": ["./packages/core/src/index.ts"],
+      "@byline/content": ["./packages/content/src/index.ts"],
+      "@byline/design": ["./packages/design/src/index.ts"],
+      "@byline/studio-contract": ["./packages/studio-contract/src/index.ts"],
+      "@byline/theme-contract": ["./packages/theme-contract/src/index.ts"],
+      "@byline/theme-editorial": ["./packages/theme-editorial/src/index.ts"],
+      "@byline/theme-magazine": ["./packages/theme-magazine/src/index.ts"],
+      "@byline/theme-modern": ["./packages/theme-modern/src/index.ts"],
+      "@byline/theme-weekly-wildcat": ["./packages/theme-weekly-wildcat/src/index.ts"],
+      "@byline/ui": ["./packages/ui/src/index.ts"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,

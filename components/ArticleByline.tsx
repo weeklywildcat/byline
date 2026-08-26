@@ -1,6 +1,9 @@
 import { decodeHtml, formatDisplayDate } from "@/lib/format";
 import { isHiddenCategory } from "@/lib/content";
 import { getAuthorHref, getCategoryHref, type WordPressAuthor, type WordPressCategory } from "@/lib/wordpress";
+import { getPublicationConfig } from "@/lib/publication";
+
+const publication = getPublicationConfig();
 
 type ArticleBylineProps = {
   author: WordPressAuthor | null;
@@ -18,7 +21,7 @@ export function ArticleByline({ author, category, date }: ArticleBylineProps) {
           {decodeHtml(visibleCategory.name)}
         </a>
       ) : null}
-      {author ? <a href={getAuthorHref(author)}>{author.name}</a> : <span>Weekly Wildcat Staff</span>}
+      {author ? <a href={getAuthorHref(author)}>{author.name}</a> : <span>{publication.identity.shortName} Staff</span>}
       <time dateTime={date}>{formatDisplayDate(date)}</time>
     </div>
   );

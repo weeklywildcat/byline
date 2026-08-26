@@ -1,6 +1,7 @@
 import { AuthorBadge } from "@/components/AuthorBadge";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
+import { getPublicationConfig } from "@/lib/publication";
 import {
   getAllAuthors,
   getAuthorHref,
@@ -25,7 +26,7 @@ async function getAuthorCards() {
 function AuthorCard({ author, storyCount }: { author: WordPressAuthor; storyCount: number }) {
   const profile = getAuthorProfile(author);
   const photo = getAuthorPhoto(author);
-  const description = author.description ? stripHtml(author.description) : "Weekly Wildcat contributor";
+  const description = author.description ? stripHtml(author.description) : `${getPublicationConfig().identity.shortName} contributor`;
 
   return (
     <article className="author-card">

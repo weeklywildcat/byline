@@ -15,7 +15,7 @@ export function FeaturedImage({ image, priority = false, showCaption = true }: F
   const caption = image.caption?.rendered?.trim();
   const fallbackCaption = stripHtml(image.media_details?.image_meta?.caption ?? "");
   const credit = stripHtml(
-    image.weeklyWildcatImage?.creditText ||
+    (image.bylineImage ?? image.weeklyWildcatImage)?.creditText ||
       image.media_details?.image_meta?.credit ||
       image.media_details?.image_meta?.copyright ||
       ""

@@ -1,5 +1,6 @@
 import { getGameCenterHref, type SportsGame, type SportsRoster } from "@/lib/headless";
 import { stripHtml } from "@/lib/format";
+import { getPublicationConfig } from "@/lib/publication";
 import { getPostCategories, getPostPrimaryGameId, getPostTags, type WordPressPost } from "@/lib/wordpress";
 
 export type TeamSummary = {
@@ -363,17 +364,17 @@ function getNormalizedSportKey(game: SportsGame) {
 
 export function getAssumedHomeVenue(game: SportsGame) {
   const sport = getNormalizedSportKey(game);
+  const publication = getPublicationConfig();
 
-  if (sport.includes("baseball")) return "NSHS Baseball Field";
-  if (sport.includes("softball")) return "NSHS Softball Field";
-  if (sport.includes("basketball") || sport.includes("volleyball") || sport.includes("wrestling") || sport.includes("cheer")) {
-    return "NSHS Gym";
+  if (publication.appearance.theme === "weekly-wildcat") {
+    if (sport.includes("baseball")) return "NSHS Baseball Field";
+    if (sport.includes("softball")) return "NSHS Softball Field";
+    if (sport.includes("basketball") || sport.includes("volleyball") || sport.includes("wrestling") || sport.includes("cheer")) return "NSHS Gym";
+    if (sport.includes("football") || sport.includes("soccer") || sport.includes("track")) return "Wilson-Campbell Stadium";
+    if (sport.includes("golf")) return "Home course";
   }
-  if (sport.includes("football") || sport.includes("soccer") || sport.includes("track")) return "Wilson-Campbell Stadium";
-  if (sport.includes("cross country")) return "Ninety Six High School";
-  if (sport.includes("golf")) return "Home course";
 
-  return "Ninety Six High School";
+  return publication.location.display || publication.identity.organizationName || "Home venue";
 }
 
 export function getScheduleLocationDisplay(game: SportsGame) {

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
+import { stripHtml } from "@/lib/format";
+import { getPublicationConfig } from "@/lib/publication";
 import { getStaticPage, STATIC_PAGES } from "@/lib/static-pages";
+import { getAllPages, getPageBySlug, type WordPressPage } from "@/lib/wordpress";
 
 type StaticPageProps = {
   params: Promise<{
@@ -10,11 +13,13 @@ type StaticPageProps = {
 };
 
 export const dynamicParams = false;
+const publication = getPublicationConfig();
 
-export function generateStaticParams() {
-  return STATIC_PAGES.map((page) => ({
-    segment: page.slug
-  }));
+export async function generateStaticParams() {
+  const wordpressPages = await getAllPages().catch((): WordPressPage[] => []);
+  const legacySlugs = publication.appearance.theme === "weekly-wildcat" ? STATIC_PAGES.map((page) => page.slug) : [];
+  return [...new Set([...legacySlugs, ...wordpressPages.map((page) => page.slug)])]
+    .map((segment) => ({ segment }));
 }
 
 function getSectionBody(body: string | string[]) {
@@ -23,37 +28,53 @@ function getSectionBody(body: string | string[]) {
 
 export async function generateMetadata({ params }: StaticPageProps): Promise<Metadata> {
   const { segment } = await params;
-  const page = getStaticPage(segment);
+  const wordpressPage = await getPageBySlug(segment).catch(() => null);
+  const staticPage = publication.appearance.theme === "weekly-wildcat" ? getStaticPage(segment) : null;
+  const useWordPress = Boolean(wordpressPage && (publication.appearance.theme !== "weekly-wildcat" || wordpressPage.bylinePage?.eyebrow));
+  const title = useWordPress ? stripHtml(wordpressPage!.title.rendered) : staticPage?.title;
+  const description = useWordPress
+    ? stripHtml(wordpressPage!.excerpt.rendered || wordpressPage!.content.rendered)
+    : staticPage?.description;
 
-  if (!page) {
+  if (!title || !description) {
     return {};
   }
 
   return buildPageMetadata({
-    title: page.title,
-    description: page.description,
-    path: `/${page.slug}/`
+    title,
+    description,
+    path: `/${segment}/`
   });
 }
 
 export default async function StaticPage({ params }: StaticPageProps) {
   const { segment } = await params;
-  const page = getStaticPage(segment);
+  const wordpressPage = await getPageBySlug(segment).catch(() => null);
+  const staticPage = publication.appearance.theme === "weekly-wildcat" ? getStaticPage(segment) : null;
+  const useWordPress = Boolean(wordpressPage && (publication.appearance.theme !== "weekly-wildcat" || wordpressPage.bylinePage?.eyebrow));
 
-  if (!page) {
+  if (!useWordPress && !staticPage) {
     notFound();
   }
+
+  const title = useWordPress ? stripHtml(wordpressPage!.title.rendered) : staticPage!.title;
+  const description = useWordPress
+    ? stripHtml(wordpressPage!.excerpt.rendered || wordpressPage!.content.rendered)
+    : staticPage!.description;
+  const eyebrow = useWordPress
+    ? wordpressPage!.bylinePage?.eyebrow || publication.identity.shortName
+    : staticPage!.eyebrow;
 
   const pageSchema = {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    name: page.title,
-    description: page.description,
-    url: absoluteUrl(`/${page.slug}/`)
+    name: title,
+    description,
+    url: absoluteUrl(`/${segment}/`)
   };
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", path: "/" },
-    { name: page.title, path: `/${page.slug}/` }
+    { name: title, path: `/${segment}/` }
   ]);
 
   return (
@@ -70,13 +91,18 @@ export default async function StaticPage({ params }: StaticPageProps) {
       />
       <article className="static-page">
         <header className="static-page-header">
-          <p>{page.eyebrow}</p>
-          <h1>{page.title}</h1>
-          <div className="static-page-deck">{page.description}</div>
+          <p>{eyebrow}</p>
+          <h1>{title}</h1>
+          <div className="static-page-deck">{description}</div>
         </header>
 
         <div className="static-page-content">
-          {page.sections.map((section) => (
+          {useWordPress ? (
+            <div
+              className="static-page-wordpress-content"
+              dangerouslySetInnerHTML={{ __html: wordpressPage!.content.rendered }}
+            />
+          ) : staticPage!.sections.map((section) => (
             <section
               className={
                 section.tone ? `static-page-section static-page-section-${section.tone}` : "static-page-section"
@@ -102,9 +128,9 @@ export default async function StaticPage({ params }: StaticPageProps) {
           ))}
         </div>
 
-        {page.actions?.length ? (
+        {!useWordPress && staticPage!.actions?.length ? (
           <div className="static-page-actions">
-            {page.actions.map((action) => (
+            {staticPage!.actions!.map((action) => (
               <a key={action.href} href={action.href}>
                 {action.label}
               </a>

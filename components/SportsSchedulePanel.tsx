@@ -1,4 +1,5 @@
 import type { SportsGame } from "@/lib/headless";
+import { getPublicationConfig } from "@/lib/publication";
 import { SiteIcon } from "./SiteIcon";
 
 type SportsSchedulePanelProps = {
@@ -82,11 +83,12 @@ function getGameOpponent(game: SportsGame) {
 }
 
 function getScoreboard(game: SportsGame) {
+  const team = game.display.scoreboard?.team ?? game.display.scoreboard?.wildcats ?? {
+    label: getPublicationConfig().identity.shortName,
+    score: game.teamScore ?? game.wildcatsScore
+  };
   return {
-    wildcats: game.display.scoreboard?.wildcats ?? {
-      label: "Wildcats",
-      score: game.wildcatsScore
-    },
+    wildcats: team,
     opponent: game.display.scoreboard?.opponent ?? {
       label: getGameOpponent(game),
       score: game.opponentScore
@@ -103,9 +105,10 @@ function getResultVerdict(game: SportsGame) {
     return "Final tied";
   }
 
-  const winner = game.wildcatsScore > game.opponentScore ? "Wildcats" : getGameOpponent(game);
+  const homeTeam = getScoreboard(game).wildcats.label;
+  const winner = game.wildcatsScore > game.opponentScore ? homeTeam : getGameOpponent(game);
   const margin = Math.abs(game.wildcatsScore - game.opponentScore);
-  const verb = winner === "Wildcats" ? "win" : "wins";
+  const verb = winner === homeTeam ? "win" : "wins";
 
   return `${winner} ${verb} by ${margin}`;
 }
