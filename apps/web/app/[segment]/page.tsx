@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { stripHtml } from "@/lib/format";
+import { requireBuildData } from "@/lib/build-data";
 import { getPublicationConfig } from "@/lib/publication";
+import { BYLINE_EMPTY_ROUTE_SLUG, isBylineEmptyRouteSlug, withEmptyRouteFallback } from "@/lib/static-params";
 import { getStaticPage, STATIC_PAGES } from "@/lib/static-pages";
 import { getAllPages, getPageBySlug, type WordPressPage } from "@/lib/wordpress";
 
@@ -15,11 +17,16 @@ type StaticPageProps = {
 export const dynamicParams = false;
 const publication = getPublicationConfig();
 
+// Pages are a required build input: a CMS outage must not quietly drop every
+// WordPress page from the export and leave only the legacy slugs behind.
 export async function generateStaticParams() {
-  const wordpressPages = await getAllPages().catch((): WordPressPage[] => []);
+  const wordpressPages = await requireBuildData("/wp-json/wp/v2/pages", getAllPages);
   const legacySlugs = publication.appearance.theme === "weekly-wildcat" ? STATIC_PAGES.map((page) => page.slug) : [];
-  return [...new Set([...legacySlugs, ...wordpressPages.map((page) => page.slug)])]
-    .map((segment) => ({ segment }));
+
+  return withEmptyRouteFallback(
+    [...new Set([...legacySlugs, ...wordpressPages.map((page) => page.slug)])].map((segment) => ({ segment })),
+    { segment: BYLINE_EMPTY_ROUTE_SLUG }
+  );
 }
 
 function getSectionBody(body: string | string[]) {
@@ -28,7 +35,12 @@ function getSectionBody(body: string | string[]) {
 
 export async function generateMetadata({ params }: StaticPageProps): Promise<Metadata> {
   const { segment } = await params;
-  const wordpressPage = await getPageBySlug(segment).catch(() => null);
+
+  if (isBylineEmptyRouteSlug(segment)) {
+    return { title: "Not found", robots: { index: false, follow: false } };
+  }
+
+  const wordpressPage = await requireBuildData(`/wp-json/wp/v2/pages?slug=${segment}`, () => getPageBySlug(segment));
   const staticPage = publication.appearance.theme === "weekly-wildcat" ? getStaticPage(segment) : null;
   const useWordPress = Boolean(wordpressPage && (publication.appearance.theme !== "weekly-wildcat" || wordpressPage.bylinePage?.eyebrow));
   const title = useWordPress ? stripHtml(wordpressPage!.title.rendered) : staticPage?.title;
@@ -49,7 +61,10 @@ export async function generateMetadata({ params }: StaticPageProps): Promise<Met
 
 export default async function StaticPage({ params }: StaticPageProps) {
   const { segment } = await params;
-  const wordpressPage = await getPageBySlug(segment).catch(() => null);
+
+  if (isBylineEmptyRouteSlug(segment)) notFound();
+
+  const wordpressPage = await requireBuildData(`/wp-json/wp/v2/pages?slug=${segment}`, () => getPageBySlug(segment));
   const staticPage = publication.appearance.theme === "weekly-wildcat" ? getStaticPage(segment) : null;
   const useWordPress = Boolean(wordpressPage && (publication.appearance.theme !== "weekly-wildcat" || wordpressPage.bylinePage?.eyebrow));
 

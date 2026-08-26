@@ -1,3 +1,4 @@
+import { optionalBuildData } from "@/lib/build-data";
 import type { Metadata } from "next";
 import { SearchPageClient, type SearchIndexItem } from "@/components/SearchPageClient";
 import { filterVisibleContentPosts, getPrimaryVisibleCategory, getPublicTopicTags } from "@/lib/content";
@@ -36,7 +37,9 @@ function getSearchExcerpt(value: string) {
 export default async function SearchPage() {
   const [posts, games] = await Promise.all([
     getAllPosts(),
-    publication.features.sports ? getAllSportsGames().catch(() => []) : []
+    publication.features.sports
+      ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-games", getAllSportsGames, [])
+      : []
   ]);
   const visiblePosts = filterVisibleContentPosts(posts);
   const teams = buildTeams(games);

@@ -4,6 +4,7 @@ import { TeamHubView } from "@/components/SportsArchiveViews";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getSportsArchiveData, getTeamMediaForSummary } from "@/lib/sports-data";
 import { getPublicationConfig } from "@/lib/publication";
+import { BYLINE_EMPTY_ROUTE_SLUG, isBylineEmptyRouteSlug, withEmptyRouteFallback } from "@/lib/static-params";
 import {
   getRelatedSportsCoverage,
   getSeasonByTeamAndYear,
@@ -24,17 +25,30 @@ async function getTeams() {
   return (await getSportsArchiveData()).teams;
 }
 
+// See the season route: the placeholder covers "sports off" and "sports on but
+// no games yet". A sports API failure throws instead of building a fake route.
 export async function generateStaticParams() {
-  if (!publication.features.sports) return [{ teamSlug: "disabled" }];
+  const placeholder = { teamSlug: BYLINE_EMPTY_ROUTE_SLUG };
+
+  if (!publication.features.sports) return [placeholder];
+
   const teams = await getTeams();
 
-  return teams.map((team) => ({
-    teamSlug: team.slug
-  }));
+  return withEmptyRouteFallback(
+    teams.map((team) => ({
+      teamSlug: team.slug
+    })),
+    placeholder
+  );
 }
 
 export async function generateMetadata({ params }: TeamPageProps): Promise<Metadata> {
   const { teamSlug } = await params;
+
+  if (isBylineEmptyRouteSlug(teamSlug)) {
+    return { title: "Not found", robots: { index: false, follow: false } };
+  }
+
   const team = getTeamBySlug(await getTeams(), teamSlug);
 
   if (!team) {
@@ -51,6 +65,9 @@ export async function generateMetadata({ params }: TeamPageProps): Promise<Metad
 export default async function TeamPage({ params }: TeamPageProps) {
   if (!publication.features.sports) notFound();
   const { teamSlug } = await params;
+
+  if (isBylineEmptyRouteSlug(teamSlug)) notFound();
+
   const { teams, teamMediaByKey, visiblePosts } = await getSportsArchiveData();
   const team = getTeamBySlug(teams, teamSlug);
 

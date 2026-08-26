@@ -1,3 +1,4 @@
+import { requireBuildData } from "@/lib/build-data";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { getAllSportsGames, getAllSportsRosters, getSportsTeams, type SportsGame, type SportsRoster, type SportsTeamMedia } from "@/lib/headless";
 import { buildTeams, type TeamSummary } from "@/lib/sports";
@@ -19,11 +20,15 @@ let sportsArchiveDataPromise: Promise<SportsArchiveData> | null = null;
 // team media settings, and WordPress posts. This shared loader reduces repeated live CMS work
 // during local development and static export generation.
 export function getSportsArchiveData() {
+  // These are required build inputs. A failure here previously became `[]`, which
+  // surfaced later as an unhelpful "generateStaticParams() returned an empty
+  // array" on whichever sports route happened to build first. Each request is now
+  // attributed to its endpoint so a build log names the thing that actually broke.
   sportsArchiveDataPromise ??= Promise.all([
-    getAllSportsGames().catch(() => []),
-    getAllSportsRosters().catch(() => []),
-    getSportsTeams().catch(() => []),
-    getAllPosts()
+    requireBuildData("/wp-json/weekly-wildcat/v1/sports-games", getAllSportsGames),
+    requireBuildData("/wp-json/weekly-wildcat/v1/sports-rosters", getAllSportsRosters),
+    requireBuildData("/wp-json/weekly-wildcat/v1/sports-teams", getSportsTeams),
+    requireBuildData("/wp-json/wp/v2/posts", getAllPosts)
   ]).then(([games, rosters, teamMedia, posts]) => {
     const teamMediaByKey = new Map(teamMedia.map((team) => [team.key, team]));
 

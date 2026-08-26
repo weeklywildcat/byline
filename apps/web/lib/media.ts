@@ -138,6 +138,17 @@ async function downloadWordPressMedia(urls: string[], filePath: string) {
       continue;
     }
 
+    // WordPress serves a themed HTML "not found" page with HTTP 200 for a missing
+    // upload, so response.ok alone is not proof that an image came back. Without
+    // this check the error page is written to disk under the image's filename and
+    // ships to the static export as a silently corrupt asset.
+    const contentType = response.headers.get("content-type") || "";
+
+    if (!contentType.startsWith("image/")) {
+      errors.push(`unexpected content-type "${contentType || "unknown"}" (${url})`);
+      continue;
+    }
+
     const buffer = Buffer.from(await response.arrayBuffer());
     const tempFilePath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
 

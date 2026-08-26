@@ -1,3 +1,4 @@
+import { optionalBuildData, requireBuildData } from "@/lib/build-data";
 import type { MetadataRoute } from "next";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { PUBLIC_SECTIONS } from "@/lib/sections";
@@ -27,7 +28,14 @@ function getPostSitemapDate(post: Pick<WordPressPost, "modified" | "modified_gmt
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const publication = getPublicationConfig();
-  const [allPosts, authors, sportsGames, wordpressPages] = await Promise.all([getAllPosts(), getAllAuthors(), publication.features.sports ? getAllSportsGames().catch(() => []) : [], getAllPages()]);
+  const [allPosts, authors, sportsGames, wordpressPages] = await Promise.all([
+    requireBuildData("/wp-json/wp/v2/posts", getAllPosts),
+    requireBuildData("/wp-json/wp/v2/users", getAllAuthors),
+    publication.features.sports
+      ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-games", getAllSportsGames, [])
+      : [],
+    requireBuildData("/wp-json/wp/v2/pages", getAllPages)
+  ]);
   const posts = filterVisibleContentPosts(allPosts);
   const sportsTeams = buildTeams(sportsGames);
   const latestModifiedPost = posts.reduce<(typeof posts)[number] | undefined>((latestPost, post) => {

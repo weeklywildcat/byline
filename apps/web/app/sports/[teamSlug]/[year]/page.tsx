@@ -4,6 +4,7 @@ import { SeasonArchiveView } from "@/components/SportsArchiveViews";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getSportsArchiveData, getTeamMediaForSummary } from "@/lib/sports-data";
 import { getPublicationConfig } from "@/lib/publication";
+import { BYLINE_EMPTY_ROUTE_SLUG, isBylineEmptyRouteSlug, withEmptyRouteFallback } from "@/lib/static-params";
 import {
   getRelatedSportsCoverage,
   getSeasonByTeamAndYear,
@@ -25,20 +26,35 @@ async function getTeams() {
   return (await getSportsArchiveData()).teams;
 }
 
+// A sports-disabled publication, and a sports-enabled publication with no games
+// yet, both build a single reserved placeholder route that renders notFound().
+// A failure to reach the sports API is not handled here: getTeams() throws a
+// BylineBuildDataError so the build stops with the failing endpoint named.
 export async function generateStaticParams() {
-  if (!publication.features.sports) return [{ teamSlug: "disabled", year: "disabled" }];
+  const placeholder = { teamSlug: BYLINE_EMPTY_ROUTE_SLUG, year: BYLINE_EMPTY_ROUTE_SLUG };
+
+  if (!publication.features.sports) return [placeholder];
+
   const teams = await getTeams();
 
-  return teams.flatMap((team) =>
-    team.seasons.map((year) => ({
-      teamSlug: team.slug,
-      year
-    }))
+  return withEmptyRouteFallback(
+    teams.flatMap((team) =>
+      team.seasons.map((year) => ({
+        teamSlug: team.slug,
+        year
+      }))
+    ),
+    placeholder
   );
 }
 
 export async function generateMetadata({ params }: SeasonPageProps): Promise<Metadata> {
   const { teamSlug, year } = await params;
+
+  if (isBylineEmptyRouteSlug(teamSlug)) {
+    return { title: "Not found", robots: { index: false, follow: false } };
+  }
+
   const season = getSeasonByTeamAndYear(await getTeams(), teamSlug, year);
 
   if (!season) {
@@ -55,6 +71,9 @@ export async function generateMetadata({ params }: SeasonPageProps): Promise<Met
 export default async function SeasonPage({ params }: SeasonPageProps) {
   if (!publication.features.sports) notFound();
   const { teamSlug, year } = await params;
+
+  if (isBylineEmptyRouteSlug(teamSlug)) notFound();
+
   const { teams, teamMediaByKey, visiblePosts } = await getSportsArchiveData();
   const season = getSeasonByTeamAndYear(teams, teamSlug, year);
 

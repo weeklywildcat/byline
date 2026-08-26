@@ -1,3 +1,4 @@
+import { optionalBuildData } from "@/lib/build-data";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SportsScheduleArchive } from "@/components/SportsScheduleArchive";
@@ -130,14 +131,43 @@ function getSportsDataUrl(limit = DEFAULT_RAW_DATA_LIMIT) {
   return `${getWordPressApiUrl().replace(/\/wp\/v2$/, "/weekly-wildcat/v1/sports-games")}?per_page=${gameLimit}&page=1`;
 }
 
+// The facets endpoint is an optional accelerator: the same numbers can always be
+// derived from the games themselves. It is therefore allowed to fail or to be
+// absent, but a malformed payload must not reach the renderer -- an earlier
+// version trusted the shape and crashed prerendering with
+// "Cannot read properties of undefined" when the response was not an object.
+function isWellFormedFacets(value: unknown): value is SportsGameFacets {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const facets = value as Partial<SportsGameFacets>;
+
+  return (
+    Array.isArray(facets.years) &&
+    Array.isArray(facets.sports) &&
+    Boolean(facets.summaries) &&
+    typeof facets.summaries === "object" &&
+    !Array.isArray(facets.summaries)
+  );
+}
+
 async function getScheduleFacets(fallbackGames: SportsGame[]): Promise<SportsGameFacets> {
+  const derived = () => ({
+    ...buildScheduleMetadata(fallbackGames),
+    dataUrl: getSportsDataUrl()
+  });
+
   try {
-    return await getSportsGameFacets();
+    const facets = await getSportsGameFacets();
+
+    if (!isWellFormedFacets(facets)) {
+      console.warn("[byline] sports schedule facets response was malformed; deriving facets from games instead.");
+
+      return derived();
+    }
+
+    return facets;
   } catch {
-    return {
-      ...buildScheduleMetadata(fallbackGames),
-      dataUrl: getSportsDataUrl()
-    };
+    return derived();
   }
 }
 
@@ -159,7 +189,14 @@ export const metadata: Metadata = {
 
 export default async function SportsSchedulePage() {
   if (!publication.features.sports) notFound();
-  const initialGames = await getSportsGames(INITIAL_SCHEDULE_LIMIT).catch(() => []);
+  // The schedule archive hydrates client-side from the same endpoint, so an
+  // initial-payload failure degrades to an empty first paint rather than
+  // breaking the export -- but it is reported instead of silently swallowed.
+  const initialGames = await optionalBuildData(
+    "/wp-json/weekly-wildcat/v1/sports-games",
+    () => getSportsGames(INITIAL_SCHEDULE_LIMIT),
+    []
+  );
   const scheduleMetadata = await getScheduleFacets(initialGames);
   const rawDataLimit = Math.max(scheduleMetadata.summaries[getSummaryKey()]?.games ?? 0, DEFAULT_RAW_DATA_LIMIT);
   const breadcrumbSchema = getBreadcrumbSchema([
