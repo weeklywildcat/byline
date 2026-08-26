@@ -41,7 +41,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   try {
     sync.health.discordConnected = true;
     await sync.initialize();
-    const changed = await syncCommands(readyClient, config.discordClientId, config.guildId, commandDefinitions());
+    const changed = await syncCommands(readyClient, config.discordClientId, config.guildId, commandDefinitions(config.publicationShortName));
     logger.info({ changed }, 'guild application commands synchronized');
     await sync.reconcileAll();
     interval = setInterval(() => { void sync.reconcileAll().catch((error) => { sync.health.wordpressReachable = false; sync.health.message = error instanceof Error ? error.message : 'Reconciliation failed'; logger.error({ err: error }, 'reconciliation failed'); }); }, config.reconcileIntervalMs);

@@ -21,7 +21,7 @@ export function mergeWorkflowTag(applied: readonly string[], available: readonly
   if (!desired) throw new Error(`Missing managed Forum tag: ${WORKFLOW_TAGS[status].emoji} ${WORKFLOW_TAGS[status].name}`);
   const managed = managedTagIds(available);
   const unrelated = applied.filter((id) => !managed.has(id));
-  if (unrelated.length >= 5) throw new Error('This thread already has five unrelated Forum tags; remove one before Wildcat can apply its workflow tag');
+  if (unrelated.length >= 5) throw new Error('This thread already has five unrelated Forum tags; remove one before Byline can apply its workflow tag');
   return [...unrelated, desired.id];
 }
 

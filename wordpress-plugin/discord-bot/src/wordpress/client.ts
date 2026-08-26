@@ -12,8 +12,13 @@ export class WordPressClient {
     const timestamp = String(Math.floor(Date.now() / 1000));
     const signingRoute = route.split('?', 1)[0]!;
     const response = await this.fetcher(`${this.config.wordpressUrl}/wp-json${route}`, { method, headers: {
-      'content-type': 'application/json', 'x-wwh-timestamp': timestamp, 'x-wwh-signature': signRequest(this.config.bridgeSecret, timestamp, method, signingRoute, body),
-      ...(requestId ? { 'x-wwh-request-id': requestId } : {}),
+      'content-type': 'application/json',
+      'x-byline-timestamp': timestamp,
+      'x-byline-signature': signRequest(this.config.bridgeSecret, timestamp, method, signingRoute, body),
+      // Legacy headers keep the bot compatible with an older installed plugin during rolling updates.
+      'x-wwh-timestamp': timestamp,
+      'x-wwh-signature': signRequest(this.config.bridgeSecret, timestamp, method, signingRoute, body),
+      ...(requestId ? { 'x-byline-request-id': requestId, 'x-wwh-request-id': requestId } : {}),
     }, ...(body ? { body } : {}) });
     const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
     if (!response.ok) throw new WordPressError(String(payload.message ?? 'WordPress request failed.'), response.status, typeof payload.code === 'string' ? payload.code : undefined);
