@@ -3,6 +3,13 @@ import { Button, Notice, SelectControl, Spinner } from "@wordpress/components";
 import { useEffect, useMemo, useRef, useState } from "@wordpress/element";
 import { Puck, type Config, type Data } from "@puckeditor/core";
 import type { CSSProperties, ReactNode } from "react";
+import { BYLINE_STUDIO_CATEGORIES, BYLINE_STUDIO_VIEWPORTS } from "@byline/studio-contract";
+import { sanitizeThemeTokenOverrides, type BylineThemeDefinition, type BylineThemeTokens } from "@byline/theme-contract";
+import { editorialTheme } from "@byline/theme-editorial";
+import { magazineTheme } from "@byline/theme-magazine";
+import { modernTheme } from "@byline/theme-modern";
+import { weeklyWildcatTheme } from "@byline/theme-weekly-wildcat";
+import { getBylineBlockPresentation, themeTokensToCssVariables } from "@byline/ui";
 import {
   AuthorPickerField,
   FocalPointField,
@@ -43,49 +50,23 @@ type StudioProps = {
   tokenOverrides: Record<string, string>;
 };
 
-export const studioBlockGroups = {
-  Stories: [
-    "story-lead", "story-grid", "story-list", "latest-stories", "featured-story", "section-feed",
-    "opinion-package", "photo-feature", "special-coverage"
-  ],
-  Sports: ["sports-scores", "sports-upcoming", "team-feature", "athlete-feature"],
-  Community: ["events-list", "poll", "newsletter"],
-  Layout: ["section", "columns", "divider"]
-} as const;
+export const studioBlockGroups = BYLINE_STUDIO_CATEGORIES;
 const blockGroups = studioBlockGroups;
 
-const labels: Record<string, string> = {
-  "story-lead": "Lead story",
-  "story-grid": "Story grid",
-  "story-list": "Story list",
-  "latest-stories": "Latest stories",
-  "featured-story": "Featured story",
-  "section-feed": "Section feed",
-  "opinion-package": "Opinion package",
-  "photo-feature": "Photo feature",
-  "special-coverage": "Special coverage",
-  "sports-scores": "Recent scores",
-  "sports-upcoming": "Upcoming games",
-  "team-feature": "Team feature",
-  "athlete-feature": "Athlete feature",
-  "events-list": "Events list",
-  poll: "Poll",
-  newsletter: "Newsletter",
-  section: "Section",
-  columns: "Columns",
-  divider: "Divider"
-};
-
-const storyBlockIds = new Set([
-  "story-lead", "story-grid", "story-list", "latest-stories", "featured-story", "section-feed",
-  "opinion-package", "photo-feature", "special-coverage", "team-feature", "athlete-feature"
-]);
-const sportsBlockIds = new Set(["sports-scores", "sports-upcoming", "team-feature", "athlete-feature"]);
+const storyLayouts = new Set(["lead", "list", "grid", "feature", "special", "opinion", "team-feature"]);
+const storyBlockIds = new Set(
+  Object.values(blockGroups).flat().filter((type) => storyLayouts.has(getBylineBlockPresentation(type)?.layout ?? ""))
+);
+const sportsBlockIds = new Set(
+  Object.values(blockGroups).flat().filter((type) => ["sports", "team-feature"].includes(getBylineBlockPresentation(type)?.layout ?? ""))
+);
 
 const components = Object.fromEntries(
   Object.values(blockGroups).flat().map((type) => {
+    const presentation = getBylineBlockPresentation(type);
+    if (!presentation) throw new Error(`Missing shared presentation for ${type}`);
     const fields: Record<string, unknown> = { title: { type: "text", label: "Heading" } };
-    const defaultProps: Record<string, unknown> = { title: labels[type] };
+    const defaultProps: Record<string, unknown> = { title: presentation.label };
     if (storyBlockIds.has(type)) {
       fields.query = StorySourceField();
       fields.allowDuplicates = { type: "radio", label: "Allow repeated stories", options: [
@@ -112,7 +93,7 @@ const components = Object.fromEntries(
     }
 
     return [type, {
-    label: labels[type], fields, defaultProps,
+    label: presentation.label, fields, defaultProps,
     render: ({ title, query }: { title?: string; query?: StorySource }) => (
       <section style={{
         background: "var(--paper, #fff)",
@@ -125,8 +106,8 @@ const components = Object.fromEntries(
       }}>
         {type === "divider" ? <hr style={{ border: 0, borderTop: "1px solid var(--rule-strong, #171717)" }} /> : (
           <>
-            <small style={{ color: "var(--muted, #635f59)", textTransform: "uppercase" }}>{labels[type]}</small>
-            <h2 style={{ margin: "8px 0 4px" }}>{title || labels[type]}</h2>
+            <small style={{ color: "var(--muted, #635f59)", textTransform: "uppercase" }}>{presentation.label}</small>
+            <h2 style={{ margin: "8px 0 4px" }}>{title || presentation.defaultHeading}</h2>
             <p style={{ color: "var(--muted, #635f59)", margin: 0 }}>
               {query ? `Preview resolves ${query.type} content in layout order.` : "Preview uses the configured publication module."}
             </p>
@@ -149,26 +130,24 @@ const studioConfigBase: Config = {
   components: components as unknown as Config["components"]
 };
 
-const previewThemes: Record<string, Record<string, string>> = {
-  "weekly-wildcat": { page: "#fbfaf7", paper: "#ffffff", ink: "#151515", muted: "#635f59", rule: "#d8d0c7", ruleStrong: "#171717", accent: "#b11f24", fontBody: '"aktiv-grotesk", Arial, sans-serif', radius: "0px" },
-  "byline-modern": { page: "#f7f9fa", paper: "#ffffff", ink: "#14212b", muted: "#5f6d76", rule: "#d9e0e3", ruleStrong: "#14212b", accent: "#008b95", fontBody: "Arial, sans-serif", radius: "4px" },
-  "byline-editorial": { page: "#f8f5ef", paper: "#fffdf8", ink: "#191714", muted: "#645f57", rule: "#cec5b7", ruleStrong: "#191714", accent: "#9a2725", fontBody: "Georgia, serif", radius: "0px" },
-  "byline-magazine": { page: "#f4f1ec", paper: "#ffffff", ink: "#171717", muted: "#68625c", rule: "#ddd5cc", ruleStrong: "#171717", accent: "#d94b32", fontBody: "Arial, sans-serif", radius: "3px" }
+const previewThemes: Record<string, BylineThemeDefinition> = {
+  [weeklyWildcatTheme.id]: weeklyWildcatTheme,
+  [modernTheme.id]: modernTheme,
+  [editorialTheme.id]: editorialTheme,
+  [magazineTheme.id]: magazineTheme
 };
 
+export function getStudioThemeVariables(theme: string, overrides: Record<string, string>) {
+  const definition = previewThemes[theme] ?? weeklyWildcatTheme;
+  const tokens: BylineThemeTokens = {
+    ...definition.tokens,
+    ...sanitizeThemeTokenOverrides(overrides)
+  };
+  return themeTokensToCssVariables(tokens);
+}
+
 export function createStudioConfig(theme: string, overrides: Record<string, string>): Config {
-  const tokens = { ...(previewThemes[theme] ?? previewThemes["weekly-wildcat"]), ...overrides };
-  const variables = {
-    "--page": tokens.background || tokens.page,
-    "--paper": tokens.surface || tokens.paper,
-    "--ink": tokens.text || tokens.ink,
-    "--muted": tokens.mutedText || tokens.muted,
-    "--rule": tokens.border || tokens.rule,
-    "--rule-strong": tokens.borderStrong || tokens.ruleStrong,
-    "--accent": tokens.accent,
-    "--font-body": tokens.fontBody,
-    "--radius-small": tokens.radiusSmall || tokens.radius
-  } as CSSProperties;
+  const variables = getStudioThemeVariables(theme, overrides) as CSSProperties;
 
   return {
     ...studioConfigBase,
@@ -296,12 +275,7 @@ export function BylineStudio({ canEdit, canPublish, publicationTheme, tokenOverr
         onPublish={publish}
         permissions={{ drag: canEdit, duplicate: canEdit, delete: canEdit, edit: canEdit, insert: canEdit }}
         headerTitle={`Byline Studio · ${template}`}
-        viewports={[
-          { label: "Mobile", width: 360 },
-          { label: "Tablet", width: 768 },
-          { label: "Desktop", width: 1280 },
-          { label: "Responsive", width: "100%" }
-        ]}
+        viewports={[...BYLINE_STUDIO_VIEWPORTS]}
         iframe={{ enabled: true, syncHostStyles: false }}
         height="calc(100vh - 230px)"
       />
