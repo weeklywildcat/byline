@@ -5,22 +5,31 @@ import "./globals.css";
 import { getOrganizationSchema, SEO_ROBOTS_PREVIEW, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
 import { getSiteUrl } from "@/lib/wordpress";
 import Script from "next/script";
+import { getPublicationConfig } from "@/lib/publication";
+import { getActiveTheme, getThemeCssVariables } from "@/lib/theme";
+
+const publication = getPublicationConfig();
+const activeTheme = getActiveTheme();
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: {
-    default: "Weekly Wildcat",
-    template: "%s | Weekly Wildcat"
+    default: publication.seo.defaultTitle,
+    template: `%s | ${publication.identity.shortName}`
   },
   description: SITE_DESCRIPTION,
   robots: SEO_ROBOTS_PREVIEW,
   icons: {
-    icon: [
-      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x512", type: "image/png" }
-    ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
+    icon: publication.branding.icons.filter((icon) => icon.width !== 180).map((icon) => ({
+      url: icon.url,
+      sizes: icon.width && icon.height ? `${icon.width}x${icon.height}` : undefined,
+      type: icon.url.endsWith(".png") ? "image/png" : undefined
+    })),
+    apple: publication.branding.icons.filter((icon) => icon.width === 180).map((icon) => ({
+      url: icon.url,
+      sizes: icon.width && icon.height ? `${icon.width}x${icon.height}` : undefined,
+      type: icon.url.endsWith(".png") ? "image/png" : undefined
+    }))
   }
 };
 
@@ -32,9 +41,14 @@ export default async function RootLayout({
   const organizationSchema = getOrganizationSchema();
 
   return (
-    <html lang="en">
+    <html
+      lang={publication.locale}
+      data-byline-theme={activeTheme.id}
+      data-byline-density={activeTheme.tokens.density}
+      style={getThemeCssVariables(activeTheme.tokens)}
+    >
       <head>
-        <link rel="stylesheet" href="https://use.typekit.net/zxb8gbj.css" />
+        {activeTheme.stylesheets?.map((href) => <link key={href} rel="stylesheet" href={href} />)}
       </head>
       <body>
         <script
@@ -46,15 +60,17 @@ export default async function RootLayout({
         {children}
         <SiteFooter />
 
-        <Script id="microsoft-clarity" strategy="afterInteractive">
-          {`
-            (function(c,l,a,r,i,t,y){
-                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i+"?ref=bwt";
-                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-            })(window, document, "clarity", "script", "xi1qesbixb");
-          `}
-        </Script>
+        {activeTheme.id === "weekly-wildcat" ? (
+          <Script id="microsoft-clarity" strategy="afterInteractive">
+            {`
+              (function(c,l,a,r,i,t,y){
+                  c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                  t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i+"?ref=bwt";
+                  y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+              })(window, document, "clarity", "script", "xi1qesbixb");
+            `}
+          </Script>
+        ) : null}
       </body>
     </html>
   );

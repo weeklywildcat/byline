@@ -1,0 +1,61 @@
+{
+  "authors": [
+    {
+      "id": 21,
+      "name": "Morgan Lee",
+      "slug": "morgan-lee",
+      "description": "Student editor covering campus life.",
+      "avatar_urls": {}
+    }
+  ],
+  "categories": [
+    {
+      "id": 31,
+      "count": 1,
+      "description": "Reporting from North Star Academy.",
+      "link": "https://northstar.example/category/campus/",
+      "name": "Campus",
+      "slug": "campus",
+      "taxonomy": "category",
+      "parent": 0
+    }
+  ],
+  "tags": [],
+  "pages": [
+    {
+      "id": 41,
+      "slug": "reach-us",
+      "date": "2026-08-01T12:00:00",
+      "modified": "2026-08-20T12:00:00",
+      "title": { "rendered": "Reach Us" },
+      "excerpt": { "rendered": "Contact the North Star newsroom." },
+      "content": { "rendered": "<section class=\"byline-page-section\"><h2>Newsroom</h2><div class=\"byline-page-section-body\"><p>Send tips and questions to the North Star student editors.</p></div></section>" },
+      "bylinePage": { "eyebrow": "North Star News" }
+    }
+  ],
+  "posts": [
+    {
+      "id": 51,
+      "date": "2026-08-20T09:00:00",
+      "date_gmt": "2026-08-20T16:00:00",
+      "modified": "2026-08-20T09:30:00",
+      "modified_gmt": "2026-08-20T16:30:00",
+      "slug": "students-open-community-reading-room",
+      "status": "publish",
+      "type": "post",
+      "link": "https://northstar.example/2026/08/20/campus/students-open-community-reading-room/",
+      "title": { "rendered": "Students open a community reading room" },
+      "content": { "rendered": "<p>Student volunteers created a quiet place for reading, tutoring, and conversation.</p>" },
+      "excerpt": { "rendered": "<p>A new student-led reading room opens its doors.</p>" },
+      "author": 21,
+      "featured_media": 0,
+      "categories": [31],
+      "tags": [],
+      "sticky": false,
+      "_embedded": {
+        "author": [{ "id": 21, "name": "Morgan Lee", "slug": "morgan-lee", "description": "Student editor covering campus life.", "avatar_urls": {} }],
+        "wp:term": [[{ "id": 31, "count": 1, "description": "Reporting from North Star Academy.", "link": "https://northstar.example/category/campus/", "name": "Campus", "slug": "campus", "taxonomy": "category", "parent": 0 }], []]
+      }
+    }
+  ]
+}

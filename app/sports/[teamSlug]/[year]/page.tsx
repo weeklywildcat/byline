@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { SeasonArchiveView } from "@/components/SportsArchiveViews";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getSportsArchiveData, getTeamMediaForSummary } from "@/lib/sports-data";
+import { getPublicationConfig } from "@/lib/publication";
 import {
   getRelatedSportsCoverage,
   getSeasonByTeamAndYear,
@@ -18,12 +19,14 @@ type SeasonPageProps = {
 };
 
 export const dynamicParams = false;
+const publication = getPublicationConfig();
 
 async function getTeams() {
   return (await getSportsArchiveData()).teams;
 }
 
 export async function generateStaticParams() {
+  if (!publication.features.sports) return [{ teamSlug: "disabled", year: "disabled" }];
   const teams = await getTeams();
 
   return teams.flatMap((team) =>
@@ -44,12 +47,13 @@ export async function generateMetadata({ params }: SeasonPageProps): Promise<Met
 
   return buildPageMetadata({
     title: `${season.team.name} ${season.year} Season`,
-    description: `${season.year} ${season.team.name} schedule, roster, scores, results and related Weekly Wildcat coverage.`,
+    description: `${season.year} ${season.team.name} schedule, roster, scores, results and related ${publication.identity.shortName} coverage.`,
     path: getSeasonHref(season.team, season.year)
   });
 }
 
 export default async function SeasonPage({ params }: SeasonPageProps) {
+  if (!publication.features.sports) notFound();
   const { teamSlug, year } = await params;
   const { teams, teamMediaByKey, visiblePosts } = await getSportsArchiveData();
   const season = getSeasonByTeamAndYear(teams, teamSlug, year);

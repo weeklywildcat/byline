@@ -1,11 +1,13 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { getPublicationConfig } from "@/lib/publication";
 import { SiteIcon } from "./SiteIcon";
 
 const pollOptions = ["More school news", "More sports coverage", "More student features"];
 
 export function HomepagePollCard() {
+  const publication = getPublicationConfig();
   const [selected, setSelected] = useState(pollOptions[0]);
   const [submitted, setSubmitted] = useState(false);
 
@@ -20,7 +22,7 @@ export function HomepagePollCard() {
         <SiteIcon name="ph:chart-bar-horizontal" width={18} height={18} />
         <h2 id="homepage-poll-heading">Your Opinion</h2>
       </div>
-      <p>What should Weekly Wildcat cover more of next?</p>
+      <p>What should {publication.identity.shortName} cover more of next?</p>
       <form onSubmit={handleSubmit}>
         <div className="homepage-poll-options">
           {pollOptions.map((option) => (

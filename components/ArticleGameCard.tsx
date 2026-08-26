@@ -1,4 +1,5 @@
 import { getGameCenterHref, type SportsGame } from "@/lib/headless";
+import { getPublicationConfig } from "@/lib/publication";
 
 type ArticleGameCardProps = {
   game: SportsGame;
@@ -27,11 +28,12 @@ function getStatusLabel(game: SportsGame) {
 }
 
 function getScoreboard(game: SportsGame) {
+  const team = game.display.scoreboard?.team ?? game.display.scoreboard?.wildcats ?? {
+    label: getPublicationConfig().identity.shortName,
+    score: game.teamScore ?? game.wildcatsScore
+  };
   return {
-    wildcats: game.display.scoreboard?.wildcats ?? {
-      label: "Wildcats",
-      score: game.wildcatsScore
-    },
+    wildcats: team,
     opponent: game.display.scoreboard?.opponent ?? {
       label: game.opponent || "Opponent",
       score: game.opponentScore

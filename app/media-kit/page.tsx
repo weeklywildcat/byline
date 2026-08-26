@@ -3,6 +3,7 @@ import { AuthorDirectory } from "@/components/AuthorDirectory";
 import { SectionHeader } from "@/components/SectionHeader";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
+import { getPublicationConfig } from "@/lib/publication";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getAllPosts, getFeaturedMedia, getPostHref, type WordPressMedia, type WordPressPost } from "@/lib/wordpress";
 
@@ -15,7 +16,7 @@ type BrandAsset = {
   previewTone?: "light" | "dark";
 };
 
-const logoAssets: BrandAsset[] = [
+const weeklyWildcatLogoAssets: BrandAsset[] = [
   {
     title: "Wide Logo Black",
     description: "Primary horizontal logo for light backgrounds, headers and print placements.",
@@ -85,7 +86,7 @@ const logoAssets: BrandAsset[] = [
   }
 ];
 
-const fontAssets = [
+const weeklyWildcatFontAssets = [
   {
     name: "Babbell Bold",
     role: "Logo Lettering",
@@ -113,17 +114,47 @@ const fontAssets = [
 
 export const dynamic = "force-static";
 
+const publication = getPublicationConfig();
+const isWeeklyWildcatTheme = publication.appearance.theme === "weekly-wildcat";
+
+function configuredBrandAssets(): BrandAsset[] {
+  if (isWeeklyWildcatTheme) return weeklyWildcatLogoAssets;
+
+  const candidates = [
+    ["Masthead", publication.branding.masthead, "Primary publication masthead."],
+    ["Publication Logo", publication.branding.logo, "Primary publication logo."],
+    ["Organization Logo", publication.branding.organizationLogo, "Organization or school mark."],
+    ["Default Social Image", publication.branding.defaultSocialImage, "Default social sharing image."]
+  ] as const;
+  const seen = new Set<string>();
+  return candidates.flatMap(([title, asset, description]) => {
+    if (!asset.url || seen.has(asset.url)) return [];
+    seen.add(asset.url);
+    const extension = /\.([a-z0-9]+)(?:\?|$)/i.exec(asset.url)?.[1]?.toUpperCase() || "IMAGE";
+    const size = asset.width && asset.height ? `${asset.width} x ${asset.height}` : extension === "SVG" ? "Vector" : "Original";
+    return [{ title, description, href: asset.url, format: extension, size }];
+  });
+}
+
+const logoAssets = configuredBrandAssets();
+const fontAssets = isWeeklyWildcatTheme ? weeklyWildcatFontAssets : [
+  { name: "Theme display font", role: "Headlines and section titles", sample: publication.identity.shortName, className: "media-kit-font-sample-display" },
+  { name: "Theme body font", role: "Stories and descriptive copy", sample: `${publication.identity.shortName} covers its community with clarity and care.`, className: "media-kit-font-sample-body" },
+  { name: "Theme interface font", role: "Navigation, labels and metadata", sample: "NEWS  FEATURES  OPINION", className: "media-kit-font-sample-ui" }
+];
+const mediaKitDescription = `Download ${publication.identity.shortName} brand assets, publication images, and newsroom information for media use.`;
+
 export const metadata: Metadata = {
   ...buildPageMetadata({
     title: "Media Kit",
-    description: "Download Weekly Wildcat logos, publication images and team information for media use.",
+    description: mediaKitDescription,
     path: "/media-kit/"
   })
 };
 
 function getImageCredit(image: WordPressMedia) {
   return stripHtml(
-    image.weeklyWildcatImage?.creditText ||
+    (image.bylineImage ?? image.weeklyWildcatImage)?.creditText ||
       image.media_details?.image_meta?.credit ||
       image.media_details?.image_meta?.copyright ||
       ""
@@ -131,7 +162,7 @@ function getImageCredit(image: WordPressMedia) {
 }
 
 function getImageAlt(image: WordPressMedia) {
-  return image.alt_text || stripHtml(image.title?.rendered ?? "") || "Weekly Wildcat editorial image";
+  return image.alt_text || stripHtml(image.title?.rendered ?? "") || `${publication.identity.shortName} editorial image`;
 }
 
 function getMediaKitImages(posts: WordPressPost[]) {
@@ -160,7 +191,7 @@ export default async function MediaKitPage() {
     "@context": "https://schema.org",
     "@type": "WebPage",
     name: "Media Kit",
-    description: "Download Weekly Wildcat logos, publication images and team information for media use.",
+    description: mediaKitDescription,
     url: absoluteUrl("/media-kit/")
   };
   const breadcrumbSchema = getBreadcrumbSchema([
@@ -183,18 +214,18 @@ export default async function MediaKitPage() {
 
       <SectionHeader
         title="Media Kit"
-        description="Logos, publication images, b-roll notes and team information for Weekly Wildcat."
+        description={`Brand assets, publication images, b-roll notes, and newsroom information for ${publication.identity.shortName}.`}
         level={1}
       />
 
       <section className="media-kit-intro" aria-labelledby="media-kit-intro-heading">
         <div>
-          <p className="profile-kicker">Weekly Wildcat Assets</p>
+          <p className="profile-kicker">{publication.identity.shortName} Assets</p>
           <h2 id="media-kit-intro-heading">Use the official marks and credit student work clearly.</h2>
         </div>
         <p>
           These files are provided for coverage, school communications and community partners. Keep the logos unaltered,
-          credit Weekly Wildcat when using publication images, and contact the newsroom for permissions, original files or
+          credit {publication.identity.shortName} when using publication images, and contact the newsroom for permissions, original files or
           b-roll requests.
         </p>
       </section>
@@ -235,7 +266,7 @@ export default async function MediaKitPage() {
       <section className="media-kit-section" aria-labelledby="media-kit-fonts-heading">
         <div className="media-kit-section-heading">
           <h2 id="media-kit-fonts-heading">Typography</h2>
-          <p>Weekly Wildcat uses a compact sans-serif system, with the logo lettering treated as its own brand asset.</p>
+          <p>{publication.identity.shortName} uses the typography defined by its active Byline theme and brand settings.</p>
         </div>
 
         <div className="media-kit-font-grid">
@@ -243,9 +274,9 @@ export default async function MediaKitPage() {
             <article className="media-kit-font-card" key={font.name}>
               <p className="media-kit-card-meta">{font.role}</p>
               <h3>{font.name}</h3>
-              {font.sample === "logo" ? (
+              {font.sample === "logo" && logoAssets[0] ? (
                 <div className="media-kit-font-logo-sample">
-                  <img src="/media-kit/logos/SVG/Weekly Wildcat Wide Logo - SVG Black.svg" alt="Weekly Wildcat logo lettering" />
+                  <img src={logoAssets[0].href} alt={`${publication.identity.shortName} logo lettering`} />
                 </div>
               ) : (
                 <p className={font.className}>{font.sample}</p>
@@ -279,7 +310,7 @@ export default async function MediaKitPage() {
                     />
                   </a>
                   <div className="media-kit-card-body">
-                    <p className="media-kit-card-meta">{credit ? `Credit: ${credit}` : "Weekly Wildcat image"}</p>
+                    <p className="media-kit-card-meta">{credit ? `Credit: ${credit}` : `${publication.identity.shortName} image`}</p>
                     <h3>{stripHtml(post.title.rendered)}</h3>
                     <div className="media-kit-card-actions">
                       <a href={image.source_url} download>
@@ -304,14 +335,14 @@ export default async function MediaKitPage() {
               and format you need so the staff can check what is available.
             </p>
           </div>
-          <a href="/contact/">Contact the Newsroom</a>
+          <a href={publication.urls.contact}>Contact the Newsroom</a>
         </div>
       </section>
 
       <section className="media-kit-section media-kit-team-section" aria-labelledby="media-kit-team-heading">
         <div className="media-kit-section-heading">
           <h2 id="media-kit-team-heading">Our Team</h2>
-          <p>Meet the students and contributors behind Weekly Wildcat.</p>
+          <p>Meet the students and contributors behind {publication.identity.shortName}.</p>
         </div>
         <AuthorDirectory />
       </section>

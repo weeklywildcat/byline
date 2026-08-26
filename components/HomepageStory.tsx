@@ -7,6 +7,9 @@ import {
   getPostHref,
   type WordPressPost
 } from "@/lib/wordpress";
+import { getPublicationConfig } from "@/lib/publication";
+
+const publication = getPublicationConfig();
 
 type HomepageStoryVariant =
   | "lead"
@@ -133,7 +136,7 @@ export function HomepageStory({
             {author ? (
               <a href={getAuthorHref(author)}>{author.name}</a>
             ) : (
-              <span>Weekly Wildcat Staff</span>
+              <span>{publication.identity.shortName} Staff</span>
             )}
           </p>
         ) : null}

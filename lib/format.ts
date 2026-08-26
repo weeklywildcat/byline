@@ -32,9 +32,12 @@ export function formatDisplayDate(value: string) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(publication.locale, {
     month: "long",
     day: "numeric",
     year: "numeric"
   }).format(new Date(year, month - 1, day));
 }
+import { getPublicationConfig } from "@/lib/publication";
+
+const publication = getPublicationConfig();

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://byline.pub/schemas/protocol-manifest.schema.json",
+  "title": "Byline protocol manifest",
+  "type": "object",
+  "required": [
+    "protocolVersion",
+    "pluginVersion",
+    "publicationSchemaVersion",
+    "designSchemaVersion",
+    "themeApiVersion"
+  ],
+  "properties": {
+    "protocolVersion": { "type": "integer", "minimum": 1 },
+    "pluginVersion": { "type": "string", "minLength": 1 },
+    "frontendVersion": { "type": "string", "minLength": 1 },
+    "publicationSchemaVersion": { "type": "integer", "minimum": 1 },
+    "designSchemaVersion": { "type": "integer", "minimum": 1 },
+    "themeApiVersion": { "type": "integer", "minimum": 1 }
+  },
+  "additionalProperties": true
+}

@@ -5,6 +5,7 @@ import { StoryTeaser } from "@/components/StoryTeaser";
 import { filterVisibleContentPosts, isHiddenCategory } from "@/lib/content";
 import { decodeHtml, stripHtml } from "@/lib/format";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
+import { getPublicationConfig } from "@/lib/publication";
 import { getAllCategories, getCategoryBySlug, getPostsByCategory } from "@/lib/wordpress";
 
 type CategoryPageProps = {
@@ -14,6 +15,7 @@ type CategoryPageProps = {
 };
 
 export const dynamicParams = false;
+const publication = getPublicationConfig();
 
 export async function generateStaticParams() {
   const categories = await getAllCategories();
@@ -35,7 +37,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
   return buildPageMetadata({
     title: categoryName,
-    description: category.description ? stripHtml(category.description) : `Latest ${categoryName} stories from Weekly Wildcat.`,
+    description: category.description ? stripHtml(category.description) : `Latest ${categoryName} stories from ${publication.identity.shortName}.`,
     path: `/category/${category.slug}/`
   });
 }

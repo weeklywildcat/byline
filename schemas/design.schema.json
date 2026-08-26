@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://byline.pub/schemas/design.schema.json",
+  "title": "Byline design document",
+  "type": "object",
+  "required": ["schemaVersion", "template", "theme", "editor", "layout"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "template": { "type": "string", "pattern": "^(?:[a-z0-9]+(?:-[a-z0-9]+)*|section:[a-z0-9]+(?:-[a-z0-9]+)*)$" },
+    "theme": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "editor": {
+      "type": "object",
+      "required": ["engine", "version"],
+      "properties": { "engine": { "const": "puck" }, "version": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "layout": {
+      "type": "object",
+      "required": ["root", "content"],
+      "properties": {
+        "root": { "type": "object" },
+        "content": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/block" } }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "block": {
+      "type": "object",
+      "required": ["type", "props"],
+      "properties": {
+        "type": { "type": "string", "pattern": "^[a-z0-9]+(?:[-/][a-z0-9]+)*$" },
+        "props": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

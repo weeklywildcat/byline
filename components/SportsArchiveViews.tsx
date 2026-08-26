@@ -5,6 +5,7 @@ import { SportsSeasonSelector } from "@/components/SportsSeasonSelector";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import type { SportsGame, SportsRoster, SportsTeamMedia } from "@/lib/headless";
 import { formatDisplayDate } from "@/lib/format";
+import { getPublicationConfig } from "@/lib/publication";
 import {
   calculateRecord,
   formatRecord,
@@ -189,12 +190,12 @@ function getTeamHeroImage(team: TeamSummary, teamMedia: SportsTeamMedia | null) 
   }
 
   const metadata = getSportMetadataForTeam(team);
-
-  if (metadata.family === "soccer") {
+  const publication = getPublicationConfig();
+  if (publication.appearance.theme === "weekly-wildcat" && metadata.family === "soccer") {
     return "/_wordpress-media/67f6b648d387a344-GirlsSoccerCelebration.jpeg";
   }
 
-  return "/social-default.png";
+  return publication.branding.defaultSocialImage.url || "/social-default.png";
 }
 
 function getNextGame(games: SportsGame[]) {
@@ -231,9 +232,10 @@ function TeamHeader({
   team: TeamSummary;
   teamMedia: SportsTeamMedia | null;
 }) {
+  const publication = getPublicationConfig();
   const metadata = getSportMetadataForTeam(team);
   const accentColor = teamMedia?.accentColor || metadata.color;
-  const logo = teamMedia?.logo?.url || "/brand/weekly-wildcat-logo.svg";
+  const logo = teamMedia?.logo?.url || publication.branding.logo.url;
   const record = formatRecord(season.record);
   const focalPoint = teamMedia?.headerImageFocalPoint;
   const imagePosition = `${focalPoint?.x ?? 50}% ${focalPoint?.y ?? 50}%`;
@@ -247,10 +249,10 @@ function TeamHeader({
           <img src={logo} alt="" />
         </div>
         <div className="team-hub-title">
-          <p>Ninety Six Wildcats</p>
+          <p>{teamMedia?.scoreboardName || publication.identity.shortName}</p>
           <h1 id="team-heading">{getTeamDisplayName(season)}</h1>
           <span>
-            Ninety Six, South Carolina · {getSchoolYearLabel(season.year)} · {record || "Record pending"}
+            {publication.location.display} · {getSchoolYearLabel(season.year)} · {record || "Record pending"}
           </span>
         </div>
       </div>
@@ -411,12 +413,13 @@ function TeamRoster({ roster, season, teamName }: { roster: SportsRoster | null;
 }
 
 export function SportsLandingView({ teams, teamMediaByKey, upcomingGames, recentScores, latestCoverage }: SportsLandingProps) {
+  const publication = getPublicationConfig();
   return (
     <div className="sports-archive-page">
       <BreadcrumbTrail items={[{ label: "Sports" }]} />
       <section className="sports-archive-hero" aria-labelledby="sports-heading">
         <p>Sports</p>
-        <h1 id="sports-heading">Wildcat Teams</h1>
+        <h1 id="sports-heading">{publication.identity.shortName} Teams</h1>
       </section>
 
       <div className="sports-landing-card-grid">
@@ -424,7 +427,7 @@ export function SportsLandingView({ teams, teamMediaByKey, upcomingGames, recent
           <SectionHeader
             id="sports-current-heading"
             title="Games"
-            description="Upcoming events and recent finals from the Weekly Wildcat sports database."
+            description={`Upcoming events and recent finals from the ${publication.identity.shortName} sports database.`}
             href="/sports/schedule/"
             actionLabel="Full Schedule"
           />
@@ -450,7 +453,7 @@ export function SportsLandingView({ teams, teamMediaByKey, upcomingGames, recent
         <SectionHeader
           id="sports-coverage-heading"
           title="Latest Sports Coverage"
-          description="Stories from the Weekly Wildcat sports desk."
+          description={`Stories from the ${publication.identity.shortName} sports desk.`}
           href="/category/sports/"
           actionLabel="All Sports Stories"
         />
@@ -461,6 +464,7 @@ export function SportsLandingView({ teams, teamMediaByKey, upcomingGames, recent
 }
 
 export function TeamHubView({ team, season, teamMedia, coverage }: TeamHubProps) {
+  const publication = getPublicationConfig();
   const nextGame = getNextGame(season.games);
   const recentFinals = getRecentFinals(season.games);
   const schedulePreview = season.games.slice(0, 12);
@@ -502,7 +506,7 @@ export function TeamHubView({ team, season, teamMedia, coverage }: TeamHubProps)
       <TeamRoster roster={season.roster} season={season.year} teamName={team.name} />
 
       <section className="sports-archive-section" id="team-news" aria-labelledby="team-coverage-heading">
-        <SectionHeader id="team-coverage-heading" title="Latest Team News" description="Weekly Wildcat coverage connected to this team." />
+        <SectionHeader id="team-coverage-heading" title="Latest Team News" description={`${publication.identity.shortName} coverage connected to this team.`} />
         <CoverageGrid posts={coverage} />
       </section>
 
@@ -515,6 +519,7 @@ export function TeamHubView({ team, season, teamMedia, coverage }: TeamHubProps)
 }
 
 export function SeasonArchiveView({ season, teamMedia, coverage }: SeasonPageProps) {
+  const publication = getPublicationConfig();
   return (
     <div className="sports-archive-page">
       <BreadcrumbTrail
@@ -530,7 +535,7 @@ export function SeasonArchiveView({ season, teamMedia, coverage }: SeasonPagePro
         <SectionHeader
           id="season-schedule-heading"
           title="Full Schedule"
-          description={`Every listed ${getSchoolYearLabel(season.year)} ${season.team.name} game from the Weekly Wildcat sports database.`}
+          description={`Every listed ${getSchoolYearLabel(season.year)} ${season.team.name} game from the ${publication.identity.shortName} sports database.`}
         />
         <SeasonScheduleTable games={season.games} />
       </section>
