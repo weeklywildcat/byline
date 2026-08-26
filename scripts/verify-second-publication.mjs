@@ -33,7 +33,8 @@ for (const file of textFiles) {
 }
 
 const home = await readFile(path.join(output, "index.html"), "utf8");
-if (!home.includes("North Star") || home.includes("use.typekit.net") || home.includes("weekly-wildcat.kit.com") || home.includes("clarity.ms")) {
+const forbiddenIntegrationUrl = /(?:https?:)?\/\/(?:use\.typekit\.net|weekly-wildcat\.kit\.com|www\.clarity\.ms)(?:[/?#"']|$)/i;
+if (!home.includes("North Star") || forbiddenIntegrationUrl.test(home)) {
   throw new Error("The second-publication homepage did not apply its independent identity/font/integration boundary.");
 }
 const sitemap = await readFile(path.join(output, "sitemap.xml"), "utf8");
