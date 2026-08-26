@@ -41,6 +41,9 @@ jobs:
       - name: Build Weekly Wildcat static export
         env:
           BYLINE_PUBLICATION_FILE: tests/fixtures/weekly-wildcat-publication.json
+          BYLINE_DEPLOYMENT_HOOK_URL: BYLINE_TEST_SECRET_DO_NOT_EXPORT
+          BYLINE_DISCORD_BRIDGE_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
+          BYLINE_DISCORD_CLIENT_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
         run: npm run build:frontend
 
       - name: Build plugin and Discord workspaces
@@ -51,8 +54,8 @@ jobs:
       - name: Build second-publication acceptance fixture
         run: npm run test:frontend:second-publication
 
-      - name: Verify updater transition
-        run: node scripts/verify-updater-transition.mjs
+      - name: Verify compatibility and updater transition
+        run: npm run verify:contracts
 
       - name: Validate production plugin archive
         run: npm run package:plugin
