@@ -8,9 +8,9 @@ content, and integrations. Its versioned `/byline/v1` API separates public
 static-build data from capability-protected admin operations.
 
 The legacy installed folder, `weekly-wildcat-headless.php` entrypoint,
-`weekly-wildcat/v1` REST routes, storage identifiers, GitHub update source, and
-ZIP name remain unchanged so existing Weekly Wildcat installations continue to
-update safely.
+`weekly-wildcat/v1` REST routes, storage identifiers, updater slug, and ZIP name
+remain unchanged. The live `v0.2.1` bridge moved future update checks from the
+standalone plugin repository to the canonical Byline monorepo.
 
 The admin bundle uses WordPress-provided React through `@wordpress/element` and
 dependency extraction. It does not ship a second React runtime. Puck and its
@@ -78,32 +78,31 @@ Only tagged releases are used for WordPress updates. Normal pushes to `main` do 
 
 To publish an update:
 
-1. Update the `Version:` header in `weekly-wildcat-headless.php`.
+1. Update the `Version:` header in `wordpress-plugin/weekly-wildcat-headless.php` and `wordpress-plugin/package.json`.
 2. Commit and push the change to `main`.
 3. Create and push a matching tag, for example:
 
    ```sh
-   git tag v0.2.1
-   git push origin v0.2.1
+   git tag v0.2.2
+   git push origin v0.2.2
    ```
 
 GitHub Actions packages `weekly-wildcat-headless.zip` and publishes it as a release asset. WordPress uses that release asset for plugin updates.
 
-Before packaging, the workflow installs the root admin dependencies, runs the
-admin tests/typecheck/build, tests and builds the separate Discord service,
-runs syntax checks across PHP files plus the PHP regression scripts, and
-verifies that compiled admin assets are present. The release excludes raw admin
-source, dependencies, tests, repository metadata, and Discord.
+Before packaging, the workflow installs the monorepo workspace, runs the admin
+tests/typecheck/build and PHP syntax/regression matrix, verifies React remains a
+WordPress external, and validates the ZIP. The release excludes raw admin
+source, dependencies, tests, repository metadata, the frontend, and Discord.
 
 For local plugin/admin verification:
 
 ```sh
 npm ci
-npm test
-npm run typecheck
-npm run build
-find . -type f -name '*.php' -not -path './node_modules/*' -print0 | xargs -0 -n1 php -l
-for test_file in tests/*.php; do php "$test_file"; done
+npm run test:plugin
+npm run typecheck:plugin
+npm run build:plugin
+npm run test:php
+npm run package:plugin
 ```
 
 ## Notes
@@ -122,7 +121,7 @@ for test_file in tests/*.php; do php "$test_file"; done
 
 ## Discord newsroom integration
 
-The repository also contains `discord-bot/`, a stateless TypeScript/discord.js service. WordPress remains canonical for stories and durable links. A meaningful WordPress draft is queued for a Forum thread; an ordinary Discord Forum post remains only a pitch until `/story create` or the publication-named message command is used. The WordPress release ZIP deliberately excludes the bot.
+The monorepo also contains `apps/discord-bot/`, a stateless TypeScript/discord.js service. WordPress remains canonical for stories and durable links. A meaningful WordPress draft is queued for a Forum thread; an ordinary Discord Forum post remains only a pitch until `/story create` or the publication-named message command is used. The WordPress release ZIP deliberately excludes the bot.
 
 ### Commands
 
@@ -176,14 +175,13 @@ The bot creates missing managed workflow tags only when it has Manage Channels. 
 
 ### Development and deployment
 
-`discord-bot/Dockerfile` uses Node 24 LTS, deterministic `npm ci`, a non-root runtime user, a health check, and graceful shutdown. `discord-bot/compose.example.yml` shows a loopback-bound deployment. Run:
+`apps/discord-bot/Dockerfile` uses Node 24 LTS, deterministic `npm ci`, a non-root runtime user, a health check, and graceful shutdown. `apps/discord-bot/compose.example.yml` shows a loopback-bound deployment. Run from the monorepo root:
 
 ```sh
-cd discord-bot
 npm ci
-npm run typecheck
-npm test
-npm run build
+npm run typecheck:discord
+npm run test:discord
+npm run build:discord
 ```
 
 The HMAC signature covers timestamp, method, REST route, and raw body. Requests older/newer than five minutes are rejected with constant-time comparison. Mutations use request IDs and durable WordPress link/message IDs so retries and restarts converge without duplicate posts, threads, cards, or publication announcements.

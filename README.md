@@ -1,54 +1,119 @@
-# Byline Frontend
+# Byline
 
-Static Next.js publication frontend for the open-source Byline platform.
-Publication identity, theme tokens, navigation, feature availability, SEO, and
-published design revisions come from the versioned WordPress `/byline/v1` API.
-Weekly Wildcat defaults preserve existing deployments while other publications
-can supply their own configuration.
+Byline is an open-source publishing platform for static news sites. This is the
+canonical monorepo for the public Next.js app, WordPress control-plane plugin,
+shared contracts and themes, Byline Studio, and the optional Discord newsroom
+service. Weekly Wildcat remains the compatibility/default publication; other
+publications supply the same versioned contracts without forking the platform.
 
-## Local Development
+## Repository layout
 
-Copy `.env.example` to `.env.local` and set the CMS and public site URL:
+- `apps/web/` — public Next.js app. It reads published WordPress contracts and
+  produces a static export; it has no auth, database, SSR, or runtime Next server.
+- `apps/discord-bot/` — separately deployed, stateless Discord newsroom service.
+- `wordpress-plugin/` — WordPress control plane and Studio. The installable
+  folder remains `weekly-wildcat-headless/` and the main file remains
+  `weekly-wildcat-headless.php`.
+- `packages/` — canonical publication, content, design, Studio, UI, and theme
+  contracts plus first-party themes. Studio and the public frontend consume the
+  same block presentations, viewports, theme definitions, and CSS-token mapping.
+- `schemas/` — versioned JSON schemas.
+- `docs/` — architecture, extension, compatibility, and migration guidance.
+- `scripts/` — root validation and release packaging utilities.
 
-```txt
-NEXT_PUBLIC_WP_API_URL=https://cms.example.edu/wp-json/wp/v2
-NEXT_PUBLIC_SITE_URL=https://news.example.edu
-```
+## Setup and root commands
 
-The build derives `/byline/v1/publication` from the CMS URL, then loads the
-public publication contract and published Studio designs before Next.js runs.
-`BYLINE_PUBLICATION_URL`, `BYLINE_PUBLICATION_FILE`, and
-`BYLINE_PUBLICATION_JSON` are explicit overrides for hosted, fixture, or CI
-builds. Sections, navigation, branding, SEO, modules, and theme selection are
-all publication data; the Weekly Wildcat fixture is only the rolling-upgrade
-fallback.
-
-Run the site locally:
-
-```sh
-npm run dev
-```
-
-Build the static export:
+Use Node 24 or newer, npm, and PHP 8.3 for the complete local matrix.
 
 ```sh
+npm ci
+npm run typecheck
+npm test
 npm run build
 ```
 
-The exported site is written to `out/`.
-
-For the isolated second-publication acceptance build (identity, content, design, disabled modules, and theme), run:
+Useful scoped commands:
 
 ```sh
-npm run test:second-publication
+npm run typecheck:frontend
+npm run test:frontend
+npm run build:frontend
+npm run test:frontend:second-publication
+
+npm run test:plugin
+npm run typecheck:plugin
+npm run build:plugin
+npm run test:php
+npm run package:plugin
+
+npm run test:discord
+npm run typecheck:discord
+npm run build:discord
 ```
 
-That command builds North Star News from local fixtures and scans every public HTML/JSON/XML artifact for Weekly Wildcat identity leakage, forced sports/Discord/polls, Adobe Typekit, and the legacy newsletter integration.
+`npm run package:plugin` writes and validates
+`wordpress-plugin/release/weekly-wildcat-headless.zip`. It verifies the legacy
+install path, required runtime assets, exclusions, and WordPress-provided React
+externals.
 
-The export includes `_byline/publication.json`, `_byline/designs.json`, and a
-small compatibility manifest. It contains no Next.js server route handlers;
-interactive modules call separately deployed public APIs.
+## Frontend
 
-First-party shared contracts and themes live under `packages/`. Trusted theme
-and block authors should follow [the Level 3 extension contract](docs/extensions.md)
-so Studio and production use the same namespaced renderer package.
+Copy `apps/web/.env.example` to `apps/web/.env.local` when using a CMS directly.
+The app reads `/byline/v1/publication` and published design endpoints before the
+Next build. Fixture/CI builds can use `BYLINE_PUBLICATION_FILE`,
+`BYLINE_PUBLICATION_JSON`, and `BYLINE_DESIGNS_FILE`.
+
+`apps/web/next.config.ts` intentionally keeps `output: "export"`, trailing
+slashes, and unoptimized images. The result is `apps/web/out/`; it includes safe
+publication/design manifests and requires no public Byline server.
+
+The North Star acceptance command builds a second publication from local
+fixtures and scans HTML, JSON, and XML for Weekly Wildcat identity, theme, or
+disabled-module leakage.
+
+## WordPress plugin and Studio
+
+The plugin owns durable editorial settings, legacy sports/events storage,
+publication configuration, protected deployment/Discord integrations, and
+private Studio drafts/revisions. Public static builds read published designs
+only. Studio runs within authenticated WordPress admin and never depends on the
+public site being reachable.
+
+Legacy CPTs, metadata/options, REST aliases, installed slug, main file, and ZIP
+name are compatibility contracts. Do not rename them as cleanup. See
+[current contracts](docs/migration/current-contracts.md) and the
+[updater transition](docs/updater-transition.md).
+
+## Plugin releases
+
+Future WordPress releases are published from `weeklywildcat/byline`:
+
+1. Bump the plugin header and `wordpress-plugin/package.json` to the same version.
+2. Merge the tested change to `main`.
+3. Create and push a matching `vX.Y.Z` tag without rewriting existing tags.
+4. `.github/workflows/release-plugin.yml` runs JS/TS and PHP validation, builds
+   Studio, validates the production ZIP, and publishes
+   `weekly-wildcat-headless.zip`.
+
+Historical plugin tags imported into this repository are prefixed `plugin-` so
+they cannot collide with canonical releases. The standalone `byline-plugin`
+repository remains available for historical releases and the live `v0.2.1`
+updater bridge.
+
+## Discord bot
+
+The service in `apps/discord-bot/` uses WordPress as the durable story/link
+store. Its `.env.example`, Dockerfile, and compose example document deployment.
+It is tested and built by monorepo CI but is always excluded from the WordPress
+ZIP.
+
+## Architecture and extension points
+
+- [Architecture](docs/architecture.md)
+- [Extension contracts](docs/extensions.md)
+- [Updater bridge and retirement criteria](docs/updater-transition.md)
+- [Legacy compatibility contracts](docs/migration/current-contracts.md)
+
+All future development happens in `weeklywildcat/byline`. The standalone plugin
+repository must not be deleted; archive it only after the bridge is observed in
+production and a canonical plugin release is proven to update bridged installs.
