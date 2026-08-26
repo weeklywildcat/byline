@@ -12,10 +12,10 @@ if (preg_match('/function wwh_register_update_checker\(\): void\s*\{(?P<body>.*?
 }
 
 $updater = $matches['body'];
-if (!str_contains($updater, "'https://github.com/weeklywildcat/byline/'")
-    || str_contains($updater, "'https://github.com/weeklywildcat/byline-plugin/'")
-    || !str_contains($updater, "'weekly-wildcat-headless'")
-    || !str_contains($updater, 'weekly-wildcat-headless\\.zip')) {
+if (strpos($updater, "'https://github.com/weeklywildcat/byline/'") === false
+    || strpos($updater, "'https://github.com/weeklywildcat/byline-plugin/'") !== false
+    || strpos($updater, "'weekly-wildcat-headless'") === false
+    || strpos($updater, 'weekly-wildcat-headless\\.zip') === false) {
     fwrite(STDERR, "The updater bridge no longer preserves the canonical repository, installed slug, and release asset contract.\n");
     exit(1);
 }

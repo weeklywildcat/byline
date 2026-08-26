@@ -15,7 +15,8 @@ $next_revision_id = 100;
 
 class WP_Error
 {
-    public function __construct(public string $code, public string $message, public array $data = []) {}
+    public string $code; public string $message; public array $data;
+    public function __construct(string $code, string $message, array $data = []) { $this->code = $code; $this->message = $message; $this->data = $data; }
 }
 class WP_Post
 {
@@ -25,15 +26,16 @@ class WP_Post
     public string $post_modified_gmt = '2026-08-25 12:00:00';
     public int $post_parent = 0;
 }
-class WP_REST_Response { public function __construct(public $data) {} }
+class WP_REST_Response { public $data; public function __construct($data) { $this->data = $data; } }
 class WP_REST_Request implements ArrayAccess
 {
-    public function __construct(private array $route, private array $json = []) {}
+    private array $route; private array $json;
+    public function __construct(array $route, array $json = []) { $this->route = $route; $this->json = $json; }
     public function get_json_params(): array { return $this->json; }
-    public function offsetExists(mixed $offset): bool { return isset($this->route[$offset]); }
-    public function offsetGet(mixed $offset): mixed { return $this->route[$offset] ?? null; }
-    public function offsetSet(mixed $offset, mixed $value): void { $this->route[$offset] = $value; }
-    public function offsetUnset(mixed $offset): void { unset($this->route[$offset]); }
+    public function offsetExists($offset): bool { return isset($this->route[$offset]); }
+    public function offsetGet($offset) { return $this->route[$offset] ?? null; }
+    public function offsetSet($offset, $value): void { $this->route[$offset] = $value; }
+    public function offsetUnset($offset): void { unset($this->route[$offset]); }
 }
 
 function add_action(...$args): void {}

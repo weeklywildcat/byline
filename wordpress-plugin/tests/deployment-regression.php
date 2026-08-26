@@ -21,7 +21,7 @@ class WP_REST_Server
     public const CREATABLE = 'POST';
 }
 class WP_REST_Request {}
-class WP_REST_Response { public function __construct(public $data) {} }
+class WP_REST_Response { public $data; public function __construct($data) { $this->data = $data; } }
 
 function add_action(...$args): void {}
 function apply_filters(string $name, $value) { return $value; }
@@ -59,7 +59,7 @@ if ($first_schedule <= time() || count($scheduled) !== 1) {
 }
 
 $status = byline_deployment_status();
-if (!$status['configured'] || str_contains(json_encode($status), 'legacy-secret-hook')) {
+if (!$status['configured'] || strpos(json_encode($status), 'legacy-secret-hook') !== false) {
     fwrite(STDERR, "Deployment status must report configuration without exposing the private URL.\n");
     exit(1);
 }

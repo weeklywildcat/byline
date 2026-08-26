@@ -21,7 +21,7 @@ const WWH_DISCORD_SYNC_EVENT = 'wwh_discord_sync_story';
 
 function wwh_discord_config(string $name): string
 {
-    $canonical_name = str_starts_with($name, 'WWH_') ? 'BYLINE_' . substr($name, 4) : $name;
+    $canonical_name = byline_string_starts_with($name, 'WWH_') ? 'BYLINE_' . substr($name, 4) : $name;
     foreach (array_unique([$canonical_name, $name]) as $candidate) {
         if (defined($candidate) && is_string(constant($candidate)) && trim((string) constant($candidate)) !== '') {
             return trim((string) constant($candidate));

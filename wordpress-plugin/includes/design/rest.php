@@ -48,10 +48,9 @@ function byline_rest_get_admin_design(WP_REST_Request $request)
     }
     $published = byline_published_design($template);
     $autosave = get_user_meta(get_current_user_id(), byline_design_autosave_key($template), true);
-    return rest_ensure_response([
-        ...$published,
-        'autosave' => is_array($autosave) ? $autosave : null,
-    ]);
+    $response = $published;
+    $response['autosave'] = is_array($autosave) ? $autosave : null;
+    return rest_ensure_response($response);
 }
 
 function byline_rest_autosave_design(WP_REST_Request $request)

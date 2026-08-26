@@ -1,7 +1,7 @@
 <?php
 
 define('ABSPATH', __DIR__ . '/../');
-const BYLINE_PLUGIN_VERSION = '0.2.1';
+const BYLINE_PLUGIN_VERSION = '0.2.2';
 const BYLINE_PROTOCOL_VERSION = 1;
 const BYLINE_PUBLICATION_SCHEMA_VERSION = 1;
 const BYLINE_DESIGN_SCHEMA_VERSION = 1;
@@ -43,8 +43,8 @@ require __DIR__ . '/../includes/core/diagnostics.php';
 $diagnostics = byline_diagnostics_payload();
 $serialized = json_encode($diagnostics);
 if (!is_string($serialized)
-    || str_contains($serialized, 'secret.example.test')
-    || str_contains($serialized, 'deployHook')
+    || strpos($serialized, 'secret.example.test') !== false
+    || strpos($serialized, 'deployHook') !== false
     || $diagnostics['deployment']['configured'] !== true
     || $diagnostics['publicManifest']['reachable'] !== true) {
     fwrite(STDERR, "Diagnostics exposed secrets or omitted safe health information.\n");

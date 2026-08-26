@@ -5,6 +5,8 @@ const BYLINE_REST_NAMESPACE = 'byline/v1';
 const BYLINE_MANAGE_CAPABILITY = 'manage_byline';
 const BYLINE_PUBLICATION_SCHEMA_VERSION = 1;
 
+require __DIR__ . '/../includes/core/compatibility.php';
+
 $registered_routes = [];
 $can_manage_byline = false;
 $test_home_url = 'https://cms.weeklywildcat.com';
@@ -101,7 +103,7 @@ if ($generic_defaults['identity']['name'] !== 'Example Gazette'
     || $generic_defaults['appearance']['theme'] !== 'byline-modern'
     || $generic_defaults['navigation'] !== []
     || $generic_defaults['features']['sports'] !== false
-    || str_contains(json_encode($generic_defaults), 'Weekly Wildcat')) {
+    || strpos(json_encode($generic_defaults), 'Weekly Wildcat') !== false) {
     fwrite(STDERR, "A new Byline installation inherited Weekly Wildcat identity.\n");
     exit(1);
 }

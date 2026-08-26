@@ -16,7 +16,7 @@ function get_option($key, $fallback = false) { global $page_options; return $pag
 function update_option($key, $value, ...$args): void { global $page_options; $page_options[$key] = $value; }
 function sanitize_title($value): string { return strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', (string) $value), '-')); }
 function sanitize_text_field($value): string { return trim(strip_tags((string) $value)); }
-function byline_sanitize_public_url($value, string $fallback = ''): string { return is_string($value) && str_starts_with($value, '/') ? $value : $fallback; }
+function byline_sanitize_public_url($value, string $fallback = ''): string { return is_string($value) && strpos($value, '/') === 0 ? $value : $fallback; }
 function esc_url($value): string { return htmlspecialchars((string) $value, ENT_QUOTES); }
 function esc_html($value): string { return htmlspecialchars((string) $value, ENT_QUOTES); }
 function wp_kses_post($value): string { return (string) $value; }
@@ -50,8 +50,8 @@ if (count($page_posts) !== 9 || (int) ($page_options[BYLINE_WEEKLY_PAGE_MIGRATIO
 $about = $page_posts['about'] ?? null;
 if (!is_array($about)
     || $about['post_status'] !== 'publish'
-    || !str_contains($about['post_content'], 'What We Do')
-    || !str_contains($about['post_content'], '/authors/')) {
+    || strpos($about['post_content'], 'What We Do') === false
+    || strpos($about['post_content'], '/authors/') === false) {
     fwrite(STDERR, "The migrated About page did not preserve its content and actions.\n");
     exit(1);
 }
@@ -63,4 +63,3 @@ if (count($page_posts) !== 9) {
 }
 
 echo "Byline page migration regression passed.\n";
-

@@ -34,7 +34,7 @@ function byline_publication_theme_ids(): array
 function byline_is_legacy_weekly_wildcat_installation(): bool
 {
     $host = (string) wp_parse_url(home_url('/'), PHP_URL_HOST);
-    return $host === 'weeklywildcat.com' || str_ends_with($host, '.weeklywildcat.com');
+    return $host === 'weeklywildcat.com' || byline_string_ends_with($host, '.weeklywildcat.com');
 }
 
 function byline_generic_publication_config(): array
@@ -359,13 +359,18 @@ function byline_normalize_publication_config($input): array
             }
             $group = byline_sanitize_public_text($item['group'] ?? null, '', 80);
             $feature = is_string($item['feature'] ?? null) ? sanitize_key($item['feature']) : '';
-            $normalized['navigation'][] = [
+            $navigation_item = [
                 'label' => $label,
                 'url' => $url,
                 'locations' => $locations,
-                ...($group !== '' ? ['group' => $group] : []),
-                ...($feature !== '' ? ['feature' => $feature] : []),
             ];
+            if ($group !== '') {
+                $navigation_item['group'] = $group;
+            }
+            if ($feature !== '') {
+                $navigation_item['feature'] = $feature;
+            }
+            $normalized['navigation'][] = $navigation_item;
         }
     }
 
@@ -411,10 +416,9 @@ function byline_get_publication_config(): array
 
 function byline_publication_response(): array
 {
-    return [
-        ...byline_get_publication_config(),
-        'revision' => max(0, (int) get_option(BYLINE_PUBLICATION_REVISION_OPTION, 0)),
-    ];
+    $response = byline_get_publication_config();
+    $response['revision'] = max(0, (int) get_option(BYLINE_PUBLICATION_REVISION_OPTION, 0));
+    return $response;
 }
 
 function byline_seed_publication_config(): void

@@ -2,6 +2,7 @@
 
 define('ABSPATH', __DIR__ . '/../');
 define('MINUTE_IN_SECONDS', 60);
+require __DIR__ . '/../includes/core/compatibility.php';
 class WP_Post { public int $ID = 0; public int $post_author = 1; public string $post_type = 'post'; public string $post_status = 'draft'; public string $post_title = ''; }
 class WP_User { public int $ID = 1; }
 $wwh_test_posts = [];

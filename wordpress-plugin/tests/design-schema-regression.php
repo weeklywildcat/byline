@@ -12,11 +12,18 @@ $design_features = [
 
 class WP_Error
 {
+    public string $code;
+    public string $message;
+    public array $data;
+
     public function __construct(
-        public string $code,
-        public string $message,
-        public array $data = []
+        string $code,
+        string $message,
+        array $data = []
     ) {
+        $this->code = $code;
+        $this->message = $message;
+        $this->data = $data;
     }
 }
 

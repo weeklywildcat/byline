@@ -2,7 +2,8 @@
 /**
  * Plugin Name: Byline
  * Description: Open-source publishing tools, design management, and integrations for student newsrooms.
- * Version: 0.2.1
+ * Version: 0.2.2
+ * Requires PHP: 7.4
  * Author: Byline Contributors
  * License: GPL-2.0-or-later
  */
@@ -11,6 +12,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+require_once __DIR__ . '/includes/core/compatibility.php';
 require_once __DIR__ . '/includes/core/protocol.php';
 require_once __DIR__ . '/includes/core/capabilities.php';
 require_once __DIR__ . '/includes/publication/config.php';

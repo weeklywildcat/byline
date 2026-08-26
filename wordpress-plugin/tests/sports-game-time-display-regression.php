@@ -1,8 +1,10 @@
 <?php
 
-define('ABSPATH', __DIR__ . '/../');
-define('WP_PLUGIN_DIR', dirname(__DIR__));
-define('WPMU_PLUGIN_DIR', dirname(__DIR__));
+$byline_plugin_root_input = getenv('BYLINE_PLUGIN_ROOT') ?: dirname(__DIR__);
+$byline_plugin_root = realpath($byline_plugin_root_input) ?: $byline_plugin_root_input;
+define('ABSPATH', $byline_plugin_root . '/');
+define('WP_PLUGIN_DIR', dirname($byline_plugin_root));
+define('WPMU_PLUGIN_DIR', dirname($byline_plugin_root));
 define('WP_DEBUG', false);
 
 function add_action(...$args): void
@@ -34,6 +36,11 @@ function register_activation_hook(...$args): void
 function wp_parse_url(string $url, int $component = -1)
 {
     return $component === -1 ? parse_url($url) : parse_url($url, $component);
+}
+
+function home_url(string $path = ''): string
+{
+    return 'https://cms.weeklywildcat.com' . $path;
 }
 
 function plugin_basename(string $file): string
@@ -73,7 +80,15 @@ function absint($maybeint): int
     return abs((int) $maybeint);
 }
 
-require __DIR__ . '/../weekly-wildcat-headless.php';
+require $byline_plugin_root . '/weekly-wildcat-headless.php';
+
+putenv('BYLINE_DISCORD_BRIDGE_SECRET=compatibility-smoke-secret');
+if (!byline_is_legacy_weekly_wildcat_installation()
+    || wwh_discord_config('WWH_DISCORD_BRIDGE_SECRET') !== 'compatibility-smoke-secret') {
+    fwrite(STDERR, "Packaged bootstrap compatibility smoke test failed.\n");
+    exit(1);
+}
+putenv('BYLINE_DISCORD_BRIDGE_SECRET');
 
 putenv('WWH_GOOGLE_CLIENT_ID');
 putenv('WWH_GOOGLE_CLIENT_SECRET');

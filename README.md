@@ -23,7 +23,9 @@ publications supply the same versioned contracts without forking the platform.
 
 ## Setup and root commands
 
-Use Node 24 or newer, npm, and PHP 8.3 for the complete local matrix.
+Use Node 24 or newer, npm, and PHP 8.3 for the complete local matrix. The
+WordPress plugin retains PHP 7.4 as its minimum and CI validates PHP 7.4, 8.0,
+and 8.3.
 
 ```sh
 npm ci
@@ -97,8 +99,8 @@ Future WordPress releases are published from `weeklywildcat/byline`:
 
 Historical plugin tags imported into this repository are prefixed `plugin-` so
 they cannot collide with canonical releases. The standalone `byline-plugin`
-repository remains available for historical releases and the live `v0.2.1`
-updater bridge.
+repository remains available for historical releases, failed bridge `v0.2.1`,
+and fixed standalone bridge `v0.2.2`.
 
 ## Discord bot
 
