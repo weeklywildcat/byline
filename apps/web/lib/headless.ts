@@ -182,6 +182,50 @@ export type SchoolEvent = {
   };
 };
 
+const weeklyWildcatFixtureGame: SportsGame = {
+  id: 1,
+  title: "Wildcats fixture game",
+  slug: "wildcats-fixture-game",
+  sportKey: "football-varsity",
+  sport: "football",
+  sportLabel: "Football - Varsity",
+  level: "Varsity",
+  teamLabel: "Wildcats",
+  opponent: "Fixture Academy",
+  site: "home",
+  location: "Ninety Six High School",
+  locationName: "Wildcat Stadium",
+  locationAddress: "Ninety Six, SC",
+  latitude: null,
+  longitude: null,
+  appleMapsId: "",
+  startDate: "2026-09-04T19:30:00-04:00",
+  season: "2026-27",
+  status: "upcoming",
+  wildcatsScore: null,
+  opponentScore: null,
+  recapUrl: "",
+  notes: "",
+  display: {
+    matchup: "Wildcats vs. Fixture Academy",
+    date: "September 4, 2026",
+    location: "Wildcat Stadium",
+    status: "Upcoming",
+    score: null
+  }
+};
+
+function weeklyWildcatHeadlessFixture<T>(path: string): T {
+  if (path === "/sports-games/1") return weeklyWildcatFixtureGame as T;
+  if (path === "/sports-games/facets") {
+    return { years: ["2026"], sports: [{ label: "Football - Varsity", value: "football-varsity" }], summaries: {} } as T;
+  }
+  if (path.startsWith("/sports-games")) return [weeklyWildcatFixtureGame] as T;
+  if (path === "/sports-teams") return [] as T;
+  if (path === "/sports-rosters" || path === "/school-events") return [] as T;
+  return [] as T;
+}
+
 function getHeadlessApiUrl() {
   return getWordPressApiUrl().replace(/\/wp\/v2$/, "/weekly-wildcat/v1");
 }
@@ -193,7 +237,10 @@ async function headlessFetch<T>(path: string, query: Record<string, QueryValue> 
 }
 
 async function headlessFetchPage<T>(path: string, query: Record<string, QueryValue> = {}) {
-  if (process.env.BYLINE_CONTENT_MODE === "empty") {
+  if (process.env.BYLINE_CONTENT_MODE === "weekly-wildcat-fixture") {
+    return { data: weeklyWildcatHeadlessFixture<T>(path), totalPages: 1 };
+  }
+  if (process.env.BYLINE_CONTENT_MODE === "empty" || process.env.BYLINE_CONTENT_MODE === "north-star-fixture") {
     return { data: [] as T, totalPages: 1 };
   }
   const url = new URL(`${getHeadlessApiUrl()}/${path.replace(/^\//, "")}`);

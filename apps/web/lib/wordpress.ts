@@ -1,6 +1,7 @@
 import { mirrorWordPressMediaInValue } from "@/lib/media";
 import { getPublicationConfig } from "@/lib/publication";
 import northStarContent from "@/tests/fixtures/north-star-content.json";
+import weeklyWildcatContent from "@/tests/fixtures/weekly-wildcat-content.json";
 
 const DEFAULT_WP_API_URL = "https://cms.weeklywildcat.com/wp-json/wp/v2";
 const DEFAULT_SITE_URL = "https://weeklywildcat.com";
@@ -16,24 +17,27 @@ const WORDPRESS_FETCH_USER_AGENT = "Byline Static Site Builder";
 type QueryValue = string | number | boolean | undefined | null;
 
 function fixtureData<T>(path: string, query: Record<string, QueryValue>): T {
+  const fixture = process.env.BYLINE_CONTENT_MODE === "weekly-wildcat-fixture"
+    ? weeklyWildcatContent
+    : northStarContent;
   if (path === "/posts") {
-    let posts = [...northStarContent.posts];
+    let posts = [...fixture.posts];
     if (query.slug) posts = posts.filter((post) => post.slug === String(query.slug));
     if (query.author) posts = posts.filter((post) => post.author === Number(query.author));
     if (query.categories) posts = posts.filter((post) => post.categories.includes(Number(query.categories)));
     return posts as T;
   }
   if (path === "/pages") {
-    const pages = query.slug ? northStarContent.pages.filter((page) => page.slug === String(query.slug)) : northStarContent.pages;
+    const pages = query.slug ? fixture.pages.filter((page) => page.slug === String(query.slug)) : fixture.pages;
     return pages as T;
   }
-  if (path === "/users") return northStarContent.authors as T;
-  if (path.startsWith("/users/")) return (northStarContent.authors.find((author) => author.id === Number(path.slice(7))) ?? null) as T;
+  if (path === "/users") return fixture.authors as T;
+  if (path.startsWith("/users/")) return (fixture.authors.find((author) => author.id === Number(path.slice(7))) ?? null) as T;
   if (path === "/categories") {
-    const categories = query.slug ? northStarContent.categories.filter((category) => category.slug === String(query.slug)) : northStarContent.categories;
+    const categories = query.slug ? fixture.categories.filter((category) => category.slug === String(query.slug)) : fixture.categories;
     return categories as T;
   }
-  if (path === "/tags") return northStarContent.tags as T;
+  if (path === "/tags") return fixture.tags as T;
   return [] as T;
 }
 
@@ -227,10 +231,10 @@ function getHeadlessApiUrl() {
 }
 
 async function wpFetch<T>(path: string, query: Record<string, QueryValue> = {}) {
-  if (process.env.BYLINE_CONTENT_MODE === "north-star-fixture") {
+  if (process.env.BYLINE_CONTENT_MODE?.endsWith("-fixture")) {
     return { data: fixtureData<T>(path, query), totalPages: 1 };
   }
-  if (process.env.BYLINE_CONTENT_MODE === "empty") {
+  if (process.env.BYLINE_CONTENT_MODE === "empty" || process.env.BYLINE_CONTENT_MODE?.endsWith("-fixture")) {
     return { data: [] as T, totalPages: 1 };
   }
   const url = new URL(`${getWordPressApiUrl()}/${path.replace(/^\//, "")}`);

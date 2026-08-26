@@ -41,6 +41,7 @@ jobs:
       - name: Build Weekly Wildcat static export
         env:
           BYLINE_PUBLICATION_FILE: tests/fixtures/weekly-wildcat-publication.json
+          BYLINE_CONTENT_MODE: weekly-wildcat-fixture
           BYLINE_DEPLOYMENT_HOOK_URL: BYLINE_TEST_SECRET_DO_NOT_EXPORT
           BYLINE_DISCORD_BRIDGE_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
           BYLINE_DISCORD_CLIENT_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
