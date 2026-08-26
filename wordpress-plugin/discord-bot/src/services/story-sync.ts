@@ -46,7 +46,7 @@ export class StorySyncService {
         thread = existing.thread; cardId = existing.cardId;
         story = await this.wordpress.linkStory(story.id, { threadId: thread.id, cardMessageId: cardId });
       } else {
-        const created = await this.forum.threads.create({ name: story.title.slice(0, 100), appliedTags: mergeWorkflowTag([], this.forum.availableTags, story.status), message: storyCard(story), reason: `Weekly Wildcat story #${story.id}` });
+        const created = await this.forum.threads.create({ name: story.title.slice(0, 100), appliedTags: mergeWorkflowTag([], this.forum.availableTags, story.status), message: storyCard(story, this.config.publicationName), reason: `${this.config.publicationName} story #${story.id}`.slice(0, 512) });
         thread = created;
         const starter = await created.fetchStarterMessage();
         cardId = starter?.id ?? '';
@@ -57,10 +57,10 @@ export class StorySyncService {
       if (!fetched?.isThread() || fetched.parentId !== this.config.storyboardChannelId) throw new Error(`Linked thread ${story.discord.threadId} is missing; manual editor recovery is required`);
       thread = fetched;
       const desiredTags = mergeWorkflowTag(thread.appliedTags, this.forum.availableTags, story.status);
-      if (thread.name !== story.title.slice(0, 100) || JSON.stringify([...thread.appliedTags].sort()) !== JSON.stringify([...desiredTags].sort())) await thread.edit({ name: story.title.slice(0, 100), appliedTags: desiredTags, reason: `Reconcile Weekly Wildcat story #${story.id}` });
+      if (thread.name !== story.title.slice(0, 100) || JSON.stringify([...thread.appliedTags].sort()) !== JSON.stringify([...desiredTags].sort())) await thread.edit({ name: story.title.slice(0, 100), appliedTags: desiredTags, reason: `Reconcile ${this.config.publicationName} story #${story.id}`.slice(0, 512) });
       let card = cardId ? await thread.messages.fetch(cardId).catch(() => null) : await this.findMarkedMessage(thread, `WordPress story #${story.id}`);
-      if (card) await card.edit(storyCard(story));
-      else { card = await thread.send(storyCard(story)); cardId = card.id; story = await this.wordpress.linkStory(story.id, { cardMessageId: cardId }); }
+      if (card) await card.edit(storyCard(story, this.config.publicationName));
+      else { card = await thread.send(storyCard(story, this.config.publicationName)); cardId = card.id; story = await this.wordpress.linkStory(story.id, { cardMessageId: cardId }); }
     }
     if (story.status === 'published' && story.publicUrl) story = await this.reconcilePublication(thread, story);
     await this.wordpress.linkStory(story.id, { threadId: thread.id, ...(cardId ? { cardMessageId: cardId } : {}) });
@@ -69,13 +69,13 @@ export class StorySyncService {
 
   private async reconcilePublication(thread: ThreadChannel, story: Story): Promise<Story> {
     let publishMessageId = story.discord.publishMessageId;
-    const publication = { content: `Published: **${story.title}**\n${story.publicUrl}`, embeds: [{ footer: { text: `Publication #${story.id}` } }], allowedMentions: NO_MENTIONS };
+    const publication = { content: `Published by **${this.config.publicationName}**: **${story.title}**\n${story.publicUrl}`, embeds: [{ author: { name: this.config.publicationName }, footer: { text: `Publication #${story.id}` } }], allowedMentions: NO_MENTIONS };
     if (publishMessageId) { const message = await thread.messages.fetch(publishMessageId).catch(() => null); if (message) await message.edit(publication); else publishMessageId = ''; }
     if (!publishMessageId) publishMessageId = (await this.findMarkedMessage(thread, `Publication #${story.id}`))?.id ?? '';
     if (!publishMessageId) publishMessageId = (await thread.send(publication)).id;
     let announcementMessageId = story.discord.announcementMessageId;
     if (this.config.publicationAnnouncements && this.announcements) {
-      const announcement = { content: `📰 **${story.title}**\n${story.writer ? `By ${story.writer.name}\n` : ''}${story.publicUrl}`, embeds: [{ ...(story.featuredImageUrl ? { image: { url: story.featuredImageUrl } } : {}), footer: { text: `Announcement #${story.id}` } }], allowedMentions: NO_MENTIONS };
+      const announcement = { content: `📰 **${story.title}**\n${story.writer ? `By ${story.writer.name}\n` : ''}${story.publicUrl}`, embeds: [{ author: { name: this.config.publicationName }, ...(story.featuredImageUrl ? { image: { url: story.featuredImageUrl } } : {}), footer: { text: `Announcement #${story.id}` } }], allowedMentions: NO_MENTIONS };
       if (announcementMessageId) { const message = await this.announcements.messages.fetch(announcementMessageId).catch(() => null); if (message) await message.edit(announcement); else announcementMessageId = ''; }
       if (!announcementMessageId) announcementMessageId = (await this.findMarkedMessage(this.announcements, `Announcement #${story.id}`))?.id ?? '';
       if (!announcementMessageId) announcementMessageId = (await this.announcements.send(announcement)).id;

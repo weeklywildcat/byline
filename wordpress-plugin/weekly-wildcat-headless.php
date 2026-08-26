@@ -1,15 +1,28 @@
 <?php
 /**
- * Plugin Name: Weekly Wildcat Bridge
- * Description: WordPress bridge extensions for Weekly Wildcat content, sports schedules, scores, and school events.
- * Version: 0.1.40
- * Author: Weekly Wildcat
+ * Plugin Name: Byline
+ * Description: Open-source publishing tools, design management, and integrations for student newsrooms.
+ * Version: 0.2.0
+ * Author: Byline Contributors
  * License: GPL-2.0-or-later
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
+
+require_once __DIR__ . '/includes/core/protocol.php';
+require_once __DIR__ . '/includes/core/capabilities.php';
+require_once __DIR__ . '/includes/publication/config.php';
+require_once __DIR__ . '/includes/design/schema.php';
+require_once __DIR__ . '/includes/design/post-type.php';
+require_once __DIR__ . '/includes/design/rest.php';
+require_once __DIR__ . '/includes/core/diagnostics.php';
+require_once __DIR__ . '/includes/content/pages.php';
+require_once __DIR__ . '/includes/admin/app.php';
+
+register_activation_hook(__FILE__, 'byline_add_administrator_capabilities');
+register_activation_hook(__FILE__, 'byline_seed_publication_config');
 
 const WWH_CONTRIBUTOR_COOKIE = 'wwh_contributor_seen';
 
@@ -79,7 +92,7 @@ function wwh_redirect_cms_frontend(): void
     }
 
     if (is_user_logged_in()) {
-        wp_redirect('https://weeklywildcat.com/', 302, 'Weekly Wildcat Bridge');
+        wp_redirect(byline_get_publication_config()['urls']['publicSite'] . '/', 302, 'Byline');
         exit;
     }
 
@@ -95,9 +108,10 @@ add_action('template_redirect', 'wwh_redirect_cms_frontend', 1);
 
 function wwh_render_cms_redirect_page(): void
 {
-    $public_url = 'https://weeklywildcat.com/';
+    $publication = byline_get_publication_config();
+    $public_url = rtrim($publication['urls']['publicSite'], '/') . '/';
     $login_url = wp_login_url(admin_url());
-    $logo_url = plugin_dir_url(__FILE__) . 'assets/weekly-wildcat-logo.svg';
+    $logo_url = byline_publication_absolute_url($publication['branding']['masthead']['url']);
     $photo = wwh_unsplash_photo('ZeGQ22v9Zhk');
 
     status_header(200);
@@ -111,7 +125,7 @@ function wwh_render_cms_redirect_page(): void
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="robots" content="noindex, nofollow">
         <meta http-equiv="refresh" content="5;url=<?php echo esc_url($public_url); ?>">
-        <title>Weekly Wildcat CMS</title>
+        <title><?php echo esc_html($publication['identity']['name']); ?> CMS</title>
         <style>
             * { box-sizing: border-box; }
             body {
@@ -172,7 +186,7 @@ function wwh_render_cms_redirect_page(): void
     </head>
     <body>
         <main>
-            <img class="logo" src="<?php echo esc_url($logo_url); ?>" alt="Weekly Wildcat">
+            <img class="logo" src="<?php echo esc_url($logo_url); ?>" alt="<?php echo esc_attr($publication['branding']['masthead']['alt']); ?>">
             <h1>This site is for contributors only</h1>
             <p class="countdown" aria-live="polite">Redirecting in <span id="wwh-countdown">5</span> seconds</p>
             <a class="login-link" href="<?php echo esc_url($login_url); ?>">Contributor sign in</a>
@@ -220,12 +234,19 @@ const WWH_SPORTS_TEAM_SETTINGS_OPTION = 'wwh_sports_team_settings';
 // Stores only the selected Sports Game post ID for the automatic article game card.
 const WWH_PRIMARY_GAME_META = 'weekly_wildcat_primary_game_id';
 
-/**
- * Replace the WordPress mark on the sign-in screen with the Weekly Wildcat logo.
- */
+require_once __DIR__ . '/includes/sports/teams.php';
+require_once __DIR__ . '/includes/integrations/deployment.php';
+register_activation_hook(__FILE__, 'byline_migrate_sports_teams');
+register_deactivation_hook(__FILE__, 'byline_clear_scheduled_deployment');
+
+/** Replace the WordPress mark with the configured publication identity. */
 function wwh_login_logo_styles(): void
 {
-    $logo_url = plugin_dir_url(__FILE__) . 'assets/weekly-wildcat-logo.svg';
+    $publication = byline_get_publication_config();
+    $logo_url = byline_publication_absolute_url((string) ($publication['branding']['logo']['url'] ?? ''));
+    if ($logo_url === '') {
+        return;
+    }
     ?>
     <style>
         #login h1 a,
@@ -243,19 +264,24 @@ add_action('login_enqueue_scripts', 'wwh_login_logo_styles');
 
 function wwh_login_logo_url(): string
 {
-    return 'https://weeklywildcat.com';
+    return byline_get_publication_config()['urls']['publicSite'];
 }
 add_filter('login_headerurl', 'wwh_login_logo_url');
 
 function wwh_login_logo_text(): string
 {
-    return 'Weekly Wildcat';
+    return byline_get_publication_config()['identity']['name'];
 }
 add_filter('login_headertext', 'wwh_login_logo_text');
 
 function wwh_login_site_html_link(string $link): string
 {
-    return '<a href="https://weeklywildcat.com/">&larr; Go to Weekly Wildcat</a>';
+    $publication = byline_get_publication_config();
+    return sprintf(
+        '<a href="%s">&larr; Go to %s</a>',
+        esc_url(rtrim($publication['urls']['publicSite'], '/') . '/'),
+        esc_html($publication['identity']['shortName'])
+    );
 }
 add_filter('login_site_html_link', 'wwh_login_site_html_link');
 
@@ -485,25 +511,46 @@ function wwh_google_login_redirect_uri(): string
 
 function wwh_google_client_id(): string
 {
-    $value = defined('WWH_GOOGLE_CLIENT_ID')
-        ? constant('WWH_GOOGLE_CLIENT_ID')
-        : getenv('WWH_GOOGLE_CLIENT_ID');
+    $value = defined('BYLINE_GOOGLE_CLIENT_ID')
+        ? constant('BYLINE_GOOGLE_CLIENT_ID')
+        : getenv('BYLINE_GOOGLE_CLIENT_ID');
+    if (!is_string($value) || trim($value) === '') {
+        $value = defined('WWH_GOOGLE_CLIENT_ID') ? constant('WWH_GOOGLE_CLIENT_ID') : getenv('WWH_GOOGLE_CLIENT_ID');
+    }
 
     return is_string($value) ? trim($value) : '';
 }
 
 function wwh_google_client_secret(): string
 {
-    $value = defined('WWH_GOOGLE_CLIENT_SECRET')
-        ? constant('WWH_GOOGLE_CLIENT_SECRET')
-        : getenv('WWH_GOOGLE_CLIENT_SECRET');
+    $value = defined('BYLINE_GOOGLE_CLIENT_SECRET')
+        ? constant('BYLINE_GOOGLE_CLIENT_SECRET')
+        : getenv('BYLINE_GOOGLE_CLIENT_SECRET');
+    if (!is_string($value) || trim($value) === '') {
+        $value = defined('WWH_GOOGLE_CLIENT_SECRET') ? constant('WWH_GOOGLE_CLIENT_SECRET') : getenv('WWH_GOOGLE_CLIENT_SECRET');
+    }
 
     return is_string($value) ? trim($value) : '';
 }
 
+function byline_google_hosted_domain(): string
+{
+    $value = defined('BYLINE_GOOGLE_HOSTED_DOMAIN')
+        ? constant('BYLINE_GOOGLE_HOSTED_DOMAIN')
+        : getenv('BYLINE_GOOGLE_HOSTED_DOMAIN');
+    if (!is_string($value) || trim($value) === '') {
+        $value = defined('WWH_GOOGLE_HOSTED_DOMAIN') ? constant('WWH_GOOGLE_HOSTED_DOMAIN') : getenv('WWH_GOOGLE_HOSTED_DOMAIN');
+    }
+    if (is_string($value) && trim($value) !== '') {
+        $domain = strtolower(trim($value));
+        return preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/', $domain) === 1 ? $domain : '';
+    }
+    return !function_exists('home_url') || byline_is_legacy_weekly_wildcat_installation() ? 'weeklywildcat.com' : '';
+}
+
 function wwh_google_login_is_configured(): bool
 {
-    return wwh_google_client_id() !== '' && wwh_google_client_secret() !== '';
+    return wwh_google_client_id() !== '' && wwh_google_client_secret() !== '' && byline_google_hosted_domain() !== '';
 }
 
 function wwh_google_login_configuration_notice(): void
@@ -514,14 +561,18 @@ function wwh_google_login_configuration_notice(): void
 
     $missing = [];
     if (wwh_google_client_id() === '') {
-        $missing[] = 'WWH_GOOGLE_CLIENT_ID';
+        $missing[] = 'BYLINE_GOOGLE_CLIENT_ID';
     }
     if (wwh_google_client_secret() === '') {
-        $missing[] = 'WWH_GOOGLE_CLIENT_SECRET';
+        $missing[] = 'BYLINE_GOOGLE_CLIENT_SECRET';
+    }
+    if (byline_google_hosted_domain() === '') {
+        $missing[] = 'BYLINE_GOOGLE_HOSTED_DOMAIN';
     }
 
     printf(
-        '<div class="notice notice-error"><p><strong>Weekly Wildcat Google sign-in is not configured.</strong> Set the missing Docker environment variable%s: <code>%s</code>.</p></div>',
+        '<div class="notice notice-error"><p><strong>%s Google sign-in is not configured.</strong> Set the missing environment variable%s: <code>%s</code>. Legacy <code>WWH_*</code> credential aliases remain supported.</p></div>',
+        esc_html(byline_get_publication_config()['identity']['shortName']),
         count($missing) === 1 ? '' : 's',
         esc_html(implode(', ', $missing))
     );
@@ -542,9 +593,10 @@ function wwh_google_login_button(string $message): string
     $button_image_url = plugin_dir_url(__FILE__) . 'assets/google-signin-light.png';
 
     $button = sprintf(
-        '<div class="wwh-google-login"><a class="wwh-google-signin-button" href="%s"><img src="%s" alt="Sign in with Google" width="360" height="80"></a><span>Use your @weeklywildcat.com account.</span><button type="button" class="wwh-password-login-toggle" aria-expanded="false">Use a password or reset it</button></div>',
+        '<div class="wwh-google-login"><a class="wwh-google-signin-button" href="%s"><img src="%s" alt="Sign in with Google" width="360" height="80"></a><span>Use your @%s account.</span><button type="button" class="wwh-password-login-toggle" aria-expanded="false">Use a password or reset it</button></div>',
         esc_url($login_url),
-        esc_url($button_image_url)
+        esc_url($button_image_url),
+        esc_html(byline_google_hosted_domain())
     );
 
     return $message . $button;
@@ -667,7 +719,7 @@ function wwh_google_login_start(): void
             'scope' => 'openid email profile',
             'state' => $state,
             'nonce' => $nonce,
-            'hd' => 'weeklywildcat.com',
+            'hd' => byline_google_hosted_domain(),
             'prompt' => 'select_account',
         ],
         'https://accounts.google.com/o/oauth2/v2/auth'
@@ -748,7 +800,7 @@ function wwh_google_id_token_claims(string $id_token, string $expected_nonce): a
         || !$valid_authorized_party
         || (int) ($claims['exp'] ?? 0) < time()
         || !hash_equals($expected_nonce, (string) ($claims['nonce'] ?? ''))
-        || !hash_equals('weeklywildcat.com', strtolower((string) ($claims['hd'] ?? '')))
+        || !hash_equals(byline_google_hosted_domain(), strtolower((string) ($claims['hd'] ?? '')))
         || ($claims['email_verified'] ?? false) !== true
         || empty($claims['sub'])
         || empty($claims['email'])
@@ -805,7 +857,7 @@ function wwh_google_login_callback(): void
     $email = strtolower(sanitize_email((string) $claims['email']));
     $user = get_user_by('email', $email);
     if (!$user instanceof WP_User) {
-        wwh_google_login_fail('No existing WordPress user matches this Weekly Wildcat account.');
+        wwh_google_login_fail('No existing WordPress user matches this publication account.');
     }
 
     $google_subject = (string) $claims['sub'];
@@ -913,10 +965,10 @@ function wwh_register_settings(): void
 
     register_setting(
         'wwh_settings',
-        WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION,
+        BYLINE_DEPLOYMENT_HOOK_OPTION,
         [
             'type' => 'string',
-            'sanitize_callback' => 'wwh_sanitize_cloudflare_deploy_hook_url',
+            'sanitize_callback' => 'byline_sanitize_deployment_hook_url_setting',
             'default' => '',
             'show_in_rest' => false,
         ]
@@ -938,18 +990,18 @@ function wwh_register_settings(): void
     );
 
     add_settings_section(
-        'wwh_cloudflare_deploy_section',
-        'Cloudflare Builds',
+        'byline_deployment_section',
+        'Deployment',
         '__return_false',
         'wwh-settings'
     );
 
     add_settings_field(
-        WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION,
-        'Cloudflare Deploy Hook URL',
+        BYLINE_DEPLOYMENT_HOOK_OPTION,
+        'Generic Deploy Hook URL',
         'wwh_render_cloudflare_deploy_hook_field',
         'wwh-settings',
-        'wwh_cloudflare_deploy_section'
+        'byline_deployment_section'
     );
 }
 add_action('admin_init', 'wwh_register_settings');
@@ -1031,35 +1083,40 @@ function wwh_render_unsplash_access_key_field(): void
 
 function wwh_sanitize_cloudflare_deploy_hook_url($value): string
 {
+    return byline_sanitize_deployment_hook_url_setting($value);
+}
+
+function byline_sanitize_deployment_hook_url_setting($value): string
+{
     if (!current_user_can('manage_options')) {
-        return (string) get_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '');
+        return byline_deployment_hook_url();
     }
 
-    if (isset($_POST['wwh_cloudflare_deploy_hook_clear'])) {
+    if (isset($_POST['byline_deployment_hook_clear']) || isset($_POST['wwh_cloudflare_deploy_hook_clear'])) {
         return '';
     }
 
     if (!is_string($value)) {
-        return (string) get_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '');
+        return byline_deployment_hook_url();
     }
 
     $value = trim($value);
 
     if ($value === '') {
-        return (string) get_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '');
+        return byline_deployment_hook_url();
     }
 
-    $url = esc_url_raw($value, ['https']);
+    $url = byline_validate_deployment_hook_url($value);
 
-    if ($url === '' || wp_parse_url($url, PHP_URL_SCHEME) !== 'https') {
+    if ($url === '') {
         add_settings_error(
-            WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION,
-            'wwh_cloudflare_deploy_hook_invalid',
+            BYLINE_DEPLOYMENT_HOOK_OPTION,
+            'byline_deployment_hook_invalid',
             'Enter a valid HTTPS deploy hook URL.',
             'error'
         );
 
-        return (string) get_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '');
+        return byline_deployment_hook_url();
     }
 
     return $url;
@@ -1072,19 +1129,19 @@ function wwh_render_cloudflare_deploy_hook_field(): void
     ?>
     <input
         type="password"
-        id="<?php echo esc_attr(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION); ?>"
-        name="<?php echo esc_attr(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION); ?>"
+        id="<?php echo esc_attr(BYLINE_DEPLOYMENT_HOOK_OPTION); ?>"
+        name="<?php echo esc_attr(BYLINE_DEPLOYMENT_HOOK_OPTION); ?>"
         value=""
         class="regular-text"
         autocomplete="new-password"
         placeholder="<?php echo esc_attr($has_url ? 'Saved. Enter a new URL to replace it.' : 'https://...'); ?>"
     >
     <p class="description">
-        <?php echo esc_html($has_url ? 'A deploy hook URL is saved. Leave this blank to keep it unchanged.' : 'Paste the private Cloudflare Workers Builds deploy hook URL.'); ?>
+        <?php echo esc_html($has_url ? 'A deploy hook URL is saved. Leave this blank to keep it unchanged.' : 'Paste a private HTTPS build hook from Cloudflare, Netlify, Vercel, GitHub Actions, or another provider.'); ?>
     </p>
     <?php if ($has_url) : ?>
         <label>
-            <input type="checkbox" name="wwh_cloudflare_deploy_hook_clear" value="1">
+            <input type="checkbox" name="byline_deployment_hook_clear" value="1">
             Remove the saved deploy hook URL
         </label>
     <?php endif; ?>
@@ -1099,7 +1156,7 @@ function wwh_render_settings_page(): void
 
     ?>
     <div class="wrap wwh-settings-page">
-        <h1>Weekly Wildcat Bridge Settings</h1>
+        <h1>Byline Legacy Integration Settings</h1>
         <form method="post" action="options.php">
             <?php
             settings_fields('wwh_settings');
@@ -1108,7 +1165,7 @@ function wwh_render_settings_page(): void
             ?>
         </form>
 
-        <h2>Cloudflare Build Status</h2>
+        <h2>Deployment Status</h2>
         <table class="widefat striped" role="presentation">
             <tbody>
                 <tr>
@@ -1172,7 +1229,7 @@ function wwh_render_team_media_field(string $team_key, string $field, string $la
 
 function wwh_render_sports_team_settings_page(): void
 {
-    if (!current_user_can('edit_posts')) {
+    if (!current_user_can(BYLINE_MANAGE_CAPABILITY)) {
         wp_die(esc_html__('Sorry, you are not allowed to manage sports team settings.', 'weekly-wildcat-headless'));
     }
 
@@ -1181,7 +1238,7 @@ function wwh_render_sports_team_settings_page(): void
     ?>
     <div class="wrap wwh-sports-team-settings-page">
         <h1>Sports Team Settings</h1>
-        <p>Upload team header images and optional marks for the public Weekly Wildcat team hub pages. These settings are keyed to the existing controlled team list and do not create duplicate game records.</p>
+        <p>Configure the teams used by games, rosters, public team pages, and Byline Studio. Stable keys are retained when a team is made inactive so existing content keeps working.</p>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
             <?php wp_nonce_field('wwh_save_sports_team_settings', 'wwh_sports_team_settings_nonce'); ?>
             <input type="hidden" name="action" value="wwh_save_sports_team_settings">
@@ -1200,6 +1257,16 @@ function wwh_render_sports_team_settings_page(): void
                     <section class="wwh-team-settings-card">
                         <h2><?php echo esc_html($team['label']); ?></h2>
                         <p class="description"><?php echo esc_html($team_key); ?></p>
+                        <div class="wwh-team-identity-fields">
+                            <label>Display name <input class="widefat" type="text" name="teams[<?php echo esc_attr($team_key); ?>][displayName]" value="<?php echo esc_attr((string) ($team['displayName'] ?? $team['label'])); ?>" required></label>
+                            <label>Short name <input class="widefat" type="text" name="teams[<?php echo esc_attr($team_key); ?>][shortName]" value="<?php echo esc_attr((string) ($team['shortName'] ?? $team['teamLabel'])); ?>"></label>
+                            <label>Scoreboard name <input class="widefat" type="text" name="teams[<?php echo esc_attr($team_key); ?>][scoreboardName]" value="<?php echo esc_attr((string) ($team['scoreboardName'] ?? $team['shortName'] ?? $team['teamLabel'])); ?>"></label>
+                            <label>Sport <input class="widefat" type="text" name="teams[<?php echo esc_attr($team_key); ?>][sport]" value="<?php echo esc_attr((string) $team['sport']); ?>" required></label>
+                            <label>Level <input class="widefat" type="text" name="teams[<?php echo esc_attr($team_key); ?>][level]" value="<?php echo esc_attr((string) $team['level']); ?>"></label>
+                            <label>Gender / division <input class="widefat" type="text" name="teams[<?php echo esc_attr($team_key); ?>][genderDivision]" value="<?php echo esc_attr((string) ($team['genderDivision'] ?? '')); ?>"></label>
+                            <label>Public slug <input class="widefat" type="text" name="teams[<?php echo esc_attr($team_key); ?>][slug]" value="<?php echo esc_attr((string) ($team['slug'] ?? $team_key)); ?>" required></label>
+                            <label><input type="checkbox" name="teams[<?php echo esc_attr($team_key); ?>][active]" value="1" <?php checked((bool) ($team['active'] ?? true)); ?>> Active</label>
+                        </div>
                         <div class="wwh-team-media-fields">
                             <?php wwh_render_team_media_field($team_key, 'headerImageId', 'Header Image', $header_id, $header_focal_point); ?>
                             <?php wwh_render_team_media_field($team_key, 'logoId', 'Logo / Mark', $logo_id); ?>
@@ -1218,6 +1285,18 @@ function wwh_render_sports_team_settings_page(): void
                     </section>
                 <?php endforeach; ?>
             </div>
+            <h2>Add a team</h2>
+            <p class="description">The key is permanent once saved because games and rosters reference it.</p>
+            <table class="form-table" role="presentation"><tbody>
+                <tr><th><label for="byline_new_team_key">Stable key</label></th><td><input class="regular-text" id="byline_new_team_key" name="newTeam[key]" placeholder="girls-lacrosse-varsity"></td></tr>
+                <tr><th><label for="byline_new_team_display">Display name</label></th><td><input class="regular-text" id="byline_new_team_display" name="newTeam[displayName]" placeholder="Girls Lacrosse - Varsity"></td></tr>
+                <tr><th><label for="byline_new_team_short">Short name</label></th><td><input class="regular-text" id="byline_new_team_short" name="newTeam[shortName]" placeholder="Girls Lacrosse"></td></tr>
+                <tr><th><label for="byline_new_team_scoreboard">Scoreboard name</label></th><td><input class="regular-text" id="byline_new_team_scoreboard" name="newTeam[scoreboardName]" placeholder="Harbor Hawks"></td></tr>
+                <tr><th><label for="byline_new_team_sport">Sport</label></th><td><input class="regular-text" id="byline_new_team_sport" name="newTeam[sport]" placeholder="Girls Lacrosse"></td></tr>
+                <tr><th><label for="byline_new_team_level">Level</label></th><td><input class="regular-text" id="byline_new_team_level" name="newTeam[level]" placeholder="Varsity"></td></tr>
+                <tr><th><label for="byline_new_team_division">Gender / division</label></th><td><input class="regular-text" id="byline_new_team_division" name="newTeam[genderDivision]"></td></tr>
+                <tr><th><label for="byline_new_team_slug">Public slug</label></th><td><input class="regular-text" id="byline_new_team_slug" name="newTeam[slug]" placeholder="girls-lacrosse-varsity"></td></tr>
+            </tbody></table>
             <?php submit_button('Save Team Settings'); ?>
         </form>
     </div>
@@ -1226,7 +1305,7 @@ function wwh_render_sports_team_settings_page(): void
 
 function wwh_save_sports_team_settings(): void
 {
-    if (!current_user_can('edit_posts')) {
+    if (!current_user_can(BYLINE_MANAGE_CAPABILITY)) {
         wp_die(esc_html__('Sorry, you are not allowed to manage sports team settings.', 'weekly-wildcat-headless'));
     }
 
@@ -1234,9 +1313,24 @@ function wwh_save_sports_team_settings(): void
 
     $raw_teams = isset($_POST['teams']) && is_array($_POST['teams']) ? wp_unslash($_POST['teams']) : [];
     $settings = [];
+    $team_entities = [];
 
-    foreach (wwh_sports_team_options() as $team_key => $_team) {
+    foreach (wwh_sports_team_options() as $team_key => $existing_team) {
         $raw_team = isset($raw_teams[$team_key]) && is_array($raw_teams[$team_key]) ? $raw_teams[$team_key] : [];
+        $identity = byline_sanitize_sports_team([
+            'key' => $team_key,
+            'sport' => $raw_team['sport'] ?? $existing_team['sport'],
+            'displayName' => $raw_team['displayName'] ?? $existing_team['displayName'],
+            'shortName' => $raw_team['shortName'] ?? $existing_team['shortName'],
+            'scoreboardName' => $raw_team['scoreboardName'] ?? $existing_team['scoreboardName'],
+            'level' => $raw_team['level'] ?? $existing_team['level'],
+            'genderDivision' => $raw_team['genderDivision'] ?? $existing_team['genderDivision'],
+            'slug' => $raw_team['slug'] ?? $existing_team['slug'],
+            'active' => isset($raw_team['active']),
+        ]);
+        if ($identity !== []) {
+            $team_entities[] = $identity;
+        }
         $header_id = absint($raw_team['headerImageId'] ?? 0);
         $logo_id = absint($raw_team['logoId'] ?? 0);
         $accent_color = sanitize_hex_color((string) ($raw_team['accentColor'] ?? '')) ?: '';
@@ -1263,6 +1357,17 @@ function wwh_save_sports_team_settings(): void
         }
     }
 
+    $raw_new_team = isset($_POST['newTeam']) && is_array($_POST['newTeam']) ? wp_unslash($_POST['newTeam']) : [];
+    if (trim((string) ($raw_new_team['key'] ?? '')) !== '' || trim((string) ($raw_new_team['displayName'] ?? '')) !== '') {
+        $raw_new_team['active'] = true;
+        $new_team = byline_sanitize_sports_team($raw_new_team);
+        if ($new_team === []) {
+            wp_die(esc_html__('A new team requires a valid unique key, sport, and display name.', 'weekly-wildcat-headless'));
+        }
+        $team_entities[] = $new_team;
+    }
+
+    byline_replace_sports_teams($team_entities);
     update_option(WWH_SPORTS_TEAM_SETTINGS_OPTION, $settings, false);
     wwh_schedule_cloudflare_deploy();
     wp_safe_redirect(add_query_arg(['post_type' => WWH_SPORTS_GAME_POST_TYPE, 'page' => 'wwh-sports-team-settings', 'updated' => 'true'], admin_url('edit.php')));
@@ -1271,12 +1376,12 @@ function wwh_save_sports_team_settings(): void
 
 function wwh_cloudflare_deploy_hook_url(): string
 {
-    return (string) get_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '');
+    return byline_deployment_hook_url();
 }
 
 function wwh_cloudflare_deploy_last_trigger_time_label(): string
 {
-    $timestamp = absint(get_option(WWH_CLOUDFLARE_DEPLOY_LAST_TRIGGERED_OPTION, 0));
+    $timestamp = byline_deployment_last_triggered();
 
     if ($timestamp <= 0) {
         return 'Never';
@@ -1287,14 +1392,14 @@ function wwh_cloudflare_deploy_last_trigger_time_label(): string
 
 function wwh_cloudflare_deploy_last_status_label(): string
 {
-    $status = (string) get_option(WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION, '');
+    $status = byline_deployment_last_status();
 
     return $status !== '' ? $status : 'Not triggered yet';
 }
 
 function wwh_cloudflare_deploy_pending_label(): string
 {
-    $timestamp = wp_next_scheduled(WWH_CLOUDFLARE_DEPLOY_EVENT);
+    $timestamp = byline_deployment_pending_timestamp();
 
     if (!$timestamp) {
         return 'No';
@@ -1364,31 +1469,7 @@ function wwh_media_image(int $attachment_id, string $size = 'large'): array
 
 function wwh_sports_team_options(): array
 {
-    return [
-        'baseball-varsity' => ['sport' => 'Baseball', 'level' => 'Varsity', 'teamLabel' => 'Baseball', 'label' => 'Baseball - Varsity'],
-        'baseball-jv' => ['sport' => 'Baseball', 'level' => 'JV', 'teamLabel' => 'Baseball', 'label' => 'Baseball - JV'],
-        'baseball-c-team' => ['sport' => 'Baseball', 'level' => 'C-Team', 'teamLabel' => 'Baseball', 'label' => 'Baseball - C-Team'],
-        'boys-basketball-varsity' => ['sport' => 'Boys Basketball', 'level' => 'Varsity', 'teamLabel' => 'Boys', 'label' => 'Boys Basketball - Varsity'],
-        'boys-basketball-jv' => ['sport' => 'Boys Basketball', 'level' => 'JV', 'teamLabel' => 'Boys', 'label' => 'Boys Basketball - JV'],
-        'boys-soccer' => ['sport' => 'Boys Soccer', 'level' => 'Varsity', 'teamLabel' => 'Boys', 'label' => 'Boys Soccer'],
-        'boys-soccer-jv' => ['sport' => 'Boys Soccer', 'level' => 'JV', 'teamLabel' => 'Boys', 'label' => 'Boys Soccer - JV'],
-        'cheer-competition' => ['sport' => 'Cheer', 'level' => 'Competition', 'teamLabel' => 'Cheer', 'label' => 'Cheer - Competition'],
-        'cheer-sideline' => ['sport' => 'Cheer', 'level' => 'Sideline', 'teamLabel' => 'Cheer', 'label' => 'Cheer - Sideline'],
-        'cross-country' => ['sport' => 'Cross Country', 'level' => 'Varsity', 'teamLabel' => 'Cross Country', 'label' => 'Cross Country'],
-        'football-varsity' => ['sport' => 'Football', 'level' => 'Varsity', 'teamLabel' => 'Football', 'label' => 'Football - Varsity'],
-        'football-jv' => ['sport' => 'Football', 'level' => 'JV', 'teamLabel' => 'Football', 'label' => 'Football - JV'],
-        'girls-basketball-varsity' => ['sport' => 'Girls Basketball', 'level' => 'Varsity', 'teamLabel' => 'Girls', 'label' => 'Girls Basketball - Varsity'],
-        'girls-basketball-jv' => ['sport' => 'Girls Basketball', 'level' => 'JV', 'teamLabel' => 'Girls', 'label' => 'Girls Basketball - JV'],
-        'girls-soccer' => ['sport' => 'Girls Soccer', 'level' => 'Varsity', 'teamLabel' => 'Girls', 'label' => 'Girls Soccer'],
-        'girls-soccer-jv' => ['sport' => 'Girls Soccer', 'level' => 'JV', 'teamLabel' => 'Girls', 'label' => 'Girls Soccer - JV'],
-        'golf' => ['sport' => 'Golf', 'level' => 'Varsity', 'teamLabel' => 'Golf', 'label' => 'Golf'],
-        'softball-jv' => ['sport' => 'Softball', 'level' => 'JV', 'teamLabel' => 'Softball', 'label' => 'Softball - JV'],
-        'softball-varsity' => ['sport' => 'Softball', 'level' => 'Varsity', 'teamLabel' => 'Softball', 'label' => 'Softball - Varsity'],
-        'track-and-field' => ['sport' => 'Track and Field', 'level' => 'Varsity', 'teamLabel' => 'Track and Field', 'label' => 'Track and Field'],
-        'volleyball-varsity' => ['sport' => 'Volleyball', 'level' => 'Varsity', 'teamLabel' => 'Volleyball', 'label' => 'Volleyball - Varsity'],
-        'volleyball-jv' => ['sport' => 'Volleyball', 'level' => 'JV', 'teamLabel' => 'Volleyball', 'label' => 'Volleyball - JV'],
-        'wrestling' => ['sport' => 'Wrestling', 'level' => 'Varsity', 'teamLabel' => 'Wrestling', 'label' => 'Wrestling'],
-    ];
+    return byline_get_sports_teams();
 }
 
 function wwh_infer_sport_key(string $sport, string $level): string
@@ -1609,10 +1690,10 @@ function wwh_register_game_embed_block(): void
 
     register_block_type('weekly-wildcat/game-embed', [
         'api_version' => 2,
-        'title' => 'Weekly Wildcat Game Embed',
+        'title' => 'Byline Game Embed',
         'category' => 'widgets',
         'icon' => 'awards',
-        'description' => 'Embed a live Weekly Wildcat sports game card by storing only the selected game ID.',
+        'description' => 'Embed a live Byline sports game card by storing only the selected game ID.',
         'editor_script' => 'wwh-game-linking-editor',
         'render_callback' => 'wwh_render_game_embed_block',
         'attributes' => [
@@ -1660,8 +1741,8 @@ function wwh_register_admin_pages(): void
     );
 
     add_options_page(
-        'Weekly Wildcat Bridge Settings',
-        'Weekly Wildcat Bridge',
+        'Byline Legacy Integration Settings',
+        'Byline Legacy Settings',
         'manage_options',
         'wwh-settings',
         'wwh_render_settings_page'
@@ -1683,6 +1764,7 @@ function wwh_cloudflare_deploy_post_types(): array
 
     $post_types = array_values(array_unique($post_types));
 
+    $post_types = apply_filters('byline_deployment_post_types', $post_types);
     return apply_filters('wwh_cloudflare_deploy_post_types', $post_types);
 }
 
@@ -1735,57 +1817,19 @@ add_action('before_delete_post', 'wwh_maybe_schedule_cloudflare_deploy_for_delet
 
 function wwh_schedule_cloudflare_deploy(): void
 {
-    if (wwh_cloudflare_deploy_hook_url() === '' || wp_next_scheduled(WWH_CLOUDFLARE_DEPLOY_EVENT)) {
-        return;
-    }
-
-    $scheduled = wp_schedule_single_event(time() + 60, WWH_CLOUDFLARE_DEPLOY_EVENT);
-
-    if (!$scheduled) {
-        error_log('Weekly Wildcat Bridge: Cloudflare deploy trigger could not be scheduled.');
-    }
+    byline_schedule_deployment('legacy-alias');
 }
 
 function wwh_trigger_cloudflare_deploy(): void
 {
-    $url = wwh_cloudflare_deploy_hook_url();
-
-    if ($url === '') {
-        update_option(WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION, 'Not configured', false);
-        return;
-    }
-
-    $response = wp_remote_post($url, [
-        'blocking' => true,
-        'headers' => [
-            'User-Agent' => 'Weekly Wildcat Bridge',
-        ],
-        'redirection' => 0,
-        'timeout' => 10,
-    ]);
-
-    update_option(WWH_CLOUDFLARE_DEPLOY_LAST_TRIGGERED_OPTION, (string) time(), false);
-
-    if (is_wp_error($response)) {
-        update_option(WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION, 'Request failed', false);
-        error_log('Weekly Wildcat Bridge: Cloudflare deploy hook request failed.');
-        return;
-    }
-
-    $code = (int) wp_remote_retrieve_response_code($response);
-    $status = $code > 0 ? sprintf('HTTP %d', $code) : 'No HTTP status';
-
-    update_option(WWH_CLOUDFLARE_DEPLOY_LAST_STATUS_OPTION, $status, false);
-
-    if ($code < 200 || $code >= 300) {
-        error_log(sprintf('Weekly Wildcat Bridge: Cloudflare deploy hook returned HTTP %d.', $code));
-    }
+    byline_trigger_deployment('legacy-event');
 }
 add_action(WWH_CLOUDFLARE_DEPLOY_EVENT, 'wwh_trigger_cloudflare_deploy');
 
 function wwh_clear_scheduled_cloudflare_deploy(): void
 {
     wp_clear_scheduled_hook(WWH_CLOUDFLARE_DEPLOY_EVENT);
+    byline_clear_scheduled_deployment();
 }
 register_deactivation_hook(__FILE__, 'wwh_clear_scheduled_cloudflare_deploy');
 
@@ -2189,9 +2233,10 @@ add_action('init', 'wwh_register_attachment_meta');
 
 function wwh_add_meta_boxes(): void
 {
+    $publication_name = byline_get_publication_config()['identity']['shortName'];
     add_meta_box(
         'wwh_homepage_treatment',
-        'Weekly Wildcat Homepage',
+        $publication_name . ' Homepage',
         'wwh_render_homepage_treatment_meta_box',
         'post',
         'side',
@@ -2200,7 +2245,7 @@ function wwh_add_meta_boxes(): void
 
     add_meta_box(
         'wwh_article_hero',
-        'Weekly Wildcat Article Hero',
+        $publication_name . ' Article Hero',
         'wwh_render_article_hero_meta_box',
         'post',
         'side',
@@ -2367,13 +2412,13 @@ function wwh_render_sports_game_meta_box(WP_Post $post): void
         'neutral' => 'Neutral',
     ]);
     wwh_field('Location Name', 'ww_location_name', wwh_meta_value($post->ID, '_ww_location_name', wwh_meta_value($post->ID, '_ww_location')));
-    wwh_field('Location Address', 'ww_location_address', wwh_meta_value($post->ID, '_ww_location_address'), 'text', ['placeholder' => '640 South Cambridge Street, Ninety Six, SC']);
+    wwh_field('Location Address', 'ww_location_address', wwh_meta_value($post->ID, '_ww_location_address'), 'text', ['placeholder' => byline_get_publication_config()['location']['address']]);
     wwh_field('Latitude', 'ww_location_latitude', wwh_meta_value($post->ID, '_ww_location_latitude'), 'text', ['inputmode' => 'decimal', 'placeholder' => '34.1750']);
     wwh_field('Longitude', 'ww_location_longitude', wwh_meta_value($post->ID, '_ww_location_longitude'), 'text', ['inputmode' => 'decimal', 'placeholder' => '-82.0240']);
     wwh_field('Apple Maps Place ID', 'ww_location_apple_maps_id', wwh_meta_value($post->ID, '_ww_location_apple_maps_id'));
     wwh_field('Start Date / Time', 'ww_start_datetime', wwh_meta_value($post->ID, '_ww_start_datetime'), 'datetime-local');
     wwh_select('Status', 'ww_game_status', wwh_meta_value($post->ID, '_ww_game_status', 'upcoming'), wwh_sports_game_status_options());
-    wwh_field('Wildcats Score', 'ww_wildcats_score', wwh_meta_value($post->ID, '_ww_wildcats_score'), 'number', ['min' => '0']);
+    wwh_field('Publication Team Score', 'ww_wildcats_score', wwh_meta_value($post->ID, '_ww_wildcats_score'), 'number', ['min' => '0']);
     wwh_field('Opponent Score', 'ww_opponent_score', wwh_meta_value($post->ID, '_ww_opponent_score'), 'number', ['min' => '0']);
     wwh_field('Recap URL', 'ww_recap_url', wwh_meta_value($post->ID, '_ww_recap_url'), 'url');
     wwh_textarea('Notes', 'ww_notes', wwh_meta_value($post->ID, '_ww_notes'));
@@ -2495,9 +2540,9 @@ function wwh_attachment_fields_to_edit(array $form_fields, WP_Post $post): array
         $help = '';
 
         if ($key === 'credit_text') {
-            $help = 'Example: Gibson Bell for Weekly Wildcat. This appears over the image on the public site.';
+            $help = sprintf('Example: Photographer for %s. This appears over the image on the public site.', byline_get_publication_config()['identity']['shortName']);
         } elseif (in_array($key, ['copyright_notice', 'license_url', 'acquire_license_url'], true)) {
-            $help = 'Leave blank to use the sitewide Weekly Wildcat image license default.';
+            $help = 'Leave blank to use the publication-wide image license default.';
         }
 
         $form_fields['ww_image_' . $key] = [
@@ -2730,8 +2775,8 @@ function wwh_render_sports_import_page(): void
                 <tr>
                     <th scope="row"><label for="wwh_import_data">Paste Data</label></th>
                     <td>
-                        <textarea id="wwh_import_data" name="wwh_import_data" rows="12" class="large-text code" placeholder="Season	Date	Time	Site	Opponent	Result	Ninety Six Score	Opponent Score	Game Type	Watch Replay"><?php echo esc_textarea($import_data); ?></textarea>
-                        <p class="description">Expected columns: Season, Date, Time, Site, Opponent, Result, Ninety Six Score, Opponent Score, Game Type, Watch Replay.</p>
+                        <textarea id="wwh_import_data" name="wwh_import_data" rows="12" class="large-text code" placeholder="Season	Date	Time	Site	Opponent	Result	Team Score	Opponent Score	Game Type	Watch Replay"><?php echo esc_textarea($import_data); ?></textarea>
+                        <p class="description">Expected columns: Season, Date, Time, Site, Opponent, Result, Team Score, Opponent Score, Game Type, Watch Replay. The legacy “Ninety Six Score” heading is still accepted.</p>
                     </td>
                 </tr>
             </table>
@@ -2834,7 +2879,7 @@ function wwh_export_sports_games(): void
 
     check_admin_referer('wwh_export_sports_games', 'wwh_sports_export_nonce');
 
-    $filename = 'weekly-wildcat-sports-games-' . wp_date('Y-m-d') . '.csv';
+    $filename = sanitize_title(byline_get_publication_config()['identity']['shortName']) . '-sports-games-' . wp_date('Y-m-d') . '.csv';
 
     nocache_headers();
     header('Content-Type: text/csv; charset=utf-8');
@@ -2875,7 +2920,7 @@ function wwh_sports_export_columns(): array
         'Site',
         'Opponent',
         'Result',
-        'Ninety Six Score',
+        'Team Score',
         'Opponent Score',
         'Game Type',
         'Watch Replay',
@@ -3081,7 +3126,9 @@ function wwh_parse_sports_import_rows(string $raw_data): array
             'site' => wwh_import_cell($columns, $header_map, 'site'),
             'opponent' => wwh_import_cell($columns, $header_map, 'opponent'),
             'result' => wwh_import_cell($columns, $header_map, 'result'),
-            'wildcats_score' => wwh_import_cell($columns, $header_map, 'ninetysixscore'),
+            'wildcats_score' => wwh_import_cell($columns, $header_map, 'teamscore') !== ''
+                ? wwh_import_cell($columns, $header_map, 'teamscore')
+                : wwh_import_cell($columns, $header_map, 'ninetysixscore'),
             'opponent_score' => wwh_import_cell($columns, $header_map, 'opponentscore'),
             'game_type' => wwh_import_cell($columns, $header_map, 'gametype'),
             'watch_replay' => wwh_import_cell($columns, $header_map, 'watchreplay'),
@@ -3633,7 +3680,7 @@ function wwh_render_author_profile_fields(WP_User $user): void
     $photo = wwh_author_profile_photo($photo_id);
 
     ?>
-    <h2>Weekly Wildcat Profile</h2>
+    <h2><?php echo esc_html(byline_get_publication_config()['identity']['shortName']); ?> Profile</h2>
     <table class="form-table wwh-author-profile" role="presentation">
         <tr>
             <th><label for="ww_author_role">Role</label></th>
@@ -3992,28 +4039,61 @@ function wwh_register_rest_routes(): void
         'permission_callback' => '__return_true',
     ]);
 
+    // Canonical Byline aliases; legacy routes remain registered above for existing consumers.
+    foreach ([
+        '/sports/games' => 'wwh_rest_sports_games',
+        '/sports/games/facets' => 'wwh_rest_sports_game_facets',
+        '/sports/games/upcoming' => 'wwh_rest_upcoming_sports_games',
+        '/sports/games/recent' => 'wwh_rest_recent_sports_games',
+        '/events' => 'wwh_rest_school_events',
+        '/authors' => 'wwh_rest_authors',
+    ] as $route => $callback) {
+        register_rest_route(BYLINE_REST_NAMESPACE, $route, [
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => $callback,
+            'permission_callback' => '__return_true',
+        ]);
+    }
+
+    register_rest_route(BYLINE_REST_NAMESPACE, '/sports/games/(?P<id>\d+)', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'wwh_rest_sports_game',
+        'permission_callback' => '__return_true',
+        'args' => [
+            'id' => ['type' => 'integer', 'required' => true, 'sanitize_callback' => 'absint'],
+        ],
+    ]);
+
     register_rest_field('user', 'weeklyWildcatProfile', [
         'get_callback' => 'wwh_rest_author_profile',
         'schema' => [
-            'description' => 'Weekly Wildcat author profile fields.',
+            'description' => 'Byline author profile fields (legacy field name retained).',
             'type' => 'object',
             'context' => ['view', 'edit'],
         ],
+    ]);
+    register_rest_field('user', 'bylineProfile', [
+        'get_callback' => 'wwh_rest_author_profile',
+        'schema' => ['description' => 'Byline author profile fields.', 'type' => 'object', 'context' => ['view', 'edit']],
     ]);
 
     register_rest_field('attachment', 'weeklyWildcatImage', [
         'get_callback' => 'wwh_rest_image_credit',
         'schema' => [
-            'description' => 'Weekly Wildcat image credit and license metadata.',
+            'description' => 'Byline image credit and license metadata (legacy field name retained).',
             'type' => 'object',
             'context' => ['view', 'edit'],
         ],
+    ]);
+    register_rest_field('attachment', 'bylineImage', [
+        'get_callback' => 'wwh_rest_image_credit',
+        'schema' => ['description' => 'Byline image credit and license metadata.', 'type' => 'object', 'context' => ['view', 'edit']],
     ]);
 
     register_rest_field('post', 'weeklyWildcat', [
         'get_callback' => 'wwh_rest_post_settings',
         'schema' => [
-            'description' => 'Weekly Wildcat post display settings.',
+            'description' => 'Byline post display settings (legacy field name retained).',
             'type' => 'object',
             'context' => ['view', 'edit'],
             'properties' => [
@@ -4031,6 +4111,10 @@ function wwh_register_rest_routes(): void
                 ],
             ],
         ],
+    ]);
+    register_rest_field('post', 'byline', [
+        'get_callback' => 'wwh_rest_post_settings',
+        'schema' => ['description' => 'Byline post display settings.', 'type' => 'object', 'context' => ['view', 'edit']],
     ]);
 }
 add_action('rest_api_init', 'wwh_register_rest_routes');
@@ -4146,6 +4230,7 @@ function wwh_rest_authors(): WP_REST_Response
             'description' => get_user_meta((int) $user->ID, 'description', true),
             'url' => $user->user_url,
             'link' => get_author_posts_url((int) $user->ID, $user->user_nicename),
+            'bylineProfile' => wwh_rest_author_profile(['id' => (int) $user->ID]),
             'weeklyWildcatProfile' => wwh_rest_author_profile(['id' => (int) $user->ID]),
         ];
 
@@ -4548,11 +4633,18 @@ function wwh_format_sports_team(string $team_key, array $team): array
     $header_focal_y = wwh_normalize_focal_coordinate(wwh_sports_team_setting($team_key, 'headerFocalY'));
 
     return [
+        'id' => $team_key,
         'key' => $team_key,
         'sport' => (string) ($team['sport'] ?? ''),
         'level' => (string) ($team['level'] ?? ''),
-        'teamLabel' => (string) ($team['teamLabel'] ?? ''),
-        'label' => (string) ($team['label'] ?? $team_key),
+        'genderDivision' => (string) ($team['genderDivision'] ?? ''),
+        'slug' => (string) ($team['slug'] ?? $team_key),
+        'active' => (bool) ($team['active'] ?? true),
+        'displayName' => (string) ($team['displayName'] ?? $team['label'] ?? $team_key),
+        'shortName' => (string) ($team['shortName'] ?? $team['teamLabel'] ?? ''),
+        'scoreboardName' => (string) ($team['scoreboardName'] ?? $team['shortName'] ?? $team['teamLabel'] ?? ''),
+        'teamLabel' => (string) ($team['teamLabel'] ?? $team['shortName'] ?? ''),
+        'label' => (string) ($team['label'] ?? $team['displayName'] ?? $team_key),
         'headerImage' => wwh_media_image($header_id, 'large'),
         'headerImageFocalPoint' => [
             'x' => $header_focal_x,
@@ -4755,7 +4847,8 @@ function wwh_format_sports_game(WP_Post $post): array
     $wildcats_score = wwh_meta_value($post->ID, '_ww_wildcats_score');
     $opponent_score = wwh_meta_value($post->ID, '_ww_opponent_score');
     $show_score = wwh_sports_game_status_shows_score($status) && $wildcats_score !== '' && $opponent_score !== '';
-    $matchup = $opponent !== '' ? sprintf('Wildcats %s %s', $site === 'away' ? 'at' : 'vs.', $opponent) : get_the_title($post);
+    $home_label = (string) ($sport_option['scoreboardName'] ?? $sport_option['shortName'] ?? byline_get_publication_config()['identity']['shortName']);
+    $matchup = $opponent !== '' ? sprintf('%s %s %s', $home_label, $site === 'away' ? 'at' : 'vs.', $opponent) : get_the_title($post);
     $sport = $sport_option['sport'] ?? wwh_meta_value($post->ID, '_ww_sport');
     $level = $sport_option['level'] ?? wwh_meta_value($post->ID, '_ww_level');
     $sport_level = trim(implode(' · ', array_filter([$sport, $level])));
@@ -4783,6 +4876,7 @@ function wwh_format_sports_game(WP_Post $post): array
         'season' => wwh_sports_game_season($post->ID, $start),
         'status' => $status,
         'wildcatsScore' => $show_score ? absint($wildcats_score) : null,
+        'teamScore' => $show_score ? absint($wildcats_score) : null,
         'opponentScore' => $show_score ? absint($opponent_score) : null,
         'recapUrl' => wwh_meta_value($post->ID, '_ww_recap_url'),
         'notes' => wwh_meta_value($post->ID, '_ww_notes'),
@@ -4791,11 +4885,15 @@ function wwh_format_sports_game(WP_Post $post): array
             'date' => $start !== '' ? wwh_format_date_text($start) : 'TBA',
             'location' => $location_name !== '' ? $location_name : $location_address,
             'status' => wwh_label_from_value($status),
-            'score' => $show_score ? sprintf('Wildcats %d, %s %d', absint($wildcats_score), $opponent !== '' ? $opponent : 'Opponent', absint($opponent_score)) : null,
+            'score' => $show_score ? sprintf('%s %d, %s %d', $home_label, absint($wildcats_score), $opponent !== '' ? $opponent : 'Opponent', absint($opponent_score)) : null,
             'sportLevel' => $sport_level,
             'scoreboard' => [
                 'wildcats' => [
-                    'label' => 'Wildcats',
+                    'label' => $home_label,
+                    'score' => $show_score ? absint($wildcats_score) : null,
+                ],
+                'team' => [
+                    'label' => $home_label,
                     'score' => $show_score ? absint($wildcats_score) : null,
                 ],
                 'opponent' => [
@@ -4809,7 +4907,7 @@ function wwh_format_sports_game(WP_Post $post): array
 
 function wwh_public_site_url(): string
 {
-    return untrailingslashit((string) apply_filters('wwh_public_site_url', 'https://weeklywildcat.com'));
+    return untrailingslashit((string) apply_filters('wwh_public_site_url', byline_get_publication_config()['urls']['publicSite']));
 }
 
 function wwh_game_center_url(int $game_id): string
@@ -4835,7 +4933,7 @@ function wwh_render_game_card_html(array $game, string $display): string
 {
     $status = (string) ($game['status'] ?? 'upcoming');
     $scoreboard = $game['display']['scoreboard'] ?? [];
-    $wildcats = $scoreboard['wildcats'] ?? ['label' => 'Wildcats', 'score' => null];
+    $wildcats = $scoreboard['team'] ?? $scoreboard['wildcats'] ?? ['label' => byline_get_publication_config()['identity']['shortName'], 'score' => null];
     $opponent = $scoreboard['opponent'] ?? ['label' => 'Opponent', 'score' => null];
     $wildcats_score = $wildcats['score'];
     $opponent_score = $opponent['score'];
@@ -4847,7 +4945,7 @@ function wwh_render_game_card_html(array $game, string $display): string
     $location = (string) ($game['display']['location'] ?? $game['locationName'] ?? $game['locationAddress'] ?? '');
     $sport_level = (string) ($game['display']['sportLevel'] ?? $game['sportLabel'] ?? 'Sports');
     $status_label = (string) ($game['display']['status'] ?? wwh_label_from_value($status));
-    $matchup = (string) ($game['display']['matchup'] ?? $game['title'] ?? 'Weekly Wildcat game');
+    $matchup = (string) ($game['display']['matchup'] ?? $game['title'] ?? 'Publication game');
     $game_url = wwh_game_center_url(absint($game['id'] ?? 0));
 
     ob_start();
@@ -4865,7 +4963,7 @@ function wwh_render_game_card_html(array $game, string $display): string
         <?php if ($has_score) : ?>
             <div class="article-game-scoreboard" aria-label="<?php echo esc_attr((string) ($game['display']['score'] ?? 'Final score')); ?>">
                 <div class="<?php echo esc_attr($wildcats_won ? 'article-game-team article-game-team-winner' : 'article-game-team'); ?>">
-                    <span><?php echo esc_html((string) ($wildcats['label'] ?? 'Wildcats')); ?></span>
+                    <span><?php echo esc_html((string) ($wildcats['label'] ?? byline_get_publication_config()['identity']['shortName'])); ?></span>
                     <strong><?php echo esc_html((string) $wildcats_score); ?></strong>
                 </div>
                 <div class="<?php echo esc_attr($opponent_won ? 'article-game-team article-game-team-winner' : 'article-game-team'); ?>">
