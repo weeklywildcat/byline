@@ -57,7 +57,18 @@ For the first install, zip this folder and upload it in WordPress admin under Pl
 
 After the plugin is active, WordPress checks GitHub releases from:
 
-`https://github.com/weeklywildcat/byline-plugin`
+`https://github.com/weeklywildcat/byline`
+
+### Updater repository bridge
+
+Version `0.2.1` is the final compatibility bridge released from the standalone
+`weeklywildcat/byline-plugin` repository. Existing installations discover that
+release through the historical repository, install the unchanged
+`weekly-wildcat-headless/weekly-wildcat-headless.php` path, and then check the
+canonical `weeklywildcat/byline` repository for future releases. The plugin
+slug, release ZIP name, CPTs, metadata, options, and legacy REST identifiers are
+unchanged. The standalone repository and its historical releases must remain
+available until the bridge has been deployed and observed in production.
 
 Enable auto-updates for **Byline** in WordPress admin if you want future releases installed automatically.
 
@@ -72,8 +83,8 @@ To publish an update:
 3. Create and push a matching tag, for example:
 
    ```sh
-   git tag v0.2.0
-   git push origin v0.2.0
+   git tag v0.2.1
+   git push origin v0.2.1
    ```
 
 GitHub Actions packages `weekly-wildcat-headless.zip` and publishes it as a release asset. WordPress uses that release asset for plugin updates.
