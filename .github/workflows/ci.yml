@@ -1,0 +1,65 @@
+name: Monorepo CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Test, build, and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Typecheck all workspaces
+        run: npm run typecheck
+
+      - name: Test all workspaces
+        run: npm test
+
+      - name: Build Weekly Wildcat static export
+        env:
+          BYLINE_PUBLICATION_FILE: tests/fixtures/weekly-wildcat-publication.json
+        run: npm run build:frontend
+
+      - name: Build plugin and Discord workspaces
+        run: |
+          npm run build:plugin
+          npm run build:discord
+
+      - name: Build second-publication acceptance fixture
+        run: npm run test:frontend:second-publication
+
+      - name: Verify updater transition
+        run: node scripts/verify-updater-transition.mjs
+
+      - name: Validate production plugin archive
+        run: npm run package:plugin
+
+      - name: Upload plugin archive simulation
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-wildcat-headless
+          path: wordpress-plugin/release/weekly-wildcat-headless.zip
+          if-no-files-found: error

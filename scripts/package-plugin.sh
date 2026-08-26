@@ -12,10 +12,13 @@ for required_file in weekly-wildcat-headless.php build/index.js build/index.asse
   test -f "$plugin_root/$required_file"
 done
 
-if grep -Eq "['\"]react(-dom)?['\"]" "$plugin_root/build/index.asset.php"; then
-  echo "React must remain external and use WordPress-provided wp-element." >&2
-  exit 1
-fi
+asset_dependencies="$(php -r '$asset = include $argv[1]; echo implode("\n", $asset["dependencies"] ?? []);' "$plugin_root/build/index.asset.php")"
+for external_dependency in react react-dom react-jsx-runtime wp-element; do
+  if ! grep -qx "$external_dependency" <<<"$asset_dependencies"; then
+    echo "React external $external_dependency is missing from the WordPress asset manifest." >&2
+    exit 1
+  fi
+done
 
 mkdir -p "$stage_root/weekly-wildcat-headless" "$release_root"
 rsync -a "$plugin_root/" "$stage_root/weekly-wildcat-headless/" \
