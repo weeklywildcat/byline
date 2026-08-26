@@ -17,6 +17,7 @@ import { magazineTheme } from "@byline/theme-magazine";
 import { modernTheme } from "@byline/theme-modern";
 import { weeklyWildcatTheme } from "@byline/theme-weekly-wildcat";
 import { parsePublishedBylineDesign } from "@byline/design";
+import { BYLINE_BLOCK_PRESENTATIONS, getBylineBlockPresentation, themeTokensToCssVariables } from "@byline/ui";
 import northStarFixture from "./fixtures/north-star-publication.json";
 import weeklyWildcatFixture from "./fixtures/weekly-wildcat-publication.json";
 
@@ -56,6 +57,8 @@ describe("shared Byline contracts", () => {
     expect(new Set(studioBlocks)).toEqual(new Set(CORE_BYLINE_BLOCK_IDS));
     expect(new Set(weeklyWildcatTheme.capabilities.supportedBlocks)).toEqual(new Set(CORE_BYLINE_BLOCK_IDS));
     expect(BYLINE_STUDIO_VIEWPORTS.map(({ width }) => width)).toEqual([360, 768, 1280, "100%"]);
+    expect(new Set(Object.keys(BYLINE_BLOCK_PRESENTATIONS))).toEqual(new Set(CORE_BYLINE_BLOCK_IDS));
+    expect(getBylineBlockPresentation("photo-feature")?.layout).toBe("feature");
   });
 
   it("rejects invalid or duplicate theme manifests", () => {
@@ -93,6 +96,7 @@ describe("shared Byline contracts", () => {
       background: "url(https://tracker.example/pixel)",
       fontBody: "Arial; background: red"
     })).toEqual({ accent: "#008b95" });
+    expect(themeTokensToCssVariables(modernTheme.tokens)["--accent"]).toBe("#008b95");
   });
 
   it("normalizes a second publication without leaking Weekly Wildcat identity or disabled modules", () => {

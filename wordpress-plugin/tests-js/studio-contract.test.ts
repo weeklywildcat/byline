@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createStudioConfig, studioBlockGroups } from "../src/studio";
+import { createStudioConfig, getStudioThemeVariables, studioBlockGroups } from "../src/studio";
 
 describe("Byline Studio contract", () => {
   it("groups the stable newspaper block vocabulary without arbitrary code blocks", () => {
@@ -26,5 +26,6 @@ describe("Byline Studio contract", () => {
     const config = createStudioConfig("byline-magazine", { accent: "#123456" });
     expect(config.root?.render).toBeTypeOf("function");
     expect(config.categories?.Stories?.defaultExpanded).toBe(true);
+    expect(getStudioThemeVariables("byline-magazine", { accent: "#123456" })["--accent"]).toBe("#123456");
   });
 });

@@ -1,4 +1,5 @@
 import type { ResolvedDesignContentBlock } from "@byline/content";
+import { getBylineBlockPresentation } from "@byline/ui";
 import { HomepageStory } from "@/components/HomepageStory";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { PollWidget } from "@/components/PollWidget";
@@ -21,26 +22,28 @@ function heading(block: ResolvedDesignContentBlock<WordPressPost>, fallback: str
 }
 
 export function DesignHomepage({ blocks, sportsSchedule }: DesignHomepageProps) {
-  const firstSportsIndex = blocks.findIndex((block) => block.type === "sports-scores" || block.type === "sports-upcoming");
+  const firstSportsIndex = blocks.findIndex((block) => getBylineBlockPresentation(block.type)?.layout === "sports");
 
   return (
     <main className="live-home-shell byline-design-home" data-byline-design="home">
       {blocks.map((block, index) => {
         const key = typeof block.props.id === "string" ? block.props.id : `${block.type}-${index}`;
         const [lead, ...remaining] = block.stories;
+        const presentation = getBylineBlockPresentation(block.type);
+        if (!presentation) return null;
 
-        if (block.type === "story-lead") {
+        if (presentation.layout === "lead") {
           return lead ? (
-            <section className="top-stories top-stories-single" aria-label={heading(block, "Top story")} key={key}>
+            <section className="top-stories top-stories-single" aria-label={heading(block, presentation.defaultHeading)} key={key}>
               <HomepageStory post={lead} variant="lead" showDeck priority />
             </section>
           ) : null;
         }
 
-        if (["story-list", "latest-stories", "section-feed"].includes(block.type)) {
+        if (presentation.layout === "list") {
           return lead ? (
             <section className="the-brief" aria-labelledby={`${key}-heading`} key={key}>
-              <h2 id={`${key}-heading`}>{heading(block, "Latest stories")}</h2>
+              <h2 id={`${key}-heading`}>{heading(block, presentation.defaultHeading)}</h2>
               <div className="brief-digest-layout">
                 <HomepageStory post={lead} variant="brief-lead" showAuthor showDeck />
                 {remaining.length ? (
@@ -53,10 +56,10 @@ export function DesignHomepage({ blocks, sportsSchedule }: DesignHomepageProps) 
           ) : null;
         }
 
-        if (block.type === "story-grid") {
+        if (presentation.layout === "grid") {
           return block.stories.length ? (
             <section className="more-weekly" aria-labelledby={`${key}-heading`} key={key}>
-              <div className="more-weekly-header"><h2 id={`${key}-heading`}>{heading(block, "Stories")}</h2><span aria-hidden="true" /></div>
+              <div className="more-weekly-header"><h2 id={`${key}-heading`}>{heading(block, presentation.defaultHeading)}</h2><span aria-hidden="true" /></div>
               <div className="more-story-grid">
                 {block.stories.map((post, storyIndex) => (
                   <HomepageStory key={post.id} post={post} variant={storyIndex === 0 ? "more-lead" : "more-compact"} showDeck />
@@ -66,19 +69,19 @@ export function DesignHomepage({ blocks, sportsSchedule }: DesignHomepageProps) 
           ) : null;
         }
 
-        if (block.type === "featured-story" || block.type === "photo-feature") {
+        if (presentation.layout === "feature") {
           return lead ? (
             <section className="in-focus" aria-labelledby={`${key}-heading`} key={key}>
-              <div className="live-package-label" id={`${key}-heading`}>{heading(block, block.type === "photo-feature" ? "In Focus" : "Featured")}</div>
+              <div className="live-package-label" id={`${key}-heading`}>{heading(block, presentation.defaultHeading)}</div>
               <HomepageStory post={lead} variant="focus" showAuthor showDeck />
             </section>
           ) : null;
         }
 
-        if (block.type === "special-coverage") {
+        if (presentation.layout === "special") {
           return block.stories.length ? (
             <section className="special-coverage" aria-labelledby={`${key}-heading`} key={key}>
-              <div className="live-package-label" id={`${key}-heading`}>{heading(block, "Special Coverage")}</div>
+              <div className="live-package-label" id={`${key}-heading`}>{heading(block, presentation.defaultHeading)}</div>
               <div className="special-coverage-layout">
                 {block.stories.map((post, storyIndex) => (
                   <HomepageStory key={post.id} post={post} variant={storyIndex === 0 ? "special" : "briefing"} showAuthor showDeck />
@@ -88,10 +91,10 @@ export function DesignHomepage({ blocks, sportsSchedule }: DesignHomepageProps) 
           ) : null;
         }
 
-        if (block.type === "opinion-package") {
+        if (presentation.layout === "opinion") {
           return lead ? (
             <section className="opinion-package" aria-labelledby={`${key}-heading`} key={key}>
-              <div className="opinion-package-header"><h2 id={`${key}-heading`}>{heading(block, "Opinion")}</h2></div>
+              <div className="opinion-package-header"><h2 id={`${key}-heading`}>{heading(block, presentation.defaultHeading)}</h2></div>
               <div className="opinion-package-layout">
                 <HomepageStory post={lead} variant="opinion-lead" showAuthor showDeck />
                 {remaining.length ? <div className="opinion-rail">{remaining.map((post) => <HomepageStory key={post.id} post={post} variant="opinion" showAuthor showDeck />)}</div> : null}
@@ -100,35 +103,35 @@ export function DesignHomepage({ blocks, sportsSchedule }: DesignHomepageProps) 
           ) : null;
         }
 
-        if (block.type === "team-feature" || block.type === "athlete-feature") {
+        if (presentation.layout === "team-feature") {
           return lead ? (
             <section className="from-field" aria-labelledby={`${key}-heading`} key={key}>
-              <div className="section-header-row"><h2 id={`${key}-heading`}>{heading(block, block.type === "athlete-feature" ? "Athlete Feature" : "Team Feature")}</h2></div>
+              <div className="section-header-row"><h2 id={`${key}-heading`}>{heading(block, presentation.defaultHeading)}</h2></div>
               <HomepageStory post={lead} variant="field" showDeck showAuthor />
             </section>
           ) : null;
         }
 
-        if (block.type === "sports-scores" || block.type === "sports-upcoming") {
+        if (presentation.layout === "sports") {
           if (index !== firstSportsIndex || (!sportsSchedule.recentScores.length && !sportsSchedule.upcomingGames.length)) return null;
           return (
             <section className="from-field" aria-labelledby={`${key}-heading`} key={key}>
-              <div className="section-header-row"><h2 id={`${key}-heading`}>{heading(block, "Sports")}</h2></div>
+              <div className="section-header-row"><h2 id={`${key}-heading`}>{heading(block, presentation.defaultHeading)}</h2></div>
               <SportsSchedulePanel recentScores={sportsSchedule.recentScores} upcomingGames={sportsSchedule.upcomingGames} />
             </section>
           );
         }
 
-        if (block.type === "events-list") {
+        if (presentation.layout === "events") {
           return sportsSchedule.schoolEvents.length || sportsSchedule.upcomingGames.length ? (
             <section className="byline-design-utility" key={key}><ThisWeekCard maxVisibleItems={5} schoolEvents={sportsSchedule.schoolEvents} sportsGames={sportsSchedule.upcomingGames} /></section>
           ) : null;
         }
 
-        if (block.type === "poll") return <section className="byline-design-utility" key={key}><PollWidget /></section>;
-        if (block.type === "newsletter") return <section id={`newsletter-${key}`} className="home-newsletter-section" key={key}><NewsletterSignupForm /></section>;
-        if (block.type === "divider") return <hr className="byline-design-divider" key={key} />;
-        if (block.type === "section" || block.type === "columns") return null;
+        if (presentation.layout === "poll") return <section className="byline-design-utility" key={key}><PollWidget /></section>;
+        if (presentation.layout === "newsletter") return <section id={`newsletter-${key}`} className="home-newsletter-section" key={key}><NewsletterSignupForm /></section>;
+        if (presentation.layout === "divider") return <hr className="byline-design-divider" key={key} />;
+        if (presentation.layout === "structure") return null;
         return null;
       })}
     </main>
