@@ -1,0 +1,194 @@
+{
+  "capturedFrom": "pre-studio page.tsx",
+  "packageCount": 11,
+  "packages": [
+    {
+      "className": "top-stories",
+      "ariaLabel": null,
+      "ariaLabelledBy": "lead-heading",
+      "id": null
+    },
+    {
+      "className": "homepage-poll-card",
+      "ariaLabel": null,
+      "ariaLabelledBy": "homepage-poll-heading",
+      "id": null
+    },
+    {
+      "className": "this-week-card",
+      "ariaLabel": null,
+      "ariaLabelledBy": "this-week-heading",
+      "id": null
+    },
+    {
+      "className": "the-brief",
+      "ariaLabel": null,
+      "ariaLabelledBy": "brief-heading",
+      "id": null
+    },
+    {
+      "className": "in-focus",
+      "ariaLabel": null,
+      "ariaLabelledBy": "focus-heading",
+      "id": null
+    },
+    {
+      "className": "opinion-package",
+      "ariaLabel": null,
+      "ariaLabelledBy": "opinion-heading",
+      "id": null
+    },
+    {
+      "className": "from-field",
+      "ariaLabel": null,
+      "ariaLabelledBy": "field-heading",
+      "id": null
+    },
+    {
+      "className": "field-schedule-result",
+      "ariaLabel": null,
+      "ariaLabelledBy": "recent-scores-heading",
+      "id": null
+    },
+    {
+      "className": "field-schedule-upcoming",
+      "ariaLabel": null,
+      "ariaLabelledBy": "upcoming-games-heading",
+      "id": null
+    },
+    {
+      "className": "more-weekly",
+      "ariaLabel": null,
+      "ariaLabelledBy": "more-heading",
+      "id": null
+    },
+    {
+      "className": "home-newsletter-section",
+      "ariaLabel": "Newsletter signup",
+      "ariaLabelledBy": null,
+      "id": "home-newsletter"
+    }
+  ],
+  "headings": [
+    "From a Last-Minute Video to a National Finish",
+    "The Latest",
+    "FCA, First Baptist bring NSHS athletes together for breakfast",
+    "Who Could Replace Lindsey Graham in the Senate?",
+    "Weekly Wildcat Begins Website Upgrade for Faster, More Reliable News",
+    "No Parking Pass? No Parking.",
+    "Your Opinion",
+    "At NSHS",
+    "The Brief",
+    "Wildcat Courage: Funding the Fight for Safety",
+    "Seniors: Don’t Miss Your Yearbook Moment",
+    "Sneak Peak of Prom",
+    "Finding a Place in the Spotlight",
+    "Opinion",
+    "Is South Carolina Ready for a Senate Shake-Up?",
+    "Sports",
+    "Ninety Six Girls Soccer Team Kicks Off Season with Win",
+    "Soccer Season is Kicking Off",
+    "Support from Wildcat to Wildcat",
+    "SCORES &amp; SCHEDULE",
+    "More From Weekly Wildcat",
+    "A New Era For Student Journalism @ NSHS",
+    "Why Being Here Matters: Mrs. Bennett on Attendance",
+    "Building the Wildcat Identity: The Pledge That Started it",
+    "Winter Storm to Blast the Upstate",
+    "Join the Staff",
+    "Stay Connected",
+    "Get Weekly Wildcat in your inbox",
+    "Columns",
+    "Policies",
+    "About"
+  ],
+  "storyOrder": [
+    "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/",
+    "/2026/08/20/news/fca-athlete-breakfast-2026/",
+    "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/",
+    "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/",
+    "/2026/02/26/features/no-parking-pass-no-parking/",
+    "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/",
+    "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/",
+    "/2026/01/24/features/sneak-peak-of-prom/",
+    "/2026/05/13/culture/finding-a-place-in-the-spotlight/",
+    "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/",
+    "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/",
+    "/2026/02/04/sports/soccer-season-is-kicking-off/",
+    "/2026/01/23/sports/support-from-wildcat-to-wildcat/",
+    "/2026/01/22/news/a-new-era-for-student-journalism-nshs/",
+    "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/",
+    "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/",
+    "/2026/01/23/news/winter-storm-to-blast-the-upstate/"
+  ],
+  "storiesByPackage": [
+    {
+      "className": "top-stories",
+      "stories": [
+        "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/",
+        "/2026/08/20/news/fca-athlete-breakfast-2026/",
+        "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/",
+        "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/",
+        "/2026/02/26/features/no-parking-pass-no-parking/"
+      ]
+    },
+    {
+      "className": "homepage-poll-card",
+      "stories": []
+    },
+    {
+      "className": "this-week-card",
+      "stories": []
+    },
+    {
+      "className": "the-brief",
+      "stories": [
+        "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/",
+        "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/",
+        "/2026/01/24/features/sneak-peak-of-prom/"
+      ]
+    },
+    {
+      "className": "in-focus",
+      "stories": [
+        "/2026/05/13/culture/finding-a-place-in-the-spotlight/"
+      ]
+    },
+    {
+      "className": "opinion-package",
+      "stories": [
+        "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/"
+      ]
+    },
+    {
+      "className": "from-field",
+      "stories": [
+        "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/",
+        "/2026/02/04/sports/soccer-season-is-kicking-off/",
+        "/2026/01/23/sports/support-from-wildcat-to-wildcat/"
+      ]
+    },
+    {
+      "className": "field-schedule-result",
+      "stories": []
+    },
+    {
+      "className": "field-schedule-upcoming",
+      "stories": []
+    },
+    {
+      "className": "more-weekly",
+      "stories": [
+        "/2026/01/22/news/a-new-era-for-student-journalism-nshs/",
+        "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/",
+        "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/",
+        "/2026/01/23/news/winter-storm-to-blast-the-upstate/"
+      ]
+    },
+    {
+      "className": "home-newsletter-section",
+      "stories": []
+    }
+  ],
+  "duplicateStories": []
+}
