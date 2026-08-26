@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Byline
  * Description: Open-source publishing tools, design management, and integrations for student newsrooms.
- * Version: 0.2.0
+ * Version: 0.2.1
  * Author: Byline Contributors
  * License: GPL-2.0-or-later
  */
@@ -938,7 +938,7 @@ function wwh_register_update_checker(): void
     require_once $update_checker_path;
 
     $update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
-        'https://github.com/weeklywildcat/byline-plugin/',
+        'https://github.com/weeklywildcat/byline/',
         __FILE__,
         'weekly-wildcat-headless'
     );
