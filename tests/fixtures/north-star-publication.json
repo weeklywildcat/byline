@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "revision": 7,
+  "identity": {
+    "name": "North Star News",
+    "shortName": "North Star",
+    "description": "Independent student reporting from North Star Academy.",
+    "organizationName": "North Star Academy",
+    "tagline": "Independent student journalism"
+  },
+  "location": {
+    "display": "Portland, Ore.",
+    "city": "Portland",
+    "region": "Oregon",
+    "country": "US",
+    "address": "100 Example Avenue, Portland, OR"
+  },
+  "locale": "en-CA",
+  "timezone": "America/Los_Angeles",
+  "urls": {
+    "publicSite": "https://northstar.example",
+    "cms": "https://cms.northstar.example",
+    "contact": "/reach-us/"
+  },
+  "branding": {
+    "masthead": { "url": "https://cdn.northstar.example/masthead.svg", "alt": "North Star News", "width": 720, "height": 120 },
+    "logo": { "url": "https://cdn.northstar.example/logo.svg", "alt": "North Star News", "width": 320, "height": 180 },
+    "organizationLogo": { "url": "https://cdn.northstar.example/academy.png", "alt": "North Star Academy", "width": 512, "height": 512 },
+    "icons": [{ "url": "https://cdn.northstar.example/icon.png", "alt": "", "width": 192, "height": 192 }],
+    "defaultSocialImage": { "url": "https://cdn.northstar.example/social.png", "alt": "North Star News", "width": 1200, "height": 630 }
+  },
+  "appearance": {
+    "theme": "byline-modern",
+    "tokenOverrides": { "accent": "#008b95", "link": "#075c78" }
+  },
+  "sections": [
+    { "name": "Campus", "slug": "campus", "description": "Campus reporting", "active": true },
+    { "name": "Ideas", "slug": "ideas", "description": "Commentary and analysis", "active": true },
+    { "name": "Athletics", "slug": "athletics", "description": "Sports coverage", "active": false }
+  ],
+  "navigation": [
+    { "label": "Campus", "url": "/campus/", "locations": ["header", "footer"], "group": "Sections" },
+    { "label": "Ideas", "url": "/ideas/", "locations": ["header", "footer"], "group": "Sections" },
+    { "label": "Athletics", "url": "/athletics/", "locations": ["header", "footer"], "group": "Sections", "feature": "sports" },
+    { "label": "Ethics", "url": "/ethics/", "locations": ["footer"], "group": "About" }
+  ],
+  "social": [
+    { "service": "youtube", "label": "YouTube", "url": "https://youtube.com/@northstarexample" }
+  ],
+  "features": { "sports": false, "events": false, "polls": false, "newsletter": true, "discord": false },
+  "licensing": {
+    "copyrightNotice": "© North Star News",
+    "imageLicenseUrl": "/reuse/",
+    "acquireLicensePage": "/permissions/"
+  },
+  "seo": {
+    "defaultTitle": "North Star News",
+    "defaultDescription": "Independent student reporting from North Star Academy.",
+    "organizationType": "NewsMediaOrganization"
+  }
+}

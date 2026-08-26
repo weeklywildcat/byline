@@ -18,6 +18,7 @@ import {
 } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, getNewsArticleSchema, serializeJsonLd } from "@/lib/seo";
+import { getPublicationConfig } from "@/lib/publication";
 import { getSportsGameById } from "@/lib/headless";
 import {
   getAllPosts,
@@ -33,11 +34,14 @@ import {
   getPostHref,
   getPostPrimaryGameId,
   getPostRouteParts,
+  getPostSettings,
   getPostTags,
   type WordPressAuthor,
   type WordPressCategory,
   type WordPressPost
 } from "@/lib/wordpress";
+
+const publication = getPublicationConfig();
 
 type ArticleRouteParams = {
   segment: string;
@@ -112,7 +116,7 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
 export async function generateViewport({ params }: ArticlePageProps): Promise<Viewport> {
   const { articleSlug } = await params;
   const post = await getPostBySlug(articleSlug);
-  const hero = post?.weeklyWildcat?.articleHero;
+  const hero = post ? getPostSettings(post)?.articleHero : undefined;
   const heroImage = post ? getArticleHeroImage(hero, getFeaturedMedia(post)) : null;
   const backgroundColor = hero?.backgroundColor;
 
@@ -201,9 +205,9 @@ function AboutWriter({
   const photo = author ? getAuthorPhoto(author) : null;
   const socialLinks = author ? getAuthorSocialLinks(author) : [];
   const contactLink = socialLinks.find((link) => link.label === "Email");
-  const name = author?.name ?? "Weekly Wildcat Staff";
+  const name = author?.name ?? `${publication.identity.shortName} Staff`;
   const role = profile?.role || "Writer";
-  const bio = author?.description ? stripHtml(author.description) : "Stories reported by the Weekly Wildcat newsroom.";
+  const bio = author?.description ? stripHtml(author.description) : `Stories reported by the ${publication.identity.shortName} newsroom.`;
   const coverageAreas = getCoverageAreas(authorPosts);
   const profileHref = author ? getAuthorHref(author) : "/authors/";
 
@@ -288,7 +292,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const primaryGame = primaryGameId ? await getSportsGameById(primaryGameId) : null;
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
-  const articleHero = post.weeklyWildcat?.articleHero;
+  const articleHero = getPostSettings(post)?.articleHero;
   const heroImage = getArticleHeroImage(articleHero, image);
   const hasCustomHero = Boolean(articleHero?.enabled && heroImage);
   const topicTags = getPublicTopicTags(post);
@@ -338,7 +342,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             excerptHtml={excerpt}
             athleteSpotlightLabel={athleteSpotlightLabel}
             athleteSport={athleteSport}
-            authorName={author?.name ?? "Weekly Wildcat Staff"}
+            authorName={author?.name ?? `${publication.identity.shortName} Staff`}
             authorHref={author ? getAuthorHref(author) : null}
             publishedDate={post.date}
             publishedLabel={formatDisplayDate(post.date)}
@@ -372,7 +376,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                   {author ? (
                     <a href={getAuthorHref(author)}>{author.name}</a>
                   ) : (
-                    <span>Weekly Wildcat Staff</span>
+                    <span>{publication.identity.shortName} Staff</span>
                   )}
                 </p>
                 <div className="article-timing">
@@ -454,7 +458,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         <aside className="weekly-wildcat-callout" aria-labelledby="weekly-wildcat-callout-heading">
           <div>
             <h2 id="weekly-wildcat-callout-heading">Have something we should cover?</h2>
-            <p>Send a tip, correction, photo opportunity, or story idea to the Weekly Wildcat newsroom.</p>
+            <p>Send a tip, correction, photo opportunity, or story idea to the {publication.identity.shortName} newsroom.</p>
           </div>
           <a href="/contact/">Contact the newsroom</a>
         </aside>

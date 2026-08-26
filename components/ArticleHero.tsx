@@ -39,7 +39,7 @@ type ArticleHeroProps = {
 function getFeaturedHeroImage(image: WordPressMedia): ArticleHeroImage {
   const caption = image.caption?.rendered?.trim() || image.media_details?.image_meta?.caption || "";
   const credit = stripHtml(
-    image.weeklyWildcatImage?.creditText ||
+    (image.bylineImage ?? image.weeklyWildcatImage)?.creditText ||
       image.media_details?.image_meta?.credit ||
       image.media_details?.image_meta?.copyright ||
       ""

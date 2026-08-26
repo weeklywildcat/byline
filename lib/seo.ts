@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, stripHtml } from "@/lib/format";
+import { getPublicationConfig } from "@/lib/publication";
 import {
   getFeaturedMedia,
   getAuthorHref,
@@ -11,16 +12,18 @@ import {
   type WordPressPost
 } from "@/lib/wordpress";
 
-export const SITE_NAME = "Weekly Wildcat";
-export const SITE_DESCRIPTION = "Student journalism from the Weekly Wildcat newsroom in Ninety Six, South Carolina.";
-export const ORGANIZATION_LOGO_PATH = "/organization-logo.png";
-export const ORGANIZATION_LOGO_WIDTH = 1024;
-export const ORGANIZATION_LOGO_HEIGHT = 1024;
-export const DEFAULT_SOCIAL_IMAGE_PATH = "/media-kit/open-graph-social.png";
-export const DEFAULT_SOCIAL_IMAGE_WIDTH = 1200;
-export const DEFAULT_SOCIAL_IMAGE_HEIGHT = 600;
-export const DEFAULT_IMAGE_LICENSE_PATH = "/image-license/";
-export const DEFAULT_IMAGE_COPYRIGHT_NOTICE = "© Weekly Wildcat";
+const publication = getPublicationConfig();
+
+export const SITE_NAME = publication.identity.name;
+export const SITE_DESCRIPTION = publication.seo.defaultDescription;
+export const ORGANIZATION_LOGO_PATH = publication.branding.organizationLogo.url;
+export const ORGANIZATION_LOGO_WIDTH = publication.branding.organizationLogo.width;
+export const ORGANIZATION_LOGO_HEIGHT = publication.branding.organizationLogo.height;
+export const DEFAULT_SOCIAL_IMAGE_PATH = publication.branding.defaultSocialImage.url;
+export const DEFAULT_SOCIAL_IMAGE_WIDTH = publication.branding.defaultSocialImage.width;
+export const DEFAULT_SOCIAL_IMAGE_HEIGHT = publication.branding.defaultSocialImage.height;
+export const DEFAULT_IMAGE_LICENSE_PATH = publication.licensing.imageLicenseUrl;
+export const DEFAULT_IMAGE_COPYRIGHT_NOTICE = publication.licensing.copyrightNotice;
 export const SEO_ROBOTS_PREVIEW: Metadata["robots"] = {
   googleBot: {
     index: true,
@@ -130,9 +133,9 @@ export function buildSocialImageMetadata(image?: SeoImage | null) {
   return [
     {
       url: absoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
-      width: DEFAULT_SOCIAL_IMAGE_WIDTH,
-      height: DEFAULT_SOCIAL_IMAGE_HEIGHT,
-      alt: SITE_NAME
+      width: DEFAULT_SOCIAL_IMAGE_WIDTH ?? undefined,
+      height: DEFAULT_SOCIAL_IMAGE_HEIGHT ?? undefined,
+      alt: publication.branding.defaultSocialImage.alt || SITE_NAME
     }
   ];
 }
@@ -173,7 +176,7 @@ export function buildPageMetadata({
       description: trimmedDescription,
       url,
       siteName: SITE_NAME,
-      locale: "en_US",
+      locale: publication.locale.replace(/-/g, "_"),
       type,
       images
     },
@@ -188,14 +191,14 @@ export function buildPageMetadata({
 
 export function getPublisherSchema() {
   return {
-    "@type": "Organization",
+    "@type": publication.seo.organizationType,
     name: SITE_NAME,
     url: getSiteUrl(),
     logo: {
       "@type": "ImageObject",
       url: absoluteUrl(ORGANIZATION_LOGO_PATH),
-      width: ORGANIZATION_LOGO_WIDTH,
-      height: ORGANIZATION_LOGO_HEIGHT
+      width: ORGANIZATION_LOGO_WIDTH ?? undefined,
+      height: ORGANIZATION_LOGO_HEIGHT ?? undefined
     }
   };
 }
@@ -248,8 +251,8 @@ function getArticleImageSchema(image: WordPressMedia | null) {
         "@type": "ImageObject",
         contentUrl: absoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
         url: absoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
-        width: DEFAULT_SOCIAL_IMAGE_WIDTH,
-        height: DEFAULT_SOCIAL_IMAGE_HEIGHT,
+        width: DEFAULT_SOCIAL_IMAGE_WIDTH ?? undefined,
+        height: DEFAULT_SOCIAL_IMAGE_HEIGHT ?? undefined,
         copyrightNotice: DEFAULT_IMAGE_COPYRIGHT_NOTICE,
         license: absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH),
         acquireLicensePage: absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH)
@@ -257,7 +260,7 @@ function getArticleImageSchema(image: WordPressMedia | null) {
     ];
   }
 
-  const imageCredit = image.weeklyWildcatImage;
+  const imageCredit = image.bylineImage ?? image.weeklyWildcatImage;
   const imageUrl = absoluteUrl(image.source_url);
   const creator = imageCredit?.creator;
   const copyrightNotice =
@@ -317,7 +320,7 @@ export function getNewsArticleSchema(post: WordPressPost) {
     dateModified: post.modified,
     author: {
       "@type": "Person",
-      name: author?.name ?? "Weekly Wildcat Staff",
+      name: author?.name ?? `${publication.identity.shortName} Staff`,
       url: author ? absoluteUrl(getAuthorHref(author)) : undefined
     },
     publisher: getPublisherSchema(),

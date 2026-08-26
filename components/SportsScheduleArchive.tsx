@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { SectionHeader } from "@/components/SectionHeader";
 import type { SportsGame } from "@/lib/headless";
+import { getPublicationConfig } from "@/lib/publication";
 
 type SportsScheduleArchiveProps = {
   apiBaseUrl?: string;
@@ -87,11 +88,12 @@ function getOpponent(game: SportsGame) {
 }
 
 function getScoreboard(game: SportsGame) {
+  const team = game.display.scoreboard?.team ?? game.display.scoreboard?.wildcats ?? {
+    label: getPublicationConfig().identity.shortName,
+    score: game.teamScore ?? game.wildcatsScore
+  };
   return {
-    wildcats: game.display.scoreboard?.wildcats ?? {
-      label: "Wildcats",
-      score: game.wildcatsScore
-    },
+    wildcats: team,
     opponent: game.display.scoreboard?.opponent ?? {
       label: getOpponent(game),
       score: game.opponentScore
@@ -311,6 +313,7 @@ function ScheduleGameCard({ game }: { game: SportsGame }) {
 }
 
 export function SportsScheduleArchive({ apiBaseUrl, dataUrl, games, sports, summaries, years }: SportsScheduleArchiveProps) {
+  const publication = getPublicationConfig();
   const [year, setYear] = useState("all");
   const [sport, setSport] = useState("all");
   const [loadedGames, setLoadedGames] = useState(games);
@@ -318,7 +321,7 @@ export function SportsScheduleArchive({ apiBaseUrl, dataUrl, games, sports, summ
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const fallbackMetadata = useMemo(() => buildFallbackMetadata(games), [games]);
-  const apiUrl = apiBaseUrl || process.env.NEXT_PUBLIC_WP_API_URL || "https://cms.weeklywildcat.com/wp-json/wp/v2";
+  const apiUrl = apiBaseUrl || `${publication.urls.cms.replace(/\/$/, "")}/wp-json/wp/v2`;
   const filterYears = years ?? fallbackMetadata.years;
   const filterSports = sports ?? fallbackMetadata.sports;
   const scheduleSummaries = summaries ?? fallbackMetadata.summaries;
@@ -375,7 +378,7 @@ export function SportsScheduleArchive({ apiBaseUrl, dataUrl, games, sports, summ
         href={dataUrl}
         id="schedule-archive-heading"
         title="Schedule"
-        description="Scores and upcoming games from Weekly Wildcat sports coverage."
+        description={`Scores and upcoming games from ${publication.identity.shortName} sports coverage.`}
         level={1}
       />
 

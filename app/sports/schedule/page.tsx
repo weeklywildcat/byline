@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { SportsScheduleArchive } from "@/components/SportsScheduleArchive";
 import { getSportsGameFacets, getSportsGames, type SportsGame, type SportsGameFacets } from "@/lib/headless";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getWordPressApiUrl } from "@/lib/wordpress";
+import { getPublicationConfig } from "@/lib/publication";
 
 const INITIAL_SCHEDULE_LIMIT = 25;
 const DEFAULT_RAW_DATA_LIMIT = 5000;
+const publication = getPublicationConfig();
 
 type ScheduleSummary = {
   games: number;
@@ -140,7 +143,7 @@ async function getScheduleFacets(fallbackGames: SportsGame[]): Promise<SportsGam
 
 const pageMetadata = buildPageMetadata({
   title: "Game History & Schedule",
-  description: "Previous scores and upcoming games for Weekly Wildcat sports coverage.",
+  description: `Previous scores and upcoming games for ${publication.identity.shortName} sports coverage.`,
   path: "/sports/schedule/"
 });
 
@@ -155,6 +158,7 @@ export const metadata: Metadata = {
 };
 
 export default async function SportsSchedulePage() {
+  if (!publication.features.sports) notFound();
   const initialGames = await getSportsGames(INITIAL_SCHEDULE_LIMIT).catch(() => []);
   const scheduleMetadata = await getScheduleFacets(initialGames);
   const rawDataLimit = Math.max(scheduleMetadata.summaries[getSummaryKey()]?.games ?? 0, DEFAULT_RAW_DATA_LIMIT);

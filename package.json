@@ -1,16 +1,21 @@
 {
   "name": "byline",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "postbuild": "node scripts/copy-wordpress-media-to-out.mjs",
+    "dev": "node scripts/next-with-publication.mjs dev",
+    "build": "node scripts/next-with-publication.mjs build",
+    "postbuild": "node scripts/copy-wordpress-media-to-out.mjs && node scripts/generate-byline-manifest.mjs && node scripts/verify-static-export.mjs",
+    "test": "vitest run",
+    "test:second-publication": "BYLINE_PUBLICATION_FILE=tests/fixtures/north-star-publication.json BYLINE_DESIGNS_FILE=tests/fixtures/north-star-designs.json BYLINE_CONTENT_MODE=north-star-fixture npm run build && node scripts/verify-second-publication.mjs",
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",
-    "next": "16.2.9",
+    "next": "^16.3.2",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
@@ -18,6 +23,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "^4.1.11"
   }
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
+import { DesignHomepage } from "@/components/DesignHomepage";
 import { HomepageStory } from "@/components/HomepageStory";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { PollWidget } from "@/components/PollWidget";
@@ -7,7 +8,7 @@ import { SiteIcon } from "@/components/SiteIcon";
 import { SportsAthleteFeature } from "@/components/SportsAthleteFeature";
 import { SportsSchedulePanel } from "@/components/SportsSchedulePanel";
 import { ThisWeekCard } from "@/components/ThisWeekCard";
-import { filterPublicHomepagePosts, isAthleteSpotlightPost, isSpecialCoveragePost } from "@/lib/content";
+import { filterPublicHomepagePosts } from "@/lib/content";
 import {
   getRecentSportsGames,
   getSchoolEvents,
@@ -15,90 +16,37 @@ import {
   type SchoolEvent,
   type SportsGame
 } from "@/lib/headless";
-import { absoluteUrl, buildPageMetadata, getWebsiteSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
-import { getFeaturedMedia, getAllPosts, getPostCategories, type WordPressPost } from "@/lib/wordpress";
+import { resolveWeeklyWildcatHomepage } from "@/lib/homepage-selection";
+import { getPublishedDesign } from "@/lib/designs";
+import { resolvePublishedDesignBlocks } from "@/lib/design-resolution";
+import { getPublicationConfig } from "@/lib/publication";
+import { buildPageMetadata, getWebsiteSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
+import { getAllPosts, getPostSettings } from "@/lib/wordpress";
+
+const publication = getPublicationConfig();
+const socialIcons: Record<string, string> = {
+  facebook: "ph:facebook-logo",
+  instagram: "ph:instagram-logo",
+  linkedin: "ph:linkedin-logo",
+  tiktok: "ph:tiktok-logo",
+  youtube: "ph:youtube-logo"
+};
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Weekly Wildcat",
+  title: publication.seo.defaultTitle,
   description: SITE_DESCRIPTION,
   path: "/"
 });
 
-function hasCategory(post: WordPressPost, slugs: string[]) {
-  const slugSet = new Set(slugs);
-
-  return getPostCategories(post).some((category) => slugSet.has(category.slug));
-}
-
-function takeUnused(posts: WordPressPost[], usedPostIds: Set<number>, count: number, predicate = (_post: WordPressPost) => true) {
-  const selected: WordPressPost[] = [];
-
-  for (const post of posts) {
-    if (usedPostIds.has(post.id) || !predicate(post)) {
-      continue;
-    }
-
-    selected.push(post);
-    usedPostIds.add(post.id);
-
-    if (selected.length === count) {
-      break;
-    }
-  }
-
-  return selected;
-}
-
-function takeOneUnused(posts: WordPressPost[], usedPostIds: Set<number>, predicate: (post: WordPressPost) => boolean) {
-  return takeUnused(posts, usedPostIds, 1, predicate)[0] ?? null;
-}
-
-function takeDiverseUnused(
-  posts: WordPressPost[],
-  usedPostIds: Set<number>,
-  count: number,
-  categorySlugs: string[]
-) {
-  const selected: WordPressPost[] = [];
-  const oldFirstPosts = [...posts].reverse();
-
-  const addPost = (post: WordPressPost) => {
-    selected.push(post);
-    usedPostIds.add(post.id);
-  };
-
-  for (const slug of categorySlugs) {
-    const post = oldFirstPosts.find((candidate) => !usedPostIds.has(candidate.id) && hasCategory(candidate, [slug]));
-
-    if (post) {
-      addPost(post);
-    }
-
-    if (selected.length === count) {
-      return selected;
-    }
-  }
-
-  for (const post of oldFirstPosts) {
-    if (usedPostIds.has(post.id)) {
-      continue;
-    }
-
-    addPost(post);
-
-    if (selected.length === count) {
-      break;
-    }
-  }
-
-  return selected;
-}
-
 async function getHomepageSportsSchedule() {
+  if (!publication.features.sports && !publication.features.events) {
+    return { recentScores: [], upcomingGames: [], schoolEvents: [] };
+  }
+
   const [recentScores, upcomingGames, schoolEvents] = await Promise.all([
-    getRecentSportsGames(3).catch((): SportsGame[] => []),
-    getUpcomingSportsGames(8).catch((): SportsGame[] => []),
-    getSchoolEvents(12).catch((): SchoolEvent[] => [])
+    publication.features.sports ? getRecentSportsGames(3).catch((): SportsGame[] => []) : [],
+    publication.features.sports ? getUpcomingSportsGames(8).catch((): SportsGame[] => []) : [],
+    publication.features.events ? getSchoolEvents(12).catch((): SchoolEvent[] => []) : []
   ]);
 
   return { recentScores, upcomingGames, schoolEvents };
@@ -108,44 +56,48 @@ export default async function HomePage() {
   const [allPosts, sportsSchedule] = await Promise.all([getAllPosts(), getHomepageSportsSchedule()]);
   const websiteSchema = getWebsiteSchema();
   const posts = filterPublicHomepagePosts(allPosts);
-  const usedPostIds = new Set<number>();
-  const athleteSpotlightPost = posts.find(isAthleteSpotlightPost) ?? null;
+  const publishedHomeDesign = getPublishedDesign("home");
 
-  if (athleteSpotlightPost) {
-    usedPostIds.add(athleteSpotlightPost.id);
+  if (publishedHomeDesign && publishedHomeDesign.revision > 0) {
+    const designBlocks = await resolvePublishedDesignBlocks(publishedHomeDesign.document.layout.content, posts);
+    return (
+      <>
+        <script
+          id="website-json-ld"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteSchema) }}
+        />
+        <DesignHomepage blocks={designBlocks} sportsSchedule={sportsSchedule} />
+      </>
+    );
   }
 
-  const leadPost = posts.find((post) => !usedPostIds.has(post.id) && post.sticky) ?? posts.find((post) => !usedPostIds.has(post.id)) ?? null;
-
-  if (leadPost) {
-    usedPostIds.add(leadPost.id);
-  }
-
-  const inFocusPost = takeOneUnused(
-    posts,
-    usedPostIds,
-    (post) => Boolean(getFeaturedMedia(post)) && hasCategory(post, ["features", "culture"])
-  );
-  const specialCoveragePosts = takeUnused(posts, usedPostIds, 3, isSpecialCoveragePost);
-  const opinionPosts = takeUnused(posts, usedPostIds, 3, (post) => hasCategory(post, ["opinion"]));
+  const {
+    athleteSpotlightPost,
+    leadPost,
+    inFocusPost,
+    specialCoveragePosts,
+    opinionPosts,
+    fieldPosts,
+    morePosts,
+    rightNowPosts,
+    briefPosts
+  } = resolveWeeklyWildcatHomepage(posts);
   const opinionLeadPost = opinionPosts[0] ?? null;
   const opinionRailPosts = opinionPosts.slice(1, 3);
-  const fieldPosts = takeUnused(posts, usedPostIds, 3, (post) => hasCategory(post, ["sports"]));
   const fieldLeadPost = fieldPosts[0] ?? null;
   const fieldRailPosts = fieldPosts.slice(1, 3);
-  const morePosts = takeDiverseUnused(posts, usedPostIds, 4, ["news", "features", "culture", "opinion", "sports"]);
   const moreLeadPost = morePosts[0] ?? null;
   const moreRailPosts = morePosts.slice(1, 4);
-  const rightNowPosts = takeUnused(posts, usedPostIds, 4);
-  const briefPosts = takeUnused(posts, usedPostIds, 4);
   const briefLeadPost = briefPosts[0] ?? null;
   const briefRailPosts = briefPosts.slice(1);
   const hasFieldSection =
-    fieldPosts.length > 0 ||
-    Boolean(athleteSpotlightPost) ||
-    sportsSchedule.recentScores.length > 0 ||
-    sportsSchedule.upcomingGames.length > 0;
-  const leadHasOpinionTreatment = Boolean(leadPost?.weeklyWildcat?.homepageOpinionTreatment);
+    publication.features.sports &&
+    (fieldPosts.length > 0 ||
+      Boolean(athleteSpotlightPost) ||
+      sportsSchedule.recentScores.length > 0 ||
+      sportsSchedule.upcomingGames.length > 0);
+  const leadHasOpinionTreatment = Boolean(leadPost && getPostSettings(leadPost)?.homepageOpinionTreatment);
 
   return (
     <main className={leadHasOpinionTreatment ? "live-home-shell live-home-shell-opinion-lead" : "live-home-shell"}>
@@ -183,8 +135,10 @@ export default async function HomePage() {
             ) : null}
 
             <aside className="top-stories-left-rail" aria-label="Poll and school calendar">
-              <PollWidget />
-              <ThisWeekCard maxVisibleItems={3} schoolEvents={sportsSchedule.schoolEvents} sportsGames={sportsSchedule.upcomingGames} />
+              {publication.features.polls ? <PollWidget /> : null}
+              {publication.features.events || publication.features.sports ? (
+                <ThisWeekCard maxVisibleItems={3} schoolEvents={sportsSchedule.schoolEvents} sportsGames={sportsSchedule.upcomingGames} />
+              ) : null}
             </aside>
           </div>
         </section>
@@ -255,7 +209,7 @@ export default async function HomePage() {
           <div className="opinion-package-header">
             <div>
               <h2 id="opinion-heading">Opinion</h2>
-              <p>Student perspectives, columns, and commentary from Weekly Wildcat writers.</p>
+              <p>Student perspectives, columns, and commentary from {publication.identity.shortName} writers.</p>
             </div>
             <a href="/category/opinion/">All Opinion →</a>
           </div>
@@ -313,7 +267,7 @@ export default async function HomePage() {
       {morePosts.length > 0 ? (
         <section className="more-weekly" aria-labelledby="more-heading">
           <div className="more-weekly-header">
-            <h2 id="more-heading">More From Weekly Wildcat</h2>
+            <h2 id="more-heading">More From {publication.identity.shortName}</h2>
             <span aria-hidden="true" />
             <a href="/stories/">View All Stories →</a>
           </div>
@@ -332,8 +286,8 @@ export default async function HomePage() {
               ) : null}
             </div>
 
-            <aside className="more-utility-rail" aria-label="Weekly Wildcat links">
-              <p className="more-rail-label">Weekly Wildcat</p>
+            <aside className="more-utility-rail" aria-label={`${publication.identity.name} links`}>
+              <p className="more-rail-label">{publication.identity.shortName}</p>
               <div className="more-utility-block">
                 <div className="more-utility-block-heading">
                   <SiteIcon name="ph:newspaper-clipping" width={18} height={18} />
@@ -356,24 +310,24 @@ export default async function HomePage() {
                   <SiteIcon name="ph:chat-circle-dots" width={18} height={18} />
                   <h3>Stay Connected</h3>
                 </div>
-                <p>Follow daily posts, send a tip, or bring Weekly Wildcat into your inbox.</p>
+                <p>Follow daily posts, send a tip, or bring {publication.identity.shortName} into your inbox.</p>
                 <nav className="more-connect-links" aria-label="Stay connected">
-                  <a href="https://www.instagram.com/theweeklywildcat" target="_blank" rel="noreferrer">
-                    <SiteIcon name="ph:instagram-logo" width={17} height={17} />
-                    Instagram
-                  </a>
-                  <a href="https://www.tiktok.com/@weeklywildcat" target="_blank" rel="noreferrer">
-                    <SiteIcon name="ph:tiktok-logo" width={17} height={17} />
-                    TikTok
-                  </a>
-                  <a href="/contact/">
+                  {publication.social.map((social) => (
+                    <a key={`${social.service}-${social.url}`} href={social.url} target="_blank" rel="noreferrer">
+                      <SiteIcon name={socialIcons[social.service] ?? "ph:link"} width={17} height={17} />
+                      {social.label}
+                    </a>
+                  ))}
+                  <a href={publication.urls.contact}>
                     <SiteIcon name="ph:envelope-simple" width={17} height={17} />
                     Contact
                   </a>
-                  <a href="#home-newsletter">
-                    <SiteIcon name="ph:paper-plane-tilt" width={17} height={17} />
-                    Newsletter
-                  </a>
+                  {publication.features.newsletter ? (
+                    <a href="#home-newsletter">
+                      <SiteIcon name="ph:paper-plane-tilt" width={17} height={17} />
+                      Newsletter
+                    </a>
+                  ) : null}
                 </nav>
               </div>
             </aside>
@@ -381,9 +335,11 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      <section id="home-newsletter" className="home-newsletter-section" aria-label="Newsletter signup">
-        <NewsletterSignupForm />
-      </section>
+      {publication.features.newsletter ? (
+        <section id="home-newsletter" className="home-newsletter-section" aria-label="Newsletter signup">
+          <NewsletterSignupForm />
+        </section>
+      ) : null}
     </main>
   );
 }

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://byline.pub/schemas/publication.schema.json",
+  "title": "Byline public publication configuration",
+  "type": "object",
+  "required": ["schemaVersion", "revision", "identity", "location", "locale", "timezone", "urls", "branding", "appearance", "sections", "navigation", "social", "features", "licensing", "seo"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "identity": { "$ref": "#/$defs/identity" },
+    "location": { "type": "object" },
+    "locale": { "type": "string" },
+    "timezone": { "type": "string" },
+    "urls": { "type": "object" },
+    "branding": { "type": "object" },
+    "appearance": { "type": "object", "required": ["theme", "tokenOverrides"] },
+    "sections": { "type": "array", "maxItems": 30, "items": { "$ref": "#/$defs/section" } },
+    "navigation": { "type": "array", "maxItems": 30 },
+    "social": { "type": "array", "maxItems": 20 },
+    "features": { "type": "object", "additionalProperties": { "type": "boolean" } },
+    "licensing": { "type": "object" },
+    "seo": { "type": "object" }
+  },
+  "$defs": {
+    "identity": {
+      "type": "object",
+      "required": ["name", "shortName", "description", "organizationName", "tagline"],
+      "properties": {
+        "name": { "type": "string", "maxLength": 120 },
+        "shortName": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 320 },
+        "organizationName": { "type": "string", "maxLength": 160 },
+        "tagline": { "type": "string", "maxLength": 200 }
+      },
+      "additionalProperties": false
+    },
+    "section": {
+      "type": "object",
+      "required": ["name", "slug", "description", "active"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "description": { "type": "string", "maxLength": 240 },
+        "active": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

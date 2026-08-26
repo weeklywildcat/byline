@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { TeamHubView } from "@/components/SportsArchiveViews";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getSportsArchiveData, getTeamMediaForSummary } from "@/lib/sports-data";
+import { getPublicationConfig } from "@/lib/publication";
 import {
   getRelatedSportsCoverage,
   getSeasonByTeamAndYear,
@@ -17,12 +18,14 @@ type TeamPageProps = {
 };
 
 export const dynamicParams = false;
+const publication = getPublicationConfig();
 
 async function getTeams() {
   return (await getSportsArchiveData()).teams;
 }
 
 export async function generateStaticParams() {
+  if (!publication.features.sports) return [{ teamSlug: "disabled" }];
   const teams = await getTeams();
 
   return teams.map((team) => ({
@@ -40,12 +43,13 @@ export async function generateMetadata({ params }: TeamPageProps): Promise<Metad
 
   return buildPageMetadata({
     title: `${team.name} Sports Hub`,
-    description: `Scores, schedules, rosters, season archives and Weekly Wildcat coverage for ${team.name}.`,
+    description: `Scores, schedules, rosters, season archives and ${publication.identity.shortName} coverage for ${team.name}.`,
     path: getTeamHubHref(team)
   });
 }
 
 export default async function TeamPage({ params }: TeamPageProps) {
+  if (!publication.features.sports) notFound();
   const { teamSlug } = await params;
   const { teams, teamMediaByKey, visiblePosts } = await getSportsArchiveData();
   const team = getTeamBySlug(teams, teamSlug);

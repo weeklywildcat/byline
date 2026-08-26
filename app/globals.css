@@ -1,20 +1,23 @@
 :root {
-  --page: #fbfaf7;
+  --page: #f7f7f7;
   --paper: #ffffff;
-  --ink: #151515;
-  --muted: #635f59;
+  --ink: #1f2328;
+  --muted: #59636e;
   --soft-muted: #8a847c;
-  --rule: #d8d0c7;
-  --rule-strong: #171717;
-  --accent: #b11f24;
+  --rule: #d0d7de;
+  --rule-strong: #1f2328;
+  --accent: #0969da;
   --accent-dark: #821316;
-  --link: #155789;
+  --link: #0969da;
   --max-width: 1180px;
   --article-width: 760px;
-  --font-display: "alternate-gothic-condensed-a", "Arial Narrow", Arial, sans-serif;
-  --font-body: "aktiv-grotesk", Arial, Helvetica, sans-serif;
-  --font-ui: "news-gothic-std", Arial, Helvetica, sans-serif;
+  --font-display: Arial, Helvetica, sans-serif;
+  --font-headline: Arial, Helvetica, sans-serif;
+  --font-body: Arial, Helvetica, sans-serif;
+  --font-ui: Arial, Helvetica, sans-serif;
   --font-serif: "Iowan Old Style", "Charter", "Source Serif 4", Georgia, serif;
+  --radius-small: 0px;
+  --radius-medium: 0px;
 }
 
 * {
@@ -297,6 +300,23 @@ body:has(.article-custom-hero-text-light) .masthead-logo img {
   margin: 0 auto;
   max-width: var(--max-width);
   padding: 24px 20px 64px;
+}
+
+.byline-design-home {
+  display: grid;
+  gap: 28px;
+}
+
+.byline-design-utility {
+  margin: 0 auto;
+  max-width: 520px;
+  width: 100%;
+}
+
+.byline-design-divider {
+  border: 0;
+  border-top: 1px solid var(--rule-strong);
+  margin: 0;
 }
 
 .front-page {
@@ -2238,6 +2258,40 @@ body:has(.article-custom-hero) .article-after {
   gap: 24px;
   grid-template-columns: minmax(160px, 0.35fr) minmax(0, 1fr);
   padding: 22px 0;
+}
+
+.static-page-wordpress-content {
+  display: grid;
+}
+
+.static-page-wordpress-content .byline-page-section {
+  border-bottom: 1px solid var(--rule);
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(160px, 0.35fr) minmax(0, 1fr);
+  padding: 22px 0;
+}
+
+.static-page-wordpress-content .byline-page-section-body {
+  display: grid;
+  gap: 12px;
+}
+
+.static-page-wordpress-content .byline-page-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.static-page-wordpress-content .byline-page-section-actions a {
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 10px 12px;
+  text-transform: uppercase;
 }
 
 .static-page-section > div {
@@ -5336,8 +5390,8 @@ p.home-story-deck {
   background: #ffffff;
   display: block;
   height: 100%;
-  mask: url("/brand/weekly-wildcat-logo.svg") left center / contain no-repeat;
-  -webkit-mask: url("/brand/weekly-wildcat-logo.svg") left center / contain no-repeat;
+  mask: var(--footer-logo-url) left center / contain no-repeat;
+  -webkit-mask: var(--footer-logo-url) left center / contain no-repeat;
   width: 100%;
 }
 
@@ -5410,6 +5464,77 @@ p.home-story-deck {
   text-underline-offset: 4px;
 }
 
+/* Official generic themes change hierarchy and composition, not just color tokens. */
+html[data-byline-theme="byline-editorial"] .site-header {
+  border-bottom: 4px double var(--rule-strong);
+}
+
+html[data-byline-theme="byline-editorial"] .live-home-shell,
+html[data-byline-theme="byline-editorial"] .section-page-shell {
+  max-width: min(var(--max-width), calc(100% - 32px));
+}
+
+html[data-byline-theme="byline-editorial"] .section-header-row,
+html[data-byline-theme="byline-editorial"] .more-weekly-header,
+html[data-byline-theme="byline-editorial"] .opinion-package-header {
+  border-bottom: 3px double var(--rule-strong);
+  border-top: 1px solid var(--rule-strong);
+  padding: 8px 0;
+}
+
+html[data-byline-theme="byline-editorial"] .home-story h2,
+html[data-byline-theme="byline-editorial"] .section-page-shell h1,
+html[data-byline-theme="byline-editorial"] .section-page-shell h2 {
+  font-family: var(--font-headline);
+  letter-spacing: -0.02em;
+}
+
+html[data-byline-theme="byline-magazine"] .live-home-shell {
+  gap: clamp(48px, 7vw, 88px);
+}
+
+html[data-byline-theme="byline-magazine"] .top-stories,
+html[data-byline-theme="byline-magazine"] .in-focus,
+html[data-byline-theme="byline-magazine"] .special-coverage {
+  border: 0;
+  border-radius: var(--radius-medium);
+  overflow: hidden;
+}
+
+html[data-byline-theme="byline-magazine"] .home-story-lead h2,
+html[data-byline-theme="byline-magazine"] .home-story-focus h2,
+html[data-byline-theme="byline-magazine"] .home-story-special h2 {
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 6vw, 5.8rem);
+  letter-spacing: -0.055em;
+  line-height: 0.9;
+}
+
+html[data-byline-theme="byline-magazine"] .more-weekly-layout,
+html[data-byline-theme="byline-magazine"] .special-coverage-layout {
+  gap: clamp(28px, 5vw, 64px);
+}
+
+html[data-byline-theme="byline-modern"] .live-home-shell > section,
+html[data-byline-theme="byline-modern"] .category-story-layout,
+html[data-byline-theme="byline-modern"] .sports-landing-card {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-medium);
+  box-shadow: 0 12px 32px rgb(20 33 43 / 0.06);
+  padding: clamp(18px, 3vw, 32px);
+}
+
+html[data-byline-theme="byline-modern"] .site-header,
+html[data-byline-theme="byline-modern"] .site-footer {
+  border-color: var(--accent);
+}
+
+html[data-byline-theme="byline-modern"] .home-story-image img,
+html[data-byline-theme="byline-modern"] .story-teaser-image img {
+  border-radius: var(--radius-small);
+}
+
 @media (max-width: 1040px) {
   .top-stories-layout {
     grid-template-columns: 1fr;
@@ -5467,7 +5592,8 @@ p.home-story-deck {
 	  .media-kit-logo-grid,
 	  .media-kit-image-grid,
 	  .media-kit-font-grid,
-	  .static-page-section {
+	  .static-page-section,
+	  .static-page-wordpress-content .byline-page-section {
 	    grid-template-columns: 1fr;
 	  }
 
@@ -5976,7 +6102,8 @@ p.home-story-deck {
     font-size: 1.02rem;
   }
 
-  .static-page-section {
+  .static-page-section,
+  .static-page-wordpress-content .byline-page-section {
     gap: 9px;
     padding: 18px 0;
   }
