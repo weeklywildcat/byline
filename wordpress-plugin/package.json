@@ -1,0 +1,24 @@
+{
+  "name": "byline-bridge-admin",
+  "version": "0.2.1",
+  "private": true,
+  "scripts": {
+    "build": "wp-scripts build",
+    "start": "wp-scripts start",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@puckeditor/core": "0.23.0",
+    "@wordpress/api-fetch": "7.53.0",
+    "@wordpress/components": "39.0.0",
+    "@wordpress/element": "8.5.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@wordpress/scripts": "34.1.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}
