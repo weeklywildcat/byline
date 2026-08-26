@@ -1,0 +1,22 @@
+{
+  "home": {
+    "revision": 1,
+    "modifiedAt": "2026-08-25T12:00:00Z",
+    "document": {
+      "schemaVersion": 1,
+      "template": "home",
+      "theme": "byline-modern",
+      "editor": { "engine": "puck", "version": "0.23.0" },
+      "layout": {
+        "root": { "props": {} },
+        "content": [
+          { "type": "story-lead", "props": { "id": "lead", "title": "Top Story", "queryType": "latest", "limit": 1 } },
+          { "type": "story-grid", "props": { "id": "campus", "title": "Campus", "queryType": "latest", "limit": 4 } },
+          { "type": "sports-scores", "props": { "id": "scores", "title": "Athletics" } },
+          { "type": "poll", "props": { "id": "poll" } },
+          { "type": "newsletter", "props": { "id": "newsletter", "title": "Stay informed" } }
+        ]
+      }
+    }
+  }
+}

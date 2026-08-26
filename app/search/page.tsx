@@ -4,15 +4,17 @@ import { filterVisibleContentPosts, getPrimaryVisibleCategory, getPublicTopicTag
 import { formatDisplayDate, stripHtml } from "@/lib/format";
 import { getAllSportsGames } from "@/lib/headless";
 import { buildPageMetadata } from "@/lib/seo";
+import { getPublicationConfig } from "@/lib/publication";
 import { buildTeams, getGameHref, getSeasonHref, getTeamHubHref } from "@/lib/sports";
 import { getAllPosts, getPostAuthor, getPostHref } from "@/lib/wordpress";
 
 export const dynamic = "force-static";
+const publication = getPublicationConfig();
 
 export const metadata: Metadata = {
   ...buildPageMetadata({
     title: "Search",
-    description: "Search Weekly Wildcat stories by headline, author, section, or topic.",
+    description: `Search ${publication.identity.shortName} stories by headline, author, section, or topic.`,
     path: "/search/",
     noIndex: true
   })
@@ -32,7 +34,10 @@ function getSearchExcerpt(value: string) {
 }
 
 export default async function SearchPage() {
-  const [posts, games] = await Promise.all([getAllPosts(), getAllSportsGames().catch(() => [])]);
+  const [posts, games] = await Promise.all([
+    getAllPosts(),
+    publication.features.sports ? getAllSportsGames().catch(() => []) : []
+  ]);
   const visiblePosts = filterVisibleContentPosts(posts);
   const teams = buildTeams(games);
   const storyItems: SearchIndexItem[] = visiblePosts.map((post) => {
@@ -49,7 +54,7 @@ export default async function SearchPage() {
       excerpt,
       href: getPostHref(post),
       category: category ? stripHtml(category.name) : "",
-      author: author?.name ?? "Weekly Wildcat Staff",
+      author: author?.name ?? `${publication.identity.shortName} Staff`,
       date: formatDisplayDate(post.date),
       searchText: [title, excerpt, category?.name, author?.name, ...topics].filter(Boolean).join(" ").toLowerCase()
     };
@@ -61,7 +66,7 @@ export default async function SearchPage() {
     excerpt: `${team.seasons.length} season${team.seasons.length === 1 ? "" : "s"} available. Latest season: ${team.latestSeason}.`,
     href: getTeamHubHref(team),
     category: "Team Hub",
-    author: "Weekly Wildcat Sports",
+    author: `${publication.identity.shortName} Sports`,
     date: team.latestSeason,
     searchText: [team.slug, team.name, team.shortName, ...team.sportKeys, ...team.seasons].join(" ").toLowerCase()
   }));
@@ -73,7 +78,7 @@ export default async function SearchPage() {
       excerpt: `Schedule and results for the ${year} ${team.name} season.`,
       href: getSeasonHref(team, year),
       category: "Season Archive",
-      author: "Weekly Wildcat Sports",
+      author: `${publication.identity.shortName} Sports`,
       date: year,
       searchText: [team.slug, team.name, team.shortName, year, "schedule", "scores", "results"].join(" ").toLowerCase()
     }))
@@ -85,7 +90,7 @@ export default async function SearchPage() {
     excerpt: [game.display.date, game.display.location, game.display.status, game.display.score].filter(Boolean).join(" · "),
     href: getGameHref(game),
     category: "Game",
-    author: game.display.sportLevel || game.sportLabel || "Weekly Wildcat Sports",
+    author: game.display.sportLevel || game.sportLabel || `${publication.identity.shortName} Sports`,
     date: game.display.date || game.startDate,
     searchText: [
       game.id,
@@ -111,7 +116,7 @@ export default async function SearchPage() {
 
   return (
     <main className="search-page-shell">
-      <SearchPageClient items={items} />
+      <SearchPageClient items={items} publicationName={publication.identity.shortName} />
     </main>
   );
 }

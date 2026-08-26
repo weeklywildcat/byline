@@ -5,6 +5,7 @@ import { StoryTeaser } from "@/components/StoryTeaser";
 import { filterVisibleContentPosts, getPrimaryPublicCategory, getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, stripHtml } from "@/lib/format";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
+import { getPublicationConfig } from "@/lib/publication";
 import {
   getAllAuthors,
   getAuthorBySlug,
@@ -23,6 +24,7 @@ type AuthorPageProps = {
 };
 
 export const dynamicParams = false;
+const publication = getPublicationConfig();
 
 export async function generateStaticParams() {
   const authors = await getAllAuthors();
@@ -42,7 +44,7 @@ export async function generateMetadata({ params }: AuthorPageProps): Promise<Met
 
   const description = author.description
     ? stripHtml(author.description)
-    : `Stories by ${author.name} for Weekly Wildcat.`;
+    : `Stories by ${author.name} for ${publication.identity.shortName}.`;
   const photo = getAuthorPhoto(author);
 
   return buildPageMetadata({
@@ -55,7 +57,7 @@ export async function generateMetadata({ params }: AuthorPageProps): Promise<Met
 }
 
 function formatNumber(value: number) {
-  return new Intl.NumberFormat("en-US").format(value);
+  return new Intl.NumberFormat(publication.locale).format(value);
 }
 
 function getAuthorBeats(posts: WordPressPost[], limit = 2) {
@@ -94,7 +96,7 @@ function getFirstBylineLabel(posts: WordPressPost[]) {
     return null;
   }
 
-  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(year, month - 1, 1));
+  return new Intl.DateTimeFormat(publication.locale, { month: "long", year: "numeric" }).format(new Date(year, month - 1, 1));
 }
 
 export default async function AuthorPage({ params }: AuthorPageProps) {
@@ -109,7 +111,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
   const profile = getAuthorProfile(author);
   const photo = getAuthorPhoto(author);
   const socialLinks = getAuthorSocialLinks(author);
-  const description = author.description ? stripHtml(author.description) : "Weekly Wildcat contributor";
+  const description = author.description ? stripHtml(author.description) : `${publication.identity.shortName} contributor`;
   const beats = getAuthorBeats(posts);
   const firstByline = getFirstBylineLabel(posts);
   const authorSchema = {

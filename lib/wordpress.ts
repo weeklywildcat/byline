@@ -1,4 +1,6 @@
 import { mirrorWordPressMediaInValue } from "@/lib/media";
+import { getPublicationConfig } from "@/lib/publication";
+import northStarContent from "@/tests/fixtures/north-star-content.json";
 
 const DEFAULT_WP_API_URL = "https://cms.weeklywildcat.com/wp-json/wp/v2";
 const DEFAULT_SITE_URL = "https://weeklywildcat.com";
@@ -9,9 +11,31 @@ const WORDPRESS_FETCH_CACHE_KEY =
   process.env.NETLIFY_COMMIT_REF ||
   (process.env.NODE_ENV === "production" ? `local-build-${Date.now()}` : "") ||
   "";
-const WORDPRESS_FETCH_USER_AGENT = "Weekly Wildcat Static Site Builder (https://weeklywildcat.com)";
+const WORDPRESS_FETCH_USER_AGENT = "Byline Static Site Builder";
 
 type QueryValue = string | number | boolean | undefined | null;
+
+function fixtureData<T>(path: string, query: Record<string, QueryValue>): T {
+  if (path === "/posts") {
+    let posts = [...northStarContent.posts];
+    if (query.slug) posts = posts.filter((post) => post.slug === String(query.slug));
+    if (query.author) posts = posts.filter((post) => post.author === Number(query.author));
+    if (query.categories) posts = posts.filter((post) => post.categories.includes(Number(query.categories)));
+    return posts as T;
+  }
+  if (path === "/pages") {
+    const pages = query.slug ? northStarContent.pages.filter((page) => page.slug === String(query.slug)) : northStarContent.pages;
+    return pages as T;
+  }
+  if (path === "/users") return northStarContent.authors as T;
+  if (path.startsWith("/users/")) return (northStarContent.authors.find((author) => author.id === Number(path.slice(7))) ?? null) as T;
+  if (path === "/categories") {
+    const categories = query.slug ? northStarContent.categories.filter((category) => category.slug === String(query.slug)) : northStarContent.categories;
+    return categories as T;
+  }
+  if (path === "/tags") return northStarContent.tags as T;
+  return [] as T;
+}
 
 export type RenderedText = {
   rendered: string;
@@ -26,6 +50,7 @@ export type WordPressAuthor = {
   url?: string;
   link?: string;
   avatar_urls?: Record<string, string>;
+  bylineProfile?: WordPressAuthorProfile;
   weeklyWildcatProfile?: WordPressAuthorProfile;
 };
 
@@ -72,6 +97,19 @@ export type WordPressTag = {
   taxonomy: "post_tag";
 };
 
+export type WordPressPage = {
+  id: number;
+  slug: string;
+  date: string;
+  modified: string;
+  title: RenderedText;
+  excerpt: RenderedText;
+  content: RenderedText;
+  bylinePage?: {
+    eyebrow?: string;
+  };
+};
+
 export type WordPressMediaSize = {
   file: string;
   width: number;
@@ -102,14 +140,17 @@ export type WordPressMedia = {
       credit?: string;
     };
   };
-  weeklyWildcatImage?: {
+  bylineImage?: WordPressImageCredit;
+  weeklyWildcatImage?: WordPressImageCredit;
+  source_url: string;
+};
+
+export type WordPressImageCredit = {
     creator: string;
     creditText: string;
     copyrightNotice: string;
     licenseUrl: string;
     acquireLicensePage: string;
-  };
-  source_url: string;
 };
 
 export type WordPressArticleHeroImage = {
@@ -150,16 +191,19 @@ export type WordPressPost = {
   categories: number[];
   tags: number[];
   sticky: boolean;
-  weeklyWildcat?: {
-    homepageOpinionTreatment?: boolean;
-    primaryGameId?: number;
-    articleHero?: WordPressArticleHero;
-  };
+  byline?: WordPressPostSettings;
+  weeklyWildcat?: WordPressPostSettings;
   _embedded?: {
     author?: WordPressAuthor[];
     "wp:featuredmedia"?: WordPressMedia[];
     "wp:term"?: Array<Array<WordPressCategory | WordPressTag | { taxonomy: string }>>;
   };
+};
+
+export type WordPressPostSettings = {
+    homepageOpinionTreatment?: boolean;
+    primaryGameId?: number;
+    articleHero?: WordPressArticleHero;
 };
 
 export type PostRouteParts = {
@@ -175,7 +219,7 @@ export function getWordPressApiUrl() {
 }
 
 export function getSiteUrl() {
-  return (process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL).replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_SITE_URL || getPublicationConfig().urls.publicSite || DEFAULT_SITE_URL).replace(/\/$/, "");
 }
 
 function getHeadlessApiUrl() {
@@ -183,6 +227,12 @@ function getHeadlessApiUrl() {
 }
 
 async function wpFetch<T>(path: string, query: Record<string, QueryValue> = {}) {
+  if (process.env.BYLINE_CONTENT_MODE === "north-star-fixture") {
+    return { data: fixtureData<T>(path, query), totalPages: 1 };
+  }
+  if (process.env.BYLINE_CONTENT_MODE === "empty") {
+    return { data: [] as T, totalPages: 1 };
+  }
   const url = new URL(`${getWordPressApiUrl()}/${path.replace(/^\//, "")}`);
 
   Object.entries(query).forEach(([key, value]) => {
@@ -244,6 +294,9 @@ async function wpFetchCollection<T>(path: string, query: Record<string, QueryVal
 }
 
 async function headlessWpFetch<T>(path: string, query: Record<string, QueryValue> = {}) {
+  if (process.env.BYLINE_CONTENT_MODE === "empty") {
+    return [] as T;
+  }
   const url = new URL(`${getHeadlessApiUrl()}/${path.replace(/^\//, "")}`);
 
   Object.entries(query).forEach(([key, value]) => {
@@ -265,7 +318,7 @@ async function headlessWpFetch<T>(path: string, query: Record<string, QueryValue
   });
 
   if (!response.ok) {
-    throw new Error(`Weekly Wildcat headless request failed: ${response.status} ${response.statusText} (${url})`);
+    throw new Error(`Byline headless request failed: ${response.status} ${response.statusText} (${url})`);
   }
 
   return mirrorWordPressMediaInValue((await response.json()) as T);
@@ -301,6 +354,23 @@ export async function getPostBySlug(slug: string) {
     per_page: 100
   });
 
+  return data[0] ?? null;
+}
+
+export async function getAllPages() {
+  return wpFetchCollection<WordPressPage>("/pages", {
+    status: "publish",
+    orderby: "menu_order",
+    order: "asc"
+  });
+}
+
+export async function getPageBySlug(slug: string) {
+  const { data } = await wpFetch<WordPressPage[]>("/pages", {
+    status: "publish",
+    slug,
+    per_page: 100
+  });
   return data[0] ?? null;
 }
 
@@ -384,7 +454,7 @@ export async function getPostAuthorWithProfile(post: WordPressPost) {
     return null;
   }
 
-  if (embeddedAuthor.weeklyWildcatProfile) {
+  if (embeddedAuthor.bylineProfile || embeddedAuthor.weeklyWildcatProfile) {
     return embeddedAuthor;
   }
 
@@ -456,7 +526,7 @@ export function getAuthorHref(author: WordPressAuthor) {
 }
 
 export function getAuthorProfile(author: WordPressAuthor) {
-  return author.weeklyWildcatProfile ?? null;
+  return author.bylineProfile ?? author.weeklyWildcatProfile ?? null;
 }
 
 export function getAuthorPhoto(author: WordPressAuthor) {
@@ -482,5 +552,10 @@ export function getAuthorSocialLinks(author: WordPressAuthor) {
 }
 
 export function getPostPrimaryGameId(post: WordPressPost) {
-  return post.weeklyWildcat?.primaryGameId && post.weeklyWildcat.primaryGameId > 0 ? post.weeklyWildcat.primaryGameId : null;
+  const primaryGameId = (post.byline ?? post.weeklyWildcat)?.primaryGameId;
+  return primaryGameId && primaryGameId > 0 ? primaryGameId : null;
+}
+
+export function getPostSettings(post: WordPressPost) {
+  return post.byline ?? post.weeklyWildcat ?? null;
 }

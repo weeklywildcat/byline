@@ -17,6 +17,7 @@ export type SearchIndexItem = {
 
 type SearchPageClientProps = {
   items: SearchIndexItem[];
+  publicationName: string;
 };
 
 type SearchItemKind = NonNullable<SearchIndexItem["kind"]>;
@@ -92,7 +93,7 @@ function limitMixedResults(results: SearchIndexItem[]) {
   return limited;
 }
 
-export function SearchPageClient({ items }: SearchPageClientProps) {
+export function SearchPageClient({ items, publicationName }: SearchPageClientProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<SearchFilter>("all");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -124,7 +125,7 @@ export function SearchPageClient({ items }: SearchPageClientProps) {
     <section className="search-page" aria-labelledby="search-page-heading">
       <header className="search-page-header">
         <p>Search</p>
-        <h1 id="search-page-heading">Find Weekly Wildcat Stories</h1>
+        <h1 id="search-page-heading">Find {publicationName} Stories</h1>
       </header>
 
       <div className="search-control">
@@ -136,7 +137,7 @@ export function SearchPageClient({ items }: SearchPageClientProps) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search by headline, author, section, or topic"
-          aria-label="Search Weekly Wildcat stories"
+          aria-label={`Search ${publicationName} stories`}
         />
         {query ? (
           <button

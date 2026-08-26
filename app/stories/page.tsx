@@ -3,14 +3,16 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
+import { getPublicationConfig } from "@/lib/publication";
 import { getAllPosts } from "@/lib/wordpress";
 
 export const dynamic = "force-static";
+const publication = getPublicationConfig();
 
 export const metadata: Metadata = {
   ...buildPageMetadata({
     title: "All Stories",
-    description: "Latest reporting, features, opinion, sports and culture from Weekly Wildcat.",
+    description: `Latest reporting, features, opinion, sports and culture from ${publication.identity.shortName}.`,
     path: "/stories/"
   })
 };
@@ -33,7 +35,7 @@ export default async function StoriesPage() {
       />
       <SectionHeader
         title="All Stories"
-        description="Latest reporting, features, opinion, sports and culture from Weekly Wildcat."
+        description={`Latest reporting, features, opinion, sports and culture from ${publication.identity.shortName}.`}
         level={1}
       />
 

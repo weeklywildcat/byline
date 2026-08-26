@@ -1,20 +1,22 @@
-import { PUBLIC_SECTIONS } from "@/lib/sections";
+import { getNavigation, getPublicationConfig } from "@/lib/publication";
 import { SiteIcon } from "./SiteIcon";
 
+const publication = getPublicationConfig();
+const headerNavigation = getNavigation("header");
 const headerNow = new Date();
-const headerDate = new Intl.DateTimeFormat("en-US", {
+const headerDate = new Intl.DateTimeFormat(publication.locale, {
   weekday: "long",
   month: "long",
   day: "numeric",
   year: "numeric",
-  timeZone: "America/New_York"
+  timeZone: publication.timezone
 }).format(headerNow);
 
-const dateParts = new Intl.DateTimeFormat("en-US", {
+const dateParts = new Intl.DateTimeFormat(publication.locale, {
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
-  timeZone: "America/New_York"
+  timeZone: publication.timezone
 }).formatToParts(headerNow);
 
 const dateTime = `${dateParts.find((part) => part.type === "year")?.value}-${
@@ -25,7 +27,7 @@ export function SiteHeader() {
   return (
     <header className="site-header">
       <div className="site-utility" aria-label="Publication details">
-        <span>Ninety Six, S.C.</span>
+        <span>{publication.location.display}</span>
         <time dateTime={dateTime}>{headerDate}</time>
         <div className="header-tools" aria-label="Site tools">
           <a className="search-button" href="/search/" aria-label="Search">
@@ -34,14 +36,14 @@ export function SiteHeader() {
         </div>
       </div>
 
-      <a className="masthead-logo" href="/" aria-label="Weekly Wildcat home">
-        <img src="/brand/weekly-wildcat-wide-logo.svg" alt="Weekly Wildcat" />
+      <a className="masthead-logo" href="/" aria-label={`${publication.identity.name} home`}>
+        <img src={publication.branding.masthead.url} alt={publication.branding.masthead.alt} />
       </a>
 
       <nav aria-label="Sections" className="section-nav">
-        {PUBLIC_SECTIONS.map((section) => (
-          <a key={section.slug} href={section.href}>
-            {section.name}
+        {headerNavigation.map((section) => (
+          <a key={`${section.label}-${section.url}`} href={section.url}>
+            {section.label}
           </a>
         ))}
       </nav>
