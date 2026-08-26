@@ -88,7 +88,7 @@ function wwh_discord_register_meta(): void
         'auth_callback' => static fn() => current_user_can('edit_others_posts'),
     ]);
     foreach ([WWH_DISCORD_USER_ID_META => 'wwh_discord_sanitize_snowflake', WWH_DISCORD_USERNAME_META => 'sanitize_text_field'] as $key => $sanitize) {
-        register_user_meta('', $key, [
+        register_meta('user', $key, [
             'single' => true,
             'type' => 'string',
             'sanitize_callback' => $sanitize,

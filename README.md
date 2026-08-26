@@ -99,8 +99,8 @@ Future WordPress releases are published from `weeklywildcat/byline`:
 
 Historical plugin tags imported into this repository are prefixed `plugin-` so
 they cannot collide with canonical releases. The standalone `byline-plugin`
-repository remains available for historical releases, failed bridge `v0.2.1`,
-and fixed standalone bridge `v0.2.2`.
+repository remains available for historical releases, failed bridges `v0.2.1`
+and `v0.2.2`, and fixed standalone bridge `v0.2.3`.
 
 ## Discord bot
 

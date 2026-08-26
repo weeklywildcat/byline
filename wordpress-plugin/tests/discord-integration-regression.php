@@ -10,9 +10,10 @@ $wwh_test_autosave = false;
 $wwh_test_revision = false;
 $wwh_test_scheduled = 0;
 $wwh_test_meta = [];
+$wwh_registered_user_meta = [];
 function add_action(...$args): void {}
 function register_post_meta(...$args): void {}
-function register_user_meta(...$args): void {}
+function register_meta($object_type, $key, array $args): bool { global $wwh_registered_user_meta; if ($object_type === 'user') { $wwh_registered_user_meta[$key] = $args; } return true; }
 function register_rest_route(...$args): void {}
 function sanitize_key($value): string { return strtolower(preg_replace('/[^a-z0-9_-]/i', '', (string) $value)); }
 function sanitize_text_field($value): string { return trim(strip_tags((string) $value)); }
@@ -34,6 +35,13 @@ function get_post_meta($post_id, $key, $single = false) { global $wwh_test_meta;
 function wp_get_post_categories($post_id): array { return []; }
 function wp_json_encode($value): string { return json_encode($value); }
 require __DIR__ . '/../includes/discord-integration.php';
+
+wwh_discord_register_meta();
+if (!isset($wwh_registered_user_meta[WWH_DISCORD_USER_ID_META], $wwh_registered_user_meta[WWH_DISCORD_USERNAME_META])
+    || count($wwh_registered_user_meta) !== 2) {
+    fwrite(STDERR, "Discord user metadata was not registered through the WordPress register_meta API.\n");
+    exit(1);
+}
 
 $now = 1800000000;
 $timestamp = (string) $now;

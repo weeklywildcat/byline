@@ -6,6 +6,7 @@ define('ABSPATH', $byline_plugin_root . '/');
 define('WP_PLUGIN_DIR', dirname($byline_plugin_root));
 define('WPMU_PLUGIN_DIR', dirname($byline_plugin_root));
 define('WP_DEBUG', false);
+$wwh_registered_user_meta = [];
 
 function add_action(...$args): void
 {
@@ -13,6 +14,19 @@ function add_action(...$args): void
 
 function add_filter(...$args): void
 {
+}
+
+function register_post_meta(...$args): void
+{
+}
+
+function register_meta($object_type, $key, array $args): bool
+{
+    global $wwh_registered_user_meta;
+    if ($object_type === 'user') {
+        $wwh_registered_user_meta[$key] = $args;
+    }
+    return true;
 }
 
 function apply_filters(string $hook_name, $value, ...$args)
@@ -81,6 +95,12 @@ function absint($maybeint): int
 }
 
 require $byline_plugin_root . '/weekly-wildcat-headless.php';
+
+wwh_discord_register_meta();
+if (!isset($wwh_registered_user_meta[WWH_DISCORD_USER_ID_META], $wwh_registered_user_meta[WWH_DISCORD_USERNAME_META])) {
+    fwrite(STDERR, "Packaged Discord metadata registration smoke test failed.\n");
+    exit(1);
+}
 
 putenv('BYLINE_DISCORD_BRIDGE_SECRET=compatibility-smoke-secret');
 if (!byline_is_legacy_weekly_wildcat_installation()
