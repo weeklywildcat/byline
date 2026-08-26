@@ -1,7 +1,7 @@
 import { ApplicationCommandType, SlashCommandBuilder, type RESTPostAPIApplicationCommandsJSONBody } from 'discord.js';
 import { WORKFLOW_TAGS } from '../discord/forums.js';
 
-export function commandDefinitions(): RESTPostAPIApplicationCommandsJSONBody[] {
+export function commandDefinitions(publicationShortName = 'Byline'): RESTPostAPIApplicationCommandsJSONBody[] {
   const statuses = Object.entries(WORKFLOW_TAGS).filter(([value]) => value !== 'published').map(([value, tag]) => ({ name: `${tag.emoji} ${tag.name}`, value }));
   return [
     new SlashCommandBuilder().setName('story').setDescription('Manage the story linked to this storyboard thread')
@@ -18,6 +18,6 @@ export function commandDefinitions(): RESTPostAPIApplicationCommandsJSONBody[] {
     new SlashCommandBuilder().setName('editing').setDescription('Show stories awaiting editing'),
     new SlashCommandBuilder().setName('announce').setDescription('Post an editor announcement'),
     new SlashCommandBuilder().setName('sync').setDescription('Reconcile this linked story with WordPress'),
-    { name: 'Create Weekly Wildcat story', type: ApplicationCommandType.Message } as RESTPostAPIApplicationCommandsJSONBody,
+    { name: `Create ${publicationShortName} story`.slice(0, 32).trim(), type: ApplicationCommandType.Message } as RESTPostAPIApplicationCommandsJSONBody,
   ].map((definition) => 'toJSON' in definition ? definition.toJSON() : definition);
 }

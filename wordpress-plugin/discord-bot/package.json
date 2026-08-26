@@ -1,6 +1,6 @@
 {
-  "name": "weekly-wildcat-discord-bot",
-  "version": "1.0.0",
+  "name": "byline-discord-bot",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": { "node": ">=24" },

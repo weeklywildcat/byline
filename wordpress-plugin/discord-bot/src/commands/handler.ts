@@ -12,7 +12,7 @@ import type { Story } from '../wordpress/types.js';
 
 const ephemeral = { flags: MessageFlags.Ephemeral, allowedMentions: NO_MENTIONS } as const;
 function threadFor(interaction: Interaction): ThreadChannel { const channel = interaction.channel; if (!channel?.isThread()) throw new Error('Use this command inside a storyboard Forum thread.'); return channel; }
-function friendly(error: unknown): string { if (error instanceof WordPressError && error.status < 500) return error.message; if (error instanceof Error && !/token|secret/i.test(error.message)) return error.message; return 'Wildcat could not complete that request. Please try again shortly.'; }
+function friendly(error: unknown, publicationShortName: string): string { if (error instanceof WordPressError && error.status < 500) return error.message; if (error instanceof Error && !/token|secret/i.test(error.message)) return error.message; return `${publicationShortName} could not complete that request. Please try again shortly.`; }
 function storyList(stories: Story[], guildId: string): string { return stories.length ? stories.slice(0, 20).map((story) => `• [${story.title}](${story.discord.threadId ? `https://discord.com/channels/${guildId}/${story.discord.threadId}` : story.wordpressUrl}) — ${story.status}${story.deadline ? ` · ${story.deadline}` : ''}`).join('\n') : 'No matching active stories.'; }
 
 export class CommandHandler {
@@ -20,11 +20,11 @@ export class CommandHandler {
   async handle(interaction: Interaction): Promise<void> {
     try {
       if (interaction.isChatInputCommand()) await this.chat(interaction);
-      else if (interaction.isMessageContextMenuCommand() && interaction.commandName === 'Create Weekly Wildcat story') await this.promote(interaction);
+      else if (interaction.isMessageContextMenuCommand() && interaction.commandName === this.config.contextMenuCommandName) await this.promote(interaction);
       else if (interaction.isButton()) await this.button(interaction);
       else if (interaction.isModalSubmit()) await this.modal(interaction);
     } catch (error) {
-      const content = friendly(error);
+      const content = friendly(error, this.config.publicationShortName);
       if (interaction.isRepliable()) {
         if (interaction.deferred || interaction.replied) await interaction.editReply({ content, embeds: [], components: [], allowedMentions: NO_MENTIONS }).catch(() => undefined);
         else await interaction.reply({ content, ...ephemeral }).catch(() => undefined);

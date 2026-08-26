@@ -481,7 +481,7 @@ add_filter('wwh_cloudflare_deploy_post_types', 'wwh_roster_cloudflare_post_types
 
 function wwh_register_sports_roster_rest_route(): void
 {
-    register_rest_route(WWH_REST_NAMESPACE, '/sports-rosters', [
+    $definition = [
         'methods' => WP_REST_Server::READABLE,
         'callback' => 'wwh_rest_sports_rosters',
         'permission_callback' => '__return_true',
@@ -491,7 +491,9 @@ function wwh_register_sports_roster_rest_route(): void
             'per_page' => ['type' => 'integer', 'default' => 100, 'sanitize_callback' => 'absint'],
             'page' => ['type' => 'integer', 'default' => 1, 'sanitize_callback' => 'absint'],
         ],
-    ]);
+    ];
+    register_rest_route(WWH_REST_NAMESPACE, '/sports-rosters', $definition);
+    register_rest_route(BYLINE_REST_NAMESPACE, '/sports/rosters', $definition);
 }
 add_action('rest_api_init', 'wwh_register_sports_roster_rest_route');
 

@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "pages": [
+    {
+      "slug": "about",
+      "title": "About Us",
+      "eyebrow": "Weekly Wildcat",
+      "description": "Weekly Wildcat is Ninety Six High School's student newspaper, created to tell the stories of our school with care, curiosity and a local voice.",
+      "content": "<section class=\"byline-page-section\"><h2>What We Do</h2>\n<div class=\"byline-page-section-body\"><p>We cover the people, events, teams, clubs, decisions and everyday moments that shape life at Ninety Six High School. Some stories are big campus updates. Others are smaller pieces that help readers understand what students are doing, building, debating and celebrating.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>A Student Newsroom</h2>\n<div class=\"byline-page-section-body\"><p>Weekly Wildcat is written, photographed, edited and designed by students. The newsroom is a place to learn by doing: asking better questions, checking facts, revising drafts, meeting deadlines and paying attention to the community around us.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Our Standards</h2>\n<div class=\"byline-page-section-body\"><p>We want our work to be fair, accurate and useful. That means listening closely, giving people a chance to respond, correcting mistakes when they happen and making sure opinion pieces are clearly presented as opinion.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Be Part of It</h2>\n<div class=\"byline-page-section-body\"><p>Readers can help by sending story ideas, sharing photos, pointing us toward events or joining the staff. A stronger school newspaper starts with more people noticing what deserves to be covered.</p></div></section>",
+      "actions": [
+        {
+          "label": "Meet Our Writers",
+          "href": "/authors/"
+        },
+        {
+          "label": "Join the Staff",
+          "href": "/join/"
+        }
+      ]
+    },
+    {
+      "slug": "advertise",
+      "title": "Advertise with Us",
+      "eyebrow": "Partnerships",
+      "description": "Reach families, students, staff and local readers who care about Ninety Six High School and the community around it.",
+      "content": "<section class=\"byline-page-section\"><h2>A Local Audience</h2>\n<div class=\"byline-page-section-body\"><p>Weekly Wildcat is read by people who are already paying attention to school life: parents checking updates, students following campus news, alumni keeping up with Ninety Six, and community members who want to support local student work.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>What Advertising Supports</h2>\n<div class=\"byline-page-section-body\"><p>Advertising helps us keep building a better student newspaper. It supports reporting, photography, design tools, web costs and the everyday work that goes into publishing stories by and for students.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Let’s Talk</h2>\n<div class=\"byline-page-section-body\"><p>If your business, organization or group is interested in advertising with Weekly Wildcat, reach out and tell us what you have in mind. We can talk through options that fit the publication and make sense for your audience.</p></div></section>",
+      "actions": [
+        {
+          "label": "Contact Us",
+          "href": "/contact/"
+        }
+      ]
+    },
+    {
+      "slug": "join",
+      "title": "Join Our Team",
+      "eyebrow": "Newsroom",
+      "description": "Weekly Wildcat is open to students who want to report, write, photograph, edit, design, make videos, cover sports or help tell the story of Ninety Six High School.",
+      "content": "<section class=\"byline-page-section\"><h2>You Don’t Have to Be an Expert</h2>\n<div class=\"byline-page-section-body\"><p>You do not need to show up as a perfect writer, photographer or designer. Good staff members are curious, reliable, willing to listen and open to revision. If you care about the school and want to learn, there is a place for you.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Ways to Help</h2>\n<div class=\"byline-page-section-body\"><p>Students can report news, write features, cover games, take photos, make graphics, edit stories, create social videos, write opinion pieces, interview classmates or help run the website. You can start small and take on more as you get comfortable.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>What You’ll Learn</h2>\n<div class=\"byline-page-section-body\"><p>Staff members practice interviewing, writing clearly, working with deadlines, editing for accuracy, using photos responsibly and building confidence with real published work. The goal is not just to make a newspaper; it is to help students become sharper communicators.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>How to Start</h2>\n<div class=\"byline-page-section-body\"><p>Send us a note, talk to a current staff member or bring us a story idea. If you are not sure what you want to do yet, that is fine too. We can help you find a role that fits your interests.</p></div></section>",
+      "actions": [
+        {
+          "label": "Get in Touch",
+          "href": "/contact/"
+        }
+      ]
+    },
+    {
+      "slug": "leadership",
+      "title": "Leadership",
+      "eyebrow": "Newsroom",
+      "description": "Weekly Wildcat leadership helps guide the newsroom, support student contributors and keep the publication focused on fair, useful student journalism.",
+      "content": "<section class=\"byline-page-section\"><h2>How Leadership Works</h2>\n<div class=\"byline-page-section-body\"><p>Student leaders help decide what needs coverage, organize story assignments, review drafts and make sure work is ready for readers. Leadership is less about having the loudest voice and more about helping the newsroom do its best work.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>What Editors Do</h2>\n<div class=\"byline-page-section-body\"><p>Editors help writers sharpen ideas, strengthen reporting, check details and make stories easier to follow. They also help with headlines, photos, layout, publishing decisions and the many small choices that shape how a story appears.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Supporting New Voices</h2>\n<div class=\"byline-page-section-body\"><p>A good student publication should make room for more than one kind of student. Weekly Wildcat leaders are expected to welcome new contributors, explain the process clearly and help students build confidence as they learn.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Accountability</h2>\n<div class=\"byline-page-section-body\"><p>Leadership also means taking responsibility when something needs to be fixed. If a story has an error, misses important context or raises a concern, we want to hear about it and review it carefully.</p></div></section>",
+      "actions": [
+        {
+          "label": "Join the Staff",
+          "href": "/join/"
+        },
+        {
+          "label": "Contact Us",
+          "href": "/contact/"
+        }
+      ]
+    },
+    {
+      "slug": "diversity-inclusion",
+      "title": "Diversity & Inclusion",
+      "eyebrow": "Standards",
+      "description": "Weekly Wildcat believes every student deserves to see their school and community represented accurately, fairly and fully. We want our newsroom to include voices, experiences and stories that are often overlooked.",
+      "content": "<section class=\"byline-page-section\"><h2>What This Means in Practice</h2>\n<div class=\"byline-page-section-body\"><p>We will look beyond the easiest voices to quote and the most visible clubs, teams and leadership groups. That means seeking a range of perspectives, covering issues that affect different groups of students, avoiding stereotypes or tokenism, and making room for students whose stories are not always treated as front-page stories.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Accessibility</h2>\n<div class=\"byline-page-section-body\"><p>Readers should be able to follow Weekly Wildcat without fighting the page. If something is hard to read, hard to navigate, missing useful context or not working well on your device, we want to hear about it so we can make the site better.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Help Us Do Better</h2>\n<div class=\"byline-page-section-body\"><p>Readers can suggest stories, flag coverage that felt inaccurate or exclusionary, request a correction, report an accessibility issue or share a concern without attaching their name.</p>\n<p>When you reach out, tell us what happened and how you would like your name handled. We will take the concern seriously, review it carefully and correct the record when needed.</p>\n<div class=\"byline-page-section-actions\"><a href=\"/contact/\">Share Feedback</a></div></div></section>\n\n<section class=\"byline-page-section\"><h2>Join the Newsroom</h2>\n<div class=\"byline-page-section-body\"><p>Weekly Wildcat is open to students of any background or experience level. We need writers, photographers, designers, illustrators, video creators, social media contributors and students with story ideas.</p>\n<p>You do not have to arrive as an expert; you just have to be curious, fair and willing to learn.</p>\n<div class=\"byline-page-section-actions\"><a href=\"/join/\">Join the Newsroom</a></div></div></section>",
+      "actions": []
+    },
+    {
+      "slug": "image-license",
+      "title": "Image License",
+      "eyebrow": "Licensing",
+      "description": "Original Weekly Wildcat images are available under the Creative Commons Attribution 4.0 International license unless otherwise noted.",
+      "content": "<section class=\"byline-page-section\"><h2>Default Image License</h2>\n<div class=\"byline-page-section-body\"><p>Unless a caption, credit line or image detail page says otherwise, original photographs and images published by Weekly Wildcat are licensed under the Creative Commons Attribution 4.0 International license.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>How to Credit Us</h2>\n<div class=\"byline-page-section-body\"><p>When you reuse an image, include the credited creator when one is listed, name Weekly Wildcat, link back to the original story or image page when practical, and note if you changed the image.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>What CC BY 4.0 Allows</h2>\n<div class=\"byline-page-section-body\"><p>CC BY 4.0 allows others to share and adapt licensed material, including for commercial purposes, as long as they give appropriate credit, link to the license and indicate if changes were made.</p>\n<div class=\"byline-page-section-actions\"><a href=\"https://creativecommons.org/licenses/by/4.0/\">Read CC BY 4.0</a></div></div></section>\n\n<section class=\"byline-page-section\"><h2>Exceptions</h2>\n<div class=\"byline-page-section-body\"><p>Some images may come from outside sources, school partners, public agencies, stock libraries or submitted materials. Those images may have different rights or restrictions. Follow the specific credit, caption or source note attached to that image.</p></div></section>",
+      "actions": [
+        {
+          "label": "Read CC BY 4.0",
+          "href": "https://creativecommons.org/licenses/by/4.0/"
+        },
+        {
+          "label": "Contact Us",
+          "href": "/contact/"
+        }
+      ]
+    },
+    {
+      "slug": "terms",
+      "title": "Terms of Service",
+      "eyebrow": "Policies",
+      "description": "These terms explain how readers may use the Weekly Wildcat website and what to expect from our published content.",
+      "content": "<section class=\"byline-page-section\"><h2>Effective Date</h2>\n<div class=\"byline-page-section-body\"><p>These terms are effective July 1, 2026. By using weeklywildcat.com, you agree to use the site in a lawful and respectful way.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>About This Site</h2>\n<div class=\"byline-page-section-body\"><p>Weekly Wildcat is a student newspaper serving Ninety Six High School and its community. The site publishes school news, sports coverage, features, opinion, photos and other student-produced journalism.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Editorial Content</h2>\n<div class=\"byline-page-section-body\"><p>We work to publish information that is accurate, fair and useful at the time it appears. News stories, features, photos, headlines and other editorial content may be updated, corrected or removed when needed.</p>\n<p>Opinion pieces reflect the views of the credited writers. They do not necessarily represent every student, staff member, adviser, administrator or reader.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Corrections and Concerns</h2>\n<div class=\"byline-page-section-body\"><p>If you believe something on the site is inaccurate, incomplete, unfair or raises a privacy concern, contact us with the story title, the issue and any helpful context. We will review good-faith concerns and correct the record when appropriate.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Using Our Work</h2>\n<div class=\"byline-page-section-body\"><p>Unless otherwise noted, Weekly Wildcat articles, photos, graphics, logos and page designs may not be copied, republished, sold or used in full without permission. Sharing links to our stories is welcome. Short excerpts may be used with clear credit and a link back to the original story.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Reader Submissions</h2>\n<div class=\"byline-page-section-body\"><p>When you send us a story idea, correction, photo, tip, letter, comment, advertising inquiry or other message, you give Weekly Wildcat permission to review it and follow up. Submitting something does not guarantee that it will be published.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Advertising and Sponsorships</h2>\n<div class=\"byline-page-section-body\"><p>Advertising and sponsorships help support the publication, but advertisers do not control our editorial coverage. Weekly Wildcat may decline advertising that is inappropriate for a school community or does not fit the publication.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>External Links</h2>\n<div class=\"byline-page-section-body\"><p>The site may link to outside websites, social platforms, forms, maps, videos or other services. Those sites are controlled by their own owners and policies. Weekly Wildcat is not responsible for their content, security or privacy practices.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Prohibited Use</h2>\n<div class=\"byline-page-section-body\"><p>Do not use the site to harass others, attempt to break into systems, scrape content at scale, upload harmful code, impersonate someone else, interfere with site operation or violate any law or school rule.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>No Guarantee</h2>\n<div class=\"byline-page-section-body\"><p>We try to keep the site available and accurate, but we cannot promise that every page will always be current, complete, uninterrupted or error-free. The site is provided as a student publication and community information resource.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Changes to These Terms</h2>\n<div class=\"byline-page-section-body\"><p>We may update these terms as the publication and website grow. The newest version will be posted on this page.</p></div></section>",
+      "actions": [
+        {
+          "label": "Privacy Policy",
+          "href": "/privacy/"
+        },
+        {
+          "label": "Contact Us",
+          "href": "/contact/"
+        }
+      ]
+    },
+    {
+      "slug": "privacy",
+      "title": "Privacy Policy",
+      "eyebrow": "Policies",
+      "description": "Weekly Wildcat keeps the website simple and avoids collecting personal information we do not need.",
+      "content": "<section class=\"byline-page-section\"><h2>Effective Date</h2>\n<div class=\"byline-page-section-body\"><p>This privacy policy is effective July 1, 2026. It explains what information may be collected when you visit weeklywildcat.com or contact Weekly Wildcat.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Information We Collect</h2>\n<div class=\"byline-page-section-body\"><p>You can read Weekly Wildcat without creating an account. The site does not offer public comments, reader profiles or user logins.</p>\n<p>Like most websites, our hosting provider may automatically process basic technical information such as IP address, browser type, device information, referring page, pages requested and the time of a visit. This helps the site load, stay secure and troubleshoot problems.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Information You Send Us</h2>\n<div class=\"byline-page-section-body\"><p>If you contact us, send a tip, request a correction, submit a photo, ask about advertising or join the staff, we may receive the name, email address, message and any files or details you choose to provide. We use that information to respond, review the request and run the publication.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Student Names, Photos and Stories</h2>\n<div class=\"byline-page-section-body\"><p>Weekly Wildcat publishes student journalism about school life. Stories may include names, photos, quotes, teams, clubs, activities, awards, events and other information that is appropriate for publication in a school newspaper.</p>\n<p>We try to use careful judgment, especially when coverage involves sensitive topics, younger students, discipline, health, safety or private family matters. If you have a concern about published student information, contact us so we can review it.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Cookies and Analytics</h2>\n<div class=\"byline-page-section-body\"><p>The site is designed to work without reader accounts or advertising trackers. Some hosting, security, analytics, font, media or embedded services may use cookies or similar technologies to provide their services, measure traffic or protect the site.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Outside Services</h2>\n<div class=\"byline-page-section-body\"><p>Weekly Wildcat uses a WordPress CMS, static website hosting, local media assets and links to outside services such as social platforms, email, maps, videos or forms. When you follow an outside link or load third-party content, that service may collect information under its own privacy policy.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>How We Share Information</h2>\n<div class=\"byline-page-section-body\"><p>We do not sell reader personal information. We may share information when needed to operate the site, respond to a request, work with school staff or advisers, protect safety, address misuse, comply with law or handle a correction or privacy concern.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>How Long We Keep Information</h2>\n<div class=\"byline-page-section-body\"><p>Published stories may remain online as part of the public record of the student newspaper. Messages, tips, corrections, advertising inquiries and staff-interest notes may be kept as long as needed for newsroom, school, technical or recordkeeping purposes.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Children’s Privacy</h2>\n<div class=\"byline-page-section-body\"><p>Weekly Wildcat is a school newspaper website for a general school and community audience. We do not knowingly ask children under 13 to create accounts or provide personal information through the public site. If you believe a child has sent personal information that should be removed, contact us.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Your Choices</h2>\n<div class=\"byline-page-section-body\"><p>You may ask us to review a privacy concern, correct inaccurate information, remove certain submitted information or explain how a message you sent was used. Some published material may be retained when there is a legitimate editorial, school or recordkeeping reason.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Security</h2>\n<div class=\"byline-page-section-body\"><p>No website can guarantee perfect security, but we try to keep the public site simple and limit the information we collect. Do not send passwords, private account numbers, medical details or other sensitive information unless we specifically ask for it.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>Changes to This Policy</h2>\n<div class=\"byline-page-section-body\"><p>We may update this privacy policy as the website, publication tools or school needs change. The newest version will be posted on this page.</p></div></section>",
+      "actions": [
+        {
+          "label": "Contact Us",
+          "href": "/contact/"
+        },
+        {
+          "label": "Terms of Service",
+          "href": "/terms/"
+        }
+      ]
+    },
+    {
+      "slug": "contact",
+      "title": "Contact",
+      "eyebrow": "Newsroom",
+      "description": "Send questions, corrections, story ideas, advertising interest or newsroom inquiries to Weekly Wildcat.",
+      "content": "<section class=\"byline-page-section\"><h2>School Address</h2>\n<div class=\"byline-page-section-body\"><p>Weekly Wildcat, Ninety Six High School, 640 South Cambridge Street, Ninety Six, SC.</p></div></section>\n\n<section class=\"byline-page-section\"><h2>What to Send</h2>\n<div class=\"byline-page-section-body\"><p>Readers can share story tips, correction requests, event information, sports updates, photo opportunities, advertising questions or ideas for future coverage.</p></div></section>",
+      "actions": [
+        {
+          "label": "Submit a Story Idea",
+          "href": "/contact/"
+        },
+        {
+          "label": "Join Our Team",
+          "href": "/join/"
+        }
+      ]
+    }
+  ]
+}
