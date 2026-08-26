@@ -37,6 +37,10 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5"
   },
+  "optionalDependencies": {
+    "@rolldown/binding-linux-x64-gnu": "1.2.5",
+    "@rolldown/binding-linux-x64-musl": "1.2.5"
+  },
   "engines": {
     "node": ">=24"
   }
