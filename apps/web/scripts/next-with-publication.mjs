@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const nextCommand = path.join(projectRoot, "node_modules", ".bin", "next");
+const require = createRequire(import.meta.url);
+const nextCommand = path.join(path.dirname(require.resolve("next/package.json")), "dist", "bin", "next");
 const nextArguments = process.argv.slice(2);
 const defaultWordPressApi = "https://cms.weeklywildcat.com/wp-json/wp/v2";
 
@@ -83,7 +85,7 @@ const designs = await loadDesigns(publication);
 const publicationWordPressApi = publication?.urls?.cms
   ? `${String(publication.urls.cms).replace(/\/$/, "")}/wp-json/wp/v2`
   : undefined;
-const child = spawnSync(nextCommand, nextArguments, {
+const child = spawnSync(process.execPath, [nextCommand, ...nextArguments], {
   cwd: projectRoot,
   env: {
     ...process.env,

@@ -25,7 +25,8 @@
     "build:frontend": "npm run build --workspace @byline/web",
     "build:plugin": "npm run build --workspace @byline/wordpress-plugin",
     "build:discord": "npm run build --workspace @byline/discord-bot",
-    "package:plugin": "bash scripts/package-plugin.sh"
+    "package:plugin": "bash scripts/package-plugin.sh",
+    "verify:contracts": "node scripts/verify-monorepo-contracts.mjs && node scripts/verify-updater-transition.mjs"
   },
   "devDependencies": {
     "@types/react": "19.2.18",
