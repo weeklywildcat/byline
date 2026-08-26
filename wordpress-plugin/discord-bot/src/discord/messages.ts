@@ -6,7 +6,7 @@ export const NO_MENTIONS = Object.freeze({ parse: [] as never[], users: [] as st
 export const userMention = (id: string) => ({ parse: [] as never[], users: [id], roles: [] as string[], repliedUser: false });
 export const roleMention = (id: string) => ({ parse: [] as never[], users: [] as string[], roles: [id], repliedUser: false });
 
-export function storyCard(story: Story) {
+export function storyCard(story: Story, publicationName = 'Byline') {
   const status = WORKFLOW_TAGS[story.status];
   const fields = [
     { name: 'Workflow', value: `${status.emoji} ${status.name}`, inline: true },
@@ -16,7 +16,7 @@ export function storyCard(story: Story) {
     ...(story.section ? [{ name: 'Section', value: story.section, inline: true }] : []),
     ...(story.visuals ? [{ name: 'Visuals', value: story.visuals.slice(0, 1024), inline: false }] : []),
   ];
-  return { embeds: [new EmbedBuilder().setTitle(story.title.slice(0, 256)).setColor(story.status === 'published' ? 0x2d7d46 : 0x27272a).setFields(fields).setFooter({ text: `WordPress story #${story.id}` })],
+  return { embeds: [new EmbedBuilder().setAuthor({ name: publicationName.slice(0, 256) }).setTitle(story.title.slice(0, 256)).setColor(story.status === 'published' ? 0x2d7d46 : 0x27272a).setFields(fields).setFooter({ text: `WordPress story #${story.id}` })],
     components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Open in WordPress').setURL(story.wordpressUrl))], allowedMentions: NO_MENTIONS };
 }
 

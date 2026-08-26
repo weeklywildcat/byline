@@ -22,6 +22,7 @@ function absint($value): int { return abs((int) $value); }
 function wp_is_post_autosave($id): bool { global $wwh_test_autosave; return $wwh_test_autosave; }
 function wp_is_post_revision($id): bool { global $wwh_test_revision; return $wwh_test_revision; }
 function wp_strip_all_tags($value): string { return strip_tags((string) $value); }
+function untrailingslashit($value): string { return rtrim((string) $value, '/\\'); }
 function get_post($id) { global $wwh_test_posts; return $wwh_test_posts[$id] ?? null; }
 function wp_next_scheduled(...$args): bool { return false; }
 function wp_schedule_single_event(...$args): bool { global $wwh_test_scheduled; $wwh_test_scheduled++; return true; }
@@ -38,6 +39,11 @@ $timestamp = (string) $now;
 $signature = wwh_discord_sign($timestamp, 'POST', '/weekly-wildcat/v1/discord/stories', '{"title":"Pitch"}', 'secret');
 if (!wwh_discord_verify_signature_values($timestamp, $signature, 'POST', '/weekly-wildcat/v1/discord/stories', '{"title":"Pitch"}', 'secret', $now)) { fwrite(STDERR, "Valid bridge signature rejected.\n"); exit(1); }
 if (wwh_discord_verify_signature_values((string) ($now - 301), $signature, 'POST', '/weekly-wildcat/v1/discord/stories', '{"title":"Pitch"}', 'secret', $now)) { fwrite(STDERR, "Stale bridge signature accepted.\n"); exit(1); }
+$byline_signature = wwh_discord_sign($timestamp, 'POST', '/byline/v1/discord/stories', '{"title":"Pitch"}', 'secret');
+if (!wwh_discord_verify_signature_values($timestamp, $byline_signature, 'POST', '/byline/v1/discord/stories', '{"title":"Pitch"}', 'secret', $now)) { fwrite(STDERR, "Canonical Byline bridge route signature rejected.\n"); exit(1); }
+putenv('BYLINE_DISCORD_BRIDGE_SECRET=canonical-secret');
+if (wwh_discord_config('WWH_DISCORD_BRIDGE_SECRET') !== 'canonical-secret') { fwrite(STDERR, "Canonical Byline Discord configuration did not override the legacy alias.\n"); exit(1); }
+putenv('BYLINE_DISCORD_BRIDGE_SECRET');
 if (wwh_discord_sanitize_snowflake('12345678901234567') !== '12345678901234567' || wwh_discord_sanitize_snowflake('not-an-id') !== '') { fwrite(STDERR, "Snowflake sanitization failed.\n"); exit(1); }
 if (wwh_discord_sanitize_deadline('2026-02-28') !== '2026-02-28' || wwh_discord_sanitize_deadline('2026-02-30') !== '') { fwrite(STDERR, "Deadline sanitization failed.\n"); exit(1); }
 if (wwh_discord_sanitize_status('editing') !== 'editing' || wwh_discord_sanitize_status('published-by-user') !== 'pitch') { fwrite(STDERR, "Workflow sanitization failed.\n"); exit(1); }

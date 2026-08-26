@@ -247,7 +247,7 @@
       el(
         Placeholder,
         {
-          label: __("Weekly Wildcat Game Embed", "weekly-wildcat-headless"),
+          label: __("Byline Game Embed", "weekly-wildcat-headless"),
           instructions: __("Select a sports schedule game. The block saves only the game ID and renders current schedule data.", "weekly-wildcat-headless"),
         },
         el(GamePicker, {
@@ -266,7 +266,7 @@
 
   blocks.registerBlockType("weekly-wildcat/game-embed", {
     apiVersion: 2,
-    title: __("Weekly Wildcat Game Embed", "weekly-wildcat-headless"),
+    title: __("Byline Game Embed", "weekly-wildcat-headless"),
     description: __("Embed a live sports schedule card by selecting an existing game.", "weekly-wildcat-headless"),
     icon: "awards",
     category: "widgets",

@@ -27,6 +27,10 @@ function register_deactivation_hook(...$args): void
 {
 }
 
+function register_activation_hook(...$args): void
+{
+}
+
 function wp_parse_url(string $url, int $component = -1)
 {
     return $component === -1 ? parse_url($url) : parse_url($url, $component);

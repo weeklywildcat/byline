@@ -21,11 +21,17 @@ const WWH_DISCORD_SYNC_EVENT = 'wwh_discord_sync_story';
 
 function wwh_discord_config(string $name): string
 {
-    if (defined($name) && is_string(constant($name))) {
-        return trim((string) constant($name));
+    $canonical_name = str_starts_with($name, 'WWH_') ? 'BYLINE_' . substr($name, 4) : $name;
+    foreach (array_unique([$canonical_name, $name]) as $candidate) {
+        if (defined($candidate) && is_string(constant($candidate)) && trim((string) constant($candidate)) !== '') {
+            return trim((string) constant($candidate));
+        }
+        $value = getenv($candidate);
+        if (is_string($value) && trim($value) !== '') {
+            return trim($value);
+        }
     }
-    $value = getenv($name);
-    return is_string($value) ? trim($value) : '';
+    return '';
 }
 
 function wwh_discord_statuses(): array
@@ -117,9 +123,11 @@ function wwh_discord_verify_signature_values(string $timestamp, string $signatur
 
 function wwh_discord_rest_permission(WP_REST_Request $request)
 {
+    $timestamp = (string) ($request->get_header('x-byline-timestamp') ?: $request->get_header('x-wwh-timestamp'));
+    $signature = (string) ($request->get_header('x-byline-signature') ?: $request->get_header('x-wwh-signature'));
     $valid = wwh_discord_verify_signature_values(
-        (string) $request->get_header('x-wwh-timestamp'),
-        (string) $request->get_header('x-wwh-signature'),
+        $timestamp,
+        $signature,
         $request->get_method(),
         $request->get_route(),
         $request->get_body(),
@@ -189,10 +197,10 @@ function wwh_discord_actor(string $discord_id)
 {
     $discord_id = wwh_discord_sanitize_snowflake($discord_id);
     if ($discord_id === '') {
-        return new WP_Error('wwh_account_unlinked', "This Discord account isn't connected to a Weekly Wildcat account yet.", ['status' => 403]);
+        return new WP_Error('wwh_account_unlinked', sprintf("This Discord account isn't connected to a %s account yet.", byline_publication_name()), ['status' => 403]);
     }
     $users = get_users(['meta_key' => WWH_DISCORD_USER_ID_META, 'meta_value' => $discord_id, 'number' => 1]);
-    return $users && $users[0] instanceof WP_User ? $users[0] : new WP_Error('wwh_account_unlinked', "This Discord account isn't connected to a Weekly Wildcat account yet.", ['status' => 403]);
+    return $users && $users[0] instanceof WP_User ? $users[0] : new WP_Error('wwh_account_unlinked', sprintf("This Discord account isn't connected to a %s account yet.", byline_publication_name()), ['status' => 403]);
 }
 
 function wwh_discord_capability(WP_User $user, string $capability, int $post_id = 0): bool
@@ -209,7 +217,7 @@ function wwh_discord_rest_story(WP_REST_Request $request)
     if ($request->get_param('actorDiscordUserId')) {
         $actor = wwh_discord_actor((string) $request->get_param('actorDiscordUserId'));
         if (is_wp_error($actor)) return $actor;
-        if (!$post_id || !wwh_discord_capability($actor, 'edit_post', $post_id)) return new WP_Error('wwh_forbidden', 'Your Weekly Wildcat account cannot view this story.', ['status' => 403]);
+        if (!$post_id || !wwh_discord_capability($actor, 'edit_post', $post_id)) return new WP_Error('wwh_forbidden', sprintf('Your %s account cannot view this story.', byline_publication_name()), ['status' => 403]);
     }
     $story = wwh_discord_story($post_id);
     return $story ? rest_ensure_response($story) : new WP_Error('wwh_story_not_found', 'This thread is not linked to a WordPress story.', ['status' => 404]);
@@ -225,7 +233,7 @@ function wwh_discord_rest_create_story(WP_REST_Request $request)
         return $actor;
     }
     if (!wwh_discord_capability($actor, 'edit_posts')) {
-        return new WP_Error('wwh_forbidden', 'Your Weekly Wildcat account cannot create stories.', ['status' => 403]);
+        return new WP_Error('wwh_forbidden', sprintf('Your %s account cannot create stories.', byline_publication_name()), ['status' => 403]);
     }
     $existing_id = wwh_discord_find_post_by_thread($thread_id);
     if ($existing_id) {
@@ -243,7 +251,7 @@ function wwh_discord_rest_create_story(WP_REST_Request $request)
         delete_option($lock_key);
         return rest_ensure_response(['created' => false, 'story' => wwh_discord_story($existing_id)]);
     }
-    $request_id = sanitize_key((string) $request->get_header('x-wwh-request-id'));
+    $request_id = sanitize_key((string) ($request->get_header('x-byline-request-id') ?: $request->get_header('x-wwh-request-id')));
     if ($request_id !== '') {
         $prior_id = absint(get_transient('wwh_discord_request_' . $request_id));
         if ($prior_id) {
@@ -301,7 +309,7 @@ function wwh_discord_rest_update_story(WP_REST_Request $request)
     $editor_operations = ['assign', 'deadline', 'unlink'];
     $capability = in_array($operation, $editor_operations, true) ? 'edit_others_posts' : 'edit_post';
     if (!wwh_discord_capability($actor, $capability, $post_id)) {
-        return new WP_Error('wwh_forbidden', 'Your Weekly Wildcat account cannot make that change.', ['status' => 403]);
+        return new WP_Error('wwh_forbidden', sprintf('Your %s account cannot make that change.', byline_publication_name()), ['status' => 403]);
     }
     if ($operation === 'status') {
         $status = wwh_discord_sanitize_status($data['status'] ?? '');
@@ -401,7 +409,7 @@ function wwh_discord_rest_stories(WP_REST_Request $request)
             return $actor;
         }
         if (!wwh_discord_capability($actor, 'edit_posts')) {
-            return new WP_Error('wwh_forbidden', 'Your Weekly Wildcat account cannot view newsroom assignments.', ['status' => 403]);
+            return new WP_Error('wwh_forbidden', sprintf('Your %s account cannot view newsroom assignments.', byline_publication_name()), ['status' => 403]);
         }
     }
     if ($scope === 'editing') {
@@ -432,19 +440,21 @@ function wwh_discord_due_range(string $scope): array
 function wwh_discord_register_rest_routes(): void
 {
     $permission = 'wwh_discord_rest_permission';
-    register_rest_route(WWH_REST_NAMESPACE, '/discord/story', ['methods' => 'GET', 'callback' => 'wwh_discord_rest_story', 'permission_callback' => $permission]);
-    register_rest_route(WWH_REST_NAMESPACE, '/discord/stories', ['methods' => 'GET', 'callback' => 'wwh_discord_rest_stories', 'permission_callback' => $permission]);
-    register_rest_route(WWH_REST_NAMESPACE, '/discord/stories', ['methods' => 'POST', 'callback' => 'wwh_discord_rest_create_story', 'permission_callback' => $permission]);
-    register_rest_route(WWH_REST_NAMESPACE, '/discord/stories/(?P<id>\d+)', ['methods' => 'PATCH', 'callback' => 'wwh_discord_rest_update_story', 'permission_callback' => $permission]);
-    register_rest_route(WWH_REST_NAMESPACE, '/discord/stories/(?P<id>\d+)/link', ['methods' => 'POST', 'callback' => 'wwh_discord_rest_link_story', 'permission_callback' => $permission]);
-    register_rest_route(WWH_REST_NAMESPACE, '/discord/stories/(?P<id>\d+)/link', ['methods' => 'DELETE', 'callback' => 'wwh_discord_rest_unlink_story', 'permission_callback' => $permission]);
-    register_rest_route(WWH_REST_NAMESPACE, '/discord/users/(?P<discordId>\d+)', ['methods' => 'GET', 'callback' => 'wwh_discord_rest_resolve_user', 'permission_callback' => $permission]);
+    foreach (array_unique([BYLINE_REST_NAMESPACE, WWH_REST_NAMESPACE]) as $namespace) {
+        register_rest_route($namespace, '/discord/story', ['methods' => 'GET', 'callback' => 'wwh_discord_rest_story', 'permission_callback' => $permission]);
+        register_rest_route($namespace, '/discord/stories', ['methods' => 'GET', 'callback' => 'wwh_discord_rest_stories', 'permission_callback' => $permission]);
+        register_rest_route($namespace, '/discord/stories', ['methods' => 'POST', 'callback' => 'wwh_discord_rest_create_story', 'permission_callback' => $permission]);
+        register_rest_route($namespace, '/discord/stories/(?P<id>\d+)', ['methods' => 'PATCH', 'callback' => 'wwh_discord_rest_update_story', 'permission_callback' => $permission]);
+        register_rest_route($namespace, '/discord/stories/(?P<id>\d+)/link', ['methods' => 'POST', 'callback' => 'wwh_discord_rest_link_story', 'permission_callback' => $permission]);
+        register_rest_route($namespace, '/discord/stories/(?P<id>\d+)/link', ['methods' => 'DELETE', 'callback' => 'wwh_discord_rest_unlink_story', 'permission_callback' => $permission]);
+        register_rest_route($namespace, '/discord/users/(?P<discordId>\d+)', ['methods' => 'GET', 'callback' => 'wwh_discord_rest_resolve_user', 'permission_callback' => $permission]);
+    }
 }
 add_action('rest_api_init', 'wwh_discord_register_rest_routes');
 
 function wwh_discord_register_story_box(): void
 {
-    add_meta_box('wwh-discord-story', 'Weekly Wildcat Workflow', 'wwh_discord_render_story_box', 'post', 'side', 'default');
+    add_meta_box('wwh-discord-story', byline_publication_name() . ' Workflow', 'wwh_discord_render_story_box', 'post', 'side', 'default');
 }
 add_action('add_meta_boxes_post', 'wwh_discord_register_story_box');
 
@@ -588,7 +598,7 @@ function wwh_discord_oauth_callback(): void
     $discord_id = wwh_discord_sanitize_snowflake($discord['id'] ?? '');
     if ($discord_id === '') wp_die('Discord returned an invalid account.');
     $duplicates = get_users(['meta_key' => WWH_DISCORD_USER_ID_META, 'meta_value' => $discord_id, 'exclude' => [$user_id], 'number' => 1]);
-    if ($duplicates) wp_die('That Discord account is already connected to another Weekly Wildcat account.');
+    if ($duplicates) wp_die(sprintf('That Discord account is already connected to another %s account.', byline_publication_name()));
     update_user_meta($user_id, WWH_DISCORD_USER_ID_META, $discord_id);
     update_user_meta($user_id, WWH_DISCORD_USERNAME_META, sanitize_text_field((string) ($discord['global_name'] ?? $discord['username'] ?? 'Discord user')));
     wp_safe_redirect(admin_url('profile.php?wwh_discord=connected'));
@@ -612,7 +622,7 @@ function wwh_discord_profile(WP_User $user): void
     if ((int) $user->ID !== get_current_user_id()) return;
     $discord_id = (string) get_user_meta($user->ID, WWH_DISCORD_USER_ID_META, true);
     $username = (string) get_user_meta($user->ID, WWH_DISCORD_USERNAME_META, true);
-    echo '<h2>Discord</h2><table class="form-table" role="presentation"><tr><th>Weekly Wildcat Discord</th><td>';
+    echo '<h2>Discord</h2><table class="form-table" role="presentation"><tr><th>' . esc_html(byline_publication_name()) . ' Discord</th><td>';
     if ($discord_id !== '') {
         echo '<p>Connected as <strong>' . esc_html($username ?: $discord_id) . '</strong></p><a class="button" href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=wwh_discord_disconnect'), 'wwh_discord_disconnect')) . '">Disconnect Discord</a>';
     } else {
