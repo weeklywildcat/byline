@@ -18,11 +18,12 @@ static public presentation.
 - The Discord bot is an optional stateless newsroom service. It is built and
   deployed separately and is excluded from the WordPress release archive.
 
-The plugin remains in its established repository and installed path during the
-repository transition. GitHub releases still publish
+The plugin source lives under `wordpress-plugin/` while retaining its installed
+path and main file. Canonical GitHub releases still publish
 `weekly-wildcat-headless.zip`; canonical Byline APIs adapt to legacy CPTs,
 metadata, options, routes, and environment names so existing installations are
-not stranded.
+not stranded. The standalone repository remains available for historical
+releases and the updater bridge.
 
 ## Three customization levels
 

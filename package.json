@@ -1,29 +1,47 @@
 {
-  "name": "byline",
-  "version": "0.2.0",
+  "name": "byline-monorepo",
+  "version": "0.2.1",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "apps/*",
+    "packages/*",
+    "wordpress-plugin"
   ],
   "scripts": {
-    "dev": "node scripts/next-with-publication.mjs dev",
-    "build": "node scripts/next-with-publication.mjs build",
-    "postbuild": "node scripts/copy-wordpress-media-to-out.mjs && node scripts/generate-byline-manifest.mjs && node scripts/verify-static-export.mjs",
-    "test": "vitest run",
-    "test:second-publication": "BYLINE_PUBLICATION_FILE=tests/fixtures/north-star-publication.json BYLINE_DESIGNS_FILE=tests/fixtures/north-star-designs.json BYLINE_CONTENT_MODE=north-star-fixture npm run build && node scripts/verify-second-publication.mjs",
-    "typecheck": "next typegen && tsc --noEmit"
-  },
-  "dependencies": {
-    "@iconify/react": "^6.0.2",
-    "next": "^16.3.2",
-    "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "dev": "npm run dev --workspace @byline/web",
+    "typecheck": "npm run typecheck:packages && npm run typecheck:frontend && npm run typecheck:plugin && npm run typecheck:discord",
+    "typecheck:packages": "tsc --noEmit -p tsconfig.packages.json",
+    "typecheck:frontend": "npm run typecheck --workspace @byline/web",
+    "typecheck:plugin": "npm run typecheck --workspace @byline/wordpress-plugin",
+    "typecheck:discord": "npm run typecheck --workspace @byline/discord-bot",
+    "test": "npm run test:packages && npm run test:frontend && npm run test:plugin && npm run test:php && npm run test:discord",
+    "test:packages": "npm run test:packages --workspace @byline/web",
+    "test:frontend": "npm run test --workspace @byline/web",
+    "test:frontend:second-publication": "npm run test:second-publication --workspace @byline/web",
+    "test:plugin": "npm run test --workspace @byline/wordpress-plugin",
+    "test:php": "bash scripts/test-plugin-php.sh",
+    "test:discord": "npm run test --workspace @byline/discord-bot",
+    "build": "npm run build:frontend && npm run build:plugin && npm run build:discord",
+    "build:frontend": "npm run build --workspace @byline/web",
+    "build:plugin": "npm run build --workspace @byline/wordpress-plugin",
+    "build:discord": "npm run build --workspace @byline/discord-bot",
+    "package:plugin": "bash scripts/package-plugin.sh",
+    "verify:contracts": "node scripts/verify-monorepo-contracts.mjs && node scripts/verify-updater-transition.mjs"
   },
   "devDependencies": {
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "typescript": "6.0.3",
-    "vitest": "^4.1.11"
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "typescript": "6.0.3"
+  },
+  "overrides": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5"
+  },
+  "optionalDependencies": {
+    "@rolldown/binding-linux-x64-gnu": "1.2.5",
+    "@rolldown/binding-linux-x64-musl": "1.2.5"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

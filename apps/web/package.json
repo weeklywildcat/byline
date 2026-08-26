@@ -1,0 +1,37 @@
+{
+  "name": "@byline/web",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/next-with-publication.mjs dev",
+    "build": "node scripts/next-with-publication.mjs build",
+    "postbuild": "node scripts/copy-wordpress-media-to-out.mjs && node scripts/generate-byline-manifest.mjs && node scripts/verify-static-export.mjs",
+    "test": "vitest run",
+    "test:packages": "vitest run tests/shared-contracts.test.ts",
+    "test:second-publication": "BYLINE_PUBLICATION_FILE=tests/fixtures/north-star-publication.json BYLINE_DESIGNS_FILE=tests/fixtures/north-star-designs.json BYLINE_CONTENT_MODE=north-star-fixture npm run build && node scripts/verify-second-publication.mjs",
+    "typecheck": "next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "@byline/content": "0.1.0",
+    "@byline/core": "0.1.0",
+    "@byline/design": "0.1.0",
+    "@byline/studio-contract": "0.1.0",
+    "@byline/theme-contract": "0.1.0",
+    "@byline/theme-editorial": "0.1.0",
+    "@byline/theme-magazine": "0.1.0",
+    "@byline/theme-modern": "0.1.0",
+    "@byline/theme-weekly-wildcat": "0.1.0",
+    "@byline/ui": "0.1.0",
+    "@iconify/react": "^6.0.2",
+    "next": "^16.3.2",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

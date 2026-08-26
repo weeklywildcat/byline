@@ -9,6 +9,8 @@ out/
 node_modules/
 wordpress/
 public/_wordpress-media/
+apps/web/public/_wordpress-media/
+apps/discord-bot/dist/
 *.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*

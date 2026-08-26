@@ -1,0 +1,77 @@
+.wwh-roster-fields {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.wwh-roster-fields .wwh-field {
+    margin: 0;
+}
+
+.wwh-roster-fields .wwh-field span {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.wwh-roster-fields select,
+.wwh-roster-fields input {
+    max-width: 100%;
+    width: 100%;
+}
+
+.wwh-roster-editor {
+    margin-top: 24px;
+}
+
+.wwh-roster-editor-heading {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.wwh-roster-editor-heading h3 {
+    margin: 0;
+}
+
+.wwh-roster-table-wrap {
+    overflow-x: auto;
+}
+
+.wwh-roster-table {
+    min-width: 720px;
+}
+
+.wwh-roster-table input {
+    width: 100%;
+}
+
+.wwh-roster-row-actions {
+    white-space: nowrap;
+    width: 126px;
+}
+
+.wwh-roster-row-actions button {
+    margin-right: 8px;
+}
+
+.wwh-roster-import-preview {
+    margin: 14px 0;
+    max-width: 780px;
+}
+
+.wwh-roster-import-confirm {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 14px 0 24px;
+}
+
+@media (max-width: 782px) {
+    .wwh-roster-fields {
+        grid-template-columns: 1fr;
+    }
+}
