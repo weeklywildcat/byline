@@ -6,6 +6,7 @@ import {
   BYLINE_DESIGN_WRITE_SCHEMA_VERSION,
   BylineDesignCompatibilityError,
   LEAD_PACKAGE_TYPE,
+  SPORTS_PACKAGE_TYPE,
   parsePublishedBylineDesign,
   resolvePublishedDesignToV2
 } from "@byline/design";
@@ -211,5 +212,93 @@ describe("publication-aware fallback", () => {
     expect(props.utility.poll).toBe(false);
     expect(props.utility.calendar).toBe(false);
     expect(props.latest.heading).toBe("Latest");
+  });
+});
+
+describe("published sports settings travel the whole pipeline", () => {
+  function sportsDocument(sportsProps: Record<string, unknown>) {
+    return {
+      schemaVersion: 2,
+      template: "home",
+      theme: "weekly-wildcat",
+      packages: [
+        { id: "home-lead", type: LEAD_PACKAGE_TYPE, props: {} },
+        { id: "home-sports", type: SPORTS_PACKAGE_TYPE, props: sportsProps }
+      ]
+    };
+  }
+
+  it("carries a sports package through the envelope parser unchanged", () => {
+    const published = parsePublishedBylineDesign(
+      envelope(sportsDocument({ scores: { enabled: false, limit: 2 }, heading: "Wildcat Sports" })),
+      "home"
+    );
+
+    // Narrowed rather than asserted: the envelope is a discriminated union, so
+    // reading `packages` is only legal once the version is proven.
+    if (published.schemaVersion !== 2) throw new Error("expected a schema 2 design");
+
+    expect(published.document.packages.map((entry) => entry.type)).toEqual([
+      LEAD_PACKAGE_TYPE,
+      SPORTS_PACKAGE_TYPE
+    ]);
+  });
+
+  it("honours a published sports design over the compatibility seed", async () => {
+    const frontend = await loadFrontend(
+      JSON.stringify({
+        home: envelope(
+          sportsDocument({
+            heading: "Wildcat Sports",
+            scores: { enabled: false, limit: 2 },
+            upcoming: { enabled: true, limit: 1 },
+            athleteSpotlight: { enabled: false, source: { type: "athlete-spotlight" } }
+          })
+        )
+      })
+    );
+
+    const document = frontend.getHomeDesignDocument();
+    const sportsPackage = frontend.findSportsPackage(document);
+    const seed = frontend.getWeeklyWildcatCompatibilityDesign("weekly-wildcat");
+
+    expect(sportsPackage?.id).toBe("home-sports");
+    // The published document, not the seed: the seed keeps scores on.
+    expect(sportsPackage?.props).not.toEqual(seed.packages[1].props);
+    expect((sportsPackage?.props as { scores: { enabled: boolean } }).scores.enabled).toBe(false);
+    expect((sportsPackage?.props as { heading: string }).heading).toBe("Wildcat Sports");
+  });
+
+  it("keeps the compatibility seed's sports settings when nothing is published", async () => {
+    const frontend = await loadFrontend(undefined);
+    const props = frontend.findSportsPackage(frontend.getHomeDesignDocument())?.props as {
+      scores: { enabled: boolean; limit: number };
+      upcoming: { limit: number };
+      athleteSpotlight: { enabled: boolean };
+    };
+
+    expect(props.scores).toEqual({ enabled: true, limit: 2 });
+    expect(props.upcoming.limit).toBe(3);
+    expect(props.athleteSpotlight.enabled).toBe(true);
+  });
+
+  it("does not give another publication Weekly Wildcat's sports conventions", async () => {
+    const frontend = await loadFrontend(undefined, "./fixtures/north-star-publication.json");
+    const props = frontend.findSportsPackage(frontend.getHomeDesignDocument())?.props as {
+      athleteSpotlight: { enabled: boolean };
+    };
+
+    // The spotlight depends on a tagging convention a new newsroom has not
+    // adopted, so the neutral starter leaves it off.
+    expect(props.athleteSpotlight.enabled).toBe(false);
+  });
+
+  it("keeps the package order the document declares", async () => {
+    const frontend = await loadFrontend(undefined);
+
+    expect(frontend.getHomePackageOrder(frontend.getHomeDesignDocument())).toEqual([
+      LEAD_PACKAGE_TYPE,
+      SPORTS_PACKAGE_TYPE
+    ]);
   });
 });

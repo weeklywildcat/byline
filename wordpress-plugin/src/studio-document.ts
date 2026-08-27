@@ -1,10 +1,12 @@
 import {
   BYLINE_DESIGN_WRITE_SCHEMA_VERSION,
   LEAD_PACKAGE_TYPE,
+  SPORTS_PACKAGE_TYPE,
   isBylinePackageType,
   migrateDesignDocumentV1ToV2,
   parseBylineDesignDocumentV2,
   parseLeadPackageProps,
+  parseSportsPackageProps,
   type BylineDesignDocumentV2,
   type BylineDesignPackage
 } from "@byline/design";
@@ -58,6 +60,15 @@ export function designDocumentToEditorState(document: BylineDesignDocumentV2): P
   };
 }
 
+// Every package normalises its own settings on the way out of the editor, so a
+// half-filled field in Puck cannot become a half-filled persisted document.
+function parsePackageProps(type: string, settings: Record<string, unknown>) {
+  if (type === LEAD_PACKAGE_TYPE) return parseLeadPackageProps(settings);
+  if (type === SPORTS_PACKAGE_TYPE) return parseSportsPackageProps(settings);
+
+  return settings;
+}
+
 function packageIdFor(props: Record<string, unknown>, type: string, index: number) {
   const id = props.id;
 
@@ -97,11 +108,7 @@ export function editorStateToDesignDocument(
     // `id` is the package's identity, not one of its settings.
     const { id: _id, ...settings } = props;
 
-    packages.push({
-      id,
-      type: item.type,
-      props: item.type === LEAD_PACKAGE_TYPE ? parseLeadPackageProps(settings) : settings
-    });
+    packages.push({ id, type: item.type, props: parsePackageProps(item.type, settings) });
   });
 
   return {

@@ -231,4 +231,62 @@ if (!$v2_bad_legacy_result instanceof WP_Error || $v2_bad_legacy_result->code !=
     exit(1);
 }
 
+// --- sports package ---------------------------------------------------------
+
+$sports_package = [
+    'id' => 'home-sports',
+    'type' => 'sports-package',
+    'props' => [
+        'heading' => 'Sports',
+        'stories' => ['source' => ['type' => 'section', 'slug' => 'sports'], 'limit' => 3],
+        'athleteSpotlight' => ['enabled' => true, 'source' => ['type' => 'athlete-spotlight']],
+        'scores' => ['enabled' => true, 'limit' => 2],
+        'upcoming' => ['enabled' => true, 'limit' => 3],
+        'presentation' => ['showDeck' => true, 'showBylines' => true],
+    ],
+];
+
+$v2_sports = $v2;
+$v2_sports['packages'][] = $sports_package;
+if (byline_validate_design_document($v2_sports, 'home') !== true) {
+    fwrite(STDERR, "A valid schema 2 sports package was rejected.\n");
+    exit(1);
+}
+
+// The sports package's own source slots are validated, not just the lead's.
+$v2_sports_bad = $v2_sports;
+$v2_sports_bad['packages'][1]['props']['stories']['source'] = ['type' => 'section', 'slug' => 'Sports Desk'];
+$v2_sports_bad_result = byline_validate_design_document($v2_sports_bad, 'home');
+if (!$v2_sports_bad_result instanceof WP_Error || $v2_sports_bad_result->code !== 'byline_invalid_story_query') {
+    fwrite(STDERR, "An invalid sports section source was not rejected.\n");
+    exit(1);
+}
+
+$v2_spotlight_bad = $v2_sports;
+$v2_spotlight_bad['packages'][1]['props']['athleteSpotlight']['source'] = ['type' => 'manual', 'storyIds' => ['x']];
+$v2_spotlight_bad_result = byline_validate_design_document($v2_spotlight_bad, 'home');
+if (!$v2_spotlight_bad_result instanceof WP_Error || $v2_spotlight_bad_result->code !== 'byline_invalid_story_query') {
+    fwrite(STDERR, "An invalid athlete spotlight source was not rejected.\n");
+    exit(1);
+}
+
+// A v1 sports block id is not a v2 package type: the two namespaces must not
+// blur while both schemas are readable.
+$v2_v1_type = $v2_sports;
+$v2_v1_type['packages'][1]['type'] = 'sports-scores';
+$v2_v1_type_result = byline_validate_design_document($v2_v1_type, 'home');
+if (!$v2_v1_type_result instanceof WP_Error || $v2_v1_type_result->code !== 'byline_unknown_design_block') {
+    fwrite(STDERR, "A v1 sports block id was accepted as a v2 package type.\n");
+    exit(1);
+}
+
+// A design may carry both extracted packages, in document order.
+$v2_ordered = $v2_sports;
+if (byline_validate_design_document($v2_ordered, 'home') !== true
+    || $v2_ordered['packages'][0]['type'] !== 'lead-package'
+    || $v2_ordered['packages'][1]['type'] !== 'sports-package') {
+    fwrite(STDERR, "The two-package home document did not validate in order.\n");
+    exit(1);
+}
+
 echo "Byline design schema regression passed.\n";

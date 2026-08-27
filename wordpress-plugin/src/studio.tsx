@@ -10,8 +10,9 @@ import { magazineTheme } from "@byline/theme-magazine";
 import { modernTheme } from "@byline/theme-modern";
 import { weeklyWildcatTheme } from "@byline/theme-weekly-wildcat";
 import { getBylineBlockPresentation, themeTokensToCssVariables } from "@byline/ui";
-import { LeadPackagePreview } from "./studio-preview";
+import { LeadPackagePreview, SportsPackagePreview } from "./studio-preview";
 import {
+  AthleteSpotlightSourceField,
   AuthorPickerField,
   LeadStorySourceField,
   FocalPointField,
@@ -25,7 +26,13 @@ import {
   TagPickerField,
   type StorySource
 } from "./studio-fields";
-import { LEAD_PACKAGE_TYPE, WEEKLY_WILDCAT_LEAD_DEFAULTS, type BylineDesignDocumentV2 } from "@byline/design";
+import {
+  LEAD_PACKAGE_TYPE,
+  SPORTS_PACKAGE_TYPE,
+  WEEKLY_WILDCAT_LEAD_DEFAULTS,
+  WEEKLY_WILDCAT_SPORTS_DEFAULTS,
+  type BylineDesignDocumentV2
+} from "@byline/design";
 import { editorStateToDesignDocument, loadDesignIntoEditor, type PuckEditorState } from "./studio-document";
 
 // What Studio writes. Reading still accepts schema 1, but only as an input to
@@ -228,6 +235,77 @@ function createLeadPackageComponent(context: StudioPreviewContext) {
   };
 }
 
+// The sports package, like the lead package, is a schema v2 semantic package
+// rather than a v1 block. Its settings are newsroom decisions -- how many
+// stories, whether to run the spotlight, how many finals and fixtures -- and
+// deliberately expose none of the sports API's own concepts.
+function createSportsPackageComponent(context: StudioPreviewContext) {
+  const showHide = (label: string) => ({
+    type: "radio" as const,
+    label,
+    options: [
+      { label: "Show", value: true },
+      { label: "Hide", value: false }
+    ]
+  });
+
+  return {
+    label: "Sports package",
+    fields: {
+      heading: { type: "text" as const, label: "Section heading" },
+      stories: {
+        type: "object" as const,
+        label: "Stories",
+        objectFields: {
+          source: LeadStorySourceField("Source"),
+          limit: { type: "number" as const, label: "Number of stories", min: 0, max: 12 }
+        }
+      },
+      athleteSpotlight: {
+        type: "object" as const,
+        label: "Athlete spotlight",
+        objectFields: {
+          enabled: showHide("Athlete spotlight"),
+          source: AthleteSpotlightSourceField("Source")
+        }
+      },
+      scores: {
+        type: "object" as const,
+        label: "Recent scores",
+        objectFields: {
+          enabled: showHide("Recent scores"),
+          limit: { type: "number" as const, label: "Number of results", min: 0, max: 8 }
+        }
+      },
+      upcoming: {
+        type: "object" as const,
+        label: "Upcoming games",
+        objectFields: {
+          enabled: showHide("Upcoming games"),
+          limit: { type: "number" as const, label: "Number of games", min: 0, max: 12 }
+        }
+      },
+      presentation: {
+        type: "object" as const,
+        label: "Story display",
+        objectFields: {
+          showDeck: showHide("Show deck"),
+          showBylines: showHide("Show bylines")
+        }
+      }
+    },
+    defaultProps: { ...WEEKLY_WILDCAT_SPORTS_DEFAULTS },
+    render: (props: Record<string, unknown>) => (
+      <SportsPackagePreview
+        props={props}
+        theme={context.theme}
+        features={context.features}
+        publicationShortName={context.publicationShortName}
+      />
+    )
+  };
+}
+
 const studioConfigBase: Config = {
   categories: Object.fromEntries(
     Object.entries(blockGroups).map(([title, categoryComponents]) => [title, {
@@ -271,12 +349,17 @@ export function createStudioConfig(
   return {
     ...studioConfigBase,
     categories: {
-      Packages: { title: "Packages", components: [LEAD_PACKAGE_TYPE], defaultExpanded: true },
+      Packages: {
+        title: "Packages",
+        components: [LEAD_PACKAGE_TYPE, SPORTS_PACKAGE_TYPE],
+        defaultExpanded: true
+      },
       ...studioConfigBase.categories
     } as Config["categories"],
     components: {
       ...studioConfigBase.components,
-      [LEAD_PACKAGE_TYPE]: createLeadPackageComponent(previewContext)
+      [LEAD_PACKAGE_TYPE]: createLeadPackageComponent(previewContext),
+      [SPORTS_PACKAGE_TYPE]: createSportsPackageComponent(previewContext)
     } as unknown as Config["components"],
     root: {
       render: ({ children }: { children: ReactNode }) => (

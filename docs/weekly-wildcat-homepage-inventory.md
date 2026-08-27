@@ -80,9 +80,28 @@ of: field posts, an athlete spotlight, recent scores, or upcoming games.
 - Lead: `variant="field"` with `showDeck cleanDeck showAuthor showReadLink`.
 - Rail: up to 2 `variant="briefing"` stories with `showAuthor`, then
   `SportsAthleteFeature` for the athlete spotlight post.
-- `SportsSchedulePanel` always renders at the foot of the package, emitting
-  `.field-schedule-result` (recent scores, limit 3) and
-  `.field-schedule-upcoming` (upcoming games, limit 8).
+- `SportsSchedulePanel` renders at the foot of the package, emitting
+  `.field-schedule-result` and `.field-schedule-upcoming`.
+
+**Corrected while extracting (2026-08-26):** an earlier revision of this document
+said the panel's limits were 3 and 8. Those are the *fetch* sizes
+(`getRecentSportsGames(3)` / `getUpcomingSportsGames(8)`); the panel itself
+sliced to **2 finals and 3 fixtures**, and that is what readers saw. The
+`sports-package` defaults persist the rendered counts.
+
+Conditional behaviour that has to survive, none of which appears in a single
+live render:
+
+- The whole `<section>` is suppressed unless `features.sports` **and** one of
+  field posts / an athlete spotlight / recent scores / upcoming games exists.
+- The panel returns `null` when both lists are empty.
+- `.field-layout` opens for an athlete spotlight even with no lead story.
+- The Upcoming column still renders, carrying `No upcoming games`, whenever
+  there are finals — so `field-schedule-layout-2` is the shape at the end of a
+  season, and `-1` is the shape when there are fixtures but no finals.
+- The athlete spotlight is absent from the current live content, so the
+  `.sports-athlete-feature` path is covered by fixtures rather than by the
+  captured baseline.
 
 ### 7. More From Weekly Wildcat — `.more-weekly`
 Header "More From {shortName}" + "View All Stories →" to `/stories/`.

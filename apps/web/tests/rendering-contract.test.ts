@@ -1,8 +1,17 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { LEAD_PACKAGE_TYPE } from "@byline/design";
-import { LeadPackage, EditorialLeadPackage, getLeadPackageRenderer, themeHasLeadPackageVariant } from "@byline/ui";
+import { LEAD_PACKAGE_TYPE, SPORTS_PACKAGE_TYPE } from "@byline/design";
+import {
+  EditorialLeadPackage,
+  EditorialSportsPackage,
+  LeadPackage,
+  SportsPackage,
+  getLeadPackageRenderer,
+  getSportsPackageRenderer,
+  themeHasLeadPackageVariant,
+  themeHasSportsPackageVariant
+} from "@byline/ui";
 
 function readSource(relativePath: string) {
   return readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), "utf8");
@@ -97,5 +106,71 @@ describe("Studio threads preserved legacy data into every write", () => {
 
     expect(toEditorState).not.toContain("legacy");
     expect(toEditorState).toContain("document.packages");
+  });
+});
+
+describe("shared rendering contract: sports package", () => {
+  const resolver = readSource("../lib/sports-packages.ts");
+  const renderer = readSource("../../../packages/ui/src/SportsPackage.tsx");
+
+  it("production renders the sports package through the shared renderer", () => {
+    expect(homepage).toMatch(/import \{[^}]*SportsPackage[^}]*\} from "@byline\/ui"/);
+    expect(homepage).toContain("<SportsPackage");
+    // The hand-written section is gone, not merely bypassed.
+    expect(homepage).not.toContain('className="from-field"');
+    expect(homepage).not.toContain("SportsSchedulePanel");
+    expect(homepage).not.toContain("SportsAthleteFeature");
+  });
+
+  it("Studio renders the shared renderer rather than its own markup", () => {
+    expect(studioPreview).toContain("getSportsPackageRenderer");
+    for (const className of ["from-field", "field-schedule", "field-rail", "sports-athlete-feature"]) {
+      expect(studioPreview).not.toContain(className);
+    }
+  });
+
+  it("registers the sports package as a real Studio component, not a placeholder", () => {
+    expect(studioConfig).toContain("SportsPackagePreview");
+    expect(studioConfig).toContain("SPORTS_PACKAGE_TYPE");
+
+    // It is registered outside the generic v1 block palette that builds the
+    // placeholder cards.
+    const groups = readSource("../../../packages/studio-contract/src/index.ts");
+
+    expect(groups).not.toContain("sports-package");
+  });
+
+  it("resolves both hosts to the same component for a given theme", () => {
+    expect(getSportsPackageRenderer("weekly-wildcat")).toBe(SportsPackage);
+    expect(getSportsPackageRenderer("editorial")).toBe(EditorialSportsPackage);
+    expect(themeHasSportsPackageVariant("magazine")).toBe(false);
+    expect(getSportsPackageRenderer("magazine")).toBe(SportsPackage);
+  });
+
+  it("keeps the persisted package type stable", () => {
+    expect(SPORTS_PACKAGE_TYPE).toBe("sports-package");
+  });
+
+  it("keeps fetching, selection and capability decisions out of the renderer", () => {
+    // The renderer receives a finished model. If any of these appear in it, the
+    // boundary the phase exists to establish has leaked.
+    for (const forbidden of [
+      "apiFetch",
+      "getRecentSportsGames",
+      "getUpcomingSportsGames",
+      "WordPressPost",
+      "SportsGame",
+      "features",
+      "usedPostIds",
+      "publication"
+    ]) {
+      expect(renderer).not.toContain(forbidden);
+    }
+  });
+
+  it("keeps those decisions in the resolver, where they belong", () => {
+    expect(resolver).toContain("features.sports");
+    expect(resolver).toContain("input.selection.fieldPosts");
+    expect(resolver).toContain("getPublicationConfig");
   });
 });
