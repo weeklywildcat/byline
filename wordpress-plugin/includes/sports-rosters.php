@@ -604,7 +604,7 @@ function wwh_sports_roster_row_actions(array $actions, WP_Post $post): array
     $team = byline_get_sports_team($team_key);
 
     if ($team_key !== '') {
-        $actions['view_team'] = sprintf('<a href="%s">View Team</a>', esc_url(admin_url('edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE . '&page=wwh-sports-team-settings&team=' . rawurlencode($team_key))));
+        $actions['view_team'] = sprintf('<a href="%s">View Team</a>', esc_url(wwh_sports_team_settings_url($team_key)));
         $actions['view_games'] = sprintf('<a href="%s">View Games</a>', esc_url(byline_sports_admin_games_url($team_key, $season)));
         $actions['view_public_team'] = sprintf('<a href="%s" target="_blank" rel="noopener">Public Team Page</a>', esc_url(byline_sports_public_team_url(is_array($team) ? $team : $team_key, $season)));
     }

@@ -305,7 +305,7 @@ try {
 } catch (RuntimeException $exception) {
     // wp_safe_redirect throws in this harness.
 }
-if (!is_string($redirected_to) || strpos($redirected_to, 'page=wwh-sports-team-settings') === false) {
+if (!is_string($redirected_to) || strpos($redirected_to, 'page=wwh-sports-team-settings') === false || strpos($redirected_to, 'page=byline-teams') !== false) {
     fail('The retired byline-teams URL must redirect to the Sports team screen.');
 }
 

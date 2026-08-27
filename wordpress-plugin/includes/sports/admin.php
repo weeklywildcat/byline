@@ -72,7 +72,7 @@ function wwh_render_sports_overview_page(): void
     uasort($active, static fn(array $left, array $right): int => strcasecmp(wwh_sports_admin_team_label($left), wwh_sports_admin_team_label($right)));
 
     $games_url = byline_sports_admin_games_url('', $season);
-    $teams_url = admin_url('edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE . '&page=wwh-sports-team-settings');
+    $teams_url = byline_sports_team_settings_url();
     $rosters_url = byline_sports_admin_rosters_url('', $season);
     $import_url = admin_url('edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE . '&page=wwh-sports-import');
     ?>
