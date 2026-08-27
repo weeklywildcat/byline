@@ -38,6 +38,7 @@ type BylineAdminConfig = {
   publicationPath: string;
   diagnosticsPath: string;
   deploymentPath: string;
+  discordPath: string;
   nonce: string;
   pluginVersion: string;
   previewStylesheetUrl: string;
@@ -860,14 +861,311 @@ function DeploymentSettings() {
   );
 }
 
+type DiscordChoice = { id: string; name: string };
+
+type DiscordPayload = {
+  settings: {
+    values: {
+      clientId: string;
+      guildId: string;
+      storyboardChannelId: string;
+      announcementsChannelId: string;
+      staffRoleId: string;
+      botUrl: string;
+      announcePublished: boolean;
+      reconcileMinutes: number;
+    };
+    sources: Record<string, "wordpress" | "environment" | "unset">;
+    secrets: { botToken: boolean; clientSecret: boolean };
+    bridgeSecretConfigured: boolean;
+    reconcileChoices: number[];
+  };
+  status: {
+    botConnected: boolean;
+    discordConnected: boolean;
+    guildFound: boolean;
+    storyboardFound: boolean;
+    announcementsFound: boolean;
+    lastSyncAt: string;
+    source: "bot" | "wordpress";
+    message: string;
+  };
+  directory: {
+    available: boolean;
+    error: string;
+    guilds: DiscordChoice[];
+    forums: DiscordChoice[];
+    textChannels: DiscordChoice[];
+    roles: DiscordChoice[];
+  };
+  sync?: { ok: boolean; error: string };
+};
+
+type DiscordDraft = DiscordPayload["settings"]["values"];
+
+const DISCORD_STATUS_ROWS: Array<{ key: keyof DiscordPayload["status"]; label: string }> = [
+  { key: "botConnected", label: "Bot connected" },
+  { key: "discordConnected", label: "Discord connected" },
+  { key: "guildFound", label: "Server found" },
+  { key: "storyboardFound", label: "Storyboard found" },
+  { key: "announcementsFound", label: "Announcements found" }
+];
+
+function environmentHelp(source: string | undefined) {
+  return source === "environment" ? "Currently set by the environment. Saving a value here overrides it." : undefined;
+}
+
+/**
+ * Discord pickers fall back to a plain ID field whenever the bot token cannot
+ * list the server, so a newsroom can still finish setup by hand.
+ */
+function DiscordChoiceField({
+  label,
+  help,
+  emptyLabel,
+  choices,
+  available,
+  value,
+  onChange
+}: {
+  label: string;
+  help?: string;
+  emptyLabel: string;
+  choices: DiscordChoice[];
+  available: boolean;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  if (!available || !choices.length) {
+    return <TextControl label={label} help={help || "Paste a Discord ID until Byline can list this server."} value={value} onChange={onChange} />;
+  }
+  const known = choices.some((choice) => choice.id === value);
+  const options = [
+    { label: emptyLabel, value: "" },
+    ...choices.map((choice) => ({ label: choice.name || choice.id, value: choice.id })),
+    ...(value && !known ? [{ label: `${value} (not visible to the bot)`, value }] : [])
+  ];
+  return <SelectControl label={label} help={help} value={value} options={options} onChange={onChange} />;
+}
+
+function DiscordSettings() {
+  const path = config?.discordPath || "/byline/v1/admin/discord";
+  const [payload, setPayload] = useState<DiscordPayload | null>(null);
+  const [draft, setDraft] = useState<DiscordDraft | null>(null);
+  const [botToken, setBotToken] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [clearBotToken, setClearBotToken] = useState(false);
+  const [clearClientSecret, setClearClientSecret] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const editable = Boolean(config?.capabilities.manageIntegrations);
+
+  const apply = (next: DiscordPayload) => {
+    setPayload(next);
+    setDraft(next.settings.values);
+    setBotToken("");
+    setClientSecret("");
+    setClearBotToken(false);
+    setClearClientSecret(false);
+  };
+
+  useEffect(() => {
+    apiFetch<DiscordPayload>({ path })
+      .then(apply)
+      .catch(() => setError("Byline could not load the Discord settings."));
+  }, []);
+
+  const update = (patch: Partial<DiscordDraft>) => setDraft((current) => (current ? { ...current, ...patch } : current));
+
+  const run = async (label: string, request: () => Promise<DiscordPayload>, success: (next: DiscordPayload) => string) => {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const next = await request();
+      apply(next);
+      setMessage(success(next));
+    } catch (requestError) {
+      const detail = (requestError as { message?: string })?.message;
+      setError(detail || `Byline could not ${label}.`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = () =>
+    run(
+      "save the Discord settings",
+      () =>
+        apiFetch<DiscordPayload>({
+          path,
+          method: "PUT",
+          data: { ...draft, botToken, clientSecret, clearBotToken, clearClientSecret }
+        }),
+      () => "Discord settings saved. Secrets are stored in WordPress and are never returned to the browser."
+    );
+
+  const test = () =>
+    run(
+      "reach Discord",
+      () => apiFetch<DiscordPayload>({ path: `${path}/test`, method: "POST" }),
+      (next) => (next.status.discordConnected ? "Discord answered. The status below is current." : `Discord could not be reached: ${next.status.message}`)
+    );
+
+  const syncNow = () =>
+    run(
+      "ask the bot to reconcile",
+      () => apiFetch<DiscordPayload>({ path: `${path}/sync`, method: "POST" }),
+      (next) => (next.sync?.ok ? "The bot reconciled every active story." : `The bot did not run: ${next.sync?.error || "no response"}`)
+    );
+
+  if (!payload || !draft) return error ? <Notice status="error" isDismissible={false}>{error}</Notice> : <Spinner />;
+
+  const { settings, status, directory } = payload;
+  const sources = settings.sources;
+
+  return (
+    <Card>
+      <CardBody className="byline-settings-card">
+        {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
+        {message ? <Notice status="success" isDismissible={false}>{message}</Notice> : null}
+
+        <div>
+          <h3>Status</h3>
+          <dl className="byline-diagnostics-list">
+            {DISCORD_STATUS_ROWS.map((row) => (
+              <div key={row.key}>
+                <dt>{row.label}</dt>
+                <dd className={status[row.key] ? "byline-status-ok" : "byline-status-off"}>
+                  <span aria-hidden="true">{status[row.key] ? "●" : "○"}</span> {status[row.key] ? "Yes" : "No"}
+                </dd>
+              </div>
+            ))}
+            <div><dt>Last sync</dt><dd>{status.lastSyncAt}</dd></div>
+            <div><dt>Reported by</dt><dd>{status.source === "bot" ? "The running bot" : "WordPress"}</dd></div>
+          </dl>
+          <p className="byline-field-note">{status.message}</p>
+          {!settings.bridgeSecretConfigured ? (
+            <Notice status="warning" isDismissible={false}>
+              No bridge secret is set. Define BYLINE_DISCORD_BRIDGE_SECRET for both WordPress and the bot before they can talk to each other.
+            </Notice>
+          ) : null}
+          <div className="byline-settings-actions">
+            <Button variant="secondary" isBusy={busy} disabled={busy || !editable} onClick={test}>Test connection</Button>
+            <Button variant="secondary" isBusy={busy} disabled={busy || !editable || !draft.botUrl} onClick={syncNow}>Sync now</Button>
+          </div>
+        </div>
+
+        <div>
+          <h3>Discord application</h3>
+          <div className="byline-settings-grid">
+            <TextControl
+              label="Application / Client ID"
+              help={environmentHelp(sources.clientId)}
+              value={draft.clientId}
+              onChange={(clientId: string) => update({ clientId })}
+            />
+            <TextControl
+              label="Bot service URL"
+              help={environmentHelp(sources.botUrl) || "Where the Byline Discord bot listens. HTTPS, or HTTP on localhost."}
+              value={draft.botUrl}
+              onChange={(botUrl: string) => update({ botUrl })}
+            />
+            <TextControl
+              type="password"
+              autoComplete="new-password"
+              label={settings.secrets.botToken ? "Replace bot token" : "Bot token"}
+              help={settings.secrets.botToken ? "Stored. Leave blank to keep it." : environmentHelp(sources.botToken)}
+              value={botToken}
+              onChange={setBotToken}
+            />
+            <TextControl
+              type="password"
+              autoComplete="new-password"
+              label={settings.secrets.clientSecret ? "Replace client secret" : "Client secret"}
+              help={settings.secrets.clientSecret ? "Stored. Leave blank to keep it." : environmentHelp(sources.clientSecret)}
+              value={clientSecret}
+              onChange={setClientSecret}
+            />
+          </div>
+          {settings.secrets.botToken ? <ToggleControl label="Remove the saved bot token" checked={clearBotToken} onChange={setClearBotToken} /> : null}
+          {settings.secrets.clientSecret ? <ToggleControl label="Remove the saved client secret" checked={clearClientSecret} onChange={setClearClientSecret} /> : null}
+        </div>
+
+        <div>
+          <h3>Server</h3>
+          {directory.error ? <Notice status="warning" isDismissible={false}>{directory.error}</Notice> : null}
+          <div className="byline-settings-grid">
+            <DiscordChoiceField
+              label="Discord server"
+              emptyLabel="Select a server"
+              help={environmentHelp(sources.guildId)}
+              choices={directory.guilds}
+              available={directory.available}
+              value={draft.guildId}
+              onChange={(guildId: string) => update({ guildId })}
+            />
+            <DiscordChoiceField
+              label="Storyboard forum"
+              emptyLabel="Select a forum channel"
+              help={environmentHelp(sources.storyboardChannelId) || "Save the server first to list its forum channels."}
+              choices={directory.forums}
+              available={directory.available}
+              value={draft.storyboardChannelId}
+              onChange={(storyboardChannelId: string) => update({ storyboardChannelId })}
+            />
+            <DiscordChoiceField
+              label="Announcements channel"
+              emptyLabel="Select a text channel"
+              help={environmentHelp(sources.announcementsChannelId)}
+              choices={directory.textChannels}
+              available={directory.available}
+              value={draft.announcementsChannelId}
+              onChange={(announcementsChannelId: string) => update({ announcementsChannelId })}
+            />
+            <DiscordChoiceField
+              label="Staff role"
+              emptyLabel="No role mention"
+              help={environmentHelp(sources.staffRoleId)}
+              choices={directory.roles}
+              available={directory.available}
+              value={draft.staffRoleId}
+              onChange={(staffRoleId: string) => update({ staffRoleId })}
+            />
+          </div>
+        </div>
+
+        <div>
+          <h3>Behavior</h3>
+          <ToggleControl
+            label="Post published stories to announcements"
+            checked={draft.announcePublished}
+            onChange={(announcePublished: boolean) => update({ announcePublished })}
+          />
+          <SelectControl
+            label="Reconciliation interval"
+            value={String(draft.reconcileMinutes)}
+            // An interval inherited from the environment need not be one Byline offers; show it rather than blanking the field.
+            options={Array.from(new Set([...settings.reconcileChoices, draft.reconcileMinutes]))
+              .sort((left, right) => left - right)
+              .map((minutes) => ({ label: minutes === 1 ? "1 minute" : `${minutes} minutes`, value: String(minutes) }))}
+            onChange={(value: string) => update({ reconcileMinutes: Number(value) })}
+          />
+          <p className="byline-field-note">The bot reads these settings from WordPress when it starts.</p>
+        </div>
+
+        <div className="byline-settings-actions">
+          <Button variant="primary" isBusy={busy} disabled={busy || !editable} onClick={save}>Save Discord settings</Button>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
 function OperationalInfo({ route, protocol }: { route: string; protocol: ProtocolManifest | null }) {
   const legacyUrl = config?.nativeUrls.legacySettings;
   const content: Record<string, { title: string; body: string; legacy?: boolean }> = {
-    "/integrations/discord": {
-      title: "Discord newsroom integration",
-      body: "The optional signed bridge and bot use BYLINE_* environment variables, with legacy WWH_* aliases retained during rolling upgrades. Secrets remain outside public publication and design responses.",
-      legacy: true
-    },
     "/content/polls": {
       title: "Polls module",
       body: "Poll blocks are available only while the Polls module is enabled. The static publication calls a host-provided relative API and does not add a Next.js runtime requirement."
@@ -977,7 +1275,7 @@ function Screen({
     const route = adminScreenRoute(page, activeTab);
     return (
       <AdminPageFrame title="Integrations" tabs={integrationTabs()} activeTab={activeTab} error={error}>
-        {route === "/integrations/deployment" ? <DeploymentSettings /> : <OperationalInfo route={route} protocol={protocol} />}
+        {route === "/integrations/deployment" ? <DeploymentSettings /> : <DiscordSettings />}
       </AdminPageFrame>
     );
   }

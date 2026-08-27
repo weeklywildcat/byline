@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from '../src/config.js';
+import { loadBootstrap, loadConfig, resolveConfig } from '../src/config.js';
 
 const base = {
   DISCORD_TOKEN: 'token',
@@ -29,5 +29,39 @@ describe('Discord configuration aliases', () => {
     expect(config.guildId).toBe(base.BYLINE_DISCORD_GUILD_ID);
     expect(config.bridgeSecret).toBe(base.BYLINE_DISCORD_BRIDGE_SECRET);
     expect(config.publicationName).toBe('The Harbor Light');
+  });
+});
+
+describe('WordPress-managed connection settings', () => {
+  it('lets WordPress override the environment while keeping unset values', () => {
+    const config = resolveConfig(
+      {
+        guildId: '12399999901234568',
+        storyboardChannelId: '12399999901234569',
+        publicationAnnouncements: false,
+        reconcileIntervalMs: 600000,
+        publicationShortName: 'Beacon',
+      },
+      base
+    );
+    expect(config.guildId).toBe('12399999901234568');
+    expect(config.storyboardChannelId).toBe('12399999901234569');
+    // Untouched by WordPress, so the environment still supplies it.
+    expect(config.announcementsChannelId).toBe(base.BYLINE_DISCORD_ANNOUNCEMENTS_CHANNEL_ID);
+    expect(config.publicationAnnouncements).toBe(false);
+    expect(config.reconcileIntervalMs).toBe(600000);
+    expect(config.contextMenuCommandName).toBe('Create Beacon story');
+  });
+
+  it('ignores empty and out-of-range values WordPress has not been given', () => {
+    const config = resolveConfig({ guildId: '  ', staffRoleId: '', reconcileIntervalMs: 1000 }, base);
+    expect(config.guildId).toBe(base.BYLINE_DISCORD_GUILD_ID);
+    expect(config.staffRoleId).toBeUndefined();
+    expect(config.reconcileIntervalMs).toBe(300000);
+  });
+
+  it('requires only the WordPress URL and bridge secret to bootstrap', () => {
+    expect(loadBootstrap(base)).toEqual({ wordpressUrl: base.BYLINE_WORDPRESS_URL, bridgeSecret: base.BYLINE_DISCORD_BRIDGE_SECRET });
+    expect(() => loadBootstrap({ BYLINE_WORDPRESS_URL: base.BYLINE_WORDPRESS_URL })).toThrow(/BYLINE_DISCORD_BRIDGE_SECRET/);
   });
 });

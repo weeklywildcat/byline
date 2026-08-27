@@ -1,7 +1,29 @@
 import { randomUUID } from 'node:crypto';
-import type { Config } from '../config.js';
+import type { Bootstrap, Config, RemoteConfig } from '../config.js';
 import { signRequest } from '../security/signing.js';
 import type { CreateStoryResult, ResolvedUser, Story } from './types.js';
+
+const CONFIG_ROUTE = '/byline/v1/discord/config';
+
+/**
+ * Reads the connection settings WordPress manages. Called before a Config
+ * exists, so it takes only the two bootstrap values and signs the request the
+ * same way every other bridge call does.
+ */
+export async function fetchRemoteConfig(bootstrap: Bootstrap, fetcher: typeof fetch = fetch): Promise<RemoteConfig> {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const response = await fetcher(`${bootstrap.wordpressUrl.replace(/\/$/, '')}/wp-json${CONFIG_ROUTE}`, {
+    method: 'GET',
+    headers: {
+      'content-type': 'application/json',
+      'x-byline-timestamp': timestamp,
+      'x-byline-signature': signRequest(bootstrap.bridgeSecret, timestamp, 'GET', CONFIG_ROUTE, ''),
+    },
+  });
+  const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (!response.ok) throw new WordPressError(String(payload.message ?? 'WordPress did not return Discord settings.'), response.status);
+  return payload as RemoteConfig;
+}
 
 export class WordPressError extends Error { constructor(message: string, readonly status: number, readonly code?: string) { super(message); } }
 

@@ -144,6 +144,19 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.byline-field-note {
+  color: #646970;
+  margin: 8px 0 0;
+}
+
+.byline-status-ok {
+  color: #008a20;
+}
+
+.byline-status-off {
+  color: #b32d2e;
+}
+
 .byline-settings-actions {
   align-items: center;
   border-top: 1px solid var(--byline-admin-border);

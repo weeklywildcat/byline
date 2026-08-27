@@ -139,33 +139,48 @@ Commands are guild-scoped. At startup the bot compares normalized registered def
 3. Install with scopes `bot applications.commands`. Do not grant Administrator.
 4. On the storyboard Forum and announcements channel grant View Channel, Send Messages, Embed Links, and Read Message History. On the Forum also grant Send Messages in Threads and Manage Threads. Grant Manage Channels on the Forum while Byline provisions missing workflow tags (it may be removed after all nine tags exist). No Manage Roles, moderation, or privileged-intent permissions are required.
    If `/announce` should notify staff, make only the configured staff role mentionable; Byline still restricts allowed mentions to that exact role ID.
-5. Copy Discord's guild, storyboard Forum, announcements channel, and optional staff role IDs into the bot environment.
-6. Set the same high-entropy bridge secret in WordPress and the bot. Configure WordPress constants/environment values, build the bot with `npm ci && npm run build`, then start it with Docker or `npm start`.
-7. Check `GET /healthz`, **Byline → Integrations → Discord**, account linking on a WordPress profile, `/story create`, WordPress-first draft creation, and a test publication.
+5. Set the same high-entropy bridge secret in the WordPress and bot environments. That secret and `BYLINE_WORDPRESS_URL` are the only values the bot needs before it can start.
+6. In **Byline → Integrations → Discord**, paste the bot token, application ID, and bot URL, then pick the server, storyboard Forum, announcements channel, and optional staff role from the lists Byline loads from Discord.
+7. Build the bot with `npm ci && npm run build`, then start it with Docker or `npm start`. It reads the rest of its settings from WordPress at boot.
+8. Check `GET /healthz`, the status panel in **Byline → Integrations → Discord**, account linking on a WordPress profile, `/story create`, WordPress-first draft creation, and a test publication.
 
 An install URL can be built in Developer Portal's OAuth2 URL Generator using the scopes and permissions above. Do not use an Administrator permission bitfield; channel overrides are preferred so the bot can access only the newsroom channels it needs.
 
 ### Configuration
 
-WordPress reads canonical `BYLINE_*` constants/environment variables first and
-continues to accept the matching `WWH_*` aliases:
+**Byline → Integrations → Discord** is the source of truth for the connection.
+WordPress stores the bot token, client secret, application ID, bot URL, server,
+storyboard Forum, announcements channel, staff role, announcement behavior, and
+reconciliation interval. Secrets are stored write-only: the settings response
+reports whether one is configured and never returns its value.
 
-- `BYLINE_DISCORD_BRIDGE_SECRET` — shared HMAC-SHA256 secret
-- `BYLINE_DISCORD_BOT_URL` — internal bot URL, such as `http://byline:3000`
-- `BYLINE_DISCORD_CLIENT_ID` and `BYLINE_DISCORD_CLIENT_SECRET` — OAuth account-linking credentials
+The bot fetches these settings from `GET /byline/v1/discord/config` — the same
+signed bridge every other call uses — when it starts. Restart the bot after
+saving so it picks up a change.
 
-The bot uses canonical Byline names and continues to accept the matching `WWH_*` aliases:
+Two values are still environment-only, because the bot needs them before it can
+ask WordPress for anything:
 
-- `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`
-- `BYLINE_PUBLICATION_NAME`, `BYLINE_PUBLICATION_SHORT_NAME`
-- `BYLINE_DISCORD_GUILD_ID`, `BYLINE_DISCORD_STORYBOARD_CHANNEL_ID`, `BYLINE_DISCORD_ANNOUNCEMENTS_CHANNEL_ID`
-- optional `BYLINE_DISCORD_STAFF_ROLE_ID`
-- `BYLINE_WORDPRESS_URL`, `BYLINE_DISCORD_BRIDGE_SECRET`
-- optional `BYLINE_HTTP_HOST`, `BYLINE_HTTP_PORT`, `BYLINE_RECONCILE_INTERVAL_MS`, `BYLINE_PUBLICATION_ANNOUNCEMENTS`, and `LOG_LEVEL`
+- `BYLINE_WORDPRESS_URL`
+- `BYLINE_DISCORD_BRIDGE_SECRET` — shared HMAC-SHA256 secret, set identically in
+  WordPress and the bot
+
+Everything else remains readable from the environment as a fallback, so an
+installation configured before this screen existed keeps running untouched. A
+saved WordPress value wins; the environment fills any gap. Both sides read
+canonical `BYLINE_*` names and continue to accept the matching `WWH_*` aliases:
+
+- WordPress: `BYLINE_DISCORD_BOT_URL`, `BYLINE_DISCORD_CLIENT_ID`, `BYLINE_DISCORD_CLIENT_SECRET`
+- Bot: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `BYLINE_DISCORD_GUILD_ID`,
+  `BYLINE_DISCORD_STORYBOARD_CHANNEL_ID`, `BYLINE_DISCORD_ANNOUNCEMENTS_CHANNEL_ID`,
+  optional `BYLINE_DISCORD_STAFF_ROLE_ID`, `BYLINE_PUBLICATION_NAME`,
+  `BYLINE_PUBLICATION_SHORT_NAME`, `BYLINE_RECONCILE_INTERVAL_MS`,
+  `BYLINE_PUBLICATION_ANNOUNCEMENTS`
+- Bot process only: optional `BYLINE_HTTP_HOST`, `BYLINE_HTTP_PORT`, and `LOG_LEVEL`
 
 No second WordPress plugin is needed. Activating/updating Byline registers the private metadata and controlled compatibility migrations; existing stories receive Discord links only when they are meaningfully saved or already linked and reconciled.
 
-Use HTTPS whenever traffic leaves a trusted private container network. Secrets are never stored in story/user metadata or returned from health endpoints. Rotate the bot token in Developer Portal, replace `DISCORD_TOKEN`, and restart. Rotate the bridge secret by changing both services in one maintenance window; reconciliation repairs updates missed during the restart.
+Use HTTPS whenever traffic leaves a trusted private container network. Secrets are never stored in story/user metadata or returned from health endpoints. Rotate the bot token in Developer Portal, replace it in **Byline → Integrations → Discord** (or in `DISCORD_TOKEN` for an environment-configured bot), and restart the bot. Rotate the bridge secret by changing both services in one maintenance window; reconciliation repairs updates missed during the restart.
 
 ### Operations and recovery
 
