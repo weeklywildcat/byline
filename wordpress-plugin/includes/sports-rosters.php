@@ -8,6 +8,8 @@ const WWH_ROSTER_TEAM_META = '_ww_roster_team_key';
 const WWH_ROSTER_SEASON_META = '_ww_roster_season';
 const WWH_ROSTER_PLAYERS_META = '_ww_roster_players';
 const WWH_ROSTER_STAFF_META = '_ww_roster_staff';
+const BYLINE_ROSTER_IDENTITIES_VERSION_OPTION = 'byline_roster_identities_version';
+const BYLINE_ROSTER_IDENTITIES_VERSION = 1;
 
 function wwh_register_sports_roster_post_type(): void
 {
@@ -22,7 +24,8 @@ function wwh_register_sports_roster_post_type(): void
                 'new_item' => 'New Team Roster',
                 'view_item' => 'View Team Roster',
                 'search_items' => 'Search Team Rosters',
-                'not_found' => 'No team rosters found',
+                'not_found' => 'No team rosters yet. Add a roster.',
+                'not_found_in_trash' => 'No team rosters in the trash.',
                 'menu_name' => 'Rosters',
                 'all_items' => 'Rosters',
             ],
@@ -69,24 +72,72 @@ add_action('init', 'wwh_register_sports_roster_meta');
 
 function wwh_sanitize_roster_season($value): string
 {
-    $season = sanitize_text_field((string) $value);
-
-    if (preg_match('/^(\d{4})-(\d{2})$/', $season, $matches) !== 1) {
-        return '';
-    }
-
-    $expected_suffix = str_pad((string) (((int) $matches[1] + 1) % 100), 2, '0', STR_PAD_LEFT);
-
-    return $matches[2] === $expected_suffix ? $season : '';
+    return function_exists('byline_sports_normalize_season')
+        ? byline_sports_normalize_season($value)
+        : '';
 }
 
-function wwh_sanitize_roster_players($rows): array
+function wwh_new_roster_row_id(string $prefix): string
+{
+    if (function_exists('wp_generate_uuid4')) {
+        $uuid = preg_replace('/[^a-f0-9]/i', '', wp_generate_uuid4());
+        if (is_string($uuid) && $uuid !== '') {
+            return $prefix . '_' . strtolower(substr($uuid, 0, 16));
+        }
+    }
+
+    return $prefix . '_' . substr(md5(uniqid('byline-roster-', true)), 0, 16);
+}
+
+function wwh_new_roster_athlete_id(): string
+{
+    return wwh_new_roster_row_id('ath');
+}
+
+function wwh_new_roster_staff_id(): string
+{
+    return wwh_new_roster_row_id('staff');
+}
+
+function wwh_validate_roster_row_id($value, string $prefix): string
+{
+    $id = sanitize_key(is_scalar($value) ? (string) $value : '');
+
+    return preg_match('/^' . preg_quote($prefix, '/') . '_[a-z0-9][a-z0-9_-]{0,63}$/', $id) === 1 ? $id : '';
+}
+
+function wwh_sanitize_roster_athlete_id($value): string
+{
+    return wwh_validate_roster_row_id($value, 'ath');
+}
+
+function wwh_sanitize_roster_staff_id($value): string
+{
+    return wwh_validate_roster_row_id($value, 'staff');
+}
+
+function wwh_valid_local_roster_image_id($value): int
+{
+    $image_id = absint($value);
+    if ($image_id <= 0 || !function_exists('get_post_type') || get_post_type($image_id) !== 'attachment') {
+        return 0;
+    }
+
+    if (function_exists('wp_attachment_is_image') && !wp_attachment_is_image($image_id)) {
+        return 0;
+    }
+
+    return $image_id;
+}
+
+function wwh_sanitize_roster_players($rows, bool $generate_ids = true): array
 {
     if (!is_array($rows)) {
         return [];
     }
 
     $players = [];
+    $used_ids = [];
 
     foreach (array_slice($rows, 0, 200) as $row) {
         if (!is_array($row)) {
@@ -99,7 +150,16 @@ function wwh_sanitize_roster_players($rows): array
             continue;
         }
 
+        $athlete_id = wwh_sanitize_roster_athlete_id($row['id'] ?? $row['row_id'] ?? '');
+        if ($athlete_id === '' || isset($used_ids[$athlete_id])) {
+            $athlete_id = $generate_ids ? wwh_new_roster_athlete_id() : '';
+        }
+        if ($athlete_id !== '') {
+            $used_ids[$athlete_id] = true;
+        }
+
         $players[] = [
+            'id' => $athlete_id,
             'name' => $name,
             'number' => sanitize_text_field((string) ($row['number'] ?? '')),
             'position' => sanitize_text_field((string) ($row['position'] ?? '')),
@@ -110,13 +170,14 @@ function wwh_sanitize_roster_players($rows): array
     return $players;
 }
 
-function wwh_sanitize_roster_staff($rows): array
+function wwh_sanitize_roster_staff($rows, bool $generate_ids = true): array
 {
     if (!is_array($rows)) {
         return [];
     }
 
     $staff = [];
+    $used_ids = [];
 
     foreach (array_slice($rows, 0, 100) as $row) {
         if (!is_array($row)) {
@@ -129,9 +190,19 @@ function wwh_sanitize_roster_staff($rows): array
             continue;
         }
 
+        $staff_id = wwh_sanitize_roster_staff_id($row['id'] ?? $row['row_id'] ?? '');
+        if ($staff_id === '' || isset($used_ids[$staff_id])) {
+            $staff_id = $generate_ids ? wwh_new_roster_staff_id() : '';
+        }
+        if ($staff_id !== '') {
+            $used_ids[$staff_id] = true;
+        }
+
         $staff[] = [
+            'id' => $staff_id,
             'name' => $name,
             'role' => sanitize_text_field((string) ($row['role'] ?? '')),
+            'imageId' => wwh_valid_local_roster_image_id($row['imageId'] ?? $row['image_id'] ?? 0),
         ];
     }
 
@@ -143,10 +214,42 @@ function wwh_roster_rows(int $post_id, string $meta_key): array
     $rows = get_post_meta($post_id, $meta_key, true);
 
     if ($meta_key === WWH_ROSTER_PLAYERS_META) {
-        return wwh_sanitize_roster_players($rows);
+        return wwh_sanitize_roster_players($rows, false);
     }
 
-    return wwh_sanitize_roster_staff($rows);
+    return wwh_sanitize_roster_staff($rows, false);
+}
+
+/**
+ * Persist opaque row identities once during an administrative upgrade. Public
+ * rendering stays read-only and never creates a different identity per request.
+ */
+function byline_migrate_roster_identities(): bool
+{
+    if (!function_exists('get_posts') || !function_exists('update_post_meta')) {
+        return false;
+    }
+
+    $post_ids = get_posts([
+        'post_type' => WWH_SPORTS_ROSTER_POST_TYPE,
+        'post_status' => ['publish', 'draft', 'pending', 'private', 'future'],
+        'posts_per_page' => -1,
+        'fields' => 'ids',
+        'no_found_rows' => true,
+    ]);
+
+    foreach ($post_ids as $post_id) {
+        $post_id = absint($post_id);
+        if ($post_id <= 0) {
+            continue;
+        }
+        $players = get_post_meta($post_id, WWH_ROSTER_PLAYERS_META, true);
+        $staff = get_post_meta($post_id, WWH_ROSTER_STAFF_META, true);
+        update_post_meta($post_id, WWH_ROSTER_PLAYERS_META, wwh_sanitize_roster_players($players, true));
+        update_post_meta($post_id, WWH_ROSTER_STAFF_META, wwh_sanitize_roster_staff($staff, true));
+    }
+
+    return true;
 }
 
 function wwh_add_sports_roster_meta_box(): void
@@ -178,14 +281,54 @@ function wwh_render_sports_roster_meta_box(WP_Post $post): void
     wp_nonce_field('wwh_save_sports_roster', 'wwh_sports_roster_nonce');
     $team_key = wwh_meta_value($post->ID, WWH_ROSTER_TEAM_META);
     $season = wwh_meta_value($post->ID, WWH_ROSTER_SEASON_META);
+
+    if ($team_key === '' && isset($_GET['wwh_roster_team_key'])) {
+        $team_key = wwh_sanitize_sport_key(sanitize_text_field(wp_unslash($_GET['wwh_roster_team_key'])));
+    }
+    if ($season === '' && isset($_GET['wwh_roster_season'])) {
+        $season = wwh_sanitize_roster_season(sanitize_text_field(wp_unslash($_GET['wwh_roster_season'])));
+    }
+    if ($season === '' && $team_key !== '' && $post->ID <= 0 && function_exists('byline_sports_current_season')) {
+        $season = byline_sports_current_season();
+    }
+
     $players = wwh_roster_rows($post->ID, WWH_ROSTER_PLAYERS_META);
     $staff = wwh_roster_rows($post->ID, WWH_ROSTER_STAFF_META);
 
     echo '<div class="wwh-roster-fields">';
-    wwh_select('Sport / Team', 'ww_roster_team_key', $team_key, wwh_roster_team_options());
+    wwh_select('Team', 'ww_roster_team_key', $team_key, wwh_roster_team_options());
     wwh_field('School Year', 'ww_roster_season', $season, 'text', ['placeholder' => '2025-26', 'pattern' => '\\d{4}-\\d{2}', 'required' => 'required']);
     echo '</div>';
-    echo '<p class="description">Publish one roster per controlled team and school year. Player and staff order is preserved publicly.</p>';
+
+    if ($team_key !== '' && function_exists('byline_sports_team_context')) {
+        $context = byline_sports_team_context($team_key, $season);
+        if (is_array($context)) {
+            $team = is_array($context['team'] ?? null) ? $context['team'] : [];
+            $team_label = (string) ($team['displayName'] ?? $team['label'] ?? $team_key);
+            $games = is_array($context['games'] ?? null) ? $context['games'] : [];
+            $public_url = byline_sports_public_team_url($team, $season);
+            echo '<div class="wwh-sports-context">';
+            printf('<p><strong>%s</strong> · %s roster</p>', esc_html($team_label), esc_html($season !== '' ? $season : 'Season pending'));
+            if (($team['active'] ?? true) === false) {
+                echo '<p class="notice inline notice-info"><strong>Historical team:</strong> this roster belongs to an inactive team and remains available for archive content.</p>';
+            }
+            echo '<p class="description">';
+            if ($games !== []) {
+                printf('%s %d · ', esc_html('Games:'), count($games));
+                printf('<a href="%s">View games</a> · ', esc_url(byline_sports_admin_games_url($team_key, $season)));
+            } else {
+                printf(
+                    '%s <a href="%s">Add game</a> · ',
+                    esc_html('No games have been added for this team and season.'),
+                    esc_url(byline_sports_admin_new_game_url($team_key, $season))
+                );
+            }
+            printf('<a href="%s">Public team page</a>', esc_url($public_url));
+            echo '</p></div>';
+        }
+    }
+
+    echo '<p class="description">Publish one roster per team and school year. Athlete and staff row IDs remain stable when names, photos, or order change.</p>';
 
     wwh_render_roster_player_editor($players);
     wwh_render_roster_staff_editor($staff);
@@ -218,7 +361,7 @@ function wwh_render_roster_player_row(int $index, array $player): void
 {
     ?>
     <tr class="wwh-roster-row">
-        <td><input type="text" name="ww_roster_players[<?php echo esc_attr((string) $index); ?>][name]" value="<?php echo esc_attr((string) ($player['name'] ?? '')); ?>" aria-label="Athlete name"></td>
+        <td><input type="hidden" name="ww_roster_players[<?php echo esc_attr((string) $index); ?>][id]" value="<?php echo esc_attr(wwh_sanitize_roster_athlete_id($player['id'] ?? '')); ?>"><input type="text" name="ww_roster_players[<?php echo esc_attr((string) $index); ?>][name]" value="<?php echo esc_attr((string) ($player['name'] ?? '')); ?>" aria-label="Athlete name"></td>
         <td><input type="text" name="ww_roster_players[<?php echo esc_attr((string) $index); ?>][number]" value="<?php echo esc_attr((string) ($player['number'] ?? '')); ?>" aria-label="Jersey number"></td>
         <td><input type="text" name="ww_roster_players[<?php echo esc_attr((string) $index); ?>][position]" value="<?php echo esc_attr((string) ($player['position'] ?? '')); ?>" aria-label="Position or event"></td>
         <td><input type="text" name="ww_roster_players[<?php echo esc_attr((string) $index); ?>][grade]" value="<?php echo esc_attr((string) ($player['grade'] ?? '')); ?>" aria-label="Grade"></td>
@@ -239,15 +382,10 @@ function wwh_render_roster_staff_editor(array $staff): void
             <h3>Coaches and Student Managers</h3>
             <button type="button" class="button wwh-roster-add-row">Add Staff Member</button>
         </div>
-        <div class="wwh-roster-table-wrap">
-            <table class="widefat striped wwh-roster-table">
-                <thead><tr><th>Name</th><th>Role</th><th>Order</th></tr></thead>
-                <tbody class="wwh-roster-rows">
-                    <?php foreach ($staff as $index => $member) : ?>
-                        <?php wwh_render_roster_staff_row((int) $index, $member); ?>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+        <div class="wwh-roster-staff-rows wwh-roster-rows">
+            <?php foreach ($staff as $index => $member) : ?>
+                <?php wwh_render_roster_staff_row((int) $index, $member); ?>
+            <?php endforeach; ?>
         </div>
         <template class="wwh-roster-row-template"><?php wwh_render_roster_staff_row(999999, []); ?></template>
     </section>
@@ -256,16 +394,29 @@ function wwh_render_roster_staff_editor(array $staff): void
 
 function wwh_render_roster_staff_row(int $index, array $member): void
 {
+    $staff_id = wwh_sanitize_roster_staff_id($member['id'] ?? '');
+    $image_id = wwh_valid_local_roster_image_id($member['imageId'] ?? 0);
+    $image = $image_id > 0 && function_exists('wwh_media_image') ? wwh_media_image($image_id, 'medium') : [];
+    $image_url = (string) ($image['url'] ?? '');
     ?>
-    <tr class="wwh-roster-row">
-        <td><input type="text" name="ww_roster_staff[<?php echo esc_attr((string) $index); ?>][name]" value="<?php echo esc_attr((string) ($member['name'] ?? '')); ?>" aria-label="Staff name"></td>
-        <td><input type="text" name="ww_roster_staff[<?php echo esc_attr((string) $index); ?>][role]" value="<?php echo esc_attr((string) ($member['role'] ?? '')); ?>" aria-label="Staff role"></td>
-        <td class="wwh-roster-row-actions">
+    <div class="wwh-roster-row wwh-roster-staff-row">
+        <input type="hidden" name="ww_roster_staff[<?php echo esc_attr((string) $index); ?>][id]" value="<?php echo esc_attr($staff_id); ?>">
+        <div class="wwh-roster-staff-photo">
+            <img class="wwh-roster-staff-preview" src="<?php echo esc_url($image_url); ?>" alt=""<?php echo $image_url === '' ? ' hidden' : ''; ?>>
+            <div>
+                <input class="wwh-roster-staff-image-id" type="hidden" name="ww_roster_staff[<?php echo esc_attr((string) $index); ?>][imageId]" value="<?php echo esc_attr((string) $image_id); ?>">
+                <button type="button" class="button wwh-roster-staff-photo-select"><?php echo $image_url === '' ? 'Choose photo' : 'Replace photo'; ?></button>
+                <button type="button" class="button-link-delete wwh-roster-staff-photo-remove"<?php echo $image_url === '' ? ' hidden' : ''; ?>>Remove photo</button>
+            </div>
+        </div>
+        <label><span>Name</span><input type="text" name="ww_roster_staff[<?php echo esc_attr((string) $index); ?>][name]" value="<?php echo esc_attr((string) ($member['name'] ?? '')); ?>" aria-label="Staff name"></label>
+        <label><span>Role</span><input type="text" name="ww_roster_staff[<?php echo esc_attr((string) $index); ?>][role]" value="<?php echo esc_attr((string) ($member['role'] ?? '')); ?>" aria-label="Staff role"></label>
+        <div class="wwh-roster-row-actions">
             <button type="button" class="button-link wwh-roster-move-up" aria-label="Move staff member up">↑</button>
             <button type="button" class="button-link wwh-roster-move-down" aria-label="Move staff member down">↓</button>
             <button type="button" class="button-link-delete wwh-roster-remove-row">Remove</button>
-        </td>
-    </tr>
+        </div>
+    </div>
     <?php
 }
 
@@ -332,30 +483,55 @@ add_filter('wp_insert_post_data', 'wwh_prepare_sports_roster_post', 10, 2);
 
 function wwh_find_sports_roster(string $team_key, string $season, int $exclude_id = 0, array $statuses = ['publish', 'draft', 'pending', 'private', 'future']): int
 {
+    $ids = wwh_find_sports_roster_ids($team_key, $season, $exclude_id, $statuses);
+
+    return $ids[0] ?? 0;
+}
+
+/**
+ * Return every matching roster in status priority order. Callers that need to
+ * enforce the one-published-roster rule can inspect the complete set instead
+ * of accidentally selecting one duplicate.
+ */
+function wwh_find_sports_roster_ids(string $team_key, string $season, int $exclude_id = 0, array $statuses = ['publish', 'draft', 'pending', 'private', 'future']): array
+{
+    $team_key = wwh_sanitize_sport_key($team_key);
+    $season = wwh_sanitize_roster_season($season);
     if ($team_key === '' || $season === '') {
-        return 0;
+        return [];
     }
 
+    $ids = [];
     foreach ($statuses as $status) {
         $posts = get_posts([
             'post_type' => WWH_SPORTS_ROSTER_POST_TYPE,
             'post_status' => $status,
-            'posts_per_page' => 1,
+            'posts_per_page' => -1,
             'fields' => 'ids',
+            'orderby' => 'ID',
+            'order' => 'ASC',
             'post__not_in' => $exclude_id > 0 ? [$exclude_id] : [],
             'meta_query' => [
                 'relation' => 'AND',
                 ['key' => WWH_ROSTER_TEAM_META, 'value' => $team_key],
-                ['key' => WWH_ROSTER_SEASON_META, 'value' => $season],
+                [
+                    'key' => WWH_ROSTER_SEASON_META,
+                    'value' => function_exists('byline_sports_season_storage_values')
+                        ? byline_sports_season_storage_values($season)
+                        : [$season],
+                    'compare' => 'IN',
+                ],
             ],
         ]);
-
-        if (isset($posts[0])) {
-            return absint($posts[0]);
+        foreach ($posts as $post_id) {
+            $post_id = absint($post_id);
+            if ($post_id > 0 && !in_array($post_id, $ids, true)) {
+                $ids[] = $post_id;
+            }
         }
     }
 
-    return 0;
+    return $ids;
 }
 
 function wwh_sports_roster_admin_notice(): void
@@ -377,10 +553,12 @@ function wwh_sports_roster_admin_columns(array $columns): array
     return [
         'cb' => $columns['cb'] ?? '<input type="checkbox">',
         'title' => 'Roster',
-        'wwh_roster_team' => 'Sport / Team',
-        'wwh_roster_season' => 'School Year',
+        'wwh_roster_team' => 'Team',
+        'wwh_roster_season' => 'Season',
         'wwh_roster_players' => 'Athletes',
-        'date' => $columns['date'] ?? 'Date',
+        'wwh_roster_staff' => 'Staff',
+        'wwh_roster_status' => 'Status',
+        'date' => 'Updated',
     ];
 }
 add_filter('manage_' . WWH_SPORTS_ROSTER_POST_TYPE . '_posts_columns', 'wwh_sports_roster_admin_columns');
@@ -401,9 +579,39 @@ function wwh_render_sports_roster_admin_column(string $column, int $post_id): vo
 
     if ($column === 'wwh_roster_players') {
         echo esc_html((string) count(wwh_roster_rows($post_id, WWH_ROSTER_PLAYERS_META)));
+        return;
+    }
+
+    if ($column === 'wwh_roster_staff') {
+        echo esc_html((string) count(wwh_roster_rows($post_id, WWH_ROSTER_STAFF_META)));
+        return;
+    }
+
+    if ($column === 'wwh_roster_status') {
+        echo esc_html(wwh_label_from_value((string) get_post_status($post_id)));
     }
 }
 add_action('manage_' . WWH_SPORTS_ROSTER_POST_TYPE . '_posts_custom_column', 'wwh_render_sports_roster_admin_column', 10, 2);
+
+function wwh_sports_roster_row_actions(array $actions, WP_Post $post): array
+{
+    if ($post->post_type !== WWH_SPORTS_ROSTER_POST_TYPE) {
+        return $actions;
+    }
+
+    $team_key = wwh_sanitize_sport_key(wwh_meta_value($post->ID, WWH_ROSTER_TEAM_META));
+    $season = wwh_sanitize_roster_season(wwh_meta_value($post->ID, WWH_ROSTER_SEASON_META));
+    $team = byline_get_sports_team($team_key);
+
+    if ($team_key !== '') {
+        $actions['view_team'] = sprintf('<a href="%s">View Team</a>', esc_url(admin_url('edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE . '&page=wwh-sports-team-settings&team=' . rawurlencode($team_key))));
+        $actions['view_games'] = sprintf('<a href="%s">View Games</a>', esc_url(byline_sports_admin_games_url($team_key, $season)));
+        $actions['view_public_team'] = sprintf('<a href="%s" target="_blank" rel="noopener">Public Team Page</a>', esc_url(byline_sports_public_team_url(is_array($team) ? $team : $team_key, $season)));
+    }
+
+    return $actions;
+}
+add_filter('post_row_actions', 'wwh_sports_roster_row_actions', 10, 2);
 
 function wwh_render_sports_roster_admin_filters(string $post_type): void
 {
@@ -423,10 +631,19 @@ function wwh_render_sports_roster_admin_filters(string $post_type): void
     $season_options = [];
 
     foreach (wwh_distinct_meta_values(WWH_SPORTS_ROSTER_POST_TYPE, WWH_ROSTER_SEASON_META) as $season) {
-        $season_options[$season] = $season;
+        $normalized = wwh_sanitize_roster_season($season);
+        if ($normalized !== '') {
+            $season_options[$normalized] = $normalized;
+        }
     }
 
     wwh_admin_filter_select('wwh_roster_season', $selected_season, 'All school years', $season_options);
+    wwh_admin_filter_select('wwh_roster_status', wwh_sanitize_choice(wwh_admin_filter_value('wwh_roster_status'), ['publish', 'draft', 'pending', 'private'], ''), 'All statuses', [
+        'publish' => 'Published',
+        'draft' => 'Draft',
+        'pending' => 'Pending review',
+        'private' => 'Private',
+    ]);
 }
 add_action('restrict_manage_posts', 'wwh_render_sports_roster_admin_filters');
 
@@ -441,17 +658,28 @@ function wwh_filter_sports_roster_admin_posts(WP_Query $query): void
     $meta_query = [];
     $team_key = wwh_sanitize_sport_key(wwh_admin_filter_value('wwh_roster_team_key'));
     $season = wwh_sanitize_roster_season(wwh_admin_filter_value('wwh_roster_season'));
+    $status = wwh_sanitize_choice(wwh_admin_filter_value('wwh_roster_status'), ['publish', 'draft', 'pending', 'private'], '');
 
     if ($team_key !== '') {
         $meta_query[] = ['key' => WWH_ROSTER_TEAM_META, 'value' => $team_key];
     }
 
     if ($season !== '') {
-        $meta_query[] = ['key' => WWH_ROSTER_SEASON_META, 'value' => $season];
+        $meta_query[] = [
+            'key' => WWH_ROSTER_SEASON_META,
+            'value' => function_exists('byline_sports_season_storage_values')
+                ? byline_sports_season_storage_values($season)
+                : [$season],
+            'compare' => 'IN',
+        ];
     }
 
     if ($meta_query !== []) {
         $query->set('meta_query', $meta_query);
+    }
+
+    if ($status !== '') {
+        $query->set('post_status', $status);
     }
 }
 add_action('pre_get_posts', 'wwh_filter_sports_roster_admin_posts', 20);
@@ -469,6 +697,9 @@ function wwh_enqueue_sports_roster_assets(string $hook): void
 
     wp_enqueue_script('wwh-sports-rosters', plugins_url('assets/sports-rosters.js', dirname(__DIR__) . '/weekly-wildcat-headless.php'), [], file_exists($script_path) ? (string) filemtime($script_path) : '1', true);
     wp_enqueue_style('wwh-sports-rosters', plugins_url('assets/sports-rosters.css', dirname(__DIR__) . '/weekly-wildcat-headless.php'), [], file_exists($style_path) ? (string) filemtime($style_path) : '1');
+    if ($screen->post_type === WWH_SPORTS_ROSTER_POST_TYPE) {
+        wp_enqueue_media();
+    }
 }
 add_action('admin_enqueue_scripts', 'wwh_enqueue_sports_roster_assets');
 
@@ -500,22 +731,34 @@ add_action('rest_api_init', 'wwh_register_sports_roster_rest_route');
 
 function wwh_format_sports_roster(WP_Post $post): array
 {
-    $team_key = wwh_meta_value($post->ID, WWH_ROSTER_TEAM_META);
-    $team = wwh_sports_team_options()[$team_key] ?? [];
+    $team_key = wwh_sanitize_sport_key(wwh_meta_value($post->ID, WWH_ROSTER_TEAM_META));
+    $team = function_exists('byline_get_sports_team') ? byline_get_sports_team($team_key) : null;
+    $team = is_array($team) ? $team : (wwh_sports_team_options()[$team_key] ?? []);
+    $season = wwh_sanitize_roster_season(wwh_meta_value($post->ID, WWH_ROSTER_SEASON_META));
+    $formatted_team = function_exists('wwh_format_sports_team') ? wwh_format_sports_team($team_key, $team) : $team;
+
+    $staff = array_map(static function (array $member): array {
+        $image_id = wwh_valid_local_roster_image_id($member['imageId'] ?? 0);
+        $image = $image_id > 0 && function_exists('wwh_media_image') ? wwh_media_image($image_id, 'medium') : [];
+
+        return [
+            'id' => (string) ($member['id'] ?? ''),
+            'name' => (string) ($member['name'] ?? ''),
+            'role' => (string) ($member['role'] ?? ''),
+            'imageId' => $image_id,
+            'image' => $image_id > 0 && !empty($image['url']) ? $image : null,
+        ];
+    }, wwh_roster_rows($post->ID, WWH_ROSTER_STAFF_META));
 
     return [
-        'id' => $post->ID,
+        'id' => (int) $post->ID,
         'teamKey' => $team_key,
-        'season' => wwh_meta_value($post->ID, WWH_ROSTER_SEASON_META),
-        'team' => [
-            'key' => $team_key,
-            'sport' => (string) ($team['sport'] ?? ''),
-            'level' => (string) ($team['level'] ?? ''),
-            'teamLabel' => (string) ($team['teamLabel'] ?? ''),
-            'label' => (string) ($team['label'] ?? $team_key),
-        ],
+        'teamSlug' => (string) ($team['slug'] ?? $team_key),
+        'season' => $season,
+        'status' => (string) $post->post_status,
+        'team' => $formatted_team,
         'players' => wwh_roster_rows($post->ID, WWH_ROSTER_PLAYERS_META),
-        'staff' => wwh_roster_rows($post->ID, WWH_ROSTER_STAFF_META),
+        'staff' => $staff,
     ];
 }
 
@@ -541,7 +784,13 @@ function wwh_rest_sports_rosters(WP_REST_Request $request): WP_REST_Response
     }
 
     if ($season !== '') {
-        $meta_query[] = ['key' => WWH_ROSTER_SEASON_META, 'value' => $season];
+        $meta_query[] = [
+            'key' => WWH_ROSTER_SEASON_META,
+            'value' => function_exists('byline_sports_season_storage_values')
+                ? byline_sports_season_storage_values($season)
+                : [$season],
+            'compare' => 'IN',
+        ];
     }
 
     $query = new WP_Query([
@@ -582,7 +831,7 @@ add_action('admin_post_wwh_export_sports_rosters', 'wwh_export_sports_rosters');
 
 function wwh_roster_csv_columns(): array
 {
-    return ['team_key', 'season', 'row_type', 'name', 'number', 'position', 'grade', 'role', 'sort_order'];
+    return ['team_key', 'team_name', 'season', 'row_type', 'row_id', 'athlete_id', 'name', 'number', 'position', 'grade', 'role', 'image_id', 'sort_order'];
 }
 
 function wwh_normalize_roster_csv_header(string $value): string
@@ -596,7 +845,7 @@ function wwh_normalize_roster_csv_header(string $value): string
 
 function wwh_parse_sports_roster_csv(string $raw_data): array
 {
-    $result = ['groups' => [], 'errors' => [], 'rows' => 0];
+    $result = ['groups' => [], 'errors' => [], 'warnings' => [], 'rows' => 0];
     $raw_data = trim($raw_data);
 
     if ($raw_data === '') {
@@ -615,6 +864,8 @@ function wwh_parse_sports_roster_csv(string $raw_data): array
     $delimiter = substr_count((string) $lines[0], "\t") > substr_count((string) $lines[0], ',') ? "\t" : ',';
     $headers = array_map('wwh_normalize_roster_csv_header', str_getcsv((string) array_shift($lines), $delimiter, '"', ''));
     $required = ['team_key', 'season', 'row_type', 'name'];
+    $configured_teams = function_exists('wwh_sports_team_options') ? wwh_sports_team_options() : null;
+    $used_row_ids = [];
 
     foreach ($required as $header) {
         if (!in_array($header, $headers, true)) {
@@ -643,8 +894,8 @@ function wwh_parse_sports_roster_csv(string $raw_data): array
         $row_type = $row_type === 'player' ? 'athlete' : $row_type;
         $name = sanitize_text_field((string) ($row['name'] ?? ''));
 
-        if ($team_key === '') {
-            $result['errors'][] = sprintf('Row %d has an unknown team_key.', $line_number);
+        if ($team_key === '' || (is_array($configured_teams) && !array_key_exists($team_key, $configured_teams))) {
+            $result['errors'][] = sprintf('Row %d has an unknown team_key; choose a configured team.', $line_number);
             continue;
         }
 
@@ -676,7 +927,19 @@ function wwh_parse_sports_roster_csv(string $raw_data): array
         }
 
         if ($row_type === 'athlete') {
+            $supplied_id = trim((string) ($row['row_id'] ?? '')) !== ''
+                ? (string) $row['row_id']
+                : (string) ($row['athlete_id'] ?? '');
+            $row_id = wwh_sanitize_roster_athlete_id($supplied_id);
+            if ($row_id === '' || isset($used_row_ids[$row_id])) {
+                if ($supplied_id !== '') {
+                    $result['warnings'][] = sprintf('Row %d has a malformed or duplicate athlete row ID; a new ID will be assigned.', $line_number);
+                }
+                $row_id = wwh_new_roster_athlete_id();
+            }
+            $used_row_ids[$row_id] = true;
             $result['groups'][$group_key]['players'][] = [
+                'id' => $row_id,
                 'name' => $name,
                 'number' => sanitize_text_field((string) ($row['number'] ?? '')),
                 'position' => sanitize_text_field((string) ($row['position'] ?? '')),
@@ -685,9 +948,25 @@ function wwh_parse_sports_roster_csv(string $raw_data): array
                 '_line' => $line_number,
             ];
         } else {
+            $supplied_id = (string) ($row['row_id'] ?? '');
+            $row_id = wwh_sanitize_roster_staff_id($supplied_id);
+            if ($row_id === '' || isset($used_row_ids[$row_id])) {
+                if ($supplied_id !== '') {
+                    $result['warnings'][] = sprintf('Row %d has a malformed or duplicate staff row ID; a new ID will be assigned.', $line_number);
+                }
+                $row_id = wwh_new_roster_staff_id();
+            }
+            $used_row_ids[$row_id] = true;
+            $supplied_image_id = absint($row['image_id'] ?? 0);
+            $image_id = wwh_valid_local_roster_image_id($supplied_image_id);
+            if ($supplied_image_id > 0 && $image_id === 0) {
+                $result['warnings'][] = sprintf('Row %d image_id is not a valid local image attachment; the staff member will be imported without a photo.', $line_number);
+            }
             $result['groups'][$group_key]['staff'][] = [
+                'id' => $row_id,
                 'name' => $name,
                 'role' => sanitize_text_field((string) ($row['role'] ?? '')),
+                'imageId' => $image_id,
                 '_sort' => $sort_order,
                 '_line' => $line_number,
             ];
@@ -728,8 +1007,18 @@ function wwh_import_sports_roster_groups(array $groups): array
             $result['errors'][] = 'Skipped an invalid roster group.';
             continue;
         }
+        if (function_exists('wwh_sports_team_options') && !array_key_exists($team_key, wwh_sports_team_options())) {
+            $result['errors'][] = sprintf('%s %s: unknown team key; configure the team before importing.', $team_key, $season);
+            continue;
+        }
 
-        $post_id = wwh_find_sports_roster($team_key, $season);
+        $matching_ids = wwh_find_sports_roster_ids($team_key, $season);
+        $published_ids = wwh_find_sports_roster_ids($team_key, $season, 0, ['publish']);
+        if (count($published_ids) > 1) {
+            $result['errors'][] = sprintf('%s %s has %d published rosters; resolve the duplicate before importing.', $team_key, $season, count($published_ids));
+            continue;
+        }
+        $post_id = $matching_ids[0] ?? 0;
         $post_data = [
             'post_type' => WWH_SPORTS_ROSTER_POST_TYPE,
             'post_status' => 'publish',
@@ -828,6 +1117,7 @@ function wwh_render_sports_roster_import_page(): void
             <div class="notice <?php echo $parsed['errors'] === [] ? 'notice-info' : 'notice-warning'; ?>">
                 <p><strong><?php echo esc_html(sprintf('Preview: %d valid rows across %d rosters.', $parsed['rows'], count($parsed['groups']))); ?></strong></p>
                 <?php if ($parsed['errors'] !== []) : ?><ul><?php foreach ($parsed['errors'] as $error) : ?><li><?php echo esc_html($error); ?></li><?php endforeach; ?></ul><?php endif; ?>
+                <?php if (($parsed['warnings'] ?? []) !== []) : ?><ul><?php foreach ($parsed['warnings'] as $warning) : ?><li><?php echo esc_html($warning); ?></li><?php endforeach; ?></ul><?php endif; ?>
             </div>
             <?php if ($parsed['errors'] === []) : ?>
                 <table class="widefat striped wwh-roster-import-preview">
@@ -856,9 +1146,9 @@ function wwh_render_sports_roster_import_page(): void
             <input type="hidden" name="wwh_roster_import_action" value="preview">
             <table class="form-table" role="presentation">
                 <tr><th scope="row"><label for="wwh_roster_csv_file">Upload CSV or TSV</label></th><td><input type="file" id="wwh_roster_csv_file" name="wwh_roster_csv_file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"></td></tr>
-                <tr><th scope="row"><label for="wwh_roster_csv_data">Paste Data</label></th><td><textarea id="wwh_roster_csv_data" name="wwh_roster_csv_data" rows="12" class="large-text code" placeholder="team_key,season,row_type,name,number,position,grade,role,sort_order"><?php echo esc_textarea($raw_data); ?></textarea></td></tr>
+                <tr><th scope="row"><label for="wwh_roster_csv_data">Paste Data</label></th><td><textarea id="wwh_roster_csv_data" name="wwh_roster_csv_data" rows="12" class="large-text code" placeholder="team_key,season,row_type,row_id,name,number,position,grade,role,image_id,sort_order"><?php echo esc_textarea($raw_data); ?></textarea></td></tr>
             </table>
-            <p class="description">Columns: <code><?php echo esc_html(implode(',', wwh_roster_csv_columns())); ?></code>. Row type must be <code>athlete</code> or <code>staff</code>.</p>
+            <p class="description">Columns: <code><?php echo esc_html(implode(',', wwh_roster_csv_columns())); ?></code>. Row type must be <code>athlete</code> or <code>staff</code>. <code>row_id</code> preserves identity for both; legacy <code>athlete_id</code> remains accepted. <code>image_id</code> must be a local WordPress image attachment.</p>
             <?php submit_button('Preview Roster Import'); ?>
         </form>
 
@@ -898,13 +1188,15 @@ function wwh_export_sports_rosters(): void
     foreach ($query->posts as $post) {
         $team_key = wwh_meta_value($post->ID, WWH_ROSTER_TEAM_META);
         $season = wwh_meta_value($post->ID, WWH_ROSTER_SEASON_META);
+        $team = function_exists('byline_get_sports_team') ? byline_get_sports_team($team_key) : null;
+        $team_name = is_array($team) ? (string) ($team['displayName'] ?? $team['label'] ?? $team_key) : $team_key;
 
         foreach (wwh_roster_rows($post->ID, WWH_ROSTER_PLAYERS_META) as $index => $player) {
-            fputcsv($output, [$team_key, $season, 'athlete', $player['name'], $player['number'], $player['position'], $player['grade'], '', $index + 1], ',', '"', '');
+            fputcsv($output, [$team_key, $team_name, $season, 'athlete', $player['id'], $player['id'], $player['name'], $player['number'], $player['position'], $player['grade'], '', '', $index + 1], ',', '"', '');
         }
 
         foreach (wwh_roster_rows($post->ID, WWH_ROSTER_STAFF_META) as $index => $member) {
-            fputcsv($output, [$team_key, $season, 'staff', $member['name'], '', '', '', $member['role'], $index + 1], ',', '"', '');
+            fputcsv($output, [$team_key, $team_name, $season, 'staff', $member['id'], '', $member['name'], '', '', '', $member['role'], $member['imageId'], $index + 1], ',', '"', '');
         }
     }
 

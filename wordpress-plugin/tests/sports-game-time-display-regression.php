@@ -89,6 +89,11 @@ function sanitize_text_field($value): string
     return trim(strip_tags((string) $value));
 }
 
+function sanitize_key($value): string
+{
+    return strtolower((string) preg_replace('/[^a-z0-9_-]/i', '', (string) $value));
+}
+
 function absint($maybeint): int
 {
     return abs((int) $maybeint);

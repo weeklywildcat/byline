@@ -20,7 +20,29 @@ class WP_REST_Server
     public const EDITABLE = 'PUT';
     public const CREATABLE = 'POST';
 }
-class WP_REST_Request {}
+class WP_Error
+{
+    public string $code;
+
+    public function __construct(string $code = '')
+    {
+        $this->code = $code;
+    }
+}
+class WP_REST_Request
+{
+    private array $params;
+
+    public function __construct(array $params = [])
+    {
+        $this->params = $params;
+    }
+
+    public function get_json_params(): array
+    {
+        return $this->params;
+    }
+}
 class WP_REST_Response { public $data; public function __construct($data) { $this->data = $data; } }
 
 function add_action(...$args): void {}
@@ -37,7 +59,7 @@ function wp_clear_scheduled_hook(string $hook): void { global $scheduled; unset(
 function wp_timezone(): DateTimeZone { return new DateTimeZone('UTC'); }
 function wp_date(string $format, int $timestamp, ?DateTimeZone $timezone = null): string { return gmdate($format, $timestamp); }
 function wp_safe_remote_post(string $url, array $args): array { global $post_count; $post_count++; return ['response' => ['code' => 202]]; }
-function is_wp_error($value): bool { return false; }
+function is_wp_error($value): bool { return $value instanceof WP_Error; }
 function wp_remote_retrieve_response_code(array $response): int { return (int) ($response['response']['code'] ?? 0); }
 function current_user_can(string $capability): bool { global $can_manage; return $capability === BYLINE_MANAGE_INTEGRATIONS_CAPABILITY && $can_manage; }
 function rest_ensure_response($data): WP_REST_Response { return new WP_REST_Response($data); }
@@ -79,6 +101,19 @@ if (!is_array($route) || $route[0]['permission_callback']() !== false) {
 $can_manage = true;
 if ($route[0]['permission_callback']() !== true) {
     fwrite(STDERR, "Authorized integration managers must be able to read deployment status.\n");
+    exit(1);
+}
+
+$options[BYLINE_DEPLOYMENT_PROVIDER_OPTION] = 'generic-hook';
+$options[BYLINE_DEPLOYMENT_HOOK_OPTION] = 'https://working.example.test/hook';
+$invalid_update = byline_rest_update_deployment(new WP_REST_Request([
+    'provider' => 'generic-hook',
+    'hookUrl' => 'http://not-allowed.example.test/hook',
+]));
+if (!is_wp_error($invalid_update)
+    || $options[BYLINE_DEPLOYMENT_PROVIDER_OPTION] !== 'generic-hook'
+    || $options[BYLINE_DEPLOYMENT_HOOK_OPTION] !== 'https://working.example.test/hook') {
+    fwrite(STDERR, "An invalid deploy-hook edit must not partially replace working configuration.\n");
     exit(1);
 }
 

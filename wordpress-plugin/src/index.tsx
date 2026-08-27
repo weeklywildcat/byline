@@ -10,7 +10,7 @@ import {
   TextControl,
   ToggleControl
 } from "@wordpress/components";
-import { createRoot, useEffect, useState } from "@wordpress/element";
+import { Component, createRoot, useEffect, useState } from "@wordpress/element";
 import "@puckeditor/core/puck.css";
 import "@byline/theme-weekly-wildcat/styles.css";
 import {
@@ -37,6 +37,7 @@ type BylineAdminConfig = {
   restPath: string;
   publicationPath: string;
   diagnosticsPath: string;
+  healthPath: string;
   deploymentPath: string;
   discordPath: string;
   nonce: string;
@@ -118,12 +119,57 @@ type DiagnosticsPayload = {
   designSchemaVersion: number;
   themeApiVersion: number;
   wordpressVersion: string;
+  phpVersion?: string;
+  siteUrl?: string;
+  homeUrl?: string;
   theme: { id: string; version: number; compatible: boolean };
   enabledModules: string[];
   deployment: { provider?: string; providerLabel?: string; configured: boolean; lastTriggeredAt: string; lastStatus: string; pending: boolean };
   publicManifest: { reachable: boolean; status: string; protocolVersion?: number; frontendVersion?: string; publicationRevision?: number };
   restHealth: boolean;
   designsNeedingMigration: number;
+  schemaVersions?: Record<string, number | null>;
+  assetPresence?: Record<string, boolean>;
+  tablePresence?: Record<string, boolean>;
+  routePresence?: Record<string, boolean | null>;
+  cronAvailable?: boolean;
+  healthSummary?: HealthSummary;
+  healthChecks?: HealthCheck[];
+  sports?: SportsDiagnostics;
+  supportReport?: string;
+};
+
+type SportsDiagnostics = {
+  status: string;
+  healthy: boolean;
+  currentSeason: string;
+  teamCount: number;
+  activeTeamCount: number;
+  counts?: Record<string, number>;
+  issues?: Array<{ code?: string; severity?: string; message?: string }>;
+};
+
+type HealthCheck = {
+  id: string;
+  label: string;
+  status: "good" | "recommended" | "critical";
+  severity: string;
+  summary: string;
+  description: string;
+  remediationUrl?: string;
+  technicalDetail?: string;
+};
+
+type HealthSummary = {
+  status: "good" | "recommended" | "critical" | string;
+  good: number;
+  recommended: number;
+  critical: number;
+};
+
+type HealthPayload = {
+  summary: HealthSummary;
+  checks: HealthCheck[];
 };
 
 declare global {
@@ -140,6 +186,127 @@ if (config?.nonce) {
 
 function adminUrl(url: string | undefined) {
   return url || config?.urls.dashboard || "admin.php?page=byline";
+}
+
+function safeRequestError(error: unknown, fallback: string): string {
+  const candidate = error && typeof error === "object" && "message" in error
+    ? (error as { message?: unknown }).message
+    : undefined;
+  if (typeof candidate !== "string") return fallback;
+
+  const message = candidate.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  if (!message || message === "[object Object]" || message.length > 240 || /(?:stack trace|fatal error|password|token|secret|authorization|sqlstate)/i.test(message)) {
+    return fallback;
+  }
+  return message;
+}
+
+function useUnsavedChangesPrompt(dirty: boolean) {
+  useEffect(() => {
+    if (!dirty) return undefined;
+
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const beforeNavigation = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const target = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      const href = target?.getAttribute("href") || "";
+      if (!target || !href || href.startsWith("#") || target.getAttribute("target")) return;
+      if (!window.confirm("You have unsaved Byline changes. Leave this page without saving?")) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("click", beforeNavigation, true);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("click", beforeNavigation, true);
+    };
+  }, [dirty]);
+}
+
+function LoadingState({ label = "Loading Byline…" }: { label?: string }) {
+  return (
+    <div className="byline-loading-state" role="status" aria-live="polite">
+      <Spinner />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function statusLabel(status: HealthCheck["status"]): string {
+  return status === "good" ? "Good" : status === "recommended" ? "Recommended" : "Critical";
+}
+
+function StatusMark({ status }: { status: HealthCheck["status"] }) {
+  return (
+    <span className={`byline-status-mark byline-status-${status}`} aria-label={statusLabel(status)}>
+      {status === "good" ? "✓" : status === "recommended" ? "!" : "×"}
+    </span>
+  );
+}
+
+function publicationDraftErrors(draft: PublicationConfig): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const add = (field: string, message: string) => { if (!errors[field]) errors[field] = message; };
+  for (const [key, label] of [["name", "Publication name"], ["shortName", "Short name"], ["description", "Description"]] as const) {
+    if (!draft.identity[key].trim()) add(`identity.${key}`, `${label} is required.`);
+    if (draft.identity[key].length > (key === "description" ? 500 : key === "name" ? 120 : 80)) {
+      add(`identity.${key}`, `${label} is too long.`);
+    }
+  }
+  for (const key of ["publicSite", "cms"] as const) {
+    try {
+      const url = new URL(draft.urls[key]);
+      if (!/^https?:$/.test(url.protocol) || !url.hostname) add(`urls.${key}`, "Use a complete http or https URL.");
+    } catch {
+      add(`urls.${key}`, "Use a complete http or https URL.");
+    }
+  }
+  if (draft.urls.contact && !draft.urls.contact.startsWith("/") && !/^https?:\/\//i.test(draft.urls.contact)) {
+    add("urls.contact", "Use a site path or complete http(s) URL.");
+  }
+  if (!(config?.themeIds || []).includes(draft.appearance.theme)) add("appearance.theme", "Choose an installed Byline theme.");
+  for (const [index, item] of draft.sections.entries()) {
+    if (!item.name.trim()) add(`sections.${index}.name`, "Section names cannot be empty.");
+    if (item.name.length > 80) add(`sections.${index}.name`, "Section names must be 80 characters or fewer.");
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item.slug)) add(`sections.${index}.slug`, "Use lowercase letters, numbers, and hyphens.");
+  }
+  const navigationKeys = new Set<string>();
+  for (const [index, item] of draft.navigation.entries()) {
+    if (!item.label.trim()) add(`navigation.${index}.label`, "Navigation labels cannot be empty.");
+    if (item.label.length > 80) add(`navigation.${index}.label`, "Navigation labels must be 80 characters or fewer.");
+    if (!item.url.trim() || (!item.url.startsWith("/") && !/^https?:\/\//i.test(item.url))) add(`navigation.${index}.url`, "Use a site path or complete http(s) URL.");
+    if (!item.locations.length) add(`navigation.${index}.locations`, "Choose a header or footer placement.");
+    const key = `${item.label.trim().toLowerCase()}|${item.url.trim()}|${item.locations.join(",")}`;
+    if (navigationKeys.has(key)) add(`navigation.${index}`, "This navigation item is duplicated.");
+    navigationKeys.add(key);
+  }
+  for (const [index, item] of draft.social.entries()) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item.service.trim().toLowerCase())) add(`social.${index}.service`, "Use a simple service name such as instagram.");
+    if (!item.label.trim()) add(`social.${index}.label`, "Social link labels cannot be empty.");
+    if (item.label.length > 80) add(`social.${index}.label`, "Social link labels must be 80 characters or fewer.");
+    try {
+      const url = new URL(item.url);
+      if (!/^https?:$/.test(url.protocol) || !url.hostname) add(`social.${index}.url`, "Use a complete http or https URL.");
+    } catch {
+      add(`social.${index}.url`, "Use a complete http or https URL.");
+    }
+  }
+  for (const [key, value] of Object.entries(draft.appearance.tokenOverrides)) {
+    if (["accent", "link", "background", "surface", "text"].includes(key) && !/^#[0-9a-f]{6}$/i.test(value)) {
+      add(`appearance.tokenOverrides.${key}`, "Use a six-digit hex color such as #008b95.");
+    }
+  }
+  return errors;
+}
+
+function fieldHelp(message: string | undefined, fallback?: string) {
+  return message ? <span className="byline-field-error">{message}</span> : fallback;
 }
 
 type AdminTab = { id: string; label: string; href: string };
@@ -199,48 +366,97 @@ function settingsTabs(): AdminTab[] {
   }));
 }
 
-function Dashboard({ protocol, publication }: { protocol: ProtocolManifest | null; publication: PublicationConfig | null }) {
+function Dashboard({ protocol, publication, health }: { protocol: ProtocolManifest | null; publication: PublicationConfig | null; health: HealthPayload | null }) {
+  const checks = health?.checks || [];
+  const checkById = Object.fromEntries(checks.map((check) => [check.id, check]));
   const checklist = [
-    { label: "Publication identity", href: config?.urls.publication.identity, complete: Boolean(publication?.identity.name && publication?.identity.description) },
-    { label: "Location, locale, and timezone", href: config?.urls.publication.identity, complete: Boolean(publication?.locale && publication?.timezone) },
-    { label: "Branding", href: config?.urls.publication.branding, complete: Boolean(publication?.branding.masthead.url || publication?.branding.logo.url) },
-    { label: "Choose a theme", href: config?.urls.theme, complete: Boolean(publication?.appearance.theme) },
-    { label: "Sections and navigation", href: config?.urls.publication.navigation, complete: Boolean(publication?.navigation.length) },
-    { label: "Optional modules", href: config?.urls.publication.navigation, complete: Boolean(publication) },
-    { label: "Deployment", href: config?.urls.integrations.deployment, complete: false },
-    { label: "Homepage design", href: config?.urls.studio, complete: false },
-    { label: "Publish", href: config?.urls.studio, complete: false }
-  ];
+    { id: "publication_identity", label: "Publication identity", href: config?.urls.publication.identity },
+    { id: "publication_urls", label: "Public and CMS URLs", href: config?.urls.publication.identity },
+    { id: "branding", label: "Branding", href: config?.urls.publication.branding },
+    { id: "theme", label: "Choose a theme", href: config?.urls.theme },
+    { id: "homepage_design", label: "Homepage", href: config?.urls.studio }
+  ].filter((item) => checkById[item.id]?.status !== undefined && checkById[item.id]?.status !== "good");
+  const overallStatus = health?.summary.status || "recommended";
+  const statusText = overallStatus === "good"
+    ? "Byline is ready."
+    : overallStatus === "critical"
+      ? "Byline needs attention before it is ready."
+      : "Byline is usable, with a few recommended setup steps.";
+  const featureEntries = Object.entries(publication?.features || {});
 
   return (
-    <div className="byline-dashboard-grid">
+    <div className="byline-dashboard-grid byline-overview-grid">
       <Card>
         <CardBody>
-          <p className="byline-eyebrow">Setup checklist</p>
-          <ol className="byline-checklist">
-            {checklist.map((item) => (
-              <li key={item.label} className={item.complete ? "is-complete" : undefined}>
-                <span aria-hidden="true">{item.complete ? "✓" : "○"}</span>
-                <a href={adminUrl(item.href)}>{item.label}</a>
-              </li>
-            ))}
-          </ol>
+          <p className="byline-eyebrow">Publication</p>
+          <h2>{publication?.identity.name || "Publication not configured"}</h2>
+          <p>{publication?.identity.description || "Add the publication identity before publishing."}</p>
+          <dl className="byline-diagnostics-list">
+            <div><dt>Short name</dt><dd>{publication?.identity.shortName || "—"}</dd></div>
+            <div><dt>Public URL</dt><dd className="byline-breakable">{publication?.urls.publicSite || "—"}</dd></div>
+            <div><dt>CMS URL</dt><dd className="byline-breakable">{publication?.urls.cms || "—"}</dd></div>
+            <div><dt>Active theme</dt><dd>{publication?.appearance.theme || "—"}</dd></div>
+          </dl>
         </CardBody>
       </Card>
       <Card>
         <CardBody>
-          <p className="byline-eyebrow">Compatibility</p>
+          <p className="byline-eyebrow">Status</p>
+          <h2 className={`byline-overview-status byline-status-${overallStatus}`}>{statusText}</h2>
+          {health ? (
+            <ul className="byline-health-list">
+              {checks.map((check) => (
+                <li key={check.id}>
+                  <StatusMark status={check.status} />
+                  <span><strong>{check.label}</strong><small>{check.summary}</small></span>
+                  {check.status !== "good" && check.remediationUrl ? <a href={adminUrl(check.remediationUrl)}>Fix</a> : null}
+                </li>
+              ))}
+            </ul>
+          ) : <LoadingState label="Checking Byline health…" />}
+        </CardBody>
+      </Card>
+      <Card>
+        <CardBody>
+          <p className="byline-eyebrow">Setup checklist</p>
+          {checklist.length ? (
+            <ol className="byline-checklist">
+              {checklist.map((item) => (
+                <li key={item.id}>
+                  <StatusMark status={checkById[item.id]?.status || "recommended"} />
+                  <a href={adminUrl(item.href)}>{item.label}</a>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="byline-empty-state">No required setup steps remain.</p>
+          )}
+          {overallStatus === "good" ? <p className="byline-status-ok">Everything required for Byline is ready.</p> : null}
+        </CardBody>
+      </Card>
+      <Card>
+        <CardBody>
+          <p className="byline-eyebrow">Features</p>
+          <ul className="byline-feature-list">
+            {featureEntries.length ? featureEntries.map(([feature, enabled]) => (
+              <li key={feature}>
+                <span>{feature.charAt(0).toUpperCase() + feature.slice(1)}</span>
+                <strong className={enabled ? "byline-status-ok" : "byline-status-off"}>{enabled ? "Enabled" : "Disabled"}</strong>
+              </li>
+            )) : <li>No optional modules configured.</li>}
+          </ul>
+        </CardBody>
+      </Card>
+      <Card>
+        <CardBody>
+          <p className="byline-eyebrow">System information</p>
           {protocol ? (
             <dl className="byline-diagnostics-list">
               <div><dt>Plugin</dt><dd>{protocol.pluginVersion}</dd></div>
-              <div><dt>Protocol</dt><dd>{protocol.protocolVersion}</dd></div>
-              <div><dt>Publication schema</dt><dd>{protocol.publicationSchemaVersion}</dd></div>
-              <div><dt>Design schema</dt><dd>{protocol.designSchemaVersion}</dd></div>
+              <div><dt>Schema</dt><dd>{protocol.publicationSchemaVersion}</dd></div>
               <div><dt>Theme API</dt><dd>{protocol.themeApiVersion}</dd></div>
             </dl>
-          ) : (
-            <Spinner />
-          )}
+          ) : <LoadingState label="Loading system information…" />}
         </CardBody>
       </Card>
     </div>
@@ -252,18 +468,34 @@ function Diagnostics() {
   const [diagnosticError, setDiagnosticError] = useState("");
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    apiFetch<DiagnosticsPayload>({ path: config?.diagnosticsPath || "/byline/v1/admin/diagnostics" })
+  const load = () => {
+    setDiagnosticError("");
+    setDiagnostics(null);
+    return apiFetch<DiagnosticsPayload>({ path: config?.diagnosticsPath || "/byline/v1/admin/diagnostics" })
       .then(setDiagnostics)
-      .catch(() => setDiagnosticError("Byline could not collect diagnostics."));
-  }, []);
+      .catch((error) => setDiagnosticError(safeRequestError(error, "Byline could not collect diagnostics. Try again or contact support.")));
+  };
 
-  if (diagnosticError) return <Notice status="error" isDismissible={false}>{diagnosticError}</Notice>;
-  if (!diagnostics) return <Spinner />;
+  useEffect(() => { void load(); }, []);
+
+  if (diagnosticError) {
+    return (
+      <Card>
+        <CardBody>
+          <Notice status="error" isDismissible={false}>{diagnosticError}</Notice>
+          <Button variant="secondary" onClick={() => void load()}>Retry</Button>
+        </CardBody>
+      </Card>
+    );
+  }
+  if (!diagnostics) return <LoadingState label="Collecting diagnostics…" />;
 
   const rows = [
     ["Plugin", diagnostics.pluginVersion],
     ["WordPress", diagnostics.wordpressVersion],
+    ["PHP", diagnostics.phpVersion || "Unknown"],
+    ["Site URL", diagnostics.siteUrl || "Unknown"],
+    ["Home URL", diagnostics.homeUrl || "Unknown"],
     ["Protocol", String(diagnostics.protocolVersion)],
     ["Publication schema", String(diagnostics.publicationSchemaVersion)],
     ["Design schema", String(diagnostics.designSchemaVersion)],
@@ -275,7 +507,8 @@ function Diagnostics() {
     ["Deployment pending", diagnostics.deployment.pending ? "Yes" : "No"],
     ["Public manifest", `${diagnostics.publicManifest.reachable ? "Reachable" : "Unavailable"} · ${diagnostics.publicManifest.status}`],
     ["REST health", diagnostics.restHealth ? "Healthy" : "Unavailable"],
-    ["Designs needing migration", String(diagnostics.designsNeedingMigration)]
+    ["Designs needing migration", String(diagnostics.designsNeedingMigration)],
+    ...(diagnostics.sports ? [["Sports integrity", `${diagnostics.sports.healthy ? "Healthy" : "Attention"} · ${diagnostics.sports.currentSeason}`]] : [])
   ];
 
   return (
@@ -285,12 +518,46 @@ function Diagnostics() {
         <dl className="byline-diagnostics-list">
           {rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
         </dl>
+        {diagnostics.sports ? (
+          <div className="byline-diagnostics-sports">
+            <h2>Sports integrity</h2>
+            <p>{diagnostics.sports.teamCount} configured teams ({diagnostics.sports.activeTeamCount} active) · {diagnostics.sports.currentSeason}</p>
+            <p>{diagnostics.sports.counts?.error || 0} errors · {diagnostics.sports.counts?.recommended || 0} recommendations</p>
+            {diagnostics.sports.issues?.length ? <Button variant="secondary" href={adminUrl(config?.urls.teams)}>Open Sports Teams</Button> : null}
+          </div>
+        ) : null}
+        {diagnostics.healthChecks?.length ? (
+          <>
+            <h2>Health checks</h2>
+            <ul className="byline-health-list">
+              {diagnostics.healthChecks.map((check) => (
+                <li key={check.id}>
+                  <StatusMark status={check.status} />
+                  <span><strong>{check.label}</strong><small>{check.summary}</small></span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+        <label className="byline-support-report-label" htmlFor="byline-support-report">Support report</label>
+        <textarea id="byline-support-report" className="byline-support-report" readOnly value={diagnostics.supportReport || ""} rows={14} />
         <div className="byline-diagnostics-copy">
           <Button variant="secondary" onClick={async () => {
-            await navigator.clipboard.writeText(JSON.stringify(diagnostics, null, 2));
-            setCopied(true);
-          }}>Copy safe diagnostics</Button>
-          {copied ? <span>Copied</span> : null}
+            try {
+              if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(diagnostics.supportReport || "");
+              } else {
+                const report = document.getElementById("byline-support-report") as HTMLTextAreaElement | null;
+                report?.focus();
+                report?.select();
+                document.execCommand("copy");
+              }
+              setCopied(true);
+            } catch {
+              setDiagnosticError("Diagnostics are ready below, but the browser could not copy them automatically.");
+            }
+          }}>Copy diagnostics</Button>
+          {copied ? <span role="status">Diagnostics copied.</span> : null}
         </div>
       </CardBody>
     </Card>
@@ -352,12 +619,24 @@ function PublicationSettings({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => setDraft(publication), [publication]);
 
-  if (!draft) return <Spinner />;
+  const dirty = Boolean(draft && publication && JSON.stringify(draft) !== JSON.stringify(publication));
+  useUnsavedChangesPrompt(dirty);
+
+  if (!draft) return <LoadingState label="Loading publication settings…" />;
 
   const save = async () => {
+    const nextValidationErrors = publicationDraftErrors(draft);
+    setValidationErrors(nextValidationErrors);
+    if (Object.keys(nextValidationErrors).length) {
+      setSaveError("Fix the highlighted fields before saving publication settings.");
+      setMessage("");
+      return;
+    }
+
     setSaving(true);
     setMessage("");
     setSaveError("");
@@ -369,9 +648,10 @@ function PublicationSettings({
       });
       setDraft(saved);
       onSaved(saved);
-      setMessage(`Saved publication revision ${saved.revision}.`);
-    } catch {
-      setSaveError("Byline could not save this publication configuration. Check your access and try again.");
+      setValidationErrors({});
+      setMessage("Publication settings saved.");
+    } catch (error) {
+      setSaveError(safeRequestError(error, "Could not save publication settings. Check your access and try again."));
     } finally {
       setSaving(false);
     }
@@ -379,10 +659,10 @@ function PublicationSettings({
 
   const actions = (
     <div className="byline-settings-actions">
-      <Button variant="primary" isBusy={saving} disabled={saving || !config?.capabilities.manage} onClick={save}>
+      <Button variant="primary" isBusy={saving} disabled={saving || !config?.capabilities.manage || !dirty} onClick={save}>
         Save publication
       </Button>
-      <span>Schema {draft.schemaVersion} · Revision {draft.revision}</span>
+      <span aria-live="polite">{saving ? "Saving…" : dirty ? "Unsaved changes" : "Saved"} · Schema {draft.schemaVersion} · Revision {draft.revision}</span>
     </div>
   );
 
@@ -447,6 +727,7 @@ function PublicationSettings({
         ) : null}
         <SelectControl
           label="Theme"
+          help={fieldHelp(validationErrors["appearance.theme"])}
           value={draft.appearance.theme as "byline-editorial" | "byline-magazine" | "byline-modern" | "weekly-wildcat"}
           options={(config?.themeIds || Object.keys(themeDefaults)).map((theme) => ({
             label: theme.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ").replace(/^Byline /, ""),
@@ -495,6 +776,7 @@ function PublicationSettings({
             <TextControl
               key={key}
               label={label}
+              help={fieldHelp(validationErrors[`appearance.tokenOverrides.${key}`])}
               value={draft.appearance.tokenOverrides[key] || ""}
               placeholder="#000000"
               onChange={(value) => {
@@ -530,6 +812,7 @@ function PublicationSettings({
             <TextControl
               key={key}
               label={label}
+              help={fieldHelp(validationErrors[`identity.${key}`])}
               value={draft.identity[key]}
               onChange={(value) => setDraft({ ...draft, identity: { ...draft.identity, [key]: value } })}
             />
@@ -537,6 +820,7 @@ function PublicationSettings({
         </div>
         <TextareaControl
           label="Description"
+          help={fieldHelp(validationErrors["identity.description"])}
           value={draft.identity.description}
           onChange={(value) => setDraft({ ...draft, identity: { ...draft.identity, description: value } })}
         />
@@ -559,6 +843,7 @@ function PublicationSettings({
             <TextControl
               key={key}
               label={{ publicSite: "Public site", cms: "WordPress CMS", contact: "Contact page" }[key]}
+              help={fieldHelp(validationErrors[`urls.${key}`], key === "contact" ? "Use a site path or complete http(s) URL." : "Use a complete http(s) URL.")}
               value={draft.urls[key]}
               onChange={(value) => setDraft({ ...draft, urls: { ...draft.urls, [key]: value } })}
             />
@@ -640,8 +925,8 @@ function PublicationSettings({
                   const sections = [...draft.sections];
                   sections[index] = { ...section, name };
                   setDraft({ ...draft, sections });
-                }} />
-                <TextControl label="Slug" value={section.slug} onChange={(slug) => {
+                }} help={fieldHelp(validationErrors[`sections.${index}.name`])} />
+                <TextControl label="Slug" help={fieldHelp(validationErrors[`sections.${index}.slug`])} value={section.slug} onChange={(slug) => {
                   const sections = [...draft.sections];
                   sections[index] = { ...section, slug };
                   setDraft({ ...draft, sections });
@@ -668,18 +953,19 @@ function PublicationSettings({
             <fieldset key={`${index}-${item.label}`}>
               <legend>Navigation item {index + 1}</legend>
               <div className="byline-settings-grid">
-                <TextControl label="Label" value={item.label} onChange={(label) => {
+                <TextControl label="Label" help={fieldHelp(validationErrors[`navigation.${index}.label`])} value={item.label} onChange={(label) => {
                   const navigation = [...draft.navigation];
                   navigation[index] = { ...item, label };
                   setDraft({ ...draft, navigation });
                 }} />
-                <TextControl label="URL" value={item.url} onChange={(url) => {
+                <TextControl label="URL" help={fieldHelp(validationErrors[`navigation.${index}.url`])} value={item.url} onChange={(url) => {
                   const navigation = [...draft.navigation];
                   navigation[index] = { ...item, url };
                   setDraft({ ...draft, navigation });
                 }} />
                 <SelectControl
                   label="Placement"
+                  help={fieldHelp(validationErrors[`navigation.${index}.locations`])}
                   value={item.locations.length === 2 ? "both" : item.locations[0] || "header"}
                   options={[
                     { label: "Header", value: "header" },
@@ -734,7 +1020,7 @@ function PublicationSettings({
               <legend>Social link {index + 1}</legend>
               <div className="byline-settings-grid">
                 {(["service", "label", "url"] as const).map((key) => (
-                  <TextControl key={key} label={key.charAt(0).toUpperCase() + key.slice(1)} value={item[key]} onChange={(value) => {
+                  <TextControl key={key} label={key.charAt(0).toUpperCase() + key.slice(1)} help={fieldHelp(validationErrors[`social.${index}.${key}`] || (validationErrors[`social.${index}`] && key === "service" ? validationErrors[`social.${index}`] : undefined))} value={item[key]} onChange={(value) => {
                     const social = [...draft.social];
                     social[index] = { ...item, [key]: value };
                     setDraft({ ...draft, social });
@@ -786,11 +1072,26 @@ function DeploymentSettings() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const dirty = hookUrl.trim() !== "" || clearHook;
+
+  useUnsavedChangesPrompt(dirty);
 
   const refresh = () => apiFetch<DeploymentStatus>({ path }).then(setStatus);
-  useEffect(() => { refresh().catch(() => setError("Byline could not load deployment settings.")); }, []);
+  useEffect(() => {
+    refresh().catch((requestError) => setError(safeRequestError(requestError, "Byline could not load deployment settings. Try again or contact support.")));
+  }, []);
 
   const save = async () => {
+    if (hookUrl.trim() !== "") {
+      try {
+        const url = new URL(hookUrl);
+        if (url.protocol !== "https:" || !url.hostname) throw new Error("invalid");
+      } catch {
+        setError("Enter a complete HTTPS deploy-hook URL.");
+        return;
+      }
+    }
+
     setBusy(true);
     setError("");
     setMessage("");
@@ -804,8 +1105,8 @@ function DeploymentSettings() {
       setHookUrl("");
       setClearHook(false);
       setMessage("Deployment settings saved. The private hook URL was not returned to the browser.");
-    } catch {
-      setError("Byline could not save the deploy hook. Enter a valid HTTPS URL and try again.");
+    } catch (requestError) {
+      setError(safeRequestError(requestError, "Byline could not save the deploy hook. Enter a valid HTTPS URL and try again."));
     } finally {
       setBusy(false);
     }
@@ -819,14 +1120,14 @@ function DeploymentSettings() {
       const next = await apiFetch<DeploymentStatus>({ path: `${path}/trigger`, method: "POST" });
       setStatus(next);
       setMessage(next.lastStatus.startsWith("HTTP 2") ? "Deployment hook accepted the request." : `Deployment completed with status: ${next.lastStatus}.`);
-    } catch {
-      setError("The deploy-hook request failed. The saved URL remains private and unchanged.");
+    } catch (requestError) {
+      setError(safeRequestError(requestError, "The deploy-hook request failed. The saved URL remains private and unchanged."));
     } finally {
       setBusy(false);
     }
   };
 
-  if (!status && !error) return <Spinner />;
+  if (!status && !error) return <LoadingState label="Loading deployment settings…" />;
 
   return (
     <Card>
@@ -853,8 +1154,9 @@ function DeploymentSettings() {
         />
         {status?.configured ? <ToggleControl label="Remove the saved hook" checked={clearHook} onChange={setClearHook} /> : null}
         <div className="byline-settings-actions">
-          <Button variant="primary" isBusy={busy} disabled={busy || !config?.capabilities.manageIntegrations} onClick={save}>Save deployment</Button>
+          <Button variant="primary" isBusy={busy} disabled={busy || !config?.capabilities.manageIntegrations || !dirty} onClick={save}>Save deployment</Button>
           <Button variant="secondary" isBusy={busy} disabled={busy || !status?.configured || !config?.capabilities.manageIntegrations} onClick={trigger}>Trigger now</Button>
+          <span aria-live="polite">{busy ? "Saving…" : dirty ? "Unsaved changes" : "Saved"}</span>
         </div>
       </CardBody>
     </Card>
@@ -987,8 +1289,7 @@ function DiscordSettings() {
       apply(next);
       setMessage(success(next));
     } catch (requestError) {
-      const detail = (requestError as { message?: string })?.message;
-      setError(detail || `Byline could not ${label}.`);
+      setError(safeRequestError(requestError, `Byline could not ${label}.`));
     } finally {
       setBusy(false);
     }
@@ -1220,12 +1521,45 @@ function AdminPageFrame({
   );
 }
 
+type AdminErrorBoundaryProps = { children: ReactNode };
+type AdminErrorBoundaryState = { hasError: boolean };
+
+class AdminErrorBoundary extends Component<AdminErrorBoundaryProps, AdminErrorBoundaryState> {
+  state: AdminErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): AdminErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+
+    return (
+      <div className="byline-admin-app">
+        <main className="byline-admin-main">
+          <Card>
+            <CardBody>
+              <Notice status="error" isDismissible={false}>Something went wrong while loading Byline.</Notice>
+              <p>Reload the screen and, if the problem continues, open Diagnostics and share the support report with an administrator.</p>
+              <div className="byline-settings-actions">
+                <Button variant="primary" onClick={() => window.location.reload()}>Retry</Button>
+                {config?.urls.settings.diagnostics ? <Button variant="secondary" href={adminUrl(config.urls.settings.diagnostics)}>Open Diagnostics</Button> : null}
+              </div>
+            </CardBody>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+}
+
 function Screen({
   page,
   tab,
   view,
   protocol,
   publication,
+  health,
   error,
   onPublicationSaved
 }: {
@@ -1234,13 +1568,14 @@ function Screen({
   view: string;
   protocol: ProtocolManifest | null;
   publication: PublicationConfig | null;
+  health: HealthPayload | null;
   error: string;
   onPublicationSaved: (publication: PublicationConfig) => void;
 }) {
   if (page === ADMIN_PAGE_SLUGS.dashboard) {
     return (
       <AdminPageFrame title="Overview" error={error}>
-        <Dashboard protocol={protocol} publication={publication} />
+        <Dashboard protocol={protocol} publication={publication} health={health} />
       </AdminPageFrame>
     );
   }
@@ -1327,6 +1662,8 @@ function BylineAdminApp() {
   const view = normalizeStudioView(config?.view);
   const [protocol, setProtocol] = useState<ProtocolManifest | null>(null);
   const [publication, setPublication] = useState<PublicationConfig | null>(null);
+  const [health, setHealth] = useState<HealthPayload | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const legacyHash = window.location.hash;
   const legacyDestination = page === ADMIN_PAGE_SLUGS.dashboard ? legacyHashDestination(legacyHash) : null;
@@ -1340,21 +1677,69 @@ function BylineAdminApp() {
     }
   }, [legacyTarget]);
 
-  useEffect(() => {
-    if (legacyTarget) return;
-    Promise.all([
+  const load = () => {
+    setLoading(true);
+    setError("");
+    setHealth(null);
+    const unavailableHealth: HealthPayload = {
+      summary: { status: "recommended", good: 0, recommended: 1, critical: 0 },
+      checks: [{
+        id: "health_endpoint",
+        label: "Byline health checks",
+        status: "recommended",
+        severity: "recommended",
+        summary: "Health checks are temporarily unavailable.",
+        description: "Open Diagnostics to retry the health report.",
+        remediationUrl: config?.urls.settings.diagnostics || ""
+      }]
+    };
+    const healthRequest: Promise<HealthPayload | null> = page === ADMIN_PAGE_SLUGS.dashboard && config?.capabilities.manage
+      ? apiFetch<HealthPayload>({ path: config.healthPath || "/byline/v1/admin/health" }).catch(() => unavailableHealth)
+      : Promise.resolve(null);
+
+    return Promise.all([
       apiFetch<ProtocolManifest>({ path: config?.restPath || "/byline/v1/capabilities/protocol" }),
-      apiFetch<PublicationConfig>({ path: config?.publicationPath || "/byline/v1/publication" })
+      apiFetch<PublicationConfig>({ path: config?.publicationPath || "/byline/v1/publication" }),
+      healthRequest
     ])
-      .then(([manifest, publicationConfig]) => {
+      .then(([manifest, publicationConfig, healthPayload]) => {
         setProtocol(manifest);
         setPublication(publicationConfig);
+        setHealth(healthPayload);
       })
-      .catch(() => setError("Byline could not read its compatibility manifest."));
-  }, [legacyTarget]);
+      .catch((requestError) => setError(safeRequestError(requestError, "Byline could not load its settings. Try again or open Diagnostics.")))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (legacyTarget) return;
+    void load();
+  }, [legacyTarget, page]);
 
   if (legacyTarget) {
-    return <div className="byline-admin-app"><div className="byline-admin-main"><Spinner /></div></div>;
+    return <div className="byline-admin-app"><div className="byline-admin-main"><LoadingState label="Opening the compatible Byline screen…" /></div></div>;
+  }
+
+  if (loading) {
+    return <div className="byline-admin-app"><div className="byline-admin-main"><LoadingState /></div></div>;
+  }
+
+  if (error || !protocol || !publication) {
+    return (
+      <div className="byline-admin-app">
+        <AdminPageFrame title="Byline" error={error || "Byline could not load its configuration."}>
+          <Card>
+            <CardBody>
+              <p>Try loading the screen again. If the problem continues, use Diagnostics to collect a support report.</p>
+              <div className="byline-settings-actions">
+                <Button variant="primary" onClick={() => void load()}>Retry</Button>
+                {config?.urls.settings.diagnostics ? <Button variant="secondary" href={adminUrl(config.urls.settings.diagnostics)}>Open Diagnostics</Button> : null}
+              </div>
+            </CardBody>
+          </Card>
+        </AdminPageFrame>
+      </div>
+    );
   }
 
   return (
@@ -1365,6 +1750,7 @@ function BylineAdminApp() {
         view={view}
         protocol={protocol}
         publication={publication}
+        health={health}
         error={error}
         onPublicationSaved={setPublication}
       />
@@ -1375,5 +1761,9 @@ function BylineAdminApp() {
 const rootElement = document.getElementById("byline-admin-root");
 
 if (rootElement) {
-  createRoot(rootElement).render(<BylineAdminApp />);
+  createRoot(rootElement).render(
+    <AdminErrorBoundary>
+      <BylineAdminApp />
+    </AdminErrorBoundary>
+  );
 }

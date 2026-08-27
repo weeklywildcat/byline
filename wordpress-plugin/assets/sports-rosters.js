@@ -23,7 +23,10 @@
             editor.querySelector('.wwh-roster-rows').appendChild(fragment);
             reindex(editor);
             var rows = editor.querySelectorAll('.wwh-roster-row');
-            rows[rows.length - 1].querySelector('input').focus();
+            var firstField = rows[rows.length - 1].querySelector('input:not([type="hidden"])');
+            if (firstField) {
+                firstField.focus();
+            }
         }
 
         if (removeButton) {
@@ -57,6 +60,43 @@
                 reindex(downEditor);
                 moveDownButton.focus();
             }
+        }
+
+        var photoButton = event.target.closest('.wwh-roster-staff-photo-select');
+        if (photoButton) {
+            event.preventDefault();
+            var photoRow = photoButton.closest('.wwh-roster-staff-row');
+            var photoInput = photoRow.querySelector('.wwh-roster-staff-image-id');
+            var preview = photoRow.querySelector('.wwh-roster-staff-preview');
+            var photoRemove = photoRow.querySelector('.wwh-roster-staff-photo-remove');
+            var frame = wp.media({
+                title: 'Choose staff portrait',
+                button: { text: 'Use portrait' },
+                library: { type: 'image' },
+                multiple: false
+            });
+            frame.on('select', function () {
+                var attachment = frame.state().get('selection').first().toJSON();
+                var sizes = attachment.sizes || {};
+                photoInput.value = attachment.id;
+                preview.src = sizes.medium ? sizes.medium.url : attachment.url;
+                preview.hidden = false;
+                photoRemove.hidden = false;
+                photoButton.textContent = 'Replace photo';
+            });
+            frame.open();
+        }
+
+        var photoRemoveButton = event.target.closest('.wwh-roster-staff-photo-remove');
+        if (photoRemoveButton) {
+            event.preventDefault();
+            var photoRemoveRow = photoRemoveButton.closest('.wwh-roster-staff-row');
+            var removePreview = photoRemoveRow.querySelector('.wwh-roster-staff-preview');
+            photoRemoveRow.querySelector('.wwh-roster-staff-image-id').value = '';
+            removePreview.removeAttribute('src');
+            removePreview.hidden = true;
+            photoRemoveButton.hidden = true;
+            photoRemoveRow.querySelector('.wwh-roster-staff-photo-select').textContent = 'Choose photo';
         }
     });
 })();

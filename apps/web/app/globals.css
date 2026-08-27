@@ -20,6 +20,623 @@
   --radius-medium: 0px;
 }
 
+/* Immersive team hubs: photographic identity with an editorial, mobile-first rhythm. */
+.sports-breadcrumbs-mobile,
+.team-roster-mobile {
+  display: none;
+}
+
+.sports-breadcrumbs-full {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.team-hub-header {
+  height: clamp(340px, 38vw, 430px);
+  max-height: 430px;
+  min-height: 340px;
+}
+
+.team-hub-header-no-image {
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--sport-accent, var(--accent)) 22%, transparent), transparent 55%),
+    var(--ink);
+}
+
+.team-hub-header-no-image::before {
+  color: rgba(255, 255, 255, 0.045);
+  content: "TEAM";
+  font-family: var(--font-display);
+  font-size: clamp(7rem, 22vw, 15rem);
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  line-height: 0.7;
+  position: absolute;
+  right: -0.03em;
+  top: 28%;
+}
+
+.team-hub-header-shade {
+  background: linear-gradient(180deg, rgba(10, 12, 14, 0.04) 15%, rgba(10, 12, 14, 0.24) 50%, rgba(10, 12, 14, 0.94) 100%);
+}
+
+.team-hub-header-content {
+  align-content: end;
+  align-items: end;
+  gap: 22px;
+  padding: 32px;
+}
+
+.team-hub-mark {
+  border-top-color: var(--sport-accent, var(--accent));
+  height: 92px;
+  width: 92px;
+}
+
+.team-hub-mark span {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.team-hub-title::before {
+  background: var(--sport-accent, var(--accent));
+  content: "";
+  height: 3px;
+  width: 42px;
+}
+
+.team-hub-title p {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.team-hub-navigation {
+  align-items: stretch;
+  background: #fff;
+  border-bottom: 1px solid var(--rule-strong);
+  display: flex;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.team-hub-tabs {
+  align-self: auto;
+  background: transparent;
+  border-top: 0;
+  bottom: auto;
+  display: flex;
+  left: auto;
+  margin: 0;
+  overflow-x: auto;
+  position: static;
+  right: auto;
+}
+
+.team-hub-tabs a {
+  border: 0;
+  padding: 16px 18px;
+}
+
+.team-hub-tabs a[aria-current="page"] {
+  box-shadow: inset 0 -3px 0 var(--sport-accent, var(--accent));
+}
+
+.team-hub-selector {
+  border-left: 1px solid var(--rule);
+  border-right: 0;
+  padding: 8px 12px;
+}
+
+.team-season-snapshot {
+  border-bottom: 1px solid var(--rule-strong);
+  border-top: 1px solid var(--rule-strong);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+
+.team-season-snapshot > div {
+  border-left: 1px solid var(--rule);
+  display: grid;
+  gap: 5px;
+  padding: 15px 18px;
+}
+
+.team-season-snapshot > div:first-child {
+  border-left: 0;
+}
+
+.team-season-snapshot dt,
+.team-season-snapshot dd {
+  font-family: var(--font-ui);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.team-season-snapshot dt {
+  color: var(--soft-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.team-season-snapshot dd {
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.team-season-snapshot > div:first-child dd {
+  color: var(--sport-accent, var(--accent));
+}
+
+.team-next-game-section > .section-heading,
+.team-news-section > .section-heading,
+.team-roster-section > .section-heading {
+  border-top: 3px solid var(--sport-accent, var(--accent));
+  padding-top: 10px;
+}
+
+.team-next-game {
+  align-items: center;
+  background: var(--ink);
+  border: 0;
+  color: #fff;
+  display: grid;
+  gap: 26px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 26px 28px;
+}
+
+.team-next-game-date {
+  border-right: 1px solid rgba(255, 255, 255, 0.22);
+  display: grid;
+  justify-items: center;
+  min-width: 96px;
+  padding-right: 24px;
+}
+
+.team-next-game-date span,
+.team-next-game-date time,
+.team-next-game-matchup p,
+.team-next-game-matchup small {
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.team-next-game-date strong {
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 3rem;
+  line-height: 0.9;
+}
+
+.team-next-game-matchup {
+  display: grid;
+  gap: 3px;
+}
+
+.team-next-game-matchup p {
+  color: var(--sport-accent, #fff);
+  margin: 0 0 5px;
+}
+
+.team-next-game-matchup > span,
+.team-next-game-matchup h3,
+.team-next-game-matchup b {
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: clamp(1.65rem, 3vw, 2.45rem);
+  font-weight: 800;
+  line-height: 0.98;
+  margin: 0;
+}
+
+.team-next-game-matchup b {
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.team-next-game > a {
+  border-bottom: 2px solid var(--sport-accent, #fff);
+  color: #fff;
+  padding: 8px 0;
+  white-space: nowrap;
+}
+
+.team-season-note {
+  border-left: 3px solid var(--sport-accent, var(--accent));
+  color: var(--muted);
+  font-family: var(--font-body);
+  margin: 0;
+  padding: 10px 14px;
+}
+
+.team-coverage-layout {
+  align-items: start;
+  display: grid;
+  gap: 28px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.8fr);
+}
+
+.team-coverage-followups {
+  border-left: 1px solid var(--rule);
+  display: grid;
+  padding-left: 22px;
+}
+
+.team-schedule-preview {
+  border-top: 1px solid var(--rule-strong);
+  display: grid;
+}
+
+.team-schedule-preview > a {
+  align-items: center;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 62px minmax(0, 1fr) 70px 86px;
+  padding: 12px 0;
+}
+
+.team-schedule-preview time {
+  display: flex;
+  gap: 5px;
+}
+
+.team-schedule-preview time span,
+.team-schedule-preview > a > span,
+.team-schedule-preview small {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.team-schedule-preview time span {
+  color: var(--sport-accent, var(--accent));
+}
+
+.team-schedule-preview b,
+.team-schedule-preview time strong {
+  font-family: var(--font-body);
+  font-size: 1rem;
+}
+
+.team-recent-score {
+  grid-template-columns: 32px 74px minmax(0, 1fr);
+}
+
+.team-recent-score > span {
+  color: var(--sport-accent, var(--accent));
+  font-family: var(--font-ui);
+}
+
+.team-recent-score > strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+
+.team-staff-groups {
+  display: grid;
+  gap: 28px;
+}
+
+.team-roster-staff {
+  border-top: 2px solid var(--sport-accent, var(--ink));
+}
+
+.team-roster-staff-list {
+  gap: 22px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.team-hub-navigation a:focus-visible,
+.team-hub-navigation select:focus-visible,
+.team-next-game a:focus-visible,
+.team-schedule-preview a:focus-visible,
+.team-recent-score:focus-visible {
+  outline: 3px solid var(--sport-accent, var(--accent));
+  outline-offset: -3px;
+}
+
+.team-roster-staff-list > article {
+  border-bottom: 1px solid var(--rule);
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding-bottom: 12px;
+}
+
+.team-staff-portrait {
+  align-items: center;
+  aspect-ratio: 4 / 5;
+  background: color-mix(in srgb, var(--ink) 92%, var(--sport-accent, var(--accent)));
+  display: flex;
+  justify-content: center;
+  margin-bottom: 5px;
+  overflow: hidden;
+}
+
+.team-staff-portrait img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.team-staff-portrait > span {
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 4vw, 2.8rem);
+  font-weight: 800;
+}
+
+.team-roster-staff-list > article > strong {
+  overflow-wrap: anywhere;
+}
+
+.team-roster-staff-list > article.is-head-coach > strong {
+  font-size: 1.08rem;
+}
+
+@media (max-width: 900px) {
+  .team-roster-staff-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .team-coverage-layout {
+    grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.8fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .sports-archive-shell {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-top: 18px;
+  }
+
+  .sports-archive-page {
+    gap: 24px;
+  }
+
+  .sports-breadcrumbs .sports-breadcrumbs-mobile {
+    display: inline-flex;
+  }
+
+  .sports-breadcrumbs .sports-breadcrumbs-full {
+    display: none;
+  }
+
+  .team-hub-header {
+    height: clamp(320px, 50svh, 380px);
+    margin-left: calc(-1 * max(16px, env(safe-area-inset-left)));
+    margin-right: calc(-1 * max(16px, env(safe-area-inset-right)));
+    max-height: 380px;
+    min-height: 320px;
+  }
+
+  .team-hub-header-content {
+    align-items: end;
+    gap: 14px;
+    grid-template-columns: 64px minmax(0, 1fr);
+    padding: 22px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
+  }
+
+  .team-hub-mark {
+    height: 64px;
+    padding: 9px;
+    width: 64px;
+  }
+
+  .team-hub-mark img {
+    max-height: 44px;
+    max-width: 44px;
+  }
+
+  .team-hub-title {
+    gap: 5px;
+  }
+
+  .team-hub-title h1 {
+    font-size: clamp(2.25rem, 11vw, 3.35rem);
+    overflow-wrap: anywhere;
+  }
+
+  .team-hub-title p,
+  .team-hub-title span {
+    font-size: 0.64rem;
+  }
+
+  .team-hub-navigation {
+    align-items: stretch;
+    margin-left: calc(-1 * max(16px, env(safe-area-inset-left)));
+    margin-right: calc(-1 * max(16px, env(safe-area-inset-right)));
+    overflow: hidden;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+
+  .team-hub-tabs {
+    padding-left: env(safe-area-inset-left);
+    scrollbar-width: none;
+  }
+
+  .team-hub-tabs a {
+    font-size: 0.66rem;
+    padding: 14px 12px;
+  }
+
+  .team-hub-selector {
+    padding: 6px max(8px, env(safe-area-inset-right)) 6px 8px;
+  }
+
+  .team-hub-selector span {
+    display: none;
+  }
+
+  .team-hub-selector select {
+    max-width: 108px;
+  }
+
+  .team-season-snapshot {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .team-season-snapshot > div {
+    padding: 13px 12px;
+  }
+
+  .team-season-snapshot > div:nth-child(3) {
+    border-left: 0;
+  }
+
+  .team-season-snapshot > div:nth-child(n + 3) {
+    border-top: 1px solid var(--rule);
+  }
+
+  .team-next-game {
+    align-items: start;
+    gap: 16px;
+    grid-template-columns: 72px minmax(0, 1fr);
+    padding: 20px 18px;
+  }
+
+  .team-next-game-date {
+    min-width: 0;
+    padding-right: 14px;
+  }
+
+  .team-next-game-date strong {
+    font-size: 2.35rem;
+  }
+
+  .team-next-game-matchup > span,
+  .team-next-game-matchup h3 {
+    font-size: 1.65rem;
+  }
+
+  .team-next-game > a {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .team-coverage-layout {
+    gap: 12px;
+    grid-template-columns: 1fr;
+  }
+
+  .team-coverage-layout .story-teaser-lead .featured-image {
+    margin-left: calc(-1 * max(16px, env(safe-area-inset-left)));
+    margin-right: calc(-1 * max(16px, env(safe-area-inset-right)));
+  }
+
+  .team-coverage-layout .story-teaser-lead h2 {
+    font-size: 2.15rem;
+  }
+
+  .team-coverage-followups {
+    border-left: 0;
+    border-top: 1px solid var(--rule-strong);
+    padding-left: 0;
+  }
+
+  .team-schedule-preview > a {
+    gap: 10px;
+    grid-template-columns: 54px minmax(0, 1fr) auto;
+  }
+
+  .team-schedule-preview > a > span {
+    justify-self: end;
+  }
+
+  .team-schedule-preview small {
+    grid-column: 2 / 4;
+  }
+
+  .team-recent-score {
+    align-items: start;
+    grid-template-columns: 26px 66px minmax(0, 1fr);
+  }
+
+  .team-roster-staff-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .team-roster-desktop {
+    display: none;
+  }
+
+  .team-roster-mobile {
+    border-top: 1px solid var(--rule-strong);
+    display: grid;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .team-roster-mobile li {
+    align-items: center;
+    border-bottom: 1px solid var(--rule);
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 52px minmax(0, 1fr);
+    padding: 13px 0;
+  }
+
+  .team-roster-mobile li > span {
+    color: var(--sport-accent, var(--accent));
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 800;
+  }
+
+  .team-roster-mobile div {
+    display: grid;
+    gap: 3px;
+  }
+
+  .team-roster-mobile strong {
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.12;
+  }
+
+  .team-roster-mobile small {
+    color: var(--muted);
+    font-family: var(--font-ui);
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+}
+
+@media (max-width: 390px) {
+  .team-hub-tabs a {
+    padding-inline: 10px;
+  }
+
+  .team-hub-selector select {
+    max-width: 92px;
+  }
+
+  .team-roster-staff-list {
+    gap: 14px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -4256,5 +4873,175 @@ html[data-byline-theme="byline-modern"] .story-teaser-image img {
 
   .not-found h1 {
     font-size: 2.7rem;
+  }
+}
+
+/* Final cascade for team hubs; legacy sports rules above remain for landing/archive pages. */
+.team-hub-header {
+  height: clamp(340px, 38vw, 430px);
+  max-height: 430px;
+  min-height: 340px;
+}
+
+.team-hub-header-content {
+  align-content: end;
+  align-items: end;
+  gap: 22px;
+  padding: 32px;
+}
+
+.team-hub-mark {
+  height: 92px;
+  width: 92px;
+}
+
+.team-hub-navigation .team-hub-tabs {
+  align-self: auto;
+  background: transparent;
+  border-top: 0;
+  bottom: auto;
+  display: flex;
+  left: auto;
+  margin: 0;
+  overflow-x: auto;
+  position: static;
+  right: auto;
+}
+
+.team-hub-navigation .team-hub-selector {
+  border-left: 1px solid var(--rule);
+  border-right: 0;
+}
+
+.team-next-game {
+  align-items: center;
+  background: var(--ink);
+  border: 0;
+  color: #fff;
+  display: grid;
+  gap: 26px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 26px 28px;
+}
+
+.team-next-game > a {
+  border-bottom: 2px solid var(--sport-accent, #fff);
+  color: #fff;
+  justify-self: auto;
+  padding: 8px 0;
+  white-space: nowrap;
+}
+
+.team-recent-score {
+  align-items: center;
+  grid-template-columns: 32px 74px minmax(0, 1fr);
+}
+
+.team-roster-staff-list {
+  gap: 22px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .team-roster-staff-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .sports-archive-shell {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-top: 18px;
+  }
+
+  .sports-breadcrumbs .sports-breadcrumbs-mobile {
+    display: inline-flex;
+  }
+
+  .sports-breadcrumbs .sports-breadcrumbs-full {
+    display: none;
+  }
+
+  .team-hub-header {
+    height: clamp(320px, 50svh, 380px);
+    margin-left: calc(-1 * max(16px, env(safe-area-inset-left)));
+    margin-right: calc(-1 * max(16px, env(safe-area-inset-right)));
+    max-height: 380px;
+    min-height: 320px;
+  }
+
+  .team-hub-header-content {
+    align-items: end;
+    gap: 14px;
+    grid-template-columns: 64px minmax(0, 1fr);
+    padding: 22px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
+  }
+
+  .team-hub-mark {
+    height: 64px;
+    padding: 9px;
+    width: 64px;
+  }
+
+  .team-hub-title h1 {
+    font-size: clamp(2.25rem, 11vw, 3.35rem);
+    overflow-wrap: anywhere;
+  }
+
+  .team-hub-navigation {
+    margin-left: calc(-1 * max(16px, env(safe-area-inset-left)));
+    margin-right: calc(-1 * max(16px, env(safe-area-inset-right)));
+    position: sticky;
+    top: 0;
+  }
+
+  .team-hub-navigation .team-hub-tabs a {
+    padding: 14px 12px;
+  }
+
+  .team-hub-navigation .team-hub-selector {
+    padding: 6px max(8px, env(safe-area-inset-right)) 6px 8px;
+  }
+
+  .team-hub-navigation .team-hub-selector span {
+    display: none;
+  }
+
+  .team-hub-navigation .team-hub-selector select {
+    max-width: 108px;
+  }
+
+  .team-season-snapshot {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .team-next-game {
+    align-items: start;
+    gap: 16px;
+    grid-template-columns: 72px minmax(0, 1fr);
+    padding: 20px 18px;
+  }
+
+  .team-next-game > a {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .team-recent-score {
+    align-items: start;
+    grid-template-columns: 26px 66px minmax(0, 1fr);
+  }
+
+  .team-roster-staff-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .team-roster-desktop {
+    display: none;
+  }
+
+  .team-roster-mobile {
+    display: grid;
   }
 }

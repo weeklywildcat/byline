@@ -21,11 +21,27 @@ function byline_capabilities(): array
     ];
 }
 
-function byline_add_administrator_capabilities(): void
+function byline_administrator_capabilities_ready(): bool
 {
     $role = get_role('administrator');
     if (!$role instanceof WP_Role) {
-        return;
+        return false;
+    }
+
+    foreach (byline_capabilities() as $capability) {
+        if (!$role->has_cap($capability)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function byline_add_administrator_capabilities(): bool
+{
+    $role = get_role('administrator');
+    if (!$role instanceof WP_Role) {
+        return false;
     }
 
     foreach (byline_capabilities() as $capability) {
@@ -38,7 +54,13 @@ function byline_add_administrator_capabilities(): void
         byline_poll_add_role_capabilities();
     }
 
+    // The upgrade coordinator writes the marker only after this function has
+    // completed and verified the step. Keeping the mutation here is retained
+    // for activation/backward-compatible callers, but a missing role must not
+    // make a failed capability install look complete.
     update_option(BYLINE_CAPABILITIES_VERSION_OPTION, BYLINE_CAPABILITIES_VERSION, false);
+
+    return true;
 }
 
 function byline_maybe_upgrade_capabilities(): void
@@ -47,5 +69,3 @@ function byline_maybe_upgrade_capabilities(): void
         byline_add_administrator_capabilities();
     }
 }
-add_action('admin_init', 'byline_maybe_upgrade_capabilities');
-

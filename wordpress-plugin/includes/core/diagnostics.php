@@ -6,12 +6,21 @@ if (!defined('ABSPATH')) {
 
 function byline_public_manifest_diagnostic(): array
 {
-    $url = rtrim(byline_get_publication_config()['urls']['publicSite'], '/') . '/_byline/manifest.json';
-    $response = wp_safe_remote_get($url, [
+    $public_site = (string) (byline_get_publication_config()['urls']['publicSite'] ?? '');
+    if ($public_site === '' || !function_exists('wp_safe_remote_get')) {
+        return ['reachable' => false, 'status' => 'Not configured'];
+    }
+
+    $url = rtrim($public_site, '/') . '/_byline/manifest.json';
+    try {
+        $response = wp_safe_remote_get($url, [
         'timeout' => 3,
         'redirection' => 2,
         'headers' => ['User-Agent' => 'Byline diagnostics'],
-    ]);
+        ]);
+    } catch (Throwable $exception) {
+        return ['reachable' => false, 'status' => 'Request failed'];
+    }
     if (is_wp_error($response)) {
         return ['reachable' => false, 'status' => 'Request failed'];
     }
@@ -45,6 +54,118 @@ function byline_design_migration_count(): int
     return $count;
 }
 
+/**
+ * Return only non-secret operational facts. This is deliberately separate
+ * from the public publication document because integrations can contain
+ * credentials that must never be copied into support output.
+ */
+function byline_diagnostics_safe_runtime(): array
+{
+    $table_presence = [];
+    if (function_exists('byline_poll_votes_table_exists')) {
+        $table_presence['pollVotes'] = byline_poll_votes_table_exists();
+    }
+
+    $asset_presence = function_exists('byline_expected_admin_asset_presence')
+        ? byline_expected_admin_asset_presence()
+        : [];
+
+    $route_presence = [];
+    if (function_exists('byline_health_registered_route')) {
+        foreach ([
+            'protocol' => '/byline/v1/capabilities/protocol',
+            'publication' => '/byline/v1/publication',
+            'designs' => '/byline/v1/designs',
+            'diagnostics' => '/byline/v1/admin/diagnostics',
+            'health' => '/byline/v1/admin/health',
+        ] as $name => $route) {
+            $registered = byline_health_registered_route($route);
+            $route_presence[$name] = $registered === null ? null : $registered;
+        }
+    }
+
+    $cron_available = function_exists('wp_schedule_single_event') && function_exists('wp_next_scheduled')
+        && !(defined('DISABLE_WP_CRON') && DISABLE_WP_CRON);
+
+    return [
+        'siteUrl' => function_exists('site_url') ? site_url('/') : '',
+        'homeUrl' => function_exists('home_url') ? home_url('/') : '',
+        'phpVersion' => PHP_VERSION,
+        'assetPresence' => $asset_presence,
+        'tablePresence' => $table_presence,
+        'routePresence' => $route_presence,
+        'cronAvailable' => $cron_available,
+        'schemaVersions' => [
+            'core' => defined('BYLINE_CORE_SCHEMA_VERSION_OPTION') ? (int) get_option(BYLINE_CORE_SCHEMA_VERSION_OPTION, 0) : null,
+            'capabilities' => defined('BYLINE_CAPABILITIES_VERSION_OPTION') ? (int) get_option(BYLINE_CAPABILITIES_VERSION_OPTION, 0) : null,
+            'polls' => defined('BYLINE_POLL_SCHEMA_VERSION_OPTION') ? (int) get_option(BYLINE_POLL_SCHEMA_VERSION_OPTION, 0) : null,
+            'sports' => defined('BYLINE_SPORTS_TEAMS_MIGRATION_OPTION') ? (int) get_option(BYLINE_SPORTS_TEAMS_MIGRATION_OPTION, 0) : null,
+            'pages' => defined('BYLINE_WEEKLY_PAGE_MIGRATION_OPTION') ? (int) get_option(BYLINE_WEEKLY_PAGE_MIGRATION_OPTION, 0) : null,
+        ],
+    ];
+}
+
+/**
+ * Stable, copyable support text. Keep field ordering explicit so two reports
+ * for the same site state are comparable in an issue or support thread.
+ */
+function byline_diagnostics_support_report(array $diagnostics): string
+{
+    $lines = [
+        'Byline diagnostics',
+        '==================',
+        'Byline version: ' . (string) ($diagnostics['pluginVersion'] ?? 'unknown'),
+        'WordPress version: ' . (string) ($diagnostics['wordpressVersion'] ?? 'unknown'),
+        'PHP version: ' . (string) ($diagnostics['phpVersion'] ?? 'unknown'),
+        'Site URL: ' . (string) ($diagnostics['siteUrl'] ?? ''),
+        'Home URL: ' . (string) ($diagnostics['homeUrl'] ?? ''),
+        'Active theme: ' . (string) (($diagnostics['theme']['id'] ?? '') ?: 'unknown'),
+        'Enabled modules: ' . (implode(', ', (array) ($diagnostics['enabledModules'] ?? [])) ?: 'None'),
+        '',
+        'Schema versions:',
+    ];
+
+    foreach ((array) ($diagnostics['schemaVersions'] ?? []) as $name => $version) {
+        $lines[] = '  ' . $name . ': ' . ($version === null ? 'unknown' : (string) $version);
+    }
+
+    $lines[] = '';
+    $lines[] = 'Runtime availability:';
+    foreach ((array) ($diagnostics['assetPresence'] ?? []) as $name => $present) {
+        $lines[] = '  asset.' . $name . ': ' . ($present ? 'present' : 'missing');
+    }
+    foreach ((array) ($diagnostics['tablePresence'] ?? []) as $name => $present) {
+        $lines[] = '  table.' . $name . ': ' . ($present ? 'present' : 'missing');
+    }
+    foreach ((array) ($diagnostics['routePresence'] ?? []) as $name => $present) {
+        $lines[] = '  route.' . $name . ': ' . ($present === null ? 'unknown' : ($present ? 'registered' : 'missing'));
+    }
+    $lines[] = '  cron: ' . (!empty($diagnostics['cronAvailable']) ? 'available' : 'unavailable');
+
+    $lines[] = '';
+    $lines[] = 'Health checks:';
+    foreach ((array) ($diagnostics['healthChecks'] ?? []) as $check) {
+        if (!is_array($check)) {
+            continue;
+        }
+        $lines[] = '  [' . strtoupper((string) ($check['status'] ?? 'unknown')) . '] ' . (string) ($check['label'] ?? 'Byline check') . ': ' . (string) ($check['summary'] ?? '');
+    }
+
+    if (is_array($diagnostics['sports'] ?? null)) {
+        $sports = $diagnostics['sports'];
+        $counts = is_array($sports['counts'] ?? null) ? $sports['counts'] : [];
+        $lines[] = '  [' . strtoupper((string) ($sports['status'] ?? 'unknown')) . '] Sports integrity: ' . (string) ($sports['currentSeason'] ?? 'unknown') . ' · ' . (int) ($counts['error'] ?? 0) . ' errors, ' . (int) ($counts['recommended'] ?? 0) . ' recommendations';
+    }
+
+    $lines[] = '';
+    $lines[] = 'External public manifest: ' . (string) (($diagnostics['publicManifest']['status'] ?? 'Unknown'));
+    $lines[] = 'Last deployment: ' . (string) (($diagnostics['deployment']['lastStatus'] ?? 'Unknown'));
+    $lines[] = '';
+    $lines[] = 'This report intentionally excludes passwords, tokens, secrets, hook URLs, auth headers, and private integration configuration.';
+
+    return implode("\n", $lines);
+}
+
 function byline_diagnostics_payload(): array
 {
     $publication = byline_get_publication_config();
@@ -59,21 +180,43 @@ function byline_diagnostics_payload(): array
             'pending' => defined('WWH_CLOUDFLARE_DEPLOY_EVENT') && wp_next_scheduled(WWH_CLOUDFLARE_DEPLOY_EVENT) ? true : false,
         ];
 
-    return [
+    $runtime = byline_diagnostics_safe_runtime();
+    $health_checks = function_exists('byline_get_health_checks') ? byline_get_health_checks() : [];
+    $rest_health = $runtime['routePresence'] === []
+        || (!in_array(false, array_values($runtime['routePresence']), true)
+            && !in_array(null, array_values($runtime['routePresence']), true));
+    $payload = [
         'pluginVersion' => BYLINE_PLUGIN_VERSION,
         'protocolVersion' => BYLINE_PROTOCOL_VERSION,
         'publicationSchemaVersion' => BYLINE_PUBLICATION_SCHEMA_VERSION,
         'designSchemaVersion' => BYLINE_DESIGN_SCHEMA_VERSION,
         'themeApiVersion' => BYLINE_THEME_API_VERSION,
         'wordpressVersion' => get_bloginfo('version'),
+        'phpVersion' => PHP_VERSION,
+        'siteUrl' => $runtime['siteUrl'],
+        'homeUrl' => $runtime['homeUrl'],
         'theme' => ['id' => $publication['appearance']['theme'], 'version' => 1, 'compatible' => true],
         'enabledModules' => array_keys(array_filter($publication['features'])),
         'deployment' => $deployment,
         'publicManifest' => byline_public_manifest_diagnostic(),
-        'restHealth' => true,
+        'restHealth' => $rest_health,
         'designsNeedingMigration' => byline_design_migration_count(),
         'polls' => function_exists('byline_poll_diagnostics') ? byline_poll_diagnostics() : null,
+        'schemaVersions' => $runtime['schemaVersions'],
+        'assetPresence' => $runtime['assetPresence'],
+        'tablePresence' => $runtime['tablePresence'],
+        'routePresence' => $runtime['routePresence'],
+        'cronAvailable' => $runtime['cronAvailable'],
+        'healthChecks' => $health_checks,
+        'sports' => function_exists('byline_sports_health') ? byline_sports_health() : null,
     ];
+
+    $payload['healthSummary'] = function_exists('byline_health_summary')
+        ? byline_health_summary($health_checks)
+        : ['status' => 'unknown', 'good' => 0, 'recommended' => 0, 'critical' => 0];
+    $payload['supportReport'] = byline_diagnostics_support_report($payload);
+
+    return $payload;
 }
 
 function byline_register_diagnostics_route(): void

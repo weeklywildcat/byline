@@ -132,10 +132,10 @@ function byline_sports_team_seed_normalized(): array
     return $teams;
 }
 
-function byline_migrate_sports_teams(): void
+function byline_migrate_sports_teams(): bool
 {
     if (!function_exists('get_option') || !function_exists('update_option')) {
-        return;
+        return false;
     }
 
     $stored = get_option(BYLINE_SPORTS_TEAMS_OPTION, null);
@@ -149,8 +149,9 @@ function byline_migrate_sports_teams(): void
     if ((int) get_option(BYLINE_SPORTS_TEAMS_MIGRATION_OPTION, 0) < BYLINE_SPORTS_TEAMS_MIGRATION_VERSION) {
         update_option(BYLINE_SPORTS_TEAMS_MIGRATION_OPTION, BYLINE_SPORTS_TEAMS_MIGRATION_VERSION, false);
     }
+
+    return (int) get_option(BYLINE_SPORTS_TEAMS_MIGRATION_OPTION, 0) >= BYLINE_SPORTS_TEAMS_MIGRATION_VERSION;
 }
-add_action('init', 'byline_migrate_sports_teams', 2);
 
 function byline_get_sports_teams(): array
 {
@@ -164,6 +165,96 @@ function byline_get_sports_teams(): array
     }
 
     return is_array($stored) ? byline_normalize_sports_teams($stored) : [];
+}
+
+/**
+ * Return one coherent team entity for callers. Presentation values continue
+ * to read from the legacy settings option when it exists, but callers never
+ * need to know that identity and media have different compatibility stores.
+ */
+function byline_get_sports_team(string $team_key): ?array
+{
+    $team_key = byline_sanitize_team_key($team_key);
+    $teams = byline_get_sports_teams();
+
+    if ($team_key === '' || !isset($teams[$team_key])) {
+        return null;
+    }
+
+    $team = $teams[$team_key];
+    $settings = function_exists('wwh_sports_team_settings') ? wwh_sports_team_settings() : [];
+    $presentation = is_array($settings[$team_key] ?? null) ? $settings[$team_key] : [];
+    $header_id = function_exists('absint') ? absint($presentation['headerImageId'] ?? 0) : abs((int) ($presentation['headerImageId'] ?? 0));
+    $logo_id = function_exists('absint') ? absint($presentation['logoId'] ?? 0) : abs((int) ($presentation['logoId'] ?? 0));
+    $accent = function_exists('sanitize_hex_color')
+        ? (sanitize_hex_color((string) ($presentation['accentColor'] ?? '')) ?: '')
+        : (string) ($presentation['accentColor'] ?? '');
+
+    $team['headerImageId'] = $header_id;
+    $team['logoId'] = $logo_id;
+    $team['headerFocalPoint'] = [
+        'x' => function_exists('wwh_normalize_focal_coordinate') ? wwh_normalize_focal_coordinate($presentation['headerFocalX'] ?? 50) : 50.0,
+        'y' => function_exists('wwh_normalize_focal_coordinate') ? wwh_normalize_focal_coordinate($presentation['headerFocalY'] ?? 50) : 50.0,
+    ];
+    $team['accentColor'] = $accent;
+
+    if (function_exists('wwh_media_image')) {
+        $team['headerImage'] = wwh_media_image($header_id, 'large');
+        $team['logo'] = wwh_media_image($logo_id, 'medium');
+    }
+
+    return $team;
+}
+
+function byline_get_sports_team_by_slug(string $slug, bool $include_inactive = true): ?array
+{
+    $normalized_slug = sanitize_title($slug);
+
+    if ($normalized_slug === '') {
+        return null;
+    }
+
+    foreach (byline_get_sports_teams() as $team_key => $team) {
+        if (!$include_inactive && empty($team['active'])) {
+            continue;
+        }
+
+        if (sanitize_title((string) ($team['slug'] ?? '')) === $normalized_slug) {
+            return byline_get_sports_team($team_key);
+        }
+    }
+
+    return null;
+}
+
+function byline_sports_team_slug_conflicts(array $teams): array
+{
+    $slugs = [];
+
+    foreach (byline_normalize_sports_teams($teams) as $team_key => $team) {
+        $slug = sanitize_title((string) ($team['slug'] ?? ''));
+        if ($slug !== '') {
+            $slugs[$slug][] = $team_key;
+        }
+    }
+
+    return array_filter($slugs, static fn(array $keys): bool => count($keys) > 1);
+}
+
+function byline_validate_sports_teams(array $teams): array
+{
+    $errors = [];
+    $normalized = byline_normalize_sports_teams($teams);
+
+    if (count($normalized) !== count($teams)) {
+        $errors[] = 'Every sports team requires a unique stable key, sport, and display name.';
+    }
+
+    foreach (byline_sports_team_slug_conflicts($teams) as $slug => $keys) {
+        $errors[] = sprintf('The public slug "%s" is used by multiple teams: %s.', $slug, implode(', ', $keys));
+    }
+
+    return array_values(array_unique($errors));
 }
 
 /**
@@ -216,6 +307,11 @@ function byline_rest_update_sports_teams(WP_REST_Request $request)
         if (!is_array($team) || byline_sanitize_sports_team($team) === []) {
             return new WP_Error('byline_invalid_team', 'Every team requires a stable key, sport, and display name.', ['status' => 400]);
         }
+    }
+
+    $validation_errors = byline_validate_sports_teams($teams);
+    if ($validation_errors !== []) {
+        return new WP_Error('byline_invalid_team_collection', implode(' ', $validation_errors), ['status' => 400, 'errors' => $validation_errors]);
     }
 
     $updated = byline_replace_sports_teams($teams);

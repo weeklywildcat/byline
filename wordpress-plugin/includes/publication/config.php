@@ -425,19 +425,163 @@ function byline_seed_publication_config(): void
 {
     if (get_option(BYLINE_PUBLICATION_OPTION, null) === null) {
         add_option(BYLINE_PUBLICATION_OPTION, byline_default_publication_config(), '', false);
+    }
+
+    // Older installations may have the configuration but not its revision
+    // marker. Adding the missing marker is safe; an existing revision is never
+    // reset during an upgrade.
+    if (get_option(BYLINE_PUBLICATION_REVISION_OPTION, null) === null) {
         add_option(BYLINE_PUBLICATION_REVISION_OPTION, 1, '', false);
     }
+}
+
+function byline_publication_validation_error(string $field, string $message)
+{
+    return new WP_Error(
+        'byline_invalid_publication_config',
+        $message,
+        ['status' => 400, 'field' => $field]
+    );
+}
+
+function byline_publication_is_http_url($value): bool
+{
+    if (!is_string($value) || trim($value) === '') {
+        return false;
+    }
+
+    $url = esc_url_raw(trim($value), ['http', 'https']);
+    if (!is_string($url) || $url === '' || !function_exists('wp_parse_url')) {
+        return false;
+    }
+
+    return in_array(strtolower((string) wp_parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)
+        && (string) wp_parse_url($url, PHP_URL_HOST) !== '';
+}
+
+/**
+ * Validate the parts of the publication document that can otherwise fail much
+ * later in a static build. Normalization remains the final safety boundary,
+ * but editors now receive a field-oriented REST error instead of a silently
+ * substituted default.
+ */
+function byline_validate_publication_config($input)
+{
+    if (!is_array($input)) {
+        return byline_publication_validation_error('publication', __('Publication configuration must be an object.', 'weekly-wildcat-headless'));
+    }
+
+    if ((int) ($input['schemaVersion'] ?? 0) !== BYLINE_PUBLICATION_SCHEMA_VERSION) {
+        return byline_publication_validation_error('schemaVersion', __('Publication configuration must use the supported Byline schema version.', 'weekly-wildcat-headless'));
+    }
+
+    $identity = is_array($input['identity'] ?? null) ? $input['identity'] : [];
+    foreach (['name' => 'Publication name', 'shortName' => 'Short name', 'description' => 'Description'] as $key => $label) {
+        if (!is_string($identity[$key] ?? null) || trim($identity[$key]) === '') {
+            return byline_publication_validation_error('identity.' . $key, sprintf(__('%s is required.', 'weekly-wildcat-headless'), $label));
+        }
+        $maximum = $key === 'description' ? 500 : ($key === 'name' ? 120 : 80);
+        if (strlen($identity[$key]) > $maximum) {
+            return byline_publication_validation_error('identity.' . $key, sprintf(__('%s must be %d characters or fewer.', 'weekly-wildcat-headless'), $label, $maximum));
+        }
+    }
+
+    $urls = is_array($input['urls'] ?? null) ? $input['urls'] : [];
+    foreach (['publicSite' => 'Public URL', 'cms' => 'CMS URL'] as $key => $label) {
+        if (!byline_publication_is_http_url($urls[$key] ?? null)) {
+            return byline_publication_validation_error('urls.' . $key, sprintf(__('%s must be a valid http or https URL.', 'weekly-wildcat-headless'), $label));
+        }
+    }
+
+    $appearance = is_array($input['appearance'] ?? null) ? $input['appearance'] : [];
+    $theme = is_string($appearance['theme'] ?? null) ? sanitize_key($appearance['theme']) : '';
+    if (!in_array($theme, byline_publication_theme_ids(), true)) {
+        return byline_publication_validation_error('appearance.theme', __('Choose one of the installed Byline themes.', 'weekly-wildcat-headless'));
+    }
+
+    $token_overrides = is_array($appearance['tokenOverrides'] ?? null) ? $appearance['tokenOverrides'] : [];
+    foreach (['accent', 'link', 'background', 'surface', 'text'] as $token) {
+        if (array_key_exists($token, $token_overrides)
+            && $token_overrides[$token] !== ''
+            && (!is_string($token_overrides[$token]) || preg_match('/^#[0-9a-f]{6}$/i', $token_overrides[$token]) !== 1)) {
+            return byline_publication_validation_error('appearance.tokenOverrides.' . $token, __('Color overrides must use six-digit hex values such as #008b95.', 'weekly-wildcat-headless'));
+        }
+    }
+
+    $navigation = is_array($input['navigation'] ?? null) ? $input['navigation'] : [];
+    $navigation_keys = [];
+    foreach ($navigation as $index => $item) {
+        if (!is_array($item)) {
+            return byline_publication_validation_error('navigation.' . $index, __('Each navigation item must be an object.', 'weekly-wildcat-headless'));
+        }
+        if (!is_string($item['label'] ?? null) || trim($item['label']) === '') {
+            return byline_publication_validation_error('navigation.' . $index . '.label', __('Navigation labels cannot be empty.', 'weekly-wildcat-headless'));
+        }
+        if (strlen($item['label']) > 80) {
+            return byline_publication_validation_error('navigation.' . $index . '.label', __('Navigation labels must be 80 characters or fewer.', 'weekly-wildcat-headless'));
+        }
+        if (byline_sanitize_public_url($item['url'] ?? null) === '') {
+            return byline_publication_validation_error('navigation.' . $index . '.url', __('Navigation URLs must be a valid site path or http(s) URL.', 'weekly-wildcat-headless'));
+        }
+        $locations = is_array($item['locations'] ?? null) ? array_values(array_intersect($item['locations'], ['header', 'footer'])) : [];
+        if ($locations === []) {
+            return byline_publication_validation_error('navigation.' . $index . '.locations', __('Choose a header or footer placement for each navigation item.', 'weekly-wildcat-headless'));
+        }
+        $navigation_key = strtolower(trim((string) $item['label'])) . '|' . byline_sanitize_public_url($item['url']) . '|' . implode(',', $locations);
+        if (in_array($navigation_key, $navigation_keys, true)) {
+            return byline_publication_validation_error('navigation.' . $index, __('Navigation items must not be duplicated.', 'weekly-wildcat-headless'));
+        }
+        $navigation_keys[] = $navigation_key;
+    }
+
+    $sections = is_array($input['sections'] ?? null) ? $input['sections'] : [];
+    $section_slugs = [];
+    foreach ($sections as $index => $section) {
+        if (!is_array($section)) {
+            return byline_publication_validation_error('sections.' . $index, __('Each section must be an object.', 'weekly-wildcat-headless'));
+        }
+        if (!is_string($section['name'] ?? null) || trim($section['name']) === '') {
+            return byline_publication_validation_error('sections.' . $index . '.name', __('Section names cannot be empty.', 'weekly-wildcat-headless'));
+        }
+        if (strlen($section['name']) > 80) {
+            return byline_publication_validation_error('sections.' . $index . '.name', __('Section names must be 80 characters or fewer.', 'weekly-wildcat-headless'));
+        }
+        if (!is_string($section['slug'] ?? null) || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $section['slug']) !== 1) {
+            return byline_publication_validation_error('sections.' . $index . '.slug', __('Section slugs must use lowercase letters, numbers, and hyphens.', 'weekly-wildcat-headless'));
+        }
+        if (in_array($section['slug'], $section_slugs, true)) {
+            return byline_publication_validation_error('sections.' . $index . '.slug', __('Section slugs must be unique.', 'weekly-wildcat-headless'));
+        }
+        $section_slugs[] = $section['slug'];
+    }
+
+    $social = is_array($input['social'] ?? null) ? $input['social'] : [];
+    foreach ($social as $index => $item) {
+        if (!is_array($item)
+            || !is_string($item['service'] ?? null)
+            || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', sanitize_key($item['service'])) !== 1) {
+            return byline_publication_validation_error('social.' . $index . '.service', __('Choose a supported social service name.', 'weekly-wildcat-headless'));
+        }
+        if (!is_string($item['label'] ?? null) || trim($item['label']) === '') {
+            return byline_publication_validation_error('social.' . $index . '.label', __('Social link labels cannot be empty.', 'weekly-wildcat-headless'));
+        }
+        if (strlen($item['label']) > 80) {
+            return byline_publication_validation_error('social.' . $index . '.label', __('Social link labels must be 80 characters or fewer.', 'weekly-wildcat-headless'));
+        }
+        if (!byline_publication_is_http_url($item['url'] ?? null)) {
+            return byline_publication_validation_error('social.' . $index . '.url', __('Social links must be valid http or https URLs.', 'weekly-wildcat-headless'));
+        }
+    }
+
+    return true;
 }
 
 function byline_update_publication_config(WP_REST_Request $request)
 {
     $input = $request->get_json_params();
-    if (!is_array($input) || (int) ($input['schemaVersion'] ?? 0) !== BYLINE_PUBLICATION_SCHEMA_VERSION) {
-        return new WP_Error(
-            'byline_invalid_publication_schema',
-            __('Publication configuration must use the supported Byline schema version.', 'weekly-wildcat-headless'),
-            ['status' => 400]
-        );
+    $validation = byline_validate_publication_config($input);
+    if ($validation instanceof WP_Error) {
+        return $validation;
     }
 
     $normalized = byline_normalize_publication_config($input);
@@ -463,4 +607,3 @@ function byline_register_publication_routes(): void
     ]);
 }
 add_action('rest_api_init', 'byline_register_publication_routes');
-add_action('admin_init', 'byline_seed_publication_config');

@@ -248,6 +248,7 @@ function byline_admin_native_urls(): array
         'polls' => byline_admin_polls_url(),
         'legacyPolls' => byline_admin_page_url(BYLINE_ADMIN_POLLS_PAGE),
         'games' => admin_url(byline_sports_menu_parent()),
+        'sportsOverview' => admin_url(byline_sports_menu_parent() . '&page=wwh-sports-overview'),
         'sportsImport' => admin_url(byline_sports_menu_parent() . '&page=wwh-sports-import'),
         'sportsExport' => admin_url(byline_sports_menu_parent() . '&page=wwh-sports-export'),
         'rosters' => admin_url('edit.php?post_type=' . WWH_SPORTS_ROSTER_POST_TYPE),
@@ -405,6 +406,7 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         'restPath' => '/' . BYLINE_REST_NAMESPACE . '/capabilities/protocol',
         'publicationPath' => '/' . BYLINE_REST_NAMESPACE . '/publication',
         'diagnosticsPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/diagnostics',
+        'healthPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/health',
         'deploymentPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/deployment',
         'discordPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/discord',
         'nonce' => wp_create_nonce('wp_rest'),
@@ -454,6 +456,7 @@ function byline_admin_config_pages(): array
 function byline_sports_utility_pages(): array
 {
     return [
+        'wwh-sports-overview',
         'wwh-sports-import',
         'wwh-sports-export',
         'wwh-sports-roster-import',

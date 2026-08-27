@@ -57,6 +57,51 @@
     margin-right: 8px;
 }
 
+.wwh-roster-staff-rows {
+    display: grid;
+    gap: 10px;
+}
+
+.wwh-roster-staff-row {
+    align-items: center;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: 168px minmax(160px, 1fr) minmax(160px, 1fr) auto;
+    padding: 12px;
+}
+
+.wwh-roster-staff-row label span {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.wwh-roster-staff-row input[type="text"] {
+    width: 100%;
+}
+
+.wwh-roster-staff-photo {
+    align-items: center;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 52px minmax(0, 1fr);
+}
+
+.wwh-roster-staff-preview {
+    aspect-ratio: 4 / 5;
+    background: #f0f0f1;
+    object-fit: cover;
+    width: 52px;
+}
+
+.wwh-roster-staff-photo > div {
+    display: grid;
+    gap: 5px;
+    justify-items: start;
+}
+
 .wwh-roster-import-preview {
     margin: 14px 0;
     max-width: 780px;
@@ -73,5 +118,14 @@
 @media (max-width: 782px) {
     .wwh-roster-fields {
         grid-template-columns: 1fr;
+    }
+
+    .wwh-roster-staff-row {
+        align-items: stretch;
+        grid-template-columns: 1fr;
+    }
+
+    .wwh-roster-staff-row .wwh-roster-row-actions {
+        width: auto;
     }
 }

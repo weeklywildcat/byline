@@ -23,7 +23,7 @@ export default async function SportsPage() {
   const sportsCoverage = getSportsCoverage(visiblePosts).slice(0, 6);
   const upcomingGames = games.filter((game) => game.status === "upcoming").sort(sortGamesAscending).slice(0, 5);
   const recentScores = games
-    .filter((game) => game.status === "final" && game.wildcatsScore !== null && game.opponentScore !== null)
+    .filter((game) => ["final", "forfeit", "tie"].includes(game.status))
     .sort(sortGamesDescending)
     .slice(0, 5);
   const breadcrumbSchema = getBreadcrumbSchema([

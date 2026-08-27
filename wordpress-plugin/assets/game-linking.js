@@ -36,7 +36,7 @@
       return "";
     }
 
-    return [game.display?.matchup || game.title, game.display?.date, game.display?.sportLevel || game.sportLabel]
+    return [game.team?.displayName || game.sportLabel || game.sportKey, game.season, game.display?.date, game.display?.status || game.status, game.display?.score]
       .filter(Boolean)
       .join(" · ");
   }
@@ -48,8 +48,8 @@
       "div",
       { className: "wwh-game-picker-preview" },
       el("strong", null, game.display?.matchup || game.title || __("Selected game", "weekly-wildcat-headless")),
-      el("span", null, [game.display?.sportLevel || game.sportLabel, status].filter(Boolean).join(" · ")),
-      game.display?.date ? el("span", null, game.display.date) : null,
+      el("span", null, [game.team?.displayName || game.sportLabel || game.sportKey, game.season].filter(Boolean).join(" · ")),
+      el("span", null, [game.display?.date, status, game.display?.score].filter(Boolean).join(" · ")),
       game.display?.location ? el("span", null, game.display.location) : null
     );
   }

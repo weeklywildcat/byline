@@ -158,6 +158,18 @@ function byline_rest_update_deployment(WP_REST_Request $request)
     if (!isset(byline_deployment_providers()[$provider])) {
         return new WP_Error('byline_unknown_deployment_provider', 'Select an installed deployment provider.', ['status' => 400]);
     }
+
+    $next_hook_url = null;
+    if (empty($payload['clearHook']) && array_key_exists('hookUrl', $payload) && trim((string) $payload['hookUrl']) !== '') {
+        $next_hook_url = byline_validate_deployment_hook_url($payload['hookUrl']);
+        if ($next_hook_url === '') {
+            return new WP_Error('byline_invalid_deployment_hook', 'Enter a valid HTTPS deploy-hook URL.', ['status' => 400]);
+        }
+    }
+
+    // Validate the complete request before changing the provider or clearing
+    // a previously working hook. An invalid edit must never partially replace
+    // good deployment configuration.
     update_option(BYLINE_DEPLOYMENT_PROVIDER_OPTION, $provider, false);
 
     if (!empty($payload['clearHook'])) {
@@ -165,12 +177,8 @@ function byline_rest_update_deployment(WP_REST_Request $request)
         if (defined('WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION')) {
             update_option(WWH_CLOUDFLARE_DEPLOY_HOOK_OPTION, '', false);
         }
-    } elseif (array_key_exists('hookUrl', $payload) && trim((string) $payload['hookUrl']) !== '') {
-        $url = byline_validate_deployment_hook_url($payload['hookUrl']);
-        if ($url === '') {
-            return new WP_Error('byline_invalid_deployment_hook', 'Enter a valid HTTPS deploy-hook URL.', ['status' => 400]);
-        }
-        update_option(BYLINE_DEPLOYMENT_HOOK_OPTION, $url, false);
+    } elseif ($next_hook_url !== null) {
+        update_option(BYLINE_DEPLOYMENT_HOOK_OPTION, $next_hook_url, false);
     }
 
     return rest_ensure_response(byline_deployment_status());

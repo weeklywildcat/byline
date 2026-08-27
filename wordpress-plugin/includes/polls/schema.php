@@ -68,20 +68,33 @@ function byline_poll_votes_table_exists(): bool
     return (string) $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) === $table;
 }
 
-function byline_poll_install_schema(): void
+function byline_poll_install_schema(): bool
 {
     if (!function_exists('dbDelta')) {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     }
 
+    if (!function_exists('dbDelta')) {
+        return false;
+    }
+
     dbDelta(byline_poll_votes_table_sql());
+
+    // dbDelta can return without throwing when the database user cannot alter
+    // the table. Never advance the marker until the table is observable.
+    if (!byline_poll_votes_table_exists()) {
+        return false;
+    }
+
     update_option(BYLINE_POLL_SCHEMA_VERSION_OPTION, BYLINE_POLL_SCHEMA_VERSION, false);
+
+    return (int) get_option(BYLINE_POLL_SCHEMA_VERSION_OPTION, 0) >= BYLINE_POLL_SCHEMA_VERSION;
 }
 
 /**
- * Schema installation happens on activation and on the first admin request
- * after an upgrade. It deliberately never runs from a public poll request:
- * anonymous traffic must not be able to trigger DDL.
+ * Schema installation happens through the central upgrade coordinator on
+ * activation and admin_init. It deliberately never runs from a public poll
+ * request: anonymous traffic must not be able to trigger DDL.
  *
  * The stored version is the only thing checked, so a routine admin request costs
  * one option read rather than a SHOW TABLES. That also covers the cases
@@ -92,11 +105,7 @@ function byline_poll_install_schema(): void
  */
 function byline_poll_maybe_upgrade_schema(): void
 {
-    if ((int) get_option(BYLINE_POLL_SCHEMA_VERSION_OPTION, 0) >= BYLINE_POLL_SCHEMA_VERSION) {
-        return;
-    }
-
-    byline_poll_install_schema();
+    byline_poll_ensure_schema();
 }
 
 /**
@@ -119,7 +128,6 @@ function byline_poll_ensure_schema(): bool
 
     return byline_poll_votes_table_exists();
 }
-add_action('admin_init', 'byline_poll_maybe_upgrade_schema');
 
 /**
  * Operator-facing poll storage health.

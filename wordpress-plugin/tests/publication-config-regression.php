@@ -5,6 +5,21 @@ const BYLINE_REST_NAMESPACE = 'byline/v1';
 const BYLINE_MANAGE_CAPABILITY = 'manage_byline';
 const BYLINE_PUBLICATION_SCHEMA_VERSION = 1;
 
+class WP_Error
+{
+    private string $code;
+
+    public function __construct(string $code, string $message = '', array $data = [])
+    {
+        $this->code = $code;
+    }
+
+    public function get_error_code(): string
+    {
+        return $this->code;
+    }
+}
+
 require __DIR__ . '/../includes/core/compatibility.php';
 
 $registered_routes = [];
@@ -19,6 +34,11 @@ class WP_REST_Server
 
 function add_action(...$args): void
 {
+}
+
+function __($message, $domain = ''): string
+{
+    return (string) $message;
 }
 
 function register_rest_route(string $namespace, string $route, array $definition): void
@@ -158,6 +178,15 @@ if ($normalized['identity']['name'] !== 'North Star News'
     || array_key_exists('unknown', $normalized['features'])
     || array_key_exists('deployHookUrl', $normalized)) {
     fwrite(STDERR, "Publication normalization did not enforce the public schema.\n");
+    exit(1);
+}
+
+$invalid = $defaults;
+$invalid['urls']['publicSite'] = 'javascript:alert(1)';
+$invalid_result = byline_validate_publication_config($invalid);
+if (!$invalid_result instanceof WP_Error
+    || $invalid_result->get_error_code() !== 'byline_invalid_publication_config') {
+    fwrite(STDERR, "Invalid publication data did not return the stable validation error code.\n");
     exit(1);
 }
 
