@@ -52,10 +52,16 @@ export function LeadPackage({ package: resolved, pollSlot, calendarSlot, railLim
   const hasLatest = latest.stories.length > 0;
   const hasUtility = utility.poll || utility.calendar;
 
+  // The section carries an aria-label rather than aria-labelledby. The pre-Studio
+  // markup pointed at an id="lead-heading" that no element has ever had, which
+  // leaves the section with no accessible name at all -- a dangling reference is
+  // worse than none, because it also suppresses the fallback. There is no single
+  // visible heading to point at either: the package holds the lead, The Latest
+  // and the utility rail, so a literal name is the honest one.
   return (
     <section
       className={hasLatest ? "top-stories" : "top-stories top-stories-single"}
-      aria-labelledby="lead-heading"
+      aria-label="Top stories"
     >
       <div className="top-stories-layout" data-homepage-top-stories>
         {railLimiterSlot}
