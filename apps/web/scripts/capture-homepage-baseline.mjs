@@ -29,8 +29,29 @@ const packages = sections.map((tag) => ({
 
 // Headline text is the most human-readable proof that story selection and
 // ordering did not shift.
+// Collect the text nodes of a fragment by scanning rather than by pattern-
+// replacing tags away. A `replace(/<[^>]+>/g, "")` pass is not a sound way to
+// reduce markup to text -- it leaves anything that does not match the pattern
+// behind -- so the depth counter below is used instead.
+function textContent(fragment) {
+  let text = "";
+  let insideTag = false;
+
+  for (const character of fragment) {
+    if (character === "<") {
+      insideTag = true;
+    } else if (character === ">") {
+      insideTag = false;
+    } else if (!insideTag) {
+      text += character;
+    }
+  }
+
+  return text.replace(/\s+/g, " ").trim();
+}
+
 const headlines = [...html.matchAll(/<h[23][^>]*>(?:(?!<\/h[23]>).)*?<\/h[23]>/g)]
-  .map((match) => match[0].replace(/<[^>]+>/g, "").trim())
+  .map((match) => textContent(match[0]))
   .filter(Boolean);
 
 // Split the shell into top-level packages so stories can be attributed to the
