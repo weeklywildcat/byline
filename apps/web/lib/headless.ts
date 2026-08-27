@@ -10,7 +10,7 @@ const HEADLESS_FETCH_CACHE_KEY =
 
 type QueryValue = string | number | boolean | undefined | null;
 
-export type SportsGameStatus = "upcoming" | "final" | "postponed" | "canceled";
+export type SportsGameStatus = "upcoming" | "final" | "forfeit" | "tie" | "postponed" | "canceled";
 export type SchoolEventStatus = "scheduled" | "canceled";
 export type GameSite = "home" | "away" | "neutral";
 
@@ -25,6 +25,7 @@ export type HeadlessImage = {
 export type SportsTeamMedia = {
   id?: string;
   key: string;
+  teamKey?: string;
   sport: string;
   level: string;
   teamLabel: string;
@@ -35,6 +36,10 @@ export type SportsTeamMedia = {
   genderDivision?: string;
   slug?: string;
   active?: boolean;
+  currentSeason?: string;
+  seasons?: string[];
+  gamesCount?: number;
+  rosterCount?: number;
   headerImage: HeadlessImage;
   headerImageFocalPoint?: {
     x: number;
@@ -45,6 +50,7 @@ export type SportsTeamMedia = {
 };
 
 export type SportsRosterPlayer = {
+  id: string;
   name: string;
   number: string;
   position: string;
@@ -52,8 +58,11 @@ export type SportsRosterPlayer = {
 };
 
 export type SportsRosterStaffMember = {
+  id: string;
   name: string;
   role: string;
+  imageId: number;
+  image: HeadlessImage | null;
 };
 
 export type SportsRoster = {
@@ -62,6 +71,12 @@ export type SportsRoster = {
   season: string;
   team: {
     key: string;
+    teamKey?: string;
+    slug?: string;
+    displayName?: string;
+    shortName?: string;
+    scoreboardName?: string;
+    active?: boolean;
     sport: string;
     level: string;
     teamLabel: string;
@@ -69,6 +84,8 @@ export type SportsRoster = {
   };
   players: SportsRosterPlayer[];
   staff: SportsRosterStaffMember[];
+  teamSlug?: string;
+  status?: string;
 };
 
 export type SportsGame = {
@@ -76,6 +93,8 @@ export type SportsGame = {
   title: string;
   slug: string;
   sportKey: string;
+  teamKey?: string;
+  teamSlug?: string;
   sport: string;
   sportLabel: string;
   level: string;
@@ -96,6 +115,10 @@ export type SportsGame = {
   teamScore?: number | null;
   opponentScore: number | null;
   recapUrl: string;
+  recap?: {
+    url: string;
+    title: string;
+  } | null;
   notes: string;
   display: {
     matchup: string;
@@ -125,6 +148,7 @@ type SportsGameQuery = {
   limit?: number | "all";
   page?: number;
   sportKey?: string;
+  teamKey?: string;
   season?: string;
   year?: string | number;
 };
@@ -138,6 +162,7 @@ function normalizeSportsGameQuery(query: number | SportsGameQuery | undefined, d
     limit: query?.limit ?? defaultLimit,
     page: query?.page,
     sportKey: query?.sportKey,
+    teamKey: query?.teamKey,
     season: query?.season,
     year: query?.year
   };
@@ -215,14 +240,93 @@ const weeklyWildcatFixtureGame: SportsGame = {
   }
 };
 
+const weeklyWildcatFixtureTeams: SportsTeamMedia[] = [
+  {
+    id: "football-varsity",
+    key: "football-varsity",
+    teamKey: "football-varsity",
+    sport: "Football",
+    level: "Varsity",
+    teamLabel: "Football",
+    label: "Football - Varsity",
+    displayName: "Football - Varsity",
+    shortName: "Football",
+    scoreboardName: "Wildcats",
+    slug: "football-varsity",
+    active: true,
+    currentSeason: "2026-27",
+    seasons: ["2026-27"],
+    headerImage: { id: 0, url: "", alt: "", width: null, height: null },
+    logo: { id: 0, url: "", alt: "", width: null, height: null },
+    accentColor: "#8b1e2d"
+  },
+  {
+    id: "girls-soccer",
+    key: "girls-soccer",
+    teamKey: "girls-soccer",
+    sport: "Girls Soccer",
+    level: "Varsity",
+    genderDivision: "Girls",
+    teamLabel: "Girls Soccer",
+    label: "Girls Soccer",
+    displayName: "Girls Soccer",
+    shortName: "Girls Soccer",
+    scoreboardName: "Wildcats",
+    slug: "girls-soccer",
+    active: true,
+    currentSeason: "2026-27",
+    seasons: ["2026-27"],
+    headerImage: { id: 901, url: "/_wordpress-media/1b98507584cd2e0d-GirlsSoccerCelebration-1024x683.jpeg", alt: "Girls soccer players celebrate", width: 1024, height: 683 },
+    headerImageFocalPoint: { x: 48, y: 34 },
+    logo: { id: 902, url: "/_wordpress-media/a9427e486a41193a-NS-Soccer-Logo-300x300.png", alt: "Girls Soccer", width: 300, height: 300 },
+    accentColor: "#8b1e2d"
+  }
+];
+
+const weeklyWildcatFixtureRoster: SportsRoster = {
+  id: 903,
+  teamKey: "girls-soccer",
+  teamSlug: "girls-soccer",
+  season: "2026-27",
+  status: "publish",
+  team: {
+    key: "girls-soccer",
+    teamKey: "girls-soccer",
+    slug: "girls-soccer",
+    displayName: "Girls Soccer",
+    shortName: "Girls Soccer",
+    scoreboardName: "Wildcats",
+    active: true,
+    sport: "Girls Soccer",
+    level: "Varsity",
+    teamLabel: "Girls Soccer",
+    label: "Girls Soccer"
+  },
+  players: [
+    { id: "ath_fixture01", name: "Avery Smith", number: "12", position: "Goalkeeper", grade: "11th" },
+    { id: "ath_fixture02", name: "Jordan Lee", number: "4", position: "Midfielder", grade: "12th" }
+  ],
+  staff: [
+    { id: "staff_fixture01", name: "Alexandra Montgomery-Washington", role: "Head Coach", imageId: 904, image: { id: 904, url: "/_wordpress-media/26c97631a396129c-SyReannas-profile-photo-300x300.png", alt: "Alexandra Montgomery-Washington", width: 300, height: 300 } },
+    { id: "staff_fixture02", name: "Morgan Lee", role: "Assistant Coach — Goalkeepers and Defensive Development", imageId: 0, image: null },
+    { id: "staff_fixture03", name: "Taylor Brooks", role: "Student Manager", imageId: 0, image: null },
+    { id: "staff_fixture04", name: "Cameron Green", role: "Assistant Coach", imageId: 0, image: null },
+    { id: "staff_fixture05", name: "Riley James", role: "Athletic Trainer", imageId: 0, image: null },
+    { id: "staff_fixture06", name: "Parker Davis", role: "Student Manager", imageId: 0, image: null },
+    { id: "staff_fixture07", name: "Quinn Thomas", role: "Assistant Coach", imageId: 0, image: null },
+    { id: "staff_fixture08", name: "Emerson Clark", role: "Team Staff", imageId: 0, image: null }
+  ]
+};
+
 function weeklyWildcatHeadlessFixture<T>(path: string): T {
   if (path === "/sports-games/1") return weeklyWildcatFixtureGame as T;
   if (path === "/sports-games/facets") {
     return { years: ["2026"], sports: [{ label: "Football - Varsity", value: "football-varsity" }], summaries: {} } as T;
   }
   if (path.startsWith("/sports-games")) return [weeklyWildcatFixtureGame] as T;
-  if (path === "/sports-teams") return [] as T;
-  if (path === "/sports-rosters" || path === "/school-events") return [] as T;
+  if (path === "/sports-teams") return weeklyWildcatFixtureTeams as T;
+  if (path === "/sports-rosters") return [weeklyWildcatFixtureRoster] as T;
+  if (path === "/school-events") return [] as T;
   return [] as T;
 }
 
@@ -289,6 +393,7 @@ export function getSportsGames(query?: number | SportsGameQuery) {
     per_page: normalizedQuery.limit,
     page: normalizedQuery.page,
     sportKey: normalizedQuery.sportKey,
+    teamKey: normalizedQuery.teamKey,
     season: normalizedQuery.season,
     year: normalizedQuery.year
   });
@@ -371,13 +476,27 @@ export async function getAllSportsRosters() {
 export function getUpcomingSportsGames(query?: number | SportsGameQuery) {
   const normalizedQuery = normalizeSportsGameQuery(query, 10);
 
-  return headlessFetch<SportsGame[]>("/sports-games/upcoming", { per_page: normalizedQuery.limit, sportKey: normalizedQuery.sportKey });
+  return headlessFetch<SportsGame[]>("/sports-games/upcoming", {
+    per_page: normalizedQuery.limit,
+    page: normalizedQuery.page,
+    sportKey: normalizedQuery.sportKey,
+    teamKey: normalizedQuery.teamKey,
+    season: normalizedQuery.season,
+    year: normalizedQuery.year
+  });
 }
 
 export function getRecentSportsGames(query?: number | SportsGameQuery) {
   const normalizedQuery = normalizeSportsGameQuery(query, 10);
 
-  return headlessFetch<SportsGame[]>("/sports-games/recent", { per_page: normalizedQuery.limit, sportKey: normalizedQuery.sportKey });
+  return headlessFetch<SportsGame[]>("/sports-games/recent", {
+    per_page: normalizedQuery.limit,
+    page: normalizedQuery.page,
+    sportKey: normalizedQuery.sportKey,
+    teamKey: normalizedQuery.teamKey,
+    season: normalizedQuery.season,
+    year: normalizedQuery.year
+  });
 }
 
 export function getSchoolEvents(limit = 20) {

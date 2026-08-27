@@ -39,10 +39,12 @@ byline_test_assert($public->get_status() === 404, 'A public read on an uninstall
 byline_test_assert($byline_test_dbdelta_calls === 0, 'A public poll request must never run DDL.');
 byline_test_assert($wpdb->installed === false, 'A public poll request must not create the vote table.');
 
-// admin_init has not run, and must not be relied on.
+// The central upgrade coordinator owns admin_init in the full plugin bootstrap;
+// this poll module must not register a second DDL path of its own. WP-CLI
+// import/verify explicitly ensure storage before touching vote rows.
 byline_test_assert(
-    isset($byline_test_actions['admin_init']) && in_array('byline_poll_maybe_upgrade_schema', $byline_test_actions['admin_init'], true),
-    'The schema upgrade is still hooked to admin_init for normal web traffic.'
+    !isset($byline_test_actions['admin_init']) || !in_array('byline_poll_maybe_upgrade_schema', $byline_test_actions['admin_init'], true),
+    'The poll module must not own a second admin_init schema migration hook.'
 );
 
 $report = byline_poll_import_artifact($artifact);

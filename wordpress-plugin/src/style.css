@@ -48,6 +48,114 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.byline-loading-state {
+  align-items: center;
+  color: #646970;
+  display: flex;
+  gap: 10px;
+  min-height: 140px;
+  padding: 24px 0;
+}
+
+.byline-health-list,
+.byline-feature-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.byline-health-list li,
+.byline-feature-list li {
+  align-items: start;
+  display: flex;
+  gap: 10px;
+}
+
+.byline-health-list li > span:not(.byline-status-mark) {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.byline-health-list small {
+  color: #646970;
+  display: block;
+}
+
+.byline-health-list a {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.byline-status-mark {
+  align-items: center;
+  border-radius: 50%;
+  display: inline-flex;
+  flex: 0 0 20px;
+  font-size: 13px;
+  font-weight: 700;
+  height: 20px;
+  justify-content: center;
+  line-height: 1;
+  width: 20px;
+}
+
+.byline-status-good {
+  color: #008a20;
+}
+
+.byline-status-mark.byline-status-good {
+  background: #d7f0dc;
+}
+
+.byline-status-recommended {
+  color: #7a4d00;
+}
+
+.byline-status-mark.byline-status-recommended {
+  background: #f7e7b8;
+}
+
+.byline-status-critical {
+  color: #b32d2e;
+}
+
+.byline-status-mark.byline-status-critical {
+  background: #f6d6d6;
+}
+
+.byline-overview-status {
+  font-size: 18px;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.byline-field-error {
+  color: #b32d2e;
+  display: block;
+  font-weight: 600;
+}
+
+.byline-support-report {
+  box-sizing: border-box;
+  font-family: monospace;
+  max-width: 100%;
+  width: 100%;
+}
+
+.byline-support-report-label {
+  display: block;
+  font-weight: 600;
+  margin: 22px 0 8px;
+}
+
+.byline-breakable {
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
 .byline-checklist {
   display: grid;
   gap: 8px;
@@ -269,6 +377,17 @@
   .byline-settings-grid,
   .byline-toggle-grid {
     grid-template-columns: 1fr;
+  }
+
+  .byline-diagnostics-list div {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .byline-diagnostics-list dd {
+    margin-left: auto;
+    max-width: 100%;
   }
 }
 

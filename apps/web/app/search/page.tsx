@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { SearchPageClient, type SearchIndexItem } from "@/components/SearchPageClient";
 import { filterVisibleContentPosts, getPrimaryVisibleCategory, getPublicTopicTags } from "@/lib/content";
 import { formatDisplayDate, stripHtml } from "@/lib/format";
-import { getAllSportsGames } from "@/lib/headless";
+import { getAllSportsGames, getAllSportsRosters, getSportsTeams } from "@/lib/headless";
 import { buildPageMetadata } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import { buildTeams, getGameHref, getSeasonHref, getTeamHubHref } from "@/lib/sports";
@@ -35,14 +35,20 @@ function getSearchExcerpt(value: string) {
 }
 
 export default async function SearchPage() {
-  const [posts, games] = await Promise.all([
+  const [posts, games, rosters, teamRecords] = await Promise.all([
     getAllPosts(),
     publication.features.sports
       ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-games", getAllSportsGames, [])
+      : [],
+    publication.features.sports
+      ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-rosters", getAllSportsRosters, [])
+      : [],
+    publication.features.sports
+      ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-teams", getSportsTeams, [])
       : []
   ]);
   const visiblePosts = filterVisibleContentPosts(posts);
-  const teams = buildTeams(games);
+  const teams = buildTeams(games, rosters, teamRecords);
   const storyItems: SearchIndexItem[] = visiblePosts.map((post) => {
     const title = stripHtml(post.title.rendered);
     const excerpt = getSearchExcerpt(post.excerpt.rendered || post.content.rendered);

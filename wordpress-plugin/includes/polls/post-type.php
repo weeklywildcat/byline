@@ -122,7 +122,7 @@ function byline_poll_post_type_labels(): array
         'new_item' => __('New Poll', 'weekly-wildcat-headless'),
         'view_item' => __('View Poll', 'weekly-wildcat-headless'),
         'search_items' => __('Search Polls', 'weekly-wildcat-headless'),
-        'not_found' => __('No polls yet.', 'weekly-wildcat-headless'),
+        'not_found' => __('No polls yet. Create your first poll.', 'weekly-wildcat-headless'),
         'not_found_in_trash' => __('No polls in the trash.', 'weekly-wildcat-headless'),
         'all_items' => __('Polls', 'weekly-wildcat-headless'),
     ];

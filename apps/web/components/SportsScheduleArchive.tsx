@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { SectionHeader } from "@/components/SectionHeader";
 import type { SportsGame } from "@/lib/headless";
 import { getPublicationConfig } from "@/lib/publication";
+import { getGameSeason } from "@/lib/sports-season";
 
 type SportsScheduleArchiveProps = {
   apiBaseUrl?: string;
@@ -27,29 +28,6 @@ type ScheduleSummary = {
 };
 
 const SCHEDULE_PAGE_SIZE = 25;
-
-function getSeasonFromDate(startDate: string) {
-  const match = /^(\d{4})-(\d{2})-\d{2}T/.exec(startDate);
-
-  if (!match) {
-    return "";
-  }
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-
-  if (!Number.isInteger(year) || !Number.isInteger(month)) {
-    return "";
-  }
-
-  const startYear = month >= 7 ? year : year - 1;
-
-  return `${startYear}-${String(startYear + 1).slice(-2)}`;
-}
-
-function getSeason(game: SportsGame) {
-  return game.season || getSeasonFromDate(game.startDate);
-}
 
 function getSportLabel(game: SportsGame) {
   return game.sport || game.sportLabel || game.sportKey || "Sports";
@@ -153,10 +131,12 @@ function addGameToSummary(summary: ScheduleSummary, game: SportsGame) {
     summary.upcoming += 1;
   }
 
-  if (game.status === "final") {
+  if (game.status === "final" || game.status === "tie") {
     summary.finals += 1;
 
-    if (game.wildcatsScore !== null && game.opponentScore !== null) {
+    if (game.status === "tie") {
+      summary.ties += 1;
+    } else if (game.wildcatsScore !== null && game.opponentScore !== null) {
       if (game.wildcatsScore > game.opponentScore) {
         summary.wins += 1;
       } else if (game.wildcatsScore < game.opponentScore) {
@@ -174,7 +154,7 @@ function buildFallbackMetadata(games: SportsGame[]) {
   const summaries: Record<string, ScheduleSummary> = {};
 
   games.forEach((game) => {
-    const year = getSeason(game);
+    const year = getGameSeason(game);
     const sport = getSportValue(game);
 
     if (year) {
@@ -252,7 +232,7 @@ function ScheduleScore({ game }: { game: SportsGame }) {
   const wildcatsWon = game.wildcatsScore !== null && game.opponentScore !== null && game.wildcatsScore > game.opponentScore;
   const opponentWon = game.wildcatsScore !== null && game.opponentScore !== null && game.opponentScore > game.wildcatsScore;
 
-  if (game.status !== "final") {
+  if (!["final", "tie"].includes(game.status)) {
     return <p className="schedule-game-status">{getGameStatusLabel(game)}</p>;
   }
 
@@ -306,7 +286,7 @@ function ScheduleGameCard({ game }: { game: SportsGame }) {
       <div className="schedule-game-result">
         <ScheduleScore game={game} />
         <a href={gameCenterHref}>Game Center</a>
-        {game.recapUrl ? <a href={game.recapUrl}>{game.status === "final" ? "Recap" : "Preview"}</a> : null}
+        {game.recapUrl ? <a href={game.recapUrl}>{["final", "tie", "forfeit"].includes(game.status) ? "Recap" : "Preview"}</a> : null}
       </div>
     </article>
   );

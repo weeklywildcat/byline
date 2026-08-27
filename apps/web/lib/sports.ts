@@ -1,13 +1,18 @@
-import { getGameCenterHref, type SportsGame, type SportsRoster } from "@/lib/headless";
-import { stripHtml } from "@/lib/format";
+import { getGameCenterHref, type SportsGame, type SportsRoster, type SportsTeamMedia } from "@/lib/headless";
 import { getPublicationConfig } from "@/lib/publication";
-import { getPostCategories, getPostPrimaryGameId, getPostTags, type WordPressPost } from "@/lib/wordpress";
+import { getPostCategories, getPostPrimaryGameId, type WordPressPost } from "@/lib/wordpress";
+import { getGameSeason, normalizeSportsSeason } from "@/lib/sports-season";
+
+export { getGameSeason, getSeasonFromDate, normalizeSportsSeason } from "@/lib/sports-season";
 
 export type TeamSummary = {
+  teamKey: string;
   slug: string;
   sportKeys: string[];
   name: string;
   shortName: string;
+  active: boolean;
+  team?: SportsTeamMedia;
   latestSeason: string;
   seasons: string[];
   games: SportsGame[];
@@ -51,54 +56,34 @@ const SPORT_METADATA: Record<string, SportMetadata> = {
   sports: { family: "sports", label: "Sports", icon: "ph:trophy", color: "#7b1f2a" }
 };
 
-// Team and season archive URLs are derived from published game and roster records.
-// Varsity sport keys use the clean team hub slug, while JV/C-team keys remain
-// complete identities such as football-jv or girls-basketball-jv.
-function getSeasonFromDate(startDate: string) {
-  const match = /^(\d{4})-(\d{2})-\d{2}T/.exec(startDate);
-
-  if (!match) {
-    return "";
-  }
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-
-  if (!Number.isInteger(year) || !Number.isInteger(month)) {
-    return "";
-  }
-
-  const startYear = month >= 7 ? year : year - 1;
-
-  return `${startYear}-${String(startYear + 1).slice(-2)}`;
+export function getGameTeamKey(game: Pick<SportsGame, "sportKey"> & { teamKey?: string }) {
+  return (game.teamKey || game.sportKey || "").trim().toLowerCase();
 }
 
-export function getGameSeason(game: SportsGame) {
-  return game.season || getSeasonFromDate(game.startDate);
+function normalizeTeamSlug(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
 export function getTeamSlug(game: SportsGame) {
-  return (game.sportKey || game.sportLabel || game.sport || "").replace(/-varsity$/, "").toLowerCase();
+  return normalizeTeamSlug(game.teamSlug || game.team?.slug || getGameTeamKey(game) || game.sportLabel || game.sport || "");
 }
 
 export function getTeamName(game: SportsGame) {
-  const label = game.sportLabel || [game.sport, game.level].filter(Boolean).join(" - ") || game.sportKey || "Sports";
-
-  return label.replace(/\s+-\s+Varsity$/i, "").replace(/\s+-\s+/g, " ");
+  return game.team?.displayName || game.team?.label || game.sportLabel || [game.sport, game.level].filter(Boolean).join(" - ") || getGameTeamKey(game) || "Sports";
 }
 
-export function getRosterTeamSlug(roster: Pick<SportsRoster, "teamKey">) {
-  return roster.teamKey.replace(/-varsity$/, "").toLowerCase();
+export function getRosterTeamSlug(roster: Pick<SportsRoster, "teamKey"> & { teamSlug?: string; team?: { slug?: string } }) {
+  return normalizeTeamSlug(roster.teamSlug || roster.team?.slug || roster.teamKey);
 }
 
 export function getRosterTeamName(roster: SportsRoster) {
-  const label = roster.team.label || [roster.team.sport, roster.team.level].filter(Boolean).join(" - ") || roster.teamKey;
+  const label = roster.team.displayName || roster.team.label || [roster.team.sport, roster.team.level].filter(Boolean).join(" - ") || roster.teamKey;
 
-  return label.replace(/\s+-\s+Varsity$/i, "").replace(/\s+-\s+/g, " ");
+  return label;
 }
 
 export function getTeamShortName(team: Pick<TeamSummary, "name">) {
-  return team.name.replace(/\s+Varsity$/i, "");
+  return team.name;
 }
 
 export function getTeamHubHref(team: Pick<TeamSummary, "slug">) {
@@ -106,112 +91,122 @@ export function getTeamHubHref(team: Pick<TeamSummary, "slug">) {
 }
 
 export function getSeasonHref(team: Pick<TeamSummary, "slug">, year: string) {
-  return `/sports/${team.slug}/${year}/`;
+  return `/sports/${team.slug}/${normalizeSportsSeason(year) || year}/`;
 }
 
 export function getTeamBySlug(teams: TeamSummary[], slug: string) {
-  return teams.find((team) => team.slug === slug) ?? null;
+  const normalizedSlug = normalizeTeamSlug(slug);
+
+  return teams.find((team) => team.slug === normalizedSlug) ?? null;
 }
 
 export function getSeasonByTeamAndYear(teams: TeamSummary[], teamSlug: string, year: string) {
   const team = getTeamBySlug(teams, teamSlug);
+  const normalizedYear = normalizeSportsSeason(year);
 
-  if (!team || !team.seasons.includes(year)) {
+  if (!team || normalizedYear === "" || !team.seasons.includes(normalizedYear)) {
     return null;
   }
 
-  const games = getTeamSeasonGames(team, year);
-  const roster = getTeamSeasonRoster(team, year);
+  const games = getTeamSeasonGames(team, normalizedYear);
+  const roster = getTeamSeasonRoster(team, normalizedYear);
 
   return {
     team,
-    year,
+    year: normalizedYear,
     games,
     record: calculateRecord(games),
     roster
   };
 }
 
-export function buildTeams(games: SportsGame[], rosters: SportsRoster[] = []) {
+export function buildTeams(games: SportsGame[], rosters: SportsRoster[] = [], teamRecords: SportsTeamMedia[] = []) {
   const teams = new Map<string, TeamSummary>();
+  const recordsByKey = new Map(
+    teamRecords
+      .map((record) => [getGameTeamKey({ sportKey: record.teamKey || record.key }), record] as const)
+      .filter(([key]) => key !== "")
+  );
+
+  const ensureTeam = (teamKey: string, source?: SportsGame | SportsRoster, record?: SportsTeamMedia) => {
+    const key = teamKey.trim().toLowerCase();
+    if (!key) return null;
+
+    const existing = teams.get(key);
+    const sourceName = source && "players" in source ? getRosterTeamName(source) : source ? getTeamName(source) : "Sports";
+    const sourceSlug = source && "players" in source ? getRosterTeamSlug(source) : source ? getTeamSlug(source) : "";
+    const canonicalName = record?.displayName || record?.label || existing?.team?.displayName || existing?.team?.label || sourceName || key;
+    const canonicalSlug = normalizeTeamSlug(record?.slug || existing?.team?.slug || sourceSlug || key);
+
+    if (existing) {
+      existing.slug = canonicalSlug || existing.slug;
+      existing.name = canonicalName || existing.name;
+      existing.shortName = record?.shortName || existing.shortName || existing.name;
+      existing.active = record?.active !== false && existing.active;
+      if (record) existing.team = record;
+      if (!existing.sportKeys.includes(key)) existing.sportKeys.push(key);
+      return existing;
+    }
+
+    const team: TeamSummary = {
+      teamKey: key,
+      slug: canonicalSlug || key,
+      sportKeys: [key],
+      name: canonicalName,
+      shortName: record?.shortName || canonicalName,
+      active: record?.active !== false,
+      team: record,
+      latestSeason: "",
+      seasons: [],
+      games: [],
+      rosters: []
+    };
+    teams.set(key, team);
+
+    return team;
+  };
+
+  teamRecords.forEach((record) => {
+    const team = ensureTeam(record.teamKey || record.key, undefined, record);
+    if (!team) return;
+
+    (record.seasons ?? []).forEach((season) => {
+      const normalizedSeason = normalizeSportsSeason(season);
+      if (normalizedSeason && !team.seasons.includes(normalizedSeason)) team.seasons.push(normalizedSeason);
+    });
+
+    const currentSeason = normalizeSportsSeason(record.currentSeason ?? "");
+    if (team.active && team.seasons.length === 0 && currentSeason) {
+      team.seasons.push(currentSeason);
+    }
+  });
 
   games.forEach((game) => {
-    const slug = getTeamSlug(game);
+    const team = ensureTeam(getGameTeamKey(game), game);
     const year = getGameSeason(game);
+    if (!team || !year) return;
 
-    if (!slug || !year) {
-      return;
-    }
-
-    const current = teams.get(slug);
-
-    if (current) {
-      current.games.push(game);
-      if (!current.sportKeys.includes(game.sportKey)) {
-        current.sportKeys.push(game.sportKey);
-      }
-      if (!current.seasons.includes(year)) {
-        current.seasons.push(year);
-      }
-      return;
-    }
-
-    const name = getTeamName(game);
-
-    teams.set(slug, {
-      slug,
-      sportKeys: game.sportKey ? [game.sportKey] : [],
-      name,
-      shortName: name,
-      latestSeason: year,
-      seasons: [year],
-      games: [game],
-      rosters: []
-    });
+    team.games.push(game);
+    if (!team.seasons.includes(year)) team.seasons.push(year);
   });
 
   rosters.forEach((roster) => {
-    const slug = getRosterTeamSlug(roster);
-    const season = roster.season;
+    const record = recordsByKey.get(roster.teamKey.trim().toLowerCase());
+    const team = ensureTeam(roster.teamKey, roster, record);
+    const season = normalizeSportsSeason(roster.season);
+    if (!team || !season) return;
 
-    if (!slug || !season) {
-      return;
-    }
-
-    const current = teams.get(slug);
-
-    if (current) {
-      current.rosters.push(roster);
-      if (!current.sportKeys.includes(roster.teamKey)) {
-        current.sportKeys.push(roster.teamKey);
-      }
-      if (!current.seasons.includes(season)) {
-        current.seasons.push(season);
-      }
-      return;
-    }
-
-    const name = getRosterTeamName(roster);
-
-    teams.set(slug, {
-      slug,
-      sportKeys: [roster.teamKey],
-      name,
-      shortName: name,
-      latestSeason: season,
-      seasons: [season],
-      games: [],
-      rosters: [roster]
-    });
+    team.rosters.push(roster);
+    if (!team.seasons.includes(season)) team.seasons.push(season);
   });
 
   return [...teams.values()]
     .map((team) => {
-      const seasons = team.seasons.sort((left, right) => right.localeCompare(left));
+      const seasons = [...team.seasons].sort((left, right) => right.localeCompare(left));
 
       return {
         ...team,
-        shortName: getTeamShortName(team),
+        shortName: team.team?.shortName || getTeamShortName(team),
         latestSeason: seasons[0] ?? "",
         seasons,
         games: team.games.sort(sortGamesDescending)
@@ -258,11 +253,23 @@ export function groupTeamsByLatestSeason(teams: TeamSummary[]) {
 }
 
 export function getTeamSeasonGames(team: TeamSummary, year: string) {
-  return team.games.filter((game) => getGameSeason(game) === year).sort(sortGamesAscending);
+  const normalizedYear = normalizeSportsSeason(year);
+
+  if (normalizedYear === "") return [];
+
+  return team.games.filter((game) => getGameSeason(game) === normalizedYear).sort(sortGamesAscending);
 }
 
 export function getTeamSeasonRoster(team: TeamSummary, year: string) {
-  return team.rosters.find((roster) => roster.season === year) ?? null;
+  const normalizedYear = normalizeSportsSeason(year);
+
+  if (normalizedYear === "") {
+    return null;
+  }
+
+  const matches = team.rosters.filter((roster) => normalizeSportsSeason(roster.season) === normalizedYear);
+
+  return matches.length === 1 ? matches[0] : null;
 }
 
 export function getTeamLatestGames(team: TeamSummary, limit = 5) {
@@ -307,7 +314,7 @@ export function getSportMetadataForTeam(team: TeamSummary) {
 }
 
 export function calculateRecord(games: SportsGame[]): TeamRecord | null {
-  const finals = games.filter((game) => game.status === "final");
+  const finals = games.filter((game) => game.status === "final" || game.status === "tie");
 
   if (finals.length === 0 || finals.some((game) => game.wildcatsScore === null || game.opponentScore === null)) {
     return null;
@@ -317,7 +324,9 @@ export function calculateRecord(games: SportsGame[]): TeamRecord | null {
     (record, game) => {
       record.finalsCounted += 1;
 
-      if (Number(game.wildcatsScore) > Number(game.opponentScore)) {
+      if (game.status === "tie") {
+        record.ties += 1;
+      } else if (Number(game.wildcatsScore) > Number(game.opponentScore)) {
         record.wins += 1;
       } else if (Number(game.wildcatsScore) < Number(game.opponentScore)) {
         record.losses += 1;
@@ -406,7 +415,7 @@ export function getScheduleLocationDisplay(game: SportsGame) {
 }
 
 export function getGameScoreText(game: SportsGame) {
-  if (game.status !== "final" || game.wildcatsScore === null || game.opponentScore === null) {
+  if (!(["final", "tie"].includes(game.status)) || game.wildcatsScore === null || game.opponentScore === null) {
     return getGameStatusLabel(game);
   }
 
@@ -419,17 +428,6 @@ export function getGameHref(game: SportsGame) {
 
 export function getSportsCoverage(posts: WordPressPost[]) {
   return posts.filter((post) => getPostCategories(post).some((category) => category.slug === "sports"));
-}
-
-function normalizeSearchText(value: string) {
-  return stripHtml(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function postSearchText(post: WordPressPost) {
-  const tags = getPostTags(post).map((tag) => `${tag.slug} ${stripHtml(tag.name)}`);
-  const categories = getPostCategories(post).map((category) => `${category.slug} ${stripHtml(category.name)}`);
-
-  return normalizeSearchText([post.slug, post.title.rendered, post.excerpt.rendered, post.content.rendered, ...tags, ...categories].join(" "));
 }
 
 export function getRelatedSportsCoverage({
@@ -445,35 +443,22 @@ export function getRelatedSportsCoverage({
   year?: string;
   limit?: number;
 }) {
-  const gameIds = new Set((games ?? team.games).map((game) => game.id));
-  const teamTerms = new Set(
-    [team.slug, team.name, team.shortName, ...team.sportKeys]
-      .flatMap((value) => normalizeSearchText(value).split(/\s+/))
-      .filter((value) => value.length > 2)
-  );
+  const normalizedYear = year ? normalizeSportsSeason(year) : "";
+  const scopedGames = year
+    ? normalizedYear === ""
+      ? []
+      : (games ?? team.games).filter((game) => getGameSeason(game) === normalizedYear)
+    : games ?? team.games;
+  const gameIds = new Set(scopedGames.map((game) => game.id));
 
-  return getSportsCoverage(posts)
-    .map((post) => {
+  return posts
+    .filter((post) => {
       const primaryGameId = getPostPrimaryGameId(post);
-      const text = postSearchText(post);
-      let score = primaryGameId && gameIds.has(primaryGameId) ? 20 : 0;
-
-      teamTerms.forEach((term) => {
-        if (text.includes(term)) {
-          score += 2;
-        }
-      });
-
-      if (year && text.includes(year)) {
-        score += 1;
-      }
-
-      return { post, score };
+      return primaryGameId !== null && gameIds.has(primaryGameId);
     })
-    .filter((result) => result.score > 0)
-    .sort((left, right) => right.score - left.score || new Date(right.post.date).getTime() - new Date(left.post.date).getTime())
+    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
     .slice(0, limit)
-    .map((result) => result.post);
+    .map((post) => post);
 }
 
 export function sortGamesAscending(left: SportsGame, right: SportsGame) {

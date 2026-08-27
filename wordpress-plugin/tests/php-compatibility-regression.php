@@ -11,11 +11,16 @@ if (!byline_string_starts_with('WWH_SECRET', 'WWH_')
     exit(1);
 }
 
-$production_files = array_merge([
-    __DIR__ . '/../includes/publication/config.php',
-    __DIR__ . '/../includes/discord-integration.php',
-    __DIR__ . '/../includes/integrations/discord.php',
-], glob(__DIR__ . '/../includes/polls/*.php') ?: []);
+$production_files = [__DIR__ . '/../weekly-wildcat-headless.php'];
+$iterator = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator(__DIR__ . '/../includes', FilesystemIterator::SKIP_DOTS)
+);
+foreach ($iterator as $file_info) {
+    if ($file_info->isFile() && $file_info->getExtension() === 'php') {
+        $production_files[] = $file_info->getPathname();
+    }
+}
+sort($production_files);
 
 // Syntax-level PHP 8 features are caught by the 7.4 lint pass in CI; these are
 // the runtime helpers a 7.4 host would only fail on when the code path runs.
@@ -32,8 +37,10 @@ foreach ($production_files as $file) {
     }
 }
 
-if (count($production_files) < 8) {
-    fwrite(STDERR, "The poll modules were not covered by the PHP baseline scan.\n");
+if (count($production_files) < 20
+    || !in_array(__DIR__ . '/../includes/core/upgrade.php', $production_files, true)
+    || !in_array(__DIR__ . '/../includes/core/health.php', $production_files, true)) {
+    fwrite(STDERR, "The complete Byline production include tree was not covered by the PHP baseline scan.\n");
     exit(1);
 }
 

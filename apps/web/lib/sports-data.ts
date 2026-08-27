@@ -30,12 +30,12 @@ export function getSportsArchiveData() {
     requireBuildData("/wp-json/weekly-wildcat/v1/sports-teams", getSportsTeams),
     requireBuildData("/wp-json/wp/v2/posts", getAllPosts)
   ]).then(([games, rosters, teamMedia, posts]) => {
-    const teamMediaByKey = new Map(teamMedia.map((team) => [team.key, team]));
+    const teamMediaByKey = new Map(teamMedia.map((team) => [team.teamKey || team.key, team]));
 
     return {
       games,
       rosters,
-      teams: buildTeams(games, rosters),
+      teams: buildTeams(games, rosters, teamMedia),
       teamMedia,
       teamMediaByKey,
       posts,
@@ -46,6 +46,6 @@ export function getSportsArchiveData() {
   return sportsArchiveDataPromise;
 }
 
-export function getTeamMediaForSummary(team: Pick<TeamSummary, "sportKeys">, teamMediaByKey: Map<string, SportsTeamMedia>) {
-  return team.sportKeys.map((key) => teamMediaByKey.get(key)).find(Boolean) ?? null;
+export function getTeamMediaForSummary(team: Pick<TeamSummary, "teamKey" | "sportKeys">, teamMediaByKey: Map<string, SportsTeamMedia>) {
+  return teamMediaByKey.get(team.teamKey) ?? team.sportKeys.map((key) => teamMediaByKey.get(key)).find(Boolean) ?? null;
 }
