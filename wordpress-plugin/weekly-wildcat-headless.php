@@ -1517,11 +1517,15 @@ function wwh_register_post_types(): void
                 'view_item' => 'View Sports Game',
                 'search_items' => 'Search Sports Games',
                 'not_found' => 'No sports games found',
-                'menu_name' => 'Sports Games',
+                // The post type owns the top-level Sports menu, so the menu
+                // name is the workflow and "all items" is the Games list.
+                'menu_name' => 'Sports',
+                'all_items' => 'Games',
             ],
             'public' => false,
             'show_ui' => true,
-            'show_in_menu' => 'byline',
+            'show_in_menu' => byline_admin_feature_enabled('sports'),
+            'menu_position' => BYLINE_MENU_POSITION_SPORTS,
             'show_in_rest' => false,
             'menu_icon' => 'dashicons-awards',
             'supports' => ['title'],
@@ -1541,11 +1545,13 @@ function wwh_register_post_types(): void
                 'view_item' => 'View School Event',
                 'search_items' => 'Search School Events',
                 'not_found' => 'No school events found',
-                'menu_name' => 'School Events',
+                'menu_name' => 'Events',
+                'all_items' => 'All Events',
             ],
             'public' => false,
             'show_ui' => true,
-            'show_in_menu' => 'byline',
+            'show_in_menu' => byline_admin_feature_enabled('events'),
+            'menu_position' => BYLINE_MENU_POSITION_EVENTS,
             'show_in_rest' => false,
             'menu_icon' => 'dashicons-calendar-alt',
             'supports' => ['title'],
@@ -1722,12 +1728,30 @@ function wwh_register_game_embed_block(): void
 }
 add_action('init', 'wwh_register_game_embed_block');
 
+function wwh_register_legacy_settings_page(): void
+{
+    add_options_page(
+        'Byline Legacy Integration Settings',
+        'Byline Legacy Settings',
+        'manage_options',
+        'wwh-settings',
+        'wwh_render_settings_page'
+    );
+}
+
 function wwh_register_admin_pages(): void
 {
+    // Without the Sports feature there is no Sports menu to hang these on.
+    // Callbacks keep their own capability checks regardless.
+    if (!byline_admin_feature_enabled('sports')) {
+        wwh_register_legacy_settings_page();
+        return;
+    }
+
     add_submenu_page(
         'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE,
         'Import Sports Games',
-        'Import Games',
+        'Import',
         'edit_posts',
         'wwh-sports-import',
         'wwh_render_sports_import_page'
@@ -1736,7 +1760,7 @@ function wwh_register_admin_pages(): void
     add_submenu_page(
         'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE,
         'Export Sports Games',
-        'Export Games',
+        'Export',
         'edit_posts',
         'wwh-sports-export',
         'wwh_render_sports_export_page'
@@ -1745,19 +1769,13 @@ function wwh_register_admin_pages(): void
     add_submenu_page(
         'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE,
         'Sports Team Settings',
-        'Team Settings',
+        'Teams',
         BYLINE_MANAGE_CAPABILITY,
         'wwh-sports-team-settings',
         'wwh_render_sports_team_settings_page'
     );
 
-    add_options_page(
-        'Byline Legacy Integration Settings',
-        'Byline Legacy Settings',
-        'manage_options',
-        'wwh-settings',
-        'wwh_render_settings_page'
-    );
+    wwh_register_legacy_settings_page();
 }
 add_action('admin_menu', 'wwh_register_admin_pages');
 add_action('admin_post_wwh_export_sports_games', 'wwh_export_sports_games');

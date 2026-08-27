@@ -1243,7 +1243,7 @@ function Screen({
 }) {
   if (page === ADMIN_PAGE_SLUGS.dashboard) {
     return (
-      <AdminPageFrame title="Dashboard" error={error}>
+      <AdminPageFrame title="Overview" error={error}>
         <Dashboard protocol={protocol} publication={publication} />
       </AdminPageFrame>
     );
