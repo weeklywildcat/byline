@@ -81,10 +81,10 @@ final class BylineTransitionApi
     public function chooseReference($branch)
     {
         return (object) [
-            'name' => 'v0.2.5',
-            'version' => '0.2.5',
+            'name' => 'v0.2.6',
+            'version' => '0.2.6',
             'updated' => '2026-08-26T00:00:00Z',
-            'downloadUrl' => 'https://github.com/weeklywildcat/byline/releases/download/v0.2.5/weekly-wildcat-headless.zip',
+            'downloadUrl' => 'https://github.com/weeklywildcat/byline/releases/download/v0.2.6/weekly-wildcat-headless.zip',
         ];
     }
 
@@ -142,15 +142,15 @@ function verify_transition($remote_source, $expected_error)
     $info = (new BylineTransitionChecker($api))->requestInfo();
 
     if ($api->requestedPath !== 'weekly-wildcat-headless.php'
-        || $api->requestedRef !== 'v0.2.5'
+        || $api->requestedRef !== 'v0.2.6'
         || $info === null
-        || $info->version !== '0.2.5'
-        || $info->download_url !== 'https://github.com/weeklywildcat/byline/releases/download/v0.2.5/weekly-wildcat-headless.zip'
+        || $info->version !== '0.2.6'
+        || $info->download_url !== 'https://github.com/weeklywildcat/byline/releases/download/v0.2.6/weekly-wildcat-headless.zip'
         || $info->filename !== 'weekly-wildcat-headless/weekly-wildcat-headless.php'
         || in_array('puc-no-plugin-version', $puc_errors, true)
         || ($expected_error !== null && !in_array($expected_error, $puc_errors, true))
         || ($expected_error === null && count($puc_errors) !== 0)) {
-        fwrite(STDERR, "The installed 0.2.3 to canonical 0.2.5 updater transition failed.\n");
+        fwrite(STDERR, "The installed 0.2.3 to canonical 0.2.6 updater transition failed.\n");
         exit(1);
     }
 }
@@ -164,4 +164,4 @@ if (!is_string($canonical_source)) {
 verify_transition($canonical_source, null);
 verify_transition(null, 'puc-github-http-error');
 
-echo "Byline 0.2.3 to 0.2.5 release-asset transition regression passed.\n";
+echo "Byline 0.2.3 to 0.2.6 release-asset transition regression passed.\n";
