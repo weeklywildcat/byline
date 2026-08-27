@@ -39,7 +39,7 @@ installable entrypoint in the ZIP.
 `wordpress-plugin/tests/updater-bridge-regression.php` locks the plugin-side
 contract and root remote-source path. The release-transition regression runs
 the bundled PUC request flow for both successful metadata resolution and a
-missing-file response, proving that a `v0.2.4` release tag still supplies the
+missing-file response, proving that a `v0.2.5` release tag still supplies the
 remote version and asset when metadata is unavailable. The missing-file case
 produces `puc-github-http-error` but not `puc-no-plugin-version`.
 `scripts/verify-updater-transition.mjs` also verifies the symlink and that the
