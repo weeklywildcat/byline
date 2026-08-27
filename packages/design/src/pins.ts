@@ -1,5 +1,10 @@
 import { LEAD_PACKAGE_TYPE, parseLeadPackageProps } from "./lead-package";
+import { BRIEF_PACKAGE_TYPE, parseBriefPackageProps } from "./brief-package";
+import { IN_FOCUS_PACKAGE_TYPE, parseInFocusPackageProps } from "./in-focus-package";
+import { SPECIAL_COVERAGE_PACKAGE_TYPE, parseSpecialCoveragePackageProps } from "./special-coverage-package";
+import { OPINION_PACKAGE_TYPE, parseOpinionPackageProps } from "./opinion-package";
 import { SPORTS_PACKAGE_TYPE, parseSportsPackageProps } from "./sports-package";
+import { MORE_PACKAGE_TYPE, parseMorePackageProps } from "./more-package";
 import type { BylineDesignDocumentV2, BylineStorySource } from "./schema-v2";
 
 // Stories an editor pinned by hand, gathered from the whole document.
@@ -33,6 +38,31 @@ export function collectPinnedStoryIds(document: BylineDesignDocumentV2): Set<num
       for (const id of [...pinnedFrom(props.stories.source), ...pinnedFrom(props.athleteSpotlight.source)]) {
         pinned.add(id);
       }
+    }
+
+    if (entry.type === BRIEF_PACKAGE_TYPE) {
+      const props = parseBriefPackageProps(entry.props);
+      for (const id of pinnedFrom(props.source)) pinned.add(id);
+    }
+
+    if (entry.type === IN_FOCUS_PACKAGE_TYPE) {
+      const props = parseInFocusPackageProps(entry.props);
+      for (const id of pinnedFrom(props.source)) pinned.add(id);
+    }
+
+    if (entry.type === SPECIAL_COVERAGE_PACKAGE_TYPE) {
+      const props = parseSpecialCoveragePackageProps(entry.props);
+      for (const id of pinnedFrom(props.source)) pinned.add(id);
+    }
+
+    if (entry.type === OPINION_PACKAGE_TYPE) {
+      const props = parseOpinionPackageProps(entry.props);
+      for (const id of pinnedFrom(props.source)) pinned.add(id);
+    }
+
+    if (entry.type === MORE_PACKAGE_TYPE) {
+      const props = parseMorePackageProps(entry.props);
+      for (const id of pinnedFrom(props.source)) pinned.add(id);
     }
   }
 

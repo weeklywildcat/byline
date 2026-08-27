@@ -9,16 +9,17 @@ import { Icon } from "./Icon";
 // one. The card an editor sees is the real card.
 export type PollCardProps = {
   children: ReactNode;
+  headingId?: string;
 };
 
-export function PollCard({ children }: PollCardProps) {
+export function PollCard({ children, headingId = "homepage-poll-heading" }: PollCardProps) {
   return (
-    <section className="homepage-poll-card" aria-labelledby="homepage-poll-heading">
+    <section className="homepage-poll-card" aria-labelledby={headingId}>
       <div className="homepage-poll-heading">
         <span>
           <Icon name="ph:chart-bar-horizontal" width={17} height={17} />
         </span>
-        <h2 id="homepage-poll-heading">Your Opinion</h2>
+        <h2 id={headingId}>Your Opinion</h2>
       </div>
       {children}
     </section>

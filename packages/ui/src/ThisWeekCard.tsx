@@ -10,15 +10,16 @@ export type ThisWeekCardProps = {
   // events or sports modules. It is a caller-supplied label now.
   heading: string;
   scheduleHref: string;
+  headingId?: string;
 };
 
-export function ThisWeekCard({ entries, heading, scheduleHref }: ThisWeekCardProps) {
+export function ThisWeekCard({ entries, heading, scheduleHref, headingId = "this-week-heading" }: ThisWeekCardProps) {
   return (
-    <section className="this-week-card" aria-labelledby="this-week-heading">
+    <section className="this-week-card" aria-labelledby={headingId}>
       <div className="this-week-header">
         <div>
           <p>This Week</p>
-          <h2 id="this-week-heading">{heading}</h2>
+          <h2 id={headingId}>{heading}</h2>
         </div>
         <Icon name="ph:calendar-dots" width={20} height={20} />
       </div>

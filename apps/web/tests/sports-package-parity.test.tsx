@@ -200,10 +200,9 @@ describe("the extracted sports package reproduces the pre-extraction markup", ()
     });
 
     expect(baseline).toBe("");
-    // The extracted package still shows the stories a sports-less publication
-    // published, which the pre-extraction page suppressed entirely. That is a
-    // deliberate divergence and is asserted separately in the resolver tests;
-    // here the packaged section is configured to match the old behaviour.
+    // The resolver suppresses the package when a publication has no sports
+    // capability. The zero-story fixture below keeps this renderer comparison
+    // focused on the same empty result as the legacy page.
     expect(
       renderExtracted({
         posts,

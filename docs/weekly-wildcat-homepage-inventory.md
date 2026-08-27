@@ -2,8 +2,9 @@
 
 The compatibility target for the design-driven homepage. Captured from the
 pre-Studio `apps/web/app/page.tsx` and verified against a production static
-export on 2026-08-26 (11 packages, 17 unique stories, zero cross-package
-duplicates).
+export on 2026-08-26 (8 semantic packages, 17 unique stories, zero
+cross-package duplicates; the lead and sports packages contain nested runtime
+sections).
 
 Nothing here may be approximated. A package renderer is only finished when it
 reproduces the behaviour in this document, including the conditional cases that

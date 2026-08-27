@@ -133,7 +133,16 @@ function byline_design_package_types(): array
 {
     // Semantic schema 2 packages. A type only appears here once a resolver and a
     // renderer exist for it on the frontend.
-    return ['lead-package', 'sports-package'];
+    return [
+        'lead-package',
+        'brief-package',
+        'in-focus-package',
+        'special-coverage-package',
+        'opinion-package',
+        'sports-package',
+        'more-package',
+        'newsletter-package',
+    ];
 }
 
 // Schema 2 splits "which stories" from "how many", so a source carries no limit.
@@ -162,11 +171,60 @@ function byline_validate_story_source($source): bool
         return is_string($source['slug'] ?? null)
             && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $source['slug']) === 1;
     }
+    if (in_array($source['type'], [
+        'compatibility-lead',
+        'compatibility-latest',
+        'compatibility-brief',
+        'compatibility-in-focus',
+        'compatibility-special-coverage',
+        'compatibility-opinion',
+        'compatibility-sports',
+        'compatibility-athlete',
+        'compatibility-more',
+    ], true)) {
+        return true;
+    }
     if (!in_array($source['type'], ['latest', 'sticky', 'category', 'tag', 'author'], true)) {
         return false;
     }
     $source_key = ['category' => 'categoryId', 'tag' => 'tagId', 'author' => 'authorId'][$source['type']] ?? null;
     return !$source_key || (is_int($source[$source_key] ?? null) && $source[$source_key] > 0);
+}
+
+function byline_collect_manual_pin_owners($value, string $package_id, string $path, array &$owners)
+{
+    if (!is_array($value)) {
+        return null;
+    }
+
+    if (($value['type'] ?? null) === 'manual' && is_array($value['storyIds'] ?? null)) {
+        $owner = $package_id . ':' . $path;
+        $seen_in_source = [];
+        foreach ($value['storyIds'] as $story_id) {
+            if (!is_int($story_id) || $story_id <= 0 || in_array($story_id, $seen_in_source, true)) {
+                continue;
+            }
+            $seen_in_source[] = $story_id;
+            if (isset($owners[$story_id]) && $owners[$story_id] !== $owner) {
+                return new WP_Error(
+                    'byline_duplicate_manual_story',
+                    __('A story is manually placed in more than one homepage slot.', 'weekly-wildcat-headless'),
+                    ['status' => 400, 'storyId' => $story_id]
+                );
+            }
+            $owners[$story_id] = $owner;
+        }
+    }
+
+    foreach ($value as $key => $child) {
+        $child_path = $path . '.' . (is_string($key) ? $key : (string) $key);
+        $error = byline_collect_manual_pin_owners($child, $package_id, $child_path, $owners);
+        if (is_wp_error($error)) {
+            return $error;
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -208,6 +266,7 @@ function byline_validate_design_document_v2(array $document, string $template)
     }
 
     $seen_ids = [];
+    $manual_pin_owners = [];
     foreach ($document['packages'] as $design_package) {
         if (!is_array($design_package)
             || !is_string($design_package['id'] ?? null)
@@ -227,10 +286,15 @@ function byline_validate_design_document_v2(array $document, string $template)
             return new WP_Error('byline_unsafe_design_props', __('The design contains unsafe or malformed package properties.', 'weekly-wildcat-headless'), ['status' => 400]);
         }
 
+        $duplicate_pin_error = byline_collect_manual_pin_owners($design_package['props'], $design_package['id'], 'props', $manual_pin_owners);
+        if (is_wp_error($duplicate_pin_error)) {
+            return $duplicate_pin_error;
+        }
+
         // Every slot that can carry a content source is checked, whichever
         // package it belongs to. Storage validates the shape; the frontend
         // parsers are what give a malformed value its safe default.
-        foreach (['lead', 'latest', 'stories', 'athleteSpotlight'] as $slot) {
+        foreach (['lead', 'latest', 'stories', 'athleteSpotlight', 'source'] as $slot) {
             $config = $design_package['props'][$slot] ?? null;
             if (is_array($config)
                 && array_key_exists('source', $config)

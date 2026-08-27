@@ -46,6 +46,17 @@ export type SportsPackageProps = {
   presentation: {
     showDeck: boolean;
     showBylines: boolean;
+    showReadLink?: boolean;
+    cleanDeck?: boolean;
+  };
+  // These semantic switches let migrated legacy sports blocks retain their
+  // actual surface without making the package renderer know about v1 block
+  // names. Normal home designs use the default full package.
+  content: "full" | "schedule" | "story";
+  archiveLink: {
+    enabled: boolean;
+    href: string;
+    label: string;
   };
 };
 
@@ -57,11 +68,24 @@ export type SportsPackageProps = {
 // the reader sees.
 export const WEEKLY_WILDCAT_SPORTS_DEFAULTS: SportsPackageProps = {
   heading: "Sports",
-  stories: { source: { type: "section", slug: "sports" }, limit: 3 },
+  stories: { source: { type: "compatibility-sports" }, limit: 3 },
   athleteSpotlight: { enabled: true, source: { type: "athlete-spotlight" } },
   scores: { enabled: true, limit: 2 },
   upcoming: { enabled: true, limit: 3 },
-  presentation: { showDeck: true, showBylines: true }
+  presentation: { showDeck: true, showBylines: true, showReadLink: true, cleanDeck: true },
+  content: "full",
+  archiveLink: { enabled: true, href: "/sports/", label: "All Sports →" }
+};
+
+export const NEUTRAL_SPORTS_DEFAULTS: SportsPackageProps = {
+  heading: "Sports",
+  stories: { source: { type: "section", slug: "sports" }, limit: 3 },
+  athleteSpotlight: { enabled: false, source: { type: "athlete-spotlight" } },
+  scores: { enabled: true, limit: 2 },
+  upcoming: { enabled: true, limit: 3 },
+  presentation: { showDeck: true, showBylines: true, showReadLink: true, cleanDeck: true },
+  content: "full",
+  archiveLink: { enabled: true, href: "/sports/", label: "All Sports →" }
 };
 
 const MAX_STORIES = 12;
@@ -78,6 +102,10 @@ function boolean(value: unknown, fallback: boolean) {
 
 function heading(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, 80) : fallback;
+}
+
+function text(value: unknown, fallback: string, max = 240) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
 }
 
 export function parseAthleteSpotlightSource(value: unknown): AthleteSpotlightSource | null {
@@ -109,6 +137,7 @@ export function parseSportsPackageProps(value: unknown): SportsPackageProps {
   const scores = (props.scores ?? {}) as Record<string, unknown>;
   const upcoming = (props.upcoming ?? {}) as Record<string, unknown>;
   const presentation = (props.presentation ?? {}) as Record<string, unknown>;
+  const archiveLink = (props.archiveLink ?? {}) as Record<string, unknown>;
 
   return {
     heading: heading(props.heading, WEEKLY_WILDCAT_SPORTS_DEFAULTS.heading),
@@ -132,7 +161,17 @@ export function parseSportsPackageProps(value: unknown): SportsPackageProps {
     },
     presentation: {
       showDeck: boolean(presentation.showDeck, WEEKLY_WILDCAT_SPORTS_DEFAULTS.presentation.showDeck),
-      showBylines: boolean(presentation.showBylines, WEEKLY_WILDCAT_SPORTS_DEFAULTS.presentation.showBylines)
+      showBylines: boolean(presentation.showBylines, WEEKLY_WILDCAT_SPORTS_DEFAULTS.presentation.showBylines),
+      showReadLink: boolean(presentation.showReadLink, WEEKLY_WILDCAT_SPORTS_DEFAULTS.presentation.showReadLink ?? true),
+      cleanDeck: boolean(presentation.cleanDeck, WEEKLY_WILDCAT_SPORTS_DEFAULTS.presentation.cleanDeck ?? true)
+    },
+    content: props.content === "schedule" || props.content === "story" || props.content === "full"
+      ? props.content
+      : WEEKLY_WILDCAT_SPORTS_DEFAULTS.content,
+    archiveLink: {
+      enabled: boolean(archiveLink.enabled, WEEKLY_WILDCAT_SPORTS_DEFAULTS.archiveLink.enabled),
+      href: text(archiveLink.href, WEEKLY_WILDCAT_SPORTS_DEFAULTS.archiveLink.href),
+      label: text(archiveLink.label, WEEKLY_WILDCAT_SPORTS_DEFAULTS.archiveLink.label, 80)
     }
   };
 }

@@ -1701,6 +1701,99 @@
   text-transform: uppercase;
 }
 
+:where(.byline-publication-preview) .more-utility-block {
+  align-content: start;
+  background: #f1ece5;
+  border-top: 2px solid var(--rule-strong);
+  display: grid;
+  gap: 10px;
+  padding: 15px;
+}
+
+:where(.byline-publication-preview) .more-utility-block-heading {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+}
+
+:where(.byline-publication-preview) .more-utility-block-heading svg {
+  color: var(--accent-dark);
+  flex: 0 0 auto;
+  height: 17px;
+  opacity: 0.85;
+  width: 17px;
+}
+
+:where(.byline-publication-preview) .more-utility-block h3 {
+  color: var(--accent-dark);
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+:where(.byline-publication-preview) .more-utility-block p {
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  line-height: 1.42;
+  margin: 0;
+}
+
+:where(.byline-publication-preview) .more-utility-block a,
+:where(.byline-publication-preview) .more-action-links a,
+:where(.byline-publication-preview) .more-connect-links a {
+  align-items: center;
+  color: var(--accent-dark);
+  display: inline-flex;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 800;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+:where(.byline-publication-preview) .more-utility-block a:hover,
+:where(.byline-publication-preview) .more-action-links a:hover,
+:where(.byline-publication-preview) .more-connect-links a:hover {
+  color: var(--ink);
+}
+
+:where(.byline-publication-preview) .more-action-links,
+:where(.byline-publication-preview) .more-connect-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+:where(.byline-publication-preview) .more-action-links {
+  border-top: 1px solid var(--rule);
+  padding-top: 10px;
+}
+
+:where(.byline-publication-preview) .more-connect-links a {
+  border: 1px solid var(--rule);
+  padding: 7px 8px;
+}
+
+:where(.byline-publication-preview) .more-connect-links a:hover {
+  border-color: var(--rule-strong);
+}
+
+:where(.byline-publication-preview) .home-newsletter-section {
+  padding-bottom: 0;
+}
+
+:where(.byline-publication-preview) .home-newsletter-section .article-newsletter-signup {
+  margin-top: 0;
+}
+
+:where(.byline-publication-preview) .home-newsletter-section .article-newsletter-turnstile:empty {
+  min-height: 0;
+}
+
 :where(.byline-publication-preview[data-theme="byline-editorial"]) .section-header-row,
 :where(.byline-publication-preview[data-theme="byline-editorial"]) .more-weekly-header,
 :where(.byline-publication-preview[data-theme="byline-editorial"]) .opinion-package-header {

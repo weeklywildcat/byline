@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { StoryCard } from "./StoryCard";
+import { packageHeadingId } from "./package-dom";
 import type { StoryView } from "./story-view";
 
 // The resolved lead package: everything the renderer needs, already selected and
@@ -7,6 +8,7 @@ import type { StoryView } from "./story-view";
 // model that both the Next static export and Studio's preview render.
 export type ResolvedLeadPackage = {
   packageId: string;
+  mode?: "content" | "poll" | "calendar";
   lead: StoryView | null;
   latest: {
     heading: string;
@@ -18,6 +20,8 @@ export type ResolvedLeadPackage = {
     // renderer never has to know what a feature flag is.
     poll: boolean;
     calendar: boolean;
+    calendarLimit?: number;
+    calendarHeading?: string;
   };
   presentation: {
     showDeck: boolean;
@@ -44,14 +48,25 @@ export type LeadPackageProps = {
 // stylesheet and the rail limiter script both depend on them.
 export function LeadPackage({ package: resolved, pollSlot, calendarSlot, railLimiterSlot }: LeadPackageProps) {
   const { lead, latest, utility, presentation } = resolved;
+  const mode = resolved.mode ?? "content";
+  const hasUtility = utility.poll || utility.calendar;
+
+  if (mode !== "content") {
+    if (!hasUtility) return null;
+
+    return (
+      <section className="byline-design-utility" aria-label={mode === "poll" ? "Poll" : "School calendar"}>
+        {mode === "poll" && utility.poll ? pollSlot : null}
+        {mode === "calendar" && utility.calendar ? calendarSlot : null}
+      </section>
+    );
+  }
 
   if (!lead) {
     return <p className="byline-package-empty-state">{resolved.emptyMessage}</p>;
   }
 
   const hasLatest = latest.stories.length > 0;
-  const hasUtility = utility.poll || utility.calendar;
-
   // The section carries an aria-label rather than aria-labelledby. The pre-Studio
   // markup pointed at an id="lead-heading" that no element has ever had, which
   // leaves the section with no accessible name at all -- a dangling reference is
@@ -76,8 +91,11 @@ export function LeadPackage({ package: resolved, pollSlot, calendarSlot, railLim
         </div>
 
         {hasLatest ? (
-          <aside className="top-stories-rail" aria-labelledby="right-now-heading">
-            <h2 id="right-now-heading">{latest.heading}</h2>
+          <aside
+            className="top-stories-rail"
+            aria-labelledby={packageHeadingId(`${resolved.packageId}-latest`, "right-now-heading")}
+          >
+            <h2 id={packageHeadingId(`${resolved.packageId}-latest`, "right-now-heading")}>{latest.heading}</h2>
             <div className="right-now-list">
               {latest.stories.map((story) => (
                 <StoryCard

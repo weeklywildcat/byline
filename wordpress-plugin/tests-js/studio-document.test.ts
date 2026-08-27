@@ -54,15 +54,15 @@ describe("Studio persists schema 2", () => {
     expect(document.packages[0].props).not.toHaveProperty("id");
   });
 
-  it("does not persist unknown editor items as packages", () => {
+  it("persists every recognized semantic package item", () => {
     const document = editorStateToDesignDocument(
       { root: { props: {} }, content: [...editorState.content, { type: "opinion-package", props: {} }] },
       "home",
       "weekly-wildcat"
     );
 
-    expect(document.packages).toHaveLength(1);
-    expect(document.packages[0].type).toBe(LEAD_PACKAGE_TYPE);
+    expect(document.packages).toHaveLength(2);
+    expect(document.packages.map((entry) => entry.type)).toEqual([LEAD_PACKAGE_TYPE, "opinion-package"]);
   });
 
   it("gives duplicated packages distinct ids so configuration cannot collide", () => {
@@ -104,7 +104,7 @@ describe("Studio loads either stored schema", () => {
     expect(loaded.editorState.content[0].props.id).toBe("home-lead");
   });
 
-  it("migrates a stored v1 document explicitly and reports what did not convert", () => {
+  it("migrates a stored v1 document explicitly", () => {
     const v1 = {
       schemaVersion: 1,
       template: "home",
@@ -121,9 +121,9 @@ describe("Studio loads either stored schema", () => {
     const loaded = loadDesignIntoEditor(v1, "home");
 
     expect(loaded.migratedFromV1).toBe(true);
-    expect(loaded.editorState.content).toHaveLength(1);
-    expect(loaded.editorState.content[0].type).toBe(LEAD_PACKAGE_TYPE);
-    expect(loaded.migrationWarnings.some((warning) => warning.includes("sports-scores"))).toBe(true);
+    expect(loaded.editorState.content).toHaveLength(2);
+    expect(loaded.editorState.content.map((item) => item.type)).toEqual([LEAD_PACKAGE_TYPE, SPORTS_PACKAGE_TYPE]);
+    expect(loaded.migrationWarnings).toEqual([]);
   });
 
   it("saving a migrated v1 design writes v2", () => {
@@ -143,11 +143,9 @@ describe("Studio loads either stored schema", () => {
   });
 });
 
-// The migration promises to preserve blocks that have no v2 package yet. That
-// promise is only real if the data survives the editor round trip: load,
-// autosave, publish. It previously did not -- the load dropped the payload and
-// every save rebuilt the document from recognised packages only, so opening a
-// migrated design and touching anything destroyed those blocks for good.
+// Unknown blocks remain outside the editor as inert legacy data. That promise
+// is only real if the data survives the editor round trip: load, autosave,
+// publish. Opening a migrated design must never destroy a future extension.
 describe("legacy migration data survives the editor round trip", () => {
   const v1WithUnconvertible = {
     schemaVersion: 1,
@@ -159,31 +157,27 @@ describe("legacy migration data survives the editor round trip", () => {
       content: [
         { type: "story-lead", props: { id: "story-lead-1", query: { type: "sticky", limit: 1 } } },
         {
-          type: "sports-scores",
+          type: "custom-extension",
           props: {
-            id: "sports-scores-2",
-            title: "Scoreboard",
-            teamKey: "football-varsity",
-            limit: 6,
-            allowDuplicates: false
+            id: "custom-extension-2",
+            title: "Future block",
+            options: { enabled: true }
           }
         }
       ]
     }
   };
 
-  const SPORTS_SCORES_PROPS = {
-    id: "sports-scores-2",
-    title: "Scoreboard",
-    teamKey: "football-varsity",
-    limit: 6,
-    allowDuplicates: false
+  const LEGACY_PROPS = {
+    id: "custom-extension-2",
+    title: "Future block",
+    options: { enabled: true }
   };
 
   it("carries the unconverted block out of load", () => {
     const loaded = loadDesignIntoEditor(v1WithUnconvertible, "home");
 
-    expect(loaded.legacy?.unconvertedBlocks).toEqual([{ type: "sports-scores", props: SPORTS_SCORES_PROPS }]);
+    expect(loaded.legacy?.unconvertedBlocks).toEqual([{ type: "custom-extension", props: LEGACY_PROPS }]);
     // It must not be exposed to Puck as an editable item.
     expect(loaded.editorState.content.map((item) => item.type)).toEqual([LEAD_PACKAGE_TYPE]);
   });
@@ -213,7 +207,7 @@ describe("legacy migration data survives the editor round trip", () => {
     expect((saved.packages[0].props as { latest: { limit: number } }).latest.limit).toBe(2);
 
     // The exact block, with its exact props.
-    expect(saved.legacy?.unconvertedBlocks).toEqual([{ type: "sports-scores", props: SPORTS_SCORES_PROPS }]);
+    expect(saved.legacy?.unconvertedBlocks).toEqual([{ type: "custom-extension", props: LEGACY_PROPS }]);
     expect(saved.legacy?.schemaVersion).toBe(1);
   });
 
@@ -237,7 +231,7 @@ describe("legacy migration data survives the editor round trip", () => {
       document = editorStateToDesignDocument(reloaded.editorState, "home", "weekly-wildcat", reloaded.legacy);
     }
 
-    expect(document.legacy?.unconvertedBlocks).toEqual([{ type: "sports-scores", props: SPORTS_SCORES_PROPS }]);
+    expect(document.legacy?.unconvertedBlocks).toEqual([{ type: "custom-extension", props: LEGACY_PROPS }]);
   });
 
   it("omitting the payload is the data loss this guards against", () => {
@@ -348,7 +342,7 @@ describe("Studio persists the sports package", () => {
   });
 });
 
-describe("legacy sports blocks survive the sports extraction", () => {
+describe("legacy sports blocks migrate into semantic sports packages", () => {
   const v1WithSports = {
     schemaVersion: 1,
     template: "home",
@@ -367,42 +361,43 @@ describe("legacy sports blocks survive the sports extraction", () => {
     }
   };
 
-  it("carries every unconverted sports block out of the load", () => {
+  it("carries every supported sports block into the editor", () => {
     const loaded = loadDesignIntoEditor(v1WithSports, "home");
 
     expect(loaded.migratedFromV1).toBe(true);
-    expect(loaded.legacy?.unconvertedBlocks.map((block) => block.type)).toEqual([
-      "sports-scores",
-      "athlete-feature"
+    expect(loaded.legacy).toBeUndefined();
+    expect(loaded.migrationWarnings).toEqual([]);
+    expect(loaded.editorState.content.map((item) => item.type)).toEqual([
+      LEAD_PACKAGE_TYPE,
+      SPORTS_PACKAGE_TYPE,
+      SPORTS_PACKAGE_TYPE
     ]);
-    // Only story-lead converted, so only story-lead is in the editor.
-    expect(loaded.editorState.content.map((item) => item.type)).toEqual([LEAD_PACKAGE_TYPE]);
   });
 
-  it("preserves them byte-for-byte through adding a sports package and saving", () => {
+  it("preserves the migrated sports packages through saving", () => {
     const loaded = loadDesignIntoEditor(v1WithSports, "home");
     const edited = {
       ...loaded.editorState,
       content: [
         ...loaded.editorState.content,
-        { type: SPORTS_PACKAGE_TYPE, props: { id: "home-sports", ...WEEKLY_WILDCAT_SPORTS_DEFAULTS } }
+        {
+          ...loaded.editorState.content[1],
+          props: { ...loaded.editorState.content[1].props, heading: "Athletics" }
+        }
       ]
     };
 
     const saved = editorStateToDesignDocument(edited, "home", "weekly-wildcat", loaded.legacy);
 
     expect(saved.schemaVersion).toBe(2);
-    expect(saved.packages.map((entry) => entry.type)).toEqual([LEAD_PACKAGE_TYPE, SPORTS_PACKAGE_TYPE]);
-    // Adding the real package does NOT convert or consume the old blocks: they
-    // are different things, and the migration never claimed otherwise.
-    expect(saved.legacy?.unconvertedBlocks).toEqual([
-      {
-        type: "sports-scores",
-        props: { id: "sports-scores-1", title: "Scoreboard", teamKey: "football-varsity", limit: 6, allowDuplicates: false }
-      },
-      { type: "athlete-feature", props: { id: "athlete-feature-1", title: "Athlete", teamKey: "golf-varsity" } }
+    expect(saved.packages.map((entry) => entry.type)).toEqual([
+      LEAD_PACKAGE_TYPE,
+      SPORTS_PACKAGE_TYPE,
+      SPORTS_PACKAGE_TYPE,
+      SPORTS_PACKAGE_TYPE
     ]);
-    expect(parseBylineDesignDocumentV2(saved, "home").legacy?.unconvertedBlocks).toHaveLength(2);
+    expect(saved.legacy).toBeUndefined();
+    expect(parseBylineDesignDocumentV2(saved, "home").packages).toHaveLength(4);
   });
 
   it("does not erode the legacy payload across repeated autosaves", () => {
@@ -418,13 +413,13 @@ describe("legacy sports blocks survive the sports extraction", () => {
       legacy = reloaded.legacy;
     }
 
-    expect(legacy?.unconvertedBlocks).toEqual(loaded.legacy?.unconvertedBlocks);
+    expect(legacy).toBeUndefined();
   });
 
   it("never leaves a block both converted and preserved", () => {
     const loaded = loadDesignIntoEditor(v1WithSports, "home");
     const saved = editorStateToDesignDocument(loaded.editorState, "home", "weekly-wildcat", loaded.legacy);
 
-    expect(saved.legacy?.unconvertedBlocks.map((block) => block.type)).not.toContain("story-lead");
+    expect(saved.legacy).toBeUndefined();
   });
 });

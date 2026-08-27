@@ -1,13 +1,31 @@
 import {
+  BRIEF_PACKAGE_TYPE,
+  IN_FOCUS_PACKAGE_TYPE,
   LEAD_PACKAGE_TYPE,
+  MORE_PACKAGE_TYPE,
+  NEWSLETTER_PACKAGE_TYPE,
+  NEUTRAL_BRIEF_DEFAULTS,
+  NEUTRAL_IN_FOCUS_DEFAULTS,
+  NEUTRAL_MORE_DEFAULTS,
+  NEUTRAL_NEWSLETTER_DEFAULTS,
+  NEUTRAL_OPINION_DEFAULTS,
+  NEUTRAL_SPECIAL_COVERAGE_DEFAULTS,
+  NEUTRAL_SPORTS_DEFAULTS,
+  OPINION_PACKAGE_TYPE,
   SPORTS_PACKAGE_TYPE,
+  SPECIAL_COVERAGE_PACKAGE_TYPE,
+  WEEKLY_WILDCAT_BRIEF_DEFAULTS,
+  WEEKLY_WILDCAT_IN_FOCUS_DEFAULTS,
   WEEKLY_WILDCAT_LEAD_DEFAULTS,
+  WEEKLY_WILDCAT_MORE_DEFAULTS,
+  WEEKLY_WILDCAT_NEWSLETTER_DEFAULTS,
+  WEEKLY_WILDCAT_OPINION_DEFAULTS,
+  WEEKLY_WILDCAT_SPECIAL_COVERAGE_DEFAULTS,
   WEEKLY_WILDCAT_SPORTS_DEFAULTS,
   type BylineDesignDocumentV2,
   type BylineDesignPackage,
   type BylinePackageType,
-  type LeadPackageProps,
-  type SportsPackageProps
+  type LeadPackageProps
 } from "@byline/design";
 import { getPublishedDesignV2 } from "@/lib/designs";
 import { getPublicationConfig } from "@/lib/publication";
@@ -20,11 +38,9 @@ import { getPublicationConfig } from "@/lib/publication";
  * published. It is Weekly-Wildcat-specific by definition and must never be
  * handed to another publication.
  *
- * Package order is the document's ordering model. The lead package is the first
- * thing on the page and the sports package is the sixth section; between them
- * sit The Brief, In Focus, Special Coverage and Opinion, which are still legacy
- * and are rendered by the transitional homepage. The two extracted packages keep
- * their relative order here so the eventual orchestrator inherits it unchanged.
+ * Package order is the document's ordering model and matches the historical
+ * production page: Lead, Brief, In Focus, Special Coverage, Opinion, Sports,
+ * More, Newsletter.
  */
 export function getWeeklyWildcatCompatibilityDesign(theme: string): BylineDesignDocumentV2 {
   return {
@@ -33,30 +49,32 @@ export function getWeeklyWildcatCompatibilityDesign(theme: string): BylineDesign
     theme,
     packages: [
       { id: "home-lead", type: LEAD_PACKAGE_TYPE, props: { ...WEEKLY_WILDCAT_LEAD_DEFAULTS } },
-      { id: "home-sports", type: SPORTS_PACKAGE_TYPE, props: { ...WEEKLY_WILDCAT_SPORTS_DEFAULTS } }
+      { id: "home-brief", type: BRIEF_PACKAGE_TYPE, props: { ...WEEKLY_WILDCAT_BRIEF_DEFAULTS } },
+      { id: "home-in-focus", type: IN_FOCUS_PACKAGE_TYPE, props: { ...WEEKLY_WILDCAT_IN_FOCUS_DEFAULTS } },
+      {
+        id: "home-special-coverage",
+        type: SPECIAL_COVERAGE_PACKAGE_TYPE,
+        props: { ...WEEKLY_WILDCAT_SPECIAL_COVERAGE_DEFAULTS }
+      },
+      { id: "home-opinion", type: OPINION_PACKAGE_TYPE, props: { ...WEEKLY_WILDCAT_OPINION_DEFAULTS } },
+      { id: "home-sports", type: SPORTS_PACKAGE_TYPE, props: { ...WEEKLY_WILDCAT_SPORTS_DEFAULTS } },
+      { id: "home-more", type: MORE_PACKAGE_TYPE, props: { ...WEEKLY_WILDCAT_MORE_DEFAULTS } },
+      { id: "home-newsletter", type: NEWSLETTER_PACKAGE_TYPE, props: { ...WEEKLY_WILDCAT_NEWSLETTER_DEFAULTS } }
     ]
   };
 }
 
-// A neutral starting point for any other publication. Same packages, but no
-// Weekly Wildcat editorial assumptions: no sticky-first lead, no poll or
-// calendar switched on by a paper that may not run either, and no athlete
-// spotlight, which depends on a tagging convention a new newsroom has not
-// adopted yet.
+// A neutral starting point for any other publication. Same semantic package
+// family, but no Weekly Wildcat editorial assumptions: no sticky-first lead, no
+// poll or calendar switched on by a paper that may not run either, and no
+// athlete spotlight, which depends on a tagging convention a new newsroom has
+// not adopted yet.
 const NEUTRAL_LEAD_DEFAULTS: LeadPackageProps = {
+  mode: "content",
   lead: { source: { type: "latest" } },
   latest: { heading: "Latest", source: { type: "latest" }, limit: 4, showBylines: true },
   utility: { poll: false, calendar: false, calendarLimit: 0 },
   presentation: { showDeck: true, opinionTreatment: "auto" }
-};
-
-const NEUTRAL_SPORTS_DEFAULTS: SportsPackageProps = {
-  heading: "Sports",
-  stories: { source: { type: "section", slug: "sports" }, limit: 3 },
-  athleteSpotlight: { enabled: false, source: { type: "athlete-spotlight" } },
-  scores: { enabled: true, limit: 2 },
-  upcoming: { enabled: true, limit: 3 },
-  presentation: { showDeck: true, showBylines: true }
 };
 
 export function getStarterHomeDesign(theme: string): BylineDesignDocumentV2 {
@@ -66,7 +84,13 @@ export function getStarterHomeDesign(theme: string): BylineDesignDocumentV2 {
     theme,
     packages: [
       { id: "home-lead", type: LEAD_PACKAGE_TYPE, props: { ...NEUTRAL_LEAD_DEFAULTS } },
-      { id: "home-sports", type: SPORTS_PACKAGE_TYPE, props: { ...NEUTRAL_SPORTS_DEFAULTS } }
+      { id: "home-brief", type: BRIEF_PACKAGE_TYPE, props: { ...NEUTRAL_BRIEF_DEFAULTS } },
+      { id: "home-in-focus", type: IN_FOCUS_PACKAGE_TYPE, props: { ...NEUTRAL_IN_FOCUS_DEFAULTS } },
+      { id: "home-special-coverage", type: SPECIAL_COVERAGE_PACKAGE_TYPE, props: { ...NEUTRAL_SPECIAL_COVERAGE_DEFAULTS } },
+      { id: "home-opinion", type: OPINION_PACKAGE_TYPE, props: { ...NEUTRAL_OPINION_DEFAULTS } },
+      { id: "home-sports", type: SPORTS_PACKAGE_TYPE, props: { ...NEUTRAL_SPORTS_DEFAULTS } },
+      { id: "home-more", type: MORE_PACKAGE_TYPE, props: { ...NEUTRAL_MORE_DEFAULTS } },
+      { id: "home-newsletter", type: NEWSLETTER_PACKAGE_TYPE, props: { ...NEUTRAL_NEWSLETTER_DEFAULTS } }
     ]
   };
 }
@@ -102,10 +126,8 @@ export function getHomeDesignDocument(): BylineDesignDocumentV2 {
 /**
  * The document's package order.
  *
- * `packages[]` is the one ordering model. This exposes it so the transitional
- * homepage and its tests can agree on where each extracted package sits without
- * a second list being maintained somewhere else. When every package has been
- * extracted, the orchestrator iterates this rather than replacing it.
+ * `packages[]` is the one ordering model. This exposes it for diagnostics and
+ * tests without maintaining a second homepage order list.
  */
 export function getHomePackageOrder(document: BylineDesignDocumentV2): BylinePackageType[] {
   return document.packages.map((entry) => entry.type);

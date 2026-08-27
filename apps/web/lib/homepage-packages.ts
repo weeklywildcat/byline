@@ -1,13 +1,37 @@
 import {
+  parseBriefPackageProps,
+  parseInFocusPackageProps,
+  parseMorePackageProps,
+  parseNewsletterPackageProps,
+  parseOpinionPackageProps,
+  parseSpecialCoveragePackageProps,
   parseLeadPackageProps,
+  type BriefPackageProps,
   type BylineStorySource,
+  type InFocusPackageProps,
+  type MorePackageProps,
+  type NewsletterPackageProps,
+  type OpinionPackageProps,
+  type SpecialCoveragePackageProps,
   type LeadPackageProps
 } from "@byline/design";
-import type { CalendarEntryView, ResolvedLeadPackage, StoryView } from "@byline/ui";
+import type {
+  CalendarEntryView,
+  ResolvedBriefPackage,
+  ResolvedInFocusPackage,
+  ResolvedLeadPackage,
+  ResolvedMorePackage,
+  ResolvedNewsletterPackage,
+  ResolvedOpinionPackage,
+  ResolvedSpecialCoveragePackage,
+  StoryView,
+  MoreUtilityLinkView
+} from "@byline/ui";
+import type { BylinePublicationConfig } from "@byline/core";
 import { getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import type { SchoolEvent, SportsGame } from "@/lib/headless";
-import { resolveWeeklyWildcatHomepage } from "@/lib/homepage-selection";
+import { hasCategory, resolveWeeklyWildcatHomepage } from "@/lib/homepage-selection";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getAuthorHref,
@@ -194,6 +218,10 @@ export type LeadPackageResolutionInput = {
   // consumes it rather than running its own queries.
   selection: HomepageSelection;
   features: { polls: boolean; events: boolean; sports: boolean };
+  usedStoryIds?: ReadonlySet<number>;
+  compatibilitySelection?: boolean;
+  publication?: BylinePublicationConfig;
+  calendarHeading?: string;
 };
 
 /**
@@ -211,14 +239,34 @@ export type LeadPackageResolutionInput = {
  * immediately, because an editor who pinned a story means it.
  */
 export function resolveLeadPackage(input: LeadPackageResolutionInput): ResolvedLeadPackage {
-  const publication = getPublicationConfig();
+  const publication = input.publication ?? getPublicationConfig();
   const config: LeadPackageProps = parseLeadPackageProps(input.props);
+  const compatibilitySelection = input.compatibilitySelection ?? true;
+  const mode = config.mode ?? "content";
 
-  const manualLead = manualStories(config.lead.source, input.posts)?.[0] ?? null;
-  const leadPost = manualLead ?? input.selection.leadPost;
+  const usedStoryIds = new Set(input.usedStoryIds ?? []);
+  const manualLead = mode === "content" ? manualStories(config.lead.source, input.posts)?.[0] ?? null : null;
+  const leadCandidates = manualLead
+    ? [manualLead]
+    : compatibilitySelection && config.lead.source.type === "sticky"
+      ? (input.selection.leadPost ? [input.selection.leadPost] : [])
+      : sourceCandidates(config.lead.source, input.posts, input.selection, compatibilitySelection);
+  const leadPost = mode === "content"
+    ? manualLead ?? leadCandidates.find((post) => !usedStoryIds.has(post.id)) ?? null
+    : null;
 
-  const manualLatest = manualStories(config.latest.source, input.posts);
-  const latestPosts = (manualLatest ?? input.selection.rightNowPosts)
+  if (leadPost) usedStoryIds.add(leadPost.id);
+
+  const manualLatest = mode === "content" ? manualStories(config.latest.source, input.posts) : [];
+  const latestCandidates = manualLatest ?? sourceCandidates(
+    config.latest.source,
+    input.posts,
+    input.selection,
+    compatibilitySelection
+  );
+  const latestPosts = (manualLatest
+    ? latestCandidates
+    : latestCandidates.filter((post) => !usedStoryIds.has(post.id)))
     .filter((post) => post.id !== leadPost?.id)
     .slice(0, config.latest.limit);
 
@@ -228,6 +276,7 @@ export function resolveLeadPackage(input: LeadPackageResolutionInput): ResolvedL
 
   return {
     packageId: input.packageId,
+    mode,
     lead: leadPost ? toStoryView(leadPost, { opinionTreatment }) : null,
     latest: {
       heading: config.latest.heading,
@@ -237,7 +286,11 @@ export function resolveLeadPackage(input: LeadPackageResolutionInput): ResolvedL
     utility: {
       // A design cannot switch on a module the publication has disabled.
       poll: config.utility.poll && input.features.polls,
-      calendar: config.utility.calendar && (input.features.events || input.features.sports)
+      calendar: config.utility.calendar && (input.features.events || input.features.sports),
+      calendarLimit: config.utility.calendarLimit,
+      calendarHeading: input.calendarHeading ?? (publication.appearance.theme === "weekly-wildcat"
+        ? "At NSHS"
+        : `At ${publication.identity.organizationName}`)
     },
     presentation: {
       showDeck: config.presentation.showDeck,
@@ -245,5 +298,299 @@ export function resolveLeadPackage(input: LeadPackageResolutionInput): ResolvedL
     },
     fallbackAuthorName: `${publication.identity.shortName} Staff`,
     emptyMessage: "No published posts are available yet."
+  };
+}
+
+// --- shared story-source resolution ----------------------------------------
+
+type CompatibilitySourceType =
+  | "compatibility-lead"
+  | "compatibility-latest"
+  | "compatibility-brief"
+  | "compatibility-in-focus"
+  | "compatibility-special-coverage"
+  | "compatibility-opinion"
+  | "compatibility-sports"
+  | "compatibility-athlete"
+  | "compatibility-more";
+
+function isCompatibilitySource(source: BylineStorySource): source is BylineStorySource & { type: CompatibilitySourceType } {
+  return typeof source.type === "string" && source.type.startsWith("compatibility-");
+}
+
+export function sourceCandidates(
+  source: BylineStorySource,
+  posts: WordPressPost[],
+  selection: HomepageSelection,
+  useCompatibilitySelection: boolean
+) {
+  if (useCompatibilitySelection && isCompatibilitySource(source)) {
+    switch (source.type) {
+      case "compatibility-lead": return selection.leadPost ? [selection.leadPost] : [];
+      case "compatibility-latest": return selection.rightNowPosts;
+      case "compatibility-brief": return selection.briefPosts;
+      case "compatibility-in-focus": return selection.inFocusPost ? [selection.inFocusPost] : [];
+      case "compatibility-special-coverage": return selection.specialCoveragePosts;
+      case "compatibility-opinion": return selection.opinionPosts;
+      case "compatibility-sports": return selection.fieldPosts;
+      case "compatibility-athlete": return selection.athleteSpotlightPost ? [selection.athleteSpotlightPost] : [];
+      case "compatibility-more": return selection.morePosts;
+    }
+  }
+
+  switch (source.type) {
+    case "latest":
+      return posts;
+    case "sticky": {
+      const sticky = posts.filter((post) => post.sticky);
+      const regular = posts.filter((post) => !post.sticky);
+      return [...sticky, ...regular];
+    }
+    case "section":
+      return posts.filter((post) => hasCategory(post, [source.slug]));
+    case "category":
+      return posts.filter((post) => post.categories.includes(source.categoryId));
+    case "tag":
+      return posts.filter((post) => post.tags.includes(source.tagId));
+    case "author":
+      return posts.filter((post) => post.author === source.authorId);
+    case "manual":
+      return manualStories(source, posts) ?? [];
+    case "compatibility-lead":
+    case "compatibility-latest":
+    case "compatibility-brief":
+    case "compatibility-in-focus":
+    case "compatibility-special-coverage":
+    case "compatibility-opinion":
+    case "compatibility-sports":
+    case "compatibility-athlete":
+    case "compatibility-more":
+      return [];
+  }
+}
+
+export function availableStories(
+  candidates: WordPressPost[],
+  usedStoryIds: ReadonlySet<number>,
+  limit: number
+) {
+  if (limit <= 0) return [];
+
+  const selected: WordPressPost[] = [];
+
+  for (const post of candidates) {
+    if (usedStoryIds.has(post.id)) continue;
+    selected.push(post);
+    if (selected.length >= limit) break;
+  }
+
+  return selected;
+}
+
+function publicationText(value: string, publication: BylinePublicationConfig) {
+  return value
+    .replaceAll("{publication.shortName}", publication.identity.shortName)
+    .replaceAll("{publication.name}", publication.identity.name)
+    .replaceAll("{publication.organizationName}", publication.identity.organizationName);
+}
+
+function resolvedPublication(input: { publication?: BylinePublicationConfig }) {
+  return input.publication ?? getPublicationConfig();
+}
+
+export type BriefPackageResolutionInput = {
+  packageId: string;
+  props: unknown;
+  posts: WordPressPost[];
+  selection: HomepageSelection;
+  usedStoryIds?: ReadonlySet<number>;
+  compatibilitySelection?: boolean;
+  publication?: BylinePublicationConfig;
+};
+
+export function resolveBriefPackage(input: BriefPackageResolutionInput): ResolvedBriefPackage {
+  const publication = resolvedPublication(input);
+  const config: BriefPackageProps = parseBriefPackageProps(input.props);
+  const used = new Set(input.usedStoryIds ?? []);
+  const posts = config.source.type === "manual"
+    ? manualStories(config.source, input.posts) ?? []
+    : availableStories(
+        sourceCandidates(config.source, input.posts, input.selection, input.compatibilitySelection ?? false),
+        used,
+        config.limit
+      );
+  const selected = posts.slice(0, config.limit);
+
+  return {
+    packageId: input.packageId,
+    heading: config.heading,
+    lead: selected[0] ? toStoryView(selected[0]) : null,
+    rail: selected.slice(1).map((post) => toStoryView(post)),
+    presentation: config.presentation,
+    fallbackAuthorName: `${publication.identity.shortName} Staff`
+  };
+}
+
+export type InFocusPackageResolutionInput = {
+  packageId: string;
+  props: unknown;
+  posts: WordPressPost[];
+  selection: HomepageSelection;
+  usedStoryIds?: ReadonlySet<number>;
+  compatibilitySelection?: boolean;
+  publication?: BylinePublicationConfig;
+};
+
+export function resolveInFocusPackage(input: InFocusPackageResolutionInput): ResolvedInFocusPackage {
+  const publication = resolvedPublication(input);
+  const config: InFocusPackageProps = parseInFocusPackageProps(input.props);
+  const used = new Set(input.usedStoryIds ?? []);
+  const manual = config.source.type === "manual" ? manualStories(config.source, input.posts) : null;
+  const candidates = manual ?? sourceCandidates(config.source, input.posts, input.selection, input.compatibilitySelection ?? false);
+  const story = manual?.[0] ?? availableStories(candidates, used, 1)[0] ?? null;
+
+  return {
+    packageId: input.packageId,
+    heading: config.heading,
+    story: story ? toStoryView(story) : null,
+    presentation: config.presentation,
+    fallbackAuthorName: `${publication.identity.shortName} Staff`
+  };
+}
+
+export type SpecialCoveragePackageResolutionInput = {
+  packageId: string;
+  props: unknown;
+  posts: WordPressPost[];
+  selection: HomepageSelection;
+  usedStoryIds?: ReadonlySet<number>;
+  compatibilitySelection?: boolean;
+  publication?: BylinePublicationConfig;
+};
+
+export function resolveSpecialCoveragePackage(
+  input: SpecialCoveragePackageResolutionInput
+): ResolvedSpecialCoveragePackage {
+  const publication = resolvedPublication(input);
+  const config: SpecialCoveragePackageProps = parseSpecialCoveragePackageProps(input.props);
+  const used = new Set(input.usedStoryIds ?? []);
+  const manual = config.source.type === "manual" ? manualStories(config.source, input.posts) : null;
+  const candidates = manual ?? sourceCandidates(config.source, input.posts, input.selection, input.compatibilitySelection ?? false);
+  const stories = manual ? manual.slice(0, config.limit) : availableStories(candidates, used, config.limit);
+
+  return {
+    packageId: input.packageId,
+    heading: config.heading,
+    stories: stories.map((post) => toStoryView(post)),
+    leadPresentation: config.leadPresentation,
+    supportingPresentation: config.supportingPresentation,
+    fallbackAuthorName: `${publication.identity.shortName} Staff`
+  };
+}
+
+export type OpinionPackageResolutionInput = {
+  packageId: string;
+  props: unknown;
+  posts: WordPressPost[];
+  selection: HomepageSelection;
+  usedStoryIds?: ReadonlySet<number>;
+  compatibilitySelection?: boolean;
+  publication?: BylinePublicationConfig;
+};
+
+export function resolveOpinionPackage(input: OpinionPackageResolutionInput): ResolvedOpinionPackage {
+  const publication = resolvedPublication(input);
+  const config: OpinionPackageProps = parseOpinionPackageProps(input.props);
+  const used = new Set(input.usedStoryIds ?? []);
+  const manual = config.source.type === "manual" ? manualStories(config.source, input.posts) : null;
+  const candidates = manual ?? sourceCandidates(config.source, input.posts, input.selection, input.compatibilitySelection ?? false);
+  const stories = (manual ? manual.slice(0, config.limit) : availableStories(candidates, used, config.limit));
+
+  return {
+    packageId: input.packageId,
+    heading: config.heading,
+    description: publicationText(config.description, publication),
+    archiveLink: config.archiveLink,
+    lead: stories[0] ? toStoryView(stories[0]) : null,
+    rail: stories.slice(1, 3).map((post) => toStoryView(post)),
+    presentation: config.presentation,
+    fallbackAuthorName: `${publication.identity.shortName} Staff`
+  };
+}
+
+function utilityLink(label: string, href: string, iconName: string, external = false): MoreUtilityLinkView {
+  return { label, href, iconName, ...(external ? { external: true } : {}) };
+}
+
+export type MorePackageResolutionInput = {
+  packageId: string;
+  props: unknown;
+  posts: WordPressPost[];
+  selection: HomepageSelection;
+  usedStoryIds?: ReadonlySet<number>;
+  compatibilitySelection?: boolean;
+  publication?: BylinePublicationConfig;
+};
+
+export function resolveMorePackage(input: MorePackageResolutionInput): ResolvedMorePackage {
+  const publication = resolvedPublication(input);
+  const config: MorePackageProps = parseMorePackageProps(input.props);
+  const used = new Set(input.usedStoryIds ?? []);
+  const manual = config.source.type === "manual" ? manualStories(config.source, input.posts) : null;
+  const candidates = manual ?? sourceCandidates(config.source, input.posts, input.selection, input.compatibilitySelection ?? false);
+  const stories = manual ? manual.slice(0, config.limit) : availableStories(candidates, used, config.limit);
+  const utility = config.utility.enabled && (config.utility.joinStaff.enabled || config.utility.stayConnected.enabled)
+    ? {
+        enabled: true,
+        publicationLabel: publication.identity.shortName,
+        joinStaff: {
+          ...config.utility.joinStaff,
+          links: [
+            utilityLink("Join the newsroom", "/join/", "ph:pencil-line"),
+            utilityLink("Meet the staff", "/authors/", "ph:users-three")
+          ]
+        },
+        stayConnected: {
+          ...config.utility.stayConnected,
+          links: [
+            ...publication.social.map((social) => utilityLink(social.label, social.url, `ph:${social.service}-logo`, true)),
+            utilityLink("Contact", publication.urls.contact, "ph:envelope-simple"),
+            ...(publication.features.newsletter
+              ? [utilityLink("Newsletter", "#home-newsletter", "ph:paper-plane-tilt")]
+              : [])
+          ]
+        }
+      }
+    : null;
+
+  return {
+    packageId: input.packageId,
+    heading: publicationText(config.heading, publication),
+    archiveLink: config.archiveLink,
+    lead: stories[0] ? toStoryView(stories[0], { cleanDeck: config.presentation.cleanDeck }) : null,
+    rail: stories.slice(1, 4).map((post) => toStoryView(post, { cleanDeck: config.presentation.cleanDeck })),
+    presentation: config.presentation,
+    utility,
+    fallbackAuthorName: `${publication.identity.shortName} Staff`
+  };
+}
+
+export type NewsletterPackageResolutionInput = {
+  packageId: string;
+  props: unknown;
+  features: { newsletter: boolean };
+  publication?: BylinePublicationConfig;
+};
+
+export function resolveNewsletterPackage(input: NewsletterPackageResolutionInput): ResolvedNewsletterPackage {
+  const publication = resolvedPublication(input);
+  const config: NewsletterPackageProps = parseNewsletterPackageProps(input.props);
+
+  return {
+    packageId: input.packageId,
+    enabled: input.features.newsletter,
+    label: config.label,
+    heading: publicationText(config.heading, publication),
+    presentation: config.presentation
   };
 }

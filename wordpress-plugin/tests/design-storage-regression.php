@@ -90,6 +90,30 @@ if (!$publish_response instanceof WP_REST_Response || $publish_response->data['r
     exit(1);
 }
 
+$v2_with_legacy = [
+    'schemaVersion' => 2,
+    'template' => 'home',
+    'theme' => 'byline-modern',
+    'packages' => [[
+        'id' => 'home-lead',
+        'type' => 'lead-package',
+        'props' => [],
+    ]],
+    'legacy' => [
+        'schemaVersion' => 1,
+        'editor' => ['engine' => 'puck', 'version' => '0.23.0'],
+        'unconvertedBlocks' => [['type' => 'custom-extension', 'props' => ['enabled' => true]]],
+    ],
+];
+$guarded_publish = byline_rest_publish_design(new WP_REST_Request(
+    ['template' => 'home'],
+    ['document' => $v2_with_legacy, 'baseRevisionId' => 1]
+));
+if (!$guarded_publish instanceof WP_Error || $guarded_publish->code !== 'byline_unconverted_design_blocks' || byline_published_design('home')['revision'] !== 1) {
+    fwrite(STDERR, "A schema 2 design with preserved legacy blocks was allowed to publish.\n");
+    exit(1);
+}
+
 $stale = byline_rest_autosave_design(new WP_REST_Request(
     ['template' => 'home'],
     ['document' => $document, 'baseRevisionId' => 0]

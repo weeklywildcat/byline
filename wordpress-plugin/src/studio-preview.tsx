@@ -1,23 +1,49 @@
 import apiFetch from "@wordpress/api-fetch";
 import { useEffect, useState } from "@wordpress/element";
 import {
-  LeadPackage,
   PollCard,
   ThisWeekCard,
+  packageHeadingId,
+  getBriefPackageRenderer,
   getLeadPackageRenderer,
+  getInFocusPackageRenderer,
+  getMorePackageRenderer,
+  getNewsletterPackageRenderer,
+  getOpinionPackageRenderer,
+  getSpecialCoveragePackageRenderer,
   getSportsPackageRenderer,
   type AthleteSpotlightView,
   type CalendarEntryView,
   type ResolvedLeadPackage,
+  type ResolvedBriefPackage,
+  type ResolvedInFocusPackage,
+  type ResolvedMorePackage,
+  type ResolvedNewsletterPackage,
+  type ResolvedOpinionPackage,
+  type ResolvedSpecialCoveragePackage,
+  type MoreUtilityLinkView,
   type ResolvedSportsPackage,
   type SportsFixtureView,
   type SportsResultView,
   type StoryView
 } from "@byline/ui";
 import {
+  parseBriefPackageProps,
+  parseInFocusPackageProps,
   parseLeadPackageProps,
+  parseMorePackageProps,
+  parseNewsletterPackageProps,
+  parseOpinionPackageProps,
   parseSportsPackageProps,
+  parseSpecialCoveragePackageProps,
+  type BylineStorySource,
+  type BriefPackageProps,
+  type InFocusPackageProps,
   type LeadPackageProps,
+  type MorePackageProps,
+  type NewsletterPackageProps,
+  type OpinionPackageProps,
+  type SpecialCoveragePackageProps,
   type SportsPackageProps
 } from "@byline/design";
 
@@ -35,9 +61,12 @@ type PreviewPost = {
   date: string;
   link: string;
   sticky?: boolean;
+  categories?: number[];
+  tags?: number[];
+  author?: number;
   _embedded?: {
     "wp:featuredmedia"?: Array<{ source_url?: string; alt_text?: string; media_details?: { width?: number; height?: number } }>;
-    "wp:term"?: Array<Array<{ taxonomy: string; name: string; slug: string }>>;
+    "wp:term"?: Array<Array<{ id?: number; taxonomy: string; name: string; slug: string }>>;
     author?: Array<{ name: string; link: string }>;
   };
 };
@@ -145,6 +174,18 @@ type PreviewData = {
   upcomingGames: PreviewGame[];
 };
 
+type PreviewSelection = {
+  athleteSpotlightPost: PreviewPost | null;
+  leadPost: PreviewPost | null;
+  inFocusPost: PreviewPost | null;
+  specialCoveragePosts: PreviewPost[];
+  opinionPosts: PreviewPost[];
+  fieldPosts: PreviewPost[];
+  morePosts: PreviewPost[];
+  rightNowPosts: PreviewPost[];
+  briefPosts: PreviewPost[];
+};
+
 let previewRequest: Promise<PreviewData> | null = null;
 
 // Fetched once per Studio session and shared by every preview render, so
@@ -173,33 +214,151 @@ function loadPreviewData(): Promise<PreviewData> {
   return previewRequest;
 }
 
+function previewHasCategory(post: PreviewPost, slug: string) {
+  return Boolean(post._embedded?.["wp:term"]?.flat().some((term) => term.taxonomy === "category" && term.slug === slug));
+}
+
+function previewHasTag(post: PreviewPost, slug: string) {
+  return Boolean(post._embedded?.["wp:term"]?.flat().some((term) => term.taxonomy === "post_tag" && term.slug === slug));
+}
+
+function resolvePreviewSelection(data: PreviewData): PreviewSelection {
+  const used = new Set<number>();
+  const take = (count: number, predicate: (post: PreviewPost) => boolean) => {
+    const result: PreviewPost[] = [];
+
+    for (const post of data.posts) {
+      if (used.has(post.id) || !predicate(post)) continue;
+      used.add(post.id);
+      result.push(post);
+      if (result.length >= count) break;
+    }
+
+    return result;
+  };
+  const athleteSpotlightPost = data.posts.find((post) => previewHasTag(post, "athlete-of-the-week") || previewHasTag(post, "athlete-of-the-month")) ?? null;
+  if (athleteSpotlightPost) used.add(athleteSpotlightPost.id);
+  const leadPost = data.posts.find((post) => post.sticky && !used.has(post.id)) ?? data.posts.find((post) => !used.has(post.id)) ?? null;
+  if (leadPost) used.add(leadPost.id);
+
+  const inFocusPost = take(1, (post) => Boolean(post._embedded?.["wp:featuredmedia"]?.length) && (previewHasCategory(post, "features") || previewHasCategory(post, "culture")))[0] ?? null;
+  const specialCoveragePosts = take(3, (post) => previewHasTag(post, "special-coverage"));
+  const opinionPosts = take(3, (post) => previewHasCategory(post, "opinion"));
+  const fieldPosts = take(3, (post) => previewHasCategory(post, "sports"));
+  const morePosts: PreviewPost[] = [];
+  const oldFirstPosts = [...data.posts].reverse();
+
+  for (const slug of ["news", "features", "culture", "opinion", "sports"]) {
+    const post = oldFirstPosts.find((candidate) => !used.has(candidate.id) && previewHasCategory(candidate, slug));
+
+    if (post) {
+      morePosts.push(post);
+      used.add(post.id);
+    }
+
+    if (morePosts.length === 4) break;
+  }
+
+  if (morePosts.length < 4) {
+    for (const post of oldFirstPosts) {
+      if (used.has(post.id)) continue;
+      morePosts.push(post);
+      used.add(post.id);
+      if (morePosts.length === 4) break;
+    }
+  }
+  const rightNowPosts = take(4, () => true);
+  const briefPosts = take(4, () => true);
+
+  return {
+    athleteSpotlightPost,
+    leadPost,
+    inFocusPost,
+    specialCoveragePosts,
+    opinionPosts,
+    fieldPosts,
+    morePosts,
+    rightNowPosts,
+    briefPosts
+  };
+}
+
+function previewManualStories(source: BylineStorySource, data: PreviewData) {
+  if (source.type !== "manual") return null;
+  const byId = new Map(data.posts.map((post) => [post.id, post]));
+
+  return source.storyIds.flatMap((id) => {
+    const post = byId.get(id);
+    return post ? [post] : [];
+  });
+}
+
+function previewSourceCandidates(source: BylineStorySource, data: PreviewData, selection: PreviewSelection) {
+  if (source.type === "compatibility-lead") return selection.leadPost ? [selection.leadPost] : [];
+  if (source.type === "compatibility-latest") return selection.rightNowPosts;
+  if (source.type === "compatibility-brief") return selection.briefPosts;
+  if (source.type === "compatibility-in-focus") return selection.inFocusPost ? [selection.inFocusPost] : [];
+  if (source.type === "compatibility-special-coverage") return selection.specialCoveragePosts;
+  if (source.type === "compatibility-opinion") return selection.opinionPosts;
+  if (source.type === "compatibility-sports") return selection.fieldPosts;
+  if (source.type === "compatibility-athlete") return selection.athleteSpotlightPost ? [selection.athleteSpotlightPost] : [];
+  if (source.type === "compatibility-more") return selection.morePosts;
+  if (source.type === "latest") return data.posts;
+  if (source.type === "sticky") {
+    const sticky = data.posts.filter((post) => post.sticky);
+    const regular = data.posts.filter((post) => !post.sticky);
+    return [...sticky, ...regular];
+  }
+  if (source.type === "section") return data.posts.filter((post) => previewHasCategory(post, source.slug));
+  if (source.type === "category") return data.posts.filter((post) => post.categories?.includes(source.categoryId));
+  if (source.type === "tag") return data.posts.filter((post) => post.tags?.includes(source.tagId));
+  if (source.type === "author") return data.posts.filter((post) => post.author === source.authorId);
+  return [];
+}
+
+function previewSelectStories(
+  source: BylineStorySource,
+  limit: number,
+  data: PreviewData,
+  selection: PreviewSelection,
+  used: Set<number>
+) {
+  const manual = previewManualStories(source, data);
+  const candidates = manual ?? previewSourceCandidates(source, data, selection);
+  const selected: PreviewPost[] = [];
+
+  for (const post of candidates) {
+    if (!manual && used.has(post.id)) continue;
+    if (selected.some((entry) => entry.id === post.id)) continue;
+    selected.push(post);
+    if (!manual) used.add(post.id);
+    if (selected.length >= limit) break;
+  }
+
+  return selected;
+}
+
 // Mirrors resolveLeadPackage's selection rules for the preview's smaller post
 // window: sticky-first lead, then the next unused stories for the rail.
 function resolvePreviewLeadPackage(
+  packageId: string,
   config: LeadPackageProps,
   data: PreviewData,
   features: { polls: boolean; events: boolean; sports: boolean },
-  publicationShortName: string
+  publicationShortName: string,
+  calendarHeading: string
 ): ResolvedLeadPackage {
-  const byId = new Map(data.posts.map((post) => [post.id, post]));
-  const manualLead = config.lead.source.type === "manual" ? byId.get(config.lead.source.storyIds[0]) : undefined;
-  const lead = manualLead ?? data.posts.find((post) => post.sticky) ?? data.posts[0] ?? null;
-
-  const manualLatest =
-    config.latest.source.type === "manual"
-      ? config.latest.source.storyIds.flatMap((id) => {
-          const post = byId.get(id);
-
-          return post ? [post] : [];
-        })
-      : null;
-
-  const latest = (manualLatest ?? data.posts)
-    .filter((post) => post.id !== lead?.id)
-    .slice(0, config.latest.limit);
+  const selection = resolvePreviewSelection(data);
+  const used = new Set<number>();
+  const manualLead = previewManualStories(config.lead.source, data)?.[0] ?? null;
+  const lead = manualLead ?? (config.lead.source.type === "sticky" ? selection.leadPost : previewSelectStories(config.lead.source, 1, data, selection, used)[0] ?? null);
+  if (lead) used.add(lead.id);
+  const latest = previewSelectStories(config.latest.source, config.latest.limit, data, selection, used)
+    .filter((post) => post.id !== lead?.id);
 
   return {
-    packageId: "home-lead",
+    packageId,
+    mode: config.mode,
     lead: lead ? toStoryView(lead) : null,
     latest: {
       heading: config.latest.heading,
@@ -208,7 +367,9 @@ function resolvePreviewLeadPackage(
     },
     utility: {
       poll: config.utility.poll && features.polls,
-      calendar: config.utility.calendar && (features.events || features.sports)
+      calendar: config.utility.calendar && (features.events || features.sports),
+      calendarLimit: config.utility.calendarLimit,
+      calendarHeading
     },
     presentation: { showDeck: config.presentation.showDeck, opinionTreatment: false },
     fallbackAuthorName: `${publicationShortName} Staff`,
@@ -258,19 +419,25 @@ export function LeadPackagePreview({
     return <p className="byline-preview-loading">Loading publication content…</p>;
   }
 
-  const resolved = resolvePreviewLeadPackage(config, data, features, publicationShortName);
+  const packageId = previewPackageId(props, "home-lead");
+  const resolved = resolvePreviewLeadPackage(packageId, config, data, features, publicationShortName, calendarHeading);
   const Renderer = getLeadPackageRenderer(theme);
 
   return (
     <Renderer
       package={resolved}
       pollSlot={
-        <PollCard>
+        <PollCard headingId={packageHeadingId(`${packageId}-poll`, "homepage-poll-heading")}>
           <p className="homepage-poll-note">Live poll results appear on the published site.</p>
         </PollCard>
       }
       calendarSlot={
-        <ThisWeekCard entries={data.events} heading={calendarHeading} scheduleHref="/sports/schedule/" />
+        <ThisWeekCard
+          entries={data.events}
+          heading={calendarHeading}
+          scheduleHref="/sports/schedule/"
+          headingId={packageHeadingId(`${packageId}-calendar`, "this-week-heading")}
+        />
       }
     />
   );
@@ -380,38 +547,35 @@ function toAthleteSpotlightView(post: PreviewPost): AthleteSpotlightView {
  * modules, whatever the design asks for -- and the resolved model's shape.
  */
 function resolvePreviewSportsPackage(
+  packageId: string,
   config: SportsPackageProps,
   data: PreviewData,
   features: { polls: boolean; events: boolean; sports: boolean },
   publicationShortName: string
 ): ResolvedSportsPackage {
-  const byId = new Map(data.posts.map((post) => [post.id, post]));
-  const pinned = (storyIds: number[]) =>
-    storyIds.flatMap((id) => {
-      const post = byId.get(id);
+  const selection = resolvePreviewSelection(data);
+  const used = new Set<number>();
+  const stories = !features.sports || config.content === "schedule"
+    ? []
+    : previewSelectStories(config.stories.source, config.stories.limit, data, selection, used);
 
-      return post ? [post] : [];
-    });
-
-  const stories = (
-    config.stories.source.type === "manual" ? pinned(config.stories.source.storyIds) : data.posts
-  ).slice(0, config.stories.limit);
-
-  const spotlightPost = config.athleteSpotlight.enabled
+  const spotlightPost = !features.sports || config.content === "schedule"
+    ? null
+    : config.athleteSpotlight.enabled
     ? config.athleteSpotlight.source.type === "manual"
-      ? (pinned(config.athleteSpotlight.source.storyIds)[0] ?? null)
-      : (data.posts.find((post) => !stories.some((story) => story.id === post.id)) ?? null)
+      ? (previewManualStories(config.athleteSpotlight.source, data)?.[0] ?? null)
+      : selection.athleteSpotlightPost
     : null;
 
-  const scoresEnabled = config.scores.enabled && features.sports;
-  const upcomingEnabled = config.upcoming.enabled && features.sports;
+  const scoresEnabled = config.content !== "story" && config.scores.enabled && features.sports;
+  const upcomingEnabled = config.content !== "story" && config.upcoming.enabled && features.sports;
   const results = scoresEnabled ? data.recentScores.slice(0, config.scores.limit).map(toSportsResultView) : [];
   const upcoming = upcomingEnabled ? data.upcomingGames.slice(0, config.upcoming.limit).map(toSportsFixtureView) : [];
 
   return {
-    packageId: "home-sports",
+    packageId,
     heading: config.heading,
-    sectionLink: { label: "All Sports →", href: "/sports/" },
+    sectionLink: config.archiveLink.enabled ? { label: config.archiveLink.label, href: config.archiveLink.href } : null,
     lead: stories[0] ? toStoryView(stories[0]) : null,
     rail: stories.slice(1).map(toStoryView),
     athleteSpotlight:
@@ -430,7 +594,12 @@ function resolvePreviewSportsPackage(
             emptyUpcomingMessage: "No upcoming games"
           }
         : null,
-    presentation: { showDeck: config.presentation.showDeck, showBylines: config.presentation.showBylines },
+    presentation: {
+      showDeck: config.presentation.showDeck,
+      showBylines: config.presentation.showBylines,
+      showReadLink: config.presentation.showReadLink
+    },
+    content: config.content,
     fallbackAuthorName: `${publicationShortName} Staff`
   };
 }
@@ -474,7 +643,13 @@ export function SportsPackagePreview({
     return <p className="byline-preview-loading">Loading publication content…</p>;
   }
 
-  const resolved = resolvePreviewSportsPackage(config, data, features, publicationShortName);
+  const resolved = resolvePreviewSportsPackage(
+    previewPackageId(props, "home-sports"),
+    config,
+    data,
+    features,
+    publicationShortName
+  );
   const Renderer = getSportsPackageRenderer(theme);
 
   // A package configured down to nothing renders nothing on the live site, so
@@ -488,5 +663,196 @@ export function SportsPackagePreview({
         </p>
       ) : null}
     </>
+  );
+}
+
+// --- remaining semantic package previews ----------------------------------
+
+function usePreviewData() {
+  const [data, setData] = useState<PreviewData | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadPreviewData().then((loaded) => {
+      if (!cancelled) setData(loaded);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return data;
+}
+
+function previewPackageId(props: unknown, fallback: string) {
+  return props && typeof props === "object" && typeof (props as Record<string, unknown>).id === "string"
+    ? (props as Record<string, unknown>).id as string
+    : fallback;
+}
+
+function previewStoryViews(stories: PreviewPost[]) {
+  // The REST preview does not need to reproduce the production sentence
+  // cleaner to be useful, but it does preserve the resolved view-model shape.
+  return stories.map((post) => toStoryView(post));
+}
+
+export type StoryPackagePreviewProps = {
+  props: unknown;
+  theme: string;
+  features: { polls: boolean; events: boolean; sports: boolean; newsletter?: boolean };
+  publicationShortName: string;
+  calendarHeading: string;
+};
+
+export function BriefPackagePreview({ props, theme, publicationShortName }: StoryPackagePreviewProps) {
+  const data = usePreviewData();
+  if (!data) return <p className="byline-preview-loading">Loading publication content…</p>;
+
+  const config = parseBriefPackageProps(props);
+  const selection = resolvePreviewSelection(data);
+  const selected = previewSelectStories(config.source, config.limit, data, selection, new Set());
+  const resolved: ResolvedBriefPackage = {
+    packageId: previewPackageId(props, "home-brief"),
+    heading: config.heading,
+    lead: selected[0] ? toStoryView(selected[0]) : null,
+    rail: previewStoryViews(selected.slice(1)),
+    presentation: config.presentation,
+    fallbackAuthorName: `${publicationShortName} Staff`
+  };
+  const Renderer = getBriefPackageRenderer(theme);
+
+  return <Renderer package={resolved} />;
+}
+
+export function InFocusPackagePreview({ props, theme, publicationShortName }: StoryPackagePreviewProps) {
+  const data = usePreviewData();
+  if (!data) return <p className="byline-preview-loading">Loading publication content…</p>;
+
+  const config = parseInFocusPackageProps(props);
+  const selection = resolvePreviewSelection(data);
+  const selected = previewSelectStories(config.source, 1, data, selection, new Set());
+  const resolved: ResolvedInFocusPackage = {
+    packageId: previewPackageId(props, "home-in-focus"),
+    heading: config.heading,
+    story: selected[0] ? toStoryView(selected[0]) : null,
+    presentation: config.presentation,
+    fallbackAuthorName: `${publicationShortName} Staff`
+  };
+  const Renderer = getInFocusPackageRenderer(theme);
+
+  return <Renderer package={resolved} />;
+}
+
+export function SpecialCoveragePackagePreview({ props, theme, publicationShortName }: StoryPackagePreviewProps) {
+  const data = usePreviewData();
+  if (!data) return <p className="byline-preview-loading">Loading publication content…</p>;
+
+  const config = parseSpecialCoveragePackageProps(props);
+  const selection = resolvePreviewSelection(data);
+  const selected = previewSelectStories(config.source, config.limit, data, selection, new Set());
+  const resolved: ResolvedSpecialCoveragePackage = {
+    packageId: previewPackageId(props, "home-special-coverage"),
+    heading: config.heading,
+    stories: previewStoryViews(selected),
+    leadPresentation: config.leadPresentation,
+    supportingPresentation: config.supportingPresentation,
+    fallbackAuthorName: `${publicationShortName} Staff`
+  };
+  const Renderer = getSpecialCoveragePackageRenderer(theme);
+
+  return <Renderer package={resolved} />;
+}
+
+export function OpinionPackagePreview({ props, theme, publicationShortName }: StoryPackagePreviewProps) {
+  const data = usePreviewData();
+  if (!data) return <p className="byline-preview-loading">Loading publication content…</p>;
+
+  const config = parseOpinionPackageProps(props);
+  const selection = resolvePreviewSelection(data);
+  const selected = previewSelectStories(config.source, config.limit, data, selection, new Set());
+  const resolved: ResolvedOpinionPackage = {
+    packageId: previewPackageId(props, "home-opinion"),
+    heading: config.heading,
+    description: config.description.replaceAll("{publication.shortName}", publicationShortName),
+    archiveLink: config.archiveLink,
+    lead: selected[0] ? toStoryView(selected[0]) : null,
+    rail: previewStoryViews(selected.slice(1, 3)),
+    presentation: config.presentation,
+    fallbackAuthorName: `${publicationShortName} Staff`
+  };
+  const Renderer = getOpinionPackageRenderer(theme);
+
+  return <Renderer package={resolved} />;
+}
+
+function previewUtilityLink(label: string, href: string, iconName: string): MoreUtilityLinkView {
+  return { label, href, iconName };
+}
+
+export function MorePackagePreview({ props, theme, features, publicationShortName }: StoryPackagePreviewProps) {
+  const data = usePreviewData();
+  if (!data) return <p className="byline-preview-loading">Loading publication content…</p>;
+
+  const config = parseMorePackageProps(props);
+  const selection = resolvePreviewSelection(data);
+  const selected = previewSelectStories(config.source, config.limit, data, selection, new Set());
+  const utility = config.utility.enabled && (config.utility.joinStaff.enabled || config.utility.stayConnected.enabled)
+    ? {
+        enabled: true,
+        publicationLabel: publicationShortName,
+        joinStaff: {
+          ...config.utility.joinStaff,
+          links: [
+            previewUtilityLink("Join the newsroom", "/join/", "ph:pencil-line"),
+            previewUtilityLink("Meet the staff", "/authors/", "ph:users-three")
+          ]
+        },
+        stayConnected: {
+          ...config.utility.stayConnected,
+          links: [
+            previewUtilityLink("Contact", "#contact", "ph:envelope-simple"),
+            ...(features.newsletter !== false ? [previewUtilityLink("Newsletter", "#home-newsletter", "ph:paper-plane-tilt")] : [])
+          ]
+        }
+      }
+    : null;
+  const resolved: ResolvedMorePackage = {
+    packageId: previewPackageId(props, "home-more"),
+    heading: config.heading.replaceAll("{publication.shortName}", publicationShortName),
+    archiveLink: config.archiveLink,
+    lead: selected[0] ? toStoryView(selected[0]) : null,
+    rail: previewStoryViews(selected.slice(1, 4)),
+    presentation: config.presentation,
+    utility,
+    fallbackAuthorName: `${publicationShortName} Staff`
+  };
+  const Renderer = getMorePackageRenderer(theme);
+
+  return <Renderer package={resolved} />;
+}
+
+export function NewsletterPackagePreview({ props, theme, features, publicationShortName }: StoryPackagePreviewProps) {
+  const config = parseNewsletterPackageProps(props);
+  const resolved: ResolvedNewsletterPackage = {
+    packageId: previewPackageId(props, "home-newsletter"),
+    enabled: features.newsletter !== false,
+    label: config.label,
+    heading: config.heading.replaceAll("{publication.shortName}", publicationShortName),
+    presentation: config.presentation
+  };
+  const Renderer = getNewsletterPackageRenderer(theme);
+
+  // This is intentionally a non-submitting preview surface. The published
+  // renderer receives the real signup form from the host; Studio never embeds
+  // a production endpoint or a client submission flow in the canvas.
+  return (
+    <Renderer package={resolved} formSlot={
+      <div className="byline-preview-newsletter-surface">
+        {config.presentation.showLabel ? <p>{config.label}</p> : null}
+        <h3>{config.heading}</h3>
+        <span>{publicationShortName} newsletter signup preview</span>
+      </div>
+    } />
   );
 }
