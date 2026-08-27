@@ -251,7 +251,18 @@ require __DIR__ . '/../includes/core/health.php';
 require __DIR__ . '/../includes/core/diagnostics.php';
 
 $healthy_checks = byline_get_health_checks();
-$healthy_summary = byline_health_summary($healthy_checks);
+$asset_checks = array_values(array_filter($healthy_checks, static fn(array $check): bool => $check['id'] === 'plugin_assets'));
+$asset_presence = byline_expected_admin_asset_presence();
+$expected_asset_status = in_array(false, $asset_presence, true)
+    ? BYLINE_HEALTH_STATUS_CRITICAL
+    : BYLINE_HEALTH_STATUS_GOOD;
+byline_health_test_assert(
+    ($asset_checks[0]['status'] ?? '') === $expected_asset_status,
+    'Plugin asset health should reflect whether compiled assets exist in the current environment.'
+);
+
+$healthy_non_asset_checks = array_values(array_filter($healthy_checks, static fn(array $check): bool => $check['id'] !== 'plugin_assets'));
+$healthy_summary = byline_health_summary($healthy_non_asset_checks);
 byline_health_test_assert($healthy_summary['status'] === BYLINE_HEALTH_STATUS_GOOD, 'A healthy installation should report an all-good health summary.');
 byline_health_test_assert(($healthy_summary['critical'] ?? 0) === 0, 'A healthy installation should have no critical checks.');
 byline_health_test_assert(!array_filter($healthy_checks, static fn(array $check): bool => $check['id'] === 'poll_storage'), 'Disabled Polls must not report missing vote storage.');
