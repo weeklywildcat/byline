@@ -74,7 +74,7 @@ const NEUTRAL_LEAD_DEFAULTS: LeadPackageProps = {
   lead: { source: { type: "latest" } },
   latest: { heading: "Latest", source: { type: "latest" }, limit: 4, showBylines: true },
   utility: { poll: false, calendar: false, calendarLimit: 0 },
-  presentation: { showDeck: true, opinionTreatment: "auto" }
+  presentation: { showDeck: true }
 };
 
 export function getStarterHomeDesign(theme: string): BylineDesignDocumentV2 {

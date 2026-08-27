@@ -33,6 +33,11 @@ build_assets=(
   build/index.asset.php
   build/index.css
   build/style-index.css
+  # The block-editor workflow entry. A production install that ships without it
+  # silently loses the editorial workflow sidebar.
+  build/editorial-workflow.js
+  build/editorial-workflow.asset.php
+  build/editorial-workflow.css
 )
 
 migration_assets=(
@@ -47,6 +52,23 @@ asset_dependencies="$(php -r '$asset = include $argv[1]; echo implode("\n", $ass
 for external_dependency in react react-dom react-jsx-runtime wp-element; do
   if ! grep -qx "$external_dependency" <<<"$asset_dependencies"; then
     echo "React external $external_dependency is missing from the WordPress asset manifest." >&2
+    exit 1
+  fi
+done
+
+# The workflow entry loads on every post editor, so it must rely entirely on the
+# WordPress-provided packages rather than bundling a second React or a second
+# copy of the editor packages.
+workflow_dependencies="$(php -r '$asset = include $argv[1]; echo implode("\n", $asset["dependencies"] ?? []);' "$plugin_root/build/editorial-workflow.asset.php")"
+for editor_dependency in wp-plugins wp-editor wp-element wp-data wp-components wp-api-fetch; do
+  if ! grep -qx "$editor_dependency" <<<"$workflow_dependencies"; then
+    echo "WordPress dependency $editor_dependency is missing from the workflow editor asset manifest." >&2
+    exit 1
+  fi
+done
+for bundled_react in react react-dom; do
+  if grep -qx "$bundled_react" <<<"$workflow_dependencies"; then
+    echo "The workflow editor bundle must use the WordPress-provided $bundled_react." >&2
     exit 1
   fi
 done
@@ -68,6 +90,7 @@ rsync -a "$plugin_root/" "$stage_root/weekly-wildcat-headless/" \
   --exclude 'package-lock.json' \
   --exclude 'tsconfig.json' \
   --exclude 'vitest.config.mts' \
+  --exclude 'webpack.config.js' \
   --exclude 'release' \
   --exclude '*.zip' \
   --exclude '*.map' \
@@ -80,6 +103,8 @@ archive_files="$(unzip -Z1 "$archive")"
 grep -qx 'weekly-wildcat-headless/weekly-wildcat-headless.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.asset.php' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/editorial-workflow.js' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/editorial-workflow.asset.php' <<<"$archive_files"
 
 # Polls are WordPress-owned storage now, so the whole poll module must ship.
 for poll_file in "${poll_files[@]}"; do

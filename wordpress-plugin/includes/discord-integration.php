@@ -4,12 +4,18 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * Discord is a *consumer* of the Byline editorial workflow, not its owner.
+ *
+ * Everything below reads and writes editorial state through
+ * `includes/editorial/workflow.php`. This file owns only Discord's own
+ * identifiers: account links, thread and message IDs, and synchronisation
+ * bookkeeping. The status vocabulary Discord sends and receives is the canonical
+ * Byline vocabulary, so slash commands and forum tags keep working unchanged.
+ */
+
 const WWH_DISCORD_USER_ID_META = '_wwh_discord_user_id';
 const WWH_DISCORD_USERNAME_META = '_wwh_discord_username';
-const WWH_STORY_STATUS_META = '_wwh_story_status';
-const WWH_STORY_EDITOR_META = '_wwh_story_editor_user_id';
-const WWH_STORY_DEADLINE_META = '_wwh_story_deadline';
-const WWH_STORY_VISUALS_META = '_wwh_story_visuals';
 const WWH_DISCORD_THREAD_META = '_wwh_discord_thread_id';
 const WWH_DISCORD_CARD_META = '_wwh_discord_card_message_id';
 const WWH_DISCORD_PUBLISH_META = '_wwh_discord_publish_message_id';
@@ -45,7 +51,7 @@ function wwh_discord_setting(string $key, string $legacy_env): string
 
 function wwh_discord_statuses(): array
 {
-    return ['pitch', 'assigned', 'reporting', 'writing', 'editing', 'ready', 'on-hold', 'dropped', 'published'];
+    return byline_editorial_status_ids();
 }
 
 function wwh_discord_sanitize_snowflake($value): string
@@ -56,23 +62,21 @@ function wwh_discord_sanitize_snowflake($value): string
 
 function wwh_discord_sanitize_status($value): string
 {
-    $status = sanitize_key((string) $value);
-    return in_array($status, wwh_discord_statuses(), true) ? $status : 'pitch';
+    return byline_editorial_sanitize_status($value);
 }
 
 function wwh_discord_sanitize_deadline($value): string
 {
-    $value = trim((string) $value);
-    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
-    return $date instanceof DateTimeImmutable && $date->format('Y-m-d') === $value ? $value : '';
+    return byline_editorial_sanitize_deadline($value);
 }
 
+/**
+ * Only Discord's own metadata is registered here. Story status, editor,
+ * deadline, and visual needs are registered by the editorial workflow domain.
+ */
 function wwh_discord_register_meta(): void
 {
     $string_meta = [
-        WWH_STORY_STATUS_META => 'wwh_discord_sanitize_status',
-        WWH_STORY_DEADLINE_META => 'wwh_discord_sanitize_deadline',
-        WWH_STORY_VISUALS_META => 'sanitize_textarea_field',
         WWH_DISCORD_THREAD_META => 'wwh_discord_sanitize_snowflake',
         WWH_DISCORD_CARD_META => 'wwh_discord_sanitize_snowflake',
         WWH_DISCORD_PUBLISH_META => 'wwh_discord_sanitize_snowflake',
@@ -89,13 +93,6 @@ function wwh_discord_register_meta(): void
             'auth_callback' => static fn() => current_user_can('edit_posts'),
         ]);
     }
-    register_post_meta('post', WWH_STORY_EDITOR_META, [
-        'single' => true,
-        'type' => 'integer',
-        'sanitize_callback' => 'absint',
-        'show_in_rest' => false,
-        'auth_callback' => static fn() => current_user_can('edit_others_posts'),
-    ]);
     foreach ([WWH_DISCORD_USER_ID_META => 'wwh_discord_sanitize_snowflake', WWH_DISCORD_USERNAME_META => 'sanitize_text_field'] as $key => $sanitize) {
         register_meta('user', $key, [
             'single' => true,
@@ -152,21 +149,21 @@ function wwh_discord_story(int $post_id): array
         return [];
     }
     $writer = get_user_by('id', (int) $post->post_author);
-    $editor_id = absint(get_post_meta($post_id, WWH_STORY_EDITOR_META, true));
-    $editor = $editor_id ? get_user_by('id', $editor_id) : false;
+    // Canonical editorial state, including the derived "published" display value.
+    $editorial = byline_get_editorial_story_state($post_id);
+    $editor = $editorial['editorId'] ? get_user_by('id', $editorial['editorId']) : false;
     $categories = get_the_category($post_id);
     $featured_id = get_post_thumbnail_id($post_id);
-    $status = $post->post_status === 'publish' ? 'published' : wwh_discord_sanitize_status(get_post_meta($post_id, WWH_STORY_STATUS_META, true) ?: 'pitch');
     return [
         'id' => $post_id,
         'title' => get_the_title($post_id),
-        'status' => $status,
+        'status' => $editorial['status'],
         'postStatus' => $post->post_status,
         'writer' => wwh_discord_user_summary($writer),
         'editor' => wwh_discord_user_summary($editor),
-        'deadline' => wwh_discord_sanitize_deadline(get_post_meta($post_id, WWH_STORY_DEADLINE_META, true)),
+        'deadline' => $editorial['deadline'],
         'section' => $categories ? (string) $categories[0]->name : '',
-        'visuals' => sanitize_textarea_field((string) get_post_meta($post_id, WWH_STORY_VISUALS_META, true)),
+        'visuals' => $editorial['visuals'],
         'wordpressUrl' => get_edit_post_link($post_id, 'raw') ?: admin_url('post.php?post=' . $post_id . '&action=edit'),
         'publicUrl' => $post->post_status === 'publish' ? get_permalink($post_id) : '',
         'featuredImageUrl' => $featured_id ? (wp_get_attachment_image_url($featured_id, 'large') ?: '') : '',
@@ -279,7 +276,8 @@ function wwh_discord_rest_create_story(WP_REST_Request $request)
         return $post_id;
     }
     update_post_meta($post_id, WWH_DISCORD_THREAD_META, $thread_id);
-    update_post_meta($post_id, WWH_STORY_STATUS_META, 'pitch');
+    // A Discord pitch enters WordPress as a draft at the first workflow stage.
+    byline_set_editorial_status($post_id, 'pitch');
     if ($request_id !== '') {
         set_transient('wwh_discord_request_' . $request_id, $post_id, DAY_IN_SECONDS);
     }
@@ -306,7 +304,7 @@ function wwh_discord_rest_update_story(WP_REST_Request $request)
         if (isset($data['status'])) {
             $status = wwh_discord_sanitize_status($data['status']);
             if ($status !== 'published' && $status !== $story['status']) {
-                update_post_meta($post_id, WWH_STORY_STATUS_META, $status);
+                byline_set_editorial_status($post_id, $status);
             }
         }
         return rest_ensure_response(wwh_discord_story($post_id));
@@ -325,7 +323,10 @@ function wwh_discord_rest_update_story(WP_REST_Request $request)
         if ($status === 'published') {
             return new WP_Error('wwh_invalid_status', 'Published follows the WordPress publication state.', ['status' => 400]);
         }
-        update_post_meta($post_id, WWH_STORY_STATUS_META, $status);
+        $updated = byline_update_editorial_story_state($post_id, ['status' => $status], (int) $actor->ID);
+        if (is_wp_error($updated)) {
+            return $updated;
+        }
     } elseif ($operation === 'headline') {
         wp_update_post(['ID' => $post_id, 'post_title' => sanitize_text_field((string) ($data['title'] ?? ''))]);
     } elseif ($operation === 'deadline') {
@@ -333,7 +334,10 @@ function wwh_discord_rest_update_story(WP_REST_Request $request)
         if ($deadline === '') {
             return new WP_Error('wwh_invalid_deadline', 'Use a valid date in YYYY-MM-DD format.', ['status' => 400]);
         }
-        update_post_meta($post_id, WWH_STORY_DEADLINE_META, $deadline);
+        $updated = byline_update_editorial_story_state($post_id, ['deadline' => $deadline], (int) $actor->ID);
+        if (is_wp_error($updated)) {
+            return $updated;
+        }
     } elseif ($operation === 'assign') {
         $target = wwh_discord_actor((string) ($data['targetDiscordUserId'] ?? ''));
         if (is_wp_error($target)) {
@@ -341,11 +345,15 @@ function wwh_discord_rest_update_story(WP_REST_Request $request)
         }
         if (($data['role'] ?? '') === 'writer') {
             wp_update_post(['ID' => $post_id, 'post_author' => (int) $target->ID]);
+            // Handing a pitch to a writer is what makes it an assignment.
             if ($story['status'] === 'pitch') {
-                update_post_meta($post_id, WWH_STORY_STATUS_META, 'assigned');
+                byline_set_editorial_status($post_id, 'assigned');
             }
         } elseif (($data['role'] ?? '') === 'editor') {
-            update_post_meta($post_id, WWH_STORY_EDITOR_META, (int) $target->ID);
+            $updated = byline_update_editorial_story_state($post_id, ['editorId' => (int) $target->ID], (int) $actor->ID);
+            if (is_wp_error($updated)) {
+                return $updated;
+            }
         } else {
             return new WP_Error('wwh_invalid_role', 'Role must be writer or editor.', ['status' => 400]);
         }
@@ -422,10 +430,10 @@ function wwh_discord_rest_stories(WP_REST_Request $request)
         }
     }
     if ($scope === 'editing') {
-        $args['meta_query'] = [['key' => WWH_STORY_STATUS_META, 'value' => 'editing']];
+        $args['meta_query'] = [['key' => BYLINE_EDITORIAL_STATUS_META, 'value' => 'editing']];
     } elseif (in_array($scope, ['today', 'tomorrow', 'this-week', 'overdue'], true)) {
         [$start, $end] = wwh_discord_due_range($scope);
-        $args['meta_query'] = [['key' => WWH_STORY_DEADLINE_META, 'value' => [$start, $end], 'compare' => 'BETWEEN', 'type' => 'DATE']];
+        $args['meta_query'] = [['key' => BYLINE_EDITORIAL_DEADLINE_META, 'value' => [$start, $end], 'compare' => 'BETWEEN', 'type' => 'DATE']];
     }
     $stories = array_values(array_filter(array_map(static fn($post) => wwh_discord_story((int) $post->ID), get_posts($args)), static function ($story) use ($scope, $actor): bool {
         if (!$story || $story['status'] === 'dropped') return false;
@@ -461,45 +469,18 @@ function wwh_discord_register_rest_routes(): void
 }
 add_action('rest_api_init', 'wwh_discord_register_rest_routes');
 
-function wwh_discord_register_story_box(): void
+/**
+ * Editorial workflow is edited through the Byline editorial surfaces, not
+ * through a Discord metabox. Discord reacts to the change instead of owning the
+ * control: the domain fires this action after any workflow write, and the sync
+ * is queued rather than performed inline so an unreachable bot can never block
+ * a save, a status change, or a publication.
+ */
+function wwh_discord_on_editorial_update(int $post_id): void
 {
-    add_meta_box('wwh-discord-story', byline_publication_name() . ' Workflow', 'wwh_discord_render_story_box', 'post', 'side', 'default');
+    wwh_discord_queue_story($post_id);
 }
-add_action('add_meta_boxes_post', 'wwh_discord_register_story_box');
-
-function wwh_discord_render_story_box(WP_Post $post): void
-{
-    wp_nonce_field('wwh_discord_save_story', 'wwh_discord_story_nonce');
-    $status = $post->post_status === 'publish' ? 'published' : wwh_discord_sanitize_status(get_post_meta($post->ID, WWH_STORY_STATUS_META, true) ?: 'pitch');
-    $labels = ['pitch' => 'Pitch', 'assigned' => 'Assigned', 'reporting' => 'Reporting', 'writing' => 'Writing', 'editing' => 'Editing', 'ready' => 'Ready', 'on-hold' => 'On hold', 'dropped' => 'Dropped', 'published' => 'Published'];
-    $editor_id = absint(get_post_meta($post->ID, WWH_STORY_EDITOR_META, true));
-    echo '<p><label for="wwh_story_status"><strong>Workflow status</strong></label><br><select id="wwh_story_status" name="wwh_story_status" class="widefat" ' . ($status === 'published' ? 'disabled' : '') . '>';
-    foreach ($labels as $value => $label) {
-        if ($value !== 'published' || $status === 'published') echo '<option value="' . esc_attr($value) . '" ' . selected($status, $value, false) . '>' . esc_html($label) . '</option>';
-    }
-    echo '</select></p><p><label for="wwh_story_editor"><strong>Editor</strong></label><br><select id="wwh_story_editor" name="wwh_story_editor" class="widefat"><option value="0">Unassigned</option>';
-    foreach (get_users(['capability' => 'edit_posts', 'orderby' => 'display_name']) as $editor) echo '<option value="' . esc_attr((string) $editor->ID) . '" ' . selected($editor_id, $editor->ID, false) . '>' . esc_html($editor->display_name) . '</option>';
-    echo '</select></p><p><label for="wwh_story_deadline"><strong>Deadline</strong></label><br><input class="widefat" type="date" id="wwh_story_deadline" name="wwh_story_deadline" value="' . esc_attr((string) get_post_meta($post->ID, WWH_STORY_DEADLINE_META, true)) . '"></p>';
-    echo '<p><label for="wwh_story_visuals"><strong>Visual needs</strong></label><br><textarea class="widefat" rows="3" id="wwh_story_visuals" name="wwh_story_visuals">' . esc_textarea((string) get_post_meta($post->ID, WWH_STORY_VISUALS_META, true)) . '</textarea></p>';
-    $thread_id = (string) get_post_meta($post->ID, WWH_DISCORD_THREAD_META, true);
-    echo '<p class="description">' . esc_html($thread_id ? 'Linked Discord thread: ' . $thread_id : 'Discord thread will be created asynchronously after save.') . '</p>';
-}
-
-function wwh_discord_save_story_box(int $post_id): void
-{
-    if (!isset($_POST['wwh_discord_story_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['wwh_discord_story_nonce'])), 'wwh_discord_save_story') || !current_user_can('edit_post', $post_id) || wp_is_post_autosave($post_id) || wp_is_post_revision($post_id)) return;
-    $post = get_post($post_id);
-    if ($post instanceof WP_Post && $post->post_status !== 'publish') update_post_meta($post_id, WWH_STORY_STATUS_META, wwh_discord_sanitize_status(wp_unslash($_POST['wwh_story_status'] ?? 'pitch')));
-    if (current_user_can('edit_others_posts')) {
-        $editor_id = absint($_POST['wwh_story_editor'] ?? 0);
-        $editor_id ? update_post_meta($post_id, WWH_STORY_EDITOR_META, $editor_id) : delete_post_meta($post_id, WWH_STORY_EDITOR_META);
-        $deadline = wwh_discord_sanitize_deadline(wp_unslash($_POST['wwh_story_deadline'] ?? ''));
-        $deadline ? update_post_meta($post_id, WWH_STORY_DEADLINE_META, $deadline) : delete_post_meta($post_id, WWH_STORY_DEADLINE_META);
-    }
-    $visuals = sanitize_textarea_field(wp_unslash($_POST['wwh_story_visuals'] ?? ''));
-    $visuals !== '' ? update_post_meta($post_id, WWH_STORY_VISUALS_META, $visuals) : delete_post_meta($post_id, WWH_STORY_VISUALS_META);
-}
-add_action('save_post_post', 'wwh_discord_save_story_box', 15);
+add_action('byline_editorial_story_updated', 'wwh_discord_on_editorial_update');
 
 function wwh_discord_meaningful_story(int $post_id, $post = null): bool
 {
@@ -511,8 +492,8 @@ function wwh_discord_story_fingerprint(int $post_id, WP_Post $post): string
 {
     return hash('sha256', wp_json_encode([
         $post->post_title, $post->post_status, (int) $post->post_author, wp_get_post_categories($post_id),
-        get_post_meta($post_id, WWH_STORY_STATUS_META, true), get_post_meta($post_id, WWH_STORY_EDITOR_META, true),
-        get_post_meta($post_id, WWH_STORY_DEADLINE_META, true), get_post_meta($post_id, WWH_STORY_VISUALS_META, true),
+        get_post_meta($post_id, BYLINE_EDITORIAL_STATUS_META, true), get_post_meta($post_id, BYLINE_EDITORIAL_EDITOR_META, true),
+        get_post_meta($post_id, BYLINE_EDITORIAL_DEADLINE_META, true), get_post_meta($post_id, BYLINE_EDITORIAL_VISUALS_META, true),
     ]));
 }
 

@@ -30,7 +30,6 @@ type HomepageStoryProps = {
   post: WordPressPost;
   variant: HomepageStoryVariant;
   cleanDeck?: boolean;
-  homepageTreatment?: "opinion";
   showAuthor?: boolean;
   showDeck?: boolean;
   showReadingTime?: boolean;
@@ -70,7 +69,6 @@ export function HomepageStory({
   post,
   variant,
   cleanDeck = false,
-  homepageTreatment,
   showAuthor = false,
   showDeck = false,
   showReadingTime = false,
@@ -87,7 +85,6 @@ export function HomepageStory({
   const className = [
     "home-story",
     `home-story-${variant}`,
-    homepageTreatment === "opinion" ? "home-story-homepage-opinion" : "",
     hasImage ? "" : "home-story-no-image"
   ]
     .filter(Boolean)

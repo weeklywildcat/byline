@@ -13,15 +13,15 @@ const resolved: ResolvedLeadPackage = {
     id: 1, title: "Lead headline", href: "/a/", deck: "Deck", deckIsHtml: false,
     isoDate: "2026-08-20T00:00:00", displayDate: "August 20, 2026", readingTime: null,
     category: { name: "News", href: "/category/news/" }, author: { name: "Reporter", href: "/author/r/" },
-    image: null, opinionTreatment: false
+    image: null
   },
   latest: { heading: "The Latest", showBylines: true, stories: [{
     id: 2, title: "Second story", href: "/b/", deck: "", deckIsHtml: false,
     isoDate: "2026-08-19T00:00:00", displayDate: "August 19, 2026", readingTime: null,
-    category: null, author: null, image: null, opinionTreatment: false
+    category: null, author: null, image: null
   }] },
   utility: { poll: true, calendar: false },
-  presentation: { showDeck: true, opinionTreatment: false },
+  presentation: { showDeck: true },
   fallbackAuthorName: "Staff",
   emptyMessage: "none"
 };
@@ -60,12 +60,12 @@ const resolvedSports: ResolvedSportsPackage = {
     id: 10, title: "Wildcats open the season", href: "/s/10/", deck: "A two sentence deck.", deckIsHtml: false,
     isoDate: "2026-08-20T00:00:00", displayDate: "August 20, 2026", readingTime: null,
     category: { name: "Sports", href: "/category/sports/" }, author: { name: "Reporter", href: "/author/r/" },
-    image: null, opinionTreatment: false
+    image: null
   },
   rail: [{
     id: 11, title: "Soccer kicks off", href: "/s/11/", deck: "", deckIsHtml: false,
     isoDate: "2026-08-19T00:00:00", displayDate: "August 19, 2026", readingTime: null,
-    category: null, author: null, image: null, opinionTreatment: false
+    category: null, author: null, image: null
   }],
   athleteSpotlight: {
     id: 12, name: "Jordan Reyes", href: "/s/12/", eyebrow: "Athlete of the Week",

@@ -78,6 +78,10 @@ function byline_diagnostics_safe_runtime(): array
             'designs' => '/byline/v1/designs',
             'diagnostics' => '/byline/v1/admin/diagnostics',
             'health' => '/byline/v1/admin/health',
+            // Registration only. The editorial routes carry private newsroom
+            // information, so diagnostics reports whether they exist and never
+            // what they contain.
+            'editorialWorkflow' => '/byline/v1/editorial/stories/(?P<id>\d+)',
         ] as $name => $route) {
             $registered = byline_health_registered_route($route);
             $route_presence[$name] = $registered === null ? null : $registered;

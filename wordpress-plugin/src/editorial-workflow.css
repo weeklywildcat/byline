@@ -1,0 +1,142 @@
+/*
+ * Restrained WordPress admin styling. The sidebar should read as a native
+ * editorial tool, not as a second dashboard bolted into the editor, so it
+ * borrows core's spacing and colour tokens rather than inventing a palette.
+ */
+
+.byline-workflow-panel {
+  padding: 16px;
+}
+
+.byline-workflow-panel + .byline-workflow-panel {
+  border-top: 1px solid #e0e0e0;
+}
+
+.byline-workflow-current {
+  margin: 0 0 4px;
+}
+
+.byline-workflow-current-label {
+  color: #757575;
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.byline-workflow-current-value {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.byline-workflow-note {
+  color: #757575;
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+/*
+ * The stage list is a radio group. Status is communicated by the label and by
+ * the checked state; the marker is decorative and never the only cue.
+ */
+.byline-workflow-stages {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.byline-workflow-stages legend {
+  color: #757575;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+  padding: 0;
+  text-transform: uppercase;
+}
+
+.byline-workflow-stage {
+  align-items: center;
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 8px;
+}
+
+.byline-workflow-stage:hover {
+  background: #f0f0f0;
+}
+
+.byline-workflow-stage input[type='radio'] {
+  flex: none;
+  margin: 0;
+}
+
+.byline-workflow-stage-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.byline-workflow-stage-current .byline-workflow-stage-text {
+  font-weight: 600;
+}
+
+.byline-workflow-stage-done .byline-workflow-stage-text {
+  color: #757575;
+}
+
+.byline-workflow-stage input[type='radio']:focus-visible {
+  outline: 2px solid var(--wp-admin-theme-color, #3858e9);
+  outline-offset: 1px;
+}
+
+.byline-workflow-stages-sidelined {
+  margin-top: 12px;
+}
+
+.byline-workflow-field + .byline-workflow-field {
+  margin-top: 12px;
+}
+
+.byline-workflow-readonly {
+  margin: 0 0 12px;
+}
+
+.byline-workflow-readonly dt {
+  color: #757575;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.byline-workflow-readonly dd {
+  margin: 2px 0 10px;
+  overflow-wrap: break-word;
+}
+
+.byline-workflow-status-line {
+  color: #757575;
+  font-size: 12px;
+  margin: 12px 0 0;
+  min-height: 18px;
+}
+
+.byline-workflow-summary {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.byline-workflow-summary-value {
+  font-weight: 600;
+}

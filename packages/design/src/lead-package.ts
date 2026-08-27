@@ -38,20 +38,17 @@ export type LeadPackageProps = {
   };
   presentation: {
     showDeck: boolean;
-    // "auto" honours the per-post homepageOpinionTreatment setting, which is the
-    // current production behaviour. "off" ignores it.
-    opinionTreatment: "auto" | "off";
   };
 };
 
 // The Weekly Wildcat production defaults, taken from the pre-Studio homepage:
 // sticky-first lead, a four-story Latest rail with bylines, both utility
-// modules on, decks shown, opinion treatment honoured.
+// modules on, decks shown.
 export const WEEKLY_WILDCAT_LEAD_DEFAULTS: LeadPackageProps = {
   lead: { source: { type: "sticky" } },
   latest: { heading: "The Latest", source: { type: "compatibility-latest" }, limit: 4, showBylines: true },
   utility: { poll: true, calendar: true, calendarLimit: 3 },
-  presentation: { showDeck: true, opinionTreatment: "auto" }
+  presentation: { showDeck: true }
 };
 
 const MAX_LATEST = 12;
@@ -108,9 +105,11 @@ export function parseLeadPackageProps(value: unknown): LeadPackageProps {
         MAX_CALENDAR_ITEMS
       )
     },
+    // Older persisted designs may still carry a retired `opinionTreatment`
+    // setting. Rebuilding presentation from the known keys drops it, so those
+    // documents stay valid and simply render the normal lead treatment.
     presentation: {
-      showDeck: boolean(presentation.showDeck, WEEKLY_WILDCAT_LEAD_DEFAULTS.presentation.showDeck),
-      opinionTreatment: presentation.opinionTreatment === "off" ? "off" : "auto"
+      showDeck: boolean(presentation.showDeck, WEEKLY_WILDCAT_LEAD_DEFAULTS.presentation.showDeck)
     }
   };
 }

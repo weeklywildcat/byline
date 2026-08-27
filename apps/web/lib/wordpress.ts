@@ -157,26 +157,6 @@ export type WordPressImageCredit = {
     acquireLicensePage: string;
 };
 
-export type WordPressArticleHeroImage = {
-  id: number;
-  sourceUrl: string;
-  alt: string;
-  width: number | null;
-  height: number | null;
-  caption: string;
-  creditText: string;
-};
-
-export type WordPressArticleHero = {
-  enabled: boolean;
-  backgroundColor: string;
-  textColor: "light" | "dark";
-  layout: "text-left" | "text-right" | "overlay";
-  imageFit: "cover" | "contain";
-  imageSource: "featured" | "custom";
-  image: WordPressArticleHeroImage | null;
-};
-
 export type WordPressPost = {
   id: number;
   date: string;
@@ -205,9 +185,7 @@ export type WordPressPost = {
 };
 
 export type WordPressPostSettings = {
-    homepageOpinionTreatment?: boolean;
     primaryGameId?: number;
-    articleHero?: WordPressArticleHero;
 };
 
 export type PostRouteParts = {
@@ -558,8 +536,4 @@ export function getAuthorSocialLinks(author: WordPressAuthor) {
 export function getPostPrimaryGameId(post: WordPressPost) {
   const primaryGameId = (post.byline ?? post.weeklyWildcat)?.primaryGameId;
   return primaryGameId && primaryGameId > 0 ? primaryGameId : null;
-}
-
-export function getPostSettings(post: WordPressPost) {
-  return post.byline ?? post.weeklyWildcat ?? null;
 }

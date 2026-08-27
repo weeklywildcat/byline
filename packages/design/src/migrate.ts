@@ -174,7 +174,7 @@ function leadPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set
       // v1 story-lead rendered one story and no adjacent modules.
       latest: { ...WEEKLY_WILDCAT_LEAD_DEFAULTS.latest, limit: 0 },
       utility: { poll: false, calendar: false, calendarLimit: 0 },
-      presentation: { showDeck: true, opinionTreatment: "auto" }
+      presentation: { showDeck: true }
     }
   };
 }
@@ -299,7 +299,7 @@ function utilityPackageFromV1(
         // was not read by that renderer.
         calendarLimit: 5
       },
-      presentation: { showDeck: true, opinionTreatment: "off" }
+      presentation: { showDeck: true }
     }
   };
 }

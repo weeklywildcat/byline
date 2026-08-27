@@ -156,6 +156,8 @@ $v2 = [
             'lead' => ['source' => ['type' => 'sticky']],
             'latest' => ['source' => ['type' => 'latest'], 'limit' => 4, 'heading' => 'The Latest', 'showBylines' => true],
             'utility' => ['poll' => true, 'calendar' => true, 'calendarLimit' => 3],
+            // The retired opinion-lead treatment is still present on designs
+            // saved before its removal. Validation must keep accepting them.
             'presentation' => ['showDeck' => true, 'opinionTreatment' => 'auto'],
         ],
     ]],

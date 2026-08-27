@@ -635,12 +635,6 @@
   text-align: center;
 }
 
-:where(.byline-publication-preview) .home-story-lead.home-story-homepage-opinion h2 {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 500;
-}
-
 :where(.byline-publication-preview) .home-story-lead .home-story-meta {
   display: none;
 }

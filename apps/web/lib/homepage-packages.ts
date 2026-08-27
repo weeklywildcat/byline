@@ -38,7 +38,6 @@ import {
   getFeaturedMedia,
   getPostAuthor,
   getPostHref,
-  getPostSettings,
   type WordPressPost
 } from "@/lib/wordpress";
 
@@ -70,7 +69,6 @@ function getReadingTime(post: WordPressPost) {
 export type StoryViewOptions = {
   cleanDeck?: boolean;
   includeReadingTime?: boolean;
-  opinionTreatment?: boolean;
 };
 
 export function toStoryView(post: WordPressPost, options: StoryViewOptions = {}): StoryView {
@@ -97,8 +95,7 @@ export function toStoryView(post: WordPressPost, options: StoryViewOptions = {})
           width: image.media_details?.width ?? null,
           height: image.media_details?.height ?? null
         }
-      : null,
-    opinionTreatment: options.opinionTreatment ?? false
+      : null
   };
 }
 
@@ -271,15 +268,11 @@ export function resolveLeadPackage(input: LeadPackageResolutionInput): ResolvedL
     .filter((post) => post.id !== leadPost?.id)
     .slice(0, config.latest.limit);
 
-  const opinionTreatment =
-    config.presentation.opinionTreatment === "auto" &&
-    Boolean(leadPost && getPostSettings(leadPost)?.homepageOpinionTreatment);
-
   return {
     packageId: input.packageId,
     mode,
     ...(config.heading ? { heading: config.heading } : {}),
-    lead: leadPost ? toStoryView(leadPost, { opinionTreatment }) : null,
+    lead: leadPost ? toStoryView(leadPost) : null,
     latest: {
       heading: config.latest.heading,
       stories: latestPosts.map((post) => toStoryView(post)),
@@ -295,8 +288,7 @@ export function resolveLeadPackage(input: LeadPackageResolutionInput): ResolvedL
         : `At ${publication.identity.organizationName}`)
     },
     presentation: {
-      showDeck: config.presentation.showDeck,
-      opinionTreatment
+      showDeck: config.presentation.showDeck
     },
     fallbackAuthorName: `${publication.identity.shortName} Staff`,
     emptyMessage: "No published posts are available yet."

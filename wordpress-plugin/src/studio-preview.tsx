@@ -130,8 +130,7 @@ function toStoryView(post: PreviewPost): StoryView {
           width: media.media_details?.width ?? null,
           height: media.media_details?.height ?? null
         }
-      : null,
-    opinionTreatment: false
+      : null
   };
 }
 
@@ -371,7 +370,7 @@ function resolvePreviewLeadPackage(
       calendarLimit: config.utility.calendarLimit,
       calendarHeading
     },
-    presentation: { showDeck: config.presentation.showDeck, opinionTreatment: false },
+    presentation: { showDeck: config.presentation.showDeck },
     fallbackAuthorName: `${publicationShortName} Staff`,
     emptyMessage: "No published posts are available yet."
   };

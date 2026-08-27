@@ -165,15 +165,33 @@ describe("lead package props", () => {
     const parsed = parseLeadPackageProps({
       latest: { heading: "Right Now", limit: 2, source: { type: "latest" }, showBylines: false },
       utility: { poll: false, calendar: true, calendarLimit: 5 },
-      presentation: { showDeck: false, opinionTreatment: "off" },
+      presentation: { showDeck: false },
       lead: { source: { type: "nonsense" } }
     });
 
     expect(parsed.latest).toEqual({ heading: "Right Now", limit: 2, source: { type: "latest" }, showBylines: false });
     expect(parsed.utility).toEqual({ poll: false, calendar: true, calendarLimit: 5 });
-    expect(parsed.presentation).toEqual({ showDeck: false, opinionTreatment: "off" });
+    expect(parsed.presentation).toEqual({ showDeck: false });
     // The unusable lead source falls back rather than throwing away the page.
     expect(parsed.lead.source).toEqual(WEEKLY_WILDCAT_LEAD_DEFAULTS.lead.source);
+  });
+
+  // The per-post opinion lead treatment was retired. Designs saved while it
+  // existed still persist `presentation.opinionTreatment`, and they must keep
+  // loading: this is an intentionally removed presentation option, not schema
+  // corruption, so it never justifies a schema version bump or a failed publish.
+  it("drops the retired opinion treatment without invalidating an existing design", () => {
+    for (const retired of ["auto", "off"]) {
+      const parsed = parseLeadPackageProps({
+        lead: { source: { type: "sticky" } },
+        presentation: { showDeck: true, opinionTreatment: retired }
+      });
+
+      expect(parsed.presentation).toEqual({ showDeck: true });
+      expect(parsed.presentation).not.toHaveProperty("opinionTreatment");
+      // Re-serialising the parsed props normalises the obsolete field away.
+      expect(JSON.stringify(parsed)).not.toContain("opinionTreatment");
+    }
   });
 
   it("bounds the latest count", () => {

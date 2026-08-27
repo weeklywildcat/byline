@@ -140,7 +140,6 @@ export type HomepageResolutionInput = {
 
 export type ResolvedHomepage = {
   packages: ResolvedHomepagePackage[];
-  leadHasOpinionTreatment: boolean;
 };
 
 /**
@@ -285,10 +284,5 @@ export function resolveHomepageDocument(input: HomepageResolutionInput): Resolve
     addResolvedStoryIds(usedStoryIds, resolvedEntry);
   }
 
-  return {
-    packages: resolved,
-    leadHasOpinionTreatment: resolved.some(
-      (entry) => entry.type === LEAD_PACKAGE_TYPE && entry.package.presentation.opinionTreatment
-    )
-  };
+  return { packages: resolved };
 }
