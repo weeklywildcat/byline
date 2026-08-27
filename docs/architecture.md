@@ -16,8 +16,13 @@ static public presentation.
 - Shared workspace packages define publication, content-query, design, Studio,
   theme, and React 18/19-compatible UI contracts. Official themes consume data
   through normalized props and never fetch WordPress directly.
+- Editorial workflow is a first-class Byline domain, separate from WordPress
+  publication state. It owns a story's stage, assigned editor, deadline, and
+  visual needs, and integrations consume it rather than owning it. See
+  [editorial-workflow.md](editorial-workflow.md).
 - The Discord bot is an optional stateless newsroom service. It is built and
-  deployed separately and is excluded from the WordPress release archive.
+  deployed separately and is excluded from the WordPress release archive. It is
+  a consumer of the editorial workflow domain, not its owner.
 
 The plugin source lives under `wordpress-plugin/` while retaining its installed
 path and main file. Canonical GitHub releases still publish

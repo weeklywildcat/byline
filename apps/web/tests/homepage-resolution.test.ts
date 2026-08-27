@@ -165,6 +165,7 @@ describe("homepage package orchestration", () => {
           lead: { source: { type: "latest" } },
           latest: { heading: "The Latest", source: { type: "latest" }, limit: 0, showBylines: true },
           utility: { poll: false, calendar: true, calendarLimit: 10 },
+          // Retired presentation option, kept as a legacy-document fixture.
           presentation: { showDeck: true, opinionTreatment: "auto" }
         }
       }]

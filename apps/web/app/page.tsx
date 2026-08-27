@@ -105,9 +105,7 @@ export default async function HomePage() {
 
   return (
     <main
-      className={resolvedHome.leadHasOpinionTreatment
-        ? "byline-publication-preview live-home-shell live-home-shell-opinion-lead"
-        : "byline-publication-preview live-home-shell"}
+      className="byline-publication-preview live-home-shell"
       data-theme={publication.appearance.theme}
     >
       <script

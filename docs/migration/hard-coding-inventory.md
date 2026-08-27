@@ -56,12 +56,13 @@ customization remain optional installation-level access settings.
 - The active font roles resolve to an Adobe Typekit kit loaded from
   `app/layout.tsx`. The kit and named Adobe families belong to the Weekly
   Wildcat theme, not Byline core.
-- Header/masthead structure, black lead treatment, opinion treatment, sports
-  presentation, footer colors/rainbow rule, mask asset, media-kit layouts, and
-  numerous raw colors are publication-theme decisions.
-- Per-post article hero fields and the homepage opinion treatment are existing
-  design inputs that must map into the Weekly Wildcat theme/compatibility
-  adapter before removal.
+- Header/masthead structure, black lead treatment, Opinion package
+  presentation, sports presentation, footer colors/rainbow rule, mask asset,
+  media-kit layouts, and numerous raw colors are publication-theme decisions.
+- The per-post custom article hero and the per-post homepage opinion-lead
+  treatment were both retired rather than migrated. Article presentation belongs
+  to the article template and homepage presentation belongs to
+  Studio/packages/themes, so neither was a per-story setting to carry forward.
 - Sports team image, focal point, logo, and accent-color settings are reusable
   concepts currently attached to a fixed team catalog.
 

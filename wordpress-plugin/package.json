@@ -21,7 +21,11 @@
     "@puckeditor/core": "0.23.0",
     "@wordpress/api-fetch": "7.53.0",
     "@wordpress/components": "39.0.0",
-    "@wordpress/element": "8.5.0"
+    "@wordpress/data": "10.53.0",
+    "@wordpress/element": "8.5.0",
+    "@wordpress/i18n": "6.26.0",
+    "@wordpress/icons": "15.4.0",
+    "@wordpress/plugins": "7.53.0"
   },
   "devDependencies": {
     "@types/react": "19.2.18",

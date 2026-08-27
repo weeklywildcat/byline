@@ -45,9 +45,10 @@ The most structurally complex package; it is three columns, not one block.
   `variant="briefing"` with `showAuthor`.
 - `HomepageHeroRailLimiter` trims the rail to the lead's height at runtime.
 - Modifier: `.top-stories-single` when the rail is empty.
-- Modifier: `.live-home-shell-opinion-lead` on the shell, and
-  `homepageTreatment="opinion"` on the story, when the lead post carries the
-  `homepageOpinionTreatment` post setting.
+- The lead once took a per-post opinion treatment
+  (`.live-home-shell-opinion-lead` on the shell, `homepageTreatment="opinion"`
+  on the story). That was retired: an individual article no longer switches the
+  homepage's presentation. Opinion presentation lives in the Opinion package.
 - Empty state: `<p class="empty-state">No published posts are available yet.</p>`
 
 ### 2. The Brief — `.the-brief`
@@ -144,12 +145,10 @@ The utility rail's newsletter link targets this anchor.
 `opinion`, `field`, `more-lead`, `more-compact`.
 
 Independent flags: `showDeck`, `cleanDeck`, `showAuthor`, `showReadLink`,
-`priority`, `homepageTreatment`.
+`priority`.
 
 ## Special post settings
 
-`getPostSettings(post)`:
-- `homepageOpinionTreatment` — restyles the lead package and its story.
 - athlete-spotlight posts are detected by `isAthleteSpotlightPost` and are
   claimed before the lead, so the spotlight never competes with the lead story.
 

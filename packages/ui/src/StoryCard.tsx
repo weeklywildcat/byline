@@ -45,7 +45,6 @@ export function StoryCard({
   const className = [
     "home-story",
     `home-story-${variant}`,
-    story.opinionTreatment ? "home-story-homepage-opinion" : "",
     hasImage ? "" : "home-story-no-image"
   ]
     .filter(Boolean)

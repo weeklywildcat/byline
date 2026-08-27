@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { ArticleShareActions } from "@/components/ArticleShareActions";
-import { ArticleHero, getArticleHeroImage } from "@/components/ArticleHero";
 import { ArticleGameCard } from "@/components/ArticleGameCard";
 import { AuthorBadge } from "@/components/AuthorBadge";
 import { FeaturedImage } from "@/components/FeaturedImage";
@@ -36,7 +35,6 @@ import {
   getPostHref,
   getPostPrimaryGameId,
   getPostRouteParts,
-  getPostSettings,
   getPostTags,
   type WordPressAuthor,
   type WordPressCategory,
@@ -130,19 +128,8 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
   };
 }
 
-export async function generateViewport({ params }: ArticlePageProps): Promise<Viewport> {
-  const { articleSlug } = await params;
-  const post = await getPostBySlug(articleSlug);
-  const hero = post ? getPostSettings(post)?.articleHero : undefined;
-  const heroImage = post ? getArticleHeroImage(hero, getFeaturedMedia(post)) : null;
-  const backgroundColor = hero?.backgroundColor;
-
-  return {
-    themeColor:
-      hero?.enabled && heroImage && backgroundColor && /^#[0-9a-f]{6}$/i.test(backgroundColor)
-        ? backgroundColor
-        : "#fbfaf7"
-  };
+export function generateViewport(): Viewport {
+  return { themeColor: "#fbfaf7" };
 }
 
 function getReadingTime(post: WordPressPost) {
@@ -312,9 +299,6 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const primaryGame = primaryGameId ? await getSportsGameById(primaryGameId) : null;
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
-  const articleHero = getPostSettings(post)?.articleHero;
-  const heroImage = getArticleHeroImage(articleHero, image);
-  const hasCustomHero = Boolean(articleHero?.enabled && heroImage);
   const topicTags = getPublicTopicTags(post);
   const topicTerms = topicTags.length > 0 ? topicTags : getPostCategories(post).filter((postCategory) => !isHiddenCategory(postCategory));
   const excerpt = post.excerpt.rendered.trim();
@@ -351,94 +335,69 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
       />
-      <article className={hasCustomHero ? "article-story article-story-custom-hero" : "article-story"}>
-        {hasCustomHero ? (
-          <ArticleHero
-            hero={articleHero!}
-            image={heroImage!}
-            category={category}
-            title={title}
-            titleHtml={post.title.rendered}
-            excerptHtml={excerpt}
-            athleteSpotlightLabel={athleteSpotlightLabel}
-            athleteSport={athleteSport}
-            authorName={author?.name ?? `${publication.identity.shortName} Staff`}
-            authorHref={author ? getAuthorHref(author) : null}
-            publishedDate={post.date}
-            publishedLabel={formatDisplayDate(post.date)}
-            updatedDate={updated ? post.modified : null}
-            updatedLabel={updated ? formatDisplayDate(post.modified) : null}
-            readingTime={getReadingTime(post)}
-            articleUrl={articleUrl}
-          />
+      <article className="article-story">
+        <header className="article-header">
+          {category ? (
+            <a className="article-section-label" href={`/category/${category.slug}/`}>
+              {decodeHtml(category.name)}
+            </a>
+          ) : null}
+          <h1 dangerouslySetInnerHTML={{ __html: post.title.rendered }} />
+          {excerpt ? <div className="article-excerpt" dangerouslySetInnerHTML={{ __html: excerpt }} /> : null}
+          {athleteSpotlightLabel || athleteSport ? (
+            <div className="article-athlete-meta" aria-label="Athlete spotlight details">
+              {athleteSpotlightLabel ? <span>{athleteSpotlightLabel}</span> : null}
+              {athleteSport ? <span>{athleteSport}</span> : null}
+            </div>
+          ) : null}
+
+          <div className="article-meta-block">
+            <p className="article-author-line">
+              By{" "}
+              {author ? (
+                <a href={getAuthorHref(author)}>{author.name}</a>
+              ) : (
+                <span>{publication.identity.shortName} Staff</span>
+              )}
+            </p>
+            <div className="article-timing">
+              <time dateTime={post.date}>Published {formatDisplayDate(post.date)}</time>
+              {updated ? <time dateTime={post.modified}>Updated {formatDisplayDate(post.modified)}</time> : null}
+              <span>{getReadingTime(post)}</span>
+            </div>
+          </div>
+
+          <ArticleShareActions title={title} url={articleUrl} />
+          <FeaturedImage image={image} priority />
+        </header>
+
+        {primaryGame ? <ArticleGameCard game={primaryGame} className="article-primary-game-card" /> : null}
+
+        {content ? (
+          <div className="article-body" dangerouslySetInnerHTML={{ __html: content }} />
+        ) : (
+          <p className="empty-state">No article body has been published yet.</p>
+        )}
+
+        {topicTerms.length > 0 ? (
+          <footer className="article-tags" aria-label="Story topics">
+            <h2>Topics</h2>
+            <div>
+              {topicTerms.map((term) => (
+                <span key={`${term.taxonomy}-${term.id}`}>{decodeHtml(term.name)}</span>
+              ))}
+            </div>
+          </footer>
         ) : null}
 
-        <div className={hasCustomHero ? "article-story-content" : undefined}>
-          {!hasCustomHero ? (
-            <header className="article-header">
-              {category ? (
-                <a className="article-section-label" href={`/category/${category.slug}/`}>
-                  {decodeHtml(category.name)}
-                </a>
-              ) : null}
-              <h1 dangerouslySetInnerHTML={{ __html: post.title.rendered }} />
-              {excerpt ? <div className="article-excerpt" dangerouslySetInnerHTML={{ __html: excerpt }} /> : null}
-              {athleteSpotlightLabel || athleteSport ? (
-                <div className="article-athlete-meta" aria-label="Athlete spotlight details">
-                  {athleteSpotlightLabel ? <span>{athleteSpotlightLabel}</span> : null}
-                  {athleteSport ? <span>{athleteSport}</span> : null}
-                </div>
-              ) : null}
+        {updated ? (
+          <aside className="article-update-notice" aria-label="Story update notice">
+            <h2>Update</h2>
+            <p>This story was updated after initial publication on {formatDisplayDate(post.modified)}.</p>
+          </aside>
+        ) : null}
 
-              <div className="article-meta-block">
-                <p className="article-author-line">
-                  By{" "}
-                  {author ? (
-                    <a href={getAuthorHref(author)}>{author.name}</a>
-                  ) : (
-                    <span>{publication.identity.shortName} Staff</span>
-                  )}
-                </p>
-                <div className="article-timing">
-                  <time dateTime={post.date}>Published {formatDisplayDate(post.date)}</time>
-                  {updated ? <time dateTime={post.modified}>Updated {formatDisplayDate(post.modified)}</time> : null}
-                  <span>{getReadingTime(post)}</span>
-                </div>
-              </div>
-
-              <ArticleShareActions title={title} url={articleUrl} />
-              <FeaturedImage image={image} priority />
-            </header>
-          ) : null}
-
-          {primaryGame ? <ArticleGameCard game={primaryGame} className="article-primary-game-card" /> : null}
-
-          {content ? (
-            <div className="article-body" dangerouslySetInnerHTML={{ __html: content }} />
-          ) : (
-            <p className="empty-state">No article body has been published yet.</p>
-          )}
-
-          {topicTerms.length > 0 ? (
-            <footer className="article-tags" aria-label="Story topics">
-              <h2>Topics</h2>
-              <div>
-                {topicTerms.map((term) => (
-                  <span key={`${term.taxonomy}-${term.id}`}>{decodeHtml(term.name)}</span>
-                ))}
-              </div>
-            </footer>
-          ) : null}
-
-          {updated ? (
-            <aside className="article-update-notice" aria-label="Story update notice">
-              <h2>Update</h2>
-              <p>This story was updated after initial publication on {formatDisplayDate(post.modified)}.</p>
-            </aside>
-          ) : null}
-
-          <NewsletterSignupForm />
-        </div>
+        <NewsletterSignupForm />
       </article>
 
       <div className="article-after">

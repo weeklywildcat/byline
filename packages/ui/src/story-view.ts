@@ -27,8 +27,6 @@ export type StoryView = {
   category: { name: string; href: string } | null;
   author: { name: string; href: string | null } | null;
   image: StoryImageView | null;
-  // Per-post editorial treatments that survive into presentation.
-  opinionTreatment: boolean;
 };
 
 // A school-calendar entry after the week-window filtering and the

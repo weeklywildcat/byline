@@ -44,10 +44,24 @@ styles are compiled into release assets.
     - `/wp-json/weekly-wildcat/v1/school-events`
     - `/wp-json/weekly-wildcat/v1/authors`
 - Public write endpoint (anonymous, rate limited): `/wp-json/byline/v1/polls/vote`
+- Capability-protected editorial endpoint: `/wp-json/byline/v1/editorial/stories/{id}`
+- Editorial workflow in the post editor, the classic editor, and the Posts list
 - WordPress user profile fields for author profiles:
   - role, pronouns, Media Library profile photo, Founder badge, author directory visibility, and social links
 
 The plugin does not render anything on the WordPress frontend. Editing stays inside the normal WordPress admin.
+
+## Editorial workflow
+
+Byline tracks where a story is in the newsroom — Pitch, Assigned, Reporting, Writing, Editing, Ready for Review, plus On Hold and Dropped — alongside its assigned editor, an internal deadline, and the pictures it still needs. This is separate from the WordPress publication state: a story is routinely a WordPress draft while it is editorially "Reporting". A published story reports "Published" and keeps its previous stage, so unpublishing recovers it.
+
+In the block editor the current status appears in the document Summary panel next to the WordPress status, and the full controls live in the **Workflow** sidebar. The classic editor gets a compact **Byline Workflow** metabox instead; the two are never both shown. The Posts list gains a **Workflow** column and filter.
+
+Anyone who can edit a story can move it through the workflow and record its visual needs. Assigning an editor or setting a deadline requires `edit_others_posts`. None of these values appear in a public REST response.
+
+Discord consumes this workflow rather than owning it, so `/story status`, `/editing`, `/stories due`, and the Forum workflow tags keep working unchanged, and an unreachable bot never blocks an editorial change.
+
+See [../docs/editorial-workflow.md](../docs/editorial-workflow.md).
 
 ## Polls
 

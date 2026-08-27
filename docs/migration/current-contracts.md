@@ -58,8 +58,10 @@ support revisions through their current native post-type configuration.
 - School event type, start/end/all-day, location, description, URL, and status.
 - Author role, pronouns, profile photo, founder/directory flags, social fields,
   and Discord/Google linkage metadata.
-- Post homepage-opinion treatment, custom article-hero settings,
-  `weekly_wildcat_primary_game_id`, and Discord workflow/link metadata.
+- Post `weekly_wildcat_primary_game_id`, Byline editorial workflow metadata
+  (see `docs/editorial-workflow.md`), and Discord link metadata. The retired
+  per-post homepage-opinion treatment and custom article-hero keys remain in the
+  database on older installations as inert legacy values that nothing reads.
 - Attachment creator, credit, copyright, license, and acquisition URL.
 
 ### Public REST

@@ -26,7 +26,6 @@ export type ResolvedLeadPackage = {
   };
   presentation: {
     showDeck: boolean;
-    opinionTreatment: boolean;
   };
   fallbackAuthorName: string;
   emptyMessage: string;

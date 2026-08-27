@@ -241,14 +241,6 @@ function createLeadPackageComponent(context: StudioPreviewContext) {
               { label: "Show", value: true },
               { label: "Hide", value: false }
             ]
-          },
-          opinionTreatment: {
-            type: "radio" as const,
-            label: "Opinion treatment",
-            options: [
-              { label: "Follow the story's setting", value: "auto" },
-              { label: "Never", value: "off" }
-            ]
           }
         }
       }

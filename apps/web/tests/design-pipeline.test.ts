@@ -144,6 +144,8 @@ describe("published design reaches the homepage", () => {
       lead: { source: { type: "latest" } },
       latest: { heading: "The Latest", source: { type: "latest" }, limit: 0, showBylines: true },
       utility: { poll: false, calendar: false, calendarLimit: 0 },
+      // Deliberately still carries the retired opinion-lead treatment: a design
+      // saved before its removal must keep loading through the pipeline.
       presentation: { showDeck: true, opinionTreatment: "auto" }
     });
 

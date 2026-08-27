@@ -149,7 +149,7 @@ describe("lead package resolution", () => {
   });
 
   it("passes presentation settings through to the renderer", () => {
-    const resolved = resolve(posts, { presentation: { showDeck: false, opinionTreatment: "off" } });
+    const resolved = resolve(posts, { presentation: { showDeck: false } });
 
     expect(resolved.presentation.showDeck).toBe(false);
   });

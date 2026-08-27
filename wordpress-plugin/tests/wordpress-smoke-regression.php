@@ -11,6 +11,8 @@
  */
 
 define('ABSPATH', __DIR__ . '/../');
+const BYLINE_PLUGIN_VERSION = '0.0.0-smoke';
+const BYLINE_REST_NAMESPACE = 'byline/v1';
 const BYLINE_MANAGE_CAPABILITY = 'manage_byline';
 const BYLINE_EDIT_DESIGN_CAPABILITY = 'edit_byline_design';
 const BYLINE_PUBLISH_DESIGN_CAPABILITY = 'publish_byline_design';
@@ -33,6 +35,68 @@ $byline_smoke_capabilities = [
     'edit_posts' => true,
 ];
 $byline_smoke_features = ['sports' => true, 'events' => true, 'polls' => true, 'discord' => true];
+$byline_smoke_posts = [];
+$byline_smoke_meta = [];
+$byline_smoke_meta_boxes = [];
+$byline_smoke_scripts = [];
+$byline_smoke_fired_actions = [];
+
+class WP_Post
+{
+    public int $ID = 0;
+    public int $post_author = 1;
+    public string $post_type = 'post';
+    public string $post_status = 'draft';
+    public string $post_title = '';
+}
+
+class WP_User
+{
+    public int $ID = 1;
+    public string $display_name = 'Smoke User';
+}
+
+class WP_Error
+{
+    private string $code;
+    public function __construct(string $code = '', string $message = '', array $data = [])
+    {
+        $this->code = $code;
+    }
+    public function get_error_code(): string
+    {
+        return $this->code;
+    }
+}
+
+class WP_Screen
+{
+    public string $id = '';
+    public string $base = '';
+    public ?string $post_type = null;
+    private bool $block_editor = false;
+    public function __construct(string $id, string $base, ?string $post_type, bool $block_editor)
+    {
+        $this->id = $id;
+        $this->base = $base;
+        $this->post_type = $post_type;
+        $this->block_editor = $block_editor;
+    }
+    public function is_block_editor(): bool
+    {
+        return $this->block_editor;
+    }
+}
+
+class WP_Query
+{
+    private array $vars;
+    public array $applied = [];
+    public function __construct(array $vars) { $this->vars = $vars; }
+    public function is_main_query(): bool { return true; }
+    public function get(string $key) { return $this->vars[$key] ?? ''; }
+    public function set(string $key, $value): void { $this->applied[$key] = $value; }
+}
 
 function byline_smoke_fail(string $message): void
 {
@@ -58,6 +122,12 @@ function apply_filters(string $tag, $value, ...$args)
     return $value;
 }
 
+function do_action(string $tag, ...$args): void
+{
+    global $byline_smoke_fired_actions;
+    $byline_smoke_fired_actions[] = $tag;
+}
+
 function add_menu_page(...$args): string
 {
     global $byline_smoke_menus;
@@ -76,7 +146,13 @@ function remove_submenu_page(...$args): void
 {
 }
 
-function current_user_can(string $capability): bool
+function current_user_can(string $capability, ...$args): bool
+{
+    global $byline_smoke_capabilities;
+    return !empty($byline_smoke_capabilities[$capability]);
+}
+
+function user_can($user, string $capability, ...$args): bool
 {
     global $byline_smoke_capabilities;
     return !empty($byline_smoke_capabilities[$capability]);
@@ -127,6 +203,154 @@ function esc_html__($value, $domain = ''): string
 function wp_die($message): void
 {
     throw new RuntimeException((string) $message);
+}
+
+function esc_attr($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES);
+}
+
+function esc_html($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES);
+}
+
+function esc_textarea($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES);
+}
+
+function selected($haystack, $current, $echo = true): string
+{
+    return (string) $haystack === (string) $current ? ' selected' : '';
+}
+
+function absint($value): int
+{
+    return abs((int) $value);
+}
+
+function is_admin(): bool
+{
+    return true;
+}
+
+function is_wp_error($thing): bool
+{
+    return $thing instanceof WP_Error;
+}
+
+function sanitize_text_field($value): string
+{
+    return trim(strip_tags((string) $value));
+}
+
+function sanitize_textarea_field($value): string
+{
+    return trim(strip_tags((string) $value));
+}
+
+function register_post_meta(...$args): bool
+{
+    return true;
+}
+
+function register_rest_route(...$args): void
+{
+}
+
+function rest_authorization_required_code(): int
+{
+    return 401;
+}
+
+function get_post($id)
+{
+    global $byline_smoke_posts;
+    return $byline_smoke_posts[$id] ?? null;
+}
+
+function get_user_by($field, $value)
+{
+    $user = new WP_User();
+    $user->ID = (int) $value;
+    $user->display_name = 'User ' . (int) $value;
+    return $user;
+}
+
+function get_users(array $args = []): array
+{
+    return [(object) ['ID' => 7, 'display_name' => 'Jane Smith']];
+}
+
+function get_post_meta($post_id, $key, $single = false)
+{
+    global $byline_smoke_meta;
+    return $byline_smoke_meta[$post_id][$key] ?? '';
+}
+
+function update_post_meta($post_id, $key, $value): void
+{
+    global $byline_smoke_meta;
+    $byline_smoke_meta[$post_id][$key] = $value;
+}
+
+function delete_post_meta($post_id, $key): void
+{
+    global $byline_smoke_meta;
+    unset($byline_smoke_meta[$post_id][$key]);
+}
+
+function add_meta_box($id, $title, $callback, $screen = null, $context = 'advanced', $priority = 'default'): void
+{
+    global $byline_smoke_meta_boxes;
+    $byline_smoke_meta_boxes[$id] = ['title' => $title, 'callback' => $callback];
+}
+
+function wp_nonce_field(...$args): void
+{
+}
+
+function wp_verify_nonce(...$args): bool
+{
+    return true;
+}
+
+function wp_is_post_autosave($id): bool
+{
+    return false;
+}
+
+function wp_is_post_revision($id): bool
+{
+    return false;
+}
+
+function plugins_url(string $path, string $plugin): string
+{
+    return 'https://cms.example.test/wp-content/plugins/byline/' . $path;
+}
+
+function wp_enqueue_script(string $handle, string $src = '', array $deps = [], $ver = false, $in_footer = false): void
+{
+    global $byline_smoke_scripts;
+    $byline_smoke_scripts[$handle] = $deps;
+}
+
+function wp_enqueue_style(string $handle, $src = '', array $deps = [], $ver = false): void
+{
+}
+
+function wp_register_style(string $handle, $src = false, array $deps = [], $ver = false): void
+{
+}
+
+function wp_add_inline_style(string $handle, string $css): void
+{
+}
+
+function wp_set_script_translations(...$args): void
+{
 }
 
 function wp_safe_redirect(string $location): void
@@ -211,5 +435,149 @@ $rendered = (string) ob_get_clean();
 if (strpos($rendered, 'id="byline-admin-root"') === false) {
     byline_smoke_fail('Authorized Publication screen did not render its application mount.');
 }
+
+// --- editorial workflow -----------------------------------------------------
+//
+// Loading and driving the editorial surfaces here is what catches the class of
+// failure this harness exists for: an undefined constant, a wrong hook
+// signature, or a TypeError that would take down wp-admin before any browser
+// test could start.
+// The earlier capability checks leave the harness user unprivileged; editorial
+// workflow is exercised as a user who can edit stories and assign them.
+$byline_smoke_capabilities = ['edit_posts' => true, 'edit_post' => true, 'edit_others_posts' => true];
+
+require __DIR__ . '/../includes/editorial/workflow.php';
+require __DIR__ . '/../includes/editorial/rest.php';
+require __DIR__ . '/../includes/editorial/admin.php';
+
+foreach ([
+    'init' => 'byline_editorial_register_meta',
+    'rest_api_init' => 'byline_editorial_register_rest_routes',
+    'admin_enqueue_scripts' => 'byline_editorial_enqueue_editor_assets',
+    'add_meta_boxes_post' => 'byline_editorial_register_meta_box',
+    'save_post_post' => 'byline_editorial_save_meta_box',
+    'pre_get_posts' => 'byline_editorial_filter_posts_query',
+    'restrict_manage_posts' => 'byline_editorial_render_posts_filter',
+] as $tag => $callback) {
+    if (!in_array($callback, $byline_smoke_actions[$tag] ?? [], true)) {
+        byline_smoke_fail("Editorial workflow callback {$callback} is not hooked to {$tag}.");
+    }
+}
+
+$byline_smoke_story = new WP_Post();
+$byline_smoke_story->ID = 4242;
+$byline_smoke_story->post_title = 'Smoke story';
+$byline_smoke_posts[4242] = $byline_smoke_story;
+
+// A block editor, a classic editor, the Posts list, and unrelated Byline post
+// types all have to resolve without throwing.
+foreach ([
+    ['hook' => 'post.php', 'screen' => new WP_Screen('post', 'post', 'post', true)],
+    ['hook' => 'post-new.php', 'screen' => new WP_Screen('post', 'post', 'post', false)],
+    ['hook' => 'edit.php', 'screen' => new WP_Screen('edit-post', 'edit', 'post', false)],
+    ['hook' => 'post.php', 'screen' => new WP_Screen('ww_sports_game', 'post', WWH_SPORTS_GAME_POST_TYPE, true)],
+    ['hook' => 'toplevel_page_byline-studio', 'screen' => new WP_Screen('toplevel_page_byline-studio', 'toplevel_page', null, false)],
+] as $case) {
+    $byline_smoke_screen = $case['screen'];
+
+    try {
+        byline_editorial_enqueue_editor_assets($case['hook']);
+        byline_editorial_admin_styles();
+        byline_editorial_register_meta_box();
+
+        ob_start();
+        byline_editorial_render_posts_filter('post');
+        byline_editorial_render_posts_column(BYLINE_EDITORIAL_LIST_COLUMN, 4242);
+        ob_end_clean();
+    } catch (Throwable $exception) {
+        byline_smoke_fail("Editorial workflow threw on {$case['screen']->id}: " . $exception->getMessage());
+    }
+}
+
+// The Studio bundle must never be dragged into a post editor.
+if (isset($byline_smoke_scripts['byline-admin'])) {
+    byline_smoke_fail('The Byline admin application was enqueued into the post editor.');
+}
+
+// The classic metabox renders, and a representative draft saves, without a
+// fatal. The block editor gets the sidebar instead, never both.
+$byline_smoke_screen = new WP_Screen('post', 'post', 'post', false);
+$byline_smoke_meta_boxes = [];
+
+try {
+    byline_editorial_register_meta_box();
+    ob_start();
+    byline_editorial_render_meta_box($byline_smoke_story);
+    ob_end_clean();
+} catch (Throwable $exception) {
+    byline_smoke_fail('The classic workflow metabox threw: ' . $exception->getMessage());
+}
+
+if (!isset($byline_smoke_meta_boxes['byline-editorial-workflow'])) {
+    byline_smoke_fail('The classic workflow metabox was not registered outside the block editor.');
+}
+
+$byline_smoke_screen = new WP_Screen('post', 'post', 'post', true);
+$byline_smoke_meta_boxes = [];
+byline_editorial_register_meta_box();
+if ($byline_smoke_meta_boxes !== []) {
+    byline_smoke_fail('The block editor was given a duplicate classic workflow metabox.');
+}
+
+$_POST = [
+    'byline_editorial_workflow_nonce' => 'nonce',
+    'byline_editorial_status' => 'writing',
+    'byline_editorial_editor' => '7',
+    'byline_editorial_deadline' => '2026-09-30',
+    'byline_editorial_visuals' => 'Scoreboard photo',
+];
+
+try {
+    byline_editorial_save_meta_box(4242);
+} catch (Throwable $exception) {
+    byline_smoke_fail('Saving a representative draft threw: ' . $exception->getMessage());
+}
+
+if (byline_get_editorial_status(4242) !== 'writing' || byline_get_editorial_editor_id(4242) !== 7) {
+    byline_smoke_fail('A representative draft save did not persist its editorial workflow.');
+}
+
+// The domain announces the change; integrations subscribe. It must never call
+// one, so that an unreachable service cannot block an editorial change.
+if (!in_array('byline_editorial_story_updated', $byline_smoke_fired_actions, true)) {
+    byline_smoke_fail('An editorial workflow change did not announce itself to integrations.');
+}
+$_POST = [];
+
+// The Posts list column reports the effective status for both publication
+// states, and the filter constrains only the query it owns.
+ob_start();
+byline_editorial_render_posts_column(BYLINE_EDITORIAL_LIST_COLUMN, 4242);
+$byline_smoke_column = (string) ob_get_clean();
+if (strpos($byline_smoke_column, 'Writing') === false) {
+    byline_smoke_fail('The Posts list Workflow column did not render its status label.');
+}
+
+$byline_smoke_story->post_status = 'publish';
+ob_start();
+byline_editorial_render_posts_column(BYLINE_EDITORIAL_LIST_COLUMN, 4242);
+if (strpos((string) ob_get_clean(), 'Published') === false) {
+    byline_smoke_fail('A published story did not report the derived Published workflow state.');
+}
+$byline_smoke_story->post_status = 'draft';
+
+$_GET = [BYLINE_EDITORIAL_LIST_FILTER => 'editing'];
+$byline_smoke_query = new WP_Query(['post_type' => 'post']);
+byline_editorial_filter_posts_query($byline_smoke_query);
+if (!isset($byline_smoke_query->applied['meta_query'])) {
+    byline_smoke_fail('The Posts list workflow filter did not constrain its own query.');
+}
+
+$byline_smoke_query = new WP_Query(['post_type' => 'page']);
+byline_editorial_filter_posts_query($byline_smoke_query);
+if ($byline_smoke_query->applied !== []) {
+    byline_smoke_fail('The Posts list workflow filter altered an unrelated admin query.');
+}
+$_GET = [];
 
 echo "Byline WordPress admin smoke regression passed.\n";
