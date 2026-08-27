@@ -82,13 +82,18 @@ require __DIR__ . '/../includes/sports/teams.php';
 $_GET = ['page' => 'wwh-sports-team-settings'];
 $deleted_constant = 'BYLINE_ADMIN_' . 'TEAMS_PAGE';
 $fatal_message = '';
+set_error_handler(static function (int $severity, string $message) use (&$fatal_message): bool {
+    $fatal_message = $message;
+    return true;
+});
 try {
     $fatal_probe = '$_teams_fatal_probe = isset($_GET["page"]) && sanitize_key((string) wp_unslash($_GET["page"])) === ' . $deleted_constant . ' ? "byline" : "legacy";';
     eval($fatal_probe);
 } catch (Throwable $exception) {
     $fatal_message = $exception->getMessage();
 }
-if (strpos($fatal_message, 'Undefined constant') === false || strpos($fatal_message, $deleted_constant) === false) {
+restore_error_handler();
+if (stripos($fatal_message, 'undefined constant') === false || strpos($fatal_message, $deleted_constant) === false) {
     teams_regression_fail('The regression harness no longer reproduces the confirmed deleted-constant fatal.');
 }
 
