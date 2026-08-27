@@ -8,7 +8,8 @@ import type { StoryView } from "./story-view";
 // model that both the Next static export and Studio's preview render.
 export type ResolvedLeadPackage = {
   packageId: string;
-  mode?: "content" | "poll" | "calendar";
+  mode?: "content" | "single-story" | "poll" | "calendar";
+  heading?: string;
   lead: StoryView | null;
   latest: {
     heading: string;
@@ -51,13 +52,29 @@ export function LeadPackage({ package: resolved, pollSlot, calendarSlot, railLim
   const mode = resolved.mode ?? "content";
   const hasUtility = utility.poll || utility.calendar;
 
-  if (mode !== "content") {
+  if (mode === "poll" || mode === "calendar") {
     if (!hasUtility) return null;
 
     return (
-      <section className="byline-design-utility" aria-label={mode === "poll" ? "Poll" : "School calendar"}>
+      <section className="byline-design-utility">
         {mode === "poll" && utility.poll ? pollSlot : null}
         {mode === "calendar" && utility.calendar ? calendarSlot : null}
+      </section>
+    );
+  }
+
+  if (mode === "single-story") {
+    if (!lead) return null;
+
+    return (
+      <section className="top-stories top-stories-single" aria-label={resolved.heading || "Top story"}>
+        <StoryCard
+          story={lead}
+          variant="lead"
+          showDeck={presentation.showDeck}
+          priority
+          fallbackAuthorName={resolved.fallbackAuthorName}
+        />
       </section>
     );
   }

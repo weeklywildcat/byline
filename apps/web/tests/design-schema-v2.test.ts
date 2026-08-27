@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   BYLINE_PACKAGE_TYPES,
@@ -109,6 +110,34 @@ describe("schema v2 parsing", () => {
       )
     ).toThrow(/manually more than once/);
   });
+
+  it("shares the PHP legacy envelope contract", () => {
+    const fixture = JSON.parse(readFileSync(new URL("./fixtures/design-v2-legacy-parity.json", import.meta.url), "utf8")) as {
+      valid: unknown;
+      invalidMissingMetadata: unknown;
+    };
+
+    expect(() => parseBylineDesignDocumentV2(fixture.valid, "home")).not.toThrow();
+    expect(() => parseBylineDesignDocumentV2(fixture.invalidMissingMetadata, "home")).toThrow(
+      /legacy metadata/
+    );
+  });
+
+  it("enforces the legacy block type and props records", () => {
+    const fixture = JSON.parse(readFileSync(new URL("./fixtures/design-v2-legacy-parity.json", import.meta.url), "utf8")) as {
+      valid: Record<string, unknown>;
+    };
+    const legacy = fixture.valid.legacy as Record<string, unknown>;
+
+    expect(() => parseBylineDesignDocumentV2({
+      ...fixture.valid,
+      legacy: { ...legacy, unconvertedBlocks: [{ type: "divider" }] }
+    }, "home")).toThrow(/legacy block/);
+    expect(() => parseBylineDesignDocumentV2({
+      ...fixture.valid,
+      legacy: { ...legacy, unconvertedBlocks: [{ type: "divider", props: [] }] }
+    }, "home")).toThrow(/legacy block/);
+  });
 });
 
 describe("story sources", () => {
@@ -208,6 +237,16 @@ describe("v1 to v2 migration", () => {
     expect(document.legacy?.unconvertedBlocks).toEqual([unknown]);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/custom-extension/);
+  });
+
+  it("keeps a visible v1 divider in the live-fallback payload", () => {
+    const divider = { type: "divider", props: { id: "divider-1" } };
+    const { document, warnings } = migrateDesignDocumentV1ToV2(v1([divider]), "home");
+
+    expect(document.packages).toEqual([]);
+    expect(document.legacy?.unconvertedBlocks).toEqual([divider]);
+    expect(warnings[0]).toMatch(/divider/);
+    expect(() => parseBylineDesignDocumentV2(document, "home")).not.toThrow();
   });
 
   it("is deterministic", () => {

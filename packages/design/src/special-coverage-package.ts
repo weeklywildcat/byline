@@ -21,7 +21,7 @@ export const WEEKLY_WILDCAT_SPECIAL_COVERAGE_DEFAULTS: SpecialCoveragePackagePro
   source: { type: "compatibility-special-coverage" },
   limit: 3,
   leadPresentation: { showAuthor: true, showDeck: true },
-  supportingPresentation: { showAuthor: false, showDeck: false }
+  supportingPresentation: { showAuthor: true, showDeck: true }
 };
 
 export const NEUTRAL_SPECIAL_COVERAGE_DEFAULTS: SpecialCoveragePackageProps = {
@@ -32,7 +32,7 @@ export const NEUTRAL_SPECIAL_COVERAGE_DEFAULTS: SpecialCoveragePackageProps = {
   supportingPresentation: { showAuthor: false, showDeck: false }
 };
 
-const MAX_STORIES = 12;
+const MAX_STORIES = 50;
 
 function boundedCount(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_STORIES

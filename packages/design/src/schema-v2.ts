@@ -72,8 +72,8 @@ export type BylineDesignPackage<Props = Record<string, unknown>> = {
 
 // v1 blocks that have no faithful v2 package are preserved here verbatim rather
 // than being force-translated into something that would render differently.
-// They are never rendered; they exist so a migration is not lossy and so a later
-// phase can convert them once the matching package exists.
+// They are inert inside a v2 package document; a published schema-v1 document
+// remains on the old whole-page fallback until its visible blocks are converted.
 export type BylineLegacyBlock = {
   type: string;
   props: Record<string, unknown>;

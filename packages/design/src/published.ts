@@ -13,8 +13,8 @@ import { parseBylineDesignDocumentV2, type BylineDesignDocumentV2 } from "./sche
 export const BYLINE_DESIGN_WRITE_SCHEMA_VERSION = 2;
 
 // What the frontend can still load. v1 remains readable for older published
-// records, but is normalised through the exhaustive migration before any
-// renderer sees it.
+// records; Studio and package consumers normalise it, while the published page
+// deliberately keeps the old renderer live for visible blocks not yet modeled.
 export const BYLINE_DESIGN_READ_SCHEMA_VERSIONS = [1, 2] as const;
 
 export type BylineDesignReadSchemaVersion = (typeof BYLINE_DESIGN_READ_SCHEMA_VERSIONS)[number];
@@ -129,10 +129,10 @@ export type ResolvedPublishedDesign = {
  * The only supported route from a stored v1 design to something the package
  * renderers will accept -- v2 is never produced by casting.
  *
- * Studio and the published homepage both call this path. That keeps the
- * editor, static export and compatibility build on one renderable contract;
- * any unsupported structural v1 data remains in `legacy` rather than being
- * dropped.
+ * Studio and package-based consumers call this path. The published homepage
+ * also retains a direct v1 fallback until every visible v1 block, including
+ * divider, has a faithful package representation; unsupported data remains in
+ * `legacy` rather than being dropped.
  */
 export function resolvePublishedDesignToV2(
   published: PublishedBylineDesign,

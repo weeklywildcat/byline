@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { HomepagePackages, ThisWeekCard as SharedThisWeekCard, packageHeadingId } from "@byline/ui";
+import { DesignHomepage } from "@/components/DesignHomepage";
 import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { PollWidget } from "@/components/PollWidget";
@@ -16,6 +17,8 @@ import {
   getHomepageDataRequirements,
   resolveHomepageDocument
 } from "@/lib/homepage-resolution";
+import { getPublishedDesign } from "@/lib/designs";
+import { resolvePublishedDesignBlocks } from "@/lib/design-resolution";
 import { toCalendarEntries } from "@/lib/homepage-packages";
 import { getPublicationConfig } from "@/lib/publication";
 import { buildPageMetadata, getWebsiteSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
@@ -66,6 +69,33 @@ export default async function HomePage() {
   ]);
   const websiteSchema = getWebsiteSchema();
   const posts = filterPublicHomepagePosts(allPosts);
+
+  const publishedHomeDesign = getPublishedDesign("home");
+
+  // Keep the old whole-page renderer live for a published v1 document while
+  // the migration/parity proof is being completed. In particular, divider is
+  // visible output in DesignHomepage, so a migrated v1 document containing it
+  // must not silently render without that rule. Schema-v2 documents always use
+  // the package orchestrator below.
+  if (publishedHomeDesign && publishedHomeDesign.revision > 0 && publishedHomeDesign.schemaVersion === 1) {
+    const designBlocks = await resolvePublishedDesignBlocks(publishedHomeDesign.document.layout.content, posts);
+
+    return (
+      <>
+        <script
+          id="website-json-ld"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteSchema) }}
+        />
+        <DesignHomepage
+          blocks={designBlocks}
+          sportsSchedule={sportsSchedule}
+          theme={publication.appearance.theme}
+        />
+      </>
+    );
+  }
+
   const resolvedHome = resolveHomepageDocument({
     document: homeDesign,
     posts,

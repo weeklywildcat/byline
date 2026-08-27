@@ -6,9 +6,10 @@ import {
 } from "@byline/design";
 import { WEEKLY_WILDCAT_PUBLICATION } from "@/lib/publication";
 import { getWeeklyWildcatCompatibilityDesign } from "@/lib/homepage-design";
-import { resolveHomepageDocument } from "@/lib/homepage-resolution";
+import { getHomepageDataRequirements, resolveHomepageDocument } from "@/lib/homepage-resolution";
+import { toCalendarEntries } from "@/lib/homepage-packages";
 import type { ResolvedHomepagePackage } from "@byline/ui";
-import { post } from "./fixtures/sports-fixture";
+import { game, post } from "./fixtures/sports-fixture";
 
 const PACKAGE_ORDER = [
   "lead-package",
@@ -149,5 +150,39 @@ describe("homepage package orchestration", () => {
       "sports-package",
       NEWSLETTER_PACKAGE_TYPE
     ]);
+  });
+
+  it("plans enough upcoming games for a ten-item calendar with no school events", () => {
+    const document: BylineDesignDocumentV2 = {
+      schemaVersion: 2,
+      template: "home",
+      theme: "weekly-wildcat",
+      packages: [{
+        id: "home-lead",
+        type: "lead-package",
+        props: {
+          mode: "content",
+          lead: { source: { type: "latest" } },
+          latest: { heading: "The Latest", source: { type: "latest" }, limit: 0, showBylines: true },
+          utility: { poll: false, calendar: true, calendarLimit: 10 },
+          presentation: { showDeck: true, opinionTreatment: "auto" }
+        }
+      }]
+    };
+    const requirements = getHomepageDataRequirements(document);
+    const upcomingGames = Array.from({ length: 10 }, (_, index) => {
+      const startDate = new Date(Date.now() + (index + 1) * 60 * 60 * 1000).toISOString();
+      const fixture = game(1000 + index, "soccer", { upcoming: true });
+
+      return {
+        ...fixture,
+        startDate,
+        display: { ...fixture.display, date: `Day ${index + 1}` }
+      };
+    });
+
+    expect(requirements.upcomingGames).toBe(10);
+    expect(requirements.schoolEvents).toBe(12);
+    expect(toCalendarEntries([], upcomingGames, 10)).toHaveLength(10);
   });
 });

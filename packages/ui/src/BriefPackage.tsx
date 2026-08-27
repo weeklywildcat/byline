@@ -22,12 +22,10 @@ export function BriefPackage({ package: resolved }: BriefPackageProps) {
   if (!resolved.lead) return null;
 
   const headingId = packageHeadingId(resolved.packageId, "brief-heading");
-  const hasRail = resolved.rail.length > 0;
-
   return (
     <section className="the-brief" aria-labelledby={headingId}>
       <h2 id={headingId}>{resolved.heading}</h2>
-      <div className={hasRail ? "brief-digest-layout" : "brief-digest-layout brief-digest-layout-single"}>
+      <div className="brief-digest-layout">
         <StoryCard
           story={resolved.lead}
           variant="brief-lead"
@@ -35,7 +33,7 @@ export function BriefPackage({ package: resolved }: BriefPackageProps) {
           showDeck={resolved.presentation.showDeck}
           fallbackAuthorName={resolved.fallbackAuthorName}
         />
-        {hasRail ? (
+        {resolved.rail.length ? (
           <div className="brief-support-list">
             {resolved.rail.map((story) => (
               <StoryCard

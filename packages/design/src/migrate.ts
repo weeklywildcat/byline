@@ -59,7 +59,11 @@ export type DesignMigrationResult = {
   warnings: string[];
 };
 
-const MAX_STORIES = 12;
+// v1 StoryQuery accepted up to 50 stories. The v2 package renderer can keep
+// that full result, so migration must not replace a larger legacy query with a
+// smaller semantic default.
+const MAX_STORIES = 50;
+const DEFAULT_V1_LIMIT = 5;
 
 function positiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
@@ -101,19 +105,19 @@ function storySourceFromV1Query(value: unknown): BylineStorySource | null {
 }
 
 function sourceAndLimitFromV1Props(
-  props: Record<string, unknown>,
-  fallbackSource: BylineStorySource = { type: "latest" },
-  fallbackLimit = 4
+  props: Record<string, unknown>
 ): { source: BylineStorySource; limit: number } {
   const query = props.query && typeof props.query === "object" ? props.query as Record<string, unknown> : null;
   const querySource = storySourceFromV1Query(query);
 
-  if (querySource) {
+  if (props.query && typeof props.query === "object") {
+    if (!querySource) return { source: { type: "manual", storyIds: [] }, limit: 0 };
+
     return {
       source: querySource,
       limit: querySource.type === "manual"
         ? Math.min(MAX_STORIES, querySource.storyIds.length)
-        : boundedLimit(query?.limit, fallbackLimit)
+        : boundedLimit(query?.limit, 0)
     };
   }
 
@@ -123,27 +127,25 @@ function sourceAndLimitFromV1Props(
     return { source: { type: "manual", storyIds }, limit: Math.min(MAX_STORIES, storyIds.length) };
   }
   if (queryType === "category" && positiveInteger(props.sourceId)) {
-    return { source: { type: "category", categoryId: props.sourceId }, limit: boundedLimit(props.limit, fallbackLimit) };
+    return { source: { type: "category", categoryId: props.sourceId }, limit: boundedLimit(props.limit, 0) };
   }
   if (queryType === "tag" && positiveInteger(props.sourceId)) {
-    return { source: { type: "tag", tagId: props.sourceId }, limit: boundedLimit(props.limit, fallbackLimit) };
+    return { source: { type: "tag", tagId: props.sourceId }, limit: boundedLimit(props.limit, 0) };
   }
   if (queryType === "author" && positiveInteger(props.sourceId)) {
-    return { source: { type: "author", authorId: props.sourceId }, limit: boundedLimit(props.limit, fallbackLimit) };
+    return { source: { type: "author", authorId: props.sourceId }, limit: boundedLimit(props.limit, 0) };
   }
-  if (queryType === "sticky") return { source: { type: "sticky" }, limit: boundedLimit(props.limit, fallbackLimit) };
-  if (queryType === "latest") return { source: { type: "latest" }, limit: boundedLimit(props.limit, fallbackLimit) };
-
-  // section-feed used a slug in some editor payloads and a numeric category id
-  // in others. Prefer the stable slug when it is available.
-  if (typeof props.sectionId === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(props.sectionId)) {
-    return { source: { type: "section", slug: props.sectionId }, limit: boundedLimit(props.limit, fallbackLimit) };
-  }
-  if (positiveInteger(props.sectionId)) {
-    return { source: { type: "category", categoryId: props.sectionId }, limit: boundedLimit(props.limit, fallbackLimit) };
+  if (queryType === "manual" || queryType === "category" || queryType === "tag" || queryType === "author") {
+    return { source: { type: "manual", storyIds: [] }, limit: 0 };
   }
 
-  return { source: fallbackSource, limit: boundedLimit(props.limit, fallbackLimit) };
+  // This is the exact fallback used by packages/content's v1 resolver:
+  // unknown or absent queryType means latest, and only this fallback supplies
+  // the default limit of five.
+  return {
+    source: queryType === "sticky" ? { type: "sticky" } : { type: "latest" },
+    limit: boundedLimit(props.limit ?? DEFAULT_V1_LIMIT, 0)
+  };
 }
 
 function packageIdFor(block: BylineLegacyBlock, index: number, usedIds: Set<string>) {
@@ -160,14 +162,15 @@ function packageIdFor(block: BylineLegacyBlock, index: number, usedIds: Set<stri
 }
 
 function leadPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<LeadPackageProps> {
-  const { source } = sourceAndLimitFromV1Props(block.props, WEEKLY_WILDCAT_LEAD_DEFAULTS.lead.source, 1);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props);
 
   return {
     id: packageIdFor(block, index, usedIds),
     type: LEAD_PACKAGE_TYPE,
     props: {
-      mode: "content",
-      lead: { source },
+      mode: "single-story",
+      heading: blockTitle(block.props, "Top story"),
+      lead: { source: limit > 0 ? source : { type: "manual", storyIds: [] } },
       // v1 story-lead rendered one story and no adjacent modules.
       latest: { ...WEEKLY_WILDCAT_LEAD_DEFAULTS.latest, limit: 0 },
       utility: { poll: false, calendar: false, calendarLimit: 0 },
@@ -192,20 +195,21 @@ function briefPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Se
 }
 
 function inFocusPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<InFocusPackageProps> {
-  const fallbackSource = positiveInteger(block.props.storyId)
-    ? { type: "manual" as const, storyIds: [block.props.storyId] }
-    : { type: "latest" as const };
-  const { source } = sourceAndLimitFromV1Props(block.props, fallbackSource, 1);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props);
 
   return {
     id: packageIdFor(block, index, usedIds),
     type: IN_FOCUS_PACKAGE_TYPE,
-    props: { ...WEEKLY_WILDCAT_IN_FOCUS_DEFAULTS, heading: blockTitle(block.props, "Featured"), source }
+    props: {
+      ...WEEKLY_WILDCAT_IN_FOCUS_DEFAULTS,
+      heading: blockTitle(block.props, block.type === "photo-feature" ? "In Focus" : "Featured"),
+      source: limit > 0 ? source : { type: "manual", storyIds: [] }
+    }
   };
 }
 
 function specialCoveragePackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<SpecialCoveragePackageProps> {
-  const { source, limit } = sourceAndLimitFromV1Props(block.props, { type: "latest" }, 3);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props);
 
   return {
     id: packageIdFor(block, index, usedIds),
@@ -215,7 +219,7 @@ function specialCoveragePackageFromV1(block: BylineLegacyBlock, index: number, u
 }
 
 function opinionPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<OpinionPackageProps> {
-  const { source, limit } = sourceAndLimitFromV1Props(block.props, { type: "section", slug: "opinion" }, 3);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props);
 
   return {
     id: packageIdFor(block, index, usedIds),
@@ -223,7 +227,9 @@ function opinionPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: 
     props: {
       ...WEEKLY_WILDCAT_OPINION_DEFAULTS,
       heading: blockTitle(block.props, "Opinion"),
-      description: typeof block.props.description === "string" ? block.props.description : "",
+      // The old DesignHomepage rendered only the h2 inside this wrapper. Its
+      // v1 block props may carry a description, but that value was not visible.
+      description: "",
       source,
       limit,
       archiveLink: { enabled: false, href: "/category/opinion/", label: "All Opinion →" }
@@ -254,10 +260,7 @@ function morePackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set
 }
 
 function sportsStoryPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<SportsPackageProps> {
-  const fallbackSource: BylineStorySource = positiveInteger(block.props.storyId)
-    ? { type: "manual", storyIds: [block.props.storyId] }
-    : { type: "section", slug: "sports" };
-  const { source, limit } = sourceAndLimitFromV1Props(block.props, fallbackSource, 1);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props);
 
   return {
     id: packageIdFor(block, index, usedIds),
@@ -292,7 +295,9 @@ function utilityPackageFromV1(
       utility: {
         poll: mode === "poll",
         calendar: mode === "calendar",
-        calendarLimit: boundedLimit(block.props.maxVisibleItems, 5)
+        // DesignHomepage always passed maxVisibleItems={5}; the v1 block prop
+        // was not read by that renderer.
+        calendarLimit: 5
       },
       presentation: { showDeck: true, opinionTreatment: "off" }
     }
@@ -305,7 +310,9 @@ function newsletterPackageFromV1(block: BylineLegacyBlock, index: number, usedId
     type: NEWSLETTER_PACKAGE_TYPE,
     props: {
       ...WEEKLY_WILDCAT_NEWSLETTER_DEFAULTS,
-      label: typeof block.props.label === "string" ? block.props.label : WEEKLY_WILDCAT_NEWSLETTER_DEFAULTS.label
+      // DesignHomepage mounted the shared signup form without reading v1
+      // label/title/page settings. Keep the visible form contract unchanged.
+      label: WEEKLY_WILDCAT_NEWSLETTER_DEFAULTS.label
     }
   };
 }
@@ -337,7 +344,7 @@ export function migrateDesignDocumentV1ToV2(value: unknown, template: string): D
     // this is intentionally the lossless escape hatch for future migration.
     unconvertedBlocks.push(block);
     warnings.push(
-      `"${block.type}" has no faithful schema 2 package and was preserved verbatim in legacy data; it will not render until it is converted.`
+      `"${block.type}" has no faithful schema 2 package and was preserved verbatim in legacy data; the live schema-v1 fallback remains responsible for its rendering.`
     );
   };
 
@@ -410,9 +417,10 @@ export function migrateDesignDocumentV1ToV2(value: unknown, template: string): D
       case "newsletter":
         packages.push(newsletterPackageFromV1(block, index, usedIds));
         break;
-      // Layout-only v1 blocks had no visible semantic content in the legacy
-      // homepage renderer. Keep them in the lossless payload until a future
-      // package can represent their intent without guessing.
+      // Section and columns are structural-only in the v1 homepage renderer.
+      // Divider is intentionally also preserved here because it does render a
+      // visible <hr>; the live schema-v1 fallback must remain until a semantic
+      // divider package exists.
       default:
         preserve(block);
         break;

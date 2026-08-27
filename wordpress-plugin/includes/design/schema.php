@@ -95,6 +95,24 @@ function byline_design_value_is_safe($value, int $depth = 0): bool
     return true;
 }
 
+// JSON objects are associative arrays after WordPress decodes them. Keep the
+// object/list distinction where PHP can observe it so the legacy contract stays
+// aligned with TypeScript's plain-record checks.
+function byline_design_is_object_array($value): bool
+{
+    if (!is_array($value)) {
+        return false;
+    }
+
+    foreach (array_keys($value) as $key) {
+        if (is_int($key)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 function byline_design_story_blocks(): array
 {
     return [
@@ -247,19 +265,26 @@ function byline_validate_design_document_v2(array $document, string $template)
     }
 
     // Preserved schema 1 blocks travel with a schema 2 document so a migrated
-    // design does not lose sections that have no package yet. They are inert --
-    // never rendered, never edited -- but they are still persisted data, so they
-    // are held to the same safety rules as package props.
+    // design does not lose sections that have no package yet. They are held to
+    // the exact legacy metadata contract the TypeScript parser accepts.
     if (array_key_exists('legacy', $document)) {
         $legacy = $document['legacy'];
-        if (!is_array($legacy)
+        if (!byline_design_is_object_array($legacy)
+            || ($legacy['schemaVersion'] ?? null) !== 1
+            || !byline_design_is_object_array($legacy['editor'] ?? null)
+            || !is_string($legacy['editor']['engine'] ?? null)
+            || !is_string($legacy['editor']['version'] ?? null)
             || !is_array($legacy['unconvertedBlocks'] ?? null)
             || count($legacy['unconvertedBlocks']) > BYLINE_DESIGN_MAX_BLOCKS
             || !byline_design_value_is_safe($legacy)) {
             return new WP_Error('byline_unsafe_design_props', __('The design contains unsafe or malformed legacy data.', 'weekly-wildcat-headless'), ['status' => 400]);
         }
         foreach ($legacy['unconvertedBlocks'] as $block) {
-            if (!is_array($block) || !is_string($block['type'] ?? null) || !is_array($block['props'] ?? null)) {
+            if (!byline_design_is_object_array($block)
+                || !is_string($block['type'] ?? null)
+                || trim($block['type']) === ''
+                || !array_key_exists('props', $block)
+                || !byline_design_is_object_array($block['props'])) {
                 return new WP_Error('byline_unsafe_design_props', __('The design contains malformed legacy data.', 'weekly-wildcat-headless'), ['status' => 400]);
             }
         }
@@ -291,16 +316,20 @@ function byline_validate_design_document_v2(array $document, string $template)
             return $duplicate_pin_error;
         }
 
-        // Every slot that can carry a content source is checked, whichever
-        // package it belongs to. Storage validates the shape; the frontend
-        // parsers are what give a malformed value its safe default.
-        foreach (['lead', 'latest', 'stories', 'athleteSpotlight', 'source'] as $slot) {
+        // Nested story slots carry `{ source: ... }` while Brief, In Focus,
+        // Special Coverage, Opinion, and More carry `{ source: ... }` directly
+        // on props. Validate both shapes explicitly.
+        foreach (['lead', 'latest', 'stories', 'athleteSpotlight'] as $slot) {
             $config = $design_package['props'][$slot] ?? null;
             if (is_array($config)
                 && array_key_exists('source', $config)
                 && !byline_validate_story_source($config['source'])) {
                 return new WP_Error('byline_invalid_story_query', __('A package contains an invalid content source.', 'weekly-wildcat-headless'), ['status' => 400]);
             }
+        }
+        if (array_key_exists('source', $design_package['props'])
+            && !byline_validate_story_source($design_package['props']['source'])) {
+            return new WP_Error('byline_invalid_story_query', __('A package contains an invalid content source.', 'weekly-wildcat-headless'), ['status' => 400]);
         }
     }
 

@@ -24,17 +24,18 @@ export function OpinionPackage({ package: resolved }: OpinionPackageProps) {
   if (!resolved.lead) return null;
 
   const headingId = packageHeadingId(resolved.packageId, "opinion-heading");
+  const hasHeaderCopy = Boolean(resolved.description) || resolved.archiveLink.enabled;
 
   return (
     <section className="opinion-package" aria-labelledby={headingId}>
       <div className="opinion-package-header">
-        <div>
+        {hasHeaderCopy ? <div>
           <h2 id={headingId}>{resolved.heading}</h2>
-          <p>{resolved.description}</p>
-        </div>
+          {resolved.description ? <p>{resolved.description}</p> : null}
+        </div> : <h2 id={headingId}>{resolved.heading}</h2>}
         {resolved.archiveLink.enabled ? <a href={resolved.archiveLink.href}>{resolved.archiveLink.label}</a> : null}
       </div>
-      <div className={resolved.rail.length ? "opinion-package-layout" : "opinion-package-layout opinion-package-layout-single"}>
+      <div className="opinion-package-layout">
         <StoryCard
           story={resolved.lead}
           variant="opinion-lead"

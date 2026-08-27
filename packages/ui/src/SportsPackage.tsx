@@ -167,6 +167,7 @@ export function SportsPackage({ package: resolved }: SportsPackageProps) {
   const content = resolved.content ?? "full";
   const hasStories = Boolean(lead) || rail.length > 0;
   const hasRail = rail.length > 0 || Boolean(athleteSpotlight);
+  const simpleStory = content === "story" && Boolean(lead) && !hasRail;
   const sectionHeadingId = packageHeadingId(resolved.packageId, "field-heading");
 
   return (
@@ -176,7 +177,16 @@ export function SportsPackage({ package: resolved }: SportsPackageProps) {
         {resolved.sectionLink ? <a href={resolved.sectionLink.href}>{resolved.sectionLink.label}</a> : null}
       </div>
 
-      {content !== "schedule" && (hasStories || athleteSpotlight) ? (
+      {content !== "schedule" && (hasStories || athleteSpotlight) ? simpleStory ? (
+        <StoryCard
+          story={lead!}
+          variant="field"
+          showDeck={presentation.showDeck}
+          showAuthor={presentation.showBylines}
+          showReadLink={presentation.showReadLink !== false}
+          fallbackAuthorName={resolved.fallbackAuthorName}
+        />
+      ) : (
         <div className="field-layout">
           {lead ? (
             <StoryCard

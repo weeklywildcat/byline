@@ -65,7 +65,14 @@ export function getHomepageDataRequirements(document: BylineDesignDocumentV2): H
     if (entry.type === LEAD_PACKAGE_TYPE) {
       const lead = parseLeadPackageProps(entry.props);
 
-      if (lead.utility.calendar) schoolEvents = Math.max(schoolEvents, lead.utility.calendarLimit);
+      if (lead.utility.calendar) {
+        // The calendar is a merged view of school events and upcoming games.
+        // Planning only schoolEvents under-fetches a calendar whose ten entries
+        // are all games, so both source domains are sized to the requested
+        // visible count while their historical baselines remain unchanged.
+        schoolEvents = Math.max(schoolEvents, lead.utility.calendarLimit);
+        upcomingGames = Math.max(upcomingGames, lead.utility.calendarLimit);
+      }
     }
   }
 

@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "template": "home",
+  "theme": "weekly-wildcat",
+  "editor": {
+    "engine": "puck",
+    "version": "0.23.0"
+  },
+  "layout": {
+    "root": {
+      "props": {}
+    },
+    "content": [
+      {
+        "type": "story-lead",
+        "props": {
+          "id": "v1-lead",
+          "title": "Top Story",
+          "query": {
+            "type": "manual",
+            "postIds": [1]
+          }
+        }
+      },
+      {
+        "type": "story-list",
+        "props": {
+          "id": "v1-brief",
+          "title": "The Brief",
+          "query": {
+            "type": "manual",
+            "postIds": [2, 3]
+          }
+        }
+      },
+      {
+        "type": "latest-stories",
+        "props": {
+          "id": "v1-latest",
+          "title": "Latest Stories",
+          "query": {
+            "type": "manual",
+            "postIds": [4, 5]
+          }
+        }
+      },
+      {
+        "type": "section-feed",
+        "props": {
+          "id": "v1-section-feed",
+          "title": "Section Feed",
+          "query": {
+            "type": "manual",
+            "postIds": [6, 7]
+          }
+        }
+      },
+      {
+        "type": "featured-story",
+        "props": {
+          "id": "v1-featured",
+          "title": "Featured",
+          "query": {
+            "type": "manual",
+            "postIds": [8]
+          }
+        }
+      },
+      {
+        "type": "photo-feature",
+        "props": {
+          "id": "v1-photo",
+          "query": {
+            "type": "manual",
+            "postIds": [9]
+          }
+        }
+      },
+      {
+        "type": "special-coverage",
+        "props": {
+          "id": "v1-special",
+          "title": "Special Coverage",
+          "query": {
+            "type": "manual",
+            "postIds": [10, 11, 12]
+          }
+        }
+      },
+      {
+        "type": "opinion-package",
+        "props": {
+          "id": "v1-opinion",
+          "title": "Opinion",
+          "description": "This description was not rendered by the old DesignHomepage",
+          "query": {
+            "type": "manual",
+            "postIds": [13, 14, 15, 16, 17]
+          }
+        }
+      },
+      {
+        "type": "team-feature",
+        "props": {
+          "id": "v1-team",
+          "title": "Team Feature",
+          "query": {
+            "type": "manual",
+            "postIds": [18]
+          }
+        }
+      },
+      {
+        "type": "athlete-feature",
+        "props": {
+          "id": "v1-athlete",
+          "title": "Athlete Feature",
+          "query": {
+            "type": "manual",
+            "postIds": [19]
+          }
+        }
+      },
+      {
+        "type": "sports-scores",
+        "props": {
+          "id": "v1-scores",
+          "title": "Sports"
+        }
+      },
+      {
+        "type": "sports-upcoming",
+        "props": {
+          "id": "v1-upcoming",
+          "title": "Upcoming Sports"
+        }
+      },
+      {
+        "type": "story-grid",
+        "props": {
+          "id": "v1-more",
+          "title": "Stories",
+          "query": {
+            "type": "manual",
+            "postIds": [20, 21, 22, 23, 24, 25]
+          }
+        }
+      },
+      {
+        "type": "events-list",
+        "props": {
+          "id": "v1-events"
+        }
+      },
+      {
+        "type": "poll",
+        "props": {
+          "id": "v1-poll"
+        }
+      },
+      {
+        "type": "newsletter",
+        "props": {
+          "id": "v1-newsletter",
+          "title": "Ignored by the v1 signup renderer"
+        }
+      },
+      {
+        "type": "divider",
+        "props": {
+          "id": "v1-divider"
+        }
+      }
+    ]
+  }
+}

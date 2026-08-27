@@ -243,21 +243,22 @@ export function resolveLeadPackage(input: LeadPackageResolutionInput): ResolvedL
   const config: LeadPackageProps = parseLeadPackageProps(input.props);
   const compatibilitySelection = input.compatibilitySelection ?? true;
   const mode = config.mode ?? "content";
+  const resolvesStories = mode === "content" || mode === "single-story";
 
   const usedStoryIds = new Set(input.usedStoryIds ?? []);
-  const manualLead = mode === "content" ? manualStories(config.lead.source, input.posts)?.[0] ?? null : null;
+  const manualLead = resolvesStories ? manualStories(config.lead.source, input.posts)?.[0] ?? null : null;
   const leadCandidates = manualLead
     ? [manualLead]
     : compatibilitySelection && config.lead.source.type === "sticky"
       ? (input.selection.leadPost ? [input.selection.leadPost] : [])
       : sourceCandidates(config.lead.source, input.posts, input.selection, compatibilitySelection);
-  const leadPost = mode === "content"
+  const leadPost = resolvesStories
     ? manualLead ?? leadCandidates.find((post) => !usedStoryIds.has(post.id)) ?? null
     : null;
 
   if (leadPost) usedStoryIds.add(leadPost.id);
 
-  const manualLatest = mode === "content" ? manualStories(config.latest.source, input.posts) : [];
+  const manualLatest = resolvesStories ? manualStories(config.latest.source, input.posts) : [];
   const latestCandidates = manualLatest ?? sourceCandidates(
     config.latest.source,
     input.posts,
@@ -277,6 +278,7 @@ export function resolveLeadPackage(input: LeadPackageResolutionInput): ResolvedL
   return {
     packageId: input.packageId,
     mode,
+    ...(config.heading ? { heading: config.heading } : {}),
     lead: leadPost ? toStoryView(leadPost, { opinionTreatment }) : null,
     latest: {
       heading: config.latest.heading,
@@ -512,7 +514,7 @@ export function resolveOpinionPackage(input: OpinionPackageResolutionInput): Res
     description: publicationText(config.description, publication),
     archiveLink: config.archiveLink,
     lead: stories[0] ? toStoryView(stories[0]) : null,
-    rail: stories.slice(1, 3).map((post) => toStoryView(post)),
+    rail: stories.slice(1).map((post) => toStoryView(post)),
     presentation: config.presentation,
     fallbackAuthorName: `${publication.identity.shortName} Staff`
   };
@@ -568,7 +570,7 @@ export function resolveMorePackage(input: MorePackageResolutionInput): ResolvedM
     heading: publicationText(config.heading, publication),
     archiveLink: config.archiveLink,
     lead: stories[0] ? toStoryView(stories[0], { cleanDeck: config.presentation.cleanDeck }) : null,
-    rail: stories.slice(1, 4).map((post) => toStoryView(post, { cleanDeck: config.presentation.cleanDeck })),
+    rail: stories.slice(1).map((post) => toStoryView(post, { cleanDeck: config.presentation.cleanDeck })),
     presentation: config.presentation,
     utility,
     fallbackAuthorName: `${publication.identity.shortName} Staff`

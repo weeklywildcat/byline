@@ -64,7 +64,7 @@ export const NEUTRAL_MORE_DEFAULTS: MorePackageProps = {
   presentation: { showDeck: true, cleanDeck: false }
 };
 
-const MAX_STORIES = 12;
+const MAX_STORIES = 50;
 
 function boundedCount(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_STORIES

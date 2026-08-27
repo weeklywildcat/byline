@@ -29,7 +29,7 @@ export function SpecialCoveragePackage({ package: resolved }: SpecialCoveragePac
   return (
     <section className="special-coverage" aria-labelledby={headingId}>
       <div className="live-package-label" id={headingId}>{resolved.heading}</div>
-      <div className={resolved.stories.length > 1 ? "special-coverage-layout" : "special-coverage-layout special-coverage-layout-single"}>
+      <div className="special-coverage-layout">
         {resolved.stories.map((story, index) => {
           const presentation = index === 0 ? resolved.leadPresentation : resolved.supportingPresentation;
 

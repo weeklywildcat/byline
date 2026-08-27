@@ -1,8 +1,10 @@
 # Design schema v2 and the homepage package architecture
 
-Status: **complete for the eight homepage packages**. The public static site
-and WordPress Studio now resolve the same semantic document into the same
-render-ready models and use the same package renderers.
+Status: **complete for the eight homepage packages; v1 fallback retained**. The
+public static site and WordPress Studio now resolve schema-v2 documents into the
+same render-ready models and use the same package renderers. Published schema-v1
+documents still use the frozen whole-page fallback until the visible divider
+block has a faithful semantic representation.
 
 ## The invariant
 
@@ -122,15 +124,18 @@ renderer displayed only the first sports layout and that panel contained both
 finals and upcoming games. Duplicate package ids are made deterministic and
 unique while preserving the requested id as the first choice.
 
-Layout-only or unknown v1 blocks (`section`, `columns`, `divider`, and future
-extensions) are copied verbatim into `legacy.unconvertedBlocks` and reported
-in `warnings`. They remain outside Puck and are threaded through every Studio
-autosave and publish. A known block is never both converted and preserved.
+Structural-only or unknown v1 blocks (`section`, `columns`, and future
+extensions) are copied verbatim into `legacy.unconvertedBlocks` and reported in
+`warnings`. `divider` is preserved separately even though it is not structural:
+the old renderer emits a visible `<hr class="byline-design-divider" />`. They
+remain outside Puck and are threaded through every Studio autosave and publish.
+A known block is never both converted and preserved.
 
-Published schema 1 envelopes are normalized through this migration before the
-homepage resolver sees them. Studio also migrates on load, so the editor only
-operates on schema 2. The old v1 components remain only where frozen parity
-fixtures need them; the live homepage no longer branches to a second renderer.
+Published schema 1 envelopes are normalized through this migration for Studio
+and package consumers. Studio migrates on load, so the editor only operates on
+schema 2. The live homepage intentionally branches to the frozen v1 renderer
+for published schema-v1 documents while the parity gate is open; this prevents
+divider and any future visible legacy block from disappearing on publish.
 
 ## Schema and storage safety
 
@@ -160,8 +165,12 @@ stylesheet; homepage newsletter and More utility rules belong to the theme.
 ## Verification references
 
 The compatibility baseline is
-`apps/web/tests/baseline/homepage-structure.json`. Focused tests cover package
-parsers, migration, pin reservation, resolver order, duplicate placement,
-shared renderers, Studio round trips, feature gates, and static-export safety;
+`apps/web/tests/baseline/homepage-structure.json`. Frozen schema-v1 renderer
+parity is covered by
+`apps/web/tests/baseline/pre-migration-design-homepage.tsx`,
+`apps/web/tests/fixtures/v1-homepage-parity.json`, and
+`apps/web/tests/v1-render-parity.test.tsx`. Focused tests cover package parsers,
+migration, pin reservation, resolver order, duplicate placement, shared
+renderers, Studio round trips, feature gates, and static-export safety;
 `apps/web/tests/homepage-resolution.test.ts` covers whole-document order,
-omission/reordering, and late pin reservation.
+omission/reordering, late pin reservation, and ten-game calendar planning.

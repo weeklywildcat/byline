@@ -26,7 +26,7 @@ export const NEUTRAL_BRIEF_DEFAULTS: BriefPackageProps = {
   presentation: { showAuthor: true, showDeck: true }
 };
 
-const MAX_STORIES = 12;
+const MAX_STORIES = 50;
 
 function boundedCount(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_STORIES

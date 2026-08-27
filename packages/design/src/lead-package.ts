@@ -16,7 +16,10 @@ export type LeadPackageProps = {
   // Utility-only migrated v1 blocks use the same host-supplied slots without
   // pretending they contain a lead story. Normal homepage packages use the
   // default `content` mode.
-  mode?: "content" | "poll" | "calendar";
+  mode?: "content" | "single-story" | "poll" | "calendar";
+  // A migrated v1 story-lead carried a visible accessible label even though
+  // the normal lead package has no section heading of its own.
+  heading?: string;
   lead: {
     source: BylineStorySource;
   };
@@ -77,12 +80,16 @@ export function parseLeadPackageProps(value: unknown): LeadPackageProps {
   const utility = (props.utility ?? {}) as Record<string, unknown>;
   const presentation = (props.presentation ?? {}) as Record<string, unknown>;
 
-  const mode = props.mode === "poll" || props.mode === "calendar" || props.mode === "content"
+  const mode = props.mode === "poll" || props.mode === "calendar" || props.mode === "content" || props.mode === "single-story"
     ? props.mode
     : undefined;
+  const packageHeading = typeof props.heading === "string" && props.heading.trim()
+    ? props.heading.trim().slice(0, 80)
+    : "Top story";
 
   return {
     ...(mode ? { mode } : {}),
+    ...(mode === "single-story" ? { heading: packageHeading } : {}),
     lead: {
       source: parseStorySource(lead.source) ?? WEEKLY_WILDCAT_LEAD_DEFAULTS.lead.source
     },
