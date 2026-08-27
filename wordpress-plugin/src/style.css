@@ -1,80 +1,38 @@
-.byline-admin-page #wpcontent {
-  padding-left: 0;
-}
-
-.byline-admin-page #wpbody-content {
-  padding-bottom: 0;
-}
-
 .byline-admin-app {
   --byline-admin-accent: #3858e9;
   --byline-admin-border: #dcdcde;
   --byline-admin-text: #1e1e1e;
-  background: #f6f7f7;
   color: var(--byline-admin-text);
-  display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
-  min-height: calc(100vh - 32px);
-}
-
-.byline-admin-sidebar {
-  background: #fff;
-  border-right: 1px solid var(--byline-admin-border);
-  padding: 24px 16px;
-}
-
-.byline-admin-brand {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  margin: 0 8px 24px;
-}
-
-.byline-admin-nav-group + .byline-admin-nav-group {
-  margin-top: 20px;
-}
-
-.byline-admin-nav-group h2 {
-  color: #646970;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  margin: 0 8px 6px;
-  text-transform: uppercase;
-}
-
-.byline-admin-nav-group > div {
-  display: grid;
-  gap: 2px;
-}
-
-.byline-admin-nav-group a {
-  align-items: center;
-  border-radius: 4px;
-  color: #2c3338;
-  display: flex;
-  justify-content: space-between;
-  padding: 8px;
-  text-decoration: none;
-}
-
-.byline-admin-nav-group a:hover,
-.byline-admin-nav-group a:focus-visible,
-.byline-admin-nav-group a[aria-current="page"] {
-  background: #f0f0f1;
-  color: var(--byline-admin-accent);
+  max-width: 1120px;
 }
 
 .byline-admin-main {
-  max-width: 1120px;
-  padding: 36px clamp(24px, 4vw, 56px) 72px;
+  padding: 0 0 48px;
   width: 100%;
 }
 
 .byline-admin-header {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
-.byline-admin-header p,
+.byline-admin-header h1 {
+  font-size: 23px;
+  font-weight: 400;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.byline-admin-tabs {
+  margin: 0 0 24px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.byline-admin-tabs .nav-tab {
+  float: none;
+  display: inline-block;
+}
+
 .byline-eyebrow {
   color: #646970;
   font-size: 12px;
@@ -82,12 +40,6 @@
   letter-spacing: 0.06em;
   margin: 0 0 5px;
   text-transform: uppercase;
-}
-
-.byline-admin-header h1 {
-  font-size: clamp(28px, 4vw, 40px);
-  line-height: 1.05;
-  margin: 0;
 }
 
 .byline-dashboard-grid {
@@ -219,6 +171,12 @@
   min-width: 220px;
 }
 
+.byline-studio-back-link {
+  flex: 0 0 auto;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .byline-studio-toolbar > span {
   color: #646970;
 }
@@ -291,10 +249,6 @@
 }
 
 @media (max-width: 900px) {
-  .byline-admin-app {
-    grid-template-columns: 190px minmax(0, 1fr);
-  }
-
   .byline-dashboard-grid {
     grid-template-columns: 1fr;
   }
@@ -302,6 +256,39 @@
   .byline-settings-grid,
   .byline-toggle-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 782px) {
+  .byline-studio-toolbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .byline-studio-toolbar .components-base-control {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .byline-studio-toolbar > strong {
+    margin-left: 0;
+  }
+
+  .byline-studio-panel-toggles {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .byline-revision-list li,
+  .byline-settings-actions {
+    flex-wrap: wrap;
+  }
+
+  .byline-studio-shell.byline-studio-wide {
+    margin-left: -10px;
+    margin-right: -10px;
   }
 }
 

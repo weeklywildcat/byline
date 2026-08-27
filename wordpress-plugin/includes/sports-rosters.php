@@ -27,7 +27,7 @@ function wwh_register_sports_roster_post_type(): void
             ],
             'public' => false,
             'show_ui' => true,
-            'show_in_menu' => 'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE,
+            'show_in_menu' => 'byline',
             'show_in_rest' => false,
             'supports' => [],
             'capability_type' => 'post',
