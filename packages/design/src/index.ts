@@ -1,3 +1,7 @@
+export * from "./schema-v2";
+export * from "./lead-package";
+export * from "./migrate";
+
 export type BylineDesignDocument = {
   schemaVersion: number;
   template: string;

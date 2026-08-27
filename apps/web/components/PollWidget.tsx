@@ -1,8 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { PollCard } from "@byline/ui";
 import { getPollVotedCookieName } from "@/lib/voter-cookie";
-import { SiteIcon } from "./SiteIcon";
 
 type PollOption = {
   id: string;
@@ -140,14 +140,7 @@ export function PollWidget() {
   }
 
   return (
-    <section className="homepage-poll-card" aria-labelledby="homepage-poll-heading">
-      <div className="homepage-poll-heading">
-        <span>
-          <SiteIcon name="ph:chart-bar-horizontal" width={17} height={17} />
-        </span>
-        <h2 id="homepage-poll-heading">Your Opinion</h2>
-      </div>
-
+    <PollCard>
       {state === "loading" ? (
         <div className="homepage-poll-loading" aria-label="Loading poll" />
       ) : null}
@@ -206,6 +199,6 @@ export function PollWidget() {
           {message ? <p className="homepage-poll-note" aria-live="polite">{message}</p> : null}
         </>
       ) : null}
-    </section>
+    </PollCard>
   );
 }

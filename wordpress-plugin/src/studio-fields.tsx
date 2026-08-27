@@ -198,3 +198,175 @@ export function StorySourceField(): CustomField<StorySource> {
     }
   };
 }
+
+// --- schema v2 fields -------------------------------------------------------
+
+// The v2 story source, in newsroom language. Two differences from the v1 field
+// above: "how many" belongs to the package rather than the source, and manual
+// selection uses the searchable story picker instead of asking an editor to
+// type WordPress post IDs.
+export type LeadStorySource =
+  | { type: "latest" }
+  | { type: "sticky" }
+  | { type: "category"; categoryId: number }
+  | { type: "tag"; tagId: number }
+  | { type: "author"; authorId: number }
+  | { type: "manual"; storyIds: number[] };
+
+function ManualStoryList({
+  storyIds,
+  onChange,
+  readOnly
+}: {
+  storyIds: number[];
+  onChange: (storyIds: number[]) => void;
+  readOnly?: boolean;
+}) {
+  const [labels, setLabels] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    let active = true;
+    const missing = storyIds.filter((id) => !labels[id]);
+
+    if (!missing.length) return () => undefined;
+
+    apiFetch<Array<{ id: number; title?: { rendered?: string } }>>({
+      path: `/wp/v2/posts?include=${missing.join(",")}&_fields=id,title&per_page=${missing.length}`
+    })
+      .then((posts) => {
+        if (!active) return;
+        setLabels((current) => ({
+          ...current,
+          ...Object.fromEntries(posts.map((post) => [post.id, post.title?.rendered ?? `Story ${post.id}`]))
+        }));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [labels, storyIds]);
+
+  return (
+    <div className="byline-manual-story-list">
+      {storyIds.length ? (
+        <ol>
+          {storyIds.map((id, index) => (
+            <li key={id}>
+              <span dangerouslySetInnerHTML={{ __html: labels[id] ?? `Story ${id}` }} />
+              <span className="byline-manual-story-actions">
+                <Button
+                  size="small"
+                  variant="tertiary"
+                  disabled={readOnly || index === 0}
+                  onClick={() => {
+                    const next = [...storyIds];
+                    [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                    onChange(next);
+                  }}
+                >
+                  Move up
+                </Button>
+                <Button
+                  size="small"
+                  variant="tertiary"
+                  isDestructive
+                  disabled={readOnly}
+                  onClick={() => onChange(storyIds.filter((entry) => entry !== id))}
+                >
+                  Remove
+                </Button>
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="byline-manual-story-empty">No stories chosen yet. Search below to add one.</p>
+      )}
+      <EntityPicker
+        value=""
+        onChange={(next) => {
+          const id = Number(next);
+          if (!readOnly && Number.isInteger(id) && id > 0 && !storyIds.includes(id)) onChange([...storyIds, id]);
+        }}
+        readOnly={readOnly}
+        label="Add a story"
+        path="/wp/v2/posts?per_page=20&_fields=id,title"
+        mapItems={wpEntities}
+      />
+    </div>
+  );
+}
+
+export function LeadStorySourceField(label: string): CustomField<LeadStorySource> {
+  return {
+    type: "custom",
+    render: ({ value, onChange, readOnly }) => {
+      const source: LeadStorySource = value && typeof value === "object" ? value : { type: "latest" };
+
+      const updateType = (nextType: LeadStorySource["type"]) => {
+        if (nextType === "manual") onChange({ type: "manual", storyIds: [] });
+        else if (nextType === "category") onChange({ type: "category", categoryId: 1 });
+        else if (nextType === "tag") onChange({ type: "tag", tagId: 1 });
+        else if (nextType === "author") onChange({ type: "author", authorId: 1 });
+        else onChange({ type: nextType });
+      };
+
+      return (
+        <div className="byline-story-source-field">
+          <SelectControl
+            label={label}
+            value={source.type}
+            disabled={readOnly}
+            options={[
+              { label: "Automatic — newest first", value: "latest" },
+              { label: "Automatic — featured first", value: "sticky" },
+              { label: "From a section", value: "category" },
+              { label: "From a tag", value: "tag" },
+              { label: "By a writer", value: "author" },
+              { label: "Chosen by hand", value: "manual" }
+            ]}
+            onChange={(nextType) => updateType(nextType as LeadStorySource["type"])}
+          />
+          {source.type === "category" ? (
+            <EntityPicker
+              value={source.categoryId}
+              onChange={(categoryId) => onChange({ type: "category", categoryId: Number(categoryId) })}
+              readOnly={readOnly}
+              label="Section"
+              path="/wp/v2/categories?per_page=50&_fields=id,name"
+              mapItems={wpEntities}
+            />
+          ) : null}
+          {source.type === "tag" ? (
+            <EntityPicker
+              value={source.tagId}
+              onChange={(tagId) => onChange({ type: "tag", tagId: Number(tagId) })}
+              readOnly={readOnly}
+              label="Tag"
+              path="/wp/v2/tags?per_page=50&_fields=id,name"
+              mapItems={wpEntities}
+            />
+          ) : null}
+          {source.type === "author" ? (
+            <EntityPicker
+              value={source.authorId}
+              onChange={(authorId) => onChange({ type: "author", authorId: Number(authorId) })}
+              readOnly={readOnly}
+              label="Writer"
+              path="/wp/v2/users?per_page=50&_fields=id,name"
+              mapItems={wpEntities}
+            />
+          ) : null}
+          {source.type === "manual" ? (
+            <ManualStoryList
+              storyIds={source.storyIds}
+              readOnly={readOnly}
+              onChange={(storyIds) => onChange({ type: "manual", storyIds })}
+            />
+          ) : null}
+        </div>
+      );
+    }
+  };
+}

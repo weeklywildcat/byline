@@ -10,8 +10,10 @@ import { magazineTheme } from "@byline/theme-magazine";
 import { modernTheme } from "@byline/theme-modern";
 import { weeklyWildcatTheme } from "@byline/theme-weekly-wildcat";
 import { getBylineBlockPresentation, themeTokensToCssVariables } from "@byline/ui";
+import { LeadPackagePreview } from "./studio-preview";
 import {
   AuthorPickerField,
+  LeadStorySourceField,
   FocalPointField,
   MediaPickerField,
   NavigationPickerField,
@@ -23,6 +25,7 @@ import {
   TagPickerField,
   type StorySource
 } from "./studio-fields";
+import { LEAD_PACKAGE_TYPE, WEEKLY_WILDCAT_LEAD_DEFAULTS } from "@byline/design";
 
 type DesignDocument = {
   schemaVersion: 1;
@@ -48,6 +51,18 @@ type StudioProps = {
   canPublish: boolean;
   publicationTheme: string;
   tokenOverrides: Record<string, string>;
+  features?: { polls: boolean; events: boolean; sports: boolean };
+  publicationShortName?: string;
+  calendarHeading?: string;
+};
+
+// Everything the preview needs that is publication-specific rather than
+// design-specific. Passed in so no Weekly Wildcat identity is baked into Studio.
+export type StudioPreviewContext = {
+  theme: string;
+  features: { polls: boolean; events: boolean; sports: boolean };
+  publicationShortName: string;
+  calendarHeading: string;
 };
 
 export const studioBlockGroups = BYLINE_STUDIO_CATEGORIES;
@@ -119,6 +134,102 @@ const components = Object.fromEntries(
   })
 );
 
+// The lead package is a schema v2 semantic package, not a v1 block. It is
+// registered separately because it carries newsroom settings rather than the
+// generic title/query pair, and because it renders the production component
+// instead of a placeholder card.
+function createLeadPackageComponent(context: StudioPreviewContext) {
+  return {
+    label: "Lead package",
+    fields: {
+      lead: {
+        type: "object" as const,
+        label: "Lead story",
+        objectFields: { source: LeadStorySourceField("Source") }
+      },
+      latest: {
+        type: "object" as const,
+        label: "The Latest rail",
+        objectFields: {
+          heading: { type: "text" as const, label: "Rail heading" },
+          source: LeadStorySourceField("Source"),
+          limit: {
+            type: "number" as const,
+            label: "Number of stories",
+            min: 0,
+            max: 12
+          },
+          showBylines: {
+            type: "radio" as const,
+            label: "Show bylines",
+            options: [
+              { label: "Yes", value: true },
+              { label: "No", value: false }
+            ]
+          }
+        }
+      },
+      utility: {
+        type: "object" as const,
+        label: "Utility rail",
+        objectFields: {
+          poll: {
+            type: "radio" as const,
+            label: "Poll",
+            options: [
+              { label: "Show", value: true },
+              { label: "Hide", value: false }
+            ]
+          },
+          calendar: {
+            type: "radio" as const,
+            label: "This Week calendar",
+            options: [
+              { label: "Show", value: true },
+              { label: "Hide", value: false }
+            ]
+          },
+          calendarLimit: { type: "number" as const, label: "Calendar entries", min: 0, max: 10 }
+        }
+      },
+      presentation: {
+        type: "object" as const,
+        label: "Story display",
+        objectFields: {
+          showDeck: {
+            type: "radio" as const,
+            label: "Show deck",
+            options: [
+              { label: "Show", value: true },
+              { label: "Hide", value: false }
+            ]
+          },
+          opinionTreatment: {
+            type: "radio" as const,
+            label: "Opinion treatment",
+            options: [
+              { label: "Follow the story's setting", value: "auto" },
+              { label: "Never", value: "off" }
+            ]
+          }
+        }
+      }
+    },
+    defaultProps: { ...WEEKLY_WILDCAT_LEAD_DEFAULTS },
+    // The acceptance criterion for this phase: Studio renders the same shared
+    // renderer as the static site, against real WordPress content.
+    render: (props: Record<string, unknown>) => (
+      <LeadPackagePreview
+        props={props}
+        theme={context.theme}
+        features={context.features}
+        publicationShortName={context.publicationShortName}
+        calendarHeading={context.calendarHeading}
+      />
+    )
+  };
+}
+
 const studioConfigBase: Config = {
   categories: Object.fromEntries(
     Object.entries(blockGroups).map(([title, categoryComponents]) => [title, {
@@ -146,11 +257,29 @@ export function getStudioThemeVariables(theme: string, overrides: Record<string,
   return themeTokensToCssVariables(tokens);
 }
 
-export function createStudioConfig(theme: string, overrides: Record<string, string>): Config {
+export function createStudioConfig(
+  theme: string,
+  overrides: Record<string, string>,
+  context?: StudioPreviewContext
+): Config {
   const variables = getStudioThemeVariables(theme, overrides) as CSSProperties;
+  const previewContext: StudioPreviewContext = context ?? {
+    theme,
+    features: { polls: true, events: true, sports: true },
+    publicationShortName: "Newsroom",
+    calendarHeading: "This week"
+  };
 
   return {
     ...studioConfigBase,
+    categories: {
+      Packages: { title: "Packages", components: [LEAD_PACKAGE_TYPE], defaultExpanded: true },
+      ...studioConfigBase.categories
+    } as Config["categories"],
+    components: {
+      ...studioConfigBase.components,
+      [LEAD_PACKAGE_TYPE]: createLeadPackageComponent(previewContext)
+    } as unknown as Config["components"],
     root: {
       render: ({ children }: { children: ReactNode }) => (
       <div style={{
@@ -177,15 +306,33 @@ function errorMessage(error: unknown) {
   return "Byline Studio could not save this design. Review the block settings and try again.";
 }
 
-export function BylineStudio({ canEdit, canPublish, publicationTheme, tokenOverrides }: StudioProps) {
+export function BylineStudio({
+  canEdit,
+  canPublish,
+  publicationTheme,
+  tokenOverrides,
+  features = { polls: true, events: true, sports: true },
+  publicationShortName = "Newsroom",
+  calendarHeading = "This week"
+}: StudioProps) {
   const [template, setTemplate] = useState<"home" | "section-default" | "article-default" | "author-default" | "sports-home">("home");
   const [design, setDesign] = useState<AdminDesign | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  // Both panels collapse so the preview can take the full width. Defaults keep
+  // them open: an editor should see the package list on first open.
+  const [outlineOpen, setOutlineOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const studioConfig = useMemo(
-    () => createStudioConfig(publicationTheme, tokenOverrides),
-    [publicationTheme, tokenOverrides]
+    () =>
+      createStudioConfig(publicationTheme, tokenOverrides, {
+        theme: publicationTheme,
+        features,
+        publicationShortName,
+        calendarHeading
+      }),
+    [calendarHeading, features, publicationShortName, publicationTheme, tokenOverrides]
   );
 
   const load = () => {
@@ -249,7 +396,11 @@ export function BylineStudio({ canEdit, canPublish, publicationTheme, tokenOverr
   };
 
   return (
-    <div className="byline-studio-shell">
+    <div
+      className="byline-studio-shell byline-studio-wide"
+      data-byline-outline={outlineOpen ? "expanded" : "collapsed"}
+      data-byline-inspector={inspectorOpen ? "expanded" : "collapsed"}
+    >
       <div className="byline-studio-toolbar">
         <SelectControl
           label="Template"
@@ -265,6 +416,24 @@ export function BylineStudio({ canEdit, canPublish, publicationTheme, tokenOverr
         />
         <span>Published revision {design.revision}{status ? ` · ${status}` : ""}</span>
         {design.autosave ? <strong>Recovered autosave</strong> : null}
+        <div className="byline-studio-panel-toggles">
+          <Button
+            variant="secondary"
+            isPressed={outlineOpen}
+            aria-pressed={outlineOpen}
+            onClick={() => setOutlineOpen((open) => !open)}
+          >
+            Packages
+          </Button>
+          <Button
+            variant="secondary"
+            isPressed={inspectorOpen}
+            aria-pressed={inspectorOpen}
+            onClick={() => setInspectorOpen((open) => !open)}
+          >
+            Settings
+          </Button>
+        </div>
       </div>
       {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
       <Puck
@@ -277,7 +446,7 @@ export function BylineStudio({ canEdit, canPublish, publicationTheme, tokenOverr
         headerTitle={`Byline Studio · ${template}`}
         viewports={[...BYLINE_STUDIO_VIEWPORTS]}
         iframe={{ enabled: true, syncHostStyles: false }}
-        height="calc(100vh - 230px)"
+        height="calc(100vh - 200px)"
       />
     </div>
   );

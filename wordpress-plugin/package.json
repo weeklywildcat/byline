@@ -17,6 +17,7 @@
     "@byline/theme-modern": "0.1.0",
     "@byline/theme-weekly-wildcat": "0.1.0",
     "@byline/ui": "0.1.0",
+    "@iconify/react": "^6.0.2",
     "@puckeditor/core": "0.23.0",
     "@wordpress/api-fetch": "7.53.0",
     "@wordpress/components": "39.0.0",
