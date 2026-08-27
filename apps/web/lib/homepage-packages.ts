@@ -150,6 +150,22 @@ export function toCalendarEntries(
 
 export type HomepageSelection = ReturnType<typeof resolveWeeklyWildcatHomepage>;
 
+/**
+ * The compatibility story-selection pass, wrapped so its role is explicit.
+ *
+ * `resolveWeeklyWildcatHomepage` is the pre-Studio ordered de-duplication
+ * algorithm. It is required verbatim for byte-identical Weekly Wildcat output --
+ * particularly The Latest, which is the eighth selection rather than a
+ * layout-order one -- so it is deliberately not being rewritten.
+ *
+ * It is reached only through this function. When the package orchestrator takes
+ * over ordering for every package, this is the single call site that has to be
+ * replaced, and the algorithm can be absorbed rather than hunted for.
+ */
+export function resolveCompatibilityHomepageSelection(posts: WordPressPost[]): HomepageSelection {
+  return resolveWeeklyWildcatHomepage(posts);
+}
+
 function manualStories(source: BylineStorySource, posts: WordPressPost[]) {
   if (source.type !== "manual") return null;
 

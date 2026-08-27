@@ -389,3 +389,8 @@
   color: #646970;
   margin: 0 0 10px;
 }
+
+.byline-migration-warnings {
+  list-style: disc outside;
+  margin: 8px 0 0 18px;
+}

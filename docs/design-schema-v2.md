@@ -93,15 +93,66 @@ seeded separately in `lib/homepage-design.ts`, and the frontend still requires a
 published revision before a design drives the homepage, so a half-finished
 experimental draft cannot become the live front page.
 
-## Storage compatibility
+## Schema capabilities
 
-WordPress accepts schema 1 **and** schema 2 while the migration is in progress,
-dispatching to `byline_validate_design_document_v2` for the latter.
+"What we write" and "what we can read" are different during the transition, so
+they are different constants:
 
-The advertised `BYLINE_DESIGN_SCHEMA_VERSION` deliberately stays at **1**: it is
-a public compatibility contract checked with strict equality by deployed
-frontends, so bumping it is a coordinated release, not a side effect of this
-phase. It moves to 2 when every package is extracted and schema 1 is dropped.
+```ts
+BYLINE_DESIGN_WRITE_SCHEMA_VERSION = 2     // Studio only ever persists v2
+BYLINE_DESIGN_READ_SCHEMA_VERSIONS = [1, 2]
+```
+
+`parsePublishedBylineDesign` dispatches on the stored `schemaVersion` and returns
+a **discriminated union**, so the compiler prevents a v1 document being handed to
+a package renderer. v2 is never obtained by casting a v1 document:
+`resolvePublishedDesignToV2` is the only route, and it runs the explicit
+migration.
+
+WordPress storage accepts both versions, dispatching to
+`byline_validate_design_document_v2`.
+
+The public `BYLINE_DESIGN_SCHEMA_VERSION` in the protocol manifest deliberately
+stays at **1**: deployed frontends check it with strict equality, so bumping it
+is a coordinated release.
+
+## How a published design reaches the page
+
+```
+Studio editor state
+  → editorStateToDesignDocument()      schema 2, no editor/layout keys
+    → PUT /byline/v1/admin/design/home
+      → GET /byline/v1/design/home     { document, revision, modifiedAt }
+        → next-with-publication.mjs    → BYLINE_DESIGNS_JSON
+          → lib/designs getPublishedDesignV2()
+            → lib/homepage-design getHomeDesignDocument()
+              → resolveLeadPackage()
+                → LeadPackage renderer
+```
+
+There is no home-only environment variable. `BYLINE_DESIGNS_JSON` is the single
+build-time source of truth for every template.
+
+### Fallbacks are publication-aware
+
+`getHomeDesignDocument()` returns the published design when one exists at
+revision > 0. Otherwise it picks a seed **by publication**:
+
+- Weekly Wildcat → `getWeeklyWildcatCompatibilityDesign()`, preserving live output
+- everything else → `getStarterHomeDesign()`, a neutral lead with no poll,
+  no calendar and no sticky-first assumption
+
+A second publication never inherits Weekly Wildcat's homepage semantics just
+because it has not published a design yet.
+
+### Published v1 designs
+
+A published *v1* design still renders through the legacy `DesignHomepage`
+compatibility renderer, not through migration. This is deliberate: only
+`story-lead` has a v2 equivalent today, so migrating a live v1 homepage would
+silently drop every other section. Studio migrates v1 on load (and says what did
+not convert); published v1 output is left alone until the remaining packages
+exist.
 
 ## Themes
 

@@ -12,6 +12,8 @@
 //   - theme is identity only; it never carries content or layout
 //   - no React component names and no CSS class names are ever persisted
 
+import { BylineDesignCompatibilityError } from "./errors";
+
 export const BYLINE_DESIGN_SCHEMA_VERSION_V2 = 2;
 
 // Semantic package identifiers. Only the packages that are actually implemented
@@ -62,7 +64,7 @@ export type BylineDesignDocumentV2 = {
   modifiedAt?: string;
 };
 
-export class BylineDesignSchemaError extends Error {
+export class BylineDesignSchemaError extends BylineDesignCompatibilityError {
   constructor(message: string) {
     super(message);
     this.name = "BylineDesignSchemaError";

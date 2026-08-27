@@ -25,22 +25,20 @@ import {
   TagPickerField,
   type StorySource
 } from "./studio-fields";
-import { LEAD_PACKAGE_TYPE, WEEKLY_WILDCAT_LEAD_DEFAULTS } from "@byline/design";
+import { LEAD_PACKAGE_TYPE, WEEKLY_WILDCAT_LEAD_DEFAULTS, type BylineDesignDocumentV2 } from "@byline/design";
+import { editorStateToDesignDocument, loadDesignIntoEditor, type PuckEditorState } from "./studio-document";
 
-type DesignDocument = {
-  schemaVersion: 1;
-  template: string;
-  theme: string;
-  editor: { engine: "puck"; version: string };
-  layout: Data;
-};
+// What Studio writes. Reading still accepts schema 1, but only as an input to
+// migration -- see loadDesignIntoEditor.
+type DesignDocument = BylineDesignDocumentV2;
 
 type AdminDesign = {
-  document: DesignDocument;
+  // Stored documents may still be schema 1 until they are re-saved.
+  document: unknown;
   revision: number;
   modifiedAt: string | null;
   autosave: {
-    document: DesignDocument;
+    document: unknown;
     baseRevisionId: number;
     modifiedAt: string;
   } | null;
@@ -354,16 +352,14 @@ export function BylineStudio({
     return <div className="byline-studio-loading">{error ? <Notice status="error">{error}</Notice> : <Spinner />}</div>;
   }
 
-  const workingDocument = design.autosave?.document ?? design.document;
+  const stored = design.autosave?.document ?? design.document;
   const baseRevisionId = design.autosave?.baseRevisionId ?? design.revision;
+  const loaded = loadDesignIntoEditor(stored, template);
 
-  const documentFor = (data: Data): DesignDocument => ({
-    schemaVersion: 1,
-    template,
-    theme: publicationTheme,
-    editor: { engine: "puck", version: "0.23.0" },
-    layout: data
-  });
+  // Editor state is converted to the semantic document before it leaves the
+  // browser. No Puck structure is persisted.
+  const documentFor = (data: Data): DesignDocument =>
+    editorStateToDesignDocument(data as unknown as PuckEditorState, template, publicationTheme);
 
   const autosave = (data: Data) => {
     if (!canEdit) return;
@@ -436,10 +432,23 @@ export function BylineStudio({
         </div>
       </div>
       {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
+      {loaded.migratedFromV1 ? (
+        <Notice status="warning" isDismissible={false}>
+          <strong>This design was created in the previous editor.</strong> It has been converted, and saving
+          will store it in the new format.
+          {loaded.migrationWarnings.length ? (
+            <ul className="byline-migration-warnings">
+              {loaded.migrationWarnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          ) : null}
+        </Notice>
+      ) : null}
       <Puck
         key={`${template}-${design.revision}-${design.autosave?.modifiedAt || "published"}`}
         config={studioConfig}
-        data={workingDocument.layout}
+        data={loaded.editorState as unknown as Data}
         onChange={autosave}
         onPublish={publish}
         permissions={{ drag: canEdit, duplicate: canEdit, delete: canEdit, edit: canEdit, insert: canEdit }}

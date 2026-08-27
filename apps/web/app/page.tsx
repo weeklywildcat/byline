@@ -18,8 +18,11 @@ import {
   type SportsGame
 } from "@/lib/headless";
 import { getHomeDesignDocument, findLeadPackage } from "@/lib/homepage-design";
-import { resolveLeadPackage, toCalendarEntries } from "@/lib/homepage-packages";
-import { resolveWeeklyWildcatHomepage } from "@/lib/homepage-selection";
+import {
+  resolveCompatibilityHomepageSelection,
+  resolveLeadPackage,
+  toCalendarEntries
+} from "@/lib/homepage-packages";
 import { getPublishedDesign } from "@/lib/designs";
 import { resolvePublishedDesignBlocks } from "@/lib/design-resolution";
 import { getPublicationConfig } from "@/lib/publication";
@@ -61,7 +64,10 @@ export default async function HomePage() {
   const posts = filterPublicHomepagePosts(allPosts);
   const publishedHomeDesign = getPublishedDesign("home");
 
-  if (publishedHomeDesign && publishedHomeDesign.revision > 0) {
+  // The whole-page schema 1 renderer. It only runs for a published *v1* design,
+  // which is the pre-package world; a v2 design drives the package path below.
+  // This is removed once every package has been extracted.
+  if (publishedHomeDesign && publishedHomeDesign.revision > 0 && publishedHomeDesign.schemaVersion === 1) {
     const designBlocks = await resolvePublishedDesignBlocks(publishedHomeDesign.document.layout.content, posts);
     return (
       <>
@@ -75,7 +81,7 @@ export default async function HomePage() {
     );
   }
 
-  const selection = resolveWeeklyWildcatHomepage(posts);
+  const selection = resolveCompatibilityHomepageSelection(posts);
   const {
     athleteSpotlightPost,
     leadPost,
