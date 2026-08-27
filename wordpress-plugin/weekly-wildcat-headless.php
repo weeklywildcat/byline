@@ -1236,6 +1236,9 @@ function wwh_render_sports_team_settings_page(): void
     }
 
     $settings = wwh_sports_team_settings();
+    $admin_destination = isset($_GET['page']) && sanitize_key((string) wp_unslash($_GET['page'])) === BYLINE_ADMIN_TEAMS_PAGE
+        ? 'byline'
+        : 'legacy';
 
     ?>
     <div class="wrap wwh-sports-team-settings-page">
@@ -1244,6 +1247,7 @@ function wwh_render_sports_team_settings_page(): void
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
             <?php wp_nonce_field('wwh_save_sports_team_settings', 'wwh_sports_team_settings_nonce'); ?>
             <input type="hidden" name="action" value="wwh_save_sports_team_settings">
+            <input type="hidden" name="byline_admin_destination" value="<?php echo esc_attr($admin_destination); ?>">
             <div class="wwh-team-settings-grid">
                 <?php foreach (wwh_sports_team_options() as $team_key => $team) : ?>
                     <?php
@@ -1372,7 +1376,12 @@ function wwh_save_sports_team_settings(): void
     byline_replace_sports_teams($team_entities);
     update_option(WWH_SPORTS_TEAM_SETTINGS_OPTION, $settings, false);
     wwh_schedule_cloudflare_deploy();
-    wp_safe_redirect(add_query_arg(['post_type' => WWH_SPORTS_GAME_POST_TYPE, 'page' => 'wwh-sports-team-settings', 'updated' => 'true'], admin_url('edit.php')));
+    if (isset($_POST['byline_admin_destination'])
+        && sanitize_key((string) wp_unslash($_POST['byline_admin_destination'])) === 'byline') {
+        wp_safe_redirect(byline_admin_page_url(BYLINE_ADMIN_TEAMS_PAGE, ['updated' => 'true']));
+    } else {
+        wp_safe_redirect(add_query_arg(['post_type' => WWH_SPORTS_GAME_POST_TYPE, 'page' => 'wwh-sports-team-settings', 'updated' => 'true'], admin_url('edit.php')));
+    }
     exit;
 }
 
@@ -1512,7 +1521,7 @@ function wwh_register_post_types(): void
             ],
             'public' => false,
             'show_ui' => true,
-            'show_in_menu' => true,
+            'show_in_menu' => 'byline',
             'show_in_rest' => false,
             'menu_icon' => 'dashicons-awards',
             'supports' => ['title'],
@@ -1536,7 +1545,7 @@ function wwh_register_post_types(): void
             ],
             'public' => false,
             'show_ui' => true,
-            'show_in_menu' => true,
+            'show_in_menu' => 'byline',
             'show_in_rest' => false,
             'menu_icon' => 'dashicons-calendar-alt',
             'supports' => ['title'],
@@ -1737,7 +1746,7 @@ function wwh_register_admin_pages(): void
         'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE,
         'Sports Team Settings',
         'Team Settings',
-        'edit_posts',
+        BYLINE_MANAGE_CAPABILITY,
         'wwh-sports-team-settings',
         'wwh_render_sports_team_settings_page'
     );

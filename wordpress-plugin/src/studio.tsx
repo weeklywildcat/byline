@@ -56,6 +56,7 @@ type StudioProps = {
   canPublish: boolean;
   publicationTheme: string;
   tokenOverrides: Record<string, string>;
+  backUrl?: string;
   features?: { polls: boolean; events: boolean; sports: boolean };
   publicationShortName?: string;
   calendarHeading?: string;
@@ -392,6 +393,7 @@ export function BylineStudio({
   canPublish,
   publicationTheme,
   tokenOverrides,
+  backUrl,
   features = { polls: true, events: true, sports: true },
   publicationShortName = "Newsroom",
   calendarHeading = "This week"
@@ -486,6 +488,7 @@ export function BylineStudio({
       data-byline-inspector={inspectorOpen ? "expanded" : "collapsed"}
     >
       <div className="byline-studio-toolbar">
+        {backUrl ? <a className="byline-studio-back-link" href={backUrl}>← Back to Byline</a> : null}
         <SelectControl
           label="Template"
           value={template}
@@ -551,7 +554,7 @@ export function BylineStudio({
 
 type DesignRevision = { id: number; authorId: number; modifiedAt: string };
 
-export function BylineDesignRevisions({ canEdit }: { canEdit: boolean }) {
+export function BylineDesignRevisions({ canEdit, backUrl }: { canEdit: boolean; backUrl?: string }) {
   const [template, setTemplate] = useState<"home" | "section-default" | "article-default" | "author-default" | "sports-home">("home");
   const [revisions, setRevisions] = useState<DesignRevision[] | null>(null);
   const [message, setMessage] = useState("");
@@ -580,6 +583,7 @@ export function BylineDesignRevisions({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div className="byline-revisions-screen">
+      {backUrl ? <a className="byline-studio-back-link" href={backUrl}>← Back to Byline</a> : null}
       <SelectControl
         label="Template"
         value={template}
