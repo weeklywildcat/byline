@@ -28,10 +28,23 @@ release, or asset, and do not republish a canonical tag that is older than
 - installed main file: `weekly-wildcat-headless/weekly-wildcat-headless.php`
 - standalone bridge release: `weeklywildcat/byline-plugin` `v0.2.3`
 
+PUC derives its remote metadata path from the installed main-file basename, so
+it requests `/contents/weekly-wildcat-headless.php` even though the canonical
+source is `wordpress-plugin/weekly-wildcat-headless.php`. The repository-root
+`weekly-wildcat-headless.php` symlink exposes that canonical source at PUC's
+fixed path without duplicating plugin code. It is repository metadata only;
+the release packager stages `wordpress-plugin/` and includes exactly one
+installable entrypoint in the ZIP.
+
 `wordpress-plugin/tests/updater-bridge-regression.php` locks the plugin-side
-contract. `scripts/verify-updater-transition.mjs` also verifies that the
-canonical tag workflow publishes the asset the updater selects. CI runs both,
-then creates and inspects a production ZIP simulation.
+contract and root remote-source path. The release-transition regression runs
+the bundled PUC request flow for both successful metadata resolution and a
+missing-file response, proving that a `v0.2.4` release tag still supplies the
+remote version and asset when metadata is unavailable. The missing-file case
+produces `puc-github-http-error` but not `puc-no-plugin-version`.
+`scripts/verify-updater-transition.mjs` also verifies the symlink and that the
+canonical tag workflow publishes the asset the updater selects. CI runs these
+checks, then creates and inspects a production ZIP simulation.
 
 ## Canonical release procedure
 
