@@ -27,6 +27,22 @@ release, or asset, and do not republish a canonical tag that is older than
 - release asset: `weekly-wildcat-headless.zip`
 - installed main file: `weekly-wildcat-headless/weekly-wildcat-headless.php`
 - standalone bridge release: `weeklywildcat/byline-plugin` `v0.2.3`
+- update-screen metadata: `readme.txt`, shipped in the ZIP and exposed at the
+  repository root
+
+## Release notes
+
+PUC never reads the GitHub release body. The changelog WordPress renders under
+**View version details** comes from the plugin's `readme.txt`, which PUC fetches
+from the repository root at the release tag by the same basename rule as the
+main file. `readme.txt` is therefore symlinked at the root alongside
+`weekly-wildcat-headless.php`.
+
+`readme.txt` also supplies `Tested up to`, `Requires at least`, `Requires PHP`,
+and the per-version `Upgrade Notice` WordPress prints inline on the Plugins
+screen. The packaging script and `verify-updater-transition.mjs` both fail a
+release whose readme has no changelog entry for the version being published, or
+whose `Stable tag` disagrees with the plugin header.
 
 PUC derives its remote metadata path from the installed main-file basename, so
 it requests `/contents/weekly-wildcat-headless.php` even though the canonical

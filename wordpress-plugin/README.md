@@ -140,9 +140,13 @@ Only tagged releases are used for WordPress updates. Normal pushes to `main` do 
 
 To publish an update:
 
-1. Update the `Version:` header in `wordpress-plugin/weekly-wildcat-headless.php` and `wordpress-plugin/package.json`.
-2. Commit and push the change to `main`.
-3. Create and push a matching tag, for example:
+1. Update the version in all three places, which must agree:
+   - the `Version:` header in `wordpress-plugin/weekly-wildcat-headless.php`
+   - `version` in `wordpress-plugin/package.json`
+   - `BYLINE_PLUGIN_VERSION` in `wordpress-plugin/includes/core/protocol.php`
+2. Add a `= <version> =` entry to `== Changelog ==` in `wordpress-plugin/readme.txt`, update its `Stable tag:`, and add an `== Upgrade Notice ==` entry if the release changes existing behaviour.
+3. Commit and push the change to `main`.
+4. Create and push a matching tag, for example:
 
    ```sh
    git tag v0.2.2
@@ -150,6 +154,14 @@ To publish an update:
    ```
 
 GitHub Actions packages `weekly-wildcat-headless.zip` and publishes it as a release asset. WordPress uses that release asset for plugin updates.
+
+### Release notes in WordPress
+
+What WordPress shows under **View version details** comes from the plugin's `readme.txt`, not from the GitHub release body. The Plugin Update Checker resolves the changelog in this order: the plugin's `readme.txt`, then a `CHANGELOG.md` in the repository, then the literal text "There is no changelog available."
+
+`readme.txt` therefore ships inside the release ZIP *and* is exposed at the repository root as a symlink, because the update checker fetches it from the root at the release tag — the same reason `weekly-wildcat-headless.php` is symlinked there. It also supplies `Tested up to`, `Requires PHP`, and the short `Upgrade Notice` that WordPress prints inline on the Plugins screen.
+
+`npm run package:plugin` and `node scripts/verify-updater-transition.mjs` both fail if `readme.txt` is missing, if its `Stable tag` disagrees with the plugin version, or if it has no changelog entry for the version being released.
 
 Before packaging, the workflow installs the monorepo workspace, runs the admin
 tests/typecheck/build and PHP syntax/regression matrix, verifies React remains a

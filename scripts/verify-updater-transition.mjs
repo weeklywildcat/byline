@@ -26,6 +26,32 @@ if (updater.includes("weeklywildcat/byline-plugin")) {
   throw new Error("Future update checks still point at the standalone compatibility repository.");
 }
 
+// WordPress reads readme.txt for the update-screen changelog, and PUC fetches it
+// from the repository root at the release tag -- the same reason the plugin
+// entrypoint is exposed there. A readme that only exists inside wordpress-plugin/
+// would leave every site showing "There is no changelog available."
+const readmeName = "readme.txt";
+const canonicalReadme = "wordpress-plugin/readme.txt";
+const readmeStats = await lstat(readmeName);
+if (!readmeStats.isSymbolicLink()) {
+  throw new Error(`${readmeName} must be a symlink that exposes the plugin readme to PUC at the repository root.`);
+}
+if ((await readlink(readmeName)) !== canonicalReadme) {
+  throw new Error(`${readmeName} must target ${canonicalReadme}.`);
+}
+
+const readme = await readFile(readmeName, "utf8");
+const stableTag = readme.match(/^Stable tag:\s*(\S+)\s*$/m)?.[1];
+if (stableTag !== version) {
+  throw new Error(`readme.txt stable tag ${stableTag ?? "<missing>"} does not match plugin version ${version}`);
+}
+if (!new RegExp(`^= ${version.replace(/\./g, "\\.")} =$`, "m").test(readme)) {
+  throw new Error(`readme.txt has no changelog entry for ${version}`);
+}
+for (const requiredHeader of ["Tested up to:", "Requires PHP:", "== Changelog =="]) {
+  if (!readme.includes(requiredHeader)) throw new Error(`readme.txt is missing ${requiredHeader}`);
+}
+
 const remoteEntrypointStats = await lstat(remoteEntrypoint);
 if (!remoteEntrypointStats.isSymbolicLink()) {
   throw new Error(`${remoteEntrypoint} must be a symlink that exposes the monorepo plugin source to PUC.`);
@@ -44,4 +70,4 @@ for (const expected of ['- "v*"', "wordpress-plugin/weekly-wildcat-headless.php"
   if (!releaseWorkflow.includes(expected)) throw new Error(`Canonical release workflow is missing ${expected}`);
 }
 
-console.log(`Updater transition verified for installed slug weekly-wildcat-headless at version ${version}; PUC remote source path ${remoteEntrypoint} resolves to ${canonicalEntrypoint}.`);
+console.log(`Updater transition verified for installed slug weekly-wildcat-headless at version ${version}; PUC remote source path ${remoteEntrypoint} resolves to ${canonicalEntrypoint}; readme.txt documents ${version}.`);

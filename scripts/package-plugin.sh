@@ -8,6 +8,8 @@ archive="$release_root/weekly-wildcat-headless.zip"
 stage_root="$(mktemp -d)"
 trap 'rm -rf "$stage_root"' EXIT
 
+plugin_header_version="$(grep -E '^[[:space:]]*\* Version:' "$plugin_root/weekly-wildcat-headless.php" | head -n 1 | sed -E 's/.*Version:[[:space:]]*//')"
+
 poll_files=(
   includes/polls/schema.php
   includes/polls/votes.php
@@ -44,9 +46,28 @@ migration_assets=(
   migrations/weekly-wildcat-pages.json
 )
 
-for required_file in weekly-wildcat-headless.php "${build_assets[@]}" "${admin_assets[@]}" "${migration_assets[@]}" "${poll_files[@]}"; do
+# WordPress reads the plugin's readme.txt for the changelog, upgrade notice, and
+# supported-version metadata shown on the update screen. Without it every site
+# sees "There is no changelog available."
+release_metadata=(
+  readme.txt
+)
+
+for required_file in weekly-wildcat-headless.php "${build_assets[@]}" "${admin_assets[@]}" "${migration_assets[@]}" "${release_metadata[@]}" "${poll_files[@]}"; do
   test -f "$plugin_root/$required_file"
 done
+
+# The readme has to document the version actually being packaged, or the update
+# screen shows a changelog for the wrong release.
+readme_stable_tag="$(grep -E '^Stable tag:' "$plugin_root/readme.txt" | head -n 1 | sed -E 's/^Stable tag:[[:space:]]*//')"
+if [[ "$readme_stable_tag" != "$plugin_header_version" ]]; then
+  echo "readme.txt stable tag $readme_stable_tag does not match plugin version $plugin_header_version." >&2
+  exit 1
+fi
+if ! grep -qE "^= ${plugin_header_version//./\.} =$" "$plugin_root/readme.txt"; then
+  echo "readme.txt has no changelog entry for $plugin_header_version." >&2
+  exit 1
+fi
 
 asset_dependencies="$(php -r '$asset = include $argv[1]; echo implode("\n", $asset["dependencies"] ?? []);' "$plugin_root/build/index.asset.php")"
 for external_dependency in react react-dom react-jsx-runtime wp-element; do
@@ -142,6 +163,13 @@ done
 for migration_file in "${migration_assets[@]}"; do
   if ! grep -qx "weekly-wildcat-headless/$migration_file" <<<"$archive_files"; then
     echo "Plugin archive is missing required migration asset $migration_file." >&2
+    exit 1
+  fi
+done
+
+for metadata_file in "${release_metadata[@]}"; do
+  if ! grep -qx "weekly-wildcat-headless/$metadata_file" <<<"$archive_files"; then
+    echo "Plugin archive is missing required release metadata $metadata_file." >&2
     exit 1
   fi
 done
