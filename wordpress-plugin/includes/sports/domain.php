@@ -795,6 +795,26 @@ function byline_sports_integrity_checks(bool $refresh = false): array
         ], $context);
     };
 
+    // Identity and branding normalization is intentionally read-only here.
+    // Health must expose malformed historical options without allowing a GET
+    // of the Teams screen to rewrite or discard them.
+    if (function_exists('byline_sports_team_integrity_records')) {
+        foreach (byline_sports_team_integrity_records() as $record_issue) {
+            if (!is_array($record_issue)) {
+                continue;
+            }
+            $context = $record_issue;
+            unset($context['code'], $context['severity'], $context['message']);
+            $add_issue(
+                $issues,
+                (string) ($record_issue['code'] ?? 'malformed_team_record'),
+                (string) ($record_issue['severity'] ?? 'warning'),
+                (string) ($record_issue['message'] ?? 'A sports team record needs review.'),
+                $context
+            );
+        }
+    }
+
     foreach ($teams as $key => $team) {
         $slug = sanitize_title((string) ($team['slug'] ?? ''));
         if ($slug !== '') {
