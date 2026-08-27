@@ -110,9 +110,14 @@ describe("published design envelope", () => {
     const resolved = resolvePublishedDesignToV2(published, "home");
 
     expect(resolved.document.schemaVersion).toBe(2);
-    expect(resolved.document.packages[0].type).toBe(LEAD_PACKAGE_TYPE);
-    // The unconvertible block is preserved and reported, not silently dropped.
-    expect(resolved.migrationWarnings.some((warning) => warning.includes("opinion-package"))).toBe(true);
+    expect(resolved.document.packages.map((entry) => entry.type)).toEqual([
+      LEAD_PACKAGE_TYPE,
+      "opinion-package"
+    ]);
+    // Both supported v1 blocks are converted before the published document
+    // reaches the homepage resolver.
+    expect(resolved.document.legacy).toBeUndefined();
+    expect(resolved.migrationWarnings).toEqual([]);
   });
 
   it("fails loudly on a malformed v2 document instead of falling back", () => {
@@ -298,7 +303,13 @@ describe("published sports settings travel the whole pipeline", () => {
 
     expect(frontend.getHomePackageOrder(frontend.getHomeDesignDocument())).toEqual([
       LEAD_PACKAGE_TYPE,
-      SPORTS_PACKAGE_TYPE
+      "brief-package",
+      "in-focus-package",
+      "special-coverage-package",
+      "opinion-package",
+      SPORTS_PACKAGE_TYPE,
+      "more-package",
+      "newsletter-package"
     ]);
   });
 });

@@ -19,7 +19,16 @@ export const BYLINE_DESIGN_SCHEMA_VERSION_V2 = 2;
 // Semantic package identifiers. Only the packages that are actually implemented
 // end-to-end belong here -- an id in this list is a promise that a resolver and
 // a renderer exist for it.
-export const BYLINE_PACKAGE_TYPES = ["lead-package", "sports-package"] as const;
+export const BYLINE_PACKAGE_TYPES = [
+  "lead-package",
+  "brief-package",
+  "in-focus-package",
+  "special-coverage-package",
+  "opinion-package",
+  "sports-package",
+  "more-package",
+  "newsletter-package"
+] as const;
 
 export type BylinePackageType = (typeof BYLINE_PACKAGE_TYPES)[number];
 
@@ -36,7 +45,22 @@ export type BylineStorySource =
   | { type: "category"; categoryId: number }
   | { type: "tag"; tagId: number }
   | { type: "author"; authorId: number }
-  | { type: "manual"; storyIds: number[] };
+  | { type: "manual"; storyIds: number[] }
+  // Compatibility sources are semantic names for the historical Weekly
+  // Wildcat selection slots. They keep the old ordered selection pass behind
+  // the public design contract without persisting resolver or CMS details.
+  | {
+      type:
+        | "compatibility-lead"
+        | "compatibility-latest"
+        | "compatibility-brief"
+        | "compatibility-in-focus"
+        | "compatibility-special-coverage"
+        | "compatibility-opinion"
+        | "compatibility-sports"
+        | "compatibility-athlete"
+        | "compatibility-more";
+    };
 
 export type BylineDesignPackage<Props = Record<string, unknown>> = {
   // Stable instance id. Survives reordering and retitling so drafts, revisions
@@ -48,8 +72,8 @@ export type BylineDesignPackage<Props = Record<string, unknown>> = {
 
 // v1 blocks that have no faithful v2 package are preserved here verbatim rather
 // than being force-translated into something that would render differently.
-// They are never rendered; they exist so a migration is not lossy and so a later
-// phase can convert them once the matching package exists.
+// They are inert inside a v2 package document; a published schema-v1 document
+// remains on the old whole-page fallback until its visible blocks are converted.
 export type BylineLegacyBlock = {
   type: string;
   props: Record<string, unknown>;
@@ -81,9 +105,66 @@ const MAX_STORY_IDS = 50;
 const PACKAGE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const THEME_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SECTION_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const COMPATIBILITY_SOURCE_TYPES = new Set([
+  "compatibility-lead",
+  "compatibility-latest",
+  "compatibility-brief",
+  "compatibility-in-focus",
+  "compatibility-special-coverage",
+  "compatibility-opinion",
+  "compatibility-sports",
+  "compatibility-athlete",
+  "compatibility-more"
+]);
+const MAX_LEGACY_BLOCKS = 200;
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
 
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function assertNoDuplicateManualPins(
+  value: unknown,
+  packageId: string,
+  path: string,
+  owners: Map<number, string>
+) {
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertNoDuplicateManualPins(entry, packageId, `${path}[${index}]`, owners));
+    return;
+  }
+
+  if (!value || typeof value !== "object") return;
+
+  const record = value as Record<string, unknown>;
+
+  if (record.type === "manual" && Array.isArray(record.storyIds)) {
+    const sourceOwner = `${packageId}:${path}`;
+    const sourceIds = new Set<number>();
+
+    for (const id of record.storyIds) {
+      if (!isPositiveInteger(id) || sourceIds.has(id)) continue;
+      sourceIds.add(id);
+
+      const previousOwner = owners.get(id);
+      if (previousOwner && previousOwner !== sourceOwner) {
+        throw new BylineDesignSchemaError(
+          `Package "${packageId}" places story ${id} manually more than once (${previousOwner} and ${sourceOwner}).`
+        );
+      }
+      owners.set(id, sourceOwner);
+    }
+  }
+
+  for (const [key, child] of Object.entries(record)) {
+    assertNoDuplicateManualPins(child, packageId, `${path}.${key}`, owners);
+  }
 }
 
 export function isBylinePackageType(value: unknown): value is BylinePackageType {
@@ -95,7 +176,13 @@ export function parseStorySource(value: unknown): BylineStorySource | null {
 
   const source = value as Record<string, unknown>;
 
-  if (source.type === "latest" || source.type === "sticky") return { type: source.type };
+  if (
+    source.type === "latest" ||
+    source.type === "sticky" ||
+    (typeof source.type === "string" && COMPATIBILITY_SOURCE_TYPES.has(source.type))
+  ) {
+    return { type: source.type } as BylineStorySource;
+  }
   if (source.type === "section" && typeof source.slug === "string" && SECTION_SLUG_PATTERN.exec(source.slug) !== null) {
     return { type: "section", slug: source.slug };
   }
@@ -162,6 +249,7 @@ export function parseBylineDesignDocumentV2(value: unknown, template: string): B
   }
 
   const seenIds = new Set<string>();
+  const manualPinOwners = new Map<number, string>();
   const packages = document.packages.map((entry, index) => {
     if (!entry || typeof entry !== "object") {
       throw new BylineDesignSchemaError(`Design ${template} package ${index} is malformed.`);
@@ -189,6 +277,8 @@ export function parseBylineDesignDocumentV2(value: unknown, template: string): B
       throw new BylineDesignSchemaError(`Design ${template} package "${designPackage.id}" has unsafe props.`);
     }
 
+    assertNoDuplicateManualPins(designPackage.props, designPackage.id, "props", manualPinOwners);
+
     return {
       id: designPackage.id,
       type: designPackage.type,
@@ -196,25 +286,53 @@ export function parseBylineDesignDocumentV2(value: unknown, template: string): B
     };
   });
 
-  const legacy = document.legacy as Record<string, unknown> | undefined;
+  let legacy: BylineDesignDocumentV2["legacy"] | undefined;
+
+  if (document.legacy !== undefined) {
+    if (!isPlainRecord(document.legacy) || document.legacy.schemaVersion !== 1) {
+      throw new BylineDesignSchemaError(`Design ${template} has malformed legacy metadata.`);
+    }
+
+    const legacyValue = document.legacy;
+    const editor = legacyValue.editor;
+    const blocks = legacyValue.unconvertedBlocks;
+
+    if (
+      !isPlainRecord(editor) ||
+      typeof editor.engine !== "string" ||
+      typeof editor.version !== "string" ||
+      !Array.isArray(blocks) ||
+      blocks.length > MAX_LEGACY_BLOCKS ||
+      !isSerialisableProps(legacyValue)
+    ) {
+      throw new BylineDesignSchemaError(`Design ${template} has unsafe or malformed legacy data.`);
+    }
+
+    for (const [index, block] of blocks.entries()) {
+      if (
+        !isPlainRecord(block) ||
+        typeof block.type !== "string" ||
+        !block.type.trim() ||
+        !isPlainRecord(block.props) ||
+        !isSerialisableProps(block.props)
+      ) {
+        throw new BylineDesignSchemaError(`Design ${template} legacy block ${index} is malformed.`);
+      }
+    }
+
+    legacy = {
+      schemaVersion: 1,
+      editor: { engine: editor.engine, version: editor.version },
+      unconvertedBlocks: blocks as BylineLegacyBlock[]
+    };
+  }
 
   return {
     schemaVersion: 2,
     template,
     theme: document.theme,
     packages,
-    ...(legacy && Array.isArray(legacy.unconvertedBlocks)
-      ? {
-          legacy: {
-            schemaVersion: 1 as const,
-            editor: {
-              engine: String((legacy.editor as Record<string, unknown>)?.engine ?? "unknown"),
-              version: String((legacy.editor as Record<string, unknown>)?.version ?? "unknown")
-            },
-            unconvertedBlocks: legacy.unconvertedBlocks as BylineLegacyBlock[]
-          }
-        }
-      : {}),
+    ...(legacy ? { legacy } : {}),
     ...(typeof document.baseRevisionId === "number" ? { baseRevisionId: document.baseRevisionId } : {}),
     ...(typeof document.modifiedAt === "string" ? { modifiedAt: document.modifiedAt } : {})
   };

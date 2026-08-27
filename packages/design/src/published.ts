@@ -12,9 +12,9 @@ import { parseBylineDesignDocumentV2, type BylineDesignDocumentV2 } from "./sche
 // What Studio persists and what the frontend renders from.
 export const BYLINE_DESIGN_WRITE_SCHEMA_VERSION = 2;
 
-// What the frontend can still load. v1 stays readable until every package has
-// been extracted and the stored designs have been migrated; it is read through
-// migration, never rendered directly.
+// What the frontend can still load. v1 remains readable for older published
+// records; Studio and package consumers normalise it, while the published page
+// deliberately keeps the old renderer live for visible blocks not yet modeled.
 export const BYLINE_DESIGN_READ_SCHEMA_VERSIONS = [1, 2] as const;
 
 export type BylineDesignReadSchemaVersion = (typeof BYLINE_DESIGN_READ_SCHEMA_VERSIONS)[number];
@@ -129,11 +129,10 @@ export type ResolvedPublishedDesign = {
  * The only supported route from a stored v1 design to something the package
  * renderers will accept -- v2 is never produced by casting.
  *
- * Note where this is and is not used. Studio calls the migration on load so the
- * editor only ever works in v2. The published homepage does *not* run a v1
- * design through here: it renders v1 with the legacy whole-page renderer
- * instead, because migrating a live v1 design today would drop every block that
- * has no package yet.
+ * Studio and package-based consumers call this path. The published homepage
+ * also retains a direct v1 fallback until every visible v1 block, including
+ * divider, has a faithful package representation; unsupported data remains in
+ * `legacy` rather than being dropped.
  */
 export function resolvePublishedDesignToV2(
   published: PublishedBylineDesign,
@@ -151,7 +150,10 @@ export function resolvePublishedDesignToV2(
   const { document, warnings } = migrateDesignDocumentV1ToV2(published.document, template);
 
   return {
-    document,
+    // Validate the generated document as well as the stored one. This catches
+    // duplicate manual pins introduced by a legacy layout before the published
+    // resolver can render them twice.
+    document: parseBylineDesignDocumentV2(document, template),
     revision: published.revision,
     modifiedAt: published.modifiedAt,
     migrationWarnings: warnings

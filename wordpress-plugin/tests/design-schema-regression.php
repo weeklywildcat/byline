@@ -231,6 +231,63 @@ if (!$v2_bad_legacy_result instanceof WP_Error || $v2_bad_legacy_result->code !=
     exit(1);
 }
 
+$cross_language_fixture = json_decode(
+    file_get_contents(__DIR__ . '/../../apps/web/tests/fixtures/design-v2-legacy-parity.json'),
+    true
+);
+if (!is_array($cross_language_fixture)
+    || byline_validate_design_document($cross_language_fixture['valid'] ?? [], 'home') !== true) {
+    fwrite(STDERR, "The shared PHP/TypeScript legacy fixture was not accepted by PHP.\n");
+    exit(1);
+}
+$cross_language_invalid = byline_validate_design_document(
+    $cross_language_fixture['invalidMissingMetadata'] ?? [],
+    'home'
+);
+if (!$cross_language_invalid instanceof WP_Error || $cross_language_invalid->code !== 'byline_unsafe_design_props') {
+    fwrite(STDERR, "The shared negative legacy fixture was not rejected by PHP.\n");
+    exit(1);
+}
+
+$legacy_missing_metadata = $v2;
+$legacy_missing_metadata['legacy'] = ['unconvertedBlocks' => []];
+$legacy_missing_metadata_result = byline_validate_design_document($legacy_missing_metadata, 'home');
+if (!$legacy_missing_metadata_result instanceof WP_Error || $legacy_missing_metadata_result->code !== 'byline_unsafe_design_props') {
+    fwrite(STDERR, "Legacy data without schema/editor metadata was accepted.\n");
+    exit(1);
+}
+
+$legacy_list_props = $v2_legacy;
+$legacy_list_props['legacy']['unconvertedBlocks'][0]['props'] = ['not-an-object'];
+$legacy_list_props_result = byline_validate_design_document($legacy_list_props, 'home');
+if (!$legacy_list_props_result instanceof WP_Error || $legacy_list_props_result->code !== 'byline_unsafe_design_props') {
+    fwrite(STDERR, "Legacy list props were accepted where TypeScript requires an object.\n");
+    exit(1);
+}
+
+// All story-bearing schema 2 packages may place their source directly on props.
+// Keep this separate from the nested lead/latest/stories checks above so a
+// package cannot bypass source validation by using its top-level shape.
+foreach (['brief-package', 'opinion-package', 'more-package', 'in-focus-package', 'special-coverage-package'] as $package_type) {
+    $top_level_source = $v2;
+    $top_level_source['packages'] = [[
+        'id' => 'top-' . str_replace('-package', '', $package_type),
+        'type' => $package_type,
+        'props' => ['source' => ['type' => 'latest']],
+    ]];
+    if (byline_validate_design_document($top_level_source, 'home') !== true) {
+        fwrite(STDERR, "A valid top-level source was rejected for {$package_type}.\n");
+        exit(1);
+    }
+
+    $top_level_source['packages'][0]['props']['source'] = ['type' => 'category'];
+    $top_level_source_result = byline_validate_design_document($top_level_source, 'home');
+    if (!$top_level_source_result instanceof WP_Error || $top_level_source_result->code !== 'byline_invalid_story_query') {
+        fwrite(STDERR, "An invalid top-level source was accepted for {$package_type}.\n");
+        exit(1);
+    }
+}
+
 // --- sports package ---------------------------------------------------------
 
 $sports_package = [

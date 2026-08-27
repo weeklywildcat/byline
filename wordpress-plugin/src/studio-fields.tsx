@@ -211,7 +211,8 @@ export type LeadStorySource =
   | { type: "category"; categoryId: number }
   | { type: "tag"; tagId: number }
   | { type: "author"; authorId: number }
-  | { type: "manual"; storyIds: number[] };
+  | { type: "manual"; storyIds: number[] }
+  | { type: `compatibility-${string}` };
 
 function ManualStoryList({
   storyIds,
@@ -303,6 +304,9 @@ export function LeadStorySourceField(label: string): CustomField<LeadStorySource
     type: "custom",
     render: ({ value, onChange, readOnly }) => {
       const source: LeadStorySource = value && typeof value === "object" ? value : { type: "latest" };
+      const compatibilityOption = typeof source.type === "string" && source.type.startsWith("compatibility-")
+        ? [{ label: "Publication default (compatibility)", value: source.type }]
+        : [];
 
       const updateType = (nextType: LeadStorySource["type"]) => {
         if (nextType === "manual") onChange({ type: "manual", storyIds: [] });
@@ -319,6 +323,7 @@ export function LeadStorySourceField(label: string): CustomField<LeadStorySource
             value={source.type}
             disabled={readOnly}
             options={[
+              ...compatibilityOption,
               { label: "Automatic — newest first", value: "latest" },
               { label: "Automatic — featured first", value: "sticky" },
               { label: "From a section", value: "category" },

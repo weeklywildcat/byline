@@ -14,16 +14,20 @@ only when both hosts also load
 | `StoryCard` | `home-story`, `home-story-{lead,briefing,brief-lead,row,focus,opinion,opinion-lead,field,grid,more-lead,more-compact,special,athlete}`, `home-story-homepage-opinion`, `home-story-no-image`, `home-story-image`, `home-story-body`, `home-story-meta`, `home-story-category`, `home-story-deck`, `home-story-author`, `home-story-read-link` | Shared image sizing/object-fit, metadata separators, headline/deck/byline typography, variant grids and responsive reductions. `home-story-grid` intentionally inherits the base card contract and has no separate legacy rule. |
 | `PollCard` and its host-supplied body | `homepage-poll-card`, `homepage-poll-heading`, `homepage-poll-question`, `homepage-poll-options`, `homepage-poll-results`, `homepage-poll-result`, `homepage-poll-bar`, `homepage-poll-bar-fill`, `homepage-poll-bar-fill-leading`, `homepage-poll-total`, `homepage-poll-note`, `homepage-poll-loading` | Card surface, form controls, result bars, compact UI typography and accent colors. |
 | `ThisWeekCard` | `this-week-card`, `this-week-header`, `this-week-list`, `this-week-item`, `this-week-type`, `this-week-type-{event,game}`, `this-week-empty`, `this-week-links` | Rail sizing/overflow, event rows, type labels and responsive behavior. |
+| `BriefPackage` | `the-brief`, `brief-digest-layout`, `brief-digest-layout-single`, `brief-support-list` | Brief heading, lead/supporting layout and the single-story collapse. |
+| `InFocusPackage` | `in-focus`, `live-package-label` | Focus label and feature-story surface. |
+| `SpecialCoveragePackage` | `special-coverage`, `special-coverage-layout`, `special-coverage-layout-single` | Special-coverage label, lead treatment and supporting-card layout. |
+| `OpinionPackage` | `opinion-package`, `opinion-package-header`, `opinion-package-layout`, `opinion-package-layout-single`, `opinion-rail` | Opinion copy/archive header and lead/rail layout. |
+| `MorePackage` | `more-weekly`, `more-weekly-header`, `more-weekly-layout`, `more-story-grid`, `more-compact-list`, `more-utility-rail`, `more-utility-block`, `more-action-links`, `more-connect-links` | More story grid, optional newsroom utility rail and responsive collapse. |
+| `NewsletterPackage` | `home-newsletter-section` | Homepage newsletter wrapper; the host supplies the signup body. |
 | `SportsPackage` | `from-field`, `section-header-row`, `field-layout`, `field-rail` | Section heading treatment, lead/rail grid and 900px collapse. |
 | Athlete spotlight | `sports-athlete-feature`, `sports-athlete-image`, `sports-athlete-body`, `sports-athlete-eyebrow`, `sports-athlete-team`, `sports-athlete-blurb`, `sports-athlete-link` | Spotlight image crop, display headline, labels, body copy and link treatment. |
 | Scores | `field-schedule`, `field-schedule-header`, `field-schedule-layout`, `field-schedule-layout-{1,2}`, `field-schedule-result`, `field-result-list`, `field-result-card`, `field-result-summary`, `field-card-label`, `field-sport-icon`, `field-scoreboard`, `field-score-team`, `field-score-team-winner`, `field-result-footer`, `field-game-link` | Schedule rules, result grids, score typography, winner color and mobile stacking. |
 | Upcoming games | `field-schedule-upcoming`, `field-game-list`, `field-upcoming-game`, `field-upcoming-date`, `field-upcoming-main`, `field-upcoming-empty` | Fixture row grid, date divider, empty state and 640px single-column layout. |
 
-The shared file also owns the legacy homepage containers required by the other
-`StoryCard` variants (`the-brief`, `in-focus`, `special-coverage`,
-`athlete-spotlight`, `opinion-package`, and `more-weekly`). This keeps each
-shared card selector canonical while those packages finish moving into the
-shared renderer layer.
+The shared file owns the containers for every semantic homepage package and the
+legacy class names required by their `StoryCard` variants. This keeps each card
+selector canonical in both the public site and Studio.
 
 ## Base contract and tokens
 

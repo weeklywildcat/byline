@@ -1,4 +1,5 @@
 import { Icon } from "./Icon";
+import { packageHeadingId } from "./package-dom";
 import { StoryCard } from "./StoryCard";
 import {
   sportsPackageHasContent,
@@ -106,23 +107,27 @@ function FixtureRow({ fixture }: { fixture: SportsFixtureView }) {
  * "Upcoming" column deliberately still renders when there are finals but no
  * fixtures, carrying the empty message -- that is the pre-Studio behaviour.
  */
-function SchedulePanel({ schedule }: { schedule: SportsScheduleView }) {
+function SchedulePanel({ schedule, packageId }: { schedule: SportsScheduleView; packageId: string }) {
   const hasResults = schedule.results.length > 0;
   const hasUpcoming = schedule.upcoming.length > 0;
   const showUpcomingColumn = hasUpcoming || hasResults;
   const columnCount = [hasResults, showUpcomingColumn].filter(Boolean).length;
 
+  const scheduleHeadingId = packageHeadingId(`${packageId}-schedule`, "field-schedule-heading");
+  const resultsHeadingId = packageHeadingId(`${packageId}-results`, "recent-scores-heading");
+  const upcomingHeadingId = packageHeadingId(`${packageId}-upcoming`, "upcoming-games-heading");
+
   return (
-    <aside className="field-schedule" aria-labelledby="field-schedule-heading">
+    <aside className="field-schedule" aria-labelledby={scheduleHeadingId}>
       <div className="field-schedule-header">
-        <h3 id="field-schedule-heading">{schedule.panelHeading}</h3>
+        <h3 id={scheduleHeadingId}>{schedule.panelHeading}</h3>
         <a href={schedule.fullScheduleLink.href}>{schedule.fullScheduleLink.label}</a>
       </div>
 
       <div className={`field-schedule-layout field-schedule-layout-${columnCount}`}>
         {hasResults ? (
-          <section className="field-schedule-result" aria-labelledby="recent-scores-heading">
-            <h4 id="recent-scores-heading">{schedule.scoresHeading}</h4>
+          <section className="field-schedule-result" aria-labelledby={resultsHeadingId}>
+            <h4 id={resultsHeadingId}>{schedule.scoresHeading}</h4>
             <div className="field-result-list">
               {schedule.results.map((result) => (
                 <ResultCard key={result.id} result={result} />
@@ -132,8 +137,8 @@ function SchedulePanel({ schedule }: { schedule: SportsScheduleView }) {
         ) : null}
 
         {showUpcomingColumn ? (
-          <section className="field-schedule-upcoming" aria-labelledby="upcoming-games-heading">
-            <h4 id="upcoming-games-heading">{schedule.upcomingHeading}</h4>
+          <section className="field-schedule-upcoming" aria-labelledby={upcomingHeadingId}>
+            <h4 id={upcomingHeadingId}>{schedule.upcomingHeading}</h4>
             {hasUpcoming ? (
               <div className="field-game-list">
                 {schedule.upcoming.map((fixture) => (
@@ -159,17 +164,29 @@ export function SportsPackage({ package: resolved }: SportsPackageProps) {
   }
 
   const { lead, rail, athleteSpotlight, schedule, presentation } = resolved;
+  const content = resolved.content ?? "full";
   const hasStories = Boolean(lead) || rail.length > 0;
   const hasRail = rail.length > 0 || Boolean(athleteSpotlight);
+  const simpleStory = content === "story" && Boolean(lead) && !hasRail;
+  const sectionHeadingId = packageHeadingId(resolved.packageId, "field-heading");
 
   return (
-    <section className="from-field" aria-labelledby="field-heading">
+    <section className="from-field" aria-labelledby={sectionHeadingId}>
       <div className="section-header-row">
-        <h2 id="field-heading">{resolved.heading}</h2>
-        <a href={resolved.sectionLink.href}>{resolved.sectionLink.label}</a>
+        <h2 id={sectionHeadingId}>{resolved.heading}</h2>
+        {resolved.sectionLink ? <a href={resolved.sectionLink.href}>{resolved.sectionLink.label}</a> : null}
       </div>
 
-      {hasStories || athleteSpotlight ? (
+      {content !== "schedule" && (hasStories || athleteSpotlight) ? simpleStory ? (
+        <StoryCard
+          story={lead!}
+          variant="field"
+          showDeck={presentation.showDeck}
+          showAuthor={presentation.showBylines}
+          showReadLink={presentation.showReadLink !== false}
+          fallbackAuthorName={resolved.fallbackAuthorName}
+        />
+      ) : (
         <div className="field-layout">
           {lead ? (
             <StoryCard
@@ -177,7 +194,7 @@ export function SportsPackage({ package: resolved }: SportsPackageProps) {
               variant="field"
               showDeck={presentation.showDeck}
               showAuthor={presentation.showBylines}
-              showReadLink
+              showReadLink={presentation.showReadLink !== false}
               fallbackAuthorName={resolved.fallbackAuthorName}
             />
           ) : null}
@@ -198,7 +215,7 @@ export function SportsPackage({ package: resolved }: SportsPackageProps) {
         </div>
       ) : null}
 
-      {schedule ? <SchedulePanel schedule={schedule} /> : null}
+      {content !== "story" && schedule ? <SchedulePanel schedule={schedule} packageId={resolved.packageId} /> : null}
     </section>
   );
 }

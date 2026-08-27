@@ -1,8 +1,15 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   BYLINE_PACKAGE_TYPES,
   BylineDesignSchemaError,
+  BRIEF_PACKAGE_TYPE,
+  IN_FOCUS_PACKAGE_TYPE,
   LEAD_PACKAGE_TYPE,
+  MORE_PACKAGE_TYPE,
+  NEWSLETTER_PACKAGE_TYPE,
+  OPINION_PACKAGE_TYPE,
+  SPECIAL_COVERAGE_PACKAGE_TYPE,
   SPORTS_PACKAGE_TYPE,
   WEEKLY_WILDCAT_SPORTS_DEFAULTS,
   WEEKLY_WILDCAT_LEAD_DEFAULTS,
@@ -80,7 +87,56 @@ describe("schema v2 parsing", () => {
   it("only advertises package types that are actually implemented", () => {
     // An id in this list is a promise that a resolver and a renderer exist for
     // it end to end. Adding one without them is what this guards against.
-    expect([...BYLINE_PACKAGE_TYPES]).toEqual([LEAD_PACKAGE_TYPE, SPORTS_PACKAGE_TYPE]);
+    expect([...BYLINE_PACKAGE_TYPES]).toEqual([
+      LEAD_PACKAGE_TYPE,
+      BRIEF_PACKAGE_TYPE,
+      IN_FOCUS_PACKAGE_TYPE,
+      SPECIAL_COVERAGE_PACKAGE_TYPE,
+      OPINION_PACKAGE_TYPE,
+      SPORTS_PACKAGE_TYPE,
+      MORE_PACKAGE_TYPE,
+      NEWSLETTER_PACKAGE_TYPE
+    ]);
+  });
+
+  it("rejects a story manually pinned in two packages", () => {
+    expect(() =>
+      parseBylineDesignDocumentV2(
+        v2([
+          { id: "home-brief", type: BRIEF_PACKAGE_TYPE, props: { source: { type: "manual", storyIds: [7] } } },
+          { id: "home-more", type: MORE_PACKAGE_TYPE, props: { source: { type: "manual", storyIds: [7] } } }
+        ]),
+        "home"
+      )
+    ).toThrow(/manually more than once/);
+  });
+
+  it("shares the PHP legacy envelope contract", () => {
+    const fixture = JSON.parse(readFileSync(new URL("./fixtures/design-v2-legacy-parity.json", import.meta.url), "utf8")) as {
+      valid: unknown;
+      invalidMissingMetadata: unknown;
+    };
+
+    expect(() => parseBylineDesignDocumentV2(fixture.valid, "home")).not.toThrow();
+    expect(() => parseBylineDesignDocumentV2(fixture.invalidMissingMetadata, "home")).toThrow(
+      /legacy metadata/
+    );
+  });
+
+  it("enforces the legacy block type and props records", () => {
+    const fixture = JSON.parse(readFileSync(new URL("./fixtures/design-v2-legacy-parity.json", import.meta.url), "utf8")) as {
+      valid: Record<string, unknown>;
+    };
+    const legacy = fixture.valid.legacy as Record<string, unknown>;
+
+    expect(() => parseBylineDesignDocumentV2({
+      ...fixture.valid,
+      legacy: { ...legacy, unconvertedBlocks: [{ type: "divider" }] }
+    }, "home")).toThrow(/legacy block/);
+    expect(() => parseBylineDesignDocumentV2({
+      ...fixture.valid,
+      legacy: { ...legacy, unconvertedBlocks: [{ type: "divider", props: [] }] }
+    }, "home")).toThrow(/legacy block/);
   });
 });
 
@@ -90,6 +146,7 @@ describe("story sources", () => {
     expect(parseStorySource({ type: "sticky" })).toEqual({ type: "sticky" });
     expect(parseStorySource({ type: "category", categoryId: 3 })).toEqual({ type: "category", categoryId: 3 });
     expect(parseStorySource({ type: "manual", storyIds: [2, 2, 5] })).toEqual({ type: "manual", storyIds: [2, 5] });
+    expect(parseStorySource({ type: "compatibility-brief" })).toEqual({ type: "compatibility-brief" });
   });
 
   it("rejects unbounded or malformed sources", () => {
@@ -153,7 +210,7 @@ describe("v1 to v2 migration", () => {
     expect(props.utility).toEqual({ poll: false, calendar: false, calendarLimit: 0 });
   });
 
-  it("preserves unconvertible blocks instead of translating them destructively", () => {
+  it("converts every supported block and preserves only unknown blocks", () => {
     const { document, warnings } = migrateDesignDocumentV1ToV2(
       v1([
         { type: "story-lead", props: { query: { type: "latest", limit: 1 } } },
@@ -163,15 +220,33 @@ describe("v1 to v2 migration", () => {
       "home"
     );
 
-    expect(document.packages).toHaveLength(1);
-    expect(document.legacy?.unconvertedBlocks.map((block) => block.type)).toEqual([
-      "opinion-package",
-      "sports-scores"
+    expect(document.packages.map((entry) => entry.type)).toEqual([
+      LEAD_PACKAGE_TYPE,
+      OPINION_PACKAGE_TYPE,
+      SPORTS_PACKAGE_TYPE
     ]);
-    expect(warnings).toHaveLength(2);
-    expect(warnings[0]).toMatch(/opinion-package/);
-    // The editor is told, rather than finding a section silently missing.
-    expect(warnings[0]).toMatch(/will not render/);
+    expect(document.legacy).toBeUndefined();
+    expect(warnings).toEqual([]);
+  });
+
+  it("preserves unknown blocks byte-for-byte", () => {
+    const unknown = { type: "custom-extension", props: { id: "custom-1", nested: { enabled: true } } };
+    const { document, warnings } = migrateDesignDocumentV1ToV2(v1([unknown]), "home");
+
+    expect(document.packages).toEqual([]);
+    expect(document.legacy?.unconvertedBlocks).toEqual([unknown]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/custom-extension/);
+  });
+
+  it("keeps a visible v1 divider in the live-fallback payload", () => {
+    const divider = { type: "divider", props: { id: "divider-1" } };
+    const { document, warnings } = migrateDesignDocumentV1ToV2(v1([divider]), "home");
+
+    expect(document.packages).toEqual([]);
+    expect(document.legacy?.unconvertedBlocks).toEqual([divider]);
+    expect(warnings[0]).toMatch(/divider/);
+    expect(() => parseBylineDesignDocumentV2(document, "home")).not.toThrow();
   });
 
   it("is deterministic", () => {
@@ -268,7 +343,7 @@ describe("sports package schema", () => {
   });
 });
 
-describe("v1 sports blocks are preserved, not force-converted", () => {
+describe("v1 sports blocks migrate to semantic sports packages", () => {
   function v1(content: Array<{ type: string; props: Record<string, unknown> }>) {
     return {
       schemaVersion: 1,
@@ -279,9 +354,9 @@ describe("v1 sports blocks are preserved, not force-converted", () => {
     };
   }
 
-  // Each of these was inspected against what DesignHomepage actually rendered
-  // for it. None has a faithful sports-package mapping; see
-  // docs/design-schema-v2.md for the block-by-block reasoning.
+  // Schedule blocks collapse to the one composite schedule surface that the
+  // legacy homepage rendered; story/athlete blocks become stories-only sports
+  // packages so migration does not invent a scoreboard beside them.
   const SPORTS_BLOCKS = [
     { type: "sports-scores", props: { id: "sports-scores-1", title: "Scoreboard", teamKey: "football-varsity" } },
     { type: "sports-upcoming", props: { id: "sports-upcoming-1", title: "Next up", teamKey: "soccer-varsity" } },
@@ -289,29 +364,37 @@ describe("v1 sports blocks are preserved, not force-converted", () => {
     { type: "athlete-feature", props: { id: "athlete-feature-1", title: "Athlete", teamKey: "golf-varsity" } }
   ];
 
-  it("preserves every v1 sports block deep-equivalently", () => {
+  it("converts every supported sports block without a legacy remainder", () => {
     const { document, warnings } = migrateDesignDocumentV1ToV2(v1(SPORTS_BLOCKS), "home");
 
-    expect(document.packages).toHaveLength(0);
-    expect(document.legacy?.unconvertedBlocks).toEqual(SPORTS_BLOCKS);
-    for (const block of SPORTS_BLOCKS) {
-      expect(warnings.some((warning) => warning.includes(block.type))).toBe(true);
-    }
+    expect(document.packages.map((entry) => entry.type)).toEqual([
+      SPORTS_PACKAGE_TYPE,
+      SPORTS_PACKAGE_TYPE,
+      SPORTS_PACKAGE_TYPE
+    ]);
+    expect(document.legacy).toBeUndefined();
+    expect(warnings).toEqual([]);
+    expect(document.packages[0].props).toMatchObject({ content: "schedule" });
+    expect(document.packages.slice(1).map((entry) => entry.props)).toEqual([
+      expect.objectContaining({ content: "story" }),
+      expect.objectContaining({ content: "story" })
+    ]);
   });
 
-  it("does not invent a sports package from a scores block", () => {
+  it("creates one schedule package from a scores block", () => {
     const { document } = migrateDesignDocumentV1ToV2(v1([SPORTS_BLOCKS[0]]), "home");
 
-    expect(document.packages.some((entry) => entry.type === SPORTS_PACKAGE_TYPE)).toBe(false);
+    expect(document.packages.map((entry) => entry.type)).toEqual([SPORTS_PACKAGE_TYPE]);
+    expect(document.packages[0].props).toMatchObject({ content: "schedule" });
   });
 
-  it("never leaves a converted block behind in the legacy payload", () => {
+  it("never leaves a converted sports block behind in legacy data", () => {
     const { document } = migrateDesignDocumentV1ToV2(
       v1([{ type: "story-lead", props: { id: "story-lead-1" } }, SPORTS_BLOCKS[0]]),
       "home"
     );
 
-    expect(document.packages.map((entry) => entry.type)).toEqual([LEAD_PACKAGE_TYPE]);
-    expect(document.legacy?.unconvertedBlocks.map((block) => block.type)).toEqual(["sports-scores"]);
+    expect(document.packages.map((entry) => entry.type)).toEqual([LEAD_PACKAGE_TYPE, SPORTS_PACKAGE_TYPE]);
+    expect(document.legacy).toBeUndefined();
   });
 });

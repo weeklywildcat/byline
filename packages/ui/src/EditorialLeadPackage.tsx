@@ -13,12 +13,39 @@ import type { LeadPackageProps } from "./LeadPackage";
 // model. A theme changes presentation only.
 export function EditorialLeadPackage({ package: resolved, pollSlot, calendarSlot }: LeadPackageProps) {
   const { lead, latest, utility, presentation } = resolved;
+  const mode = resolved.mode ?? "content";
+  const hasUtility = utility.poll || utility.calendar;
+
+  if (mode === "poll" || mode === "calendar") {
+    if (!hasUtility) return null;
+
+    return (
+      <section className="byline-design-utility">
+        {mode === "poll" && utility.poll ? pollSlot : null}
+        {mode === "calendar" && utility.calendar ? calendarSlot : null}
+      </section>
+    );
+  }
+
+  if (mode === "single-story") {
+    if (!lead) return null;
+
+    return (
+      <section className="top-stories top-stories-single" aria-label={resolved.heading || "Top story"}>
+        <StoryCard
+          story={lead}
+          variant="lead"
+          showDeck={presentation.showDeck}
+          priority
+          fallbackAuthorName={resolved.fallbackAuthorName}
+        />
+      </section>
+    );
+  }
 
   if (!lead) {
     return <p className="byline-package-empty-state">{resolved.emptyMessage}</p>;
   }
-
-  const hasUtility = utility.poll || utility.calendar;
 
   return (
     // Same fix as the Weekly Wildcat renderer, and for a second reason here: the

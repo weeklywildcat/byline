@@ -1,9 +1,10 @@
 # Weekly Wildcat homepage inventory
 
 The compatibility target for the design-driven homepage. Captured from the
-pre-Studio `apps/web/app/page.tsx` and verified against a production static
-export on 2026-08-26 (11 packages, 17 unique stories, zero cross-package
-duplicates).
+pre-Studio `apps/web/app/page.tsx` and the frozen schema-v1
+`DesignHomepage`, then verified against a production static export on
+2026-08-26 (8 semantic packages, 17 unique stories, zero cross-package
+duplicates; the lead and sports packages contain nested runtime sections).
 
 Nothing here may be approximated. A package renderer is only finished when it
 reproduces the behaviour in this document, including the conditional cases that
@@ -52,25 +53,30 @@ The most structurally complex package; it is three columns, not one block.
 ### 2. The Brief — `.the-brief`
 Heading "The Brief". Lead is `variant="brief-lead"` with `showAuthor showDeck`;
 the remainder render as `variant="row"` with `showAuthor` inside
-`.brief-support-list`. Modifier `.brief-digest-layout-single` when there is no
-support list.
+`.brief-support-list`. The frozen schema-v1 renderer uses
+`.brief-digest-layout` for both the single-story and multi-story cases.
 
 ### 3. In Focus — `.in-focus`
 Label "In Focus" (`.live-package-label`, not an `<h2>`). Single story,
 `variant="focus"`, `showAuthor showDeck`.
 
 ### 4. Special Coverage — `.special-coverage`
-Label "Special Coverage". First story `variant="special"` with `showAuthor showDeck`;
-subsequent stories `variant="briefing"` with both flags off. Modifier
-`.special-coverage-layout-single` for one story. *Not present in the current
-render — no special-coverage posts exist today. Still required.*
+Label "Special Coverage". The frozen schema-v1 renderer sends
+`showAuthor showDeck` to every resolved story: the first uses
+`variant="special"`, subsequent stories use `variant="briefing"`. Its layout
+class is `.special-coverage-layout` for both single and multiple stories.
+*Not present in the current render — no special-coverage posts exist today.
+Still required.*
 
 ### 5. Opinion — `.opinion-package`
-Header block with `<h2>Opinion</h2>`, a standing description
-("Student perspectives, columns, and commentary from {shortName} writers."), and
-an "All Opinion →" link to `/category/opinion/`. Lead is `variant="opinion-lead"`;
-up to 2 rail stories are `variant="opinion"`. All with `showAuthor showDeck`.
-Modifier `.opinion-package-layout-single`.
+The frozen schema-v1 header contains `<h2>Opinion</h2>` in the
+`.opinion-package-header` wrapper. Lead is `variant="opinion-lead"`; every
+remaining resolved story is `variant="opinion"`, all with `showAuthor showDeck`.
+The package resolver preserves the full configured v1 result rather than
+silently capping it at two rail stories. The migrated v1 shape keeps the old
+header wrapper and has no archive link or description because the old
+`DesignHomepage` did not render those props. The regular Weekly Wildcat v2
+seed may opt into its publication-generic description and archive link.
 
 ### 6. Sports — `.from-field`
 A composite package, not a story list. Renders when `features.sports` **and** any
@@ -104,10 +110,15 @@ live render:
   captured baseline.
 
 ### 7. More From Weekly Wildcat — `.more-weekly`
-Header "More From {shortName}" + "View All Stories →" to `/stories/`.
+The frozen schema-v1 header is the configured block title followed by the
+decorative rule; it has no archive link. The regular Weekly Wildcat v2 seed
+uses "More From {shortName}" + "View All Stories →" to `/stories/`.
 
 - Lead `variant="more-lead"` with `showDeck cleanDeck`.
-- Up to 3 `variant="more-compact"` with `showDeck cleanDeck`.
+- Every remaining resolved v1 grid story is `variant="more-compact"` with
+  `showDeck` and the old raw deck treatment. The v2 seed has a four-story
+  default; configured package limits are resolved in full up to the schema
+  safety maximum.
 - **Newsroom utility rail** (`.more-utility-rail`), a fixed editorial fixture:
   - "Join the Staff" block with links to `/join/` and `/authors/`.
   - "Stay Connected" block listing `publication.social` entries, a contact link,

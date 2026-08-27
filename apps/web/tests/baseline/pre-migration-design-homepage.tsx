@@ -8,7 +8,7 @@ import { ThisWeekCard } from "@/components/ThisWeekCard";
 import type { SchoolEvent, SportsGame } from "@/lib/headless";
 import type { WordPressPost } from "@/lib/wordpress";
 
-type DesignHomepageProps = {
+type PreMigrationDesignHomepageProps = {
   blocks: Array<ResolvedDesignContentBlock<WordPressPost>>;
   theme: string;
   sportsSchedule: {
@@ -22,12 +22,14 @@ function heading(block: ResolvedDesignContentBlock<WordPressPost>, fallback: str
   return typeof block.props.title === "string" && block.props.title.trim() ? block.props.title : fallback;
 }
 
-/**
- * Frozen schema-v1 whole-page renderer. This path is reached only for a
- * published v1 document while its preserved legacy blocks still need the old
- * visible behavior. New schema-v2 documents never enter this component.
- */
-export function DesignHomepage({ blocks, sportsSchedule, theme }: DesignHomepageProps) {
+// This is deliberately a test-only frozen copy of the schema-v1 DesignHomepage
+// renderer. It is the reference implementation for migration parity tests; do
+// not refactor it together with the production package renderers.
+export function PreMigrationDesignHomepage({
+  blocks,
+  sportsSchedule,
+  theme
+}: PreMigrationDesignHomepageProps) {
   const firstSportsIndex = blocks.findIndex((block) => getBylineBlockPresentation(block.type)?.layout === "sports");
 
   return (

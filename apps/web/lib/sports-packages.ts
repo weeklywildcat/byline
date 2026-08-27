@@ -5,10 +5,16 @@ import type {
   SportsFixtureView,
   SportsResultView
 } from "@byline/ui";
-import { getAthleteSportLabel, getAthleteSpotlightLabel } from "@/lib/content";
+import { getAthleteSportLabel, getAthleteSpotlightLabel, isAthleteSpotlightPost } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
 import type { SportsGame } from "@/lib/headless";
-import { toStoryView, type HomepageSelection } from "@/lib/homepage-packages";
+import {
+  availableStories,
+  sourceCandidates,
+  toStoryView,
+  type HomepageSelection
+} from "@/lib/homepage-packages";
+import type { BylinePublicationConfig } from "@byline/core";
 import { getPublicationConfig } from "@/lib/publication";
 import { getFeaturedMedia, getPostHref, type WordPressPost } from "@/lib/wordpress";
 
@@ -89,10 +95,10 @@ function getGameOpponent(game: SportsGame) {
   return game.opponent || game.display.scoreboard?.opponent.label || "Opponent";
 }
 
-function getScoreboard(game: SportsGame) {
+function getScoreboard(game: SportsGame, publication: BylinePublicationConfig = getPublicationConfig()) {
   const team = game.display.scoreboard?.team ??
     game.display.scoreboard?.wildcats ?? {
-      label: getPublicationConfig().identity.shortName,
+      label: publication.identity.shortName,
       score: game.teamScore ?? game.wildcatsScore
     };
 
@@ -102,7 +108,7 @@ function getScoreboard(game: SportsGame) {
   };
 }
 
-function getResultVerdict(game: SportsGame) {
+function getResultVerdict(game: SportsGame, publication: BylinePublicationConfig = getPublicationConfig()) {
   if (game.wildcatsScore === null || game.opponentScore === null) {
     return game.display.score ?? "";
   }
@@ -110,7 +116,7 @@ function getResultVerdict(game: SportsGame) {
     return "Final tied";
   }
 
-  const homeTeam = getScoreboard(game).team.label;
+  const homeTeam = getScoreboard(game, publication).team.label;
   const winner = game.wildcatsScore > game.opponentScore ? homeTeam : getGameOpponent(game);
   const margin = Math.abs(game.wildcatsScore - game.opponentScore);
   const verb = winner === homeTeam ? "win" : "wins";
@@ -118,8 +124,11 @@ function getResultVerdict(game: SportsGame) {
   return `${winner} ${verb} by ${margin}`;
 }
 
-export function toSportsResultView(game: SportsGame): SportsResultView {
-  const scoreboard = getScoreboard(game);
+export function toSportsResultView(
+  game: SportsGame,
+  publication: BylinePublicationConfig = getPublicationConfig()
+): SportsResultView {
+  const scoreboard = getScoreboard(game, publication);
   const teamWon =
     game.wildcatsScore !== null && game.opponentScore !== null && game.wildcatsScore > game.opponentScore;
   const opponentWon =
@@ -146,7 +155,7 @@ export function toSportsResultView(game: SportsGame): SportsResultView {
           : String(scoreboard.opponent.score),
       isWinner: opponentWon
     },
-    verdict: getResultVerdict(game) || game.display.status || "Final",
+    verdict: getResultVerdict(game, publication) || game.display.status || "Final",
     context: getEditorialContext(game),
     recapHref: game.recapUrl || null
   };
@@ -232,6 +241,9 @@ export type SportsPackageResolutionInput = {
   recentScores: SportsGame[];
   upcomingGames: SportsGame[];
   features: { sports: boolean };
+  usedStoryIds?: ReadonlySet<number>;
+  compatibilitySelection?: boolean;
+  publication?: BylinePublicationConfig;
 };
 
 /**
@@ -257,21 +269,42 @@ export type SportsPackageResolutionInput = {
  * renderer has to know what a feature flag is.
  */
 export function resolveSportsPackage(input: SportsPackageResolutionInput): ResolvedSportsPackage {
-  const publication = getPublicationConfig();
+  const publication = input.publication ?? getPublicationConfig();
   const config: SportsPackageProps = parseSportsPackageProps(input.props);
+  const compatibilitySelection = input.compatibilitySelection ?? true;
+  const usedStoryIds = new Set(input.usedStoryIds ?? []);
+  const content = config.content;
 
-  const selectedStories = (
-    config.stories.source.type === "manual"
-      ? // Pinned stories were reserved out of the ordered pass before it ran, so
-        // no other package is showing them and no extra filtering is needed here.
-        manualStories(config.stories.source.storyIds, input.posts)
-      : input.selection.fieldPosts
-  ).slice(0, config.stories.limit);
+  const manualStoryPosts = config.stories.source.type === "manual"
+    ? manualStories(config.stories.source.storyIds, input.posts)
+    : null;
+  const selectedStories = content === "schedule" || !input.features.sports
+    ? []
+    : manualStoryPosts
+      ? manualStoryPosts.slice(0, config.stories.limit)
+      : availableStories(
+          sourceCandidates(config.stories.source, input.posts, input.selection, compatibilitySelection),
+          usedStoryIds,
+          config.stories.limit
+        );
 
-  const spotlightPost = config.athleteSpotlight.enabled
+  const spotlightPost = content === "schedule" || !input.features.sports
+    ? null
+    : config.athleteSpotlight.enabled
     ? config.athleteSpotlight.source.type === "manual"
       ? (manualStories(config.athleteSpotlight.source.storyIds, input.posts)[0] ?? null)
-      : input.selection.athleteSpotlightPost
+      : config.athleteSpotlight.source.type === "athlete-spotlight"
+        ? (() => {
+            const candidate = compatibilitySelection
+              ? input.selection.athleteSpotlightPost
+              : input.posts.find(isAthleteSpotlightPost) ?? null;
+
+            // A manual pin in another package reserves its story before the
+            // ordered pass. The standing athlete convention must yield to that
+            // explicit placement rather than duplicating it in Sports.
+            return candidate && !usedStoryIds.has(candidate.id) ? candidate : null;
+          })()
+        : null
     : null;
   // A spotlight must never repeat a story this package is already showing.
   const athleteSpotlight =
@@ -281,18 +314,24 @@ export function resolveSportsPackage(input: SportsPackageResolutionInput): Resol
 
   // Capability reconciliation: a design cannot switch on a module the
   // publication has disabled.
-  const scoresEnabled = config.scores.enabled && input.features.sports;
-  const upcomingEnabled = config.upcoming.enabled && input.features.sports;
-  const results = scoresEnabled ? input.recentScores.slice(0, config.scores.limit).map(toSportsResultView) : [];
+  const scoresEnabled = content !== "story" && config.scores.enabled && input.features.sports;
+  const upcomingEnabled = content !== "story" && config.upcoming.enabled && input.features.sports;
+  const results = scoresEnabled
+    ? input.recentScores.slice(0, config.scores.limit).map((game) => toSportsResultView(game, publication))
+    : [];
   const upcoming = upcomingEnabled ? input.upcomingGames.slice(0, config.upcoming.limit).map(toSportsFixtureView) : [];
 
   return {
     packageId: input.packageId,
     heading: config.heading,
-    sectionLink: { label: "All Sports →", href: "/sports/" },
+    sectionLink: config.archiveLink.enabled
+      ? { label: config.archiveLink.label, href: config.archiveLink.href }
+      : null,
     // The sports lead runs a cleaned two-sentence deck rather than the raw
     // excerpt, which is why it resolves with different options than the rail.
-    lead: selectedStories[0] ? toStoryView(selectedStories[0], { cleanDeck: true }) : null,
+    lead: selectedStories[0]
+      ? toStoryView(selectedStories[0], { cleanDeck: config.presentation.cleanDeck ?? true })
+      : null,
     rail: selectedStories.slice(1).map((post) => toStoryView(post)),
     athleteSpotlight,
     // No games and no modules means no panel -- never a placeholder scoreboard.
@@ -310,8 +349,10 @@ export function resolveSportsPackage(input: SportsPackageResolutionInput): Resol
         : null,
     presentation: {
       showDeck: config.presentation.showDeck,
-      showBylines: config.presentation.showBylines
+      showBylines: config.presentation.showBylines,
+      showReadLink: config.presentation.showReadLink
     },
+    content,
     fallbackAuthorName: `${publication.identity.shortName} Staff`
   };
 }

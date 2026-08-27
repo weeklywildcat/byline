@@ -398,10 +398,12 @@ describe("publication capabilities are authoritative", () => {
     expect(resolved.schedule).toBeNull();
   });
 
-  it("still resolves the sports stories a publication actually published", () => {
+  it("suppresses sports stories when the publication disables the module", () => {
     const resolved = resolve(homepagePosts(), {}, { sports: false });
 
-    expect(resolved.lead?.id).toBe(7);
+    expect(resolved.lead).toBeNull();
+    expect(resolved.rail).toEqual([]);
+    expect(resolved.athleteSpotlight).toBeNull();
   });
 });
 
@@ -429,7 +431,7 @@ describe("sports package settings", () => {
   it("turns bylines and decks off", () => {
     const resolved = resolve(homepagePosts(), { presentation: { showDeck: false, showBylines: false } });
 
-    expect(resolved.presentation).toEqual({ showDeck: false, showBylines: false });
+    expect(resolved.presentation).toEqual({ showDeck: false, showBylines: false, showReadLink: true });
   });
 
   it("rejects an athlete source the package cannot render", () => {

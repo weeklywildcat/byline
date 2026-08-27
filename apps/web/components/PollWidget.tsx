@@ -26,7 +26,7 @@ function hasVotedCookie(pollId: string) {
     .some((cookie) => cookie.startsWith(`${getPollVotedCookieName(pollId)}=`));
 }
 
-export function PollWidget() {
+export function PollWidget({ headingId, inputName = "homepage-poll" }: { headingId?: string; inputName?: string }) {
   const [poll, setPoll] = useState<ActivePoll | null>(null);
   const [selectedOptionId, setSelectedOptionId] = useState("");
   const [state, setState] = useState<PollState>("loading");
@@ -133,7 +133,7 @@ export function PollWidget() {
   }
 
   return (
-    <PollCard>
+    <PollCard headingId={headingId}>
       {state === "loading" ? (
         <div className="homepage-poll-loading" aria-label="Loading poll" />
       ) : null}
@@ -177,7 +177,7 @@ export function PollWidget() {
                   <label key={option.id}>
                     <input
                       type="radio"
-                      name="homepage-poll"
+                      name={inputName}
                       value={option.id}
                       checked={selectedOptionId === option.id}
                       onChange={() => setSelectedOptionId(option.id)}

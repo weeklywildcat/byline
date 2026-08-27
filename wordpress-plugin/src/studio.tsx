@@ -10,7 +10,16 @@ import { magazineTheme } from "@byline/theme-magazine";
 import { modernTheme } from "@byline/theme-modern";
 import { weeklyWildcatTheme } from "@byline/theme-weekly-wildcat";
 import { getBylineBlockPresentation, themeTokensToCssVariables } from "@byline/ui";
-import { LeadPackagePreview, SportsPackagePreview } from "./studio-preview";
+import {
+  BriefPackagePreview,
+  InFocusPackagePreview,
+  LeadPackagePreview,
+  MorePackagePreview,
+  NewsletterPackagePreview,
+  OpinionPackagePreview,
+  SpecialCoveragePackagePreview,
+  SportsPackagePreview
+} from "./studio-preview";
 import {
   AthleteSpotlightSourceField,
   AuthorPickerField,
@@ -27,9 +36,22 @@ import {
   type StorySource
 } from "./studio-fields";
 import {
+  BRIEF_PACKAGE_TYPE,
+  IN_FOCUS_PACKAGE_TYPE,
   LEAD_PACKAGE_TYPE,
+  MORE_PACKAGE_TYPE,
+  NEWSLETTER_PACKAGE_TYPE,
+  OPINION_PACKAGE_TYPE,
+  SPECIAL_COVERAGE_PACKAGE_TYPE,
+  BYLINE_PACKAGE_TYPES,
   SPORTS_PACKAGE_TYPE,
+  WEEKLY_WILDCAT_BRIEF_DEFAULTS,
+  WEEKLY_WILDCAT_IN_FOCUS_DEFAULTS,
   WEEKLY_WILDCAT_LEAD_DEFAULTS,
+  WEEKLY_WILDCAT_MORE_DEFAULTS,
+  WEEKLY_WILDCAT_NEWSLETTER_DEFAULTS,
+  WEEKLY_WILDCAT_OPINION_DEFAULTS,
+  WEEKLY_WILDCAT_SPECIAL_COVERAGE_DEFAULTS,
   WEEKLY_WILDCAT_SPORTS_DEFAULTS,
   type BylineDesignDocumentV2
 } from "@byline/design";
@@ -58,7 +80,7 @@ type StudioProps = {
   previewStylesheetUrl: string;
   tokenOverrides: Record<string, string>;
   backUrl?: string;
-  features?: { polls: boolean; events: boolean; sports: boolean };
+  features?: { polls: boolean; events: boolean; sports: boolean; newsletter?: boolean };
   publicationShortName?: string;
   calendarHeading?: string;
 };
@@ -67,7 +89,7 @@ type StudioProps = {
 // design-specific. Passed in so no Weekly Wildcat identity is baked into Studio.
 export type StudioPreviewContext = {
   theme: string;
-  features: { polls: boolean; events: boolean; sports: boolean };
+  features: { polls: boolean; events: boolean; sports: boolean; newsletter?: boolean };
   publicationShortName: string;
   calendarHeading: string;
 };
@@ -149,6 +171,15 @@ function createLeadPackageComponent(context: StudioPreviewContext) {
   return {
     label: "Lead package",
     fields: {
+      mode: {
+        type: "radio" as const,
+        label: "Package content",
+        options: [
+          { label: "Lead and latest", value: "content" },
+          { label: "Poll only", value: "poll" },
+          { label: "Calendar only", value: "calendar" }
+        ]
+      },
       lead: {
         type: "object" as const,
         label: "Lead story",
@@ -292,7 +323,27 @@ function createSportsPackageComponent(context: StudioPreviewContext) {
         label: "Story display",
         objectFields: {
           showDeck: showHide("Show deck"),
-          showBylines: showHide("Show bylines")
+          showBylines: showHide("Show bylines"),
+          showReadLink: showHide("Show read link"),
+          cleanDeck: showHide("Use clean decks")
+        }
+      },
+      content: {
+        type: "radio" as const,
+        label: "Package content",
+        options: [
+          { label: "Stories and schedule", value: "full" },
+          { label: "Stories only", value: "story" },
+          { label: "Schedule only", value: "schedule" }
+        ]
+      },
+      archiveLink: {
+        type: "object" as const,
+        label: "Section link",
+        objectFields: {
+          enabled: showHide("Show section link"),
+          href: { type: "text" as const, label: "Link URL" },
+          label: { type: "text" as const, label: "Link label" }
         }
       }
     },
@@ -305,6 +356,184 @@ function createSportsPackageComponent(context: StudioPreviewContext) {
         publicationShortName={context.publicationShortName}
       />
     )
+  };
+}
+
+const showHideField = (label: string) => ({
+  type: "radio" as const,
+  label,
+  options: [
+    { label: "Show", value: true },
+    { label: "Hide", value: false }
+  ]
+});
+
+const packagePreviewProps = (context: StudioPreviewContext) => ({
+  theme: context.theme,
+  features: context.features,
+  publicationShortName: context.publicationShortName,
+  calendarHeading: context.calendarHeading
+});
+
+function createBriefPackageComponent(context: StudioPreviewContext) {
+  return {
+    label: "Brief package",
+    fields: {
+      heading: { type: "text" as const, label: "Section heading" },
+      source: LeadStorySourceField("Story source"),
+      limit: { type: "number" as const, label: "Number of stories", min: 0, max: 12 },
+      presentation: {
+        type: "object" as const,
+        label: "Story display",
+        objectFields: {
+          showAuthor: showHideField("Show bylines"),
+          showDeck: showHideField("Show decks")
+        }
+      }
+    },
+    defaultProps: { ...WEEKLY_WILDCAT_BRIEF_DEFAULTS },
+    render: (props: Record<string, unknown>) => <BriefPackagePreview props={props} {...packagePreviewProps(context)} />
+  };
+}
+
+function createInFocusPackageComponent(context: StudioPreviewContext) {
+  return {
+    label: "In Focus package",
+    fields: {
+      heading: { type: "text" as const, label: "Section heading" },
+      source: LeadStorySourceField("Story source"),
+      presentation: {
+        type: "object" as const,
+        label: "Story display",
+        objectFields: {
+          showAuthor: showHideField("Show byline"),
+          showDeck: showHideField("Show deck")
+        }
+      }
+    },
+    defaultProps: { ...WEEKLY_WILDCAT_IN_FOCUS_DEFAULTS },
+    render: (props: Record<string, unknown>) => <InFocusPackagePreview props={props} {...packagePreviewProps(context)} />
+  };
+}
+
+function createSpecialCoveragePackageComponent(context: StudioPreviewContext) {
+  const storyPresentation = (label: string) => ({
+    type: "object" as const,
+    label,
+    objectFields: {
+      showAuthor: showHideField("Show byline"),
+      showDeck: showHideField("Show deck")
+    }
+  });
+
+  return {
+    label: "Special Coverage package",
+    fields: {
+      heading: { type: "text" as const, label: "Section heading" },
+      source: LeadStorySourceField("Story source"),
+      limit: { type: "number" as const, label: "Number of stories", min: 0, max: 12 },
+      leadPresentation: storyPresentation("Lead story display"),
+      supportingPresentation: storyPresentation("Supporting story display")
+    },
+    defaultProps: { ...WEEKLY_WILDCAT_SPECIAL_COVERAGE_DEFAULTS },
+    render: (props: Record<string, unknown>) => <SpecialCoveragePackagePreview props={props} {...packagePreviewProps(context)} />
+  };
+}
+
+function createOpinionPackageComponent(context: StudioPreviewContext) {
+  return {
+    label: "Opinion package",
+    fields: {
+      heading: { type: "text" as const, label: "Section heading" },
+      description: { type: "text" as const, label: "Description" },
+      source: LeadStorySourceField("Story source"),
+      limit: { type: "number" as const, label: "Number of stories", min: 0, max: 12 },
+      archiveLink: {
+        type: "object" as const,
+        label: "Archive link",
+        objectFields: {
+          enabled: showHideField("Show archive link"),
+          href: { type: "text" as const, label: "Link URL" },
+          label: { type: "text" as const, label: "Link label" }
+        }
+      },
+      presentation: {
+        type: "object" as const,
+        label: "Story display",
+        objectFields: {
+          showAuthor: showHideField("Show bylines"),
+          showDeck: showHideField("Show decks")
+        }
+      }
+    },
+    defaultProps: { ...WEEKLY_WILDCAT_OPINION_DEFAULTS },
+    render: (props: Record<string, unknown>) => <OpinionPackagePreview props={props} {...packagePreviewProps(context)} />
+  };
+}
+
+function createMorePackageComponent(context: StudioPreviewContext) {
+  const utilityBlock = (label: string) => ({
+    type: "object" as const,
+    label,
+    objectFields: {
+      enabled: showHideField(`Show ${label.toLowerCase()}`),
+      heading: { type: "text" as const, label: "Heading" },
+      copy: { type: "text" as const, label: "Copy" }
+    }
+  });
+
+  return {
+    label: "More package",
+    fields: {
+      heading: { type: "text" as const, label: "Section heading" },
+      source: LeadStorySourceField("Story source"),
+      limit: { type: "number" as const, label: "Number of stories", min: 0, max: 12 },
+      archiveLink: {
+        type: "object" as const,
+        label: "Archive link",
+        objectFields: {
+          enabled: showHideField("Show archive link"),
+          href: { type: "text" as const, label: "Link URL" },
+          label: { type: "text" as const, label: "Link label" }
+        }
+      },
+      utility: {
+        type: "object" as const,
+        label: "Utility rail",
+        objectFields: {
+          enabled: showHideField("Enable utility rail"),
+          joinStaff: utilityBlock("Join the newsroom"),
+          stayConnected: utilityBlock("Stay connected")
+        }
+      },
+      presentation: {
+        type: "object" as const,
+        label: "Story display",
+        objectFields: {
+          showDeck: showHideField("Show decks"),
+          cleanDeck: showHideField("Use clean decks")
+        }
+      }
+    },
+    defaultProps: { ...WEEKLY_WILDCAT_MORE_DEFAULTS },
+    render: (props: Record<string, unknown>) => <MorePackagePreview props={props} {...packagePreviewProps(context)} />
+  };
+}
+
+function createNewsletterPackageComponent(context: StudioPreviewContext) {
+  return {
+    label: "Newsletter package",
+    fields: {
+      label: { type: "text" as const, label: "Accessible label" },
+      heading: { type: "text" as const, label: "Heading" },
+      presentation: {
+        type: "object" as const,
+        label: "Display",
+        objectFields: { showLabel: showHideField("Show label") }
+      }
+    },
+    defaultProps: { ...WEEKLY_WILDCAT_NEWSLETTER_DEFAULTS },
+    render: (props: Record<string, unknown>) => <NewsletterPackagePreview props={props} {...packagePreviewProps(context)} />
   };
 }
 
@@ -347,7 +576,7 @@ export function createStudioConfig(
   const variables = getStudioThemeVariables(theme, overrides) as CSSProperties;
   const previewContext: StudioPreviewContext = context ?? {
     theme,
-    features: { polls: true, events: true, sports: true },
+    features: { polls: true, events: true, sports: true, newsletter: true },
     publicationShortName: "Newsroom",
     calendarHeading: "This week"
   };
@@ -357,7 +586,7 @@ export function createStudioConfig(
     categories: {
       Packages: {
         title: "Packages",
-        components: [LEAD_PACKAGE_TYPE, SPORTS_PACKAGE_TYPE],
+        components: [...BYLINE_PACKAGE_TYPES],
         defaultExpanded: true
       },
       ...studioConfigBase.categories
@@ -365,7 +594,13 @@ export function createStudioConfig(
     components: {
       ...studioConfigBase.components,
       [LEAD_PACKAGE_TYPE]: createLeadPackageComponent(previewContext),
-      [SPORTS_PACKAGE_TYPE]: createSportsPackageComponent(previewContext)
+      [BRIEF_PACKAGE_TYPE]: createBriefPackageComponent(previewContext),
+      [IN_FOCUS_PACKAGE_TYPE]: createInFocusPackageComponent(previewContext),
+      [SPECIAL_COVERAGE_PACKAGE_TYPE]: createSpecialCoveragePackageComponent(previewContext),
+      [OPINION_PACKAGE_TYPE]: createOpinionPackageComponent(previewContext),
+      [SPORTS_PACKAGE_TYPE]: createSportsPackageComponent(previewContext),
+      [MORE_PACKAGE_TYPE]: createMorePackageComponent(previewContext),
+      [NEWSLETTER_PACKAGE_TYPE]: createNewsletterPackageComponent(previewContext)
     } as unknown as Config["components"],
     root: {
       render: ({ children }: { children: ReactNode }) => (
@@ -406,7 +641,7 @@ export function BylineStudio({
   previewStylesheetUrl,
   tokenOverrides,
   backUrl,
-  features = { polls: true, events: true, sports: true },
+  features = { polls: true, events: true, sports: true, newsletter: true },
   publicationShortName = "Newsroom",
   calendarHeading = "This week"
 }: StudioProps) {
@@ -477,6 +712,7 @@ export function BylineStudio({
   const stored = design.autosave?.document ?? design.document;
   const baseRevisionId = design.autosave?.baseRevisionId ?? design.revision;
   const loaded = loadDesignIntoEditor(stored, template);
+  const hasUnconvertedLegacy = Boolean(loaded.legacy?.unconvertedBlocks.length);
 
   // Editor state is converted to the semantic document before it leaves the
   // browser. No Puck structure is persisted.
@@ -504,6 +740,10 @@ export function BylineStudio({
 
   const publish = async (data: Data) => {
     if (!canPublish) return;
+    if (hasUnconvertedLegacy) {
+      setError("This design still contains preserved legacy blocks. Convert or remove them before publishing.");
+      return;
+    }
     setError("");
     try {
       const published = await apiFetch<AdminDesign>({
@@ -571,6 +811,12 @@ export function BylineStudio({
               ))}
             </ul>
           ) : null}
+        </Notice>
+      ) : null}
+      {hasUnconvertedLegacy ? (
+        <Notice status="warning" isDismissible={false}>
+          Publishing is disabled while preserved legacy blocks remain outside the package editor. The original data
+          will continue to round-trip through autosaves.
         </Notice>
       ) : null}
       <Puck

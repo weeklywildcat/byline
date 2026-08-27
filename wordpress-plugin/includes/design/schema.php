@@ -95,6 +95,24 @@ function byline_design_value_is_safe($value, int $depth = 0): bool
     return true;
 }
 
+// JSON objects are associative arrays after WordPress decodes them. Keep the
+// object/list distinction where PHP can observe it so the legacy contract stays
+// aligned with TypeScript's plain-record checks.
+function byline_design_is_object_array($value): bool
+{
+    if (!is_array($value)) {
+        return false;
+    }
+
+    foreach (array_keys($value) as $key) {
+        if (is_int($key)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 function byline_design_story_blocks(): array
 {
     return [
@@ -133,7 +151,16 @@ function byline_design_package_types(): array
 {
     // Semantic schema 2 packages. A type only appears here once a resolver and a
     // renderer exist for it on the frontend.
-    return ['lead-package', 'sports-package'];
+    return [
+        'lead-package',
+        'brief-package',
+        'in-focus-package',
+        'special-coverage-package',
+        'opinion-package',
+        'sports-package',
+        'more-package',
+        'newsletter-package',
+    ];
 }
 
 // Schema 2 splits "which stories" from "how many", so a source carries no limit.
@@ -162,11 +189,60 @@ function byline_validate_story_source($source): bool
         return is_string($source['slug'] ?? null)
             && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $source['slug']) === 1;
     }
+    if (in_array($source['type'], [
+        'compatibility-lead',
+        'compatibility-latest',
+        'compatibility-brief',
+        'compatibility-in-focus',
+        'compatibility-special-coverage',
+        'compatibility-opinion',
+        'compatibility-sports',
+        'compatibility-athlete',
+        'compatibility-more',
+    ], true)) {
+        return true;
+    }
     if (!in_array($source['type'], ['latest', 'sticky', 'category', 'tag', 'author'], true)) {
         return false;
     }
     $source_key = ['category' => 'categoryId', 'tag' => 'tagId', 'author' => 'authorId'][$source['type']] ?? null;
     return !$source_key || (is_int($source[$source_key] ?? null) && $source[$source_key] > 0);
+}
+
+function byline_collect_manual_pin_owners($value, string $package_id, string $path, array &$owners)
+{
+    if (!is_array($value)) {
+        return null;
+    }
+
+    if (($value['type'] ?? null) === 'manual' && is_array($value['storyIds'] ?? null)) {
+        $owner = $package_id . ':' . $path;
+        $seen_in_source = [];
+        foreach ($value['storyIds'] as $story_id) {
+            if (!is_int($story_id) || $story_id <= 0 || in_array($story_id, $seen_in_source, true)) {
+                continue;
+            }
+            $seen_in_source[] = $story_id;
+            if (isset($owners[$story_id]) && $owners[$story_id] !== $owner) {
+                return new WP_Error(
+                    'byline_duplicate_manual_story',
+                    __('A story is manually placed in more than one homepage slot.', 'weekly-wildcat-headless'),
+                    ['status' => 400, 'storyId' => $story_id]
+                );
+            }
+            $owners[$story_id] = $owner;
+        }
+    }
+
+    foreach ($value as $key => $child) {
+        $child_path = $path . '.' . (is_string($key) ? $key : (string) $key);
+        $error = byline_collect_manual_pin_owners($child, $package_id, $child_path, $owners);
+        if (is_wp_error($error)) {
+            return $error;
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -189,25 +265,33 @@ function byline_validate_design_document_v2(array $document, string $template)
     }
 
     // Preserved schema 1 blocks travel with a schema 2 document so a migrated
-    // design does not lose sections that have no package yet. They are inert --
-    // never rendered, never edited -- but they are still persisted data, so they
-    // are held to the same safety rules as package props.
+    // design does not lose sections that have no package yet. They are held to
+    // the exact legacy metadata contract the TypeScript parser accepts.
     if (array_key_exists('legacy', $document)) {
         $legacy = $document['legacy'];
-        if (!is_array($legacy)
+        if (!byline_design_is_object_array($legacy)
+            || ($legacy['schemaVersion'] ?? null) !== 1
+            || !byline_design_is_object_array($legacy['editor'] ?? null)
+            || !is_string($legacy['editor']['engine'] ?? null)
+            || !is_string($legacy['editor']['version'] ?? null)
             || !is_array($legacy['unconvertedBlocks'] ?? null)
             || count($legacy['unconvertedBlocks']) > BYLINE_DESIGN_MAX_BLOCKS
             || !byline_design_value_is_safe($legacy)) {
             return new WP_Error('byline_unsafe_design_props', __('The design contains unsafe or malformed legacy data.', 'weekly-wildcat-headless'), ['status' => 400]);
         }
         foreach ($legacy['unconvertedBlocks'] as $block) {
-            if (!is_array($block) || !is_string($block['type'] ?? null) || !is_array($block['props'] ?? null)) {
+            if (!byline_design_is_object_array($block)
+                || !is_string($block['type'] ?? null)
+                || trim($block['type']) === ''
+                || !array_key_exists('props', $block)
+                || !byline_design_is_object_array($block['props'])) {
                 return new WP_Error('byline_unsafe_design_props', __('The design contains malformed legacy data.', 'weekly-wildcat-headless'), ['status' => 400]);
             }
         }
     }
 
     $seen_ids = [];
+    $manual_pin_owners = [];
     foreach ($document['packages'] as $design_package) {
         if (!is_array($design_package)
             || !is_string($design_package['id'] ?? null)
@@ -227,9 +311,14 @@ function byline_validate_design_document_v2(array $document, string $template)
             return new WP_Error('byline_unsafe_design_props', __('The design contains unsafe or malformed package properties.', 'weekly-wildcat-headless'), ['status' => 400]);
         }
 
-        // Every slot that can carry a content source is checked, whichever
-        // package it belongs to. Storage validates the shape; the frontend
-        // parsers are what give a malformed value its safe default.
+        $duplicate_pin_error = byline_collect_manual_pin_owners($design_package['props'], $design_package['id'], 'props', $manual_pin_owners);
+        if (is_wp_error($duplicate_pin_error)) {
+            return $duplicate_pin_error;
+        }
+
+        // Nested story slots carry `{ source: ... }` while Brief, In Focus,
+        // Special Coverage, Opinion, and More carry `{ source: ... }` directly
+        // on props. Validate both shapes explicitly.
         foreach (['lead', 'latest', 'stories', 'athleteSpotlight'] as $slot) {
             $config = $design_package['props'][$slot] ?? null;
             if (is_array($config)
@@ -237,6 +326,10 @@ function byline_validate_design_document_v2(array $document, string $template)
                 && !byline_validate_story_source($config['source'])) {
                 return new WP_Error('byline_invalid_story_query', __('A package contains an invalid content source.', 'weekly-wildcat-headless'), ['status' => 400]);
             }
+        }
+        if (array_key_exists('source', $design_package['props'])
+            && !byline_validate_story_source($design_package['props']['source'])) {
+            return new WP_Error('byline_invalid_story_query', __('A package contains an invalid content source.', 'weekly-wildcat-headless'), ['status' => 400]);
         }
     }
 

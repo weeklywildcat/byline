@@ -25,9 +25,11 @@ export function getPublishedDesign(template: string): PublishedBylineDesign | nu
 /**
  * The canonical way to obtain a renderable design.
  *
- * Every published design reaches the renderers through here, whatever schema it
- * was stored as: BYLINE_DESIGNS_JSON is populated from /byline/v1/design/<template>
- * by the build wrapper, parsed by schema version, and normalised to v2. There is
+ * Package-based consumers reach the renderers through here, whatever schema the
+ * design was stored as: BYLINE_DESIGNS_JSON is populated from
+ * /byline/v1/design/<template> by the build wrapper, parsed by schema version,
+ * and normalised to v2. The published homepage keeps its direct v1 fallback
+ * until all visible legacy blocks have faithful package equivalents. There is
  * no separate per-template environment variable.
  *
  * Returns null only when the publication has published nothing for this

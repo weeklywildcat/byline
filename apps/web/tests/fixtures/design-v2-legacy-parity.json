@@ -1,0 +1,44 @@
+{
+  "valid": {
+    "schemaVersion": 2,
+    "template": "home",
+    "theme": "weekly-wildcat",
+    "packages": [
+      {
+        "id": "home-lead",
+        "type": "lead-package",
+        "props": {}
+      }
+    ],
+    "legacy": {
+      "schemaVersion": 1,
+      "editor": {
+        "engine": "puck",
+        "version": "0.23.0"
+      },
+      "unconvertedBlocks": [
+        {
+          "type": "divider",
+          "props": {
+            "id": "legacy-divider"
+          }
+        }
+      ]
+    }
+  },
+  "invalidMissingMetadata": {
+    "schemaVersion": 2,
+    "template": "home",
+    "theme": "weekly-wildcat",
+    "packages": [
+      {
+        "id": "home-lead",
+        "type": "lead-package",
+        "props": {}
+      }
+    ],
+    "legacy": {
+      "unconvertedBlocks": []
+    }
+  }
+}

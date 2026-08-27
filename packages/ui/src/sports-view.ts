@@ -91,7 +91,7 @@ export type SportsScheduleView = {
 export type ResolvedSportsPackage = {
   packageId: string;
   heading: string;
-  sectionLink: { label: string; href: string };
+  sectionLink: { label: string; href: string } | null;
   lead: StoryView | null;
   rail: StoryView[];
   athleteSpotlight: AthleteSpotlightView | null;
@@ -102,7 +102,9 @@ export type ResolvedSportsPackage = {
   presentation: {
     showDeck: boolean;
     showBylines: boolean;
+    showReadLink?: boolean;
   };
+  content?: "full" | "schedule" | "story";
   fallbackAuthorName: string;
 };
 

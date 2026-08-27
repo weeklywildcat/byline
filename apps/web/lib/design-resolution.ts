@@ -26,6 +26,11 @@ function postMatchesQuery(post: WordPressPost, query: StoryQuery) {
   return query.postIds.includes(post.id);
 }
 
+/**
+ * The retained schema-v1 runtime. It is intentionally the old resolver, not a
+ * second homepage architecture: it exists only while a published v1 document
+ * still contains a visible block without a faithful v2 representation.
+ */
 export async function resolvePublishedDesignBlocks(
   content: Array<{ type: string; props: Record<string, unknown> }>,
   posts: WordPressPost[]

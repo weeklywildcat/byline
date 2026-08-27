@@ -1,12 +1,24 @@
 import {
   BYLINE_DESIGN_WRITE_SCHEMA_VERSION,
+  BRIEF_PACKAGE_TYPE,
+  IN_FOCUS_PACKAGE_TYPE,
   LEAD_PACKAGE_TYPE,
+  MORE_PACKAGE_TYPE,
+  NEWSLETTER_PACKAGE_TYPE,
+  OPINION_PACKAGE_TYPE,
   SPORTS_PACKAGE_TYPE,
+  SPECIAL_COVERAGE_PACKAGE_TYPE,
   isBylinePackageType,
   migrateDesignDocumentV1ToV2,
   parseBylineDesignDocumentV2,
+  parseBriefPackageProps,
+  parseInFocusPackageProps,
   parseLeadPackageProps,
+  parseMorePackageProps,
+  parseNewsletterPackageProps,
+  parseOpinionPackageProps,
   parseSportsPackageProps,
+  parseSpecialCoveragePackageProps,
   type BylineDesignDocumentV2,
   type BylineDesignPackage
 } from "@byline/design";
@@ -64,7 +76,13 @@ export function designDocumentToEditorState(document: BylineDesignDocumentV2): P
 // half-filled field in Puck cannot become a half-filled persisted document.
 function parsePackageProps(type: string, settings: Record<string, unknown>) {
   if (type === LEAD_PACKAGE_TYPE) return parseLeadPackageProps(settings);
+  if (type === BRIEF_PACKAGE_TYPE) return parseBriefPackageProps(settings);
+  if (type === IN_FOCUS_PACKAGE_TYPE) return parseInFocusPackageProps(settings);
+  if (type === SPECIAL_COVERAGE_PACKAGE_TYPE) return parseSpecialCoveragePackageProps(settings);
+  if (type === OPINION_PACKAGE_TYPE) return parseOpinionPackageProps(settings);
   if (type === SPORTS_PACKAGE_TYPE) return parseSportsPackageProps(settings);
+  if (type === MORE_PACKAGE_TYPE) return parseMorePackageProps(settings);
+  if (type === NEWSLETTER_PACKAGE_TYPE) return parseNewsletterPackageProps(settings);
 
   return settings;
 }
@@ -117,7 +135,7 @@ export function editorStateToDesignDocument(
     theme,
     packages,
     // Merged back verbatim. These blocks are never edited here, only preserved,
-    // so a later phase can convert them once their packages exist.
+    // so a future package can convert them without losing the original data.
     ...(legacy && legacy.unconvertedBlocks.length ? { legacy } : {})
   };
 }

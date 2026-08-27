@@ -24,8 +24,9 @@ const homepage = readSource("../app/page.tsx");
 // The invariant this whole phase exists to prove: one renderer, two hosts.
 describe("shared rendering contract", () => {
   it("production renders the lead package through the shared renderer", () => {
-    expect(homepage).toMatch(/import \{[^}]*LeadPackage[^}]*\} from "@byline\/ui"/);
-    expect(homepage).toContain("<LeadPackage");
+    expect(homepage).toMatch(/import \{[^}]*HomepagePackages[^}]*\} from "@byline\/ui"/);
+    expect(homepage).toContain("<HomepagePackages");
+    expect(homepage).not.toContain("<LeadPackage");
   });
 
   it("Studio renders the shared renderer rather than its own implementation", () => {
@@ -110,12 +111,14 @@ describe("Studio threads preserved legacy data into every write", () => {
 });
 
 describe("shared rendering contract: sports package", () => {
-  const resolver = readSource("../lib/sports-packages.ts");
+  const homepageResolver = readSource("../lib/homepage-resolution.ts");
+  const sportsResolver = readSource("../lib/sports-packages.ts");
   const renderer = readSource("../../../packages/ui/src/SportsPackage.tsx");
 
   it("production renders the sports package through the shared renderer", () => {
-    expect(homepage).toMatch(/import \{[^}]*SportsPackage[^}]*\} from "@byline\/ui"/);
-    expect(homepage).toContain("<SportsPackage");
+    expect(homepage).toMatch(/import \{[^}]*HomepagePackages[^}]*\} from "@byline\/ui"/);
+    expect(homepage).toContain("<HomepagePackages");
+    expect(homepage).not.toContain("<SportsPackage");
     // The hand-written section is gone, not merely bypassed.
     expect(homepage).not.toContain('className="from-field"');
     expect(homepage).not.toContain("SportsSchedulePanel");
@@ -169,8 +172,10 @@ describe("shared rendering contract: sports package", () => {
   });
 
   it("keeps those decisions in the resolver, where they belong", () => {
-    expect(resolver).toContain("features.sports");
-    expect(resolver).toContain("input.selection.fieldPosts");
-    expect(resolver).toContain("getPublicationConfig");
+    expect(homepageResolver).toContain("resolveSportsPackage");
+    expect(homepageResolver).toContain("usedStoryIds");
+    expect(sportsResolver).toContain("features.sports");
+    expect(sportsResolver).toContain("sourceCandidates");
+    expect(sportsResolver).toContain("getPublicationConfig");
   });
 });

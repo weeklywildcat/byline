@@ -6,7 +6,15 @@ import { getPublicationConfig } from "@/lib/publication";
 const kitScriptSrc = "https://weekly-wildcat.kit.com/d1eb6ce2f7/index.js";
 const kitFormUid = "d1eb6ce2f7";
 
-export function NewsletterSignupForm() {
+export function NewsletterSignupForm({
+  headingId = "article-newsletter-heading",
+  heading,
+  showLabel = true
+}: {
+  headingId?: string;
+  heading?: string;
+  showLabel?: boolean;
+}) {
   const publication = getPublicationConfig();
   const embedRef = useRef<HTMLDivElement>(null);
   const usesLegacyKitForm = publication.appearance.theme === "weekly-wildcat";
@@ -34,10 +42,10 @@ export function NewsletterSignupForm() {
   }
 
   return (
-    <aside className="article-newsletter-signup" aria-labelledby="article-newsletter-heading">
+    <aside className="article-newsletter-signup" aria-labelledby={headingId}>
       <div className="article-newsletter-copy">
-        <p className="article-newsletter-kicker">Newsletter</p>
-        <h2 id="article-newsletter-heading">Get {publication.identity.shortName} in your inbox</h2>
+        {showLabel ? <p className="article-newsletter-kicker">Newsletter</p> : null}
+        <h2 id={headingId}>{heading ?? `Get ${publication.identity.shortName} in your inbox`}</h2>
         <p>Catch the newest stories, scores, and campus updates when they publish.</p>
       </div>
 
