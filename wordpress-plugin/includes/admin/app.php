@@ -92,6 +92,7 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         'deploymentPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/deployment',
         'nonce' => wp_create_nonce('wp_rest'),
         'pluginVersion' => BYLINE_PLUGIN_VERSION,
+        'previewStylesheetUrl' => plugins_url('build/index.css', dirname(__DIR__, 2) . '/weekly-wildcat-headless.php'),
         'capabilities' => [
             'manage' => current_user_can(BYLINE_MANAGE_CAPABILITY),
             'editDesign' => current_user_can(BYLINE_EDIT_DESIGN_CAPABILITY),

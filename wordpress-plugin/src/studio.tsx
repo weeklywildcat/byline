@@ -1,6 +1,6 @@
 import apiFetch from "@wordpress/api-fetch";
 import { Button, Notice, SelectControl, Spinner } from "@wordpress/components";
-import { useEffect, useMemo, useRef, useState } from "@wordpress/element";
+import { createPortal, useEffect, useMemo, useRef, useState } from "@wordpress/element";
 import { Puck, type Config, type Data } from "@puckeditor/core";
 import type { CSSProperties, ReactNode } from "react";
 import { BYLINE_STUDIO_CATEGORIES, BYLINE_STUDIO_VIEWPORTS } from "@byline/studio-contract";
@@ -55,6 +55,7 @@ type StudioProps = {
   canEdit: boolean;
   canPublish: boolean;
   publicationTheme: string;
+  previewStylesheetUrl: string;
   tokenOverrides: Record<string, string>;
   features?: { polls: boolean; events: boolean; sports: boolean };
   publicationShortName?: string;
@@ -333,6 +334,10 @@ export function getStudioThemeVariables(theme: string, overrides: Record<string,
   return themeTokensToCssVariables(tokens);
 }
 
+export function getStudioThemeStylesheets(theme: string) {
+  return [...((previewThemes[theme] ?? weeklyWildcatTheme).stylesheets ?? [])];
+}
+
 export function createStudioConfig(
   theme: string,
   overrides: Record<string, string>,
@@ -363,18 +368,24 @@ export function createStudioConfig(
     } as unknown as Config["components"],
     root: {
       render: ({ children }: { children: ReactNode }) => (
-      <div style={{
-        ...variables,
-        background: "var(--page)",
-        display: "grid",
-        gap: 20,
-        margin: "0 auto",
-        maxWidth: "var(--max-width, 1180px)",
-        minHeight: "100vh",
-        padding: 24
-      }}>
-        {children}
-      </div>
+        <div
+          className="byline-publication-preview"
+          data-byline-preview-surface="studio"
+          data-theme={previewContext.theme}
+          style={{
+            ...variables,
+            background: "var(--page)",
+            display: "grid",
+            gap: 20,
+            margin: "0 auto",
+            maxWidth: "var(--max-width, 1180px)",
+            minHeight: "100vh",
+            padding: 24,
+            width: "100%"
+          }}
+        >
+          {children}
+        </div>
       )
     }
   } as Config;
@@ -391,6 +402,7 @@ export function BylineStudio({
   canEdit,
   canPublish,
   publicationTheme,
+  previewStylesheetUrl,
   tokenOverrides,
   features = { polls: true, events: true, sports: true },
   publicationShortName = "Newsroom",
@@ -414,6 +426,31 @@ export function BylineStudio({
         calendarHeading
       }),
     [calendarHeading, features, publicationShortName, publicationTheme, tokenOverrides]
+  );
+  const previewStylesheets = useMemo(
+    () => [previewStylesheetUrl, ...getStudioThemeStylesheets(publicationTheme)].filter(Boolean),
+    [previewStylesheetUrl, publicationTheme]
+  );
+  const iframeOverride = useMemo(
+    () =>
+      function BylinePreviewIframe({ children, document }: { children: ReactNode; document?: Document }) {
+        return (
+          <>
+            {document
+              ? createPortal(
+                  <>
+                    {previewStylesheets.map((href) => (
+                      <link key={href} rel="stylesheet" href={href} data-byline-preview-stylesheet />
+                    ))}
+                  </>,
+                  document.head
+                )
+              : null}
+            {children}
+          </>
+        );
+      },
+    [previewStylesheets]
   );
 
   const load = () => {
@@ -541,6 +578,7 @@ export function BylineStudio({
         onPublish={publish}
         permissions={{ drag: canEdit, duplicate: canEdit, delete: canEdit, edit: canEdit, insert: canEdit }}
         headerTitle={`Byline Studio · ${template}`}
+        overrides={{ iframe: iframeOverride }}
         viewports={[...BYLINE_STUDIO_VIEWPORTS]}
         iframe={{ enabled: true, syncHostStyles: false }}
         height="calc(100vh - 200px)"

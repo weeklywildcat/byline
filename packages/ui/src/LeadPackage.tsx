@@ -46,7 +46,7 @@ export function LeadPackage({ package: resolved, pollSlot, calendarSlot, railLim
   const { lead, latest, utility, presentation } = resolved;
 
   if (!lead) {
-    return <p className="empty-state">{resolved.emptyMessage}</p>;
+    return <p className="byline-package-empty-state">{resolved.emptyMessage}</p>;
   }
 
   const hasLatest = latest.stories.length > 0;
