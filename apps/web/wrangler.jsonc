@@ -12,14 +12,13 @@
     "html_handling": "auto-trailing-slash"
   },
 
-  "d1_databases": [
-    {
-      "binding": "POLLS_DB",
-      "database_name": "weekly-wildcat-polls",
-      "database_id": "92921f36-aa48-4070-8d0e-5c3ef686a0de",
-      "migrations_dir": "./migrations"
-    }
-  ],
+  // Polls have no database binding. WordPress is the poll datastore and the
+  // Worker only proxies /api/polls/* to its byline/v1 poll routes.
+  //
+  // The CMS origin is read from the static export's _byline/publication.json
+  // (urls.cms), so no configuration is required. Set the optional BYLINE_CMS_URL
+  // var or secret to override it per deployment:
+  //   npx wrangler secret put BYLINE_CMS_URL
 
   "observability": {
     "enabled": false,

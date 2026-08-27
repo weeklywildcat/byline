@@ -33,6 +33,7 @@ Sports                        27
   Teams
   Roster Import / Export
 Polls                         28   (only when the polls feature is enabled)
+  Polls / Add Poll
 Events                        29   (only when the events feature is enabled)
 --------------------------------   WordPress's administration boundary
 Appearance
@@ -69,7 +70,7 @@ REST permissions are unchanged.
 | --- | --- |
 | Studio | `edit_byline_design` |
 | Sports | post-type capabilities (`edit_posts`); utilities keep their own |
-| Polls | `edit_posts` |
+| Polls | poll capabilities (`edit_byline_polls`, `publish_byline_polls`, ...) |
 | Events | post-type capabilities (`edit_posts`) |
 | Byline | `manage_byline`, or `manage_byline_integrations` |
 
@@ -86,7 +87,7 @@ ownership are independent.
 | Screen | URL |
 | --- | --- |
 | Studio | `admin.php?page=byline-studio` (`view=revisions` for Revisions) |
-| Polls | `admin.php?page=byline-polls` |
+| Polls | `edit.php?post_type=byline_poll` |
 | Byline Overview | `admin.php?page=byline` |
 | Publication | `admin.php?page=byline-publication` |
 | Theme | `admin.php?page=byline-theme` |
@@ -112,7 +113,13 @@ The Sports Games post type owns the top-level `Sports` menu directly
 `Sports` lands on the Games list rather than a synthetic dashboard. Rosters
 attach with `show_in_menu => 'edit.php?post_type=ww_sports_game'`, and the
 import/export/team utilities were already registered against that parent.
-School Events own a top-level `Events` menu the same way.
+School Events own a top-level `Events` menu the same way, and the Byline Poll
+post type owns `Polls`.
+
+`Polls` was an informational screen before polls became WordPress content. The
+retired `admin.php?page=byline-polls` URL now redirects to the poll list table
+rather than duplicating a screen, exactly as the retired Byline-owned Teams page
+redirects to Sports.
 
 Authors intentionally remain in the native Users screen; Byline does not add an
 Authors menu.

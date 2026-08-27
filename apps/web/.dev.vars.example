@@ -1,1 +1,3 @@
-POLL_COOKIE_SECRET=replace_with_a_long_random_poll_cookie_secret
+# Optional. Overrides the CMS origin the poll proxy forwards to; otherwise it is
+# read from the static export's _byline/publication.json (urls.cms).
+BYLINE_CMS_URL=https://cms.example.edu

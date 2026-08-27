@@ -8,6 +8,7 @@ const BYLINE_MANAGE_INTEGRATIONS_CAPABILITY = 'manage_byline_integrations';
 const WWH_SPORTS_GAME_POST_TYPE = 'ww_sports_game';
 const WWH_SPORTS_ROSTER_POST_TYPE = 'ww_sports_roster';
 const WWH_SCHOOL_EVENT_POST_TYPE = 'ww_school_event';
+const BYLINE_POLL_POST_TYPE = 'byline_poll';
 const BYLINE_REST_NAMESPACE = 'byline/v1';
 
 $registered_menus = [];
@@ -136,7 +137,6 @@ byline_register_admin_app();
 
 $expected_top_level = [
     'byline-studio' => ['title' => 'Studio', 'capability' => BYLINE_EDIT_DESIGN_CAPABILITY, 'position' => 26],
-    'byline-polls' => ['title' => 'Polls', 'capability' => 'edit_posts', 'position' => 28],
     'byline' => ['title' => 'Byline', 'capability' => BYLINE_MANAGE_CAPABILITY, 'position' => 100],
 ];
 foreach ($expected_top_level as $slug => $expected) {
@@ -207,11 +207,26 @@ if (count($byline_children) !== count($expected_children)) {
 reset_menu_state();
 $test_features = ['polls' => false, 'sports' => false, 'events' => false];
 byline_register_admin_app();
-if (isset($registered_menus['byline-polls'])) {
-    fail('Polls must not register a menu when the polls feature is disabled.');
-}
 if (!isset($registered_menus['byline-studio']) || !isset($registered_menus['byline'])) {
     fail('Studio and Byline must remain registered regardless of optional features.');
+}
+
+// Polls are now the byline_poll post type, whose own registration gates the
+// Polls menu on the feature flag. Byline must not add a second Polls screen.
+// See tests/poll-storage-regression.php for the post type's menu gating.
+$test_features = ['polls' => true, 'sports' => true, 'events' => true, 'discord' => true];
+reset_menu_state();
+byline_register_admin_app();
+if (isset($registered_menus['byline-polls'])) {
+    fail('Polls belong to the byline_poll post type, not a Byline placeholder menu.');
+}
+foreach ($registered_submenus as $submenu) {
+    if (($submenu[4] ?? '') === 'byline-polls') {
+        fail('Polls must not be re-registered as a Byline submenu.');
+    }
+}
+if (strpos(byline_admin_polls_url(), 'post_type=' . BYLINE_POLL_POST_TYPE) === false) {
+    fail('The Polls destination must be the native byline_poll list table.');
 }
 
 $test_features = ['polls' => true, 'sports' => true, 'events' => true, 'discord' => true];

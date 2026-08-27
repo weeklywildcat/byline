@@ -20,11 +20,16 @@ styles are compiled into release assets.
 
 - Admin sidebar item: Sports Games
 - Admin sidebar item: School Events
+- Admin sidebar item: Polls
 - Custom post type: `ww_sports_game`
 - Custom post type: `ww_school_event`
+- Custom post type: `byline_poll`
+- Custom table: `{prefix}byline_poll_votes`
 - Public read-only REST endpoints:
   - `/wp-json/byline/v1/publication`
   - `/wp-json/byline/v1/designs`
+  - `/wp-json/byline/v1/polls/active`
+  - `/wp-json/byline/v1/polls/{id}/results`
   - `/wp-json/byline/v1/sports/teams`
   - `/wp-json/byline/v1/sports/games`
   - `/wp-json/byline/v1/sports/rosters`
@@ -38,10 +43,44 @@ styles are compiled into release assets.
     - `/wp-json/weekly-wildcat/v1/sports-rosters`
     - `/wp-json/weekly-wildcat/v1/school-events`
     - `/wp-json/weekly-wildcat/v1/authors`
+- Public write endpoint (anonymous, rate limited): `/wp-json/byline/v1/polls/vote`
 - WordPress user profile fields for author profiles:
   - role, pronouns, Media Library profile photo, Founder badge, author directory visibility, and social links
 
 The plugin does not render anything on the WordPress frontend. Editing stays inside the normal WordPress admin.
+
+## Polls
+
+**Polls** is a normal WordPress post type with its own capability family, so
+running polls does not require `manage_options`. WordPress is the authoritative
+poll datastore: poll definitions live in `byline_poll` posts and individual votes
+live in a dedicated `{prefix}byline_poll_votes` table with a
+`UNIQUE (poll_id, voter_key)` duplicate guard. There is no external poll
+database.
+
+Voting is anonymous. A signed first-party cookie carries an opaque voter id; only
+a one-way key derived from it is ever stored. No login, email, name, fingerprint,
+or full IP address is required or recorded. Public per-answer results stay
+withheld until five people have responded, enforced by the API and not only by
+the UI.
+
+The signing secret is server-side only. Set `BYLINE_POLL_COOKIE_SECRET` in
+`wp-config.php` to pin it — required when migrating an existing poll installation
+so already-issued cookies keep validating — or let the plugin generate a stable
+per-site secret. `wp byline polls secret` reports which source is active without
+printing the value.
+
+WP-CLI:
+
+```sh
+wp byline polls install-schema      # create the vote table (useful on multisite)
+wp byline polls secret              # report the signing-secret source
+wp byline polls import <file.json>  # one-time import of exported poll data
+wp byline polls verify <file.json>  # compare source and destination counts
+```
+
+See [docs/polls.md](../docs/polls.md) for the content model, REST contract, host
+proxy, capability model, and the Cloudflare D1 migration and cutover runbook.
 
 ## Deployment hooks
 

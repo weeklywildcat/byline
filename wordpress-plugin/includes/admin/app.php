@@ -31,6 +31,16 @@ function byline_sports_team_settings_url(): string
 }
 
 /**
+ * Polls are a real post type now, so the Polls destination is its native list
+ * table. Kept as a function for the same reason as the sports parent: the post
+ * type constant is defined after this file is loaded.
+ */
+function byline_admin_polls_url(): string
+{
+    return admin_url('edit.php?post_type=' . BYLINE_POLL_POST_TYPE);
+}
+
+/**
  * Return the capability for a Byline page. This is also used by the page
  * callback so a hidden menu entry can never become an authorization check.
  */
@@ -43,7 +53,9 @@ function byline_admin_page_capability(string $page): string
         BYLINE_ADMIN_THEME_PAGE => BYLINE_MANAGE_CAPABILITY,
         BYLINE_ADMIN_INTEGRATIONS_PAGE => BYLINE_MANAGE_INTEGRATIONS_CAPABILITY,
         BYLINE_ADMIN_SETTINGS_PAGE => BYLINE_MANAGE_CAPABILITY,
-        BYLINE_ADMIN_POLLS_PAGE => 'edit_posts',
+        // Retained for the redirect below; polls themselves use their own
+        // mapped capability family, not a generic post capability.
+        BYLINE_ADMIN_POLLS_PAGE => 'edit_byline_polls',
     ];
 
     return $capabilities[$page] ?? BYLINE_MANAGE_CAPABILITY;
@@ -136,6 +148,7 @@ function byline_admin_menu_capability(): string
  */
 const BYLINE_MENU_POSITION_STUDIO = 26;
 const BYLINE_MENU_POSITION_SPORTS = 27;
+// Claimed by the byline_poll post type's own top-level menu.
 const BYLINE_MENU_POSITION_POLLS = 28;
 const BYLINE_MENU_POSITION_EVENTS = 29;
 const BYLINE_MENU_POSITION_CONFIG = 100;
@@ -152,19 +165,6 @@ function byline_register_admin_app(): void
         'dashicons-art',
         BYLINE_MENU_POSITION_STUDIO
     );
-
-    // Polls are newsroom content, so they follow the content capability.
-    if (byline_admin_feature_enabled('polls')) {
-        add_menu_page(
-            'Polls',
-            'Polls',
-            'edit_posts',
-            BYLINE_ADMIN_POLLS_PAGE,
-            'byline_render_admin_app',
-            'dashicons-chart-bar',
-            BYLINE_MENU_POSITION_POLLS
-        );
-    }
 
     add_menu_page(
         'Byline',
@@ -233,7 +233,7 @@ function byline_admin_page_urls(): array
             'compatibility' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'compatibility']),
             'diagnostics' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'diagnostics']),
         ],
-        'polls' => byline_admin_page_url(BYLINE_ADMIN_POLLS_PAGE),
+        'polls' => byline_admin_polls_url(),
         'teams' => byline_sports_team_settings_url(),
     ];
 }
@@ -245,6 +245,8 @@ function byline_admin_native_urls(): array
         'authors' => admin_url('users.php'),
         'teams' => byline_sports_team_settings_url(),
         'legacyTeams' => byline_admin_page_url(BYLINE_ADMIN_LEGACY_TEAMS_PAGE),
+        'polls' => byline_admin_polls_url(),
+        'legacyPolls' => byline_admin_page_url(BYLINE_ADMIN_POLLS_PAGE),
         'games' => admin_url(byline_sports_menu_parent()),
         'sportsImport' => admin_url(byline_sports_menu_parent() . '&page=wwh-sports-import'),
         'sportsExport' => admin_url(byline_sports_menu_parent() . '&page=wwh-sports-export'),
@@ -305,8 +307,8 @@ function byline_admin_user_landing_url(): string
         return byline_admin_page_url(BYLINE_ADMIN_INTEGRATIONS_PAGE);
     }
 
-    if (current_user_can('edit_posts') && byline_admin_feature_enabled('polls')) {
-        return byline_admin_page_url(BYLINE_ADMIN_POLLS_PAGE);
+    if (current_user_can('edit_byline_polls') && byline_admin_feature_enabled('polls')) {
+        return byline_admin_polls_url();
     }
 
     if (current_user_can('edit_posts') && byline_admin_feature_enabled('sports')) {
@@ -335,10 +337,6 @@ function byline_render_admin_app(): void
         wp_die(esc_html__('Sorry, you are not allowed to manage this Byline screen.', 'weekly-wildcat-headless'));
     }
 
-    if ($page === BYLINE_ADMIN_POLLS_PAGE && !byline_admin_feature_enabled('polls')) {
-        wp_die(esc_html__('The Polls module is not enabled for this publication.', 'weekly-wildcat-headless'));
-    }
-
     echo '<div class="wrap"><div id="byline-admin-root"></div></div>';
 }
 
@@ -352,7 +350,6 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         BYLINE_ADMIN_THEME_PAGE,
         BYLINE_ADMIN_INTEGRATIONS_PAGE,
         BYLINE_ADMIN_SETTINGS_PAGE,
-        BYLINE_ADMIN_POLLS_PAGE,
     ];
 
     if (!in_array($page, $app_pages, true)) {

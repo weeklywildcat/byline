@@ -23,8 +23,23 @@ require_once __DIR__ . '/includes/core/diagnostics.php';
 require_once __DIR__ . '/includes/content/pages.php';
 require_once __DIR__ . '/includes/admin/app.php';
 
+// Polls are WordPress-native content with their own vote table. WordPress is
+// the only datastore for poll definitions, lifecycle, and votes.
+require_once __DIR__ . '/includes/polls/schema.php';
+require_once __DIR__ . '/includes/polls/votes.php';
+require_once __DIR__ . '/includes/polls/voter.php';
+require_once __DIR__ . '/includes/polls/post-type.php';
+require_once __DIR__ . '/includes/polls/model.php';
+require_once __DIR__ . '/includes/polls/rest.php';
+require_once __DIR__ . '/includes/polls/admin.php';
+require_once __DIR__ . '/includes/polls/migration.php';
+require_once __DIR__ . '/includes/polls/cli.php';
+
 register_activation_hook(__FILE__, 'byline_add_administrator_capabilities');
 register_activation_hook(__FILE__, 'byline_seed_publication_config');
+register_activation_hook(__FILE__, 'byline_poll_install_schema');
+register_activation_hook(__FILE__, 'byline_poll_add_role_capabilities');
+register_activation_hook(__FILE__, 'byline_poll_ensure_signing_secret');
 
 const WWH_CONTRIBUTOR_COOKIE = 'wwh_contributor_seen';
 

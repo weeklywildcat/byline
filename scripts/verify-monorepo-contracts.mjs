@@ -29,6 +29,22 @@ for (const legacyContract of [
   if (!pluginSource.includes(legacyContract)) throw new Error(`Legacy storage/API contract changed: ${legacyContract}`);
 }
 
+// Polls are WordPress-owned storage behind a thin host proxy. The published
+// frontend must carry no poll database binding and no poll signing secret.
+const wranglerConfig = await readFile("apps/web/wrangler.jsonc", "utf8");
+for (const retired of ["d1_databases", "POLLS_DB", "POLL_COOKIE_SECRET", "VOTER_COOKIE_SECRET"]) {
+  if (wranglerConfig.includes(retired)) {
+    throw new Error(`The public Worker must not declare ${retired}; WordPress is the poll datastore.`);
+  }
+}
+
+const workerSource = await readFile("apps/web/src/worker.js", "utf8");
+for (const retired of ["POLLS_DB", "poll_votes", "poll_options", "voter_key", "SELECT ", "INSERT "]) {
+  if (workerSource.includes(retired)) {
+    throw new Error(`The public Worker must not reimplement poll storage (${retired}).`);
+  }
+}
+
 const studioSource = await readFile("wordpress-plugin/src/studio.tsx", "utf8");
 if (/https?:\/\/|NEXT_PUBLIC_SITE_URL|NEXT_PUBLIC_WP_API_URL/.test(studioSource)) {
   throw new Error("Studio must not load or depend on the public frontend.");
@@ -43,7 +59,10 @@ const forbiddenPublicValues = [
   "BYLINE_DISCORD_CLIENT_SECRET",
   "deployHookUrl",
   "clientSecret",
-  "wpNonce"
+  "wpNonce",
+  "POLL_COOKIE_SECRET",
+  "VOTER_COOKIE_SECRET",
+  "byline_poll_signing_secret"
 ];
 for (const file of await textFiles(outputRoot)) {
   const contents = await readFile(file, "utf8");

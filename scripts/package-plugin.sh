@@ -8,7 +8,19 @@ archive="$release_root/weekly-wildcat-headless.zip"
 stage_root="$(mktemp -d)"
 trap 'rm -rf "$stage_root"' EXIT
 
-for required_file in weekly-wildcat-headless.php build/index.js build/index.asset.php build/index.css build/style-index.css; do
+poll_files=(
+  includes/polls/schema.php
+  includes/polls/votes.php
+  includes/polls/voter.php
+  includes/polls/post-type.php
+  includes/polls/model.php
+  includes/polls/rest.php
+  includes/polls/admin.php
+  includes/polls/migration.php
+  includes/polls/cli.php
+)
+
+for required_file in weekly-wildcat-headless.php build/index.js build/index.asset.php build/index.css build/style-index.css "${poll_files[@]}"; do
   test -f "$plugin_root/$required_file"
 done
 
@@ -49,6 +61,14 @@ archive_files="$(unzip -Z1 "$archive")"
 grep -qx 'weekly-wildcat-headless/weekly-wildcat-headless.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.asset.php' <<<"$archive_files"
+
+# Polls are WordPress-owned storage now, so the whole poll module must ship.
+for poll_file in "${poll_files[@]}"; do
+  if ! grep -qx "weekly-wildcat-headless/$poll_file" <<<"$archive_files"; then
+    echo "Plugin archive is missing required poll code $poll_file." >&2
+    exit 1
+  fi
+done
 
 main_plugin_files="$(grep -Ec '(^|/)weekly-wildcat-headless\.php$' <<<"$archive_files")"
 if [[ "$main_plugin_files" -ne 1 ]]; then

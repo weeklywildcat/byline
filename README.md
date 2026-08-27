@@ -69,6 +69,11 @@ Next build. Fixture/CI builds can use `BYLINE_PUBLICATION_FILE`,
 slashes, and unoptimized images. The result is `apps/web/out/`; it includes safe
 publication/design manifests and requires no public Byline server.
 
+Polls are the only runtime state the published site reads. WordPress owns poll
+definitions and vote records; `apps/web/src/worker.js` is a thin same-origin
+proxy from the relative `/api/polls/*` contract to `/byline/v1/polls/*`. It has
+no database binding. See [docs/polls.md](docs/polls.md).
+
 The North Star acceptance command builds a second publication from local
 fixtures and scans HTML, JSON, and XML for Weekly Wildcat identity, theme, or
 disabled-module leakage.
@@ -112,6 +117,7 @@ ZIP.
 ## Architecture and extension points
 
 - [Architecture](docs/architecture.md)
+- [Polls: WordPress storage, REST, proxy, and D1 migration](docs/polls.md)
 - [Extension contracts](docs/extensions.md)
 - [Updater bridge and retirement criteria](docs/updater-transition.md)
 - [Legacy compatibility contracts](docs/migration/current-contracts.md)
