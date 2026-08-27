@@ -18,7 +18,9 @@ import {
 } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, getNewsArticleSchema, serializeJsonLd } from "@/lib/seo";
+import { requireBuildData } from "@/lib/build-data";
 import { getPublicationConfig } from "@/lib/publication";
+import { BYLINE_EMPTY_ROUTE_SLUG, isBylineEmptyRouteSlug, withEmptyRouteFallback } from "@/lib/static-params";
 import { getSportsGameById } from "@/lib/headless";
 import {
   getAllPosts,
@@ -58,10 +60,12 @@ type ArticlePageProps = {
 export const dynamicParams = false;
 const WORDS_PER_MINUTE = 225;
 
+// A publication with no published, visible posts must still produce a buildable
+// article route. getAllPosts() throws on a CMS failure rather than returning [].
 export async function generateStaticParams() {
-  const posts = await getAllPosts();
+  const posts = await requireBuildData("/wp-json/wp/v2/posts", getAllPosts);
 
-  return posts.filter(isVisibleContentPost).flatMap((post) => {
+  const params = posts.filter(isVisibleContentPost).flatMap((post) => {
     const route = getPostRouteParts(post);
 
     return route
@@ -76,10 +80,23 @@ export async function generateStaticParams() {
         ]
       : [];
   });
+
+  return withEmptyRouteFallback(params, {
+    segment: BYLINE_EMPTY_ROUTE_SLUG,
+    month: BYLINE_EMPTY_ROUTE_SLUG,
+    day: BYLINE_EMPTY_ROUTE_SLUG,
+    category: BYLINE_EMPTY_ROUTE_SLUG,
+    articleSlug: BYLINE_EMPTY_ROUTE_SLUG
+  });
 }
 
 export async function generateMetadata({ params }: ArticlePageProps): Promise<Metadata> {
   const { articleSlug } = await params;
+
+  if (isBylineEmptyRouteSlug(articleSlug)) {
+    return { title: "Not found", robots: { index: false, follow: false } };
+  }
+
   const post = await getPostBySlug(articleSlug);
 
   if (!post) {
@@ -265,6 +282,9 @@ function AboutWriter({
 
 export default async function ArticlePage({ params }: ArticlePageProps) {
   const routeParams = await params;
+
+  if (isBylineEmptyRouteSlug(routeParams.articleSlug)) notFound();
+
   const [post, allPosts] = await Promise.all([getPostBySlug(routeParams.articleSlug), getAllPosts()]);
 
   if (!post) {

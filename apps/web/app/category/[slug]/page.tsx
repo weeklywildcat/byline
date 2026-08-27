@@ -5,7 +5,9 @@ import { StoryTeaser } from "@/components/StoryTeaser";
 import { filterVisibleContentPosts, isHiddenCategory } from "@/lib/content";
 import { decodeHtml, stripHtml } from "@/lib/format";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
+import { requireBuildData } from "@/lib/build-data";
 import { getPublicationConfig } from "@/lib/publication";
+import { BYLINE_EMPTY_ROUTE_SLUG, isBylineEmptyRouteSlug, withEmptyRouteFallback } from "@/lib/static-params";
 import { getAllCategories, getCategoryBySlug, getPostsByCategory } from "@/lib/wordpress";
 
 type CategoryPageProps = {
@@ -17,16 +19,26 @@ type CategoryPageProps = {
 export const dynamicParams = false;
 const publication = getPublicationConfig();
 
+// A publication whose categories are all hidden (or which has none yet) still
+// needs one buildable route under `output: export`.
 export async function generateStaticParams() {
-  const categories = await getAllCategories();
+  const categories = await requireBuildData("/wp-json/wp/v2/categories", getAllCategories);
 
-  return categories.filter((category) => !isHiddenCategory(category)).map((category) => ({
-    slug: category.slug
-  }));
+  return withEmptyRouteFallback(
+    categories.filter((category) => !isHiddenCategory(category)).map((category) => ({
+      slug: category.slug
+    })),
+    { slug: BYLINE_EMPTY_ROUTE_SLUG }
+  );
 }
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
+
+  if (isBylineEmptyRouteSlug(slug)) {
+    return { title: "Not found", robots: { index: false, follow: false } };
+  }
+
   const category = await getCategoryBySlug(slug);
 
   if (!category) {
@@ -44,6 +56,9 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
+
+  if (isBylineEmptyRouteSlug(slug)) notFound();
+
   const category = await getCategoryBySlug(slug);
 
   if (!category) {

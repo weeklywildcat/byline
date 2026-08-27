@@ -226,6 +226,15 @@ function weeklyWildcatHeadlessFixture<T>(path: string): T {
   return [] as T;
 }
 
+// Shape-correct empty payloads for a publication with no sports data at all.
+function emptyHeadlessPayload<T>(path: string): T {
+  if (path === "/sports-games/facets") {
+    return { years: [], sports: [], summaries: {} } as T;
+  }
+
+  return [] as T;
+}
+
 function getHeadlessApiUrl() {
   return getWordPressApiUrl().replace(/\/wp\/v2$/, "/weekly-wildcat/v1");
 }
@@ -241,7 +250,10 @@ async function headlessFetchPage<T>(path: string, query: Record<string, QueryVal
     return { data: weeklyWildcatHeadlessFixture<T>(path), totalPages: 1 };
   }
   if (process.env.BYLINE_CONTENT_MODE === "empty" || process.env.BYLINE_CONTENT_MODE === "north-star-fixture") {
-    return { data: [] as T, totalPages: 1 };
+    // Not every headless endpoint is collection-shaped. Returning `[]` for an
+    // object-shaped endpoint (such as the schedule facets) produced a malformed
+    // response that crashed prerendering rather than rendering an empty archive.
+    return { data: emptyHeadlessPayload<T>(path), totalPages: 1 };
   }
   const url = new URL(`${getHeadlessApiUrl()}/${path.replace(/^\//, "")}`);
 

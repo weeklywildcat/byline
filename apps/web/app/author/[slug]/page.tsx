@@ -5,7 +5,9 @@ import { StoryTeaser } from "@/components/StoryTeaser";
 import { filterVisibleContentPosts, getPrimaryPublicCategory, getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, stripHtml } from "@/lib/format";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
+import { requireBuildData } from "@/lib/build-data";
 import { getPublicationConfig } from "@/lib/publication";
+import { BYLINE_EMPTY_ROUTE_SLUG, isBylineEmptyRouteSlug, withEmptyRouteFallback } from "@/lib/static-params";
 import {
   getAllAuthors,
   getAuthorBySlug,
@@ -26,16 +28,25 @@ type AuthorPageProps = {
 export const dynamicParams = false;
 const publication = getPublicationConfig();
 
+// A brand-new publication can have zero published authors; that must still build.
 export async function generateStaticParams() {
-  const authors = await getAllAuthors();
+  const authors = await requireBuildData("/wp-json/wp/v2/users", getAllAuthors);
 
-  return authors.map((author) => ({
-    slug: author.slug
-  }));
+  return withEmptyRouteFallback(
+    authors.map((author) => ({
+      slug: author.slug
+    })),
+    { slug: BYLINE_EMPTY_ROUTE_SLUG }
+  );
 }
 
 export async function generateMetadata({ params }: AuthorPageProps): Promise<Metadata> {
   const { slug } = await params;
+
+  if (isBylineEmptyRouteSlug(slug)) {
+    return { title: "Not found", robots: { index: false, follow: false } };
+  }
+
   const author = await getAuthorBySlug(slug);
 
   if (!author) {
@@ -101,6 +112,9 @@ function getFirstBylineLabel(posts: WordPressPost[]) {
 
 export default async function AuthorPage({ params }: AuthorPageProps) {
   const { slug } = await params;
+
+  if (isBylineEmptyRouteSlug(slug)) notFound();
+
   const author = await getAuthorBySlug(slug);
 
   if (!author) {
