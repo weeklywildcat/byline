@@ -1,0 +1,98 @@
+import type { ReactNode } from "react";
+import { StoryCard } from "./StoryCard";
+import type { StoryView } from "./story-view";
+
+// The resolved lead package: everything the renderer needs, already selected and
+// flattened. No CMS types, no fetching, no story selection. This is the single
+// model that both the Next static export and Studio's preview render.
+export type ResolvedLeadPackage = {
+  packageId: string;
+  lead: StoryView | null;
+  latest: {
+    heading: string;
+    stories: StoryView[];
+    showBylines: boolean;
+  };
+  utility: {
+    // Already reconciled against the publication's enabled modules, so the
+    // renderer never has to know what a feature flag is.
+    poll: boolean;
+    calendar: boolean;
+  };
+  presentation: {
+    showDeck: boolean;
+    opinionTreatment: boolean;
+  };
+  fallbackAuthorName: string;
+  emptyMessage: string;
+};
+
+export type LeadPackageProps = {
+  package: ResolvedLeadPackage;
+  // The two utility modules are host-supplied: the poll is client-interactive and
+  // the calendar's entries come from a different endpoint than stories do. Both
+  // hosts pass the shared PollCard/ThisWeekCard components.
+  pollSlot?: ReactNode;
+  calendarSlot?: ReactNode;
+  // Production mounts a small client script that trims the rail to the lead's
+  // height. Studio has no equivalent, so it is injected rather than assumed.
+  railLimiterSlot?: ReactNode;
+};
+
+// Extracted from apps/web/app/page.tsx. Class names, element order, ARIA
+// attributes and the data- hooks are reproduced exactly: the Weekly Wildcat
+// stylesheet and the rail limiter script both depend on them.
+export function LeadPackage({ package: resolved, pollSlot, calendarSlot, railLimiterSlot }: LeadPackageProps) {
+  const { lead, latest, utility, presentation } = resolved;
+
+  if (!lead) {
+    return <p className="empty-state">{resolved.emptyMessage}</p>;
+  }
+
+  const hasLatest = latest.stories.length > 0;
+  const hasUtility = utility.poll || utility.calendar;
+
+  return (
+    <section
+      className={hasLatest ? "top-stories" : "top-stories top-stories-single"}
+      aria-labelledby="lead-heading"
+    >
+      <div className="top-stories-layout" data-homepage-top-stories>
+        {railLimiterSlot}
+        <div className="live-lead" data-homepage-lead>
+          <StoryCard
+            story={lead}
+            variant="lead"
+            showDeck={presentation.showDeck}
+            priority
+            fallbackAuthorName={resolved.fallbackAuthorName}
+          />
+        </div>
+
+        {hasLatest ? (
+          <aside className="top-stories-rail" aria-labelledby="right-now-heading">
+            <h2 id="right-now-heading">{latest.heading}</h2>
+            <div className="right-now-list">
+              {latest.stories.map((story) => (
+                <StoryCard
+                  key={story.id}
+                  story={story}
+                  variant="briefing"
+                  showAuthor={latest.showBylines}
+                  fallbackAuthorName={resolved.fallbackAuthorName}
+                />
+              ))}
+            </div>
+          </aside>
+        ) : null}
+
+        {hasUtility ? (
+          <aside className="top-stories-left-rail" aria-label="Poll and school calendar">
+            {utility.poll ? pollSlot : null}
+            {utility.calendar ? calendarSlot : null}
+          </aside>
+        ) : null}
+      </div>
+    </section>
+  );
+}

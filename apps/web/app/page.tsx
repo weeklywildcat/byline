@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LeadPackage, ThisWeekCard as SharedThisWeekCard } from "@byline/ui";
 import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
 import { DesignHomepage } from "@/components/DesignHomepage";
 import { HomepageStory } from "@/components/HomepageStory";
@@ -16,7 +17,12 @@ import {
   type SchoolEvent,
   type SportsGame
 } from "@/lib/headless";
-import { resolveWeeklyWildcatHomepage } from "@/lib/homepage-selection";
+import { getHomeDesignDocument, findLeadPackage } from "@/lib/homepage-design";
+import {
+  resolveCompatibilityHomepageSelection,
+  resolveLeadPackage,
+  toCalendarEntries
+} from "@/lib/homepage-packages";
 import { getPublishedDesign } from "@/lib/designs";
 import { resolvePublishedDesignBlocks } from "@/lib/design-resolution";
 import { getPublicationConfig } from "@/lib/publication";
@@ -58,7 +64,13 @@ export default async function HomePage() {
   const posts = filterPublicHomepagePosts(allPosts);
   const publishedHomeDesign = getPublishedDesign("home");
 
-  if (publishedHomeDesign && publishedHomeDesign.revision > 0) {
+  // Published schema 1 designs render here, through the legacy whole-page
+  // renderer, and are deliberately NOT migrated on read: only story-lead has a
+  // v2 equivalent today, so converting a live v1 homepage would silently drop
+  // every other section. Studio migrates v1 on load; the published page does
+  // not. A published v2 design takes the package path below.
+  // This branch goes away once the remaining packages exist.
+  if (publishedHomeDesign && publishedHomeDesign.revision > 0 && publishedHomeDesign.schemaVersion === 1) {
     const designBlocks = await resolvePublishedDesignBlocks(publishedHomeDesign.document.layout.content, posts);
     return (
       <>
@@ -72,6 +84,7 @@ export default async function HomePage() {
     );
   }
 
+  const selection = resolveCompatibilityHomepageSelection(posts);
   const {
     athleteSpotlightPost,
     leadPost,
@@ -80,9 +93,8 @@ export default async function HomePage() {
     opinionPosts,
     fieldPosts,
     morePosts,
-    rightNowPosts,
     briefPosts
-  } = resolveWeeklyWildcatHomepage(posts);
+  } = selection;
   const opinionLeadPost = opinionPosts[0] ?? null;
   const opinionRailPosts = opinionPosts.slice(1, 3);
   const fieldLeadPost = fieldPosts[0] ?? null;
@@ -99,6 +111,24 @@ export default async function HomePage() {
       sportsSchedule.upcomingGames.length > 0);
   const leadHasOpinionTreatment = Boolean(leadPost && getPostSettings(leadPost)?.homepageOpinionTreatment);
 
+  // The lead package is resolved from the design document. It consumes the same
+  // ordered selection the legacy sections below use, so extracting it cannot
+  // change which stories any other package receives.
+  const homeDesign = getHomeDesignDocument();
+  const leadPackage = findLeadPackage(homeDesign);
+  const resolvedLead = resolveLeadPackage({
+    packageId: leadPackage?.id ?? "home-lead",
+    props: leadPackage?.props ?? {},
+    posts,
+    selection,
+    features: {
+      polls: publication.features.polls,
+      events: publication.features.events,
+      sports: publication.features.sports
+    }
+  });
+  const leadCalendarLimit = resolvedLead.utility.calendar ? 3 : 0;
+
   return (
     <main className={leadHasOpinionTreatment ? "live-home-shell live-home-shell-opinion-lead" : "live-home-shell"}>
       <script
@@ -106,45 +136,21 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteSchema) }}
       />
-      {leadPost ? (
-        <section
-          className={rightNowPosts.length > 0 ? "top-stories" : "top-stories top-stories-single"}
-          aria-labelledby="lead-heading"
-        >
-          <div className="top-stories-layout" data-homepage-top-stories>
-            <HomepageHeroRailLimiter />
-            <div className="live-lead" data-homepage-lead>
-              <HomepageStory
-                post={leadPost}
-                variant="lead"
-                homepageTreatment={leadHasOpinionTreatment ? "opinion" : undefined}
-                showDeck
-                priority
-              />
-            </div>
-
-            {rightNowPosts.length > 0 ? (
-              <aside className="top-stories-rail" aria-labelledby="right-now-heading">
-                <h2 id="right-now-heading">The Latest</h2>
-                <div className="right-now-list">
-                  {rightNowPosts.map((post) => (
-                    <HomepageStory key={post.id} post={post} variant="briefing" showAuthor />
-                  ))}
-                </div>
-              </aside>
-            ) : null}
-
-            <aside className="top-stories-left-rail" aria-label="Poll and school calendar">
-              {publication.features.polls ? <PollWidget /> : null}
-              {publication.features.events || publication.features.sports ? (
-                <ThisWeekCard maxVisibleItems={3} schoolEvents={sportsSchedule.schoolEvents} sportsGames={sportsSchedule.upcomingGames} />
-              ) : null}
-            </aside>
-          </div>
-        </section>
-      ) : (
-        <p className="empty-state">No published posts are available yet.</p>
-      )}
+      {/* Design-driven: the lead package now renders through the shared
+          renderer that Studio also uses. The sections below are still legacy
+          and will be extracted in later phases. */}
+      <LeadPackage
+        package={resolvedLead}
+        railLimiterSlot={<HomepageHeroRailLimiter />}
+        pollSlot={<PollWidget />}
+        calendarSlot={
+          <SharedThisWeekCard
+            entries={toCalendarEntries(sportsSchedule.schoolEvents, sportsSchedule.upcomingGames, leadCalendarLimit)}
+            heading="At NSHS"
+            scheduleHref="/sports/schedule/"
+          />
+        }
+      />
 
       {briefPosts.length > 0 ? (
         <section className="the-brief" aria-labelledby="brief-heading">

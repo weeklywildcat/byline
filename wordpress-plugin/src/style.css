@@ -304,3 +304,93 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Studio: give the publication the majority of the viewport -------------
+   The default screen stacked the WordPress admin menu, the Byline wrap, Puck's
+   block sidebar and its property inspector around a narrow centre column, so
+   the actual publication got very little room. The shell now breaks out of the
+   admin wrap's padding and both Puck sidebars can be collapsed, which leaves the
+   preview as the dominant surface. */
+.byline-studio-shell.byline-studio-wide {
+  margin-left: -20px;
+  margin-right: -20px;
+  min-height: calc(100vh - 150px);
+}
+
+.byline-studio-panel-toggles {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.byline-studio-panel-toggles .components-button.is-pressed {
+  background: #1e1e1e;
+  color: #fff;
+}
+
+/* Puck renders its own chrome; these collapse it without forking the editor. */
+.byline-studio-shell[data-byline-outline="collapsed"] [class*="PuckLayout-leftSideBar"] {
+  display: none;
+}
+
+.byline-studio-shell[data-byline-inspector="collapsed"] [class*="PuckLayout-rightSideBar"] {
+  display: none;
+}
+
+/* Puck sizes its grid from these, so the preview only actually reclaims the
+   space if the tracks collapse too. */
+.byline-studio-shell[data-byline-outline="collapsed"] [class*="PuckLayout-inner"] {
+  --puck-side-bar-width: 0px;
+  grid-template-columns: 0 1fr var(--puck-side-bar-width-right, 320px);
+}
+
+.byline-studio-shell[data-byline-inspector="collapsed"] [class*="PuckLayout-inner"] {
+  --puck-side-bar-width-right: 0px;
+  grid-template-columns: var(--puck-side-bar-width, 320px) 1fr 0;
+}
+
+.byline-studio-shell[data-byline-outline="collapsed"][data-byline-inspector="collapsed"] [class*="PuckLayout-inner"] {
+  grid-template-columns: 0 1fr 0;
+}
+
+.byline-preview-loading {
+  color: #646970;
+  font-style: italic;
+  padding: 24px;
+}
+
+/* Manual story selection: an ordered list an editor can reorder, rather than a
+   comma-separated list of WordPress post IDs. */
+.byline-manual-story-list ol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: decimal inside;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.byline-manual-story-list li {
+  align-items: center;
+  border: 1px solid var(--byline-admin-border);
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 6px 8px;
+}
+
+.byline-manual-story-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.byline-manual-story-empty {
+  color: #646970;
+  margin: 0 0 10px;
+}
+
+.byline-migration-warnings {
+  list-style: disc outside;
+  margin: 8px 0 0 18px;
+}

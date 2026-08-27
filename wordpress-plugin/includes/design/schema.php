@@ -129,6 +129,108 @@ function byline_validate_story_query($query): bool
     return !$source_key || (is_int($query[$source_key] ?? null) && $query[$source_key] > 0);
 }
 
+function byline_design_package_types(): array
+{
+    // Semantic schema 2 packages. A type only appears here once a resolver and a
+    // renderer exist for it on the frontend.
+    return ['lead-package'];
+}
+
+// Schema 2 splits "which stories" from "how many", so a source carries no limit.
+function byline_validate_story_source($source): bool
+{
+    if (!is_array($source) || !is_string($source['type'] ?? null)) {
+        return false;
+    }
+    if ($source['type'] === 'manual') {
+        if (!is_array($source['storyIds'] ?? null) || count($source['storyIds']) > 50) {
+            return false;
+        }
+        foreach ($source['storyIds'] as $story_id) {
+            if (!is_int($story_id) || $story_id <= 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+    if (!in_array($source['type'], ['latest', 'sticky', 'category', 'tag', 'author'], true)) {
+        return false;
+    }
+    $source_key = ['category' => 'categoryId', 'tag' => 'tagId', 'author' => 'authorId'][$source['type']] ?? null;
+    return !$source_key || (is_int($source[$source_key] ?? null) && $source[$source_key] > 0);
+}
+
+/**
+ * Validates a schema 2 design document.
+ *
+ * Storage accepts both schema 1 and schema 2 while the homepage is being moved
+ * package by package: schema 1 designs still exist and must remain loadable so
+ * they can be migrated rather than discarded. This is transitional, not a second
+ * permanent schema -- the advertised BYLINE_DESIGN_SCHEMA_VERSION stays at 1
+ * until every package has been extracted and schema 1 can be dropped in one
+ * coordinated release.
+ */
+function byline_validate_design_document_v2(array $document, string $template)
+{
+    if (!is_array($document['packages'] ?? null)) {
+        return new WP_Error('byline_invalid_design_layout', __('The design has no package list.', 'weekly-wildcat-headless'), ['status' => 400]);
+    }
+    if (count($document['packages']) > BYLINE_DESIGN_MAX_BLOCKS) {
+        return new WP_Error('byline_invalid_design_layout', __('The design contains too many packages.', 'weekly-wildcat-headless'), ['status' => 400]);
+    }
+
+    // Preserved schema 1 blocks travel with a schema 2 document so a migrated
+    // design does not lose sections that have no package yet. They are inert --
+    // never rendered, never edited -- but they are still persisted data, so they
+    // are held to the same safety rules as package props.
+    if (array_key_exists('legacy', $document)) {
+        $legacy = $document['legacy'];
+        if (!is_array($legacy)
+            || !is_array($legacy['unconvertedBlocks'] ?? null)
+            || count($legacy['unconvertedBlocks']) > BYLINE_DESIGN_MAX_BLOCKS
+            || !byline_design_value_is_safe($legacy)) {
+            return new WP_Error('byline_unsafe_design_props', __('The design contains unsafe or malformed legacy data.', 'weekly-wildcat-headless'), ['status' => 400]);
+        }
+        foreach ($legacy['unconvertedBlocks'] as $block) {
+            if (!is_array($block) || !is_string($block['type'] ?? null) || !is_array($block['props'] ?? null)) {
+                return new WP_Error('byline_unsafe_design_props', __('The design contains malformed legacy data.', 'weekly-wildcat-headless'), ['status' => 400]);
+            }
+        }
+    }
+
+    $seen_ids = [];
+    foreach ($document['packages'] as $design_package) {
+        if (!is_array($design_package)
+            || !is_string($design_package['id'] ?? null)
+            || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $design_package['id']) !== 1) {
+            return new WP_Error('byline_invalid_design_package', __('A design package has an invalid identifier.', 'weekly-wildcat-headless'), ['status' => 400]);
+        }
+        if (in_array($design_package['id'], $seen_ids, true)) {
+            return new WP_Error('byline_invalid_design_package', __('A design package identifier is repeated.', 'weekly-wildcat-headless'), ['status' => 400]);
+        }
+        $seen_ids[] = $design_package['id'];
+
+        if (!is_string($design_package['type'] ?? null)
+            || !in_array($design_package['type'], byline_design_package_types(), true)) {
+            return new WP_Error('byline_unknown_design_block', __('The design contains an unsupported package.', 'weekly-wildcat-headless'), ['status' => 400]);
+        }
+        if (!is_array($design_package['props'] ?? null) || !byline_design_value_is_safe($design_package['props'])) {
+            return new WP_Error('byline_unsafe_design_props', __('The design contains unsafe or malformed package properties.', 'weekly-wildcat-headless'), ['status' => 400]);
+        }
+
+        foreach (['lead', 'latest'] as $slot) {
+            $config = $design_package['props'][$slot] ?? null;
+            if (is_array($config)
+                && array_key_exists('source', $config)
+                && !byline_validate_story_source($config['source'])) {
+                return new WP_Error('byline_invalid_story_query', __('A package contains an invalid content source.', 'weekly-wildcat-headless'), ['status' => 400]);
+            }
+        }
+    }
+
+    return true;
+}
+
 function byline_validate_design_document($document, string $template)
 {
     if (!is_array($document) || !byline_is_design_template($template)) {
@@ -138,11 +240,22 @@ function byline_validate_design_document($document, string $template)
     if (!is_string($encoded) || strlen($encoded) > BYLINE_DESIGN_MAX_BYTES) {
         return new WP_Error('byline_design_too_large', __('The design document is too large.', 'weekly-wildcat-headless'), ['status' => 413]);
     }
-    if ((int) ($document['schemaVersion'] ?? 0) !== BYLINE_DESIGN_SCHEMA_VERSION
+    // Storage reads both schemas during the transition: 1 because stored designs
+    // still exist, 2 because that is what Studio now writes. This is separate
+    // from BYLINE_DESIGN_ADVERTISED_SCHEMA_VERSION, which is the compatibility
+    // number frontends check.
+    $schema_version = (int) ($document['schemaVersion'] ?? 0);
+    if (!in_array($schema_version, [1, 2], true)
         || ($document['template'] ?? null) !== $template
         || !is_string($document['theme'] ?? null)
         || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $document['theme']) !== 1) {
         return new WP_Error('byline_invalid_design_identity', __('The design schema, template, or theme is invalid.', 'weekly-wildcat-headless'), ['status' => 400]);
+    }
+
+    // Schema 2 carries semantic packages and no editor block; it is validated
+    // separately rather than being forced through the schema 1 layout checks.
+    if ($schema_version === 2) {
+        return byline_validate_design_document_v2($document, $template);
     }
 
     $editor = is_array($document['editor'] ?? null) ? $document['editor'] : [];

@@ -141,4 +141,94 @@ if (!$oversized_result instanceof WP_Error || $oversized_result->code !== 'bylin
     exit(1);
 }
 
+// --- schema 2 ---------------------------------------------------------------
+// Storage accepts schema 2 alongside schema 1 while the homepage is migrated
+// package by package. These pin the v2 validation rules.
+
+$v2 = [
+    'schemaVersion' => 2,
+    'template' => 'home',
+    'theme' => 'weekly-wildcat',
+    'packages' => [[
+        'id' => 'home-lead',
+        'type' => 'lead-package',
+        'props' => [
+            'lead' => ['source' => ['type' => 'sticky']],
+            'latest' => ['source' => ['type' => 'latest'], 'limit' => 4, 'heading' => 'The Latest', 'showBylines' => true],
+            'utility' => ['poll' => true, 'calendar' => true, 'calendarLimit' => 3],
+            'presentation' => ['showDeck' => true, 'opinionTreatment' => 'auto'],
+        ],
+    ]],
+];
+
+if (byline_validate_design_document($v2, 'home') !== true) {
+    fwrite(STDERR, "A valid schema 2 document was rejected.\n");
+    exit(1);
+}
+
+$v2_unknown = $v2;
+$v2_unknown['packages'][0]['type'] = 'mystery-package';
+$v2_unknown_result = byline_validate_design_document($v2_unknown, 'home');
+if (!$v2_unknown_result instanceof WP_Error || $v2_unknown_result->code !== 'byline_unknown_design_block') {
+    fwrite(STDERR, "An unknown schema 2 package was not rejected.\n");
+    exit(1);
+}
+
+$v2_duplicate = $v2;
+$v2_duplicate['packages'][] = $v2['packages'][0];
+$v2_duplicate_result = byline_validate_design_document($v2_duplicate, 'home');
+if (!$v2_duplicate_result instanceof WP_Error || $v2_duplicate_result->code !== 'byline_invalid_design_package') {
+    fwrite(STDERR, "A repeated schema 2 package id was not rejected.\n");
+    exit(1);
+}
+
+$v2_bad_source = $v2;
+$v2_bad_source['packages'][0]['props']['lead']['source'] = ['type' => 'category'];
+$v2_bad_source_result = byline_validate_design_document($v2_bad_source, 'home');
+if (!$v2_bad_source_result instanceof WP_Error || $v2_bad_source_result->code !== 'byline_invalid_story_query') {
+    fwrite(STDERR, "An invalid schema 2 story source was not rejected.\n");
+    exit(1);
+}
+
+// A schema 2 source must not smuggle a v1 unbounded limit back in.
+$v2_manual = $v2;
+$v2_manual['packages'][0]['props']['lead']['source'] = ['type' => 'manual', 'storyIds' => array_fill(0, 51, 1)];
+$v2_manual_result = byline_validate_design_document($v2_manual, 'home');
+if (!$v2_manual_result instanceof WP_Error || $v2_manual_result->code !== 'byline_invalid_story_query') {
+    fwrite(STDERR, "An oversized manual schema 2 selection was not rejected.\n");
+    exit(1);
+}
+
+$v2_unsupported = $v2;
+$v2_unsupported['schemaVersion'] = 3;
+$v2_unsupported_result = byline_validate_design_document($v2_unsupported, 'home');
+if (!$v2_unsupported_result instanceof WP_Error || $v2_unsupported_result->code !== 'byline_invalid_design_identity') {
+    fwrite(STDERR, "An unsupported schema version was not rejected.\n");
+    exit(1);
+}
+
+// Preserved schema 1 blocks must round-trip through storage, and must be held to
+// the same safety rules as package props.
+$v2_legacy = $v2;
+$v2_legacy['legacy'] = [
+    'schemaVersion' => 1,
+    'editor' => ['engine' => 'puck', 'version' => '0.23.0'],
+    'unconvertedBlocks' => [[
+        'type' => 'sports-scores',
+        'props' => ['id' => 'sports-scores-2', 'title' => 'Scoreboard', 'teamKey' => 'football-varsity'],
+    ]],
+];
+if (byline_validate_design_document($v2_legacy, 'home') !== true) {
+    fwrite(STDERR, "A schema 2 document carrying preserved legacy blocks was rejected.\n");
+    exit(1);
+}
+
+$v2_bad_legacy = $v2_legacy;
+$v2_bad_legacy['legacy']['unconvertedBlocks'] = [['type' => 'sports-scores']];
+$v2_bad_legacy_result = byline_validate_design_document($v2_bad_legacy, 'home');
+if (!$v2_bad_legacy_result instanceof WP_Error || $v2_bad_legacy_result->code !== 'byline_unsafe_design_props') {
+    fwrite(STDERR, "Malformed legacy data was not rejected.\n");
+    exit(1);
+}
+
 echo "Byline design schema regression passed.\n";
