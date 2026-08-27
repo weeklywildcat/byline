@@ -21,7 +21,10 @@ export function EditorialLeadPackage({ package: resolved, pollSlot, calendarSlot
   const hasUtility = utility.poll || utility.calendar;
 
   return (
-    <section className="editorial-lead" aria-labelledby="editorial-lead-heading">
+    // Same fix as the Weekly Wildcat renderer, and for a second reason here: the
+    // heading this pointed at lives inside the "has latest stories" branch, so
+    // the reference dangled whenever the strip was empty.
+    <section className="editorial-lead" aria-label="Top stories">
       <div className="editorial-lead-main">
         <StoryCard
           story={lead}
@@ -35,7 +38,7 @@ export function EditorialLeadPackage({ package: resolved, pollSlot, calendarSlot
 
       {latest.stories.length > 0 ? (
         <div className="editorial-lead-strip">
-          <h2 id="editorial-lead-heading">{latest.heading}</h2>
+          <h2>{latest.heading}</h2>
           <div className="editorial-lead-strip-items">
             {latest.stories.map((story) => (
               <StoryCard

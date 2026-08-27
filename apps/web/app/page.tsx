@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
-import { LeadPackage, ThisWeekCard as SharedThisWeekCard } from "@byline/ui";
+import { LeadPackage, SportsPackage, ThisWeekCard as SharedThisWeekCard } from "@byline/ui";
 import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
 import { DesignHomepage } from "@/components/DesignHomepage";
 import { HomepageStory } from "@/components/HomepageStory";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { PollWidget } from "@/components/PollWidget";
 import { SiteIcon } from "@/components/SiteIcon";
-import { SportsAthleteFeature } from "@/components/SportsAthleteFeature";
-import { SportsSchedulePanel } from "@/components/SportsSchedulePanel";
 import { ThisWeekCard } from "@/components/ThisWeekCard";
+import { collectPinnedStoryIds, parseSportsPackageProps, type SportsPackageProps } from "@byline/design";
 import { filterPublicHomepagePosts } from "@/lib/content";
 import {
   getRecentSportsGames,
@@ -17,12 +16,13 @@ import {
   type SchoolEvent,
   type SportsGame
 } from "@/lib/headless";
-import { getHomeDesignDocument, findLeadPackage } from "@/lib/homepage-design";
+import { getHomeDesignDocument, findLeadPackage, findSportsPackage } from "@/lib/homepage-design";
 import {
   resolveCompatibilityHomepageSelection,
   resolveLeadPackage,
   toCalendarEntries
 } from "@/lib/homepage-packages";
+import { resolveSportsPackage } from "@/lib/sports-packages";
 import { getPublishedDesign } from "@/lib/designs";
 import { resolvePublishedDesignBlocks } from "@/lib/design-resolution";
 import { getPublicationConfig } from "@/lib/publication";
@@ -44,14 +44,26 @@ export const metadata: Metadata = buildPageMetadata({
   path: "/"
 });
 
-async function getHomepageSportsSchedule() {
+// The pre-Studio homepage fetched a fixed 3 recent games and 8 upcoming ones and
+// then sliced them down to what it rendered. Now that those counts are editorial
+// settings, the fetch has to be at least as large as the package asks for --
+// while never dropping below the original sizes, so the request stays identical
+// at the default configuration and the This Week calendar, which is fed from the
+// same upcoming list, keeps exactly the entries it had.
+const BASELINE_RECENT_GAMES = 3;
+const BASELINE_UPCOMING_GAMES = 8;
+
+async function getHomepageSportsSchedule(sports: SportsPackageProps) {
   if (!publication.features.sports && !publication.features.events) {
     return { recentScores: [], upcomingGames: [], schoolEvents: [] };
   }
 
+  const recentLimit = Math.max(BASELINE_RECENT_GAMES, sports.scores.limit);
+  const upcomingLimit = Math.max(BASELINE_UPCOMING_GAMES, sports.upcoming.limit);
+
   const [recentScores, upcomingGames, schoolEvents] = await Promise.all([
-    publication.features.sports ? getRecentSportsGames(3).catch((): SportsGame[] => []) : [],
-    publication.features.sports ? getUpcomingSportsGames(8).catch((): SportsGame[] => []) : [],
+    publication.features.sports ? getRecentSportsGames(recentLimit).catch((): SportsGame[] => []) : [],
+    publication.features.sports ? getUpcomingSportsGames(upcomingLimit).catch((): SportsGame[] => []) : [],
     publication.features.events ? getSchoolEvents(12).catch((): SchoolEvent[] => []) : []
   ]);
 
@@ -59,7 +71,15 @@ async function getHomepageSportsSchedule() {
 }
 
 export default async function HomePage() {
-  const [allPosts, sportsSchedule] = await Promise.all([getAllPosts(), getHomepageSportsSchedule()]);
+  // The design document is read before the content so the sports package's
+  // configured counts can size the schedule request.
+  const homeDesign = getHomeDesignDocument();
+  const sportsPackage = findSportsPackage(homeDesign);
+  const sportsConfig = parseSportsPackageProps(sportsPackage?.props ?? {});
+  const [allPosts, sportsSchedule] = await Promise.all([
+    getAllPosts(),
+    getHomepageSportsSchedule(sportsConfig)
+  ]);
   const websiteSchema = getWebsiteSchema();
   const posts = filterPublicHomepagePosts(allPosts);
   const publishedHomeDesign = getPublishedDesign("home");
@@ -84,37 +104,25 @@ export default async function HomePage() {
     );
   }
 
-  const selection = resolveCompatibilityHomepageSelection(posts);
-  const {
-    athleteSpotlightPost,
-    leadPost,
-    inFocusPost,
-    specialCoveragePosts,
-    opinionPosts,
-    fieldPosts,
-    morePosts,
-    briefPosts
-  } = selection;
+  // Stories an editor pinned are reserved before the ordered pass runs, so the
+  // package that pinned them is the only one that can show them.
+  const selection = resolveCompatibilityHomepageSelection(posts, collectPinnedStoryIds(homeDesign));
+  // athleteSpotlightPost and fieldPosts are no longer destructured here: the
+  // sports package consumes them through the resolver. They are still claimed by
+  // the same ordered pass, in the same position, so the remaining legacy
+  // sections receive exactly the stories they did before.
+  const { leadPost, inFocusPost, specialCoveragePosts, opinionPosts, morePosts, briefPosts } = selection;
   const opinionLeadPost = opinionPosts[0] ?? null;
   const opinionRailPosts = opinionPosts.slice(1, 3);
-  const fieldLeadPost = fieldPosts[0] ?? null;
-  const fieldRailPosts = fieldPosts.slice(1, 3);
   const moreLeadPost = morePosts[0] ?? null;
   const moreRailPosts = morePosts.slice(1, 4);
   const briefLeadPost = briefPosts[0] ?? null;
   const briefRailPosts = briefPosts.slice(1);
-  const hasFieldSection =
-    publication.features.sports &&
-    (fieldPosts.length > 0 ||
-      Boolean(athleteSpotlightPost) ||
-      sportsSchedule.recentScores.length > 0 ||
-      sportsSchedule.upcomingGames.length > 0);
   const leadHasOpinionTreatment = Boolean(leadPost && getPostSettings(leadPost)?.homepageOpinionTreatment);
 
-  // The lead package is resolved from the design document. It consumes the same
-  // ordered selection the legacy sections below use, so extracting it cannot
-  // change which stories any other package receives.
-  const homeDesign = getHomeDesignDocument();
+  // Both extracted packages are resolved from the design document. They consume
+  // the same ordered selection the legacy sections below use, so extracting them
+  // cannot change which stories any other package receives.
   const leadPackage = findLeadPackage(homeDesign);
   const resolvedLead = resolveLeadPackage({
     packageId: leadPackage?.id ?? "home-lead",
@@ -128,6 +136,15 @@ export default async function HomePage() {
     }
   });
   const leadCalendarLimit = resolvedLead.utility.calendar ? 3 : 0;
+  const resolvedSports = resolveSportsPackage({
+    packageId: sportsPackage?.id ?? "home-sports",
+    props: sportsPackage?.props ?? {},
+    posts,
+    selection,
+    recentScores: sportsSchedule.recentScores,
+    upcomingGames: sportsSchedule.upcomingGames,
+    features: { sports: publication.features.sports }
+  });
 
   return (
     <main className={leadHasOpinionTreatment ? "live-home-shell live-home-shell-opinion-lead" : "live-home-shell"}>
@@ -136,9 +153,10 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteSchema) }}
       />
-      {/* Design-driven: the lead package now renders through the shared
-          renderer that Studio also uses. The sections below are still legacy
-          and will be extracted in later phases. */}
+      {/* Design-driven: the lead package renders through the shared renderer
+          that Studio also uses. The Brief, In Focus, Special Coverage, Opinion,
+          More and Newsletter below are still legacy and will be extracted in
+          later phases. */}
       <LeadPackage
         package={resolvedLead}
         railLimiterSlot={<HomepageHeroRailLimiter />}
@@ -238,37 +256,9 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      {hasFieldSection ? (
-        <section className="from-field" aria-labelledby="field-heading">
-          <div className="section-header-row">
-            <h2 id="field-heading">Sports</h2>
-            <a href="/sports/">All Sports →</a>
-          </div>
-          {fieldPosts.length > 0 || athleteSpotlightPost ? (
-            <div className="field-layout">
-              {fieldLeadPost ? (
-                <HomepageStory
-                  post={fieldLeadPost}
-                  variant="field"
-                  showDeck
-                  cleanDeck
-                  showAuthor
-                  showReadLink
-                />
-              ) : null}
-              {fieldRailPosts.length > 0 || athleteSpotlightPost ? (
-                <div className="field-rail">
-                  {fieldRailPosts.map((post) => (
-                    <HomepageStory key={post.id} post={post} variant="briefing" showAuthor />
-                  ))}
-                  {athleteSpotlightPost ? <SportsAthleteFeature post={athleteSpotlightPost} /> : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          <SportsSchedulePanel recentScores={sportsSchedule.recentScores} upcomingGames={sportsSchedule.upcomingGames} />
-        </section>
-      ) : null}
+      {/* Design-driven: the sports package renders through the shared renderer
+          that Studio also uses. */}
+      <SportsPackage package={resolvedSports} />
 
       {morePosts.length > 0 ? (
         <section className="more-weekly" aria-labelledby="more-heading">

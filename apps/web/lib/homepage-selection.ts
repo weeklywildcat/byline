@@ -83,8 +83,14 @@ export function takeDiverseUnused(
 // This is the compatibility resolver for the current Weekly Wildcat homepage.
 // It is intentionally pure so the future design resolver and Studio preview can
 // be compared against the exact ordered de-duplication behavior before replacing it.
-export function resolveWeeklyWildcatHomepage(posts: WordPressPost[]) {
-  const usedPostIds = new Set<number>();
+//
+// `reservedPostIds` are stories an editor pinned into a specific package. They
+// are seeded into the one used-story set so no other package can claim them
+// first; the pinning package then places them itself. An empty set -- which is
+// what every design without a manual source produces -- leaves the algorithm
+// byte-for-byte unchanged.
+export function resolveWeeklyWildcatHomepage(posts: WordPressPost[], reservedPostIds?: ReadonlySet<number>) {
+  const usedPostIds = new Set<number>(reservedPostIds ?? []);
   const athleteSpotlightPost = posts.find(isAthleteSpotlightPost) ?? null;
 
   if (athleteSpotlightPost) {

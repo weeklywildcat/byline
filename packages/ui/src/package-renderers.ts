@@ -1,6 +1,8 @@
 import type { ComponentType } from "react";
 import { EditorialLeadPackage } from "./EditorialLeadPackage";
+import { EditorialSportsPackage } from "./EditorialSportsPackage";
 import { LeadPackage, type LeadPackageProps } from "./LeadPackage";
+import { SportsPackage, type SportsPackageProps } from "./SportsPackage";
 
 // Maps a theme to its renderer for a semantic package.
 //
@@ -27,4 +29,24 @@ export function getLeadPackageRenderer(themeId: string): ComponentType<LeadPacka
 
 export function themeHasLeadPackageVariant(themeId: string) {
   return themeId in LEAD_PACKAGE_RENDERERS;
+}
+
+const SPORTS_PACKAGE_RENDERERS: Record<string, ComponentType<SportsPackageProps>> = {
+  "weekly-wildcat": SportsPackage,
+  editorial: EditorialSportsPackage
+};
+
+/**
+ * Returns the sports renderer for a theme.
+ *
+ * Same degradation rule as the lead package: a theme with no bespoke sports
+ * treatment falls back to the Weekly Wildcat structure rather than dropping the
+ * package off the page.
+ */
+export function getSportsPackageRenderer(themeId: string): ComponentType<SportsPackageProps> {
+  return SPORTS_PACKAGE_RENDERERS[themeId] ?? SportsPackage;
+}
+
+export function themeHasSportsPackageVariant(themeId: string) {
+  return themeId in SPORTS_PACKAGE_RENDERERS;
 }

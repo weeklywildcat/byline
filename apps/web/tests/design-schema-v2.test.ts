@@ -3,10 +3,14 @@ import {
   BYLINE_PACKAGE_TYPES,
   BylineDesignSchemaError,
   LEAD_PACKAGE_TYPE,
+  SPORTS_PACKAGE_TYPE,
+  WEEKLY_WILDCAT_SPORTS_DEFAULTS,
   WEEKLY_WILDCAT_LEAD_DEFAULTS,
   migrateDesignDocumentV1ToV2,
   parseBylineDesignDocumentV2,
+  parseAthleteSpotlightSource,
   parseLeadPackageProps,
+  parseSportsPackageProps,
   parseStorySource
 } from "@byline/design";
 
@@ -74,7 +78,9 @@ describe("schema v2 parsing", () => {
   });
 
   it("only advertises package types that are actually implemented", () => {
-    expect([...BYLINE_PACKAGE_TYPES]).toEqual([LEAD_PACKAGE_TYPE]);
+    // An id in this list is a promise that a resolver and a renderer exist for
+    // it end to end. Adding one without them is what this guards against.
+    expect([...BYLINE_PACKAGE_TYPES]).toEqual([LEAD_PACKAGE_TYPE, SPORTS_PACKAGE_TYPE]);
   });
 });
 
@@ -185,5 +191,127 @@ describe("v1 to v2 migration", () => {
 
   it("refuses to migrate something that is not a v1 document", () => {
     expect(() => migrateDesignDocumentV1ToV2({ schemaVersion: 2 }, "home")).toThrow(/expected schema 1/);
+  });
+});
+
+describe("sports package schema", () => {
+  it("accepts a well-formed sports package", () => {
+    const document = parseBylineDesignDocumentV2(
+      v2([
+        {
+          id: "home-sports",
+          type: SPORTS_PACKAGE_TYPE,
+          props: WEEKLY_WILDCAT_SPORTS_DEFAULTS as unknown as Record<string, unknown>
+        }
+      ]),
+      "home"
+    );
+
+    expect(document.packages[0].type).toBe(SPORTS_PACKAGE_TYPE);
+  });
+
+  it("stays editor-independent: no component names, classes or endpoints persist", () => {
+    const persisted = JSON.stringify(WEEKLY_WILDCAT_SPORTS_DEFAULTS);
+
+    for (const forbidden of [
+      "SportsPackage",
+      "SportsSchedulePanel",
+      "from-field",
+      "field-schedule",
+      "field-rail",
+      "wp-json",
+      "weekly-wildcat/v1",
+      "Puck",
+      "zone"
+    ]) {
+      expect(persisted).not.toContain(forbidden);
+    }
+  });
+
+  it("rejects unsafe props on a sports package the same way as any other", () => {
+    const unsafe = { ...WEEKLY_WILDCAT_SPORTS_DEFAULTS, note: { html: "<script>x</script>" } };
+
+    expect(() =>
+      parseBylineDesignDocumentV2(
+        v2([{ id: "home-sports", type: SPORTS_PACKAGE_TYPE, props: Object.assign(Object.create({ leaked: 1 }), unsafe) }]),
+        "home"
+      )
+    ).toThrow(BylineDesignSchemaError);
+  });
+
+  it("repairs malformed sports props rather than dropping the package", () => {
+    expect(parseSportsPackageProps({ scores: { enabled: "yes", limit: 999 } })).toEqual(
+      WEEKLY_WILDCAT_SPORTS_DEFAULTS
+    );
+    expect(parseSportsPackageProps({ heading: "   " }).heading).toBe("Sports");
+    expect(parseSportsPackageProps({ upcoming: { enabled: false, limit: 5 } }).upcoming).toEqual({
+      enabled: false,
+      limit: 5
+    });
+  });
+
+  it("accepts a section source and rejects a malformed slug", () => {
+    expect(parseStorySource({ type: "section", slug: "sports" })).toEqual({ type: "section", slug: "sports" });
+    expect(parseStorySource({ type: "section", slug: "Sports Desk" })).toBeNull();
+    expect(parseStorySource({ type: "section" })).toBeNull();
+  });
+
+  it("narrows the athlete spotlight source to what the treatment can render", () => {
+    expect(parseAthleteSpotlightSource({ type: "athlete-spotlight" })).toEqual({ type: "athlete-spotlight" });
+    expect(parseAthleteSpotlightSource({ type: "manual", storyIds: [4, 4, 9] })).toEqual({
+      type: "manual",
+      storyIds: [4, 9]
+    });
+    // A general story source is not a spotlight source.
+    expect(parseAthleteSpotlightSource({ type: "latest" })).toBeNull();
+    expect(parseAthleteSpotlightSource({ type: "category", categoryId: 3 })).toBeNull();
+  });
+});
+
+describe("v1 sports blocks are preserved, not force-converted", () => {
+  function v1(content: Array<{ type: string; props: Record<string, unknown> }>) {
+    return {
+      schemaVersion: 1,
+      template: "home",
+      theme: "weekly-wildcat",
+      editor: { engine: "puck", version: "0.23.0" },
+      layout: { root: { props: {} }, content }
+    };
+  }
+
+  // Each of these was inspected against what DesignHomepage actually rendered
+  // for it. None has a faithful sports-package mapping; see
+  // docs/design-schema-v2.md for the block-by-block reasoning.
+  const SPORTS_BLOCKS = [
+    { type: "sports-scores", props: { id: "sports-scores-1", title: "Scoreboard", teamKey: "football-varsity" } },
+    { type: "sports-upcoming", props: { id: "sports-upcoming-1", title: "Next up", teamKey: "soccer-varsity" } },
+    { type: "team-feature", props: { id: "team-feature-1", title: "Team", query: { type: "latest", limit: 1 } } },
+    { type: "athlete-feature", props: { id: "athlete-feature-1", title: "Athlete", teamKey: "golf-varsity" } }
+  ];
+
+  it("preserves every v1 sports block deep-equivalently", () => {
+    const { document, warnings } = migrateDesignDocumentV1ToV2(v1(SPORTS_BLOCKS), "home");
+
+    expect(document.packages).toHaveLength(0);
+    expect(document.legacy?.unconvertedBlocks).toEqual(SPORTS_BLOCKS);
+    for (const block of SPORTS_BLOCKS) {
+      expect(warnings.some((warning) => warning.includes(block.type))).toBe(true);
+    }
+  });
+
+  it("does not invent a sports package from a scores block", () => {
+    const { document } = migrateDesignDocumentV1ToV2(v1([SPORTS_BLOCKS[0]]), "home");
+
+    expect(document.packages.some((entry) => entry.type === SPORTS_PACKAGE_TYPE)).toBe(false);
+  });
+
+  it("never leaves a converted block behind in the legacy payload", () => {
+    const { document } = migrateDesignDocumentV1ToV2(
+      v1([{ type: "story-lead", props: { id: "story-lead-1" } }, SPORTS_BLOCKS[0]]),
+      "home"
+    );
+
+    expect(document.packages.map((entry) => entry.type)).toEqual([LEAD_PACKAGE_TYPE]);
+    expect(document.legacy?.unconvertedBlocks.map((block) => block.type)).toEqual(["sports-scores"]);
   });
 });

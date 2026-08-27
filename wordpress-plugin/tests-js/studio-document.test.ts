@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { LEAD_PACKAGE_TYPE, WEEKLY_WILDCAT_LEAD_DEFAULTS, parseBylineDesignDocumentV2 } from "@byline/design";
+import {
+  LEAD_PACKAGE_TYPE,
+  SPORTS_PACKAGE_TYPE,
+  WEEKLY_WILDCAT_LEAD_DEFAULTS,
+  WEEKLY_WILDCAT_SPORTS_DEFAULTS,
+  parseBylineDesignDocumentV2
+} from "@byline/design";
 import {
   designDocumentToEditorState,
   editorStateToDesignDocument,
@@ -281,5 +287,144 @@ describe("loading validates rather than casts", () => {
         "section-default"
       )
     ).toThrow(/mismatched template/);
+  });
+});
+
+describe("Studio persists the sports package", () => {
+  const sportsEditorState = {
+    root: { props: {} },
+    content: [
+      { type: LEAD_PACKAGE_TYPE, props: { id: "home-lead", ...WEEKLY_WILDCAT_LEAD_DEFAULTS } },
+      { type: SPORTS_PACKAGE_TYPE, props: { id: "home-sports", ...WEEKLY_WILDCAT_SPORTS_DEFAULTS } }
+    ]
+  };
+
+  it("writes both packages in editor order", () => {
+    const document = editorStateToDesignDocument(sportsEditorState, "home", "weekly-wildcat");
+
+    expect(document.packages.map((entry) => entry.type)).toEqual([LEAD_PACKAGE_TYPE, SPORTS_PACKAGE_TYPE]);
+    expect(document.packages.map((entry) => entry.id)).toEqual(["home-lead", "home-sports"]);
+    expect(parseBylineDesignDocumentV2(document, "home").packages).toHaveLength(2);
+  });
+
+  it("normalises sports settings on the way out of the editor", () => {
+    const document = editorStateToDesignDocument(
+      {
+        root: { props: {} },
+        content: [
+          {
+            type: SPORTS_PACKAGE_TYPE,
+            props: { id: "home-sports", scores: { enabled: false, limit: 4 }, upcoming: { limit: 999 } }
+          }
+        ]
+      },
+      "home",
+      "weekly-wildcat"
+    );
+
+    const props = document.packages[0].props as typeof WEEKLY_WILDCAT_SPORTS_DEFAULTS;
+
+    expect(props.scores).toEqual({ enabled: false, limit: 4 });
+    // Out of range falls back to the default rather than persisting nonsense.
+    expect(props.upcoming.limit).toBe(WEEKLY_WILDCAT_SPORTS_DEFAULTS.upcoming.limit);
+    expect(props.heading).toBe("Sports");
+  });
+
+  it("round-trips the sports package through the editor without drift", () => {
+    const first = editorStateToDesignDocument(sportsEditorState, "home", "weekly-wildcat");
+    const reloaded = loadDesignIntoEditor(first, "home");
+    const second = editorStateToDesignDocument(reloaded.editorState, "home", "weekly-wildcat", reloaded.legacy);
+
+    expect(second).toEqual(first);
+  });
+
+  it("persists no renderer, class or endpoint detail for the sports package", () => {
+    const document = editorStateToDesignDocument(sportsEditorState, "home", "weekly-wildcat");
+    const persisted = JSON.stringify(document);
+
+    for (const forbidden of ["SportsPackage", "from-field", "field-schedule", "wp-json", "sports-games"]) {
+      expect(persisted).not.toContain(forbidden);
+    }
+  });
+});
+
+describe("legacy sports blocks survive the sports extraction", () => {
+  const v1WithSports = {
+    schemaVersion: 1,
+    template: "home",
+    theme: "weekly-wildcat",
+    editor: { engine: "puck", version: "0.23.0" },
+    layout: {
+      root: { props: {} },
+      content: [
+        { type: "story-lead", props: { id: "story-lead-1", query: { type: "sticky" } } },
+        {
+          type: "sports-scores",
+          props: { id: "sports-scores-1", title: "Scoreboard", teamKey: "football-varsity", limit: 6, allowDuplicates: false }
+        },
+        { type: "athlete-feature", props: { id: "athlete-feature-1", title: "Athlete", teamKey: "golf-varsity" } }
+      ]
+    }
+  };
+
+  it("carries every unconverted sports block out of the load", () => {
+    const loaded = loadDesignIntoEditor(v1WithSports, "home");
+
+    expect(loaded.migratedFromV1).toBe(true);
+    expect(loaded.legacy?.unconvertedBlocks.map((block) => block.type)).toEqual([
+      "sports-scores",
+      "athlete-feature"
+    ]);
+    // Only story-lead converted, so only story-lead is in the editor.
+    expect(loaded.editorState.content.map((item) => item.type)).toEqual([LEAD_PACKAGE_TYPE]);
+  });
+
+  it("preserves them byte-for-byte through adding a sports package and saving", () => {
+    const loaded = loadDesignIntoEditor(v1WithSports, "home");
+    const edited = {
+      ...loaded.editorState,
+      content: [
+        ...loaded.editorState.content,
+        { type: SPORTS_PACKAGE_TYPE, props: { id: "home-sports", ...WEEKLY_WILDCAT_SPORTS_DEFAULTS } }
+      ]
+    };
+
+    const saved = editorStateToDesignDocument(edited, "home", "weekly-wildcat", loaded.legacy);
+
+    expect(saved.schemaVersion).toBe(2);
+    expect(saved.packages.map((entry) => entry.type)).toEqual([LEAD_PACKAGE_TYPE, SPORTS_PACKAGE_TYPE]);
+    // Adding the real package does NOT convert or consume the old blocks: they
+    // are different things, and the migration never claimed otherwise.
+    expect(saved.legacy?.unconvertedBlocks).toEqual([
+      {
+        type: "sports-scores",
+        props: { id: "sports-scores-1", title: "Scoreboard", teamKey: "football-varsity", limit: 6, allowDuplicates: false }
+      },
+      { type: "athlete-feature", props: { id: "athlete-feature-1", title: "Athlete", teamKey: "golf-varsity" } }
+    ]);
+    expect(parseBylineDesignDocumentV2(saved, "home").legacy?.unconvertedBlocks).toHaveLength(2);
+  });
+
+  it("does not erode the legacy payload across repeated autosaves", () => {
+    const loaded = loadDesignIntoEditor(v1WithSports, "home");
+    let state = loaded.editorState;
+    let legacy = loaded.legacy;
+
+    for (let pass = 0; pass < 4; pass += 1) {
+      const document = editorStateToDesignDocument(state, "home", "weekly-wildcat", legacy);
+      const reloaded = loadDesignIntoEditor(document, "home");
+
+      state = reloaded.editorState;
+      legacy = reloaded.legacy;
+    }
+
+    expect(legacy?.unconvertedBlocks).toEqual(loaded.legacy?.unconvertedBlocks);
+  });
+
+  it("never leaves a block both converted and preserved", () => {
+    const loaded = loadDesignIntoEditor(v1WithSports, "home");
+    const saved = editorStateToDesignDocument(loaded.editorState, "home", "weekly-wildcat", loaded.legacy);
+
+    expect(saved.legacy?.unconvertedBlocks.map((block) => block.type)).not.toContain("story-lead");
   });
 });

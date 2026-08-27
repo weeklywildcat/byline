@@ -161,9 +161,17 @@ export type HomepageSelection = ReturnType<typeof resolveWeeklyWildcatHomepage>;
  * It is reached only through this function. When the package orchestrator takes
  * over ordering for every package, this is the single call site that has to be
  * replaced, and the algorithm can be absorbed rather than hunted for.
+ *
+ * `pinnedStoryIds` comes from `collectPinnedStoryIds`. Passing it here rather
+ * than filtering inside each package keeps one used-story set: a pinned story is
+ * withheld from every automatic selection, and the package that pinned it places
+ * it explicitly.
  */
-export function resolveCompatibilityHomepageSelection(posts: WordPressPost[]): HomepageSelection {
-  return resolveWeeklyWildcatHomepage(posts);
+export function resolveCompatibilityHomepageSelection(
+  posts: WordPressPost[],
+  pinnedStoryIds?: ReadonlySet<number>
+): HomepageSelection {
+  return resolveWeeklyWildcatHomepage(posts, pinnedStoryIds);
 }
 
 function manualStories(source: BylineStorySource, posts: WordPressPost[]) {

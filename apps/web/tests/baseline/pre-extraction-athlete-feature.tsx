@@ -1,3 +1,5 @@
+// The pre-extraction athlete spotlight card, frozen. See pre-extraction-sports.tsx
+// for why this lives under tests/baseline rather than in components/.
 import { getAthleteSportLabel, getAthleteSpotlightLabel } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
 import { getFeaturedMedia, getPostHref, type WordPressPost } from "@/lib/wordpress";

@@ -370,3 +370,44 @@ export function LeadStorySourceField(label: string): CustomField<LeadStorySource
     }
   };
 }
+
+// The athlete spotlight's source, in newsroom language.
+//
+// The package deliberately supports only two answers -- the standing spotlight
+// convention, or a story chosen by hand -- so the field offers exactly those
+// rather than the general story-source picker.
+export type AthleteSpotlightSourceValue = { type: "athlete-spotlight" } | { type: "manual"; storyIds: number[] };
+
+export function AthleteSpotlightSourceField(label: string): CustomField<AthleteSpotlightSourceValue> {
+  return {
+    type: "custom",
+    render: ({ value, onChange, readOnly }) => {
+      const source: AthleteSpotlightSourceValue =
+        value && typeof value === "object" && value.type === "manual" ? value : { type: "athlete-spotlight" };
+
+      return (
+        <div className="byline-story-source-field">
+          <SelectControl
+            label={label}
+            value={source.type}
+            disabled={readOnly}
+            options={[
+              { label: "Whoever is flagged this week", value: "athlete-spotlight" },
+              { label: "Chosen by hand", value: "manual" }
+            ]}
+            onChange={(nextType) =>
+              onChange(nextType === "manual" ? { type: "manual", storyIds: [] } : { type: "athlete-spotlight" })
+            }
+          />
+          {source.type === "manual" ? (
+            <ManualStoryList
+              storyIds={source.storyIds}
+              readOnly={readOnly}
+              onChange={(storyIds) => onChange({ type: "manual", storyIds })}
+            />
+          ) : null}
+        </div>
+      );
+    }
+  };
+}

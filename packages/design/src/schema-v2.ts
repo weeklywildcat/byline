@@ -19,7 +19,7 @@ export const BYLINE_DESIGN_SCHEMA_VERSION_V2 = 2;
 // Semantic package identifiers. Only the packages that are actually implemented
 // end-to-end belong here -- an id in this list is a promise that a resolver and
 // a renderer exist for it.
-export const BYLINE_PACKAGE_TYPES = ["lead-package"] as const;
+export const BYLINE_PACKAGE_TYPES = ["lead-package", "sports-package"] as const;
 
 export type BylinePackageType = (typeof BYLINE_PACKAGE_TYPES)[number];
 
@@ -28,6 +28,11 @@ export type BylinePackageType = (typeof BYLINE_PACKAGE_TYPES)[number];
 export type BylineStorySource =
   | { type: "latest" }
   | { type: "sticky" }
+  // A newsroom section addressed by its stable slug. `category` addresses the
+  // same taxonomy by numeric id; a section is the editorial name for it, and is
+  // what an editor actually says ("the Sports section"), so it survives an
+  // export/import that renumbers term ids.
+  | { type: "section"; slug: string }
   | { type: "category"; categoryId: number }
   | { type: "tag"; tagId: number }
   | { type: "author"; authorId: number }
@@ -75,6 +80,7 @@ const MAX_PACKAGES = 60;
 const MAX_STORY_IDS = 50;
 const PACKAGE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const THEME_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SECTION_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
@@ -90,6 +96,9 @@ export function parseStorySource(value: unknown): BylineStorySource | null {
   const source = value as Record<string, unknown>;
 
   if (source.type === "latest" || source.type === "sticky") return { type: source.type };
+  if (source.type === "section" && typeof source.slug === "string" && SECTION_SLUG_PATTERN.exec(source.slug) !== null) {
+    return { type: "section", slug: source.slug };
+  }
   if (source.type === "category" && isPositiveInteger(source.categoryId)) {
     return { type: "category", categoryId: source.categoryId };
   }
