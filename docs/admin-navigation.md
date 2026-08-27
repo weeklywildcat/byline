@@ -30,7 +30,9 @@ import/export remain native WordPress admin utility pages.
 Related settings use stable query-string state:
 
 - Publication: `tab=identity`, `branding`, `navigation`, or `social`
-- Integrations: `tab=discord` or `deployment`
+- Integrations: `tab=discord` or `deployment`; the Discord tab is where the
+  connection is configured, and it appears only while the Discord module is
+  enabled
 - Settings: `tab=access`, `api`, `compatibility`, or `diagnostics`
 - Studio: `view=revisions` for Revisions; the default view is the editor
 

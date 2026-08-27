@@ -2,16 +2,34 @@ import { ChannelType, Client, Events, GatewayIntentBits } from 'discord.js';
 import pino from 'pino';
 import { CommandHandler } from './commands/handler.js';
 import { commandDefinitions } from './commands/definitions.js';
-import { loadConfig } from './config.js';
+import { loadBootstrap, loadConfig, resolveConfig } from './config.js';
+import type { Config } from './config.js';
 import { syncCommands } from './discord/command-sync.js';
 import { matchingTag, WORKFLOW_TAGS } from './discord/forums.js';
 import { startHttpServer } from './http/server.js';
 import { StorySyncService } from './services/story-sync.js';
-import { WordPressClient, WordPressError } from './wordpress/client.js';
+import { fetchRemoteConfig, WordPressClient, WordPressError } from './wordpress/client.js';
 import type { WorkflowStatus } from './wordpress/types.js';
 
-const config = loadConfig();
+/**
+ * WordPress owns the Discord connection settings. The bot still boots from its
+ * own environment when WordPress is unreachable or has nothing saved yet, so an
+ * installation configured entirely through environment variables is unaffected.
+ */
+async function startupConfig(): Promise<{ config: Config; source: string }> {
+  try {
+    const remote = await fetchRemoteConfig(loadBootstrap());
+    return { config: resolveConfig(remote), source: 'wordpress' };
+  } catch (error) {
+    const config = loadConfig();
+    process.emitWarning(`Falling back to environment configuration: ${error instanceof Error ? error.message : 'WordPress settings unavailable'}`);
+    return { config, source: 'environment' };
+  }
+}
+
+const { config, source: configSource } = await startupConfig();
 const logger = pino({ level: config.logLevel, redact: ['discordToken', 'bridgeSecret', 'req.headers.authorization', 'headers.authorization'] });
+logger.info({ configSource }, 'connection settings resolved');
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const wordpress = new WordPressClient(config);
 const sync = new StorySyncService(client, wordpress, config);

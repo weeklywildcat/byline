@@ -12,16 +12,20 @@ export function startHttpServer(config: Config, sync: StorySyncService): Server 
       response.writeHead(ready ? 200 : 503, { 'content-type': 'application/json' });
       response.end(JSON.stringify({ healthy: true, ready, version: process.env.npm_package_version ?? '1.0.0', ...sync.health })); return;
     }
-    if (request.method !== 'POST' || !['/sync', '/announce'].includes(url.pathname)) { response.writeHead(404).end(); return; }
+    if (request.method !== 'POST' || !['/sync', '/announce', '/reconcile'].includes(url.pathname)) { response.writeHead(404).end(); return; }
     let body = '';
     for await (const chunk of request) { body += String(chunk); if (body.length > 64_000) { response.writeHead(413).end(); return; } }
-    const timestamp = String(request.headers['x-wwh-timestamp'] ?? ''); const signature = String(request.headers['x-wwh-signature'] ?? '');
+    const timestamp = String(request.headers['x-byline-timestamp'] ?? request.headers['x-wwh-timestamp'] ?? ''); const signature = String(request.headers['x-byline-signature'] ?? request.headers['x-wwh-signature'] ?? '');
     if (!verifyRequest(config.bridgeSecret, timestamp, signature, 'POST', url.pathname, body)) { response.writeHead(401, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Invalid or stale bridge signature' })); return; }
-    const requestId = String(request.headers['x-wwh-request-id'] ?? ''); const now = Date.now();
+    const requestId = String(request.headers['x-byline-request-id'] ?? request.headers['x-wwh-request-id'] ?? ''); const now = Date.now();
     for (const [id, expires] of seen) if (expires < now) seen.delete(id);
     if (requestId && seen.has(requestId)) { response.writeHead(202, { 'content-type': 'application/json' }).end(JSON.stringify({ accepted: true, duplicate: true })); return; }
     if (requestId) seen.set(requestId, now + 10 * 60_000);
     try {
+      if (url.pathname === '/reconcile') {
+        await sync.reconcileAll();
+        response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ reconciled: true, lastSuccessfulReconciliation: sync.health.lastSuccessfulReconciliation })); return;
+      }
       const payload = JSON.parse(body) as Record<string, unknown>;
       if (url.pathname === '/announce') {
         const title = String(payload.title ?? '').trim(); const message = String(payload.message ?? '').trim();

@@ -14,6 +14,7 @@ if (!byline_string_starts_with('WWH_SECRET', 'WWH_')
 $production_files = [
     __DIR__ . '/../includes/publication/config.php',
     __DIR__ . '/../includes/discord-integration.php',
+    __DIR__ . '/../includes/integrations/discord.php',
 ];
 foreach ($production_files as $file) {
     $source = file_get_contents($file);

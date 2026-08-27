@@ -63,3 +63,65 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     publicationName, publicationShortName, contextMenuCommandName, logLevel: env.LOG_LEVEL ?? 'info',
   };
 }
+
+/**
+ * The connection settings WordPress owns. Everything here is optional: a value
+ * WordPress has not been given falls back to this process's environment, which
+ * is how installations configured before the settings screen existed keep
+ * running unchanged.
+ */
+export interface RemoteConfig {
+  discordToken?: string;
+  discordClientId?: string;
+  guildId?: string;
+  storyboardChannelId?: string;
+  announcementsChannelId?: string;
+  staffRoleId?: string;
+  publicationAnnouncements?: boolean;
+  reconcileIntervalMs?: number;
+  publicationName?: string;
+  publicationShortName?: string;
+}
+
+export interface Bootstrap {
+  wordpressUrl: string;
+  bridgeSecret: string;
+}
+
+/** The two values the bot must already hold before it can ask WordPress for the rest. */
+export function loadBootstrap(env: NodeJS.ProcessEnv = process.env): Bootstrap {
+  const alias = (canonical: string, legacy: string): string => env[canonical]?.trim() || env[legacy]?.trim() || '';
+  const wordpressUrl = alias('BYLINE_WORDPRESS_URL', 'WWH_WORDPRESS_URL');
+  const bridgeSecret = alias('BYLINE_DISCORD_BRIDGE_SECRET', 'WWH_DISCORD_BRIDGE_SECRET');
+  const missing = Object.entries({ BYLINE_WORDPRESS_URL: wordpressUrl, BYLINE_DISCORD_BRIDGE_SECRET: bridgeSecret }).filter(([, value]) => !value).map(([key]) => key);
+  if (missing.length) throw new Error(`Missing required configuration: ${missing.join(', ')}`);
+  return { wordpressUrl, bridgeSecret };
+}
+
+const REMOTE_ENV_KEYS: Array<[keyof RemoteConfig, string]> = [
+  ['discordToken', 'DISCORD_TOKEN'],
+  ['discordClientId', 'DISCORD_CLIENT_ID'],
+  ['guildId', 'BYLINE_DISCORD_GUILD_ID'],
+  ['storyboardChannelId', 'BYLINE_DISCORD_STORYBOARD_CHANNEL_ID'],
+  ['announcementsChannelId', 'BYLINE_DISCORD_ANNOUNCEMENTS_CHANNEL_ID'],
+  ['staffRoleId', 'BYLINE_DISCORD_STAFF_ROLE_ID'],
+  ['publicationName', 'BYLINE_PUBLICATION_NAME'],
+  ['publicationShortName', 'BYLINE_PUBLICATION_SHORT_NAME'],
+];
+
+/**
+ * Overlays the settings WordPress manages onto this process's environment and
+ * validates the result exactly as an environment-only boot would.
+ */
+export function resolveConfig(remote: RemoteConfig, env: NodeJS.ProcessEnv = process.env): Config {
+  const merged: NodeJS.ProcessEnv = { ...env };
+  for (const [key, name] of REMOTE_ENV_KEYS) {
+    const value = remote[key];
+    if (typeof value === 'string' && value.trim()) merged[name] = value.trim();
+  }
+  if (typeof remote.publicationAnnouncements === 'boolean') merged.BYLINE_PUBLICATION_ANNOUNCEMENTS = remote.publicationAnnouncements ? 'true' : 'false';
+  if (typeof remote.reconcileIntervalMs === 'number' && Number.isFinite(remote.reconcileIntervalMs) && remote.reconcileIntervalMs >= 60000) {
+    merged.BYLINE_RECONCILE_INTERVAL_MS = String(Math.floor(remote.reconcileIntervalMs));
+  }
+  return loadConfig(merged);
+}

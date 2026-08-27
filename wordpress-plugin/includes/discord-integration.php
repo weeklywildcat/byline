@@ -34,6 +34,15 @@ function wwh_discord_config(string $name): string
     return '';
 }
 
+/**
+ * Reads a Discord connection value. WordPress-managed settings win once the
+ * settings screen has saved one; the environment remains the fallback.
+ */
+function wwh_discord_setting(string $key, string $legacy_env): string
+{
+    return function_exists('byline_discord_setting') ? byline_discord_setting($key) : wwh_discord_config($legacy_env);
+}
+
 function wwh_discord_statuses(): array
 {
     return ['pitch', 'assigned', 'reporting', 'writing', 'editing', 'ready', 'on-hold', 'dropped', 'published'];
@@ -525,7 +534,7 @@ add_action('save_post_post', 'wwh_discord_queue_story', 20, 3);
 
 function wwh_discord_http(string $path, array $data): array
 {
-    $base = untrailingslashit(wwh_discord_config('WWH_DISCORD_BOT_URL'));
+    $base = untrailingslashit(wwh_discord_setting('botUrl', 'WWH_DISCORD_BOT_URL'));
     $secret = wwh_discord_config('WWH_DISCORD_BRIDGE_SECRET');
     if ($base === '' || $secret === '') {
         return ['ok' => false, 'error' => 'Discord bridge is not configured.'];
@@ -572,7 +581,7 @@ function wwh_discord_connect(): void
 {
     if (!is_user_logged_in()) auth_redirect();
     check_admin_referer('wwh_discord_connect');
-    $client_id = wwh_discord_config('WWH_DISCORD_CLIENT_ID');
+    $client_id = wwh_discord_setting('clientId', 'WWH_DISCORD_CLIENT_ID');
     if ($client_id === '') wp_die('Discord OAuth is not configured.');
     wp_redirect(add_query_arg(['client_id' => $client_id, 'response_type' => 'code', 'redirect_uri' => wwh_discord_oauth_redirect_uri(), 'scope' => 'identify', 'state' => wwh_discord_oauth_state(get_current_user_id()), 'prompt' => 'consent'], 'https://discord.com/oauth2/authorize'));
     exit;
@@ -588,7 +597,7 @@ function wwh_discord_oauth_callback(): void
     delete_transient($key);
     if (!$user_id || $user_id !== get_current_user_id()) wp_die('Invalid or expired Discord connection request.');
     $response = wp_remote_post('https://discord.com/api/v10/oauth2/token', ['timeout' => 10, 'body' => [
-        'client_id' => wwh_discord_config('WWH_DISCORD_CLIENT_ID'), 'client_secret' => wwh_discord_config('WWH_DISCORD_CLIENT_SECRET'),
+        'client_id' => wwh_discord_setting('clientId', 'WWH_DISCORD_CLIENT_ID'), 'client_secret' => wwh_discord_setting('clientSecret', 'WWH_DISCORD_CLIENT_SECRET'),
         'grant_type' => 'authorization_code', 'code' => sanitize_text_field(wp_unslash($_GET['code'] ?? '')), 'redirect_uri' => wwh_discord_oauth_redirect_uri(),
     ]]);
     $token = is_wp_error($response) ? [] : json_decode(wp_remote_retrieve_body($response), true);
@@ -636,10 +645,10 @@ add_action('edit_user_profile', 'wwh_discord_profile', 20);
 function wwh_discord_admin_status(): void
 {
     if (!current_user_can('manage_options')) return;
-    $configured = wwh_discord_config('WWH_DISCORD_BOT_URL') !== '' && wwh_discord_config('WWH_DISCORD_BRIDGE_SECRET') !== '';
+    $configured = wwh_discord_setting('botUrl', 'WWH_DISCORD_BOT_URL') !== '' && wwh_discord_config('WWH_DISCORD_BRIDGE_SECRET') !== '';
     echo '<h2>Discord</h2><table class="widefat striped" role="presentation"><tbody><tr><th>Bridge configuration</th><td>' . esc_html($configured ? 'Configured' : 'Not configured') . '</td></tr>';
     if ($configured) {
-        $health = wp_remote_get(untrailingslashit(wwh_discord_config('WWH_DISCORD_BOT_URL')) . '/healthz', ['timeout' => 3]);
+        $health = wp_remote_get(untrailingslashit(wwh_discord_setting('botUrl', 'WWH_DISCORD_BOT_URL')) . '/healthz', ['timeout' => 3]);
         $body = is_wp_error($health) ? [] : json_decode(wp_remote_retrieve_body($health), true);
         echo '<tr><th>Wildcat connected</th><td>' . esc_html(!empty($body['discordConnected']) ? 'Yes' : 'No') . '</td></tr>';
         echo '<tr><th>Server connected</th><td>' . esc_html(!empty($body['guildFound']) ? 'Yes' : 'No') . '</td></tr>';
