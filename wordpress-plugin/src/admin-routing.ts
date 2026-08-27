@@ -5,8 +5,7 @@ export const ADMIN_PAGE_SLUGS = {
   theme: "byline-theme",
   integrations: "byline-integrations",
   settings: "byline-settings",
-  polls: "byline-polls",
-  teams: "byline-teams"
+  polls: "byline-polls"
 } as const;
 
 export type AdminPageSlug = (typeof ADMIN_PAGE_SLUGS)[keyof typeof ADMIN_PAGE_SLUGS];

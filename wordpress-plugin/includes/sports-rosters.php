@@ -23,11 +23,12 @@ function wwh_register_sports_roster_post_type(): void
                 'view_item' => 'View Team Roster',
                 'search_items' => 'Search Team Rosters',
                 'not_found' => 'No team rosters found',
-                'menu_name' => 'Team Rosters',
+                'menu_name' => 'Rosters',
+                'all_items' => 'Rosters',
             ],
             'public' => false,
             'show_ui' => true,
-            'show_in_menu' => 'byline',
+            'show_in_menu' => byline_admin_feature_enabled('sports') ? byline_sports_menu_parent() : false,
             'show_in_rest' => false,
             'supports' => [],
             'capability_type' => 'post',
@@ -563,6 +564,10 @@ function wwh_rest_sports_rosters(WP_REST_Request $request): WP_REST_Response
 
 function wwh_register_sports_roster_admin_pages(): void
 {
+    if (!byline_admin_feature_enabled('sports')) {
+        return;
+    }
+
     add_submenu_page(
         'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE,
         'Import and Export Team Rosters',
