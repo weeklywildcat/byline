@@ -161,6 +161,46 @@ function byline_poll_normalize_import_artifact($artifact)
 }
 
 /**
+ * Refuse to import vote history under a signing secret that cannot possibly be
+ * the one those votes were derived from.
+ *
+ * A voter_key is a one-way function of the secret. If WordPress is running on
+ * the automatically generated fallback secret, every imported key is guaranteed
+ * not to match what returning visitors present, so their cookies silently stop
+ * working and they can vote a second time. That is a known-invalid state and is
+ * blocked rather than documented against.
+ *
+ * The importer cannot prove that an explicitly supplied secret is the
+ * historically correct one; it only rules out the case it can be certain about.
+ * The secret itself is never included in the message.
+ *
+ * @param array<string,mixed> $normalized
+ * @param array<string,mixed> $options
+ * @return true|WP_Error
+ */
+function byline_poll_migration_secret_guard(array $normalized, array $options = [])
+{
+    if ($normalized['votes'] === [] || !empty($options['allow_generated_secret'])) {
+        return true;
+    }
+
+    $source = byline_poll_signing_secret_source();
+    if ($source !== 'generated' && $source !== 'missing') {
+        return true;
+    }
+
+    return new WP_Error(
+        'byline_poll_provisional_secret',
+        'This artifact contains ' . count($normalized['votes']) . ' vote(s), but WordPress is using an automatically generated poll signing secret. '
+        . 'Imported voter keys would never match the cookies existing visitors hold, so they could all vote again. '
+        . 'Set the previous poll signing secret in wp-config.php before importing: '
+        . "define( 'BYLINE_POLL_COOKIE_SECRET', '...' ); "
+        . 'Confirm it with `wp byline polls secret`. '
+        . 'If this site has no voter continuity to preserve, re-run with --allow-generated-secret.'
+    );
+}
+
+/**
  * Source-side counts, used for the verification report.
  *
  * @param array<string,mixed> $normalized
@@ -241,9 +281,20 @@ function byline_poll_import_artifact(array $artifact, array $options = [])
     }
 
     $dry_run = !empty($options['dry_run']);
+    $votes_only = !empty($options['votes_only']);
+
+    // A vote is only continuity-compatible if WordPress signs with the same
+    // secret the retired Worker used, so importing history under a generated
+    // fallback secret is refused rather than documented against.
+    $secret_guard = byline_poll_migration_secret_guard($normalized, $options);
+    if (is_wp_error($secret_guard) && !$dry_run) {
+        return $secret_guard;
+    }
+
     $report = [
         'dryRun' => $dry_run,
-        'polls' => ['created' => 0, 'updated' => 0, 'failed' => 0],
+        'votesOnly' => $votes_only,
+        'polls' => ['created' => 0, 'updated' => 0, 'failed' => 0, 'unchanged' => 0],
         'options' => ['imported' => 0],
         'votes' => [
             'inserted' => 0,
@@ -254,12 +305,33 @@ function byline_poll_import_artifact(array $artifact, array $options = [])
         'errors' => $normalized['notes'],
     ];
 
-    if (!$dry_run && !byline_poll_votes_table_exists()) {
-        byline_poll_install_schema();
+    if (is_wp_error($secret_guard)) {
+        $report['errors'][] = $secret_guard->get_error_message();
+    }
+
+    // WP-CLI does not run admin_init, so storage is guaranteed here rather than
+    // assumed. A dry run stays read-only.
+    if (!$dry_run && !byline_poll_ensure_schema()) {
+        return new WP_Error('byline_poll_no_storage', 'The poll vote table could not be created; import aborted before touching poll data.');
     }
 
     foreach ($normalized['polls'] as $poll_id => $poll) {
         $existing = byline_poll_find_post_by_public_id((string) $poll_id);
+
+        // A votes-only delta deliberately never rewrites a poll's question,
+        // answers, schedule, or status. That is what makes it safe to run after
+        // a cutover write freeze: nothing in the source artifact can overwrite
+        // the live editorial state.
+        if ($votes_only) {
+            if ($existing instanceof WP_Post) {
+                $report['polls']['unchanged']++;
+                $report['options']['imported'] += count(byline_poll_options((int) $existing->ID));
+            } else {
+                $report['polls']['failed']++;
+                $report['errors'][] = 'Poll ' . $poll_id . ' does not exist in WordPress; its votes were skipped.';
+            }
+            continue;
+        }
 
         if ($dry_run) {
             $report['polls'][$existing instanceof WP_Post ? 'updated' : 'created']++;
@@ -305,6 +377,20 @@ function byline_poll_import_artifact(array $artifact, array $options = [])
     }
 
     foreach ($normalized['votes'] as $vote) {
+        // In votes-only mode the answer must still exist in WordPress, not just
+        // in the artifact, so a delta cannot resurrect a removed answer.
+        if ($votes_only) {
+            $post = byline_poll_find_post_by_public_id($vote['poll_id']);
+            $stored = $post instanceof WP_Post ? array_column(byline_poll_options((int) $post->ID), 'id') : [];
+
+            if (!in_array($vote['option_id'], $stored, true)) {
+                $report['votes']['skipped']++;
+                $report['errors'][] = 'Skipped a delta vote for an answer WordPress no longer holds: '
+                    . $vote['poll_id'] . '/' . $vote['option_id'] . '.';
+                continue;
+            }
+        }
+
         if ($dry_run) {
             $report['votes']['inserted']++;
             continue;
@@ -367,6 +453,12 @@ function byline_poll_verify_artifact(array $artifact)
         return $normalized;
     }
 
+    // Verification reads the vote table, and WP-CLI has not run admin_init, so
+    // the schema is guaranteed here too rather than assumed.
+    if (!byline_poll_ensure_schema()) {
+        return new WP_Error('byline_poll_no_storage', 'The poll vote table is missing and could not be created; nothing to verify against.');
+    }
+
     $source = byline_poll_migration_source_counts($normalized);
     $destination = byline_poll_migration_destination_counts($normalized);
 
@@ -408,6 +500,10 @@ function byline_poll_migration_report_lines(array $report): array
             $actual,
             (int) $count === $actual ? 'ok' : 'MISMATCH'
         );
+    }
+
+    if (!empty($report['votesOnly'])) {
+        $lines[] = 'mode     votes-only (poll questions, answers, schedules, and statuses left untouched)';
     }
 
     foreach ((array) ($report['errors'] ?? []) as $error) {

@@ -24,9 +24,7 @@ class Byline_Poll_CLI_Command
      */
     public function install_schema($args, $assoc_args)
     {
-        byline_poll_install_schema();
-
-        if (!byline_poll_votes_table_exists()) {
+        if (!byline_poll_ensure_schema()) {
             WP_CLI::error('The poll vote table could not be created.');
         }
 
@@ -53,12 +51,32 @@ class Byline_Poll_CLI_Command
      *
      * [--dry-run]
      * : Report what would be imported without writing.
+     *
+     * [--votes-only]
+     * : Import vote rows only, leaving every poll question, answer, schedule,
+     * and status exactly as WordPress holds it. Use this for the final delta
+     * after a cutover write freeze.
+     *
+     * [--allow-generated-secret]
+     * : Import vote history even though WordPress is using an automatically
+     * generated poll signing secret. Only for a site with no voter continuity
+     * to preserve; existing visitors will be able to vote again.
      */
     public function import($args, $assoc_args)
     {
         $artifact = $this->read_artifact($args[0] ?? '');
+        $dry_run = !empty($assoc_args['dry-run']);
+
+        // admin_init has not run under WP-CLI, so storage is guaranteed before
+        // any poll data is touched rather than assumed to already exist.
+        if (!$dry_run) {
+            $this->ensure_schema();
+        }
+
         $report = byline_poll_import_artifact($artifact, [
-            'dry_run' => !empty($assoc_args['dry-run']),
+            'dry_run' => $dry_run,
+            'votes_only' => !empty($assoc_args['votes-only']),
+            'allow_generated_secret' => !empty($assoc_args['allow-generated-secret']),
         ]);
 
         if (is_wp_error($report)) {
@@ -66,9 +84,10 @@ class Byline_Poll_CLI_Command
         }
 
         WP_CLI::line(sprintf(
-            'polls created %d, updated %d, failed %d',
+            'polls created %d, updated %d, unchanged %d, failed %d',
             $report['polls']['created'],
             $report['polls']['updated'],
+            $report['polls']['unchanged'],
             $report['polls']['failed']
         ));
         WP_CLI::line(sprintf(
@@ -101,7 +120,9 @@ class Byline_Poll_CLI_Command
      */
     public function verify($args, $assoc_args)
     {
-        $report = byline_poll_verify_artifact($this->read_artifact($args[0] ?? ''));
+        $artifact = $this->read_artifact($args[0] ?? '');
+        $this->ensure_schema();
+        $report = byline_poll_verify_artifact($artifact);
 
         if (is_wp_error($report)) {
             WP_CLI::error($report->get_error_message());
@@ -116,6 +137,13 @@ class Byline_Poll_CLI_Command
         }
 
         WP_CLI::success('Poll migration verification passed.');
+    }
+
+    private function ensure_schema(): void
+    {
+        if (!byline_poll_ensure_schema()) {
+            WP_CLI::error('The poll vote table is missing and could not be created. Run `wp byline polls install-schema` and check database privileges.');
+        }
     }
 
     private function read_artifact(string $path): array

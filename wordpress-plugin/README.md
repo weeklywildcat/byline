@@ -73,11 +73,20 @@ printing the value.
 WP-CLI:
 
 ```sh
-wp byline polls install-schema      # create the vote table (useful on multisite)
-wp byline polls secret              # report the signing-secret source
-wp byline polls import <file.json>  # one-time import of exported poll data
-wp byline polls verify <file.json>  # compare source and destination counts
+wp byline polls install-schema                    # create the vote table (useful on multisite)
+wp byline polls secret                            # report the signing-secret source
+wp byline polls import <file.json>                # import poll definitions and votes
+wp byline polls import <file.json> --dry-run       # report only, writes nothing
+wp byline polls import <delta.json> --votes-only   # final cutover delta: votes only, never touches poll content
+wp byline polls verify <file.json>                 # compare source and destination counts
 ```
+
+Import and verify guarantee poll storage exists before touching data -- WP-CLI
+never fires `admin_init`, so this cannot be assumed. Importing vote history
+while WordPress is on an automatically generated signing secret is refused,
+since those voter keys could never match an existing visitor's cookie; pass
+`--allow-generated-secret` only for a fresh publication with no continuity to
+preserve.
 
 See [docs/polls.md](../docs/polls.md) for the content model, REST contract, host
 proxy, capability model, and the Cloudflare D1 migration and cutover runbook.

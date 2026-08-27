@@ -181,10 +181,12 @@ describe("PollWidget", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(poll()));
     await render();
 
+    // What the API actually sends while suppressing: every count withheld,
+    // including the running total.
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
         poll({
-          totalVotes: MIN_RESULTS_VOTES - 1,
+          totalVotes: 0,
           resultsAvailable: false,
           options: [
             { id: "news", label: "More school news", votes: 0 },
@@ -198,6 +200,50 @@ describe("PollWidget", () => {
     expect(text()).toContain("Thanks for your response.");
     expect(text()).not.toContain("%");
     expect(container.querySelector(".homepage-poll-results")).toBeNull();
+  });
+
+  it("treats resultsAvailable as authoritative rather than counting votes itself", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(poll()));
+    await render();
+
+    // The server released results at a total the client would not have accepted
+    // on its own. The flag decides, not the arithmetic.
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        poll({
+          totalVotes: 2,
+          resultsAvailable: true,
+          options: [
+            { id: "news", label: "More school news", votes: 1 },
+            { id: "sports", label: "More sports coverage", votes: 1 }
+          ]
+        })
+      )
+    );
+    await submit();
+
+    expect(container.querySelector(".homepage-poll-results")).not.toBeNull();
+    expect(text()).toContain("50%");
+  });
+
+  it("falls back to the threshold only when the API omits the flag", async () => {
+    const legacy = poll({
+      totalVotes: 9,
+      options: [
+        { id: "news", label: "More school news", votes: 6 },
+        { id: "sports", label: "More sports coverage", votes: 3 }
+      ]
+    });
+    delete legacy.resultsAvailable;
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(poll()));
+    await render();
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(legacy));
+    await submit();
+
+    expect(text()).toContain("67%");
+    expect(MIN_RESULTS_VOTES).toBe(5);
   });
 
   it("never shows percentages the API withheld, even at a high total", async () => {
@@ -242,7 +288,9 @@ describe("PollWidget", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(poll()));
     await render();
 
-    fetchMock.mockResolvedValueOnce(jsonResponse({ error: "Already voted.", poll: poll({ totalVotes: 2 }) }, 409));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Already voted.", poll: poll({ totalVotes: 0, resultsAvailable: false }) }, 409)
+    );
     await submit();
 
     expect(text()).toContain("Thanks for your response.");

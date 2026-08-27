@@ -250,12 +250,15 @@ evaluated server-side, and the answer must belong to that poll.
 
 ### Low-response privacy
 
-Per-answer counts are withheld until `BYLINE_POLL_MIN_RESULTS_VOTES` (5)
-responses. Below that, `resultsAvailable` is `false` and every `votes` is `0`,
-while `totalVotes` still reports the true total so the client knows which state
-it is in. The rule lives in the API, not only in the UI, so an unauthenticated
-caller cannot skip the widget and read suppressed results. Editors always see
-full results in WordPress.
+Results are withheld entirely until `BYLINE_POLL_MIN_RESULTS_VOTES` (5)
+responses -- not just the per-answer split. Below the threshold,
+`resultsAvailable` is `false` and every count, including `totalVotes`, is
+reported as `0`, so an unauthenticated caller cannot watch a small poll fill up
+one vote at a time, or skip the widget and read the real total straight from the
+API. `resultsAvailable` is the authoritative signal: `PollWidget` trusts it
+outright rather than re-deriving visibility from a vote count, falling back to
+comparing `totalVotes` against the threshold only when an older CMS omits the
+field. Editors always see full, exact results in WordPress.
 
 ### Abuse protection
 
@@ -311,6 +314,55 @@ the publication build already makes. The proxy does not follow redirects: a
 canonical-host or scheme redirect from the CMS surfaces as
 `502 Poll service is unavailable.` rather than silently downgrading a `POST` to a
 `GET`.
+
+### Origin authentication
+
+Not every CMS origin is anonymously reachable, and the Worker is the one client
+of the WordPress poll routes -- so it is also the one place upstream credentials
+belong. Two independent, optional mechanisms:
+
+| Worker var/secret | Sends |
+| --- | --- |
+| `BYLINE_CMS_ACCESS_CLIENT_ID` + `BYLINE_CMS_ACCESS_CLIENT_SECRET` | `CF-Access-Client-Id` / `CF-Access-Client-Secret` -- a Cloudflare Access service token |
+| `BYLINE_CMS_AUTH_HEADER` + `BYLINE_CMS_AUTH_VALUE` | one arbitrary header, for a gateway that is not Cloudflare Access (basic auth, a bearer token, a mesh header) |
+
+Set them with `wrangler secret put`. Neither is required, and nothing in the
+WordPress poll domain knows or cares which one, if either, is used -- the
+Cloudflare Access pairing is the *Cloudflare adapter's* convenience, not a core
+plugin dependency.
+
+Credentials are built into every upstream request from Worker bindings alone,
+never copied from the incoming request, so a browser cannot inject or forge one.
+They are equally never copied onto the response the browser receives, even if
+the CMS were to echo them back.
+
+### Making the CMS poll routes non-public
+
+The public REST routes (`/byline/v1/polls/*`) are reachable by design so the
+Worker can proxy to them, but a deployment can additionally refuse to answer any
+caller that is not the Worker. Set `BYLINE_POLL_PROXY_SECRET` on the Worker and
+the matching `BYLINE_POLL_PROXY_SECRET` constant (or environment variable) in
+WordPress, and every poll request without a matching `X-Byline-Poll-Proxy`
+header is refused with `403`. This is off by default -- a publication that
+serves poll routes straight from a reachable WordPress needs no secret -- and it
+does not turn the routes into authenticated ones; it narrows who may call them.
+Combine it with network-level restrictions (a firewall rule, a Cloudflare Access
+policy on the CMS origin, or hosting the CMS off the public internet entirely)
+for a deployment that wants the WordPress poll routes unreachable from arbitrary
+public clients.
+
+### Worker environment
+
+| Variable | Purpose |
+| --- | --- |
+| `BYLINE_CMS_URL` | overrides the CMS origin discovered from the publication manifest |
+| `BYLINE_CMS_ACCESS_CLIENT_ID` / `BYLINE_CMS_ACCESS_CLIENT_SECRET` | Cloudflare Access service token for a protected CMS origin |
+| `BYLINE_CMS_AUTH_HEADER` / `BYLINE_CMS_AUTH_VALUE` | one arbitrary header for a non-Cloudflare protected origin |
+| `BYLINE_POLL_PROXY_SECRET` | proves to WordPress that this Worker is the caller |
+| `BYLINE_POLL_FREEZE_VOTES` | refuses `POST /api/polls/vote` with `503` without contacting WordPress; reads keep working |
+
+None of these are ever read from a request, returned in a response, or written
+to a static build artifact.
 
 ## Polls admin
 
@@ -423,27 +475,79 @@ exists. **Do not retire D1 until verification passes.**
 
 ### 4. Cut over
 
+The strict, zero-loss production order:
+
 ```
-1. Deploy the WordPress plugin.               WordPress poll API is live; no traffic yet.
-2. Export, import, verify.                    Historical data lands in WordPress.
-3. Configure the secret.                      BYLINE_POLL_COOKIE_SECRET == the Worker's old value.
-4. Deploy the new Worker.                     The single atomic switch: writes now go to WordPress.
-5. Re-export, re-import, re-verify.           Backfills votes cast between steps 2 and 4.
-6. Verify public voting on the live site.      Vote once; confirm the 409 on a second attempt.
-7. Retire D1.
+1. Deploy the WordPress plugin.        WordPress poll API is live; no public traffic yet.
+2. Set the OLD signing secret.         BYLINE_POLL_COOKIE_SECRET == the retired Worker's value.
+3. Initial D1 export/import.           Historical data lands in WordPress.
+4. Verify.
+5. Freeze OLD D1 vote writes.          A deployment freeze, not a poll status change.
+6. Final D1 delta export.
+7. Import the delta (--votes-only).    Only vote rows; editorial state is left alone.
+8. Verify.
+9. Switch the Worker to WordPress.     BYLINE_POLL_FREEZE_VOTES cleared at the same time.
+10. Smoke-test.                        Vote once; confirm the 409 on a second attempt.
+11. Retire D1.
 ```
 
-Step 4 is what avoids a dual-write window: the Worker is the only entry point, so
-its deploy flips the datastore atomically and D1 stops receiving writes at that
-instant. Steps 2-5 mean WordPress totals may lag by a few votes for the few
-minutes between the bulk import and the cutover; the delta import in step 5
-closes that gap, and step 5 is idempotent.
+**The delta (steps 6-8) must land before the switch (step 9), not after.** A
+voter whose last old-datastore vote is only in the final delta is unknown to
+WordPress until that delta is imported. Switching first opens a window where
+that voter can vote again in WordPress -- the delta import then absorbs their
+old vote as a harmless-looking duplicate, silently hiding the double vote. See
+`tests/poll-migration-cutover-regression.php`, which reproduces the race and
+proves the correct order closes it.
 
-If you need a strictly zero-loss cutover instead, close the poll in D1 between
-steps 2 and 4 (`UPDATE polls SET status = 'closed'`). Voting is then refused for
-that window with the existing "Poll is not open." message rather than lagging.
+**The write freeze (step 5) is a deployment mechanism, not a change to poll
+state.** Do not use `UPDATE polls SET status = 'closed'` to stop writes: that
+mutates domain data, and if the frozen source is later imported as a full
+(non-delta) import, the mutated status would overwrite what an editor set in
+WordPress. Options, in order of preference:
 
-### 5. Retire D1
+- take the old Worker offline, or point its route at a maintenance response;
+- a Cloudflare (or equivalent) rule that returns `503` for `POST /api/polls/vote`
+  against the old deployment;
+- if neither is available, `BYLINE_POLL_FREEZE_VOTES` on the **new** Worker
+  achieves the equivalent for the WordPress side of a brief overlap window --
+  see [Worker environment](#worker-environment) below.
+
+**Step 7 uses votes-only mode**, `wp byline polls import <delta> --votes-only`,
+so the final handoff can only ever add vote rows. It cannot create a poll that
+does not already exist in WordPress, and it cannot touch a poll's question,
+answers, schedule, or status -- so anything the write freeze mutated at the
+source, or anything an editor changed in WordPress since the initial import,
+survives untouched. A delta vote for an answer WordPress no longer holds is
+skipped and reported rather than resurrecting it.
+
+### 5. Migration secret fail-safe
+
+A `voter_key` is a one-way function of the signing secret, so importing vote
+history while WordPress is on its automatically generated fallback secret would
+silently produce keys that never match any cookie an existing visitor holds --
+every one of them could vote again. `wp byline polls import` refuses this case
+outright rather than relying on the documentation above being followed:
+
+```
+$ wp byline polls import polls-export.json
+Error: This artifact contains 6 vote(s), but WordPress is using an automatically
+generated poll signing secret. Imported voter keys would never match the
+cookies existing visitors hold, so they could all vote again. Set the previous
+poll signing secret in wp-config.php before importing: define(
+'BYLINE_POLL_COOKIE_SECRET', '...' ); Confirm it with `wp byline polls secret`.
+If this site has no voter continuity to preserve, re-run with
+--allow-generated-secret.
+```
+
+The secret itself is never printed. A `--dry-run` is still permitted -- it is
+read-only -- and reports the same warning so the counts can be checked before
+the secret is configured. An artifact with no vote rows (poll definitions only)
+is never blocked, since there is no continuity to lose. The check cannot prove
+an *explicitly supplied* secret is the historically correct one; it only rules
+out the one case it can be certain about. A brand-new publication with no
+history to preserve passes `--allow-generated-secret` deliberately.
+
+### 6. Retire D1
 
 Already done in this repository:
 
@@ -485,6 +589,8 @@ in the export.
 | REST, voting, duplicates, cookies, throttling | `wordpress-plugin/tests/poll-rest-regression.php` |
 | Admin columns, actions, saves, export, reset | `wordpress-plugin/tests/poll-admin-regression.php` |
 | D1 import, preservation, idempotency, verification | `wordpress-plugin/tests/poll-migration-regression.php` |
+| WP-CLI schema guarantee, cutover order, votes-only delta safety | `wordpress-plugin/tests/poll-migration-cutover-regression.php` |
+| Migration secret fail-safe | `wordpress-plugin/tests/poll-migration-secret-regression.php` |
 | Worker proxy, cookies, failure modes, no D1 | `apps/web/tests/poll-worker.test.ts` |
 | PollWidget behavior | `apps/web/tests/poll-widget.test.tsx` |
 | Cross-language contract | `apps/web/tests/poll-contract.test.ts` |

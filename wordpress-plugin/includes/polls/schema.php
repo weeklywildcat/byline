@@ -98,6 +98,27 @@ function byline_poll_maybe_upgrade_schema(): void
 
     byline_poll_install_schema();
 }
+
+/**
+ * Guarantee poll storage before a privileged caller touches poll data.
+ *
+ * WP-CLI does not fire admin_init, so a migration run against freshly deployed
+ * plugin files cannot assume the upgrade path has happened yet. Unlike
+ * byline_poll_maybe_upgrade_schema() this also confirms the table itself is
+ * present, because a migration is exactly the moment to find out that it is not.
+ *
+ * Only ever called from CLI and activation. Public poll requests never reach it,
+ * so anonymous traffic still cannot trigger DDL.
+ */
+function byline_poll_ensure_schema(): bool
+{
+    if ((int) get_option(BYLINE_POLL_SCHEMA_VERSION_OPTION, 0) < BYLINE_POLL_SCHEMA_VERSION
+        || !byline_poll_votes_table_exists()) {
+        byline_poll_install_schema();
+    }
+
+    return byline_poll_votes_table_exists();
+}
 add_action('admin_init', 'byline_poll_maybe_upgrade_schema');
 
 /**

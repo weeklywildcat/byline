@@ -21,7 +21,9 @@ if (!defined('ARRAY_A')) {
 }
 
 // Deterministic secret so signature and voter-key expectations are stable.
-if (!defined('BYLINE_POLL_COOKIE_SECRET')) {
+// A suite that needs the generated-fallback path defines
+// BYLINE_POLL_TEST_WITHOUT_SECRET before including this file.
+if (!defined('BYLINE_POLL_COOKIE_SECRET') && !defined('BYLINE_POLL_TEST_WITHOUT_SECRET')) {
     define('BYLINE_POLL_COOKIE_SECRET', 'byline-poll-test-secret');
 }
 
@@ -42,6 +44,7 @@ $byline_test_features = ['polls' => true];
 $byline_test_roles = [];
 $byline_test_notices = [];
 $byline_test_redirects = [];
+$byline_test_dbdelta_calls = 0;
 
 function byline_test_fail(string $message): void
 {
@@ -251,6 +254,9 @@ class Byline_Test_WPDB
     public $suppressed = false;
     public $insert_failure = null;
     public $insert_calls = 0;
+    // Set when a row was written while the table did not exist, which is how the
+    // cutover suite proves the schema was guaranteed before any data was touched.
+    public $inserted_without_table = false;
 
     public function get_charset_collate(): string
     {
@@ -274,6 +280,10 @@ class Byline_Test_WPDB
     {
         $this->insert_calls++;
         $this->last_error = '';
+
+        if (!$this->installed) {
+            $this->inserted_without_table = true;
+        }
 
         if ($this->insert_failure !== null) {
             $this->last_error = $this->insert_failure;
@@ -817,7 +827,8 @@ function add_meta_box(...$args): void
 
 function dbDelta($queries, bool $execute = true): array
 {
-    global $wpdb;
+    global $wpdb, $byline_test_dbdelta_calls;
+    $byline_test_dbdelta_calls++;
     $wpdb->installed = true;
 
     return [];
@@ -842,7 +853,11 @@ require __DIR__ . '/../../includes/polls/model.php';
 require __DIR__ . '/../../includes/polls/rest.php';
 require __DIR__ . '/../../includes/polls/migration.php';
 
-byline_poll_install_schema();
+// A suite that needs to represent freshly deployed plugin files with no admin
+// request yet defines BYLINE_POLL_TEST_NO_SCHEMA before including this file.
+if (!defined('BYLINE_POLL_TEST_NO_SCHEMA')) {
+    byline_poll_install_schema();
+}
 
 /**
  * Create a poll the way the editor would, returning its post id.
@@ -881,14 +896,38 @@ function byline_test_create_poll(
     return $post_id;
 }
 
+/**
+ * Headers a legitimate publication proxy sends, including the proxy credential
+ * once a suite has configured one.
+ *
+ * @param array<string,string> $headers
+ * @return array<string,string>
+ */
+function byline_test_proxy_headers(array $headers = []): array
+{
+    if (defined('BYLINE_POLL_PROXY_SECRET')) {
+        $headers['X-Byline-Poll-Proxy'] = (string) constant('BYLINE_POLL_PROXY_SECRET');
+    }
+
+    return $headers;
+}
+
+function byline_test_proxy_request(array $params = [], array $headers = []): WP_REST_Request
+{
+    return new WP_REST_Request($params, byline_test_proxy_headers($headers));
+}
+
 function byline_test_vote_request(string $poll_id, string $option_id, string $cookie = ''): WP_REST_Request
 {
-    $body = json_encode(['pollId' => $poll_id, 'optionId' => $option_id]);
+    $headers = ['Content-Type' => 'application/json'];
+    if ($cookie !== '') {
+        $headers['Cookie'] = $cookie;
+    }
 
     return new WP_REST_Request(
         ['pollId' => $poll_id, 'optionId' => $option_id],
-        $cookie !== '' ? ['Cookie' => $cookie, 'Content-Type' => 'application/json'] : ['Content-Type' => 'application/json'],
-        (string) $body
+        byline_test_proxy_headers($headers),
+        (string) json_encode(['pollId' => $poll_id, 'optionId' => $option_id])
     );
 }
 

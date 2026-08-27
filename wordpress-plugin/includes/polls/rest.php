@@ -20,6 +20,12 @@ const BYLINE_POLL_ERROR_WRONG_POLL = 'That answer does not belong to this poll.'
 const BYLINE_POLL_ERROR_ALREADY_VOTED = 'Already voted.';
 const BYLINE_POLL_ERROR_NOT_CONFIGURED = 'Poll voting is not configured yet.';
 const BYLINE_POLL_ERROR_THROTTLED = 'Too many poll requests. Try again shortly.';
+const BYLINE_POLL_ERROR_UNTRUSTED_CLIENT = 'Poll requests are not accepted from this client.';
+
+// Header a trusted publication proxy presents to prove it is the caller. The
+// name is deliberately host-neutral: nothing in the WordPress poll domain knows
+// or cares which edge provider a publication uses.
+const BYLINE_POLL_PROXY_HEADER = 'X-Byline-Poll-Proxy';
 
 const BYLINE_POLL_MAX_REQUEST_BYTES = 2048;
 const BYLINE_POLL_RATE_LIMIT_WINDOW = 60;
@@ -91,6 +97,66 @@ function byline_poll_rest_error(string $message, int $status, ?array $poll = nul
 }
 
 /**
+ * Shared secret a publication proxy must present, when the deployment sets one.
+ *
+ * Optional and off by default: poll routes are public, and a publication that
+ * serves them straight from WordPress needs no secret. Setting it lets an
+ * operator make the poll runtime routes unreachable from arbitrary public
+ * clients while the publication's own proxy keeps working, without turning the
+ * endpoints into authenticated routes and without assuming any particular edge
+ * provider.
+ *
+ * Server-side only, exactly like the signing secret: never in publication.json,
+ * a REST response, diagnostics, or browser JavaScript.
+ */
+function byline_poll_proxy_secret(): string
+{
+    if (defined('BYLINE_POLL_PROXY_SECRET') && is_string(constant('BYLINE_POLL_PROXY_SECRET'))) {
+        return (string) constant('BYLINE_POLL_PROXY_SECRET');
+    }
+
+    $environment = getenv('BYLINE_POLL_PROXY_SECRET');
+
+    return is_string($environment) ? $environment : '';
+}
+
+/**
+ * Enforce the proxy trust boundary when one is configured.
+ *
+ * @return true|WP_REST_Response
+ */
+function byline_poll_check_proxy_trust(WP_REST_Request $request)
+{
+    $secret = byline_poll_proxy_secret();
+    if ($secret === '') {
+        return true;
+    }
+
+    $presented = (string) $request->get_header(BYLINE_POLL_PROXY_HEADER);
+    if ($presented !== '' && hash_equals($secret, $presented)) {
+        return true;
+    }
+
+    return byline_poll_rest_error(BYLINE_POLL_ERROR_UNTRUSTED_CLIENT, 403);
+}
+
+/**
+ * Headers that may carry the real client address when a trusted proxy is in
+ * front of WordPress, most specific first.
+ *
+ * This is a list rather than one provider's header precisely so no edge provider
+ * is assumed, and it is filterable for a gateway that uses a different one.
+ * These headers are only ever read for throttle bucketing, and only when the
+ * deployment has declared its proxy trustworthy.
+ *
+ * @return array<int,string>
+ */
+function byline_poll_forwarded_ip_headers(): array
+{
+    return apply_filters('byline_poll_forwarded_ip_headers', ['cf-connecting-ip', 'x-real-ip', 'x-forwarded-for']);
+}
+
+/**
  * Client bucket for short-window throttling.
  *
  * The address is never stored: it is HMAC'd with the site's poll secret and the
@@ -103,8 +169,8 @@ function byline_poll_client_bucket(WP_REST_Request $request): string
     $address = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
 
     if (defined('BYLINE_POLL_TRUSTED_PROXY') && constant('BYLINE_POLL_TRUSTED_PROXY')) {
-        foreach (['cf-connecting-ip', 'x-forwarded-for'] as $header) {
-            $forwarded = (string) $request->get_header($header);
+        foreach (byline_poll_forwarded_ip_headers() as $header) {
+            $forwarded = (string) $request->get_header((string) $header);
             if ($forwarded !== '') {
                 $address = trim(explode(',', $forwarded)[0]);
                 break;
@@ -131,6 +197,11 @@ function byline_poll_rate_limit_exceeded(WP_REST_Request $request): bool
 
 function byline_poll_rest_get_active(WP_REST_Request $request)
 {
+    $trusted = byline_poll_check_proxy_trust($request);
+    if ($trusted !== true) {
+        return $trusted;
+    }
+
     $record = byline_poll_active_record();
 
     if ($record === null) {
@@ -149,6 +220,11 @@ function byline_poll_rest_get_active(WP_REST_Request $request)
 
 function byline_poll_rest_get_results(WP_REST_Request $request)
 {
+    $trusted = byline_poll_check_proxy_trust($request);
+    if ($trusted !== true) {
+        return $trusted;
+    }
+
     if (!byline_poll_feature_enabled()) {
         return byline_poll_rest_error(BYLINE_POLL_ERROR_NO_ACTIVE_POLL, 404);
     }
@@ -182,6 +258,11 @@ function byline_poll_rest_get_results(WP_REST_Request $request)
  */
 function byline_poll_rest_vote(WP_REST_Request $request)
 {
+    $trusted = byline_poll_check_proxy_trust($request);
+    if ($trusted !== true) {
+        return $trusted;
+    }
+
     if (!byline_poll_feature_enabled()) {
         return byline_poll_rest_error(BYLINE_POLL_ERROR_NOT_OPEN, 404);
     }

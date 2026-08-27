@@ -22,11 +22,60 @@ const CMS_POLL_API_BASE = "/wp-json/byline/v1";
 // There is deliberately no pattern that could forward an arbitrary /api path or
 // an attacker-chosen upstream URL.
 const POLL_ROUTES = {
-  "/api/polls/active": { method: "GET", upstream: `${CMS_POLL_API_BASE}/polls/active` },
-  "/api/polls/vote": { method: "POST", upstream: `${CMS_POLL_API_BASE}/polls/vote` }
+  "/api/polls/active": { method: "GET", upstream: `${CMS_POLL_API_BASE}/polls/active`, write: false },
+  "/api/polls/vote": { method: "POST", upstream: `${CMS_POLL_API_BASE}/polls/vote`, write: true }
 };
 
 const PUBLICATION_MANIFEST_PATH = "/_byline/publication.json";
+
+/**
+ * Trust boundary.
+ *
+ * The browser only ever talks to the publication domain. This Worker is the one
+ * client of the WordPress poll routes, so it is also the only place that holds
+ * upstream credentials. None of the values below are ever read from the request,
+ * returned downstream, or published in a static artifact -- they come from
+ * Worker vars/secrets and travel in one direction only.
+ *
+ * A CMS origin does not have to be anonymously reachable. Two mechanisms are
+ * supported, and neither is required:
+ *
+ *   BYLINE_CMS_ACCESS_CLIENT_ID / BYLINE_CMS_ACCESS_CLIENT_SECRET
+ *     A Cloudflare Access service token, emitted as CF-Access-Client-Id and
+ *     CF-Access-Client-Secret. This is the Cloudflare adapter's convenience;
+ *     nothing in the WordPress poll domain knows about it.
+ *
+ *   BYLINE_CMS_AUTH_HEADER / BYLINE_CMS_AUTH_VALUE
+ *     Any single header a protected origin expects, so a publication behind a
+ *     different gateway (basic auth, a bearer token, a mesh header) needs no
+ *     Cloudflare-specific configuration.
+ *
+ * BYLINE_POLL_PROXY_SECRET is the reverse direction: it proves to WordPress that
+ * this proxy is the caller, which is what lets an operator keep the poll runtime
+ * routes from answering arbitrary public clients.
+ */
+function upstreamAuthHeaders(env) {
+  const headers = [];
+
+  if (env.BYLINE_CMS_ACCESS_CLIENT_ID && env.BYLINE_CMS_ACCESS_CLIENT_SECRET) {
+    headers.push(["CF-Access-Client-Id", env.BYLINE_CMS_ACCESS_CLIENT_ID]);
+    headers.push(["CF-Access-Client-Secret", env.BYLINE_CMS_ACCESS_CLIENT_SECRET]);
+  }
+
+  if (env.BYLINE_CMS_AUTH_HEADER && env.BYLINE_CMS_AUTH_VALUE) {
+    headers.push([env.BYLINE_CMS_AUTH_HEADER, env.BYLINE_CMS_AUTH_VALUE]);
+  }
+
+  if (env.BYLINE_POLL_PROXY_SECRET) {
+    headers.push(["X-Byline-Poll-Proxy", env.BYLINE_POLL_PROXY_SECRET]);
+  }
+
+  return headers;
+}
+
+function truthy(value) {
+  return value !== undefined && value !== null && value !== "" && value !== "0" && value !== "false";
+}
 
 let resolvedCmsOrigin;
 
@@ -54,13 +103,22 @@ async function handlePollRoute(request, env, route) {
     });
   }
 
+  // Cutover write freeze. Reads keep working while a migration's final vote
+  // delta is exported and imported, so no vote can be accepted into either
+  // datastore during the handoff. It is deliberately a deployment flag rather
+  // than a change to poll state: closing the poll would mutate editorial data
+  // and could be re-imported as the poll's final status.
+  if (route.write && truthy(env.BYLINE_POLL_FREEZE_VOTES)) {
+    return json({ error: "Voting is paused." }, 503);
+  }
+
   const origin = await cmsOrigin(request, env);
 
   if (!origin) {
     return json({ error: "Poll service is unavailable." }, 502);
   }
 
-  return proxyToCms(request, origin + route.upstream);
+  return proxyToCms(request, origin + route.upstream, env);
 }
 
 /**
@@ -110,12 +168,18 @@ function normalizeOrigin(value) {
   }
 }
 
-async function proxyToCms(request, upstreamUrl) {
+async function proxyToCms(request, upstreamUrl, env) {
+  // Built from scratch, never cloned from the request: a browser cannot inject
+  // an upstream credential or forge the proxy header by sending it itself.
   const headers = new Headers({ Accept: "application/json" });
   const contentType = request.headers.get("content-type");
 
   if (contentType) {
     headers.set("Content-Type", contentType);
+  }
+
+  for (const [name, value] of upstreamAuthHeaders(env)) {
+    headers.set(name, value);
   }
 
   const cookie = forwardablePollCookies(request.headers.get("cookie"));

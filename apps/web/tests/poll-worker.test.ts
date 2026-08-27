@@ -234,6 +234,172 @@ describe("poll cookie handling through the proxy", () => {
   });
 });
 
+describe("origin authentication", () => {
+  it("sends a Cloudflare Access service token upstream", async () => {
+    const worker = await loadWorker();
+    fetchMock.mockResolvedValueOnce(upstream({ id: "p", question: "Q", options: [], totalVotes: 0 }));
+
+    await worker.fetch(new Request(`${SITE}${POLL_ACTIVE_ENDPOINT}`), {
+      ASSETS: assetsBinding(),
+      BYLINE_CMS_URL: CMS,
+      BYLINE_CMS_ACCESS_CLIENT_ID: "service-token-id",
+      BYLINE_CMS_ACCESS_CLIENT_SECRET: "service-token-secret"
+    });
+
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(headers.get("CF-Access-Client-Id")).toBe("service-token-id");
+    expect(headers.get("CF-Access-Client-Secret")).toBe("service-token-secret");
+  });
+
+  it("supports a provider-neutral auth header so Cloudflare is not mandatory", async () => {
+    const worker = await loadWorker();
+    fetchMock.mockResolvedValueOnce(upstream({ id: "p", question: "Q", options: [], totalVotes: 0 }));
+
+    await worker.fetch(new Request(`${SITE}${POLL_ACTIVE_ENDPOINT}`), {
+      ASSETS: assetsBinding(),
+      BYLINE_CMS_URL: CMS,
+      BYLINE_CMS_AUTH_HEADER: "Authorization",
+      BYLINE_CMS_AUTH_VALUE: "Bearer upstream-token"
+    });
+
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(headers.get("Authorization")).toBe("Bearer upstream-token");
+    expect(headers.get("CF-Access-Client-Id")).toBeNull();
+  });
+
+  it("proves to WordPress that the proxy is the caller", async () => {
+    const worker = await loadWorker();
+    fetchMock.mockResolvedValueOnce(upstream({ id: "p", question: "Q", options: [], totalVotes: 0 }));
+
+    await worker.fetch(
+      new Request(`${SITE}${POLL_VOTE_ENDPOINT}`, { method: "POST", body: "{}" }),
+      { ASSETS: assetsBinding(), BYLINE_CMS_URL: CMS, BYLINE_POLL_PROXY_SECRET: "proxy-shared-secret" }
+    );
+
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(headers.get("X-Byline-Poll-Proxy")).toBe("proxy-shared-secret");
+  });
+
+  it("sends no credential when the deployment configures none", async () => {
+    const worker = await loadWorker();
+    fetchMock.mockResolvedValueOnce(upstream({ id: "p", question: "Q", options: [], totalVotes: 0 }));
+
+    await worker.fetch(new Request(`${SITE}${POLL_ACTIVE_ENDPOINT}`), {
+      ASSETS: assetsBinding(),
+      BYLINE_CMS_URL: CMS
+    });
+
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    for (const name of ["CF-Access-Client-Id", "CF-Access-Client-Secret", "Authorization", "X-Byline-Poll-Proxy"]) {
+      expect(headers.get(name)).toBeNull();
+    }
+  });
+
+  it("never returns upstream credentials downstream, even if the CMS echoes them", async () => {
+    const worker = await loadWorker();
+    fetchMock.mockResolvedValueOnce(
+      upstream({ id: "p", question: "Q", options: [], totalVotes: 0 }, {
+        headers: {
+          "CF-Access-Client-Id": "service-token-id",
+          "CF-Access-Client-Secret": "service-token-secret",
+          "X-Byline-Poll-Proxy": "proxy-shared-secret",
+          Authorization: "Bearer upstream-token"
+        }
+      })
+    );
+
+    const response = await worker.fetch(new Request(`${SITE}${POLL_ACTIVE_ENDPOINT}`), {
+      ASSETS: assetsBinding(),
+      BYLINE_CMS_URL: CMS,
+      BYLINE_CMS_ACCESS_CLIENT_ID: "service-token-id",
+      BYLINE_CMS_ACCESS_CLIENT_SECRET: "service-token-secret",
+      BYLINE_CMS_AUTH_HEADER: "Authorization",
+      BYLINE_CMS_AUTH_VALUE: "Bearer upstream-token",
+      BYLINE_POLL_PROXY_SECRET: "proxy-shared-secret"
+    });
+
+    for (const name of ["CF-Access-Client-Id", "CF-Access-Client-Secret", "X-Byline-Poll-Proxy", "Authorization"]) {
+      expect(response.headers.get(name)).toBeNull();
+    }
+
+    const body = await response.text();
+    for (const secret of ["service-token-id", "service-token-secret", "proxy-shared-secret", "upstream-token"]) {
+      expect(body).not.toContain(secret);
+    }
+    expect([...response.headers.keys()].sort()).toEqual(["cache-control", "content-type"]);
+  });
+
+  it("ignores credentials a browser tries to supply for itself", async () => {
+    const worker = await loadWorker();
+    fetchMock.mockResolvedValueOnce(upstream({ id: "p", question: "Q", options: [], totalVotes: 0 }));
+
+    await worker.fetch(
+      new Request(`${SITE}${POLL_VOTE_ENDPOINT}`, {
+        method: "POST",
+        headers: {
+          "CF-Access-Client-Id": "forged-id",
+          "CF-Access-Client-Secret": "forged-secret",
+          "X-Byline-Poll-Proxy": "forged-proxy-secret",
+          Authorization: "Bearer forged"
+        },
+        body: "{}"
+      }),
+      { ASSETS: assetsBinding(), BYLINE_CMS_URL: CMS }
+    );
+
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    for (const name of ["CF-Access-Client-Id", "CF-Access-Client-Secret", "X-Byline-Poll-Proxy", "Authorization"]) {
+      expect(headers.get(name)).toBeNull();
+    }
+  });
+});
+
+describe("cutover write freeze", () => {
+  it("refuses votes without contacting the CMS while the freeze is set", async () => {
+    const worker = await loadWorker();
+    const env = { ASSETS: assetsBinding(), BYLINE_CMS_URL: CMS, BYLINE_POLL_FREEZE_VOTES: "1" };
+
+    const response = await worker.fetch(
+      new Request(`${SITE}${POLL_VOTE_ENDPOINT}`, { method: "POST", body: JSON.stringify({ pollId: "p", optionId: "o" }) }),
+      env
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: "Voting is paused." });
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps reads working during the freeze", async () => {
+    const worker = await loadWorker();
+    fetchMock.mockResolvedValueOnce(upstream({ id: "p", question: "Q", options: [], totalVotes: 0 }));
+
+    const response = await worker.fetch(new Request(`${SITE}${POLL_ACTIVE_ENDPOINT}`), {
+      ASSETS: assetsBinding(),
+      BYLINE_CMS_URL: CMS,
+      BYLINE_POLL_FREEZE_VOTES: "1"
+    });
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats absent and falsy freeze values as not frozen", async () => {
+    for (const value of [undefined, "", "0", "false"]) {
+      const worker = await loadWorker();
+      fetchMock.mockResolvedValueOnce(upstream({ id: "p", question: "Q", options: [], totalVotes: 0 }));
+
+      const response = await worker.fetch(
+        new Request(`${SITE}${POLL_VOTE_ENDPOINT}`, { method: "POST", body: "{}" }),
+        { ASSETS: assetsBinding(), BYLINE_CMS_URL: CMS, BYLINE_POLL_FREEZE_VOTES: value }
+      );
+
+      expect(response.status, `freeze value ${JSON.stringify(value)}`).toBe(200);
+      fetchMock.mockClear();
+    }
+  });
+});
+
 describe("CMS origin discovery", () => {
   it("reads the CMS origin from the published publication document", async () => {
     const worker = await loadWorker();

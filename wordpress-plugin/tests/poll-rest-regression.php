@@ -69,7 +69,9 @@ $byline_test_features = ['polls' => true];
 byline_test_reset_rate_limit();
 $vote = byline_poll_rest_vote(byline_test_vote_request($poll_id, $options[0]['id']));
 byline_test_assert($vote->get_status() === 200, 'A valid vote succeeds.');
-byline_test_assert($vote->get_data()['totalVotes'] === 1, 'The vote count increments immediately.');
+byline_test_assert(byline_poll_vote_total($poll_id) === 1, 'The vote count increments immediately.');
+byline_test_assert($vote->get_data()['resultsAvailable'] === false, 'A single vote is below the public threshold.');
+byline_test_assert($vote->get_data()['totalVotes'] === 0, 'The voter is not handed the running total of a low-response poll.');
 byline_test_assert($vote->get_headers()['Cache-Control'] === ['no-store'], 'A vote response is no-store.');
 byline_test_assert(count($wpdb->rows) === 1, 'Exactly one vote row is written.');
 
@@ -123,7 +125,7 @@ $duplicate = byline_poll_rest_vote(byline_test_vote_request($poll_id, $options[1
 byline_test_assert($duplicate->get_status() === 409, 'A returning voter receives a deterministic 409.');
 byline_test_assert($duplicate->get_data()['error'] === BYLINE_POLL_ERROR_ALREADY_VOTED, 'The duplicate message is preserved.');
 byline_test_assert(isset($duplicate->get_data()['poll']), 'A duplicate response still returns current poll state.');
-byline_test_assert($duplicate->get_data()['poll']['totalVotes'] === 1, 'A duplicate vote does not inflate the total.');
+byline_test_assert(byline_poll_vote_total($poll_id) === 1, 'A duplicate vote does not inflate the total.');
 byline_test_assert(count($wpdb->rows) === 1, 'A duplicate vote writes no row.');
 byline_test_assert(count(byline_poll_issued_cookies()) === 1, 'A recognised voter is not issued a second voter cookie.');
 byline_test_assert(strpos(byline_poll_issued_cookies()[0], 'ww_poll_voted_') === 0, 'A duplicate still marks the browser as having voted.');
@@ -134,6 +136,62 @@ $forged = byline_poll_rest_vote(byline_test_vote_request($poll_id, $options[1]['
 byline_test_assert($forged->get_status() === 200, 'A forged cookie does not block voting; it is simply not trusted.');
 byline_test_assert(count(byline_poll_issued_cookies()) === 2, 'A forged cookie is replaced with a freshly signed one.');
 byline_test_assert(count($wpdb->rows) === 2, 'The untrusted visitor is counted as a new voter.');
+
+// Crossing the threshold releases the total and the per-answer split together.
+byline_test_reset_rate_limit();
+for ($filler = 0; $filler < BYLINE_POLL_MIN_RESULTS_VOTES; $filler++) {
+    byline_poll_insert_vote($poll_id, $options[0]['id'], 'threshold-voter-' . $filler);
+}
+$released = byline_poll_rest_get_active(new WP_REST_Request());
+byline_test_assert($released->get_data()['resultsAvailable'] === true, 'Reaching the threshold releases results.');
+byline_test_assert($released->get_data()['totalVotes'] === byline_poll_vote_total($poll_id), 'Released results report the true total.');
+byline_test_assert($released->get_data()['options'][0]['votes'] > 0, 'Released results report per-answer counts.');
+$wpdb->rows = array_slice($wpdb->rows, 0, 2);
+
+// ---------------------------------------------------------------------------
+// Optional proxy trust boundary
+// ---------------------------------------------------------------------------
+
+// Unset by default: poll routes stay reachable without any proxy credential.
+byline_test_assert(byline_poll_proxy_secret() === '', 'No proxy secret is configured by default.');
+byline_test_assert(byline_poll_check_proxy_trust(new WP_REST_Request()) === true, 'Without a configured secret every client is accepted.');
+
+define('BYLINE_POLL_PROXY_SECRET', 'proxy-shared-secret');
+
+byline_test_reset_rate_limit();
+$anonymous = byline_poll_rest_get_active(new WP_REST_Request());
+byline_test_assert($anonymous->get_status() === 403, 'With a proxy secret set, an arbitrary public client is refused.');
+byline_test_assert($anonymous->get_data()['error'] === BYLINE_POLL_ERROR_UNTRUSTED_CLIENT, 'The refusal message names the client, not the secret.');
+byline_test_assert(
+    strpos((string) json_encode($anonymous->get_data()), 'proxy-shared-secret') === false,
+    'A refusal must never echo the proxy secret.'
+);
+
+$wrong = byline_poll_rest_get_active(new WP_REST_Request([], ['X-Byline-Poll-Proxy' => 'guessed']));
+byline_test_assert($wrong->get_status() === 403, 'A wrong proxy credential is refused.');
+
+$trusted_request = new WP_REST_Request([], ['X-Byline-Poll-Proxy' => 'proxy-shared-secret']);
+byline_test_assert(byline_poll_rest_get_active($trusted_request)->get_status() === 200, 'The publication proxy is accepted.');
+
+byline_test_reset_rate_limit();
+$untrusted_vote = byline_poll_rest_vote(new WP_REST_Request(
+    ['pollId' => $poll_id, 'optionId' => $options[0]['id']],
+    ['Content-Type' => 'application/json'],
+    (string) json_encode(['pollId' => $poll_id, 'optionId' => $options[0]['id']])
+));
+byline_test_assert($untrusted_vote->get_status() === 403, 'The vote route is behind the same boundary.');
+byline_test_assert(count($wpdb->rows) === 2, 'A refused client writes no vote.');
+
+$untrusted_results = byline_poll_rest_get_results(new WP_REST_Request(['id' => $poll_id]));
+byline_test_assert($untrusted_results->get_status() === 403, 'The results route is behind the same boundary.');
+
+byline_test_assert(
+    byline_poll_rest_get_results(new WP_REST_Request(['id' => $poll_id], ['X-Byline-Poll-Proxy' => 'proxy-shared-secret']))->get_status() === 200,
+    'A trusted caller still reads results.'
+);
+
+// From here on every case speaks through the trusted proxy; the harness adds
+// the credential to its request builders once the secret is configured.
 
 // ---------------------------------------------------------------------------
 // Cookie compatibility with the retired Worker implementation
@@ -210,7 +268,7 @@ byline_test_assert($wpdb->rows === [], 'No out-of-window vote is stored.');
 byline_test_reset_rate_limit();
 $oversized = byline_poll_rest_vote(new WP_REST_Request(
     ['pollId' => $poll_id, 'optionId' => $options[0]['id']],
-    ['Content-Type' => 'application/json'],
+    byline_test_proxy_headers(['Content-Type' => 'application/json']),
     str_repeat('x', BYLINE_POLL_MAX_REQUEST_BYTES + 1)
 ));
 byline_test_assert($oversized->get_status() === 400, 'An oversized vote body is refused.');
@@ -250,7 +308,7 @@ byline_test_reset_rate_limit();
 $wpdb->rows = [];
 byline_poll_insert_vote($poll_id, $options[0]['id'], 'results-voter-1');
 
-$results = byline_poll_rest_get_results(new WP_REST_Request(['id' => $poll_id]));
+$results = byline_poll_rest_get_results(byline_test_proxy_request(['id' => $poll_id]));
 byline_test_assert($results->get_status() === 200, 'Published poll results are public.');
 byline_test_assert($results->get_data()['resultsAvailable'] === false, 'The results route applies the same suppression.');
 byline_test_assert(array_sum(array_column($results->get_data()['options'], 'votes')) === 0, 'Suppressed results expose no per-answer counts.');
@@ -258,13 +316,13 @@ byline_test_assert($results->get_data()['status'] === BYLINE_POLL_STATUS_OPEN, '
 byline_test_assert($results->get_headers()['Cache-Control'] === ['no-store'], 'Results are no-store.');
 
 byline_test_assert(
-    byline_poll_rest_get_results(new WP_REST_Request(['id' => 'unknown-poll']))->get_status() === 404,
+    byline_poll_rest_get_results(byline_test_proxy_request(['id' => 'unknown-poll']))->get_status() === 404,
     'An unknown poll has no public results.'
 );
 
 $drafted = byline_test_create_poll('Drafted', ['A', 'B'], BYLINE_POLL_STATUS_DRAFT);
 byline_test_assert(
-    byline_poll_rest_get_results(new WP_REST_Request(['id' => byline_poll_public_id($drafted)]))->get_status() === 404,
+    byline_poll_rest_get_results(byline_test_proxy_request(['id' => byline_poll_public_id($drafted)]))->get_status() === 404,
     'A drafted poll exposes no public results.'
 );
 
@@ -278,11 +336,11 @@ $unconfigured = byline_poll_rest_vote(byline_test_vote_request($poll_id, $option
 byline_test_assert($unconfigured->get_status() === 500, 'Missing vote storage is a server error, not a silent success.');
 byline_test_assert($unconfigured->get_data()['error'] === BYLINE_POLL_ERROR_NOT_CONFIGURED, 'The unconfigured message is preserved.');
 
-$unreadable = byline_poll_rest_get_active(new WP_REST_Request());
+$unreadable = byline_poll_rest_get_active(byline_test_proxy_request());
 byline_test_assert($unreadable->get_status() === 500, 'Serving a poll whose totals cannot be read is reported, not attempted.');
 byline_test_assert($unreadable->get_data()['error'] === BYLINE_POLL_ERROR_NOT_CONFIGURED, 'The active-poll route reports the same misconfiguration.');
 
-$unreadable_results = byline_poll_rest_get_results(new WP_REST_Request(['id' => $poll_id]));
+$unreadable_results = byline_poll_rest_get_results(byline_test_proxy_request(['id' => $poll_id]));
 byline_test_assert($unreadable_results->get_status() === 500, 'The results route reports missing storage rather than querying it.');
 
 // An answer can never look vote-free just because storage is unavailable, so a

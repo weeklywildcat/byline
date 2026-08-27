@@ -5,7 +5,8 @@ import {
   CMS_POLL_VOTE_ROUTE,
   MIN_RESULTS_VOTES,
   POLL_ACTIVE_ENDPOINT,
-  POLL_VOTE_ENDPOINT
+  POLL_VOTE_ENDPOINT,
+  pollResultsVisible
 } from "@/lib/polls";
 import { POLL_VOTED_COOKIE_PREFIX, VOTER_COOKIE_NAME } from "@/lib/voter-cookie";
 
@@ -77,6 +78,46 @@ describe("canonical poll API contract", () => {
   it("shares one response threshold between WordPress and the client", async () => {
     const postType = await plugin("post-type.php");
     expect(postType).toContain(`const BYLINE_POLL_MIN_RESULTS_VOTES = ${MIN_RESULTS_VOTES};`);
+  });
+
+  it("withholds the running total, not just the split, below the threshold", async () => {
+    const model = await plugin("model.php");
+    expect(model).toContain("'totalVotes' => $available ? $total : 0,");
+  });
+
+  it("makes resultsAvailable the authoritative client signal", () => {
+    expect(pollResultsVisible({ id: "p", question: "Q", options: [], totalVotes: 0, resultsAvailable: true })).toBe(true);
+    expect(pollResultsVisible({ id: "p", question: "Q", options: [], totalVotes: 999, resultsAvailable: false })).toBe(false);
+    // Legacy fallback only, for a CMS that predates the field.
+    expect(pollResultsVisible({ id: "p", question: "Q", options: [], totalVotes: MIN_RESULTS_VOTES })).toBe(true);
+    expect(pollResultsVisible({ id: "p", question: "Q", options: [], totalVotes: MIN_RESULTS_VOTES - 1 })).toBe(false);
+  });
+
+  it("names the proxy trust header identically on both sides", async () => {
+    const rest = await plugin("rest.php");
+    expect(rest).toContain("const BYLINE_POLL_PROXY_HEADER = 'X-Byline-Poll-Proxy';");
+    expect(workerSource).toContain('"X-Byline-Poll-Proxy"');
+  });
+
+  it("keeps upstream credentials and publication identity out of the WordPress poll domain", async () => {
+    const modules = ["rest.php", "model.php", "voter.php", "post-type.php", "votes.php", "schema.php", "migration.php", "cli.php"];
+
+    for (const file of modules) {
+      const source = await plugin(file);
+      // No edge-provider credential or header ever reaches the CMS side, and no
+      // publication's identity is baked into it.
+      expect(source, file).not.toContain("CF-Access");
+      expect(source, file).not.toContain("CF-Connecting");
+      expect(source, file).not.toContain("weeklywildcat");
+    }
+
+    // The poll runtime itself must not name a provider at all. The migration
+    // and voter modules may describe the historical Cloudflare source in prose,
+    // which is documentation rather than a dependency.
+    for (const file of ["rest.php", "model.php", "post-type.php", "votes.php", "schema.php"]) {
+      const source = await plugin(file);
+      expect(source, file).not.toContain("Cloudflare");
+    }
   });
 
   it("preserves the user-facing poll error messages", async () => {

@@ -431,9 +431,16 @@ function byline_poll_active_record(?string $now = null): ?array
 /**
  * Public poll payload.
  *
- * Per-answer counts are withheld until the response threshold is met. The
- * suppression lives here, so an unauthenticated caller cannot skip the UI and
- * read low-count results straight from the API.
+ * Results are withheld entirely until the response threshold is met: not just
+ * the per-answer counts but the running total, which would otherwise let anyone
+ * watch a small poll fill up one vote at a time. Below the threshold the
+ * response is `resultsAvailable: false` with every count, including the total,
+ * reported as 0.
+ *
+ * The suppression lives here rather than in the widget, so an unauthenticated
+ * caller cannot skip the UI and read low-count results straight from the API.
+ * `resultsAvailable` is the authoritative signal for clients; the counts carry
+ * no information while it is false.
  *
  * @param array<string,mixed> $record
  * @return array<string,mixed>
@@ -458,7 +465,7 @@ function byline_poll_public_payload(array $record): array
         'id' => $poll_id,
         'question' => (string) $record['question'],
         'options' => $options,
-        'totalVotes' => $total,
+        'totalVotes' => $available ? $total : 0,
         'resultsAvailable' => $available,
     ];
 }

@@ -216,9 +216,10 @@ for ($index = 0; $index < BYLINE_POLL_MIN_RESULTS_VOTES - 1; $index++) {
 }
 
 $payload = byline_poll_public_payload($record);
-byline_test_assert($payload['totalVotes'] === 4, 'The public payload reports the true response total.');
 byline_test_assert($payload['resultsAvailable'] === false, 'Low-response polls report results as unavailable.');
 byline_test_assert(array_sum(array_column($payload['options'], 'votes')) === 0, 'Per-answer counts are withheld below the threshold.');
+byline_test_assert($payload['totalVotes'] === 0, 'The running total is withheld too, so a small poll cannot be watched filling up.');
+byline_test_assert(byline_poll_vote_total($record['id']) === 4, 'The withheld total is a public-response decision, not a storage one.');
 
 byline_poll_insert_vote($record['id'], $options[1]['id'], 'privacy-voter-threshold');
 $payload = byline_poll_public_payload($record);
