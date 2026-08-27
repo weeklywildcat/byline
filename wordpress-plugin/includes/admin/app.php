@@ -377,7 +377,7 @@ function byline_enqueue_admin_app(string $hook_suffix): void
 }
 add_action('admin_enqueue_scripts', 'byline_enqueue_admin_app');
 
-function byline_admin_parent_file(string $parent_file): string
+function byline_admin_parent_file(?string $parent_file): ?string
 {
     if (in_array(byline_admin_current_page(), [
         BYLINE_ADMIN_PAGE,
@@ -418,7 +418,7 @@ function byline_admin_parent_file(string $parent_file): string
 }
 add_filter('parent_file', 'byline_admin_parent_file');
 
-function byline_admin_submenu_file(string $submenu_file): string
+function byline_admin_submenu_file(?string $submenu_file): ?string
 {
     $page = byline_admin_current_page();
     if (in_array($page, [

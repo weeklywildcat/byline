@@ -12,6 +12,7 @@ const BYLINE_REST_NAMESPACE = 'byline/v1';
 
 $registered_menu = null;
 $registered_submenus = [];
+$registered_filters = [];
 $test_screen = null;
 $test_capabilities = [
     BYLINE_MANAGE_CAPABILITY => true,
@@ -22,9 +23,29 @@ $test_capabilities = [
 ];
 
 function add_action(...$args): void {}
-function add_filter(...$args): void {}
+function add_filter(string $tag, $callback, int $priority = 10, int $accepted_args = 1): bool
+{
+    global $registered_filters;
+    $registered_filters[$tag][] = [
+        'callback' => $callback,
+        'accepted_args' => $accepted_args,
+    ];
+    return true;
+}
 function remove_submenu_page(...$args): void {}
-function apply_filters(string $tag, $value) { return $value; }
+function apply_filters(string $tag, $value, ...$args)
+{
+    global $registered_filters;
+    foreach ($registered_filters[$tag] ?? [] as $filter) {
+        $filter_args = array_merge([$value], $args);
+        $value = call_user_func_array(
+            $filter['callback'],
+            array_slice($filter_args, 0, $filter['accepted_args'])
+        );
+    }
+
+    return $value;
+}
 
 function add_menu_page(...$args): string
 {
@@ -136,6 +157,25 @@ if ($legacy_urls['/publication/branding'] !== $urls['publication']['branding']
     || $legacy_urls['/design/revisions'] !== $urls['studioRevisions']
     || $legacy_urls['/advanced/diagnostics'] !== $urls['settings']['diagnostics']) {
     fwrite(STDERR, "Legacy hash routes no longer translate to their native destinations.\n");
+    exit(1);
+}
+
+$_GET = [];
+$test_screen = (object) ['id' => 'plugins', 'post_type' => null];
+try {
+    $unrelated_parent_file = byline_admin_parent_file(null);
+    $unrelated_submenu_file = byline_admin_submenu_file(null);
+    $filtered_parent_file = apply_filters('parent_file', null);
+    $filtered_submenu_file = apply_filters('submenu_file', null, 'plugins.php');
+} catch (Throwable $exception) {
+    fwrite(STDERR, "Nullable WordPress admin filter arguments must not throw on plugins.php.\n");
+    exit(1);
+}
+if ($unrelated_parent_file !== null
+    || $unrelated_submenu_file !== null
+    || $filtered_parent_file !== null
+    || $filtered_submenu_file !== null) {
+    fwrite(STDERR, "Unrelated WordPress admin filters did not preserve null values.\n");
     exit(1);
 }
 
