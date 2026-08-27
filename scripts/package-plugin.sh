@@ -50,6 +50,12 @@ grep -qx 'weekly-wildcat-headless/weekly-wildcat-headless.php' <<<"$archive_file
 grep -qx 'weekly-wildcat-headless/build/index.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.asset.php' <<<"$archive_files"
 
+main_plugin_files="$(grep -Ec '(^|/)weekly-wildcat-headless\.php$' <<<"$archive_files")"
+if [[ "$main_plugin_files" -ne 1 ]]; then
+  echo "Plugin archive must contain exactly one weekly-wildcat-headless.php entrypoint." >&2
+  exit 1
+fi
+
 if grep -Eq '(^|/)(node_modules|tests|tests-js|src|discord-bot|apps|\.git)(/|$)' <<<"$archive_files"; then
   echo "Plugin archive contains development or repository-only content." >&2
   exit 1
