@@ -75,3 +75,27 @@ describe("storage contract", () => {
     expect(seeded).not.toMatch(/LeadPackage|StoryCard/);
   });
 });
+
+// Studio's adapter tests pass the legacy payload explicitly, so they cannot
+// catch Studio simply forgetting to thread it. This pins the call site, which is
+// the actual data-loss risk: a migrated design that loses its preserved blocks
+// on the first edit.
+describe("Studio threads preserved legacy data into every write", () => {
+  const studio = readSource("../../../wordpress-plugin/src/studio.tsx");
+
+  it("passes the loaded legacy payload when building the document", () => {
+    expect(studio).toMatch(/editorStateToDesignDocument\([^)]*loaded\.legacy\)/s);
+  });
+
+  it("uses one conversion for both autosave and publish", () => {
+    expect(studio.match(/documentFor\(data\)/g)).toHaveLength(2);
+  });
+
+  it("does not put legacy blocks into the editor as pseudo-packages", () => {
+    const adapter = readSource("../../../wordpress-plugin/src/studio-document.ts");
+    const toEditorState = /export function designDocumentToEditorState[\s\S]*?\n}/.exec(adapter)?.[0] ?? "";
+
+    expect(toEditorState).not.toContain("legacy");
+    expect(toEditorState).toContain("document.packages");
+  });
+});

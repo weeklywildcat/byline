@@ -207,4 +207,28 @@ if (!$v2_unsupported_result instanceof WP_Error || $v2_unsupported_result->code 
     exit(1);
 }
 
+// Preserved schema 1 blocks must round-trip through storage, and must be held to
+// the same safety rules as package props.
+$v2_legacy = $v2;
+$v2_legacy['legacy'] = [
+    'schemaVersion' => 1,
+    'editor' => ['engine' => 'puck', 'version' => '0.23.0'],
+    'unconvertedBlocks' => [[
+        'type' => 'sports-scores',
+        'props' => ['id' => 'sports-scores-2', 'title' => 'Scoreboard', 'teamKey' => 'football-varsity'],
+    ]],
+];
+if (byline_validate_design_document($v2_legacy, 'home') !== true) {
+    fwrite(STDERR, "A schema 2 document carrying preserved legacy blocks was rejected.\n");
+    exit(1);
+}
+
+$v2_bad_legacy = $v2_legacy;
+$v2_bad_legacy['legacy']['unconvertedBlocks'] = [['type' => 'sports-scores']];
+$v2_bad_legacy_result = byline_validate_design_document($v2_bad_legacy, 'home');
+if (!$v2_bad_legacy_result instanceof WP_Error || $v2_bad_legacy_result->code !== 'byline_unsafe_design_props') {
+    fwrite(STDERR, "Malformed legacy data was not rejected.\n");
+    exit(1);
+}
+
 echo "Byline design schema regression passed.\n";

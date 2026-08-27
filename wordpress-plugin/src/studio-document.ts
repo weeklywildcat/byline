@@ -3,6 +3,7 @@ import {
   LEAD_PACKAGE_TYPE,
   isBylinePackageType,
   migrateDesignDocumentV1ToV2,
+  parseBylineDesignDocumentV2,
   parseLeadPackageProps,
   type BylineDesignDocumentV2,
   type BylineDesignPackage
@@ -23,6 +24,14 @@ export type PuckEditorState = {
 
 export type StudioLoadResult = {
   editorState: PuckEditorState;
+  // Inert migration data that has no v2 package yet. It is deliberately kept
+  // *outside* Puck -- putting it in the editor as fake packages would let an
+  // editor drag, configure or delete something the renderers cannot draw -- and
+  // is merged back into every document Studio writes.
+  //
+  // Studio must thread this through to editorStateToDesignDocument on autosave
+  // and publish. Dropping it destroys blocks the migration promised to preserve.
+  legacy: BylineDesignDocumentV2["legacy"];
   // Non-empty when a stored v1 design was migrated on load, so Studio can tell
   // the editor what did not convert instead of silently dropping sections.
   migrationWarnings: string[];
@@ -67,7 +76,10 @@ function packageIdFor(props: Record<string, unknown>, type: string, index: numbe
 export function editorStateToDesignDocument(
   editorState: PuckEditorState,
   template: string,
-  theme: string
+  theme: string,
+  // Carried forward unchanged from the load. Omitting it on a document that had
+  // legacy data is data loss, not a no-op.
+  legacy?: BylineDesignDocumentV2["legacy"]
 ): BylineDesignDocumentV2 {
   const packages: BylineDesignPackage[] = [];
   const seenIds = new Set<string>();
@@ -96,7 +108,10 @@ export function editorStateToDesignDocument(
     schemaVersion: BYLINE_DESIGN_WRITE_SCHEMA_VERSION,
     template,
     theme,
-    packages
+    packages,
+    // Merged back verbatim. These blocks are never edited here, only preserved,
+    // so a later phase can convert them once their packages exist.
+    ...(legacy && legacy.unconvertedBlocks.length ? { legacy } : {})
   };
 }
 
@@ -110,8 +125,15 @@ export function loadDesignIntoEditor(document: unknown, template: string): Studi
   const stored = (document ?? {}) as Record<string, unknown>;
 
   if (stored.schemaVersion === 2) {
+    // Validated, not cast: a stored document that no longer satisfies the schema
+    // must fail here rather than reaching the editor half-formed.
+    const parsed = parseBylineDesignDocumentV2(stored, template);
+
     return {
-      editorState: designDocumentToEditorState(stored as unknown as BylineDesignDocumentV2),
+      editorState: designDocumentToEditorState(parsed),
+      // A v2 document can still be carrying legacy data from an earlier
+      // migration that has not been converted yet.
+      legacy: parsed.legacy,
       migrationWarnings: [],
       migratedFromV1: false
     };
@@ -121,6 +143,7 @@ export function loadDesignIntoEditor(document: unknown, template: string): Studi
 
   return {
     editorState: designDocumentToEditorState(migrated),
+    legacy: migrated.legacy,
     migrationWarnings: warnings,
     migratedFromV1: true
   };

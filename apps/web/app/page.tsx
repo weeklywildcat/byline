@@ -64,9 +64,12 @@ export default async function HomePage() {
   const posts = filterPublicHomepagePosts(allPosts);
   const publishedHomeDesign = getPublishedDesign("home");
 
-  // The whole-page schema 1 renderer. It only runs for a published *v1* design,
-  // which is the pre-package world; a v2 design drives the package path below.
-  // This is removed once every package has been extracted.
+  // Published schema 1 designs render here, through the legacy whole-page
+  // renderer, and are deliberately NOT migrated on read: only story-lead has a
+  // v2 equivalent today, so converting a live v1 homepage would silently drop
+  // every other section. Studio migrates v1 on load; the published page does
+  // not. A published v2 design takes the package path below.
+  // This branch goes away once the remaining packages exist.
   if (publishedHomeDesign && publishedHomeDesign.revision > 0 && publishedHomeDesign.schemaVersion === 1) {
     const designBlocks = await resolvePublishedDesignBlocks(publishedHomeDesign.document.layout.content, posts);
     return (

@@ -112,9 +112,11 @@ migration.
 WordPress storage accepts both versions, dispatching to
 `byline_validate_design_document_v2`.
 
-The public `BYLINE_DESIGN_SCHEMA_VERSION` in the protocol manifest deliberately
-stays at **1**: deployed frontends check it with strict equality, so bumping it
-is a coordinated release.
+In PHP the advertised number is now named
+`BYLINE_DESIGN_ADVERTISED_SCHEMA_VERSION` so it cannot be misread as "the schema
+we write". It deliberately stays at **1**: deployed frontends check it with
+strict equality, so raising it breaks every frontend pinned to 1. It moves to 2
+once schema 1 support is dropped.
 
 ## How a published design reaches the page
 
@@ -145,14 +147,41 @@ revision > 0. Otherwise it picks a seed **by publication**:
 A second publication never inherits Weekly Wildcat's homepage semantics just
 because it has not published a design yet.
 
-### Published v1 designs
+### Who reads which schema
 
-A published *v1* design still renders through the legacy `DesignHomepage`
-compatibility renderer, not through migration. This is deliberate: only
-`story-lead` has a v2 equivalent today, so migrating a live v1 homepage would
-silently drop every other section. Studio migrates v1 on load (and says what did
-not convert); published v1 output is left alone until the remaining packages
-exist.
+Four different answers, deliberately:
+
+| Surface | Behaviour |
+|---|---|
+| Published **v1** homepage design | Renders through the legacy `DesignHomepage` renderer. **Not** migrated on read. |
+| Published **v2** homepage design | Renders through the package renderer path. |
+| **Studio** loading a stored design | Migrates v1 to v2 explicitly; the editor only ever works in v2. |
+| **Package renderers** | Consume v2 only. A v1 document cannot reach them — the compiler blocks it. |
+
+Published v1 designs are left alone on purpose: only `story-lead` has a v2
+equivalent today, so migrating a *live* v1 homepage on read would silently drop
+every other section. That behaviour changes when the remaining packages exist,
+not before.
+
+### Preserved legacy blocks
+
+When Studio migrates a v1 design, blocks with no v2 package are carried in
+`legacy.unconvertedBlocks`.
+
+They are held **outside** Puck's editor state. Injecting them as pseudo-packages
+would let an editor drag, configure or delete something no renderer can draw,
+and would let them leak into `packages` on save. Instead `loadDesignIntoEditor`
+returns them alongside the editor state, and Studio threads them back into
+*every* autosave and publish unchanged.
+
+This matters more than it looks: without it, opening a migrated design and
+making any edit would rebuild the document from recognised packages only and
+permanently destroy the very blocks the migration promised to keep. The round
+trip is covered by regression tests, including a repeated-autosave loop and a
+source-level check that Studio actually passes the payload.
+
+WordPress validates the preserved blocks with the same safety rules as package
+props — they are inert, but they are still persisted data.
 
 ## Themes
 

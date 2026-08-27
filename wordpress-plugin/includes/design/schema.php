@@ -179,6 +179,25 @@ function byline_validate_design_document_v2(array $document, string $template)
         return new WP_Error('byline_invalid_design_layout', __('The design contains too many packages.', 'weekly-wildcat-headless'), ['status' => 400]);
     }
 
+    // Preserved schema 1 blocks travel with a schema 2 document so a migrated
+    // design does not lose sections that have no package yet. They are inert --
+    // never rendered, never edited -- but they are still persisted data, so they
+    // are held to the same safety rules as package props.
+    if (array_key_exists('legacy', $document)) {
+        $legacy = $document['legacy'];
+        if (!is_array($legacy)
+            || !is_array($legacy['unconvertedBlocks'] ?? null)
+            || count($legacy['unconvertedBlocks']) > BYLINE_DESIGN_MAX_BLOCKS
+            || !byline_design_value_is_safe($legacy)) {
+            return new WP_Error('byline_unsafe_design_props', __('The design contains unsafe or malformed legacy data.', 'weekly-wildcat-headless'), ['status' => 400]);
+        }
+        foreach ($legacy['unconvertedBlocks'] as $block) {
+            if (!is_array($block) || !is_string($block['type'] ?? null) || !is_array($block['props'] ?? null)) {
+                return new WP_Error('byline_unsafe_design_props', __('The design contains malformed legacy data.', 'weekly-wildcat-headless'), ['status' => 400]);
+            }
+        }
+    }
+
     $seen_ids = [];
     foreach ($document['packages'] as $design_package) {
         if (!is_array($design_package)
@@ -221,8 +240,12 @@ function byline_validate_design_document($document, string $template)
     if (!is_string($encoded) || strlen($encoded) > BYLINE_DESIGN_MAX_BYTES) {
         return new WP_Error('byline_design_too_large', __('The design document is too large.', 'weekly-wildcat-headless'), ['status' => 413]);
     }
+    // Storage reads both schemas during the transition: 1 because stored designs
+    // still exist, 2 because that is what Studio now writes. This is separate
+    // from BYLINE_DESIGN_ADVERTISED_SCHEMA_VERSION, which is the compatibility
+    // number frontends check.
     $schema_version = (int) ($document['schemaVersion'] ?? 0);
-    if (!in_array($schema_version, [BYLINE_DESIGN_SCHEMA_VERSION, 2], true)
+    if (!in_array($schema_version, [1, 2], true)
         || ($document['template'] ?? null) !== $template
         || !is_string($document['theme'] ?? null)
         || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $document['theme']) !== 1) {

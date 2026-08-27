@@ -136,3 +136,150 @@ describe("Studio loads either stored schema", () => {
     expect((saved.packages[0].props as { latest: { limit: number } }).latest.limit).toBe(0);
   });
 });
+
+// The migration promises to preserve blocks that have no v2 package yet. That
+// promise is only real if the data survives the editor round trip: load,
+// autosave, publish. It previously did not -- the load dropped the payload and
+// every save rebuilt the document from recognised packages only, so opening a
+// migrated design and touching anything destroyed those blocks for good.
+describe("legacy migration data survives the editor round trip", () => {
+  const v1WithUnconvertible = {
+    schemaVersion: 1,
+    template: "home",
+    theme: "weekly-wildcat",
+    editor: { engine: "puck", version: "0.23.0" },
+    layout: {
+      root: { props: {} },
+      content: [
+        { type: "story-lead", props: { id: "story-lead-1", query: { type: "sticky", limit: 1 } } },
+        {
+          type: "sports-scores",
+          props: {
+            id: "sports-scores-2",
+            title: "Scoreboard",
+            teamKey: "football-varsity",
+            limit: 6,
+            allowDuplicates: false
+          }
+        }
+      ]
+    }
+  };
+
+  const SPORTS_SCORES_PROPS = {
+    id: "sports-scores-2",
+    title: "Scoreboard",
+    teamKey: "football-varsity",
+    limit: 6,
+    allowDuplicates: false
+  };
+
+  it("carries the unconverted block out of load", () => {
+    const loaded = loadDesignIntoEditor(v1WithUnconvertible, "home");
+
+    expect(loaded.legacy?.unconvertedBlocks).toEqual([{ type: "sports-scores", props: SPORTS_SCORES_PROPS }]);
+    // It must not be exposed to Puck as an editable item.
+    expect(loaded.editorState.content.map((item) => item.type)).toEqual([LEAD_PACKAGE_TYPE]);
+  });
+
+  it("preserves it byte-for-byte through an edit and save", () => {
+    const loaded = loadDesignIntoEditor(v1WithUnconvertible, "home");
+
+    // Edit the lead the way an editor would.
+    const edited = {
+      ...loaded.editorState,
+      content: [
+        {
+          ...loaded.editorState.content[0],
+          props: {
+            ...loaded.editorState.content[0].props,
+            latest: { ...WEEKLY_WILDCAT_LEAD_DEFAULTS.latest, limit: 2 }
+          }
+        }
+      ]
+    };
+
+    const saved = editorStateToDesignDocument(edited, "home", "weekly-wildcat", loaded.legacy);
+
+    expect(saved.schemaVersion).toBe(2);
+    expect(saved.packages).toHaveLength(1);
+    expect(saved.packages[0].type).toBe(LEAD_PACKAGE_TYPE);
+    expect((saved.packages[0].props as { latest: { limit: number } }).latest.limit).toBe(2);
+
+    // The exact block, with its exact props.
+    expect(saved.legacy?.unconvertedBlocks).toEqual([{ type: "sports-scores", props: SPORTS_SCORES_PROPS }]);
+    expect(saved.legacy?.schemaVersion).toBe(1);
+  });
+
+  it("produces a document the canonical parser still accepts", () => {
+    const loaded = loadDesignIntoEditor(v1WithUnconvertible, "home");
+    const saved = editorStateToDesignDocument(loaded.editorState, "home", "weekly-wildcat", loaded.legacy);
+
+    expect(() => parseBylineDesignDocumentV2(saved, "home")).not.toThrow();
+  });
+
+  it("survives repeated autosaves without drift", () => {
+    // Autosave and publish use the same conversion, so an autosave loop is the
+    // realistic worst case: it runs on every keystroke pause.
+    const loaded = loadDesignIntoEditor(v1WithUnconvertible, "home");
+    let document = editorStateToDesignDocument(loaded.editorState, "home", "weekly-wildcat", loaded.legacy);
+
+    for (let pass = 0; pass < 3; pass += 1) {
+      const reloaded = loadDesignIntoEditor(document, "home");
+
+      expect(reloaded.migratedFromV1).toBe(false);
+      document = editorStateToDesignDocument(reloaded.editorState, "home", "weekly-wildcat", reloaded.legacy);
+    }
+
+    expect(document.legacy?.unconvertedBlocks).toEqual([{ type: "sports-scores", props: SPORTS_SCORES_PROPS }]);
+  });
+
+  it("omitting the payload is the data loss this guards against", () => {
+    const loaded = loadDesignIntoEditor(v1WithUnconvertible, "home");
+    const withoutLegacy = editorStateToDesignDocument(loaded.editorState, "home", "weekly-wildcat");
+
+    expect(withoutLegacy.legacy).toBeUndefined();
+  });
+
+  it("does not invent a legacy key for designs that never had one", () => {
+    const clean = loadDesignIntoEditor(
+      {
+        schemaVersion: 2,
+        template: "home",
+        theme: "weekly-wildcat",
+        packages: [{ id: "home-lead", type: LEAD_PACKAGE_TYPE, props: WEEKLY_WILDCAT_LEAD_DEFAULTS }]
+      },
+      "home"
+    );
+
+    expect(clean.legacy).toBeUndefined();
+    expect(editorStateToDesignDocument(clean.editorState, "home", "weekly-wildcat", clean.legacy)).not.toHaveProperty(
+      "legacy"
+    );
+  });
+});
+
+describe("loading validates rather than casts", () => {
+  it("rejects a stored v2 document that no longer satisfies the schema", () => {
+    expect(() =>
+      loadDesignIntoEditor(
+        {
+          schemaVersion: 2,
+          template: "home",
+          theme: "weekly-wildcat",
+          packages: [{ id: "home-lead", type: "not-a-real-package", props: {} }]
+        },
+        "home"
+      )
+    ).toThrow(/unknown type/);
+  });
+
+  it("rejects a v2 document whose template identity does not match", () => {
+    expect(() =>
+      loadDesignIntoEditor(
+        { schemaVersion: 2, template: "home", theme: "weekly-wildcat", packages: [] },
+        "section-default"
+      )
+    ).toThrow(/mismatched template/);
+  });
+});

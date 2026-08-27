@@ -358,8 +358,13 @@ export function BylineStudio({
 
   // Editor state is converted to the semantic document before it leaves the
   // browser. No Puck structure is persisted.
+  //
+  // `loaded.legacy` is threaded through on every write. It holds migrated blocks
+  // that have no v2 package yet, kept outside Puck so they cannot be edited --
+  // but they must be merged back, or the first edit to a migrated design would
+  // permanently destroy the sections the migration preserved.
   const documentFor = (data: Data): DesignDocument =>
-    editorStateToDesignDocument(data as unknown as PuckEditorState, template, publicationTheme);
+    editorStateToDesignDocument(data as unknown as PuckEditorState, template, publicationTheme, loaded.legacy);
 
   const autosave = (data: Data) => {
     if (!canEdit) return;

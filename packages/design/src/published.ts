@@ -124,10 +124,16 @@ export type ResolvedPublishedDesign = {
 };
 
 /**
- * Normalises any readable published design to schema 2.
+ * Normalises a readable published design to schema 2.
  *
- * This is the only supported route from a stored v1 design to something the
- * package renderers will accept -- v2 is never produced by casting.
+ * The only supported route from a stored v1 design to something the package
+ * renderers will accept -- v2 is never produced by casting.
+ *
+ * Note where this is and is not used. Studio calls the migration on load so the
+ * editor only ever works in v2. The published homepage does *not* run a v1
+ * design through here: it renders v1 with the legacy whole-page renderer
+ * instead, because migrating a live v1 design today would drop every block that
+ * has no package yet.
  */
 export function resolvePublishedDesignToV2(
   published: PublishedBylineDesign,
