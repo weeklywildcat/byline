@@ -10,15 +10,30 @@ import {
   TextControl,
   ToggleControl
 } from "@wordpress/components";
-import { createRoot, useEffect, useMemo, useState } from "@wordpress/element";
+import { createRoot, useEffect, useState } from "@wordpress/element";
 import "@puckeditor/core/puck.css";
 import "@byline/theme-weekly-wildcat/styles.css";
-import { isNavigationItemVisible, normalizeAdminRoute } from "./admin-routing";
+import {
+  ADMIN_PAGE_SLUGS,
+  INTEGRATION_TABS,
+  PUBLICATION_TABS,
+  SETTINGS_TABS,
+  adminScreenRoute,
+  legacyHashDestination,
+  normalizeAdminPage,
+  normalizeAdminRoute,
+  normalizeAdminTab,
+  normalizeStudioView
+} from "./admin-routing";
 import { contrastRatio } from "./contrast";
 import { BylineDesignRevisions, BylineStudio } from "./studio";
+import type { ReactNode } from "react";
 import "./style.css";
 
 type BylineAdminConfig = {
+  page: string;
+  tab: string;
+  view: string;
   restPath: string;
   publicationPath: string;
   diagnosticsPath: string;
@@ -34,6 +49,8 @@ type BylineAdminConfig = {
   };
   features: Record<string, boolean>;
   themeIds: string[];
+  urls: AdminUrls;
+  legacyRoutes: Record<string, string>;
   nativeUrls: Record<string, string>;
 };
 
@@ -81,6 +98,18 @@ type PublicationConfig = {
 
 type PublicationAsset = { url: string; alt: string; width: number | null; height: number | null };
 
+type AdminUrls = {
+  dashboard: string;
+  studio: string;
+  studioRevisions: string;
+  theme: string;
+  publication: Record<(typeof PUBLICATION_TABS)[number], string>;
+  integrations: Record<(typeof INTEGRATION_TABS)[number], string>;
+  settings: Record<(typeof SETTINGS_TABS)[number], string>;
+  polls: string;
+  teams: string;
+};
+
 type DiagnosticsPayload = {
   pluginVersion: string;
   protocolVersion: number;
@@ -108,127 +137,78 @@ if (config?.nonce) {
   apiFetch.use(apiFetch.createNonceMiddleware(config.nonce));
 }
 
-type NavigationItem = {
-  label: string;
-  route?: string;
-  nativeUrl?: string;
-  feature?: string;
-};
-
-type NavigationGroup = {
-  label: string;
-  items: NavigationItem[];
-};
-
-const navigation: NavigationGroup[] = [
-  { label: "", items: [{ label: "Dashboard", route: "/dashboard" }] },
-  {
-    label: "Publication",
-    items: [
-      { label: "Identity", route: "/publication/identity" },
-      { label: "Branding", route: "/publication/branding" },
-      { label: "Navigation", route: "/publication/navigation" },
-      { label: "Social", route: "/publication/social" }
-    ]
-  },
-  {
-    label: "Design",
-    items: [
-      { label: "Theme", route: "/design/theme" },
-      { label: "Studio", route: "/design/studio" },
-      { label: "Revisions", route: "/design/revisions" }
-    ]
-  },
-  {
-    label: "Content",
-    items: [
-      { label: "Authors", nativeUrl: config?.nativeUrls.authors },
-      { label: "Teams", nativeUrl: config?.nativeUrls.teams, feature: "sports" },
-      { label: "Games", nativeUrl: config?.nativeUrls.games, feature: "sports" },
-      { label: "Rosters", nativeUrl: config?.nativeUrls.rosters, feature: "sports" },
-      { label: "Events", nativeUrl: config?.nativeUrls.events, feature: "events" },
-      { label: "Polls", route: "/content/polls", feature: "polls" }
-    ]
-  },
-  {
-    label: "Integrations",
-    items: [
-      { label: "Discord", route: "/integrations/discord", feature: "discord" },
-      { label: "Deployment", route: "/integrations/deployment" }
-    ]
-  },
-  {
-    label: "Advanced",
-    items: [
-      { label: "Access", route: "/advanced/access" },
-      { label: "API", route: "/advanced/api" },
-      { label: "Compatibility", route: "/advanced/compatibility" },
-      { label: "Diagnostics", route: "/advanced/diagnostics" }
-    ]
-  }
-];
-
-function currentRoute() {
-  return normalizeAdminRoute(window.location.hash);
+function adminUrl(url: string | undefined) {
+  return url || config?.urls.dashboard || "admin.php?page=byline";
 }
 
-function routeTitle(route: string) {
-  for (const group of navigation) {
-    const match = group.items.find((item) => item.route === route);
-    if (match) return match.label;
-  }
-  return "Dashboard";
-}
+type AdminTab = { id: string; label: string; href: string };
 
-function AdminNavigation({ route, features }: { route: string; features: Record<string, boolean> }) {
+function AdminLocalTabs({ label, active, tabs }: { label: string; active: string; tabs: AdminTab[] }) {
   return (
-    <nav className="byline-admin-nav" aria-label="Byline sections">
-      {navigation.map((group) => {
-        const visibleItems = group.items.filter((item) =>
-          isNavigationItemVisible(item.feature, features)
-        );
-
-        if (visibleItems.length === 0) return null;
-
-        return (
-          <section key={group.label || "dashboard"} className="byline-admin-nav-group">
-            {group.label ? <h2>{group.label}</h2> : null}
-            <div>
-              {visibleItems.map((item) =>
-                item.nativeUrl ? (
-                  <a key={item.label} href={item.nativeUrl}>
-                    {item.label}
-                    <span aria-hidden="true">↗</span>
-                  </a>
-                ) : (
-                  <a
-                    key={item.label}
-                    href={`#${item.route}`}
-                    aria-current={route === item.route ? "page" : undefined}
-                  >
-                    {item.label}
-                  </a>
-                )
-              )}
-            </div>
-          </section>
-        );
-      })}
+    <nav className="nav-tab-wrapper byline-admin-tabs" aria-label={`${label} sections`}>
+      {tabs.map((tab) => (
+        <a
+          key={tab.id}
+          className={`nav-tab${active === tab.id ? " nav-tab-active" : ""}`}
+          href={tab.href}
+          aria-current={active === tab.id ? "page" : undefined}
+        >
+          {tab.label}
+        </a>
+      ))}
     </nav>
   );
 }
 
+function publicationTabs(): AdminTab[] {
+  const labels: Record<(typeof PUBLICATION_TABS)[number], string> = {
+    identity: "Identity",
+    branding: "Branding",
+    navigation: "Navigation",
+    social: "Social"
+  };
+  return PUBLICATION_TABS.map((id) => ({
+    id,
+    label: labels[id],
+    href: adminUrl(config?.urls.publication[id])
+  }));
+}
+
+function integrationTabs(): AdminTab[] {
+  const tabs: AdminTab[] = [
+    { id: "deployment", label: "Deployment", href: adminUrl(config?.urls.integrations.deployment) }
+  ];
+  if (config?.features.discord) {
+    tabs.unshift({ id: "discord", label: "Discord", href: adminUrl(config?.urls.integrations.discord) });
+  }
+  return tabs;
+}
+
+function settingsTabs(): AdminTab[] {
+  const labels: Record<(typeof SETTINGS_TABS)[number], string> = {
+    access: "Access",
+    api: "API",
+    compatibility: "Compatibility",
+    diagnostics: "Diagnostics"
+  };
+  return SETTINGS_TABS.map((id) => ({
+    id,
+    label: labels[id],
+    href: adminUrl(config?.urls.settings[id])
+  }));
+}
+
 function Dashboard({ protocol, publication }: { protocol: ProtocolManifest | null; publication: PublicationConfig | null }) {
   const checklist = [
-    { label: "Publication identity", route: "/publication/identity", complete: Boolean(publication?.identity.name && publication?.identity.description) },
-    { label: "Location, locale, and timezone", route: "/publication/identity", complete: Boolean(publication?.locale && publication?.timezone) },
-    { label: "Branding", route: "/publication/branding", complete: Boolean(publication?.branding.masthead.url || publication?.branding.logo.url) },
-    { label: "Choose a theme", route: "/design/theme", complete: Boolean(publication?.appearance.theme) },
-    { label: "Sections and navigation", route: "/publication/navigation", complete: Boolean(publication?.navigation.length) },
-    { label: "Optional modules", route: "/publication/navigation", complete: Boolean(publication) },
-    { label: "Deployment", route: "/integrations/deployment", complete: false },
-    { label: "Homepage design", route: "/design/studio", complete: false },
-    { label: "Publish", route: "/design/studio", complete: false }
+    { label: "Publication identity", href: config?.urls.publication.identity, complete: Boolean(publication?.identity.name && publication?.identity.description) },
+    { label: "Location, locale, and timezone", href: config?.urls.publication.identity, complete: Boolean(publication?.locale && publication?.timezone) },
+    { label: "Branding", href: config?.urls.publication.branding, complete: Boolean(publication?.branding.masthead.url || publication?.branding.logo.url) },
+    { label: "Choose a theme", href: config?.urls.theme, complete: Boolean(publication?.appearance.theme) },
+    { label: "Sections and navigation", href: config?.urls.publication.navigation, complete: Boolean(publication?.navigation.length) },
+    { label: "Optional modules", href: config?.urls.publication.navigation, complete: Boolean(publication) },
+    { label: "Deployment", href: config?.urls.integrations.deployment, complete: false },
+    { label: "Homepage design", href: config?.urls.studio, complete: false },
+    { label: "Publish", href: config?.urls.studio, complete: false }
   ];
 
   return (
@@ -240,7 +220,7 @@ function Dashboard({ protocol, publication }: { protocol: ProtocolManifest | nul
             {checklist.map((item) => (
               <li key={item.label} className={item.complete ? "is-complete" : undefined}>
                 <span aria-hidden="true">{item.complete ? "✓" : "○"}</span>
-                <a href={`#${item.route}`}>{item.label}</a>
+                <a href={adminUrl(item.href)}>{item.label}</a>
               </li>
             ))}
           </ol>
@@ -921,76 +901,161 @@ function OperationalInfo({ route, protocol }: { route: string; protocol: Protoco
   );
 }
 
+function AdminPageFrame({
+  title,
+  tabs,
+  activeTab,
+  error,
+  children
+}: {
+  title: string;
+  tabs?: AdminTab[];
+  activeTab?: string;
+  error: string;
+  children: ReactNode;
+}) {
+  return (
+    <main className="byline-admin-main">
+      <header className="byline-admin-header">
+        <h1>{title}</h1>
+      </header>
+      {tabs && activeTab ? <AdminLocalTabs label={title} active={activeTab} tabs={tabs} /> : null}
+      {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
+      {children}
+    </main>
+  );
+}
+
 function Screen({
-  route,
+  page,
+  tab,
+  view,
   protocol,
   publication,
+  error,
   onPublicationSaved
 }: {
-  route: string;
+  page: string;
+  tab: string;
+  view: string;
   protocol: ProtocolManifest | null;
   publication: PublicationConfig | null;
+  error: string;
   onPublicationSaved: (publication: PublicationConfig) => void;
 }) {
-  if (route === "/dashboard") return <Dashboard protocol={protocol} publication={publication} />;
-
-  if (route === "/advanced/diagnostics") return <Diagnostics />;
-
-  if (route === "/integrations/deployment") return <DeploymentSettings />;
-
-  if (route.startsWith("/publication/") || route === "/design/theme") {
-    return <PublicationSettings route={route} publication={publication} onSaved={onPublicationSaved} />;
-  }
-
-  if (route === "/design/studio") {
+  if (page === ADMIN_PAGE_SLUGS.dashboard) {
     return (
-      <BylineStudio
-        canEdit={Boolean(config?.capabilities.editDesign)}
-        canPublish={Boolean(config?.capabilities.publishDesign)}
-        publicationTheme={publication?.appearance.theme || "weekly-wildcat"}
-        previewStylesheetUrl={config?.previewStylesheetUrl || ""}
-        tokenOverrides={publication?.appearance.tokenOverrides || {}}
-      />
+      <AdminPageFrame title="Dashboard" error={error}>
+        <Dashboard protocol={protocol} publication={publication} />
+      </AdminPageFrame>
     );
   }
 
-  if (route === "/design/revisions") {
-    return <BylineDesignRevisions canEdit={Boolean(config?.capabilities.editDesign)} />;
+  if (page === ADMIN_PAGE_SLUGS.publication) {
+    const activeTab = normalizeAdminTab(page, tab);
+    return (
+      <AdminPageFrame title="Publication" tabs={publicationTabs()} activeTab={activeTab} error={error}>
+        <PublicationSettings route={adminScreenRoute(page, activeTab)} publication={publication} onSaved={onPublicationSaved} />
+      </AdminPageFrame>
+    );
   }
 
-  if ([
-    "/integrations/discord",
-    "/content/polls",
-    "/advanced/access",
-    "/advanced/api",
-    "/advanced/compatibility"
-  ].includes(route)) {
-    return <OperationalInfo route={route} protocol={protocol} />;
+  if (page === ADMIN_PAGE_SLUGS.theme) {
+    return (
+      <AdminPageFrame title="Theme" error={error}>
+        <PublicationSettings route="/design/theme" publication={publication} onSaved={onPublicationSaved} />
+      </AdminPageFrame>
+    );
+  }
+
+  if (page === ADMIN_PAGE_SLUGS.integrations) {
+    const availableTabs = integrationTabs();
+    const requestedTab = normalizeAdminTab(page, tab);
+    const activeTab = availableTabs.some((availableTab) => availableTab.id === requestedTab)
+      ? requestedTab
+      : availableTabs[0]?.id || "deployment";
+    const route = adminScreenRoute(page, activeTab);
+    return (
+      <AdminPageFrame title="Integrations" tabs={integrationTabs()} activeTab={activeTab} error={error}>
+        {route === "/integrations/deployment" ? <DeploymentSettings /> : <OperationalInfo route={route} protocol={protocol} />}
+      </AdminPageFrame>
+    );
+  }
+
+  if (page === ADMIN_PAGE_SLUGS.settings) {
+    const activeTab = normalizeAdminTab(page, tab);
+    const route = adminScreenRoute(page, activeTab);
+    return (
+      <AdminPageFrame title="Settings" tabs={settingsTabs()} activeTab={activeTab} error={error}>
+        {route === "/advanced/diagnostics" ? <Diagnostics /> : <OperationalInfo route={route} protocol={protocol} />}
+      </AdminPageFrame>
+    );
+  }
+
+  if (page === ADMIN_PAGE_SLUGS.polls) {
+    return (
+      <AdminPageFrame title="Polls" error={error}>
+        <OperationalInfo route="/content/polls" protocol={protocol} />
+      </AdminPageFrame>
+    );
+  }
+
+  if (page === ADMIN_PAGE_SLUGS.studio) {
+    const activeView = normalizeStudioView(view);
+    const studioTabs: AdminTab[] = [
+      { id: "editor", label: "Edit", href: adminUrl(config?.urls.studio) },
+      { id: "revisions", label: "Revisions", href: adminUrl(config?.urls.studioRevisions) }
+    ];
+    return (
+      <AdminPageFrame title="Studio" tabs={studioTabs} activeTab={activeView} error={error}>
+        {activeView === "revisions" ? (
+          <BylineDesignRevisions canEdit={Boolean(config?.capabilities.editDesign)} backUrl={adminUrl(config?.urls.dashboard)} />
+        ) : (
+          <BylineStudio
+            canEdit={Boolean(config?.capabilities.editDesign)}
+            canPublish={Boolean(config?.capabilities.publishDesign)}
+            publicationTheme={publication?.appearance.theme || "weekly-wildcat"}
+            previewStylesheetUrl={config?.previewStylesheetUrl || ""}
+            tokenOverrides={publication?.appearance.tokenOverrides || {}}
+            backUrl={adminUrl(config?.urls.dashboard)}
+          />
+        )}
+      </AdminPageFrame>
+    );
   }
 
   return (
-    <Card>
-      <CardBody>
-        <p>This Byline section is unavailable for the current module configuration.</p>
-      </CardBody>
-    </Card>
+    <AdminPageFrame title="Byline" error={error}>
+      <Card>
+        <CardBody>
+          <p>This Byline section is unavailable for the current module configuration.</p>
+        </CardBody>
+      </Card>
+    </AdminPageFrame>
   );
 }
 
 function BylineAdminApp() {
-  const [route, setRoute] = useState(currentRoute);
+  const page = normalizeAdminPage(config?.page);
+  const tab = normalizeAdminTab(page, config?.tab);
+  const view = normalizeStudioView(config?.view);
   const [protocol, setProtocol] = useState<ProtocolManifest | null>(null);
   const [publication, setPublication] = useState<PublicationConfig | null>(null);
   const [error, setError] = useState("");
-  const title = useMemo(() => routeTitle(route), [route]);
+  const legacyHash = window.location.hash;
+  const legacyDestination = page === ADMIN_PAGE_SLUGS.dashboard ? legacyHashDestination(legacyHash) : null;
+  const legacyTarget = legacyDestination && config?.legacyRoutes
+    ? config.legacyRoutes[normalizeAdminRoute(legacyHash)]
+    : undefined;
 
   useEffect(() => {
-    const onHashChange = () => setRoute(currentRoute());
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
+    if (legacyTarget) {
+      window.location.replace(legacyTarget);
+    }
+  }, [legacyTarget]);
 
   useEffect(() => {
+    if (legacyTarget) return;
     Promise.all([
       apiFetch<ProtocolManifest>({ path: config?.restPath || "/byline/v1/capabilities/protocol" }),
       apiFetch<PublicationConfig>({ path: config?.publicationPath || "/byline/v1/publication" })
@@ -1000,22 +1065,23 @@ function BylineAdminApp() {
         setPublication(publicationConfig);
       })
       .catch(() => setError("Byline could not read its compatibility manifest."));
-  }, []);
+  }, [legacyTarget]);
+
+  if (legacyTarget) {
+    return <div className="byline-admin-app"><div className="byline-admin-main"><Spinner /></div></div>;
+  }
 
   return (
     <div className="byline-admin-app">
-      <aside className="byline-admin-sidebar">
-        <div className="byline-admin-brand">Byline</div>
-        <AdminNavigation route={route} features={publication?.features || config?.features || {}} />
-      </aside>
-      <main className="byline-admin-main">
-        <header className="byline-admin-header">
-          <p>Byline publishing platform</p>
-          <h1>{title}</h1>
-        </header>
-        {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
-        <Screen route={route} protocol={protocol} publication={publication} onPublicationSaved={setPublication} />
-      </main>
+      <Screen
+        page={page}
+        tab={tab}
+        view={view}
+        protocol={protocol}
+        publication={publication}
+        error={error}
+        onPublicationSaved={setPublication}
+      />
     </div>
   );
 }
