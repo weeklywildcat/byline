@@ -72,6 +72,7 @@ function byline_diagnostics_payload(): array
         'publicManifest' => byline_public_manifest_diagnostic(),
         'restHealth' => true,
         'designsNeedingMigration' => byline_design_migration_count(),
+        'polls' => function_exists('byline_poll_diagnostics') ? byline_poll_diagnostics() : null,
     ];
 }
 

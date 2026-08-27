@@ -26,6 +26,10 @@ historical/update compatibility infrastructure only.
   release asset `weekly-wildcat-headless.zip`.
 - Preserve legacy `ww_*` CPT/meta/option identifiers and
   `/weekly-wildcat/v1/*` REST aliases. Canonical `/byline/v1/*` APIs adapt them.
+- Keep the public poll cookie names `ww_voter_id` and `ww_poll_voted_<pollId>`,
+  their signature format, and their voter-key derivation. WordPress is the only
+  poll datastore; do not reintroduce Cloudflare D1 or a second poll
+  implementation in the Worker. See `docs/polls.md`.
 - Do not expose deploy hooks, Discord/OAuth secrets, admin nonces, or other
   protected configuration through public endpoints or static manifests.
 - Publish WordPress releases from `weeklywildcat/byline`; do not remove the

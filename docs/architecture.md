@@ -6,8 +6,9 @@ static public presentation.
 ## Applications and contracts
 
 - WordPress plus the legacy-compatible Byline plugin are the control plane.
-  WordPress owns stories, people, pages, sports, events, publication settings,
-  designs, revisions, capabilities, and protected integration credentials.
+  WordPress owns stories, people, pages, sports, events, polls and poll votes,
+  publication settings, designs, revisions, capabilities, and protected
+  integration credentials.
 - The Next.js app is a build client. It reads public `/byline/v1` contracts,
   resolves bounded content queries, and emits an `output: "export"` site plus a
   safe `/_byline/manifest.json`. It has no database, auth, SSR, image optimizer,
@@ -74,3 +75,17 @@ Deployment uses a provider filter and ships a generic HTTPS POST hook with
 Cloudflare, Netlify, Vercel, and GitHub Actions as examples. The CMS and Studio
 remain usable before the first deployment and whenever the public site is
 unreachable.
+
+## Runtime poll state
+
+Polls are the one piece of publication state that changes between builds, so they
+are the one place the static site talks to a runtime API. WordPress is the
+authoritative datastore: poll definitions are a `byline_poll` post type, votes
+are a dedicated `wp_*_byline_poll_votes` table, and `/byline/v1/polls/*` is the
+public API. The static frontend calls the relative, publication-agnostic
+`/api/polls/*`, which a thin same-origin host proxy forwards to WordPress.
+
+That proxy owns no poll logic and no database binding: it exists so poll cookies
+stay first-party, CORS stays out of the picture, and the CMS hostname stays an
+implementation detail. There is no Cloudflare D1 dependency, and no poll change
+requires a rebuild. See [polls.md](polls.md).

@@ -1166,10 +1166,6 @@ function DiscordSettings() {
 function OperationalInfo({ route, protocol }: { route: string; protocol: ProtocolManifest | null }) {
   const legacyUrl = config?.nativeUrls.legacySettings;
   const content: Record<string, { title: string; body: string; legacy?: boolean }> = {
-    "/content/polls": {
-      title: "Polls module",
-      body: "Poll blocks are available only while the Polls module is enabled. The static publication calls a host-provided relative API and does not add a Next.js runtime requirement."
-    },
     "/advanced/access": {
       title: "Capability-based access",
       body: `Manage publication: ${config?.capabilities.manage ? "allowed" : "not allowed"}; edit designs: ${config?.capabilities.editDesign ? "allowed" : "not allowed"}; publish designs: ${config?.capabilities.publishDesign ? "allowed" : "not allowed"}; manage integrations: ${config?.capabilities.manageIntegrations ? "allowed" : "not allowed"}.`
@@ -1286,14 +1282,6 @@ function Screen({
     return (
       <AdminPageFrame title="Settings" tabs={settingsTabs()} activeTab={activeTab} error={error}>
         {route === "/advanced/diagnostics" ? <Diagnostics /> : <OperationalInfo route={route} protocol={protocol} />}
-      </AdminPageFrame>
-    );
-  }
-
-  if (page === ADMIN_PAGE_SLUGS.polls) {
-    return (
-      <AdminPageFrame title="Polls" error={error}>
-        <OperationalInfo route="/content/polls" protocol={protocol} />
       </AdminPageFrame>
     );
   }

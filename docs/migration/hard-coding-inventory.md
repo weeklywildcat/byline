@@ -95,11 +95,12 @@ contracts while moving editable prose out of source.
   Microsoft Clarity, media mirroring, Unsplash login backgrounds, Google SSO,
   Discord, and deployment hooks are independently optional concerns today but
   are not modeled as modules.
-- Polls currently contradict the intended static-only web contract: the Next
-  tree contains dynamic `/api/polls/*` routes and the deployment adds a
-  Cloudflare Worker plus D1 database. The public site otherwise uses static
-  export. Polls must move behind an optional external/WordPress adapter or be
-  disabled without requiring a public Next runtime.
+- Polls contradicted the intended static-only web contract: the deployment added
+  a Cloudflare Worker plus a D1 database, and the poll domain was implemented
+  twice outside WordPress. **Resolved.** WordPress is now the authoritative poll
+  CMS and datastore, the Worker is a thin same-origin proxy with no database
+  binding, the relative `/api/polls/*` contract is unchanged, and no public Next
+  runtime is required. See [../polls.md](../polls.md).
 - Deployment is named and presented as Cloudflare although its useful core is a
   coalesced HTTPS POST hook.
 - Discord has its own Node project and is correctly excluded from the plugin
@@ -152,8 +153,9 @@ The following identifiers are explicitly compatibility-sensitive:
   prefix;
 - current team keys such as `football-varsity`, which existing games and
   rosters reference;
-- poll cookies and existing Cloudflare/D1 names while the poll installation is
-  migrated.
+- public poll cookie names (`ww_voter_id`, `ww_poll_voted_<pollId>`), their
+  signature format, and their voter-key derivation, so the completed
+  Cloudflare-to-WordPress poll migration does not reset every existing visitor.
 
 The initial Byline public API will sit above these identifiers. Legacy routes
 and fields remain aliases until all known consumers and installed data have

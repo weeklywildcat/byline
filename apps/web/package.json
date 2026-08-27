@@ -31,6 +31,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "jsdom": "26.1.0",
     "typescript": "6.0.3",
     "vitest": "^4.1.11"
   }

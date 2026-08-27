@@ -2,24 +2,17 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { PollCard } from "@byline/ui";
+import {
+  POLL_ACTIVE_ENDPOINT,
+  POLL_VOTE_ENDPOINT,
+  pollResultsVisible,
+  type ActivePoll,
+  type PollResponse
+} from "@/lib/polls";
 import { getPollVotedCookieName } from "@/lib/voter-cookie";
-
-type PollOption = {
-  id: string;
-  label: string;
-  votes: number;
-};
-
-type ActivePoll = {
-  id: string;
-  question: string;
-  options: PollOption[];
-  totalVotes: number;
-};
 
 type PollState = "loading" | "ready" | "results" | "empty" | "error";
 
-const MIN_RESULTS_VOTES = 5;
 const LOW_RESPONSE_MESSAGE = "Thanks for your response. We use this to improve our coverage.";
 
 function hasVotedCookie(pollId: string) {
@@ -44,7 +37,7 @@ export function PollWidget() {
 
     async function loadPoll() {
       try {
-        const response = await fetch("/api/polls/active", {
+        const response = await fetch(POLL_ACTIVE_ENDPOINT, {
           headers: {
             Accept: "application/json"
           },
@@ -103,7 +96,7 @@ export function PollWidget() {
     setMessage("");
 
     try {
-      const response = await fetch("/api/polls/vote", {
+      const response = await fetch(POLL_VOTE_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -114,7 +107,7 @@ export function PollWidget() {
           optionId: selectedOptionId
         })
       });
-      const payload = (await response.json()) as ActivePoll | { error?: string; poll?: ActivePoll };
+      const payload = (await response.json()) as PollResponse;
 
       if ("poll" in payload && payload.poll) {
         setPoll(payload.poll);
@@ -125,11 +118,11 @@ export function PollWidget() {
       const nextPoll = "poll" in payload && payload.poll ? payload.poll : response.ok ? (payload as ActivePoll) : null;
 
       if (response.status === 409) {
-        setMessage(nextPoll && nextPoll.totalVotes >= MIN_RESULTS_VOTES ? "You already voted. Here is where things stand." : "");
+        setMessage(pollResultsVisible(nextPoll) ? "You already voted. Here is where things stand." : "");
       } else if (!response.ok) {
         setMessage("We could not record that vote right now.");
       } else {
-        setMessage(nextPoll && nextPoll.totalVotes >= MIN_RESULTS_VOTES ? "Vote counted." : "");
+        setMessage(pollResultsVisible(nextPoll) ? "Vote counted." : "");
       }
 
       setState("results");
@@ -153,7 +146,7 @@ export function PollWidget() {
         <>
           <p className="homepage-poll-question">{poll.question}</p>
           {state === "results" ? (
-            poll.totalVotes >= MIN_RESULTS_VOTES ? (
+            pollResultsVisible(poll) ? (
               <div className="homepage-poll-results" aria-live="polite">
                 {poll.options.map((option) => {
                   const percent = poll.totalVotes > 0 ? Math.round((option.votes / poll.totalVotes) * 100) : 0;

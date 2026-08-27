@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "source": "cloudflare-d1:weekly-wildcat-polls",
+  "exportedAt": "2026-08-27T12:00:00.000Z",
+  "polls": [
+    {
+      "id": "website-coverage",
+      "question": "What should Weekly Wildcat cover more of next?",
+      "status": "open",
+      "opens_at": null,
+      "closes_at": null,
+      "created_at": "2026-08-01 09:00:00"
+    },
+    {
+      "id": "spirit-week",
+      "question": "Favorite spirit week day?",
+      "status": "closed",
+      "opens_at": "2026-08-10T00:00:00.000Z",
+      "closes_at": "2026-08-17T00:00:00.000Z",
+      "created_at": "2026-08-05 14:30:00"
+    },
+    {
+      "id": "fall-sport",
+      "question": "Best fall sport?",
+      "status": "draft",
+      "opens_at": null,
+      "closes_at": null,
+      "created_at": "2026-08-20 08:15:00"
+    }
+  ],
+  "options": [
+    { "id": "news", "poll_id": "website-coverage", "label": "More school news", "position": 0 },
+    { "id": "sports", "poll_id": "website-coverage", "label": "More sports coverage", "position": 1 },
+    { "id": "features", "poll_id": "website-coverage", "label": "More student features", "position": 2 },
+    { "id": "pajama", "poll_id": "spirit-week", "label": "Pajama day", "position": 0 },
+    { "id": "decades", "poll_id": "spirit-week", "label": "Decades day", "position": 1 },
+    { "id": "football", "poll_id": "fall-sport", "label": "Football", "position": 0 },
+    { "id": "volleyball", "poll_id": "fall-sport", "label": "Volleyball", "position": 1 },
+    { "id": "orphaned", "poll_id": "retired-poll", "label": "Belongs to a poll that no longer exists", "position": 0 }
+  ],
+  "votes": [
+    { "id": "v1", "poll_id": "website-coverage", "option_id": "news", "voter_key": "0ZtYMhz_g4Q9DFkprjzF61ldOqq36LaEiwJx5dmAICg", "created_at": "2026-08-02 10:00:00" },
+    { "id": "v2", "poll_id": "website-coverage", "option_id": "sports", "voter_key": "voter-key-two", "created_at": "2026-08-02 11:00:00" },
+    { "id": "v3", "poll_id": "website-coverage", "option_id": "sports", "voter_key": "voter-key-three", "created_at": "2026-08-03 09:30:00" },
+    { "id": "v4", "poll_id": "website-coverage", "option_id": "features", "voter_key": "voter-key-four", "created_at": "2026-08-03 12:00:00" },
+    { "id": "v5", "poll_id": "spirit-week", "option_id": "pajama", "voter_key": "voter-key-two", "created_at": "2026-08-11 09:00:00" },
+    { "id": "v6", "poll_id": "spirit-week", "option_id": "decades", "voter_key": "voter-key-five", "created_at": "2026-08-12 09:00:00" },
+    { "id": "v7", "poll_id": "retired-poll", "option_id": "orphaned", "voter_key": "voter-key-six", "created_at": "2026-08-13 09:00:00" },
+    { "id": "v8", "poll_id": "website-coverage", "option_id": "removed-option", "voter_key": "voter-key-seven", "created_at": "2026-08-14 09:00:00" }
+  ]
+}
