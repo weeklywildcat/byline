@@ -85,7 +85,7 @@ function byline_sports_date_for_value($value): ?DateTimeImmutable
     }
 
     if ($value instanceof DateTimeInterface) {
-        return new DateTimeImmutable('@' . $value->getTimestamp())->setTimezone(byline_sports_timezone());
+        return (new DateTimeImmutable('@' . $value->getTimestamp()))->setTimezone(byline_sports_timezone());
     }
 
     $source = is_scalar($value) ? trim((string) $value) : '';
