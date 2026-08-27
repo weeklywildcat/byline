@@ -15,7 +15,7 @@ export function EditorialLeadPackage({ package: resolved, pollSlot, calendarSlot
   const { lead, latest, utility, presentation } = resolved;
 
   if (!lead) {
-    return <p className="empty-state">{resolved.emptyMessage}</p>;
+    return <p className="byline-package-empty-state">{resolved.emptyMessage}</p>;
   }
 
   const hasUtility = utility.poll || utility.calendar;

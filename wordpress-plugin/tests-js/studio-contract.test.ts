@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createStudioConfig, getStudioThemeVariables, studioBlockGroups } from "../src/studio";
+import {
+  createStudioConfig,
+  getStudioThemeStylesheets,
+  getStudioThemeVariables,
+  studioBlockGroups
+} from "../src/studio";
 
 describe("Byline Studio contract", () => {
   it("groups the stable newspaper block vocabulary without arbitrary code blocks", () => {
@@ -27,5 +32,13 @@ describe("Byline Studio contract", () => {
     expect(config.root?.render).toBeTypeOf("function");
     expect(config.categories?.Stories?.defaultExpanded).toBe(true);
     expect(getStudioThemeVariables("byline-magazine", { accent: "#123456" })["--accent"]).toBe("#123456");
+    expect(getStudioThemeStylesheets("weekly-wildcat")).toEqual(["https://use.typekit.net/zxb8gbj.css"]);
+
+    const root = config.root?.render?.({ children: "Preview" } as never) as {
+      props?: Record<string, unknown>;
+    };
+    expect(root.props?.className).toBe("byline-publication-preview");
+    expect(root.props?.["data-byline-preview-surface"]).toBe("studio");
+    expect(root.props?.["data-theme"]).toBe("byline-magazine");
   });
 });

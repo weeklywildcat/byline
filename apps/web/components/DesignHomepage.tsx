@@ -10,6 +10,7 @@ import type { WordPressPost } from "@/lib/wordpress";
 
 type DesignHomepageProps = {
   blocks: Array<ResolvedDesignContentBlock<WordPressPost>>;
+  theme: string;
   sportsSchedule: {
     recentScores: SportsGame[];
     upcomingGames: SportsGame[];
@@ -21,11 +22,15 @@ function heading(block: ResolvedDesignContentBlock<WordPressPost>, fallback: str
   return typeof block.props.title === "string" && block.props.title.trim() ? block.props.title : fallback;
 }
 
-export function DesignHomepage({ blocks, sportsSchedule }: DesignHomepageProps) {
+export function DesignHomepage({ blocks, sportsSchedule, theme }: DesignHomepageProps) {
   const firstSportsIndex = blocks.findIndex((block) => getBylineBlockPresentation(block.type)?.layout === "sports");
 
   return (
-    <main className="live-home-shell byline-design-home" data-byline-design="home">
+    <main
+      className="byline-publication-preview live-home-shell byline-design-home"
+      data-byline-design="home"
+      data-theme={theme}
+    >
       {blocks.map((block, index) => {
         const key = typeof block.props.id === "string" ? block.props.id : `${block.type}-${index}`;
         const [lead, ...remaining] = block.stories;

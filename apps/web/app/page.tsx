@@ -99,7 +99,11 @@ export default async function HomePage() {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteSchema) }}
         />
-        <DesignHomepage blocks={designBlocks} sportsSchedule={sportsSchedule} />
+        <DesignHomepage
+          blocks={designBlocks}
+          sportsSchedule={sportsSchedule}
+          theme={publication.appearance.theme}
+        />
       </>
     );
   }
@@ -147,7 +151,12 @@ export default async function HomePage() {
   });
 
   return (
-    <main className={leadHasOpinionTreatment ? "live-home-shell live-home-shell-opinion-lead" : "live-home-shell"}>
+    <main
+      className={leadHasOpinionTreatment
+        ? "byline-publication-preview live-home-shell live-home-shell-opinion-lead"
+        : "byline-publication-preview live-home-shell"}
+      data-theme={publication.appearance.theme}
+    >
       <script
         id="website-json-ld"
         type="application/ld+json"

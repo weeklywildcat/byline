@@ -12,6 +12,7 @@ import {
 } from "@wordpress/components";
 import { createRoot, useEffect, useMemo, useState } from "@wordpress/element";
 import "@puckeditor/core/puck.css";
+import "@byline/theme-weekly-wildcat/styles.css";
 import { isNavigationItemVisible, normalizeAdminRoute } from "./admin-routing";
 import { contrastRatio } from "./contrast";
 import { BylineDesignRevisions, BylineStudio } from "./studio";
@@ -24,6 +25,7 @@ type BylineAdminConfig = {
   deploymentPath: string;
   nonce: string;
   pluginVersion: string;
+  previewStylesheetUrl: string;
   capabilities: {
     manage: boolean;
     editDesign: boolean;
@@ -946,6 +948,7 @@ function Screen({
         canEdit={Boolean(config?.capabilities.editDesign)}
         canPublish={Boolean(config?.capabilities.publishDesign)}
         publicationTheme={publication?.appearance.theme || "weekly-wildcat"}
+        previewStylesheetUrl={config?.previewStylesheetUrl || ""}
         tokenOverrides={publication?.appearance.tokenOverrides || {}}
       />
     );
