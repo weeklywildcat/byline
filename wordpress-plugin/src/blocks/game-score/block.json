@@ -1,0 +1,31 @@
+{
+  "apiVersion": 3,
+  "name": "byline/game-score",
+  "version": "1.0.0",
+  "title": "Game Score",
+  "category": "byline",
+  "description": "Show a compact scoreboard from the article's canonical Primary Game.",
+  "keywords": ["sports", "score", "game", "recap", "matchup"],
+  "icon": "awards",
+  "textdomain": "weekly-wildcat-headless",
+  "postTypes": ["post"],
+  "usesContext": ["postId", "postType"],
+  "attributes": {
+    "source": { "type": "string", "default": "primary" },
+    "gameId": { "type": "integer", "default": 0 },
+    "showLogos": { "type": "boolean", "default": true },
+    "showDetails": { "type": "boolean", "default": true },
+    "showLink": { "type": "boolean", "default": true }
+  },
+  "supports": {
+    "align": ["wide"],
+    "anchor": true,
+    "html": false
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "example": {
+    "attributes": { "source": "primary", "showLogos": true }
+  }
+}

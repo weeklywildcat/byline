@@ -10,16 +10,18 @@ import { Icon } from "./Icon";
 export type PollCardProps = {
   children: ReactNode;
   headingId?: string;
+  heading?: string;
+  className?: string;
 };
 
-export function PollCard({ children, headingId = "homepage-poll-heading" }: PollCardProps) {
+export function PollCard({ children, headingId = "homepage-poll-heading", heading = "Your Opinion", className = "" }: PollCardProps) {
   return (
-    <section className="homepage-poll-card" aria-labelledby={headingId}>
+    <section className={className ? `homepage-poll-card ${className}` : "homepage-poll-card"} aria-labelledby={headingId}>
       <div className="homepage-poll-heading">
         <span>
           <Icon name="ph:chart-bar-horizontal" width={17} height={17} />
         </span>
-        <h2 id={headingId}>Your Opinion</h2>
+        <h2 id={headingId}>{heading}</h2>
       </div>
       {children}
     </section>

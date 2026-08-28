@@ -191,7 +191,8 @@ export type WordPressPost = {
 };
 
 export type WordPressPostSettings = {
-    primaryGameId?: number;
+  primaryGameId?: number;
+  gameScoreGameIds?: number[];
 };
 
 export type PostRouteParts = {
@@ -550,4 +551,12 @@ export function getAuthorSocialLinks(author: WordPressAuthor) {
 export function getPostPrimaryGameId(post: WordPressPost) {
   const primaryGameId = (post.byline ?? post.weeklyWildcat)?.primaryGameId;
   return primaryGameId && primaryGameId > 0 ? primaryGameId : null;
+}
+
+export function getPostGameScoreGameIds(post: WordPressPost) {
+  const ids = (post.byline ?? post.weeklyWildcat)?.gameScoreGameIds;
+
+  return Array.isArray(ids)
+    ? Array.from(new Set(ids.map(Number).filter((id) => Number.isInteger(id) && id > 0)))
+    : [];
 }

@@ -26,14 +26,23 @@ function hasVotedCookie(pollId: string) {
     .some((cookie) => cookie.startsWith(`${getPollVotedCookieName(pollId)}=`));
 }
 
-export function PollWidget({ headingId, inputName = "homepage-poll" }: { headingId?: string; inputName?: string }) {
-  const [poll, setPoll] = useState<ActivePoll | null>(null);
+export function PollWidget({ headingId, inputName = "homepage-poll", initialPoll, heading = "Your Opinion", className = "" }: { headingId?: string; inputName?: string; initialPoll?: ActivePoll; heading?: string; className?: string }) {
+  const [poll, setPoll] = useState<ActivePoll | null>(initialPoll ?? null);
   const [selectedOptionId, setSelectedOptionId] = useState("");
-  const [state, setState] = useState<PollState>("loading");
+  const [state, setState] = useState<PollState>(initialPoll ? (initialPoll.votingOpen === false || hasVotedCookie(initialPoll.id) ? "results" : "ready") : "loading");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     let ignore = false;
+
+    if (initialPoll) {
+      setPoll(initialPoll);
+      setSelectedOptionId(initialPoll.options[0]?.id ?? "");
+      setState(initialPoll.votingOpen === false || hasVotedCookie(initialPoll.id) ? "results" : "ready");
+      return () => {
+        ignore = true;
+      };
+    }
 
     async function loadPoll() {
       try {
@@ -76,7 +85,7 @@ export function PollWidget({ headingId, inputName = "homepage-poll" }: { heading
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [initialPoll]);
 
   const leadingOptionId = useMemo(() => {
     if (!poll) {
@@ -133,7 +142,7 @@ export function PollWidget({ headingId, inputName = "homepage-poll" }: { heading
   }
 
   return (
-    <PollCard headingId={headingId}>
+    <PollCard headingId={headingId} heading={heading} className={className}>
       {state === "loading" ? (
         <div className="homepage-poll-loading" aria-label="Loading poll" />
       ) : null}

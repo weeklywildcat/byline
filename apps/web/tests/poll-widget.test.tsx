@@ -96,6 +96,17 @@ describe("PollWidget", () => {
     expect(container.querySelector(".homepage-poll-loading")).toBeNull();
   });
 
+  it("uses a server-rendered block payload without fetching a second poll", async () => {
+    await act(async () => {
+      root.render(<PollWidget initialPoll={poll({ votingOpen: true })} heading="Reader question" />);
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(text()).toContain("Reader question");
+    expect(text()).toContain("What should we cover more of next?");
+    expect(container.querySelector("form")).not.toBeNull();
+  });
+
   it("renders the active poll question and answers", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(poll()));
     await render();

@@ -1,0 +1,36 @@
+{
+  "apiVersion": 3,
+  "name": "byline/stories",
+  "version": "1.0.0",
+  "title": "Stories",
+  "category": "byline",
+  "description": "Show published journalism from the canonical WordPress story archive.",
+  "keywords": ["stories", "articles", "news", "archive"],
+  "icon": "list-view",
+  "textdomain": "weekly-wildcat-headless",
+  "postTypes": ["post", "page"],
+  "attributes": {
+    "heading": { "type": "string", "default": "Stories" },
+    "source": { "type": "string", "default": "latest" },
+    "termId": { "type": "integer", "default": 0 },
+    "authorId": { "type": "integer", "default": 0 },
+    "postIds": { "type": "array", "default": [] },
+    "limit": { "type": "integer", "default": 6 },
+    "layout": { "type": "string", "default": "grid" },
+    "showImage": { "type": "boolean", "default": true },
+    "showExcerpt": { "type": "boolean", "default": false },
+    "showByline": { "type": "boolean", "default": true },
+    "showDate": { "type": "boolean", "default": true }
+  },
+  "supports": {
+    "align": ["wide"],
+    "anchor": true,
+    "html": false
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "example": {
+    "attributes": { "heading": "Latest stories", "source": "latest", "layout": "grid" }
+  }
+}

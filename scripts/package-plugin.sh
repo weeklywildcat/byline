@@ -49,6 +49,36 @@ build_assets=(
   build/blocks/page-section/index.asset.php
   build/blocks/page-section/render.php
   build/blocks/page-section/style-index.css
+  # Newsroom block metadata, editor bundles, and the shared publication-neutral
+  # stylesheet emitted for each block entry.
+  build/blocks/stories/block.json
+  build/blocks/stories/index.js
+  build/blocks/stories/index.asset.php
+  build/blocks/stories/style-index.css
+  build/blocks/people/block.json
+  build/blocks/people/index.js
+  build/blocks/people/index.asset.php
+  build/blocks/people/style-index.css
+  build/blocks/sports-schedule/block.json
+  build/blocks/sports-schedule/index.js
+  build/blocks/sports-schedule/index.asset.php
+  build/blocks/sports-schedule/style-index.css
+  build/blocks/events/block.json
+  build/blocks/events/index.js
+  build/blocks/events/index.asset.php
+  build/blocks/events/style-index.css
+  build/blocks/poll/block.json
+  build/blocks/poll/index.js
+  build/blocks/poll/index.asset.php
+  build/blocks/poll/style-index.css
+  build/blocks/game-score/block.json
+  build/blocks/game-score/index.js
+  build/blocks/game-score/index.asset.php
+  build/blocks/game-score/style-index.css
+  build/blocks/correction-notice/block.json
+  build/blocks/correction-notice/index.js
+  build/blocks/correction-notice/index.asset.php
+  build/blocks/correction-notice/style-index.css
 )
 
 migration_assets=(
@@ -150,6 +180,13 @@ grep -qx 'weekly-wildcat-headless/build/blocks/page-section/index.js' <<<"$archi
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/index.asset.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/render.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/style-index.css' <<<"$archive_files"
+
+for newsroom_block in stories people sports-schedule events poll game-score correction-notice; do
+  grep -qx "weekly-wildcat-headless/build/blocks/$newsroom_block/block.json" <<<"$archive_files"
+  grep -qx "weekly-wildcat-headless/build/blocks/$newsroom_block/index.js" <<<"$archive_files"
+  grep -qx "weekly-wildcat-headless/build/blocks/$newsroom_block/index.asset.php" <<<"$archive_files"
+  grep -qx "weekly-wildcat-headless/build/blocks/$newsroom_block/style-index.css" <<<"$archive_files"
+done
 
 # Polls are WordPress-owned storage now, so the whole poll module must ship.
 for poll_file in "${poll_files[@]}"; do

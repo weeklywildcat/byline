@@ -4,6 +4,7 @@ import { ArticleShareActions } from "@/components/ArticleShareActions";
 import { ArticleGameCard } from "@/components/ArticleGameCard";
 import { AuthorBadge } from "@/components/AuthorBadge";
 import { FeaturedImage } from "@/components/FeaturedImage";
+import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import {
@@ -32,6 +33,7 @@ import {
   getPostCategories,
   getPostAuthor,
   getPostAuthorWithProfile,
+  getPostGameScoreGameIds,
   getPostHref,
   getPostPrimaryGameId,
   getPostRouteParts,
@@ -297,6 +299,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const author = await getPostAuthorWithProfile(post);
   const primaryGameId = getPostPrimaryGameId(post);
   const primaryGame = primaryGameId ? await getSportsGameById(primaryGameId) : null;
+  const gameScoreGameIds = getPostGameScoreGameIds(post);
+  const showLegacyPrimaryGame = Boolean(primaryGame && !gameScoreGameIds.includes(primaryGame.id));
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
   const topicTags = getPublicTopicTags(post);
@@ -371,13 +375,15 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <FeaturedImage image={image} priority />
         </header>
 
-        {primaryGame ? <ArticleGameCard game={primaryGame} className="article-primary-game-card" /> : null}
+        {showLegacyPrimaryGame && primaryGame ? <ArticleGameCard game={primaryGame} className="article-primary-game-card" /> : null}
 
         {content ? (
           <div className="article-body" dangerouslySetInnerHTML={{ __html: content }} />
         ) : (
           <p className="empty-state">No article body has been published yet.</p>
         )}
+
+        <NewsroomPollHydrator />
 
         {topicTerms.length > 0 ? (
           <footer className="article-tags" aria-label="Story topics">

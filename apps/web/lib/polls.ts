@@ -42,6 +42,8 @@ export type ActivePoll = {
    * Optional only for compatibility with a CMS that predates the field.
    */
   resultsAvailable?: boolean;
+  /** Present on a block's server-rendered payload; absent on the legacy active endpoint. */
+  votingOpen?: boolean;
 };
 
 export type PollVoteRequest = {

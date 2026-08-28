@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./page-blocks.css": "./src/page-blocks.css"
+    "./page-blocks.css": "./src/page-blocks.css",
+    "./newsroom-blocks.css": "./src/newsroom-blocks.css"
   },
   "dependencies": {
     "@byline/theme-contract": "0.1.0",

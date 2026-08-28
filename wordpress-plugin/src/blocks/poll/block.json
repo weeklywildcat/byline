@@ -1,0 +1,28 @@
+{
+  "apiVersion": 3,
+  "name": "byline/poll",
+  "version": "1.0.0",
+  "title": "Poll",
+  "category": "byline",
+  "description": "Embed the canonical Byline poll with its existing vote and cookie contract.",
+  "keywords": ["poll", "opinion", "survey", "vote"],
+  "icon": "chart-bar",
+  "textdomain": "weekly-wildcat-headless",
+  "postTypes": ["post", "page"],
+  "attributes": {
+    "source": { "type": "string", "default": "active" },
+    "pollId": { "type": "string", "default": "" },
+    "heading": { "type": "string", "default": "Your Opinion" }
+  },
+  "supports": {
+    "align": ["wide"],
+    "anchor": true,
+    "html": false
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "example": {
+    "attributes": { "heading": "Your Opinion", "source": "active" }
+  }
+}

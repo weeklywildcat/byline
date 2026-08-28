@@ -5,6 +5,7 @@ import { stripHtml } from "@/lib/format";
 import { requireBuildData } from "@/lib/build-data";
 import { BYLINE_EMPTY_ROUTE_SLUG, isBylineEmptyRouteSlug, withEmptyRouteFallback } from "@/lib/static-params";
 import { getAllPages, getPageBySlug } from "@/lib/wordpress";
+import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
 
 type StaticPageProps = {
   params: Promise<{
@@ -99,6 +100,7 @@ export default async function StaticPage({ params }: StaticPageProps) {
           className="static-page-content byline-page-content"
           dangerouslySetInnerHTML={{ __html: wordpressPage.content.rendered }}
         />
+        <NewsroomPollHydrator />
       </article>
     </main>
   );

@@ -1,0 +1,29 @@
+{
+  "apiVersion": 3,
+  "name": "byline/correction-notice",
+  "version": "1.0.0",
+  "title": "Correction Notice",
+  "category": "byline",
+  "description": "A consistent, accessible editorial notice for corrections and clarifications.",
+  "keywords": ["correction", "clarification", "update", "editor's note"],
+  "icon": "editor-help",
+  "textdomain": "weekly-wildcat-headless",
+  "postTypes": ["post", "page"],
+  "attributes": {
+    "type": { "type": "string", "default": "correction" },
+    "date": { "type": "string", "default": "" },
+    "notice": { "type": "string", "default": "Add a clear explanation of what changed." }
+  },
+  "supports": {
+    "align": ["wide"],
+    "anchor": true,
+    "customClassName": false,
+    "html": false
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "example": {
+    "attributes": { "type": "correction", "date": "2026-08-28", "notice": "An earlier version of this story misstated a detail." }
+  }
+}
