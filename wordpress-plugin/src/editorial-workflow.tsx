@@ -31,6 +31,8 @@ import {
   workflowStages,
   workflowStatusLabel,
   workflowStoryPath,
+  createWorkflowRequestTracker,
+  createSerializedWorkflowSaveQueue,
   type WorkflowChanges,
   type WorkflowPayload,
   type WorkflowStatusDefinition
@@ -47,6 +49,31 @@ function errorMessage(error: unknown): string {
 
 const storyPath = workflowStoryPath;
 
+function deadlineContext(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
+  const deadline = new Date(`${value}T12:00:00`);
+  if (!Number.isFinite(deadline.getTime())) return '';
+  const today = new Date();
+  const todayNoon = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0);
+  const dayDelta = Math.round((deadline.getTime() - todayNoon.getTime()) / 86400000);
+  const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(deadline);
+  if (dayDelta === 0) return __('Today', 'weekly-wildcat-headless');
+  if (dayDelta === 1) return __('Tomorrow', 'weekly-wildcat-headless');
+  if (dayDelta > 1) return sprintf(
+    /* translators: 1: weekday, 2: number of days until a deadline. */
+    __('%1$s · %2$d days', 'weekly-wildcat-headless'),
+    weekday,
+    dayDelta
+  );
+  const overdueDays = Math.abs(dayDelta);
+  return sprintf(
+    /* translators: 1: weekday, 2: number of days since a deadline. */
+    __('%1$s · %2$d days overdue', 'weekly-wildcat-headless'),
+    weekday,
+    overdueDays
+  );
+}
+
 /**
  * Loads the workflow once per post and owns every write.
  *
@@ -60,9 +87,14 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
-  // Guards against a slow first response overwriting a newer one, and against
-  // setting state on an unmounted sidebar.
-  const requestRef = useRef(0);
+  // Reads and writes have independent lifecycles. A publication-status reload
+  // must never make an unrelated workflow save look stale (or leave its busy
+  // indicator stuck).
+  const requestTrackerRef = useRef(createWorkflowRequestTracker());
+  const saveInFlightRef = useRef(false);
+  const saveInFlightPostIdRef = useRef<number | null>(null);
+  const activePostIdRef = useRef(postId);
+  activePostIdRef.current = postId;
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -75,22 +107,27 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
   const load = useCallback(() => {
     if (!postId) return;
 
-    const requestId = requestRef.current + 1;
-    requestRef.current = requestId;
+    const requestTracker = requestTrackerRef.current;
+    const requestId = requestTracker.beginRead();
+    const saveSequenceAtStart = requestTracker.writeVersion();
     setIsLoading(true);
     setLoadError(null);
 
     apiFetch<WorkflowPayload>({ path: storyPath(postId) })
       .then((next) => {
-        if (!mountedRef.current || requestRef.current !== requestId) return;
+        if (!mountedRef.current || activePostIdRef.current !== postId || !requestTracker.isCurrentRead(requestId)) return;
+        // A save response is authoritative while it is in flight. Applying a
+        // slower GET here would put the sidebar back on the pre-save values.
+        if ((saveInFlightRef.current && saveInFlightPostIdRef.current === postId)
+          || requestTracker.writeVersion() !== saveSequenceAtStart) return;
         setPayload(next);
       })
       .catch((error: unknown) => {
-        if (!mountedRef.current || requestRef.current !== requestId) return;
+        if (!mountedRef.current || activePostIdRef.current !== postId || !requestTracker.isCurrentRead(requestId)) return;
         setLoadError(errorMessage(error));
       })
       .finally(() => {
-        if (!mountedRef.current || requestRef.current !== requestId) return;
+        if (!mountedRef.current || activePostIdRef.current !== postId || !requestTracker.isCurrentRead(requestId)) return;
         setIsLoading(false);
       });
   }, [postId]);
@@ -108,14 +145,17 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
     (changes: WorkflowChanges) => {
       if (!postId) return Promise.resolve(false);
 
-      const requestId = requestRef.current + 1;
-      requestRef.current = requestId;
+      const requestTracker = requestTrackerRef.current;
+      const requestPostId = postId;
+      const requestId = requestTracker.beginWrite();
+      saveInFlightRef.current = true;
+      saveInFlightPostIdRef.current = requestPostId;
       setIsSaving(true);
       setSaveError(null);
 
       return apiFetch<WorkflowPayload>({ path: storyPath(postId), method: 'POST', data: changes })
         .then((next) => {
-          if (!mountedRef.current || requestRef.current !== requestId) return false;
+          if (!mountedRef.current || activePostIdRef.current !== requestPostId || !requestTracker.isCurrentWrite(requestId)) return false;
           setPayload(next);
           setSavedAt(Date.now());
           return true;
@@ -123,17 +163,23 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
         .catch((error: unknown) => {
           // The entered value is deliberately left in the field so the editor
           // can correct it and retry rather than retyping it.
-          if (mountedRef.current && requestRef.current === requestId) setSaveError(errorMessage(error));
+          if (mountedRef.current && activePostIdRef.current === requestPostId && requestTracker.isCurrentWrite(requestId)) setSaveError(errorMessage(error));
           return false;
         })
         .finally(() => {
-          if (mountedRef.current && requestRef.current === requestId) setIsSaving(false);
+          if (saveInFlightPostIdRef.current === requestPostId) {
+            saveInFlightPostIdRef.current = null;
+            saveInFlightRef.current = false;
+          }
+          if (mountedRef.current && activePostIdRef.current === requestPostId && requestTracker.isCurrentWrite(requestId)) setIsSaving(false);
         });
     },
     [postId]
   );
 
-  return { payload, load, save, isLoading, isSaving, loadError, saveError, savedAt };
+  const clearSaveError = useCallback(() => setSaveError(null), []);
+
+  return { payload, load, save, clearSaveError, isLoading, isSaving, loadError, saveError, savedAt };
 }
 
 type StageListProps = {
@@ -194,14 +240,57 @@ function StageList({ statuses, current, disabled, onChange }: StageListProps) {
 type WorkflowControlsProps = ReturnType<typeof useEditorialWorkflow>;
 
 function WorkflowControls(workflow: WorkflowControlsProps) {
-  const { payload, load, save, isLoading, isSaving, loadError, saveError, savedAt } = workflow;
+  const { payload, load, save, clearSaveError, isLoading, isSaving, loadError, saveError, savedAt } = workflow;
   const [visuals, setVisuals] = useState('');
   const [visualsDirty, setVisualsDirty] = useState(false);
+  const [visualsSaving, setVisualsSaving] = useState(false);
+  const [visualsSaveError, setVisualsSaveError] = useState(false);
+  const visualsSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestVisualsRef = useRef('');
+  const visualsDirtyRef = useRef(false);
+  const visualsSaveCountRef = useRef(0);
+  const visualsInitializedRef = useRef(false);
+  const visualsQueueRef = useRef(createSerializedWorkflowSaveQueue<string>((value) => save({ visuals: value })));
+
+  const enqueueVisualSave = useCallback((value: string) => {
+    visualsSaveCountRef.current += 1;
+    setVisualsSaving(true);
+    const request = visualsQueueRef.current.enqueue(value);
+    void request.then((saved) => {
+      visualsSaveCountRef.current -= 1;
+      if (visualsSaveCountRef.current === 0) setVisualsSaving(false);
+      if (saved && latestVisualsRef.current === value) {
+        visualsDirtyRef.current = false;
+        setVisualsDirty(false);
+        setVisualsSaveError(false);
+      } else if (!saved && latestVisualsRef.current === value) {
+        setVisualsSaveError(true);
+      }
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (visualsSaveTimerRef.current !== null) clearTimeout(visualsSaveTimerRef.current);
+    if (visualsDirtyRef.current) enqueueVisualSave(latestVisualsRef.current);
+  }, [enqueueVisualSave]);
 
   useEffect(() => {
-    if (payload && !visualsDirty) setVisuals(payload.story.visuals);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payload?.story.visuals]);
+    if (!visualsDirty) return undefined;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => window.removeEventListener('beforeunload', beforeUnload);
+  }, [visualsDirty]);
+
+  useEffect(() => {
+    if (payload && !visualsDirty && (!visualsInitializedRef.current || payload.story.visuals === latestVisualsRef.current)) {
+      setVisuals(payload.story.visuals);
+      latestVisualsRef.current = payload.story.visuals;
+      visualsInitializedRef.current = true;
+    }
+  }, [payload?.story.visuals, visualsDirty]);
 
   if (loadError) {
     return (
@@ -298,6 +387,9 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
                 disabled={busy}
                 onChange={(value: string) => save({ deadline: value })}
               />
+              {story.deadline && deadlineContext(story.deadline) ? (
+                <p className="byline-workflow-field-note">{deadlineContext(story.deadline)}</p>
+              ) : null}
             </div>
           </>
         ) : (
@@ -307,7 +399,10 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
             {story.deadline ? (
               <>
                 <dt>{__('Deadline', 'weekly-wildcat-headless')}</dt>
-                <dd>{story.deadline}</dd>
+                <dd>
+                  {story.deadline}
+                  {deadlineContext(story.deadline) ? <small>{deadlineContext(story.deadline)}</small> : null}
+                </dd>
               </>
             ) : null}
           </dl>
@@ -320,23 +415,41 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
             help={__('Internal only. Never shown to readers.', 'weekly-wildcat-headless')}
             rows={3}
             value={visuals}
-            disabled={busy || !capabilities.changeStatus}
+            disabled={isLoading || !capabilities.changeStatus}
             onChange={(value: string) => {
+              clearSaveError();
+              setVisualsSaveError(false);
               setVisuals(value);
               setVisualsDirty(true);
+              visualsDirtyRef.current = true;
+              latestVisualsRef.current = value;
+              if (visualsSaveTimerRef.current !== null) clearTimeout(visualsSaveTimerRef.current);
+              visualsSaveTimerRef.current = setTimeout(() => {
+                visualsSaveTimerRef.current = null;
+                enqueueVisualSave(value);
+              }, 650);
             }}
           />
-          {visualsDirty ? (
+          <p className="byline-workflow-field-note" aria-live="polite">
+            {visualsDirty
+              ? visualsSaving
+                ? __('Saving visual needs…', 'weekly-wildcat-headless')
+                : visualsSaveError
+                  ? __('Couldn’t save visual needs. Your text is still here; try again.', 'weekly-wildcat-headless')
+                : __('Visual needs will save automatically.', 'weekly-wildcat-headless')
+              : ''}
+          </p>
+          {visualsSaveError ? (
             <Button
               variant="secondary"
-              disabled={busy}
+              disabled={visualsSaving}
               onClick={() => {
-                save({ visuals }).then((saved) => {
-                  if (saved) setVisualsDirty(false);
-                });
+                clearSaveError();
+                setVisualsSaveError(false);
+                enqueueVisualSave(latestVisualsRef.current);
               }}
             >
-              {__('Save visual needs', 'weekly-wildcat-headless')}
+              {__('Retry visual needs', 'weekly-wildcat-headless')}
             </Button>
           ) : null}
         </div>
@@ -347,7 +460,16 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
           <dt>{__('Discussion', 'weekly-wildcat-headless')}</dt>
           <dd>
             {discord.threadId
-              ? __('Discord thread linked.', 'weekly-wildcat-headless')
+              ? (
+                <>
+                  {__('Discord thread linked.', 'weekly-wildcat-headless')}{' '}
+                  {discord.threadUrl ? (
+                    <a href={discord.threadUrl} target="_blank" rel="noreferrer">
+                      {__('Open in Discord', 'weekly-wildcat-headless')}
+                    </a>
+                  ) : null}
+                </>
+              )
               : __('Not linked to a Discord thread yet.', 'weekly-wildcat-headless')}
           </dd>
         </dl>
@@ -429,7 +551,7 @@ function EditorialWorkflowPlugin() {
       </PluginSidebarMoreMenuItem>
 
       <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={listView}>
-        <WorkflowControls {...workflow} />
+        <WorkflowControls key={postId} {...workflow} />
       </PluginSidebar>
     </>
   );

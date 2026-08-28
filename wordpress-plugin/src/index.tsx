@@ -27,6 +27,7 @@ import {
 } from "./admin-routing";
 import { contrastRatio } from "./contrast";
 import { BylineDesignRevisions, BylineStudio } from "./studio";
+import { createNavigationItem, moveItem, navigationConflictKey, sectionSlugForName } from "./settings-model";
 import type { ReactNode } from "react";
 import "./style.css";
 
@@ -100,6 +101,8 @@ type PublicationConfig = {
 
 type PublicationAsset = { url: string; alt: string; width: number | null; height: number | null };
 
+type NavigationPage = { id: number; title?: { rendered?: string }; link: string };
+
 type AdminUrls = {
   dashboard: string;
   studio: string;
@@ -125,7 +128,7 @@ type DiagnosticsPayload = {
   theme: { id: string; version: number; compatible: boolean };
   enabledModules: string[];
   deployment: { provider?: string; providerLabel?: string; configured: boolean; lastTriggeredAt: string; lastStatus: string; pending: boolean };
-  publicManifest: { reachable: boolean; status: string; protocolVersion?: number; frontendVersion?: string; publicationRevision?: number };
+  publicManifest: { reachable: boolean; status: string; protocolVersion?: number; frontendVersion?: string; publicationRevision?: number; designRevisions?: Record<string, number> };
   restHealth: boolean;
   designsNeedingMigration: number;
   schemaVersions?: Record<string, number | null>;
@@ -286,7 +289,7 @@ function publicationDraftErrors(draft: PublicationConfig): Record<string, string
     if (item.label.length > 80) add(`navigation.${index}.label`, "Navigation labels must be 80 characters or fewer.");
     if (!item.url.trim() || (!item.url.startsWith("/") && !/^https?:\/\//i.test(item.url))) add(`navigation.${index}.url`, "Use a site path or complete http(s) URL.");
     if (!item.locations.length) add(`navigation.${index}.locations`, "Choose a header or footer placement.");
-    const key = `${item.label.trim().toLowerCase()}|${item.url.trim()}|${item.locations.join(",")}`;
+    const key = navigationConflictKey(item);
     if (navigationKeys.has(key)) add(`navigation.${index}`, "This navigation item is duplicated.");
     navigationKeys.add(key);
   }
@@ -313,6 +316,27 @@ function fieldHelp(message: string | undefined, fallback?: string) {
   return message ? <span className="byline-field-error">{message}</span> : fallback;
 }
 
+function moveIndexedState<T>(state: Record<number, T>, index: number, direction: -1 | 1): Record<number, T> {
+  const other = index + direction;
+  const next = { ...state };
+  const current = next[index];
+  const adjacent = next[other];
+  if (adjacent === undefined) delete next[index];
+  else next[index] = adjacent;
+  if (current === undefined) delete next[other];
+  else next[other] = current;
+  return next;
+}
+
+function removeIndexedState<T>(state: Record<number, T>, index: number): Record<number, T> {
+  const next: Record<number, T> = {};
+  Object.entries(state).forEach(([key, value]) => {
+    const oldIndex = Number(key);
+    if (oldIndex !== index) next[oldIndex > index ? oldIndex - 1 : oldIndex] = value;
+  });
+  return next;
+}
+
 type AdminTab = { id: string; label: string; href: string };
 
 function AdminLocalTabs({ label, active, tabs }: { label: string; active: string; tabs: AdminTab[] }) {
@@ -337,6 +361,7 @@ function publicationTabs(): AdminTab[] {
     identity: "Identity",
     branding: "Branding",
     navigation: "Navigation",
+    features: "Features",
     social: "Social"
   };
   return PUBLICATION_TABS.map((id) => ({
@@ -370,7 +395,7 @@ function settingsTabs(): AdminTab[] {
   }));
 }
 
-function Dashboard({ protocol, publication, health }: { protocol: ProtocolManifest | null; publication: PublicationConfig | null; health: HealthPayload | null }) {
+function Dashboard({ publication, health }: { publication: PublicationConfig | null; health: HealthPayload | null }) {
   const checks = health?.checks || [];
   const checkById = Object.fromEntries(checks.map((check) => [check.id, check]));
   const checklist = [
@@ -449,18 +474,6 @@ function Dashboard({ protocol, publication, health }: { protocol: ProtocolManife
               </li>
             )) : <li>No optional modules configured.</li>}
           </ul>
-        </CardBody>
-      </Card>
-      <Card>
-        <CardBody>
-          <p className="byline-eyebrow">System information</p>
-          {protocol ? (
-            <dl className="byline-diagnostics-list">
-              <div><dt>Plugin</dt><dd>{protocol.pluginVersion}</dd></div>
-              <div><dt>Schema</dt><dd>{protocol.publicationSchemaVersion}</dd></div>
-              <div><dt>Theme API</dt><dd>{protocol.themeApiVersion}</dd></div>
-            </dl>
-          ) : <LoadingState label="Loading system information…" />}
         </CardBody>
       </Card>
     </div>
@@ -601,12 +614,24 @@ function MediaAssetControl({
   return (
     <fieldset>
       <legend>{label}</legend>
-      <TextControl label="Image URL" value={asset.url} onChange={(url) => onChange({ ...asset, url })} />
+      {asset.url ? (
+        <div className="byline-media-asset-preview">
+          <img src={asset.url} alt="" />
+          <div>
+            <strong>{asset.url.split("/").pop() || label}</strong>
+            {asset.width && asset.height ? <span>{asset.width}×{asset.height}</span> : <span>Preview loaded from Media Library</span>}
+          </div>
+        </div>
+      ) : <p className="byline-empty-state">No {label.toLowerCase()} selected.</p>}
       <TextControl label="Alternative text" value={asset.alt} onChange={(alt) => onChange({ ...asset, alt })} />
       <div className="byline-settings-actions">
-        <Button variant="secondary" onClick={chooseImage}>Choose from Media Library</Button>
-        {asset.url ? <Button variant="link" isDestructive onClick={() => onChange({ url: "", alt: "", width: null, height: null })}>Clear</Button> : null}
+        <Button variant="secondary" onClick={chooseImage}>{asset.url ? "Replace" : "Choose from Media Library"}</Button>
+        {asset.url ? <Button variant="link" isDestructive onClick={() => onChange({ url: "", alt: "", width: null, height: null })}>Remove</Button> : null}
       </div>
+      <details className="byline-advanced-details">
+        <summary>Advanced: manual image URL</summary>
+        <TextControl label="Image URL" value={asset.url} onChange={(url) => onChange({ ...asset, url })} />
+      </details>
     </fieldset>
   );
 }
@@ -625,13 +650,77 @@ function PublicationSettings({
   const [message, setMessage] = useState("");
   const [saveError, setSaveError] = useState("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [sectionSlugModes, setSectionSlugModes] = useState<Record<number, "auto" | "manual">>({});
+  const [originalSectionSlugs, setOriginalSectionSlugs] = useState<Record<number, string>>({});
+  const [newNavigationTarget, setNewNavigationTarget] = useState("");
+  const [footerGroupEditors, setFooterGroupEditors] = useState<Record<number, boolean>>({});
+  const [navigationPages, setNavigationPages] = useState<NavigationPage[]>([]);
 
-  useEffect(() => setDraft(publication), [publication]);
+  useEffect(() => {
+    setDraft(publication);
+    const modes: Record<number, "auto" | "manual"> = {};
+    const originals: Record<number, string> = {};
+    publication?.sections.forEach((section, index) => {
+      originals[index] = section.slug;
+      // Existing records are established URLs. Only newly-added rows opt into
+      // name-driven slug generation automatically.
+      modes[index] = section.slug ? "manual" : "auto";
+    });
+    setSectionSlugModes(modes);
+    setOriginalSectionSlugs(originals);
+    setFooterGroupEditors({});
+  }, [publication]);
+
+  useEffect(() => {
+    if (route !== "/publication/navigation") return undefined;
+    let cancelled = false;
+    apiFetch<NavigationPage[]>({ path: "/wp/v2/pages?per_page=100&_fields=id,title,link" })
+      .then((pages) => {
+        if (!cancelled) setNavigationPages(Array.isArray(pages) ? pages : []);
+      })
+      .catch(() => {
+        // The section and custom URL pickers remain useful if the current
+        // account cannot list pages through the native WordPress endpoint.
+        if (!cancelled) setNavigationPages([]);
+      });
+    return () => { cancelled = true; };
+  }, [route]);
 
   const dirty = Boolean(draft && publication && JSON.stringify(draft) !== JSON.stringify(publication));
   useUnsavedChangesPrompt(dirty);
 
+  useEffect(() => {
+    if (dirty) {
+      setMessage("");
+      setSaveError("");
+    }
+  }, [dirty, draft]);
+
   if (!draft) return <LoadingState label="Loading publication settings…" />;
+
+  const navigationSections = draft.sections.filter((section) => section.active && section.slug);
+  const addNavigationItem = () => {
+    const item = createNavigationItem(
+      newNavigationTarget,
+      navigationSections,
+      navigationPages.map((page) => ({
+        id: page.id,
+        title: page.title?.rendered?.replace(/<[^>]+>/g, "") || `Page ${page.id}`,
+        url: page.link
+      }))
+    );
+    if (!item) return;
+    setDraft({ ...draft, navigation: [...draft.navigation, item] });
+    setNewNavigationTarget("");
+  };
+  const moveNavigation = (index: number, direction: -1 | 1) => {
+    setDraft({ ...draft, navigation: moveItem(draft.navigation, index, direction) });
+    setFooterGroupEditors((editors) => moveIndexedState(editors, index, direction));
+  };
+  const removeNavigation = (index: number) => {
+    setDraft({ ...draft, navigation: draft.navigation.filter((_, itemIndex) => itemIndex !== index) });
+    setFooterGroupEditors((editors) => removeIndexedState(editors, index));
+  };
 
   const save = async () => {
     const nextValidationErrors = publicationDraftErrors(draft);
@@ -639,6 +728,12 @@ function PublicationSettings({
     if (Object.keys(nextValidationErrors).length) {
       setSaveError("Fix the highlighted fields before saving publication settings.");
       setMessage("");
+      window.setTimeout(() => {
+        const firstError = document.querySelector<HTMLElement>(".byline-field-error");
+        const control = firstError?.closest(".components-base-control")?.querySelector<HTMLElement>("input, textarea, select, button");
+        control?.scrollIntoView({ behavior: "smooth", block: "center" });
+        control?.focus();
+      }, 0);
       return;
     }
 
@@ -667,7 +762,13 @@ function PublicationSettings({
       <Button variant="primary" isBusy={saving} disabled={saving || !config?.capabilities.manage || !dirty} onClick={save}>
         Save publication
       </Button>
-      <span aria-live="polite">{saving ? "Saving…" : dirty ? "Unsaved changes" : "Saved"} · Schema {draft.schemaVersion} · Revision {draft.revision}</span>
+      <span aria-live="polite">{saving ? "Saving…" : dirty ? "Unsaved changes" : "Saved ✓"}</span>
+      {!dirty && !saving ? (
+        <details className="byline-advanced-details byline-settings-details">
+          <summary>Advanced details</summary>
+          <span>Configuration revision {draft.revision} · compatibility schema {draft.schemaVersion}</span>
+        </details>
+      ) : null}
     </div>
   );
 
@@ -774,24 +875,41 @@ function PublicationSettings({
             }}
           />
         </div>
-        <h3>Optional token overrides</h3>
-        <p>Use six-digit hex colors. Leave a field empty to use the theme default.</p>
+        <h3>Appearance colors</h3>
+        <p>Choose a color or enter an exact six-digit hex value. Leave a field empty to use the theme default.</p>
         <div className="byline-settings-grid">
-          {colorTokens.map(([key, label]) => (
-            <TextControl
-              key={key}
-              label={label}
-              help={fieldHelp(validationErrors[`appearance.tokenOverrides.${key}`])}
-              value={draft.appearance.tokenOverrides[key] || ""}
-              placeholder="#000000"
-              onChange={(value) => {
-                const tokenOverrides = { ...draft.appearance.tokenOverrides };
-                if (value) tokenOverrides[key] = value;
-                else delete tokenOverrides[key];
-                setDraft({ ...draft, appearance: { ...draft.appearance, tokenOverrides } });
-              }}
-            />
-          ))}
+          {colorTokens.map(([key, label]) => {
+            const value = draft.appearance.tokenOverrides[key] || "";
+            const fallback = key === "accent" ? defaults.accent : key === "text" ? defaults.text : defaults.background;
+            const pickerValue = /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+            const updateColor = (nextValue: string) => {
+              const tokenOverrides = { ...draft.appearance.tokenOverrides };
+              if (nextValue) tokenOverrides[key] = nextValue;
+              else delete tokenOverrides[key];
+              setDraft({ ...draft, appearance: { ...draft.appearance, tokenOverrides } });
+            };
+            return (
+              <div className="byline-color-control" key={key}>
+                <label>
+                  <span>{label}</span>
+                  <input
+                    type="color"
+                    aria-label={`${label} color picker`}
+                    value={pickerValue}
+                    onChange={(event) => updateColor(event.target.value)}
+                  />
+                </label>
+                <TextControl
+                  label={`${label} hex`}
+                  help={fieldHelp(validationErrors[`appearance.tokenOverrides.${key}`])}
+                  value={value}
+                  placeholder="#000000"
+                  onChange={updateColor}
+                />
+                {value ? <Button variant="link" onClick={() => updateColor("")}>Use theme default</Button> : null}
+              </div>
+            );
+          })}
         </div>
       </>
     );
@@ -928,13 +1046,23 @@ function PublicationSettings({
               <div className="byline-settings-grid">
                 <TextControl label="Name" value={section.name} onChange={(name) => {
                   const sections = [...draft.sections];
-                  sections[index] = { ...section, name };
+                  sections[index] = {
+                    ...section,
+                    name,
+                    slug: sectionSlugForName(name, section.slug, sectionSlugModes[index] ?? "manual")
+                  };
                   setDraft({ ...draft, sections });
                 }} help={fieldHelp(validationErrors[`sections.${index}.name`])} />
-                <TextControl label="Slug" help={fieldHelp(validationErrors[`sections.${index}.slug`])} value={section.slug} onChange={(slug) => {
+                <TextControl label="Slug" help={fieldHelp(
+                  validationErrors[`sections.${index}.slug`],
+                  originalSectionSlugs[index] && section.slug !== originalSectionSlugs[index]
+                    ? "Changing this slug may affect existing links."
+                    : undefined
+                )} value={section.slug} onChange={(slug) => {
                   const sections = [...draft.sections];
                   sections[index] = { ...section, slug };
                   setDraft({ ...draft, sections });
+                  setSectionSlugModes((modes) => ({ ...modes, [index]: "manual" }));
                 }} />
               </div>
               <TextareaControl label="Description" value={section.description} onChange={(description) => {
@@ -947,16 +1075,45 @@ function PublicationSettings({
                 sections[index] = { ...section, active };
                 setDraft({ ...draft, sections });
               }} />
-              <Button variant="link" isDestructive onClick={() => setDraft({ ...draft, sections: draft.sections.filter((_, sectionIndex) => sectionIndex !== index) })}>Remove section</Button>
+              <Button variant="link" isDestructive onClick={() => {
+                setDraft({ ...draft, sections: draft.sections.filter((_, sectionIndex) => sectionIndex !== index) });
+                setSectionSlugModes((modes) => removeIndexedState(modes, index));
+                setOriginalSectionSlugs((originals) => removeIndexedState(originals, index));
+              }}>Remove section</Button>
             </fieldset>
           ))}
         </div>
-        <Button variant="secondary" onClick={() => setDraft({ ...draft, sections: [...draft.sections, { name: "", slug: "", description: "", active: true }] })}>Add section</Button>
+        <Button variant="secondary" onClick={() => {
+          const index = draft.sections.length;
+          setDraft({ ...draft, sections: [...draft.sections, { name: "", slug: "", description: "", active: true }] });
+          setSectionSlugModes((modes) => ({ ...modes, [index]: "auto" }));
+        }}>Add section</Button>
         <h3>Navigation</h3>
-        <div className="byline-repeat-list">
+        <p>Use the arrows to reorder items. Section links are generated from your active sections; custom URLs remain supported.</p>
+        <ol className="byline-repeat-list byline-navigation-list">
           {draft.navigation.map((item, index) => (
-            <fieldset key={`${index}-${item.label}`}>
-              <legend>Navigation item {index + 1}</legend>
+            <li className="byline-navigation-row" key={`${index}-${item.label}`}>
+              <div className="byline-navigation-row-header">
+                <strong>{item.label || `Navigation item ${index + 1}`}</strong>
+                <div className="byline-navigation-order" aria-label={`Reorder ${item.label || `navigation item ${index + 1}`}`}>
+                  <Button
+                    icon="arrow-up-alt2"
+                    label="Move up"
+                    showTooltip
+                    variant="tertiary"
+                    disabled={index === 0}
+                    onClick={() => moveNavigation(index, -1)}
+                  />
+                  <Button
+                    icon="arrow-down-alt2"
+                    label="Move down"
+                    showTooltip
+                    variant="tertiary"
+                    disabled={index === draft.navigation.length - 1}
+                    onClick={() => moveNavigation(index, 1)}
+                  />
+                </div>
+              </div>
               <div className="byline-settings-grid">
                 <TextControl label="Label" help={fieldHelp(validationErrors[`navigation.${index}.label`])} value={item.label} onChange={(label) => {
                   const navigation = [...draft.navigation];
@@ -986,32 +1143,88 @@ function PublicationSettings({
                     setDraft({ ...draft, navigation });
                   }}
                 />
-                <TextControl label="Footer group" value={item.group || ""} onChange={(group) => {
-                  const navigation = [...draft.navigation];
-                  navigation[index] = { ...item, group };
-                  setDraft({ ...draft, navigation });
-                }} />
+                {item.locations.includes("footer") ? (
+                  <>
+                    <SelectControl
+                      label="Footer group"
+                      value={footerGroupEditors[index] ? "__new__" : item.group || ""}
+                      options={[
+                        { label: "No group", value: "" },
+                        ...Array.from(new Set(draft.navigation.map((candidate) => candidate.group).filter(Boolean))).map((group) => ({ label: String(group), value: String(group) })),
+                        { label: "Create a new group…", value: "__new__" }
+                      ]}
+                      onChange={(group) => {
+                        if (group === "__new__") {
+                          setFooterGroupEditors((editors) => ({ ...editors, [index]: true }));
+                          return;
+                        }
+                        const navigation = [...draft.navigation];
+                        navigation[index] = { ...item, group };
+                        setDraft({ ...draft, navigation });
+                        setFooterGroupEditors((editors) => ({ ...editors, [index]: false }));
+                      }}
+                    />
+                    {footerGroupEditors[index] ? (
+                      <TextControl
+                        label="New footer group"
+                        value={item.group || ""}
+                        onChange={(group) => {
+                          const navigation = [...draft.navigation];
+                          navigation[index] = { ...item, group };
+                          setDraft({ ...draft, navigation });
+                        }}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
               </div>
-              <Button variant="link" isDestructive onClick={() => setDraft({
-                ...draft,
-                navigation: draft.navigation.filter((_, itemIndex) => itemIndex !== index)
-              })}>Remove item</Button>
-            </fieldset>
+              <Button variant="link" isDestructive onClick={() => removeNavigation(index)}>Remove item</Button>
+            </li>
           ))}
+        </ol>
+        <div className="byline-navigation-add">
+          <SelectControl
+            label="Add a navigation item"
+            value={newNavigationTarget}
+            options={[
+              { label: "Choose a section, page, or custom URL", value: "" },
+              ...navigationSections.map((section) => ({ label: `Section: ${section.name}`, value: `section:${section.slug}` })),
+              ...navigationPages.map((page) => ({
+                label: `Page: ${page.title?.rendered?.replace(/<[^>]+>/g, "") || `Page ${page.id}`}`,
+                value: `page:${page.id}`
+              })),
+              { label: "Custom URL", value: "__custom__" }
+            ]}
+            onChange={setNewNavigationTarget}
+          />
+          <Button variant="secondary" disabled={!newNavigationTarget} onClick={addNavigationItem}>Add item</Button>
         </div>
-        <Button variant="secondary" onClick={() => setDraft({
-          ...draft,
-          navigation: [...draft.navigation, { label: "", url: "/", locations: ["header"] }]
-        })}>Add navigation item</Button>
-        <h3>Optional modules</h3>
+      </>
+    );
+  } else if (route === "/publication/features") {
+    const featureDescriptions: Record<string, string> = {
+      sports: "Show sports schedules, scores, rosters, and sports navigation.",
+      polls: "Enable newsroom polls and their public voting surfaces.",
+      events: "Show the publication events calendar and event blocks.",
+      newsletter: "Enable newsletter signup blocks and navigation links."
+    };
+    const featureEntries = Object.entries(draft.features).filter(([feature]) => featureDescriptions[feature]);
+    fields = (
+      <>
+        <p>Features control which optional newsroom modules are active. Turning one off hides its public surfaces but keeps its existing content safe in WordPress.</p>
         <div className="byline-toggle-grid">
-          {Object.entries(draft.features).map(([feature, enabled]) => (
-            <ToggleControl
-              key={feature}
-              label={feature.charAt(0).toUpperCase() + feature.slice(1)}
-              checked={enabled}
-              onChange={(checked) => setDraft({ ...draft, features: { ...draft.features, [feature]: checked } })}
-            />
+          {featureEntries.map(([feature, enabled]) => (
+            <div className="byline-feature-setting" key={feature}>
+              <ToggleControl
+                label={feature.charAt(0).toUpperCase() + feature.slice(1)}
+                checked={enabled}
+                onChange={(checked) => {
+                  if (!checked && !window.confirm(`${feature.charAt(0).toUpperCase() + feature.slice(1)} content will be hidden, not deleted. Continue?`)) return;
+                  setDraft({ ...draft, features: { ...draft.features, [feature]: checked } });
+                }}
+              />
+              <p className="byline-field-note">{featureDescriptions[feature]}</p>
+            </div>
           ))}
         </div>
       </>
@@ -1074,7 +1287,7 @@ function DeploymentSettings() {
   const [status, setStatus] = useState<DeploymentStatus | null>(null);
   const [hookUrl, setHookUrl] = useState("");
   const [clearHook, setClearHook] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<"idle" | "saving" | "deploying">("idle");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const dirty = hookUrl.trim() !== "" || clearHook;
@@ -1097,7 +1310,7 @@ function DeploymentSettings() {
       }
     }
 
-    setBusy(true);
+    setOperation("saving");
     setError("");
     setMessage("");
     try {
@@ -1113,12 +1326,12 @@ function DeploymentSettings() {
     } catch (requestError) {
       setError(safeRequestError(requestError, "Byline could not save the deploy hook. Enter a valid HTTPS URL and try again."));
     } finally {
-      setBusy(false);
+      setOperation("idle");
     }
   };
 
   const trigger = async () => {
-    setBusy(true);
+    setOperation("deploying");
     setError("");
     setMessage("");
     try {
@@ -1128,7 +1341,7 @@ function DeploymentSettings() {
     } catch (requestError) {
       setError(safeRequestError(requestError, "The deploy-hook request failed. The saved URL remains private and unchanged."));
     } finally {
-      setBusy(false);
+      setOperation("idle");
     }
   };
 
@@ -1159,9 +1372,9 @@ function DeploymentSettings() {
         />
         {status?.configured ? <ToggleControl label="Remove the saved hook" checked={clearHook} onChange={setClearHook} /> : null}
         <div className="byline-settings-actions">
-          <Button variant="primary" isBusy={busy} disabled={busy || !config?.capabilities.manageIntegrations || !dirty} onClick={save}>Save deployment</Button>
-          <Button variant="secondary" isBusy={busy} disabled={busy || !status?.configured || !config?.capabilities.manageIntegrations} onClick={trigger}>Trigger now</Button>
-          <span aria-live="polite">{busy ? "Saving…" : dirty ? "Unsaved changes" : "Saved"}</span>
+          <Button variant="primary" isBusy={operation === "saving"} disabled={operation !== "idle" || !config?.capabilities.manageIntegrations || !dirty} onClick={save}>Save deployment</Button>
+          <Button variant="secondary" isBusy={operation === "deploying"} disabled={operation !== "idle" || !status?.configured || !config?.capabilities.manageIntegrations} onClick={trigger}>Trigger now</Button>
+          <span aria-live="polite">{operation === "saving" ? "Saving…" : operation === "deploying" ? "Triggering deployment…" : dirty ? "Unsaved changes" : "Saved ✓"}</span>
         </div>
       </CardBody>
     </Card>
@@ -1263,12 +1476,16 @@ function DiscordSettings() {
   const [clientSecret, setClientSecret] = useState("");
   const [clearBotToken, setClearBotToken] = useState(false);
   const [clearClientSecret, setClearClientSecret] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<"idle" | "saving" | "testing" | "syncing">("idle");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const editable = Boolean(config?.capabilities.manageIntegrations);
 
-  const apply = (next: DiscordPayload) => {
+  const applyServerPayload = (next: DiscordPayload) => {
+    setPayload(next);
+  };
+
+  const applySavedPayload = (next: DiscordPayload) => {
     setPayload(next);
     setDraft(next.settings.values);
     setBotToken("");
@@ -1279,42 +1496,61 @@ function DiscordSettings() {
 
   useEffect(() => {
     apiFetch<DiscordPayload>({ path })
-      .then(apply)
+      .then(applySavedPayload)
       .catch(() => setError("Byline could not load the Discord settings."));
   }, []);
 
-  const update = (patch: Partial<DiscordDraft>) => setDraft((current) => (current ? { ...current, ...patch } : current));
+  const update = (patch: Partial<DiscordDraft>) => {
+    setMessage("");
+    setError("");
+    setDraft((current) => (current ? { ...current, ...patch } : current));
+  };
+  const updateSecret = (setter: (value: string) => void, value: string) => {
+    setMessage("");
+    setError("");
+    setter(value);
+  };
 
-  const run = async (label: string, request: () => Promise<DiscordPayload>, success: (next: DiscordPayload) => string) => {
-    setBusy(true);
+  const run = async (
+    label: string,
+    nextOperation: "saving" | "testing" | "syncing",
+    request: () => Promise<DiscordPayload>,
+    success: (next: DiscordPayload) => string,
+    applyDraft = false
+  ) => {
+    setOperation(nextOperation);
     setError("");
     setMessage("");
     try {
       const next = await request();
-      apply(next);
+      if (applyDraft) applySavedPayload(next);
+      else applyServerPayload(next);
       setMessage(success(next));
     } catch (requestError) {
       setError(safeRequestError(requestError, `Byline could not ${label}.`));
     } finally {
-      setBusy(false);
+      setOperation("idle");
     }
   };
 
   const save = () =>
     run(
       "save the Discord settings",
+      "saving",
       () =>
         apiFetch<DiscordPayload>({
           path,
           method: "PUT",
           data: { ...draft, botToken, clientSecret, clearBotToken, clearClientSecret }
         }),
-      () => "Discord settings saved. Secrets are stored in WordPress and are never returned to the browser."
+      () => "Discord settings saved. Secrets are stored in WordPress and are never returned to the browser.",
+      true
     );
 
   const test = () =>
     run(
       "reach Discord",
+      "testing",
       () => apiFetch<DiscordPayload>({ path: `${path}/test`, method: "POST" }),
       (next) => (next.status.discordConnected ? "Discord answered. The status below is current." : `Discord could not be reached: ${next.status.message}`)
     );
@@ -1322,9 +1558,19 @@ function DiscordSettings() {
   const syncNow = () =>
     run(
       "ask the bot to reconcile",
+      "syncing",
       () => apiFetch<DiscordPayload>({ path: `${path}/sync`, method: "POST" }),
       (next) => (next.sync?.ok ? "The bot reconciled every active story." : `The bot did not run: ${next.sync?.error || "no response"}`)
     );
+
+  const dirty = Boolean(payload && draft && (
+    JSON.stringify(draft) !== JSON.stringify(payload.settings.values)
+      || botToken
+      || clientSecret
+      || clearBotToken
+      || clearClientSecret
+  ));
+  useUnsavedChangesPrompt(dirty);
 
   if (!payload || !draft) return error ? <Notice status="error" isDismissible={false}>{error}</Notice> : <Spinner />;
 
@@ -1358,8 +1604,11 @@ function DiscordSettings() {
             </Notice>
           ) : null}
           <div className="byline-settings-actions">
-            <Button variant="secondary" isBusy={busy} disabled={busy || !editable} onClick={test}>Test connection</Button>
-            <Button variant="secondary" isBusy={busy} disabled={busy || !editable || !draft.botUrl} onClick={syncNow}>Sync now</Button>
+            <Button variant="secondary" isBusy={operation === "testing"} disabled={operation !== "idle" || !editable} onClick={test}>Test connection</Button>
+            <Button variant="secondary" isBusy={operation === "syncing"} disabled={operation !== "idle" || !editable || !draft.botUrl} onClick={syncNow}>Sync now</Button>
+            <span aria-live="polite">
+              {operation === "testing" ? "Testing connection…" : operation === "syncing" ? "Syncing stories…" : ""}
+            </span>
           </div>
         </div>
 
@@ -1384,7 +1633,7 @@ function DiscordSettings() {
               label={settings.secrets.botToken ? "Replace bot token" : "Bot token"}
               help={settings.secrets.botToken ? "Stored. Leave blank to keep it." : environmentHelp(sources.botToken)}
               value={botToken}
-              onChange={setBotToken}
+              onChange={(value: string) => updateSecret(setBotToken, value)}
             />
             <TextControl
               type="password"
@@ -1392,11 +1641,11 @@ function DiscordSettings() {
               label={settings.secrets.clientSecret ? "Replace client secret" : "Client secret"}
               help={settings.secrets.clientSecret ? "Stored. Leave blank to keep it." : environmentHelp(sources.clientSecret)}
               value={clientSecret}
-              onChange={setClientSecret}
+              onChange={(value: string) => updateSecret(setClientSecret, value)}
             />
           </div>
-          {settings.secrets.botToken ? <ToggleControl label="Remove the saved bot token" checked={clearBotToken} onChange={setClearBotToken} /> : null}
-          {settings.secrets.clientSecret ? <ToggleControl label="Remove the saved client secret" checked={clearClientSecret} onChange={setClearClientSecret} /> : null}
+          {settings.secrets.botToken ? <ToggleControl label="Remove the saved bot token" checked={clearBotToken} onChange={(value) => { setMessage(""); setClearBotToken(value); }} /> : null}
+          {settings.secrets.clientSecret ? <ToggleControl label="Remove the saved client secret" checked={clearClientSecret} onChange={(value) => { setMessage(""); setClearClientSecret(value); }} /> : null}
         </div>
 
         <div>
@@ -1462,7 +1711,8 @@ function DiscordSettings() {
         </div>
 
         <div className="byline-settings-actions">
-          <Button variant="primary" isBusy={busy} disabled={busy || !editable} onClick={save}>Save Discord settings</Button>
+          <Button variant="primary" isBusy={operation === "saving"} disabled={operation !== "idle" || !editable || !dirty} onClick={save}>Save Discord settings</Button>
+          <span aria-live="polite">{operation === "saving" ? "Saving…" : dirty ? "Unsaved changes" : "Saved ✓"}</span>
         </div>
       </CardBody>
     </Card>
@@ -1580,7 +1830,7 @@ function Screen({
   if (page === ADMIN_PAGE_SLUGS.dashboard) {
     return (
       <AdminPageFrame title="Overview" error={error}>
-        <Dashboard protocol={protocol} publication={publication} health={health} />
+        <Dashboard publication={publication} health={health} />
       </AdminPageFrame>
     );
   }
@@ -1636,7 +1886,11 @@ function Screen({
     if (activeView === "revisions") {
       return (
         <AdminPageFrame title="Studio" tabs={studioTabs} activeTab={activeView} error={error}>
-          <BylineDesignRevisions canEdit={Boolean(config?.capabilities.editDesign)} backUrl={adminUrl(config?.urls.dashboard)} />
+          <BylineDesignRevisions
+            canEdit={Boolean(config?.capabilities.editDesign)}
+            backUrl={adminUrl(config?.urls.dashboard)}
+            studioUrl={adminUrl(config?.urls.studio)}
+          />
         </AdminPageFrame>
       );
     }
@@ -1669,6 +1923,7 @@ function Screen({
             ? "At NSHS"
             : `At ${publication?.identity.organizationName || publication?.identity.shortName || "school"}`
         }
+        publicSiteUrl={publication?.urls.publicSite}
       />
     );
   }

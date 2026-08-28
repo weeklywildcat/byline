@@ -27,12 +27,32 @@ function byline_public_manifest_diagnostic(): array
 
     $code = (int) wp_remote_retrieve_response_code($response);
     $manifest = json_decode((string) wp_remote_retrieve_body($response), true);
+    $design_revisions = [];
+    if (is_array($manifest) && is_array($manifest['designRevisions'] ?? null)) {
+        foreach ($manifest['designRevisions'] as $template => $revision) {
+            if (!is_scalar($template) || !is_scalar($revision)) {
+                continue;
+            }
+            // Section templates contain a colon (section:slug), which
+            // sanitize_key() would remove and make impossible to match to the
+            // frontend manifest. Validate the known template grammar without
+            // changing the key we compare.
+            $template = strtolower(trim((string) $template));
+            if (preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*(?::[a-z0-9]+(?:-[a-z0-9]+)*)?$/', $template) !== 1
+                || (function_exists('byline_is_design_template') && !byline_is_design_template($template))) {
+                continue;
+            }
+            $design_revisions[$template] = absint($revision);
+        }
+    }
+
     return [
         'reachable' => $code >= 200 && $code < 300 && is_array($manifest),
         'status' => 'HTTP ' . $code,
         'protocolVersion' => is_array($manifest) ? (int) ($manifest['protocolVersion'] ?? 0) : 0,
         'frontendVersion' => is_array($manifest) ? sanitize_text_field((string) ($manifest['frontendVersion'] ?? '')) : '',
         'publicationRevision' => is_array($manifest) ? (int) ($manifest['publicationRevision'] ?? 0) : 0,
+        'designRevisions' => $design_revisions,
     ];
 }
 

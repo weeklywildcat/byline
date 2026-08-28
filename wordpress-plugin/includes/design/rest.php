@@ -50,7 +50,41 @@ function byline_rest_get_admin_design(WP_REST_Request $request)
     $autosave = get_user_meta(get_current_user_id(), byline_design_autosave_key($template), true);
     $response = $published;
     $response['autosave'] = is_array($autosave) ? $autosave : null;
+    $post = byline_get_design_post($template);
+    $author = $post ? get_userdata((int) $post->post_author) : false;
+    $response['publishedAuthorId'] = $author instanceof WP_User ? (int) $author->ID : 0;
+    $response['publishedAuthorName'] = $author instanceof WP_User ? (string) $author->display_name : '';
     return rest_ensure_response($response);
+}
+
+function byline_rest_design_deployment_payload(): array
+{
+    $deployment = function_exists('byline_deployment_status')
+        ? byline_deployment_status()
+        : [
+            'configured' => false,
+            'pending' => false,
+            'lastTriggeredAt' => 'Never',
+            'lastStatus' => 'Not configured',
+        ];
+    $deployment['canRetry'] = current_user_can(
+        defined('BYLINE_MANAGE_INTEGRATIONS_CAPABILITY')
+            ? BYLINE_MANAGE_INTEGRATIONS_CAPABILITY
+            : 'manage_options'
+    );
+    $deployment['publicManifest'] = function_exists('byline_public_manifest_diagnostic')
+        ? byline_public_manifest_diagnostic()
+        : ['reachable' => false, 'status' => 'Unavailable', 'designRevisions' => []];
+    return $deployment;
+}
+
+function byline_rest_get_design_deployment(WP_REST_Request $request)
+{
+    $template = byline_rest_design_template($request);
+    if (!byline_is_design_template($template)) {
+        return new WP_Error('byline_unknown_template', __('Unknown Byline template.', 'weekly-wildcat-headless'), ['status' => 404]);
+    }
+    return rest_ensure_response(byline_rest_design_deployment_payload());
 }
 
 function byline_rest_autosave_design(WP_REST_Request $request)
@@ -157,7 +191,9 @@ function byline_rest_publish_design(WP_REST_Request $request)
         wwh_schedule_cloudflare_deploy();
     }
 
-    return rest_ensure_response(byline_published_design($template));
+    $response = byline_published_design($template);
+    $response['deployment'] = byline_rest_design_deployment_payload();
+    return rest_ensure_response($response);
 }
 
 function byline_rest_design_revisions(WP_REST_Request $request)
@@ -168,11 +204,15 @@ function byline_rest_design_revisions(WP_REST_Request $request)
         return rest_ensure_response([]);
     }
     $revisions = wp_get_post_revisions($post->ID, ['posts_per_page' => 50]);
-    return rest_ensure_response(array_values(array_map(static fn(WP_Post $revision): array => [
-        'id' => $revision->ID,
-        'authorId' => (int) $revision->post_author,
-        'modifiedAt' => mysql_to_rfc3339($revision->post_modified_gmt),
-    ], $revisions)));
+    return rest_ensure_response(array_values(array_map(static function (WP_Post $revision): array {
+        $author = get_userdata((int) $revision->post_author);
+        return [
+            'id' => $revision->ID,
+            'authorId' => (int) $revision->post_author,
+            'authorName' => $author instanceof WP_User ? (string) $author->display_name : '',
+            'modifiedAt' => mysql_to_rfc3339($revision->post_modified_gmt),
+        ];
+    }, $revisions)));
 }
 
 function byline_rest_restore_design_revision(WP_REST_Request $request)
@@ -218,6 +258,11 @@ function byline_register_design_routes(): void
     register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)', [
         'methods' => WP_REST_Server::READABLE,
         'callback' => 'byline_rest_get_admin_design',
+        'permission_callback' => static fn() => current_user_can(BYLINE_EDIT_DESIGN_CAPABILITY),
+    ]);
+    register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)/deployment', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'byline_rest_get_design_deployment',
         'permission_callback' => static fn() => current_user_can(BYLINE_EDIT_DESIGN_CAPABILITY),
     ]);
     register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)/autosave', [

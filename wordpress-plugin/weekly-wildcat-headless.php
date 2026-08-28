@@ -1838,6 +1838,18 @@ function wwh_sports_team_options(): array
     return byline_get_sports_teams();
 }
 
+/**
+ * Bulk schedule and roster operations can replace or trash many records at
+ * once, so authors must not be able to reach them with edit_posts alone.
+ * Keep the Byline manager capability as an escape hatch for custom newsroom
+ * roles that do not inherit the built-in WordPress editor role.
+ */
+function wwh_can_manage_bulk_sports_data(): bool
+{
+    return current_user_can('edit_others_posts')
+        || (defined('BYLINE_MANAGE_CAPABILITY') && current_user_can(BYLINE_MANAGE_CAPABILITY));
+}
+
 function wwh_infer_sport_key(string $sport, string $level): string
 {
     $sport = strtolower(trim($sport));
@@ -2086,7 +2098,7 @@ function wwh_register_admin_pages(): void
         'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE,
         'Import Sports Games',
         'Import',
-        'edit_posts',
+        'edit_others_posts',
         'wwh-sports-import',
         'wwh_render_sports_import_page'
     );
@@ -3055,7 +3067,7 @@ add_action('save_post_' . WWH_SCHOOL_EVENT_POST_TYPE, 'wwh_save_school_event');
 
 function wwh_render_sports_import_page(): void
 {
-    if (!current_user_can('edit_posts')) {
+    if (!wwh_can_manage_bulk_sports_data()) {
         wp_die(esc_html__('Sorry, you are not allowed to import sports games.', 'weekly-wildcat-headless'));
     }
 
@@ -3235,7 +3247,7 @@ function wwh_reset_sports_games(): array
         'errors' => [],
     ];
 
-    if (!current_user_can('edit_posts')) {
+    if (!wwh_can_manage_bulk_sports_data()) {
         $result['errors'][] = 'You are not allowed to reset sports games.';
         return $result;
     }
@@ -3465,6 +3477,11 @@ function wwh_import_sports_games(string $sport_key, string $raw_data): array
         'skipped' => 0,
         'errors' => [],
     ];
+
+    if (!wwh_can_manage_bulk_sports_data()) {
+        $result['errors'][] = 'You are not allowed to import sports games.';
+        return $result;
+    }
 
     if ($sport_key === '') {
         $result['errors'][] = 'Choose a sport/team before importing.';
@@ -4698,6 +4715,19 @@ function wwh_rest_post_settings(array $post): array
     ];
 }
 
+function wwh_rest_image_credit(array $attachment): array
+{
+    $attachment_id = isset($attachment['id']) ? absint($attachment['id']) : 0;
+
+    return [
+        'creator' => wwh_image_meta_value($attachment_id, 'creator'),
+        'creditText' => wwh_image_meta_value($attachment_id, 'credit_text'),
+        'copyrightNotice' => wwh_image_meta_value($attachment_id, 'copyright_notice'),
+        'licenseUrl' => wwh_image_meta_value($attachment_id, 'license_url'),
+        'acquireLicensePage' => wwh_image_meta_value($attachment_id, 'acquire_license_url'),
+    ];
+}
+
 function wwh_rest_author_profile(array $user): array
 {
     $user_id = isset($user['id']) ? absint($user['id']) : 0;
@@ -5555,6 +5585,7 @@ require_once __DIR__ . '/includes/discord-integration.php';
 require_once __DIR__ . '/includes/integrations/discord.php';
 require_once __DIR__ . '/includes/core/upgrade.php';
 require_once __DIR__ . '/includes/core/health.php';
+require_once __DIR__ . '/includes/admin/dashboard.php';
 
 // One activation callback owns all first-install work. Updates are repaired by
 // byline_maybe_upgrade() on admin_init, so replacing plugin files never

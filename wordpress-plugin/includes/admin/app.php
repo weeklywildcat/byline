@@ -221,6 +221,7 @@ function byline_admin_page_urls(): array
             'identity' => byline_admin_page_url(BYLINE_ADMIN_PUBLICATION_PAGE, ['tab' => 'identity']),
             'branding' => byline_admin_page_url(BYLINE_ADMIN_PUBLICATION_PAGE, ['tab' => 'branding']),
             'navigation' => byline_admin_page_url(BYLINE_ADMIN_PUBLICATION_PAGE, ['tab' => 'navigation']),
+            'features' => byline_admin_page_url(BYLINE_ADMIN_PUBLICATION_PAGE, ['tab' => 'features']),
             'social' => byline_admin_page_url(BYLINE_ADMIN_PUBLICATION_PAGE, ['tab' => 'social']),
         ],
         'integrations' => [
@@ -264,6 +265,7 @@ function byline_admin_legacy_hash_urls(array $page_urls): array
         '/publication/identity' => $page_urls['publication']['identity'],
         '/publication/branding' => $page_urls['publication']['branding'],
         '/publication/navigation' => $page_urls['publication']['navigation'],
+        '/publication/features' => $page_urls['publication']['features'],
         '/publication/social' => $page_urls['publication']['social'],
         '/design/theme' => $page_urls['theme'],
         '/design/studio' => $page_urls['studio'],

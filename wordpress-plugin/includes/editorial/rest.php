@@ -79,7 +79,10 @@ function byline_editorial_rest_payload(int $post_id): array
             : null,
         // Only an editor may assign, so only an editor receives the roster.
         'editors' => $can_assign ? byline_editorial_assignable_editors() : [],
-        'discord' => ['threadId' => byline_editorial_rest_discord_thread($post_id)],
+        'discord' => [
+            'threadId' => byline_editorial_rest_discord_thread($post_id),
+            'threadUrl' => byline_editorial_rest_discord_thread_url($post_id),
+        ],
     ];
 }
 
@@ -97,6 +100,22 @@ function byline_editorial_rest_discord_thread(int $post_id): string
     $thread_id = get_post_meta($post_id, WWH_DISCORD_THREAD_META, true);
 
     return is_string($thread_id) ? $thread_id : '';
+}
+
+/**
+ * Discord's canonical thread URL is safe to expose when both snowflakes are
+ * known. Keeping construction here means the editor and any other client do
+ * not need to know how Byline stores Discord configuration.
+ */
+function byline_editorial_rest_discord_thread_url(int $post_id): string
+{
+    $thread_id = byline_editorial_rest_discord_thread($post_id);
+    $guild_id = function_exists('byline_discord_setting') ? byline_discord_setting('guildId') : '';
+    if ($thread_id === '' || $guild_id === '' || !preg_match('/^\d+$/', $thread_id) || !preg_match('/^\d+$/', $guild_id)) {
+        return '';
+    }
+
+    return 'https://discord.com/channels/' . rawurlencode($guild_id) . '/' . rawurlencode($thread_id);
 }
 
 function byline_editorial_rest_get_story(WP_REST_Request $request)

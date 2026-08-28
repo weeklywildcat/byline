@@ -128,6 +128,19 @@
   min-height: 18px;
 }
 
+.byline-workflow-field-note {
+  color: #757575;
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+
+.byline-workflow-readonly dd small {
+  color: #757575;
+  display: block;
+  font-size: 12px;
+  margin-top: -6px;
+}
+
 .byline-workflow-summary {
   align-items: baseline;
   display: flex;

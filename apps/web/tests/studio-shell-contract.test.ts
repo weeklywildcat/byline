@@ -70,7 +70,7 @@ describe("Studio is a full-viewport editor", () => {
   });
 
   it("always offers a way out of the full-screen surface", () => {
-    expect(studio).toContain("← Exit Studio");
+    expect(studio).toContain("← Byline");
   });
 
   it("keeps the editor chrome unscaled -- only the simulated page zooms", () => {
@@ -84,9 +84,9 @@ describe("Studio tells the truth about live versus draft", () => {
   it("separates the published design from the unpublished draft in the toolbar", () => {
     expect(studio).toContain("byline-studio-state-live");
     expect(studio).toContain("byline-studio-state-draft");
-    expect(studio).toContain("Live: published revision");
-    expect(studio).toContain("default homepage");
-    expect(studio).toContain("Draft: recovered autosave · never published");
+    expect(studio).toContain("Not published yet");
+    expect(studio).toContain("Unpublished changes");
+    expect(studio).toContain("published in Byline");
   });
 
   it("offers a confirmation-gated reset to the design the live site is using", () => {

@@ -30,7 +30,7 @@ export type WorkflowPayload = {
   capabilities: { changeStatus: boolean; assign: boolean };
   writer: { id: number; name: string } | null;
   editors: Array<{ id: number; name: string }>;
-  discord: { threadId: string };
+  discord: { threadId: string; threadUrl?: string };
 };
 
 export type WorkflowChanges = Partial<Pick<WorkflowStory, "status" | "editorId" | "deadline" | "visuals">>;
@@ -93,4 +93,42 @@ export function workflowStatusLabel(payload: WorkflowPayload | null): string {
 
 export function workflowStoryPath(postId: number): string {
   return `/byline/v1/editorial/stories/${postId}`;
+}
+
+/**
+ * Read and write requests share a resource but not a generation. This tiny
+ * tracker makes that distinction explicit and keeps it unit-testable without
+ * mounting the WordPress editor.
+ */
+export function createWorkflowRequestTracker() {
+  let readGeneration = 0;
+  let writeGeneration = 0;
+
+  return {
+    beginRead: () => ++readGeneration,
+    isCurrentRead: (generation: number) => generation === readGeneration,
+    beginWrite: () => ++writeGeneration,
+    isCurrentWrite: (generation: number) => generation === writeGeneration,
+    writeVersion: () => writeGeneration
+  };
+}
+
+/**
+ * Serializes debounced workflow-field writes. The caller owns the debounce;
+ * this queue makes a second value wait for the first request so an older
+ * network response cannot win at the server either. Failures are swallowed in
+ * the queue tail so a later edit can still be attempted.
+ */
+export function createSerializedWorkflowSaveQueue<T>(save: (value: T) => Promise<boolean>) {
+  let tail: Promise<boolean> = Promise.resolve(true);
+
+  return {
+    enqueue(value: T): Promise<boolean> {
+      tail = tail.then(() => save(value)).catch(() => false);
+      return tail;
+    },
+    drain(): Promise<boolean> {
+      return tail;
+    }
+  };
 }

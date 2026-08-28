@@ -1,8 +1,8 @@
 import apiFetch from "@wordpress/api-fetch";
 import { Button, Notice, SelectControl, Spinner } from "@wordpress/components";
-import { createPortal, useEffect, useMemo, useRef, useState } from "@wordpress/element";
+import { createPortal, useCallback, useEffect, useMemo, useRef, useState } from "@wordpress/element";
 import { Puck, type Config, type Data } from "@puckeditor/core";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { BYLINE_STUDIO_CATEGORIES, BYLINE_STUDIO_VIEWPORTS } from "@byline/studio-contract";
 import { sanitizeThemeTokenOverrides, type BylineThemeDefinition, type BylineThemeTokens } from "@byline/theme-contract";
 import { editorialTheme } from "@byline/theme-editorial";
@@ -59,7 +59,9 @@ import {
   getFallbackDesignDocument,
   type BylineDesignDocumentV2
 } from "@byline/design";
-import { editorStateToDesignDocument, loadDesignIntoEditor, type PuckEditorState } from "./studio-document";
+import { editorStateToDesignDocument, loadDesignIntoEditor, type PuckEditorState, type StudioLoadResult } from "./studio-document";
+import { legacyBlockLabel } from "@byline/design";
+import { useStudioAutosave, type StudioAutosaveRecord } from "./studio-autosave";
 
 // What Studio writes. Reading still accepts schema 1, but only as an input to
 // migration -- see loadDesignIntoEditor.
@@ -75,6 +77,25 @@ type AdminDesign = {
     baseRevisionId: number;
     modifiedAt: string;
   } | null;
+  publishedAuthorId?: number;
+  publishedAuthorName?: string;
+  deployment?: StudioDeploymentStatus;
+};
+
+type StudioDeploymentStatus = {
+  configured: boolean;
+  pending: boolean;
+  lastTriggeredAt: string;
+  lastStatus: string;
+  canRetry?: boolean;
+  publicManifest?: {
+    reachable: boolean;
+    status: string;
+    protocolVersion?: number;
+    frontendVersion?: string;
+    publicationRevision?: number;
+    designRevisions?: Record<string, number>;
+  };
 };
 
 type StudioProps = {
@@ -91,6 +112,7 @@ type StudioProps = {
   contactHref?: string;
   social?: Array<{ service: string; label: string; url: string }>;
   calendarHeading?: string;
+  publicSiteUrl?: string;
 };
 
 // Everything the preview needs that is publication-specific rather than
@@ -622,6 +644,16 @@ const TEMPLATE_OPTIONS = [
   { label: "Sports homepage", value: "sports-home" }
 ] as const;
 
+type StudioTemplate = (typeof TEMPLATE_OPTIONS)[number]["value"];
+
+function initialStudioTemplate(): StudioTemplate {
+  if (typeof window !== "undefined") {
+    const requested = new URLSearchParams(window.location.search).get("template");
+    if (TEMPLATE_OPTIONS.some((option) => option.value === requested)) return requested as StudioTemplate;
+  }
+  return "home";
+}
+
 function templateLabel(template: string) {
   return TEMPLATE_OPTIONS.find((option) => option.value === template)?.label ?? template;
 }
@@ -641,6 +673,87 @@ function errorMessage(error: unknown) {
  * and the footer stop consuming the canvas, and it provides its own exit.
  * Nothing outside this component's own class scope is restyled.
  */
+function relativePublishedTime(value: string | null | undefined): string {
+  if (!value) return "";
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return "";
+  const minutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+function isDeploymentLive(status: StudioDeploymentStatus | null, template: string, revision: number): boolean {
+  return status?.publicManifest?.reachable === true
+    && status.publicManifest.designRevisions?.[template] === revision;
+}
+
+function legacyBlockTitle(type: string, props: Record<string, unknown>): string {
+  const title = typeof props.title === "string" ? props.title.trim() : "";
+  return title ? `${legacyBlockLabel(type)} — ${title}` : legacyBlockLabel(type);
+}
+
+function downloadLegacyBlock(
+  template: string,
+  block: NonNullable<BylineDesignDocumentV2["legacy"]>["unconvertedBlocks"][number]
+): void {
+  const blob = new Blob([JSON.stringify({ template, block }, null, 2)], { type: "application/json" });
+  const url = window.URL.createObjectURL(blob);
+  const link = window.document.createElement("a");
+  link.href = url;
+  link.download = `byline-${template}-${block.type.replace(/[^a-z0-9_-]+/gi, "-")}-recovery.json`;
+  link.click();
+  window.URL.revokeObjectURL(url);
+}
+
+function LegacyResolution({
+  template,
+  legacy,
+  onRemove
+}: {
+  template: string;
+  legacy: NonNullable<BylineDesignDocumentV2["legacy"]>;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <Notice status="warning" isDismissible={false}>
+      <strong>One or more older blocks need a decision before publishing.</strong>
+      <p>These blocks are preserved safely outside the editor. This Byline version cannot convert them automatically.</p>
+      <ul className="byline-legacy-resolution-list">
+        {legacy.unconvertedBlocks.map((block, index) => (
+          <li key={`${block.type}-${index}`}>
+            <div>
+              <strong>{legacyBlockTitle(block.type, block.props)}</strong>
+              <small>Conversion unavailable in this version. The original data remains in this draft.</small>
+            </div>
+            <div className="byline-legacy-resolution-actions">
+              <Button
+                variant="secondary"
+                onClick={() => downloadLegacyBlock(template, block)}
+                aria-label={`Download recovery data for ${legacyBlockLabel(block.type)}`}
+              >
+                Download data
+              </Button>
+              <Button
+                variant="link"
+                isDestructive
+                onClick={() => onRemove(index)}
+                aria-label={`Remove ${legacyBlockLabel(block.type)} from this design`}
+              >
+                Remove from design
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <p className="byline-field-note">Removing a preserved block changes the unpublished draft only. The published revision and its history stay unchanged until you publish.</p>
+    </Notice>
+  );
+}
+
 export function BylineStudio({
   canEdit,
   canPublish,
@@ -654,12 +767,20 @@ export function BylineStudio({
   organizationName,
   contactHref = "#contact",
   social = [],
-  calendarHeading = "This week"
+  calendarHeading = "This week",
+  publicSiteUrl = ""
 }: StudioProps) {
-  const [template, setTemplate] = useState<"home" | "section-default" | "article-default" | "author-default" | "sports-home">("home");
+  const [template, setTemplate] = useState<StudioTemplate>(initialStudioTemplate);
   const [design, setDesign] = useState<AdminDesign | null>(null);
+  const [loaded, setLoaded] = useState<StudioLoadResult | null>(null);
+  const [editorState, setEditorState] = useState<PuckEditorState | null>(null);
+  const [editorKey, setEditorKey] = useState(0);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
+  const [publishPhase, setPublishPhase] = useState<"idle" | "publishing" | "published">("idle");
+  const [deployment, setDeployment] = useState<StudioDeploymentStatus | null>(null);
+  const [deploymentRetrying, setDeploymentRetrying] = useState(false);
+  const [deploymentRefreshToken, setDeploymentRefreshToken] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   // Both panels collapse so the preview can take the full width. The inspector
   // starts closed on a laptop-width workspace: the canvas is the point of the
   // screen, and the inspector opens as soon as a package is selected.
@@ -670,7 +791,9 @@ export function BylineStudio({
   // Editor-only markers for packages that resolve to nothing. On by default so
   // an invisible package is still findable; off gives a reader-accurate canvas.
   const [showHiddenPackages, setShowHiddenPackages] = useState(true);
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadRequestRef = useRef(0);
+  const latestDocumentRef = useRef<DesignDocument | null>(null);
+  const editorVersionRef = useRef(0);
   // Keyed on the individual flags rather than on the `features` prop itself:
   // the host builds that object inline, so its identity changes on every admin
   // render, and keying on identity would rebuild the Puck config and re-resolve
@@ -733,21 +856,6 @@ export function BylineStudio({
     [previewStylesheets]
   );
 
-  const load = () => {
-    setDesign(null);
-    setError("");
-    apiFetch<AdminDesign>({ path: `/byline/v1/admin/design/${encodeURIComponent(template)}` })
-      .then(setDesign)
-      .catch((loadError) => setError(errorMessage(loadError)));
-  };
-
-  useEffect(() => {
-    load();
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    };
-  }, [template]);
-
   useEffect(() => {
     setStudioPreviewOptions({ showHiddenPackages });
   }, [showHiddenPackages]);
@@ -763,6 +871,81 @@ export function BylineStudio({
     };
   }, []);
 
+  const saveDocument = useCallback((document: DesignDocument, baseRevisionId: number) => (
+    apiFetch<StudioAutosaveRecord<DesignDocument>>({
+      path: `/byline/v1/admin/design/${encodeURIComponent(template)}/autosave`,
+      method: "PUT",
+      data: { document, baseRevisionId }
+    })
+  ), [template]);
+
+  const onAutosaved = useCallback((record: StudioAutosaveRecord<DesignDocument>, isLatestLocalEdit: boolean) => {
+    if (!isLatestLocalEdit) return;
+    // Keep the editor document in its own state. A response for an older edit
+    // may still provide useful draft metadata, but it must never remount Puck
+    // onto that older document.
+    setDesign((current) => current ? {
+      ...current,
+      autosave: {
+        document: record.document,
+        baseRevisionId: record.baseRevisionId,
+        modifiedAt: record.modifiedAt
+      }
+    } : current);
+  }, []);
+
+  const onAutosaveError = useCallback((autosaveError: unknown) => {
+    setError(errorMessage(autosaveError));
+  }, []);
+
+  const baseRevisionId = design?.autosave?.baseRevisionId ?? design?.revision ?? 0;
+  const autosave = useStudioAutosave<DesignDocument>({
+    baseRevisionId,
+    save: saveDocument,
+    onSaved: onAutosaved,
+    onError: onAutosaveError
+  });
+
+  useEffect(() => {
+    const requestId = ++loadRequestRef.current;
+    setDesign(null);
+    setLoaded(null);
+    setEditorState(null);
+    setDeployment(null);
+    setDeploymentRetrying(false);
+    setPublishPhase("idle");
+    setError("");
+    autosave.hydrate({ hasDraft: false, baseRevisionId: 0 });
+
+    apiFetch<AdminDesign>({ path: `/byline/v1/admin/design/${encodeURIComponent(template)}` })
+      .then((next) => {
+        if (loadRequestRef.current !== requestId) return;
+        const stored = next.autosave?.document ?? (
+          next.revision > 0 ? next.document : getFallbackDesignDocument(template, publicationTheme)
+        );
+        const nextLoaded = loadDesignIntoEditor(stored ?? {}, template);
+        const nextEditorState = nextLoaded.editorState;
+        const nextDocument = editorStateToDesignDocument(nextEditorState, template, publicationTheme, nextLoaded.legacy);
+        setDesign(next);
+        setLoaded(nextLoaded);
+        setEditorState(nextEditorState);
+        setEditorKey((key) => key + 1);
+        setDeployment(next.deployment ?? null);
+        latestDocumentRef.current = nextDocument;
+        editorVersionRef.current += 1;
+        autosave.hydrate({
+          hasDraft: Boolean(next.autosave),
+          baseRevisionId: next.autosave?.baseRevisionId ?? next.revision
+        });
+      })
+      .catch((loadError) => {
+        if (loadRequestRef.current === requestId) setError(errorMessage(loadError));
+      });
+    return () => {
+      if (loadRequestRef.current === requestId) loadRequestRef.current += 1;
+    };
+  }, [autosave.hydrate, publicationTheme, template]);
+
   /**
    * What the live site is actually resolving for this template right now.
    *
@@ -771,130 +954,273 @@ export function BylineStudio({
    * the same shared seed the frontend uses is what makes "reset to the live
    * homepage" honest.
    */
-  const liveDocument = useMemo(
-    () =>
-      design && design.revision > 0
-        ? design.document
-        : getFallbackDesignDocument(template, publicationTheme),
-    [design, publicationTheme, template]
+  const currentDocument = useMemo(
+    () => editorState && loaded
+      ? editorStateToDesignDocument(editorState, template, publicationTheme, loaded.legacy)
+      : null,
+    [editorState, loaded, publicationTheme, template]
   );
-
-  const stored = design?.autosave?.document ?? liveDocument;
-  const loaded = useMemo(() => loadDesignIntoEditor(stored ?? {}, template), [stored, template]);
 
   // The canvas previews the document an autosave would write, resolved once for
   // the whole page. Published before the first render so no package renders
   // against a stale or absent model.
   useEffect(() => {
-    setStudioPreviewDocument(
-      editorStateToDesignDocument(loaded.editorState, template, publicationTheme, loaded.legacy),
-      previewPublication
-    );
-  }, [loaded, previewPublication, publicationTheme, template]);
+    if (currentDocument) setStudioPreviewDocument(currentDocument, previewPublication);
+  }, [currentDocument, previewPublication]);
 
-  if (!design) {
+  useEffect(() => {
+    if (!autosave.hasPending) return undefined;
+
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [autosave.hasPending]);
+
+  const hasUnconvertedLegacy = Boolean(loaded?.legacy?.unconvertedBlocks.length);
+  const hasDraft = Boolean(design?.autosave) || autosave.hasDraft;
+  const neverPublished = design?.revision === 0;
+  const liveLabel = neverPublished ? "Not published yet" : "Live";
+  const publishedTime = relativePublishedTime(design?.modifiedAt);
+  const saveLabel = autosave.status === "pending" || autosave.status === "saving"
+    ? "Saving…"
+    : autosave.status === "error"
+      ? "Couldn’t save"
+      : autosave.status === "offline"
+        ? "Offline"
+        : "Saved ✓";
+  const liveNow = design ? isDeploymentLive(deployment, template, design.revision) : false;
+  const deploymentStatus = deployment?.lastStatus || "";
+  const deploymentFailed = !deployment?.pending && /request failed|http [45]\d\d|no http status/i.test(deploymentStatus);
+  const deploymentLabel = publishPhase === "publishing"
+    ? "Publishing…"
+    : liveNow
+      ? "Live ✓"
+      : deploymentFailed
+        ? "Published in Byline, but the website could not update."
+        : deployment?.pending
+          ? "Published · rebuilding site…"
+          : deployment?.configured
+            ? "Published · waiting for site rebuild…"
+            : publishPhase === "published"
+              ? "Published in Byline · website rebuild not configured"
+              : "";
+
+  const documentFor = useCallback((data: Data): DesignDocument => (
+    editorStateToDesignDocument(data as unknown as PuckEditorState, template, publicationTheme, loaded?.legacy)
+  ), [loaded?.legacy, publicationTheme, template]);
+
+  const onEditorChange = (data: Data) => {
+    if (!loaded || !canEdit) return;
+    const document = documentFor(data);
+    const nextEditorState = data as unknown as PuckEditorState;
+    setEditorState(nextEditorState);
+    latestDocumentRef.current = document;
+    editorVersionRef.current += 1;
+    setError("");
+    setPublishPhase("idle");
+    setStudioPreviewDocument(document, previewPublication);
+    autosave.schedule(document);
+  };
+
+  const changeTemplate = async (nextTemplate: string) => {
+    if (!nextTemplate || nextTemplate === template || isTransitioning) return;
+    setIsTransitioning(true);
+    setError("");
+    try {
+      await autosave.flush();
+      autosave.supersede();
+      setTemplate(nextTemplate as StudioTemplate);
+    } catch (transitionError) {
+      setError(errorMessage(transitionError));
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
+  const exitStudio = async (event: ReactMouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    if (!backUrl || isTransitioning) return;
+    setIsTransitioning(true);
+    setError("");
+    try {
+      await autosave.flush();
+      window.location.assign(backUrl);
+    } catch (exitError) {
+      setError(errorMessage(exitError));
+      setIsTransitioning(false);
+    }
+  };
+
+  const publish = async (data: Data) => {
+    if (!canPublish || !loaded) return;
+    if (hasUnconvertedLegacy) {
+      setError("Resolve the preserved older blocks below before publishing. Your draft is safe.");
+      return;
+    }
+    setError("");
+    setPublishPhase("publishing");
+    const documentAtStart = documentFor(data);
+    const publishVersion = editorVersionRef.current;
+    latestDocumentRef.current = documentAtStart;
+    try {
+      await autosave.flush();
+      // If the editor changed while the first flush was in flight, serialize
+      // the newer queued document before publishing it.
+      if (publishVersion !== editorVersionRef.current || autosave.hasPending) await autosave.flush();
+      const document = latestDocumentRef.current ?? documentAtStart;
+      const published = await apiFetch<AdminDesign>({
+        path: `/byline/v1/admin/design/${encodeURIComponent(template)}/publish`,
+        method: "POST",
+        data: { document, baseRevisionId: autosave.baseRevisionId }
+      });
+      const changedDuringPublish = editorVersionRef.current > publishVersion;
+      setDesign({ ...published, autosave: null });
+      setDeployment(published.deployment ?? null);
+      setPublishPhase("published");
+      if (changedDuringPublish && latestDocumentRef.current) {
+        // The published request used the earlier snapshot. Keep a newer edit as
+        // a draft against the new published revision instead of discarding it.
+        autosave.rebase(published.revision);
+        autosave.schedule(latestDocumentRef.current);
+      } else {
+        autosave.markPublished(published.revision);
+      }
+    } catch (publishError) {
+      setPublishPhase("idle");
+      setError(errorMessage(publishError));
+    }
+  };
+
+  const resetToLive = async () => {
+    if (!canEdit || !design || !hasDraft || isTransitioning) return;
+    if (!window.confirm(
+      "Discard this draft and start again from the design the live site is using? Your unpublished changes for this template will be deleted."
+    )) return;
+
+    setIsTransitioning(true);
+    setError("");
+    try {
+      // Discard explicitly supersedes debounce work and waits for a request
+      // already in flight before the DELETE can run.
+      await autosave.discard();
+      await apiFetch({
+        path: `/byline/v1/admin/design/${encodeURIComponent(template)}/autosave`,
+        method: "DELETE"
+      });
+      const liveDocument = design.revision > 0
+        ? design.document
+        : getFallbackDesignDocument(template, publicationTheme);
+      const nextLoaded = loadDesignIntoEditor(liveDocument ?? {}, template);
+      const nextEditorState = nextLoaded.editorState;
+      const nextDocument = editorStateToDesignDocument(nextEditorState, template, publicationTheme, nextLoaded.legacy);
+      setDesign({ ...design, autosave: null });
+      setLoaded(nextLoaded);
+      setEditorState(nextEditorState);
+      setEditorKey((key) => key + 1);
+      latestDocumentRef.current = nextDocument;
+      editorVersionRef.current += 1;
+      setPublishPhase("idle");
+      autosave.hydrate({ hasDraft: false, baseRevisionId: design.revision });
+    } catch (resetError) {
+      autosave.hydrate({ hasDraft: Boolean(design.autosave), baseRevisionId: design.autosave?.baseRevisionId ?? design.revision });
+      setError(errorMessage(resetError));
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
+  const removeLegacyBlock = (index: number) => {
+    if (!loaded?.legacy || !editorState) return;
+    const block = loaded.legacy.unconvertedBlocks[index];
+    if (!block) return;
+    if (!window.confirm(
+      `Remove ${legacyBlockLabel(block.type)} from this unpublished design? This deletes the preserved legacy block from the draft; the published revision and history remain unchanged.`
+    )) return;
+    const remaining = loaded.legacy.unconvertedBlocks.filter((_, blockIndex) => blockIndex !== index);
+    const nextLegacy = remaining.length
+      ? {
+          ...loaded.legacy,
+          unconvertedBlocks: remaining,
+          ...(loaded.legacy.packageIndexes
+            ? { packageIndexes: loaded.legacy.packageIndexes.filter((_, blockIndex) => blockIndex !== index) }
+            : {})
+        }
+      : undefined;
+    const nextLoaded: StudioLoadResult = {
+      ...loaded,
+      legacy: nextLegacy,
+      unsupportedLegacyTypes: nextLegacy
+        ? [...new Set(nextLegacy.unconvertedBlocks.map((preserved) => legacyBlockLabel(preserved.type)))]
+        : []
+    };
+    const nextDocument = editorStateToDesignDocument(editorState, template, publicationTheme, nextLegacy);
+    setLoaded(nextLoaded);
+    latestDocumentRef.current = nextDocument;
+    setError("");
+    autosave.schedule(nextDocument);
+  };
+
+  const retryDeployment = async () => {
+    if (!deployment?.canRetry || deploymentRetrying) return;
+    const retryTemplate = template;
+    setDeploymentRetrying(true);
+    setError("");
+    try {
+      const next = await apiFetch<StudioDeploymentStatus>({
+        path: "/byline/v1/admin/deployment/trigger",
+        method: "POST"
+      });
+      if (template === retryTemplate) {
+        setDeployment(next);
+        setDeploymentRefreshToken((token) => token + 1);
+      }
+    } catch (deploymentError) {
+      setError("Your design is published in Byline, but deployment could not be retried. Check Deployment settings and try again.");
+      void deploymentError;
+    } finally {
+      setDeploymentRetrying(false);
+    }
+  };
+
+  useEffect(() => {
+    if (publishPhase !== "published" || !design || !design.revision) return undefined;
+    let cancelled = false;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const check = async () => {
+      try {
+        const next = await apiFetch<StudioDeploymentStatus>({
+          path: `/byline/v1/admin/design/${encodeURIComponent(template)}/deployment`
+        });
+        if (cancelled) return;
+        setDeployment(next);
+        attempts += 1;
+        if (!isDeploymentLive(next, template, design.revision) && (next.pending || attempts < 12)) {
+          timer = setTimeout(() => void check(), 5000);
+        }
+      } catch {
+        // The WordPress publish remains authoritative. Leave the editor with
+        // the safe "published, status not confirmed" context rather than
+        // claiming the public site is live.
+      }
+    };
+    void check();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [deploymentRefreshToken, design, publishPhase, template]);
+
+  if (!design || !loaded || !editorState) {
     return (
       <div className="byline-studio-app byline-studio-app-loading">
         <div className="byline-studio-loading">{error ? <Notice status="error">{error}</Notice> : <Spinner />}</div>
       </div>
     );
   }
-
-  const baseRevisionId = design.autosave?.baseRevisionId ?? design.revision;
-  const hasUnconvertedLegacy = Boolean(loaded.legacy?.unconvertedBlocks.length);
-  const hasDraft = Boolean(design.autosave);
-  const neverPublished = design.revision === 0;
-
-  // Editor state is converted to the semantic document before it leaves the
-  // browser. No Puck structure is persisted.
-  //
-  // `loaded.legacy` is threaded through on every write. It holds migrated blocks
-  // that have no v2 package yet, kept outside Puck so they cannot be edited --
-  // but they must be merged back, or the first edit to a migrated design would
-  // permanently destroy the sections the migration preserved.
-  const documentFor = (data: Data): DesignDocument =>
-    editorStateToDesignDocument(data as unknown as PuckEditorState, template, publicationTheme, loaded.legacy);
-
-  const scheduleAutosave = (document: DesignDocument) => {
-    if (!canEdit) return;
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    autosaveTimer.current = setTimeout(() => {
-      apiFetch({
-        path: `/byline/v1/admin/design/${encodeURIComponent(template)}/autosave`,
-        method: "PUT",
-        data: { document, baseRevisionId }
-      })
-        .then(() => setStatus("Draft autosaved"))
-        .catch((autosaveError) => setError(errorMessage(autosaveError)));
-    }, 900);
-  };
-
-  // One conversion feeds the canvas and the autosave, so what an editor sees is
-  // exactly what would be stored.
-  const onEditorChange = (data: Data) => {
-    const document = documentFor(data);
-
-    setStudioPreviewDocument(document, previewPublication);
-    scheduleAutosave(document);
-  };
-
-  const publish = async (data: Data) => {
-    if (!canPublish) return;
-    if (hasUnconvertedLegacy) {
-      setError("This design still contains preserved legacy blocks. Convert or remove them before publishing.");
-      return;
-    }
-    setError("");
-    try {
-      const published = await apiFetch<AdminDesign>({
-        path: `/byline/v1/admin/design/${encodeURIComponent(template)}/publish`,
-        method: "POST",
-        data: { document: documentFor(data), baseRevisionId }
-      });
-      setDesign(published);
-      setStatus(`Published revision ${published.revision}`);
-    } catch (publishError) {
-      setError(errorMessage(publishError));
-    }
-  };
-
-  /**
-   * Discards this editor's own draft and reopens the live design.
-   *
-   * Deliberately narrow: it deletes the current user's autosave and nothing
-   * else. No published revision is touched, no post is modified, and no deploy
-   * is triggered -- resetting a draft is an editing decision, not a release.
-   */
-  const resetToLive = async () => {
-    if (!canEdit) return;
-    if (!window.confirm(
-      "Discard this draft and start again from the design the live site is using? Your unpublished changes for this template will be deleted."
-    )) return;
-
-    setError("");
-    try {
-      await apiFetch({
-        path: `/byline/v1/admin/design/${encodeURIComponent(template)}/autosave`,
-        method: "DELETE"
-      });
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-      // Dropping the autosave is enough: `stored` falls back to the live
-      // document, and the key change below remounts the editor onto it.
-      setDesign({ ...design, autosave: null });
-      setStatus("Draft reset to the live design");
-    } catch (resetError) {
-      setError(errorMessage(resetError));
-    }
-  };
-
-  const liveLabel = neverPublished
-    ? `Live: ${template === "home" ? "default homepage" : "default template"}`
-    : `Live: published revision ${design.revision}`;
-  const draftLabel = hasDraft
-    ? design.autosave && design.autosave.baseRevisionId === 0 && neverPublished
-      ? "Draft: recovered autosave · never published"
-      : "Draft: unpublished changes"
-    : "Draft: none";
 
   return (
     <div
@@ -904,51 +1230,65 @@ export function BylineStudio({
       data-byline-hidden-packages={showHiddenPackages ? "visible" : "hidden"}
     >
       <div className="byline-studio-toolbar">
-        {backUrl ? <a className="byline-studio-back-link" href={backUrl}>← Exit Studio</a> : null}
-        <span className="byline-studio-title">Byline Studio · {templateLabel(template)}</span>
+        {backUrl ? <a className="byline-studio-back-link" href={backUrl} onClick={exitStudio}>← Byline</a> : null}
         <SelectControl
           label="Template"
           hideLabelFromVision
           value={template}
           options={[...TEMPLATE_OPTIONS]}
-          onChange={setTemplate}
+          onChange={(nextTemplate) => void changeTemplate(nextTemplate)}
+          disabled={isTransitioning}
         />
-        <span className="byline-studio-state">
-          <span className="byline-studio-state-live">{liveLabel}</span>
-          <span className={hasDraft ? "byline-studio-state-draft is-active" : "byline-studio-state-draft"}>
-            {draftLabel}
-            {status ? ` · ${status}` : ""}
-          </span>
+        <span className="byline-studio-title">{templateLabel(template)}</span>
+        <span className="byline-studio-state" aria-live="polite">
+          <span className="byline-studio-save-state">{saveLabel}</span>
+          <span className="byline-studio-state-live">{liveLabel}{publishedTime ? ` · Published ${publishedTime}` : ""}</span>
+          {hasDraft ? <span className="byline-studio-state-draft is-active">Unpublished changes</span> : null}
         </span>
-        <div className="byline-studio-panel-toggles">
-          <Button
-            variant="secondary"
-            isPressed={showHiddenPackages}
-            aria-pressed={showHiddenPackages}
-            onClick={() => setShowHiddenPackages((visible) => !visible)}
-          >
-            Inactive packages
-          </Button>
-          <Button
-            variant="secondary"
-            isPressed={outlineOpen}
-            aria-pressed={outlineOpen}
-            onClick={() => setOutlineOpen((open) => !open)}
-          >
-            Packages
-          </Button>
-          <Button
-            variant="secondary"
-            isPressed={inspectorOpen}
-            aria-pressed={inspectorOpen}
-            onClick={() => setInspectorOpen((open) => !open)}
-          >
-            Settings
-          </Button>
-        </div>
+        {publicSiteUrl ? <Button variant="secondary" href={publicSiteUrl} target="_blank" rel="noreferrer">Preview</Button> : null}
+        <details className="byline-studio-view-menu">
+          <summary>View</summary>
+          <div className="byline-studio-panel-toggles">
+            <Button
+              variant="secondary"
+              isPressed={showHiddenPackages}
+              aria-pressed={showHiddenPackages}
+              onClick={() => setShowHiddenPackages((visible) => !visible)}
+            >
+              Inactive packages
+            </Button>
+            <Button
+              variant="secondary"
+              isPressed={outlineOpen}
+              aria-pressed={outlineOpen}
+              onClick={() => setOutlineOpen((open) => !open)}
+            >
+              Packages
+            </Button>
+            <Button
+              variant="secondary"
+              isPressed={inspectorOpen}
+              aria-pressed={inspectorOpen}
+              onClick={() => setInspectorOpen((open) => !open)}
+            >
+              Settings
+            </Button>
+            <Button variant="secondary" disabled={!canEdit || !hasDraft || isTransitioning} onClick={() => void resetToLive()}>
+              Reset to live
+            </Button>
+          </div>
+        </details>
       </div>
       <div className="byline-studio-notices">
         {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
+        {publishPhase === "published" ? (
+          <Notice status={deploymentFailed ? "error" : liveNow ? "success" : "warning"} isDismissible={false}>
+            <strong>{deploymentLabel}</strong>
+            {deploymentFailed ? <p>Your design is still published and safe in Byline. Retry deployment or check the Deployment settings.</p> : null}
+            {publishPhase === "published" && publicSiteUrl ? <p><Button variant="secondary" href={publicSiteUrl} target="_blank" rel="noreferrer">View site</Button></p> : null}
+            {deploymentFailed && deployment?.canRetry ? <Button variant="secondary" isBusy={deploymentRetrying} disabled={deploymentRetrying} onClick={() => void retryDeployment()}>Retry deployment</Button> : null}
+          </Notice>
+        ) : null}
         {hasDraft && neverPublished ? (
           <Notice status="warning" isDismissible={false}>
             <strong>You are editing an unpublished draft.</strong> This template has never been published, so the live
@@ -982,22 +1322,16 @@ export function BylineStudio({
             package format. Review the packages below; the next save stores them.
           </Notice>
         ) : null}
-        {hasUnconvertedLegacy ? (
-          <Notice status="warning" isDismissible={false}>
-            Publishing is disabled while preserved legacy blocks remain outside the package editor
-            {loaded.unsupportedLegacyTypes.length ? ` (${loaded.unsupportedLegacyTypes.join(", ")})` : ""}. The original
-            data will continue to round-trip through autosaves.
-          </Notice>
-        ) : null}
+        {hasUnconvertedLegacy && loaded.legacy ? <LegacyResolution template={template} legacy={loaded.legacy} onRemove={removeLegacyBlock} /> : null}
       </div>
       <div className="byline-studio-workspace">
         <Puck
-          key={`${template}-${design.revision}-${design.autosave?.modifiedAt || "published"}`}
+          key={`${template}-${editorKey}`}
           config={studioConfig}
-          data={loaded.editorState as unknown as Data}
+          data={editorState as unknown as Data}
           onChange={onEditorChange}
           onPublish={publish}
-          permissions={{ drag: canEdit, duplicate: canEdit, delete: canEdit, edit: canEdit, insert: canEdit }}
+          permissions={{ drag: canEdit && !isTransitioning && publishPhase !== "publishing", duplicate: canEdit && !isTransitioning, delete: canEdit && !isTransitioning, edit: canEdit && !isTransitioning && publishPhase !== "publishing", insert: canEdit && !isTransitioning }}
           headerTitle={`Byline Studio · ${template}`}
           overrides={{ iframe: iframeOverride }}
           viewports={[...BYLINE_STUDIO_VIEWPORTS]}
@@ -1009,20 +1343,35 @@ export function BylineStudio({
   );
 }
 
-type DesignRevision = { id: number; authorId: number; modifiedAt: string };
+type DesignRevision = { id: number; authorId: number; authorName?: string; modifiedAt: string };
 
-export function BylineDesignRevisions({ canEdit, backUrl }: { canEdit: boolean; backUrl?: string }) {
-  const [template, setTemplate] = useState<"home" | "section-default" | "article-default" | "author-default" | "sports-home">("home");
+export function BylineDesignRevisions({ canEdit, backUrl, studioUrl }: { canEdit: boolean; backUrl?: string; studioUrl?: string }) {
+  const [template, setTemplate] = useState<StudioTemplate>(initialStudioTemplate);
   const [revisions, setRevisions] = useState<DesignRevision[] | null>(null);
+  const [current, setCurrent] = useState<AdminDesign | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [restored, setRestored] = useState(false);
 
   useEffect(() => {
     setRevisions(null);
+    setCurrent(null);
     setMessage("");
-    apiFetch<DesignRevision[]>({ path: `/byline/v1/admin/design/${encodeURIComponent(template)}/revisions` })
-      .then(setRevisions)
-      .catch((revisionError) => setError(errorMessage(revisionError)));
+    setRestored(false);
+    let cancelled = false;
+    Promise.all([
+      apiFetch<DesignRevision[]>({ path: `/byline/v1/admin/design/${encodeURIComponent(template)}/revisions` }),
+      apiFetch<AdminDesign>({ path: `/byline/v1/admin/design/${encodeURIComponent(template)}` })
+    ])
+      .then(([nextRevisions, nextCurrent]) => {
+        if (cancelled) return;
+        setRevisions(nextRevisions);
+        setCurrent(nextCurrent);
+      })
+      .catch((revisionError) => {
+        if (!cancelled) setError(errorMessage(revisionError));
+      });
+    return () => { cancelled = true; };
   }, [template]);
 
   const restore = async (revision: DesignRevision) => {
@@ -1032,7 +1381,8 @@ export function BylineDesignRevisions({ canEdit, backUrl }: { canEdit: boolean; 
         path: `/byline/v1/admin/design/${encodeURIComponent(template)}/restore/${revision.id}`,
         method: "POST"
       });
-      setMessage("The selected revision is now an unpublished Studio draft. Open Studio to review and publish it.");
+      setRestored(true);
+      setMessage("The selected revision is now an unpublished Studio draft. The published revision is unchanged.");
     } catch (restoreError) {
       setError(errorMessage(restoreError));
     }
@@ -1048,19 +1398,38 @@ export function BylineDesignRevisions({ canEdit, backUrl }: { canEdit: boolean; 
         onChange={setTemplate}
       />
       {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
-      {message ? <Notice status="success" isDismissible={false}>{message}</Notice> : null}
-      {!revisions ? <Spinner /> : revisions.length === 0 ? <p>No prior published revisions are available yet.</p> : (
+      {message ? (
+        <Notice status="success" isDismissible={false}>
+          {message}
+          {restored && studioUrl ? (
+            <p><Button variant="secondary" href={`${studioUrl}${studioUrl.includes("?") ? "&" : "?"}template=${encodeURIComponent(template)}`}>Open restored draft</Button></p>
+          ) : null}
+        </Notice>
+      ) : null}
+      {!revisions || !current ? <Spinner /> : (
+        <>
+          {current.revision > 0 ? (
+            <section className="byline-current-revision" aria-label="Current published revision">
+              <strong>Current — Revision {current.revision}</strong>
+              <span>{current.modifiedAt ? new Date(current.modifiedAt).toLocaleString() : ""}{current.publishedAuthorName ? ` · ${current.publishedAuthorName}` : ""}</span>
+            </section>
+          ) : <p>No published design exists for this template yet.</p>}
+          {revisions.length === 0 ? <p>No prior published revisions are available yet.</p> : (
         <ol className="byline-revision-list">
           {revisions.map((revision) => (
             <li key={revision.id}>
               <div>
                 <strong>Revision {revision.id}</strong>
-                <span>{new Date(revision.modifiedAt).toLocaleString()}</span>
+                <span>{new Date(revision.modifiedAt).toLocaleString()}{revision.authorName ? ` · ${revision.authorName}` : ""}</span>
               </div>
-              <Button variant="secondary" disabled={!canEdit} onClick={() => restore(revision)}>Restore as draft</Button>
+              <div className="byline-revision-actions">
+                <Button variant="secondary" disabled={!canEdit} onClick={() => restore(revision)}>Restore as draft</Button>
+              </div>
             </li>
           ))}
         </ol>
+          )}
+        </>
       )}
     </div>
   );

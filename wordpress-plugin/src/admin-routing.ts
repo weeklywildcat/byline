@@ -10,7 +10,7 @@ export const ADMIN_PAGE_SLUGS = {
 
 export type AdminPageSlug = (typeof ADMIN_PAGE_SLUGS)[keyof typeof ADMIN_PAGE_SLUGS];
 
-export const PUBLICATION_TABS = ["identity", "branding", "navigation", "social"] as const;
+export const PUBLICATION_TABS = ["identity", "branding", "navigation", "features", "social"] as const;
 export const INTEGRATION_TABS = ["discord", "deployment"] as const;
 export const SETTINGS_TABS = ["access", "api", "compatibility", "diagnostics"] as const;
 export const STUDIO_VIEWS = ["editor", "revisions"] as const;
@@ -70,6 +70,7 @@ const legacyDestinations: Record<string, LegacyAdminDestination> = {
   "/publication/identity": { page: ADMIN_PAGE_SLUGS.publication, tab: "identity" },
   "/publication/branding": { page: ADMIN_PAGE_SLUGS.publication, tab: "branding" },
   "/publication/navigation": { page: ADMIN_PAGE_SLUGS.publication, tab: "navigation" },
+  "/publication/features": { page: ADMIN_PAGE_SLUGS.publication, tab: "features" },
   "/publication/social": { page: ADMIN_PAGE_SLUGS.publication, tab: "social" },
   "/design/theme": { page: ADMIN_PAGE_SLUGS.theme },
   "/design/studio": { page: ADMIN_PAGE_SLUGS.studio, view: "editor" },

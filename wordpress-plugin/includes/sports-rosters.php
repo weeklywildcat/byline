@@ -821,7 +821,7 @@ function wwh_register_sports_roster_admin_pages(): void
         'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE,
         'Import and Export Team Rosters',
         'Roster Import / Export',
-        'edit_posts',
+        'edit_others_posts',
         'wwh-sports-roster-import',
         'wwh_render_sports_roster_import_page'
     );
@@ -999,6 +999,11 @@ function wwh_import_sports_roster_groups(array $groups): array
 {
     $result = ['created' => 0, 'updated' => 0, 'errors' => []];
 
+    if (!function_exists('wwh_can_manage_bulk_sports_data') || !wwh_can_manage_bulk_sports_data()) {
+        $result['errors'][] = 'You are not allowed to import team rosters.';
+        return $result;
+    }
+
     foreach ($groups as $group) {
         $team_key = wwh_sanitize_sport_key((string) ($group['teamKey'] ?? ''));
         $season = wwh_sanitize_roster_season((string) ($group['season'] ?? ''));
@@ -1071,7 +1076,7 @@ function wwh_roster_import_raw_data(): string
 
 function wwh_render_sports_roster_import_page(): void
 {
-    if (!current_user_can('edit_posts')) {
+    if (!function_exists('wwh_can_manage_bulk_sports_data') || !wwh_can_manage_bulk_sports_data()) {
         wp_die(esc_html__('Sorry, you are not allowed to import team rosters.', 'weekly-wildcat-headless'));
     }
 

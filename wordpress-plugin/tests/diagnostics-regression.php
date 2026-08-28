@@ -19,7 +19,10 @@ function register_rest_route(...$args): void {}
 function current_user_can(...$args): bool { return true; }
 function rest_ensure_response($value) { return $value; }
 function sanitize_text_field($value): string { return trim(strip_tags((string) $value)); }
-function wp_safe_remote_get(...$args) { return ['code' => 200, 'body' => '{"protocolVersion":1,"frontendVersion":"0.1.0","publicationRevision":9}']; }
+function sanitize_key($value): string { return strtolower((string) preg_replace('/[^a-z0-9_-]/i', '', (string) $value)); }
+function byline_is_design_template(string $template): bool { return in_array($template, ['home', 'section:news'], true); }
+function absint($value): int { return abs((int) $value); }
+function wp_safe_remote_get(...$args) { return ['code' => 200, 'body' => '{"protocolVersion":1,"frontendVersion":"0.1.0","publicationRevision":9,"designRevisions":{"home":12,"section:news":13,"unknown":99}}']; }
 function wp_remote_retrieve_response_code($response): int { return (int) $response['code']; }
 function wp_remote_retrieve_body($response): string { return (string) $response['body']; }
 function is_wp_error($value): bool { return $value instanceof WP_Error; }
@@ -46,7 +49,9 @@ if (!is_string($serialized)
     || strpos($serialized, 'secret.example.test') !== false
     || strpos($serialized, 'deployHook') !== false
     || $diagnostics['deployment']['configured'] !== true
-    || $diagnostics['publicManifest']['reachable'] !== true) {
+    || $diagnostics['publicManifest']['reachable'] !== true
+    || !isset($diagnostics['publicManifest']['designRevisions'])
+    || $diagnostics['publicManifest']['designRevisions'] !== ['home' => 12, 'section:news' => 13]) {
     fwrite(STDERR, "Diagnostics exposed secrets or omitted safe health information.\n");
     exit(1);
 }
