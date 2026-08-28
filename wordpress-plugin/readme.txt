@@ -24,7 +24,8 @@ modules, native polls, and an optional Discord newsroom integration.
 
 = 0.2.12 =
 
-**Restores normal-page design parity and repairs migrated Page Section blocks.**
+**Restores normal-page design parity, expands the newsroom block library, and
+makes Studio a real homepage editor.**
 
 * Page Sections now save only their attributes and normal InnerBlocks; the
   section wrapper is server-rendered by WordPress so Gutenberg has one stable
@@ -34,6 +35,15 @@ modules, native polls, and an optional Discord newsroom integration.
   Buttons style.
 * Shared Page CSS restores the pre-Gutenberg section rhythm, featured callout
   treatment, and outlined page actions in both the editor and public export.
+* Adds server-rendered newsroom blocks for stories, people, sports schedules,
+  game scores, events, polls, and correction notices, with matching Page
+  patterns and shared block styles.
+* Studio now resolves the whole homepage document once per change through a
+  single shared resolver, so packages no longer repeat articles or render
+  sections the public site does not, and the editor uses the full-width admin
+  canvas instead of the ordinary wp-admin content column.
+* Rewrites the shared deck and blurb text helpers without backtracking regular
+  expressions, so long publication excerpts no longer degrade quadratically.
 
 = 0.2.11 =
 
@@ -107,7 +117,9 @@ modules, native polls, and an optional Discord newsroom integration.
 = 0.2.12 =
 Existing Page Sections are repaired automatically on the next administrator
 request. Review the affected Pages after updating; malformed content is left
-untouched and reported in Byline diagnostics.
+untouched and reported in Byline diagnostics. Studio recomputes homepage
+previews with a shared document resolver, so open a homepage design once after
+updating to confirm its packages look as expected.
 
 = 0.2.11 =
 Normal-page routes now come from published WordPress Pages. Existing seeded
