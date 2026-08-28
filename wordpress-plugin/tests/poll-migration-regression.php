@@ -160,4 +160,24 @@ byline_test_assert(
     'Answer ids stay stable across reruns.'
 );
 
+// A full repair import must not erase an answer that was added locally and has
+// already received a vote after the export was generated.
+$live_option_id = 'local-live';
+$live_options = byline_poll_options((int) $coverage->ID);
+$live_options[] = ['id' => $live_option_id, 'label' => 'Local answer', 'position' => count($live_options)];
+byline_poll_set_options((int) $coverage->ID, $live_options);
+byline_test_assert(
+    byline_poll_insert_vote('website-coverage', $live_option_id, 'post-export-voter') === BYLINE_POLL_VOTE_INSERTED,
+    'A locally added answer can receive a vote.'
+);
+
+$repair = byline_poll_import_artifact($artifact);
+$repair_ids = array_column(byline_poll_options((int) $coverage->ID), 'id');
+byline_test_assert(in_array($live_option_id, $repair_ids, true), 'A full import retains a locally voted answer.');
+byline_test_assert(byline_poll_option_vote_count('website-coverage', $live_option_id) === 1, 'A full import does not orphan a locally voted answer.');
+byline_test_assert(
+    strpos(implode("\n", $repair['errors']), 'retained answer(s) with existing votes') !== false,
+    'A retained voted answer is surfaced in the migration report.'
+);
+
 echo "Byline poll migration regression passed.\n";

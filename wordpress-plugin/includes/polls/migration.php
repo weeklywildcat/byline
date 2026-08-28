@@ -368,7 +368,22 @@ function byline_poll_import_artifact(array $artifact, array $options = [])
 
         $post_id = (int) $post_id;
         update_post_meta($post_id, BYLINE_POLL_ID_META, $poll_id);
-        byline_poll_set_options($post_id, $poll['options']);
+
+        // A full artifact is authoritative for editorial wording and order, but
+        // it must not erase an answer that received a vote after the export (or
+        // was added locally before a repair import). Use the same reconciliation
+        // rule as the admin editor so a rerun cannot orphan live vote history.
+        $options = $poll['options'];
+        if ($existing instanceof WP_Post) {
+            $merge = byline_poll_merge_options($poll_id, byline_poll_options($post_id), $options);
+            $options = $merge['options'];
+            if ($merge['blocked'] !== []) {
+                $labels = array_values(array_unique(array_map('strval', $merge['blocked'])));
+                $report['errors'][] = 'Poll ' . $poll_id . ' retained answer(s) with existing votes: ' . implode(', ', $labels) . '.';
+            }
+        }
+
+        byline_poll_set_options($post_id, $options);
         byline_poll_set_status($post_id, $poll['status']);
         byline_poll_set_schedule($post_id, $poll['opensAt'], $poll['closesAt']);
 
