@@ -90,8 +90,7 @@ function byline_rest_publish_design(WP_REST_Request $request)
     if (is_wp_error($validation)) {
         return $validation;
     }
-    if (($document['schemaVersion'] ?? null) === 2
-        && !empty($document['legacy']['unconvertedBlocks'])) {
+    if (byline_design_has_unconverted_blocks($document)) {
         return new WP_Error(
             'byline_unconverted_design_blocks',
             __('This design still contains homepage blocks that have not been converted. Save it, but convert or remove the preserved blocks before publishing.', 'weekly-wildcat-headless'),

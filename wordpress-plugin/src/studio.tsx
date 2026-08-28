@@ -619,6 +619,18 @@ export function createStudioConfig(
   } as Config;
 }
 
+const TEMPLATE_OPTIONS = [
+  { label: "Homepage", value: "home" },
+  { label: "Default section", value: "section-default" },
+  { label: "Default article", value: "article-default" },
+  { label: "Default author", value: "author-default" },
+  { label: "Sports homepage", value: "sports-home" }
+] as const;
+
+function templateLabel(template: string) {
+  return TEMPLATE_OPTIONS.find((option) => option.value === template)?.label ?? template;
+}
+
 function errorMessage(error: unknown) {
   if (error && typeof error === "object" && "code" in error && error.code === "byline_design_conflict") {
     return "Another editor published this design. Reload it before reapplying your work.";
@@ -761,13 +773,7 @@ export function BylineStudio({
         <SelectControl
           label="Template"
           value={template}
-          options={[
-            { label: "Homepage", value: "home" },
-            { label: "Default section", value: "section-default" },
-            { label: "Default article", value: "article-default" },
-            { label: "Default author", value: "author-default" },
-            { label: "Sports homepage", value: "sports-home" }
-          ]}
+          options={[...TEMPLATE_OPTIONS]}
           onChange={setTemplate}
         />
         <span>Published revision {design.revision}{status ? ` · ${status}` : ""}</span>
@@ -805,10 +811,19 @@ export function BylineStudio({
           ) : null}
         </Notice>
       ) : null}
+      {loaded.recoveredLegacyBlocks ? (
+        <Notice status="success" isDismissible={false}>
+          <strong>{templateLabel(template)} design updated.</strong>{" "}
+          {loaded.recoveredLegacyBlocks === 1 ? "1 block" : `${loaded.recoveredLegacyBlocks} blocks`} preserved by an
+          older version of Byline {loaded.recoveredLegacyBlocks === 1 ? "was" : "were"} recovered into the current
+          package format. Review the packages below; the next save stores them.
+        </Notice>
+      ) : null}
       {hasUnconvertedLegacy ? (
         <Notice status="warning" isDismissible={false}>
-          Publishing is disabled while preserved legacy blocks remain outside the package editor. The original data
-          will continue to round-trip through autosaves.
+          Publishing is disabled while preserved legacy blocks remain outside the package editor
+          {loaded.unsupportedLegacyTypes.length ? ` (${loaded.unsupportedLegacyTypes.join(", ")})` : ""}. The original
+          data will continue to round-trip through autosaves.
         </Notice>
       ) : null}
       <Puck
@@ -863,13 +878,7 @@ export function BylineDesignRevisions({ canEdit, backUrl }: { canEdit: boolean; 
       <SelectControl
         label="Template"
         value={template}
-        options={[
-          { label: "Homepage", value: "home" },
-          { label: "Default section", value: "section-default" },
-          { label: "Default article", value: "article-default" },
-          { label: "Default author", value: "author-default" },
-          { label: "Sports homepage", value: "sports-home" }
-        ]}
+        options={[...TEMPLATE_OPTIONS]}
         onChange={setTemplate}
       />
       {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}

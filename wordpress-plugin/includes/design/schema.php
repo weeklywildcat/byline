@@ -288,6 +288,23 @@ function byline_validate_design_document_v2(array $document, string $template)
                 return new WP_Error('byline_unsafe_design_props', __('The design contains malformed legacy data.', 'weekly-wildcat-headless'), ['status' => 400]);
             }
         }
+
+        // Ordering metadata is aligned by index with the preserved blocks, so a
+        // mismatched length is corrupt rather than merely absent. Documents
+        // written before the field existed carry none at all, which is allowed.
+        if (array_key_exists('packageIndexes', $legacy)) {
+            $package_indexes = $legacy['packageIndexes'];
+            if (!is_array($package_indexes)
+                || count($package_indexes) !== count($legacy['unconvertedBlocks'])
+                || ($package_indexes !== [] && array_keys($package_indexes) !== range(0, count($package_indexes) - 1))) {
+                return new WP_Error('byline_unsafe_design_props', __('The design contains malformed legacy ordering metadata.', 'weekly-wildcat-headless'), ['status' => 400]);
+            }
+            foreach ($package_indexes as $package_index) {
+                if (!is_int($package_index) || $package_index < 0) {
+                    return new WP_Error('byline_unsafe_design_props', __('The design contains malformed legacy ordering metadata.', 'weekly-wildcat-headless'), ['status' => 400]);
+                }
+            }
+        }
     }
 
     $seen_ids = [];
@@ -334,6 +351,24 @@ function byline_validate_design_document_v2(array $document, string $template)
     }
 
     return true;
+}
+
+/**
+ * Whether a design still carries schema 1 blocks that have no package yet.
+ *
+ * This is the publish guard. It is a function rather than an inline check in
+ * the REST route so the regression suite can hold it to the same fixture the
+ * TypeScript recovery pass is held to: a design that Studio has re-migrated
+ * carries no preserved blocks, and must go live.
+ */
+function byline_design_has_unconverted_blocks($document): bool
+{
+    if (!is_array($document) || (int) ($document['schemaVersion'] ?? 0) !== 2) {
+        return false;
+    }
+    $legacy = $document['legacy'] ?? null;
+
+    return is_array($legacy) && !empty($legacy['unconvertedBlocks']);
 }
 
 function byline_validate_design_document($document, string $template)

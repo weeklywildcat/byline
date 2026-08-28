@@ -9,6 +9,7 @@ import {
   SPORTS_PACKAGE_TYPE,
   SPECIAL_COVERAGE_PACKAGE_TYPE,
   isBylinePackageType,
+  legacyBlockLabel,
   migrateDesignDocumentV1ToV2,
   parseBylineDesignDocumentV2,
   parseBriefPackageProps,
@@ -19,6 +20,7 @@ import {
   parseOpinionPackageProps,
   parseSportsPackageProps,
   parseSpecialCoveragePackageProps,
+  upgradeLegacyBlocksInV2Document,
   type BylineDesignDocumentV2,
   type BylineDesignPackage
 } from "@byline/design";
@@ -51,6 +53,14 @@ export type StudioLoadResult = {
   migrationWarnings: string[];
   // True when the document Studio loaded was schema 1. The next save writes v2.
   migratedFromV1: boolean;
+  // How many blocks a *stored schema 2* document was carrying in `legacy` that
+  // this Byline version now understands, and which were converted on load. Non-
+  // zero means the editor is looking at packages that were not in storage a
+  // moment ago, which is worth telling them about.
+  recoveredLegacyBlocks: number;
+  // Readable types of the blocks that still have no package, for the notice
+  // that explains why publishing is held back.
+  unsupportedLegacyTypes: string[];
 };
 
 const PACKAGE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -153,14 +163,19 @@ export function loadDesignIntoEditor(document: unknown, template: string): Studi
     // Validated, not cast: a stored document that no longer satisfies the schema
     // must fail here rather than reaching the editor half-formed.
     const parsed = parseBylineDesignDocumentV2(stored, template);
+    // A v2 document can still be carrying legacy data from an earlier migration
+    // that had no mapping for it. Retry it against the current mappings instead
+    // of forwarding it untouched: carrying it forward is what left production
+    // designs permanently unpublishable.
+    const upgraded = upgradeLegacyBlocksInV2Document(parsed);
 
     return {
-      editorState: designDocumentToEditorState(parsed),
-      // A v2 document can still be carrying legacy data from an earlier
-      // migration that has not been converted yet.
-      legacy: parsed.legacy,
-      migrationWarnings: [],
-      migratedFromV1: false
+      editorState: designDocumentToEditorState(upgraded.document),
+      legacy: upgraded.document.legacy,
+      migrationWarnings: upgraded.warnings,
+      migratedFromV1: false,
+      recoveredLegacyBlocks: upgraded.recoveredBlocks,
+      unsupportedLegacyTypes: upgraded.unsupportedTypes
     };
   }
 
@@ -170,6 +185,12 @@ export function loadDesignIntoEditor(document: unknown, template: string): Studi
     editorState: designDocumentToEditorState(migrated),
     legacy: migrated.legacy,
     migrationWarnings: warnings,
-    migratedFromV1: true
+    migratedFromV1: true,
+    // A v1 document is converted in full here; nothing was recovered from a
+    // previous conversion because there was no previous conversion.
+    recoveredLegacyBlocks: 0,
+    unsupportedLegacyTypes: [
+      ...new Set((migrated.legacy?.unconvertedBlocks ?? []).map((block) => legacyBlockLabel(block.type)))
+    ]
   };
 }

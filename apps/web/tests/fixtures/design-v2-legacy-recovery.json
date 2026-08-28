@@ -1,0 +1,334 @@
+{
+  "//": "The production homepage autosave that could not be published. A schema 2 document whose v1 -> v2 migration ran when only story-lead had a package mapping, leaving nine blocks in `legacy` that every later Byline version can convert. Captured verbatim, including the absence of ordering metadata.",
+  "autosave": {
+    "document": {
+      "schemaVersion": 2,
+      "template": "home",
+      "theme": "weekly-wildcat",
+      "packages": [
+        {
+          "id": "story-lead-1",
+          "type": "lead-package",
+          "props": {
+            "mode": "single-story",
+            "heading": "Top story",
+            "lead": {
+              "source": {
+                "type": "sticky"
+              }
+            },
+            "latest": {
+              "heading": "The Latest",
+              "source": {
+                "type": "compatibility-latest"
+              },
+              "limit": 0,
+              "showBylines": true
+            },
+            "utility": {
+              "poll": false,
+              "calendar": false,
+              "calendarLimit": 0
+            },
+            "presentation": {
+              "showDeck": true
+            }
+          }
+        }
+      ],
+      "legacy": {
+        "schemaVersion": 1,
+        "editor": {
+          "engine": "puck",
+          "version": "0.23.0"
+        },
+        "unconvertedBlocks": [
+          {
+            "type": "latest-stories",
+            "props": {
+              "id": "latest-stories-2",
+              "title": "Latest Stories",
+              "limit": 6
+            }
+          },
+          {
+            "type": "opinion-package",
+            "props": {
+              "id": "opinion-package-3",
+              "title": "Opinion",
+              "limit": 3
+            }
+          },
+          {
+            "type": "photo-feature",
+            "props": {
+              "id": "photo-feature-4",
+              "title": "In Focus",
+              "limit": 1
+            }
+          },
+          {
+            "type": "special-coverage",
+            "props": {
+              "id": "special-coverage-5",
+              "title": "Special Coverage",
+              "limit": 4
+            }
+          },
+          {
+            "type": "sports-scores",
+            "props": {
+              "id": "sports-scores-6",
+              "title": "Sports",
+              "limit": 5
+            }
+          },
+          {
+            "type": "sports-upcoming",
+            "props": {
+              "id": "sports-upcoming-7",
+              "title": "Upcoming",
+              "limit": 5
+            }
+          },
+          {
+            "type": "events-list",
+            "props": {
+              "id": "events-list-8",
+              "title": "This Week",
+              "limit": 5
+            }
+          },
+          {
+            "type": "poll",
+            "props": {
+              "id": "poll-9",
+              "title": "Poll"
+            }
+          },
+          {
+            "type": "newsletter",
+            "props": {
+              "id": "newsletter-10",
+              "title": "Newsletter"
+            }
+          }
+        ]
+      }
+    },
+    "baseRevisionId": 0
+  },
+  "//recovered": "The same design after Studio's load-time recovery and one autosave: nine semantic packages in the original homepage order, the two schedule blocks collapsed into one, and no `legacy` key left for the publish guard to trip on. TypeScript asserts the recovery produces exactly this; PHP asserts storage validation and the publish guard both accept it.",
+  "recovered": {
+    "schemaVersion": 2,
+    "template": "home",
+    "theme": "weekly-wildcat",
+    "packages": [
+      {
+        "id": "story-lead-1",
+        "type": "lead-package",
+        "props": {
+          "mode": "single-story",
+          "heading": "Top story",
+          "lead": {
+            "source": {
+              "type": "sticky"
+            }
+          },
+          "latest": {
+            "heading": "The Latest",
+            "source": {
+              "type": "compatibility-latest"
+            },
+            "limit": 0,
+            "showBylines": true
+          },
+          "utility": {
+            "poll": false,
+            "calendar": false,
+            "calendarLimit": 0
+          },
+          "presentation": {
+            "showDeck": true
+          }
+        }
+      },
+      {
+        "id": "latest-stories-2",
+        "type": "brief-package",
+        "props": {
+          "heading": "Latest Stories",
+          "source": {
+            "type": "latest"
+          },
+          "limit": 6,
+          "presentation": {
+            "showAuthor": true,
+            "showDeck": true
+          }
+        }
+      },
+      {
+        "id": "opinion-package-3",
+        "type": "opinion-package",
+        "props": {
+          "heading": "Opinion",
+          "description": "",
+          "source": {
+            "type": "latest"
+          },
+          "limit": 3,
+          "archiveLink": {
+            "enabled": false,
+            "href": "/category/opinion/",
+            "label": "All Opinion →"
+          },
+          "presentation": {
+            "showAuthor": true,
+            "showDeck": true
+          }
+        }
+      },
+      {
+        "id": "photo-feature-4",
+        "type": "in-focus-package",
+        "props": {
+          "heading": "In Focus",
+          "source": {
+            "type": "latest"
+          },
+          "presentation": {
+            "showAuthor": true,
+            "showDeck": true
+          }
+        }
+      },
+      {
+        "id": "special-coverage-5",
+        "type": "special-coverage-package",
+        "props": {
+          "heading": "Special Coverage",
+          "source": {
+            "type": "latest"
+          },
+          "limit": 4,
+          "leadPresentation": {
+            "showAuthor": true,
+            "showDeck": true
+          },
+          "supportingPresentation": {
+            "showAuthor": true,
+            "showDeck": true
+          }
+        }
+      },
+      {
+        "id": "sports-scores-6",
+        "type": "sports-package",
+        "props": {
+          "heading": "Sports",
+          "stories": {
+            "source": {
+              "type": "section",
+              "slug": "sports"
+            },
+            "limit": 0
+          },
+          "athleteSpotlight": {
+            "enabled": false,
+            "source": {
+              "type": "athlete-spotlight"
+            }
+          },
+          "scores": {
+            "enabled": true,
+            "limit": 2
+          },
+          "upcoming": {
+            "enabled": true,
+            "limit": 3
+          },
+          "presentation": {
+            "showDeck": true,
+            "showBylines": true,
+            "showReadLink": true,
+            "cleanDeck": true
+          },
+          "content": "schedule",
+          "archiveLink": {
+            "enabled": false,
+            "href": "/sports/",
+            "label": "All Sports →"
+          }
+        }
+      },
+      {
+        "id": "events-list-8",
+        "type": "lead-package",
+        "props": {
+          "mode": "calendar",
+          "lead": {
+            "source": {
+              "type": "latest"
+            }
+          },
+          "latest": {
+            "heading": "The Latest",
+            "source": {
+              "type": "compatibility-latest"
+            },
+            "limit": 0,
+            "showBylines": true
+          },
+          "utility": {
+            "poll": false,
+            "calendar": true,
+            "calendarLimit": 5
+          },
+          "presentation": {
+            "showDeck": true
+          }
+        }
+      },
+      {
+        "id": "poll-9",
+        "type": "lead-package",
+        "props": {
+          "mode": "poll",
+          "lead": {
+            "source": {
+              "type": "latest"
+            }
+          },
+          "latest": {
+            "heading": "The Latest",
+            "source": {
+              "type": "compatibility-latest"
+            },
+            "limit": 0,
+            "showBylines": true
+          },
+          "utility": {
+            "poll": true,
+            "calendar": false,
+            "calendarLimit": 5
+          },
+          "presentation": {
+            "showDeck": true
+          }
+        }
+      },
+      {
+        "id": "newsletter-10",
+        "type": "newsletter-package",
+        "props": {
+          "label": "Newsletter signup",
+          "heading": "Get {publication.shortName} in your inbox",
+          "presentation": {
+            "showLabel": true
+          }
+        }
+      }
+    ]
+  }
+}

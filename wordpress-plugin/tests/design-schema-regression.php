@@ -348,4 +348,61 @@ if (byline_validate_design_document($v2_ordered, 'home') !== true
     exit(1);
 }
 
+// The production homepage recovery, from the server's side.
+//
+// The stored autosave must remain valid storage while its blocks are preserved,
+// and must be refused by the publish guard. The document Studio writes after
+// re-migrating those blocks must be valid storage *and* pass the guard --
+// otherwise recovery would move the block from Studio to the server and the
+// homepage would still be unpublishable.
+$recovery_fixture = json_decode(
+    file_get_contents(__DIR__ . '/../../apps/web/tests/fixtures/design-v2-legacy-recovery.json'),
+    true
+);
+if (!is_array($recovery_fixture)) {
+    fwrite(STDERR, "The legacy recovery fixture could not be read.\n");
+    exit(1);
+}
+
+$stored_autosave = $recovery_fixture['autosave']['document'] ?? [];
+if (byline_validate_design_document($stored_autosave, 'home') !== true) {
+    fwrite(STDERR, "The stored production autosave was rejected by storage validation.\n");
+    exit(1);
+}
+if (!byline_design_has_unconverted_blocks($stored_autosave)) {
+    fwrite(STDERR, "The publish guard did not hold back the un-recovered production autosave.\n");
+    exit(1);
+}
+
+$recovered_document = $recovery_fixture['recovered'] ?? [];
+if (byline_validate_design_document($recovered_document, 'home') !== true) {
+    fwrite(STDERR, "The recovered production document was rejected by storage validation.\n");
+    exit(1);
+}
+if (byline_design_has_unconverted_blocks($recovered_document)) {
+    fwrite(STDERR, "The publish guard still blocks a fully recovered document.\n");
+    exit(1);
+}
+if (count($recovered_document['packages']) !== 9 || array_key_exists('legacy', $recovered_document)) {
+    fwrite(STDERR, "The recovered production document is not the expected nine-package design.\n");
+    exit(1);
+}
+
+// Ordering metadata is part of the legacy contract in both languages.
+$legacy_ordered = $v2_legacy;
+$legacy_ordered['legacy']['packageIndexes'] = [1];
+if (byline_validate_design_document($legacy_ordered, 'home') !== true) {
+    fwrite(STDERR, "Legacy ordering metadata was rejected.\n");
+    exit(1);
+}
+foreach ([[1, 2], ['1'], [-1]] as $bad_indexes) {
+    $legacy_bad_order = $v2_legacy;
+    $legacy_bad_order['legacy']['packageIndexes'] = $bad_indexes;
+    $legacy_bad_order_result = byline_validate_design_document($legacy_bad_order, 'home');
+    if (!$legacy_bad_order_result instanceof WP_Error || $legacy_bad_order_result->code !== 'byline_unsafe_design_props') {
+        fwrite(STDERR, "Malformed legacy ordering metadata was accepted.\n");
+        exit(1);
+    }
+}
+
 echo "Byline design schema regression passed.\n";

@@ -88,6 +88,15 @@ export type BylineDesignDocumentV2 = {
     schemaVersion: 1;
     editor: { engine: string; version: string };
     unconvertedBlocks: BylineLegacyBlock[];
+    // The ordering contract for preserved blocks, aligned by index with
+    // `unconvertedBlocks`: the index in `packages` each block belonged at.
+    //
+    // Ordering cannot be recovered from the blocks themselves once their v1
+    // neighbours have become packages, so it is recorded when the block is
+    // preserved and updated whenever a later migration converts one of its
+    // siblings. Optional only because documents written before this field
+    // existed do not carry it.
+    packageIndexes?: number[];
   };
   baseRevisionId?: number;
   modifiedAt?: string;
@@ -320,10 +329,23 @@ export function parseBylineDesignDocumentV2(value: unknown, template: string): B
       }
     }
 
+    const packageIndexes = legacyValue.packageIndexes;
+
+    if (packageIndexes !== undefined) {
+      if (
+        !Array.isArray(packageIndexes) ||
+        packageIndexes.length !== blocks.length ||
+        !packageIndexes.every((index) => typeof index === "number" && Number.isInteger(index) && index >= 0)
+      ) {
+        throw new BylineDesignSchemaError(`Design ${template} has malformed legacy ordering metadata.`);
+      }
+    }
+
     legacy = {
       schemaVersion: 1,
       editor: { engine: editor.engine, version: editor.version },
-      unconvertedBlocks: blocks as BylineLegacyBlock[]
+      unconvertedBlocks: blocks as BylineLegacyBlock[],
+      ...(packageIndexes ? { packageIndexes: packageIndexes as number[] } : {})
     };
   }
 
