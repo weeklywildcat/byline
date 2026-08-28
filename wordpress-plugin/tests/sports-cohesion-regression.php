@@ -146,6 +146,20 @@ if (($legacy_read[0]['id'] ?? 'unexpected') !== '') {
     sports_cohesion_fail('Read-only roster normalization must not generate random identities.');
 }
 
+$next_game = byline_sports_next_game([
+    ['id' => 1, 'status' => 'upcoming', 'startDate' => ''],
+    ['id' => 2, 'status' => 'upcoming', 'startDate' => '2026-09-03T19:00'],
+    ['id' => 3, 'status' => 'upcoming', 'startDate' => '2026-09-02T19:00'],
+]);
+$previous_game = byline_sports_previous_game([
+    ['id' => 4, 'status' => 'final', 'startDate' => ''],
+    ['id' => 5, 'status' => 'final', 'startDate' => '2026-08-20T19:00'],
+    ['id' => 6, 'status' => 'tie', 'startDate' => '2026-08-21T19:00'],
+]);
+if (($next_game['id'] ?? 0) !== 3 || ($previous_game['id'] ?? 0) !== 6) {
+    sports_cohesion_fail('Sports context must choose the nearest dated upcoming game and latest dated result even when TBA or input order comes first.');
+}
+
 $valid_csv = wwh_parse_sports_roster_csv(implode("\n", [
     'team_key,team_name,season,row_type,athlete_id,name,number,position,grade,role,sort_order',
     'football-varsity,Football First Team,2026/2027,athlete,ath_returning,Jordan Lee,7,QB,12,,2',

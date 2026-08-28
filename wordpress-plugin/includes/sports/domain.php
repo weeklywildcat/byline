@@ -626,25 +626,63 @@ function byline_sports_team_context(string $team_key, string $season = ''): ?arr
 
 function byline_sports_next_game(array $games): ?array
 {
+    $next = null;
+
     foreach ($games as $game) {
-        if (($game['status'] ?? '') === 'upcoming') {
-            return $game;
+        if (!is_array($game) || ($game['status'] ?? '') !== 'upcoming') {
+            continue;
+        }
+
+        if ($next === null) {
+            $next = $game;
+            continue;
+        }
+
+        $candidate_timestamp = byline_sports_game_timestamp($game);
+        $next_timestamp = byline_sports_game_timestamp($next);
+
+        // TBA games are valid upcoming games, but an unknown date must not sort
+        // ahead of a dated game merely because an empty string compares first.
+        if ($candidate_timestamp > 0 && ($next_timestamp === 0 || $candidate_timestamp < $next_timestamp)) {
+            $next = $game;
         }
     }
 
-    return null;
+    return $next;
 }
 
 function byline_sports_previous_game(array $games): ?array
 {
     $previous = null;
+
     foreach ($games as $game) {
-        if (in_array(($game['status'] ?? ''), ['final', 'forfeit', 'tie'], true)) {
+        if (!is_array($game) || !in_array(($game['status'] ?? ''), ['final', 'forfeit', 'tie'], true)) {
+            continue;
+        }
+
+        if ($previous === null) {
+            $previous = $game;
+            continue;
+        }
+
+        $candidate_timestamp = byline_sports_game_timestamp($game);
+        $previous_timestamp = byline_sports_game_timestamp($previous);
+
+        // Prefer the latest dated result; an undated historical result is only
+        // a fallback when no completed game has a readable start time.
+        if ($candidate_timestamp > 0 && ($previous_timestamp === 0 || $candidate_timestamp > $previous_timestamp)) {
             $previous = $game;
         }
     }
 
     return $previous;
+}
+
+function byline_sports_game_timestamp(array $game): int
+{
+    $date = byline_sports_date_for_value($game['startDate'] ?? '');
+
+    return $date ? $date->getTimestamp() : 0;
 }
 
 function byline_sports_linked_coverage_for_games(array $game_ids, int $per_game_limit = 6): array

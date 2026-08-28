@@ -7,6 +7,7 @@ define('WP_PLUGIN_DIR', dirname($byline_plugin_root));
 define('WPMU_PLUGIN_DIR', dirname($byline_plugin_root));
 define('WP_DEBUG', false);
 $wwh_registered_user_meta = [];
+$sports_bulk_capabilities = [];
 
 function add_action(...$args): void
 {
@@ -99,7 +100,31 @@ function absint($maybeint): int
     return abs((int) $maybeint);
 }
 
+function current_user_can(string $capability, ...$args): bool
+{
+    global $sports_bulk_capabilities;
+    return !empty($sports_bulk_capabilities[$capability]);
+}
+
 require $byline_plugin_root . '/weekly-wildcat-headless.php';
+
+$sports_bulk_capabilities = ['edit_posts' => true];
+if (wwh_can_manage_bulk_sports_data()) {
+    fwrite(STDERR, "Authors must not be allowed to manage bulk sports imports or resets.\n");
+    exit(1);
+}
+
+$sports_bulk_capabilities = ['edit_others_posts' => true];
+if (!wwh_can_manage_bulk_sports_data()) {
+    fwrite(STDERR, "Editors must be allowed to manage bulk sports imports or resets.\n");
+    exit(1);
+}
+
+$sports_bulk_capabilities = [BYLINE_MANAGE_CAPABILITY => true];
+if (!wwh_can_manage_bulk_sports_data()) {
+    fwrite(STDERR, "Byline managers must be allowed to manage bulk sports imports or resets.\n");
+    exit(1);
+}
 
 wwh_discord_register_meta();
 if (!isset($wwh_registered_user_meta[WWH_DISCORD_USER_ID_META], $wwh_registered_user_meta[WWH_DISCORD_USERNAME_META])) {
