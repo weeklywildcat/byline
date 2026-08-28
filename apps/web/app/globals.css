@@ -4089,17 +4089,7 @@ img {
 }
 
 .site-footer::before {
-  background: linear-gradient(
-    90deg,
-    #e03131 0%,
-    #f08c00 16%,
-    #f2c94c 31%,
-    #2f9e44 47%,
-    #15aabf 62%,
-    #4263eb 76%,
-    #9c36b5 89%,
-    #e64980 100%
-  );
+  background: var(--accent);
   content: "";
   display: block;
   height: 3px;
