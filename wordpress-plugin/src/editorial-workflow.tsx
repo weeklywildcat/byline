@@ -23,7 +23,7 @@ import { useDispatch, useSelect } from '@wordpress/data';
 import { useCallback, useEffect, useMemo, useRef, useState } from '@wordpress/element';
 import { PluginPostStatusInfo, PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
 import { __, sprintf } from '@wordpress/i18n';
-import { pencil } from '@wordpress/icons';
+import { listView } from '@wordpress/icons';
 import { registerPlugin } from '@wordpress/plugins';
 
 import {
@@ -424,11 +424,11 @@ function EditorialWorkflowPlugin() {
         </div>
       </PluginPostStatusInfo>
 
-      <PluginSidebarMoreMenuItem target={SIDEBAR_NAME} icon={pencil}>
+      <PluginSidebarMoreMenuItem target={SIDEBAR_NAME} icon={listView}>
         {sidebarTitle}
       </PluginSidebarMoreMenuItem>
 
-      <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={pencil}>
+      <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={listView}>
         <WorkflowControls {...workflow} />
       </PluginSidebar>
     </>
