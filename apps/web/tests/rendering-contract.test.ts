@@ -18,6 +18,9 @@ function readSource(relativePath: string) {
 }
 
 const studioPreview = readSource("../../../wordpress-plugin/src/studio-preview.tsx");
+// Studio's resolution half, kept free of the WordPress client so both hosts'
+// resolutions can be compared directly.
+const studioPreviewModel = readSource("../../../wordpress-plugin/src/studio-preview-model.ts");
 const studioConfig = readSource("../../../wordpress-plugin/src/studio.tsx");
 const homepage = readSource("../app/page.tsx");
 
@@ -113,6 +116,9 @@ describe("Studio threads preserved legacy data into every write", () => {
 describe("shared rendering contract: sports package", () => {
   const homepageResolver = readSource("../lib/homepage-resolution.ts");
   const sportsResolver = readSource("../lib/sports-packages.ts");
+  // The one canonical resolver both hosts run. Selection, de-duplication and
+  // capability reconciliation live here and nowhere else.
+  const canonicalResolver = readSource("../../../packages/content/src/homepage/resolve.ts");
   const renderer = readSource("../../../packages/ui/src/SportsPackage.tsx");
 
   it("production renders the sports package through the shared renderer", () => {
@@ -171,11 +177,21 @@ describe("shared rendering contract: sports package", () => {
     }
   });
 
-  it("keeps those decisions in the resolver, where they belong", () => {
-    expect(homepageResolver).toContain("resolveSportsPackage");
-    expect(homepageResolver).toContain("usedStoryIds");
-    expect(sportsResolver).toContain("features.sports");
-    expect(sportsResolver).toContain("sourceCandidates");
+  it("keeps those decisions in the one canonical resolver, where they belong", () => {
+    expect(canonicalResolver).toContain("resolveSportsPackage");
+    expect(canonicalResolver).toContain("usedStoryIds");
+    expect(canonicalResolver).toContain("features.sports");
+    expect(canonicalResolver).toContain("sourceCandidates");
+
+    // Both hosts reach it rather than approximating it.
+    expect(homepageResolver).toContain("resolveSharedHomepageDocument");
+    expect(studioPreviewModel).toContain("resolveHomepageDocument");
+    // No Studio-side selection survives: the model module adapts and delegates.
+    expect(studioPreviewModel).not.toContain("resolvePreviewSelection");
+    expect(studioPreview).not.toContain("previewSelectStories");
+
+    // The build-time adapter keeps only the WordPress-shaped boundary.
+    expect(sportsResolver).toContain("toSportsResultView");
     expect(sportsResolver).toContain("getPublicationConfig");
   });
 });

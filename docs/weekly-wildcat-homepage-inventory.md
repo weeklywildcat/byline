@@ -29,8 +29,13 @@ implements the ordered, single-pass model the package system needs. It walks a
 | 9 | `briefPosts` | remaining unused posts for The Brief |
 
 The invariant to preserve: **a story appears at most once on the homepage**, and
-packages claim stories in layout order. The package model must resolve through
-one shared resolver, not per-package queries.
+packages claim stories in layout order. The package model resolves through one
+shared resolver — `resolveHomepageDocument()` in `@byline/content`, which the
+static export and Studio both call — not per-package queries. Note that the
+table above is the *selection* order, which is deliberately not the visual
+package order: The Latest and The Brief are resolved last so they receive what
+the semantic packages did not take. Reordering packages in Studio changes the
+visual order, never this one.
 
 ## Packages
 
@@ -67,7 +72,10 @@ Label "Special Coverage". The frozen schema-v1 renderer sends
 `variant="special"`, subsequent stories use `variant="briefing"`. Its layout
 class is `.special-coverage-layout` for both single and multiple stories.
 *Not present in the current render — no special-coverage posts exist today.
-Still required.*
+Still required.* The package stays configured in the design and resolves to an
+empty story list; production renders nothing, and Studio's public preview
+renders nothing either. Studio marks the position with an editor-only chip so
+the package remains selectable. See `docs/design-schema-v2.md`.
 
 ### 5. Opinion — `.opinion-package`
 The frozen schema-v1 header contains `<h2>Opinion</h2>` in the

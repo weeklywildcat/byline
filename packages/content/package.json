@@ -2,6 +2,9 @@
   "name": "@byline/content",
   "version": "0.1.0",
   "type": "module",
-  "exports": "./src/index.ts"
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@byline/design": "0.1.0",
+    "@byline/ui": "0.1.0"
+  }
 }
-

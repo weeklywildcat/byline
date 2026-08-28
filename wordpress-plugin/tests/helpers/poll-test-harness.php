@@ -128,6 +128,7 @@ class WP_REST_Server
     public const READABLE = 'GET';
     public const CREATABLE = 'POST';
     public const EDITABLE = 'PUT';
+    public const DELETABLE = 'DELETE';
 }
 
 class WP_REST_Response

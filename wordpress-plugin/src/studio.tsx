@@ -18,7 +18,10 @@ import {
   NewsletterPackagePreview,
   OpinionPackagePreview,
   SpecialCoveragePackagePreview,
-  SportsPackagePreview
+  SportsPackagePreview,
+  setStudioPreviewDocument,
+  setStudioPreviewOptions,
+  type StudioPreviewPublication
 } from "./studio-preview";
 import {
   AthleteSpotlightSourceField,
@@ -53,6 +56,7 @@ import {
   WEEKLY_WILDCAT_OPINION_DEFAULTS,
   WEEKLY_WILDCAT_SPECIAL_COVERAGE_DEFAULTS,
   WEEKLY_WILDCAT_SPORTS_DEFAULTS,
+  getFallbackDesignDocument,
   type BylineDesignDocumentV2
 } from "@byline/design";
 import { editorStateToDesignDocument, loadDesignIntoEditor, type PuckEditorState } from "./studio-document";
@@ -82,6 +86,10 @@ type StudioProps = {
   backUrl?: string;
   features?: { polls: boolean; events: boolean; sports: boolean; newsletter?: boolean };
   publicationShortName?: string;
+  publicationName?: string;
+  organizationName?: string;
+  contactHref?: string;
+  social?: Array<{ service: string; label: string; url: string }>;
   calendarHeading?: string;
 };
 
@@ -249,13 +257,7 @@ function createLeadPackageComponent(context: StudioPreviewContext) {
     // The acceptance criterion for this phase: Studio renders the same shared
     // renderer as the static site, against real WordPress content.
     render: (props: Record<string, unknown>) => (
-      <LeadPackagePreview
-        props={props}
-        theme={context.theme}
-        features={context.features}
-        publicationShortName={context.publicationShortName}
-        calendarHeading={context.calendarHeading}
-      />
+      <LeadPackagePreview props={props} {...packagePreviewProps(context)} />
     )
   };
 }
@@ -341,12 +343,7 @@ function createSportsPackageComponent(context: StudioPreviewContext) {
     },
     defaultProps: { ...WEEKLY_WILDCAT_SPORTS_DEFAULTS },
     render: (props: Record<string, unknown>) => (
-      <SportsPackagePreview
-        props={props}
-        theme={context.theme}
-        features={context.features}
-        publicationShortName={context.publicationShortName}
-      />
+      <SportsPackagePreview props={props} {...packagePreviewProps(context)} />
     )
   };
 }
@@ -596,20 +593,18 @@ export function createStudioConfig(
     } as unknown as Config["components"],
     root: {
       render: ({ children }: { children: ReactNode }) => (
+        // The canvas is the published page's own shell, not an editor
+        // approximation of it. Width, padding and section rhythm come from the
+        // shared publication stylesheet, so a package is laid out against
+        // exactly the containing box it receives on the live homepage.
         <div
-          className="byline-publication-preview"
+          className="byline-publication-preview live-home-shell"
           data-byline-preview-surface="studio"
           data-theme={previewContext.theme}
           style={{
             ...variables,
             background: "var(--page)",
-            display: "grid",
-            gap: 20,
-            margin: "0 auto",
-            maxWidth: "var(--max-width, 1180px)",
-            minHeight: "100vh",
-            padding: 24,
-            width: "100%"
+            minHeight: "100vh"
           }}
         >
           {children}
@@ -638,6 +633,14 @@ function errorMessage(error: unknown) {
   return "Byline Studio could not save this design. Review the block settings and try again.";
 }
 
+/**
+ * The Studio application shell.
+ *
+ * Studio is a full-screen design surface, not a WordPress settings screen. It
+ * mounts as a fixed overlay over wp-admin so the admin menu, the page padding
+ * and the footer stop consuming the canvas, and it provides its own exit.
+ * Nothing outside this component's own class scope is restyled.
+ */
 export function BylineStudio({
   canEdit,
   canPublish,
@@ -647,26 +650,62 @@ export function BylineStudio({
   backUrl,
   features = { polls: true, events: true, sports: true, newsletter: true },
   publicationShortName = "Newsroom",
+  publicationName,
+  organizationName,
+  contactHref = "#contact",
+  social = [],
   calendarHeading = "This week"
 }: StudioProps) {
   const [template, setTemplate] = useState<"home" | "section-default" | "article-default" | "author-default" | "sports-home">("home");
   const [design, setDesign] = useState<AdminDesign | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
-  // Both panels collapse so the preview can take the full width. Defaults keep
-  // them open: an editor should see the package list on first open.
+  // Both panels collapse so the preview can take the full width. The inspector
+  // starts closed on a laptop-width workspace: the canvas is the point of the
+  // screen, and the inspector opens as soon as a package is selected.
   const [outlineOpen, setOutlineOpen] = useState(true);
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(
+    () => typeof window === "undefined" || window.innerWidth >= 1500
+  );
+  // Editor-only markers for packages that resolve to nothing. On by default so
+  // an invisible package is still findable; off gives a reader-accurate canvas.
+  const [showHiddenPackages, setShowHiddenPackages] = useState(true);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Keyed on the individual flags rather than on the `features` prop itself:
+  // the host builds that object inline, so its identity changes on every admin
+  // render, and keying on identity would rebuild the Puck config and re-resolve
+  // the whole document for no reason. `social` arrives straight from the
+  // publication record and is already stable.
+  const featureFlags = useMemo(
+    () => ({
+      polls: features.polls,
+      events: features.events,
+      sports: features.sports,
+      newsletter: features.newsletter !== false
+    }),
+    [features.events, features.newsletter, features.polls, features.sports]
+  );
+  const previewPublication: StudioPreviewPublication = useMemo(
+    () => ({
+      shortName: publicationShortName,
+      name: publicationName ?? publicationShortName,
+      organizationName: organizationName ?? publicationShortName,
+      contactHref,
+      social,
+      features: featureFlags,
+      calendarHeading
+    }),
+    [calendarHeading, contactHref, featureFlags, organizationName, publicationName, publicationShortName, social]
+  );
   const studioConfig = useMemo(
     () =>
       createStudioConfig(publicationTheme, tokenOverrides, {
         theme: publicationTheme,
-        features,
+        features: featureFlags,
         publicationShortName,
         calendarHeading
       }),
-    [calendarHeading, features, publicationShortName, publicationTheme, tokenOverrides]
+    [calendarHeading, featureFlags, publicationShortName, publicationTheme, tokenOverrides]
   );
   const previewStylesheets = useMemo(
     () => [previewStylesheetUrl, ...getStudioThemeStylesheets(publicationTheme)].filter(Boolean),
@@ -709,14 +748,62 @@ export function BylineStudio({
     };
   }, [template]);
 
+  useEffect(() => {
+    setStudioPreviewOptions({ showHiddenPackages });
+  }, [showHiddenPackages]);
+
+  // The shell covers wp-admin, so the page behind it must not scroll with it.
+  useEffect(() => {
+    const body = window.document.body;
+
+    body.classList.add("byline-studio-fullscreen");
+
+    return () => {
+      body.classList.remove("byline-studio-fullscreen");
+    };
+  }, []);
+
+  /**
+   * What the live site is actually resolving for this template right now.
+   *
+   * Revision 0 means nothing has ever been published, and the frontend is
+   * running its canonical fallback rather than the stored placeholder. Using
+   * the same shared seed the frontend uses is what makes "reset to the live
+   * homepage" honest.
+   */
+  const liveDocument = useMemo(
+    () =>
+      design && design.revision > 0
+        ? design.document
+        : getFallbackDesignDocument(template, publicationTheme),
+    [design, publicationTheme, template]
+  );
+
+  const stored = design?.autosave?.document ?? liveDocument;
+  const loaded = useMemo(() => loadDesignIntoEditor(stored ?? {}, template), [stored, template]);
+
+  // The canvas previews the document an autosave would write, resolved once for
+  // the whole page. Published before the first render so no package renders
+  // against a stale or absent model.
+  useEffect(() => {
+    setStudioPreviewDocument(
+      editorStateToDesignDocument(loaded.editorState, template, publicationTheme, loaded.legacy),
+      previewPublication
+    );
+  }, [loaded, previewPublication, publicationTheme, template]);
+
   if (!design) {
-    return <div className="byline-studio-loading">{error ? <Notice status="error">{error}</Notice> : <Spinner />}</div>;
+    return (
+      <div className="byline-studio-app byline-studio-app-loading">
+        <div className="byline-studio-loading">{error ? <Notice status="error">{error}</Notice> : <Spinner />}</div>
+      </div>
+    );
   }
 
-  const stored = design.autosave?.document ?? design.document;
   const baseRevisionId = design.autosave?.baseRevisionId ?? design.revision;
-  const loaded = loadDesignIntoEditor(stored, template);
   const hasUnconvertedLegacy = Boolean(loaded.legacy?.unconvertedBlocks.length);
+  const hasDraft = Boolean(design.autosave);
+  const neverPublished = design.revision === 0;
 
   // Editor state is converted to the semantic document before it leaves the
   // browser. No Puck structure is persisted.
@@ -728,18 +815,27 @@ export function BylineStudio({
   const documentFor = (data: Data): DesignDocument =>
     editorStateToDesignDocument(data as unknown as PuckEditorState, template, publicationTheme, loaded.legacy);
 
-  const autosave = (data: Data) => {
+  const scheduleAutosave = (document: DesignDocument) => {
     if (!canEdit) return;
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => {
       apiFetch({
         path: `/byline/v1/admin/design/${encodeURIComponent(template)}/autosave`,
         method: "PUT",
-        data: { document: documentFor(data), baseRevisionId }
+        data: { document, baseRevisionId }
       })
         .then(() => setStatus("Draft autosaved"))
         .catch((autosaveError) => setError(errorMessage(autosaveError)));
     }, 900);
+  };
+
+  // One conversion feeds the canvas and the autosave, so what an editor sees is
+  // exactly what would be stored.
+  const onEditorChange = (data: Data) => {
+    const document = documentFor(data);
+
+    setStudioPreviewDocument(document, previewPublication);
+    scheduleAutosave(document);
   };
 
   const publish = async (data: Data) => {
@@ -762,23 +858,77 @@ export function BylineStudio({
     }
   };
 
+  /**
+   * Discards this editor's own draft and reopens the live design.
+   *
+   * Deliberately narrow: it deletes the current user's autosave and nothing
+   * else. No published revision is touched, no post is modified, and no deploy
+   * is triggered -- resetting a draft is an editing decision, not a release.
+   */
+  const resetToLive = async () => {
+    if (!canEdit) return;
+    if (!window.confirm(
+      "Discard this draft and start again from the design the live site is using? Your unpublished changes for this template will be deleted."
+    )) return;
+
+    setError("");
+    try {
+      await apiFetch({
+        path: `/byline/v1/admin/design/${encodeURIComponent(template)}/autosave`,
+        method: "DELETE"
+      });
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+      // Dropping the autosave is enough: `stored` falls back to the live
+      // document, and the key change below remounts the editor onto it.
+      setDesign({ ...design, autosave: null });
+      setStatus("Draft reset to the live design");
+    } catch (resetError) {
+      setError(errorMessage(resetError));
+    }
+  };
+
+  const liveLabel = neverPublished
+    ? `Live: ${template === "home" ? "default homepage" : "default template"}`
+    : `Live: published revision ${design.revision}`;
+  const draftLabel = hasDraft
+    ? design.autosave && design.autosave.baseRevisionId === 0 && neverPublished
+      ? "Draft: recovered autosave · never published"
+      : "Draft: unpublished changes"
+    : "Draft: none";
+
   return (
     <div
-      className="byline-studio-shell byline-studio-wide"
+      className="byline-studio-app"
       data-byline-outline={outlineOpen ? "expanded" : "collapsed"}
       data-byline-inspector={inspectorOpen ? "expanded" : "collapsed"}
+      data-byline-hidden-packages={showHiddenPackages ? "visible" : "hidden"}
     >
       <div className="byline-studio-toolbar">
-        {backUrl ? <a className="byline-studio-back-link" href={backUrl}>← Back to Byline</a> : null}
+        {backUrl ? <a className="byline-studio-back-link" href={backUrl}>← Exit Studio</a> : null}
+        <span className="byline-studio-title">Byline Studio · {templateLabel(template)}</span>
         <SelectControl
           label="Template"
+          hideLabelFromVision
           value={template}
           options={[...TEMPLATE_OPTIONS]}
           onChange={setTemplate}
         />
-        <span>Published revision {design.revision}{status ? ` · ${status}` : ""}</span>
-        {design.autosave ? <strong>Recovered autosave</strong> : null}
+        <span className="byline-studio-state">
+          <span className="byline-studio-state-live">{liveLabel}</span>
+          <span className={hasDraft ? "byline-studio-state-draft is-active" : "byline-studio-state-draft"}>
+            {draftLabel}
+            {status ? ` · ${status}` : ""}
+          </span>
+        </span>
         <div className="byline-studio-panel-toggles">
+          <Button
+            variant="secondary"
+            isPressed={showHiddenPackages}
+            aria-pressed={showHiddenPackages}
+            onClick={() => setShowHiddenPackages((visible) => !visible)}
+          >
+            Inactive packages
+          </Button>
           <Button
             variant="secondary"
             isPressed={outlineOpen}
@@ -797,48 +947,64 @@ export function BylineStudio({
           </Button>
         </div>
       </div>
-      {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
-      {loaded.migratedFromV1 ? (
-        <Notice status="warning" isDismissible={false}>
-          <strong>This design was created in the previous editor.</strong> It has been converted, and saving
-          will store it in the new format.
-          {loaded.migrationWarnings.length ? (
-            <ul className="byline-migration-warnings">
-              {loaded.migrationWarnings.map((warning) => (
-                <li key={warning}>{warning}</li>
-              ))}
-            </ul>
-          ) : null}
-        </Notice>
-      ) : null}
-      {loaded.recoveredLegacyBlocks ? (
-        <Notice status="success" isDismissible={false}>
-          <strong>{templateLabel(template)} design updated.</strong>{" "}
-          {loaded.recoveredLegacyBlocks === 1 ? "1 block" : `${loaded.recoveredLegacyBlocks} blocks`} preserved by an
-          older version of Byline {loaded.recoveredLegacyBlocks === 1 ? "was" : "were"} recovered into the current
-          package format. Review the packages below; the next save stores them.
-        </Notice>
-      ) : null}
-      {hasUnconvertedLegacy ? (
-        <Notice status="warning" isDismissible={false}>
-          Publishing is disabled while preserved legacy blocks remain outside the package editor
-          {loaded.unsupportedLegacyTypes.length ? ` (${loaded.unsupportedLegacyTypes.join(", ")})` : ""}. The original
-          data will continue to round-trip through autosaves.
-        </Notice>
-      ) : null}
-      <Puck
-        key={`${template}-${design.revision}-${design.autosave?.modifiedAt || "published"}`}
-        config={studioConfig}
-        data={loaded.editorState as unknown as Data}
-        onChange={autosave}
-        onPublish={publish}
-        permissions={{ drag: canEdit, duplicate: canEdit, delete: canEdit, edit: canEdit, insert: canEdit }}
-        headerTitle={`Byline Studio · ${template}`}
-        overrides={{ iframe: iframeOverride }}
-        viewports={[...BYLINE_STUDIO_VIEWPORTS]}
-        iframe={{ enabled: true, syncHostStyles: false }}
-        height="calc(100vh - 200px)"
-      />
+      <div className="byline-studio-notices">
+        {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
+        {hasDraft && neverPublished ? (
+          <Notice status="warning" isDismissible={false}>
+            <strong>You are editing an unpublished draft.</strong> This template has never been published, so the live
+            site is still rendering its default design — not what the canvas shows. Keep editing to publish this draft,
+            or reset it and start from the live design.
+            <span className="byline-studio-notice-actions">
+              <Button variant="secondary" disabled={!canEdit} onClick={resetToLive}>
+                Reset draft to the live design
+              </Button>
+            </span>
+          </Notice>
+        ) : null}
+        {loaded.migratedFromV1 ? (
+          <Notice status="warning" isDismissible={false}>
+            <strong>This design was created in the previous editor.</strong> It has been converted, and saving
+            will store it in the new format.
+            {loaded.migrationWarnings.length ? (
+              <ul className="byline-migration-warnings">
+                {loaded.migrationWarnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            ) : null}
+          </Notice>
+        ) : null}
+        {loaded.recoveredLegacyBlocks ? (
+          <Notice status="success" isDismissible={false}>
+            <strong>{templateLabel(template)} design updated.</strong>{" "}
+            {loaded.recoveredLegacyBlocks === 1 ? "1 block" : `${loaded.recoveredLegacyBlocks} blocks`} preserved by an
+            older version of Byline {loaded.recoveredLegacyBlocks === 1 ? "was" : "were"} recovered into the current
+            package format. Review the packages below; the next save stores them.
+          </Notice>
+        ) : null}
+        {hasUnconvertedLegacy ? (
+          <Notice status="warning" isDismissible={false}>
+            Publishing is disabled while preserved legacy blocks remain outside the package editor
+            {loaded.unsupportedLegacyTypes.length ? ` (${loaded.unsupportedLegacyTypes.join(", ")})` : ""}. The original
+            data will continue to round-trip through autosaves.
+          </Notice>
+        ) : null}
+      </div>
+      <div className="byline-studio-workspace">
+        <Puck
+          key={`${template}-${design.revision}-${design.autosave?.modifiedAt || "published"}`}
+          config={studioConfig}
+          data={loaded.editorState as unknown as Data}
+          onChange={onEditorChange}
+          onPublish={publish}
+          permissions={{ drag: canEdit, duplicate: canEdit, delete: canEdit, edit: canEdit, insert: canEdit }}
+          headerTitle={`Byline Studio · ${template}`}
+          overrides={{ iframe: iframeOverride }}
+          viewports={[...BYLINE_STUDIO_VIEWPORTS]}
+          iframe={{ enabled: true, syncHostStyles: false }}
+          height="100%"
+        />
+      </div>
     </div>
   );
 }

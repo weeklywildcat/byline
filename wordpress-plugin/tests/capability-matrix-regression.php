@@ -30,6 +30,7 @@ class WP_REST_Server
     public const READABLE = 'GET';
     public const EDITABLE = 'POST';
     public const CREATABLE = 'POST';
+    public const DELETABLE = 'DELETE';
 }
 
 function byline_matrix_fail(string $message): void
@@ -252,20 +253,22 @@ foreach (['editor', 'author', 'poll-editor'] as $role) {
 // REST write permissions are checked independently of menu visibility.
 $route_permissions = [
     'publication' => $byline_matrix_routes['/publication'][1]['permission_callback'],
-    'designAutosave' => $byline_matrix_routes['/admin/design/(?P<template>[a-z0-9:-]+)/autosave']['permission_callback'],
+    'designAutosave' => $byline_matrix_routes['/admin/design/(?P<template>[a-z0-9:-]+)/autosave'][0]['permission_callback'],
+    // Discarding a draft is an editing capability, never a publishing one.
+    'designAutosaveDelete' => $byline_matrix_routes['/admin/design/(?P<template>[a-z0-9:-]+)/autosave'][1]['permission_callback'],
     'designPublish' => $byline_matrix_routes['/admin/design/(?P<template>[a-z0-9:-]+)/publish']['permission_callback'],
     'deployment' => $byline_matrix_routes['/admin/deployment'][1]['permission_callback'],
     'sportsTeams' => $byline_matrix_routes['/sports/teams'][1]['permission_callback'],
 ];
 
 $expected_permissions = [
-    'administrator' => [true, true, true, true, true],
-    'editor' => [false, false, false, false, false],
-    'author' => [false, false, false, false, false],
-    'design-only' => [false, true, true, false, false],
-    'sports-content-editor' => [false, false, false, false, false],
-    'poll-editor' => [false, false, false, false, false],
-    'integration-manager' => [false, false, false, true, false],
+    'administrator' => [true, true, true, true, true, true],
+    'editor' => [false, false, false, false, false, false],
+    'author' => [false, false, false, false, false, false],
+    'design-only' => [false, true, true, true, false, false],
+    'sports-content-editor' => [false, false, false, false, false, false],
+    'poll-editor' => [false, false, false, false, false, false],
+    'integration-manager' => [false, false, false, false, true, false],
 ];
 
 foreach ($expected_permissions as $role => $expected) {

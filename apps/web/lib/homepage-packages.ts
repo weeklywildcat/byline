@@ -1,20 +1,16 @@
 import {
-  parseBriefPackageProps,
-  parseInFocusPackageProps,
-  parseMorePackageProps,
-  parseNewsletterPackageProps,
-  parseOpinionPackageProps,
-  parseSpecialCoveragePackageProps,
-  parseLeadPackageProps,
-  type BriefPackageProps,
-  type BylineStorySource,
-  type InFocusPackageProps,
-  type MorePackageProps,
-  type NewsletterPackageProps,
-  type OpinionPackageProps,
-  type SpecialCoveragePackageProps,
-  type LeadPackageProps
-} from "@byline/design";
+  resolveBriefPackage as resolveSharedBriefPackage,
+  resolveInFocusPackage as resolveSharedInFocusPackage,
+  resolveLeadPackage as resolveSharedLeadPackage,
+  resolveMorePackage as resolveSharedMorePackage,
+  resolveNewsletterPackage as resolveSharedNewsletterPackage,
+  resolveOpinionPackage as resolveSharedOpinionPackage,
+  resolveSpecialCoveragePackage as resolveSharedSpecialCoveragePackage,
+  availableStories as sharedAvailableStories,
+  sourceCandidates as sharedSourceCandidates,
+  type HomepagePackageResolutionContext,
+  type HomepageStoryInput
+} from "@byline/content";
 import type {
   CalendarEntryView,
   ResolvedBriefPackage,
@@ -23,81 +19,26 @@ import type {
   ResolvedMorePackage,
   ResolvedNewsletterPackage,
   ResolvedOpinionPackage,
-  ResolvedSpecialCoveragePackage,
-  StoryView,
-  MoreUtilityLinkView
+  ResolvedSpecialCoveragePackage
 } from "@byline/ui";
 import type { BylinePublicationConfig } from "@byline/core";
-import { getPrimaryVisibleCategory } from "@/lib/content";
-import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import type { SchoolEvent, SportsGame } from "@/lib/headless";
-import { hasCategory, resolveWeeklyWildcatHomepage } from "@/lib/homepage-selection";
+import { hasCategory, resolveWeeklyWildcatHomepage, type HomepageSelection } from "@/lib/homepage-selection";
+import { toHomepagePublicationInput, toHomepageStoryInputs } from "@/lib/homepage-story-input";
 import { getPublicationConfig } from "@/lib/publication";
-import {
-  getAuthorHref,
-  getFeaturedMedia,
-  getPostAuthor,
-  getPostHref,
-  type WordPressPost
-} from "@/lib/wordpress";
+import type { WordPressPost } from "@/lib/wordpress";
 
-// Turns CMS records into the presentation-neutral view models the shared
-// renderers consume. Everything WordPress-shaped stops here.
+// The build-time host's thin adapter over the canonical resolver.
+//
+// Story selection, de-duplication and package assembly all live in
+// `@byline/content` so Studio runs the identical code. What remains here is the
+// WordPress-shaped boundary: view models, the calendar merge, and per-package
+// entry points the static site and its regression tests call directly.
 
-function getCleanDeck(post: WordPressPost) {
-  const text = stripHtml(post.content.rendered || post.excerpt.rendered)
-    .replace(/\s*\[\s*(?:&hellip;|…|\.\.\.)\s*\]\s*$/i, "")
-    .replace(/\s*(?:&hellip;|…|\.\.\.)\s*$/i, "")
-    .trim();
-  const sentences = text.match(/[^.!?]+[.!?]+(?=\s|$)/g);
-
-  if (sentences?.length) return sentences.slice(0, 2).join(" ").trim();
-  if (text.length <= 260) return text;
-
-  const trimmed = text.slice(0, 260);
-  const lastSpace = trimmed.lastIndexOf(" ");
-
-  return `${trimmed.slice(0, lastSpace > 0 ? lastSpace : trimmed.length).trim()}...`;
-}
-
-function getReadingTime(post: WordPressPost) {
-  const words = stripHtml(post.content.rendered || post.excerpt.rendered).split(/\s+/).filter(Boolean).length;
-
-  return `${Math.max(1, Math.ceil(words / 225))} min read`;
-}
-
-export type StoryViewOptions = {
-  cleanDeck?: boolean;
-  includeReadingTime?: boolean;
-};
-
-export function toStoryView(post: WordPressPost, options: StoryViewOptions = {}): StoryView {
-  const author = getPostAuthor(post);
-  const category = getPrimaryVisibleCategory(post);
-  const image = getFeaturedMedia(post);
-  const cleanDeck = options.cleanDeck ?? false;
-
-  return {
-    id: post.id,
-    title: stripHtml(post.title.rendered),
-    href: getPostHref(post),
-    deck: cleanDeck ? getCleanDeck(post) : post.excerpt.rendered.trim(),
-    deckIsHtml: !cleanDeck,
-    isoDate: post.date,
-    displayDate: formatDisplayDate(post.date),
-    readingTime: options.includeReadingTime ? getReadingTime(post) : null,
-    category: category ? { name: decodeHtml(category.name), href: `/category/${category.slug}/` } : null,
-    author: author ? { name: author.name, href: getAuthorHref(author) } : null,
-    image: image?.source_url
-      ? {
-          src: image.source_url,
-          alt: image.alt_text || stripHtml(image.title.rendered ?? ""),
-          width: image.media_details?.width ?? null,
-          height: image.media_details?.height ?? null
-        }
-      : null
-  };
-}
+export { toStoryView, toAthleteSpotlightView } from "@/lib/story-view";
+export type { StoryViewOptions } from "@/lib/story-view";
+export { sharedAvailableStories as availableStories, sharedSourceCandidates as sourceCandidates };
+export type { HomepageSelection };
 
 // --- calendar ---------------------------------------------------------------
 
@@ -167,26 +108,18 @@ export function toCalendarEntries(
   return (inWeek.length > 0 ? inWeek : entries).slice(0, limit).map(({ sortKey: _sortKey, ...entry }) => entry);
 }
 
-// --- lead package -----------------------------------------------------------
-
-export type HomepageSelection = ReturnType<typeof resolveWeeklyWildcatHomepage>;
+// --- shared selection -------------------------------------------------------
 
 /**
  * The compatibility story-selection pass, wrapped so its role is explicit.
  *
- * `resolveWeeklyWildcatHomepage` is the pre-Studio ordered de-duplication
- * algorithm. It is required verbatim for byte-identical Weekly Wildcat output --
- * particularly The Latest, which is the eighth selection rather than a
- * layout-order one -- so it is deliberately not being rewritten.
- *
- * It is reached only through this function. When the package orchestrator takes
- * over ordering for every package, this is the single call site that has to be
- * replaced, and the algorithm can be absorbed rather than hunted for.
+ * The algorithm now lives in `@byline/content` and is the only one either host
+ * runs. This remains the build-time entry point into it.
  *
  * `pinnedStoryIds` comes from `collectPinnedStoryIds`. Passing it here rather
- * than filtering inside each package keeps one used-story set: a pinned story is
- * withheld from every automatic selection, and the package that pinned it places
- * it explicitly.
+ * than filtering inside each package keeps one used-story set: a pinned story
+ * is withheld from every automatic selection, and the package that pinned it
+ * places it explicitly.
  */
 export function resolveCompatibilityHomepageSelection(
   posts: WordPressPost[],
@@ -195,378 +128,82 @@ export function resolveCompatibilityHomepageSelection(
   return resolveWeeklyWildcatHomepage(posts, pinnedStoryIds);
 }
 
-function manualStories(source: BylineStorySource, posts: WordPressPost[]) {
-  if (source.type !== "manual") return null;
+export { hasCategory };
 
-  const byId = new Map(posts.map((post) => [post.id, post]));
+// --- per-package entry points ----------------------------------------------
 
-  return source.storyIds.flatMap((id) => {
-    const post = byId.get(id);
-
-    return post ? [post] : [];
-  });
-}
-
-export type LeadPackageResolutionInput = {
+type PackageResolutionInput = {
   packageId: string;
   props: unknown;
   posts: WordPressPost[];
-  // The whole-page ordered pass. See the note below on why the lead package
-  // consumes it rather than running its own queries.
   selection: HomepageSelection;
-  features: { polls: boolean; events: boolean; sports: boolean };
   usedStoryIds?: ReadonlySet<number>;
   compatibilitySelection?: boolean;
   publication?: BylinePublicationConfig;
+};
+
+function resolutionContext(
+  input: PackageResolutionInput & { calendarHeading?: string; stories?: HomepageStoryInput[] },
+  compatibilityDefault: boolean
+): HomepagePackageResolutionContext {
+  return {
+    stories: input.stories ?? toHomepageStoryInputs(input.posts),
+    selection: input.selection,
+    usedStoryIds: new Set(input.usedStoryIds ?? []),
+    compatibilitySelection: input.compatibilitySelection ?? compatibilityDefault,
+    publication: toHomepagePublicationInput(input.publication ?? getPublicationConfig(), input.calendarHeading)
+  };
+}
+
+export type LeadPackageResolutionInput = PackageResolutionInput & {
+  features: { polls: boolean; events: boolean; sports: boolean };
   calendarHeading?: string;
 };
 
-/**
- * Resolves the lead package into the model the shared renderer consumes.
- *
- * On ordering: `The Latest` rail is not resolved in layout order. In the
- * pre-Studio homepage it is the eighth selection, taken from what is left after
- * In Focus, Special Coverage, Opinion, Sports and More have claimed their
- * stories. Resolving it immediately after the lead would pull different stories
- * into the rail -- a visible regression -- so this package consumes the existing
- * ordered pass instead of issuing its own queries. That keeps one de-duplication
- * algorithm rather than introducing a competing one.
- *
- * A manual source is an explicit editorial override and does take effect
- * immediately, because an editor who pinned a story means it.
- */
 export function resolveLeadPackage(input: LeadPackageResolutionInput): ResolvedLeadPackage {
-  const publication = input.publication ?? getPublicationConfig();
-  const config: LeadPackageProps = parseLeadPackageProps(input.props);
-  const compatibilitySelection = input.compatibilitySelection ?? true;
-  const mode = config.mode ?? "content";
-  const resolvesStories = mode === "content" || mode === "single-story";
+  const context = resolutionContext(input, true);
 
-  const usedStoryIds = new Set(input.usedStoryIds ?? []);
-  const manualLead = resolvesStories ? manualStories(config.lead.source, input.posts)?.[0] ?? null : null;
-  const leadCandidates = manualLead
-    ? [manualLead]
-    : compatibilitySelection && config.lead.source.type === "sticky"
-      ? (input.selection.leadPost ? [input.selection.leadPost] : [])
-      : sourceCandidates(config.lead.source, input.posts, input.selection, compatibilitySelection);
-  const leadPost = resolvesStories
-    ? manualLead ?? leadCandidates.find((post) => !usedStoryIds.has(post.id)) ?? null
-    : null;
-
-  if (leadPost) usedStoryIds.add(leadPost.id);
-
-  const manualLatest = resolvesStories ? manualStories(config.latest.source, input.posts) : [];
-  const latestCandidates = manualLatest ?? sourceCandidates(
-    config.latest.source,
-    input.posts,
-    input.selection,
-    compatibilitySelection
-  );
-  const latestPosts = (manualLatest
-    ? latestCandidates
-    : latestCandidates.filter((post) => !usedStoryIds.has(post.id)))
-    .filter((post) => post.id !== leadPost?.id)
-    .slice(0, config.latest.limit);
-
-  return {
-    packageId: input.packageId,
-    mode,
-    ...(config.heading ? { heading: config.heading } : {}),
-    lead: leadPost ? toStoryView(leadPost) : null,
-    latest: {
-      heading: config.latest.heading,
-      stories: latestPosts.map((post) => toStoryView(post)),
-      showBylines: config.latest.showBylines
-    },
-    utility: {
-      // A design cannot switch on a module the publication has disabled.
-      poll: config.utility.poll && input.features.polls,
-      calendar: config.utility.calendar && (input.features.events || input.features.sports),
-      calendarLimit: config.utility.calendarLimit,
-      calendarHeading: input.calendarHeading ?? (publication.appearance.theme === "weekly-wildcat"
-        ? "At NSHS"
-        : `At ${publication.identity.organizationName}`)
-    },
-    presentation: {
-      showDeck: config.presentation.showDeck
-    },
-    fallbackAuthorName: `${publication.identity.shortName} Staff`,
-    emptyMessage: "No published posts are available yet."
-  };
-}
-
-// --- shared story-source resolution ----------------------------------------
-
-type CompatibilitySourceType =
-  | "compatibility-lead"
-  | "compatibility-latest"
-  | "compatibility-brief"
-  | "compatibility-in-focus"
-  | "compatibility-special-coverage"
-  | "compatibility-opinion"
-  | "compatibility-sports"
-  | "compatibility-athlete"
-  | "compatibility-more";
-
-function isCompatibilitySource(source: BylineStorySource): source is BylineStorySource & { type: CompatibilitySourceType } {
-  return typeof source.type === "string" && source.type.startsWith("compatibility-");
-}
-
-export function sourceCandidates(
-  source: BylineStorySource,
-  posts: WordPressPost[],
-  selection: HomepageSelection,
-  useCompatibilitySelection: boolean
-) {
-  if (useCompatibilitySelection && isCompatibilitySource(source)) {
-    switch (source.type) {
-      case "compatibility-lead": return selection.leadPost ? [selection.leadPost] : [];
-      case "compatibility-latest": return selection.rightNowPosts;
-      case "compatibility-brief": return selection.briefPosts;
-      case "compatibility-in-focus": return selection.inFocusPost ? [selection.inFocusPost] : [];
-      case "compatibility-special-coverage": return selection.specialCoveragePosts;
-      case "compatibility-opinion": return selection.opinionPosts;
-      case "compatibility-sports": return selection.fieldPosts;
-      case "compatibility-athlete": return selection.athleteSpotlightPost ? [selection.athleteSpotlightPost] : [];
-      case "compatibility-more": return selection.morePosts;
+  return resolveSharedLeadPackage(input.packageId, input.props, {
+    ...context,
+    // The caller's feature view wins so a host can resolve a package against
+    // module flags it has already reconciled.
+    publication: {
+      ...context.publication,
+      features: { ...context.publication.features, ...input.features }
     }
-  }
-
-  switch (source.type) {
-    case "latest":
-      return posts;
-    case "sticky": {
-      const sticky = posts.filter((post) => post.sticky);
-      const regular = posts.filter((post) => !post.sticky);
-      return [...sticky, ...regular];
-    }
-    case "section":
-      return posts.filter((post) => hasCategory(post, [source.slug]));
-    case "category":
-      return posts.filter((post) => post.categories.includes(source.categoryId));
-    case "tag":
-      return posts.filter((post) => post.tags.includes(source.tagId));
-    case "author":
-      return posts.filter((post) => post.author === source.authorId);
-    case "manual":
-      return manualStories(source, posts) ?? [];
-    case "compatibility-lead":
-    case "compatibility-latest":
-    case "compatibility-brief":
-    case "compatibility-in-focus":
-    case "compatibility-special-coverage":
-    case "compatibility-opinion":
-    case "compatibility-sports":
-    case "compatibility-athlete":
-    case "compatibility-more":
-      return [];
-  }
+  });
 }
 
-export function availableStories(
-  candidates: WordPressPost[],
-  usedStoryIds: ReadonlySet<number>,
-  limit: number
-) {
-  if (limit <= 0) return [];
-
-  const selected: WordPressPost[] = [];
-
-  for (const post of candidates) {
-    if (usedStoryIds.has(post.id)) continue;
-    selected.push(post);
-    if (selected.length >= limit) break;
-  }
-
-  return selected;
-}
-
-function publicationText(value: string, publication: BylinePublicationConfig) {
-  return value
-    .replaceAll("{publication.shortName}", publication.identity.shortName)
-    .replaceAll("{publication.name}", publication.identity.name)
-    .replaceAll("{publication.organizationName}", publication.identity.organizationName);
-}
-
-function resolvedPublication(input: { publication?: BylinePublicationConfig }) {
-  return input.publication ?? getPublicationConfig();
-}
-
-export type BriefPackageResolutionInput = {
-  packageId: string;
-  props: unknown;
-  posts: WordPressPost[];
-  selection: HomepageSelection;
-  usedStoryIds?: ReadonlySet<number>;
-  compatibilitySelection?: boolean;
-  publication?: BylinePublicationConfig;
-};
+export type BriefPackageResolutionInput = PackageResolutionInput;
 
 export function resolveBriefPackage(input: BriefPackageResolutionInput): ResolvedBriefPackage {
-  const publication = resolvedPublication(input);
-  const config: BriefPackageProps = parseBriefPackageProps(input.props);
-  const used = new Set(input.usedStoryIds ?? []);
-  const posts = config.source.type === "manual"
-    ? manualStories(config.source, input.posts) ?? []
-    : availableStories(
-        sourceCandidates(config.source, input.posts, input.selection, input.compatibilitySelection ?? false),
-        used,
-        config.limit
-      );
-  const selected = posts.slice(0, config.limit);
-
-  return {
-    packageId: input.packageId,
-    heading: config.heading,
-    lead: selected[0] ? toStoryView(selected[0]) : null,
-    rail: selected.slice(1).map((post) => toStoryView(post)),
-    presentation: config.presentation,
-    fallbackAuthorName: `${publication.identity.shortName} Staff`
-  };
+  return resolveSharedBriefPackage(input.packageId, input.props, resolutionContext(input, false));
 }
 
-export type InFocusPackageResolutionInput = {
-  packageId: string;
-  props: unknown;
-  posts: WordPressPost[];
-  selection: HomepageSelection;
-  usedStoryIds?: ReadonlySet<number>;
-  compatibilitySelection?: boolean;
-  publication?: BylinePublicationConfig;
-};
+export type InFocusPackageResolutionInput = PackageResolutionInput;
 
 export function resolveInFocusPackage(input: InFocusPackageResolutionInput): ResolvedInFocusPackage {
-  const publication = resolvedPublication(input);
-  const config: InFocusPackageProps = parseInFocusPackageProps(input.props);
-  const used = new Set(input.usedStoryIds ?? []);
-  const manual = config.source.type === "manual" ? manualStories(config.source, input.posts) : null;
-  const candidates = manual ?? sourceCandidates(config.source, input.posts, input.selection, input.compatibilitySelection ?? false);
-  const story = manual?.[0] ?? availableStories(candidates, used, 1)[0] ?? null;
-
-  return {
-    packageId: input.packageId,
-    heading: config.heading,
-    story: story ? toStoryView(story) : null,
-    presentation: config.presentation,
-    fallbackAuthorName: `${publication.identity.shortName} Staff`
-  };
+  return resolveSharedInFocusPackage(input.packageId, input.props, resolutionContext(input, false));
 }
 
-export type SpecialCoveragePackageResolutionInput = {
-  packageId: string;
-  props: unknown;
-  posts: WordPressPost[];
-  selection: HomepageSelection;
-  usedStoryIds?: ReadonlySet<number>;
-  compatibilitySelection?: boolean;
-  publication?: BylinePublicationConfig;
-};
+export type SpecialCoveragePackageResolutionInput = PackageResolutionInput;
 
 export function resolveSpecialCoveragePackage(
   input: SpecialCoveragePackageResolutionInput
 ): ResolvedSpecialCoveragePackage {
-  const publication = resolvedPublication(input);
-  const config: SpecialCoveragePackageProps = parseSpecialCoveragePackageProps(input.props);
-  const used = new Set(input.usedStoryIds ?? []);
-  const manual = config.source.type === "manual" ? manualStories(config.source, input.posts) : null;
-  const candidates = manual ?? sourceCandidates(config.source, input.posts, input.selection, input.compatibilitySelection ?? false);
-  const stories = manual ? manual.slice(0, config.limit) : availableStories(candidates, used, config.limit);
-
-  return {
-    packageId: input.packageId,
-    heading: config.heading,
-    stories: stories.map((post) => toStoryView(post)),
-    leadPresentation: config.leadPresentation,
-    supportingPresentation: config.supportingPresentation,
-    fallbackAuthorName: `${publication.identity.shortName} Staff`
-  };
+  return resolveSharedSpecialCoveragePackage(input.packageId, input.props, resolutionContext(input, false));
 }
 
-export type OpinionPackageResolutionInput = {
-  packageId: string;
-  props: unknown;
-  posts: WordPressPost[];
-  selection: HomepageSelection;
-  usedStoryIds?: ReadonlySet<number>;
-  compatibilitySelection?: boolean;
-  publication?: BylinePublicationConfig;
-};
+export type OpinionPackageResolutionInput = PackageResolutionInput;
 
 export function resolveOpinionPackage(input: OpinionPackageResolutionInput): ResolvedOpinionPackage {
-  const publication = resolvedPublication(input);
-  const config: OpinionPackageProps = parseOpinionPackageProps(input.props);
-  const used = new Set(input.usedStoryIds ?? []);
-  const manual = config.source.type === "manual" ? manualStories(config.source, input.posts) : null;
-  const candidates = manual ?? sourceCandidates(config.source, input.posts, input.selection, input.compatibilitySelection ?? false);
-  const stories = (manual ? manual.slice(0, config.limit) : availableStories(candidates, used, config.limit));
-
-  return {
-    packageId: input.packageId,
-    heading: config.heading,
-    description: publicationText(config.description, publication),
-    archiveLink: config.archiveLink,
-    lead: stories[0] ? toStoryView(stories[0]) : null,
-    rail: stories.slice(1).map((post) => toStoryView(post)),
-    presentation: config.presentation,
-    fallbackAuthorName: `${publication.identity.shortName} Staff`
-  };
+  return resolveSharedOpinionPackage(input.packageId, input.props, resolutionContext(input, false));
 }
 
-function utilityLink(label: string, href: string, iconName: string, external = false): MoreUtilityLinkView {
-  return { label, href, iconName, ...(external ? { external: true } : {}) };
-}
-
-export type MorePackageResolutionInput = {
-  packageId: string;
-  props: unknown;
-  posts: WordPressPost[];
-  selection: HomepageSelection;
-  usedStoryIds?: ReadonlySet<number>;
-  compatibilitySelection?: boolean;
-  publication?: BylinePublicationConfig;
-};
+export type MorePackageResolutionInput = PackageResolutionInput;
 
 export function resolveMorePackage(input: MorePackageResolutionInput): ResolvedMorePackage {
-  const publication = resolvedPublication(input);
-  const config: MorePackageProps = parseMorePackageProps(input.props);
-  const used = new Set(input.usedStoryIds ?? []);
-  const manual = config.source.type === "manual" ? manualStories(config.source, input.posts) : null;
-  const candidates = manual ?? sourceCandidates(config.source, input.posts, input.selection, input.compatibilitySelection ?? false);
-  const stories = manual ? manual.slice(0, config.limit) : availableStories(candidates, used, config.limit);
-  const utility = config.utility.enabled && (config.utility.joinStaff.enabled || config.utility.stayConnected.enabled)
-    ? {
-        enabled: true,
-        publicationLabel: publication.identity.shortName,
-        joinStaff: {
-          ...config.utility.joinStaff,
-          links: [
-            utilityLink("Join the newsroom", "/join/", "ph:pencil-line"),
-            utilityLink("Meet the staff", "/authors/", "ph:users-three")
-          ]
-        },
-        stayConnected: {
-          ...config.utility.stayConnected,
-          links: [
-            ...publication.social.map((social) => utilityLink(social.label, social.url, `ph:${social.service}-logo`, true)),
-            utilityLink("Contact", publication.urls.contact, "ph:envelope-simple"),
-            ...(publication.features.newsletter
-              ? [utilityLink("Newsletter", "#home-newsletter", "ph:paper-plane-tilt")]
-              : [])
-          ]
-        }
-      }
-    : null;
-
-  return {
-    packageId: input.packageId,
-    heading: publicationText(config.heading, publication),
-    archiveLink: config.archiveLink,
-    lead: stories[0] ? toStoryView(stories[0], { cleanDeck: config.presentation.cleanDeck }) : null,
-    rail: stories.slice(1).map((post) => toStoryView(post, { cleanDeck: config.presentation.cleanDeck })),
-    presentation: config.presentation,
-    utility,
-    fallbackAuthorName: `${publication.identity.shortName} Staff`
-  };
+  return resolveSharedMorePackage(input.packageId, input.props, resolutionContext(input, false));
 }
 
 export type NewsletterPackageResolutionInput = {
@@ -577,14 +214,15 @@ export type NewsletterPackageResolutionInput = {
 };
 
 export function resolveNewsletterPackage(input: NewsletterPackageResolutionInput): ResolvedNewsletterPackage {
-  const publication = resolvedPublication(input);
-  const config: NewsletterPackageProps = parseNewsletterPackageProps(input.props);
+  const publication = toHomepagePublicationInput(input.publication ?? getPublicationConfig());
 
-  return {
-    packageId: input.packageId,
-    enabled: input.features.newsletter,
-    label: config.label,
-    heading: publicationText(config.heading, publication),
-    presentation: config.presentation
-  };
+  return resolveSharedNewsletterPackage(input.packageId, input.props, {
+    stories: [],
+    selection: resolveWeeklyWildcatHomepage([]),
+    usedStoryIds: new Set(),
+    compatibilitySelection: false,
+    publication: { ...publication, features: { ...publication.features, newsletter: input.features.newsletter } }
+  });
 }
+
+export type { BylineStorySource } from "@byline/design";

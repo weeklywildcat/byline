@@ -11,8 +11,8 @@ block has a faithful semantic representation.
 ```
 schema-v2 document
         ↓
-one homepage resolver       apps/web/lib/homepage-resolution.ts
-        ↓                    wordpress-plugin/src/studio-preview.tsx
+one homepage resolver        packages/content/src/homepage
+        ↓
 resolved package models
         ↓
 one shared renderer          packages/ui
@@ -20,9 +20,26 @@ one shared renderer          packages/ui
   Studio     Next static site
 ```
 
+`resolveHomepageDocument()` in `@byline/content` is the only homepage
+resolution pipeline. Each host owns a transport and an adapter and nothing
+else:
+
+| | fetch | adapt | resolve | render |
+|---|---|---|---|---|
+| static site | `lib/wordpress.ts` | `lib/homepage-story-input.ts` | `@byline/content` | `packages/ui` |
+| Studio | `src/studio-preview.tsx` | `src/studio-preview-model.ts` | `@byline/content` | `packages/ui` |
+
 The transports differ — build-time WordPress records in Next and authenticated
 REST records in Studio — but the renderer never receives WordPress, Puck, or
-endpoint-shaped data.
+endpoint-shaped data, and neither host has a selection algorithm of its own.
+`apps/web/tests/studio-production-parity.test.ts` feeds equivalent content
+through both adapters and asserts the resolved documents agree on package set,
+order, visibility, story ids and story order.
+
+Studio resolves the **whole document once**, not one package at a time. A
+package preview looks its own model up in that resolution; it never issues a
+query. Resolving per package is what produced repeated stories across packages
+and a Special Coverage section that production omits.
 
 ## Package contract
 
@@ -119,6 +136,27 @@ schedule and team-feature blocks migrate without rendering an unrelated module.
 | `poll` | poll-only `lead-package` |
 | `newsletter` | `newsletter-package` |
 
+### Historical implicit sources
+
+`byline_default_design_document()` minted the Weekly Wildcat starter as one
+sparse `{ id }` block per homepage section, in the live page's own order. Those
+blocks name a slot in the historical ordered selection; they are not generic
+story feeds. Migration therefore distinguishes two fallbacks:
+
+- a *generic* legacy story block (`story-list`, `story-grid`, `section-feed`,
+  `featured-story`) with no query keeps the old resolver's `latest`, limit 5;
+- a *named* Weekly Wildcat slot with no query takes the compatibility source its
+  old renderer supplied implicitly — `story-lead` → `compatibility-lead`,
+  `latest-stories` → `compatibility-brief`, `photo-feature` →
+  `compatibility-in-focus`, `special-coverage` →
+  `compatibility-special-coverage`, `opinion-package` →
+  `compatibility-opinion`, `team-feature` → `compatibility-sports`,
+  `athlete-feature` → `compatibility-athlete`.
+
+A block that carries a real query always keeps it. `LEGACY_BLOCK_SEMANTICS` in
+`packages/design/src/migrate.ts` is the table, and the sparse recovered
+production blocks are permanent regression coverage.
+
 The two legacy sports schedule blocks collapse to one package because the v1
 renderer displayed only the first sports layout and that panel contained both
 finals and upcoming games. Duplicate package ids are made deterministic and
@@ -162,6 +200,40 @@ Homepage package CSS lives in the shared theme stylesheet and is scoped under
 Studio preview iframe. Article-only newsletter rules remain in the app global
 stylesheet; homepage newsletter and More utility rules belong to the theme.
 
+## Conditional packages
+
+A configured package is an available homepage *position*, not a promise that a
+section exists. Every package renderer returns `null` for its own empty case,
+and `isResolvedHomepagePackageVisible()` in `packages/ui` mirrors those
+conditions in one place so a host can ask before rendering.
+
+Studio's public preview suppresses an invisible package exactly as production
+does. It draws a small editor-only marker in its place — dashed, inline-styled,
+never part of the published output — so the package is still findable, and the
+toolbar's *Inactive packages* toggle removes even that for a reader-accurate
+canvas. The package itself is never deleted from the design.
+
+## The Studio shell
+
+Studio mounts a fixed, full-viewport application shell on its own route only:
+toolbar, notices, then a workspace row that receives every remaining pixel
+(`grid-template-rows: auto auto minmax(0, 1fr)` with `min-height: 0` on the
+workspace). wp-admin is not restyled globally; the single body class Studio adds
+and removes itself is the only change outside `.byline-studio-app`, and
+*Exit Studio* is always in the toolbar.
+
+The canvas mounts the published page's own shell —
+`byline-publication-preview live-home-shell` — so package widths, padding and
+section rhythm are measured against exactly the box the reader gets. Those rules
+live in the shared publication stylesheet, and the Puck wrapper around each
+package is layout-neutral.
+
+The header states the live design and the draft separately. A draft on revision
+0 has never been published, and Studio says so rather than presenting a stale
+autosave as the live homepage. *Reset draft to the live design* is
+confirmation-gated, deletes only the current user's autosave, and reopens the
+document `getLiveDesignDocument()` says the frontend is actually resolving.
+
 ## Verification references
 
 The compatibility baseline is
@@ -174,3 +246,10 @@ migration, pin reservation, resolver order, duplicate placement, shared
 renderers, Studio round trips, feature gates, and static-export safety;
 `apps/web/tests/homepage-resolution.test.ts` covers whole-document order,
 omission/reordering, late pin reservation, and ten-game calendar planning.
+`apps/web/tests/studio-production-parity.test.ts` covers host equivalence, the
+zero-duplicate invariant, conditional Special Coverage and sparse legacy props;
+`apps/web/tests/opinion-parity.test.tsx` renders both hosts' Opinion resolution
+through the one renderer and compares the markup;
+`apps/web/tests/studio-shell-contract.test.ts` and
+`wordpress-plugin/tests-js/studio-shell.test.ts` cover the full-viewport shell,
+the live/draft distinction and the draft reset.

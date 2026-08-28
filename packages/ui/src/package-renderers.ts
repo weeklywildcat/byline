@@ -9,7 +9,7 @@ import { NewsletterPackage, type NewsletterPackageProps, type ResolvedNewsletter
 import { OpinionPackage, type OpinionPackageProps, type ResolvedOpinionPackage } from "./OpinionPackage";
 import { SpecialCoveragePackage, type ResolvedSpecialCoveragePackage, type SpecialCoveragePackageProps } from "./SpecialCoveragePackage";
 import { SportsPackage, type SportsPackageProps } from "./SportsPackage";
-import type { ResolvedSportsPackage } from "./sports-view";
+import { sportsPackageHasContent, type ResolvedSportsPackage } from "./sports-view";
 
 export type ResolvedHomepagePackage =
   | { type: "lead-package"; package: ResolvedLeadPackage }
@@ -143,5 +143,46 @@ export function getHomepagePackageRenderer(type: ResolvedHomepagePackage["type"]
     case "sports-package": return getSportsPackageRenderer(themeId);
     case "more-package": return getMorePackageRenderer(themeId);
     case "newsletter-package": return getNewsletterPackageRenderer(themeId);
+  }
+}
+
+/**
+ * Whether a resolved package renders anything on the public page.
+ *
+ * Every package renderer above returns `null` for its own empty case, which is
+ * the production contract: a configured package is an available homepage
+ * position, not a promise that a section exists. This predicate mirrors those
+ * conditions in one place so an editor host can ask the question *before*
+ * rendering -- to suppress a section it must not draw, or to explain in an
+ * outline why a configured package is currently invisible -- without inventing
+ * a second set of rules that could drift from the renderers.
+ */
+export function isResolvedHomepagePackageVisible(entry: ResolvedHomepagePackage): boolean {
+  switch (entry.type) {
+    case "lead-package": {
+      const resolved = entry.package;
+      const mode = resolved.mode ?? "content";
+
+      if (mode === "poll" || mode === "calendar") return resolved.utility.poll || resolved.utility.calendar;
+      if (mode === "single-story") return Boolean(resolved.lead);
+
+      // The default lead package always draws its shell, including its empty
+      // state, exactly as the pre-Studio homepage did.
+      return true;
+    }
+    case "brief-package":
+      return Boolean(entry.package.lead);
+    case "in-focus-package":
+      return Boolean(entry.package.story);
+    case "special-coverage-package":
+      return entry.package.stories.length > 0;
+    case "opinion-package":
+      return Boolean(entry.package.lead);
+    case "sports-package":
+      return sportsPackageHasContent(entry.package);
+    case "more-package":
+      return Boolean(entry.package.lead);
+    case "newsletter-package":
+      return entry.package.enabled;
   }
 }

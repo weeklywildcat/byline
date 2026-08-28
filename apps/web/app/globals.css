@@ -2567,28 +2567,9 @@ img {
   line-height: 1.55;
 }
 
-.live-home-shell {
-  margin: 0 auto;
-  max-width: var(--max-width);
-  padding: 20px 20px 64px;
-}
-
-.live-home-shell > section > h2 {
-  color: var(--accent-dark);
-  font-family: var(--font-ui);
-  font-size: 0.86rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  line-height: 1;
-  margin: 0 0 16px;
-  text-transform: uppercase;
-}
-
-.live-home-shell > section + section {
-  border-top: 1px solid var(--rule);
-  margin-top: 28px;
-  padding-top: 22px;
-}
+/* The homepage shell's own box, section rhythm and package headings moved to
+   the shared publication stylesheet so Studio's canvas is measured with the
+   identical rules. See packages/theme-weekly-wildcat/src/styles.css. */
 
 .schedule-page-shell {
   background: var(--page);
