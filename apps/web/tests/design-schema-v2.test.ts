@@ -18,7 +18,8 @@ import {
   parseAthleteSpotlightSource,
   parseLeadPackageProps,
   parseSportsPackageProps,
-  parseStorySource
+  parseStorySource,
+  upgradeLegacyBlocksInV2Document
 } from "@byline/design";
 
 function v2(packages: unknown[]) {
@@ -414,5 +415,164 @@ describe("v1 sports blocks migrate to semantic sports packages", () => {
 
     expect(document.packages.map((entry) => entry.type)).toEqual([LEAD_PACKAGE_TYPE, SPORTS_PACKAGE_TYPE]);
     expect(document.legacy).toBeUndefined();
+  });
+});
+
+// The bug this guards against is structural, not a missing mapping: the v1 -> v2
+// migration and the in-place v2 upgrade used to be two pieces of code, so a
+// block type could be convertible on one path and unsupported on the other.
+// They now share `convertLegacyBlock`, and these hold them to that.
+describe("one canonical legacy-block conversion", () => {
+  const v1 = (content: unknown[]) => ({
+    schemaVersion: 1,
+    template: "home",
+    theme: "weekly-wildcat",
+    editor: { engine: "puck", version: "0.23.0" },
+    layout: { root: { props: {} }, content }
+  });
+
+  const SUPPORTED_BLOCKS = [
+    "story-lead",
+    "story-list",
+    "latest-stories",
+    "section-feed",
+    "story-grid",
+    "featured-story",
+    "photo-feature",
+    "special-coverage",
+    "opinion-package",
+    "team-feature",
+    "athlete-feature",
+    "sports-scores",
+    "sports-upcoming",
+    "events-list",
+    "poll",
+    "newsletter"
+  ];
+
+  it("converts a block identically whichever path reaches it", () => {
+    for (const type of SUPPORTED_BLOCKS) {
+      const block = { type, props: { id: `${type}-1`, title: "Section" } };
+
+      const throughV1 = migrateDesignDocumentV1ToV2(v1([block]), "home").document;
+      const throughUpgrade = upgradeLegacyBlocksInV2Document({
+        schemaVersion: 2,
+        template: "home",
+        theme: "weekly-wildcat",
+        packages: [],
+        legacy: { schemaVersion: 1, editor: { engine: "puck", version: "0.23.0" }, unconvertedBlocks: [block] }
+      }).document;
+
+      expect(throughUpgrade.packages).toEqual(throughV1.packages);
+      expect(throughUpgrade.legacy).toBeUndefined();
+    }
+  });
+
+  it("collapses schedule blocks the same way on both paths", () => {
+    const blocks = [
+      { type: "sports-scores", props: { id: "sports-scores-1" } },
+      { type: "sports-upcoming", props: { id: "sports-upcoming-2" } }
+    ];
+
+    const throughV1 = migrateDesignDocumentV1ToV2(v1(blocks), "home").document;
+    const throughUpgrade = upgradeLegacyBlocksInV2Document({
+      schemaVersion: 2,
+      template: "home",
+      theme: "weekly-wildcat",
+      packages: [],
+      legacy: { schemaVersion: 1, editor: { engine: "puck", version: "0.23.0" }, unconvertedBlocks: blocks }
+    }).document;
+
+    expect(throughV1.packages).toHaveLength(1);
+    expect(throughUpgrade.packages).toEqual(throughV1.packages);
+  });
+
+  it("records where each preserved block belonged when it preserves one", () => {
+    const { document } = migrateDesignDocumentV1ToV2(
+      v1([
+        { type: "divider", props: { id: "divider-1" } },
+        { type: "story-lead", props: { id: "story-lead-2" } },
+        { type: "divider", props: { id: "divider-3" } }
+      ]),
+      "home"
+    );
+
+    // Before the lead package, and after it.
+    expect(document.legacy?.packageIndexes).toEqual([0, 1]);
+    expect(() => parseBylineDesignDocumentV2(document, "home")).not.toThrow();
+  });
+
+  it("gives a recovered package an id that cannot collide with an existing one", () => {
+    const { document } = upgradeLegacyBlocksInV2Document({
+      schemaVersion: 2,
+      template: "home",
+      theme: "weekly-wildcat",
+      packages: [{ id: "poll-9", type: LEAD_PACKAGE_TYPE, props: WEEKLY_WILDCAT_LEAD_DEFAULTS }],
+      legacy: {
+        schemaVersion: 1,
+        editor: { engine: "puck", version: "0.23.0" },
+        unconvertedBlocks: [{ type: "poll", props: { id: "poll-9" } }]
+      }
+    });
+
+    expect(document.packages.map((entry) => entry.id)).toEqual(["poll-9", "poll-9-2"]);
+    expect(() => parseBylineDesignDocumentV2(document, "home")).not.toThrow();
+  });
+
+  it("places a recovered package by its recorded index, not by appending", () => {
+    const { document } = upgradeLegacyBlocksInV2Document({
+      schemaVersion: 2,
+      template: "home",
+      theme: "weekly-wildcat",
+      packages: [
+        { id: "first", type: LEAD_PACKAGE_TYPE, props: WEEKLY_WILDCAT_LEAD_DEFAULTS },
+        { id: "second", type: LEAD_PACKAGE_TYPE, props: WEEKLY_WILDCAT_LEAD_DEFAULTS }
+      ],
+      legacy: {
+        schemaVersion: 1,
+        editor: { engine: "puck", version: "0.23.0" },
+        unconvertedBlocks: [{ type: "newsletter", props: {} }],
+        // Explicit metadata beats the id-suffix compatibility aid.
+        packageIndexes: [1]
+      }
+    });
+
+    expect(document.packages.map((entry) => entry.id)).toEqual(["first", "newsletter-1", "second"]);
+  });
+
+  it("appends rather than throwing when the recorded index is stale", () => {
+    const { document } = upgradeLegacyBlocksInV2Document({
+      schemaVersion: 2,
+      template: "home",
+      theme: "weekly-wildcat",
+      packages: [{ id: "only", type: LEAD_PACKAGE_TYPE, props: WEEKLY_WILDCAT_LEAD_DEFAULTS }],
+      legacy: {
+        schemaVersion: 1,
+        editor: { engine: "puck", version: "0.23.0" },
+        unconvertedBlocks: [{ type: "newsletter", props: {} }],
+        packageIndexes: [97]
+      }
+    });
+
+    expect(document.packages.map((entry) => entry.id)).toEqual(["only", "newsletter-1"]);
+  });
+
+  it("leaves a document with nothing convertible exactly as it was", () => {
+    const document = {
+      schemaVersion: 2 as const,
+      template: "home",
+      theme: "weekly-wildcat",
+      packages: [],
+      legacy: {
+        schemaVersion: 1 as const,
+        editor: { engine: "puck", version: "0.23.0" },
+        unconvertedBlocks: [{ type: "divider", props: { id: "divider-1" } }]
+      }
+    };
+    const upgrade = upgradeLegacyBlocksInV2Document(document);
+
+    expect(upgrade.changed).toBe(false);
+    expect(upgrade.document).toBe(document);
+    expect(upgrade.unsupportedTypes).toEqual(["Divider"]);
   });
 });
