@@ -161,21 +161,21 @@ function byline_build_page_buttons_block(array $buttons, bool $page_actions = fa
     ];
 }
 
-function byline_build_page_section_block(string $heading, bool $featured = false, array $paragraphs = [], array $buttons = []): array
+/**
+ * Build a Page Section from its normal InnerBlocks.
+ *
+ * This is the one persistence contract for Page Sections. The block is
+ * dynamic, so its saved representation must never contain the server-rendered
+ * section, heading, or body wrapper.
+ */
+function byline_build_page_section_block_from_inner_blocks(string $heading, array $inner_blocks = [], bool $featured = false): array
 {
     $attributes = ['heading' => sanitize_text_field($heading)];
     if ($featured) {
         $attributes['className'] = 'is-style-featured';
     }
 
-    $inner_blocks = [];
-    foreach ($paragraphs as $paragraph) {
-        $inner_blocks[] = byline_build_page_paragraph_block($paragraph);
-    }
-    $buttons_block = byline_build_page_buttons_block($buttons);
-    if ($buttons_block !== null) {
-        $inner_blocks[] = $buttons_block;
-    }
+    $inner_blocks = array_values(array_filter($inner_blocks, static fn($block): bool => is_array($block) && (string) ($block['blockName'] ?? '') !== ''));
 
     return [
         'blockName' => 'byline/page-section',
@@ -186,6 +186,20 @@ function byline_build_page_section_block(string $heading, bool $featured = false
         'innerHTML' => '',
         'innerContent' => array_fill(0, count($inner_blocks), null),
     ];
+}
+
+function byline_build_page_section_block(string $heading, bool $featured = false, array $paragraphs = [], array $buttons = []): array
+{
+    $inner_blocks = [];
+    foreach ($paragraphs as $paragraph) {
+        $inner_blocks[] = byline_build_page_paragraph_block($paragraph);
+    }
+    $buttons_block = byline_build_page_buttons_block($buttons);
+    if ($buttons_block !== null) {
+        $inner_blocks[] = $buttons_block;
+    }
+
+    return byline_build_page_section_block_from_inner_blocks($heading, $inner_blocks, $featured);
 }
 
 function byline_weekly_page_legacy_seed_hash(array $page): string

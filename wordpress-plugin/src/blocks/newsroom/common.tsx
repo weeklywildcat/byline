@@ -255,12 +255,12 @@ export function PersonPreviewCard({
         <div>
           <h3 className="byline-person-name">{person.name}</h3>
           {showRole && profile?.role ? <p className="byline-person-role">{profile.role}</p> : null}
-          {showBio && person.description ? <p className="byline-person-bio">{person.description}</p> : null}
-          {showSocials && socialLinks.length > 0 ? (
-            <span className="byline-person-socials">{socialLinks.map(([service, href]) => <span key={service}>{service}: <span>{href}</span></span>)}</span>
-          ) : null}
         </div>
       </a>
+      {showBio && person.description ? <p className="byline-person-bio">{person.description}</p> : null}
+      {showSocials && socialLinks.length > 0 ? (
+        <p className="byline-person-socials">{socialLinks.map(([service, href]) => <a key={service} href={href}>{service}</a>)}</p>
+      ) : null}
     </article>
   );
 }

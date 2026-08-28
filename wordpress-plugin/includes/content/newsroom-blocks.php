@@ -13,6 +13,13 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Page Section persistence is shared with the seed migration and the existing
+// page patterns. Keep newsroom patterns on that same canonical builder when
+// this file is loaded directly by a test harness or an integration.
+if (!function_exists('byline_build_page_section_block_from_inner_blocks')) {
+    require_once __DIR__ . '/pages.php';
+}
+
 const BYLINE_NEWSROOM_MAX_LIMIT = 12;
 const BYLINE_NEWSROOM_EDITOR_POLL_ROUTE = '/editor/polls';
 
@@ -282,7 +289,9 @@ function byline_newsroom_person_card(array $person, array $attributes): string
         }
     }
 
-    return '<article class="byline-person-card"><a class="byline-person-card-link" href="' . esc_url((string) ($person['link'] ?? '#')) . '">' . $media . '<div><h3 class="byline-person-name">' . esc_html($name) . '</h3>' . $role . $bio . $socials . '</div></a></article>';
+    // Keep the profile link limited to the identity area. Social links are
+    // independent actions and must never be descendants of that anchor.
+    return '<article class="byline-person-card"><a class="byline-person-card-link" href="' . esc_url((string) ($person['link'] ?? '#')) . '">' . $media . '<div><h3 class="byline-person-name">' . esc_html($name) . '</h3>' . $role . '</div></a>' . $bio . $socials . '</article>';
 }
 
 function byline_newsroom_render_people(array $attributes = [], string $content = '', $block = null): string
@@ -338,8 +347,10 @@ function byline_newsroom_sports_games(array $attributes): array
     $args = [
         'post_type' => $post_type,
         'post_status' => 'publish',
-        'numberposts' => 100,
-        'posts_per_page' => 100,
+        // The visible limits are applied after the upcoming/recent split.
+        // Never truncate a chronological collection before that split.
+        'numberposts' => -1,
+        'posts_per_page' => -1,
         'orderby' => 'meta_value',
         'meta_key' => '_ww_start_datetime',
         'order' => 'ASC',
@@ -349,8 +360,18 @@ function byline_newsroom_sports_games(array $attributes): array
     if ($team_key !== '') {
         $args['meta_query'] = [['key' => '_ww_sport_key', 'value' => sanitize_key($team_key)]];
     }
-    if ($season !== '' && function_exists('byline_sports_game_ids_for_season')) {
-        $ids = byline_sports_game_ids_for_season($season, $team_key, true);
+    $season_filters = $season !== '' ? [$season] : [];
+    if ($season_filters === [] && $team_key !== '' && function_exists('byline_sports_team_seasons')) {
+        $season_filters = byline_sports_team_seasons($team_key, true);
+    } elseif ($season_filters === [] && function_exists('byline_sports_available_seasons')) {
+        $season_filters = byline_sports_available_seasons(true);
+    }
+    if ($season_filters !== [] && function_exists('byline_sports_game_ids_for_season')) {
+        $ids = [];
+        foreach ($season_filters as $season_filter) {
+            $ids = array_merge($ids, byline_sports_game_ids_for_season((string) $season_filter, $team_key, true));
+        }
+        $ids = array_values(array_unique(array_map('absint', $ids)));
         $args['post__in'] = $ids !== [] ? $ids : [0];
     }
 
@@ -421,18 +442,29 @@ function byline_newsroom_events(array $attributes): array
 
     $post_type = defined('WWH_SCHOOL_EVENT_POST_TYPE') ? WWH_SCHOOL_EVENT_POST_TYPE : 'ww_school_event';
     $event_type = byline_newsroom_attr_string($attributes, 'eventType');
+    $timezone = function_exists('wp_timezone') ? wp_timezone() : new DateTimeZone('UTC');
+    $today_start = (new DateTimeImmutable('today', $timezone))->format('Y-m-d\\T00:00');
     $posts = get_posts([
         'post_type' => $post_type,
         'post_status' => 'publish',
-        'numberposts' => 100,
-        'posts_per_page' => 100,
+        // Query from the start of today so all-day events still survive the
+        // database boundary. The block applies the exact-now check below and
+        // then its small visible limit.
+        'numberposts' => -1,
+        'posts_per_page' => -1,
         'orderby' => 'meta_value',
         'meta_key' => '_ww_event_start_datetime',
         'order' => 'ASC',
         'no_found_rows' => true,
         'suppress_filters' => false,
+        'meta_query' => [[
+            'key' => '_ww_event_start_datetime',
+            'value' => $today_start,
+            'compare' => '>=',
+            'type' => 'CHAR',
+        ]],
     ]);
-    $now = new DateTimeImmutable('now', function_exists('wp_timezone') ? wp_timezone() : new DateTimeZone('UTC'));
+    $now = new DateTimeImmutable('now', $timezone);
     $events = [];
     foreach ($posts as $post) {
         if (!byline_newsroom_post_is_public($post, $post_type)) {
@@ -837,9 +869,25 @@ add_action('rest_api_init', 'byline_newsroom_register_editor_routes', 20);
 
 function byline_newsroom_block_markup(string $name, array $attributes = [], string $content = ''): string
 {
+    // Core's saved comment names omit the `core/` namespace. Keeping this
+    // normalization here prevents every pattern helper from inventing its
+    // own block-comment spelling.
+    $serialized_name = strpos($name, 'core/') === 0 ? substr($name, 5) : $name;
     $json = $attributes !== [] ? ' ' . wp_json_encode($attributes) : '';
 
-    return '<!-- wp:' . $name . $json . ' -->' . $content . '<!-- /wp:' . $name . ' -->';
+    $markup = '<!-- wp:' . $serialized_name . $json . ' -->' . $content . '<!-- /wp:' . $serialized_name . ' -->';
+
+    // When WordPress is available, run the candidate through its parser and
+    // serializer so Core's current saved markup remains authoritative. The
+    // raw fallback only exists for the small PHP harnesses used by tests.
+    if (function_exists('parse_blocks') && function_exists('serialize_blocks')) {
+        $parsed = parse_blocks($markup);
+        if (is_array($parsed) && count($parsed) === 1) {
+            return serialize_blocks($parsed);
+        }
+    }
+
+    return $markup;
 }
 
 function byline_newsroom_paragraph(string $text, array $attributes = []): string
@@ -872,16 +920,17 @@ function byline_newsroom_group(string $content, array $attributes = []): string
 
 function byline_newsroom_page_section(string $heading, string $content = '', bool $featured = false): string
 {
-    $attributes = ['heading' => $heading];
-    $classes = 'wp-block-byline-page-section';
-    if ($featured) {
-        $attributes['className'] = 'is-style-featured';
-        $classes .= ' is-style-featured';
+    // Page Section is dynamic. Parse the normal child block comments and let
+    // the canonical #55 builder/serializer persist only attrs + InnerBlocks;
+    // render.php owns the section, heading, and body wrapper.
+    $inner_blocks = function_exists('parse_blocks') ? parse_blocks($content) : [];
+    if (!is_array($inner_blocks)) {
+        $inner_blocks = [];
     }
 
-    $html = '<section class="' . esc_attr($classes) . '"><h2 class="wp-block-heading">' . esc_html($heading) . '</h2><div class="wp-block-byline-page-section__body">' . $content . '</div></section>';
-
-    return byline_newsroom_block_markup('byline/page-section', $attributes, $html);
+    return byline_serialize_page_block(
+        byline_build_page_section_block_from_inner_blocks($heading, $inner_blocks, $featured)
+    );
 }
 
 function byline_newsroom_buttons(string $content, array $attributes = []): string
@@ -900,6 +949,55 @@ function byline_newsroom_columns(string $content): string
 function byline_newsroom_column(string $content): string
 {
     return byline_newsroom_block_markup('core/column', [], '<div class="wp-block-column">' . $content . '</div>');
+}
+
+function byline_newsroom_image(string $alt, string $size_slug = ''): string
+{
+    $attributes = ['alt' => $alt];
+    $classes = 'wp-block-image';
+    if ($size_slug !== '') {
+        $attributes['sizeSlug'] = sanitize_key($size_slug);
+        $classes .= ' size-' . sanitize_html_class($size_slug);
+    }
+
+    // A placeholder image must not serialize an empty src attribute. Core
+    // Image treats the absent URL as an unselected image and the editor can
+    // replace it without creating an invalid block on insertion.
+    return byline_newsroom_block_markup('core/image', $attributes, '<figure class="' . esc_attr($classes) . '"><img alt="' . esc_attr($alt) . '" /></figure>');
+}
+
+function byline_newsroom_list_item(string $content): string
+{
+    return byline_newsroom_block_markup('core/list-item', [], '<li>' . wp_kses_post($content) . '</li>');
+}
+
+function byline_newsroom_list(array $items, array $attributes = []): string
+{
+    $class_name = trim((string) ($attributes['className'] ?? ''));
+    $classes = trim('wp-block-list ' . $class_name);
+    $items_markup = implode('', array_map('byline_newsroom_list_item', $items));
+
+    return byline_newsroom_block_markup('core/list', $attributes, '<ul class="' . esc_attr($classes) . '">' . $items_markup . '</ul>');
+}
+
+function byline_newsroom_details(string $summary, string $answer, array $attributes = []): string
+{
+    $attributes = array_merge(['summary' => $summary], $attributes);
+    $class_name = trim((string) ($attributes['className'] ?? ''));
+    $classes = trim('wp-block-details ' . $class_name);
+    $content = '<details class="' . esc_attr($classes) . '"><summary>' . esc_html($summary) . '</summary>' . byline_newsroom_paragraph($answer) . '</details>';
+
+    return byline_newsroom_block_markup('core/details', $attributes, $content);
+}
+
+function byline_newsroom_correction_notice(string $notice, string $type = 'correction', string $date = ''): string
+{
+    $type = in_array($type, ['correction', 'clarification', 'editors-note'], true) ? $type : 'correction';
+    $label = $type === 'clarification' ? 'Clarification' : ($type === 'editors-note' ? "Editor's note" : 'Correction');
+    $attributes = ['type' => $type, 'date' => $date, 'notice' => $notice];
+    $content = '<aside class="wp-block-byline-correction-notice byline-correction-notice byline-correction-notice-' . esc_attr($type) . '" data-correction-type="' . esc_attr($type) . '"><p class="byline-correction-notice-label">' . esc_html($label) . '</p><p class="byline-correction-notice-body">' . wp_kses_post($notice) . '</p>' . ($date !== '' ? '<time datetime="' . esc_attr($date) . '">' . esc_html($date) . '</time>' : '') . '</aside>';
+
+    return byline_newsroom_block_markup('byline/correction-notice', $attributes, $content);
 }
 
 function byline_newsroom_page_pattern(string $title, string $description, string $content): array
@@ -948,27 +1046,27 @@ function byline_newsroom_register_patterns(): void
         'byline/about-mission-page' => byline_newsroom_page_pattern('About / Mission Page', 'A page starter for an organization story and mission.', byline_newsroom_page_section('About the publication', byline_newsroom_paragraph('Explain who you are, what you cover, and how your work serves readers.')) . byline_newsroom_page_section('Mission', byline_newsroom_paragraph('Add the principles that guide this publication.')) . byline_newsroom_page_section('Values', byline_newsroom_paragraph('Describe the commitments readers should expect from this newsroom.')) . byline_newsroom_page_section('Get involved', byline_newsroom_paragraph('Invite readers or contributors to take a next step.') . byline_newsroom_button('Get in touch', '/contact/'), true)),
         'byline/policy-standards-page' => byline_newsroom_page_pattern('Policy / Standards Page', 'A structured page for standards, policies, or public commitments.', byline_newsroom_page_section('Standards', byline_newsroom_paragraph('State the policy in plain language.')) . byline_newsroom_page_section('Corrections and transparency', byline_newsroom_paragraph('Explain how the newsroom handles corrections, updates, and questions.')) . byline_newsroom_page_section('Questions', byline_newsroom_paragraph('Explain how readers can ask for clarification or report a concern.'))),
         'byline/join-recruiting-page' => byline_newsroom_page_pattern('Join / Recruiting Page', 'A recruiting page with an editable call to action.', byline_newsroom_page_section('Join the newsroom', byline_newsroom_paragraph('Describe who can participate, what the work involves, and how to get started.')) . byline_newsroom_page_section('Ways to contribute', byline_newsroom_paragraph('List the roles, projects, or skills that could help this publication.')) . byline_newsroom_page_section('What you will learn', byline_newsroom_paragraph('Describe the experience and support contributors can expect.')) . byline_newsroom_page_section('Take the next step', byline_newsroom_paragraph('Add an invitation or deadline.') . byline_newsroom_button('Get in touch', '/contact/'), true)),
-        'byline/contact-feedback-page' => byline_newsroom_page_pattern('Contact / Feedback Page', 'A public contact page with publication identity support.', byline_newsroom_page_section('Contact', byline_newsroom_paragraph('Contact this publication with a question, tip, correction, or feedback.', $publication_name_binding) . byline_newsroom_paragraph('Add the appropriate contact details and response expectations.')) . byline_newsroom_page_section('Feedback and corrections', byline_newsroom_paragraph('Tell readers how to report a correction or share feedback.') . byline_newsroom_button('Send feedback', '/contact/'), true)),
+        'byline/contact-feedback-page' => byline_newsroom_page_pattern('Contact / Feedback Page', 'A public contact page with publication identity support.', byline_newsroom_page_section('Contact', byline_newsroom_paragraph('Publication name', $publication_name_binding) . byline_newsroom_paragraph('Contact this publication with a question, tip, correction, or feedback.') . byline_newsroom_paragraph('Add the appropriate contact details and response expectations.')) . byline_newsroom_page_section('Feedback and corrections', byline_newsroom_paragraph('Tell readers how to report a correction or share feedback.') . byline_newsroom_button('Send feedback', '/contact/'), true)),
         'byline/leadership-page' => byline_newsroom_page_pattern('Leadership Page', 'A people-led page for leadership and governance.', byline_newsroom_page_section('Leadership', byline_newsroom_paragraph('Introduce the people responsible for this publication.')) . byline_newsroom_block_markup('byline/people', ['source' => 'selected', 'layout' => 'portrait-grid', 'showBio' => true]) . byline_newsroom_page_section('Contact leadership', byline_newsroom_paragraph('Add a public route for questions about the newsroom.') . byline_newsroom_button('Get in touch', '/contact/'), true)),
         'byline/staff-directory' => byline_newsroom_page_pattern('Staff Directory', 'A directory powered by public author profiles.', byline_newsroom_page_section('Staff', byline_newsroom_paragraph('Introduce the people who report, edit, photograph, and support this publication.')) . byline_newsroom_block_markup('byline/people', ['source' => 'all', 'layout' => 'portrait-grid', 'showPhoto' => true, 'showRole' => true, 'showBio' => true])),
         'byline/special-coverage' => byline_newsroom_page_pattern('Special Coverage', 'A story-led page starter for a continuing topic.', byline_newsroom_page_section('Special coverage', byline_newsroom_paragraph('Add a concise introduction to the reporting project.')) . byline_newsroom_block_markup('byline/stories', ['heading' => 'Latest coverage', 'source' => 'latest', 'layout' => 'featured', 'limit' => 6, 'showExcerpt' => true]) . byline_newsroom_page_section('Stay informed', byline_newsroom_paragraph('Add context, related links, or a call to follow this coverage.'))),
         'byline/sports-coverage' => byline_newsroom_page_pattern('Sports Coverage', 'A page starter combining schedule and reporting.', byline_newsroom_page_section('Sports', byline_newsroom_paragraph('Introduce the team, season, or sports project.')) . byline_newsroom_block_markup('byline/sports-schedule', ['heading' => 'Schedule and results', 'display' => 'both']) . byline_newsroom_block_markup('byline/stories', ['heading' => 'Latest sports stories', 'source' => 'latest', 'layout' => 'list', 'limit' => 6])),
         'byline/event-campaign' => byline_newsroom_page_pattern('Event / Campaign', 'A page starter for an event or public campaign.', byline_newsroom_page_section('Event or campaign', byline_newsroom_paragraph('Explain the event or campaign and why readers should care.')) . byline_newsroom_block_markup('byline/events', ['heading' => 'Upcoming dates', 'limit' => 5]) . byline_newsroom_block_markup('byline/stories', ['heading' => 'Related coverage', 'source' => 'latest', 'layout' => 'list', 'limit' => 4]) . byline_newsroom_page_section('Learn more', byline_newsroom_paragraph('Add a final invitation or public information link.') . byline_newsroom_button('Learn more', '/'), true)),
-        'byline/photo-led-page' => byline_newsroom_page_pattern('Photo-led Page', 'A visual page starter using native image blocks.', byline_newsroom_page_section('Lead image', byline_newsroom_block_markup('core/image', ['sizeSlug' => 'large'], '<figure class="wp-block-image size-large"><img src="" alt="Add a lead image" /></figure>')) . byline_newsroom_page_section('The story behind the image', byline_newsroom_paragraph('Add context, captions, and reporting below the lead image.'))),
-        'byline/resource-page' => byline_newsroom_page_pattern('Resource Page', 'A practical page for links and reader resources.', byline_newsroom_page_section('Resources', byline_newsroom_paragraph('Add a short explanation of how to use this resource list.') . byline_newsroom_block_markup('core/list', ['className' => 'is-style-byline-resource-list'], '<ul class="wp-block-list"><li>Add a resource link</li><li>Add another resource link</li></ul>') . byline_newsroom_button('Open a resource', '/'))),
-        'byline/faq-page' => byline_newsroom_page_pattern('FAQ Page', 'A frequently asked questions page using native Details blocks.', byline_newsroom_page_section('Frequently asked questions', byline_newsroom_paragraph('Introduce the questions this page answers.')) . byline_newsroom_block_markup('core/details', ['className' => 'is-style-byline-faq'], '<details class="wp-block-details is-style-byline-faq"><summary>Question</summary><p>Add a concise answer.</p></details>') . byline_newsroom_block_markup('core/details', ['className' => 'is-style-byline-faq'], '<details class="wp-block-details is-style-byline-faq"><summary>Another question</summary><p>Add another answer.</p></details>')),
-        'byline/two-column-image-text' => byline_newsroom_page_pattern('Two-column Image + Text', 'A two-column page section for visual and written content.', byline_newsroom_page_section('Image and text', byline_newsroom_columns(byline_newsroom_column(byline_newsroom_block_markup('core/image', [], '<figure class="wp-block-image"><img src="" alt="Add an image" /></figure>')) . byline_newsroom_column(byline_newsroom_heading('Add a heading', 3) . byline_newsroom_paragraph('Add supporting copy.'))))),
+        'byline/photo-led-page' => byline_newsroom_page_pattern('Photo-led Page', 'A visual page starter using native image blocks.', byline_newsroom_page_section('Lead image', byline_newsroom_image('Add a lead image', 'large')) . byline_newsroom_page_section('The story behind the image', byline_newsroom_paragraph('Add context, captions, and reporting below the lead image.'))),
+        'byline/resource-page' => byline_newsroom_page_pattern('Resource Page', 'A practical page for links and reader resources.', byline_newsroom_page_section('Resources', byline_newsroom_paragraph('Add a short explanation of how to use this resource list.') . byline_newsroom_list(['Add a resource link', 'Add another resource link'], ['className' => 'is-style-byline-resource-list']) . byline_newsroom_button('Open a resource', '/'))),
+        'byline/faq-page' => byline_newsroom_page_pattern('FAQ Page', 'A frequently asked questions page using native Details blocks.', byline_newsroom_page_section('Frequently asked questions', byline_newsroom_paragraph('Introduce the questions this page answers.')) . byline_newsroom_details('Question', 'Add a concise answer.', ['className' => 'is-style-byline-faq']) . byline_newsroom_details('Another question', 'Add another answer.', ['className' => 'is-style-byline-faq'])),
+        'byline/two-column-image-text' => byline_newsroom_page_pattern('Two-column Image + Text', 'A two-column page section for visual and written content.', byline_newsroom_page_section('Image and text', byline_newsroom_columns(byline_newsroom_column(byline_newsroom_image('Add an image')) . byline_newsroom_column(byline_newsroom_heading('Add a heading', 3) . byline_newsroom_paragraph('Add supporting copy.'))))),
         'byline/featured-cta' => byline_newsroom_page_pattern('Featured CTA', 'A high-emphasis call to action.', byline_newsroom_page_section('Featured invitation', byline_newsroom_paragraph('Tell readers what to do next and why it matters.') . byline_newsroom_buttons(byline_newsroom_button('Take action'), ['className' => 'is-style-byline-standard-cta']), true)),
-        'byline/fact-box' => byline_newsroom_page_pattern('Fact Box', 'A compact, scannable block for key facts.', byline_newsroom_group(byline_newsroom_heading('At a glance', 3) . byline_newsroom_block_markup('core/list', [], '<ul class="wp-block-list"><li>Add a key fact</li><li>Add a second key fact</li><li>Add a source or date</li></ul>'), ['className' => 'is-style-byline-soft-callout'])),
+        'byline/fact-box' => byline_newsroom_page_pattern('Fact Box', 'A compact, scannable block for key facts.', byline_newsroom_group(byline_newsroom_heading('At a glance', 3) . byline_newsroom_list(['Add a key fact', 'Add a second key fact', 'Add a source or date']), ['className' => 'is-style-byline-soft-callout'])),
         'byline/key-numbers' => byline_newsroom_page_pattern('Key Numbers', 'A native columns layout for important figures.', byline_newsroom_columns(byline_newsroom_column(byline_newsroom_heading('00', 3) . byline_newsroom_paragraph('Label one')) . byline_newsroom_column(byline_newsroom_heading('00', 3) . byline_newsroom_paragraph('Label two')) . byline_newsroom_column(byline_newsroom_heading('00', 3) . byline_newsroom_paragraph('Label three')))),
-        'byline/quote-callout' => byline_newsroom_page_pattern('Quote Callout', 'A quote-led callout using the native Quote block.', byline_newsroom_block_markup('core/quote', ['className' => 'is-style-byline-editorial-quote'], '<blockquote class="wp-block-quote is-style-byline-editorial-quote"><p>Add a meaningful quote.</p><cite>Source or attribution</cite></blockquote>')),
-        'byline/related-resources' => byline_newsroom_page_pattern('Related Resources', 'A link list for related coverage and resources.', byline_newsroom_heading('Related resources') . byline_newsroom_block_markup('core/list', ['className' => 'is-style-byline-link-list'], '<ul class="wp-block-list"><li><a href="/">Add a related link</a></li><li><a href="/">Add another link</a></li></ul>')),
-        'byline/corrections-feedback-cta' => byline_newsroom_page_pattern('Corrections & Feedback CTA', 'A transparent corrections and feedback call to action.', byline_newsroom_group(byline_newsroom_heading('See something we should fix?') . byline_newsroom_paragraph('Tell readers how to report a correction or share feedback.') . byline_newsroom_button('Contact the newsroom', '/contact/'), ['className' => 'is-style-byline-soft-callout'])),
-        'byline/sports-game-recap' => byline_newsroom_post_pattern('Sports Game Recap', 'A recap starter that follows the article Primary Game.', byline_newsroom_block_markup('byline/game-score', ['source' => 'primary', 'showDetails' => true, 'showLink' => true]) . byline_newsroom_heading('What happened') . byline_newsroom_paragraph('Summarize the result, turning points, and voices from the game.') . byline_newsroom_heading('What is next') . byline_newsroom_paragraph('Add the next relevant game, practice, or story.' )),
+        'byline/quote-callout' => byline_newsroom_page_pattern('Quote Callout', 'A quote-led callout using the native Quote block.', byline_newsroom_block_markup('core/quote', ['className' => 'is-style-byline-editorial-quote'], '<blockquote class="wp-block-quote is-style-byline-editorial-quote">' . byline_newsroom_paragraph('Add a meaningful quote.') . '<cite>Source or attribution</cite></blockquote>')),
+        'byline/related-resources' => byline_newsroom_page_pattern('Related Resources', 'A link list for related coverage and resources.', byline_newsroom_heading('Related resources') . byline_newsroom_list(['<a href="/">Add a related link</a>', '<a href="/">Add another link</a>'], ['className' => 'is-style-byline-link-list'])),
+        'byline/corrections-feedback-cta' => byline_newsroom_page_pattern('Corrections & Feedback CTA', 'A transparent corrections and feedback call to action.', byline_newsroom_group(byline_newsroom_heading('See something we should fix?') . byline_newsroom_paragraph('Tell readers how to report a correction or share feedback.') . byline_newsroom_button('Contact the newsroom', '/'), ['className' => 'is-style-byline-soft-callout'])),
+        'byline/sports-game-recap' => byline_newsroom_post_pattern('Sports Game Recap', 'A recap starter that follows the article Primary Game.', byline_newsroom_block_markup('byline/game-score', ['source' => 'primary', 'showDetails' => true, 'showLink' => true]) . byline_newsroom_heading('What happened') . byline_newsroom_paragraph('Summarize the result, turning points, and voices from the game.') . byline_newsroom_heading('What is next') . byline_newsroom_paragraph('Add the next relevant game, practice, or story.')),
         'byline/sports-game-preview' => byline_newsroom_post_pattern('Sports Game Preview', 'A preview starter for an article Primary Game.', byline_newsroom_block_markup('byline/game-score', ['source' => 'primary', 'showDetails' => true, 'showLink' => true]) . byline_newsroom_heading('The matchup') . byline_newsroom_paragraph('Set the scene with what readers should know before the game.') . byline_newsroom_heading('What to watch') . byline_newsroom_paragraph('Add players, trends, or context without inventing scores or live status.')),
-        'byline/correction-notice' => byline_newsroom_post_pattern('Correction Notice', 'A static correction or clarification notice.', byline_newsroom_block_markup('byline/correction-notice', ['type' => 'correction', 'date' => '', 'notice' => 'Explain clearly what changed.'])),
-        'byline/fact-box-post' => byline_newsroom_post_pattern('Fact Box', 'A fact box for a reported post.', byline_newsroom_group(byline_newsroom_heading('Key facts', 3) . byline_newsroom_block_markup('core/list', [], '<ul class="wp-block-list"><li>Add a verified fact</li><li>Add a source or date</li></ul>'), ['className' => 'is-style-byline-soft-callout'])),
-        'byline/quote-callout-post' => byline_newsroom_post_pattern('Quote Callout', 'A quote callout for a reported post.', byline_newsroom_block_markup('core/quote', ['className' => 'is-style-byline-source-quote'], '<blockquote class="wp-block-quote is-style-byline-source-quote"><p>Add a reported quote.</p><cite>Source or attribution</cite></blockquote>')),
+        'byline/correction-notice' => byline_newsroom_post_pattern('Correction Notice', 'A static correction or clarification notice.', byline_newsroom_correction_notice('Explain clearly what changed.')),
+        'byline/fact-box-post' => byline_newsroom_post_pattern('Fact Box', 'A fact box for a reported post.', byline_newsroom_group(byline_newsroom_heading('Key facts', 3) . byline_newsroom_list(['Add a verified fact', 'Add a source or date']), ['className' => 'is-style-byline-soft-callout'])),
+        'byline/quote-callout-post' => byline_newsroom_post_pattern('Quote Callout', 'A quote callout for a reported post.', byline_newsroom_block_markup('core/quote', ['className' => 'is-style-byline-source-quote'], '<blockquote class="wp-block-quote is-style-byline-source-quote">' . byline_newsroom_paragraph('Add a reported quote.') . '<cite>Source or attribution</cite></blockquote>')),
     ];
 
     foreach ($patterns as $name => $pattern) {
