@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
 // These are public compatibility versions, not storage migration flags.
 // Legacy WWH identifiers remain the installed storage/update contract.
 const BYLINE_PROTOCOL_VERSION = 1;
-const BYLINE_PLUGIN_VERSION = '0.2.9';
+const BYLINE_PLUGIN_VERSION = '0.2.10';
 const BYLINE_PUBLICATION_SCHEMA_VERSION = 1;
 
 // The design schema this plugin *advertises* to frontends, which check it with

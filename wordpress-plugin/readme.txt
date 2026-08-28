@@ -4,7 +4,7 @@ Tags: newsroom, editorial, journalism, headless, student-journalism
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.2.9
+Stable tag: 0.2.10
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,24 @@ WordPress publication state, a Studio for homepage design, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==
+
+= 0.2.10 =
+
+**Fixes homepage designs that could not be published.**
+
+* A homepage saved by an older version of Byline could hold sections that
+  version had no way to convert. Those sections were kept safe but were never
+  reconsidered afterwards, so Studio went on reporting unconverted blocks and
+  kept Publish disabled even once a later Byline understood every one of them.
+* Studio now reconverts those preserved sections when it opens a design, puts
+  them back in their original order, and tells you what it recovered. Publish
+  becomes available again as soon as nothing is left unconverted.
+* Recovery reaches recovered autosaves as well as published designs, so an
+  affected homepage repairs itself on the next open. There is no need to delete
+  a draft, rebuild the page, or remove sections by hand.
+* Reopening a repaired design does not duplicate anything.
+* Sections Byline genuinely cannot convert yet are still preserved untouched,
+  and the notice now names them.
 
 = 0.2.9 =
 
@@ -58,6 +76,11 @@ modules, native polls, and an optional Discord newsroom integration.
 * Homepage designs saved while these settings existed continue to load.
 
 == Upgrade Notice ==
+
+= 0.2.10 =
+Repairs homepage designs that were stuck with Publish disabled because sections
+preserved by an older Byline were never reconverted. Affected homepages recover
+themselves the next time Studio opens them, in their original order.
 
 = 0.2.9 =
 Editorial workflow is now a native block-editor sidebar and no longer lives in
