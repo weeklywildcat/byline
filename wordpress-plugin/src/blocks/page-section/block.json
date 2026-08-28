@@ -1,0 +1,55 @@
+{
+  "apiVersion": 3,
+  "name": "byline/page-section",
+  "version": "1.0.0",
+  "title": "Page Section",
+  "category": "byline",
+  "description": "Structured editorial section with a heading and flexible block content.",
+  "keywords": ["section", "page", "content", "callout"],
+  "icon": "layout",
+  "textdomain": "weekly-wildcat-headless",
+  "postTypes": ["page"],
+  "attributes": {
+    "heading": {
+      "type": "string",
+      "default": "Section heading"
+    },
+    "headingLevel": {
+      "type": "number",
+      "default": 2
+    }
+  },
+  "supports": {
+    "align": ["wide"],
+    "anchor": true,
+    "customClassName": false,
+    "html": false
+  },
+  "styles": [
+    {
+      "name": "default",
+      "label": "Default",
+      "isDefault": true
+    },
+    {
+      "name": "featured",
+      "label": "Featured"
+    }
+  ],
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "example": {
+    "attributes": {
+      "heading": "Section heading"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "Add a short introduction to this section."
+        }
+      }
+    ]
+  }
+}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "@byline/theme-weekly-wildcat/styles.css";
+import "@byline/ui/page-blocks.css";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";

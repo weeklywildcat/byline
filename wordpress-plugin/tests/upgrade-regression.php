@@ -238,7 +238,7 @@ const BYLINE_SPORTS_TEAMS_MIGRATION_VERSION = 1;
 const BYLINE_ROSTER_IDENTITIES_VERSION_OPTION = 'byline_roster_identities_version';
 const BYLINE_ROSTER_IDENTITIES_VERSION = 1;
 const BYLINE_WEEKLY_PAGE_MIGRATION_OPTION = 'byline_weekly_page_migration_version';
-const BYLINE_WEEKLY_PAGE_MIGRATION_VERSION = 1;
+const BYLINE_WEEKLY_PAGE_MIGRATION_VERSION = 2;
 
 require __DIR__ . '/../includes/core/upgrade.php';
 

@@ -105,7 +105,9 @@ export type WordPressPage = {
   id: number;
   slug: string;
   date: string;
+  date_gmt?: string;
   modified: string;
+  modified_gmt?: string;
   title: RenderedText;
   excerpt: RenderedText;
   content: RenderedText;

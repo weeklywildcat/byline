@@ -1,5 +1,29 @@
 declare module "*.css";
 
+declare module "@wordpress/blocks" {
+  export function registerBlockType(metadata: unknown, settings: unknown): unknown;
+}
+
+declare module "@wordpress/block-editor" {
+  export const BlockControls: any;
+  export const InnerBlocks: any;
+  export const InspectorControls: any;
+  export const RichText: any;
+  export const useBlockProps: any;
+}
+
+declare module "@wordpress/edit-post" {
+  import type { ComponentType, ReactNode } from "react";
+
+  export const PluginDocumentSettingPanel: ComponentType<{
+    name: string;
+    title: string;
+    className?: string;
+    initialOpen?: boolean;
+    children?: ReactNode;
+  }>;
+}
+
 /**
  * The block-editor SlotFills the workflow sidebar uses.
  *

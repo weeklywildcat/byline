@@ -5,7 +5,6 @@ import { PUBLIC_SECTIONS } from "@/lib/sections";
 import { absoluteUrl } from "@/lib/seo";
 import { getAllSportsGames, getAllSportsRosters, getSportsTeams } from "@/lib/headless";
 import { buildTeams, getSeasonHref, getTeamHubHref } from "@/lib/sports";
-import { STATIC_PAGES } from "@/lib/static-pages";
 import { getPublicationConfig } from "@/lib/publication";
 import { getAllAuthors, getAllPages, getAllPosts, getAuthorHref, getPostHref, type WordPressPost } from "@/lib/wordpress";
 
@@ -24,6 +23,10 @@ function parseSitemapDate(value: string | undefined) {
 
 function getPostSitemapDate(post: Pick<WordPressPost, "modified" | "modified_gmt">) {
   return parseSitemapDate(post.modified_gmt) ?? parseSitemapDate(post.modified);
+}
+
+function getPageSitemapDate(page: { modified?: string; modified_gmt?: string }) {
+  return parseSitemapDate(page.modified_gmt) ?? parseSitemapDate(page.modified);
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -56,7 +59,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }, undefined);
   const latestModified = latestModifiedPost ? getPostSitemapDate(latestModifiedPost) : undefined;
 
-  const staticPages: MetadataRoute.Sitemap = [
+  const applicationPages: MetadataRoute.Sitemap = [
     {
       url: absoluteUrl("/"),
       lastModified: latestModified,
@@ -93,13 +96,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly" as const,
       priority: 0.5
     },
-    ...(publication.appearance.theme === "weekly-wildcat" ? STATIC_PAGES.map((page) => page.slug) : wordpressPages.map((page) => page.slug)).map((slug) => ({
-      url: absoluteUrl(`/${slug}/`),
-      lastModified: latestModified,
+  ];
+
+  const applicationUrls = new Set(applicationPages.map((page) => page.url));
+  const authoredPages: MetadataRoute.Sitemap = wordpressPages
+    .map((page) => ({
+      url: absoluteUrl(`/${page.slug}/`),
+      lastModified: getPageSitemapDate(page),
       changeFrequency: "monthly" as const,
       priority: 0.5
     }))
-  ];
+    .filter((page) => !applicationUrls.has(page.url));
 
   const articlePages: MetadataRoute.Sitemap = posts.map((post) => ({
     url: absoluteUrl(getPostHref(post)),
@@ -130,5 +137,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }))
   ]);
 
-  return [...staticPages, ...sportsPages, ...articlePages, ...authorPages];
+  return [...applicationPages, ...authoredPages, ...sportsPages, ...articlePages, ...authorPages];
 }
