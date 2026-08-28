@@ -26,9 +26,9 @@ migration replaces them.
 - `lib/wordpress.ts`, `lib/media.ts`, `lib/headless.ts`, and sports client
   components default to `cms.weeklywildcat.com`, `weeklywildcat.com`, and a
   Weekly Wildcat build user-agent.
-- `lib/static-pages.ts` contains the publication's About, Advertise, Join,
-  Leadership, Diversity & Inclusion, image license, Terms, Privacy, and Contact
-  prose. This is publication content, not platform code.
+- The former `lib/static-pages.ts` publication page catalog has been retired;
+  normal page prose now lives in WordPress Pages and is exported through the
+  `wp/v2/pages` build input. This is publication content, not platform code.
 - `app/media-kit/page.tsx`, `NewsletterSignupForm`, and the homepage utility
   rail embed publication assets, Kit, Instagram, and TikTok URLs.
 - Sports views embed `Ninety Six Wildcats`, `Ninety Six High School`, and a

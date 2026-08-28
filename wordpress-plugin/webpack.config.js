@@ -24,5 +24,7 @@ module.exports = {
   entry: {
     index: path.resolve(__dirname, 'src/index.tsx'),
     'editorial-workflow': path.resolve(__dirname, 'src/editorial-workflow.tsx'),
+    'page-editor': path.resolve(__dirname, 'src/page-editor.tsx'),
+    'blocks/page-section/index': path.resolve(__dirname, 'src/blocks/page-section/index.tsx'),
   },
 };

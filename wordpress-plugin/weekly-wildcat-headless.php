@@ -21,6 +21,7 @@ require_once __DIR__ . '/includes/design/post-type.php';
 require_once __DIR__ . '/includes/design/rest.php';
 require_once __DIR__ . '/includes/core/diagnostics.php';
 require_once __DIR__ . '/includes/content/pages.php';
+require_once __DIR__ . '/includes/content/page-blocks.php';
 require_once __DIR__ . '/includes/admin/app.php';
 
 // Editorial workflow is a first-class Byline domain. Integrations consume it;

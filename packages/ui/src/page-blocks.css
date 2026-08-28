@@ -1,0 +1,235 @@
+/*
+ * Canonical styles for authored WordPress pages.
+ *
+ * This file is loaded by the Next public page template and by the
+ * byline/page-section block in the WordPress editor. Keep the saved block
+ * markup semantic and stable; presentation belongs here.
+ */
+
+:where(.wp-block-byline-page-section) {
+  border-bottom: 1px solid var(--rule, #d0d7de);
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(160px, 0.35fr) minmax(0, 1fr);
+  padding: 22px 0;
+}
+
+:where(.wp-block-byline-page-section) > .wp-block-heading,
+:where(.byline-page-content) .byline-page-section > h2,
+:where(.byline-page-content) .byline-page-section > h3,
+:where(.byline-page-content) .byline-page-section > h4 {
+  color: var(--ink, #1f2328);
+  font-family: var(--font-ui, Arial, Helvetica, sans-serif);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+:where(.wp-block-byline-page-section__body),
+:where(.byline-page-content) .byline-page-section-body {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) {
+  color: var(--ink, #1f2328);
+  font-family: var(--font-body, Arial, Helvetica, sans-serif);
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table) {
+  margin: 0 0 1.35em;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) :is(p, li) {
+  color: var(--ink, #1f2328);
+  font-family: var(--font-body, Arial, Helvetica, sans-serif);
+  font-size: 1.02rem;
+  line-height: 1.58;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) :is(ul, ol) {
+  padding-left: 1.3em;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) :is(h2, h3, h4):not(.wp-block-byline-page-section > .wp-block-heading) {
+  color: var(--ink, #1f2328);
+  font-family: var(--font-ui, Arial, Helvetica, sans-serif);
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0 0 0.6em;
+}
+
+:where(.byline-page-content) > :is(h2, h3, h4) {
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  text-transform: none;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) :is(blockquote, .wp-block-quote) {
+  border-left: 4px solid var(--accent, #b11f24);
+  color: var(--ink, #1f2328);
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1.28rem;
+  line-height: 1.45;
+  padding-left: 18px;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-pullquote {
+  border-bottom: 4px solid var(--accent, #b11f24);
+  border-top: 4px solid var(--accent, #b11f24);
+  padding: 1.2em 0;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) :is(.wp-block-image, .wp-block-gallery) img {
+  border: 1px solid var(--rule, #d0d7de);
+  height: auto;
+  max-width: 100%;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-gallery {
+  align-items: start;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-table {
+  overflow-x: auto;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-table table {
+  border-collapse: collapse;
+  min-width: 100%;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-table :is(td, th) {
+  border: 1px solid var(--rule, #d0d7de);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-embed__wrapper,
+:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-embed iframe {
+  max-width: 100%;
+  width: 100%;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-button__link {
+  background: var(--accent, #b11f24);
+  border: 1px solid var(--accent, #b11f24);
+  color: #fff;
+  display: inline-block;
+  font-family: var(--font-ui, Arial, Helvetica, sans-serif);
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.2;
+  padding: 10px 12px;
+  text-transform: uppercase;
+}
+
+:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-button__link:hover,
+:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-button__link:focus-visible {
+  background: var(--ink, #1f2328);
+  border-color: var(--ink, #1f2328);
+  color: #fff;
+}
+
+:where(.wp-block-byline-page-section.is-style-featured) {
+  background: #171a21;
+  border-bottom: 0;
+  color: #fff;
+  gap: 28px;
+  margin: 20px 0;
+  padding: 24px;
+}
+
+:where(.wp-block-byline-page-section.is-style-featured) > .wp-block-heading,
+:where(.wp-block-byline-page-section.is-style-featured) :is(p, li, blockquote, h2, h3, h4) {
+  color: #fff;
+}
+
+:where(.wp-block-byline-page-section.is-style-featured) :is(p, li) {
+  color: #eee8e1;
+  font-size: 1.08rem;
+}
+
+:where(.wp-block-byline-page-section.is-style-featured) :is(blockquote, .wp-block-quote) {
+  border-left-color: #fff;
+}
+
+:where(.byline-page-content) .byline-page-section.is-style-featured {
+  background: #171a21;
+  border-bottom: 0;
+  color: #fff;
+  gap: 28px;
+  margin: 20px 0;
+  padding: 24px;
+}
+
+:where(.byline-page-content) .byline-page-section.is-style-featured > :is(h2, h3, h4),
+:where(.byline-page-content) .byline-page-section.is-style-featured :is(p, li, blockquote) {
+  color: #fff;
+}
+
+:where(.byline-page-content) .byline-page-section.is-style-featured :is(p, li) {
+  color: #eee8e1;
+  font-size: 1.08rem;
+}
+
+/* Compatibility for user-edited pre-block pages. New content must not use
+ * these classes; isolate them here so a future cleanup can remove one file. */
+:where(.byline-page-content) .byline-page-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+:where(.byline-page-content) .byline-page-section-actions a {
+  background: var(--accent, #b11f24);
+  color: #fff;
+  font-family: var(--font-ui, Arial, Helvetica, sans-serif);
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 10px 12px;
+  text-transform: uppercase;
+}
+
+:where(.byline-page-content) .alignwide {
+  margin-left: -40px;
+  margin-right: -40px;
+  max-width: none;
+  width: calc(100% + 80px);
+}
+
+@media (max-width: 900px) {
+  :where(.wp-block-byline-page-section) {
+    grid-template-columns: 1fr;
+  }
+
+  :where(.byline-page-content) .alignwide {
+    margin-left: 0;
+    margin-right: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  :where(.wp-block-byline-page-section) {
+    gap: 9px;
+    padding: 18px 0;
+  }
+
+  :where(.wp-block-byline-page-section.is-style-featured),
+  :where(.byline-page-content) .byline-page-section.is-style-featured {
+    gap: 14px;
+    margin: 16px 0;
+    padding: 18px;
+  }
+}

@@ -40,6 +40,14 @@ build_assets=(
   build/editorial-workflow.js
   build/editorial-workflow.asset.php
   build/editorial-workflow.css
+  # The normal Page editor settings panel is separate from the story workflow.
+  build/page-editor.js
+  build/page-editor.asset.php
+  # Metadata, editor script, and shared block CSS are all runtime assets.
+  build/blocks/page-section/block.json
+  build/blocks/page-section/index.js
+  build/blocks/page-section/index.asset.php
+  build/blocks/page-section/style-index.css
 )
 
 migration_assets=(
@@ -94,6 +102,14 @@ for bundled_react in react react-dom; do
   fi
 done
 
+page_editor_dependencies="$(php -r '$asset = include $argv[1]; echo implode("\n", $asset["dependencies"] ?? []);' "$plugin_root/build/page-editor.asset.php")"
+for page_editor_dependency in wp-plugins wp-edit-post wp-data wp-components wp-i18n; do
+  if ! grep -qx "$page_editor_dependency" <<<"$page_editor_dependencies"; then
+    echo "WordPress dependency $page_editor_dependency is missing from the Page editor asset manifest." >&2
+    exit 1
+  fi
+done
+
 mkdir -p "$stage_root/weekly-wildcat-headless" "$release_root"
 rsync -a "$plugin_root/" "$stage_root/weekly-wildcat-headless/" \
   --exclude '.git' \
@@ -126,6 +142,12 @@ grep -qx 'weekly-wildcat-headless/build/index.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.asset.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/editorial-workflow.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/editorial-workflow.asset.php' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/page-editor.js' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/page-editor.asset.php' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/blocks/page-section/block.json' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/blocks/page-section/index.js' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/blocks/page-section/index.asset.php' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/blocks/page-section/style-index.css' <<<"$archive_files"
 
 # Polls are WordPress-owned storage now, so the whole poll module must ship.
 for poll_file in "${poll_files[@]}"; do

@@ -118,6 +118,13 @@ function byline_expected_admin_asset_presence(): array
         'editorialWorkflowScript' => $plugin_root . '/build/editorial-workflow.js',
         'editorialWorkflowManifest' => $plugin_root . '/build/editorial-workflow.asset.php',
         'editorialWorkflowStyles' => $plugin_root . '/build/editorial-workflow.css',
+        // Normal Pages use a small native document-settings entry plus the
+        // metadata-driven page-section block entry.
+        'pageEditorScript' => $plugin_root . '/build/page-editor.js',
+        'pageEditorManifest' => $plugin_root . '/build/page-editor.asset.php',
+        'pageSectionBlockScript' => $plugin_root . '/build/blocks/page-section/index.js',
+        'pageSectionBlockMetadata' => $plugin_root . '/build/blocks/page-section/block.json',
+        'pageSectionBlockStyles' => $plugin_root . '/build/blocks/page-section/style-index.css',
     ];
     $presence = [];
     foreach ($files as $name => $path) {
@@ -529,6 +536,48 @@ function byline_health_deployment_check(): ?array
     );
 }
 
+function byline_health_legacy_page_check(): ?array
+{
+    if (!function_exists('byline_get_weekly_page_migration_report')) {
+        return null;
+    }
+
+    $report = byline_get_weekly_page_migration_report();
+    $legacy_pages = is_array($report['legacyPages'] ?? null) ? $report['legacyPages'] : [];
+    if ($legacy_pages === []) {
+        return null;
+    }
+
+    $page_labels = [];
+    $first_edit_link = '';
+    $page_ids = [];
+    foreach ($legacy_pages as $page) {
+        if (!is_array($page)) {
+            continue;
+        }
+        $title = sanitize_text_field((string) ($page['title'] ?? 'Untitled page'));
+        $edit_link = (string) ($page['editLink'] ?? '');
+        if ($first_edit_link === '' && $edit_link !== '') {
+            $first_edit_link = $edit_link;
+        }
+        $page_ids[] = (int) ($page['id'] ?? 0);
+        $page_labels[] = $edit_link !== ''
+            ? '<a href="' . esc_url($edit_link) . '">' . esc_html($title) . '</a>'
+            : esc_html($title);
+    }
+
+    $count = count($page_labels);
+    return byline_health_check(
+        'legacy_page_markup',
+        'Legacy page markup',
+        BYLINE_HEALTH_STATUS_RECOMMENDED,
+        sprintf('%d legacy Page%s still use pre-block Byline page markup.', $count, $count === 1 ? '' : 's'),
+        'These pages were changed after their original seed and were not overwritten. Review the affected page' . ($count === 1 ? '' : 's') . ': ' . implode(', ', $page_labels) . '.',
+        $first_edit_link,
+        'page_ids=' . implode(',', $page_ids)
+    );
+}
+
 /**
  * @return array<int,array<string,mixed>>
  */
@@ -576,6 +625,10 @@ function byline_get_health_checks(): array
     $checks = array_merge($checks, byline_health_publication_checks($publication));
     $checks[] = byline_health_homepage_design_check();
     $checks[] = byline_health_route_check();
+    $legacy_page_check = byline_health_legacy_page_check();
+    if ($legacy_page_check !== null) {
+        $checks[] = $legacy_page_check;
+    }
 
     $features = is_array($publication['features'] ?? null) ? $publication['features'] : [];
     $checks = array_merge($checks, byline_health_optional_module_checks($features));
