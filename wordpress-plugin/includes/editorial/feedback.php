@@ -91,6 +91,39 @@ function byline_feedback_post_is_public_story(int $story_id): bool
     return $story instanceof WP_Post && $story->post_type === 'post' && $story->post_status === 'publish';
 }
 
+function byline_feedback_user_can(?int $user_id, string $capability, ...$args): bool
+{
+    if ($user_id !== null && $user_id > 0 && function_exists('user_can')) {
+        return (bool) user_can($user_id, $capability, ...$args);
+    }
+
+    return function_exists('current_user_can') && (bool) current_user_can($capability, ...$args);
+}
+
+/**
+ * Feedback contains reader-submitted private data. The inbox is editor-level,
+ * while an object-specific caller may use the linked story capability as the
+ * narrower exception. A story must still be a real post before its feedback
+ * can be handled.
+ */
+function byline_feedback_can_manage_story(int $story_id = 0, ?int $user_id = null): bool
+{
+    $story_id = absint($story_id);
+    if (byline_feedback_user_can($user_id, 'edit_others_posts')
+        || byline_feedback_user_can($user_id, 'manage_byline')) {
+        return true;
+    }
+
+    if ($story_id > 0) {
+        $story = get_post($story_id);
+        if (!$story instanceof WP_Post || $story->post_type !== 'post') {
+            return false;
+        }
+    }
+
+    return $story_id > 0 && byline_feedback_user_can($user_id, 'edit_post', $story_id);
+}
+
 /** @return array<string,mixed> */
 function byline_sanitize_feedback_input(array $input): array
 {
@@ -314,7 +347,7 @@ function byline_get_feedback(int $feedback_id): array
 }
 
 /** @return array<int,array<string,mixed>> */
-function byline_list_feedback(array $args = []): array
+function byline_list_feedback(array $args = [], ?int $user_id = null): array
 {
     $query = [
         'post_type' => BYLINE_FEEDBACK_POST_TYPE,
@@ -337,6 +370,9 @@ function byline_list_feedback(array $args = []): array
         if ($item === []) {
             continue;
         }
+        if ($user_id !== null && !byline_feedback_can_manage_story((int) ($item['storyId'] ?? 0), $user_id)) {
+            continue;
+        }
         if (isset($args['status']) && $item['status'] !== byline_sanitize_feedback_status($args['status'])) {
             continue;
         }
@@ -349,7 +385,7 @@ function byline_list_feedback(array $args = []): array
 function byline_update_feedback_status(int $feedback_id, string $status): bool
 {
     $feedback = byline_get_feedback($feedback_id);
-    if ($feedback === [] || !current_user_can('edit_posts')) {
+    if ($feedback === [] || !byline_feedback_can_manage_story((int) ($feedback['storyId'] ?? 0))) {
         return false;
     }
     update_post_meta($feedback_id, BYLINE_FEEDBACK_STATUS_META, byline_sanitize_feedback_status($status));
@@ -367,7 +403,7 @@ function byline_update_feedback_status(int $feedback_id, string $status): bool
 function byline_feedback_correction_draft(int $feedback_id)
 {
     $feedback = byline_get_feedback($feedback_id);
-    if ($feedback === [] || !current_user_can('edit_posts')) {
+    if ($feedback === [] || !byline_feedback_can_manage_story((int) ($feedback['storyId'] ?? 0))) {
         return new WP_Error('byline_feedback_forbidden', 'You are not allowed to use this feedback.', ['status' => 403]);
     }
     if ($feedback['status'] === 'spam') {

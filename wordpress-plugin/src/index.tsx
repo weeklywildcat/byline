@@ -31,6 +31,7 @@ import { createNavigationItem, moveItem, navigationConflictKey, sectionSlugForNa
 import { PlanningApp, createPlanningFetchers, type PlanningView } from "./planning";
 import { NewsletterApp, createNewsletterFetchers } from "./newsletters";
 import type { NewsletterBranding } from "./newsletters/render";
+import { stripMarkupForText } from "./safe-text";
 import type { ReactNode } from "react";
 import "./style.css";
 
@@ -228,7 +229,7 @@ function safeRequestError(error: unknown, fallback: string): string {
     : undefined;
   if (typeof candidate !== "string") return fallback;
 
-  const message = candidate.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  const message = stripMarkupForText(candidate);
   if (!message || message === "[object Object]" || message.length > 240 || /(?:stack trace|fatal error|password|token|secret|authorization|sqlstate)/i.test(message)) {
     return fallback;
   }
@@ -783,7 +784,7 @@ function PublicationSettings({
       navigationSections,
       navigationPages.map((page) => ({
         id: page.id,
-        title: page.title?.rendered?.replace(/<[^>]+>/g, "") || `Page ${page.id}`,
+        title: page.title?.rendered ? stripMarkupForText(page.title.rendered) || `Page ${page.id}` : `Page ${page.id}`,
         url: page.link
       }))
     );
@@ -1268,7 +1269,7 @@ function PublicationSettings({
               { label: "Choose a section, page, or custom URL", value: "" },
               ...navigationSections.map((section) => ({ label: `Section: ${section.name}`, value: `section:${section.slug}` })),
               ...navigationPages.map((page) => ({
-                label: `Page: ${page.title?.rendered?.replace(/<[^>]+>/g, "") || `Page ${page.id}`}`,
+                label: `Page: ${page.title?.rendered ? stripMarkupForText(page.title.rendered) || `Page ${page.id}` : `Page ${page.id}`}`,
                 value: `page:${page.id}`
               })),
               { label: "Custom URL", value: "__custom__" }

@@ -19,6 +19,12 @@ $actions = [];
 $remote_requests = [];
 $remote_campaigns = 0;
 $current_user = 7;
+$capabilities = [
+    BYLINE_MANAGE_INTEGRATIONS_CAPABILITY => true,
+    'edit_posts' => true,
+    'publish_posts' => true,
+    'edit_others_posts' => true,
+];
 
 class WP_Error
 {
@@ -58,7 +64,14 @@ class WP_Post
 
 class NewsletterRegressionRequest
 {
-    public function __construct(private array $params) {}
+    /** @var array<string,mixed> */
+    private $params;
+
+    /** @param array<string,mixed> $params */
+    public function __construct(array $params)
+    {
+        $this->params = $params;
+    }
     public function get_json_params(): array { return $this->params; }
     public function get_params(): array { return $this->params; }
     public function get_param(string $key) { return $this->params[$key] ?? null; }
@@ -103,7 +116,20 @@ function get_the_title(int $post_id): string { $post = get_post($post_id); retur
 function get_the_excerpt(int $post_id): string { $post = get_post($post_id); return $post ? (string) $post->post_excerpt : ''; }
 function get_bloginfo(string $show = ''): string { return $show === 'name' ? 'Example Newsroom' : ''; }
 function get_current_user_id(): int { global $current_user; return $current_user; }
-function current_user_can(string $capability, ...$args): bool { return $capability === BYLINE_MANAGE_INTEGRATIONS_CAPABILITY; }
+function current_user_can(string $capability, ...$args): bool
+{
+    global $capabilities, $current_user;
+    if ($capability === 'edit_post') {
+        $post = get_post(absint($args[0] ?? 0));
+        if (!$post) return false;
+        if ((int) ($post->post_author ?? 0) === (int) $current_user) {
+            return !empty($capabilities['edit_posts']);
+        }
+        return !empty($capabilities['edit_others_posts']);
+    }
+    return !empty($capabilities[$capability]);
+}
+function newsletter_set_capabilities(array $next): void { global $capabilities; $capabilities = array_fill_keys($next, true); }
 function wp_timezone(): DateTimeZone { return new DateTimeZone('UTC'); }
 function wp_timezone_string(): string { return 'UTC'; }
 function wp_insert_post(array $data, bool $wp_error = false)
@@ -171,6 +197,7 @@ require __DIR__ . '/../includes/integrations/newsletter.php';
 
 $posts[7] = (object) ['ID' => 7, 'post_type' => 'post', 'post_status' => 'publish', 'post_title' => 'Campus update', 'post_excerpt' => 'A useful reported update.'];
 $posts[8] = (object) ['ID' => 8, 'post_type' => 'post', 'post_status' => 'publish', 'post_title' => 'Sports desk', 'post_excerpt' => 'A second story.'];
+$posts[9] = (object) ['ID' => 9, 'post_type' => 'post', 'post_status' => 'draft', 'post_title' => 'Private desk draft', 'post_excerpt' => 'Unpublished reporting.', 'post_author' => 99];
 $options[BYLINE_NEWSLETTER_SETTINGS_OPTION] = [
     'provider' => 'mailchimp',
     'mailchimp' => [
@@ -188,6 +215,89 @@ newsletter_assert(!empty($definitions['mailchimp']['capabilities']['remoteSchedu
 newsletter_assert(empty($definitions['kit']['capabilities']['sendTest']), 'Kit advertised an unsupported issue test send.');
 newsletter_assert(empty($definitions['buttondown']['capabilities']['immediateSend']), 'Buttondown advertised an unsupported issue send.');
 newsletter_assert(empty($definitions['signup-link']['capabilities']['immediateSend']), 'Signup-link advertised an unsupported issue send.');
+
+$settings_payload = byline_newsletter_settings_payload();
+newsletter_assert(strpos(json_encode($settings_payload), 'mailchimp-secret') === false, 'Newsletter provider secrets leaked into the settings payload.');
+$mailchimp_payload = null;
+foreach ((array) ($settings_payload['providers'] ?? []) as $provider_payload) {
+    if (($provider_payload['id'] ?? '') === 'mailchimp') {
+        $mailchimp_payload = $provider_payload;
+        break;
+    }
+}
+$mailchimp_secret_field = null;
+foreach ((array) ($mailchimp_payload['fields'] ?? []) as $field) {
+    if (($field['id'] ?? '') === 'apiKey') {
+        $mailchimp_secret_field = $field;
+        break;
+    }
+}
+newsletter_assert(is_array($mailchimp_secret_field) && ($mailchimp_secret_field['value'] ?? null) === '', 'Newsletter provider secret fields must remain blank in settings payloads.');
+
+$publisher_capabilities = ['edit_posts', 'publish_posts'];
+$contributor_capabilities = ['edit_posts'];
+$integration_manager_capabilities = [BYLINE_MANAGE_INTEGRATIONS_CAPABILITY];
+newsletter_set_capabilities($contributor_capabilities);
+newsletter_assert(byline_newsletter_can_edit_issues(), 'Contributors should be able to prepare newsletter drafts.');
+newsletter_assert(!byline_newsletter_can_publish_issues(), 'Contributors must not have newsletter delivery capability.');
+newsletter_assert(!byline_newsletter_can_manage(), 'Contributors must not have newsletter integration-management capability.');
+
+$contributor_issue = byline_newsletter_issue_create_or_update([
+    'title' => 'Contributor draft',
+    'subject' => 'Contributor draft',
+    'providerId' => 'mailchimp',
+    'leadStoryId' => 7,
+]);
+newsletter_assert(is_array($contributor_issue) && ($contributor_issue['id'] ?? 0) > 0, 'Contributors should be able to create newsletter drafts.');
+$contributor_issue_id = (int) $contributor_issue['id'];
+$private_story_attempt = byline_newsletter_issue_create_or_update([
+    'title' => 'Private story attempt',
+    'subject' => 'Private story attempt',
+    'providerId' => 'mailchimp',
+    'leadStoryId' => 9,
+]);
+newsletter_assert(is_wp_error($private_story_attempt) && $private_story_attempt->get_error_code() === 'byline_newsletter_story_missing', 'Contributors must not attach another writer\'s private draft to a newsletter.');
+$private_story_add_attempt = byline_newsletter_issue_add_story($contributor_issue_id, 9, 'additional');
+newsletter_assert(is_wp_error($private_story_add_attempt) && $private_story_add_attempt->get_error_code() === 'byline_newsletter_story_missing', 'Contributors must not add another writer\'s private draft to an existing issue.');
+foreach (['send-test', 'send', 'schedule', 'cancel'] as $delivery_action) {
+    $denied = byline_newsletter_issue_action($contributor_issue_id, $delivery_action, $delivery_action === 'schedule' ? ['scheduledAt' => gmdate('c', time() + 3600)] : []);
+    newsletter_assert(is_wp_error($denied) && $denied->get_error_code() === 'byline_newsletter_forbidden', 'Contributors must be denied direct newsletter action: ' . $delivery_action . '.');
+}
+$rest_denied = byline_newsletter_rest_action(new NewsletterRegressionRequest(['id' => $contributor_issue_id]), 'send');
+newsletter_assert(is_wp_error($rest_denied) && $rest_denied->get_error_code() === 'byline_newsletter_forbidden', 'Direct newsletter action endpoint calls must not bypass delivery permissions.');
+
+$settings_before_contributor = get_option(BYLINE_NEWSLETTER_SETTINGS_OPTION);
+$denied_settings = byline_newsletter_update_settings([
+    'provider' => 'mailchimp',
+    'mailchimp' => ['apiKey' => 'attacker-secret', 'serverPrefix' => 'us2', 'audienceId' => 'audience-2'],
+]);
+newsletter_assert(is_wp_error($denied_settings) && $denied_settings->get_error_code() === 'byline_newsletter_forbidden', 'Contributors must not update newsletter provider settings.');
+newsletter_assert(get_option(BYLINE_NEWSLETTER_SETTINGS_OPTION) === $settings_before_contributor, 'Denied provider settings update changed stored credentials.');
+$denied_connection = byline_newsletter_test_connection('mailchimp');
+newsletter_assert(($denied_connection['status'] ?? 0) === 403 && empty($denied_connection['ok']), 'Contributors must not test newsletter provider connections.');
+$denied_audiences = byline_newsletter_list_audiences('mailchimp');
+newsletter_assert(($denied_audiences['status'] ?? 0) === 403 && empty($denied_audiences['ok']), 'Contributors must not discover newsletter audiences.');
+
+$current_user = 8;
+$unshared_issue = byline_newsletter_rest_get(new NewsletterRegressionRequest(['id' => $contributor_issue_id]));
+newsletter_assert(is_wp_error($unshared_issue) && $unshared_issue->get_error_code() === 'byline_newsletter_not_found', 'Contributors must not retrieve another writer\'s private newsletter issue.');
+$unshared_list = byline_newsletter_issue_list();
+newsletter_assert(($unshared_list['total'] ?? 0) === 0, 'Contributors must not enumerate another writer\'s private newsletter issues.');
+$current_user = 7;
+
+$editor_capabilities = ['edit_posts', 'edit_others_posts'];
+newsletter_set_capabilities($editor_capabilities);
+$editor_draft_issue = byline_newsletter_issue_create_or_update([
+    'title' => 'Editor draft with private story',
+    'subject' => 'Editor draft with private story',
+    'providerId' => 'mailchimp',
+    'leadStoryId' => 9,
+]);
+newsletter_assert(is_array($editor_draft_issue) && ($editor_draft_issue['stories'][0]['id'] ?? 0) === 9, 'Editors with object-level access should be able to use a private story in a newsletter.');
+
+newsletter_set_capabilities($publisher_capabilities);
+newsletter_assert(byline_newsletter_can_edit_issues() && byline_newsletter_can_publish_issues(), 'A publisher should be able to prepare and deliver newsletters.');
+newsletter_assert(!byline_newsletter_can_manage(), 'Newsletter delivery must not require integration-management capability.');
 
 $issue = byline_newsletter_issue_create_or_update([
     'title' => 'Friday briefing',
@@ -246,6 +356,8 @@ $options[BYLINE_NEWSLETTER_SETTINGS_OPTION] = [
     'provider' => 'webhook',
     'webhook' => ['webhookUrl' => 'https://webhook.example.test/newsletter', 'authToken' => 'webhook-secret'],
 ];
+$webhook_settings_payload = byline_newsletter_settings_payload();
+newsletter_assert(strpos(json_encode($webhook_settings_payload), 'webhook-secret') === false, 'Webhook secrets leaked into the settings payload.');
 $webhook_issue = byline_newsletter_issue_create_or_update([
     'title' => 'Webhook briefing',
     'subject' => 'Webhook briefing',
@@ -281,6 +393,38 @@ foreach ([
     newsletter_assert(isset($routes[$route]), 'Missing protected newsletter route: ' . $route);
 }
 newsletter_assert(($routes['byline/v1/admin/newsletters']['0']['permission_callback'] ?? null) === 'byline_newsletter_can_edit_issues', 'Newsletter issue route was not capability protected.');
+newsletter_assert(($routes['byline/v1/admin/newsletters/(?P<id>\\d+)']['0']['permission_callback'] ?? null) === 'byline_newsletter_rest_issue_permission', 'Newsletter issue reads were not object-permission protected.');
+newsletter_assert(($routes['byline/v1/admin/newsletters/(?P<id>\\d+)']['1']['permission_callback'] ?? null) === 'byline_newsletter_rest_issue_permission', 'Newsletter issue updates were not object-permission protected.');
+foreach (['send-test', 'send', 'schedule', 'cancel'] as $delivery_action) {
+    $route = 'byline/v1/admin/newsletters/(?P<id>\\d+)/' . $delivery_action;
+    newsletter_assert(($routes[$route]['permission_callback'] ?? null) === 'byline_newsletter_rest_issue_delivery_permission', 'Newsletter delivery route was not publisher/object protected: ' . $delivery_action . '.');
+}
+foreach (['byline/v1/admin/newsletter', 'byline/v1/admin/newsletters/provider'] as $legacy_settings_route) {
+    newsletter_assert(isset($routes[$legacy_settings_route]), 'Missing newsletter settings alias: ' . $legacy_settings_route . '.');
+    foreach ((array) ($routes[$legacy_settings_route] ?? []) as $method) {
+        newsletter_assert(($method['permission_callback'] ?? null) === 'byline_newsletter_can_manage', 'Newsletter settings alias lost integration-management protection: ' . $legacy_settings_route . '.');
+    }
+}
+foreach ([
+    'byline/v1/admin/newsletters/providers',
+    'byline/v1/admin/newsletters/providers/(?P<provider>[a-z0-9_-]+)/settings',
+    'byline/v1/admin/newsletters/providers/(?P<provider>[a-z0-9_-]+)/test',
+    'byline/v1/admin/newsletter/test',
+    'byline/v1/admin/newsletter/audiences',
+] as $integration_route) {
+    newsletter_assert(isset($routes[$integration_route]), 'Missing newsletter integration route: ' . $integration_route . '.');
+    newsletter_assert(($routes[$integration_route]['permission_callback'] ?? null) === 'byline_newsletter_can_manage', 'Newsletter integration route was not protected: ' . $integration_route . '.');
+}
+newsletter_set_capabilities($contributor_capabilities);
+newsletter_assert(call_user_func($routes['byline/v1/admin/newsletters']['0']['permission_callback']) === true, 'Contributors should retain draft issue route access.');
+foreach (['send-test', 'send', 'schedule', 'cancel'] as $delivery_action) {
+    $route = 'byline/v1/admin/newsletters/(?P<id>\\d+)/' . $delivery_action;
+    newsletter_assert(call_user_func($routes[$route]['permission_callback']) === false, 'Contributors must be denied the newsletter delivery route: ' . $delivery_action . '.');
+}
+newsletter_assert(call_user_func($routes['byline/v1/admin/newsletters/providers']['permission_callback']) === false, 'Contributors must be denied newsletter provider routes.');
+newsletter_set_capabilities($integration_manager_capabilities);
+newsletter_assert(call_user_func($routes['byline/v1/admin/newsletters/providers']['permission_callback']) === true, 'Integration managers should retain newsletter provider access.');
+newsletter_set_capabilities($publisher_capabilities);
 
 $list = byline_newsletter_issue_list(['status' => 'sent']);
 newsletter_assert(($list['total'] ?? 0) >= 1 && isset($list['items'][0]['htmlSnapshot']), 'Issue list did not return normalized private issue records.');

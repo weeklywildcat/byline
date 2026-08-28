@@ -305,6 +305,14 @@ function byline_newsletter_error(string $code, string $message)
     return ['error' => $code, 'message' => $message];
 }
 
+function byline_newsletter_forbidden(string $message)
+{
+    if (class_exists('WP_Error')) {
+        return new WP_Error('byline_newsletter_forbidden', $message, ['status' => 403]);
+    }
+    return ['error' => 'byline_newsletter_forbidden', 'message' => $message, 'status' => 403];
+}
+
 function byline_newsletter_provider_configured(string $provider, array $settings): bool
 {
     $config = is_array($settings[$provider] ?? null) ? $settings[$provider] : [];
@@ -468,6 +476,9 @@ function byline_newsletter_settings_payload(): array
 
 function byline_newsletter_update_settings(array $payload)
 {
+    if (!byline_newsletter_can_manage()) {
+        return byline_newsletter_forbidden('You are not allowed to manage newsletter provider settings.');
+    }
     $previous = byline_newsletter_raw_settings();
     $next = byline_newsletter_normalize_settings($payload, $previous, true);
     if (function_exists('is_wp_error') && is_wp_error($next)) {
@@ -517,6 +528,15 @@ function byline_newsletter_test_connection(?string $provider = null, ?array $pro
 {
     $settings = $provided_settings !== null ? $provided_settings : byline_newsletter_raw_settings();
     $provider = $provider !== null ? byline_newsletter_provider_alias($provider) : $settings['provider'];
+    if (!byline_newsletter_can_manage()) {
+        return [
+            'ok' => false,
+            'provider' => $provider,
+            'code' => 0,
+            'error' => 'You are not allowed to test newsletter provider connections.',
+            'status' => 403,
+        ];
+    }
     $definitions = byline_newsletter_provider_definitions();
     if (!isset($definitions[$provider])) {
         return ['ok' => false, 'provider' => $provider, 'error' => 'Select a supported newsletter provider.'];
@@ -555,6 +575,15 @@ function byline_newsletter_list_audiences(?string $provider = null): array
 {
     $settings = byline_newsletter_raw_settings();
     $provider = $provider !== null ? byline_newsletter_provider_alias($provider) : $settings['provider'];
+    if (!byline_newsletter_can_manage()) {
+        return [
+            'ok' => false,
+            'provider' => $provider,
+            'audiences' => [],
+            'error' => 'You are not allowed to discover newsletter audiences.',
+            'status' => 403,
+        ];
+    }
     $definitions = byline_newsletter_provider_definitions();
     if (!isset($definitions[$provider]) || empty($definitions[$provider]['capabilities']['audienceDiscovery'])) {
         return ['ok' => false, 'provider' => $provider, 'audiences' => [], 'error' => 'Audience discovery is not supported by this provider.'];
@@ -737,6 +766,38 @@ function byline_newsletter_issue_record($issue_id): ?array
     return $record;
 }
 
+/**
+ * Newsletter issues are private post-backed records. Keep collection access
+ * broad enough for the newsroom screen, but make every existing issue
+ * object-scoped so one editor cannot read another editor's private issue.
+ * The author fallback is intentional: a private custom post can require
+ * edit_private_posts in Core even when the author has the existing newsroom
+ * edit_posts capability and should still be able to edit their own issue.
+ */
+function byline_newsletter_issue_can_access(int $issue_id, ?int $user_id = null): bool
+{
+    $post = byline_newsletter_issue_post($issue_id);
+    if (!$post) {
+        return false;
+    }
+    $management_capability = defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline';
+    if ($user_id !== null && function_exists('user_can')) {
+        if (user_can($user_id, $management_capability) || user_can($user_id, 'edit_post', $issue_id)) {
+            return true;
+        }
+        return (int) ($post->post_author ?? 0) === $user_id && user_can($user_id, 'edit_posts');
+    }
+    if (!function_exists('current_user_can')) {
+        return false;
+    }
+    if (current_user_can($management_capability) || current_user_can('edit_post', $issue_id)) {
+        return true;
+    }
+    return function_exists('get_current_user_id')
+        && (int) ($post->post_author ?? 0) === (int) get_current_user_id()
+        && current_user_can('edit_posts');
+}
+
 function byline_newsletter_issue_scalar($value, int $maximum = 512): string
 {
     if (!is_scalar($value)) {
@@ -850,11 +911,34 @@ function byline_newsletter_issue_ordered_story_ids(array $record): array
     return $ids;
 }
 
-function byline_newsletter_issue_story($story_id): ?array
+/**
+ * Return whether the current actor may use a story in a private newsletter
+ * issue. Published stories are already public; every other status remains
+ * object-scoped so a newsletter cannot become a draft-story discovery API.
+ */
+function byline_newsletter_issue_story_allowed(int $story_id, ?int $user_id = null): bool
+{
+    $post = function_exists('get_post') ? get_post($story_id) : null;
+    if (!$post || ($post->post_type ?? 'post') !== 'post') {
+        return false;
+    }
+    if (($post->post_status ?? 'publish') === 'publish') {
+        return true;
+    }
+    if ($user_id !== null && function_exists('user_can')) {
+        return (bool) user_can($user_id, 'edit_post', $story_id);
+    }
+    return function_exists('current_user_can') && (bool) current_user_can('edit_post', $story_id);
+}
+
+function byline_newsletter_issue_story($story_id, ?int $user_id = null): ?array
 {
     $story_id = byline_newsletter_issue_id($story_id);
     $post = function_exists('get_post') ? get_post($story_id) : null;
     if (!$post || ($post->post_type ?? 'post') !== 'post') {
+        return null;
+    }
+    if (!byline_newsletter_issue_story_allowed($story_id, $user_id)) {
         return null;
     }
     $title = function_exists('get_the_title') ? get_the_title($story_id) : ($post->post_title ?? '');
@@ -868,11 +952,11 @@ function byline_newsletter_issue_story($story_id): ?array
     ];
 }
 
-function byline_newsletter_issue_stories(array $record, bool $require_all = false)
+function byline_newsletter_issue_stories(array $record, bool $require_all = false, ?int $user_id = null)
 {
     $stories = [];
     foreach (byline_newsletter_issue_ordered_story_ids($record) as $story_id) {
-        $story = byline_newsletter_issue_story($story_id);
+        $story = byline_newsletter_issue_story($story_id, $user_id);
         if (!$story) {
             if ($require_all) {
                 return byline_newsletter_issue_error('byline_newsletter_story_missing', 'One of the selected stories is no longer available.', 404);
@@ -951,6 +1035,21 @@ function byline_newsletter_issue_payload(int $issue_id, bool $include_stories = 
 {
     $record = byline_newsletter_issue_record($issue_id) ?: byline_newsletter_issue_defaults();
     $record['id'] = $issue_id;
+    $visible_story_ids = [];
+    foreach (byline_newsletter_issue_ordered_story_ids($record) as $story_id) {
+        if (byline_newsletter_issue_story($story_id)) {
+            $visible_story_ids[] = $story_id;
+        }
+    }
+    $record['leadStoryId'] = in_array((int) ($record['leadStoryId'] ?? 0), $visible_story_ids, true)
+        ? (int) $record['leadStoryId']
+        : null;
+    $record['additionalStoryIds'] = array_values(array_filter(
+        $visible_story_ids,
+        static function (int $story_id) use ($record): bool {
+            return $story_id !== (int) ($record['leadStoryId'] ?? 0);
+        }
+    ));
     $payload = $record;
     if ($include_stories) {
         $stories = byline_newsletter_issue_stories($record, false);
@@ -1069,8 +1168,14 @@ function byline_newsletter_issue_snapshot(array $record)
 
 function byline_newsletter_issue_create_or_update(array $input, ?int $issue_id = null)
 {
+    if (!byline_newsletter_can_edit_issues()) {
+        return byline_newsletter_issue_error('byline_newsletter_forbidden', 'You are not allowed to prepare newsletter issues.', 403);
+    }
     $existing = $issue_id ? byline_newsletter_issue_record($issue_id) : null;
     if ($issue_id && $existing === null) {
+        return byline_newsletter_issue_error('byline_newsletter_not_found', 'Newsletter issue not found.', 404);
+    }
+    if ($issue_id && !byline_newsletter_issue_can_access((int) $issue_id)) {
         return byline_newsletter_issue_error('byline_newsletter_not_found', 'Newsletter issue not found.', 404);
     }
     if ($existing !== null && in_array($existing['status'], ['sending', 'sent'], true)) {
@@ -1126,6 +1231,7 @@ function byline_newsletter_issue_list(array $params = []): array
         $id = byline_newsletter_issue_id(is_object($post) ? ($post->ID ?? 0) : $post);
         $record = $id ? byline_newsletter_issue_record($id) : null;
         if (!$record || ($status !== '' && $record['status'] !== $status)) continue;
+        if (!byline_newsletter_issue_can_access($id)) continue;
         $items[] = byline_newsletter_issue_payload($id, false);
     }
     $total = count($items);
@@ -1135,8 +1241,12 @@ function byline_newsletter_issue_list(array $params = []): array
 
 function byline_newsletter_issue_add_story(int $issue_id, int $story_id, string $placement)
 {
+    if (!byline_newsletter_can_edit_issues()) {
+        return byline_newsletter_issue_error('byline_newsletter_forbidden', 'You are not allowed to prepare newsletter issues.', 403);
+    }
     $record = byline_newsletter_issue_record($issue_id);
     if (!$record) return byline_newsletter_issue_error('byline_newsletter_not_found', 'Newsletter issue not found.', 404);
+    if (!byline_newsletter_issue_can_access($issue_id)) return byline_newsletter_issue_error('byline_newsletter_not_found', 'Newsletter issue not found.', 404);
     if (in_array($record['status'], ['sending', 'sent'], true)) return byline_newsletter_issue_error('byline_newsletter_immutable', 'A sending or sent issue cannot be edited.');
     if (!byline_newsletter_issue_story($story_id)) return byline_newsletter_issue_error('byline_newsletter_story_missing', 'The selected story is not available.', 404);
     if ($placement === 'lead') {
@@ -1151,8 +1261,12 @@ function byline_newsletter_issue_add_story(int $issue_id, int $story_id, string 
 
 function byline_newsletter_issue_action(int $issue_id, string $action, array $params = [])
 {
+    if (!byline_newsletter_can_publish_issues()) {
+        return byline_newsletter_issue_error('byline_newsletter_forbidden', 'You are not allowed to send, schedule, or cancel newsletters.', 403);
+    }
     $record = byline_newsletter_issue_record($issue_id);
     if (!$record) return byline_newsletter_issue_error('byline_newsletter_not_found', 'Newsletter issue not found.', 404);
+    if (!byline_newsletter_issue_can_access($issue_id)) return byline_newsletter_issue_error('byline_newsletter_not_found', 'Newsletter issue not found.', 404);
     $provider = byline_newsletter_issue_provider($record);
     $settings = byline_newsletter_raw_settings();
     $definitions = byline_newsletter_provider_definitions();
@@ -1280,6 +1394,7 @@ function byline_newsletter_rest_get($request = null)
     $id = byline_newsletter_issue_id($params['id'] ?? 0);
     $record = byline_newsletter_issue_record($id);
     if (!$record) return byline_newsletter_issue_error('byline_newsletter_not_found', 'Newsletter issue not found.', 404);
+    if (!byline_newsletter_issue_can_access($id)) return byline_newsletter_issue_error('byline_newsletter_not_found', 'Newsletter issue not found.', 404);
     return rest_ensure_response(['newsletter' => byline_newsletter_issue_payload($id, false), 'stories' => byline_newsletter_issue_payload($id, true)['stories'], 'providers' => byline_newsletter_settings_payload()['providers']]);
 }
 
@@ -1292,10 +1407,14 @@ function byline_newsletter_rest_save($request = null)
 
 function byline_newsletter_rest_delete($request = null)
 {
+    if (!byline_newsletter_can_edit_issues()) {
+        return rest_ensure_response(byline_newsletter_issue_error('byline_newsletter_forbidden', 'You are not allowed to prepare newsletter issues.', 403));
+    }
     $params = byline_newsletter_rest_issue_request($request);
     $id = byline_newsletter_issue_id($params['id'] ?? 0);
     $record = byline_newsletter_issue_record($id);
     if (!$record) return byline_newsletter_issue_error('byline_newsletter_not_found', 'Newsletter issue not found.', 404);
+    if (!byline_newsletter_issue_can_access($id)) return rest_ensure_response(byline_newsletter_issue_error('byline_newsletter_not_found', 'Newsletter issue not found.', 404));
     if (in_array($record['status'], ['sending', 'sent'], true)) return byline_newsletter_issue_error('byline_newsletter_immutable', 'A sending or sent issue cannot be deleted.');
     if (!function_exists('wp_delete_post') || !wp_delete_post($id, true)) return byline_newsletter_issue_error('byline_newsletter_delete_failed', 'Newsletter issue could not be deleted.', 500);
     return rest_ensure_response(['deleted' => true, 'id' => $id]);
@@ -1313,13 +1432,16 @@ function byline_newsletter_rest_add_story($request = null)
 
 function byline_newsletter_rest_action($request = null, string $action = '')
 {
+    if (!byline_newsletter_can_publish_issues()) {
+        return rest_ensure_response(byline_newsletter_issue_error('byline_newsletter_forbidden', 'You are not allowed to send, schedule, or cancel newsletters.', 403));
+    }
     $params = byline_newsletter_rest_issue_request($request);
     return rest_ensure_response(byline_newsletter_issue_action(byline_newsletter_issue_id($params['id'] ?? 0), $action, $params));
 }
 
 function byline_newsletter_can_manage(): bool
 {
-    return current_user_can(defined('BYLINE_MANAGE_INTEGRATIONS_CAPABILITY') ? BYLINE_MANAGE_INTEGRATIONS_CAPABILITY : 'manage_byline_integrations');
+    return function_exists('current_user_can') && current_user_can(defined('BYLINE_MANAGE_INTEGRATIONS_CAPABILITY') ? BYLINE_MANAGE_INTEGRATIONS_CAPABILITY : 'manage_byline_integrations');
 }
 
 /**
@@ -1329,7 +1451,39 @@ function byline_newsletter_can_manage(): bool
  */
 function byline_newsletter_can_edit_issues(): bool
 {
-    return current_user_can('edit_posts');
+    return function_exists('current_user_can') && current_user_can('edit_posts');
+}
+
+/**
+ * Delivery is a publication mutation, not draft preparation. Core publisher
+ * capabilities keep this aligned with the site's existing newsroom roles.
+ */
+function byline_newsletter_can_publish_issues(): bool
+{
+    if (!function_exists('current_user_can')) {
+        return false;
+    }
+    return current_user_can('publish_posts') || current_user_can('edit_others_posts');
+}
+
+function byline_newsletter_rest_issue_permission($request = null): bool
+{
+    if (!byline_newsletter_can_edit_issues()) {
+        return false;
+    }
+    $params = byline_newsletter_rest_issue_request($request);
+    $issue_id = byline_newsletter_issue_id($params['id'] ?? 0);
+    return $issue_id <= 0 || byline_newsletter_issue_can_access($issue_id);
+}
+
+function byline_newsletter_rest_issue_delivery_permission($request = null): bool
+{
+    if (!byline_newsletter_can_publish_issues()) {
+        return false;
+    }
+    $params = byline_newsletter_rest_issue_request($request);
+    $issue_id = byline_newsletter_issue_id($params['id'] ?? 0);
+    return $issue_id > 0 && byline_newsletter_issue_can_access($issue_id);
 }
 
 function byline_newsletter_request_json($request): array
@@ -1478,18 +1632,21 @@ function byline_register_newsletter_routes(): void
     ];
     register_rest_route('byline/v1', '/admin/newsletters', [$issue_read, $issue_create]);
     register_rest_route('byline/v1', '/admin/newsletters/(?P<id>\d+)', [
-        array_merge($issue_read, ['callback' => 'byline_newsletter_rest_get']),
-        $issue_create,
+        array_merge($issue_read, [
+            'callback' => 'byline_newsletter_rest_get',
+            'permission_callback' => 'byline_newsletter_rest_issue_permission',
+        ]),
+        array_merge($issue_create, ['permission_callback' => 'byline_newsletter_rest_issue_permission']),
         [
             'methods' => 'DELETE',
             'callback' => 'byline_newsletter_rest_delete',
-            'permission_callback' => 'byline_newsletter_can_edit_issues',
+            'permission_callback' => 'byline_newsletter_rest_issue_permission',
         ],
     ]);
     register_rest_route('byline/v1', '/admin/newsletters/(?P<id>\d+)/stories', [
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'byline_newsletter_rest_add_story',
-        'permission_callback' => 'byline_newsletter_can_edit_issues',
+        'permission_callback' => 'byline_newsletter_rest_issue_permission',
     ]);
     foreach (['send-test', 'send', 'schedule', 'cancel'] as $action) {
         register_rest_route('byline/v1', '/admin/newsletters/(?P<id>\d+)/' . $action, [
@@ -1497,7 +1654,7 @@ function byline_register_newsletter_routes(): void
             'callback' => static function ($request) use ($action) {
                 return byline_newsletter_rest_action($request, $action);
             },
-            'permission_callback' => 'byline_newsletter_can_edit_issues',
+            'permission_callback' => 'byline_newsletter_rest_issue_delivery_permission',
         ]);
     }
 }

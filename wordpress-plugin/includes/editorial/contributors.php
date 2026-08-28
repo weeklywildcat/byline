@@ -630,22 +630,39 @@ function byline_story_contributors_can_edit(int $post_id, ?int $user_id = null):
     return user_can($user_id, 'edit_post', $post_id);
 }
 
-function byline_guest_can_create(?int $user_id = null): bool
+function byline_guest_management_capability(): string
 {
+    return defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline';
+}
+
+function byline_guest_can_manage(?int $user_id = null): bool
+{
+    $management_capability = byline_guest_management_capability();
+
     if ($user_id === null) {
-        return current_user_can('edit_posts') || current_user_can('manage_byline');
+        return current_user_can('edit_others_posts') || current_user_can($management_capability);
     }
 
-    return user_can($user_id, 'edit_posts') || user_can($user_id, 'manage_byline');
+    return user_can($user_id, 'edit_others_posts') || user_can($user_id, $management_capability);
+}
+
+function byline_guest_can_publish(?int $user_id = null): bool
+{
+    if ($user_id === null) {
+        return current_user_can('publish_posts');
+    }
+
+    return user_can($user_id, 'publish_posts');
+}
+
+function byline_guest_can_create(?int $user_id = null): bool
+{
+    return byline_guest_can_manage($user_id);
 }
 
 function byline_guest_can_edit(int $guest_id, ?int $user_id = null): bool
 {
-    if ($user_id === null) {
-        return current_user_can('manage_byline') || current_user_can('edit_post', $guest_id);
-    }
-
-    return user_can($user_id, 'manage_byline') || user_can($user_id, 'edit_post', $guest_id);
+    return byline_guest_can_manage($user_id);
 }
 
 /**
@@ -777,10 +794,21 @@ function byline_guest_store_fields(int $guest_id, array $data): void
     }
 }
 
+function byline_guest_sanitize_status($value, string $fallback = 'draft'): string
+{
+    if (!is_scalar($value)) {
+        return $fallback;
+    }
+
+    $status = sanitize_key((string) $value);
+
+    return in_array($status, ['draft', 'publish'], true) ? $status : $fallback;
+}
+
 /**
- * Create a guest contributor. The default status is publish because the
- * record itself contains only explicitly public-facing profile data; callers
- * can request draft status until an editor is ready to use it publicly.
+ * Create a guest contributor. A publisher may opt into the normal published
+ * default, while newsroom editors without publish_posts get a draft that must
+ * be explicitly published by an authorised user.
  */
 function byline_create_guest_contributor(array $input, ?int $user_id = null)
 {
@@ -802,8 +830,14 @@ function byline_create_guest_contributor(array $input, ?int $user_id = null)
     }
 
     $post_author = $user_id !== null && $user_id > 0 ? $user_id : (function_exists('get_current_user_id') ? get_current_user_id() : 0);
-    $status = sanitize_key((string) ($input['status'] ?? 'publish'));
-    $status = in_array($status, ['draft', 'publish'], true) ? $status : 'draft';
+    $can_publish = byline_guest_can_publish($user_id);
+    $has_status = array_key_exists('status', $input);
+    $status = $has_status
+        ? byline_guest_sanitize_status($input['status'])
+        : ($can_publish ? 'publish' : 'draft');
+    if ($status === 'publish' && !$can_publish) {
+        return new WP_Error('byline_guest_forbidden_publish', 'You are not allowed to publish guest contributors.', ['status' => 403]);
+    }
     $guest_id = wp_insert_post([
         'post_type' => BYLINE_GUEST_POST_TYPE,
         'post_status' => $status,
@@ -845,9 +879,15 @@ function byline_update_guest_contributor(int $guest_id, array $input, ?int $user
     $data = byline_normalize_guest_input($input, (string) ($existing['displayName'] ?? $post->post_title));
     $has_name = array_key_exists('displayName', $input) || array_key_exists('name', $input);
     $has_slug = array_key_exists('slug', $input);
+    $has_status = array_key_exists('status', $input);
+    $status = $has_status ? byline_guest_sanitize_status($input['status']) : (string) $post->post_status;
 
     if ($has_name && $data['displayName'] === '') {
         return new WP_Error('byline_guest_invalid', 'A guest contributor name cannot be empty.', ['status' => 400]);
+    }
+
+    if ($has_status && $status === 'publish' && $post->post_status !== 'publish' && !byline_guest_can_publish($user_id)) {
+        return new WP_Error('byline_guest_forbidden_publish', 'You are not allowed to publish guest contributors.', ['status' => 403]);
     }
 
     $requested_slug = $has_slug ? $data['slug'] : byline_guest_public_slug($guest_id);
@@ -864,6 +904,9 @@ function byline_update_guest_contributor(int $guest_id, array $input, ?int $user
     }
     if ($has_slug || $requested_slug !== (string) $post->post_name) {
         $post_changes['post_name'] = $requested_slug;
+    }
+    if ($has_status && $status !== (string) $post->post_status) {
+        $post_changes['post_status'] = $status;
     }
 
     if (count($post_changes) > 1 && function_exists('wp_update_post')) {
@@ -904,9 +947,10 @@ function byline_delete_guest_contributor(int $guest_id, ?int $user_id = null, bo
     }
 
     if ($user_id === null) {
-        $can_delete = current_user_can('manage_byline') || current_user_can('delete_post', $guest_id);
+        $can_delete = current_user_can(byline_guest_management_capability()) || current_user_can('delete_post', $guest_id);
     } else {
-        $can_delete = user_can($user_id, 'manage_byline') || user_can($user_id, 'delete_post', $guest_id);
+        $management_capability = byline_guest_management_capability();
+        $can_delete = user_can($user_id, $management_capability) || user_can($user_id, 'delete_post', $guest_id);
     }
     if (!$can_delete) {
         return new WP_Error('byline_guest_forbidden', 'You cannot delete this guest contributor.', ['status' => 403]);

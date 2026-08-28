@@ -430,17 +430,37 @@ function byline_distribution_request_id_from_request($request): int
 function byline_distribution_rest_permission($request): bool
 {
     $post_id = byline_distribution_request_id_from_request($request);
-    if (current_user_can(defined('BYLINE_MANAGE_INTEGRATIONS_CAPABILITY') ? BYLINE_MANAGE_INTEGRATIONS_CAPABILITY : 'manage_byline_integrations')) {
-        return true;
-    }
-    if ($post_id <= 0) {
+    $post = $post_id > 0 ? byline_distribution_post($post_id) : null;
+    if (!is_object($post) || (($post->post_type ?? 'post') !== 'post')) {
         return false;
     }
     try {
-        return (bool) current_user_can('edit_post', $post_id);
+        return (bool) current_user_can('edit_post', $post_id)
+            || current_user_can(defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline');
     } catch (Throwable $exception) {
         return false;
     }
+}
+
+function byline_distribution_rest_action_permission($request): bool
+{
+    $post_id = byline_distribution_request_id_from_request($request);
+    $post = $post_id > 0 ? byline_distribution_post($post_id) : null;
+    if (!is_object($post) || (($post->post_type ?? 'post') !== 'post')) {
+        return false;
+    }
+
+    try {
+        if (!current_user_can('edit_post', $post_id)) {
+            return false;
+        }
+    } catch (Throwable $exception) {
+        return false;
+    }
+
+    return current_user_can('publish_posts')
+        || current_user_can('edit_others_posts')
+        || current_user_can(defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline');
 }
 
 function byline_distribution_request_params($request): array
@@ -506,17 +526,17 @@ function byline_register_distribution_routes(): void
     register_rest_route('byline/v1', '/editorial/distribution/(?P<id>\d+)/social', [
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'byline_distribution_rest_social',
-        'permission_callback' => $permission,
+        'permission_callback' => 'byline_distribution_rest_action_permission',
     ]);
     register_rest_route('byline/v1', '/editorial/distribution/(?P<id>\d+)/discord', [
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'byline_distribution_rest_discord',
-        'permission_callback' => $permission,
+        'permission_callback' => 'byline_distribution_rest_action_permission',
     ]);
     register_rest_route('byline/v1', '/editorial/distribution/(?P<id>\d+)/newsletter', [
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'byline_distribution_rest_newsletter',
-        'permission_callback' => $permission,
+        'permission_callback' => 'byline_distribution_rest_action_permission',
     ]);
     register_rest_route('byline/v1', '/admin/distribution/(?P<id>\d+)', [
         'methods' => WP_REST_Server::READABLE,

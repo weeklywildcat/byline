@@ -683,9 +683,47 @@ function byline_analytics_rest_performance($request = null): WP_REST_Response
     ]);
 }
 
-function byline_analytics_can_view_performance(): bool
+function byline_analytics_performance_post_id($request): int
 {
-    return byline_analytics_can_manage() || current_user_can('edit_posts');
+    if (is_object($request) && method_exists($request, 'get_param')) {
+        return absint($request->get_param('postId'));
+    }
+
+    return 0;
+}
+
+function byline_analytics_performance_path($request): string
+{
+    if (is_object($request) && method_exists($request, 'get_param')) {
+        $path = $request->get_param('path');
+        return is_scalar($path) ? trim((string) $path) : '';
+    }
+
+    return '';
+}
+
+function byline_analytics_can_view_performance($request = null): bool
+{
+    $can_manage = byline_analytics_can_manage();
+    if (!$can_manage && !current_user_can('edit_posts')) {
+        return false;
+    }
+
+    $post_id = byline_analytics_performance_post_id($request);
+    $path = byline_analytics_performance_path($request);
+    if ($post_id > 0) {
+        $post = function_exists('get_post') ? get_post($post_id) : null;
+        if (!is_object($post) || (($post->post_type ?? 'post') !== 'post') || (($post->post_status ?? '') !== 'publish')) {
+            return false;
+        }
+
+        return $can_manage || (bool) current_user_can('edit_post', $post_id);
+    }
+
+    // A bare path cannot establish that the corresponding article is public.
+    // Story-scoped analytics must carry a published post ID so private and draft
+    // URLs cannot be used as a side channel through the aggregate endpoint.
+    return $path === '';
 }
 
 function byline_register_analytics_routes(): void

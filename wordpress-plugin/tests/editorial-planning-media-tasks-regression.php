@@ -335,14 +335,20 @@ function editorial_test_compare_meta(int $post_id, array $clause): bool
     if (!$exists) {
         return false;
     }
-    return match ($compare) {
-        '=' => $actual === $value,
-        '<' => $actual < $value,
-        '<=' => $actual <= $value,
-        '>=' => $actual >= $value,
-        'LIKE' => strpos($actual, $value) !== false,
-        default => true,
-    };
+    switch ($compare) {
+        case '=':
+            return $actual === $value;
+        case '<':
+            return $actual < $value;
+        case '<=':
+            return $actual <= $value;
+        case '>=':
+            return $actual >= $value;
+        case 'LIKE':
+            return strpos($actual, $value) !== false;
+        default:
+            return true;
+    }
 }
 
 function get_posts(array $args = []): array

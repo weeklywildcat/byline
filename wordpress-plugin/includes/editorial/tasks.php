@@ -122,6 +122,10 @@ function byline_task_can_view(int $task_id, ?int $user_id = null): bool
     // newsroom work is deliberately editor-level so it cannot become a side
     // channel for private assignments.
     if ($story_id > 0) {
+        $story = function_exists('get_post') ? get_post($story_id) : null;
+        if (!$story instanceof WP_Post || $story->post_type !== 'post') {
+            return false;
+        }
         return byline_task_user_can($user_id, 'edit_post', $story_id);
     }
 

@@ -17,6 +17,8 @@ $options = [];
 $routes = [];
 $actions = [];
 $can_manage = false;
+$capabilities = [];
+$capability_checks = [];
 $remote_count = 0;
 $remote_code = 200;
 $last_remote = null;
@@ -38,6 +40,23 @@ class WP_REST_Server
 {
     const READABLE = 'GET';
     const CREATABLE = 'POST';
+}
+
+class HealthTestRequest
+{
+    /** @var array<string,mixed> */
+    private $params;
+
+    /** @param array<string,mixed> $params */
+    public function __construct(array $params)
+    {
+        $this->params = $params;
+    }
+
+    public function get_param(string $key)
+    {
+        return $this->params[$key] ?? null;
+    }
 }
 
 function health_assert(bool $condition, string $message): void
@@ -71,7 +90,25 @@ function get_transient(string $key) { global $transients; return $transients[$ke
 function set_transient(string $key, $value, int $expiration = 0): bool { global $transients; $transients[$key] = $value; return true; }
 function get_option(string $key, $default = false) { global $options; return array_key_exists($key, $options) ? $options[$key] : $default; }
 function update_option(string $key, $value, $autoload = false): bool { global $options; $options[$key] = $value; return true; }
-function get_posts(array $query = []): array { global $posts, $last_query; $last_query = $query; return array_slice(array_keys($posts), (int) ($query['offset'] ?? 0), (int) ($query['posts_per_page'] ?? 10)); }
+function get_posts(array $query = []): array
+{
+    global $posts, $last_query;
+    $last_query = $query;
+    $ids = array_keys($posts);
+    if (isset($query['post_type'])) {
+        $post_types = array_map('strval', (array) $query['post_type']);
+        $ids = array_values(array_filter($ids, static function ($id) use ($posts, $post_types): bool {
+            return in_array((string) ($posts[$id]->post_type ?? ''), $post_types, true);
+        }));
+    }
+    if (isset($query['post_status'])) {
+        $post_statuses = array_map('strval', (array) $query['post_status']);
+        $ids = array_values(array_filter($ids, static function ($id) use ($posts, $post_statuses): bool {
+            return in_array((string) ($posts[$id]->post_status ?? ''), $post_statuses, true);
+        }));
+    }
+    return array_slice($ids, (int) ($query['offset'] ?? 0), (int) ($query['posts_per_page'] ?? 10));
+}
 function wp_remote_retrieve_response_code($response): int { return (int) ($response['response']['code'] ?? 0); }
 function wp_safe_remote_get(string $url, array $args = [])
 {
@@ -80,7 +117,21 @@ function wp_safe_remote_get(string $url, array $args = [])
     $last_remote = ['url' => $url, 'args' => $args];
     return ['response' => ['code' => $remote_code], 'body' => ''];
 }
-function current_user_can(string $capability, ...$args): bool { global $can_manage; return $can_manage; }
+function current_user_can(string $capability, ...$args): bool
+{
+    global $can_manage, $capabilities, $capability_checks;
+    $capability_checks[] = [$capability, $args];
+    if ($capability === 'edit_post') {
+        $post_id = absint($args[0] ?? 0);
+        return array_key_exists($post_id, $capabilities['edit_post'] ?? [])
+            ? (bool) $capabilities['edit_post'][$post_id]
+            : false;
+    }
+    if (array_key_exists($capability, $capabilities)) {
+        return (bool) $capabilities[$capability];
+    }
+    return $can_manage;
+}
 function register_rest_route(string $namespace, string $route, $definition): void { global $routes; $routes[$namespace . $route] = $definition; }
 function rest_ensure_response($value) { return $value; }
 function wp_schedule_event(int $timestamp, string $recurrence, string $hook): bool { global $options; $options['scheduled:' . $hook] = $timestamp; return true; }
@@ -88,6 +139,8 @@ function wp_next_scheduled(string $hook) { global $options; return $options['sch
 
 $posts[5] = (object) ['ID' => 5, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => 'A link https://public.example.test/story.'];
 $posts[6] = (object) ['ID' => 6, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => 'No external links.'];
+$posts[7] = (object) ['ID' => 7, 'post_status' => 'draft', 'post_type' => 'post', 'post_title' => 'Private draft story', 'post_content' => 'Private newsroom work.'];
+$posts[8] = (object) ['ID' => 8, 'post_status' => 'private', 'post_type' => 'post', 'post_title' => 'Private story', 'post_content' => 'Private newsroom work.'];
 
 require __DIR__ . '/../includes/content-health/checks.php';
 require __DIR__ . '/../includes/content-health/scanner.php';
@@ -147,6 +200,29 @@ byline_register_content_health_routes();
 $summary_route = $routes['byline/v1/admin/content-health'] ?? null;
 $recheck_route = $routes['byline/v1/admin/content-health/recheck/(?P<id>\\d+)'] ?? null;
 health_assert(is_array($summary_route) && $summary_route['permission_callback']() === false, 'Content-health summary route was not capability protected.');
-health_assert(is_array($recheck_route) && $recheck_route['permission_callback']((object) ['get_param' => static function () {}]) === false, 'Content-health recheck route was not protected.');
+
+// Collection access must not substitute for the object-level edit_post check.
+// Keep the actor an ordinary edit_posts newsroom user; a true management
+// capability intentionally grants the broader all-stories view.
+$can_manage = false;
+$capabilities['edit_post'] = [5 => true, 6 => true, 7 => false, 8 => false];
+$collection = byline_content_health_summary();
+$collection_story_ids = [];
+foreach ($collection['issues'] as $issue) {
+    if (is_array($issue) && isset($issue['story']['id'])) {
+        $collection_story_ids[] = (int) $issue['story']['id'];
+        health_assert(strpos((string) ($issue['story']['title'] ?? ''), 'Private') === false, 'Content-health collection leaked a private story title.');
+        health_assert(strpos((string) ($issue['story']['editUrl'] ?? ''), 'post=7') === false && strpos((string) ($issue['story']['editUrl'] ?? ''), 'post=8') === false, 'Content-health collection leaked a private story edit URL.');
+    }
+}
+health_assert(!in_array(7, $collection_story_ids, true) && !in_array(8, $collection_story_ids, true), 'Content-health collection returned a draft or private story.');
+health_assert(is_array($recheck_route) && $recheck_route['permission_callback'](new HealthTestRequest(['id' => 7])) === false, 'Content-health recheck allowed an uneditable draft through collection access.');
+health_assert(is_array($recheck_route) && $recheck_route['permission_callback'](new HealthTestRequest(['id' => 5])) === true, 'Content-health recheck denied an editable story.');
+$story_route = $routes['byline/v1/admin/content-health/story/(?P<id>\\d+)'] ?? null;
+health_assert(is_array($story_route) && $story_route['permission_callback'](new HealthTestRequest(['id' => 7])) === false, 'Content-health story summary allowed an uneditable draft through collection access.');
+health_assert(is_array($story_route) && $story_route['permission_callback'](new HealthTestRequest(['id' => 5])) === true, 'Content-health story summary denied an editable story.');
+health_assert(!empty(array_filter($capability_checks, static function (array $check): bool {
+    return $check[0] === 'edit_post' && ($check[1][0] ?? 0) === 7;
+})), 'Content-health story permissions did not evaluate edit_post for the requested story.');
 
 echo "Byline content-health backend regression passed.\n";

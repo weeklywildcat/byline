@@ -327,9 +327,13 @@ $byline_contributor_test_capabilities = [
     'edit_post' => [10 => true],
     'delete_post' => [],
     'manage_byline' => true,
+    // This fixture represents the existing authorized publisher path; the
+    // hardening tests separately cover managers who lack publish_posts.
+    'publish_posts' => true,
     'user:1:edit_posts' => true,
     'user:1:edit_post' => [10 => true],
     'user:1:manage_byline' => true,
+    'user:1:publish_posts' => true,
 ];
 
 $guest = byline_create_guest_contributor([

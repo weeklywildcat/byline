@@ -25,27 +25,63 @@ function byline_content_health_rest_post_id($request): int
     return absint(byline_content_health_rest_param($request, 'id', 0));
 }
 
-function byline_content_health_can_view(): bool
+function byline_content_health_rest_requested_post_id($request): int
 {
-    return current_user_can(defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline')
-        || current_user_can(defined('BYLINE_MANAGE_INTEGRATIONS_CAPABILITY') ? BYLINE_MANAGE_INTEGRATIONS_CAPABILITY : 'manage_byline_integrations')
-        || current_user_can('edit_posts');
+    $post_id = absint(byline_content_health_rest_param($request, 'postId', 0));
+    if ($post_id > 0) {
+        return $post_id;
+    }
+
+    return byline_content_health_rest_post_id($request);
 }
 
-function byline_content_health_can_edit_story($request): bool
+function byline_content_health_can_manage_all(): bool
 {
-    if (byline_content_health_can_view()) {
-        return true;
-    }
-    $post_id = byline_content_health_rest_post_id($request);
-    if ($post_id <= 0) {
+    return current_user_can(defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline');
+}
+
+function byline_content_health_user_can_view_story(int $post_id): bool
+{
+    if ($post_id <= 0 || !function_exists('get_post')) {
         return false;
     }
+
+    $post = get_post($post_id);
+    if (!is_object($post) || (($post->post_type ?? 'post') !== 'post')) {
+        return false;
+    }
+
+    if (byline_content_health_can_manage_all()) {
+        return true;
+    }
+
     try {
         return (bool) current_user_can('edit_post', $post_id);
     } catch (Throwable $exception) {
         return false;
     }
+}
+
+function byline_content_health_can_view($request = null): bool
+{
+    $post_id = byline_content_health_rest_requested_post_id($request);
+    if ($post_id > 0) {
+        return byline_content_health_user_can_view_story($post_id);
+    }
+
+    return byline_content_health_can_manage_all()
+        || current_user_can('edit_posts');
+}
+
+function byline_content_health_user_can_edit_story(int $post_id): bool
+{
+    return byline_content_health_user_can_view_story($post_id);
+}
+
+function byline_content_health_can_edit_story($request): bool
+{
+    $post_id = byline_content_health_rest_requested_post_id($request);
+    return byline_content_health_user_can_edit_story($post_id);
 }
 
 function byline_content_health_filter_issues(array $issues, string $issue_type = '', string $severity = ''): array
@@ -96,9 +132,19 @@ function byline_content_health_rest_issue(array $issue): array
 /** @param array<int,array<string,mixed>> $issues */
 function byline_content_health_rest_issues(array $issues): array
 {
-    return array_values(array_map(static function ($issue): array {
-        return byline_content_health_rest_issue(is_array($issue) ? $issue : []);
-    }, $issues));
+    $result = [];
+    foreach ($issues as $issue) {
+        if (!is_array($issue)) {
+            continue;
+        }
+        $post_id = absint($issue['postId'] ?? $issue['objectId'] ?? 0);
+        if ($post_id > 0 && !byline_content_health_user_can_view_story($post_id)) {
+            continue;
+        }
+        $result[] = byline_content_health_rest_issue($issue);
+    }
+
+    return $result;
 }
 
 function byline_content_health_summary(int $post_id = 0, string $issue_type = '', string $severity = ''): array
@@ -106,6 +152,9 @@ function byline_content_health_summary(int $post_id = 0, string $issue_type = ''
     $items = [];
     $scanned = 0;
     if ($post_id > 0) {
+        if (!byline_content_health_user_can_view_story($post_id)) {
+            return [];
+        }
         $payload = byline_content_health_cached_story($post_id);
         if (!is_array($payload)) {
             // Page-load reads deliberately perform only local metadata checks.
@@ -140,7 +189,7 @@ function byline_content_health_summary(int $post_id = 0, string $issue_type = ''
         }
         foreach (is_array($posts) ? $posts : [] as $id) {
             $id = absint($id);
-            if ($id <= 0) {
+            if ($id <= 0 || !byline_content_health_user_can_edit_story($id)) {
                 continue;
             }
             $payload = byline_content_health_cached_story($id);
@@ -183,9 +232,9 @@ function byline_content_health_summary(int $post_id = 0, string $issue_type = ''
 
 function byline_content_health_rest_summary($request)
 {
-    $post_id = absint(byline_content_health_rest_param($request, 'postId', 0));
-    if ($post_id <= 0) {
-        $post_id = byline_content_health_rest_post_id($request);
+    $post_id = byline_content_health_rest_requested_post_id($request);
+    if ($post_id > 0 && !byline_content_health_user_can_view_story($post_id)) {
+        return new WP_Error('byline_content_health_forbidden', 'You are not allowed to view health for that story.', ['status' => rest_authorization_required_code()]);
     }
     return rest_ensure_response(byline_content_health_summary(
         $post_id,
@@ -196,7 +245,10 @@ function byline_content_health_rest_summary($request)
 
 function byline_content_health_rest_recheck($request)
 {
-    $payload = byline_content_health_scan_story(byline_content_health_rest_post_id($request), true);
+    if (!byline_content_health_can_edit_story($request)) {
+        return new WP_Error('byline_content_health_forbidden', 'You are not allowed to recheck that story.', ['status' => rest_authorization_required_code()]);
+    }
+    $payload = byline_content_health_scan_story(byline_content_health_rest_requested_post_id($request), true);
     if (is_array($payload) && isset($payload['issues']) && is_array($payload['issues'])) {
         $payload['issues'] = byline_content_health_rest_issues($payload['issues']);
         $payload['lastRunAt'] = $payload['checkedAt'] ?? null;

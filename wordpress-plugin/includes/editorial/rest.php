@@ -50,6 +50,26 @@ function byline_editorial_rest_permission(WP_REST_Request $request)
     return true;
 }
 
+function byline_editorial_rest_distribution_action_permission(WP_REST_Request $request)
+{
+    $story_permission = byline_editorial_rest_permission($request);
+    if ($story_permission !== true) {
+        return $story_permission;
+    }
+
+    if (current_user_can('publish_posts')
+        || current_user_can('edit_others_posts')
+        || current_user_can(defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline')) {
+        return true;
+    }
+
+    return new WP_Error(
+        'byline_distribution_forbidden',
+        'Only an editor can send or mark a story as distributed.',
+        ['status' => rest_authorization_required_code()]
+    );
+}
+
 /**
  * The status vocabulary, in newsroom order, with the derived publication state
  * marked so the client never offers it as a choice.
@@ -121,7 +141,7 @@ function byline_editorial_rest_payload(int $post_id): array
             'total' => (int) ($readiness['total'] ?? 0),
             'ready' => !empty($readiness['ready']),
         ],
-        'notes' => byline_editorial_rest_notes_support(),
+        'notes' => byline_editorial_rest_notes_support($post_id),
         'discord' => [
             'threadId' => byline_editorial_rest_discord_thread($post_id),
             'threadUrl' => byline_editorial_rest_discord_thread_url($post_id),
@@ -130,17 +150,35 @@ function byline_editorial_rest_payload(int $post_id): array
 }
 
 /**
- * WordPress Notes are optional and their public API has changed across Core
- * releases.  Report capability only when a stable callable is present; the
- * workflow itself never depends on the Notes datastore.
+ * WordPress Notes are progressive enhancement. Core 6.9 stores Notes as
+ * ordinary comments with comment_type=note and exposes their support through
+ * the post-type editor sub-feature. Do not call private/unstable Note helpers
+ * or create a second Byline datastore just to render this action.
  */
-function byline_editorial_rest_notes_support(): array
+function byline_editorial_rest_notes_support(int $post_id = 0): array
 {
-    $available = function_exists('wp_get_notes') || function_exists('wp_create_note');
+    $editor_supports_notes = false;
+    if ($post_id > 0 && function_exists('get_all_post_type_supports')) {
+        $supports = get_all_post_type_supports('post');
+        $editor = is_array($supports['editor'] ?? null) ? ($supports['editor'][0] ?? []) : [];
+        $editor_supports_notes = is_array($editor) && !empty($editor['notes']);
+    }
+
+    // is_avatar_comment_type() is a public Core function. The 'note' value was
+    // added with the Core Notes feature in 6.9, so this is a useful version/API
+    // signal while still allowing a site to disable Notes for posts.
+    $core_notes_api = function_exists('get_comments')
+        && function_exists('is_avatar_comment_type')
+        && is_avatar_comment_type('note');
+    $edit_url = $post_id > 0 && function_exists('get_edit_post_link')
+        ? (string) get_edit_post_link($post_id, 'raw')
+        : '';
+    $available = $editor_supports_notes && $core_notes_api && $edit_url !== '';
 
     return [
         'available' => $available,
-        'url' => $available && function_exists('admin_url') ? admin_url('post.php') . '#wp-notes' : '',
+        'url' => $available ? esc_url_raw($edit_url) : '',
+        'message' => $available ? '' : 'Notes are not available for this story in the current WordPress editor.',
     ];
 }
 
@@ -350,9 +388,30 @@ function byline_editorial_rest_can_edit_coverage(WP_REST_Request $request)
 
 function byline_editorial_rest_can_view_feedback(WP_REST_Request $request)
 {
-    return current_user_can('edit_posts')
+    return current_user_can('edit_others_posts') || current_user_can('manage_byline')
         ? true
         : new WP_Error('byline_feedback_forbidden', 'You are not allowed to view reader feedback.', ['status' => rest_authorization_required_code()]);
+}
+
+function byline_editorial_rest_can_view_feedback_item(WP_REST_Request $request)
+{
+    if (current_user_can('edit_others_posts') || current_user_can('manage_byline')) {
+        return true;
+    }
+
+    $feedback_id = absint($request->get_param('id'));
+    $feedback = function_exists('byline_get_feedback') ? byline_get_feedback($feedback_id) : [];
+    if ($feedback === []) {
+        return new WP_Error('byline_feedback_not_found', 'That feedback item does not exist.', ['status' => 404]);
+    }
+
+    $story_id = absint($feedback['storyId'] ?? 0);
+    $story = $story_id > 0 ? get_post($story_id) : null;
+    if ($story instanceof WP_Post && $story->post_type === 'post' && current_user_can('edit_post', $story_id)) {
+        return true;
+    }
+
+    return new WP_Error('byline_feedback_forbidden', 'You are not allowed to view reader feedback for that story.', ['status' => rest_authorization_required_code()]);
 }
 
 function byline_editorial_rest_feedback_permission(WP_REST_Request $request)
@@ -576,6 +635,7 @@ function byline_editorial_rest_planning(WP_REST_Request $request)
     $current_user = byline_editorial_rest_user_person($user_id);
     $can_assign = current_user_can('edit_others_posts');
     $can_edit_posts = current_user_can('edit_posts');
+    $can_manage_feedback = current_user_can('edit_others_posts') || current_user_can('manage_byline');
 
     return rest_ensure_response([
         'stories' => $stories,
@@ -587,7 +647,7 @@ function byline_editorial_rest_planning(WP_REST_Request $request)
             'canManageSavedViews' => $can_edit_posts,
             'canManageMedia' => $can_edit_posts,
             'canManageCoverage' => $can_edit_posts,
-            'canManageFeedback' => $can_edit_posts,
+            'canManageFeedback' => $can_manage_feedback,
         ],
         'currentUser' => $current_user,
         'total' => count($stories),
@@ -858,10 +918,38 @@ function byline_editorial_rest_public_coverage(WP_REST_Request $request)
         : rest_ensure_response($coverage);
 }
 
+/**
+ * Return the private Coverage record with nested story IDs filtered by the
+ * current user's object-level story capability. The raw record is useful to
+ * storage code, but it must never be handed to a broad collection endpoint.
+ * Staff relationships are newsroom-wide planning metadata and are reserved
+ * for editors/Byline managers.
+ *
+ * @return array<string,mixed>
+ */
+function byline_editorial_rest_filter_coverage_record(array $coverage): array
+{
+    if (function_exists('byline_coverage_editable_story_ids')) {
+        $coverage['storyIds'] = byline_coverage_editable_story_ids(
+            (array) ($coverage['storyIds'] ?? [])
+        );
+    } else {
+        $coverage['storyIds'] = [];
+    }
+
+    if (!current_user_can('edit_others_posts') && !current_user_can('manage_byline')) {
+        $coverage['staffIds'] = [];
+    }
+
+    return $coverage;
+}
+
 /** @return array<string,mixed> */
 function byline_editorial_rest_admin_coverage_item(array $coverage): array
 {
-    $story_ids = array_values(array_map('absint', (array) ($coverage['storyIds'] ?? [])));
+    $story_ids = function_exists('byline_coverage_editable_story_ids')
+        ? byline_coverage_editable_story_ids((array) ($coverage['storyIds'] ?? []))
+        : [];
     $stories = [];
     $planned_count = 0;
     foreach ($story_ids as $story_id) {
@@ -881,10 +969,12 @@ function byline_editorial_rest_admin_coverage_item(array $coverage): array
     }
 
     $staff = [];
-    foreach ((array) ($coverage['staffIds'] ?? []) as $staff_id) {
-        $person = byline_editorial_rest_user_person(absint($staff_id));
-        if ($person !== null) {
-            $staff[] = $person;
+    if (current_user_can('edit_others_posts') || current_user_can('manage_byline')) {
+        foreach ((array) ($coverage['staffIds'] ?? []) as $staff_id) {
+            $person = byline_editorial_rest_user_person(absint($staff_id));
+            if ($person !== null) {
+                $staff[] = $person;
+            }
         }
     }
 
@@ -933,7 +1023,7 @@ function byline_editorial_rest_admin_coverages(WP_REST_Request $request)
         if (isset($params['status']) && sanitize_key((string) $params['status']) !== (string) $item['status']) {
             continue;
         }
-        $items[] = $item;
+        $items[] = byline_editorial_rest_filter_coverage_record($item);
     }
 
     return rest_ensure_response([
@@ -952,7 +1042,7 @@ function byline_editorial_rest_create_coverage(WP_REST_Request $request)
     $user_id = function_exists('get_current_user_id') ? absint(get_current_user_id()) : 0;
     $result = byline_create_coverage($body, $user_id);
 
-    return is_wp_error($result) ? $result : rest_ensure_response($result);
+    return is_wp_error($result) ? $result : rest_ensure_response(byline_editorial_rest_filter_coverage_record($result));
 }
 
 function byline_editorial_rest_get_coverage(WP_REST_Request $request)
@@ -961,14 +1051,14 @@ function byline_editorial_rest_get_coverage(WP_REST_Request $request)
 
     return $coverage === []
         ? new WP_Error('byline_coverage_not_found', 'The coverage could not be found.', ['status' => 404])
-        : rest_ensure_response($coverage);
+        : rest_ensure_response(byline_editorial_rest_filter_coverage_record($coverage));
 }
 
 function byline_editorial_rest_update_coverage(WP_REST_Request $request)
 {
     $result = byline_update_coverage(absint($request->get_param('id')), byline_editorial_rest_body($request));
 
-    return is_wp_error($result) ? $result : rest_ensure_response($result);
+    return is_wp_error($result) ? $result : rest_ensure_response(byline_editorial_rest_filter_coverage_record($result));
 }
 
 function byline_editorial_rest_delete_coverage(WP_REST_Request $request)
@@ -1290,12 +1380,15 @@ function byline_editorial_rest_feedback_cors($served, $result, $request, $server
 
 function byline_editorial_rest_feedback(WP_REST_Request $request)
 {
-    $items = byline_list_feedback(byline_editorial_rest_request_params($request));
+    $items = byline_list_feedback(
+        byline_editorial_rest_request_params($request),
+        byline_editorial_rest_current_user_id()
+    );
     $feedback = array_map('byline_editorial_rest_feedback_item', $items);
 
     return rest_ensure_response([
         'feedback' => $feedback,
-        'capabilities' => ['canManageFeedback' => current_user_can('edit_posts')],
+        'capabilities' => ['canManageFeedback' => current_user_can('edit_others_posts') || current_user_can('manage_byline')],
         // Keep the original key for authenticated callers that adopted the
         // first grouped REST response.
         'items' => $items,
@@ -1601,7 +1694,8 @@ function byline_editorial_rest_can_create_guest(): bool
 {
     return function_exists('byline_guest_can_create')
         ? byline_guest_can_create()
-        : current_user_can('edit_posts');
+        : (current_user_can('edit_others_posts')
+            || current_user_can(defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline'));
 }
 
 function byline_editorial_rest_can_edit_guest(WP_REST_Request $request)
@@ -1896,23 +1990,23 @@ function byline_editorial_register_extended_rest_routes(): void
         [
             'methods' => WP_REST_Server::READABLE,
             'callback' => 'byline_editorial_rest_get_feedback',
-            'permission_callback' => 'byline_editorial_rest_can_view_feedback',
+            'permission_callback' => 'byline_editorial_rest_can_view_feedback_item',
         ],
         [
             'methods' => WP_REST_Server::EDITABLE,
             'callback' => 'byline_editorial_rest_update_feedback',
-            'permission_callback' => 'byline_editorial_rest_can_view_feedback',
+            'permission_callback' => 'byline_editorial_rest_can_view_feedback_item',
         ],
     ]);
     register_rest_route(BYLINE_REST_NAMESPACE, '/admin/feedback/(?P<id>\d+)/correction-draft', [
         'methods' => WP_REST_Server::READABLE,
         'callback' => 'byline_editorial_rest_feedback_correction_draft',
-        'permission_callback' => 'byline_editorial_rest_can_view_feedback',
+        'permission_callback' => 'byline_editorial_rest_can_view_feedback_item',
     ]);
     register_rest_route(BYLINE_REST_NAMESPACE, '/admin/feedback/(?P<id>\d+)/correction', [
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'byline_editorial_rest_create_feedback_correction',
-        'permission_callback' => 'byline_editorial_rest_can_view_feedback',
+        'permission_callback' => 'byline_editorial_rest_can_view_feedback_item',
     ]);
     if (function_exists('add_filter')) {
         add_filter('rest_pre_serve_request', 'byline_editorial_rest_feedback_cors', 10, 4);
@@ -1938,12 +2032,12 @@ function byline_editorial_register_extended_rest_routes(): void
     register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/stories/(?P<id>\d+)/distribution/newsletter', [
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'byline_editorial_rest_story_newsletter',
-        'permission_callback' => 'byline_editorial_rest_permission',
+        'permission_callback' => 'byline_editorial_rest_distribution_action_permission',
     ]);
     register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/stories/(?P<id>\d+)/distribution/(?P<channelId>[a-z0-9_-]+)', [
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'byline_editorial_rest_story_distribution_action',
-        'permission_callback' => 'byline_editorial_rest_permission',
+        'permission_callback' => 'byline_editorial_rest_distribution_action_permission',
     ]);
 
     register_rest_route(BYLINE_REST_NAMESPACE, '/contributors/guests', [

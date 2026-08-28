@@ -143,6 +143,112 @@ function byline_coverage_exists(int $coverage_id): bool
     return $coverage instanceof WP_Post && $coverage->post_type === BYLINE_COVERAGE_POST_TYPE;
 }
 
+function byline_coverage_user_can_edit_story(int $story_id, ?int $user_id = null): bool
+{
+    if ($user_id === null) {
+        return function_exists('current_user_can') && (bool) current_user_can('edit_post', $story_id);
+    }
+
+    return function_exists('user_can') && (bool) user_can($user_id, 'edit_post', $story_id);
+}
+
+/** @return array<int,int> */
+function byline_coverage_editable_story_ids(array $story_ids, ?int $user_id = null): array
+{
+    $editable = [];
+    foreach (byline_sanitize_coverage_ids($story_ids) as $story_id) {
+        if (byline_coverage_is_story($story_id) && byline_coverage_user_can_edit_story($story_id, $user_id)) {
+            $editable[] = $story_id;
+        }
+    }
+
+    return $editable;
+}
+
+/**
+ * Keep a caller from using Coverage as a write-side relationship oracle. Any
+ * story that is not editable by the actor is discarded before the canonical
+ * list is synchronized, so a Contributor cannot attach another writer's draft
+ * merely by guessing its ID.
+ */
+function byline_coverage_filter_story_ids_for_user(array $story_ids, ?int $user_id = null): array
+{
+    return byline_coverage_editable_story_ids($story_ids, $user_id);
+}
+
+/**
+ * Read the canonical Coverage record without applying a caller-facing story
+ * capability projection.  This is for public publication checks and
+ * relationship synchronization only; private/admin callers use
+ * byline_get_coverage(), which filters linked stories per object.
+ *
+ * @return array<string,mixed>
+ */
+function byline_get_coverage_record(int $coverage_id): array
+{
+    $post = get_post($coverage_id);
+    if (!$post instanceof WP_Post || $post->post_type !== BYLINE_COVERAGE_POST_TYPE) {
+        return [];
+    }
+
+    return [
+        'id' => (int) $post->ID,
+        'title' => (string) $post->post_title,
+        'slug' => (string) ($post->post_name ?? ''),
+        'description' => byline_sanitize_coverage_text(get_post_meta($coverage_id, BYLINE_COVERAGE_DESCRIPTION_META, true), 320),
+        'overview' => byline_sanitize_coverage_rich_text(get_post_meta($coverage_id, BYLINE_COVERAGE_OVERVIEW_META, true), 10000),
+        'startAt' => byline_sanitize_coverage_datetime(get_post_meta($coverage_id, BYLINE_COVERAGE_START_META, true)),
+        'endAt' => byline_sanitize_coverage_datetime(get_post_meta($coverage_id, BYLINE_COVERAGE_END_META, true)),
+        'status' => byline_sanitize_coverage_status(get_post_meta($coverage_id, BYLINE_COVERAGE_STATUS_META, true)),
+        'public' => (bool) get_post_meta($coverage_id, BYLINE_COVERAGE_PUBLIC_META, true),
+        'staffIds' => byline_coverage_meta_ids($coverage_id, BYLINE_COVERAGE_STAFF_META),
+        'storyIds' => byline_get_coverage_story_ids($coverage_id),
+        'postStatus' => (string) $post->post_status,
+    ];
+}
+
+function byline_coverage_sync_story_reverse_index(int $story_id, int $coverage_id, bool $should_link): void
+{
+    if (!byline_coverage_is_story($story_id)) {
+        return;
+    }
+
+    $current = byline_get_story_coverage_ids($story_id);
+    $next = $current;
+    if ($should_link) {
+        if (!in_array($coverage_id, $next, true)) {
+            $next[] = $coverage_id;
+        }
+    } elseif (in_array($coverage_id, $next, true)) {
+        $next = array_values(array_diff($next, [$coverage_id]));
+    }
+
+    if ($next !== $current) {
+        update_post_meta($story_id, BYLINE_STORY_COVERAGE_META, $next);
+    }
+}
+
+function byline_coverage_sync_canonical_story_membership(int $coverage_id, int $story_id, bool $should_link): void
+{
+    if (!byline_coverage_exists($coverage_id)) {
+        return;
+    }
+
+    $current = byline_get_coverage_story_ids($coverage_id);
+    $next = $current;
+    if ($should_link) {
+        if (!in_array($story_id, $next, true)) {
+            $next[] = $story_id;
+        }
+    } elseif (in_array($story_id, $next, true)) {
+        $next = array_values(array_diff($next, [$story_id]));
+    }
+
+    if ($next !== $current) {
+        update_post_meta($coverage_id, BYLINE_COVERAGE_STORIES_META, $next);
+    }
+}
+
 /**
  * Replace a Coverage's linked story list.  Invalid/non-story IDs are ignored;
  * relationships are never allowed to point at arbitrary post types.
@@ -160,60 +266,23 @@ function byline_set_coverage_story_ids(int $coverage_id, array $story_ids): arra
         }
     }
 
-    update_post_meta($coverage_id, BYLINE_COVERAGE_STORIES_META, $valid);
+    $current = byline_get_coverage_story_ids($coverage_id);
+    $added = array_values(array_diff($valid, $current));
+    $removed = array_values(array_diff($current, $valid));
 
-    // Keep the story-facing convenience index in sync.  Coverage remains the
-    // canonical relationship owner; this index only makes story lookups cheap.
-    $existing_coverage_ids = get_posts([
-        'post_type' => BYLINE_COVERAGE_POST_TYPE,
-        'post_status' => 'any',
-        'posts_per_page' => -1,
-        'numberposts' => -1,
-    ]);
-    foreach (is_array($existing_coverage_ids) ? $existing_coverage_ids : [] as $coverage) {
-        if (!$coverage instanceof WP_Post) {
-            continue;
-        }
-
-        $linked = byline_get_coverage_story_ids((int) $coverage->ID);
-        if ((int) $coverage->ID === $coverage_id) {
-            $linked = $valid;
-        }
-
-        foreach ($linked as $story_id) {
-            $story_coverages = byline_get_story_coverage_ids($story_id);
-            if ((int) $coverage->ID === $coverage_id && !in_array($coverage_id, $story_coverages, true)) {
-                $story_coverages[] = $coverage_id;
-            }
-            if ((int) $coverage->ID !== $coverage_id && !in_array($coverage_id, $story_coverages, true)) {
-                continue;
-            }
-            update_post_meta($story_id, BYLINE_STORY_COVERAGE_META, byline_sanitize_coverage_ids($story_coverages));
-        }
+    if ($current !== $valid) {
+        update_post_meta($coverage_id, BYLINE_COVERAGE_STORIES_META, $valid);
     }
 
-    // Remove this coverage from stories no longer linked.  This is a bounded
-    // relationship cleanup and does not touch any other coverage membership.
-    $story_candidates = get_posts([
-        'post_type' => 'post',
-        'post_status' => 'any',
-        'posts_per_page' => -1,
-        'numberposts' => -1,
-    ]);
-    foreach (is_array($story_candidates) ? $story_candidates : [] as $story) {
-        if (!$story instanceof WP_Post) {
-            continue;
-        }
-        $story_id = (int) $story->ID;
-        $story_coverages = byline_get_story_coverage_ids($story_id);
-        if (in_array($story_id, $valid, true)) {
-            if (!in_array($coverage_id, $story_coverages, true)) {
-                $story_coverages[] = $coverage_id;
-            }
-        } elseif (in_array($coverage_id, $story_coverages, true)) {
-            $story_coverages = array_values(array_diff($story_coverages, [$coverage_id]));
-        }
-        update_post_meta($story_id, BYLINE_STORY_COVERAGE_META, byline_sanitize_coverage_ids($story_coverages));
+    // Coverage owns the relationship.  The reverse index is updated only for
+    // stories whose membership changed; no site-wide post query is needed.
+    $stories_to_sync = array_values(array_unique(array_merge($added, $removed)));
+    foreach ($stories_to_sync as $story_id) {
+        byline_coverage_sync_story_reverse_index(
+            $story_id,
+            $coverage_id,
+            in_array($story_id, $valid, true)
+        );
     }
 
     return $valid;
@@ -223,6 +292,9 @@ function byline_add_story_to_coverage(int $coverage_id, int $story_id)
 {
     if (!byline_coverage_exists($coverage_id) || !byline_coverage_is_story($story_id)) {
         return new WP_Error('byline_invalid_coverage_relationship', 'Select an existing coverage and story.', ['status' => 400]);
+    }
+    if (!current_user_can('edit_post', $coverage_id) || !current_user_can('edit_post', $story_id)) {
+        return new WP_Error('byline_coverage_forbidden', 'You are not allowed to change this coverage relationship.', ['status' => 403]);
     }
 
     $story_ids = byline_get_coverage_story_ids($coverage_id);
@@ -235,6 +307,12 @@ function byline_remove_story_from_coverage(int $coverage_id, int $story_id)
 {
     if (!byline_coverage_exists($coverage_id)) {
         return new WP_Error('byline_coverage_not_found', 'The coverage could not be found.', ['status' => 404]);
+    }
+    if (!byline_coverage_is_story($story_id)) {
+        return new WP_Error('byline_coverage_story_not_found', 'That story does not exist.', ['status' => 404]);
+    }
+    if (!current_user_can('edit_post', $coverage_id) || !current_user_can('edit_post', $story_id)) {
+        return new WP_Error('byline_coverage_forbidden', 'You are not allowed to change this coverage relationship.', ['status' => 403]);
     }
 
     return byline_set_coverage_story_ids($coverage_id, array_values(array_diff(byline_get_coverage_story_ids($coverage_id), [$story_id])));
@@ -266,18 +344,24 @@ function byline_set_story_coverage_ids(int $story_id, array $coverage_ids)
     }
 
     $current = byline_get_story_coverage_ids($story_id);
-    foreach (array_unique(array_merge($current, $valid)) as $coverage_id) {
-        $stories = byline_get_coverage_story_ids($coverage_id);
-        if (in_array($coverage_id, $valid, true)) {
-            if (!in_array($story_id, $stories, true)) {
-                $stories[] = $story_id;
-            }
-        } else {
-            $stories = array_values(array_diff($stories, [$story_id]));
-        }
-        update_post_meta($coverage_id, BYLINE_COVERAGE_STORIES_META, byline_sanitize_coverage_ids($stories));
+    $added = array_values(array_diff($valid, $current));
+    $removed = array_values(array_diff($current, $valid));
+
+    // The reverse index is a lookup aid, not the source of truth.  Only
+    // changed memberships are synchronized, so an unchanged list never
+    // rewrites unrelated Coverage objects.
+    $coverages_to_sync = array_values(array_unique(array_merge($added, $removed)));
+    foreach ($coverages_to_sync as $coverage_id) {
+        byline_coverage_sync_canonical_story_membership(
+            $coverage_id,
+            $story_id,
+            in_array($coverage_id, $valid, true)
+        );
     }
-    update_post_meta($story_id, BYLINE_STORY_COVERAGE_META, $valid);
+
+    if ($current !== $valid) {
+        update_post_meta($story_id, BYLINE_STORY_COVERAGE_META, $valid);
+    }
 
     return $valid;
 }
@@ -294,17 +378,15 @@ function byline_get_story_coverage_summary(int $story_id, ?int $user_id = null):
     if (!byline_coverage_is_story($story_id)) {
         return [];
     }
-    $allowed = $user_id === null
-        ? current_user_can('edit_post', $story_id)
-        : (function_exists('user_can') ? user_can($user_id, 'edit_post', $story_id) : false);
+    $allowed = byline_coverage_user_can_edit_story($story_id, $user_id);
     if (!$allowed) {
         return [];
     }
 
     $summary = [];
     foreach (byline_get_story_coverage_ids($story_id) as $coverage_id) {
-        $coverage = byline_get_coverage($coverage_id);
-        if ($coverage === []) {
+        $coverage = byline_get_coverage($coverage_id, $user_id);
+        if ($coverage === [] || !in_array($story_id, $coverage['storyIds'], true)) {
             continue;
         }
         $summary[] = [
@@ -316,7 +398,7 @@ function byline_get_story_coverage_summary(int $story_id, ?int $user_id = null):
             'public' => !empty($coverage['public']),
             'startAt' => (string) $coverage['startAt'],
             'endAt' => (string) $coverage['endAt'],
-            'storyCount' => count(byline_get_coverage_story_ids($coverage_id)),
+            'storyCount' => count($coverage['storyIds']),
         ];
     }
 
@@ -327,13 +409,22 @@ function byline_story_has_coverage(int $story_id, $coverage): bool
 {
     $coverage_ids = byline_get_story_coverage_ids($story_id);
     if (is_numeric($coverage)) {
-        return in_array(absint($coverage), $coverage_ids, true);
+        $coverage_id = absint($coverage);
+        if (!in_array($coverage_id, $coverage_ids, true)) {
+            return false;
+        }
+
+        $record = byline_get_coverage_record($coverage_id);
+
+        return $record !== [] && in_array($story_id, $record['storyIds'], true);
     }
 
     $slug = sanitize_title((string) $coverage);
     foreach ($coverage_ids as $coverage_id) {
-        $record = byline_get_coverage($coverage_id);
-        if ($record !== [] && (string) $record['slug'] === $slug) {
+        $record = byline_get_coverage_record($coverage_id);
+        if ($record !== []
+            && (string) $record['slug'] === $slug
+            && in_array($story_id, $record['storyIds'], true)) {
             return true;
         }
     }
@@ -371,28 +462,23 @@ function byline_sanitize_coverage_input(array $input, array $existing = []): arr
     return $result;
 }
 
-/** @return array<string,mixed> */
-function byline_get_coverage(int $coverage_id): array
+/**
+ * Return the private/admin Coverage projection for the requesting user.
+ * Linked stories are object-scoped: a Coverage editor may only receive a
+ * story ID when that user can edit the story itself.
+ *
+ * @return array<string,mixed>
+ */
+function byline_get_coverage(int $coverage_id, ?int $user_id = null): array
 {
-    $post = get_post($coverage_id);
-    if (!$post instanceof WP_Post || $post->post_type !== BYLINE_COVERAGE_POST_TYPE) {
+    $coverage = byline_get_coverage_record($coverage_id);
+    if ($coverage === []) {
         return [];
     }
 
-    return [
-        'id' => (int) $post->ID,
-        'title' => (string) $post->post_title,
-        'slug' => (string) ($post->post_name ?? ''),
-        'description' => byline_sanitize_coverage_text(get_post_meta($coverage_id, BYLINE_COVERAGE_DESCRIPTION_META, true), 320),
-        'overview' => byline_sanitize_coverage_rich_text(get_post_meta($coverage_id, BYLINE_COVERAGE_OVERVIEW_META, true), 10000),
-        'startAt' => byline_sanitize_coverage_datetime(get_post_meta($coverage_id, BYLINE_COVERAGE_START_META, true)),
-        'endAt' => byline_sanitize_coverage_datetime(get_post_meta($coverage_id, BYLINE_COVERAGE_END_META, true)),
-        'status' => byline_sanitize_coverage_status(get_post_meta($coverage_id, BYLINE_COVERAGE_STATUS_META, true)),
-        'public' => (bool) get_post_meta($coverage_id, BYLINE_COVERAGE_PUBLIC_META, true),
-        'staffIds' => byline_coverage_meta_ids($coverage_id, BYLINE_COVERAGE_STAFF_META),
-        'storyIds' => byline_get_coverage_story_ids($coverage_id),
-        'postStatus' => (string) $post->post_status,
-    ];
+    $coverage['storyIds'] = byline_coverage_editable_story_ids($coverage['storyIds'], $user_id);
+
+    return $coverage;
 }
 
 function byline_coverage_can_edit(int $coverage_id = 0): bool
@@ -412,6 +498,13 @@ function byline_create_coverage(array $input, ?int $author_id = null)
     }
 
     $data = byline_sanitize_coverage_input($input);
+    $actor_id = $author_id !== null
+        ? absint($author_id)
+        : (function_exists('get_current_user_id') ? absint(get_current_user_id()) : 0);
+    $data['storyIds'] = byline_coverage_filter_story_ids_for_user(
+        $data['storyIds'],
+        $actor_id > 0 ? $actor_id : null
+    );
     if (!empty($data['public']) && !current_user_can('publish_posts')) {
         return new WP_Error('byline_coverage_forbidden_publish', 'You are not allowed to publish coverage.', ['status' => 403]);
     }
@@ -421,7 +514,7 @@ function byline_create_coverage(array $input, ?int $author_id = null)
         'post_title' => $data['title'],
         'post_name' => $data['slug'],
         'post_content' => $data['overview'],
-        'post_author' => $author_id !== null ? absint($author_id) : (function_exists('get_current_user_id') ? get_current_user_id() : 0),
+        'post_author' => $actor_id,
     ];
     $coverage_id = wp_insert_post($post_data, true);
     if (is_wp_error($coverage_id)) {
@@ -447,8 +540,18 @@ function byline_update_coverage(int $coverage_id, array $input)
         return new WP_Error('byline_coverage_forbidden', 'You are not allowed to edit this coverage.', ['status' => 403]);
     }
 
-    $existing = byline_get_coverage($coverage_id);
+    $existing = byline_get_coverage_record($coverage_id);
     $data = byline_sanitize_coverage_input($input, $existing);
+    if (array_key_exists('storyIds', $input)) {
+        $visible_existing = byline_coverage_filter_story_ids_for_user($existing['storyIds']);
+        $protected_existing = array_values(array_diff($existing['storyIds'], $visible_existing));
+        $visible_requested = byline_coverage_filter_story_ids_for_user($data['storyIds']);
+        // A filtered projection must not turn an editor's partial view into a
+        // destructive replacement. Memberships for stories the actor cannot
+        // edit remain owned by the Coverage record until an authorized actor
+        // explicitly changes them.
+        $data['storyIds'] = byline_sanitize_coverage_ids(array_merge($protected_existing, $visible_requested));
+    }
     if (array_key_exists('public', $input)
         && (bool) $data['public'] !== (bool) $existing['public']
         && !current_user_can('publish_posts')) {
@@ -514,7 +617,7 @@ function byline_update_coverage_meta(int $coverage_id, array $data, ?array $chan
  */
 function byline_get_public_coverage_stories(int $coverage_id): array
 {
-    $coverage = byline_get_coverage($coverage_id);
+    $coverage = byline_get_coverage_record($coverage_id);
     if ($coverage === [] || !$coverage['public'] || $coverage['postStatus'] !== 'publish') {
         return [];
     }
@@ -556,7 +659,7 @@ function byline_public_story_projection($story): ?array
 /** @return array<string,mixed>|null */
 function byline_get_public_coverage(int $coverage_id): ?array
 {
-    $coverage = byline_get_coverage($coverage_id);
+    $coverage = byline_get_coverage_record($coverage_id);
     if ($coverage === [] || !$coverage['public'] || $coverage['postStatus'] !== 'publish') {
         return null;
     }
