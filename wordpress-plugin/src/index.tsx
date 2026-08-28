@@ -129,6 +129,10 @@ type DiagnosticsPayload = {
   restHealth: boolean;
   designsNeedingMigration: number;
   schemaVersions?: Record<string, number | null>;
+  pageMigration?: {
+    legacyPages?: Array<{ id: number; title: string; editLink?: string }>;
+    correctionFailures?: Array<{ id: number; title: string; editLink?: string; reason?: string }>;
+  };
   assetPresence?: Record<string, boolean>;
   tablePresence?: Record<string, boolean>;
   routePresence?: Record<string, boolean | null>;
@@ -508,6 +512,7 @@ function Diagnostics() {
     ["Public manifest", `${diagnostics.publicManifest.reachable ? "Reachable" : "Unavailable"} · ${diagnostics.publicManifest.status}`],
     ["REST health", diagnostics.restHealth ? "Healthy" : "Unavailable"],
     ["Designs needing migration", String(diagnostics.designsNeedingMigration)],
+    ...(diagnostics.pageMigration ? [["Page migration", `${diagnostics.pageMigration.correctionFailures?.length || 0} correction failures · ${diagnostics.pageMigration.legacyPages?.length || 0} legacy pages`]] : []),
     ...(diagnostics.sports ? [["Sports integrity", `${diagnostics.sports.healthy ? "Healthy" : "Attention"} · ${diagnostics.sports.currentSeason}`]] : [])
   ];
 

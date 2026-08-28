@@ -47,6 +47,7 @@ build_assets=(
   build/blocks/page-section/block.json
   build/blocks/page-section/index.js
   build/blocks/page-section/index.asset.php
+  build/blocks/page-section/render.php
   build/blocks/page-section/style-index.css
 )
 
@@ -147,6 +148,7 @@ grep -qx 'weekly-wildcat-headless/build/page-editor.asset.php' <<<"$archive_file
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/block.json' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/index.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/index.asset.php' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/blocks/page-section/render.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/style-index.css' <<<"$archive_files"
 
 # Polls are WordPress-owned storage now, so the whole poll module must ship.

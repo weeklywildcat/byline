@@ -1,0 +1,51 @@
+{
+  "diversity-inclusion": {
+    "eyebrow": "Standards",
+    "title": "Diversity & Inclusion",
+    "deck": "Weekly Wildcat believes every student deserves to see their school and community represented accurately, fairly and fully. We want our newsroom to include voices, experiences and stories that are often overlooked.",
+    "sections": [
+      { "heading": "What This Means in Practice", "featured": false, "paragraphs": ["We will look beyond the easiest voices to quote and the most visible clubs, teams and leadership groups."] },
+      { "heading": "Accessibility", "featured": false, "paragraphs": ["Readers should be able to follow Weekly Wildcat without fighting the page."] },
+      { "heading": "Help Us Do Better", "featured": true, "paragraphs": ["Readers can suggest stories, flag coverage that felt inaccurate or exclusionary, request a correction, report an accessibility issue or share a concern without attaching their name.", "When you reach out, tell us what happened and how you would like your name handled."], "actions": [{ "label": "Share Feedback", "href": "/contact/" }] },
+      { "heading": "Join the Newsroom", "featured": true, "paragraphs": ["Weekly Wildcat is open to students of any background or experience level.", "You do not have to arrive as an expert; you just have to be curious, fair and willing to learn."], "actions": [{ "label": "Join the Newsroom", "href": "/join/" }] }
+    ],
+    "actions": []
+  },
+  "about": {
+    "eyebrow": "Weekly Wildcat",
+    "title": "About Us",
+    "deck": "Weekly Wildcat is Ninety Six High School's student newspaper, created to tell the stories of our school with care, curiosity and a local voice.",
+    "sections": [
+      { "heading": "What We Do", "featured": false },
+      { "heading": "A Student Newsroom", "featured": false },
+      { "heading": "Our Standards", "featured": false },
+      { "heading": "Be Part of It", "featured": false }
+    ],
+    "actions": [
+      { "label": "Meet Our Writers", "href": "/authors/" },
+      { "label": "Join the Staff", "href": "/join/" }
+    ]
+  },
+  "terms": {
+    "eyebrow": "Policies",
+    "title": "Terms of Service",
+    "deck": "These terms explain how readers may use the Weekly Wildcat website and what to expect from our published content.",
+    "sections": [
+      { "heading": "Effective Date", "featured": false },
+      { "heading": "About This Site", "featured": false },
+      { "heading": "Editorial Content", "featured": false },
+      { "heading": "Corrections and Concerns", "featured": false },
+      { "heading": "Using Our Work", "featured": false },
+      { "heading": "Reader Submissions", "featured": false },
+      { "heading": "Advertising and Sponsorships", "featured": false },
+      { "heading": "External Links", "featured": false },
+      { "heading": "Prohibited Use", "featured": false },
+      { "heading": "No Guarantee", "featured": false },
+      { "heading": "Changes to These Terms", "featured": false }
+    ],
+    "actions": [
+      { "label": "Privacy Policy", "href": "/privacy/" },
+      { "label": "Contact Us", "href": "/contact/" }
+    ]
+  }
+}

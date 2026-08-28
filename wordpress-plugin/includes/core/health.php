@@ -124,6 +124,7 @@ function byline_expected_admin_asset_presence(): array
         'pageEditorManifest' => $plugin_root . '/build/page-editor.asset.php',
         'pageSectionBlockScript' => $plugin_root . '/build/blocks/page-section/index.js',
         'pageSectionBlockMetadata' => $plugin_root . '/build/blocks/page-section/block.json',
+        'pageSectionBlockRender' => $plugin_root . '/build/blocks/page-section/render.php',
         'pageSectionBlockStyles' => $plugin_root . '/build/blocks/page-section/style-index.css',
     ];
     $presence = [];
@@ -543,6 +544,39 @@ function byline_health_legacy_page_check(): ?array
     }
 
     $report = byline_get_weekly_page_migration_report();
+    $correction_failures = is_array($report['correctionFailures'] ?? null) ? $report['correctionFailures'] : [];
+    if ($correction_failures !== []) {
+        $page_labels = [];
+        $first_edit_link = '';
+        $page_ids = [];
+        foreach ($correction_failures as $failure) {
+            if (!is_array($failure)) {
+                continue;
+            }
+            $title = sanitize_text_field((string) ($failure['title'] ?? 'Untitled page'));
+            $edit_link = (string) ($failure['editLink'] ?? '');
+            if ($first_edit_link === '' && $edit_link !== '') {
+                $first_edit_link = $edit_link;
+            }
+            $page_ids[] = (int) ($failure['id'] ?? 0);
+            $reason = sanitize_text_field((string) ($failure['reason'] ?? 'The Page could not be corrected safely.'));
+            $page_labels[] = $edit_link !== ''
+                ? '<a href="' . esc_url($edit_link) . '">' . esc_html($title) . '</a> (' . esc_html($reason) . ')'
+                : esc_html($title) . ' (' . esc_html($reason) . ')';
+        }
+
+        $count = count($page_labels);
+        return byline_health_check(
+            'page_block_correction',
+            'Page block correction',
+            BYLINE_HEALTH_STATUS_CRITICAL,
+            sprintf('%d Page%s could not be safely repaired from the #53 block format.', $count, $count === 1 ? '' : 's'),
+            'No Page content was overwritten for the failed cases. Review the affected Page' . ($count === 1 ? '' : 's') . ' and repair the reported structural issue before rerunning the upgrade: ' . implode(', ', $page_labels) . '.',
+            $first_edit_link !== '' ? $first_edit_link : byline_health_admin_url('byline-settings', ['tab' => 'diagnostics']),
+            'page_ids=' . implode(',', $page_ids)
+        );
+    }
+
     $legacy_pages = is_array($report['legacyPages'] ?? null) ? $report['legacyPages'] : [];
     if ($legacy_pages === []) {
         return null;

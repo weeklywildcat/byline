@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Byline
  * Description: Open-source publishing tools, design management, and integrations for student newsrooms.
- * Version: 0.2.11
+ * Version: 0.2.12
  * Requires PHP: 7.4
  * Author: Byline Contributors
  * License: GPL-2.0-or-later

@@ -3,10 +3,19 @@
  *
  * This file is loaded by the Next public page template and by the
  * byline/page-section block in the WordPress editor. Keep the saved block
- * markup semantic and stable; presentation belongs here.
+ * markup semantic and stable; presentation belongs here. The host selectors
+ * intentionally keep public and editor rules in one source while giving the
+ * layout-critical rules enough specificity to survive the global cascade.
  */
 
-:where(.wp-block-byline-page-section) {
+.byline-page-content,
+.editor-styles-wrapper {
+  color: var(--ink, #1f2328);
+  font-family: var(--font-body, Arial, Helvetica, sans-serif);
+}
+
+.byline-page-content .wp-block-byline-page-section,
+.editor-styles-wrapper .wp-block-byline-page-section {
   border-bottom: 1px solid var(--rule, #d0d7de);
   display: grid;
   gap: 24px;
@@ -14,10 +23,9 @@
   padding: 22px 0;
 }
 
-:where(.wp-block-byline-page-section) > .wp-block-heading,
-:where(.byline-page-content) .byline-page-section > h2,
-:where(.byline-page-content) .byline-page-section > h3,
-:where(.byline-page-content) .byline-page-section > h4 {
+.byline-page-content .wp-block-byline-page-section > .wp-block-heading,
+.editor-styles-wrapper .wp-block-byline-page-section > .wp-block-heading,
+.byline-page-content .byline-page-section > :is(h2, h3, h4) {
   color: var(--ink, #1f2328);
   font-family: var(--font-ui, Arial, Helvetica, sans-serif);
   font-size: 0.82rem;
@@ -27,34 +35,56 @@
   text-transform: uppercase;
 }
 
-:where(.wp-block-byline-page-section__body),
-:where(.byline-page-content) .byline-page-section-body {
+.byline-page-content .wp-block-byline-page-section__body,
+.editor-styles-wrapper .wp-block-byline-page-section__body,
+.byline-page-content .byline-page-section-body {
   display: grid;
   gap: 12px;
   min-width: 0;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) {
-  color: var(--ink, #1f2328);
-  font-family: var(--font-body, Arial, Helvetica, sans-serif);
+/* The section body uses its grid gap as the rhythm between sibling blocks.
+ * Direct and nested editorial blocks therefore do not add a second prose
+ * margin on top of that gap. */
+.byline-page-content .wp-block-byline-page-section__body :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table, .wp-block-columns, .wp-block-buttons),
+.editor-styles-wrapper .wp-block-byline-page-section__body :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table, .wp-block-columns, .wp-block-buttons),
+.byline-page-content .byline-page-section-body :is(p, ul, ol, blockquote, figure, .byline-page-section-actions) {
+  margin-bottom: 0;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table) {
-  margin: 0 0 1.35em;
+.byline-page-content :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table),
+.editor-styles-wrapper :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table) {
+  margin-top: 0;
+  margin-bottom: 1.35em;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) :is(p, li) {
+.byline-page-content .wp-block-byline-page-section__body :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table),
+.editor-styles-wrapper .wp-block-byline-page-section__body :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table),
+.byline-page-content .byline-page-section-body :is(p, ul, ol, blockquote, figure) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.byline-page-content :is(p, li),
+.editor-styles-wrapper :is(p, li) {
   color: var(--ink, #1f2328);
   font-family: var(--font-body, Arial, Helvetica, sans-serif);
   font-size: 1.02rem;
   line-height: 1.58;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) :is(ul, ol) {
+.byline-page-content :is(ul, ol),
+.editor-styles-wrapper :is(ul, ol) {
   padding-left: 1.3em;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) :is(h2, h3, h4):not(.wp-block-byline-page-section > .wp-block-heading) {
+.byline-page-content .wp-block-byline-page-section__body :is(ul, ol),
+.editor-styles-wrapper .wp-block-byline-page-section__body :is(ul, ol) {
+  padding-left: 1.3em;
+}
+
+.byline-page-content :is(h2, h3, h4),
+.editor-styles-wrapper :is(h2, h3, h4) {
   color: var(--ink, #1f2328);
   font-family: var(--font-ui, Arial, Helvetica, sans-serif);
   font-weight: 800;
@@ -62,12 +92,13 @@
   margin: 0 0 0.6em;
 }
 
-:where(.byline-page-content) > :is(h2, h3, h4) {
+.byline-page-content > :is(h2, h3, h4) {
   font-size: clamp(1.45rem, 3vw, 2rem);
   text-transform: none;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) :is(blockquote, .wp-block-quote) {
+.byline-page-content :is(blockquote, .wp-block-quote),
+.editor-styles-wrapper :is(blockquote, .wp-block-quote) {
   border-left: 4px solid var(--accent, #b11f24);
   color: var(--ink, #1f2328);
   font-family: var(--font-serif, Georgia, serif);
@@ -76,51 +107,67 @@
   padding-left: 18px;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-pullquote {
+.byline-page-content .wp-block-pullquote,
+.editor-styles-wrapper .wp-block-pullquote {
   border-bottom: 4px solid var(--accent, #b11f24);
   border-top: 4px solid var(--accent, #b11f24);
   padding: 1.2em 0;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) :is(.wp-block-image, .wp-block-gallery) img {
+.byline-page-content :is(.wp-block-image, .wp-block-gallery) img,
+.editor-styles-wrapper :is(.wp-block-image, .wp-block-gallery) img {
   border: 1px solid var(--rule, #d0d7de);
   height: auto;
   max-width: 100%;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-gallery {
+.byline-page-content .wp-block-gallery,
+.editor-styles-wrapper .wp-block-gallery {
   align-items: start;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-table {
+.byline-page-content .wp-block-table,
+.editor-styles-wrapper .wp-block-table {
   overflow-x: auto;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-table table {
+.byline-page-content .wp-block-table table,
+.editor-styles-wrapper .wp-block-table table {
   border-collapse: collapse;
   min-width: 100%;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-table :is(td, th) {
+.byline-page-content .wp-block-table :is(td, th),
+.editor-styles-wrapper .wp-block-table :is(td, th) {
   border: 1px solid var(--rule, #d0d7de);
   padding: 8px 10px;
   text-align: left;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-embed__wrapper,
-:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-embed iframe {
+.byline-page-content .wp-block-embed__wrapper,
+.byline-page-content .wp-block-embed iframe,
+.editor-styles-wrapper .wp-block-embed__wrapper,
+.editor-styles-wrapper .wp-block-embed iframe {
   max-width: 100%;
   width: 100%;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-buttons {
+.byline-page-content .wp-block-buttons,
+.editor-styles-wrapper .wp-block-buttons,
+.byline-page-content .byline-page-section-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   margin: 0;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-button__link {
+.byline-page-content .wp-block-button,
+.editor-styles-wrapper .wp-block-button {
+  margin: 0;
+}
+
+.byline-page-content .wp-block-button__link,
+.editor-styles-wrapper .wp-block-button__link {
   background: var(--accent, #b11f24);
   border: 1px solid var(--accent, #b11f24);
   color: #fff;
@@ -130,17 +177,45 @@
   font-weight: 800;
   line-height: 1.2;
   padding: 10px 12px;
+  text-decoration: none;
   text-transform: uppercase;
 }
 
-:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-button__link:hover,
-:where(.byline-page-content, .wp-block-byline-page-section) .wp-block-button__link:focus-visible {
+.byline-page-content .wp-block-button__link:hover,
+.byline-page-content .wp-block-button__link:focus-visible,
+.editor-styles-wrapper .wp-block-button__link:hover,
+.editor-styles-wrapper .wp-block-button__link:focus-visible {
   background: var(--ink, #1f2328);
   border-color: var(--ink, #1f2328);
   color: #fff;
 }
 
-:where(.wp-block-byline-page-section.is-style-featured) {
+/* Page-level actions are still editable Core Buttons, but retain the outlined
+ * treatment used by the pre-Gutenberg page templates. */
+.byline-page-content .wp-block-buttons.is-style-page-actions .wp-block-button__link,
+.editor-styles-wrapper .wp-block-buttons.is-style-page-actions .wp-block-button__link {
+  background: transparent;
+  border: 1px solid var(--rule-strong, #1f2328);
+  color: var(--ink, #1f2328);
+  padding: 9px 12px;
+}
+
+.byline-page-content .wp-block-buttons.is-style-page-actions,
+.editor-styles-wrapper .wp-block-buttons.is-style-page-actions {
+  padding-top: 20px;
+}
+
+.byline-page-content .wp-block-buttons.is-style-page-actions .wp-block-button__link:hover,
+.byline-page-content .wp-block-buttons.is-style-page-actions .wp-block-button__link:focus-visible,
+.editor-styles-wrapper .wp-block-buttons.is-style-page-actions .wp-block-button__link:hover,
+.editor-styles-wrapper .wp-block-buttons.is-style-page-actions .wp-block-button__link:focus-visible {
+  background: var(--ink, #1f2328);
+  border-color: var(--ink, #1f2328);
+  color: var(--page, #f7f7f7);
+}
+
+.byline-page-content .wp-block-byline-page-section.is-style-featured,
+.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured {
   background: #171a21;
   border-bottom: 0;
   color: #fff;
@@ -149,21 +224,50 @@
   padding: 24px;
 }
 
-:where(.wp-block-byline-page-section.is-style-featured) > .wp-block-heading,
-:where(.wp-block-byline-page-section.is-style-featured) :is(p, li, blockquote, h2, h3, h4) {
+.byline-page-content .wp-block-byline-page-section.is-style-featured > .wp-block-heading,
+.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured > .wp-block-heading,
+.byline-page-content .wp-block-byline-page-section.is-style-featured :is(p, li, blockquote, h2, h3, h4),
+.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured :is(p, li, blockquote, h2, h3, h4) {
   color: #fff;
 }
 
-:where(.wp-block-byline-page-section.is-style-featured) :is(p, li) {
+.byline-page-content .wp-block-byline-page-section.is-style-featured :is(p, li),
+.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured :is(p, li) {
   color: #eee8e1;
   font-size: 1.08rem;
 }
 
-:where(.wp-block-byline-page-section.is-style-featured) :is(blockquote, .wp-block-quote) {
+.byline-page-content .wp-block-byline-page-section.is-style-featured :is(blockquote, .wp-block-quote),
+.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured :is(blockquote, .wp-block-quote) {
   border-left-color: #fff;
 }
 
-:where(.byline-page-content) .byline-page-section.is-style-featured {
+.byline-page-content .wp-block-byline-page-section.is-style-featured .wp-block-button__link:hover,
+.byline-page-content .wp-block-byline-page-section.is-style-featured .wp-block-button__link:focus-visible,
+.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured .wp-block-button__link:hover,
+.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured .wp-block-button__link:focus-visible {
+  background: #fff;
+  border-color: #fff;
+  color: #171a21;
+}
+
+.byline-page-content .wp-block-byline-page-section__body > .wp-block-buttons:not(.is-style-page-actions),
+.editor-styles-wrapper .wp-block-byline-page-section__body > .wp-block-buttons:not(.is-style-page-actions) {
+  padding-top: 4px;
+}
+
+/* Compatibility for user-edited pre-block pages. New content uses the
+ * dynamic Page Section class above; these selectors can be removed once the
+ * legacy markup health warning is no longer needed. */
+.byline-page-content .byline-page-section {
+  border-bottom: 1px solid var(--rule, #d0d7de);
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(160px, 0.35fr) minmax(0, 1fr);
+  padding: 22px 0;
+}
+
+.byline-page-content .byline-page-section.is-style-featured {
   background: #171a21;
   border-bottom: 0;
   color: #fff;
@@ -172,26 +276,21 @@
   padding: 24px;
 }
 
-:where(.byline-page-content) .byline-page-section.is-style-featured > :is(h2, h3, h4),
-:where(.byline-page-content) .byline-page-section.is-style-featured :is(p, li, blockquote) {
+.byline-page-content .byline-page-section.is-style-featured > :is(h2, h3, h4),
+.byline-page-content .byline-page-section.is-style-featured :is(p, li, blockquote) {
   color: #fff;
 }
 
-:where(.byline-page-content) .byline-page-section.is-style-featured :is(p, li) {
+.byline-page-content .byline-page-section.is-style-featured :is(p, li) {
   color: #eee8e1;
   font-size: 1.08rem;
 }
 
-/* Compatibility for user-edited pre-block pages. New content must not use
- * these classes; isolate them here so a future cleanup can remove one file. */
-:where(.byline-page-content) .byline-page-section-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+.byline-page-content .byline-page-section-actions {
   padding-top: 4px;
 }
 
-:where(.byline-page-content) .byline-page-section-actions a {
+.byline-page-content .byline-page-section-actions a {
   background: var(--accent, #b11f24);
   color: #fff;
   font-family: var(--font-ui, Arial, Helvetica, sans-serif);
@@ -201,7 +300,8 @@
   text-transform: uppercase;
 }
 
-:where(.byline-page-content) .alignwide {
+.byline-page-content .alignwide,
+.editor-styles-wrapper .alignwide {
   margin-left: -40px;
   margin-right: -40px;
   max-width: none;
@@ -209,11 +309,14 @@
 }
 
 @media (max-width: 900px) {
-  :where(.wp-block-byline-page-section) {
+  .byline-page-content .wp-block-byline-page-section,
+  .editor-styles-wrapper .wp-block-byline-page-section,
+  .byline-page-content .byline-page-section {
     grid-template-columns: 1fr;
   }
 
-  :where(.byline-page-content) .alignwide {
+  .byline-page-content .alignwide,
+  .editor-styles-wrapper .alignwide {
     margin-left: 0;
     margin-right: 0;
     width: 100%;
@@ -221,13 +324,16 @@
 }
 
 @media (max-width: 640px) {
-  :where(.wp-block-byline-page-section) {
+  .byline-page-content .wp-block-byline-page-section,
+  .editor-styles-wrapper .wp-block-byline-page-section,
+  .byline-page-content .byline-page-section {
     gap: 9px;
     padding: 18px 0;
   }
 
-  :where(.wp-block-byline-page-section.is-style-featured),
-  :where(.byline-page-content) .byline-page-section.is-style-featured {
+  .byline-page-content .wp-block-byline-page-section.is-style-featured,
+  .editor-styles-wrapper .wp-block-byline-page-section.is-style-featured,
+  .byline-page-content .byline-page-section.is-style-featured {
     gap: 14px;
     margin: 16px 0;
     padding: 18px;

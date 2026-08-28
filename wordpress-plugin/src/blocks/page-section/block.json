@@ -37,6 +37,7 @@
     }
   ],
   "editorScript": "file:./index.js",
+  "render": "file:./render.php",
   "style": "file:./style-index.css",
   "editorStyle": "file:./style-index.css",
   "example": {

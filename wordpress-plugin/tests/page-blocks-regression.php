@@ -52,7 +52,8 @@ page_blocks_assert(count(byline_add_page_block_category($categories)) === count(
 
 byline_register_page_section_block();
 page_blocks_assert(count($page_block_test['blocks']) === 1 && substr($page_block_test['blocks'][0], -strlen('/build/blocks/page-section')) === '/build/blocks/page-section', 'The metadata-driven page-section block was not registered.');
-page_blocks_assert(($page_block_test['styles']['byline/page-section']['name'] ?? '') === 'featured', 'The Featured page-section style was not registered.');
+page_blocks_assert(!isset($page_block_test['styles']['byline/page-section']), 'The metadata-declared Featured style must not be registered a second time.');
+page_blocks_assert(($page_block_test['styles']['core/buttons']['name'] ?? '') === 'page-actions', 'The editable Core Buttons Page Actions style was not registered.');
 
 byline_register_page_meta();
 $meta = $page_block_test['meta']['page'][BYLINE_PAGE_EYEBROW_META] ?? null;
@@ -72,6 +73,7 @@ foreach ($page_block_test['patterns'] as $name => $pattern) {
     page_blocks_assert(($pattern['postTypes'] ?? []) === ['page'], "Pattern {$name} is not scoped to Pages.");
     page_blocks_assert(strpos($pattern['content'] ?? '', '<!-- wp:byline/page-section') !== false, "Pattern {$name} is not composed of page-section blocks.");
     page_blocks_assert(strpos($pattern['content'] ?? '', 'Weekly Wildcat') === false && strpos($pattern['content'] ?? '', 'Ninety Six') === false, "Pattern {$name} contains publication-specific copy.");
+    page_blocks_assert(strpos($pattern['content'] ?? '', '<section class=') === false, "Pattern {$name} still stores a Page Section wrapper.");
 }
 
 $metadata = json_decode((string) file_get_contents(__DIR__ . '/../src/blocks/page-section/block.json'), true);
@@ -79,5 +81,11 @@ page_blocks_assert(is_array($metadata) && (int) ($metadata['apiVersion'] ?? 0) =
 page_blocks_assert(($metadata['supports']['align'] ?? []) === ['wide'], 'The page-section block should support wide alignment.');
 page_blocks_assert(($metadata['supports']['anchor'] ?? false) === true, 'The page-section block should support anchors.');
 page_blocks_assert(($metadata['styles'][1]['name'] ?? '') === 'featured', 'The block metadata must expose the Featured style.');
+page_blocks_assert(($metadata['render'] ?? '') === 'file:./render.php', 'The Page Section block must declare its server renderer.');
+page_blocks_assert(is_readable(__DIR__ . '/../src/blocks/page-section/render.php'), 'The Page Section server renderer is missing from source.');
+
+$section = byline_build_page_section_block('Accessibility', true, ['Editor-authored copy.']);
+page_blocks_assert(($section['innerHTML'] ?? '') === '', 'A dynamic Page Section must not store wrapper HTML.');
+page_blocks_assert(($section['innerContent'] ?? []) === [null], 'A dynamic Page Section must persist only InnerBlocks content.');
 
 echo "Byline page block regression passed.\n";
