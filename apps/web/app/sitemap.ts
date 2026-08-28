@@ -6,7 +6,16 @@ import { absoluteUrl } from "@/lib/seo";
 import { getAllSportsGames, getAllSportsRosters, getSportsTeams } from "@/lib/headless";
 import { buildTeams, getSeasonHref, getTeamHubHref } from "@/lib/sports";
 import { getPublicationConfig } from "@/lib/publication";
-import { getAllAuthors, getAllPages, getAllPosts, getAuthorHref, getPostHref, type WordPressPost } from "@/lib/wordpress";
+import {
+  getAllAuthors,
+  getAllPages,
+  getAllPosts,
+  getAllPublicContributors,
+  getAllPublicCoverages,
+  getCoverageHref,
+  getPostHref,
+  type WordPressPost
+} from "@/lib/wordpress";
 
 export const dynamic = "force-static";
 
@@ -31,7 +40,7 @@ function getPageSitemapDate(page: { modified?: string; modified_gmt?: string }) 
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const publication = getPublicationConfig();
-  const [allPosts, authors, sportsGames, sportsRosters, sportsTeamRecords, wordpressPages] = await Promise.all([
+  const [allPosts, authors, sportsGames, sportsRosters, sportsTeamRecords, wordpressPages, coverages] = await Promise.all([
     requireBuildData("/wp-json/wp/v2/posts", getAllPosts),
     requireBuildData("/wp-json/wp/v2/users", getAllAuthors),
     publication.features.sports
@@ -43,8 +52,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     publication.features.sports
       ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-teams", getSportsTeams, [])
       : [],
-    requireBuildData("/wp-json/wp/v2/pages", getAllPages)
+    requireBuildData("/wp-json/wp/v2/pages", getAllPages),
+    optionalBuildData("/wp-json/byline/v1/coverage", getAllPublicCoverages, [])
   ]);
+  const publicContributors = await optionalBuildData(
+    "/wp-json/byline/v1/contributors",
+    getAllPublicContributors,
+    authors
+  );
   const posts = filterVisibleContentPosts(allPosts);
   const sportsTeams = buildTeams(sportsGames, sportsRosters, sportsTeamRecords);
   const latestModifiedPost = posts.reduce<(typeof posts)[number] | undefined>((latestPost, post) => {
@@ -84,6 +99,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily" as const,
       priority: 0.7
     },
+    {
+      url: absoluteUrl("/corrections/"),
+      lastModified: latestModified,
+      changeFrequency: "weekly" as const,
+      priority: 0.5
+    },
     ...(publication.features.sports ? [{
       url: absoluteUrl("/sports/schedule/"),
       lastModified: latestModified,
@@ -115,9 +136,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8
   }));
 
-  const authorPages: MetadataRoute.Sitemap = authors.map((author) => ({
-    url: absoluteUrl(getAuthorHref(author)),
+  const authorPages: MetadataRoute.Sitemap = publicContributors.map((contributor) => ({
+    url: absoluteUrl(`/author/${contributor.slug}/`),
     lastModified: latestModified,
+    changeFrequency: "weekly" as const,
+    priority: 0.6
+  }));
+
+  const coveragePages: MetadataRoute.Sitemap = coverages.map((coverage) => ({
+    url: absoluteUrl(getCoverageHref(coverage)),
+    lastModified: parseSitemapDate(coverage.modified),
     changeFrequency: "weekly" as const,
     priority: 0.6
   }));
@@ -137,5 +165,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }))
   ]);
 
-  return [...applicationPages, ...authoredPages, ...sportsPages, ...articlePages, ...authorPages];
+  return [...applicationPages, ...authoredPages, ...sportsPages, ...articlePages, ...authorPages, ...coveragePages];
 }

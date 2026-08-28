@@ -257,6 +257,125 @@
   margin: 8px 0 0;
 }
 
+.byline-advanced-details {
+  color: #646970;
+  font-size: 12px;
+}
+
+.byline-advanced-details summary {
+  color: var(--byline-admin-accent);
+  cursor: pointer;
+}
+
+.byline-media-asset-preview {
+  align-items: center;
+  background: #f6f7f7;
+  border: 1px solid var(--byline-admin-border);
+  display: flex;
+  gap: 12px;
+  min-height: 76px;
+  padding: 8px;
+}
+
+.byline-media-asset-preview img {
+  background: #fff;
+  height: 64px;
+  object-fit: contain;
+  width: 180px;
+}
+
+.byline-media-asset-preview div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.byline-media-asset-preview strong,
+.byline-media-asset-preview span {
+  overflow-wrap: anywhere;
+}
+
+.byline-media-asset-preview span {
+  color: #646970;
+  font-size: 12px;
+}
+
+.byline-navigation-list {
+  counter-reset: byline-navigation;
+  list-style: none;
+  padding: 0;
+}
+
+.byline-navigation-row {
+  border: 1px solid var(--byline-admin-border);
+  border-radius: 4px;
+  counter-increment: byline-navigation;
+  padding: 16px;
+}
+
+.byline-navigation-row-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.byline-navigation-row-header strong::before {
+  color: #646970;
+  content: counter(byline-navigation) ". ";
+  font-weight: 400;
+}
+
+.byline-navigation-order {
+  display: flex;
+  gap: 2px;
+}
+
+.byline-navigation-add {
+  align-items: end;
+  display: flex;
+  gap: 12px;
+}
+
+.byline-navigation-add .components-base-control {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.byline-color-control {
+  border: 1px solid var(--byline-admin-border);
+  padding: 12px;
+}
+
+.byline-color-control > label {
+  align-items: center;
+  display: flex;
+  font-weight: 600;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.byline-color-control input[type="color"] {
+  border: 1px solid var(--byline-admin-border);
+  cursor: pointer;
+  height: 32px;
+  padding: 2px;
+  width: 48px;
+}
+
+.byline-current-revision {
+  background: #f0f6fc;
+  border-left: 4px solid var(--byline-admin-accent);
+  display: grid;
+  gap: 4px;
+  padding: 12px 16px;
+}
+
+.byline-current-revision span {
+  color: #646970;
+}
+
 .byline-status-ok {
   color: #008a20;
 }
@@ -296,7 +415,7 @@
   position: fixed;
   width: 100vw;
   /* Above the admin bar (99999) so nothing of wp-admin shows through. The
-     toolbar's Exit Studio link is the way back out. */
+     toolbar's Byline link is the way back out. */
   z-index: 100000;
 }
 
@@ -328,6 +447,63 @@
 .byline-studio-notice-actions {
   display: block;
   margin-top: 10px;
+}
+
+.byline-legacy-resolution-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding-left: 20px;
+}
+
+.byline-legacy-resolution-list li {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.byline-legacy-resolution-list li > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.byline-legacy-resolution-list small {
+  color: #646970;
+}
+
+.byline-legacy-resolution-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.byline-studio-view-menu {
+  margin-left: auto;
+  position: relative;
+}
+
+.byline-studio-view-menu summary {
+  color: var(--byline-admin-accent);
+  cursor: pointer;
+  font-weight: 600;
+  padding: 6px 2px;
+}
+
+.byline-studio-view-menu .byline-studio-panel-toggles {
+  background: #fff;
+  border: 1px solid var(--byline-admin-border);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
+  display: grid;
+  gap: 4px;
+  min-width: 190px;
+  padding: 8px;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 2;
 }
 
 .byline-studio-toolbar {
@@ -463,6 +639,29 @@
   .byline-settings-grid,
   .byline-toggle-grid {
     grid-template-columns: 1fr;
+  }
+
+  .byline-navigation-add {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .byline-media-asset-preview {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .byline-media-asset-preview img {
+    width: 100%;
+  }
+
+  .byline-legacy-resolution-list li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .byline-legacy-resolution-actions {
+    justify-content: flex-start;
   }
 
   .byline-diagnostics-list div {

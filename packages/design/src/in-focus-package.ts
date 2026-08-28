@@ -1,4 +1,4 @@
-import { parseStorySource, type BylineStorySource } from "./schema-v2";
+import { parseStorySourceOrFallback, type BylineStorySource } from "./schema-v2";
 
 export const IN_FOCUS_PACKAGE_TYPE = "in-focus-package";
 
@@ -40,7 +40,7 @@ export function parseInFocusPackageProps(
 
   return {
     heading: heading(props.heading, defaults.heading),
-    source: parseStorySource(props.source) ?? defaults.source,
+    source: parseStorySourceOrFallback(props.source, defaults.source),
     presentation: {
       showAuthor: boolean(presentation.showAuthor, defaults.presentation.showAuthor),
       showDeck: boolean(presentation.showDeck, defaults.presentation.showDeck)

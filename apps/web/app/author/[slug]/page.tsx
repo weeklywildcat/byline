@@ -9,13 +9,15 @@ import { requireBuildData } from "@/lib/build-data";
 import { getPublicationConfig } from "@/lib/publication";
 import { BYLINE_EMPTY_ROUTE_SLUG, isBylineEmptyRouteSlug, withEmptyRouteFallback } from "@/lib/static-params";
 import {
-  getAllAuthors,
-  getAuthorBySlug,
-  getAuthorHref,
-  getAuthorPhoto,
-  getAuthorProfile,
-  getAuthorSocialLinks,
-  getPostsByAuthor,
+  getAllPublicContributors,
+  getContributorBySlug,
+  getContributorDescription,
+  getContributorHref,
+  getContributorPhoto,
+  getContributorRole,
+  getContributorSocialLinks,
+  getPostsByContributor,
+  isGuestContributor,
   type WordPressPost
 } from "@/lib/wordpress";
 
@@ -30,11 +32,11 @@ const publication = getPublicationConfig();
 
 // A brand-new publication can have zero published authors; that must still build.
 export async function generateStaticParams() {
-  const authors = await requireBuildData("/wp-json/wp/v2/users", getAllAuthors);
+  const contributors = await requireBuildData("/wp-json/byline/v1/contributors", getAllPublicContributors);
 
   return withEmptyRouteFallback(
-    authors.map((author) => ({
-      slug: author.slug
+    contributors.map((contributor) => ({
+      slug: contributor.slug
     })),
     { slug: BYLINE_EMPTY_ROUTE_SLUG }
   );
@@ -47,23 +49,22 @@ export async function generateMetadata({ params }: AuthorPageProps): Promise<Met
     return { title: "Not found", robots: { index: false, follow: false } };
   }
 
-  const author = await getAuthorBySlug(slug);
+  const contributor = await getContributorBySlug(slug);
 
-  if (!author) {
+  if (!contributor) {
     return {};
   }
 
-  const description = author.description
-    ? stripHtml(author.description)
-    : `Stories by ${author.name} for ${publication.identity.shortName}.`;
-  const photo = getAuthorPhoto(author);
+  const description = stripHtml(getContributorDescription(contributor))
+    || `Stories by ${contributor.name} for ${publication.identity.shortName}.`;
+  const photo = getContributorPhoto(contributor);
 
   return buildPageMetadata({
-    title: author.name,
+    title: contributor.name,
     description,
-    path: getAuthorHref(author),
+    path: getContributorHref(contributor),
     type: "profile",
-    image: photo ? { url: photo.url, width: photo.width, height: photo.height, alt: author.name } : undefined
+    image: photo ? { url: photo.url, width: photo.width, height: photo.height, alt: contributor.name } : undefined
   });
 }
 
@@ -115,17 +116,17 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
 
   if (isBylineEmptyRouteSlug(slug)) notFound();
 
-  const author = await getAuthorBySlug(slug);
+  const contributor = await getContributorBySlug(slug);
 
-  if (!author) {
+  if (!contributor) {
     notFound();
   }
 
-  const posts = filterVisibleContentPosts(await getPostsByAuthor(author.id));
-  const profile = getAuthorProfile(author);
-  const photo = getAuthorPhoto(author);
-  const socialLinks = getAuthorSocialLinks(author);
-  const description = author.description ? stripHtml(author.description) : `${publication.identity.shortName} contributor`;
+  const posts = filterVisibleContentPosts(await getPostsByContributor(contributor));
+  const profile = !isGuestContributor(contributor) ? contributor.bylineProfile ?? contributor.weeklyWildcatProfile : null;
+  const photo = getContributorPhoto(contributor);
+  const socialLinks = getContributorSocialLinks(contributor);
+  const description = stripHtml(getContributorDescription(contributor)) || `${publication.identity.shortName} contributor`;
   const beats = getAuthorBeats(posts);
   const firstByline = getFirstBylineLabel(posts);
   const authorSchema = {
@@ -133,10 +134,10 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
     "@type": "ProfilePage",
     mainEntity: {
       "@type": "Person",
-      name: author.name,
+      name: contributor.name,
       description,
-      jobTitle: profile?.role || undefined,
-      url: absoluteUrl(getAuthorHref(author)),
+      jobTitle: getContributorRole(contributor) || undefined,
+      url: absoluteUrl(getContributorHref(contributor)),
       image: photo?.url ? absoluteUrl(photo.url) : undefined,
       sameAs: socialLinks.filter((link) => !link.href.startsWith("mailto:")).map((link) => link.href)
     }
@@ -144,7 +145,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", path: "/" },
     { name: "Authors", path: "/authors/" },
-    { name: author.name, path: getAuthorHref(author) }
+    { name: contributor.name, path: getContributorHref(contributor) }
   ]);
 
   return (
@@ -170,15 +171,15 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
           />
         ) : (
           <div className="author-avatar author-avatar-fallback" aria-hidden="true">
-            {author.name.slice(0, 1)}
+            {contributor.name.slice(0, 1)}
           </div>
         )}
         <div>
           <div className="author-profile-meta">
-            <p className="profile-kicker">{profile?.role || "Author"}</p>
+            <p className="profile-kicker">{getContributorRole(contributor)}</p>
             {profile?.founder ? <AuthorBadge label="Founder" /> : null}
           </div>
-          <h1>{author.name}</h1>
+          <h1>{contributor.name}</h1>
           {profile?.pronouns ? <p className="author-pronouns">{profile.pronouns}</p> : null}
           <p className="author-bio">{description}</p>
           <dl className="author-stats">
@@ -200,7 +201,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
             ) : null}
           </dl>
           {socialLinks.length > 0 ? (
-            <div className="author-social-links" aria-label={`${author.name} social links`}>
+              <div className="author-social-links" aria-label={`${contributor.name} social links`}>
               {socialLinks.map((link) => (
                 <a key={link.label} href={link.href}>
                   {link.label}

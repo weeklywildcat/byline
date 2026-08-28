@@ -14,12 +14,14 @@ describe("Byline admin local routing", () => {
     expect(normalizeAdminPage("byline-publication")).toBe(ADMIN_PAGE_SLUGS.publication);
     expect(normalizeAdminPage("not-a-byline-page")).toBe(ADMIN_PAGE_SLUGS.dashboard);
     expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.publication, "branding")).toBe("branding");
+    expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.publication, "features")).toBe("features");
     expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.publication, "invalid")).toBe("identity");
     expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.integrations, undefined)).toBe("discord");
     expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.settings, "invalid")).toBe("access");
     expect(normalizeStudioView("revisions")).toBe("revisions");
     expect(normalizeStudioView("invalid")).toBe("editor");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.publication, "branding")).toBe("/publication/branding");
+    expect(adminScreenRoute(ADMIN_PAGE_SLUGS.publication, "features")).toBe("/publication/features");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.integrations, "deployment")).toBe("/integrations/deployment");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.settings, "diagnostics")).toBe("/advanced/diagnostics");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.theme, undefined)).toBe("/design/theme");
@@ -32,6 +34,10 @@ describe("Byline admin local routing", () => {
     expect(legacyHashDestination("#/publication/branding")).toEqual({
       page: ADMIN_PAGE_SLUGS.publication,
       tab: "branding"
+    });
+    expect(legacyHashDestination("#/publication/features")).toEqual({
+      page: ADMIN_PAGE_SLUGS.publication,
+      tab: "features"
     });
     expect(legacyHashDestination("#/design/revisions")).toEqual({
       page: ADMIN_PAGE_SLUGS.studio,

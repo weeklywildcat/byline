@@ -4,7 +4,7 @@ import { getPrimaryVisibleCategory } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
 import {
   getFeaturedMedia,
-  getPostAuthor,
+  getPostContributors,
   getPostHref,
   type WordPressPost
 } from "@/lib/wordpress";
@@ -18,10 +18,22 @@ type StoryTeaserProps = {
   priority?: boolean;
 };
 
+function getStoryTeaserImageSizes(variant: StoryTeaserVariant) {
+  if (variant === "secondary" || variant === "compact" || variant === "list") {
+    return "92px";
+  }
+
+  if (variant === "lead") {
+    return "(max-width: 900px) 100vw, 66vw";
+  }
+
+  return "(max-width: 900px) 100vw, 45vw";
+}
+
 export function StoryTeaser({ post, variant = "standard", showImage = true, priority = false }: StoryTeaserProps) {
   const href = getPostHref(post);
   const image = getFeaturedMedia(post);
-  const author = getPostAuthor(post);
+  const contributors = getPostContributors(post);
   const category = getPrimaryVisibleCategory(post);
   const excerpt = post.excerpt.rendered.trim();
   const title = stripHtml(post.title.rendered);
@@ -31,9 +43,16 @@ export function StoryTeaser({ post, variant = "standard", showImage = true, prio
 
   return (
     <article className={className}>
-      {shouldShowImage ? <FeaturedImage image={image} priority={priority} showCaption={false} /> : null}
+      {shouldShowImage ? (
+        <FeaturedImage
+          image={image}
+          priority={priority}
+          showCaption={false}
+          sizes={getStoryTeaserImageSizes(variant)}
+        />
+      ) : null}
       <div className="story-teaser-body">
-        <ArticleByline author={author} category={category} date={post.date} />
+        <ArticleByline contributors={contributors} category={category} date={post.date} />
         <h2>
           <a href={href}>{title}</a>
         </h2>

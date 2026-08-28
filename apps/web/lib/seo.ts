@@ -4,8 +4,12 @@ import { decodeHtml, stripHtml } from "@/lib/format";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getFeaturedMedia,
-  getAuthorHref,
-  getPostAuthor,
+  getContributorDescription,
+  getContributorHref,
+  getContributorName,
+  getContributorRole,
+  getContributorSocialLinks,
+  getPostContributors,
   getPostHref,
   getSiteUrl,
   type WordPressMedia,
@@ -294,7 +298,7 @@ function getArticleImageSchema(image: WordPressMedia | null) {
 }
 
 export function getNewsArticleSchema(post: WordPressPost) {
-  const author = getPostAuthor(post);
+  const contributors = getPostContributors(post);
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
   const articleUrl = absoluteUrl(getPostHref(post));
@@ -305,6 +309,27 @@ export function getNewsArticleSchema(post: WordPressPost) {
     ?.flat()
     .filter((term): term is { name: string; taxonomy: string } => "name" in term && term.taxonomy === "post_tag")
     .map((tag) => decodeHtml(tag.name));
+  const authorEntities = contributors.map((contributor) => {
+    const socialLinks = getContributorSocialLinks(contributor)
+      .map((link) => link.href.trim())
+      .filter((href) => !href.toLowerCase().startsWith("mailto:") && (/^https?:\/\//i.test(href) || (href.startsWith("/") && !href.startsWith("//"))))
+      .map((href) => absoluteUrl(href));
+
+    return {
+      "@type": "Person",
+      name: getContributorName(contributor),
+      url: absoluteUrl(getContributorHref(contributor)),
+      jobTitle: getContributorRole(contributor) || undefined,
+      description: getContributorDescription(contributor) || undefined,
+      sameAs: socialLinks.length > 0 ? socialLinks : undefined
+    };
+  });
+  const authors = authorEntities.length > 0
+    ? authorEntities
+    : [{
+        "@type": "Person",
+        name: `${publication.identity.shortName} Staff`
+      }];
 
   return {
     "@context": "https://schema.org",
@@ -318,11 +343,7 @@ export function getNewsArticleSchema(post: WordPressPost) {
     url: articleUrl,
     datePublished: post.date,
     dateModified: post.modified,
-    author: {
-      "@type": "Person",
-      name: author?.name ?? `${publication.identity.shortName} Staff`,
-      url: author ? absoluteUrl(getAuthorHref(author)) : undefined
-    },
+    author: authors.length === 1 ? authors[0] : authors,
     publisher: getPublisherSchema(),
     articleSection: category ? decodeHtml(category.name) : undefined,
     keywords: keywords?.length ? keywords.join(", ") : undefined,

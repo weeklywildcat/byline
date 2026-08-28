@@ -168,6 +168,29 @@ if (byline_validate_design_document($v2, 'home') !== true) {
     exit(1);
 }
 
+$v2_coverage = $v2;
+$v2_coverage['packages'][0]['props']['source'] = ['type' => 'coverage', 'coverageId' => 42];
+if (byline_validate_design_document($v2_coverage, 'home') !== true) {
+    fwrite(STDERR, "A valid Coverage story source was rejected.\n");
+    exit(1);
+}
+
+foreach ([
+    ['type' => 'coverage'],
+    ['type' => 'coverage', 'coverageId' => 0],
+    ['type' => 'coverage', 'coverageId' => '42'],
+    ['type' => 'coverage', 'coverageId' => 42, 'slug' => 'special'],
+    ['type' => 'unknown-coverage', 'coverageId' => 42],
+] as $invalid_coverage_source) {
+    $invalid_coverage = $v2;
+    $invalid_coverage['packages'][0]['props']['source'] = $invalid_coverage_source;
+    $invalid_coverage_result = byline_validate_design_document($invalid_coverage, 'home');
+    if (!$invalid_coverage_result instanceof WP_Error || $invalid_coverage_result->code !== 'byline_invalid_story_query') {
+        fwrite(STDERR, "Malformed or unknown Coverage source was not rejected.\n");
+        exit(1);
+    }
+}
+
 $v2_unknown = $v2;
 $v2_unknown['packages'][0]['type'] = 'mystery-package';
 $v2_unknown_result = byline_validate_design_document($v2_unknown, 'home');

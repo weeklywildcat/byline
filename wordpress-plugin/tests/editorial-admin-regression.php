@@ -14,6 +14,7 @@
 define('ABSPATH', __DIR__ . '/../');
 const BYLINE_PLUGIN_VERSION = '0.0.0-test';
 const BYLINE_REST_NAMESPACE = 'byline/v1';
+const WWH_DISCORD_THREAD_META = '_wwh_discord_thread_id';
 
 class WP_Post { public int $ID = 0; public int $post_author = 1; public string $post_type = 'post'; public string $post_status = 'draft'; public string $post_title = ''; }
 class WP_User { public int $ID = 1; public string $display_name = 'Test User'; }
@@ -75,6 +76,7 @@ function user_can($user, string $capability, ...$args): bool { global $byline_ca
 function get_current_screen() { global $byline_screen; return $byline_screen; }
 function get_post($id) { global $byline_posts; return $byline_posts[$id] ?? null; }
 function get_user_by($field, $value) { $user = new WP_User(); $user->ID = (int) $value; $user->display_name = 'User ' . (int) $value; return $user; }
+function byline_discord_setting(string $key): string { return $key === 'guildId' ? '12345678901234567' : ''; }
 function get_users(array $args = []): array { return [(object) ['ID' => 7, 'display_name' => 'Jane Smith']]; }
 function update_post_meta($post_id, $key, $value): void { global $byline_meta; $byline_meta[$post_id][$key] = $value; }
 function delete_post_meta($post_id, $key): void { global $byline_meta; unset($byline_meta[$post_id][$key]); }
@@ -330,6 +332,11 @@ if (!isset($payload['story'], $payload['statuses'], $payload['capabilities'], $p
 }
 if ($payload['capabilities']['assign'] !== true || $payload['editors'] === []) {
     byline_test_fail('An editor did not receive the assignable roster.');
+}
+$byline_meta[5][WWH_DISCORD_THREAD_META] = '98765432109876543';
+$payload = byline_editorial_rest_payload(5);
+if (($payload['discord']['threadUrl'] ?? '') !== 'https://discord.com/channels/12345678901234567/98765432109876543') {
+    byline_test_fail('The editorial payload did not provide the canonical Discord thread URL.');
 }
 // Only an editor may assign, so only an editor receives the roster.
 $byline_capabilities = ['edit_posts' => true, 'edit_post' => true];

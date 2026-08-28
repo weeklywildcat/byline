@@ -27,8 +27,22 @@ require_once __DIR__ . '/includes/admin/app.php';
 // Editorial workflow is a first-class Byline domain. Integrations consume it;
 // none of them owns it.
 require_once __DIR__ . '/includes/editorial/workflow.php';
+require_once __DIR__ . '/includes/editorial/planning.php';
+require_once __DIR__ . '/includes/editorial/tasks.php';
+require_once __DIR__ . '/includes/editorial/media.php';
+require_once __DIR__ . '/includes/editorial/coverage.php';
+require_once __DIR__ . '/includes/editorial/corrections.php';
+require_once __DIR__ . '/includes/editorial/feedback.php';
+require_once __DIR__ . '/includes/editorial/contributors.php';
+require_once __DIR__ . '/includes/editorial/readiness.php';
 require_once __DIR__ . '/includes/editorial/rest.php';
 require_once __DIR__ . '/includes/editorial/admin.php';
+
+// Design publication is shared by the immediate REST action and the
+// idempotent scheduled executor. Loading the helper before the REST routes
+// keeps both paths on the same validation/locking implementation.
+require_once __DIR__ . '/includes/design/publishing.php';
+require_once __DIR__ . '/includes/design/scheduling.php';
 
 // Polls are WordPress-native content with their own vote table. WordPress is
 // the only datastore for poll definitions, lifecycle, and votes.
@@ -5585,6 +5599,13 @@ require_once __DIR__ . '/includes/discord-integration.php';
 require_once __DIR__ . '/includes/integrations/discord.php';
 require_once __DIR__ . '/includes/core/upgrade.php';
 require_once __DIR__ . '/includes/core/health.php';
+require_once __DIR__ . '/includes/admin/dashboard.php';
+
+// Integrations, Content Health, Command Palette, and newsletter delivery are
+// first-class protected WordPress services.  The registration adapter is
+// loaded last so every core/editorial helper it consumes is already defined.
+require_once __DIR__ . '/includes/integrations/registration.php';
+byline_register_optional_backend_slice();
 
 // One activation callback owns all first-install work. Updates are repaired by
 // byline_maybe_upgrade() on admin_init, so replacing plugin files never

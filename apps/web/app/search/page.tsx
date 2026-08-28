@@ -6,8 +6,10 @@ import { formatDisplayDate, stripHtml } from "@/lib/format";
 import { getAllSportsGames, getAllSportsRosters, getSportsTeams } from "@/lib/headless";
 import { buildPageMetadata } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
+import { getBylineRestUrl } from "@/lib/byline-rest";
+import { toSearchFacetValue } from "@/lib/search";
 import { buildTeams, getGameHref, getSeasonHref, getTeamHubHref } from "@/lib/sports";
-import { getAllPosts, getPostAuthor, getPostHref } from "@/lib/wordpress";
+import { getAllPosts, getPostContributors, getPostHref } from "@/lib/wordpress";
 
 export const dynamic = "force-static";
 const publication = getPublicationConfig();
@@ -53,8 +55,15 @@ export default async function SearchPage() {
     const title = stripHtml(post.title.rendered);
     const excerpt = getSearchExcerpt(post.excerpt.rendered || post.content.rendered);
     const category = getPrimaryVisibleCategory(post);
-    const author = getPostAuthor(post);
-    const topics = getPublicTopicTags(post).map((tag) => stripHtml(tag.name));
+    const contributors = getPostContributors(post);
+    const topicEntries = getPublicTopicTags(post).map((tag) => ({
+      value: tag.slug,
+      label: stripHtml(tag.name)
+    }));
+    const authorName = contributors.length > 0
+      ? contributors.map((contributor) => contributor.name).join(", ")
+      : `${publication.identity.shortName} Staff`;
+    const sectionLabel = category ? stripHtml(category.name) : "";
 
     return {
       id: post.id,
@@ -62,10 +71,28 @@ export default async function SearchPage() {
       title,
       excerpt,
       href: getPostHref(post),
-      category: category ? stripHtml(category.name) : "",
-      author: author?.name ?? `${publication.identity.shortName} Staff`,
+      category: sectionLabel,
+      section: category?.slug ?? "",
+      sectionLabel,
+      author: authorName,
+      authorKey: contributors.length > 0 ? contributors.map((contributor) => contributor.slug).join(",") : toSearchFacetValue(authorName),
+      authorOptions: contributors.map((contributor) => ({ value: contributor.slug, label: contributor.name })),
+      topics: topicEntries.map((topic) => topic.value),
+      topicLabels: Object.fromEntries(topicEntries.map((topic) => [topic.value, topic.label])),
       date: formatDisplayDate(post.date),
-      searchText: [title, excerpt, category?.name, author?.name, ...topics].filter(Boolean).join(" ").toLowerCase()
+      sortDate: post.date,
+      searchText: [
+        title,
+        excerpt,
+        sectionLabel,
+        category?.slug,
+        authorName,
+        ...contributors.flatMap((contributor) => [contributor.name, contributor.slug]),
+        ...topicEntries.flatMap((topic) => [topic.label, topic.value])
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
     };
   });
   const teamItems: SearchIndexItem[] = teams.map((team) => ({
@@ -75,8 +102,12 @@ export default async function SearchPage() {
     excerpt: `${team.seasons.length} season${team.seasons.length === 1 ? "" : "s"} available. Latest season: ${team.latestSeason}.`,
     href: getTeamHubHref(team),
     category: "Team Hub",
+    section: "sports",
+    sectionLabel: "Sports",
     author: `${publication.identity.shortName} Sports`,
+    authorKey: toSearchFacetValue(`${publication.identity.shortName} Sports`),
     date: team.latestSeason,
+    sortDate: team.latestSeason,
     searchText: [team.slug, team.name, team.shortName, ...team.sportKeys, ...team.seasons].join(" ").toLowerCase()
   }));
   const seasonItems: SearchIndexItem[] = teams.flatMap((team) =>
@@ -87,8 +118,12 @@ export default async function SearchPage() {
       excerpt: `Schedule and results for the ${year} ${team.name} season.`,
       href: getSeasonHref(team, year),
       category: "Season Archive",
+      section: "sports",
+      sectionLabel: "Sports",
       author: `${publication.identity.shortName} Sports`,
+      authorKey: toSearchFacetValue(`${publication.identity.shortName} Sports`),
       date: year,
+      sortDate: `${year}-01-01`,
       searchText: [team.slug, team.name, team.shortName, year, "schedule", "scores", "results"].join(" ").toLowerCase()
     }))
   );
@@ -99,8 +134,12 @@ export default async function SearchPage() {
     excerpt: [game.display.date, game.display.location, game.display.status, game.display.score].filter(Boolean).join(" · "),
     href: getGameHref(game),
     category: "Game",
+    section: "sports",
+    sectionLabel: "Sports",
     author: game.display.sportLevel || game.sportLabel || `${publication.identity.shortName} Sports`,
+    authorKey: toSearchFacetValue(game.display.sportLevel || game.sportLabel || `${publication.identity.shortName} Sports`),
     date: game.display.date || game.startDate,
+    sortDate: game.startDate,
     searchText: [
       game.id,
       game.sportKey,
@@ -125,7 +164,7 @@ export default async function SearchPage() {
 
   return (
     <main className="search-page-shell">
-      <SearchPageClient items={items} publicationName={publication.identity.shortName} />
+      <SearchPageClient items={items} publicationName={publication.identity.shortName} searchGapEndpoint={getBylineRestUrl("search-gaps")} />
     </main>
   );
 }

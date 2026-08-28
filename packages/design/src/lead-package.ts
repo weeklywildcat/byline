@@ -8,7 +8,7 @@
 //
 // See docs/weekly-wildcat-homepage-inventory.md for the behaviour this must
 // reproduce.
-import { parseStorySource, type BylineStorySource } from "./schema-v2";
+import { parseStorySourceOrFallback, type BylineStorySource } from "./schema-v2";
 
 export const LEAD_PACKAGE_TYPE = "lead-package";
 
@@ -88,11 +88,11 @@ export function parseLeadPackageProps(value: unknown): LeadPackageProps {
     ...(mode ? { mode } : {}),
     ...(mode === "single-story" ? { heading: packageHeading } : {}),
     lead: {
-      source: parseStorySource(lead.source) ?? WEEKLY_WILDCAT_LEAD_DEFAULTS.lead.source
+      source: parseStorySourceOrFallback(lead.source, WEEKLY_WILDCAT_LEAD_DEFAULTS.lead.source)
     },
     latest: {
       heading: heading(latest.heading, WEEKLY_WILDCAT_LEAD_DEFAULTS.latest.heading),
-      source: parseStorySource(latest.source) ?? WEEKLY_WILDCAT_LEAD_DEFAULTS.latest.source,
+      source: parseStorySourceOrFallback(latest.source, WEEKLY_WILDCAT_LEAD_DEFAULTS.latest.source),
       limit: boundedCount(latest.limit, WEEKLY_WILDCAT_LEAD_DEFAULTS.latest.limit, MAX_LATEST),
       showBylines: boolean(latest.showBylines, WEEKLY_WILDCAT_LEAD_DEFAULTS.latest.showBylines)
     },

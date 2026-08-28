@@ -136,7 +136,8 @@ function submenus_by_parent(): array
 byline_register_admin_app();
 
 $expected_top_level = [
-    'byline-studio' => ['title' => 'Studio', 'capability' => BYLINE_EDIT_DESIGN_CAPABILITY, 'position' => 26],
+    'byline-planning' => ['title' => 'Planning', 'capability' => 'edit_posts', 'position' => 26],
+    'byline-studio' => ['title' => 'Studio', 'capability' => BYLINE_EDIT_DESIGN_CAPABILITY, 'position' => 27],
     'byline' => ['title' => 'Byline', 'capability' => BYLINE_MANAGE_CAPABILITY, 'position' => 100],
 ];
 foreach ($expected_top_level as $slug => $expected) {

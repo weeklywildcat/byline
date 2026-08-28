@@ -24,17 +24,25 @@ Posts
 Media
 Pages
 Comments
-Studio                        26
-Sports                        27
+Planning                      26
+  Stories / List / Calendar
+  Media Desk
+  Coverage
+  Performance
+  Content Health
+  Feedback
+Studio                        27
+Sports                        28
   Games / Add Game
   Rosters
   Import
   Export
   Teams
   Roster Import / Export
-Polls                         28   (only when the polls feature is enabled)
+Polls                         29   (only when the polls feature is enabled)
   Polls / Add Poll
-Events                        29   (only when the events feature is enabled)
+Events                        30   (only when the events feature is enabled)
+Newsletters                   31   (only when the newsletter feature is enabled)
 --------------------------------   WordPress's administration boundary
 Appearance
 Plugins
@@ -52,7 +60,7 @@ Byline                        100
 ### Menu positions
 
 Core content menus occupy 5 (Posts) through 25 (Comments), and the first core
-separator sits at 59. Byline's workflow menus therefore claim 26-29, reading as
+separator sits at 59. Byline's workflow menus therefore claim 26-31, reading as
 a continuation of the content block without displacing core items. WordPress
 advances to the next free slot when another plugin already holds a position, so
 nothing here depends on exact numbering.
@@ -68,10 +76,12 @@ REST permissions are unchanged.
 
 | Menu | Capability |
 | --- | --- |
+| Planning | `edit_posts` |
 | Studio | `edit_byline_design` |
 | Sports | post-type capabilities (`edit_posts`); utilities keep their own |
 | Polls | poll capabilities (`edit_byline_polls`, `publish_byline_polls`, ...) |
 | Events | post-type capabilities (`edit_posts`) |
+| Newsletters | `edit_posts` for issue workflow; integration settings require `manage_byline_integrations` |
 | Byline | `manage_byline`, or `manage_byline_integrations` |
 
 Being able to edit posts is deliberately **not** enough to see the Byline
@@ -86,7 +96,9 @@ ownership are independent.
 
 | Screen | URL |
 | --- | --- |
+| Planning | `admin.php?page=byline-planning` |
 | Studio | `admin.php?page=byline-studio` (`view=revisions` for Revisions) |
+| Newsletters | `admin.php?page=byline-newsletters` |
 | Polls | `edit.php?post_type=byline_poll` |
 | Byline Overview | `admin.php?page=byline` |
 | Publication | `admin.php?page=byline-publication` |

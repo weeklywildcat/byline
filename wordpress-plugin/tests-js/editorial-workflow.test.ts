@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   WORKFLOW_FALLBACK_ERROR,
+  createSerializedWorkflowSaveQueue,
+  createWorkflowRequestTracker,
   describeWorkflowError,
   workflowStages,
   workflowStatusLabel,
@@ -121,5 +123,49 @@ describe("workflow transport", () => {
   it("addresses the capability-protected Byline editorial endpoint", () => {
     expect(workflowStoryPath(42)).toBe("/byline/v1/editorial/stories/42");
     expect(workflowStoryPath(42)).not.toContain("/wp/v2/");
+  });
+});
+
+describe("workflow request ordering", () => {
+  it("does not let a reload invalidate a save generation", () => {
+    const tracker = createWorkflowRequestTracker();
+    const read = tracker.beginRead();
+    const write = tracker.beginWrite();
+    const reload = tracker.beginRead();
+
+    expect(tracker.isCurrentRead(reload)).toBe(true);
+    expect(tracker.isCurrentWrite(write)).toBe(true);
+    expect(tracker.isCurrentRead(read)).toBe(false);
+  });
+
+  it("lets a newer save supersede an older save response", () => {
+    const tracker = createWorkflowRequestTracker();
+    const first = tracker.beginWrite();
+    const second = tracker.beginWrite();
+
+    expect(tracker.isCurrentWrite(first)).toBe(false);
+    expect(tracker.isCurrentWrite(second)).toBe(true);
+  });
+});
+
+describe("workflow field autosave", () => {
+  it("serializes visual-needs values and continues after a failed request", async () => {
+    const requests: Array<{ value: string; resolve: (saved: boolean) => void }> = [];
+    const save = (value: string) => new Promise<boolean>((resolve) => requests.push({ value, resolve }));
+    const queue = createSerializedWorkflowSaveQueue(save);
+
+    const first = queue.enqueue("first note");
+    const second = queue.enqueue("latest note");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(requests.map((request) => request.value)).toEqual(["first note"]);
+
+    requests[0].resolve(false);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(requests.map((request) => request.value)).toEqual(["first note", "latest note"]);
+
+    requests[1].resolve(true);
+    await expect(first).resolves.toBe(false);
+    await expect(second).resolves.toBe(true);
+    await expect(queue.drain()).resolves.toBe(true);
   });
 });

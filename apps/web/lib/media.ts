@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { stripHtml } from "@/lib/format";
 
 const DEFAULT_WP_API_URL = "https://cms.weeklywildcat.com/wp-json/wp/v2";
 const DEFAULT_SITE_URL = "https://weeklywildcat.com";
@@ -20,6 +21,136 @@ type WordPressMediaResponse = {
     sizes?: Record<string, { source_url?: string }>;
   };
 };
+
+/**
+ * The public image renderers only need this small, serializable slice of a
+ * WordPress attachment. Keeping it structural means the helper also works with
+ * media returned by a compatible endpoint without coupling this server module
+ * to the full WordPress response type.
+ */
+export type ResponsiveWordPressMedia = {
+  source_url?: string;
+  alt_text?: string;
+  title?: {
+    rendered?: string;
+  };
+  media_details?: {
+    width?: number;
+    height?: number;
+    sizes?: Record<
+      string,
+      {
+        source_url?: string;
+        width?: number;
+        height?: number;
+      }
+    >;
+  };
+};
+
+export type ResponsiveImageOptions = {
+  alt?: string;
+  sizes?: string;
+  priority?: boolean;
+  loading?: "eager" | "lazy";
+  fetchPriority?: "high" | "low" | "auto";
+};
+
+export type ResponsiveImageProps = {
+  src: string;
+  srcSet?: string;
+  sizes: string;
+  width?: number;
+  height?: number;
+  alt: string;
+  loading: "eager" | "lazy";
+  decoding: "async";
+  fetchPriority: "high" | "low" | "auto";
+};
+
+export const DEFAULT_RESPONSIVE_IMAGE_SIZES = "(max-width: 900px) 100vw, 900px";
+
+function positiveInteger(value: unknown) {
+  const number = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(number) && number > 0 ? Math.round(number) : undefined;
+}
+
+/**
+ * Build normal HTML image attributes from mirrored WordPress media metadata.
+ *
+ * The build pipeline mirrors every WordPress media URL before this helper is
+ * called, so the helper deliberately preserves each URL exactly as supplied.
+ * That keeps srcSet candidates on the same local mirror as src while still
+ * allowing the CMS URL fallback when mirroring was unavailable.
+ */
+export function getResponsiveImageProps(
+  image: ResponsiveWordPressMedia | null | undefined,
+  options: ResponsiveImageOptions = {}
+): ResponsiveImageProps | null {
+  if (!image) {
+    return null;
+  }
+
+  const src = image.source_url?.trim();
+
+  if (!src) {
+    return null;
+  }
+
+  const candidates = new Map<number, { sourceUrl: string; width: number; height?: number }>();
+
+  for (const size of Object.values(image.media_details?.sizes ?? {})) {
+    const sourceUrl = size.source_url?.trim();
+    const width = positiveInteger(size.width);
+
+    if (!sourceUrl || !width || candidates.has(width)) {
+      continue;
+    }
+
+    candidates.set(width, {
+      sourceUrl,
+      width,
+      height: positiveInteger(size.height)
+    });
+  }
+
+  const intrinsicWidth = positiveInteger(image.media_details?.width);
+  const intrinsicHeight = positiveInteger(image.media_details?.height);
+
+  // The original source is the safest candidate at its intrinsic width. If a
+  // `full` size has the same width, prefer this URL so a cropped derivative
+  // cannot replace the fallback image at the largest breakpoint.
+  if (intrinsicWidth && candidates.size > 0) {
+    const intrinsicCandidate = candidates.get(intrinsicWidth);
+
+    candidates.set(intrinsicWidth, {
+      sourceUrl: src,
+      width: intrinsicWidth,
+      height: intrinsicHeight ?? intrinsicCandidate?.height
+    });
+  }
+
+  const sortedCandidates = [...candidates.values()].sort((left, right) => left.width - right.width);
+  const largestCandidate = sortedCandidates.at(-1);
+  const width = intrinsicWidth ?? largestCandidate?.width;
+  const height = intrinsicHeight ?? largestCandidate?.height;
+
+  return {
+    src,
+    srcSet:
+      sortedCandidates.length > 0
+        ? sortedCandidates.map((candidate) => `${candidate.sourceUrl} ${candidate.width}w`).join(", ")
+        : undefined,
+    sizes: options.sizes ?? DEFAULT_RESPONSIVE_IMAGE_SIZES,
+    width,
+    height,
+    alt: options.alt ?? (image.alt_text?.trim() || stripHtml(image.title?.rendered ?? "")),
+    loading: options.loading ?? (options.priority ? "eager" : "lazy"),
+    decoding: "async",
+    fetchPriority: options.fetchPriority ?? (options.priority ? "high" : "auto")
+  };
+}
 
 function getWordPressApiUrl() {
   return (process.env.NEXT_PUBLIC_WP_API_URL || DEFAULT_WP_API_URL).replace(/\/$/, "");

@@ -1,4 +1,4 @@
-import { parseStorySource, type BylineStorySource } from "./schema-v2";
+import { parseStorySourceOrFallback, type BylineStorySource } from "./schema-v2";
 
 export const OPINION_PACKAGE_TYPE = "opinion-package";
 
@@ -74,7 +74,7 @@ export function parseOpinionPackageProps(
     description: typeof props.description === "string"
       ? props.description.trim().slice(0, 240)
       : defaults.description,
-    source: parseStorySource(props.source) ?? defaults.source,
+    source: parseStorySourceOrFallback(props.source, defaults.source),
     limit: boundedCount(props.limit, defaults.limit),
     archiveLink: link(props.archiveLink, defaults.archiveLink),
     presentation: {

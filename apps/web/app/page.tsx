@@ -4,6 +4,7 @@ import { DesignHomepage } from "@/components/DesignHomepage";
 import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { PollWidget } from "@/components/PollWidget";
+import { optionalBuildData } from "@/lib/build-data";
 import { filterPublicHomepagePosts } from "@/lib/content";
 import {
   getRecentSportsGames,
@@ -22,7 +23,7 @@ import { resolvePublishedDesignBlocks } from "@/lib/design-resolution";
 import { toCalendarEntries } from "@/lib/homepage-packages";
 import { getPublicationConfig } from "@/lib/publication";
 import { buildPageMetadata, getWebsiteSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
-import { getAllPosts } from "@/lib/wordpress";
+import { getAllPosts, getAllPublicCoverages } from "@/lib/wordpress";
 
 const publication = getPublicationConfig();
 export const metadata: Metadata = buildPageMetadata({
@@ -63,8 +64,9 @@ async function getHomepageSportsSchedule(requirements: ReturnType<typeof getHome
 export default async function HomePage() {
   const homeDesign = getHomeDesignDocument();
   const requirements = getHomepageDataRequirements(homeDesign);
-  const [allPosts, sportsSchedule] = await Promise.all([
+  const [allPosts, coverages, sportsSchedule] = await Promise.all([
     getAllPosts(),
+    optionalBuildData("/wp-json/byline/v1/coverage", getAllPublicCoverages, []),
     getHomepageSportsSchedule(requirements)
   ]);
   const websiteSchema = getWebsiteSchema();
@@ -99,6 +101,7 @@ export default async function HomePage() {
   const resolvedHome = resolveHomepageDocument({
     document: homeDesign,
     posts,
+    coverages,
     publication,
     sportsSchedule
   });

@@ -6,12 +6,19 @@ const BYLINE_REST_NAMESPACE = 'byline/v1';
 const BYLINE_MANAGE_CAPABILITY = 'manage_byline';
 const BYLINE_EDIT_DESIGN_CAPABILITY = 'edit_byline_design';
 const BYLINE_PUBLISH_DESIGN_CAPABILITY = 'publish_byline_design';
+const BYLINE_MANAGE_INTEGRATIONS_CAPABILITY = 'manage_byline_integrations';
 
 $design_post = null;
 $post_meta = [];
 $user_meta = [];
 $revisions = [];
 $next_revision_id = 100;
+$design_routes = [];
+$design_capabilities = [
+    'edit_byline_design' => true,
+    'publish_byline_design' => true,
+    'manage_byline_integrations' => false,
+];
 
 class WP_Error
 {
@@ -26,6 +33,7 @@ class WP_Post
     public string $post_modified_gmt = '2026-08-25 12:00:00';
     public int $post_parent = 0;
 }
+class WP_REST_Server { public const READABLE = 'GET'; public const EDITABLE = 'PUT'; public const DELETABLE = 'DELETE'; public const CREATABLE = 'POST'; }
 class WP_REST_Response { public $data; public function __construct($data) { $this->data = $data; } }
 class WP_REST_Request implements ArrayAccess
 {
@@ -45,8 +53,8 @@ function wp_json_encode($value) { return json_encode($value); }
 function wp_slash($value) { return $value; }
 function is_wp_error($value): bool { return $value instanceof WP_Error; }
 function rest_ensure_response($data): WP_REST_Response { return new WP_REST_Response($data); }
-function register_rest_route(...$args): void {}
-function current_user_can(string $capability): bool { return true; }
+function register_rest_route(...$args): void { global $design_routes; $design_routes[$args[1]] = $args[2]; }
+function current_user_can(string $capability): bool { global $design_capabilities; return !empty($design_capabilities[$capability]); }
 function get_current_user_id(): int { return 7; }
 function byline_get_publication_config(): array { return ['appearance' => ['theme' => 'byline-modern'], 'features' => ['sports' => true, 'events' => true, 'polls' => true, 'newsletter' => true]]; }
 function byline_protocol_manifest(): array { return []; }
@@ -69,6 +77,24 @@ function mysql_to_rfc3339(string $value): string { return '2026-08-25T12:00:00+0
 require __DIR__ . '/../includes/design/schema.php';
 require __DIR__ . '/../includes/design/post-type.php';
 require __DIR__ . '/../includes/design/rest.php';
+
+byline_register_design_routes();
+$deployment_route = $design_routes['/admin/design/(?P<template>[a-z0-9:-]+)/deployment'] ?? null;
+if (!is_array($deployment_route) || !isset($deployment_route['callback'], $deployment_route['permission_callback'])) {
+    fwrite(STDERR, "Studio deployment status route was not registered with a capability callback.\n");
+    exit(1);
+}
+$design_capabilities['edit_byline_design'] = false;
+if ($deployment_route['permission_callback']() !== false) {
+    fwrite(STDERR, "Studio deployment status must remain capability protected.\n");
+    exit(1);
+}
+$design_capabilities['edit_byline_design'] = true;
+$deployment_response = $deployment_route['callback'](new WP_REST_Request(['template' => 'home']));
+if (!$deployment_response instanceof WP_REST_Response || !isset($deployment_response->data['publicManifest'])) {
+    fwrite(STDERR, "Studio deployment status did not return a safe public-manifest payload.\n");
+    exit(1);
+}
 
 $document = byline_default_design_document('home');
 $document['layout']['content'][0]['props']['title'] = 'Private autosave';

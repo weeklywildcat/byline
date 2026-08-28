@@ -9,7 +9,7 @@
 //
 // See docs/weekly-wildcat-homepage-inventory.md for the behaviour this must
 // reproduce.
-import { parseStorySource, type BylineStorySource } from "./schema-v2";
+import { parseStorySource, parseStorySourceOrFallback, type BylineStorySource } from "./schema-v2";
 
 export const SPORTS_PACKAGE_TYPE = "sports-package";
 
@@ -142,7 +142,7 @@ export function parseSportsPackageProps(value: unknown): SportsPackageProps {
   return {
     heading: heading(props.heading, WEEKLY_WILDCAT_SPORTS_DEFAULTS.heading),
     stories: {
-      source: parseStorySource(stories.source) ?? WEEKLY_WILDCAT_SPORTS_DEFAULTS.stories.source,
+      source: parseStorySourceOrFallback(stories.source, WEEKLY_WILDCAT_SPORTS_DEFAULTS.stories.source),
       limit: boundedCount(stories.limit, WEEKLY_WILDCAT_SPORTS_DEFAULTS.stories.limit, MAX_STORIES)
     },
     athleteSpotlight: {
