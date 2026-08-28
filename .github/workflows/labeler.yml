@@ -1,0 +1,33 @@
+name: Label pull requests
+
+# `pull_request_target` rather than `pull_request` so the job has a writable
+# token on pull requests opened from forks, where `pull_request` would be given
+# a read-only one and the labelling would silently do nothing. The usual
+# `pull_request_target` hazard does not apply here: this job never checks out
+# or executes the pull request's code, it only reads the list of changed paths.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# A rapid series of pushes should leave one labelling run, not a queue of them.
+concurrency:
+  group: labeler-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Apply path labels
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Label by changed paths
+        uses: actions/labeler@v5
+        with:
+          configuration-path: .github/labeler.yml
+          # Labels are derived entirely from paths, so a label must come off
+          # again when the paths it matched leave the pull request.
+          sync-labels: true

@@ -1,0 +1,77 @@
+# Path-based PR labels.
+#
+# The labels are the monorepo's actual seams -- the boundaries a reviewer cares
+# about when deciding whether a change is theirs. A PR can carry several: a
+# design-schema change usually touches the plugin and the frontend too, and
+# that overlap is the useful signal, not noise.
+#
+# Every label named here must exist in the repository, because the labeler adds
+# labels but never creates them.
+
+plugin:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "wordpress-plugin/**"
+          - "weekly-wildcat-headless.php"
+          - "readme.txt"
+          - "scripts/package-plugin.sh"
+          - "scripts/test-plugin-php.sh"
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/web/**"
+
+discord:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/discord-bot/**"
+
+packages:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/**"
+          - "tsconfig.packages.json"
+
+themes:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/theme-*/**"
+
+# The storage contract, wherever it is enforced. It is validated in TypeScript
+# and again in PHP, so a change to one side is nearly always a change to both.
+design-schema:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/design/**"
+          - "wordpress-plugin/includes/design/**"
+          - "wordpress-plugin/src/studio*.ts"
+          - "wordpress-plugin/src/studio*.tsx"
+          - "schemas/design.schema.json"
+          - "docs/design-schema-v2.md"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/tests/**"
+          - "**/tests-js/**"
+          - "**/*.test.ts"
+          - "**/*.test.tsx"
+          - "scripts/verify-*.mjs"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/package.json"
+          - "package-lock.json"
