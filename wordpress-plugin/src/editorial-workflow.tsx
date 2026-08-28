@@ -26,6 +26,29 @@ import { __, sprintf } from '@wordpress/i18n';
 import { listView } from '@wordpress/icons';
 import { registerPlugin } from '@wordpress/plugins';
 
+import { CorrectionsPanel } from './editorial/CorrectionsPanel';
+import { ContributorsPanel } from './editorial/ContributorsPanel';
+import { DistributionPanel } from './editorial/DistributionPanel';
+import { ReadinessPanel } from './editorial/ReadinessPanel';
+import { TasksPanel } from './editorial/TasksPanel';
+import { WorkflowPanel } from './editorial/WorkflowPanel';
+import {
+  createEditorialRestClient,
+  describeProtectedRestFailure,
+  type ProtectedEditorialFetcher,
+  type ProtectedEditorialRequest
+} from './editorial/editorial-rest';
+import type {
+  ContributorEntry,
+  CorrectionRecord,
+  DistributionChannel,
+  EditorialTask,
+  EditorialWorkflowPayload,
+  ReadinessCheck,
+  TaskInput,
+  TaskPatch,
+} from './editorial/editorial-model';
+
 import {
   describeWorkflowError,
   workflowStages,
@@ -492,14 +515,393 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
   );
 }
 
+type UnknownRecord = Record<string, unknown>;
+
+function record(value: unknown): UnknownRecord {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as UnknownRecord : {};
+}
+
+function stringValue(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : value == null ? fallback : String(value);
+}
+
+function numberValue(value: unknown, fallback = 0): number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizeContributor(value: unknown): ContributorEntry | null {
+  const item = record(value);
+  const id = item.id;
+  if ((typeof id !== 'number' && typeof id !== 'string') || String(id) === '') return null;
+  const kind = stringValue(item.kind || item.type, 'user') === 'guest' ? 'guest' : 'user';
+  return {
+    id,
+    kind,
+    name: stringValue(item.name, 'Contributor'),
+    ...(stringValue(item.role) ? { role: stringValue(item.role) } : {}),
+    ...(stringValue(item.slug) ? { slug: stringValue(item.slug) } : {}),
+    ...(stringValue(item.imageUrl || item.avatarUrl) ? { imageUrl: stringValue(item.imageUrl || item.avatarUrl) } : {}),
+    ...(stringValue(item.publicUrl) ? { publicUrl: stringValue(item.publicUrl) } : {}),
+    ...(numberValue(item.order, -1) >= 0 ? { order: numberValue(item.order) } : {})
+  };
+}
+
+function normalizeContributors(value: unknown): ContributorEntry[] {
+  return arrayValue(value).map(normalizeContributor).filter((item): item is ContributorEntry => item !== null);
+}
+
+function normalizeWorkflowPayload(value: unknown, fallback: WorkflowPayload | null, postId: number, title: string): EditorialWorkflowPayload | null {
+  const raw = record(value);
+  const rawStory = record(raw.story);
+  const fallbackStory = record(fallback?.story);
+  if (!rawStory.postId && !fallbackStory.postId && !postId) return null;
+  const editors = normalizeContributors(raw.editors ?? fallback?.editors);
+  const editorIdValue = rawStory.editorId ?? fallbackStory.editorId;
+  const editorId = numberValue(editorIdValue, 0) || null;
+  const editor = normalizeContributor(rawStory.editor ?? editors.find((item) => Number(item.id) === editorId));
+  const writer = normalizeContributor(raw.writer ?? fallback?.writer);
+  const statuses = arrayValue(raw.statuses ?? fallback?.statuses).map((status) => {
+    const item = record(status);
+    return {
+      id: stringValue(item.id),
+      label: stringValue(item.label, stringValue(item.id)),
+      group: (stringValue(item.group, 'main') as 'main' | 'sidelined' | 'derived'),
+      selectable: item.selectable !== false
+    };
+  }).filter((status) => status.id);
+  const rawCapabilities = record(raw.capabilities ?? fallback?.capabilities);
+  const rawVisual = record(rawStory.visual ?? raw.media);
+  const rawCoverage = arrayValue(rawStory.coverage ?? raw.coverage).map((item) => stringValue(record(item).slug || record(item).title || item)).filter(Boolean);
+  const workflowStatus = stringValue(rawStory.status ?? fallbackStory.status, 'pitch');
+
+  return {
+    story: {
+      postId: numberValue(rawStory.postId ?? fallbackStory.postId, postId),
+      title: stringValue(rawStory.title, title),
+      status: workflowStatus,
+      storedStatus: stringValue(rawStory.storedStatus, workflowStatus),
+      postStatus: stringValue(rawStory.postStatus ?? fallbackStory.postStatus, 'draft'),
+      isPublished: Boolean(rawStory.isPublished ?? fallbackStory.isPublished),
+      writer,
+      editor,
+      editorId,
+      deadline: stringValue(rawStory.deadline ?? fallbackStory.deadline) || null,
+      plannedPublication: stringValue(rawStory.plannedPublication ?? raw.plannedPublishAt) || null,
+      scheduledAt: stringValue(rawStory.scheduledAt) || null,
+      visual: Object.keys(rawVisual).length > 0 ? {
+        type: (stringValue(rawVisual.type, 'other') as 'none' | 'photo' | 'gallery' | 'graphic' | 'video' | 'other'),
+        status: (stringValue(rawVisual.status, 'needed') as 'none' | 'needed' | 'assigned' | 'in-progress' | 'uploaded' | 'selected' | 'done'),
+        label: stringValue(rawVisual.label || rawVisual.notes)
+      } : null,
+      visuals: stringValue(rawStory.visuals ?? fallbackStory.visuals) || null,
+      tasksOpen: numberValue(record(raw.tasks).openCount, 0),
+      coverage: rawCoverage,
+      modifiedAt: stringValue(rawStory.modifiedAt) || null
+    },
+    statuses,
+    capabilities: {
+      changeStatus: rawCapabilities.changeStatus !== false,
+      assign: rawCapabilities.assign === true,
+      changeDeadline: rawCapabilities.changeDeadline !== false && rawCapabilities.assign === true,
+      changePlannedPublication: rawCapabilities.changePlannedPublication !== false && rawCapabilities.assign === true
+    },
+    writer,
+    editors,
+    notes: record(raw.notes).available === true ? {
+      available: true,
+      url: stringValue(record(raw.notes).url),
+      message: stringValue(record(raw.notes).message)
+    } : { available: false, message: 'Notes are not available in this WordPress version.' }
+  };
+}
+
+function normalizeReadiness(value: unknown, storyId: number): ReadinessCheck[] {
+  const raw = record(value);
+  return arrayValue(raw.checks).map((check, index) => {
+    const item = record(check);
+    const status = stringValue(item.state || item.status, 'warning');
+    return {
+      id: stringValue(item.id, `check-${index}`),
+      label: stringValue(item.label, 'Readiness check'),
+      state: (status === 'pass' || status === 'error' ? status : 'warning') as 'pass' | 'warning' | 'error',
+      explanation: stringValue(item.explanation, 'Review this check before publishing.'),
+      ...(record(item.fix).href || record(item.fix).label ? {
+        fix: {
+          label: stringValue(record(item.fix).label, 'Review'),
+          ...(stringValue(record(item.fix).href) ? { href: stringValue(record(item.fix).href) } : {})
+        }
+      } : {})
+    };
+  }).filter((check) => check.id && (storyId > 0));
+}
+
+function normalizeTask(value: unknown): EditorialTask | null {
+  const item = record(value);
+  const id = item.id;
+  if ((typeof id !== 'number' && typeof id !== 'string') || String(id) === '') return null;
+  const state = stringValue(item.state || item.status, 'open') === 'completed' ? 'completed' : 'open';
+  const priority = stringValue(item.priority, 'normal');
+  return {
+    id,
+    title: stringValue(item.title, 'Untitled task'),
+    state,
+    assignee: normalizeContributor(item.assignee),
+    assigneeId: numberValue(item.assigneeId, 0) || null,
+    dueAt: stringValue(item.dueAt) || null,
+    priority: (['low', 'normal', 'high', 'urgent'].includes(priority) ? priority : 'normal') as 'low' | 'normal' | 'high' | 'urgent',
+    storyId: numberValue(item.storyId, 0) || null,
+    coverageId: numberValue(item.coverageId, 0) || null,
+    createdBy: normalizeContributor(item.createdBy),
+    completedAt: stringValue(item.completedAt) || null,
+    order: numberValue(item.order, 0)
+  };
+}
+
+function normalizeTasks(value: unknown): EditorialTask[] {
+  const raw = record(value);
+  return arrayValue(raw.tasks ?? raw.items ?? value).map(normalizeTask).filter((item): item is EditorialTask => item !== null);
+}
+
+function normalizeCorrections(value: unknown): CorrectionRecord[] {
+  const raw = record(value);
+  const normalized: CorrectionRecord[] = [];
+  arrayValue(raw.records ?? raw.corrections ?? raw.items ?? value).forEach((entry) => {
+    const item = record(entry);
+    const id = item.id;
+    if ((typeof id !== 'number' && typeof id !== 'string') || String(id) === '') return;
+    const type = stringValue(item.type, 'correction');
+    const publicText = stringValue(item.publicText ?? item.text);
+    if (!publicText.trim()) return;
+    normalized.push({
+      id,
+      type: (['correction', 'clarification', 'editors-note', 'substantive-update'].includes(type) ? type : 'correction') as CorrectionRecord['type'],
+      date: stringValue(item.date ?? item.recordedAt) || null,
+      publicText,
+      createdAt: stringValue(item.createdAt ?? item.recordedAt) || null,
+      modifiedAt: stringValue(item.modifiedAt ?? item.updatedAt) || null
+    });
+  });
+  return normalized;
+}
+
+function normalizeDistribution(value: unknown, postId: number, headline: string, canonicalUrl: string, excerpt: string): {
+  channels: DistributionChannel[];
+  capabilities: { addToNewsletter: boolean };
+} {
+  const raw = record(value);
+  const source = record(raw.channels);
+  const entries = Array.isArray(raw.channels) ? raw.channels : Object.entries(source).map(([id, channel]) => ({ ...record(channel), channelId: record(channel).channelId || id }));
+  const channels = entries.map((entry) => {
+    const item = record(entry);
+    const status = stringValue(item.status, 'not-configured');
+    return {
+      id: stringValue(item.id || item.channelId, 'channel'),
+      label: stringValue(item.label, 'Distribution'),
+      status: (status === 'sent' || status === 'pending' || status === 'failed' || status === 'skipped' || status === 'ready' ? status : status === 'live' || status === 'published' ? 'distributed' : 'not-configured') as DistributionChannel['status'],
+      configured: Boolean(item.configured),
+      capabilities: record(item.capabilities) as DistributionChannel['capabilities'],
+      provider: stringValue(item.provider) || undefined,
+      distributedAt: stringValue(item.distributedAt) || null,
+      externalUrl: stringValue(item.externalUrl) || null,
+      lastError: stringValue(item.lastError) || null
+    };
+  });
+  return {
+    channels,
+    capabilities: { addToNewsletter: Boolean(channels.find((channel) => channel.id === 'newsletter')?.configured) && postId > 0 && Boolean(headline || canonicalUrl || excerpt) }
+  };
+}
+
+function EditorialNewsroomPanels({
+  postId,
+  title,
+  canonicalUrl,
+  excerpt,
+  legacyPayload
+}: {
+  postId: number;
+  title: string;
+  canonicalUrl: string;
+  excerpt: string;
+  legacyPayload: WorkflowPayload | null;
+}) {
+  const fetcher = useMemo<ProtectedEditorialFetcher>(() => {
+    return async function protectedFetch<T>({ path, method, data }: ProtectedEditorialRequest): Promise<T> {
+      let nextData = data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const body = { ...(data as UnknownRecord) };
+        if (Object.prototype.hasOwnProperty.call(body, 'plannedPublication')) {
+          body.plannedPublishAt = body.plannedPublication;
+          delete body.plannedPublication;
+        }
+        if (path.includes('/corrections') && Object.prototype.hasOwnProperty.call(body, 'publicText')) {
+          body.text = body.publicText;
+          body.recordedAt = body.date;
+          delete body.publicText;
+          delete body.date;
+        }
+        nextData = body;
+      }
+      return apiFetch<unknown>({ path, ...(method ? { method } : {}), ...(nextData !== undefined ? { data: nextData } : {}) }) as Promise<T>;
+    };
+  }, []);
+  const client = useMemo(() => createEditorialRestClient(fetcher), [fetcher]);
+  const [workflowPayload, setWorkflowPayload] = useState<EditorialWorkflowPayload | null>(() => normalizeWorkflowPayload(legacyPayload, legacyPayload, postId, title));
+  const [readiness, setReadiness] = useState<ReadinessCheck[]>([]);
+  const [tasks, setTasks] = useState<EditorialTask[]>([]);
+  const [taskPeople, setTaskPeople] = useState<ContributorEntry[]>([]);
+  const [contributors, setContributors] = useState<ContributorEntry[]>([]);
+  const [availableContributors, setAvailableContributors] = useState<ContributorEntry[]>([]);
+  const [corrections, setCorrections] = useState<CorrectionRecord[]>([]);
+  const [legacyCorrectionText, setLegacyCorrectionText] = useState<string | null>(null);
+  const [distribution, setDistribution] = useState<{ channels: DistributionChannel[]; capabilities: { addToNewsletter: boolean } }>({ channels: [], capabilities: { addToNewsletter: false } });
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, unknown>>({});
+
+  const load = useCallback(() => {
+    if (!postId) return;
+    let active = true;
+    const begin = (key: string) => {
+      setLoading((current) => ({ ...current, [key]: true }));
+      setErrors((current) => ({ ...current, [key]: undefined }));
+    };
+    const finish = (key: string, error?: unknown) => {
+      if (!active) return;
+      setLoading((current) => ({ ...current, [key]: false }));
+      if (error) setErrors((current) => ({ ...current, [key]: error }));
+    };
+    const run = <T,>(key: string, operation: () => Promise<T>, onValue: (value: T) => void) => {
+      begin(key);
+      void operation().then((value) => {
+        if (active) onValue(value);
+        finish(key);
+      }).catch((error: unknown) => finish(key, error));
+    };
+    run('workflow', () => client.getWorkflow(postId), (value) => setWorkflowPayload(normalizeWorkflowPayload(value, legacyPayload, postId, title)));
+    run('readiness', () => client.getReadiness(postId), (value) => setReadiness(normalizeReadiness(value, postId)));
+    run('tasks', () => client.listTasks(postId), (value) => {
+      setTasks(normalizeTasks(value));
+      const rawPeople = arrayValue(record(value).people).map(normalizeContributor).filter((item): item is ContributorEntry => item !== null);
+      setTaskPeople(rawPeople);
+    });
+    run('contributors', () => client.getContributors(postId), (value) => {
+      const raw = record(value);
+      setContributors(normalizeContributors(raw.contributors));
+      setAvailableContributors(normalizeContributors(raw.available ?? record(legacyPayload).editors));
+    });
+    run('corrections', () => client.getCorrections(postId), (value) => {
+      const raw = record(value);
+      setCorrections(normalizeCorrections(value));
+      setLegacyCorrectionText(stringValue(raw.legacyText) || null);
+    });
+    run('distribution', () => client.getDistribution(postId), (value) => setDistribution(normalizeDistribution(value, postId, title, canonicalUrl, excerpt)));
+    return () => { active = false; };
+  }, [canonicalUrl, client, excerpt, legacyPayload, postId, title]);
+
+  useEffect(() => load(), [load]);
+
+  const refreshTasks = async () => {
+    const value = await client.listTasks(postId);
+    setTasks(normalizeTasks(value));
+  };
+  const refreshCorrections = async () => {
+    const value = await client.getCorrections(postId);
+    const raw = record(value);
+    setCorrections(normalizeCorrections(value));
+    setLegacyCorrectionText(stringValue(raw.legacyText) || null);
+  };
+  const refreshDistribution = async () => setDistribution(normalizeDistribution(await client.getDistribution(postId), postId, title, canonicalUrl, excerpt));
+
+  if (!postId) return null;
+  const workflowForPanel = workflowPayload ?? normalizeWorkflowPayload(legacyPayload, legacyPayload, postId, title);
+  const canEditStory = Boolean(legacyPayload?.capabilities.changeStatus ?? workflowForPanel?.capabilities.changeStatus);
+  const taskCapabilities = { canEditLinkedStory: canEditStory, canAssign: canEditStory && taskPeople.length > 0, canDelete: canEditStory, canManageUnlinked: false };
+  const contributorsCanEdit = Boolean(legacyPayload?.capabilities.assign ?? workflowForPanel?.capabilities.assign);
+
+  return (
+    <div className="byline-editorial-newsroom-panels">
+      {workflowForPanel ? (
+        <WorkflowPanel
+          story={workflowForPanel.story}
+          statuses={workflowForPanel.statuses}
+          capabilities={{ changeStatus: false, assign: false, changeDeadline: false, changePlannedPublication: false }}
+          editors={[]}
+          notes={workflowForPanel.notes}
+          isLoading={loading.workflow}
+          error={errors.workflow && !legacyPayload ? errors.workflow : undefined}
+          onMove={() => undefined}
+        />
+      ) : <Notice status="warning" isDismissible={false}>{describeProtectedRestFailure(errors.workflow)}</Notice>}
+      <TasksPanel
+        storyId={postId}
+        tasks={tasks}
+        people={taskPeople}
+        capabilities={taskCapabilities}
+        isLoading={loading.tasks}
+        error={errors.tasks}
+        onCreate={async (input: TaskInput) => { await client.createTask(input); await refreshTasks(); }}
+        onUpdate={async (taskId: number | string, patch: TaskPatch) => { await client.updateTask(taskId, patch); await refreshTasks(); }}
+        onDelete={async (taskId: number | string) => { await client.deleteTask(taskId); await refreshTasks(); }}
+      />
+      <ReadinessPanel
+        checks={readiness}
+        isLoading={loading.readiness}
+        error={errors.readiness}
+        onRefresh={async () => { setLoading((current) => ({ ...current, readiness: true })); try { setReadiness(normalizeReadiness(await client.getReadiness(postId), postId)); } finally { setLoading((current) => ({ ...current, readiness: false })); } }}
+      />
+      <ContributorsPanel
+        contributors={contributors}
+        availableContributors={availableContributors}
+        canEdit={contributorsCanEdit}
+        isLoading={loading.contributors}
+        isSaving={false}
+        error={errors.contributors}
+        onChange={async (next) => { const value = await client.saveContributors(postId, next); setContributors(normalizeContributors(record(value).contributors)); }}
+      />
+      <CorrectionsPanel
+        records={corrections}
+        legacyText={legacyCorrectionText}
+        canEdit={contributorsCanEdit}
+        isLoading={loading.corrections}
+        error={errors.corrections}
+        onCreate={async (input) => { await client.createCorrection(postId, input); await refreshCorrections(); }}
+        onUpdate={async (id, input) => { await client.updateCorrection(postId, id, input); await refreshCorrections(); }}
+        onDelete={async (id) => { await client.deleteCorrection(postId, id); await refreshCorrections(); }}
+      />
+      <DistributionPanel
+        headline={title}
+        canonicalUrl={canonicalUrl}
+        excerpt={excerpt}
+        channels={distribution.channels}
+        capabilities={distribution.capabilities}
+        isLoading={loading.distribution}
+        error={errors.distribution}
+        onAction={async (channelId, action) => {
+          await client.distributionAction(postId, channelId, action);
+          await refreshDistribution();
+        }}
+        onAddToNewsletter={async () => { await client.addToNewsletter(postId); await refreshDistribution(); }}
+      />
+    </div>
+  );
+}
+
 function EditorialWorkflowPlugin() {
-  const { postId, postType, isPublished } = useSelect((select: any) => {
+  const { postId, postType, isPublished, title, canonicalUrl, excerpt } = useSelect((select: any) => {
     const editor = select('core/editor');
 
     return {
       postId: (editor?.getCurrentPostId?.() as number) ?? 0,
       postType: (editor?.getCurrentPostType?.() as string) ?? '',
       isPublished: (editor?.getEditedPostAttribute?.('status') as string) === 'publish',
+      title: (editor?.getEditedPostAttribute?.('title') as string) ?? '',
+      canonicalUrl: (editor?.getPermalink?.() as string) ?? '',
+      excerpt: (editor?.getEditedPostAttribute?.('excerpt') as string) ?? '',
     };
   }, []);
 
@@ -552,6 +954,14 @@ function EditorialWorkflowPlugin() {
 
       <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={listView}>
         <WorkflowControls key={postId} {...workflow} />
+        <EditorialNewsroomPanels
+          key={`newsroom-${postId}`}
+          postId={postId}
+          title={title}
+          canonicalUrl={canonicalUrl}
+          excerpt={excerpt}
+          legacyPayload={payload}
+        />
       </PluginSidebar>
     </>
   );

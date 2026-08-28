@@ -1,4 +1,4 @@
-import { parseStorySource, type BylineStorySource } from "./schema-v2";
+import { parseStorySourceOrFallback, type BylineStorySource } from "./schema-v2";
 
 export const BRIEF_PACKAGE_TYPE = "brief-package";
 
@@ -48,7 +48,7 @@ export function parseBriefPackageProps(value: unknown, defaults: BriefPackagePro
 
   return {
     heading: heading(props.heading, defaults.heading),
-    source: parseStorySource(props.source) ?? defaults.source,
+    source: parseStorySourceOrFallback(props.source, defaults.source),
     limit: boundedCount(props.limit, defaults.limit),
     presentation: {
       showAuthor: boolean(presentation.showAuthor, defaults.presentation.showAuthor),

@@ -1,6 +1,15 @@
 import { stripHtml } from "@/lib/format";
 import { FOCUS_SECTION_SLUGS, PUBLIC_SECTION_SLUGS } from "@/lib/sections";
-import { getPostCategories, getPostTags, type WordPressCategory, type WordPressPost, type WordPressTag } from "@/lib/wordpress";
+import {
+  getLegacyCorrectionNotices,
+  getPostCategories,
+  getPostCorrections,
+  getPostTags,
+  type WordPressCategory,
+  type WordPressCorrection,
+  type WordPressPost,
+  type WordPressTag
+} from "@/lib/wordpress";
 
 const HIDDEN_CATEGORY_SLUGS = new Set(["uncategorized"]);
 const HIDDEN_POST_SLUGS = new Set(["hello-world"]);
@@ -93,6 +102,10 @@ export function getAthleteSportLabel(post: WordPressPost) {
 }
 
 export function isVisibleContentPost(post: WordPressPost) {
+  if (post.status !== "publish") {
+    return false;
+  }
+
   const title = stripHtml(post.title.rendered).toLowerCase();
 
   if (HIDDEN_POST_SLUGS.has(post.slug) || HIDDEN_POST_TITLES.has(title)) {
@@ -112,4 +125,60 @@ export function filterVisibleContentPosts(posts: WordPressPost[]) {
 
 export function filterPublicHomepagePosts(posts: WordPressPost[]) {
   return posts.filter(isPublicHomepagePost);
+}
+
+function correctionKey(correction: WordPressCorrection) {
+  return `${correction.postId ?? "unknown"}|${correction.type}|${correction.date}|${correction.text.toLowerCase().replace(/\s+/g, " ").trim()}`;
+}
+
+export type PublicCorrectionEntry = WordPressCorrection & {
+  post: WordPressPost;
+};
+
+/**
+ * Joins public correction records to the already-published post collection.
+ * The join is deliberate: a correction endpoint must not be able to make an
+ * unpublished headline or a private story discoverable on the public log.
+ */
+export function getPublicCorrectionLog(posts: WordPressPost[], remoteCorrections: WordPressCorrection[] = []) {
+  const visiblePosts = posts.filter(isVisibleContentPost);
+  const postsById = new Map(visiblePosts.map((post) => [post.id, post]));
+  const entries: PublicCorrectionEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const post of visiblePosts) {
+    for (const correction of [...getLegacyCorrectionNotices(post), ...getPostCorrections(post)]) {
+      const entry = { ...correction, post: post };
+      const key = correctionKey(entry);
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        entries.push(entry);
+      }
+    }
+  }
+
+  for (const correction of remoteCorrections) {
+    const post = correction.postId ? postsById.get(correction.postId) : undefined;
+
+    if (!post) {
+      continue;
+    }
+
+    const entry = { ...correction, post };
+    const key = correctionKey(entry);
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      entries.push(entry);
+    }
+  }
+
+  return entries
+    .sort((left, right) => {
+      const rightDate = new Date(right.date || right.post.modified || right.post.date).getTime();
+      const leftDate = new Date(left.date || left.post.modified || left.post.date).getTime();
+      return (Number.isFinite(rightDate) ? rightDate : 0) - (Number.isFinite(leftDate) ? leftDate : 0);
+    })
+    .slice(0, 100);
 }

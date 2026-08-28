@@ -18,6 +18,7 @@
 // document-level model, computed once and shared by every package render.
 import {
   resolveHomepageDocument,
+  type HomepageCoverageInput,
   type HomepagePublicationInput,
   type HomepageStoryInput
 } from "@byline/content";
@@ -31,6 +32,12 @@ import {
   type StoryView
 } from "@byline/ui";
 import type { BylineDesignDocumentV2 } from "@byline/design";
+import {
+  analyzeResolvedDesign,
+  semanticDesignDiff,
+  type DesignDiff,
+  type DesignIntelligence
+} from "./design-intelligence-model";
 
 export type StudioPreviewPublication = HomepagePublicationInput;
 
@@ -283,6 +290,8 @@ export type PreviewData = {
   events: CalendarEntryView[];
   recentScores: SportsResultView[];
   upcomingGames: SportsFixtureView[];
+  /** Public-safe Coverage relationship/status data supplied by the host loader. */
+  coverages?: HomepageCoverageInput[];
 };
 
 export type PreviewDataLoader = () => Promise<PreviewData>;
@@ -328,6 +337,7 @@ export function toPreviewData(input: {
   events?: Array<Record<string, unknown>>;
   recentScores?: PreviewGame[];
   upcomingGames?: PreviewGame[];
+  coverages?: readonly HomepageCoverageInput[];
 }): PreviewData {
   return {
     stories: input.posts.map(toPreviewStoryInput),
@@ -341,8 +351,53 @@ export function toPreviewData(input: {
       date: String((event.display as Record<string, unknown>)?.date ?? ""),
       location: String(event.location ?? ""),
       href: ""
-    }))
+    })),
+    // Coverage records are intentionally opt-in. The Studio host can pass
+    // only public-safe relationship/status fields here without making this
+    // preview model depend on an editorial or public-site endpoint.
+    ...(input.coverages ? { coverages: [...input.coverages] } : {})
   };
+}
+
+function previewCollection(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== "object") return [];
+
+  const record = value as Record<string, unknown>;
+  for (const key of ["items", "coverage", "coverages", "data"]) {
+    if (Array.isArray(record[key])) return record[key];
+  }
+
+  return [];
+}
+
+/**
+ * Converts the public Coverage endpoint to the relationship-only data used by
+ * the shared homepage resolver.  This deliberately ignores every editorial
+ * field other than the public flag and published story IDs.
+ */
+export function toPreviewCoverageInputs(value: unknown): HomepageCoverageInput[] {
+  return previewCollection(value).flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+
+    const record = entry as Record<string, unknown>;
+    const id = typeof record.id === "number" ? record.id : Number(record.id ?? record.coverageId);
+    if (!Number.isInteger(id) || id <= 0) return [];
+
+    const stories = [record.stories, record.posts, record.linkedStories, record.publicStories]
+      .find(Array.isArray) ?? [];
+    const storyIds = stories.flatMap((story) => {
+      if (!story || typeof story !== "object") return [];
+      const storyRecord = story as Record<string, unknown>;
+      const storyId = typeof storyRecord.id === "number" ? storyRecord.id : Number(storyRecord.id);
+      return Number.isInteger(storyId) && storyId > 0 ? [storyId] : [];
+    });
+    const isPublic = record.public === false || record.isPublic === false || record.publicLandingPage === false
+      ? false
+      : true;
+
+    return [{ id, storyIds: [...new Set(storyIds)], isPublic, exists: true }];
+  });
 }
 
 // Test seam. Studio never calls this; it exists so the resolution contract can
@@ -361,6 +416,9 @@ type PreviewStore = {
   document: BylineDesignDocumentV2 | null;
   publication: StudioPreviewPublication | null;
   model: Map<string, ResolvedHomepagePackage> | null;
+  intelligence: DesignIntelligence | null;
+  semanticDiff: DesignDiff | null;
+  liveDocument: BylineDesignDocumentV2 | null;
   // Editor-only markers for packages that resolve to nothing. The canvas is
   // reader-accurate when this is off, and still navigable when it is on.
   showHiddenPackages: boolean;
@@ -372,6 +430,9 @@ const store: PreviewStore = {
   document: null,
   publication: null,
   model: null,
+  intelligence: null,
+  semanticDiff: null,
+  liveDocument: null,
   showHiddenPackages: true,
   listeners: new Set()
 };
@@ -383,6 +444,8 @@ function emit() {
 function recomputeModel() {
   if (!store.data || !store.document || !store.publication) {
     store.model = null;
+    store.intelligence = null;
+    store.semanticDiff = null;
     return;
   }
 
@@ -393,10 +456,19 @@ function recomputeModel() {
     sportsSchedule: {
       recentScores: store.data.recentScores,
       upcomingGames: store.data.upcomingGames
-    }
+    },
+    coverages: store.data.coverages
   });
 
   store.model = new Map(resolved.packages.map((entry) => [entry.package.packageId, entry]));
+  store.intelligence = analyzeResolvedDesign({
+    document: store.document,
+    packages: resolved.packages,
+    coverages: store.data.coverages
+  });
+  store.semanticDiff = store.liveDocument
+    ? semanticDesignDiff(store.document, store.liveDocument)
+    : null;
 }
 
 /**
@@ -408,10 +480,30 @@ function recomputeModel() {
  */
 export function setStudioPreviewDocument(
   document: BylineDesignDocumentV2,
-  publication: StudioPreviewPublication
+  publication: StudioPreviewPublication,
+  liveDocument?: BylineDesignDocumentV2 | null
 ) {
   store.document = document;
   store.publication = publication;
+  if (liveDocument !== undefined) store.liveDocument = liveDocument;
+  recomputeModel();
+  emit();
+}
+
+/**
+ * Supplies the last published document used by the Studio's draft/live
+ * comparison surface. It is separate from the draft setter so an autosave
+ * does not accidentally replace the immutable live baseline.
+ */
+export function setStudioPreviewLiveDocument(document: BylineDesignDocumentV2 | null) {
+  store.liveDocument = document;
+  recomputeModel();
+  emit();
+}
+
+/** Replaces the public-safe Coverage catalog without changing the preview document. */
+export function setStudioPreviewCoverages(coverages: readonly HomepageCoverageInput[]) {
+  if (store.data) store.data = { ...store.data, coverages: [...coverages] };
   recomputeModel();
   emit();
 }
@@ -442,6 +534,8 @@ export type PreviewSnapshot = {
   events: CalendarEntryView[];
   entry: ResolvedHomepagePackage | null;
   showHiddenPackages: boolean;
+  intelligence: DesignIntelligence | null;
+  semanticDiff: DesignDiff | null;
 };
 
 export function snapshotFor(packageId: string): PreviewSnapshot {
@@ -449,13 +543,25 @@ export function snapshotFor(packageId: string): PreviewSnapshot {
     ready: Boolean(store.data && store.model),
     events: store.data?.events ?? [],
     entry: store.model?.get(packageId) ?? null,
-    showHiddenPackages: store.showHiddenPackages
+    showHiddenPackages: store.showHiddenPackages,
+    intelligence: store.intelligence,
+    semanticDiff: store.semanticDiff
   };
 }
+
+export function studioPreviewIntelligence(): DesignIntelligence | null {
+  return store.intelligence;
+}
+
+export function studioPreviewDiff(): DesignDiff | null {
+  return store.semanticDiff;
+}
+
+export const getStudioPreviewIntelligence = studioPreviewIntelligence;
+export const getStudioPreviewDiff = studioPreviewDiff;
 
 export function previewPackageId(props: unknown, fallback: string) {
   return props && typeof props === "object" && typeof (props as Record<string, unknown>).id === "string"
     ? (props as Record<string, unknown>).id as string
     : fallback;
 }
-

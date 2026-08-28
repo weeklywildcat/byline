@@ -205,11 +205,11 @@ $profiles = [
 ];
 
 $expected_menus = [
-    'administrator' => ['byline-studio', 'byline'],
-    'editor' => [],
-    'author' => [],
+    'administrator' => ['byline-planning', 'byline-studio', 'byline'],
+    'editor' => ['byline-planning'],
+    'author' => ['byline-planning'],
     'design-only' => ['byline-studio'],
-    'sports-content-editor' => [],
+    'sports-content-editor' => ['byline-planning'],
     'poll-editor' => [],
     'integration-manager' => ['byline'],
 ];
@@ -226,8 +226,13 @@ foreach ($profiles as $role => $capabilities) {
 
 // Direct screen access follows the same capability model as menu visibility.
 byline_matrix_set_role('administrator', $profiles['administrator']);
-foreach (['byline', 'byline-studio', 'byline-publication', 'byline-theme', 'byline-integrations', 'byline-settings'] as $page) {
+foreach (['byline', 'byline-planning', 'byline-studio', 'byline-publication', 'byline-theme', 'byline-integrations', 'byline-settings'] as $page) {
     byline_matrix_expect_mount($page);
+}
+
+foreach (['editor', 'author', 'sports-content-editor'] as $role) {
+    byline_matrix_set_role($role, $profiles[$role]);
+    byline_matrix_expect_mount('byline-planning');
 }
 
 byline_matrix_set_role('design-only', $profiles['design-only']);
@@ -241,12 +246,12 @@ byline_matrix_expect_redirect('byline', 'page=byline-integrations');
 byline_matrix_expect_denied('byline-publication');
 
 byline_matrix_set_role('sports-content-editor', $profiles['sports-content-editor']);
-byline_matrix_expect_redirect('byline', 'post_type=' . WWH_SPORTS_GAME_POST_TYPE);
+byline_matrix_expect_redirect('byline', 'page=byline-planning');
 byline_matrix_expect_denied('byline-settings');
 
 foreach (['editor', 'author', 'poll-editor'] as $role) {
     byline_matrix_set_role($role, $profiles[$role]);
-    byline_matrix_expect_redirect('byline', 'post_type=' . BYLINE_POLL_POST_TYPE);
+    byline_matrix_expect_redirect('byline', $role === 'poll-editor' ? 'post_type=' . BYLINE_POLL_POST_TYPE : 'page=byline-planning');
     byline_matrix_expect_denied('byline-settings');
 }
 

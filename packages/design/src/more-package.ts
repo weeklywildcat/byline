@@ -1,4 +1,4 @@
-import { parseStorySource, type BylineStorySource } from "./schema-v2";
+import { parseStorySourceOrFallback, type BylineStorySource } from "./schema-v2";
 
 export const MORE_PACKAGE_TYPE = "more-package";
 
@@ -113,7 +113,7 @@ export function parseMorePackageProps(
 
   return {
     heading: text(props.heading, defaults.heading, 120),
-    source: parseStorySource(props.source) ?? defaults.source,
+    source: parseStorySourceOrFallback(props.source, defaults.source),
     limit: boundedCount(props.limit, defaults.limit),
     archiveLink: link(props.archiveLink, defaults.archiveLink),
     utility: {

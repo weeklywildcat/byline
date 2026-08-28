@@ -1,10 +1,12 @@
 export const ADMIN_PAGE_SLUGS = {
   dashboard: "byline",
+  planning: "byline-planning",
   studio: "byline-studio",
   publication: "byline-publication",
   theme: "byline-theme",
   integrations: "byline-integrations",
   settings: "byline-settings",
+  newsletters: "byline-newsletters",
   polls: "byline-polls"
 } as const;
 
@@ -13,6 +15,8 @@ export type AdminPageSlug = (typeof ADMIN_PAGE_SLUGS)[keyof typeof ADMIN_PAGE_SL
 export const PUBLICATION_TABS = ["identity", "branding", "navigation", "features", "social"] as const;
 export const INTEGRATION_TABS = ["discord", "deployment"] as const;
 export const SETTINGS_TABS = ["access", "api", "compatibility", "diagnostics"] as const;
+export const PLANNING_TABS = ["stories", "calendar", "media", "coverage", "performance", "content-health", "feedback"] as const;
+export const NEWSLETTER_TABS = ["issues", "settings"] as const;
 export const STUDIO_VIEWS = ["editor", "revisions"] as const;
 
 const knownPageSlugs = new Set<string>(Object.values(ADMIN_PAGE_SLUGS));
@@ -28,6 +32,10 @@ export function normalizeAdminTab(page: string, tab: string | undefined) {
       ? INTEGRATION_TABS
       : page === ADMIN_PAGE_SLUGS.settings
         ? SETTINGS_TABS
+        : page === ADMIN_PAGE_SLUGS.planning
+          ? PLANNING_TABS
+          : page === ADMIN_PAGE_SLUGS.newsletters
+            ? NEWSLETTER_TABS
         : [];
 
   if (tabs.includes(tab as never)) return tab as string;
@@ -46,6 +54,8 @@ export function adminScreenRoute(page: string, tab: string | undefined) {
   if (normalizedPage === ADMIN_PAGE_SLUGS.theme) return "/design/theme";
   if (normalizedPage === ADMIN_PAGE_SLUGS.integrations) return `/integrations/${normalizedTab}`;
   if (normalizedPage === ADMIN_PAGE_SLUGS.settings) return `/advanced/${normalizedTab}`;
+  if (normalizedPage === ADMIN_PAGE_SLUGS.planning) return `/planning/${normalizedTab}`;
+  if (normalizedPage === ADMIN_PAGE_SLUGS.newsletters) return `/newsletters/${normalizedTab}`;
   if (normalizedPage === ADMIN_PAGE_SLUGS.polls) return "/content/polls";
   return "/dashboard";
 }
@@ -67,6 +77,15 @@ export type LegacyAdminDestination = {
 
 const legacyDestinations: Record<string, LegacyAdminDestination> = {
   "/dashboard": { page: ADMIN_PAGE_SLUGS.dashboard },
+  "/planning/stories": { page: ADMIN_PAGE_SLUGS.planning, tab: "stories" },
+  "/planning/calendar": { page: ADMIN_PAGE_SLUGS.planning, tab: "calendar" },
+  "/planning/media": { page: ADMIN_PAGE_SLUGS.planning, tab: "media" },
+  "/planning/coverage": { page: ADMIN_PAGE_SLUGS.planning, tab: "coverage" },
+  "/planning/performance": { page: ADMIN_PAGE_SLUGS.planning, tab: "performance" },
+  "/planning/content-health": { page: ADMIN_PAGE_SLUGS.planning, tab: "content-health" },
+  "/planning/feedback": { page: ADMIN_PAGE_SLUGS.planning, tab: "feedback" },
+  "/newsletters/issues": { page: ADMIN_PAGE_SLUGS.newsletters, tab: "issues" },
+  "/newsletters/settings": { page: ADMIN_PAGE_SLUGS.newsletters, tab: "settings" },
   "/publication/identity": { page: ADMIN_PAGE_SLUGS.publication, tab: "identity" },
   "/publication/branding": { page: ADMIN_PAGE_SLUGS.publication, tab: "branding" },
   "/publication/navigation": { page: ADMIN_PAGE_SLUGS.publication, tab: "navigation" },

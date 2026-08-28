@@ -28,7 +28,7 @@ const BYLINE_REWRITE_VERSION = 1;
  */
 function byline_upgrade_steps(): array
 {
-    return [
+    $steps = [
         'core' => [
             'label' => 'core configuration',
             'option' => BYLINE_CORE_SCHEMA_VERSION_OPTION,
@@ -72,6 +72,21 @@ function byline_upgrade_steps(): array
             'callback' => 'byline_upgrade_pages',
         ],
     ];
+
+    // The optional integration file is loaded by the canonical plugin
+    // bootstrap after this coordinator is defined. Keeping this conditional
+    // also preserves the lightweight standalone upgrade harness used by older
+    // hosts and tests that do not load optional integrations.
+    if (defined('BYLINE_SEARCH_GAPS_SCHEMA_VERSION_OPTION') && defined('BYLINE_SEARCH_GAPS_SCHEMA_VERSION')) {
+        $steps['searchGaps'] = [
+            'label' => 'anonymous search-gap aggregate table',
+            'option' => BYLINE_SEARCH_GAPS_SCHEMA_VERSION_OPTION,
+            'version' => BYLINE_SEARCH_GAPS_SCHEMA_VERSION,
+            'callback' => 'byline_upgrade_search_gaps',
+        ];
+    }
+
+    return $steps;
 }
 
 function byline_upgrade_core(): bool
@@ -139,6 +154,12 @@ function byline_upgrade_pages(): bool
         && (int) get_option(BYLINE_WEEKLY_PAGE_MIGRATION_OPTION, 0) >= BYLINE_WEEKLY_PAGE_MIGRATION_VERSION;
 }
 
+function byline_upgrade_search_gaps(): bool
+{
+    return function_exists('byline_search_gaps_install_schema')
+        && byline_search_gaps_install_schema();
+}
+
 function byline_upgrade_failure_message(string $step): string
 {
     $messages = [
@@ -149,6 +170,7 @@ function byline_upgrade_failure_message(string $step): string
         'sports' => 'Sports configuration could not be upgraded.',
         'rosterIdentities' => 'Roster row identities could not be upgraded.',
         'pages' => 'Publication pages could not be migrated.',
+        'searchGaps' => 'Anonymous search-gap aggregate storage could not be installed.',
     ];
 
     return $messages[$step] ?? 'A Byline upgrade step could not be completed.';
@@ -246,6 +268,11 @@ function byline_upgrade_step_needs_run(string $step_id, array $step): bool
     if ($step_id === 'secrets') {
         return function_exists('byline_poll_signing_secret_source')
             && byline_poll_signing_secret_source() === 'missing';
+    }
+
+    if ($step_id === 'searchGaps') {
+        return function_exists('byline_search_gaps_table_exists')
+            && !byline_search_gaps_table_exists();
     }
 
     return false;

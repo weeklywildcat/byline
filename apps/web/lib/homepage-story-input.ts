@@ -1,9 +1,9 @@
-import type { HomepagePublicationInput, HomepageStoryInput } from "@byline/content";
+import type { HomepageCoverageInput, HomepagePublicationInput, HomepageStoryInput } from "@byline/content";
 import type { BylinePublicationConfig } from "@byline/core";
 import { isAthleteSpotlightPost, isSpecialCoveragePost } from "@/lib/content";
 import { toAthleteSpotlightView, toStoryView } from "@/lib/story-view";
 import { getPublicationConfig } from "@/lib/publication";
-import { getFeaturedMedia, getPostCategories, type WordPressPost } from "@/lib/wordpress";
+import { getFeaturedMedia, getPostCategories, type WordPressCoverage, type WordPressPost } from "@/lib/wordpress";
 
 /**
  * The static site's adapter into the canonical homepage resolver.
@@ -32,6 +32,25 @@ export function toHomepageStoryInput(post: WordPressPost): HomepageStoryInput {
 
 export function toHomepageStoryInputs(posts: readonly WordPressPost[]): HomepageStoryInput[] {
   return posts.map(toHomepageStoryInput);
+}
+
+/**
+ * Adapts the public Coverage response to the resolver's relationship-only
+ * contract. The resolver never receives titles, descriptions, artwork, or any
+ * other Coverage presentation data.
+ */
+export function toHomepageCoverageInputs(coverages: readonly WordPressCoverage[]): HomepageCoverageInput[] {
+  return coverages.flatMap((coverage) => {
+    const id = typeof coverage.id === "number" ? coverage.id : Number(coverage.id);
+    if (!Number.isInteger(id) || id <= 0) return [];
+
+    return [{
+      id,
+      storyIds: coverage.stories.map((story) => story.id),
+      isPublic: true,
+      exists: true
+    }];
+  });
 }
 
 export function toHomepagePublicationInput(

@@ -45,6 +45,10 @@ export type BylineStorySource =
   | { type: "category"; categoryId: number }
   | { type: "tag"; tagId: number }
   | { type: "author"; authorId: number }
+  // Coverage is a first-class WordPress object. The numeric id is the
+  // canonical source identity at the CMS boundary; a missing/deleted object
+  // is resolved as empty by the host resolver, never as `latest`.
+  | { type: "coverage"; coverageId: number }
   | { type: "manual"; storyIds: number[] }
   // Compatibility sources are semantic names for the historical Weekly
   // Wildcat selection slots. They keep the old ordered selection pass behind
@@ -138,6 +142,10 @@ function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]) {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
 function assertNoDuplicateManualPins(
   value: unknown,
   packageId: string,
@@ -181,7 +189,7 @@ export function isBylinePackageType(value: unknown): value is BylinePackageType 
 }
 
 export function parseStorySource(value: unknown): BylineStorySource | null {
-  if (!value || typeof value !== "object") return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
 
   const source = value as Record<string, unknown>;
 
@@ -202,6 +210,13 @@ export function parseStorySource(value: unknown): BylineStorySource | null {
   if (source.type === "author" && isPositiveInteger(source.authorId)) {
     return { type: "author", authorId: source.authorId };
   }
+  if (
+    source.type === "coverage"
+    && hasOnlyKeys(source, ["type", "coverageId"])
+    && isPositiveInteger(source.coverageId)
+  ) {
+    return { type: "coverage", coverageId: source.coverageId };
+  }
   if (source.type === "manual") {
     if (!Array.isArray(source.storyIds) || !source.storyIds.every(isPositiveInteger)) return null;
     const storyIds = [...new Set(source.storyIds as number[])];
@@ -210,6 +225,67 @@ export function parseStorySource(value: unknown): BylineStorySource | null {
   }
 
   return null;
+}
+
+/**
+ * Package prop parsers intentionally repair ordinary malformed settings so a
+ * damaged field does not blank a publication. Coverage is different: it is a
+ * named editorial object, and silently repairing an invalid Coverage source to
+ * a generic feed would publish the wrong stories. Callers use this helper when
+ * they need the normal fallback behaviour for all other source kinds.
+ */
+export function parseStorySourceOrFallback(
+  value: unknown,
+  fallback: BylineStorySource
+): BylineStorySource {
+  const parsed = parseStorySource(value);
+  if (parsed) return parsed;
+
+  if (
+    value
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && (value as Record<string, unknown>).type === "coverage"
+  ) {
+    throw new BylineDesignSchemaError(
+      "A Coverage source must contain a positive numeric coverageId and no unsupported fields."
+    );
+  }
+
+  return fallback;
+}
+
+function parsePackageStorySource(value: unknown, path: string, allowAthleteSpotlight = false) {
+  if (
+    allowAthleteSpotlight
+    && value
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && (value as Record<string, unknown>).type === "athlete-spotlight"
+  ) {
+    return;
+  }
+
+  if (!parseStorySource(value)) {
+    throw new BylineDesignSchemaError(`Design contains an invalid story source at ${path}.`);
+  }
+}
+
+function assertPackageStorySources(props: Record<string, unknown>, packageId: string) {
+  for (const slot of ["lead", "latest", "stories", "athleteSpotlight"]) {
+    const config = props[slot];
+    if (!isPlainRecord(config) || !Object.prototype.hasOwnProperty.call(config, "source")) continue;
+
+    parsePackageStorySource(
+      config.source,
+      `package "${packageId}" props.${slot}.source`,
+      slot === "athleteSpotlight"
+    );
+  }
+
+  if (Object.prototype.hasOwnProperty.call(props, "source")) {
+    parsePackageStorySource(props.source, `package "${packageId}" props.source`);
+  }
 }
 
 // Rejects anything that is not a plain JSON tree. Persisted design props must
@@ -285,6 +361,8 @@ export function parseBylineDesignDocumentV2(value: unknown, template: string): B
     if (!isSerialisableProps(designPackage.props)) {
       throw new BylineDesignSchemaError(`Design ${template} package "${designPackage.id}" has unsafe props.`);
     }
+
+    assertPackageStorySources(designPackage.props as Record<string, unknown>, designPackage.id);
 
     assertNoDuplicateManualPins(designPackage.props, designPackage.id, "props", manualPinOwners);
 

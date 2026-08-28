@@ -21,6 +21,7 @@ import {
   setPreviewDataLoader,
   snapshotFor,
   subscribe,
+  toPreviewCoverageInputs,
   toPreviewData,
   type PreviewGame,
   type PreviewPost,
@@ -31,10 +32,24 @@ export {
   loadPreviewData,
   previewPackageId,
   setStudioPreviewDocument,
+  setStudioPreviewLiveDocument,
+  setStudioPreviewCoverages,
   setStudioPreviewOptions,
+  studioPreviewDiff,
+  studioPreviewIntelligence,
   __setPreviewDataForTests,
-  type StudioPreviewPublication
+  type StudioPreviewPublication,
+  type PreviewSnapshot
 } from "./studio-preview-model";
+export {
+  createDesignScheduleApi,
+  createWordPressDesignScheduleApi,
+  designSchedulePath,
+  DesignScheduleApiError,
+  type DesignScheduleApi,
+  type DesignScheduleRequest,
+  type DesignScheduleTransport
+} from "./design-scheduling-api";
 import { previewPackageId } from "./studio-preview-model";
 
 // Studio's preview transport. Fetching lives here; resolution lives in the
@@ -45,9 +60,10 @@ setPreviewDataLoader(() =>
     apiFetch<PreviewPost[]>({ path: "/wp/v2/posts?per_page=20&_embed=1&status=publish" }).catch(() => []),
     apiFetch<Array<Record<string, unknown>>>({ path: "/weekly-wildcat/v1/school-events?per_page=12" }).catch(() => []),
     apiFetch<PreviewGame[]>({ path: "/weekly-wildcat/v1/sports-games/recent?per_page=8" }).catch(() => []),
-    apiFetch<PreviewGame[]>({ path: "/weekly-wildcat/v1/sports-games/upcoming?per_page=12" }).catch(() => [])
-  ]).then(([posts, events, recentScores, upcomingGames]) =>
-    toPreviewData({ posts, events, recentScores, upcomingGames })
+    apiFetch<PreviewGame[]>({ path: "/weekly-wildcat/v1/sports-games/upcoming?per_page=12" }).catch(() => []),
+    apiFetch<unknown>({ path: "/byline/v1/coverage?public=1&per_page=100" }).catch(() => [])
+  ]).then(([posts, events, recentScores, upcomingGames, coverages]) =>
+    toPreviewData({ posts, events, recentScores, upcomingGames, coverages: toPreviewCoverageInputs(coverages) })
   )
 );
 

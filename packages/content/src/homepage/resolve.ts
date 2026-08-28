@@ -68,11 +68,27 @@ function isCompatibilitySource(source: BylineStorySource) {
   return typeof source.type === "string" && source.type.startsWith("compatibility-");
 }
 
+/**
+ * The public relationship slice needed to resolve a Coverage source.
+ *
+ * Coverage itself remains a host concern: the static exporter and Studio each
+ * adapt their endpoint response into this small, public-safe shape. Keeping
+ * only IDs here prevents editorial notes, staff assignments, and other
+ * private planning fields from becoming part of homepage resolution.
+ */
+export type HomepageCoverageInput = {
+  id: number;
+  storyIds: readonly number[];
+  isPublic?: boolean;
+  exists?: boolean;
+};
+
 export function sourceCandidates(
   source: BylineStorySource,
   stories: readonly HomepageStoryInput[],
   selection: HomepageSelection,
-  useCompatibilitySelection: boolean
+  useCompatibilitySelection: boolean,
+  coverages: readonly HomepageCoverageInput[] = []
 ): HomepageStoryInput[] {
   if (useCompatibilitySelection && isCompatibilitySource(source)) {
     switch (source.type) {
@@ -105,6 +121,14 @@ export function sourceCandidates(
       return stories.filter((story) => story.tagIds.includes(source.tagId));
     case "author":
       return stories.filter((story) => story.authorId === source.authorId);
+    case "coverage": {
+      const coverage = coverages.find((candidate) => candidate.id === source.coverageId);
+
+      if (!coverage || coverage.exists === false || coverage.isPublic === false) return [];
+
+      const storyIds = new Set(coverage.storyIds);
+      return stories.filter((story) => storyIds.has(story.id));
+    }
     case "manual":
       return manualStories(source, stories) ?? [];
     default:
@@ -140,6 +164,7 @@ export type HomepagePackageResolutionContext = {
   usedStoryIds: ReadonlySet<number>;
   compatibilitySelection: boolean;
   publication: HomepagePublicationInput;
+  coverages?: readonly HomepageCoverageInput[];
 };
 
 function selectStories(source: BylineStorySource, limit: number, context: HomepagePackageResolutionContext) {
@@ -148,7 +173,13 @@ function selectStories(source: BylineStorySource, limit: number, context: Homepa
   if (manual) return manual.slice(0, limit);
 
   return availableStories(
-    sourceCandidates(source, context.stories, context.selection, context.compatibilitySelection),
+    sourceCandidates(
+      source,
+      context.stories,
+      context.selection,
+      context.compatibilitySelection,
+      context.coverages ?? []
+    ),
     context.usedStoryIds,
     limit
   );
@@ -175,7 +206,13 @@ export function resolveLeadPackage(
     ? [manualLead]
     : context.compatibilitySelection && config.lead.source.type === "sticky"
       ? (context.selection.leadStory ? [context.selection.leadStory] : [])
-      : sourceCandidates(config.lead.source, context.stories, context.selection, context.compatibilitySelection);
+      : sourceCandidates(
+          config.lead.source,
+          context.stories,
+          context.selection,
+          context.compatibilitySelection,
+          context.coverages ?? []
+        );
   const leadStory = resolvesStories
     ? manualLead ?? leadCandidates.find((story) => !used.has(story.id)) ?? null
     : null;
@@ -187,7 +224,8 @@ export function resolveLeadPackage(
     config.latest.source,
     context.stories,
     context.selection,
-    context.compatibilitySelection
+    context.compatibilitySelection,
+    context.coverages ?? []
   );
   const latestStories = (manualLatest ? latestCandidates : latestCandidates.filter((story) => !used.has(story.id)))
     .filter((story) => story.id !== leadStory?.id)
@@ -500,6 +538,7 @@ export type HomepageDocumentResolutionInput = {
   stories: readonly HomepageStoryInput[];
   publication: HomepagePublicationInput;
   sportsSchedule: HomepageSportsSchedule;
+  coverages?: readonly HomepageCoverageInput[];
 };
 
 export type ResolvedHomepageDocument = {
@@ -532,7 +571,8 @@ export function resolveHomepageDocument(input: HomepageDocumentResolutionInput):
       selection,
       usedStoryIds,
       compatibilitySelection,
-      publication: input.publication
+      publication: input.publication,
+      coverages: input.coverages ?? []
     };
     let resolvedEntry: ResolvedHomepagePackage;
 

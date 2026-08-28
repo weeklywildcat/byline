@@ -11,9 +11,9 @@ import {
 } from "@byline/content";
 import type { BylinePublicationConfig } from "@byline/core";
 import type { SchoolEvent, SportsGame } from "@/lib/headless";
-import { toHomepagePublicationInput, toHomepageStoryInputs } from "@/lib/homepage-story-input";
+import { toHomepageCoverageInputs, toHomepagePublicationInput, toHomepageStoryInputs } from "@/lib/homepage-story-input";
 import { toSportsFixtureView, toSportsResultView } from "@/lib/sports-packages";
-import type { WordPressPost } from "@/lib/wordpress";
+import type { WordPressCoverage, WordPressPost } from "@/lib/wordpress";
 
 const BASELINE_RECENT_GAMES = 3;
 const BASELINE_UPCOMING_GAMES = 8;
@@ -65,6 +65,7 @@ export function getHomepageDataRequirements(document: BylineDesignDocumentV2): H
 export type HomepageResolutionInput = {
   document: BylineDesignDocumentV2;
   posts: WordPressPost[];
+  coverages?: WordPressCoverage[];
   publication: BylinePublicationConfig;
   sportsSchedule: {
     recentScores: SportsGame[];
@@ -87,6 +88,7 @@ export function resolveHomepageDocument(input: HomepageResolutionInput): Resolve
   return resolveSharedHomepageDocument({
     document: input.document,
     stories: toHomepageStoryInputs(input.posts),
+    coverages: toHomepageCoverageInputs(input.coverages ?? []),
     publication: toHomepagePublicationInput(input.publication),
     sportsSchedule: {
       recentScores: input.sportsSchedule.recentScores.map((game) => toSportsResultView(game, input.publication)),

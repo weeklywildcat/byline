@@ -20,7 +20,10 @@ import {
   SpecialCoveragePackagePreview,
   SportsPackagePreview,
   setStudioPreviewDocument,
+  setStudioPreviewLiveDocument,
   setStudioPreviewOptions,
+  studioPreviewDiff,
+  studioPreviewIntelligence,
   type StudioPreviewPublication
 } from "./studio-preview";
 import {
@@ -61,6 +64,13 @@ import {
 } from "@byline/design";
 import { editorStateToDesignDocument, loadDesignIntoEditor, type PuckEditorState, type StudioLoadResult } from "./studio-document";
 import { legacyBlockLabel } from "@byline/design";
+import { createWordPressDesignScheduleApi, type DesignScheduleApi } from "./design-scheduling-api";
+import {
+  designScheduleNeedsReview,
+  designScheduleStatusLabel,
+  type DesignScheduleRecord
+} from "./design-scheduling-model";
+import { subscribe as subscribeToStudioPreview } from "./studio-preview-model";
 import { useStudioAutosave, type StudioAutosaveRecord } from "./studio-autosave";
 
 // What Studio writes. Reading still accepts schema 1, but only as an input to
@@ -754,6 +764,209 @@ function LegacyResolution({
   );
 }
 
+function scheduleErrorMessage(error: unknown): string {
+  const candidate = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  const code = typeof candidate.code === "string" ? candidate.code : "";
+  if (code === "byline_design_conflict" || code === "byline_design_schedule_conflict") {
+    return "The live design changed after this schedule was created. Review the current design, then rebase the schedule before retrying.";
+  }
+  if (code === "byline_design_schedule_terminal") {
+    return "This schedule has already completed or been cancelled and cannot be changed.";
+  }
+  if (code === "byline_design_schedule_processing") {
+    return "This schedule is currently publishing and cannot be changed yet.";
+  }
+  if (code === "byline_design_schedule_capability") {
+    return "Your publishing permission changed, so this schedule was not changed.";
+  }
+  if (code === "byline_design_schedule_idempotency_conflict") {
+    return "That schedule request was already used for different content. Refresh the schedule list and try again.";
+  }
+  return "Byline could not update the design schedule. No schedule change was assumed; refresh and try again.";
+}
+
+function scheduleDateInput(value: string | Date): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (!Number.isFinite(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function scheduleDateIso(value: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function scheduleDateLabel(value: string): string {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString() : "Unknown time";
+}
+
+function newScheduleIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `studio-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+type DesignOperationsPanelProps = {
+  canPublish: boolean;
+  scheduleReady: boolean;
+  scheduleBlocked: boolean;
+  scheduleLoading: boolean;
+  scheduleError: string;
+  schedules: DesignScheduleRecord[];
+  scheduleDate: string;
+  scheduleBusy: string;
+  intelligence: ReturnType<typeof studioPreviewIntelligence>;
+  semanticDiff: ReturnType<typeof studioPreviewDiff>;
+  onScheduleDateChange: (value: string) => void;
+  onSchedule: () => void;
+  onRefresh: () => void;
+  onReschedule: (record: DesignScheduleRecord, value: string) => void;
+  onRebase: (record: DesignScheduleRecord) => void;
+  onCancel: (record: DesignScheduleRecord) => void;
+};
+
+function DesignOperationsPanel({
+  canPublish,
+  scheduleReady,
+  scheduleBlocked,
+  scheduleLoading,
+  scheduleError,
+  schedules,
+  scheduleDate,
+  scheduleBusy,
+  intelligence,
+  semanticDiff,
+  onScheduleDateChange,
+  onSchedule,
+  onRefresh,
+  onReschedule,
+  onRebase,
+  onCancel
+}: DesignOperationsPanelProps) {
+  const [rescheduleDates, setRescheduleDates] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    setRescheduleDates((current) => Object.fromEntries(
+      schedules.map((record) => [record.id, current[record.id] ?? scheduleDateInput(record.scheduledAt)])
+    ));
+  }, [schedules]);
+
+  if (!canPublish) return null;
+
+  const reviewCount = intelligence?.issues.filter((issue) => issue.severity === "warning").length ?? 0;
+  const diffCount = semanticDiff?.operations.length ?? 0;
+
+  return (
+    <section className="byline-studio-operations" aria-labelledby="byline-studio-operations-title">
+      <div className="byline-studio-operations-header">
+        <div>
+          <h2 id="byline-studio-operations-title">Publishing operations</h2>
+          <p>Schedule an immutable snapshot of this design. The live site changes only when the protected WordPress job runs.</p>
+        </div>
+        <div className="byline-studio-operations-intelligence" aria-label="Design checks">
+          <strong>{intelligence === null ? "Design checks unavailable" : reviewCount ? `${reviewCount} design check${reviewCount === 1 ? "" : "s"} need review` : "Design checks clear"}</strong>
+          {semanticDiff === null
+            ? <span>Draft/live comparison unavailable</span>
+            : diffCount
+              ? <span>{diffCount} draft/live difference{diffCount === 1 ? "" : "s"}</span>
+              : <span>Draft matches live</span>}
+        </div>
+      </div>
+
+      {intelligence?.issues.length ? (
+        <ul className="byline-studio-intelligence-list">
+          {intelligence.issues.slice(0, 5).map((issue, index) => (
+            <li key={`${issue.code}-${issue.packageId}-${issue.storyId ?? index}`}>
+              <strong>{issue.severity === "warning" ? "Review" : "Info"}:</strong> {issue.message}
+            </li>
+          ))}
+          {intelligence.issues.length > 5 ? <li>+{intelligence.issues.length - 5} more checks in the preview.</li> : null}
+        </ul>
+      ) : null}
+
+      {!scheduleReady ? (
+        <Notice status={scheduleBlocked ? "warning" : scheduleError ? "error" : "warning"} isDismissible={false}>
+          {scheduleBlocked
+            ? "Resolve preserved older blocks before scheduling this design."
+            : scheduleError || (scheduleLoading ? "Loading protected schedules…" : "Schedules are unavailable until WordPress confirms access.")}
+          {scheduleError && !scheduleBlocked ? <Button variant="secondary" onClick={onRefresh}>Retry</Button> : null}
+        </Notice>
+      ) : (
+        <>
+          <div className="byline-studio-schedule-create">
+            <label htmlFor="byline-studio-schedule-date"><strong>Publish this design at</strong></label>
+            <input
+              id="byline-studio-schedule-date"
+              type="datetime-local"
+              value={scheduleDate}
+              min={scheduleDateInput(new Date())}
+              onChange={(event) => onScheduleDateChange(event.target.value)}
+              disabled={Boolean(scheduleBusy)}
+            />
+            <Button variant="primary" onClick={onSchedule} disabled={!scheduleDate || Boolean(scheduleBusy)} isBusy={scheduleBusy === "create"}>
+              Schedule publish
+            </Button>
+          </div>
+
+          {schedules.length === 0 ? <p>No scheduled design snapshots for this template.</p> : (
+            <ol className="byline-studio-schedule-list">
+              {schedules.map((record) => {
+                const terminal = record.status === "published" || record.status === "cancelled";
+                const processing = record.status === "processing";
+                const needsReview = designScheduleNeedsReview(record);
+                return (
+                  <li key={record.id} className={`byline-studio-schedule-item is-${record.status}`}>
+                    <div className="byline-studio-schedule-summary">
+                      <strong>{designScheduleStatusLabel(record.status)}</strong>
+                      <span>{scheduleDateLabel(record.scheduledAt)}</span>
+                      <small>Snapshot {record.snapshotHash ?? "verified"} · base revision {record.baseLiveRevision}</small>
+                    </div>
+                    {record.error ? <p className="byline-studio-schedule-error">{record.error}</p> : null}
+                    {needsReview ? <p className="byline-studio-schedule-review">Review the current design before rebasing this snapshot. Rebase changes only the live revision guard; it never changes the scheduled document.</p> : null}
+                    {!terminal && !processing ? (
+                      <div className="byline-studio-schedule-actions">
+                        <label>
+                          <span className="screen-reader-text">New time for schedule {record.id}</span>
+                          <input
+                            type="datetime-local"
+                            value={rescheduleDates[record.id] ?? scheduleDateInput(record.scheduledAt)}
+                            min={scheduleDateInput(new Date())}
+                            onChange={(event) => setRescheduleDates((current) => ({ ...current, [record.id]: event.target.value }))}
+                            disabled={Boolean(scheduleBusy)}
+                          />
+                        </label>
+                        <Button
+                          variant="secondary"
+                          onClick={() => onReschedule(record, rescheduleDates[record.id] ?? "")}
+                          disabled={Boolean(scheduleBusy) || !rescheduleDates[record.id]}
+                          isBusy={scheduleBusy === `${record.id}:reschedule`}
+                        >
+                          Reschedule
+                        </Button>
+                        {needsReview ? (
+                          <Button variant="secondary" onClick={() => onRebase(record)} disabled={Boolean(scheduleBusy)} isBusy={scheduleBusy === `${record.id}:rebase`}>
+                            Rebase to current live
+                          </Button>
+                        ) : null}
+                        <Button variant="link" isDestructive onClick={() => onCancel(record)} disabled={Boolean(scheduleBusy)} isBusy={scheduleBusy === `${record.id}:cancel`}>
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : null}
+                    <small className="byline-studio-schedule-id">Schedule #{record.id} · idempotent snapshot</small>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function BylineStudio({
   canEdit,
   canPublish,
@@ -781,6 +994,15 @@ export function BylineStudio({
   const [deploymentRetrying, setDeploymentRetrying] = useState(false);
   const [deploymentRefreshToken, setDeploymentRefreshToken] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [schedules, setSchedules] = useState<DesignScheduleRecord[] | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
+  const [scheduleBusy, setScheduleBusy] = useState("");
+  const [scheduleDate, setScheduleDate] = useState(() => scheduleDateInput(new Date(Date.now() + 60 * 60 * 1000)));
+  const scheduleApi = useMemo<DesignScheduleApi>(() => createWordPressDesignScheduleApi(), []);
+  const scheduleRequestRef = useRef(0);
+  const scheduleIdempotencyKeyRef = useRef<string | null>(null);
+  const [previewRevision, setPreviewRevision] = useState(0);
   // Both panels collapse so the preview can take the full width. The inspector
   // starts closed on a laptop-width workspace: the canvas is the point of the
   // screen, and the inspector opens as soon as a package is selected.
@@ -860,6 +1082,45 @@ export function BylineStudio({
     setStudioPreviewOptions({ showHiddenPackages });
   }, [showHiddenPackages]);
 
+  useEffect(() => subscribeToStudioPreview(() => setPreviewRevision((revision) => revision + 1)), []);
+
+  const intelligence = useMemo(() => {
+    void previewRevision;
+    return studioPreviewIntelligence();
+  }, [previewRevision]);
+  const semanticDiff = useMemo(() => {
+    void previewRevision;
+    return studioPreviewDiff();
+  }, [previewRevision]);
+
+  const refreshSchedules = useCallback(async () => {
+    if (!canPublish) {
+      setSchedules([]);
+      setScheduleError("");
+      return;
+    }
+    const requestId = ++scheduleRequestRef.current;
+    setScheduleLoading(true);
+    setScheduleError("");
+    try {
+      const next = await scheduleApi.list(template);
+      if (requestId === scheduleRequestRef.current) setSchedules(next);
+    } catch (loadError) {
+      if (requestId === scheduleRequestRef.current) {
+        setSchedules(null);
+        setScheduleError(scheduleErrorMessage(loadError));
+      }
+    } finally {
+      if (requestId === scheduleRequestRef.current) setScheduleLoading(false);
+    }
+  }, [canPublish, scheduleApi, template]);
+
+  useEffect(() => {
+    scheduleIdempotencyKeyRef.current = null;
+    void refreshSchedules();
+    return () => { scheduleRequestRef.current += 1; };
+  }, [refreshSchedules]);
+
   // The shell covers wp-admin, so the page behind it must not scroll with it.
   useEffect(() => {
     const body = window.document.body;
@@ -915,6 +1176,7 @@ export function BylineStudio({
     setDeploymentRetrying(false);
     setPublishPhase("idle");
     setError("");
+    setStudioPreviewLiveDocument(null);
     autosave.hydrate({ hasDraft: false, baseRevisionId: 0 });
 
     apiFetch<AdminDesign>({ path: `/byline/v1/admin/design/${encodeURIComponent(template)}` })
@@ -926,12 +1188,18 @@ export function BylineStudio({
         const nextLoaded = loadDesignIntoEditor(stored ?? {}, template);
         const nextEditorState = nextLoaded.editorState;
         const nextDocument = editorStateToDesignDocument(nextEditorState, template, publicationTheme, nextLoaded.legacy);
+        const liveSource = next.revision > 0
+          ? next.document
+          : getFallbackDesignDocument(template, publicationTheme);
+        const liveLoaded = loadDesignIntoEditor(liveSource ?? {}, template);
+        const liveDocument = editorStateToDesignDocument(liveLoaded.editorState, template, publicationTheme, liveLoaded.legacy);
         setDesign(next);
         setLoaded(nextLoaded);
         setEditorState(nextEditorState);
         setEditorKey((key) => key + 1);
         setDeployment(next.deployment ?? null);
         latestDocumentRef.current = nextDocument;
+        setStudioPreviewLiveDocument(liveDocument);
         editorVersionRef.current += 1;
         autosave.hydrate({
           hasDraft: Boolean(next.autosave),
@@ -1020,6 +1288,7 @@ export function BylineStudio({
     latestDocumentRef.current = document;
     editorVersionRef.current += 1;
     setError("");
+    scheduleIdempotencyKeyRef.current = null;
     setPublishPhase("idle");
     setStudioPreviewDocument(document, previewPublication);
     autosave.schedule(document);
@@ -1079,6 +1348,7 @@ export function BylineStudio({
       const changedDuringPublish = editorVersionRef.current > publishVersion;
       setDesign({ ...published, autosave: null });
       setDeployment(published.deployment ?? null);
+      setStudioPreviewLiveDocument(document);
       setPublishPhase("published");
       if (changedDuringPublish && latestDocumentRef.current) {
         // The published request used the earlier snapshot. Keep a newer edit as
@@ -1091,6 +1361,94 @@ export function BylineStudio({
     } catch (publishError) {
       setPublishPhase("idle");
       setError(errorMessage(publishError));
+    }
+  };
+
+  const schedulePublish = async () => {
+    if (!canPublish || !loaded || hasUnconvertedLegacy || schedules === null || scheduleError) return;
+    const scheduledAt = scheduleDateIso(scheduleDate);
+    if (!scheduledAt || Date.parse(scheduledAt) <= Date.now()) {
+      setScheduleError("Choose a future date and time for the scheduled publish.");
+      return;
+    }
+    const document = latestDocumentRef.current ?? currentDocument;
+    if (!document) {
+      setScheduleError("The design is still loading, so no schedule was created.");
+      return;
+    }
+
+    setScheduleBusy("create");
+    setScheduleError("");
+    try {
+      const saved = await autosave.flush();
+      const next = await scheduleApi.create(template, {
+        document,
+        baseRevisionId: saved?.baseRevisionId ?? autosave.baseRevisionId,
+        scheduledAt,
+        idempotencyKey: scheduleIdempotencyKeyRef.current ?? (scheduleIdempotencyKeyRef.current = newScheduleIdempotencyKey())
+      });
+      scheduleIdempotencyKeyRef.current = null;
+      setScheduleDate(scheduleDateInput(new Date(Date.now() + 60 * 60 * 1000)));
+      setSchedules((current) => current ? [next, ...current.filter((record) => record.id !== next.id)] : current);
+      await refreshSchedules();
+    } catch (schedulePublishError) {
+      // Keep the idempotency key after an uncertain request so a retry cannot
+      // create a second schedule for the same snapshot.
+      setScheduleError(scheduleErrorMessage(schedulePublishError));
+    } finally {
+      setScheduleBusy("");
+    }
+  };
+
+  const reschedulePublish = async (record: DesignScheduleRecord, value: string) => {
+    const scheduledAt = scheduleDateIso(value);
+    if (!scheduledAt || Date.parse(scheduledAt) <= Date.now()) {
+      setScheduleError("Choose a future date and time for the rescheduled publish.");
+      return;
+    }
+    setScheduleBusy(`${record.id}:reschedule`);
+    setScheduleError("");
+    try {
+      const next = await scheduleApi.reschedule(template, record.id, scheduledAt);
+      setSchedules((current) => current?.map((candidate) => candidate.id === next.id ? next : candidate) ?? current);
+      await refreshSchedules();
+    } catch (rescheduleError) {
+      setScheduleError(scheduleErrorMessage(rescheduleError));
+    } finally {
+      setScheduleBusy("");
+    }
+  };
+
+  const rebaseSchedule = async (record: DesignScheduleRecord) => {
+    setScheduleBusy(`${record.id}:rebase`);
+    setScheduleError("");
+    try {
+      const current = await apiFetch<AdminDesign>({
+        path: `/byline/v1/admin/design/${encodeURIComponent(template)}`
+      });
+      if (!Number.isInteger(current.revision) || current.revision < 0) throw new Error("Invalid live revision");
+      const next = await scheduleApi.rebase(template, record.id, current.revision);
+      setSchedules((existing) => existing?.map((candidate) => candidate.id === next.id ? next : candidate) ?? existing);
+      await refreshSchedules();
+    } catch (rebaseError) {
+      setScheduleError(scheduleErrorMessage(rebaseError));
+    } finally {
+      setScheduleBusy("");
+    }
+  };
+
+  const cancelSchedule = async (record: DesignScheduleRecord) => {
+    if (!window.confirm(`Cancel the ${scheduleDateLabel(record.scheduledAt)} design publish? The immutable snapshot will be retained as cancelled.`)) return;
+    setScheduleBusy(`${record.id}:cancel`);
+    setScheduleError("");
+    try {
+      const next = await scheduleApi.cancel(template, record.id);
+      setSchedules((existing) => existing?.map((candidate) => candidate.id === next.id ? next : candidate) ?? existing);
+      await refreshSchedules();
+    } catch (cancelError) {
+      setScheduleError(scheduleErrorMessage(cancelError));
+    } finally {
+      setScheduleBusy("");
     }
   };
 
@@ -1159,6 +1517,7 @@ export function BylineStudio({
     const nextDocument = editorStateToDesignDocument(editorState, template, publicationTheme, nextLegacy);
     setLoaded(nextLoaded);
     latestDocumentRef.current = nextDocument;
+    scheduleIdempotencyKeyRef.current = null;
     setError("");
     autosave.schedule(nextDocument);
   };
@@ -1324,6 +1683,24 @@ export function BylineStudio({
         ) : null}
         {hasUnconvertedLegacy && loaded.legacy ? <LegacyResolution template={template} legacy={loaded.legacy} onRemove={removeLegacyBlock} /> : null}
       </div>
+      <DesignOperationsPanel
+        canPublish={canPublish}
+        scheduleReady={canPublish && schedules !== null && !scheduleLoading && !scheduleError && !hasUnconvertedLegacy}
+        scheduleBlocked={hasUnconvertedLegacy}
+        scheduleLoading={scheduleLoading}
+        scheduleError={scheduleError}
+        schedules={schedules ?? []}
+        scheduleDate={scheduleDate}
+        scheduleBusy={scheduleBusy}
+        intelligence={intelligence}
+        semanticDiff={semanticDiff}
+        onScheduleDateChange={setScheduleDate}
+        onSchedule={() => void schedulePublish()}
+        onRefresh={() => void refreshSchedules()}
+        onReschedule={(record, value) => void reschedulePublish(record, value)}
+        onRebase={(record) => void rebaseSchedule(record)}
+        onCancel={(record) => void cancelSchedule(record)}
+      />
       <div className="byline-studio-workspace">
         <Puck
           key={`${template}-${editorKey}`}

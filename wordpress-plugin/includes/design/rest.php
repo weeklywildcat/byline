@@ -4,6 +4,12 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// The main plugin bootstrap intentionally remains untouched. Loading the
+// shared publish/schedule helpers from the design REST module keeps them
+// available to immediate REST publishes and cron execution alike.
+require_once __DIR__ . '/publishing.php';
+require_once __DIR__ . '/scheduling.php';
+
 function byline_rest_design_template(WP_REST_Request $request): string
 {
     return sanitize_text_field((string) $request['template']);
@@ -144,56 +150,107 @@ function byline_rest_publish_design(WP_REST_Request $request)
     $params = $request->get_json_params();
     $document = $params['document'] ?? null;
     $base_revision = (int) ($params['baseRevisionId'] ?? -1);
-    $validation = byline_validate_design_document($document, $template);
-    if (is_wp_error($validation)) {
-        return $validation;
-    }
-    if (byline_design_has_unconverted_blocks($document)) {
-        return new WP_Error(
-            'byline_unconverted_design_blocks',
-            __('This design still contains homepage blocks that have not been converted. Save it, but convert or remove the preserved blocks before publishing.', 'weekly-wildcat-headless'),
-            ['status' => 409]
-        );
-    }
-
-    $existing = byline_get_design_post($template);
-    $published_revision = byline_design_revision($existing);
-    $conflict = byline_design_conflict($base_revision, $published_revision);
-    if ($conflict) {
-        return $conflict;
-    }
-    if ($existing) {
-        wp_save_post_revision($existing->ID);
+    $published = byline_publish_design_document(
+        $template,
+        $document,
+        $base_revision,
+        get_current_user_id(),
+        'immediate',
+        true
+    );
+    if (is_wp_error($published)) {
+        return $published;
     }
 
-    $post_data = [
-        'post_type' => BYLINE_DESIGN_POST_TYPE,
-        'post_status' => 'publish',
-        'post_title' => 'Byline design: ' . $template,
-        'post_content' => wp_json_encode($document),
-    ];
-    if ($existing) {
-        $post_data['ID'] = $existing->ID;
-        $post_id = wp_update_post(wp_slash($post_data), true);
-    } else {
-        $post_id = wp_insert_post(wp_slash($post_data), true);
-    }
-    if (is_wp_error($post_id)) {
-        return $post_id;
-    }
-
-    $next_revision = $published_revision + 1;
-    update_post_meta($post_id, BYLINE_DESIGN_TEMPLATE_META, $template);
-    update_post_meta($post_id, BYLINE_DESIGN_REVISION_META, $next_revision);
-    delete_user_meta(get_current_user_id(), byline_design_autosave_key($template));
-    wp_save_post_revision($post_id);
-    if (function_exists('wwh_schedule_cloudflare_deploy')) {
-        wwh_schedule_cloudflare_deploy();
-    }
-
-    $response = byline_published_design($template);
+    $response = $published;
     $response['deployment'] = byline_rest_design_deployment_payload();
     return rest_ensure_response($response);
+}
+
+function byline_rest_list_design_schedules(WP_REST_Request $request)
+{
+    $template = byline_rest_design_template($request);
+    if (!byline_is_design_template($template)) {
+        return new WP_Error('byline_unknown_template', __('Unknown Byline template.', 'weekly-wildcat-headless'), ['status' => 404]);
+    }
+    if (!function_exists('get_posts')) {
+        return rest_ensure_response([]);
+    }
+
+    $posts = get_posts([
+        'post_type' => BYLINE_DESIGN_SCHEDULE_POST_TYPE,
+        'post_status' => 'any',
+        'posts_per_page' => 100,
+        'orderby' => 'ID',
+        'order' => 'DESC',
+        'meta_key' => BYLINE_DESIGN_SCHEDULE_TEMPLATE_META,
+        'meta_value' => $template,
+    ]);
+    $records = [];
+    foreach (is_array($posts) ? $posts : [] as $post) {
+        if (!$post instanceof WP_Post) {
+            continue;
+        }
+        $record = byline_get_design_schedule((int) $post->ID);
+        if ($record) {
+            $records[] = $record;
+        }
+    }
+    return rest_ensure_response($records);
+}
+
+function byline_rest_create_design_schedule(WP_REST_Request $request)
+{
+    $template = byline_rest_design_template($request);
+    $params = $request->get_json_params();
+    $result = byline_create_design_schedule(
+        $template,
+        $params['document'] ?? null,
+        (int) ($params['baseRevisionId'] ?? -1),
+        (string) ($params['scheduledAt'] ?? ''),
+        max(0, (int) get_current_user_id()),
+        (string) ($params['idempotencyKey'] ?? '')
+    );
+    return is_wp_error($result) ? $result : rest_ensure_response($result);
+}
+
+function byline_rest_reschedule_design(WP_REST_Request $request)
+{
+    $schedule_id = (int) $request['schedule'];
+    $record = byline_get_design_schedule($schedule_id);
+    if (!$record || $record['template'] !== byline_rest_design_template($request)) {
+        return new WP_Error('byline_unknown_design_schedule', __('Unknown scheduled design.', 'weekly-wildcat-headless'), ['status' => 404]);
+    }
+    $result = byline_design_schedule_reschedule(
+        $schedule_id,
+        (string) ($request->get_json_params()['scheduledAt'] ?? '')
+    );
+    return is_wp_error($result) ? $result : rest_ensure_response($result);
+}
+
+function byline_rest_rebase_design_schedule(WP_REST_Request $request)
+{
+    $schedule_id = (int) $request['schedule'];
+    $record = byline_get_design_schedule($schedule_id);
+    if (!$record || $record['template'] !== byline_rest_design_template($request)) {
+        return new WP_Error('byline_unknown_design_schedule', __('Unknown scheduled design.', 'weekly-wildcat-headless'), ['status' => 404]);
+    }
+    $result = byline_design_schedule_rebase(
+        $schedule_id,
+        (int) ($request->get_json_params()['baseRevisionId'] ?? -1)
+    );
+    return is_wp_error($result) ? $result : rest_ensure_response($result);
+}
+
+function byline_rest_cancel_design_schedule(WP_REST_Request $request)
+{
+    $schedule_id = (int) $request['schedule'];
+    $record = byline_get_design_schedule($schedule_id);
+    if (!$record || $record['template'] !== byline_rest_design_template($request)) {
+        return new WP_Error('byline_unknown_design_schedule', __('Unknown scheduled design.', 'weekly-wildcat-headless'), ['status' => 404]);
+    }
+    $result = byline_cancel_design_schedule($schedule_id);
+    return is_wp_error($result) ? $result : rest_ensure_response($result);
 }
 
 function byline_rest_design_revisions(WP_REST_Request $request)
@@ -280,6 +337,31 @@ function byline_register_design_routes(): void
     register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)/publish', [
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'byline_rest_publish_design',
+        'permission_callback' => static fn() => current_user_can(BYLINE_PUBLISH_DESIGN_CAPABILITY),
+    ]);
+    register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)/schedules', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'byline_rest_list_design_schedules',
+        'permission_callback' => static fn() => current_user_can(BYLINE_PUBLISH_DESIGN_CAPABILITY),
+    ]);
+    register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)/schedule', [
+        'methods' => WP_REST_Server::CREATABLE,
+        'callback' => 'byline_rest_create_design_schedule',
+        'permission_callback' => static fn() => current_user_can(BYLINE_PUBLISH_DESIGN_CAPABILITY),
+    ]);
+    register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)/schedule/(?P<schedule>\d+)/reschedule', [
+        'methods' => WP_REST_Server::CREATABLE,
+        'callback' => 'byline_rest_reschedule_design',
+        'permission_callback' => static fn() => current_user_can(BYLINE_PUBLISH_DESIGN_CAPABILITY),
+    ]);
+    register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)/schedule/(?P<schedule>\d+)/rebase', [
+        'methods' => WP_REST_Server::CREATABLE,
+        'callback' => 'byline_rest_rebase_design_schedule',
+        'permission_callback' => static fn() => current_user_can(BYLINE_PUBLISH_DESIGN_CAPABILITY),
+    ]);
+    register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)/schedule/(?P<schedule>\d+)', [
+        'methods' => WP_REST_Server::DELETABLE,
+        'callback' => 'byline_rest_cancel_design_schedule',
         'permission_callback' => static fn() => current_user_can(BYLINE_PUBLISH_DESIGN_CAPABILITY),
     ]);
     register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)/revisions', [

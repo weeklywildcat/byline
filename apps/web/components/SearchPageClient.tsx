@@ -1,125 +1,151 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { SiteIcon } from "@/components/SiteIcon";
+import { reportZeroResultSearch } from "@/lib/search-gap";
+import {
+  buildSearchFacets,
+  DEFAULT_SEARCH_STATE,
+  getItemKind,
+  getResultLabel,
+  getSearchTerms,
+  getSearchUrl,
+  highlightText,
+  parseSearchUrlState,
+  searchIndex,
+  type SearchFacetOption,
+  type SearchFilter,
+  type SearchIndexItem,
+  type SearchUrlState
+} from "@/lib/search";
 
-export type SearchIndexItem = {
-  id: number | string;
-  kind?: "story" | "team" | "season" | "game";
-  title: string;
-  excerpt: string;
-  href: string;
-  category: string;
-  author: string;
-  date: string;
-  searchText: string;
-};
+export type { SearchIndexItem } from "@/lib/search";
+export {
+  scoreSearchResult,
+  scoreSearchResult as scoreResult,
+  searchIndex,
+  highlightText,
+  parseSearchUrlState,
+  serializeSearchUrlState
+} from "@/lib/search";
 
 type SearchPageClientProps = {
   items: SearchIndexItem[];
   publicationName: string;
+  searchGapEndpoint?: string;
 };
 
-type SearchItemKind = NonNullable<SearchIndexItem["kind"]>;
-type SearchFilter = "all" | SearchItemKind;
+type SearchFacetKey = "section" | "author" | "topic";
 
-function normalizeSearch(value: string) {
-  return value.toLowerCase().trim();
+function syncSearchUrl(state: SearchUrlState, mode: "push" | "replace") {
+  const nextUrl = getSearchUrl(window.location.href, state);
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+  if (nextUrl === currentUrl) {
+    return;
+  }
+
+  window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", nextUrl);
 }
 
-function scoreResult(item: SearchIndexItem, terms: string[]) {
-  const kind = getItemKind(item);
-  const kindBoost = kind === "team" ? 12 : kind === "season" ? 6 : kind === "story" ? 3 : 0;
-
-  return terms.reduce((score, term) => {
-    if (item.title.toLowerCase().includes(term)) {
-      return score + 6;
-    }
-
-    if (item.category.toLowerCase().includes(term)) {
-      return score + 4;
-    }
-
-    if (item.author.toLowerCase().includes(term)) {
-      return score + 3;
-    }
-
-    if (item.searchText.includes(term)) {
-      return score + 1;
-    }
-
-    return -1000;
-  }, kindBoost);
+function HighlightedText({ value, terms }: { value: string; terms: string[] }) {
+  return (
+    <>
+      {highlightText(value, terms).map((part, index) =>
+        part.matched ? (
+          <mark key={`${part.text}-${index}`}>{part.text}</mark>
+        ) : (
+          <Fragment key={`${part.text}-${index}`}>{part.text}</Fragment>
+        )
+      )}
+    </>
+  );
 }
 
-function getItemKind(item: SearchIndexItem): SearchItemKind {
-  return item.kind ?? "story";
+function FacetSelect({
+  id,
+  label,
+  value,
+  options,
+  emptyLabel,
+  onChange
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: SearchFacetOption[];
+  emptyLabel: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="search-facet-filter">
+      <label htmlFor={id}>{label}</label>
+      <select id={id} value={value} disabled={options.length === 0} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{emptyLabel}</option>
+        {options.map((option) => (
+          <option value={option.value} key={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
-function getResultLabel(kind: SearchItemKind) {
-  if (kind === "team") return "Team";
-  if (kind === "season") return "Season";
-  if (kind === "game") return "Game";
+export function SearchPageClient({ items, publicationName, searchGapEndpoint }: SearchPageClientProps) {
+  const [searchState, setSearchState] = useState<SearchUrlState>(DEFAULT_SEARCH_STATE);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const hydratedRef = useRef(false);
+  const facets = useMemo(() => buildSearchFacets(items), [items]);
+  const terms = useMemo(() => getSearchTerms(searchState.query), [searchState.query]);
+  const results = useMemo(() => searchIndex(items, searchState), [items, searchState]);
+  const hasQuery = terms.length > 0;
 
-  return "Story";
-}
+  useEffect(() => {
+    const applyUrlState = () => {
+      setSearchState(parseSearchUrlState(window.location.search, facets));
+    };
 
-function limitMixedResults(results: SearchIndexItem[]) {
-  const counts: Record<SearchItemKind, number> = {
-    story: 0,
-    team: 0,
-    season: 0,
-    game: 0
-  };
-  const caps: Record<SearchItemKind, number> = {
-    story: 12,
-    team: 8,
-    season: 8,
-    game: 4
-  };
-  const limited: SearchIndexItem[] = [];
+    applyUrlState();
+    hydratedRef.current = true;
+    window.addEventListener("popstate", applyUrlState);
 
-  results.forEach((item) => {
-    const kind = getItemKind(item);
+    return () => window.removeEventListener("popstate", applyUrlState);
+  }, [facets]);
 
-    if (limited.length >= 24 || counts[kind] >= caps[kind]) {
+  useEffect(() => {
+    if (!hasQuery || results.length > 0) {
       return;
     }
 
-    counts[kind] += 1;
-    limited.push(item);
-  });
+    // A short delay avoids reporting every intermediate keystroke while still
+    // recording a zero-result query when the reader pauses on it.
+    const timer = window.setTimeout(() => reportZeroResultSearch(searchState.query, { endpoint: searchGapEndpoint }), 350);
 
-  return limited;
-}
+    return () => window.clearTimeout(timer);
+  }, [hasQuery, results.length, searchGapEndpoint, searchState.author, searchState.query, searchState.section, searchState.topic, searchState.type]);
 
-export function SearchPageClient({ items, publicationName }: SearchPageClientProps) {
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<SearchFilter>("all");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const normalizedQuery = normalizeSearch(query);
-  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
-  const results = useMemo(() => {
-    const filteredItems = filter === "all" ? items : items.filter((item) => getItemKind(item) === filter);
+  function updateSearchState(patch: Partial<SearchUrlState>, mode: "push" | "replace" = "replace") {
+    const nextState = { ...searchState, ...patch };
 
-    if (terms.length === 0) {
-      return filteredItems.filter((item) => getItemKind(item) !== "game").slice(0, 8);
+    setSearchState(nextState);
+
+    if (hydratedRef.current) {
+      syncSearchUrl(nextState, mode);
     }
+  }
 
-    const scoredResults = filteredItems
-      .map((item) => ({
-        item,
-        score: scoreResult(item, terms)
-      }))
-      .filter((result) => result.score > -1000)
-      .sort((left, right) => right.score - left.score || right.item.date.localeCompare(left.item.date) || left.item.title.localeCompare(right.item.title))
-      .map((result) => result.item);
+  function updateFacet(key: SearchFacetKey, value: string) {
+    updateSearchState({ [key]: value } as Partial<SearchUrlState>, "push");
+  }
 
-    return filter === "all" ? limitMixedResults(scoredResults) : scoredResults.slice(0, 24);
-  }, [filter, items, terms]);
-  const hasQuery = terms.length > 0;
   const resultLabel = results.length === 1 ? "result" : "results";
-  const resultHeading = hasQuery ? "Search Results" : filter === "story" || filter === "all" ? "Latest Stories and Hubs" : "Browse";
+  const resultHeading = hasQuery
+    ? "Search Results"
+    : searchState.type === "story" || searchState.type === "all"
+      ? "Latest Stories and Hubs"
+      : "Browse";
+  const resultStatus = `${results.length} ${resultLabel}`;
 
   return (
     <section className="search-page" aria-labelledby="search-page-heading">
@@ -128,31 +154,50 @@ export function SearchPageClient({ items, publicationName }: SearchPageClientPro
         <h1 id="search-page-heading">Find {publicationName} Stories</h1>
       </header>
 
-      <div className="search-control">
+      <form
+        className="search-control"
+        role="search"
+        onSubmit={(event) => {
+          event.preventDefault();
+        }}
+      >
         <SiteIcon name="ph:magnifying-glass" width={20} height={20} />
+        <label className="search-visually-hidden" htmlFor="search-query">
+          Search {publicationName} stories
+        </label>
         <input
           ref={inputRef}
+          id="search-query"
           autoFocus
           type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          value={searchState.query}
+          onChange={(event) => updateSearchState({ query: event.target.value }, "replace")}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && searchState.query) {
+              event.preventDefault();
+              updateSearchState({ query: "" }, "replace");
+            }
+          }}
           placeholder="Search by headline, author, section, or topic"
           aria-label={`Search ${publicationName} stories`}
+          aria-controls="search-results"
         />
-        {query ? (
+        {searchState.query ? (
           <button
             type="button"
+            aria-label="Clear search"
             onClick={() => {
-              setQuery("");
+              updateSearchState({ query: "" }, "replace");
               inputRef.current?.focus();
             }}
           >
             Clear
           </button>
         ) : null}
-      </div>
+      </form>
 
-      <div className="search-kind-filter" aria-label="Search result type">
+      <fieldset className="search-kind-filter">
+        <legend className="search-visually-hidden">Filter by result type</legend>
         {[
           { label: "All", value: "all" },
           { label: "Stories", value: "story" },
@@ -161,41 +206,81 @@ export function SearchPageClient({ items, publicationName }: SearchPageClientPro
           { label: "Games", value: "game" }
         ].map((option) => (
           <button
-            aria-pressed={filter === option.value}
+            aria-pressed={searchState.type === option.value}
+            aria-controls="search-results"
             key={option.value}
-            onClick={() => setFilter(option.value as SearchFilter)}
+            onClick={() => updateSearchState({ type: option.value as SearchFilter }, "push")}
             type="button"
           >
             {option.label}
           </button>
         ))}
+      </fieldset>
+
+      <div className="search-facet-filters" aria-label="Filter search results">
+        <FacetSelect
+          id="search-section-filter"
+          label="Section"
+          value={searchState.section}
+          options={facets.sections}
+          emptyLabel="All sections"
+          onChange={(value) => updateFacet("section", value)}
+        />
+        <FacetSelect
+          id="search-author-filter"
+          label="Author"
+          value={searchState.author}
+          options={facets.authors}
+          emptyLabel="All authors"
+          onChange={(value) => updateFacet("author", value)}
+        />
+        <FacetSelect
+          id="search-topic-filter"
+          label="Topic"
+          value={searchState.topic}
+          options={facets.topics}
+          emptyLabel="All topics"
+          onChange={(value) => updateFacet("topic", value)}
+        />
       </div>
 
-      <div className="search-results-header" aria-live="polite">
-        <h2>{resultHeading}</h2>
-        <span>{results.length === 1 ? `1 ${resultLabel}` : `${results.length} ${resultLabel}`}</span>
+      <div className="search-results-header">
+        <h2 id="search-results-heading">{resultHeading}</h2>
+        <span id="search-results-status" role="status" aria-live="polite">
+          {resultStatus}
+        </span>
       </div>
 
-      {results.length > 0 ? (
-        <div className="search-result-list">
-          {results.map((item) => (
-            <article className="search-result" key={item.id}>
-              <div className="search-result-meta">
-                <span>{getResultLabel(getItemKind(item))}</span>
-                {item.category ? <span>{item.category}</span> : null}
-                {item.author ? <span>{item.author}</span> : null}
-                <time>{item.date}</time>
-              </div>
-              <h3>
-                <a href={item.href}>{item.title}</a>
-              </h3>
-              {item.excerpt ? <p>{item.excerpt}</p> : null}
-            </article>
-          ))}
-        </div>
-      ) : (
-        <p className="empty-state search-empty">No stories matched that search.</p>
-      )}
+      <div id="search-results" aria-describedby="search-results-status">
+        {results.length > 0 ? (
+          <div className="search-result-list">
+            {results.map((item) => (
+              <article className="search-result" key={item.id}>
+                <div className="search-result-meta">
+                  <span>{getResultLabel(getItemKind(item))}</span>
+                  {item.category ? <span><HighlightedText value={item.category} terms={terms} /></span> : null}
+                  {item.author ? <span><HighlightedText value={item.author} terms={terms} /></span> : null}
+                  <time dateTime={item.sortDate}>{item.date}</time>
+                </div>
+                <h3>
+                  <a href={item.href}><HighlightedText value={item.title} terms={terms} /></a>
+                </h3>
+                {item.excerpt ? <p><HighlightedText value={item.excerpt} terms={terms} /></p> : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-state search-empty">
+            {hasQuery ? (
+              <>
+                No results matched <q>{searchState.query}</q>. Try a broader search or clear a filter.
+              </>
+            ) : (
+              "No published stories are available for this filter yet."
+            )}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

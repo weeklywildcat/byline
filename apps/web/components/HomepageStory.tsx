@@ -1,9 +1,11 @@
 import { getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
+import { getResponsiveImageProps } from "@/lib/media";
 import {
+  getContributorHref,
+  getContributorName,
   getFeaturedMedia,
-  getAuthorHref,
-  getPostAuthor,
+  getPostContributors,
   getPostHref,
   type WordPressPost
 } from "@/lib/wordpress";
@@ -65,6 +67,18 @@ function getCleanDeck(post: WordPressPost) {
   return `${trimmed.slice(0, lastSpace > 0 ? lastSpace : trimmed.length).trim()}...`;
 }
 
+function getHomepageStoryImageSizes(variant: HomepageStoryVariant) {
+  if (variant === "lead" || variant === "brief-lead" || variant === "more-lead") {
+    return "(max-width: 900px) 100vw, 62vw";
+  }
+
+  if (variant === "row" || variant === "briefing" || variant === "field" || variant === "grid" || variant === "more-compact") {
+    return "(max-width: 900px) 100vw, 33vw";
+  }
+
+  return "(max-width: 900px) 100vw, 50vw";
+}
+
 export function HomepageStory({
   post,
   variant,
@@ -75,13 +89,31 @@ export function HomepageStory({
   showReadLink = false,
   priority = false
 }: HomepageStoryProps) {
-  const author = getPostAuthor(post);
+  const contributors = getPostContributors(post);
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
   const title = stripHtml(post.title.rendered);
   const href = getPostHref(post);
   const excerpt = cleanDeck ? getCleanDeck(post) : post.excerpt.rendered.trim();
-  const hasImage = Boolean(image?.source_url);
+  const imageProps = image
+    ? getResponsiveImageProps(image, { priority, sizes: getHomepageStoryImageSizes(variant) })
+    : null;
+  // Keep the exact legacy markup for attachments without usable size
+  // metadata. Responsive attributes are added when WordPress provides real
+  // candidates, while the static fallback remains visually and structurally
+  // compatible with the existing homepage parity fixtures.
+  const renderedImageProps = imageProps?.srcSet
+    ? imageProps
+    : imageProps
+      ? {
+          src: imageProps.src,
+          alt: imageProps.alt,
+          width: imageProps.width,
+          height: imageProps.height,
+          loading: imageProps.loading
+        }
+      : null;
+  const hasImage = Boolean(renderedImageProps);
   const className = [
     "home-story",
     `home-story-${variant}`,
@@ -92,15 +124,9 @@ export function HomepageStory({
 
   return (
     <article className={className}>
-      {hasImage ? (
+      {renderedImageProps ? (
         <a className="home-story-image" href={href} aria-label={title}>
-          <img
-            src={image?.source_url}
-            alt={image?.alt_text || stripHtml(image?.title.rendered ?? "")}
-            width={image?.media_details?.width}
-            height={image?.media_details?.height}
-            loading={priority ? "eager" : "lazy"}
-          />
+          <img {...renderedImageProps} />
         </a>
       ) : null}
 
@@ -130,8 +156,13 @@ export function HomepageStory({
         {showAuthor ? (
           <p className="home-story-author">
             By{" "}
-            {author ? (
-              <a href={getAuthorHref(author)}>{author.name}</a>
+            {contributors.length > 0 ? (
+              contributors.map((contributor, index) => (
+                <span key={`${contributor.id}-${contributor.slug}`}>
+                  {index > 0 ? ", " : null}
+                  <a href={getContributorHref(contributor)}>{getContributorName(contributor)}</a>
+                </span>
+              ))
             ) : (
               <span>{publication.identity.shortName} Staff</span>
             )}

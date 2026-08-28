@@ -189,6 +189,18 @@ function byline_validate_story_source($source): bool
         return is_string($source['slug'] ?? null)
             && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $source['slug']) === 1;
     }
+    if ($source['type'] === 'coverage') {
+        // Coverage is a first-class WordPress object. Keep its identity
+        // unambiguous at the contract boundary: malformed or extended
+        // Coverage sources must fail validation instead of being repaired to a
+        // generic latest feed by a package parser.
+        foreach (array_keys($source) as $key) {
+            if (!in_array($key, ['type', 'coverageId'], true)) {
+                return false;
+            }
+        }
+        return is_int($source['coverageId'] ?? null) && $source['coverageId'] > 0;
+    }
     if (in_array($source['type'], [
         'compatibility-lead',
         'compatibility-latest',

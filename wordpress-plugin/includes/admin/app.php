@@ -5,11 +5,13 @@ if (!defined('ABSPATH')) {
 }
 
 const BYLINE_ADMIN_PAGE = 'byline';
+const BYLINE_ADMIN_PLANNING_PAGE = 'byline-planning';
 const BYLINE_ADMIN_STUDIO_PAGE = 'byline-studio';
 const BYLINE_ADMIN_PUBLICATION_PAGE = 'byline-publication';
 const BYLINE_ADMIN_THEME_PAGE = 'byline-theme';
 const BYLINE_ADMIN_INTEGRATIONS_PAGE = 'byline-integrations';
 const BYLINE_ADMIN_SETTINGS_PAGE = 'byline-settings';
+const BYLINE_ADMIN_NEWSLETTERS_PAGE = 'byline-newsletters';
 const BYLINE_ADMIN_POLLS_PAGE = 'byline-polls';
 // Retained only so bookmarked links to the former Byline-owned Teams screen
 // can be translated to their canonical Sports destination.
@@ -48,11 +50,13 @@ function byline_admin_page_capability(string $page): string
 {
     $capabilities = [
         BYLINE_ADMIN_PAGE => BYLINE_MANAGE_CAPABILITY,
+        BYLINE_ADMIN_PLANNING_PAGE => 'edit_posts',
         BYLINE_ADMIN_STUDIO_PAGE => BYLINE_EDIT_DESIGN_CAPABILITY,
         BYLINE_ADMIN_PUBLICATION_PAGE => BYLINE_MANAGE_CAPABILITY,
         BYLINE_ADMIN_THEME_PAGE => BYLINE_MANAGE_CAPABILITY,
         BYLINE_ADMIN_INTEGRATIONS_PAGE => BYLINE_MANAGE_INTEGRATIONS_CAPABILITY,
         BYLINE_ADMIN_SETTINGS_PAGE => BYLINE_MANAGE_CAPABILITY,
+        BYLINE_ADMIN_NEWSLETTERS_PAGE => 'edit_posts',
         // Retained for the redirect below; polls themselves use their own
         // mapped capability family, not a generic post capability.
         BYLINE_ADMIN_POLLS_PAGE => 'edit_byline_polls',
@@ -140,21 +144,33 @@ function byline_admin_menu_capability(): string
  * Menu positions.
  *
  * Core content menus occupy 5 (Posts) through 25 (Comments), and the first
- * separator sits at 59. Byline's newsroom workflows therefore claim 26-29 so
+ * separator sits at 59. Byline's newsroom workflows therefore claim 26-31 so
  * they read as a continuation of the content block without displacing core.
  *
  * Byline configuration sits at 100, below the last core separator (99), which
  * places it after Settings (80) in the administration block.
  */
-const BYLINE_MENU_POSITION_STUDIO = 26;
-const BYLINE_MENU_POSITION_SPORTS = 27;
+const BYLINE_MENU_POSITION_PLANNING = 26;
+const BYLINE_MENU_POSITION_STUDIO = 27;
+const BYLINE_MENU_POSITION_SPORTS = 28;
 // Claimed by the byline_poll post type's own top-level menu.
-const BYLINE_MENU_POSITION_POLLS = 28;
-const BYLINE_MENU_POSITION_EVENTS = 29;
+const BYLINE_MENU_POSITION_POLLS = 29;
+const BYLINE_MENU_POSITION_EVENTS = 30;
+const BYLINE_MENU_POSITION_NEWSLETTERS = 31;
 const BYLINE_MENU_POSITION_CONFIG = 100;
 
 function byline_register_admin_app(): void
 {
+    add_menu_page(
+        'Planning',
+        'Planning',
+        'edit_posts',
+        BYLINE_ADMIN_PLANNING_PAGE,
+        'byline_render_admin_app',
+        'dashicons-calendar-alt',
+        BYLINE_MENU_POSITION_PLANNING
+    );
+
     // Studio is a design workflow, not publication configuration.
     add_menu_page(
         'Byline Studio',
@@ -175,6 +191,18 @@ function byline_register_admin_app(): void
         'dashicons-welcome-write-blog',
         BYLINE_MENU_POSITION_CONFIG
     );
+
+    if (byline_admin_feature_enabled('newsletter')) {
+        add_menu_page(
+            'Newsletters',
+            'Newsletters',
+            'edit_posts',
+            BYLINE_ADMIN_NEWSLETTERS_PAGE,
+            'byline_render_admin_app',
+            'dashicons-email-alt',
+            BYLINE_MENU_POSITION_NEWSLETTERS
+        );
+    }
 
     foreach (byline_admin_page_definitions() as $slug => $page) {
         add_submenu_page(
@@ -214,6 +242,15 @@ function byline_admin_page_urls(): array
 {
     return [
         'dashboard' => byline_admin_page_url(BYLINE_ADMIN_PAGE),
+        'planning' => [
+            'stories' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'stories']),
+            'calendar' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'calendar']),
+            'media' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'media']),
+            'coverage' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'coverage']),
+            'performance' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'performance']),
+            'contentHealth' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'content-health']),
+            'feedback' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'feedback']),
+        ],
         'studio' => byline_admin_page_url(BYLINE_ADMIN_STUDIO_PAGE),
         'studioRevisions' => byline_admin_page_url(BYLINE_ADMIN_STUDIO_PAGE, ['view' => 'revisions']),
         'theme' => byline_admin_page_url(BYLINE_ADMIN_THEME_PAGE),
@@ -233,6 +270,10 @@ function byline_admin_page_urls(): array
             'api' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'api']),
             'compatibility' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'compatibility']),
             'diagnostics' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'diagnostics']),
+        ],
+        'newsletters' => [
+            'issues' => byline_admin_page_url(BYLINE_ADMIN_NEWSLETTERS_PAGE, ['tab' => 'issues']),
+            'settings' => byline_admin_page_url(BYLINE_ADMIN_NEWSLETTERS_PAGE, ['tab' => 'settings']),
         ],
         'polls' => byline_admin_polls_url(),
         'teams' => byline_sports_team_settings_url(),
@@ -262,6 +303,15 @@ function byline_admin_legacy_hash_urls(array $page_urls): array
 {
     return [
         '/dashboard' => $page_urls['dashboard'],
+        '/planning/stories' => $page_urls['planning']['stories'],
+        '/planning/calendar' => $page_urls['planning']['calendar'],
+        '/planning/media' => $page_urls['planning']['media'],
+        '/planning/coverage' => $page_urls['planning']['coverage'],
+        '/planning/performance' => $page_urls['planning']['performance'],
+        '/planning/content-health' => $page_urls['planning']['contentHealth'],
+        '/planning/feedback' => $page_urls['planning']['feedback'],
+        '/newsletters/issues' => $page_urls['newsletters']['issues'],
+        '/newsletters/settings' => $page_urls['newsletters']['settings'],
         '/publication/identity' => $page_urls['publication']['identity'],
         '/publication/branding' => $page_urls['publication']['branding'],
         '/publication/navigation' => $page_urls['publication']['navigation'],
@@ -310,6 +360,10 @@ function byline_admin_user_landing_url(): string
         return byline_admin_page_url(BYLINE_ADMIN_INTEGRATIONS_PAGE);
     }
 
+    if (current_user_can('edit_posts')) {
+        return byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE);
+    }
+
     if (current_user_can('edit_byline_polls') && byline_admin_feature_enabled('polls')) {
         return byline_admin_polls_url();
     }
@@ -348,11 +402,13 @@ function byline_enqueue_admin_app(string $hook_suffix): void
     $page = byline_admin_current_page();
     $app_pages = [
         BYLINE_ADMIN_PAGE,
+        BYLINE_ADMIN_PLANNING_PAGE,
         BYLINE_ADMIN_STUDIO_PAGE,
         BYLINE_ADMIN_PUBLICATION_PAGE,
         BYLINE_ADMIN_THEME_PAGE,
         BYLINE_ADMIN_INTEGRATIONS_PAGE,
         BYLINE_ADMIN_SETTINGS_PAGE,
+        BYLINE_ADMIN_NEWSLETTERS_PAGE,
     ];
 
     if (!in_array($page, $app_pages, true)) {
@@ -411,6 +467,17 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         'healthPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/health',
         'deploymentPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/deployment',
         'discordPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/discord',
+        'planningPath' => '/' . BYLINE_REST_NAMESPACE . '/editorial/planning',
+        'tasksPath' => '/' . BYLINE_REST_NAMESPACE . '/editorial/tasks',
+        'readinessPath' => '/' . BYLINE_REST_NAMESPACE . '/editorial/readiness',
+        'mediaPath' => '/' . BYLINE_REST_NAMESPACE . '/editorial/media',
+        'coveragePath' => '/' . BYLINE_REST_NAMESPACE . '/admin/coverage',
+        'feedbackPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/feedback',
+        'distributionPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/distribution',
+        'newsletterPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/newsletters',
+        'analyticsPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/analytics',
+        'contentHealthPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/content-health',
+        'currentUserId' => get_current_user_id(),
         'nonce' => wp_create_nonce('wp_rest'),
         'pluginVersion' => BYLINE_PLUGIN_VERSION,
         'previewStylesheetUrl' => plugins_url('build/index.css', dirname(__DIR__, 2) . '/weekly-wildcat-headless.php'),

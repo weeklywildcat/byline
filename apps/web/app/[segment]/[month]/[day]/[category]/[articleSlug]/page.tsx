@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { ArticleShareActions } from "@/components/ArticleShareActions";
+import { ArticleCorrectionNotices } from "@/components/ArticleCorrectionNotices";
 import { ArticleGameCard } from "@/components/ArticleGameCard";
 import { AuthorBadge } from "@/components/AuthorBadge";
 import { FeaturedImage } from "@/components/FeaturedImage";
 import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
+import { ReaderFeedbackForm } from "@/components/ReaderFeedbackForm";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import {
   getAthleteSportLabel,
@@ -23,23 +25,31 @@ import { getPublicationConfig } from "@/lib/publication";
 import { BYLINE_EMPTY_ROUTE_SLUG, isBylineEmptyRouteSlug, withEmptyRouteFallback } from "@/lib/static-params";
 import { getSportsGameById } from "@/lib/headless";
 import {
+  getBylineRestUrl,
   getAllPosts,
-  getAuthorHref,
-  getAuthorPhoto,
+  getContributorDescription,
+  getContributorHref,
+  getContributorName,
+  getContributorPhoto,
+  getContributorRole,
+  getContributorSocialLinks,
   getAuthorProfile,
-  getAuthorSocialLinks,
   getFeaturedMedia,
   getPostBySlug,
   getPostCategories,
-  getPostAuthor,
   getPostAuthorWithProfile,
+  getPostContributors,
+  getPostContributorsWithProfiles,
   getPostGameScoreGameIds,
   getPostHref,
   getPostPrimaryGameId,
   getPostRouteParts,
   getPostTags,
+  getPublicCorrectionsForPost,
+  isGuestContributor,
   type WordPressAuthor,
   type WordPressCategory,
+  type WordPressContributor,
   type WordPressPost
 } from "@/lib/wordpress";
 
@@ -103,10 +113,14 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
     return {};
   }
 
+  if (!isVisibleContentPost(post)) {
+    return { title: "Not found", robots: { index: false, follow: false } };
+  }
+
   const image = getFeaturedMedia(post);
   const title = stripHtml(post.title.rendered);
   const category = getPrimaryVisibleCategory(post);
-  const author = getPostAuthor(post);
+  const contributors = getPostContributors(post);
   const tags = getPublicTopicTags(post).map((tag) => stripHtml(tag.name));
   const metadata = buildPageMetadata({
     title,
@@ -123,7 +137,7 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
       type: "article",
       publishedTime: post.date,
       modifiedTime: post.modified,
-      authors: author ? [author.name] : undefined,
+      authors: contributors.length > 0 ? contributors.map((contributor) => getContributorName(contributor)) : undefined,
       section: category ? decodeHtml(category.name) : undefined,
       tags
     }
@@ -200,70 +214,94 @@ function getRelatedPosts(post: WordPressPost, posts: WordPressPost[]) {
     .map(({ post: relatedPost }) => relatedPost);
 }
 
+function postHasContributor(post: WordPressPost, contributor: WordPressContributor) {
+  return getPostContributors(post).some((candidate) => {
+    if (isGuestContributor(candidate) !== isGuestContributor(contributor)) {
+      return false;
+    }
+
+    return isGuestContributor(candidate)
+      ? candidate.id === contributor.id || candidate.slug === contributor.slug
+      : candidate.id === contributor.id;
+  });
+}
+
 function AboutWriter({
-  author,
+  contributors,
   authorPosts
 }: {
-  author: WordPressAuthor | null;
+  contributors: WordPressContributor[];
   authorPosts: WordPressPost[];
 }) {
-  const profile = author ? getAuthorProfile(author) : null;
-  const photo = author ? getAuthorPhoto(author) : null;
-  const socialLinks = author ? getAuthorSocialLinks(author) : [];
-  const contactLink = socialLinks.find((link) => link.label === "Email");
-  const name = author?.name ?? `${publication.identity.shortName} Staff`;
-  const role = profile?.role || "Writer";
-  const bio = author?.description ? stripHtml(author.description) : `Stories reported by the ${publication.identity.shortName} newsroom.`;
+  const entries: Array<WordPressContributor | null> = contributors.length > 0 ? contributors : [null];
   const coverageAreas = getCoverageAreas(authorPosts);
-  const profileHref = author ? getAuthorHref(author) : "/authors/";
+  const heading = contributors.length > 1 ? "About the Writers" : "About the Writer";
 
   return (
     <section className="article-after-section about-writer" aria-labelledby="about-writer-heading">
       <div className="section-heading">
         <div>
-          <h2 id="about-writer-heading">About the Writer</h2>
+          <h2 id="about-writer-heading">{heading}</h2>
         </div>
       </div>
 
-      <div className="about-writer-layout">
-        {photo ? (
-          <img
-            className="author-avatar about-writer-avatar"
-            src={photo.url}
-            alt={photo.alt || ""}
-            width={photo.width ?? 132}
-            height={photo.height ?? 132}
-          />
-        ) : (
-          <div className="author-avatar author-avatar-fallback about-writer-avatar" aria-hidden="true">
-            {getAuthorInitial(name)}
-          </div>
-        )}
+      <div className={entries.length > 1 ? "about-writer-contributors" : undefined}>
+        {entries.map((contributor, index) => {
+          const profile = contributor && !isGuestContributor(contributor) ? getAuthorProfile(contributor) : null;
+          const photo = contributor ? getContributorPhoto(contributor) : null;
+          const socialLinks = contributor ? getContributorSocialLinks(contributor) : [];
+          const contactLink = contributor && !isGuestContributor(contributor)
+            ? socialLinks.find((link) => link.label === "Email")
+            : undefined;
+          const name = contributor ? getContributorName(contributor) : `${publication.identity.shortName} Staff`;
+          const role = contributor ? getContributorRole(contributor) : "Writer";
+          const description = contributor ? stripHtml(getContributorDescription(contributor)) : "";
+          const bio = description || `Stories reported by the ${publication.identity.shortName} newsroom.`;
+          const profileHref = contributor ? getContributorHref(contributor) : "/authors/";
 
-        <div className="about-writer-body">
-          <div className="author-profile-meta">
-            <p className="profile-kicker">{role}</p>
-            {profile?.founder ? <AuthorBadge label="Founder" /> : null}
-          </div>
-          <h3>{name}</h3>
-          {coverageAreas.length > 0 ? (
-            <p className="about-writer-coverage">
-              Covers{" "}
-              {coverageAreas.map((area, index) => (
-                <span key={area.slug}>
-                  <a href={`/category/${area.slug}/`}>{decodeHtml(area.name)}</a>
-                  {index < coverageAreas.length - 1 ? ", " : ""}
-                </span>
-              ))}
-            </p>
-          ) : null}
-          <p>{bio}</p>
-          <div className="about-writer-links">
-            <a href={profileHref}>View full profile</a>
-            <a href={`${profileHref}#author-stories-heading`}>More stories by {author?.name ?? "the staff"}</a>
-            {contactLink ? <a href={contactLink.href}>Contact</a> : null}
-          </div>
-        </div>
+          return (
+            <div className="about-writer-layout" key={contributor ? `${contributor.id}-${contributor.slug}` : `staff-${index}`}>
+              {photo ? (
+                <img
+                  className="author-avatar about-writer-avatar"
+                  src={photo.url}
+                  alt={photo.alt || ""}
+                  width={photo.width ?? 132}
+                  height={photo.height ?? 132}
+                />
+              ) : (
+                <div className="author-avatar author-avatar-fallback about-writer-avatar" aria-hidden="true">
+                  {getAuthorInitial(name)}
+                </div>
+              )}
+
+              <div className="about-writer-body">
+                <div className="author-profile-meta">
+                  <p className="profile-kicker">{role}</p>
+                  {profile?.founder ? <AuthorBadge label="Founder" /> : null}
+                </div>
+                <h3>{name}</h3>
+                {coverageAreas.length > 0 ? (
+                  <p className="about-writer-coverage">
+                    Covers{" "}
+                    {coverageAreas.map((area, areaIndex) => (
+                      <span key={area.slug}>
+                        <a href={`/category/${area.slug}/`}>{decodeHtml(area.name)}</a>
+                        {areaIndex < coverageAreas.length - 1 ? ", " : ""}
+                      </span>
+                    ))}
+                  </p>
+                ) : null}
+                <p>{bio}</p>
+                <div className="about-writer-links">
+                  <a href={profileHref}>View full profile</a>
+                  <a href={`${profileHref}#author-stories-heading`}>More stories by {contributor ? name : "the staff"}</a>
+                  {contactLink ? <a href={contactLink.href}>Contact</a> : null}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -296,7 +334,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     notFound();
   }
 
-  const author = await getPostAuthorWithProfile(post);
+  const contributors = await getPostContributorsWithProfiles(post);
+  const author = contributors.find((contributor): contributor is WordPressAuthor => !isGuestContributor(contributor))
+    ?? await getPostAuthorWithProfile(post);
   const primaryGameId = getPostPrimaryGameId(post);
   const primaryGame = primaryGameId ? await getSportsGameById(primaryGameId) : null;
   const gameScoreGameIds = getPostGameScoreGameIds(post);
@@ -309,12 +349,18 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const content = post.content.rendered.trim();
   const title = stripHtml(post.title.rendered);
   const articleUrl = absoluteUrl(getPostHref(post));
-  const updated = hasUpdatedDate(post);
+  const publicCorrections = getPublicCorrectionsForPost(post);
+  const hasPublicCorrectionNotice = publicCorrections.length > 0;
+  const updated = hasUpdatedDate(post) && !hasPublicCorrectionNotice;
   const athleteSpotlight = isAthleteSpotlightPost(post);
   const athleteSpotlightLabel = athleteSpotlight ? getAthleteSpotlightLabel(post) : null;
   const athleteSport = athleteSpotlight ? getAthleteSportLabel(post) : null;
   const visiblePosts = allPosts.filter(isVisibleContentPost);
-  const authorPosts = author ? visiblePosts.filter((candidate) => candidate.author === author.id) : [];
+  const authorPosts = contributors.length > 0
+    ? visiblePosts.filter((candidate) => contributors.some((contributor) => postHasContributor(candidate, contributor)))
+    : author
+      ? visiblePosts.filter((candidate) => candidate.author === author.id)
+      : [];
   const relatedPosts = getRelatedPosts(post, visiblePosts);
   const relatedPostIds = new Set(relatedPosts.map((relatedPost) => relatedPost.id));
   const moreByAuthorPosts = authorPosts
@@ -358,8 +404,15 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <div className="article-meta-block">
             <p className="article-author-line">
               By{" "}
-              {author ? (
-                <a href={getAuthorHref(author)}>{author.name}</a>
+              {contributors.length > 0 ? (
+                contributors.map((contributor, index) => (
+                  <span key={`${contributor.id}-${contributor.slug}`}>
+                    {index > 0 ? ", " : null}
+                    <a href={getContributorHref(contributor)}>{getContributorName(contributor)}</a>
+                  </span>
+                ))
+              ) : author ? (
+                <a href={getContributorHref(author)}>{getContributorName(author)}</a>
               ) : (
                 <span>{publication.identity.shortName} Staff</span>
               )}
@@ -383,6 +436,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <p className="empty-state">No article body has been published yet.</p>
         )}
 
+        <ArticleCorrectionNotices corrections={publicCorrections} />
+
         <NewsroomPollHydrator />
 
         {topicTerms.length > 0 ? (
@@ -403,11 +458,20 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </aside>
         ) : null}
 
+        {publication.features.readerFeedback !== false ? (
+          <ReaderFeedbackForm
+            postId={post.id}
+            articleTitle={title}
+            articleUrl={articleUrl}
+            endpointCandidates={[getBylineRestUrl("/feedback"), getBylineRestUrl("/feedback", true)]}
+          />
+        ) : null}
+
         <NewsletterSignupForm />
       </article>
 
       <div className="article-after">
-        <AboutWriter author={author} authorPosts={authorPosts} />
+        <AboutWriter contributors={contributors.length > 0 ? contributors : author ? [author] : []} authorPosts={authorPosts} />
 
         {relatedPosts.length > 0 ? (
           <section className="article-after-section" aria-labelledby="related-stories-heading">
@@ -429,7 +493,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <section className="article-after-section" aria-labelledby="more-by-author-heading">
             <div className="section-heading">
               <div>
-                <h2 id="more-by-author-heading">More by {author?.name}</h2>
+                <h2 id="more-by-author-heading">
+                  {contributors.length > 1 ? "More by the writers" : `More by ${author?.name ?? "the newsroom"}`}
+                </h2>
               </div>
             </div>
             <div className="article-story-grid">

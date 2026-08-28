@@ -28,6 +28,9 @@ import {
 import { contrastRatio } from "./contrast";
 import { BylineDesignRevisions, BylineStudio } from "./studio";
 import { createNavigationItem, moveItem, navigationConflictKey, sectionSlugForName } from "./settings-model";
+import { PlanningApp, createPlanningFetchers, type PlanningView } from "./planning";
+import { NewsletterApp, createNewsletterFetchers } from "./newsletters";
+import type { NewsletterBranding } from "./newsletters/render";
 import type { ReactNode } from "react";
 import "./style.css";
 
@@ -44,6 +47,17 @@ type BylineAdminConfig = {
   nonce: string;
   pluginVersion: string;
   previewStylesheetUrl: string;
+  planningPath?: string;
+  tasksPath?: string;
+  readinessPath?: string;
+  mediaPath?: string;
+  coveragePath?: string;
+  feedbackPath?: string;
+  distributionPath?: string;
+  newsletterPath?: string;
+  analyticsPath?: string;
+  contentHealthPath?: string;
+  currentUserId?: number;
   capabilities: {
     manage: boolean;
     editDesign: boolean;
@@ -105,6 +119,15 @@ type NavigationPage = { id: number; title?: { rendered?: string }; link: string 
 
 type AdminUrls = {
   dashboard: string;
+  planning: {
+    stories: string;
+    calendar: string;
+    media: string;
+    coverage: string;
+    performance: string;
+    contentHealth: string;
+    feedback: string;
+  };
   studio: string;
   studioRevisions: string;
   theme: string;
@@ -113,6 +136,10 @@ type AdminUrls = {
   settings: Record<(typeof SETTINGS_TABS)[number], string>;
   polls: string;
   teams: string;
+  newsletters: {
+    issues: string;
+    settings: string;
+  };
 };
 
 type DiagnosticsPayload = {
@@ -393,6 +420,57 @@ function settingsTabs(): AdminTab[] {
     label: labels[id],
     href: adminUrl(config?.urls.settings[id])
   }));
+}
+
+function planningTabs(): AdminTab[] {
+  return [
+    { id: "stories", label: "Stories", href: adminUrl(config?.urls.planning?.stories) },
+    { id: "calendar", label: "Calendar", href: adminUrl(config?.urls.planning?.calendar) },
+    { id: "media", label: "Media Desk", href: adminUrl(config?.urls.planning?.media) },
+    { id: "coverage", label: "Coverage", href: adminUrl(config?.urls.planning?.coverage) },
+    { id: "performance", label: "Performance", href: adminUrl(config?.urls.planning?.performance) },
+    { id: "content-health", label: "Content Health", href: adminUrl(config?.urls.planning?.contentHealth) },
+    { id: "feedback", label: "Feedback", href: adminUrl(config?.urls.planning?.feedback) }
+  ];
+}
+
+function planningViewForTab(tab: string): PlanningView {
+  switch (tab) {
+    case "calendar": return "calendar";
+    case "media": return "media";
+    case "coverage": return "coverage";
+    case "performance": return "performance";
+    case "contentHealth":
+    case "content-health": return "content-health";
+    case "feedback": return "feedback";
+    default: return "board";
+  }
+}
+
+function newsletterTabs(): AdminTab[] {
+  const labels: Record<keyof AdminUrls["newsletters"], string> = {
+    issues: "Issues",
+    settings: "Settings"
+  };
+
+  return (Object.keys(labels) as Array<keyof AdminUrls["newsletters"]>).map((id) => ({
+    id,
+    label: labels[id],
+    href: adminUrl(config?.urls.newsletters?.[id])
+  }));
+}
+
+function adminProtectedRequest<T>({ path, method, data }: { path: string; method?: "GET" | "POST" | "DELETE"; data?: unknown }): Promise<T> {
+  return apiFetch({ path, method, data }) as Promise<T>;
+}
+
+function newsletterBranding(publication: PublicationConfig | null): NewsletterBranding {
+  const accentColor = publication?.appearance.tokenOverrides.accent || publication?.appearance.tokenOverrides.link;
+  return {
+    publicationName: publication?.identity.name || publication?.identity.shortName || "Publication",
+    accentColor,
+    logoUrl: publication?.branding.logo.url || publication?.branding.masthead.url || null
+  };
 }
 
 function Dashboard({ publication, health }: { publication: PublicationConfig | null; health: HealthPayload | null }) {
@@ -1831,6 +1909,32 @@ function Screen({
     return (
       <AdminPageFrame title="Overview" error={error}>
         <Dashboard publication={publication} health={health} />
+      </AdminPageFrame>
+    );
+  }
+
+  if (page === ADMIN_PAGE_SLUGS.planning) {
+    const activeTab = normalizeAdminTab(page, tab);
+    return (
+      <AdminPageFrame title="Planning" tabs={planningTabs()} activeTab={activeTab} error={error}>
+        <PlanningApp
+          fetchers={createPlanningFetchers(adminProtectedRequest)}
+          initialView={planningViewForTab(activeTab)}
+          currentUserId={config?.currentUserId}
+        />
+      </AdminPageFrame>
+    );
+  }
+
+  if (page === ADMIN_PAGE_SLUGS.newsletters) {
+    const activeTab = normalizeAdminTab(page, tab);
+    return (
+      <AdminPageFrame title="Newsletters" tabs={newsletterTabs()} activeTab={activeTab} error={error}>
+        <NewsletterApp
+          fetchers={createNewsletterFetchers(adminProtectedRequest)}
+          initialView={activeTab === "settings" ? "settings" : "list"}
+          branding={newsletterBranding(publication)}
+        />
       </AdminPageFrame>
     );
   }

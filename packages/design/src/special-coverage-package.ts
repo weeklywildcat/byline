@@ -1,4 +1,4 @@
-import { parseStorySource, type BylineStorySource } from "./schema-v2";
+import { parseStorySourceOrFallback, type BylineStorySource } from "./schema-v2";
 
 export const SPECIAL_COVERAGE_PACKAGE_TYPE = "special-coverage-package";
 
@@ -65,7 +65,7 @@ export function parseSpecialCoveragePackageProps(
 
   return {
     heading: heading(props.heading, defaults.heading),
-    source: parseStorySource(props.source) ?? defaults.source,
+    source: parseStorySourceOrFallback(props.source, defaults.source),
     limit: boundedCount(props.limit, defaults.limit),
     leadPresentation: presentation(props.leadPresentation, defaults.leadPresentation),
     supportingPresentation: presentation(props.supportingPresentation, defaults.supportingPresentation)

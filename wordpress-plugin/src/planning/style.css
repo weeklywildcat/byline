@@ -1,0 +1,605 @@
+.byline-planning-app {
+  max-width: 1440px;
+  margin: 0 auto;
+  color: #1d2327;
+}
+
+.byline-planning-app-header,
+.byline-planning-view-header,
+.byline-planning-saved-view-bar,
+.byline-planning-filter-grid,
+.byline-planning-date-filter-grid,
+.byline-planning-toggle-row,
+.byline-planning-card-actions,
+.byline-planning-card-statuses,
+.byline-planning-signal-line,
+.byline-planning-feedback-heading,
+.byline-planning-feedback-actions,
+.byline-planning-coverage-heading,
+.byline-planning-coverage-actions,
+.byline-planning-inline-action,
+.byline-planning-performance-list li,
+.byline-planning-source-list li,
+.byline-planning-inline-list li,
+.byline-planning-health-item,
+.byline-planning-health-copy,
+.byline-planning-calendar-controls,
+.byline-planning-calendar-heading-row,
+.byline-planning-provider-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.byline-planning-app-header,
+.byline-planning-view-header {
+  justify-content: space-between;
+  align-items: flex-start;
+  margin: 24px 0 16px;
+}
+
+.byline-planning-app-header h1,
+.byline-planning-view-header h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.byline-planning-app-header p:last-child,
+.byline-planning-view-header p {
+  max-width: 760px;
+  margin: 6px 0 0;
+  color: #50575e;
+}
+
+.byline-planning-eyebrow,
+.byline-planning-feedback-type {
+  margin: 0 0 4px;
+  color: #646970;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.byline-planning-view-tabs,
+.byline-planning-toggle-row,
+.byline-planning-saved-view-bar {
+  flex-wrap: wrap;
+}
+
+.byline-planning-view-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  border-bottom: 1px solid #dcdcde;
+  padding-bottom: 12px;
+}
+
+.byline-planning-saved-view-bar {
+  padding: 12px;
+  border: 1px solid #dcdcde;
+  background: #fff;
+}
+
+.byline-planning-saved-view-bar .components-base-control {
+  min-width: 180px;
+  flex: 1 1 180px;
+  margin: 0;
+}
+
+.byline-planning-filters {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid #dcdcde;
+  background: #f6f7f7;
+}
+
+.byline-planning-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  align-items: end;
+}
+
+.byline-planning-date-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  margin-top: 12px;
+}
+
+.byline-planning-toggle-row {
+  margin-top: 12px;
+}
+
+.byline-planning-toggle-row .components-base-control {
+  margin-bottom: 0;
+}
+
+.byline-planning-app-content {
+  min-width: 0;
+}
+
+.byline-planning-board-columns {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(190px, 1fr));
+  gap: 12px;
+  overflow-x: auto;
+  align-items: start;
+}
+
+.byline-planning-board-column,
+.byline-planning-media-group,
+.byline-planning-coverage-card,
+.byline-planning-feedback-card,
+.byline-planning-metric-card,
+.byline-planning-health-item {
+  border: 1px solid #dcdcde;
+  background: #fff;
+}
+
+.byline-planning-board-column {
+  min-width: 190px;
+  padding: 12px;
+  background: #f6f7f7;
+}
+
+.byline-planning-column-heading,
+.byline-planning-sidelined-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.byline-planning-column-heading h3,
+.byline-planning-sidelined-heading h3,
+.byline-planning-media-group h3,
+.byline-planning-performance-section h3,
+.byline-planning-calendar-heading-row h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.byline-planning-count {
+  display: inline-block;
+  min-width: 1.5em;
+  border-radius: 12px;
+  padding: 2px 6px;
+  background: #dcdcde;
+  text-align: center;
+  font-size: 12px;
+}
+
+.byline-planning-card-list,
+.byline-planning-media-list,
+.byline-planning-feedback-list,
+.byline-planning-health-list,
+.byline-planning-performance-list,
+.byline-planning-source-list,
+.byline-planning-inline-list,
+.byline-planning-calendar-events,
+.byline-planning-coverage-list,
+.byline-planning-card-list ul,
+.byline-planning-coverage-stories ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.byline-planning-card-list li {
+  margin-top: 10px;
+}
+
+.byline-planning-story-card,
+.byline-planning-media-card {
+  padding: 12px;
+  border: 1px solid #dcdcde;
+  background: #fff;
+}
+
+.byline-planning-story-title {
+  color: #2271b1;
+  font-weight: 600;
+}
+
+.byline-planning-card-heading,
+.byline-planning-media-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.byline-planning-card-byline,
+.byline-planning-media-type,
+.byline-planning-media-notes,
+.byline-planning-help,
+.byline-planning-muted,
+.byline-planning-list-story-meta,
+.byline-planning-list-date-note,
+.byline-planning-drag-help,
+.byline-planning-feedback-contact,
+.byline-planning-coverage-staff,
+.byline-planning-provider-line,
+.byline-planning-app-status {
+  color: #646970;
+  font-size: 12px;
+}
+
+.byline-planning-card-byline {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0;
+}
+
+.byline-planning-card-dates,
+.byline-planning-media-meta,
+.byline-planning-coverage-meta {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.byline-planning-card-dates div,
+.byline-planning-media-meta div,
+.byline-planning-coverage-meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.byline-planning-card-dates dt,
+.byline-planning-media-meta dt,
+.byline-planning-coverage-meta dt {
+  color: #646970;
+  font-size: 11px;
+}
+
+.byline-planning-card-dates dd,
+.byline-planning-media-meta dd,
+.byline-planning-coverage-meta dd {
+  margin: 0;
+  text-align: right;
+  font-size: 12px;
+}
+
+.byline-planning-signal-line {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.byline-planning-status {
+  display: inline-block;
+  border: 1px solid #c3c4c7;
+  border-radius: 2px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.byline-planning-status-success { border-color: #00a32a; color: #006b1b; }
+.byline-planning-status-warning { border-color: #dba617; color: #785b00; }
+.byline-planning-status-error { border-color: #d63638; color: #8a2424; }
+.byline-planning-status-info { border-color: #2271b1; color: #135e96; }
+
+.byline-planning-card-actions .components-base-control,
+.byline-planning-media-controls .components-base-control {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.byline-planning-sidelined {
+  margin-top: 24px;
+}
+
+.byline-planning-sidelined-heading {
+  margin-bottom: 10px;
+}
+
+.byline-planning-sidelined-heading p {
+  margin: 0;
+  color: #646970;
+  font-size: 12px;
+}
+
+.byline-planning-list-wrap {
+  overflow-x: auto;
+  border: 1px solid #dcdcde;
+  background: #fff;
+}
+
+.byline-planning-list {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.byline-planning-list th,
+.byline-planning-list td {
+  border-bottom: 1px solid #f0f0f1;
+  padding: 10px;
+  vertical-align: top;
+  text-align: left;
+}
+
+.byline-planning-list thead th {
+  background: #f6f7f7;
+  color: #50575e;
+  font-size: 12px;
+}
+
+.byline-planning-list-workflow,
+.byline-planning-list-story,
+.byline-planning-list-date-note {
+  display: grid;
+  gap: 4px;
+}
+
+.byline-planning-sort-button {
+  padding: 0;
+  font-weight: 600;
+}
+
+.byline-planning-calendar-controls,
+.byline-planning-calendar-heading-row {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.byline-planning-calendar-weekdays,
+.byline-planning-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(100px, 1fr));
+  gap: 1px;
+  background: #c3c4c7;
+}
+
+.byline-planning-calendar-weekdays {
+  margin-top: 12px;
+}
+
+.byline-planning-calendar-weekdays span {
+  padding: 8px;
+  background: #f6f7f7;
+  color: #50575e;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.byline-planning-calendar-day {
+  min-height: 110px;
+  padding: 8px;
+  background: #fff;
+}
+
+.byline-planning-calendar-day-outside { background: #f6f7f7; color: #646970; }
+.byline-planning-calendar-day-today { outline: 2px solid #2271b1; outline-offset: -2px; }
+
+.byline-planning-calendar-day-number {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.byline-planning-calendar-events li + li { margin-top: 4px; }
+
+.byline-planning-calendar-event {
+  display: block;
+  overflow: hidden;
+  border-left: 3px solid #646970;
+  padding: 3px 5px;
+  background: #f6f7f7;
+  color: #1d2327;
+  font-size: 11px;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.byline-planning-calendar-event-deadline { border-color: #dba617; }
+.byline-planning-calendar-event-planned { border-color: #646970; }
+.byline-planning-calendar-event-scheduled { border-color: #2271b1; }
+.byline-planning-calendar-event-published { border-color: #00a32a; }
+.byline-planning-calendar-event-title { margin-left: 4px; }
+
+.byline-planning-media-groups,
+.byline-planning-coverage-list,
+.byline-planning-feedback-list {
+  display: grid;
+  gap: 16px;
+}
+
+.byline-planning-media-group,
+.byline-planning-coverage-card,
+.byline-planning-feedback-card {
+  padding: 16px;
+}
+
+.byline-planning-media-group h3 {
+  margin-bottom: 12px;
+}
+
+.byline-planning-media-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 12px;
+}
+
+.byline-planning-media-controls {
+  display: flex;
+  gap: 12px;
+}
+
+.byline-planning-coverage-heading img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+}
+
+.byline-planning-coverage-heading h3,
+.byline-planning-feedback-heading p,
+.byline-planning-feedback-heading time {
+  margin: 0;
+}
+
+.byline-planning-coverage-heading > div:last-child {
+  flex: 1;
+}
+
+.byline-planning-coverage-heading {
+  align-items: flex-start;
+}
+
+.byline-planning-coverage-stories {
+  margin-top: 16px;
+}
+
+.byline-planning-coverage-stories h4 {
+  margin: 0 0 6px;
+}
+
+.byline-planning-coverage-stories li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.byline-planning-link-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #2271b1;
+  cursor: pointer;
+  text-align: left;
+}
+
+.byline-planning-feedback-heading {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.byline-planning-feedback-message {
+  white-space: pre-wrap;
+}
+
+.byline-planning-feedback-contact {
+  overflow-wrap: anywhere;
+}
+
+.byline-planning-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.byline-planning-metric-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+
+.byline-planning-metric-card strong {
+  font-size: 24px;
+}
+
+.byline-planning-metric-card p {
+  margin: 0;
+  color: #646970;
+  font-size: 12px;
+}
+
+.byline-planning-performance-section {
+  margin-top: 24px;
+}
+
+.byline-planning-performance-list li,
+.byline-planning-source-list li,
+.byline-planning-inline-list li {
+  justify-content: space-between;
+  border-bottom: 1px solid #f0f0f1;
+  padding: 8px 0;
+}
+
+.byline-planning-performance-list a {
+  flex: 1;
+  color: #2271b1;
+}
+
+.byline-planning-trend-up { color: #006b1b; }
+.byline-planning-trend-down { color: #8a2424; }
+
+.byline-planning-provider-line {
+  margin: 12px 0;
+}
+
+.byline-planning-health-list {
+  display: grid;
+  gap: 8px;
+}
+
+.byline-planning-health-item {
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px;
+}
+
+.byline-planning-health-copy {
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.byline-planning-health-copy a {
+  color: #2271b1;
+}
+
+.byline-planning-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.byline-planning-app-status {
+  margin-top: 16px;
+}
+
+.byline-planning-calendar-event:focus-visible,
+.byline-planning-link-button:focus-visible,
+.byline-planning-story-title:focus-visible,
+.byline-planning-sort-button:focus-visible {
+  outline: 2px solid #2271b1;
+  outline-offset: 2px;
+}
+
+@media (max-width: 782px) {
+  .byline-planning-app-header,
+  .byline-planning-view-header,
+  .byline-planning-health-item {
+    display: grid;
+  }
+
+  .byline-planning-board-columns {
+    grid-template-columns: repeat(6, minmax(240px, 1fr));
+  }
+
+  .byline-planning-calendar-grid,
+  .byline-planning-calendar-weekdays {
+    min-width: 760px;
+  }
+
+  .byline-planning-calendar {
+    overflow-x: auto;
+  }
+
+  .byline-planning-media-controls {
+    display: grid;
+  }
+}

@@ -1,13 +1,15 @@
 import { stripHtml } from "@/lib/format";
+import { getResponsiveImageProps } from "@/lib/media";
 import type { WordPressMedia } from "@/lib/wordpress";
 
 type FeaturedImageProps = {
   image: WordPressMedia | null;
   priority?: boolean;
   showCaption?: boolean;
+  sizes?: string;
 };
 
-export function FeaturedImage({ image, priority = false, showCaption = true }: FeaturedImageProps) {
+export function FeaturedImage({ image, priority = false, showCaption = true, sizes }: FeaturedImageProps) {
   if (!image?.source_url) {
     return null;
   }
@@ -21,19 +23,17 @@ export function FeaturedImage({ image, priority = false, showCaption = true }: F
       ""
   );
   const hasCaptionDetails = Boolean(caption || fallbackCaption || credit);
-  const width = image.media_details?.width;
-  const height = image.media_details?.height;
-  const alt = image.alt_text || stripHtml(image.title?.rendered ?? "");
+  const imageProps = getResponsiveImageProps(image, { priority, sizes });
+
+  if (!imageProps) {
+    return null;
+  }
 
   return (
     <figure className="featured-image">
       <div className="featured-image-frame">
         <img
-          src={image.source_url}
-          alt={alt}
-          width={width}
-          height={height}
-          loading={priority ? "eager" : "lazy"}
+          {...imageProps}
         />
       </div>
       {showCaption && hasCaptionDetails ? (
