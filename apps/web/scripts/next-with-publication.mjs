@@ -20,6 +20,16 @@ function publicationEndpoint() {
   return wordpressApi.replace(/\/wp\/v2\/?$/, "/byline/v1/publication");
 }
 
+function wordpressFetchCacheKey() {
+  return (
+    process.env.WORDPRESS_FETCH_CACHE_KEY ||
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.CF_PAGES_COMMIT_SHA ||
+    process.env.NETLIFY_COMMIT_REF ||
+    `local-build-${Date.now()}`
+  );
+}
+
 async function loadPublication() {
   if (process.env.BYLINE_PUBLICATION_FILE) {
     const configured = JSON.parse(
@@ -85,10 +95,12 @@ const designs = await loadDesigns(publication);
 const publicationWordPressApi = publication?.urls?.cms
   ? `${String(publication.urls.cms).replace(/\/$/, "")}/wp-json/wp/v2`
   : undefined;
+const buildFetchCacheKey = wordpressFetchCacheKey();
 const child = spawnSync(process.execPath, [nextCommand, ...nextArguments], {
   cwd: projectRoot,
   env: {
     ...process.env,
+    WORDPRESS_FETCH_CACHE_KEY: buildFetchCacheKey,
     ...(publication ? { BYLINE_PUBLICATION_JSON: JSON.stringify(publication) } : {}),
     ...(publication?.urls?.publicSite && !process.env.NEXT_PUBLIC_SITE_URL ? { NEXT_PUBLIC_SITE_URL: publication.urls.publicSite } : {}),
     ...(publicationWordPressApi && !process.env.NEXT_PUBLIC_WP_API_URL ? { NEXT_PUBLIC_WP_API_URL: publicationWordPressApi } : {}),
