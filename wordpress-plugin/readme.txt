@@ -4,7 +4,7 @@ Tags: newsroom, editorial, journalism, headless, student-journalism
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.2.10
+Stable tag: 0.2.11
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,20 @@ WordPress publication state, a Studio for homepage design, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==
+
+= 0.2.11 =
+
+**Adds native WordPress Pages and polishes editorial workflow navigation.**
+
+* Published WordPress Pages are now the canonical source for normal-page routes,
+  metadata, and sitemap entries.
+* Adds the `byline/page-section` Gutenberg block, generic Page patterns, native
+  excerpts, eyebrow metadata, and a Page editor settings panel.
+* Existing Weekly Wildcat seed pages migrate safely to block markup, with health
+  diagnostics and hash-gated migration to protect manually edited pages.
+* Page and block styles are shared between the WordPress editor and public export.
+* The editorial workflow editor now uses the WordPress list icon in the sidebar
+  and More menu.
 
 = 0.2.10 =
 
@@ -76,6 +90,11 @@ modules, native polls, and an optional Discord newsroom integration.
 * Homepage designs saved while these settings existed continue to load.
 
 == Upgrade Notice ==
+
+= 0.2.11 =
+Normal-page routes now come from published WordPress Pages. Existing seeded
+pages migrate safely to the new block-based Page editor; review them in Pages
+after updating. The editorial workflow editor also has an updated list icon.
 
 = 0.2.10 =
 Repairs homepage designs that were stuck with Publish disabled because sections
