@@ -1,0 +1,32 @@
+{
+  "apiVersion": 3,
+  "name": "byline/sports-schedule",
+  "version": "1.0.0",
+  "title": "Sports Schedule",
+  "category": "byline",
+  "description": "Show canonical upcoming games and recent results for a team and season.",
+  "keywords": ["sports", "schedule", "games", "scores", "results"],
+  "icon": "calendar-alt",
+  "textdomain": "weekly-wildcat-headless",
+  "postTypes": ["post", "page"],
+  "attributes": {
+    "heading": { "type": "string", "default": "Sports Schedule" },
+    "teamKey": { "type": "string", "default": "" },
+    "season": { "type": "string", "default": "" },
+    "display": { "type": "string", "default": "both" },
+    "upcomingLimit": { "type": "integer", "default": 3 },
+    "recentLimit": { "type": "integer", "default": 3 },
+    "hideWhenEmpty": { "type": "boolean", "default": false }
+  },
+  "supports": {
+    "align": ["wide"],
+    "anchor": true,
+    "html": false
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "example": {
+    "attributes": { "heading": "This season", "display": "both" }
+  }
+}

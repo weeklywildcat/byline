@@ -4665,12 +4665,25 @@ function wwh_register_rest_routes(): void
                     'type' => 'integer',
                     'description' => 'Selected Sports Game post ID for the automatic article game card.',
                 ],
+                'gameScoreGameIds' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'integer'],
+                    'description' => 'Published game IDs rendered by structured Byline Game Score blocks in the post content.',
+                ],
             ],
         ],
     ]);
     register_rest_field('post', 'byline', [
         'get_callback' => 'wwh_rest_post_settings',
-        'schema' => ['description' => 'Byline post display settings.', 'type' => 'object', 'context' => ['view', 'edit']],
+        'schema' => [
+            'description' => 'Byline post display settings.',
+            'type' => 'object',
+            'context' => ['view', 'edit'],
+            'properties' => [
+                'primaryGameId' => ['type' => 'integer'],
+                'gameScoreGameIds' => ['type' => 'array', 'items' => ['type' => 'integer']],
+            ],
+        ],
     ]);
 }
 add_action('rest_api_init', 'wwh_register_rest_routes');
@@ -4681,6 +4694,7 @@ function wwh_rest_post_settings(array $post): array
 
     return [
         'primaryGameId' => absint(get_post_meta($post_id, WWH_PRIMARY_GAME_META, true)),
+        'gameScoreGameIds' => function_exists('byline_newsroom_game_score_game_ids') ? byline_newsroom_game_score_game_ids($post_id) : [],
     ];
 }
 
@@ -5536,6 +5550,7 @@ function wwh_format_school_event(WP_Post $post): array
 
 require_once __DIR__ . '/includes/sports-rosters.php';
 require_once __DIR__ . '/includes/sports/admin.php';
+require_once __DIR__ . '/includes/content/newsroom-blocks.php';
 require_once __DIR__ . '/includes/discord-integration.php';
 require_once __DIR__ . '/includes/integrations/discord.php';
 require_once __DIR__ . '/includes/core/upgrade.php';

@@ -26,5 +26,12 @@ module.exports = {
     'editorial-workflow': path.resolve(__dirname, 'src/editorial-workflow.tsx'),
     'page-editor': path.resolve(__dirname, 'src/page-editor.tsx'),
     'blocks/page-section/index': path.resolve(__dirname, 'src/blocks/page-section/index.tsx'),
+    'blocks/stories/index': path.resolve(__dirname, 'src/blocks/stories/index.tsx'),
+    'blocks/people/index': path.resolve(__dirname, 'src/blocks/people/index.tsx'),
+    'blocks/sports-schedule/index': path.resolve(__dirname, 'src/blocks/sports-schedule/index.tsx'),
+    'blocks/events/index': path.resolve(__dirname, 'src/blocks/events/index.tsx'),
+    'blocks/poll/index': path.resolve(__dirname, 'src/blocks/poll/index.tsx'),
+    'blocks/game-score/index': path.resolve(__dirname, 'src/blocks/game-score/index.tsx'),
+    'blocks/correction-notice/index': path.resolve(__dirname, 'src/blocks/correction-notice/index.tsx'),
   },
 };

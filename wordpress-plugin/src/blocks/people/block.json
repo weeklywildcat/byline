@@ -1,0 +1,34 @@
+{
+  "apiVersion": 3,
+  "name": "byline/people",
+  "version": "1.0.0",
+  "title": "People",
+  "category": "byline",
+  "description": "Show the publication's canonical public author and profile directory.",
+  "keywords": ["people", "authors", "staff", "contributors", "directory"],
+  "icon": "groups",
+  "textdomain": "weekly-wildcat-headless",
+  "postTypes": ["post", "page"],
+  "attributes": {
+    "heading": { "type": "string", "default": "People" },
+    "source": { "type": "string", "default": "all" },
+    "selectedIds": { "type": "array", "default": [] },
+    "roleFilter": { "type": "string", "default": "" },
+    "layout": { "type": "string", "default": "portrait-grid" },
+    "showPhoto": { "type": "boolean", "default": true },
+    "showRole": { "type": "boolean", "default": true },
+    "showBio": { "type": "boolean", "default": true },
+    "showSocials": { "type": "boolean", "default": false }
+  },
+  "supports": {
+    "align": ["wide"],
+    "anchor": true,
+    "html": false
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "example": {
+    "attributes": { "heading": "Meet the newsroom", "layout": "portrait-grid" }
+  }
+}

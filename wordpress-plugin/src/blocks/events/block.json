@@ -1,0 +1,29 @@
+{
+  "apiVersion": 3,
+  "name": "byline/events",
+  "version": "1.0.0",
+  "title": "Events",
+  "category": "byline",
+  "description": "Show canonical upcoming publication or school events.",
+  "keywords": ["events", "calendar", "dates", "campus"],
+  "icon": "calendar",
+  "textdomain": "weekly-wildcat-headless",
+  "postTypes": ["post", "page"],
+  "attributes": {
+    "heading": { "type": "string", "default": "Events" },
+    "limit": { "type": "integer", "default": 5 },
+    "eventType": { "type": "string", "default": "" },
+    "hideWhenEmpty": { "type": "boolean", "default": false }
+  },
+  "supports": {
+    "align": ["wide"],
+    "anchor": true,
+    "html": false
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "example": {
+    "attributes": { "heading": "Upcoming events" }
+  }
+}
