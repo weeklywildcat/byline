@@ -1,4 +1,4 @@
-import { cleanDeckText, type AthleteSpotlightView, type StoryView } from "@byline/ui";
+import { cleanDeckText, stripBracketedEllipsis, type AthleteSpotlightView, type StoryView } from "@byline/ui";
 import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import {
@@ -67,10 +67,10 @@ function getAthleteName(post: WordPressPost) {
 }
 
 function getAthleteBlurb(post: WordPressPost) {
-  const text = stripHtml(post.excerpt.rendered || post.content.rendered).replace(
-    /\s*\[\s*(?:&hellip;|…|\.\.\.)\s*\]\s*$/i,
-    ""
-  );
+  // Shares the linear excerpt-marker strip rather than repeating the regex it
+  // replaced: the same publication text reaches both, and the same
+  // backtracking hazard would come with it.
+  const text = stripBracketedEllipsis(stripHtml(post.excerpt.rendered || post.content.rendered));
 
   if (text.length <= 120) return text;
 
