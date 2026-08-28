@@ -7,6 +7,10 @@ const HEADLESS_FETCH_CACHE_KEY =
   process.env.CF_PAGES_COMMIT_SHA ||
   process.env.NETLIFY_COMMIT_REF ||
   String(Date.now());
+const HEADLESS_PAGE_CONCURRENCY = Math.min(
+  16,
+  Math.max(1, Number.parseInt(process.env.BYLINE_WORDPRESS_FETCH_CONCURRENCY || "4", 10) || 4)
+);
 
 type QueryValue = string | number | boolean | undefined | null;
 
@@ -386,6 +390,36 @@ async function headlessFetchPage<T>(path: string, query: Record<string, QueryVal
   };
 }
 
+async function fetchAllHeadlessPages<T>(path: string) {
+  const firstPage = await headlessFetchPage<T[]>(path, {
+    per_page: 100,
+    page: 1
+  });
+
+  if (firstPage.totalPages <= 1) {
+    return firstPage.data;
+  }
+
+  const data = [...firstPage.data];
+  for (let firstPageNumber = 2; firstPageNumber <= firstPage.totalPages; firstPageNumber += HEADLESS_PAGE_CONCURRENCY) {
+    const lastPageNumber = Math.min(
+      firstPage.totalPages,
+      firstPageNumber + HEADLESS_PAGE_CONCURRENCY - 1
+    );
+    const batch = await Promise.all(
+      Array.from({ length: lastPageNumber - firstPageNumber + 1 }, (_, index) =>
+        headlessFetchPage<T[]>(path, {
+          per_page: 100,
+          page: firstPageNumber + index
+        })
+      )
+    );
+    data.push(...batch.flatMap((page) => page.data));
+  }
+
+  return data;
+}
+
 export function getSportsGames(query?: number | SportsGameQuery) {
   const normalizedQuery = normalizeSportsGameQuery(query, 20);
 
@@ -402,26 +436,8 @@ export function getSportsGames(query?: number | SportsGameQuery) {
 // Sports archive pages build team hubs and season URLs from the canonical
 // ww_sports_game records, so a game edit updates every dependent static page on
 // the next WordPress-triggered rebuild without duplicating schedule data.
-export async function getAllSportsGames() {
-  const firstPage = await headlessFetchPage<SportsGame[]>("/sports-games", {
-    per_page: 100,
-    page: 1
-  });
-
-  if (firstPage.totalPages <= 1) {
-    return firstPage.data;
-  }
-
-  const remainingPages = await Promise.all(
-    Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
-      headlessFetchPage<SportsGame[]>("/sports-games", {
-        per_page: 100,
-        page: index + 2
-      })
-    )
-  );
-
-  return [...firstPage.data, ...remainingPages.flatMap((page) => page.data)];
+export function getAllSportsGames() {
+  return fetchAllHeadlessPages<SportsGame>("/sports-games");
 }
 
 export function getGameCenterHref(game: Pick<SportsGame, "id">) {
@@ -451,26 +467,8 @@ export function getSportsTeams() {
   return headlessFetch<SportsTeamMedia[]>("/sports-teams");
 }
 
-export async function getAllSportsRosters() {
-  const firstPage = await headlessFetchPage<SportsRoster[]>("/sports-rosters", {
-    per_page: 100,
-    page: 1
-  });
-
-  if (firstPage.totalPages <= 1) {
-    return firstPage.data;
-  }
-
-  const remainingPages = await Promise.all(
-    Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
-      headlessFetchPage<SportsRoster[]>("/sports-rosters", {
-        per_page: 100,
-        page: index + 2
-      })
-    )
-  );
-
-  return [...firstPage.data, ...remainingPages.flatMap((page) => page.data)];
+export function getAllSportsRosters() {
+  return fetchAllHeadlessPages<SportsRoster>("/sports-rosters");
 }
 
 export function getUpcomingSportsGames(query?: number | SportsGameQuery) {
