@@ -13,6 +13,10 @@ const WORDPRESS_FETCH_CACHE_KEY =
   (process.env.NODE_ENV === "production" ? `local-build-${Date.now()}` : "") ||
   "";
 const WORDPRESS_FETCH_USER_AGENT = "Byline Static Site Builder";
+const WORDPRESS_PAGE_CONCURRENCY = Math.min(
+  16,
+  Math.max(1, Number.parseInt(process.env.BYLINE_WORDPRESS_FETCH_CONCURRENCY || "4", 10) || 4)
+);
 
 type QueryValue = string | number | boolean | undefined | null;
 
@@ -264,17 +268,25 @@ async function wpFetchCollection<T>(path: string, query: Record<string, QueryVal
     return firstPage.data;
   }
 
-  const remainingPages = await Promise.all(
-    Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
-      wpFetch<T[]>(path, {
-        per_page: 100,
-        page: index + 2,
-        ...query
-      })
-    )
-  );
+  const data = [...firstPage.data];
+  for (let firstPageNumber = 2; firstPageNumber <= firstPage.totalPages; firstPageNumber += WORDPRESS_PAGE_CONCURRENCY) {
+    const lastPageNumber = Math.min(
+      firstPage.totalPages,
+      firstPageNumber + WORDPRESS_PAGE_CONCURRENCY - 1
+    );
+    const batch = await Promise.all(
+      Array.from({ length: lastPageNumber - firstPageNumber + 1 }, (_, index) =>
+        wpFetch<T[]>(path, {
+          per_page: 100,
+          page: firstPageNumber + index,
+          ...query
+        })
+      )
+    );
+    data.push(...batch.flatMap((page) => page.data));
+  }
 
-  return [...firstPage.data, ...remainingPages.flatMap((page) => page.data)];
+  return data;
 }
 
 async function headlessWpFetch<T>(path: string, query: Record<string, QueryValue> = {}) {
