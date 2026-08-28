@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@byline/content": "0.1.0",
     "@byline/core": "0.1.0",
+    "@byline/design": "0.1.0",
     "@byline/studio-contract": "0.1.0",
     "@byline/theme-contract": "0.1.0",
     "@byline/theme-editorial": "0.1.0",

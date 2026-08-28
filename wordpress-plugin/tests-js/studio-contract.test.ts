@@ -37,7 +37,9 @@ describe("Byline Studio contract", () => {
     const root = config.root?.render?.({ children: "Preview" } as never) as {
       props?: Record<string, unknown>;
     };
-    expect(root.props?.className).toBe("byline-publication-preview");
+    // The canvas mounts the published homepage shell itself, so the package
+    // widths, padding and section rhythm it measures are production's.
+    expect(root.props?.className).toBe("byline-publication-preview live-home-shell");
     expect(root.props?.["data-byline-preview-surface"]).toBe("studio");
     expect(root.props?.["data-theme"]).toBe("byline-magazine");
   });

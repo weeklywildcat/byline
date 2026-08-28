@@ -40,3 +40,32 @@ export type CalendarEntryView = {
   location: string;
   href: string;
 };
+
+/**
+ * The "clean deck" treatment: at most two sentences of plain text.
+ *
+ * Packages configured with `cleanDeck` -- the More rail and the Sports lead --
+ * render this instead of the raw excerpt HTML. It lives beside the view model
+ * because it is part of what a `StoryView` *is*, and because both hosts have to
+ * produce it identically: a Studio canvas showing the raw excerpt where the
+ * published page shows two trimmed sentences makes a package look taller than
+ * it really is.
+ *
+ * The input is already plain text; stripping markup is the host's job, since
+ * only the host knows which field it came from.
+ */
+export function cleanDeckText(text: string, maxLength = 260) {
+  const normalised = text
+    .replace(/\s*\[\s*(?:&hellip;|…|\.\.\.)\s*\]\s*$/i, "")
+    .replace(/\s*(?:&hellip;|…|\.\.\.)\s*$/i, "")
+    .trim();
+  const sentences = normalised.match(/[^.!?]+[.!?]+(?=\s|$)/g);
+
+  if (sentences?.length) return sentences.slice(0, 2).join(" ").trim();
+  if (normalised.length <= maxLength) return normalised;
+
+  const trimmed = normalised.slice(0, maxLength);
+  const lastSpace = trimmed.lastIndexOf(" ");
+
+  return `${trimmed.slice(0, lastSpace > 0 ? lastSpace : trimmed.length).trim()}...`;
+}

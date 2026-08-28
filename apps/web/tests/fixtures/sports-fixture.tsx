@@ -20,6 +20,9 @@ export type PostOptions = {
   image?: boolean;
   // Carries the athlete-of-the-week flag, which the ordered pass claims first.
   athlete?: boolean;
+  // Carries the special-coverage flag. Absent from the captured production
+  // content, which is exactly why the conditional case needs a fixture.
+  specialCoverage?: boolean;
   title?: string;
   excerpt?: string;
 };
@@ -27,7 +30,9 @@ export type PostOptions = {
 export function post(id: number, categorySlug: string, options: PostOptions = {}): WordPressPost {
   const tags: WordPressTag[] = options.athlete
     ? [tag(id + 500, "athlete-of-the-week", "Athlete of the Week"), tag(id + 600, "soccer", "Sport: Soccer")]
-    : [];
+    : options.specialCoverage
+      ? [tag(id + 700, "special-coverage", "Special Coverage")]
+      : [];
 
   return {
     id,

@@ -108,8 +108,55 @@ function storySourceFromV1Query(value: unknown): BylineStorySource | null {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Historical implicit sources.
+//
+// Several v1 homepage blocks carry no query at all. `byline_default_design_document`
+// minted the Weekly Wildcat starter as exactly that: one sparse `{ id }` block
+// per homepage section, in the live homepage's own order. Those blocks are not
+// generic story feeds that happen to be unconfigured -- they *name* a slot in
+// the historical ordered homepage selection, and the live page has always
+// filled them from that pass rather than from "the five newest stories".
+//
+// Translating them into a generic `latest` source is what produced the failure
+// this table exists to prevent: every semantic package became an independent
+// recent-stories feed, so Opinion, In Focus and Special Coverage showed the
+// same articles as each other and Special Coverage rendered a section where
+// production shows nothing at all.
+//
+// The distinction being drawn is between:
+//
+//   - a genuinely generic legacy story block (`story-list`, `story-grid`,
+//     `section-feed`, `featured-story`), whose historical fallback really was
+//     the newest stories; and
+//   - a named Weekly Wildcat homepage slot, whose source the old page supplied
+//     implicitly.
+//
+// Only the second kind appears below, and only a block that carries *no*
+// explicit query configuration reaches it. A block with a real query keeps it.
+type LegacyBlockSemantics = { source: BylineStorySource; limit: number };
+
+const LEGACY_BLOCK_SEMANTICS: Record<string, LegacyBlockSemantics> = {
+  "story-lead": { source: { type: "compatibility-lead" }, limit: 1 },
+  "latest-stories": { source: { type: "compatibility-brief" }, limit: WEEKLY_WILDCAT_BRIEF_DEFAULTS.limit },
+  "opinion-package": { source: { type: "compatibility-opinion" }, limit: WEEKLY_WILDCAT_OPINION_DEFAULTS.limit },
+  "photo-feature": { source: { type: "compatibility-in-focus" }, limit: 1 },
+  "special-coverage": {
+    source: { type: "compatibility-special-coverage" },
+    limit: WEEKLY_WILDCAT_SPECIAL_COVERAGE_DEFAULTS.limit
+  },
+  "team-feature": { source: { type: "compatibility-sports" }, limit: 1 },
+  "athlete-feature": { source: { type: "compatibility-athlete" }, limit: 1 }
+};
+
+export function legacyBlockSemantics(type: string): LegacyBlockSemantics | null {
+  return LEGACY_BLOCK_SEMANTICS[type] ?? null;
+}
+
 function sourceAndLimitFromV1Props(
-  props: Record<string, unknown>
+  props: Record<string, unknown>,
+  // The historical implicit source for this block type, when it has one.
+  semantics: LegacyBlockSemantics | null = null
 ): { source: BylineStorySource; limit: number } {
   const query = props.query && typeof props.query === "object" ? props.query as Record<string, unknown> : null;
   const querySource = storySourceFromV1Query(query);
@@ -143,9 +190,20 @@ function sourceAndLimitFromV1Props(
     return { source: { type: "manual", storyIds: [] }, limit: 0 };
   }
 
-  // This is the exact fallback used by packages/content's v1 resolver:
-  // unknown or absent queryType means latest, and only this fallback supplies
-  // the default limit of five.
+  // A named homepage slot with no explicit query keeps the source its old
+  // renderer supplied implicitly. The block's own `limit`, when it has one, is
+  // still an editorial setting and is honoured.
+  if (semantics) {
+    return {
+      source: semantics.source,
+      limit: boundedLimit(props.limit ?? semantics.limit, 0)
+    };
+  }
+
+  // The generic fallback, and only the generic fallback: this is the exact
+  // behaviour of packages/content's v1 resolver for a block that never had
+  // implicit semantics -- unknown or absent queryType means latest, with the
+  // default limit of five.
   return {
     source: queryType === "sticky" ? { type: "sticky" } : { type: "latest" },
     limit: boundedLimit(props.limit ?? DEFAULT_V1_LIMIT, 0)
@@ -166,7 +224,7 @@ function packageIdFor(block: BylineLegacyBlock, index: number, usedIds: Set<stri
 }
 
 function leadPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<LeadPackageProps> {
-  const { source, limit } = sourceAndLimitFromV1Props(block.props);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props, legacyBlockSemantics(block.type));
 
   return {
     id: packageIdFor(block, index, usedIds),
@@ -184,7 +242,7 @@ function leadPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set
 }
 
 function briefPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<BriefPackageProps> {
-  const { source, limit } = sourceAndLimitFromV1Props(block.props);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props, legacyBlockSemantics(block.type));
 
   return {
     id: packageIdFor(block, index, usedIds),
@@ -199,7 +257,7 @@ function briefPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Se
 }
 
 function inFocusPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<InFocusPackageProps> {
-  const { source, limit } = sourceAndLimitFromV1Props(block.props);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props, legacyBlockSemantics(block.type));
 
   return {
     id: packageIdFor(block, index, usedIds),
@@ -213,7 +271,7 @@ function inFocusPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: 
 }
 
 function specialCoveragePackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<SpecialCoveragePackageProps> {
-  const { source, limit } = sourceAndLimitFromV1Props(block.props);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props, legacyBlockSemantics(block.type));
 
   return {
     id: packageIdFor(block, index, usedIds),
@@ -223,7 +281,7 @@ function specialCoveragePackageFromV1(block: BylineLegacyBlock, index: number, u
 }
 
 function opinionPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<OpinionPackageProps> {
-  const { source, limit } = sourceAndLimitFromV1Props(block.props);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props, legacyBlockSemantics(block.type));
 
   return {
     id: packageIdFor(block, index, usedIds),
@@ -242,7 +300,7 @@ function opinionPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: 
 }
 
 function morePackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<MorePackageProps> {
-  const { source, limit } = sourceAndLimitFromV1Props(block.props);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props, legacyBlockSemantics(block.type));
 
   return {
     id: packageIdFor(block, index, usedIds),
@@ -264,7 +322,7 @@ function morePackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set
 }
 
 function sportsStoryPackageFromV1(block: BylineLegacyBlock, index: number, usedIds: Set<string>): BylineDesignPackage<SportsPackageProps> {
-  const { source, limit } = sourceAndLimitFromV1Props(block.props);
+  const { source, limit } = sourceAndLimitFromV1Props(block.props, legacyBlockSemantics(block.type));
 
   return {
     id: packageIdFor(block, index, usedIds),

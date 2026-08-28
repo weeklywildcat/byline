@@ -1632,21 +1632,44 @@ function Screen({
       { id: "editor", label: "Edit", href: adminUrl(config?.urls.studio) },
       { id: "revisions", label: "Revisions", href: adminUrl(config?.urls.studioRevisions) }
     ];
-    return (
-      <AdminPageFrame title="Studio" tabs={studioTabs} activeTab={activeView} error={error}>
-        {activeView === "revisions" ? (
+
+    if (activeView === "revisions") {
+      return (
+        <AdminPageFrame title="Studio" tabs={studioTabs} activeTab={activeView} error={error}>
           <BylineDesignRevisions canEdit={Boolean(config?.capabilities.editDesign)} backUrl={adminUrl(config?.urls.dashboard)} />
-        ) : (
-          <BylineStudio
-            canEdit={Boolean(config?.capabilities.editDesign)}
-            canPublish={Boolean(config?.capabilities.publishDesign)}
-            publicationTheme={publication?.appearance.theme || "weekly-wildcat"}
-            previewStylesheetUrl={config?.previewStylesheetUrl || ""}
-            tokenOverrides={publication?.appearance.tokenOverrides || {}}
-            backUrl={adminUrl(config?.urls.dashboard)}
-          />
-        )}
-      </AdminPageFrame>
+        </AdminPageFrame>
+      );
+    }
+
+    // The editor is deliberately not wrapped in the admin page frame. A visual
+    // page builder needs the whole viewport, and the frame's heading, tab bar
+    // and wp-admin padding are exactly what was squeezing the canvas into a
+    // narrow column. Studio provides its own toolbar and its own way out.
+    return (
+      <BylineStudio
+        canEdit={Boolean(config?.capabilities.editDesign)}
+        canPublish={Boolean(config?.capabilities.publishDesign)}
+        publicationTheme={publication?.appearance.theme || "weekly-wildcat"}
+        previewStylesheetUrl={config?.previewStylesheetUrl || ""}
+        tokenOverrides={publication?.appearance.tokenOverrides || {}}
+        backUrl={adminUrl(config?.urls.dashboard)}
+        features={{
+          polls: publication?.features.polls !== false,
+          events: publication?.features.events !== false,
+          sports: publication?.features.sports !== false,
+          newsletter: publication?.features.newsletter !== false
+        }}
+        publicationShortName={publication?.identity.shortName || "Newsroom"}
+        publicationName={publication?.identity.name}
+        organizationName={publication?.identity.organizationName}
+        contactHref={publication?.urls.contact}
+        social={publication?.social}
+        calendarHeading={
+          publication?.appearance.theme === "weekly-wildcat"
+            ? "At NSHS"
+            : `At ${publication?.identity.organizationName || publication?.identity.shortName || "school"}`
+        }
+      />
     );
   }
 

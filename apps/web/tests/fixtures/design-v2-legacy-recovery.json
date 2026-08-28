@@ -118,7 +118,7 @@
     },
     "baseRevisionId": 0
   },
-  "//recovered": "The same design after Studio's load-time recovery and one autosave: nine semantic packages in the original homepage order, the two schedule blocks collapsed into one, and no `legacy` key left for the publish guard to trip on. TypeScript asserts the recovery produces exactly this; PHP asserts storage validation and the publish guard both accept it.",
+  "//recovered": "The same design after Studio's load-time recovery and one autosave: nine semantic packages in the original homepage order, the two schedule blocks collapsed into one, and no `legacy` key left for the publish guard to trip on. Each sparse legacy block keeps the source its historical renderer supplied implicitly -- the compatibility homepage slots -- rather than becoming an independent generic `latest` feed. TypeScript asserts the recovery produces exactly this; PHP asserts storage validation and the publish guard both accept it.",
   "recovered": {
     "schemaVersion": 2,
     "template": "home",
@@ -159,7 +159,7 @@
         "props": {
           "heading": "Latest Stories",
           "source": {
-            "type": "latest"
+            "type": "compatibility-brief"
           },
           "limit": 6,
           "presentation": {
@@ -175,7 +175,7 @@
           "heading": "Opinion",
           "description": "",
           "source": {
-            "type": "latest"
+            "type": "compatibility-opinion"
           },
           "limit": 3,
           "archiveLink": {
@@ -195,7 +195,7 @@
         "props": {
           "heading": "In Focus",
           "source": {
-            "type": "latest"
+            "type": "compatibility-in-focus"
           },
           "presentation": {
             "showAuthor": true,
@@ -209,7 +209,7 @@
         "props": {
           "heading": "Special Coverage",
           "source": {
-            "type": "latest"
+            "type": "compatibility-special-coverage"
           },
           "limit": 4,
           "leadPresentation": {

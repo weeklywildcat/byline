@@ -1,22 +1,25 @@
 import { parseSportsPackageProps, type SportsPackageProps } from "@byline/design";
+import {
+  resolveSportsPackage as resolveSharedSportsPackage,
+  type HomepagePackageResolutionContext,
+  type HomepageStoryInput
+} from "@byline/content";
 import type {
   AthleteSpotlightView,
   ResolvedSportsPackage,
   SportsFixtureView,
   SportsResultView
 } from "@byline/ui";
-import { getAthleteSportLabel, getAthleteSpotlightLabel, isAthleteSpotlightPost } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
 import type { SportsGame } from "@/lib/headless";
-import {
-  availableStories,
-  sourceCandidates,
-  toStoryView,
-  type HomepageSelection
-} from "@/lib/homepage-packages";
+import type { HomepageSelection } from "@/lib/homepage-selection";
+import { toHomepagePublicationInput, toHomepageStoryInputs } from "@/lib/homepage-story-input";
 import type { BylinePublicationConfig } from "@byline/core";
 import { getPublicationConfig } from "@/lib/publication";
-import { getFeaturedMedia, getPostHref, type WordPressPost } from "@/lib/wordpress";
+import { toAthleteSpotlightView } from "@/lib/story-view";
+import type { WordPressPost } from "@/lib/wordpress";
+
+export { toAthleteSpotlightView };
 
 // The sports package resolver.
 //
@@ -173,70 +176,13 @@ export function toSportsFixtureView(game: SportsGame): SportsFixtureView {
   };
 }
 
-// --- athlete spotlight ------------------------------------------------------
-//
-// Moved verbatim from apps/web/components/SportsAthleteFeature.tsx.
-
-function getAthleteName(post: WordPressPost) {
-  return stripHtml(post.title.rendered)
-    .replace(/^athlete\s+of\s+the\s+(?:week|month)\s*:?\s*/i, "")
-    .trim();
-}
-
-function getAthleteBlurb(post: WordPressPost) {
-  const text = stripHtml(post.excerpt.rendered || post.content.rendered).replace(
-    /\s*\[\s*(?:&hellip;|…|\.\.\.)\s*\]\s*$/i,
-    ""
-  );
-
-  if (text.length <= 120) return text;
-
-  const trimmed = text.slice(0, 120);
-  const lastSpace = trimmed.lastIndexOf(" ");
-
-  return `${trimmed.slice(0, lastSpace > 0 ? lastSpace : trimmed.length).trim()}...`;
-}
-
-export function toAthleteSpotlightView(post: WordPressPost): AthleteSpotlightView {
-  const image = getFeaturedMedia(post);
-  const blurb = getAthleteBlurb(post);
-
-  return {
-    id: post.id,
-    name: getAthleteName(post),
-    href: getPostHref(post),
-    eyebrow: getAthleteSpotlightLabel(post),
-    sport: getAthleteSportLabel(post),
-    blurb: blurb || null,
-    image: image?.source_url
-      ? {
-          src: image.source_url,
-          alt: image.alt_text || stripHtml(image.title.rendered ?? ""),
-          width: image.media_details?.width ?? null,
-          height: image.media_details?.height ?? null
-        }
-      : null
-  };
-}
-
 // --- package ----------------------------------------------------------------
-
-function manualStories(storyIds: number[], posts: WordPressPost[]) {
-  const byId = new Map(posts.map((post) => [post.id, post]));
-
-  return storyIds.flatMap((id) => {
-    const post = byId.get(id);
-
-    return post ? [post] : [];
-  });
-}
 
 export type SportsPackageResolutionInput = {
   packageId: string;
   props: unknown;
   posts: WordPressPost[];
-  // The whole-page ordered pass. See the note below on why the sports package
-  // consumes it rather than running its own queries.
+  // The whole-page ordered pass, produced by the canonical selection.
   selection: HomepageSelection;
   recentScores: SportsGame[];
   upcomingGames: SportsGame[];
@@ -244,115 +190,35 @@ export type SportsPackageResolutionInput = {
   usedStoryIds?: ReadonlySet<number>;
   compatibilitySelection?: boolean;
   publication?: BylinePublicationConfig;
+  stories?: HomepageStoryInput[];
 };
 
 /**
- * Resolves the sports package into the model the shared renderers consume.
+ * The build-time entry point into the canonical sports package resolver.
  *
- * On ordering: the sports stories are the sixth selection in the pre-Studio
- * homepage and the athlete spotlight is the first -- claimed ahead of the lead
- * story, so the spotlight never competes with the front page. Issuing an
- * independent "newest three in Sports" query here would take stories that In
- * Focus, Special Coverage and Opinion have already claimed, and would push
- * different stories into More, The Latest and The Brief. So, exactly as the lead
- * package does, an automatic source consumes the existing ordered pass rather
- * than introducing a second de-duplication algorithm.
- *
- * A manual source is an explicit editorial override and does take effect
- * immediately, because an editor who pinned a story means it. Manual stories are
- * still filtered against the rest of the selection so a pin cannot silently
- * duplicate a story another package is already showing.
- *
- * On capabilities: the package configuration is a request, not an authority. A
- * publication with the sports module switched off gets no structured modules at
- * all, whatever the design asks for. That reconciliation lives here so neither
- * renderer has to know what a feature flag is.
+ * Selection, athlete-spotlight reconciliation and capability reconciliation all
+ * live in `@byline/content`. What happens here is the WordPress-shaped part:
+ * structured sports records become `SportsResultView`/`SportsFixtureView`
+ * before the shared resolver decides how many of them the reader sees.
  */
 export function resolveSportsPackage(input: SportsPackageResolutionInput): ResolvedSportsPackage {
   const publication = input.publication ?? getPublicationConfig();
-  const config: SportsPackageProps = parseSportsPackageProps(input.props);
-  const compatibilitySelection = input.compatibilitySelection ?? true;
-  const usedStoryIds = new Set(input.usedStoryIds ?? []);
-  const content = config.content;
+  const context: HomepagePackageResolutionContext = {
+    stories: input.stories ?? toHomepageStoryInputs(input.posts),
+    selection: input.selection,
+    usedStoryIds: new Set(input.usedStoryIds ?? []),
+    compatibilitySelection: input.compatibilitySelection ?? true,
+    publication: (() => {
+      const resolved = toHomepagePublicationInput(publication);
 
-  const manualStoryPosts = config.stories.source.type === "manual"
-    ? manualStories(config.stories.source.storyIds, input.posts)
-    : null;
-  const selectedStories = content === "schedule" || !input.features.sports
-    ? []
-    : manualStoryPosts
-      ? manualStoryPosts.slice(0, config.stories.limit)
-      : availableStories(
-          sourceCandidates(config.stories.source, input.posts, input.selection, compatibilitySelection),
-          usedStoryIds,
-          config.stories.limit
-        );
-
-  const spotlightPost = content === "schedule" || !input.features.sports
-    ? null
-    : config.athleteSpotlight.enabled
-    ? config.athleteSpotlight.source.type === "manual"
-      ? (manualStories(config.athleteSpotlight.source.storyIds, input.posts)[0] ?? null)
-      : config.athleteSpotlight.source.type === "athlete-spotlight"
-        ? (() => {
-            const candidate = compatibilitySelection
-              ? input.selection.athleteSpotlightPost
-              : input.posts.find(isAthleteSpotlightPost) ?? null;
-
-            // A manual pin in another package reserves its story before the
-            // ordered pass. The standing athlete convention must yield to that
-            // explicit placement rather than duplicating it in Sports.
-            return candidate && !usedStoryIds.has(candidate.id) ? candidate : null;
-          })()
-        : null
-    : null;
-  // A spotlight must never repeat a story this package is already showing.
-  const athleteSpotlight =
-    spotlightPost && !selectedStories.some((post) => post.id === spotlightPost.id)
-      ? toAthleteSpotlightView(spotlightPost)
-      : null;
-
-  // Capability reconciliation: a design cannot switch on a module the
-  // publication has disabled.
-  const scoresEnabled = content !== "story" && config.scores.enabled && input.features.sports;
-  const upcomingEnabled = content !== "story" && config.upcoming.enabled && input.features.sports;
-  const results = scoresEnabled
-    ? input.recentScores.slice(0, config.scores.limit).map((game) => toSportsResultView(game, publication))
-    : [];
-  const upcoming = upcomingEnabled ? input.upcomingGames.slice(0, config.upcoming.limit).map(toSportsFixtureView) : [];
-
-  return {
-    packageId: input.packageId,
-    heading: config.heading,
-    sectionLink: config.archiveLink.enabled
-      ? { label: config.archiveLink.label, href: config.archiveLink.href }
-      : null,
-    // The sports lead runs a cleaned two-sentence deck rather than the raw
-    // excerpt, which is why it resolves with different options than the rail.
-    lead: selectedStories[0]
-      ? toStoryView(selectedStories[0], { cleanDeck: config.presentation.cleanDeck ?? true })
-      : null,
-    rail: selectedStories.slice(1).map((post) => toStoryView(post)),
-    athleteSpotlight,
-    // No games and no modules means no panel -- never a placeholder scoreboard.
-    schedule:
-      results.length > 0 || upcoming.length > 0
-        ? {
-            panelHeading: "SCORES & SCHEDULE",
-            scoresHeading: "Finals",
-            upcomingHeading: "Upcoming",
-            fullScheduleLink: { label: "FULL SCHEDULE →", href: "/sports/schedule/" },
-            results,
-            upcoming,
-            emptyUpcomingMessage: "No upcoming games"
-          }
-        : null,
-    presentation: {
-      showDeck: config.presentation.showDeck,
-      showBylines: config.presentation.showBylines,
-      showReadLink: config.presentation.showReadLink
-    },
-    content,
-    fallbackAuthorName: `${publication.identity.shortName} Staff`
+      return { ...resolved, features: { ...resolved.features, sports: input.features.sports } };
+    })()
   };
+
+  return resolveSharedSportsPackage(input.packageId, input.props, context, {
+    recentScores: input.recentScores.map((game) => toSportsResultView(game, publication)),
+    upcomingGames: input.upcomingGames.map(toSportsFixtureView)
+  });
 }
+
+export type { SportsPackageProps };

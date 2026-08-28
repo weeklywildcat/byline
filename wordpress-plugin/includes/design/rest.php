@@ -80,6 +80,30 @@ function byline_rest_autosave_design(WP_REST_Request $request)
     return rest_ensure_response($autosave);
 }
 
+/**
+ * Discards the current user's draft for a template.
+ *
+ * Deliberately narrow. It deletes one user meta record -- this editor's own
+ * autosave -- and touches nothing else: no published revision, no post, no
+ * deployment. Resetting a stale draft is an editing decision, not a release,
+ * and another editor's draft is not this editor's to discard.
+ */
+function byline_rest_delete_design_autosave(WP_REST_Request $request)
+{
+    $template = byline_rest_design_template($request);
+    if (!byline_is_design_template($template)) {
+        return new WP_Error('byline_unknown_template', __('Unknown Byline template.', 'weekly-wildcat-headless'), ['status' => 404]);
+    }
+
+    delete_user_meta(get_current_user_id(), byline_design_autosave_key($template));
+
+    $published = byline_published_design($template);
+    $response = $published;
+    $response['autosave'] = null;
+
+    return rest_ensure_response($response);
+}
+
 function byline_rest_publish_design(WP_REST_Request $request)
 {
     $template = byline_rest_design_template($request);
@@ -197,9 +221,16 @@ function byline_register_design_routes(): void
         'permission_callback' => static fn() => current_user_can(BYLINE_EDIT_DESIGN_CAPABILITY),
     ]);
     register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)/autosave', [
-        'methods' => WP_REST_Server::EDITABLE,
-        'callback' => 'byline_rest_autosave_design',
-        'permission_callback' => static fn() => current_user_can(BYLINE_EDIT_DESIGN_CAPABILITY),
+        [
+            'methods' => WP_REST_Server::EDITABLE,
+            'callback' => 'byline_rest_autosave_design',
+            'permission_callback' => static fn() => current_user_can(BYLINE_EDIT_DESIGN_CAPABILITY),
+        ],
+        [
+            'methods' => WP_REST_Server::DELETABLE,
+            'callback' => 'byline_rest_delete_design_autosave',
+            'permission_callback' => static fn() => current_user_can(BYLINE_EDIT_DESIGN_CAPABILITY),
+        ],
     ]);
     register_rest_route(BYLINE_REST_NAMESPACE, '/admin/design/(?P<template>[a-z0-9:-]+)/publish', [
         'methods' => WP_REST_Server::CREATABLE,
