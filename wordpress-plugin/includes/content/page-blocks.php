@@ -55,9 +55,11 @@ function byline_register_page_section_block(): void
     }
 
     if (function_exists('register_block_style')) {
-        register_block_style('byline/page-section', [
-            'name' => 'featured',
-            'label' => 'Featured',
+        // Featured is declared by block.json. Page Actions is a separate
+        // native Core Buttons style used only for top-level page actions.
+        register_block_style('core/buttons', [
+            'name' => 'page-actions',
+            'label' => 'Page Actions',
         ]);
     }
 }

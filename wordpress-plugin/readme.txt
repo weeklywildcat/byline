@@ -4,7 +4,7 @@ Tags: newsroom, editorial, journalism, headless, student-journalism
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.2.11
+Stable tag: 0.2.12
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,19 @@ WordPress publication state, a Studio for homepage design, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==
+
+= 0.2.12 =
+
+**Restores normal-page design parity and repairs migrated Page Section blocks.**
+
+* Page Sections now save only their attributes and normal InnerBlocks; the
+  section wrapper is server-rendered by WordPress so Gutenberg has one stable
+  serialization contract.
+* Existing #53-migrated Pages are repaired structurally without replacing
+  editor-authored content, and top-level page actions use an editable Core
+  Buttons style.
+* Shared Page CSS restores the pre-Gutenberg section rhythm, featured callout
+  treatment, and outlined page actions in both the editor and public export.
 
 = 0.2.11 =
 
@@ -90,6 +103,11 @@ modules, native polls, and an optional Discord newsroom integration.
 * Homepage designs saved while these settings existed continue to load.
 
 == Upgrade Notice ==
+
+= 0.2.12 =
+Existing Page Sections are repaired automatically on the next administrator
+request. Review the affected Pages after updating; malformed content is left
+untouched and reported in Byline diagnostics.
 
 = 0.2.11 =
 Normal-page routes now come from published WordPress Pages. Existing seeded

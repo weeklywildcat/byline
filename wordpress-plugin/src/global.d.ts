@@ -1,7 +1,14 @@
 declare module "*.css";
 
 declare module "@wordpress/blocks" {
+  export function __unstableGetInnerBlocksProps(...args: any[]): any;
+  export function createBlock(...args: any[]): any;
+  export function getBlockType(...args: any[]): any;
+  export function parse(...args: any[]): any;
   export function registerBlockType(metadata: unknown, settings: unknown): unknown;
+  export function serialize(...args: any[]): any;
+  export function unregisterBlockType(...args: any[]): any;
+  export function validateBlock(...args: any[]): any;
 }
 
 declare module "@wordpress/block-editor" {

@@ -185,6 +185,9 @@ function byline_diagnostics_payload(): array
         ];
 
     $runtime = byline_diagnostics_safe_runtime();
+    $page_migration = function_exists('byline_get_weekly_page_migration_report')
+        ? byline_get_weekly_page_migration_report()
+        : ['legacyPages' => [], 'correctionFailures' => []];
     $health_checks = function_exists('byline_get_health_checks') ? byline_get_health_checks() : [];
     $rest_health = $runtime['routePresence'] === []
         || (!in_array(false, array_values($runtime['routePresence']), true)
@@ -207,6 +210,7 @@ function byline_diagnostics_payload(): array
         'designsNeedingMigration' => byline_design_migration_count(),
         'polls' => function_exists('byline_poll_diagnostics') ? byline_poll_diagnostics() : null,
         'schemaVersions' => $runtime['schemaVersions'],
+        'pageMigration' => $page_migration,
         'assetPresence' => $runtime['assetPresence'],
         'tablePresence' => $runtime['tablePresence'],
         'routePresence' => $runtime['routePresence'],

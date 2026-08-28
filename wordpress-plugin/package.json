@@ -1,6 +1,6 @@
 {
   "name": "@byline/wordpress-plugin",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "private": true,
   "scripts": {
     "build": "wp-scripts build",
@@ -20,6 +20,7 @@
     "@iconify/react": "^6.0.2",
     "@puckeditor/core": "0.23.0",
     "@wordpress/api-fetch": "7.53.0",
+    "@wordpress/blocks": "^15.26.0",
     "@wordpress/components": "39.0.0",
     "@wordpress/data": "10.53.0",
     "@wordpress/element": "8.5.0",
@@ -31,6 +32,8 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "@wordpress/scripts": "34.1.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
     "typescript": "6.0.3",
     "vitest": "4.1.11"
   }

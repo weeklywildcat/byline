@@ -71,18 +71,11 @@ function PageSectionEdit({ attributes, setAttributes }: any) {
   );
 }
 
-function PageSectionSave({ attributes }: any) {
-  const tagName = headingTag(attributes.headingLevel);
-  const blockProps = useBlockProps.save({ className: attributes.className });
-
-  return (
-    <section {...blockProps}>
-      <RichText.Content tagName={tagName} className="wp-block-heading" value={attributes.heading} />
-      <div className="wp-block-byline-page-section__body">
-        <InnerBlocks.Content />
-      </div>
-    </section>
-  );
+export function PageSectionSave() {
+  // The server renderer owns the section wrapper. Keeping save limited to
+  // InnerBlocks makes the persisted contract stable and avoids a second PHP
+  // serializer drifting from this implementation.
+  return <InnerBlocks.Content />;
 }
 
 registerBlockType(metadata as any, {

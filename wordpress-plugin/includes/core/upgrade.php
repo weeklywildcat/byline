@@ -135,9 +135,8 @@ function byline_upgrade_pages(): bool
         return false;
     }
 
-    byline_migrate_weekly_wildcat_pages();
-
-    return (int) get_option(BYLINE_WEEKLY_PAGE_MIGRATION_OPTION, 0) >= BYLINE_WEEKLY_PAGE_MIGRATION_VERSION;
+    return byline_migrate_weekly_wildcat_pages()
+        && (int) get_option(BYLINE_WEEKLY_PAGE_MIGRATION_OPTION, 0) >= BYLINE_WEEKLY_PAGE_MIGRATION_VERSION;
 }
 
 function byline_upgrade_failure_message(string $step): string
