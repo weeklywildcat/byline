@@ -9,6 +9,7 @@ import {
   consumeStorySidebarNavigation,
   createStorySidebarPanelOpenState,
   focusStorySidebarPanel,
+  installStorySidebarNavigationBridge,
   normalizeStorySidebarNavigationCommand,
   publishStorySidebarNavigation,
   setStorySidebarPanelOpen,
@@ -145,6 +146,14 @@ describe("Story sidebar contextual navigation", () => {
     }
 
     unsubscribe();
+  });
+
+  it("preserves a panel command published before the Story bundle mounts", () => {
+    window.bylineStorySidebarNavigation = { pending: { panel: "tasks" }, publish: () => false };
+
+    installStorySidebarNavigationBridge(window);
+
+    expect(consumeStorySidebarNavigation(window)).toEqual({ panel: "tasks" });
   });
 
   it("rejects invalid commands and never forwards arbitrary selectors", () => {

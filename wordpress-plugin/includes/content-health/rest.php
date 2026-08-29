@@ -552,7 +552,19 @@ function byline_content_health_enqueue_editor_navigation(string $hook): void
             // closed command vocabulary instead of reaching into Gutenberg's
             // DOM or trying to infer panel markup from this transport bridge.
             var navigation = window.bylineStorySidebarNavigation;
-            if (!navigation || typeof navigation.publish !== 'function') return Promise.resolve(null);
+            // A plugin bundle/load-order mismatch should still leave the user
+            // at the safe Story sidebar rather than turning a valid edit link
+            // into a stale-target warning. The Story bundle will consume the
+            // panel command when it is available.
+            if (!navigation || typeof navigation.publish !== 'function') {
+                var pendingNavigation = navigation && typeof navigation === 'object' && !Array.isArray(navigation)
+                    ? navigation
+                    : {};
+                pendingNavigation.pending = { panel: target.panel };
+                window.bylineStorySidebarNavigation = pendingNavigation;
+                editorActions.openGeneralSidebar('byline-editorial-workflow/byline-editorial-workflow-sidebar');
+                return Promise.resolve(true);
+            }
             return Promise.resolve(navigation.publish({ panel: target.panel }) ? true : null);
         }
         return Promise.resolve(false);
