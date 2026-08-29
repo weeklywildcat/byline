@@ -373,9 +373,19 @@ function byline_editorial_preview_enqueue_assets(string $hook): void
     }
 
     $post_id = byline_editorial_preview_post_id();
+    $publication = byline_get_publication_config();
+    $appearance = is_array($publication['appearance'] ?? null) ? $publication['appearance'] : [];
+    $theme_id = sanitize_key((string) ($appearance['theme'] ?? 'byline-modern'));
+    $theme_ids = function_exists('byline_publication_theme_ids') ? byline_publication_theme_ids() : [];
+    if ($theme_ids !== [] && !in_array($theme_id, $theme_ids, true)) {
+        $theme_id = 'byline-modern';
+    }
+    $token_overrides = is_array($appearance['tokenOverrides'] ?? null) ? $appearance['tokenOverrides'] : [];
     wp_localize_script(BYLINE_EDITORIAL_PREVIEW_HANDLE, 'bylineArticlePreview', [
         'model' => byline_editorial_preview_can_view($post_id) ? byline_editorial_preview_presentation($post_id) : null,
         'stylesheetUrl' => plugins_url('build/article-preview.css', $plugin_file),
+        'themeId' => $theme_id,
+        'tokenOverrides' => $token_overrides,
         'postId' => $post_id,
     ]);
 }
@@ -388,4 +398,3 @@ function byline_editorial_preview_noindex(): void
     }
 }
 add_action('admin_head', 'byline_editorial_preview_noindex');
-

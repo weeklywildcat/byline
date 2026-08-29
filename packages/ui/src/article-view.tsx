@@ -303,8 +303,8 @@ export function ArticleView({ presentation, slots = {}, className = "" }: Articl
             <div className="article-story-grid">{presentation.moreByAuthorStories.map((story) => <StoryCard key={story.id} story={story} />)}</div>
           </section>
         ) : null}
-        <aside className="weekly-wildcat-callout" aria-labelledby="weekly-wildcat-callout-heading">
-          <div><h2 id="weekly-wildcat-callout-heading">Have something we should cover?</h2><p>Send a tip, correction, photo opportunity, or story idea to the {presentation.publication.shortName} newsroom.</p></div>
+        <aside className="article-tip-callout" aria-labelledby="article-tip-callout-heading">
+          <div><h2 id="article-tip-callout-heading">Have something we should cover?</h2><p>Send a tip, correction, photo opportunity, or story idea to the {presentation.publication.shortName} newsroom.</p></div>
           <a href={presentation.publication.contactHref}>Contact the newsroom</a>
         </aside>
       </div>

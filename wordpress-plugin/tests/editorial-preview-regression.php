@@ -29,6 +29,8 @@ foreach ([
     "add_submenu_page(\n        null",
     "add_action('admin_enqueue_scripts', 'byline_editorial_preview_enqueue_assets', 20)",
     '\'model\' => byline_editorial_preview_can_view($post_id) ? byline_editorial_preview_presentation($post_id) : null',
+    "'themeId' => \$theme_id",
+    "'tokenOverrides' => \$token_overrides",
     "echo '<meta name=\"robots\" content=\"noindex, nofollow\">';",
     'apply_filters(\'the_content\'',
 ] as $needle) {

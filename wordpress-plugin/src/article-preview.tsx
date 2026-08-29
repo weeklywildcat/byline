@@ -1,15 +1,17 @@
-import { Button, Notice, Spinner } from "@wordpress/components";
+import { Button, Notice } from "@wordpress/components";
 import { createRoot, useMemo, useRef, useState } from "@wordpress/element";
 import { __ } from "@wordpress/i18n";
 import { ArticleView, type ArticlePresentation } from "@byline/ui";
+import { getPublicationTheme, getPublicationThemeStylesheets, getPublicationThemeVariables } from "./publication-theme";
 
-import "@byline/theme-weekly-wildcat/styles.css";
 import "@byline/ui/article.css";
 import "./article-preview.css";
 
 type PreviewConfig = {
   model?: ArticlePresentation | null;
   stylesheetUrl?: string;
+  themeId?: string;
+  tokenOverrides?: Record<string, string>;
   postId?: number;
 };
 
@@ -31,14 +33,39 @@ function attribute(value: string) {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function previewDocument(stylesheetUrl: string) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="${attribute(stylesheetUrl)}"></head><body><div id="byline-article-preview-frame-root"></div></body></html>`;
+function previewDocument(stylesheetUrl: string, themeId: string, tokenOverrides: Record<string, string>) {
+  const stylesheets = [stylesheetUrl, ...getPublicationThemeStylesheets(themeId)].filter(Boolean);
+  const stylesheetLinks = stylesheets
+    .map((href) => `<link rel="stylesheet" href="${attribute(href)}">`)
+    .join("");
+  const cssVariables = Object.entries(getPublicationThemeVariables(themeId, tokenOverrides))
+    .map(([name, value]) => `${name}:${value}`)
+    .join(";");
+  const safeThemeId = attribute(getPublicationTheme(themeId).id);
+  const safeVariables = attribute(cssVariables);
+
+  return `<!doctype html><html lang="en" data-byline-theme="${safeThemeId}" style="${safeVariables}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${stylesheetLinks}<style>html,body{background:var(--page);color:var(--ink);font-family:var(--font-body)}html,body,*{box-sizing:border-box}body{margin:0}</style></head><body><div id="byline-article-preview-frame-root"></div></body></html>`;
 }
 
-function PreviewFrame({ model, stylesheetUrl, viewport }: { model: ArticlePresentation; stylesheetUrl: string; viewport: ViewportId }) {
+function PreviewFrame({
+  model,
+  stylesheetUrl,
+  themeId,
+  tokenOverrides,
+  viewport
+}: {
+  model: ArticlePresentation;
+  stylesheetUrl: string;
+  themeId: string;
+  tokenOverrides: Record<string, string>;
+  viewport: ViewportId;
+}) {
   const rootRef = useRef<ReturnType<typeof createRoot> | null>(null);
   const frameSize = VIEWPORTS[viewport];
-  const srcDoc = useMemo(() => previewDocument(stylesheetUrl), [stylesheetUrl]);
+  const srcDoc = useMemo(
+    () => previewDocument(stylesheetUrl, themeId, tokenOverrides),
+    [stylesheetUrl, themeId, tokenOverrides]
+  );
 
   return (
     <div className="byline-preview-device" style={{ maxWidth: frameSize.width }}>
@@ -92,7 +119,13 @@ function PreviewApp({ config }: { config: PreviewConfig }) {
           ))}
         </div>
       </div>
-      <PreviewFrame model={model} stylesheetUrl={config.stylesheetUrl || ""} viewport={viewport} />
+      <PreviewFrame
+        model={model}
+        stylesheetUrl={config.stylesheetUrl || ""}
+        themeId={config.themeId || "byline-modern"}
+        tokenOverrides={config.tokenOverrides || {}}
+        viewport={viewport}
+      />
     </div>
   );
 }
