@@ -4,7 +4,7 @@ Tags: newsroom, editorial, journalism, headless, student-journalism
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.2.13
+Stable tag: 0.2.14
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,29 @@ WordPress publication state, a Studio for homepage design, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==
+
+= 0.2.14 =
+
+**Makes the newsroom admin reliable end to end: safe, reversible actions,
+durable notifications, and a preview that matches the published site.**
+
+* Adds durable editorial notifications with transition context, plus due-date
+  reminders that fail locally instead of breaking the surrounding screen.
+* Adds a protected, theme-aware article preview that shares the public article
+  presentation renderer, so preview matches the published page.
+* Connects Media Desk attachment controls with deterministic REST
+  reconciliation, and protects featured images during media unlink.
+* Adds a Planning story quick view and precise navigation from Content Health
+  fixes to the exact story panel.
+* Tracks deployment revisions durably, honors exact deployment state on the
+  dashboard and in the editor status, and surfaces and explains stale public
+  revisions in Home and Doctor.
+* Makes admin actions safe and reversible by serializing editorial workflow
+  mutations and rolling back grouped updates on failure.
+* Adds an optional WordPress Abilities adapter and makes plugin archives
+  reproducible.
+* Adds a getting started guide, static deployment provider recipes, and
+  editorial collaboration ownership docs.
 
 = 0.2.13 =
 
@@ -142,6 +165,13 @@ makes Studio a real homepage editor.**
 * Homepage designs saved while these settings existed continue to load.
 
 == Upgrade Notice ==
+
+= 0.2.14 =
+Editorial notifications and deployment revisions are now stored durably, so the
+dashboard, Home, and Doctor report the real published state and flag stale
+public revisions after updating. Article preview is new and restricted to users
+who can edit the story. Existing workflow, media, poll, and design data is
+preserved.
 
 = 0.2.13 =
 Adds the newsroom planning, coverage, newsletter, and design-scheduling
