@@ -16,7 +16,7 @@ The harness is **opt-in**. It needs Docker (for `wp-env`) and downloaded
 Playwright browsers, so it is deliberately not part of `npm test`.
 
 ```bash
-npm run env:start --workspace @byline/wordpress-plugin
+npm run env:start
 ```
 
 ```bash

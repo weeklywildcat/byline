@@ -24,7 +24,7 @@
     "test:plugin": "npm run test --workspace @byline/wordpress-plugin",
     "test:php": "bash scripts/test-plugin-php.sh",
     "test:discord": "npm run test --workspace @byline/discord-bot",
-    "test:e2e": "npm run test:e2e:wp71 --workspace @byline/wordpress-plugin",
+    "test:e2e": "npm run test:e2e:wp71",
     "test:e2e:wp71": "npm run test:e2e:primary --workspace @byline/wordpress-plugin",
     "test:e2e:legacy": "npm run test:e2e:legacy --workspace @byline/wordpress-plugin",
     "build": "npm run build:frontend && npm run build:plugin && npm run build:discord",
