@@ -340,6 +340,10 @@ export function PlanningApp({
       setStories((current) => replacePlanningStory(current, story.id, story, result.story));
       setPlanning((current) => current ? { ...current, stories: replacePlanningStory(current.stories, story.id, story, result.story) } : current);
       setActionError(error && typeof error === "object" && "message" in error ? String((error as { message: unknown }).message) : __("The workflow move could not be saved. The previous stage was restored.", "weekly-wildcat-headless"));
+      // Quick View owns its modal-local error surface. Re-throw after the
+      // collection rollback so it can show the failure above the modal too;
+      // board/list callers explicitly absorb this rejection below.
+      throw error;
     } finally {
       setMovingStoryId(null);
     }
@@ -500,8 +504,8 @@ export function PlanningApp({
   const renderStories = () => {
     if (isLoading && !planning) return <PlanningLoading label={__("Loading Planning stories…", "weekly-wildcat-headless")} />;
     if (loadError && !planning) return <PlanningEmpty label={__("Planning stories", "weekly-wildcat-headless")} instructions={loadError} />;
-    if (view === "board") return <StoryBoard stories={visibleStories} statuses={statuses} canMoveStories={planning?.capabilities.canMoveStories ?? false} movingStoryId={movingStoryId} error={actionError} onMoveStory={(story, status) => void handleMoveStory(story, status)} onOpenStory={openStory} />;
-    if (view === "list") return <StoryList stories={visibleStories} statuses={statuses} sort={sort} canMoveStories={planning?.capabilities.canMoveStories ?? false} movingStoryId={movingStoryId} onSortChange={handleSortChange} onMoveStory={(story, status) => void handleMoveStory(story, status)} onOpenStory={openStory} />;
+    if (view === "board") return <StoryBoard stories={visibleStories} statuses={statuses} canMoveStories={planning?.capabilities.canMoveStories ?? false} movingStoryId={movingStoryId} error={actionError} onMoveStory={(story, status) => { void handleMoveStory(story, status).catch(() => undefined); }} onOpenStory={openStory} />;
+    if (view === "list") return <StoryList stories={visibleStories} statuses={statuses} sort={sort} canMoveStories={planning?.capabilities.canMoveStories ?? false} movingStoryId={movingStoryId} onSortChange={handleSortChange} onMoveStory={(story, status) => { void handleMoveStory(story, status).catch(() => undefined); }} onOpenStory={openStory} />;
     return <PlanningCalendar stories={visibleStories} onOpenStory={openStory} />;
   };
 
