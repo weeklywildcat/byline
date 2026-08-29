@@ -152,7 +152,7 @@ if ($build_available) {
 
     // WordPress must supply React and the editor packages; the plugin must not
     // ship its own copies into the post editor.
-    foreach (['wp-plugins', 'wp-editor', 'wp-element', 'wp-data', 'wp-components', 'wp-api-fetch'] as $required) {
+    foreach (['wp-plugins', 'wp-edit-post', 'wp-element', 'wp-data', 'wp-components', 'wp-api-fetch'] as $required) {
         if (!in_array($required, $deps, true)) {
             byline_test_fail("The workflow bundle does not declare the WordPress dependency {$required}.");
         }

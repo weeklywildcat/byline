@@ -37,7 +37,7 @@ test.describe("Preview as Byline", () => {
 
       const previewFrame = preview.frameLocator('iframe[title="Byline article preview"]');
       await expect(previewFrame.getByRole("heading", { name: story.title, exact: true })).toBeVisible();
-      await expect(previewFrame.getByText("Unsaved preview body from the browser golden path.", { exact: true })).toBeVisible();
+      await expect(previewFrame.getByText("Unsaved preview body from the browser golden path.", { exact: true }).first()).toBeVisible();
 
       const previewUrl = preview.url();
       const contactLink = previewFrame.getByRole("link", { name: "Contact the newsroom", exact: true });

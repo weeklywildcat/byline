@@ -34,7 +34,9 @@ export async function loginAsAdmin(page: Page): Promise<void> {
     () => page.evaluate(() => {
       const body = document.body;
       const pathname = window.location.pathname;
-      return !pathname.endsWith("/wp-login.php") && body.classList.contains("wp-admin");
+      return Boolean(body)
+        && !pathname.endsWith("/wp-login.php")
+        && body.classList.contains("wp-admin");
     }),
     { timeout: 20_000, intervals: [100, 250, 500] }
   ).toBe(true);

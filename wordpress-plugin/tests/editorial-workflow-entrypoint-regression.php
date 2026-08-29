@@ -29,7 +29,7 @@ foreach ([
     "import { DistributionPanel }",
     "import { TasksPanel }",
     "Panel, PanelBody",
-    "import * as editorModule from '@wordpress/editor';",
+    "import * as editPostModule from '@wordpress/edit-post';",
     '<EditorialNewsroomPanels',
     '<WorkflowControls key={postId}',
     'function PrePublishReadinessPanel',

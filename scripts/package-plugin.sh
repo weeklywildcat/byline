@@ -124,7 +124,7 @@ done
 # WordPress-provided packages rather than bundling a second React or a second
 # copy of the editor packages.
 workflow_dependencies="$(php -r '$asset = include $argv[1]; echo implode("\n", $asset["dependencies"] ?? []);' "$plugin_root/build/editorial-workflow.asset.php")"
-for editor_dependency in wp-plugins wp-editor wp-element wp-data wp-components wp-api-fetch; do
+for editor_dependency in wp-plugins wp-edit-post wp-element wp-data wp-components wp-api-fetch; do
   if ! grep -qx "$editor_dependency" <<<"$workflow_dependencies"; then
     echo "WordPress dependency $editor_dependency is missing from the workflow editor asset manifest." >&2
     exit 1
