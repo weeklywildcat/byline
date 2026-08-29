@@ -266,6 +266,9 @@ require_once __DIR__ . '/includes/sports/teams.php';
 require_once __DIR__ . '/includes/sports/domain.php';
 require_once __DIR__ . '/includes/core/jobs.php';
 require_once __DIR__ . '/includes/integrations/deployment.php';
+// Notifications use the durable job runner and only resolve private story
+// data at delivery time after rechecking the recipient's capabilities.
+require_once __DIR__ . '/includes/editorial/notifications.php';
 
 /** Replace the WordPress mark with the configured publication identity. */
 function wwh_login_logo_styles(): void

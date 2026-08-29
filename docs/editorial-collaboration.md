@@ -37,6 +37,21 @@ linked. The WordPress control plane exposes only safe configuration and link
 state. Credentials and unlinked private integration settings never appear in
 the public API.
 
+## Notifications
+
+Byline sends a small set of transactional assignment, review, media, task, and
+publication-failure notifications through WordPress email when the recipient
+has enabled them in the native **Byline Notifications** profile section. Due
+work is coalesced into a daily digest. Notification jobs contain stable IDs,
+are retried by the durable job runner, and recheck the recipient's current
+capabilities before resolving private titles or sending mail.
+
+Byline does not send Discord direct messages based on display-name or email
+guessing. A future Discord delivery adapter needs an explicit, safe WordPress
+user-to-Discord identity mapping; without one, Discord remains the broad
+discussion surface above. WordPress Notes notifications are also left to Notes
+and are not duplicated by Byline.
+
 ## Integration boundary
 
 The Story sidebar leaves native Notes available and reports whether Notes are
