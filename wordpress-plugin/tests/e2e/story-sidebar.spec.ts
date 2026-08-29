@@ -190,6 +190,7 @@ test.describe("Gutenberg Story sidebar", () => {
 
     let expectedRevision = 0;
     const observedRevisions: Array<{ expected: number; public: number }> = [];
+    const observedLifecycles: Array<{ status: string; lifecycle: string }> = [];
     const distributionRoute = "**/byline/v1/editorial/stories/*/distribution**";
     await page.route(distributionRoute, async (route) => {
       const response = await route.fetch();
@@ -197,6 +198,10 @@ test.describe("Gutenberg Story sidebar", () => {
       const website = payload.channels?.find((channel: { id: string }) => channel.id === "website");
       if (website) {
         const evidence = website.evidence ?? {};
+        observedLifecycles.push({
+          status: String(website.status ?? ""),
+          lifecycle: String(website.lifecycle ?? "")
+        });
         const observedExpectedRevision = Number(evidence.expectedRevision ?? 0);
         expectedRevision = Math.max(expectedRevision, observedExpectedRevision);
         const publicRevision = Number(evidence.publicRevision ?? 0);
@@ -214,6 +219,10 @@ test.describe("Gutenberg Story sidebar", () => {
 
       await expect.poll(() => expectedRevision).toBeGreaterThan(0);
       expect(observedRevisions.some((revision) => revision.expected > 0 && revision.public < revision.expected)).toBe(true);
+      expect(
+        observedLifecycles.some(({ status, lifecycle }) => /queued|building|rebuild_pending/i.test(`${status} ${lifecycle}`)),
+        `The first deployment response did not report a queued/building lifecycle: ${JSON.stringify(observedLifecycles)}`
+      ).toBe(true);
       await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/building|queued/i);
       await expect.poll(() => manifest.requests()).toBeGreaterThan(0);
       await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/live/i, { timeout: 30_000 });
@@ -268,9 +277,9 @@ test.describe("Gutenberg Story sidebar", () => {
       await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/building|queued/i);
       await expect.poll(() => triggerRequests.length).toBe(1);
 
-      const jobs = await adminSession.rest<{ jobs?: Array<{ id?: string; type?: string }> }>("/byline/v1/admin/jobs");
+      const jobs = await adminSession.rest<{ jobs?: Array<{ id?: number; jobId?: string; type?: string }> }>("/byline/v1/admin/jobs");
       expect(jobs.ok).toBe(true);
-      const deploymentJobs = (jobs.payload?.jobs ?? []).filter((job) => job.type === "deployment" && job.id === triggerPayload.jobId);
+      const deploymentJobs = (jobs.payload?.jobs ?? []).filter((job) => job.type === "deployment" && job.jobId === triggerPayload.jobId);
       expect(deploymentJobs).toHaveLength(1);
     } finally {
       await page.unroute(distributionRoute);

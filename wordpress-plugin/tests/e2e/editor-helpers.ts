@@ -44,6 +44,7 @@ type WordPressEditorState = {
       dispatch?: (store: string) => {
         insertBlock?: (block: unknown, index?: number, rootClientId?: string) => void;
         insertBlocks?: (blocks: unknown[], index?: number, rootClientId?: string) => void;
+        openGeneralSidebar?: (name: string) => void;
       } | undefined;
     };
     blocks?: {
@@ -378,6 +379,24 @@ export async function openStorySidebar(page: Page): Promise<Locator> {
   const ownedSurface = page.locator(".byline-editorial-sidebar").first();
   if (await existing.isVisible().catch(() => false)) return existing;
   if (await ownedSurface.isVisible().catch(() => false)) return ownedSurface;
+
+  // Prefer the same Gutenberg command used by the product navigation bridge.
+  // It avoids racing the More menu against a PluginSidebar slotfill that has
+  // registered but has not finished mounting yet.
+  const openedByCommand = await page.evaluate(() => {
+    const state = window as unknown as WordPressEditorState;
+    const openGeneralSidebar = state.wp?.data?.dispatch?.("core/edit-post")?.openGeneralSidebar;
+    if (typeof openGeneralSidebar !== "function") return false;
+    openGeneralSidebar("byline-editorial-workflow/byline-editorial-workflow-sidebar");
+    return true;
+  });
+  if (openedByCommand) {
+    await expect.poll(
+      async () => (await existing.isVisible().catch(() => false)) || (await ownedSurface.isVisible().catch(() => false)),
+      { timeout: EDITOR_READY_TIMEOUT, intervals: [100, 250, 500] }
+    ).toBe(true);
+    return (await existing.isVisible().catch(() => false)) ? existing : ownedSurface;
+  }
 
   const topBar = page.getByRole("region", { name: /editor top bar/i });
   const optionCandidates = [
