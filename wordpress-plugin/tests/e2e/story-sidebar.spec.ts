@@ -34,6 +34,43 @@ async function openStorySidebar(page: Page): Promise<void> {
   await expect(page.getByRole("region", { name: /story/i })).toBeVisible();
 }
 
+type AdminRestResult = { ok: boolean; status: number; payload: unknown };
+
+async function adminRest(page: Page, path: string, method: "GET" | "POST" = "GET", data?: Record<string, unknown>): Promise<AdminRestResult> {
+  return page.evaluate(async ({ path: requestPath, method: requestMethod, data: requestData }) => {
+    const settings = (window as Window & { wpApiSettings?: { nonce?: string } }).wpApiSettings;
+    const response = await window.fetch(`/wp-json${requestPath}`, {
+      method: requestMethod,
+      credentials: "same-origin",
+      headers: {
+        "X-WP-Nonce": settings?.nonce ?? "",
+        ...(requestData ? { "Content-Type": "application/json" } : {})
+      },
+      body: requestData ? JSON.stringify(requestData) : undefined
+    });
+    return { ok: response.ok, status: response.status, payload: await response.json().catch(() => null) };
+  }, { path, method, data });
+}
+
+async function ensureTestDeployment(page: Page): Promise<() => Promise<void>> {
+  const current = await adminRest(page, "/byline/v1/admin/deployment");
+  expect(current.ok, `Deployment status request failed with HTTP ${current.status}.`).toBe(true);
+  const status = (current.payload ?? {}) as { configured?: boolean };
+  if (status.configured) return async () => undefined;
+
+  const configured = await adminRest(page, "/byline/v1/admin/deployment", "POST", {
+    provider: "generic-hook",
+    hookUrl: "https://example.invalid/byline-e2e-build"
+  });
+  expect(configured.ok, `Test deployment setup failed with HTTP ${configured.status}.`).toBe(true);
+  return async () => {
+    await adminRest(page, "/byline/v1/admin/deployment", "POST", {
+      provider: "generic-hook",
+      clearHook: true
+    });
+  };
+}
+
 test.describe("Gutenberg Story sidebar", () => {
   test("a Stage change and an overlapping Visual Notes autosave both persist", async ({ adminPage: page }) => {
     await newDraft(page);
@@ -91,11 +128,20 @@ test.describe("Gutenberg Story sidebar", () => {
     await newDraft(page);
 
     let manifestRevision = 0;
+    let expectedRevision = 0;
+    const observedRevisions: Array<{ expected: number; public: number }> = [];
     await page.route("**/byline/v1/editorial/stories/*/distribution", async (route) => {
       const response = await route.fetch();
       const payload = await response.json();
       const website = payload.channels?.find((channel: { id: string }) => channel.id === "website");
-      if (website) website.status = manifestRevision > 0 ? "live" : "rebuild_pending";
+      if (website) {
+        const evidence = website.evidence ?? {};
+        expectedRevision = Math.max(expectedRevision, Number(evidence.expectedRevision ?? 0));
+        const publicRevision = manifestRevision;
+        observedRevisions.push({ expected: expectedRevision, public: publicRevision });
+        website.status = expectedRevision > 0 && publicRevision >= expectedRevision ? "live" : "rebuild_pending";
+        website.evidence = { ...evidence, expectedRevision, publicRevision };
+      }
       return route.fulfill({ response, json: payload });
     });
 
@@ -103,41 +149,52 @@ test.describe("Gutenberg Story sidebar", () => {
     await page.getByRole("button", { name: "Publish", exact: true }).nth(1).click();
 
     await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/building|queued/i);
-    manifestRevision = 1;
+    await expect.poll(() => expectedRevision).toBeGreaterThan(0);
+    manifestRevision = expectedRevision;
     await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/live/i, { timeout: 30_000 });
+    expect(observedRevisions.some((revision) => revision.expected > 0 && revision.public >= revision.expected)).toBe(true);
   });
 
   test("a failed website update retries through the durable job system", async ({ adminPage: page }) => {
-    await page.goto("/wp-admin/post.php?post=" + (process.env.WP_PUBLISHED_POST_ID ?? "1") + "&action=edit");
+    const cleanupDeployment = await ensureTestDeployment(page);
+    try {
+      await newDraft(page);
 
-    await page.route("**/byline/v1/editorial/stories/*/distribution", async (route) => {
-      const response = await route.fetch();
-      const payload = await response.json();
-      const website = payload.channels?.find((channel: { id: string }) => channel.id === "website");
-      if (website) website.status = "build_failed";
-      payload.capabilities = { ...payload.capabilities, retryWebsite: true };
-      return route.fulfill({ response, json: payload });
-    });
+      await page.route("**/byline/v1/editorial/stories/*/distribution", async (route) => {
+        const response = await route.fetch();
+        const payload = await response.json();
+        const website = payload.channels?.find((channel: { id: string }) => channel.id === "website");
+        if (website) website.status = "build_failed";
+        payload.capabilities = { ...payload.capabilities, retryWebsite: true };
+        return route.fulfill({ response, json: payload });
+      });
 
-    const triggerRequests: string[] = [];
-    page.on("request", (request) => {
-      if (request.url().includes("/byline/v1/admin/deployment/trigger")) triggerRequests.push(request.url());
-    });
+      const triggerRequests: string[] = [];
+      page.on("request", (request) => {
+        if (request.url().includes("/byline/v1/admin/deployment/trigger")) triggerRequests.push(request.url());
+      });
 
-    const retry = page.getByRole("button", { name: /retry website update/i });
-    await expect(retry).toBeVisible();
-    await retry.click();
-    // The retry participates in the durable lifecycle, so the panel leaves the
-    // failed state immediately instead of waiting on an untracked hook request.
-    await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/building|queued/i);
-    await retry.click({ trial: true }).catch(() => undefined);
-    expect(triggerRequests.length).toBeLessThanOrEqual(1);
+      const retry = page.getByRole("button", { name: /retry website update/i });
+      await page.getByRole("button", { name: "Publish", exact: true }).click();
+      await page.getByRole("button", { name: "Publish", exact: true }).nth(1).click();
+      await expect(retry).toBeVisible();
+      await retry.click();
+      // The retry participates in the durable lifecycle, so the panel leaves the
+      // failed state immediately instead of waiting on an untracked hook request.
+      await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/building|queued/i);
+      await expect(retry).toBeEnabled();
+      await retry.click();
+      expect(triggerRequests.length).toBe(2);
 
-    const jobs = await page.evaluate(async () => {
-      const response = await window.fetch("/wp-json/byline/v1/admin/jobs", { credentials: "same-origin" });
-      return response.ok ? await response.json() : null;
-    });
-    expect(jobs).not.toBeNull();
-    expect(JSON.stringify(jobs)).toContain("deployment");
+      const jobs = await page.evaluate(async () => {
+        const response = await window.fetch("/wp-json/byline/v1/admin/jobs", { credentials: "same-origin" });
+        return response.ok ? await response.json() : null;
+      });
+      expect(jobs).not.toBeNull();
+      const deploymentJobs = (jobs.jobs ?? []).filter((job: { type?: string }) => job.type === "deployment");
+      expect(deploymentJobs).toHaveLength(1);
+    } finally {
+      await cleanupDeployment();
+    }
   });
 });
