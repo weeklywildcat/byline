@@ -365,7 +365,7 @@ jobs_test_assert(is_array($deployment_done) && $deployment_done['status'] === 's
 jobs_test_assert(($job_test_last_remote_args['headers']['X-Byline-Expected-Revision'] ?? '') === '7' && ($job_test_last_remote_args['headers']['X-Byline-Idempotency'] ?? '') === 'deployment:7', 'Durable deployment requests should pass only safe revision and idempotency headers to the external hook.');
 jobs_test_assert(byline_deployment_lifecycle_status(['expectedRevision' => 7, 'jobStatus' => 'running'], []) === 'building', 'A leased deployment job should report building.');
 jobs_test_assert(byline_deployment_lifecycle_status(['expectedRevision' => 7, 'jobStatus' => 'failed'], []) === 'failed', 'A terminal deployment job should report failed.');
-jobs_test_assert(byline_deployment_lifecycle_status(['expectedRevision' => 7, 'jobStatus' => 'succeeded'], []) === 'unknown', 'A completed request without a matching public manifest should report unknown.');
+jobs_test_assert(byline_deployment_lifecycle_status(['expectedRevision' => 7, 'jobStatus' => 'succeeded'], []) === 'queued', 'A completed request without a matching public manifest should remain queued until the manifest proves the revision.');
 jobs_test_assert(byline_deployment_lifecycle_status($deployment_status, ['reachable' => true, 'publicationRevision' => 7]) === 'live', 'A public manifest at the expected revision should be reported live.');
 
 require __DIR__ . '/../includes/core/diagnostics.php';

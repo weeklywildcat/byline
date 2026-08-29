@@ -92,6 +92,15 @@ if ($post_count !== 1 || byline_deployment_last_status() !== 'HTTP 202') {
     exit(1);
 }
 
+$stale_lifecycle = byline_deployment_lifecycle_status(
+    ['configured' => true, 'expectedRevision' => 9, 'jobStatus' => null, 'pending' => false],
+    ['reachable' => false, 'publicationRevision' => 0]
+);
+if ($stale_lifecycle !== 'queued') {
+    fwrite(STDERR, "A recorded public revision without a live manifest must remain queued.\n");
+    exit(1);
+}
+
 byline_register_deployment_routes();
 $route = $routes['byline/v1/admin/deployment'] ?? null;
 if (!is_array($route) || $route[0]['permission_callback']() !== false) {

@@ -204,6 +204,14 @@ function byline_deployment_lifecycle_status(array $deployment, array $manifest =
         return 'queued';
     }
 
+    // The expected revision is durable evidence that a published change still
+    // has to reach the public site. A worker can briefly be between the
+    // scheduler and the job record, so do not let that small gap fall back to
+    // the misleading WordPress-only "published" label.
+    if ($expected > 0) {
+        return 'queued';
+    }
+
     // A successful hook request only means that the external build was
     // requested. Until the public manifest proves the expected revision, the
     // honest state is unknown rather than live.

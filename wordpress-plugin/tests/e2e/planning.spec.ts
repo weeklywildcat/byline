@@ -113,8 +113,11 @@ test.describe("Planning Story Quick View", () => {
       // mutation must not replace its current Planning state with an older
       // collection snapshot.
       await closeQuickView(firstDialog);
-      const secondCard = page.locator(".byline-planning-story-card").filter({ hasText: second.title });
-      await expect(secondCard.locator(".byline-planning-status").filter({ hasText: "Editing" })).toBeVisible();
+      const editingColumn = page.locator(".byline-planning-board-column").filter({
+        has: page.locator("h3", { hasText: "Editing" })
+      });
+      await expect(editingColumn.getByRole("heading", { name: "Editing", exact: true })).toBeVisible();
+      await expect(editingColumn.locator(".byline-planning-story-card").filter({ hasText: second.title })).toBeVisible();
       await expect.poll(() => workflowStatus(adminSession, second.id)).toBe("editing");
 
       firstDialog = await openPlanningStory(page, first.title);

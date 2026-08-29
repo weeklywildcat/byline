@@ -1565,6 +1565,7 @@ function PostPublishLifecycle({
   const websiteStatus: WebsiteLifecycleStatus = retriedStatus
     ?? distribution?.websiteStatus
     ?? (isPublished ? 'published' : 'unknown');
+  const canRetryNow = canRetry || distribution?.canRetryWebsite === true;
 
   useEffect(() => {
     pollAttemptsRef.current = 0;
@@ -1624,7 +1625,7 @@ function PostPublishLifecycle({
    * server, which requeues the existing job instead of creating a second one.
    */
   const retryWebsite = async () => {
-    if (!canRetry || isRetrying) return;
+    if (!canRetryNow || isRetrying) return;
     setIsRetrying(true);
     setError(null);
     try {
@@ -1672,7 +1673,7 @@ function PostPublishLifecycle({
               ? __('The website build failed after publication.', 'weekly-wildcat-headless')
               : __('No deployment target is configured, so the public website has not been rebuilt yet.', 'weekly-wildcat-headless')}
           </p>
-          {canRetry ? (
+          {canRetryNow ? (
             <Button variant="secondary" disabled={isRetrying} onClick={() => void retryWebsite()}>
               {isRetrying ? __('Retrying website update…', 'weekly-wildcat-headless') : __('Retry website update', 'weekly-wildcat-headless')}
             </Button>
