@@ -20,6 +20,7 @@ function readSource(relativePath: string) {
 }
 
 const articleRoute = readSource("../app/[segment]/[month]/[day]/[category]/[articleSlug]/page.tsx");
+const articleRenderer = readSource("../../../packages/ui/src/article-view.tsx");
 const homepageRoute = readSource("../app/page.tsx");
 const globalCss = readSource("../app/globals.css");
 const weeklyWildcatCss = readSource("../../../packages/theme-weekly-wildcat/src/styles.css");
@@ -84,9 +85,11 @@ describe("the custom article hero is gone", () => {
     expect(articleRoute).not.toContain("hasCustomHero");
     expect(articleRoute).not.toContain("article-story-custom-hero");
 
-    // Exactly one header, and it is the standard one.
-    expect(articleRoute.match(/className="article-header"/g)).toHaveLength(1);
-    expect(articleRoute).toContain('<article className="article-story">');
+    // The route supplies data and slots; the shared renderer owns the one
+    // canonical header and article structure used by production and preview.
+    expect(articleRoute).toContain("<ArticleView");
+    expect(articleRenderer.match(/className="article-header"/g)).toHaveLength(1);
+    expect(articleRenderer).toContain('<article className="article-story">');
   });
 
   it("keeps the rest of the canonical article intact", () => {
@@ -97,15 +100,15 @@ describe("the custom article hero is gone", () => {
       "article-author-line",
       "article-timing",
       "ArticleShareActions",
-      "FeaturedImage",
+      "ArticleImage",
       "ArticleGameCard",
       "article-body",
       "article-tags",
       "article-update-notice",
       "NewsletterSignupForm",
-      "AboutWriter"
+      "AboutWriters"
     ]) {
-      expect(articleRoute).toContain(marker);
+      expect(`${articleRoute}\n${articleRenderer}`).toContain(marker);
     }
   });
 
