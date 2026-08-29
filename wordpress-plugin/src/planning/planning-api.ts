@@ -143,6 +143,12 @@ export type PlanningFetchers = {
   getPlanning: (filters?: Partial<PlanningFilters>) => Promise<PlanningResponse>;
   /** Optional so read-only installs can still render the collection. */
   moveStory?: (storyId: number, status: string) => Promise<unknown>;
+  /** Lazy protected aggregate used by Story Quick View. */
+  getStoryQuickView?: (storyId: number) => Promise<unknown>;
+  /** Ordinary planning edits use the same protected story domain endpoint. */
+  updateStory?: (storyId: number, changes: Record<string, unknown>) => Promise<unknown>;
+  createStoryTask?: (storyId: number, input: Record<string, unknown>) => Promise<unknown>;
+  updateTask?: (taskId: number | string, changes: Record<string, unknown>) => Promise<unknown>;
   getSavedViews?: () => Promise<SavedPlanningView[]>;
   saveSavedView?: (view: SavedPlanningViewInput) => Promise<SavedPlanningView>;
   deleteSavedView?: (viewId: string) => Promise<void>;
@@ -212,6 +218,28 @@ export function createPlanningFetchers(request: PlanningRequest): PlanningFetche
       path: idPath(PLANNING_REST_ROUTES.story, storyId),
       method: "POST",
       data: { status }
+    }),
+
+    getStoryQuickView: (storyId) => request({
+      path: `${idPath(PLANNING_REST_ROUTES.story, storyId)}/quick-view`
+    }),
+
+    updateStory: (storyId, changes) => request({
+      path: idPath(PLANNING_REST_ROUTES.story, storyId),
+      method: "POST",
+      data: changes
+    }),
+
+    createStoryTask: (storyId, input) => request({
+      path: `${idPath(PLANNING_REST_ROUTES.story, storyId)}/tasks`,
+      method: "POST",
+      data: input
+    }),
+
+    updateTask: (taskId, changes) => request({
+      path: idPath("/byline/v1/editorial/tasks", taskId),
+      method: "POST",
+      data: changes
     }),
 
     getSavedViews: () => request<SavedPlanningView[]>({ path: PLANNING_REST_ROUTES.savedViews }),

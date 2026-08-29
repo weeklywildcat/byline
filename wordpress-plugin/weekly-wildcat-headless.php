@@ -39,6 +39,7 @@ require_once __DIR__ . '/includes/editorial/activity.php';
 require_once __DIR__ . '/includes/editorial/presets.php';
 require_once __DIR__ . '/includes/editorial/preview.php';
 require_once __DIR__ . '/includes/editorial/rest.php';
+require_once __DIR__ . '/includes/editorial/quick-view.php';
 require_once __DIR__ . '/includes/editorial/admin.php';
 
 // Design publication is shared by the immediate REST action and the
