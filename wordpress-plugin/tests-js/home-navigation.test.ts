@@ -97,10 +97,26 @@ describe("Byline Home model", () => {
     withServices.health.data = {
       checks: [{ id: "routes", label: "REST routes", status: "critical", summary: "A route is missing" }]
     };
-    withServices.deployment.data = { configured: true, lastStatus: "Request failed", pending: false };
+    withServices.deployment.data = { configured: true, lastStatus: "Request failed", lifecycle: "failed", pending: false };
     expect(homeAttentionItems(withServices, now)).toEqual(expect.arrayContaining([
       expect.objectContaining({ source: "health", severity: "critical" }),
       expect.objectContaining({ source: "deployment", severity: "critical" })
+    ]));
+
+    const stale = homeAttentionItems({
+      ...homeData([]),
+      deployment: resource({ configured: true, lastStatus: "HTTP 200", lifecycle: "unknown", expectedRevision: 8, publicRevision: 7, pending: false })
+    }, now);
+    expect(stale).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "deployment-unverified", severity: "warning" })
+    ]));
+
+    const unconfigured = homeAttentionItems({
+      ...homeData([]),
+      deployment: resource({ configured: false, lastStatus: "Not configured", lifecycle: "needs_configuration", expectedRevision: 8, publicRevision: 7, pending: false })
+    }, now);
+    expect(unconfigured).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "deployment-needs-configuration", severity: "critical" })
     ]));
   });
 
