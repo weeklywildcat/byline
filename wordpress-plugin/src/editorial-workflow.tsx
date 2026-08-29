@@ -64,11 +64,26 @@ import {
   type WorkflowChanges,
   type WorkflowPayload
 } from './editorial-workflow-model';
+import {
+  consumeStorySidebarNavigation,
+  createStorySidebarPanelOpenState,
+  focusStorySidebarPanel,
+  installStorySidebarNavigationBridge,
+  setStorySidebarPanelOpen,
+  subscribeToStorySidebarNavigation,
+  type StorySidebarPanel,
+  type StorySidebarPanelOpenState
+} from './editorial/story-sidebar-navigation';
 
 import './editorial-workflow.css';
 
 const PLUGIN_NAME = 'byline-editorial-workflow';
 const SIDEBAR_NAME = 'byline-editorial-workflow-sidebar';
+
+// Content Health can publish its command before React has mounted. Installing
+// the bridge during bundle evaluation gives the PHP inline script a stable,
+// typed hand-off point and retains pending state until the sidebar consumes it.
+installStorySidebarNavigationBridge();
 
 declare global {
   interface Window {
@@ -1059,7 +1074,9 @@ function EditorialNewsroomPanels({
   canonicalUrl,
   excerpt,
   workflow,
-  client
+  client,
+  openPanels,
+  onPanelToggle
 }: {
   postId: number;
   title: string;
@@ -1067,6 +1084,8 @@ function EditorialNewsroomPanels({
   excerpt: string;
   workflow: WorkflowControlsProps;
   client: EditorialRestClient;
+  openPanels: StorySidebarPanelOpenState;
+  onPanelToggle: (panel: StorySidebarPanel, opened: boolean) => void;
 }) {
   const { payload } = workflow;
   const workflowForPanel = payload ? normalizeWorkflowPayload(payload, payload, postId, title) : null;
@@ -1180,6 +1199,17 @@ function EditorialNewsroomPanels({
     setDistribution(normalizeDistribution(value, postId, title, canonicalUrl, excerpt));
   }, [canonicalUrl, client, excerpt, postId, title]);
 
+  // A controlled PanelBody does not call onToggle when its `opened` prop is
+  // changed by a navigation command. Keep lazy secondary data lazy for normal
+  // renders, while making a Content Health deep link load the panel it opens.
+  useEffect(() => {
+    if (openPanels.tasks) loadTasks();
+  }, [loadTasks, openPanels.tasks]);
+
+  useEffect(() => {
+    if (openPanels.contributors) loadContributors();
+  }, [loadContributors, openPanels.contributors]);
+
   if (!postId) return null;
 
   const rawPayload = record(payload);
@@ -1210,6 +1240,8 @@ function EditorialNewsroomPanels({
         className="byline-editorial-sidebar-panel"
         title={__('Visuals', 'weekly-wildcat-headless')}
         initialOpen={false}
+        opened={openPanels.visuals}
+        onToggle={(opened) => onPanelToggle('visuals', opened)}
       >
         {({ opened }) => opened ? <VisualNeedsPanel workflow={workflow} /> : null}
       </PanelBody>
@@ -1218,7 +1250,8 @@ function EditorialNewsroomPanels({
         className="byline-editorial-sidebar-panel"
         title={taskCount ? sprintf(/* translators: %d: open task count. */ __('Tasks · %d open', 'weekly-wildcat-headless'), taskCount) : __('Tasks', 'weekly-wildcat-headless')}
         initialOpen={false}
-        onToggle={(opened) => { if (opened) loadTasks(); }}
+        opened={openPanels.tasks}
+        onToggle={(opened) => onPanelToggle('tasks', opened)}
       >
         {({ opened }) => opened ? (
           <TasksPanel
@@ -1239,7 +1272,8 @@ function EditorialNewsroomPanels({
         className="byline-editorial-sidebar-panel"
         title={contributorCount ? sprintf(/* translators: %d: contributor count. */ __('Contributors · %d', 'weekly-wildcat-headless'), contributorCount) : __('Contributors', 'weekly-wildcat-headless')}
         initialOpen={false}
-        onToggle={(opened) => { if (opened) loadContributors(); }}
+        opened={openPanels.contributors}
+        onToggle={(opened) => onPanelToggle('contributors', opened)}
       >
         {({ opened }) => opened ? (
           <ContributorsPanel
@@ -1671,6 +1705,34 @@ function EditorialWorkflowPlugin() {
     openGeneralSidebar?: (name: string) => void;
   };
 
+  const [openPanels, setOpenPanels] = useState<StorySidebarPanelOpenState>(() => createStorySidebarPanelOpenState());
+  const onPanelToggle = useCallback((panel: StorySidebarPanel, opened: boolean) => {
+    setOpenPanels((current) => setStorySidebarPanelOpen(current, panel, opened));
+  }, []);
+  const openRequestedStoryPanel = useCallback((panel: StorySidebarPanel) => {
+    setOpenPanels((current) => focusStorySidebarPanel(current, panel));
+    openGeneralSidebar?.(`${PLUGIN_NAME}/${SIDEBAR_NAME}`);
+  }, [openGeneralSidebar]);
+
+  // Navigating between stories remounts the lazy newsroom panels, but the
+  // workflow PanelBody belongs to this entrypoint. Reset its controlled state
+  // so a panel requested for one story cannot remain focused on another.
+  useEffect(() => {
+    setOpenPanels(createStorySidebarPanelOpenState());
+  }, [postId]);
+
+  useEffect(() => {
+    if (postType !== 'post' || postId <= 0) return undefined;
+
+    installStorySidebarNavigationBridge();
+    const unsubscribe = subscribeToStorySidebarNavigation(window, (command) => {
+      openRequestedStoryPanel(command.panel);
+    });
+    const pending = consumeStorySidebarNavigation();
+    if (pending) openRequestedStoryPanel(pending.panel);
+    return unsubscribe;
+  }, [openRequestedStoryPanel, postId, postType]);
+
   // Workflow is a story concept. Pages and the other Byline post types never
   // see it, and the server does not load this bundle for them either.
   if (postType !== 'post') return null;
@@ -1711,6 +1773,8 @@ function EditorialWorkflowPlugin() {
             className="byline-editorial-sidebar-panel byline-editorial-workflow-panel"
             title={__('Workflow', 'weekly-wildcat-headless')}
             initialOpen={true}
+            opened={openPanels.workflow}
+            onToggle={(opened) => onPanelToggle('workflow', opened)}
           >
             <WorkflowControls key={postId} {...workflow} />
           </PanelBody>
@@ -1722,6 +1786,8 @@ function EditorialWorkflowPlugin() {
             excerpt={excerpt}
             workflow={workflow}
             client={editorialClient}
+            openPanels={openPanels}
+            onPanelToggle={onPanelToggle}
           />
         </Panel>
       </PluginSidebar>

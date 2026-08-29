@@ -11,6 +11,7 @@ import {
   type PlanningResponse,
   type SavedPlanningView
 } from "./planning-model";
+import { normalizeStorySidebarPanel } from "../editorial/story-sidebar-navigation";
 
 /**
  * The caller supplies WordPress' authenticated apiFetch (or a compatible
@@ -56,6 +57,11 @@ function isSafeFingerprint(value: unknown): value is string {
   return typeof value === "string" && /^[a-f0-9]{8,64}$/i.test(value);
 }
 
+function hasOnlyKeys(value: Record<string, unknown>, keys: string[]): boolean {
+  const allowed = new Set(keys);
+  return Object.keys(value).every((key) => allowed.has(key));
+}
+
 export function normalizeContentHealthFixTarget(value: unknown): ContentHealthFixTarget | null {
   if (!isRecord(value) || typeof value.kind !== "string") return null;
 
@@ -84,8 +90,10 @@ export function normalizeContentHealthFixTarget(value: unknown): ContentHealthFi
 
   if (value.kind === "featured-image") return { kind: "featured-image" };
 
-  if (value.kind === "story-sidebar" && ["tasks", "visuals", "contributors", "workflow"].includes(String(value.panel))) {
-    return { kind: "story-sidebar", panel: value.panel as "tasks" | "visuals" | "contributors" | "workflow" };
+  if (value.kind === "story-sidebar") {
+    if (!hasOnlyKeys(value, ["kind", "panel"])) return null;
+    const panel = normalizeStorySidebarPanel(value.panel);
+    return panel ? { kind: "story-sidebar", panel } : null;
   }
 
   if (value.kind === "settings" && typeof value.url === "string" && value.url.trim() !== "") {

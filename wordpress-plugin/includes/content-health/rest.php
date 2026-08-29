@@ -460,7 +460,13 @@ function byline_content_health_enqueue_editor_navigation(string $hook): void
     function validTarget(value) {
         if (!value || typeof value !== 'object' || Object.prototype.hasOwnProperty.call(value, 'clientId')) return false;
         if (value.kind === 'featured-image') return true;
-        if (value.kind === 'story-sidebar') return ['tasks', 'visuals', 'contributors', 'workflow'].indexOf(value.panel) !== -1;
+        if (value.kind === 'story-sidebar') {
+            var storyKeys = Object.keys(value);
+            return storyKeys.length === 2
+                && storyKeys.indexOf('kind') !== -1
+                && storyKeys.indexOf('panel') !== -1
+                && ['tasks', 'visuals', 'contributors', 'workflow'].indexOf(value.panel) !== -1;
+        }
         if (value.kind !== 'block' || !Array.isArray(value.blockPath) || value.blockPath.length < 1 || value.blockPath.length > 32) return false;
         if (value.blockPath.some(function (index) { return !Number.isInteger(index) || index < 0 || index > 10000; })) return false;
         if (value.blockName !== undefined && (typeof value.blockName !== 'string' || value.blockName.length > 120 || !/^[a-z0-9-]+\/[a-z0-9-]+$/i.test(value.blockName))) return false;
@@ -542,8 +548,12 @@ function byline_content_health_enqueue_editor_navigation(string $hook): void
             return Promise.resolve(true);
         }
         if (target.kind === 'story-sidebar') {
-            editorActions.openGeneralSidebar('byline-editorial-workflow/byline-editorial-workflow-sidebar');
-            return Promise.resolve(true);
+            // The Story bundle owns the sidebar and PanelBody state. Publish a
+            // closed command vocabulary instead of reaching into Gutenberg's
+            // DOM or trying to infer panel markup from this transport bridge.
+            var navigation = window.bylineStorySidebarNavigation;
+            if (!navigation || typeof navigation.publish !== 'function') return Promise.resolve(null);
+            return Promise.resolve(navigation.publish({ panel: target.panel }) ? true : null);
         }
         return Promise.resolve(false);
     }

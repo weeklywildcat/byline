@@ -1,8 +1,21 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import { contentHealthFixHref, CONTENT_HEALTH_FIX_TARGET_QUERY_PARAM } from "../src/planning/content-health-navigation";
 import { normalizeContentHealthFixTarget, normalizeContentHealthResponse } from "../src/planning/planning-api";
 import { resolveContentHealthBlockPath, type ContentHealthEditorBlock } from "../src/planning/planning-model";
+import {
+  consumeStorySidebarNavigation,
+  createStorySidebarPanelOpenState,
+  focusStorySidebarPanel,
+  normalizeStorySidebarNavigationCommand,
+  publishStorySidebarNavigation,
+  setStorySidebarPanelOpen,
+  STORY_SIDEBAR_NAVIGATION_EVENT,
+  STORY_SIDEBAR_PANEL_IDS,
+  subscribeToStorySidebarNavigation
+} from "../src/editorial/story-sidebar-navigation";
 
 describe("Content Health navigation", () => {
   it("normalizes structured locators without accepting ephemeral clientIds", () => {
@@ -33,6 +46,22 @@ describe("Content Health navigation", () => {
       }]
     });
     expect(response.issues[0].fixTarget).toEqual({ kind: "featured-image" });
+  });
+
+  it("accepts only the closed Story panel vocabulary", () => {
+    expect(normalizeContentHealthFixTarget({ kind: "story-sidebar", panel: "tasks" })).toEqual({
+      kind: "story-sidebar",
+      panel: "tasks"
+    });
+
+    for (const value of [
+      { kind: "story-sidebar", panel: "story" },
+      { kind: "story-sidebar", panel: "tasks", selector: ".components-panel__body" },
+      { kind: "story-sidebar", panel: "tasks", clientId: "session-only" },
+      { kind: "story-sidebar", panel: "tasks", target: "#arbitrary-dom-node" }
+    ]) {
+      expect(normalizeContentHealthFixTarget(value)).toBeNull();
+    }
   });
 
   it("resolves an exact saved-tree path to the current runtime block", () => {
@@ -77,5 +106,70 @@ describe("Content Health navigation", () => {
     expect(targeted).toContain(`${CONTENT_HEALTH_FIX_TARGET_QUERY_PARAM}=`);
     expect(targeted).toContain("#editor");
     expect((targeted.match(/clientId/g) || []).length).toBe(0);
+  });
+});
+
+describe("Story sidebar contextual navigation", () => {
+  afterEach(() => {
+    delete window.bylineStorySidebarNavigation;
+  });
+
+  it.each(STORY_SIDEBAR_PANEL_IDS)("focuses exactly the %s PanelBody", (panel) => {
+    const initial = createStorySidebarPanelOpenState();
+    const focused = focusStorySidebarPanel(initial, panel);
+
+    expect(focused).toEqual(Object.fromEntries(
+      STORY_SIDEBAR_PANEL_IDS.map((id) => [id, id === panel])
+    ));
+  });
+
+  it("preserves ordinary user toggles but rejects an unknown panel", () => {
+    const initial = createStorySidebarPanelOpenState();
+    const opened = setStorySidebarPanelOpen(initial, "tasks", true);
+    expect(opened.tasks).toBe(true);
+    expect(opened.workflow).toBe(true);
+
+    expect(setStorySidebarPanelOpen(initial, "document", true)).toBe(initial);
+    expect(focusStorySidebarPanel(initial, "document")).toBe(initial);
+  });
+
+  it("publishes and consumes one validated command for every supported panel", () => {
+    const received: unknown[] = [];
+    const unsubscribe = subscribeToStorySidebarNavigation(window, (command) => received.push(command));
+
+    for (const panel of STORY_SIDEBAR_PANEL_IDS) {
+      expect(publishStorySidebarNavigation({ panel }, window)).toBe(true);
+      expect(received.at(-1)).toEqual({ panel });
+      expect(consumeStorySidebarNavigation(window)).toEqual({ panel });
+      expect(consumeStorySidebarNavigation(window)).toBeNull();
+    }
+
+    unsubscribe();
+  });
+
+  it("rejects invalid commands and never forwards arbitrary selectors", () => {
+    const received: unknown[] = [];
+    const unsubscribe = subscribeToStorySidebarNavigation(window, (command) => received.push(command));
+
+    for (const value of [
+      null,
+      undefined,
+      [],
+      { panel: "unknown" },
+      { panel: "tasks", selector: ".components-panel__body" },
+      { panel: "tasks", clientId: "session-only" },
+      { panel: "tasks", domPath: ["#wpadminbar"] }
+    ]) {
+      expect(normalizeStorySidebarNavigationCommand(value)).toBeNull();
+      expect(publishStorySidebarNavigation(value, window)).toBe(false);
+    }
+
+    window.dispatchEvent(new CustomEvent(STORY_SIDEBAR_NAVIGATION_EVENT, {
+      detail: { panel: "tasks", selector: ".components-panel__body" }
+    }));
+
+    expect(received).toEqual([]);
+    expect(consumeStorySidebarNavigation(window)).toBeNull();
+    unsubscribe();
   });
 });
