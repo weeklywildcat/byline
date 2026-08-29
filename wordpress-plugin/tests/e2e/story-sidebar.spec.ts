@@ -223,7 +223,10 @@ test.describe("Gutenberg Story sidebar", () => {
         observedLifecycles.some(({ status, lifecycle }) => /queued|building|rebuild_pending/i.test(`${status} ${lifecycle}`)),
         `The first deployment response did not report a queued/building lifecycle: ${JSON.stringify(observedLifecycles)}`
       ).toBe(true);
-      await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/building|queued/i);
+      await expect(
+        page.locator(".byline-postpublish-lifecycle"),
+        `Deployment lifecycle responses: ${JSON.stringify(observedLifecycles)}`
+      ).toContainText(/building|queued/i);
       await expect.poll(() => manifest.requests()).toBeGreaterThan(0);
       await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/live/i, { timeout: 30_000 });
       expect(observedRevisions.some((revision) => revision.expected > 0 && revision.public >= revision.expected)).toBe(true);
@@ -238,6 +241,7 @@ test.describe("Gutenberg Story sidebar", () => {
     await createEditorDraft(page, adminSession.registerTestPost, "retry");
 
     let failedDistributionResponses = 0;
+    const observedFailureLifecycles: Array<{ status: string; lifecycle: string; retryWebsite: unknown }> = [];
     const distributionRoute = "**/byline/v1/editorial/stories/*/distribution**";
     await page.route(distributionRoute, async (route) => {
       const response = await route.fetch();
@@ -249,6 +253,11 @@ test.describe("Gutenberg Story sidebar", () => {
         failedDistributionResponses += 1;
       }
       payload.capabilities = { ...payload.capabilities, retryWebsite: true };
+      observedFailureLifecycles.push({
+        status: String(website?.status ?? ""),
+        lifecycle: String(website?.lifecycle ?? ""),
+        retryWebsite: payload.capabilities.retryWebsite
+      });
       return route.fulfill({ response, json: payload });
     });
 
@@ -262,7 +271,10 @@ test.describe("Gutenberg Story sidebar", () => {
       await page.getByRole("button", { name: "Publish", exact: true }).last().click();
       const retry = page.getByRole("button", { name: /retry website update/i });
       await expect.poll(() => failedDistributionResponses).toBeGreaterThan(0);
-      await expect(retry).toBeVisible();
+      await expect(
+        retry,
+        `Failed deployment responses: ${JSON.stringify(observedFailureLifecycles)}`
+      ).toBeVisible();
       const triggerResponsePromise = page.waitForResponse((response) => (
         response.request().method() === "POST"
         && response.url().includes("/byline/v1/admin/deployment/trigger")
