@@ -7,7 +7,8 @@ update rollback, and the deployment lifecycle have PHP regressions in
 `wordpress-plugin/tests/`.
 
 A handful of behaviours only exist once WordPress, the block editor, and the
-protected endpoints are all real. Those live in `wordpress-plugin/e2e/`.
+protected endpoints are all real. Those live in `wordpress-plugin/tests/e2e/`;
+the Playwright configuration remains in `wordpress-plugin/e2e/`.
 
 ## Running the harness
 
@@ -19,16 +20,17 @@ npm run env:start --workspace @byline/wordpress-plugin
 ```
 
 ```bash
-npx playwright install chromium && npm run test:e2e --workspace @byline/wordpress-plugin
+npx playwright install chromium && npm run test:e2e:wp71
 ```
 
-Stop the environment with `npm run env:stop --workspace @byline/wordpress-plugin`.
+Stop the environment with `npm run env:stop`.
 `WP_BASE_URL`, `WP_ADMIN_USER`, and `WP_ADMIN_PASSWORD` override the `wp-env`
 defaults (`http://localhost:8888`, `admin`, `password`).
 
 `.wp-env.json` mounts this repository's plugin directory directly, so run
 `npm run build:plugin` first: the editor loads `build/editorial-workflow.js`,
-not `src/`.
+not `src/`. Use `npm run test:e2e:legacy` for the smaller WordPress 6.6
+compatibility environment.
 
 ## What the specs cover
 

@@ -9,10 +9,10 @@
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "test:e2e:primary": "bash ../scripts/run-wordpress-e2e.sh primary",
     "test:e2e:legacy": "bash ../scripts/run-wordpress-e2e.sh legacy",
-    "env:start": "wp-env start --config=../.wp-env.json",
-    "env:stop": "wp-env stop --config=../.wp-env.json",
-    "env:start:legacy": "wp-env start --config=../.wp-env.legacy.json",
-    "env:stop:legacy": "wp-env stop --config=../.wp-env.legacy.json",
+    "env:start": "cd .. && wp-env start --config=.wp-env.json",
+    "env:stop": "cd .. && wp-env stop --config=.wp-env.json",
+    "env:start:legacy": "cd .. && wp-env start --config=.wp-env.legacy.json",
+    "env:stop:legacy": "cd .. && wp-env stop --config=.wp-env.legacy.json",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -43,7 +43,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "@wordpress/env": "11.14.0",
-    "@wordpress/scripts": "34.1.0",
+    "@wordpress/scripts": "34.2.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "typescript": "6.0.3",
