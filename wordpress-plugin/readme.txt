@@ -4,7 +4,7 @@ Tags: newsroom, editorial, journalism, headless, student-journalism
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.2.12
+Stable tag: 0.2.13
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,35 @@ WordPress publication state, a Studio for homepage design, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==
+
+= 0.2.13 =
+
+**Adds the newsroom OS planning, coverage, and distribution surfaces, and
+hardens their permissions.**
+
+* Adds Planning Board, List, and Calendar views with saved views, plus Media
+  Desk, Coverage, Feedback, Performance, Content Health, and a command palette,
+  all behind protected REST contracts.
+* Adds editorial workflow panels for tasks, readiness, contributors and guest
+  bylines, corrections, distribution, and reader feedback.
+* Adds public Coverage and Corrections routes and a static-export-safe search
+  with facets, typo-tolerant matching, URL state, and safe highlighting.
+* Adds newsletter issues with provider adapters, immutable snapshots,
+  scheduling and idempotency, and privacy-safe integration boundaries.
+* Adds Studio design scheduling with conflict, rebase, and cancel flows, diff
+  review, and Coverage-aware preview resolution.
+* Hardens newsroom permissions with object-level filtering, publisher-only
+  delivery, and private feedback and guest controls.
+* Preserves locally voted poll answers during full migrations and reports the
+  retained answers.
+* Sports now picks the nearest and latest dated game even when TBA or unsorted
+  records come first, and bulk schedule and roster imports are restricted to
+  editors or Byline managers.
+* Restores the attachment image-credit REST callback.
+* Discord tells you when a storyboard thread has no WordPress article yet and
+  offers to create one, instead of showing an ambiguous permission error.
+* The rule above the site footer now uses the publication's accent token
+  instead of a fixed rainbow gradient.
 
 = 0.2.12 =
 
@@ -113,6 +142,12 @@ makes Studio a real homepage editor.**
 * Homepage designs saved while these settings existed continue to load.
 
 == Upgrade Notice ==
+
+= 0.2.13 =
+Adds the newsroom planning, coverage, newsletter, and design-scheduling
+surfaces. New capabilities are granted to existing editor and Byline manager
+roles, so review who can publish newsletters and manage guest contributors
+after updating. Existing workflow, poll, and design data is preserved.
 
 = 0.2.12 =
 Existing Page Sections are repaired automatically on the next administrator
