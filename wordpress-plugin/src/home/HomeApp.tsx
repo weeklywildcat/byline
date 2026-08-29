@@ -56,7 +56,7 @@ function requestError(error: unknown, fallback: string): string {
     ? (error as { message?: unknown }).message
     : undefined;
   if (typeof candidate !== "string") return fallback;
-  const message = candidate.replace(/<[^>]*>/g, "").trim();
+  const message = candidate.replace(/[<>]/g, "").trim();
   if (!message || message.length > 180 || /(?:stack trace|fatal error|password|token|secret|authorization|sqlstate)/i.test(message)) return fallback;
   return message;
 }
