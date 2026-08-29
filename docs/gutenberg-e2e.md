@@ -1,4 +1,4 @@
-# Browser coverage for the Gutenberg Story sidebar
+# Browser coverage for Story workflow, Preview, and Planning
 
 Most of the Story sidebar is covered without a browser: the mutation queue, the
 Discord state projection, and the website lifecycle mapping have vitest suites
@@ -30,7 +30,8 @@ defaults (`http://localhost:8888`, `admin`, `password`).
 `.wp-env.json` mounts this repository's plugin directory directly, so run
 `npm run build:plugin` first: the editor loads `build/editorial-workflow.js`,
 not `src/`. Use `npm run test:e2e:legacy` for the smaller WordPress 6.6
-compatibility environment.
+compatibility environment. The same suite runs in both environments; the
+primary command uses WordPress 7.1 and the legacy command uses WordPress 6.6.
 
 ## What the specs cover
 
@@ -42,6 +43,11 @@ compatibility environment.
 4. Publishing shows a queued/building website state, and Live only after the
    public manifest reports the expected revision.
 5. A failed website update retries into the durable job system, once per click.
+6. Preview as Byline saves the current draft first, renders saved content in
+   the authenticated private preview, blocks public actions, and is not
+   anonymously accessible.
+7. Planning Quick View moves one story optimistically, persists it, rolls back
+   a failed move without corrupting another story, and opens the full editor.
 
 ## Manual QA that still needs a person
 

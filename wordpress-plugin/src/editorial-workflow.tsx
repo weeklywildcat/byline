@@ -1032,6 +1032,25 @@ function StoryPreviewLaunch({ postId }: { postId: number }) {
   const openPreview = useCallback(async () => {
     if (postId <= 0 || isSaving) return;
 
+    // Reserve the popup during the click gesture. Waiting for savePost() before
+    // calling window.open() is rejected by popup blockers in real browsers.
+    // The window stays blank until the save has completed, so the preview can
+    // never render an older draft snapshot as the result of this action.
+    const previewWindow = window.open('about:blank', '_blank');
+    if (!previewWindow) {
+      setError(__('The preview window was blocked. Allow pop-ups for this WordPress site and try again.', 'weekly-wildcat-headless'));
+      return;
+    }
+    try {
+      // This is a same-origin, trusted admin URL. Clear the opener before any
+      // later navigation so reserving the window does not create a reverse-tab
+      // navigation surface.
+      previewWindow.opener = null;
+    } catch {
+      // The navigation below remains safe even when a browser exposes a
+      // read-only opener property.
+    }
+
     setIsSaving(true);
     setError(null);
 
@@ -1044,11 +1063,9 @@ function StoryPreviewLaunch({ postId }: { postId: number }) {
 
       const previewUrl = new URL(configuredUrl, window.location.href);
       previewUrl.searchParams.set('post', String(postId));
-      const previewWindow = window.open(previewUrl.toString(), '_blank', 'noopener,noreferrer');
-      if (!previewWindow) {
-        throw new Error(__('The preview window was blocked. Allow pop-ups for this WordPress site and try again.', 'weekly-wildcat-headless'));
-      }
+      previewWindow.location.replace(previewUrl.toString());
     } catch (nextError) {
+      previewWindow.close();
       setError(errorMessage(nextError));
     } finally {
       setIsSaving(false);
