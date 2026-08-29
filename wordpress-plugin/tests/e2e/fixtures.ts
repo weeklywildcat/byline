@@ -27,7 +27,17 @@ export async function loginAsAdmin(page: Page): Promise<void> {
     await page.click("#wp-submit");
   }
 
-  await expect(page.locator("#wpadminbar")).toBeVisible();
+  // The admin bar is not guaranteed on every admin screen/theme. The stable
+  // login boundary is the authenticated admin document itself, which exposes
+  // the REST nonce used by the session fixture.
+  await expect.poll(
+    () => page.evaluate(() => {
+      const body = document.body;
+      const pathname = window.location.pathname;
+      return !pathname.endsWith("/wp-login.php") && body.classList.contains("wp-admin");
+    }),
+    { timeout: 20_000, intervals: [100, 250, 500] }
+  ).toBe(true);
 }
 
 export type AdminRestResult<T = unknown> = { ok: boolean; status: number; payload: T };

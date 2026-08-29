@@ -271,7 +271,11 @@ export function StoryQuickView({ story, statuses, fetchers, onClose, onMoveStory
         </header>
 
         {loadError ? <Notice status="warning" isDismissible={false}>{loadError}<Button variant="link" onClick={() => void load()}>{__("Retry", "weekly-wildcat-headless")}</Button></Notice> : null}
-        {actionError ? <Notice status="error" isDismissible={false}>{actionError}</Notice> : null}
+        {actionError ? (
+          <div className="byline-story-quick-view-action-error" role="alert" aria-live="assertive">
+            <Notice status="error" isDismissible={false}>{actionError}</Notice>
+          </div>
+        ) : null}
         {isLoading ? <div className="byline-story-quick-view-loading"><Spinner /><span>{__("Loading story details…", "weekly-wildcat-headless")}</span></div> : null}
 
         <StoryQuickViewSection title={__("Actions", "weekly-wildcat-headless")}>

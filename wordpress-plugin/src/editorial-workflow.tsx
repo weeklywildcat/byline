@@ -25,7 +25,7 @@ import apiFetch from '@wordpress/api-fetch';
 import { Button, Notice, Panel, PanelBody, SelectControl, Spinner, TextControl, TextareaControl } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { useCallback, useEffect, useMemo, useRef, useState } from '@wordpress/element';
-import * as editorModule from '@wordpress/editor';
+import * as editPostModule from '@wordpress/edit-post';
 import { __, sprintf } from '@wordpress/i18n';
 import { listView } from '@wordpress/icons';
 import { registerPlugin } from '@wordpress/plugins';
@@ -96,7 +96,7 @@ declare global {
 // `PluginSidebar` registers its own entry in the editor's More menu, so no
 // separate `PluginSidebarMoreMenuItem` is rendered here: a second registration
 // would put two identical "Story" items in that menu.
-const { PluginPostStatusInfo, PluginSidebar } = editorModule;
+const { PluginPostStatusInfo, PluginSidebar } = editPostModule;
 
 /**
  * These fills are available in the WordPress editor runtime, but older
@@ -108,7 +108,7 @@ type EditorPanelSlotFill = ComponentType<{ className?: string; children?: ReactN
 const {
   PluginPrePublishPanel,
   PluginPostPublishPanel
-} = editorModule as typeof editorModule & {
+} = editPostModule as typeof editPostModule & {
   PluginPrePublishPanel?: EditorPanelSlotFill;
   PluginPostPublishPanel?: EditorPanelSlotFill;
 };

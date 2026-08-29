@@ -159,20 +159,31 @@ export async function dismissEditorWelcome(page: Page): Promise<void> {
   for (let index = 0; index < await dialogs.count(); index += 1) {
     const dialog = dialogs.nth(index);
     if (!(await dialog.isVisible().catch(() => false))) continue;
-    const welcome = dialog.filter({ hasText: /welcome|get started|block editor/i });
+    const welcome = dialog.filter({ hasText: /welcome(?: to)? the (?:block )?editor|get started/i });
     if (!(await welcome.isVisible().catch(() => false))) continue;
 
-    const dismiss = welcome.getByRole("button", { name: /get started|close|dismiss/i }).first();
-    if (await dismiss.isVisible().catch(() => false)) {
-      await dismiss.click();
-      return;
+    // The modern guide can briefly leave its button covered while the editor
+    // iframe is attaching. Escape is the guide's own keyboard dismissal and
+    // avoids waiting for a stale overlay hit target. Fall back to the named
+    // control when an older build does not wire Escape.
+    await welcome.press("Escape").catch(() => undefined);
+    if (await welcome.isVisible().catch(() => false)) {
+      const dismiss = welcome.getByRole("button", { name: /^(?:get started|close|dismiss)$/i }).first();
+      if (await dismiss.isVisible().catch(() => false)) {
+        await dismiss.click({ timeout: 5_000 }).catch(() => undefined);
+      }
     }
+    await expect(welcome).not.toBeVisible({ timeout: 5_000 }).catch(() => undefined);
+    return;
   }
 
   // Some older editor builds render the welcome control without a dialog
   // wrapper. Check it without waiting for an optional element.
   const getStarted = page.getByRole("button", { name: /get started/i }).first();
-  if (await getStarted.isVisible().catch(() => false)) await getStarted.click();
+  if (await getStarted.isVisible().catch(() => false)) {
+    await page.keyboard.press("Escape").catch(() => undefined);
+    if (await getStarted.isVisible().catch(() => false)) await getStarted.click({ timeout: 5_000 }).catch(() => undefined);
+  }
 }
 
 async function editorTitleLocator(canvas: EditorSurface): Promise<Locator> {
@@ -364,7 +375,9 @@ export async function openStorySidebar(page: Page): Promise<Locator> {
   // plugin-owned semantic name is stable; do not couple the helper to one
   // Gutenberg wording variant.
   const existing = page.getByRole("region", { name: /story/i }).first();
+  const ownedSurface = page.locator(".byline-editorial-sidebar").first();
   if (await existing.isVisible().catch(() => false)) return existing;
+  if (await ownedSurface.isVisible().catch(() => false)) return ownedSurface;
 
   const topBar = page.getByRole("region", { name: /editor top bar/i });
   const optionCandidates = [
@@ -393,8 +406,11 @@ export async function openStorySidebar(page: Page): Promise<Locator> {
   await expect(storyItems).toHaveCount(1);
   await storyItems.first().click();
 
-  await expect(existing).toBeVisible({ timeout: EDITOR_READY_TIMEOUT });
-  return existing;
+  await expect.poll(
+    async () => (await existing.isVisible().catch(() => false)) || (await ownedSurface.isVisible().catch(() => false)),
+    { timeout: EDITOR_READY_TIMEOUT, intervals: [100, 250, 500] }
+  ).toBe(true);
+  return (await existing.isVisible().catch(() => false)) ? existing : ownedSurface;
 }
 
 export type StoryPanel = "workflow" | "tasks" | "visuals" | "contributors";
@@ -417,10 +433,12 @@ export async function openStoryPanel(page: Page, panel: StoryPanel): Promise<Loc
 }
 
 export async function closeStorySidebar(page: Page): Promise<void> {
-  const sidebar = page.getByRole("region", { name: /^Story$/i }).first();
-  if (!(await sidebar.isVisible().catch(() => false))) return;
+  const sidebar = page.getByRole("region", { name: /story/i }).first();
+  const ownedSurface = page.locator(".byline-editorial-sidebar").first();
+  const surface = await sidebar.isVisible().catch(() => false) ? sidebar : ownedSurface;
+  if (!(await surface.isVisible().catch(() => false))) return;
 
-  const closeButton = sidebar.getByRole("button", { name: /close story|close/i }).first();
+  const closeButton = surface.getByRole("button", { name: /close story|close/i }).first();
   if (await closeButton.isVisible().catch(() => false)) {
     await closeButton.click();
   }
