@@ -5,7 +5,8 @@
  *
  *  - `PluginPostStatusInfo` adds one summary row to the document Summary panel,
  *    next to — and clearly distinct from — the WordPress publication status.
- *  - `PluginSidebar` (with its More-menu item) holds the compact Story surface.
+ *  - `PluginSidebar` holds the compact Story surface and registers exactly one
+ *    "Story" entry in the editor's More menu by itself.
  *  - `PluginPrePublishPanel` and `PluginPostPublishPanel` provide publish-time
  *    readiness and website lifecycle context when the host editor supports them.
  *
@@ -55,11 +56,11 @@ import type {
 import { summarizeReadiness } from './editorial/editorial-model';
 
 import {
-  describeWorkflowError,
+  workflowDiscordState,
   workflowStatusLabel,
   workflowStoryPath,
+  createWorkflowMutationQueue,
   createWorkflowRequestTracker,
-  createSerializedWorkflowSaveQueue,
   type WorkflowChanges,
   type WorkflowPayload
 } from './editorial-workflow-model';
@@ -69,7 +70,10 @@ import './editorial-workflow.css';
 const PLUGIN_NAME = 'byline-editorial-workflow';
 const SIDEBAR_NAME = 'byline-editorial-workflow-sidebar';
 
-const { PluginPostStatusInfo, PluginSidebar, PluginSidebarMoreMenuItem } = editorModule;
+// `PluginSidebar` registers its own entry in the editor's More menu, so no
+// separate `PluginSidebarMoreMenuItem` is rendered here: a second registration
+// would put two identical "Story" items in that menu.
+const { PluginPostStatusInfo, PluginSidebar } = editorModule;
 
 /**
  * These fills are available in the WordPress editor runtime, but older
@@ -124,6 +128,11 @@ function deadlineContext(value: string): string {
 /**
  * Loads the workflow once per post and owns every write.
  *
+ * Every mutation — stage, editor, deadline, planned publication, visual notes —
+ * goes through one serialized, revision-aware queue per story, so two of this
+ * editor's own controls can never conflict with each other. Requests never
+ * block typing: a later edit simply coalesces into the next queued request.
+ *
  * A failure here is never fatal: `error` is surfaced as a dismissible notice
  * with a retry, and the editor keeps writing their article regardless.
  */
@@ -131,6 +140,7 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
   const [payload, setPayload] = useState<WorkflowPayload | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [hasConflict, setHasConflict] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -138,8 +148,6 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
   // must never make an unrelated workflow save look stale (or leave its busy
   // indicator stuck).
   const requestTrackerRef = useRef(createWorkflowRequestTracker());
-  const inFlightWritesRef = useRef(new Set<number>());
-  const revisionRef = useRef<number | null>(null);
   const activePostIdRef = useRef(postId);
   activePostIdRef.current = postId;
   const mountedRef = useRef(true);
@@ -151,26 +159,66 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
     };
   }, []);
 
-  useEffect(() => {
-    revisionRef.current = null;
-  }, [postId]);
+  // One queue per story. A queue captures its own post id, so a response for a
+  // story the editor already left can never be applied to the current one.
+  const queue = useMemo(() => createWorkflowMutationQueue<WorkflowPayload>({
+    send: (changes) => apiFetch<WorkflowPayload>({ path: storyPath(postId), method: 'POST', data: changes }),
+    readRevision: (next) => (typeof next.story?.revision === 'number' ? next.story.revision : null),
+    onSuccess: (next, { superseded }) => {
+      if (!mountedRef.current || activePostIdRef.current !== postId) return;
+      // A newer local edit is already queued behind this response. Applying it
+      // now would briefly put the sidebar back on the superseded values.
+      if (!superseded) setPayload(next);
+      setSaveError(null);
+      setSavedAt(Date.now());
+    },
+    onError: (error, { conflict }) => {
+      if (!mountedRef.current || activePostIdRef.current !== postId) return;
+      // The entered value is deliberately left in the field so the editor can
+      // retry rather than retyping it.
+      setSaveError(error.message);
+      if (conflict) setHasConflict(true);
+    },
+    onPendingChange: (pendingCount) => {
+      if (!mountedRef.current || activePostIdRef.current !== postId) return;
+      setIsSaving(pendingCount > 0);
+    },
+    errorOptions: {
+      title: __('Workflow error', 'weekly-wildcat-headless'),
+      message: __('Something went wrong. Please try again.', 'weekly-wildcat-headless')
+    },
+    conflictMessage: __('This story changed somewhere else. Reload the workflow before saving again.', 'weekly-wildcat-headless')
+  }), [postId]);
+
+  useEffect(() => () => queue.detach(), [queue]);
 
   const load = useCallback(() => {
     if (!postId) return;
 
     const requestTracker = requestTrackerRef.current;
     const requestId = requestTracker.beginRead();
-    const saveSequenceAtStart = requestTracker.writeVersion();
+    const settledWritesAtStart = queue.settledCount();
     setIsLoading(true);
     setLoadError(null);
 
     apiFetch<WorkflowPayload>({ path: `${storyPath(postId)}/bootstrap` })
       .then((next) => {
         if (!mountedRef.current || activePostIdRef.current !== postId || !requestTracker.isCurrentRead(requestId)) return;
-        // A save response is authoritative while it is in flight. Applying a
-        // slower GET here would put the sidebar back on the pre-save values.
-        if (inFlightWritesRef.current.size > 0 || requestTracker.writeVersion() !== saveSequenceAtStart) return;
-        if (typeof next.story?.revision === 'number') revisionRef.current = next.story.revision;
+        // A save that is queued, in flight, or that finished while this read
+        // was open is authoritative. Applying a slower GET here would put the
+        // sidebar back on pre-save values and — worse — would reset the
+        // revision the next mutation builds on, turning the editor's own write
+        // into a conflict. A conflicted queue is the exception: it is not
+        // sending anything, so a fresh read is exactly what reconciles it.
+        if (!queue.hasConflict() && (queue.pendingCount() > 0 || queue.settledCount() !== settledWritesAtStart)) return;
+        const revision = typeof next.story?.revision === 'number' ? next.story.revision : null;
+        // A completed read is also the reconciliation point for a conflict:
+        // this snapshot is now the revision the next mutation builds on.
+        queue.reconcile(revision);
+        setHasConflict(false);
+        // A reconciled read clears the stale conflict notice with it; the
+        // sidebar now shows the values the next save will build on.
+        setSaveError(null);
         setPayload(next);
       })
       .catch((error: unknown) => {
@@ -181,7 +229,7 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
         if (!mountedRef.current || activePostIdRef.current !== postId || !requestTracker.isCurrentRead(requestId)) return;
         setIsLoading(false);
       });
-  }, [postId]);
+  }, [postId, queue]);
 
   useEffect(load, [load]);
 
@@ -195,51 +243,21 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
   const save = useCallback(
     (changes: WorkflowSaveChanges) => {
       if (!postId) return Promise.resolve(false);
-
-      const requestTracker = requestTrackerRef.current;
-      const requestPostId = postId;
-      const requestId = requestTracker.beginWrite();
-      inFlightWritesRef.current.add(requestId);
-      setIsSaving(true);
       setSaveError(null);
-
-      const requestChanges: WorkflowSaveChanges = changes.expectedRevision === undefined && revisionRef.current !== null
-        ? { ...changes, expectedRevision: revisionRef.current }
-        : changes;
-
-      return apiFetch<WorkflowPayload>({ path: storyPath(postId), method: 'POST', data: requestChanges })
-        .then((next) => {
-          if (!mountedRef.current || activePostIdRef.current !== requestPostId || !requestTracker.isCurrentWrite(requestId)) return false;
-          if (typeof next.story?.revision === 'number') revisionRef.current = next.story.revision;
-          setPayload(next);
-          setSavedAt(Date.now());
-          return true;
-        })
-        .catch((error: unknown) => {
-          // The entered value is deliberately left in the field so the editor
-          // can correct it and retry rather than retyping it.
-          if (mountedRef.current && activePostIdRef.current === requestPostId && requestTracker.isCurrentWrite(requestId)) setSaveError(errorMessage(error));
-          return false;
-        })
-        .finally(() => {
-          inFlightWritesRef.current.delete(requestId);
-          if (mountedRef.current && activePostIdRef.current === requestPostId && requestTracker.isCurrentWrite(requestId)) {
-            setIsSaving(inFlightWritesRef.current.size > 0);
-          }
-        });
+      return queue.enqueue(changes as Record<string, unknown>).then((outcome) => outcome.ok);
     },
-    [postId]
+    [postId, queue]
   );
 
   const clearSaveError = useCallback(() => setSaveError(null), []);
 
-  return { payload, load, save, clearSaveError, isLoading, isSaving, loadError, saveError, savedAt };
+  return { payload, load, save, clearSaveError, isLoading, isSaving, loadError, saveError, hasConflict, savedAt };
 }
 
 type WorkflowControlsProps = ReturnType<typeof useEditorialWorkflow>;
 
 function WorkflowControls(workflow: WorkflowControlsProps) {
-  const { payload, load, save, isLoading, isSaving, loadError, saveError, savedAt } = workflow;
+  const { payload, load, save, isLoading, isSaving, loadError, saveError, hasConflict, savedAt } = workflow;
 
   if (loadError) {
     return (
@@ -270,7 +288,10 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
   const { story, statuses = [], capabilities, writer, editors = [], notes } = normalized;
   const currentLabel = workflowStatusLabel(payload);
   const published = story.isPublished || story.postStatus === 'publish';
-  const busy = isLoading || isSaving;
+  // A save in flight never disables a control. Edits queue behind the request
+  // and are sent with the revision the previous response returned, so an editor
+  // is never made to wait to change a stage or type a date.
+  const busy = isLoading;
   const canEditDates = capabilities.assign === true && capabilities.changeDeadline !== false;
   const canEditPlannedPublication = capabilities.assign === true && capabilities.changePlannedPublication !== false;
 
@@ -387,8 +408,16 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
       ) : null}
 
       {saveError ? (
-        <Notice status="error" isDismissible={false}>
+        <Notice status={hasConflict ? 'warning' : 'error'} isDismissible={false}>
           <p>{saveError}</p>
+          {hasConflict ? (
+            <>
+              <p>{__('Your entries are still here. Reload the workflow to see the newer values before saving again.', 'weekly-wildcat-headless')}</p>
+              <Button variant="secondary" onClick={load}>
+                {__('Reload workflow', 'weekly-wildcat-headless')}
+              </Button>
+            </>
+          ) : null}
         </Notice>
       ) : null}
 
@@ -423,9 +452,11 @@ function visualStatusLabel(story: EditorialWorkflowPayload['story']): string {
 }
 
 /**
- * The visual note remains serialized even though it now lives in its own
- * collapsed panel. This prevents navigation or a slower response from losing
- * the editor's latest note.
+ * The visual note shares the story's single mutation queue. Autosave here and a
+ * Stage change in the panel above are the same editor's writes, so they are
+ * serialized against one another and each request carries the revision the
+ * previous response returned. That is what keeps an autosave from conflicting
+ * with its own author's previous write.
  */
 function VisualNeedsPanel({ workflow }: { workflow: WorkflowControlsProps }) {
   const { payload, save, clearSaveError, isLoading, loadError } = workflow;
@@ -439,20 +470,21 @@ function VisualNeedsPanel({ workflow }: { workflow: WorkflowControlsProps }) {
   const visualsDirtyRef = useRef(false);
   const visualsSaveCountRef = useRef(0);
   const visualsInitializedRef = useRef(false);
-  const visualsQueueRef = useRef(createSerializedWorkflowSaveQueue<string>((value) => save({ visuals: value })));
+  const saveRef = useRef(save);
+  saveRef.current = save;
 
   const enqueueVisualSave = useCallback((value: string) => {
     visualsSaveCountRef.current += 1;
     setVisualsSaving(true);
-    const request = visualsQueueRef.current.enqueue(value);
-    void request.then((saved) => {
+    void saveRef.current({ visuals: value }).then((saved) => {
       visualsSaveCountRef.current -= 1;
       if (visualsSaveCountRef.current === 0) setVisualsSaving(false);
-      if (saved && latestVisualsRef.current === value) {
+      if (latestVisualsRef.current !== value) return;
+      if (saved) {
         visualsDirtyRef.current = false;
         setVisualsDirty(false);
         setVisualsSaveError(false);
-      } else if (!saved && latestVisualsRef.current === value) {
+      } else {
         setVisualsSaveError(true);
       }
     });
@@ -828,13 +860,22 @@ function ActivityPanel({ records, isLoading, error, onRetry }: { records: Editor
   );
 }
 
-type WebsiteLifecycleStatus = 'not-published' | 'published' | 'building' | 'live' | 'failed' | 'unknown';
+type WebsiteLifecycleStatus =
+  | 'not-published'
+  | 'published'
+  | 'building'
+  | 'live'
+  | 'failed'
+  | 'needs-configuration'
+  | 'unknown';
 
 type NormalizedDistribution = {
   channels: DistributionChannel[];
   capabilities: { addToNewsletter: boolean };
   websiteStatus: WebsiteLifecycleStatus;
   canRetryWebsite: boolean;
+  /** True when the server answered the retry capability itself. */
+  retryWebsiteAnswered: boolean;
 };
 
 function websiteLifecycleStatus(value: unknown): WebsiteLifecycleStatus {
@@ -844,6 +885,9 @@ function websiteLifecycleStatus(value: unknown): WebsiteLifecycleStatus {
   if (status === 'rebuild-pending' || status === 'building' || status === 'pending' || status === 'queued') return 'building';
   if (status === 'live') return 'live';
   if (status === 'build-failed' || status === 'failed' || status === 'error') return 'failed';
+  // A published story with no deployment target is not a build failure and is
+  // certainly not live. It is a configuration gap, and it says so.
+  if (status === 'needs-configuration' || status === 'not-configured') return 'needs-configuration';
   return 'unknown';
 }
 
@@ -882,10 +926,11 @@ function normalizeDistribution(value: unknown, postId: number, headline: string,
       )
     },
     websiteStatus,
-    canRetryWebsite: websiteStatus === 'failed' && (
+    canRetryWebsite: (websiteStatus === 'failed' || websiteStatus === 'needs-configuration') && (
       raw.canRetryWebsite === true ||
       rawCapabilities.retryWebsite === true
-    )
+    ),
+    retryWebsiteAnswered: rawCapabilities.retryWebsite !== undefined || raw.canRetryWebsite !== undefined
   };
 }
 
@@ -982,7 +1027,8 @@ function EditorialNewsroomPanels({
     channels: [],
     capabilities: { addToNewsletter: false },
     websiteStatus: 'unknown',
-    canRetryWebsite: false
+    canRetryWebsite: false,
+    retryWebsiteAnswered: false
   });
   const [loading, setLoading] = useState<Record<EditorialPanelKey, boolean>>(emptyEditorialPanelState);
   const [loaded, setLoaded] = useState<Record<EditorialPanelKey, boolean>>(emptyEditorialPanelState);
@@ -1100,9 +1146,9 @@ function EditorialNewsroomPanels({
     : summaryCount(rawPayload.corrections, normalizeCorrections(rawPayload.corrections).length);
   const isPublished = Boolean(workflowForPanel?.story.isPublished || workflowForPanel?.story.postStatus === 'publish');
   const discord = record(rawPayload.discord);
-  const discordThreadId = stringValue(discord.threadId);
   const discordUrl = stringValue(discord.threadUrl);
-  const discordConfigured = discord.configured === true || discord.available === true || Boolean(discordThreadId || discordUrl);
+  const discordState = workflowDiscordState(discord);
+  const discordCanCreateThread = discord.canCreateThread === true;
 
   return (
     <>
@@ -1217,7 +1263,10 @@ function EditorialNewsroomPanels({
         </PanelBody>
       ) : null}
 
-      {discordConfigured ? (
+      {/* Discord is optional. When it is not configured the Discussion panel is
+          not rendered at all, so an unused integration never adds a dead end to
+          the article sidebar. */}
+      {discordState !== 'not-configured' ? (
         <PanelBody
           className="byline-editorial-sidebar-panel"
           title={__('Discussion', 'weekly-wildcat-headless')}
@@ -1226,10 +1275,15 @@ function EditorialNewsroomPanels({
           {({ opened }) => opened ? (
             <div className="byline-editorial-discussion-summary">
               <p>
-                {discordThreadId
+                {discordState === 'linked'
                   ? __('This story has a linked Discord discussion.', 'weekly-wildcat-headless')
                   : __('Discord is connected, but this story is not linked to a thread yet.', 'weekly-wildcat-headless')}
               </p>
+              {discordState === 'configured-unlinked' && !discordCanCreateThread ? (
+                <p className="byline-editorial-muted">
+                  {__('Threads are created in Discord. This story links itself the next time the Byline bot syncs the storyboard.', 'weekly-wildcat-headless')}
+                </p>
+              ) : null}
               {discordUrl ? <a href={discordUrl} target="_blank" rel="noreferrer">{__('Open Discord thread', 'weekly-wildcat-headless')}</a> : null}
             </div>
           ) : null}
@@ -1344,6 +1398,7 @@ function postPublishStatusLabel(status: WebsiteLifecycleStatus, isPublished: boo
   if (status === 'live') return __('Live', 'weekly-wildcat-headless');
   if (status === 'building') return __('Building', 'weekly-wildcat-headless');
   if (status === 'failed') return __('Website update failed', 'weekly-wildcat-headless');
+  if (status === 'needs-configuration') return __('Website update requires configuration', 'weekly-wildcat-headless');
   if (status === 'published' || isPublished) return __('Published in Byline', 'weekly-wildcat-headless');
   if (status === 'not-published') return __('Not published to Byline yet', 'weekly-wildcat-headless');
   return __('Website status is unavailable', 'weekly-wildcat-headless');
@@ -1369,6 +1424,7 @@ function PostPublishLifecycle({
   const [error, setError] = useState<unknown>(null);
   const [canRetry, setCanRetry] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [retriedStatus, setRetriedStatus] = useState<WebsiteLifecycleStatus | null>(null);
   const mountedRef = useRef(true);
   const pollAttemptsRef = useRef(0);
 
@@ -1381,7 +1437,13 @@ function PostPublishLifecycle({
     setError(null);
     try {
       const value = await client.getDistribution(postId);
-      if (mountedRef.current) setDistribution(normalizeDistribution(value, postId, title, canonicalUrl, excerpt));
+      if (mountedRef.current) {
+        const next = normalizeDistribution(value, postId, title, canonicalUrl, excerpt);
+        setDistribution(next);
+        // Once the server reports a lifecycle of its own, the optimistic
+        // post-retry state has done its job and must not mask a later failure.
+        if (next.websiteStatus !== 'failed' && next.websiteStatus !== 'needs-configuration') setRetriedStatus(null);
+      }
     } catch (caught: unknown) {
       if (mountedRef.current) setError(caught);
     } finally {
@@ -1393,14 +1455,22 @@ function PostPublishLifecycle({
     if (isPublished) void load();
   }, [isPublished, load]);
 
-  const websiteStatus = distribution?.websiteStatus ?? (isPublished ? 'published' : 'unknown');
+  // A retry answers with the durable job's own state, so the panel can move to
+  // queued/building immediately instead of showing "failed" while work runs.
+  const websiteStatus: WebsiteLifecycleStatus = retriedStatus
+    ?? distribution?.websiteStatus
+    ?? (isPublished ? 'published' : 'unknown');
 
   useEffect(() => {
     pollAttemptsRef.current = 0;
   }, [isPublished, postId]);
 
   useEffect(() => {
-    if (!isPublished || websiteStatus === 'live' || websiteStatus === 'failed' || pollAttemptsRef.current >= 12) {
+    if (!isPublished
+      || websiteStatus === 'live'
+      || websiteStatus === 'failed'
+      || websiteStatus === 'needs-configuration'
+      || pollAttemptsRef.current >= 12) {
       return undefined;
     }
 
@@ -1418,9 +1488,16 @@ function PostPublishLifecycle({
   }, [isPublished, load, websiteStatus]);
 
   useEffect(() => {
-    if (websiteStatus !== 'failed') return undefined;
+    if (websiteStatus !== 'failed' && websiteStatus !== 'needs-configuration') return undefined;
     if (distribution?.canRetryWebsite) {
       setCanRetry(true);
+      return undefined;
+    }
+    // The story's own distribution response reports whether this user may
+    // retry. When it has answered, do not also probe the integrations route
+    // that most editors are not allowed to read.
+    if (distribution?.retryWebsiteAnswered) {
+      setCanRetry(false);
       return undefined;
     }
     let active = true;
@@ -1436,15 +1513,27 @@ function PostPublishLifecycle({
     };
   }, [distribution, websiteStatus]);
 
+  /**
+   * Retry requeues the durable deployment job rather than firing an untracked
+   * hook request. Repeated clicks are guarded here and remain idempotent on the
+   * server, which requeues the existing job instead of creating a second one.
+   */
   const retryWebsite = async () => {
     if (!canRetry || isRetrying) return;
     setIsRetrying(true);
     setError(null);
     try {
-      await apiFetch({ path: '/byline/v1/admin/deployment/trigger', method: 'POST' });
+      const status = await apiFetch<UnknownRecord>({ path: '/byline/v1/admin/deployment/trigger', method: 'POST' });
+      if (mountedRef.current) {
+        const lifecycle = websiteLifecycleStatus(record(status).lifecycle);
+        setRetriedStatus(lifecycle === 'unknown' ? 'building' : lifecycle);
+      }
       await load();
     } catch (caught: unknown) {
-      if (mountedRef.current) setError(caught);
+      if (mountedRef.current) {
+        setRetriedStatus(null);
+        setError(caught);
+      }
     } finally {
       if (mountedRef.current) setIsRetrying(false);
     }
@@ -1464,14 +1553,20 @@ function PostPublishLifecycle({
       <p className="byline-editorial-muted">
         {websiteStatus === 'failed'
           ? __('WordPress publication succeeded; the Byline website update needs attention.', 'weekly-wildcat-headless')
+          : websiteStatus === 'needs-configuration'
+            ? __('WordPress publication succeeded. This change is recorded and will deploy once a deployment target is configured.', 'weekly-wildcat-headless')
           : websiteStatus === 'building' || websiteStatus === 'published'
             ? __('WordPress publication succeeded; Byline is checking the public manifest for the exact revision.', 'weekly-wildcat-headless')
           : __('WordPress publication and the Byline website build are tracked separately.', 'weekly-wildcat-headless')}
       </p>
       {error ? <Notice status="warning" isDismissible={false}>{errorMessage(error)}</Notice> : null}
-      {websiteStatus === 'failed' ? (
-        <Notice status="error" isDismissible={false}>
-          <p>{__('The website build failed after publication.', 'weekly-wildcat-headless')}</p>
+      {websiteStatus === 'failed' || websiteStatus === 'needs-configuration' ? (
+        <Notice status={websiteStatus === 'failed' ? 'error' : 'warning'} isDismissible={false}>
+          <p>
+            {websiteStatus === 'failed'
+              ? __('The website build failed after publication.', 'weekly-wildcat-headless')
+              : __('No deployment target is configured, so the public website has not been rebuilt yet.', 'weekly-wildcat-headless')}
+          </p>
           {canRetry ? (
             <Button variant="secondary" disabled={isRetrying} onClick={() => void retryWebsite()}>
               {isRetrying ? __('Retrying website update…', 'weekly-wildcat-headless') : __('Retry website update', 'weekly-wildcat-headless')}
@@ -1553,10 +1648,6 @@ function EditorialWorkflowPlugin() {
           )}
         </div>
       </PluginPostStatusInfo>
-
-      <PluginSidebarMoreMenuItem target={SIDEBAR_NAME} icon={listView}>
-        {sidebarTitle}
-      </PluginSidebarMoreMenuItem>
 
       <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={listView} className="byline-editorial-sidebar">
         <Panel className="byline-story-panel">
