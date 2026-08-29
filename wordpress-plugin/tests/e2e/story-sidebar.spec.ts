@@ -236,6 +236,7 @@ test.describe("Gutenberg Story sidebar", () => {
       const website = payload.channels?.find((channel: { id: string }) => channel.id === "website");
       if (website) {
         website.status = "build_failed";
+        website.lifecycle = "failed";
         failedDistributionResponses += 1;
       }
       payload.capabilities = { ...payload.capabilities, retryWebsite: true };
