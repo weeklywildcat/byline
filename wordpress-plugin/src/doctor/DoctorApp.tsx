@@ -53,6 +53,20 @@ function checkAction(check: DoctorCheck): DoctorActionId | undefined {
   return undefined;
 }
 
+function manifestAttentionMessage(manifest: DoctorDiagnostics["publicManifest"]): string {
+  if (manifest?.lifecycle === "needs_configuration") {
+    return __("WordPress has a newer public revision, but no deployment provider is configured. Add one in Deployment, then test the public site again.", "weekly-wildcat-headless");
+  }
+
+  const expected = Number(manifest?.expectedRevision || 0);
+  const actual = Number(manifest?.publicationRevision ?? manifest?.contentRevision ?? 0);
+  if (expected > 0 && actual < expected) {
+    return `The public site is at revision ${actual}; Byline expects revision ${expected}. Test the public site again after the build catches up.`;
+  }
+
+  return __("The public manifest could not be verified. WordPress remains available while you test the public site again.", "weekly-wildcat-headless");
+}
+
 function Mark({ status }: { status: string }) {
   const normalized = status === "critical" ? "critical" : status === "recommended" ? "recommended" : "good";
   return <span className={`byline-doctor-mark byline-doctor-mark-${normalized}`} aria-label={normalized === "good" ? __("Good", "weekly-wildcat-headless") : normalized === "critical" ? __("Needs attention", "weekly-wildcat-headless") : __("Recommended", "weekly-wildcat-headless")}>{normalized === "good" ? "✓" : "!"}</span>;
@@ -199,7 +213,7 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
         <Card className="byline-doctor-problem-card">
           <CardBody>
             <h2>{__("Public site needs attention", "weekly-wildcat-headless")}</h2>
-            <p>{__("The public manifest could not be verified. WordPress remains available while you test the public site again.", "weekly-wildcat-headless")}</p>
+            <p>{manifestAttentionMessage(diagnostics?.publicManifest)}</p>
             <Button variant="secondary" isBusy={busyAction === "test-public-manifest"} disabled={Boolean(busyAction)} onClick={() => void runAction("test-public-manifest")}>{__("Test public site", "weekly-wildcat-headless")}</Button>
           </CardBody>
         </Card>
