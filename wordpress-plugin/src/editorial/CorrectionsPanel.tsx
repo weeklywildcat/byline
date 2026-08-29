@@ -93,6 +93,10 @@ export function CorrectionsPanel({
 
   const remove = (record: CorrectionRecord) => {
     if (record.legacy) return;
+    // Kept as a confirmation on purpose. A correction is a public transparency
+    // record: removing one changes what readers see, and re-creating it would
+    // produce a different record with a new identity and timestamps rather than
+    // genuinely restoring the original. Undo here would be a pretence.
     const confirmed = typeof window === "undefined" || window.confirm("Remove this public correction or update?");
     if (confirmed) run(() => onDelete(record.id));
   };

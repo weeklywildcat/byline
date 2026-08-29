@@ -2,6 +2,8 @@ import { Button, Card, CardBody, Notice, SelectControl, Spinner, TextControl, To
 import { useCallback, useEffect, useMemo, useRef, useState } from "@wordpress/element";
 import { __ } from "@wordpress/i18n";
 
+import { createUndoableMutation, normalizeBylineError } from "@byline/admin-runtime";
+
 import type { HomeFetchers } from "./home-api";
 import type { HomePreset, HomePresetsPayload } from "./home-model";
 
@@ -33,12 +35,9 @@ function presetCopy(value: HomePreset): HomePreset {
 }
 
 function requestError(error: unknown): string {
-  const message = error && typeof error === "object" && "message" in error
-    ? (error as { message?: unknown }).message
-    : undefined;
-  return typeof message === "string" && message.trim() && message.length < 220
-    ? message.trim()
-    : __("Workflow defaults could not be loaded. The rest of Home remains usable.", "weekly-wildcat-headless");
+  return normalizeBylineError(error, {
+    message: __("Workflow defaults could not be loaded. The rest of Home remains usable.", "weekly-wildcat-headless")
+  }).message;
 }
 
 export function PresetsPanel({ fetchers, canEdit }: PresetsPanelProps) {
@@ -50,6 +49,10 @@ export function PresetsPanel({ fetchers, canEdit }: PresetsPanelProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  // Resetting a preset is fully reversible: the previous values are captured
+  // and can be written back through the same save endpoint. That earns an Undo
+  // rather than a confirmation dialog in front of the action.
+  const [undoReset, setUndoReset] = useState<(() => Promise<void>) | null>(null);
 
   const load = useCallback(async () => {
     if (!fetchers.getPresets) return;
@@ -117,19 +120,59 @@ export function PresetsPanel({ fetchers, canEdit }: PresetsPanelProps) {
     }
   };
 
+  const applyResult = (type: string, result: { revision: number; preset: HomePreset }) => {
+    setPayload((current) => current ? {
+      ...current,
+      revision: result.revision,
+      presets: { ...current.presets, [type]: result.preset }
+    } : current);
+  };
+
   const reset = async () => {
-    if (!selectedType || !fetchers.resetPreset || !window.confirm(__("Reset this workflow preset to its built-in defaults?", "weekly-wildcat-headless"))) return;
+    const resetPreset = fetchers.resetPreset;
+    const updatePreset = fetchers.updatePreset;
+    const previous = selectedType ? payload?.presets?.[selectedType] : undefined;
+    if (!selectedType || !resetPreset || !previous) return;
+    const type = selectedType;
+    const restored = presetCopy(previous);
+
+    const mutation = createUndoableMutation({
+      perform: () => resetPreset(type),
+      undo: () => {
+        if (!updatePreset) throw new Error("Presets cannot be edited by this account.");
+        return updatePreset(type, {
+          label: restored.label,
+          section: restored.section,
+          workflow: restored.workflow,
+          media: restored.media
+        });
+      }
+    });
+
     setSaving(true);
     setError("");
     setMessage("");
+    setUndoReset(null);
     try {
-      const result = await fetchers.resetPreset(selectedType);
-      setPayload((current) => current ? {
-        ...current,
-        revision: result.revision,
-        presets: { ...current.presets, [selectedType]: result.preset }
-      } : current);
+      applyResult(type, await mutation.execute());
       setMessage(__("Preset reset to its built-in defaults.", "weekly-wildcat-headless"));
+      if (updatePreset) {
+        setUndoReset(() => async () => {
+          setSaving(true);
+          setError("");
+          try {
+            applyResult(type, await mutation.undo());
+            setMessage(__("Preset restored.", "weekly-wildcat-headless"));
+            setUndoReset(null);
+          } catch (caught) {
+            // Undo is a real server write, so a failure says so and stays
+            // available instead of pretending the reset was reversed.
+            setError(requestError(caught));
+          } finally {
+            setSaving(false);
+          }
+        });
+      }
     } catch (caught) {
       setError(requestError(caught));
     } finally {
@@ -169,7 +212,19 @@ export function PresetsPanel({ fetchers, canEdit }: PresetsPanelProps) {
                 </div>
               </>
             ) : <p className="byline-home-muted">{__("Preset editing is limited to publication managers.", "weekly-wildcat-headless")}</p>}
-            {message ? <p className="byline-home-status-line" role="status" aria-live="polite">{message}</p> : null}
+            {message ? (
+              <p className="byline-home-status-line" role="status" aria-live="polite">
+                {message}
+                {undoReset ? (
+                  <>
+                    {" "}
+                    <Button variant="link" disabled={saving} onClick={() => void undoReset()}>
+                      {__("Undo", "weekly-wildcat-headless")}
+                    </Button>
+                  </>
+                ) : null}
+              </p>
+            ) : null}
           </div>
         ) : !loading && !error ? <p className="byline-home-muted">{__("No workflow presets are available.", "weekly-wildcat-headless")}</p> : null}
       </CardBody>

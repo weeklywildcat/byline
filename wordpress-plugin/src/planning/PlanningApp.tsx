@@ -38,6 +38,7 @@ import {
   type PlanningWorkflowStatus,
   type SavedPlanningView
 } from "./planning-model";
+import { describeEditorialError } from "../editorial/editorial-model";
 import { PlanningEmpty, PlanningLoading, PlanningNotice, ViewHeader } from "./planning-ui";
 
 export type PlanningAppProps = {
@@ -166,6 +167,7 @@ export function PlanningApp({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [undoDeletedView, setUndoDeletedView] = useState<(() => Promise<void>) | null>(null);
   const [movingStoryId, setMovingStoryId] = useState<number | null>(null);
   const [savedViews, setSavedViews] = useState<SavedPlanningView[]>(initialData?.savedViews || []);
   const [selectedSavedViewId, setSelectedSavedViewId] = useState("");
@@ -327,25 +329,55 @@ export function PlanningApp({
       setSavedViewName(saved.name);
       setNotice(__("Saved view updated.", "weekly-wildcat-headless"));
     } catch (error: unknown) {
-      setActionError(error && typeof error === "object" && "message" in error ? String((error as { message: unknown }).message) : __("The saved view could not be saved.", "weekly-wildcat-headless"));
+      setActionError(describeEditorialError(error, __("The saved view could not be saved.", "weekly-wildcat-headless")));
     } finally {
       setIsSavingView(false);
     }
   };
 
+  /**
+   * Deleting a saved view is reversible: the same id, name, filters, and sort
+   * can be written straight back through the save endpoint. So it happens
+   * immediately and offers Undo, instead of stopping the user with a dialog.
+   */
   const deleteView = async () => {
     const selected = visibleSavedViews.find((savedView) => savedView.id === selectedSavedViewId);
     if (!selected || !fetchers.deleteSavedView) return;
-    if (typeof window !== "undefined" && !window.confirm(__("Delete this saved view?", "weekly-wildcat-headless"))) return;
+    const restoreSavedView = fetchers.saveSavedView;
     setIsSavingView(true);
+    setActionError(null);
+    setUndoDeletedView(null);
     try {
       await fetchers.deleteSavedView(selected.id);
       setSavedViews((current) => current.filter((item) => item.id !== selected.id));
       setSelectedSavedViewId("");
       setSavedViewName("");
       setNotice(__("Saved view deleted.", "weekly-wildcat-headless"));
+      if (restoreSavedView) {
+        setUndoDeletedView(() => async () => {
+          setIsSavingView(true);
+          setActionError(null);
+          try {
+            const restored = await restoreSavedView({
+              id: selected.id,
+              name: selected.name,
+              filters: selected.filters,
+              sort: selected.sort
+            });
+            setSavedViews((current) => [restored, ...current.filter((item) => item.id !== restored.id)]);
+            setSelectedSavedViewId(restored.id);
+            setSavedViewName(restored.name);
+            setNotice(__("Saved view restored.", "weekly-wildcat-headless"));
+            setUndoDeletedView(null);
+          } catch (error: unknown) {
+            setActionError(describeEditorialError(error, __("The saved view could not be restored.", "weekly-wildcat-headless")));
+          } finally {
+            setIsSavingView(false);
+          }
+        });
+      }
     } catch (error: unknown) {
-      setActionError(error && typeof error === "object" && "message" in error ? String((error as { message: unknown }).message) : __("The saved view could not be deleted.", "weekly-wildcat-headless"));
+      setActionError(describeEditorialError(error, __("The saved view could not be deleted.", "weekly-wildcat-headless")));
     } finally {
       setIsSavingView(false);
     }
@@ -426,7 +458,19 @@ export function PlanningApp({
 
       {actionError ? <PlanningNotice onRemove={() => setActionError(null)}>{actionError}</PlanningNotice> : null}
       {loadError && planning ? <PlanningNotice status="warning" onRemove={() => setLoadError(null)}>{loadError}</PlanningNotice> : null}
-      {notice ? <PlanningNotice status="success" onRemove={() => setNotice(null)}>{notice}</PlanningNotice> : null}
+      {notice ? (
+        <PlanningNotice status="success" onRemove={() => { setNotice(null); setUndoDeletedView(null); }}>
+          {notice}
+          {undoDeletedView ? (
+            <>
+              {" "}
+              <Button variant="link" disabled={isSavingView} onClick={() => void undoDeletedView()}>
+                {__("Undo", "weekly-wildcat-headless")}
+              </Button>
+            </>
+          ) : null}
+        </PlanningNotice>
+      ) : null}
 
       {renderFilters()}
 

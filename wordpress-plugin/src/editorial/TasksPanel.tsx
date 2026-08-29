@@ -62,6 +62,9 @@ export function TasksPanel({
   const [priority, setPriority] = useState<TaskPriority>("normal");
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Deleting a small newsroom task is reversible through the same create API,
+  // so the panel performs it and offers Undo instead of asking twice first.
+  const [undoDelete, setUndoDelete] = useState<{ title: string; run: () => Promise<void> } | null>(null);
 
   const isLinked = storyId != null;
   const canCreate = canEditTask({ storyId: storyId ?? null }, capabilities);
@@ -117,8 +120,27 @@ export function TasksPanel({
 
   const deleteTask = (task: EditorialTask) => {
     if (!canDeleteTask(task, capabilities)) return;
-    const confirmed = typeof window === "undefined" || window.confirm(`Delete task “${task.title}”?`);
-    if (confirmed) run(String(task.id), () => onDelete(task.id));
+    const restore: TaskInput = {
+      title: task.title,
+      assigneeId: task.assigneeId ?? (typeof task.assignee?.id === "number" ? task.assignee.id : null),
+      dueAt: task.dueAt ?? null,
+      priority: task.priority,
+      storyId: task.storyId ?? storyId ?? null,
+      coverageId: task.coverageId ?? coverageId ?? null
+    };
+    setUndoDelete(null);
+    run(String(task.id), async () => {
+      await onDelete(task.id);
+      setUndoDelete({
+        title: task.title,
+        // Undo is a real create request. If it fails, the panel says so rather
+        // than pretending the task came back.
+        run: async () => {
+          await onCreate(restore);
+          setUndoDelete(null);
+        }
+      });
+    });
   };
 
   return (
@@ -133,6 +155,18 @@ export function TasksPanel({
 
       {error ? <Notice status="warning" isDismissible={false}>{describeEditorialError(error)}</Notice> : null}
       {actionError ? <Notice status="error" isDismissible={false}>{actionError}</Notice> : null}
+      {undoDelete ? (
+        <Notice status="success" isDismissible onRemove={() => setUndoDelete(null)}>
+          {`Deleted “${undoDelete.title}”.`}{" "}
+          <Button
+            variant="link"
+            disabled={busyId !== null}
+            onClick={() => run(null, undoDelete.run)}
+          >
+            Undo
+          </Button>
+        </Notice>
+      ) : null}
 
       <form className="byline-editorial-task-form" onSubmit={submit}>
         <TextControl

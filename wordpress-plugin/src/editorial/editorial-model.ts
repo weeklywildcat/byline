@@ -5,6 +5,7 @@
  * accept plain values so they can be used by a WordPress REST adapter, a test
  * harness, or a future editor integration without creating a second data store.
  */
+import { normalizeBylineError } from "@byline/admin-runtime";
 
 export type EditorialStatusGroup = "main" | "sidelined" | "derived";
 
@@ -499,9 +500,12 @@ export function buildDistributionCopy(
 
 export function describeEditorialError(error: unknown, fallback = "Something went wrong. Please try again."): string {
   if (typeof error === "string" && error.trim()) return error.trim();
-  if (error && typeof error === "object") {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim()) return message.trim();
-  }
-  return fallback;
+  // One safe boundary for every panel: an HTML error page, a stack trace, a
+  // credential, or a whole server response never reaches an editor's screen.
+  return normalizeBylineError(error, { message: fallback }).message;
+}
+
+/** Whether a failed editorial action is worth offering a retry for. */
+export function isRetryableEditorialError(error: unknown): boolean {
+  return normalizeBylineError(error).retryable;
 }

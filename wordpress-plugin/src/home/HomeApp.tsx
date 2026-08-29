@@ -2,6 +2,8 @@ import { Button, Card, CardBody, Notice, Spinner } from "@wordpress/components";
 import { useCallback, useEffect, useMemo, useState } from "@wordpress/element";
 import { __ } from "@wordpress/i18n";
 
+import { normalizeBylineError } from "@byline/admin-runtime";
+
 import {
   exactPlanningDate,
   relativePlanningDate,
@@ -51,14 +53,9 @@ function emptyData(fetchers: HomeFetchers): HomeData {
   };
 }
 
+/** One safe error boundary, shared with every other Byline admin surface. */
 function requestError(error: unknown, fallback: string): string {
-  const candidate = error && typeof error === "object" && "message" in error
-    ? (error as { message?: unknown }).message
-    : undefined;
-  if (typeof candidate !== "string") return fallback;
-  const message = candidate.replace(/<[^>]*>/g, "").trim();
-  if (!message || message.length > 180 || /(?:stack trace|fatal error|password|token|secret|authorization|sqlstate)/i.test(message)) return fallback;
-  return message;
+  return normalizeBylineError(error, { message: fallback }).message;
 }
 
 async function loadResource<T>(fetcher: (() => Promise<T>) | undefined, label: string): Promise<HomeResourceState<T>> {
