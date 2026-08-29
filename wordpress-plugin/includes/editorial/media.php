@@ -691,7 +691,9 @@ function byline_set_editorial_media_request(int $post_id, array $value, ?int $us
     }
 
     $result = byline_get_editorial_media_request($post_id, $user_id);
-    do_action('byline_editorial_media_request_updated', $post_id, $result, $user_id);
+    // The fourth argument is private transition context for integrations that
+    // need to distinguish assignment from ordinary media metadata changes.
+    do_action('byline_editorial_media_request_updated', $post_id, $result, $user_id, $context);
 
     return $result;
 }
