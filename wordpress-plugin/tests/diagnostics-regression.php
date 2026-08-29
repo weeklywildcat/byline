@@ -9,14 +9,25 @@ const BYLINE_THEME_API_VERSION = 1;
 const BYLINE_DESIGN_POST_TYPE = 'byline_design';
 const BYLINE_REST_NAMESPACE = 'byline/v1';
 const BYLINE_MANAGE_CAPABILITY = 'manage_byline';
+const BYLINE_MANAGE_INTEGRATIONS_CAPABILITY = 'manage_byline_integrations';
 const WWH_CLOUDFLARE_DEPLOY_EVENT = 'wwh_trigger_cloudflare_deploy';
 
-class WP_Error {}
-class WP_REST_Server { public const READABLE = 'GET'; }
+class WP_Error
+{
+    public function __construct(...$args) {}
+}
+class WP_REST_Server { public const READABLE = 'GET'; public const CREATABLE = 'POST'; }
+class WP_REST_Request
+{
+    private array $body;
+    public function __construct(array $body) { $this->body = $body; }
+    public function get_json_params(): array { return $this->body; }
+    public function get_param(string $key) { return $this->body[$key] ?? null; }
+}
 
 function add_action(...$args): void {}
-function register_rest_route(...$args): void {}
-function current_user_can(...$args): bool { return true; }
+function register_rest_route(...$args): void { global $registered_routes; $registered_routes[] = $args; }
+function current_user_can(...$args): bool { global $diagnostics_capabilities; return !empty($diagnostics_capabilities[(string) ($args[0] ?? '')]); }
 function rest_ensure_response($value) { return $value; }
 function sanitize_text_field($value): string { return trim(strip_tags((string) $value)); }
 function sanitize_key($value): string { return strtolower((string) preg_replace('/[^a-z0-9_-]/i', '', (string) $value)); }
@@ -41,6 +52,12 @@ function byline_get_publication_config(): array {
     ];
 }
 
+$diagnostics_capabilities = [
+    BYLINE_MANAGE_CAPABILITY => true,
+    BYLINE_MANAGE_INTEGRATIONS_CAPABILITY => true,
+];
+$registered_routes = [];
+
 require __DIR__ . '/../includes/core/diagnostics.php';
 
 $diagnostics = byline_diagnostics_payload();
@@ -53,6 +70,60 @@ if (!is_string($serialized)
     || !isset($diagnostics['publicManifest']['designRevisions'])
     || $diagnostics['publicManifest']['designRevisions'] !== ['home' => 12, 'section:news' => 13]) {
     fwrite(STDERR, "Diagnostics exposed secrets or omitted safe health information.\n");
+    exit(1);
+}
+
+$health_action = byline_diagnostics_run_action('health');
+if (empty($health_action['ok']) || strpos($health_action['message'], 'completed') === false) {
+    fwrite(STDERR, "The read-only Doctor health action did not complete.\n");
+    exit(1);
+}
+
+$manifest_action = byline_diagnostics_run_action('test-public-manifest');
+if (empty($manifest_action['ok'])) {
+    fwrite(STDERR, "The public-manifest Doctor action did not use the safe diagnostic contract.\n");
+    exit(1);
+}
+
+$unknown_action = byline_diagnostics_run_action('delete-publication');
+if (!empty($unknown_action['ok'])) {
+    fwrite(STDERR, "An unknown Doctor action was accepted.\n");
+    exit(1);
+}
+
+$request = new WP_REST_Request(['action' => 'test-public-manifest']);
+if (byline_diagnostics_action_permission($request) !== true) {
+    fwrite(STDERR, "An authorized Doctor action was rejected.\n");
+    exit(1);
+}
+$diagnostics_capabilities[BYLINE_MANAGE_CAPABILITY] = false;
+if (!(byline_diagnostics_action_permission($request) instanceof WP_Error)) {
+    fwrite(STDERR, "Unauthorized users could run a Doctor action.\n");
+    exit(1);
+}
+$diagnostics_capabilities[BYLINE_MANAGE_CAPABILITY] = true;
+$diagnostics_capabilities[BYLINE_MANAGE_INTEGRATIONS_CAPABILITY] = false;
+if (!(byline_diagnostics_action_permission(new WP_REST_Request(['action' => 'test-deploy-hook'])) instanceof WP_Error)) {
+    fwrite(STDERR, "Deployment Doctor action bypassed its integration capability gate.\n");
+    exit(1);
+}
+$diagnostics_capabilities[BYLINE_MANAGE_INTEGRATIONS_CAPABILITY] = true;
+
+byline_register_diagnostics_route();
+$route = $registered_routes[0] ?? null;
+if (!is_array($route) || count($route) !== 3 || !is_array($route[2] ?? null) || count($route[2]) !== 2) {
+    fwrite(STDERR, "Diagnostics did not register readable and action routes together.\n");
+    exit(1);
+}
+$route_methods = array_column($route[2], 'methods');
+if (!in_array(WP_REST_Server::READABLE, $route_methods, true) || !in_array(WP_REST_Server::CREATABLE, $route_methods, true)) {
+    fwrite(STDERR, "Diagnostics route methods are incomplete.\n");
+    exit(1);
+}
+
+$action_payload = byline_diagnostics_action_route(new WP_REST_Request(['action' => 'health']));
+if (($action_payload['action'] ?? '') !== 'health' || empty($action_payload['actionResult']['ok'])) {
+    fwrite(STDERR, "Doctor action response did not include a refreshed safe payload.\n");
     exit(1);
 }
 

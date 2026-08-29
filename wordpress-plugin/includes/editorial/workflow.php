@@ -26,6 +26,10 @@ const BYLINE_EDITORIAL_STATUS_META = '_wwh_story_status';
 const BYLINE_EDITORIAL_EDITOR_META = '_wwh_story_editor_user_id';
 const BYLINE_EDITORIAL_DEADLINE_META = '_wwh_story_deadline';
 const BYLINE_EDITORIAL_VISUALS_META = '_wwh_story_visuals';
+// This is a new private coordination marker. It is deliberately not exposed
+// through post REST meta; clients receive it only from protected editorial
+// responses and send it back as expectedRevision on meaningful mutations.
+const BYLINE_EDITORIAL_REVISION_META = '_byline_story_editorial_revision';
 
 /**
  * The default status for a story that has never had workflow metadata written.
@@ -232,6 +236,59 @@ function byline_set_editorial_visuals(int $post_id, string $visuals): void
     update_post_meta($post_id, BYLINE_EDITORIAL_VISUALS_META, $visuals);
 }
 
+function byline_get_editorial_revision(int $post_id): int
+{
+    return max(0, absint(get_post_meta($post_id, BYLINE_EDITORIAL_REVISION_META, true)));
+}
+
+function byline_bump_editorial_revision(int $post_id): int
+{
+    $revision = byline_get_editorial_revision($post_id) + 1;
+    update_post_meta($post_id, BYLINE_EDITORIAL_REVISION_META, $revision);
+
+    return $revision;
+}
+
+/**
+ * Compare a client snapshot with the current private editorial snapshot.
+ *
+ * A null expected revision means a legacy caller did not opt into optimistic
+ * concurrency. That keeps old integrations working while all current admin
+ * clients can opt into a clear conflict instead of silently overwriting a
+ * colleague's assignment or workflow change.
+ *
+ * @return true|WP_Error
+ */
+function byline_assert_editorial_revision(int $post_id, ?int $expected_revision = null)
+{
+    if ($expected_revision === null) {
+        return true;
+    }
+
+    if ($expected_revision < 0) {
+        return new WP_Error(
+            'byline_editorial_invalid_revision',
+            'The story revision is invalid. Reload the story and try again.',
+            ['status' => 400]
+        );
+    }
+
+    $current_revision = byline_get_editorial_revision($post_id);
+    if ($current_revision === $expected_revision) {
+        return true;
+    }
+
+    return new WP_Error(
+        'byline_editorial_conflict',
+        'This story changed while you were editing it. Reload changes before trying again.',
+        [
+            'status' => 409,
+            'expectedRevision' => $expected_revision,
+            'currentRevision' => $current_revision,
+        ]
+    );
+}
+
 /**
  * The complete editorial state for one story. `status` is the effective display
  * value; `storedStatus` is the pre-publication stage that survives publication.
@@ -248,6 +305,7 @@ function byline_get_editorial_story_state(int $post_id): array
         'storedStatus' => byline_get_editorial_status($post_id),
         'isPublished' => $post_status === 'publish',
         'postStatus' => $post_status,
+        'revision' => byline_get_editorial_revision($post_id),
         'editorId' => byline_get_editorial_editor_id($post_id),
         'deadline' => byline_get_editorial_deadline($post_id),
         'visuals' => byline_get_editorial_visuals($post_id),
@@ -285,7 +343,7 @@ function byline_editorial_can_assign(int $post_id, ?int $user_id = null): bool
  * @param array<string, mixed> $changes
  * @return array|WP_Error
  */
-function byline_update_editorial_story_state(int $post_id, array $changes, ?int $user_id = null)
+function byline_update_editorial_story_state(int $post_id, array $changes, ?int $user_id = null, bool $bump_revision = true)
 {
     $post_id = absint($post_id);
     $post = get_post($post_id);
@@ -296,6 +354,20 @@ function byline_update_editorial_story_state(int $post_id, array $changes, ?int 
 
     if (!byline_editorial_can_change_status($post_id, $user_id)) {
         return new WP_Error('byline_editorial_forbidden', 'You are not allowed to change this story.', ['status' => 403]);
+    }
+
+    $expected_revision = null;
+    if (array_key_exists('expectedRevision', $changes)) {
+        $raw_revision = $changes['expectedRevision'];
+        if (!is_int($raw_revision) && !is_numeric($raw_revision)) {
+            return new WP_Error(
+                'byline_editorial_invalid_revision',
+                'The story revision is invalid. Reload the story and try again.',
+                ['status' => 400]
+            );
+        }
+        $expected_revision = (int) $raw_revision;
+        unset($changes['expectedRevision']);
     }
 
     $can_assign = byline_editorial_can_assign($post_id, $user_id);
@@ -326,7 +398,7 @@ function byline_update_editorial_story_state(int $post_id, array $changes, ?int 
             return new WP_Error('byline_editorial_invalid_status', 'That workflow status is not recognised.', ['status' => 400]);
         }
 
-        byline_set_editorial_status($post_id, $requested);
+        $changes['status'] = $requested;
     }
 
     if (array_key_exists('editorId', $changes)) {
@@ -336,7 +408,7 @@ function byline_update_editorial_story_state(int $post_id, array $changes, ?int 
             return new WP_Error('byline_editorial_unknown_editor', 'That editor account does not exist.', ['status' => 400]);
         }
 
-        byline_set_editorial_editor_id($post_id, $editor_id);
+        $changes['editorId'] = $editor_id;
     }
 
     if (array_key_exists('deadline', $changes)) {
@@ -346,11 +418,33 @@ function byline_update_editorial_story_state(int $post_id, array $changes, ?int 
             return new WP_Error('byline_editorial_invalid_deadline', 'Use a valid date in YYYY-MM-DD format.', ['status' => 400]);
         }
 
-        byline_set_editorial_deadline($post_id, $deadline);
+        $changes['deadline'] = $deadline;
     }
 
     if (array_key_exists('visuals', $changes)) {
+        $changes['visuals'] = (string) $changes['visuals'];
+    }
+
+    $revision_check = byline_assert_editorial_revision($post_id, $expected_revision);
+    if ($revision_check !== true) {
+        return $revision_check;
+    }
+
+    if (array_key_exists('status', $changes)) {
+        byline_set_editorial_status($post_id, (string) $changes['status']);
+    }
+    if (array_key_exists('editorId', $changes)) {
+        byline_set_editorial_editor_id($post_id, (int) $changes['editorId']);
+    }
+    if (array_key_exists('deadline', $changes)) {
+        byline_set_editorial_deadline($post_id, (string) $changes['deadline']);
+    }
+    if (array_key_exists('visuals', $changes)) {
         byline_set_editorial_visuals($post_id, (string) $changes['visuals']);
+    }
+
+    if ($bump_revision && $changes !== []) {
+        byline_bump_editorial_revision($post_id);
     }
 
     $state = byline_get_editorial_story_state($post_id);
@@ -429,6 +523,16 @@ function byline_editorial_register_meta(): void
         'show_in_rest' => false,
         'auth_callback' => static function () {
             return current_user_can('edit_others_posts');
+        },
+    ]);
+
+    register_post_meta('post', BYLINE_EDITORIAL_REVISION_META, [
+        'single' => true,
+        'type' => 'integer',
+        'sanitize_callback' => 'absint',
+        'show_in_rest' => false,
+        'auth_callback' => static function () {
+            return current_user_can('edit_posts');
         },
     ]);
 }

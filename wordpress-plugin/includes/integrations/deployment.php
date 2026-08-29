@@ -10,6 +10,13 @@ const BYLINE_DEPLOYMENT_LAST_TRIGGERED_OPTION = 'byline_deployment_last_triggere
 const BYLINE_DEPLOYMENT_LAST_STATUS_OPTION = 'byline_deployment_last_status';
 const BYLINE_DEPLOYMENT_EVENT = 'byline_trigger_deployment';
 
+if (!defined('BYLINE_DEPLOYMENT_JOB_TYPE')) {
+    define('BYLINE_DEPLOYMENT_JOB_TYPE', 'deployment');
+}
+if (!defined('BYLINE_DEPLOYMENT_JOB_OPTION')) {
+    define('BYLINE_DEPLOYMENT_JOB_OPTION', 'byline_deployment_job_id');
+}
+
 function byline_deployment_providers(): array
 {
     return apply_filters('byline_deployment_providers', [
@@ -65,19 +72,99 @@ function byline_deployment_last_status(): string
     return $value;
 }
 
-function byline_deployment_pending_timestamp(): int
+function byline_deployment_job_internal(): ?array
 {
-    $timestamp = wp_next_scheduled(BYLINE_DEPLOYMENT_EVENT);
-    if (!$timestamp && defined('WWH_CLOUDFLARE_DEPLOY_EVENT')) {
+    if (!function_exists('byline_job_internal')) {
+        return null;
+    }
+
+    $job_id = (int) get_option(BYLINE_DEPLOYMENT_JOB_OPTION, 0);
+    if ($job_id > 0) {
+        $job = byline_job_internal($job_id);
+        if ($job && $job['type'] === BYLINE_DEPLOYMENT_JOB_TYPE) {
+            return $job;
+        }
+    }
+
+    if (function_exists('byline_job_posts')) {
+        foreach (byline_job_posts(['posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'DESC']) as $post) {
+            $job = byline_job_internal((int) ($post->ID ?? 0));
+            if ($job && $job['type'] === BYLINE_DEPLOYMENT_JOB_TYPE) {
+                return $job;
+            }
+        }
+    }
+    return null;
+}
+
+function byline_deployment_job_status(): string
+{
+    $job = byline_deployment_job_internal();
+    return $job ? (string) $job['status'] : '';
+}
+
+function byline_deployment_expected_revision(): int
+{
+    $job = byline_deployment_job_internal();
+    $payload = is_array($job['payload'] ?? null) ? $job['payload'] : [];
+    return max(0, (int) ($payload['expectedRevision'] ?? 0));
+}
+
+function byline_deployment_cron_event_timestamp(): int
+{
+    $timestamp = function_exists('wp_next_scheduled') ? wp_next_scheduled(BYLINE_DEPLOYMENT_EVENT) : 0;
+    if (!$timestamp && defined('WWH_CLOUDFLARE_DEPLOY_EVENT') && function_exists('wp_next_scheduled')) {
         $timestamp = wp_next_scheduled(WWH_CLOUDFLARE_DEPLOY_EVENT);
     }
     return $timestamp ? (int) $timestamp : 0;
 }
 
+function byline_deployment_pending_timestamp(): int
+{
+    $timestamp = byline_deployment_cron_event_timestamp();
+    if ($timestamp > 0) {
+        return $timestamp;
+    }
+
+    $job = byline_deployment_job_internal();
+    if ($job && in_array($job['status'], ['queued', 'running', 'retry_waiting'], true)) {
+        return (int) ($job['nextAttemptAt'] ?: $job['dueAt'] ?: time());
+    }
+    return 0;
+}
+
+function byline_deployment_lifecycle_status(array $deployment, array $manifest = []): string
+{
+    $expected = max(0, (int) ($deployment['expectedRevision'] ?? byline_deployment_expected_revision()));
+    $manifest_revision = max(0, (int) ($manifest['publicationRevision'] ?? $manifest['contentRevision'] ?? 0));
+    $manifest_reachable = !empty($manifest['reachable']);
+    if ($expected > 0 && $manifest_reachable && $manifest_revision >= $expected) {
+        return 'live';
+    }
+
+    $job_status = (string) ($deployment['jobStatus'] ?? byline_deployment_job_status());
+    if ($job_status === 'running') {
+        return 'building';
+    }
+    if ($job_status === 'failed') {
+        return 'failed';
+    }
+    if (in_array($job_status, ['queued', 'retry_waiting'], true) || !empty($deployment['pending'])) {
+        return 'queued';
+    }
+
+    // A successful hook request only means that the external build was
+    // requested. Until the public manifest proves the expected revision, the
+    // honest state is unknown rather than live.
+    return 'unknown';
+}
+
 function byline_deployment_status(): array
 {
     $provider = byline_deployment_providers()[byline_deployment_provider_id()];
-    return [
+    $job = byline_deployment_job_internal();
+    $job_public = function_exists('byline_job_public_record') ? byline_job_public_record($job) : null;
+    $status = [
         'provider' => $provider['id'],
         'providerLabel' => $provider['label'],
         'configured' => byline_deployment_hook_url() !== '',
@@ -88,53 +175,231 @@ function byline_deployment_status(): array
         'lastStatus' => byline_deployment_last_status() !== '' ? byline_deployment_last_status() : 'Not triggered yet',
         'pending' => byline_deployment_pending_timestamp() > 0,
     ];
+    $status['jobId'] = is_array($job_public) ? $job_public['jobId'] : null;
+    $status['jobStatus'] = is_array($job_public) ? $job_public['status'] : null;
+    $status['expectedRevision'] = byline_deployment_expected_revision();
+    $status['publicRevision'] = function_exists('byline_public_content_revision') ? byline_public_content_revision() : 0;
+    $status['contentRevision'] = $status['publicRevision'];
+    $status['lastError'] = is_array($job_public) ? (string) ($job_public['lastError'] ?? '') : '';
+    $status['nextAttemptAt'] = is_array($job_public) ? ($job_public['nextAttemptAt'] ?? null) : null;
+    $status['lifecycle'] = byline_deployment_lifecycle_status($status);
+    return $status;
 }
 
-function byline_schedule_deployment(string $reason = 'content'): void
+function byline_schedule_deployment(string $reason = 'content', bool $revision_already_recorded = false, ?int $expected_revision = null): void
 {
-    if (byline_deployment_hook_url() === '' || byline_deployment_pending_timestamp() > 0) {
+    if ($expected_revision === null && function_exists('byline_public_content_revision')) {
+        $expected_revision = $revision_already_recorded
+            ? byline_public_content_revision()
+            : byline_bump_public_content_revision();
+    }
+    $expected_revision = max(0, (int) $expected_revision);
+    if (byline_deployment_hook_url() === '') {
         return;
     }
 
-    $scheduled = wp_schedule_single_event(time() + 60, BYLINE_DEPLOYMENT_EVENT, [$reason]);
+    $reason = sanitize_key($reason) ?: 'content';
+    if (function_exists('byline_create_job') && function_exists('byline_job_update_payload')) {
+        $job = byline_deployment_job_internal();
+        $payload = [
+            'reason' => $reason,
+            'expectedRevision' => $expected_revision,
+            'requestedAt' => gmdate(DATE_ATOM),
+            'reasons' => [$reason],
+        ];
+        $job_id = 0;
+        if ($job && in_array($job['status'], ['queued', 'retry_waiting'], true)) {
+            $old_payload = is_array($job['payload'] ?? null) ? $job['payload'] : [];
+            $reasons = array_values(array_unique(array_filter(array_merge(
+                (array) ($old_payload['reasons'] ?? []),
+                [(string) ($old_payload['reason'] ?? ''), $reason]
+            ))));
+            $payload['reasons'] = $reasons;
+            $payload['expectedRevision'] = max($expected_revision, (int) ($old_payload['expectedRevision'] ?? 0));
+            $updated = byline_job_update_payload((int) $job['id'], $payload, [
+                'idempotencyKey' => 'deployment:' . $payload['expectedRevision'],
+                'dueAt' => time() + 60,
+            ]);
+            if (!(function_exists('is_wp_error') && is_wp_error($updated))) {
+                $job_id = (int) $job['id'];
+            }
+        }
+        if ($job_id <= 0) {
+            $created = byline_create_job(BYLINE_DEPLOYMENT_JOB_TYPE, $payload, [
+                'idempotencyKey' => 'deployment:' . $expected_revision,
+                'dueAt' => time() + 60,
+                'maxAttempts' => 3,
+                'retryDelay' => 60,
+            ]);
+            if (function_exists('is_wp_error') && is_wp_error($created)) {
+                error_log('Byline: durable deploy job could not be stored.');
+                return;
+            }
+            $job_id = (int) ($created['id'] ?? 0);
+        }
+        if ($job_id > 0) {
+            update_option(BYLINE_DEPLOYMENT_JOB_OPTION, $job_id, false);
+        }
+
+        if (function_exists('wp_schedule_single_event') && byline_deployment_cron_event_timestamp() <= 0) {
+            $scheduled = wp_schedule_single_event(time() + 60, BYLINE_DEPLOYMENT_EVENT, [$job_id]);
+        } else {
+            $scheduled = true;
+        }
+    } else {
+        if (byline_deployment_cron_event_timestamp() > 0) {
+            return;
+        }
+        $scheduled = wp_schedule_single_event(time() + 60, BYLINE_DEPLOYMENT_EVENT, [$reason]);
+    }
     if (!$scheduled) {
         error_log('Byline: deploy-hook trigger could not be scheduled.');
     }
 }
 
-function byline_trigger_deployment(string $reason = 'scheduled'): void
+function byline_send_deployment_request(string $reason = 'scheduled', int $expected_revision = 0, string $idempotency_key = '')
 {
     $url = byline_deployment_hook_url();
     if ($url === '') {
         update_option(BYLINE_DEPLOYMENT_LAST_STATUS_OPTION, 'Not configured', false);
-        return;
+        return new WP_Error('byline_deployment_not_configured', 'Deployment is not configured.', ['retryable' => false]);
     }
 
-    $response = wp_safe_remote_post($url, [
-        'blocking' => true,
-        'headers' => [
-            'User-Agent' => 'Byline',
-            'X-Byline-Reason' => sanitize_key($reason),
-        ],
-        'redirection' => 0,
-        'timeout' => 10,
-    ]);
+    $headers = [
+        'User-Agent' => 'Byline',
+        'X-Byline-Reason' => sanitize_key($reason),
+    ];
+    if ($idempotency_key !== '') {
+        $headers['X-Byline-Idempotency'] = byline_job_idempotency_value($idempotency_key);
+    }
+    if ($expected_revision > 0) {
+        $headers['X-Byline-Expected-Revision'] = (string) $expected_revision;
+    }
+    try {
+        $response = wp_safe_remote_post($url, [
+            'blocking' => true,
+            'headers' => $headers,
+            'redirection' => 0,
+            'timeout' => 10,
+        ]);
+    } catch (Throwable $exception) {
+        update_option(BYLINE_DEPLOYMENT_LAST_TRIGGERED_OPTION, (string) time(), false);
+        update_option(BYLINE_DEPLOYMENT_LAST_STATUS_OPTION, 'Request failed', false);
+        return new WP_Error('byline_deployment_request_failed', 'The deployment request failed.', ['retryable' => true]);
+    }
     update_option(BYLINE_DEPLOYMENT_LAST_TRIGGERED_OPTION, (string) time(), false);
 
     if (is_wp_error($response)) {
         update_option(BYLINE_DEPLOYMENT_LAST_STATUS_OPTION, 'Request failed', false);
-        error_log('Byline: deploy-hook request failed.');
-        return;
+        return new WP_Error('byline_deployment_request_failed', 'The deployment request failed.', ['retryable' => true]);
     }
 
     $code = (int) wp_remote_retrieve_response_code($response);
     $status = $code > 0 ? sprintf('HTTP %d', $code) : 'No HTTP status';
     update_option(BYLINE_DEPLOYMENT_LAST_STATUS_OPTION, $status, false);
     if ($code < 200 || $code >= 300) {
-        error_log(sprintf('Byline: deploy hook returned HTTP %d.', $code));
+        return new WP_Error(
+            'byline_deployment_http_failure',
+            'The deployment hook returned an unsuccessful response.',
+            ['retryable' => $code === 0 || $code === 408 || $code === 425 || $code === 429 || $code >= 500, 'httpStatus' => $code]
+        );
+    }
+    return ['ok' => true, 'status' => $status, 'expectedRevision' => $expected_revision];
+}
+
+function byline_execute_deployment_job(array $job)
+{
+    $payload = is_array($job['payload'] ?? null) ? $job['payload'] : [];
+    $reason = (string) ($payload['reason'] ?? 'scheduled');
+    $expected_revision = (int) ($payload['expectedRevision'] ?? 0);
+    if (function_exists('do_action')) {
+        do_action('byline_editorial_build_started', $expected_revision, $reason);
+    }
+
+    $result = byline_send_deployment_request(
+        $reason,
+        $expected_revision,
+        (string) ($job['idempotencyKey'] ?? '')
+    );
+    if (is_wp_error($result) && function_exists('do_action')) {
+        do_action('byline_editorial_build_failed', $reason, $result);
+    }
+
+    return $result;
+}
+
+/**
+ * Published content is the deployable public artifact. Queue its build from
+ * WordPress's status transition hook so Gutenberg, imports, and other writers
+ * share the same durable lifecycle as settings and design changes.
+ */
+function byline_schedule_story_deployment_on_status($new_status, $old_status, $post): void
+{
+    if (!is_object($post) || (string) ($post->post_type ?? '') !== 'post' || (string) $new_status !== 'publish') {
+        return;
+    }
+    if (function_exists('wp_is_post_revision') && wp_is_post_revision((int) ($post->ID ?? 0))) {
+        return;
+    }
+    if (function_exists('wp_is_post_autosave') && wp_is_post_autosave((int) ($post->ID ?? 0))) {
+        return;
+    }
+
+    byline_schedule_deployment('story-published');
+}
+
+add_action('transition_post_status', 'byline_schedule_story_deployment_on_status', 20, 3);
+
+function byline_process_deployment_event($job_id = 0): void
+{
+    $legacy_reason = is_string($job_id) ? sanitize_key($job_id) : 'scheduled';
+    $job_id = is_numeric($job_id) ? (int) $job_id : 0;
+    if ($job_id <= 0) {
+        $job = byline_deployment_job_internal();
+        $job_id = $job ? (int) $job['id'] : 0;
+    }
+    if ($job_id > 0 && function_exists('byline_job_run') && function_exists('byline_job_internal')) {
+        $job = byline_job_internal($job_id);
+        if ($job && $job['type'] === BYLINE_DEPLOYMENT_JOB_TYPE) {
+            byline_job_run($job_id, null, 'wp-cron');
+            return;
+        }
+    }
+    byline_trigger_deployment($legacy_reason !== '' ? $legacy_reason : 'scheduled');
+}
+
+function byline_trigger_deployment(string $reason = 'scheduled'): void
+{
+    // A pre-adapter legacy event may still fire after an upgrade. If it points
+    // at a durable deployment job, process that job so the old event cannot
+    // leave the new record queued or perform an untracked request.
+    if ($reason === 'legacy-event' && function_exists('byline_job_run')) {
+        $job = byline_deployment_job_internal();
+        if ($job && in_array($job['status'], ['queued', 'retry_waiting'], true)) {
+            byline_job_run((int) $job['id'], null, 'legacy-cron');
+            return;
+        }
+        if ($job) {
+            // The durable wake or modern event may already have processed the
+            // request. Never send a second untracked hook request from the
+            // compatibility event.
+            return;
+        }
+    }
+    $result = byline_send_deployment_request($reason, 0);
+    if (is_wp_error($result)) {
+        error_log('Byline: deploy-hook request failed.');
+        return;
+    }
+    if (is_array($result) && isset($result['status']) && strpos((string) $result['status'], 'HTTP 2') !== 0) {
+        error_log('Byline: deploy hook returned an unsuccessful response.');
     }
 }
-add_action(BYLINE_DEPLOYMENT_EVENT, 'byline_trigger_deployment', 10, 1);
+add_action(BYLINE_DEPLOYMENT_EVENT, 'byline_process_deployment_event', 10, 1);
+
+if (function_exists('byline_register_job_handler')) {
+    byline_register_job_handler(BYLINE_DEPLOYMENT_JOB_TYPE, 'byline_execute_deployment_job');
+}
 
 function byline_clear_scheduled_deployment(): void
 {

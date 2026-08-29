@@ -15,7 +15,7 @@ export type AdminPageSlug = (typeof ADMIN_PAGE_SLUGS)[keyof typeof ADMIN_PAGE_SL
 export const PUBLICATION_TABS = ["identity", "branding", "navigation", "features", "social"] as const;
 export const INTEGRATION_TABS = ["discord", "deployment"] as const;
 export const SETTINGS_TABS = ["access", "api", "compatibility", "diagnostics"] as const;
-export const PLANNING_TABS = ["stories", "calendar", "media", "coverage", "performance", "content-health", "feedback"] as const;
+export const PLANNING_TABS = ["today", "stories", "calendar", "media", "coverage", "performance", "content-health", "feedback"] as const;
 export const NEWSLETTER_TABS = ["issues", "settings"] as const;
 export const STUDIO_VIEWS = ["editor", "revisions"] as const;
 
@@ -54,7 +54,7 @@ export function adminScreenRoute(page: string, tab: string | undefined) {
   if (normalizedPage === ADMIN_PAGE_SLUGS.theme) return "/design/theme";
   if (normalizedPage === ADMIN_PAGE_SLUGS.integrations) return `/integrations/${normalizedTab}`;
   if (normalizedPage === ADMIN_PAGE_SLUGS.settings) return `/advanced/${normalizedTab}`;
-  if (normalizedPage === ADMIN_PAGE_SLUGS.planning) return `/planning/${normalizedTab}`;
+  if (normalizedPage === ADMIN_PAGE_SLUGS.planning) return normalizedTab === "today" ? "/home" : `/planning/${normalizedTab}`;
   if (normalizedPage === ADMIN_PAGE_SLUGS.newsletters) return `/newsletters/${normalizedTab}`;
   if (normalizedPage === ADMIN_PAGE_SLUGS.polls) return "/content/polls";
   return "/dashboard";
@@ -77,6 +77,8 @@ export type LegacyAdminDestination = {
 
 const legacyDestinations: Record<string, LegacyAdminDestination> = {
   "/dashboard": { page: ADMIN_PAGE_SLUGS.dashboard },
+  "/home": { page: ADMIN_PAGE_SLUGS.planning, tab: "today" },
+  "/planning/today": { page: ADMIN_PAGE_SLUGS.planning, tab: "today" },
   "/planning/stories": { page: ADMIN_PAGE_SLUGS.planning, tab: "stories" },
   "/planning/calendar": { page: ADMIN_PAGE_SLUGS.planning, tab: "calendar" },
   "/planning/media": { page: ADMIN_PAGE_SLUGS.planning, tab: "media" },

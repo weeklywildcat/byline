@@ -162,6 +162,39 @@ function byline_list_corrections(int $story_id, bool $public_only = false): arra
     return $result;
 }
 
+/**
+ * Count private correction records without loading their explanatory text.
+ * Bootstrap responses use this bounded query so the full correction collection
+ * remains lazy until an editor opens its panel.
+ */
+function byline_count_corrections(int $story_id): int
+{
+    $story = get_post($story_id);
+    if (!$story instanceof WP_Post || $story->post_type !== 'post' || !function_exists('get_posts')) {
+        return 0;
+    }
+
+    $records = get_posts([
+        'post_type' => BYLINE_CORRECTION_POST_TYPE,
+        'post_status' => 'publish',
+        'post_parent' => $story_id,
+        'posts_per_page' => 100,
+        'numberposts' => 100,
+        'fields' => 'ids',
+        'no_found_rows' => true,
+    ]);
+    $count = 0;
+    foreach (is_array($records) ? $records : [] as $record) {
+        if (is_scalar($record)) {
+            $count++;
+        } elseif ($record instanceof WP_Post && (int) ($record->post_parent ?? 0) === $story_id) {
+            $count++;
+        }
+    }
+
+    return $count;
+}
+
 /** @return array<int,array<string,mixed>> */
 function byline_get_public_corrections(int $story_id): array
 {
@@ -274,7 +307,12 @@ function byline_create_correction(int $story_id, array $input, ?int $user_id = n
     update_post_meta($post_id, BYLINE_CORRECTION_RECORDED_AT_META, $recorded_at);
     update_post_meta($post_id, BYLINE_CORRECTION_UPDATED_AT_META, $recorded_at);
 
-    return byline_get_correction($post_id);
+    $correction = byline_get_correction($post_id);
+    if (function_exists('do_action')) {
+        do_action('byline_editorial_correction_changed', $post_id, $correction, 'created');
+    }
+
+    return $correction;
 }
 
 /** @return array<string,mixed>|WP_Error */
@@ -304,7 +342,12 @@ function byline_update_correction(int $correction_id, array $input, ?int $user_i
         wp_update_post(['ID' => $correction_id]);
     }
 
-    return byline_get_correction($correction_id);
+    $correction = byline_get_correction($correction_id);
+    if (function_exists('do_action')) {
+        do_action('byline_editorial_correction_changed', $correction_id, $correction, 'edited');
+    }
+
+    return $correction;
 }
 
 function byline_delete_correction(int $correction_id, ?int $user_id = null): bool
@@ -314,7 +357,12 @@ function byline_delete_correction(int $correction_id, ?int $user_id = null): boo
         return false;
     }
 
-    return function_exists('wp_delete_post') ? (bool) wp_delete_post($correction_id, true) : false;
+    $deleted = function_exists('wp_delete_post') ? (bool) wp_delete_post($correction_id, true) : false;
+    if ($deleted && function_exists('do_action')) {
+        do_action('byline_editorial_correction_changed', $correction_id, $existing, 'deleted');
+    }
+
+    return $deleted;
 }
 
 function byline_correction_register_post_type(): void

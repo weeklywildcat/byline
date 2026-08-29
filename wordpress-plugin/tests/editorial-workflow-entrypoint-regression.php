@@ -8,10 +8,11 @@
  */
 
 $entrypoint = file_get_contents(__DIR__ . '/../src/editorial-workflow.tsx');
+$styles = file_get_contents(__DIR__ . '/../src/editorial-workflow.css');
 $rest = file_get_contents(__DIR__ . '/../includes/editorial/rest.php');
 
-if (!is_string($entrypoint) || !is_string($rest)) {
-    fwrite(STDERR, "Could not read the editorial entrypoint or REST adapter.\n");
+if (!is_string($entrypoint) || !is_string($styles) || !is_string($rest)) {
+    fwrite(STDERR, "Could not read the editorial entrypoint, styles, or REST adapter.\n");
     exit(1);
 }
 
@@ -26,15 +27,39 @@ foreach ([
     "import { CorrectionsPanel }",
     "import { ContributorsPanel }",
     "import { DistributionPanel }",
-    "import { ReadinessPanel }",
     "import { TasksPanel }",
-    "import { WorkflowPanel }",
+    "Panel, PanelBody",
+    "import * as editorModule from '@wordpress/editor';",
     '<EditorialNewsroomPanels',
     '<WorkflowControls key={postId}',
+    'function PrePublishReadinessPanel',
+    'function PostPublishLifecycle',
+    'PluginPrePublishPanel',
+    'PluginPostPublishPanel',
+    "const sidebarTitle = __('Story'",
+    '${storyPath(postId)}/bootstrap',
+    'initialOpen={true}',
+    'initialOpen={false}',
+    'className="byline-editorial-sidebar"',
+    'onToggle',
     "body.plannedPublishAt = body.plannedPublication",
     "body.text = body.publicText",
 ] as $needle) {
     $assert(strpos($entrypoint, $needle) !== false, "Entrypoint contract missing: {$needle}");
+}
+
+$assert(substr_count($entrypoint, '<WorkflowControls') === 1, 'The editor entrypoint renders more than one workflow controls surface.');
+$assert(strpos($entrypoint, '<WorkflowPanel') === false, 'The legacy duplicate WorkflowPanel is still mounted.');
+$assert(strpos($entrypoint, 'client.getWorkflow') === false, 'A secondary panel still issues a duplicate workflow request.');
+$assert(strpos($entrypoint, 'Workflow: %s') === false, 'The sidebar title still exposes a dynamic workflow label.');
+
+foreach ([
+    '.byline-editorial-sidebar',
+    '.byline-story-summary',
+    '.byline-prepublish-readiness',
+    '.byline-postpublish-lifecycle',
+] as $needle) {
+    $assert(strpos($styles, $needle) !== false, "Sidebar style contract missing: {$needle}");
 }
 
 foreach ([

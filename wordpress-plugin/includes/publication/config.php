@@ -586,7 +586,14 @@ function byline_update_publication_config(WP_REST_Request $request)
 
     $normalized = byline_normalize_publication_config($input);
     update_option(BYLINE_PUBLICATION_OPTION, $normalized, false);
-    update_option(BYLINE_PUBLICATION_REVISION_OPTION, max(0, (int) get_option(BYLINE_PUBLICATION_REVISION_OPTION, 0)) + 1, false);
+    $revision = max(0, (int) get_option(BYLINE_PUBLICATION_REVISION_OPTION, 0)) + 1;
+    update_option(BYLINE_PUBLICATION_REVISION_OPTION, $revision, false);
+    // The publication revision is already the value emitted by the static
+    // manifest. Record that exact revision on the durable deployment request;
+    // the scheduler must not bump it a second time.
+    if (function_exists('byline_schedule_deployment')) {
+        byline_schedule_deployment('publication', true, $revision);
+    }
 
     return rest_ensure_response(byline_publication_response());
 }

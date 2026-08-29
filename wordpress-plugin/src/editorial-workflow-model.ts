@@ -15,6 +15,8 @@ export type WorkflowStatusDefinition = {
 
 export type WorkflowStory = {
   postId: number;
+  /** Private optimistic-concurrency revision from the protected editorial API. */
+  revision?: number;
   status: string;
   storedStatus: string;
   isPublished: boolean;
@@ -33,7 +35,9 @@ export type WorkflowPayload = {
   discord: { threadId: string; threadUrl?: string };
 };
 
-export type WorkflowChanges = Partial<Pick<WorkflowStory, "status" | "editorId" | "deadline" | "visuals">>;
+export type WorkflowChanges = Partial<Pick<WorkflowStory, "status" | "editorId" | "deadline" | "visuals">> & {
+  expectedRevision?: number;
+};
 
 export const WORKFLOW_FALLBACK_ERROR = "Something went wrong. Please try again.";
 

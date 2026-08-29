@@ -212,6 +212,18 @@ if (!is_wp_error($rejected) || $rejected->get_error_code() !== 'byline_editorial
     byline_test_fail('A missing story was not refused.');
 }
 
+// Collaborative metadata uses a private monotonic revision. An opted-in stale
+// writer must receive a conflict and must not overwrite the current value.
+$revision_before = byline_get_editorial_revision(1);
+$updated = byline_update_editorial_story_state(1, ['status' => 'editing', 'expectedRevision' => $revision_before]);
+if (is_wp_error($updated) || $updated['revision'] !== $revision_before + 1) {
+    byline_test_fail('An expected editorial revision did not advance after a successful update.');
+}
+$stale = byline_update_editorial_story_state(1, ['status' => 'reporting', 'expectedRevision' => $revision_before]);
+if (!is_wp_error($stale) || $stale->get_error_code() !== 'byline_editorial_conflict' || byline_get_editorial_status(1) !== 'editing') {
+    byline_test_fail('A stale editorial update silently overwrote a newer story revision.');
+}
+
 // A partial update leaves untouched fields alone: a caller that only knows
 // about the stage must never clear an assignment.
 $before = byline_get_editorial_story_state(1);
@@ -228,7 +240,7 @@ if (byline_get_editorial_deadline(1) !== '') { byline_test_fail('An explicit emp
 // --- privacy ----------------------------------------------------------------
 
 byline_editorial_register_meta();
-foreach ([BYLINE_EDITORIAL_STATUS_META, BYLINE_EDITORIAL_EDITOR_META, BYLINE_EDITORIAL_DEADLINE_META, BYLINE_EDITORIAL_VISUALS_META] as $key) {
+foreach ([BYLINE_EDITORIAL_STATUS_META, BYLINE_EDITORIAL_EDITOR_META, BYLINE_EDITORIAL_DEADLINE_META, BYLINE_EDITORIAL_VISUALS_META, BYLINE_EDITORIAL_REVISION_META] as $key) {
     if (!isset($byline_registered_meta[$key])) { byline_test_fail("Workflow meta {$key} was not registered with WordPress."); }
     if (!empty($byline_registered_meta[$key]['show_in_rest'])) {
         byline_test_fail("Workflow meta {$key} is exposed through the public REST schema.");

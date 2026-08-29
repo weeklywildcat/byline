@@ -67,6 +67,8 @@ export type VisualSummary = {
 
 export type WorkflowStory = {
   postId: number;
+  /** Private revision used to detect stale collaborative edits. */
+  revision?: number;
   title?: string;
   editUrl?: string;
   status: string;
@@ -401,6 +403,8 @@ export type CorrectionRecord = {
 };
 
 export type CorrectionInput = Pick<CorrectionRecord, "type" | "date" | "publicText">;
+
+export type { EditorialActivityActor, EditorialActivityPayload, EditorialActivityRecord, EditorialActivityStory } from "./activity-model";
 
 export function correctionTypeLabel(type: CorrectionType): string {
   if (type === "editors-note") return "Editor's note";

@@ -80,10 +80,10 @@ function byline_admin_page_definitions(): array
 {
     $pages = [
         BYLINE_ADMIN_PAGE => [
-            'page_title' => 'Byline Overview',
-            // WordPress already owns a top-level "Dashboard"; this one is an
-            // overview of the publication, not a second dashboard.
-            'menu_title' => 'Overview',
+            'page_title' => 'Byline Home',
+            // WordPress already owns a top-level "Dashboard"; this is the
+            // actionable newsroom landing surface for Byline.
+            'menu_title' => 'Home',
             'capability' => BYLINE_MANAGE_CAPABILITY,
             'callback' => 'byline_render_admin_app',
         ],
@@ -243,6 +243,7 @@ function byline_admin_page_urls(): array
     return [
         'dashboard' => byline_admin_page_url(BYLINE_ADMIN_PAGE),
         'planning' => [
+            'today' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'today']),
             'stories' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'stories']),
             'calendar' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'calendar']),
             'media' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'media']),
@@ -303,6 +304,8 @@ function byline_admin_legacy_hash_urls(array $page_urls): array
 {
     return [
         '/dashboard' => $page_urls['dashboard'],
+        '/home' => $page_urls['planning']['today'],
+        '/planning/today' => $page_urls['planning']['today'],
         '/planning/stories' => $page_urls['planning']['stories'],
         '/planning/calendar' => $page_urls['planning']['calendar'],
         '/planning/media' => $page_urls['planning']['media'],
@@ -361,7 +364,7 @@ function byline_admin_user_landing_url(): string
     }
 
     if (current_user_can('edit_posts')) {
-        return byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE);
+        return byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'today']);
     }
 
     if (current_user_can('edit_byline_polls') && byline_admin_feature_enabled('polls')) {
@@ -486,6 +489,8 @@ function byline_enqueue_admin_app(string $hook_suffix): void
             'editDesign' => current_user_can(BYLINE_EDIT_DESIGN_CAPABILITY),
             'publishDesign' => current_user_can(BYLINE_PUBLISH_DESIGN_CAPABILITY),
             'manageIntegrations' => current_user_can(BYLINE_MANAGE_INTEGRATIONS_CAPABILITY),
+            'editPosts' => current_user_can('edit_posts'),
+            'editOthersPosts' => current_user_can('edit_others_posts'),
         ],
         'features' => $publication['features'],
         'themeIds' => byline_publication_theme_ids(),

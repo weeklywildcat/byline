@@ -1,16 +1,19 @@
 /**
  * The Byline editorial workflow, as a native block-editor integration.
  *
- * Two supported SlotFills, no DOM manipulation:
+ * Native editor SlotFills, no DOM manipulation:
  *
  *  - `PluginPostStatusInfo` adds one summary row to the document Summary panel,
  *    next to — and clearly distinct from — the WordPress publication status.
- *  - `PluginSidebar` (with its More-menu item) holds the full controls.
+ *  - `PluginSidebar` (with its More-menu item) holds the compact Story surface.
+ *  - `PluginPrePublishPanel` and `PluginPostPublishPanel` provide publish-time
+ *    readiness and website lifecycle context when the host editor supports them.
  *
  * Editorial workflow and WordPress publication state are different questions.
- * The UI never merges them: Summary shows "Status: Draft" and "Workflow:
- * Writing" as two separate rows, and "Published" is reported as derived from
- * WordPress rather than offered as a choice.
+ * The UI never merges them: the Story summary and workflow panel show the
+ * editorial stage and WordPress publication state as separate values, and
+ * "Published" is reported as derived from WordPress rather than offered as a
+ * workflow choice.
  *
  * Workflow values are private newsroom information, so they travel over a
  * capability-protected Byline endpoint rather than through public post meta.
@@ -18,23 +21,23 @@
  * says so rather than leaving an editor to guess.
  */
 import apiFetch from '@wordpress/api-fetch';
-import { Button, Notice, SelectControl, Spinner, TextControl, TextareaControl } from '@wordpress/components';
+import { Button, Notice, Panel, PanelBody, SelectControl, Spinner, TextControl, TextareaControl } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { useCallback, useEffect, useMemo, useRef, useState } from '@wordpress/element';
-import { PluginPostStatusInfo, PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
+import * as editorModule from '@wordpress/editor';
 import { __, sprintf } from '@wordpress/i18n';
 import { listView } from '@wordpress/icons';
 import { registerPlugin } from '@wordpress/plugins';
+import type { ComponentType, ReactNode } from 'react';
+
+import { normalizeBylineError } from '@byline/admin-runtime';
 
 import { CorrectionsPanel } from './editorial/CorrectionsPanel';
 import { ContributorsPanel } from './editorial/ContributorsPanel';
 import { DistributionPanel } from './editorial/DistributionPanel';
-import { ReadinessPanel } from './editorial/ReadinessPanel';
 import { TasksPanel } from './editorial/TasksPanel';
-import { WorkflowPanel } from './editorial/WorkflowPanel';
 import {
   createEditorialRestClient,
-  describeProtectedRestFailure,
   type ProtectedEditorialFetcher,
   type ProtectedEditorialRequest
 } from './editorial/editorial-rest';
@@ -42,23 +45,23 @@ import type {
   ContributorEntry,
   CorrectionRecord,
   DistributionChannel,
+  EditorialActivityRecord,
   EditorialTask,
   EditorialWorkflowPayload,
   ReadinessCheck,
   TaskInput,
   TaskPatch,
 } from './editorial/editorial-model';
+import { summarizeReadiness } from './editorial/editorial-model';
 
 import {
   describeWorkflowError,
-  workflowStages,
   workflowStatusLabel,
   workflowStoryPath,
   createWorkflowRequestTracker,
   createSerializedWorkflowSaveQueue,
   type WorkflowChanges,
-  type WorkflowPayload,
-  type WorkflowStatusDefinition
+  type WorkflowPayload
 } from './editorial-workflow-model';
 
 import './editorial-workflow.css';
@@ -66,11 +69,32 @@ import './editorial-workflow.css';
 const PLUGIN_NAME = 'byline-editorial-workflow';
 const SIDEBAR_NAME = 'byline-editorial-workflow-sidebar';
 
+const { PluginPostStatusInfo, PluginSidebar, PluginSidebarMoreMenuItem } = editorModule;
+
+/**
+ * These fills are available in the WordPress editor runtime, but older
+ * WordPress type declarations do not include them. Keeping the lookup
+ * optional also lets the workflow sidebar continue working if a host editor
+ * does not provide one of the publish-time fills.
+ */
+type EditorPanelSlotFill = ComponentType<{ className?: string; children?: ReactNode }>;
+const {
+  PluginPrePublishPanel,
+  PluginPostPublishPanel
+} = editorModule as typeof editorModule & {
+  PluginPrePublishPanel?: EditorPanelSlotFill;
+  PluginPostPublishPanel?: EditorPanelSlotFill;
+};
+
 function errorMessage(error: unknown): string {
-  return describeWorkflowError(error, __('Something went wrong. Please try again.', 'weekly-wildcat-headless'));
+  return normalizeBylineError(error, {
+    title: __('Workflow error', 'weekly-wildcat-headless'),
+    message: __('Something went wrong. Please try again.', 'weekly-wildcat-headless')
+  }).message;
 }
 
 const storyPath = workflowStoryPath;
+type WorkflowSaveChanges = WorkflowChanges & { plannedPublishAt?: string | null };
 
 function deadlineContext(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
@@ -114,8 +138,8 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
   // must never make an unrelated workflow save look stale (or leave its busy
   // indicator stuck).
   const requestTrackerRef = useRef(createWorkflowRequestTracker());
-  const saveInFlightRef = useRef(false);
-  const saveInFlightPostIdRef = useRef<number | null>(null);
+  const inFlightWritesRef = useRef(new Set<number>());
+  const revisionRef = useRef<number | null>(null);
   const activePostIdRef = useRef(postId);
   activePostIdRef.current = postId;
   const mountedRef = useRef(true);
@@ -127,6 +151,10 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
     };
   }, []);
 
+  useEffect(() => {
+    revisionRef.current = null;
+  }, [postId]);
+
   const load = useCallback(() => {
     if (!postId) return;
 
@@ -136,13 +164,13 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
     setIsLoading(true);
     setLoadError(null);
 
-    apiFetch<WorkflowPayload>({ path: storyPath(postId) })
+    apiFetch<WorkflowPayload>({ path: `${storyPath(postId)}/bootstrap` })
       .then((next) => {
         if (!mountedRef.current || activePostIdRef.current !== postId || !requestTracker.isCurrentRead(requestId)) return;
         // A save response is authoritative while it is in flight. Applying a
         // slower GET here would put the sidebar back on the pre-save values.
-        if ((saveInFlightRef.current && saveInFlightPostIdRef.current === postId)
-          || requestTracker.writeVersion() !== saveSequenceAtStart) return;
+        if (inFlightWritesRef.current.size > 0 || requestTracker.writeVersion() !== saveSequenceAtStart) return;
+        if (typeof next.story?.revision === 'number') revisionRef.current = next.story.revision;
         setPayload(next);
       })
       .catch((error: unknown) => {
@@ -165,20 +193,24 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
   }, [isPublished]);
 
   const save = useCallback(
-    (changes: WorkflowChanges) => {
+    (changes: WorkflowSaveChanges) => {
       if (!postId) return Promise.resolve(false);
 
       const requestTracker = requestTrackerRef.current;
       const requestPostId = postId;
       const requestId = requestTracker.beginWrite();
-      saveInFlightRef.current = true;
-      saveInFlightPostIdRef.current = requestPostId;
+      inFlightWritesRef.current.add(requestId);
       setIsSaving(true);
       setSaveError(null);
 
-      return apiFetch<WorkflowPayload>({ path: storyPath(postId), method: 'POST', data: changes })
+      const requestChanges: WorkflowSaveChanges = changes.expectedRevision === undefined && revisionRef.current !== null
+        ? { ...changes, expectedRevision: revisionRef.current }
+        : changes;
+
+      return apiFetch<WorkflowPayload>({ path: storyPath(postId), method: 'POST', data: requestChanges })
         .then((next) => {
           if (!mountedRef.current || activePostIdRef.current !== requestPostId || !requestTracker.isCurrentWrite(requestId)) return false;
+          if (typeof next.story?.revision === 'number') revisionRef.current = next.story.revision;
           setPayload(next);
           setSavedAt(Date.now());
           return true;
@@ -190,11 +222,10 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
           return false;
         })
         .finally(() => {
-          if (saveInFlightPostIdRef.current === requestPostId) {
-            saveInFlightPostIdRef.current = null;
-            saveInFlightRef.current = false;
+          inFlightWritesRef.current.delete(requestId);
+          if (mountedRef.current && activePostIdRef.current === requestPostId && requestTracker.isCurrentWrite(requestId)) {
+            setIsSaving(inFlightWritesRef.current.size > 0);
           }
-          if (mountedRef.current && activePostIdRef.current === requestPostId && requestTracker.isCurrentWrite(requestId)) setIsSaving(false);
         });
     },
     [postId]
@@ -205,65 +236,200 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
   return { payload, load, save, clearSaveError, isLoading, isSaving, loadError, saveError, savedAt };
 }
 
-type StageListProps = {
-  statuses: WorkflowStatusDefinition[];
-  current: string;
-  disabled: boolean;
-  onChange: (status: string) => void;
-};
-
-/**
- * A native radio group, not a fake select. Progress through the main line is
- * conveyed by position and by a "done" text style; the accessible name of each
- * option is always the plain status label.
- */
-function StageList({ statuses, current, disabled, onChange }: StageListProps) {
-  const { main, sidelined } = workflowStages(statuses, current);
-
-  const renderStage = (stage: (typeof main)[number]) => {
-    const className = [
-      'byline-workflow-stage',
-      stage.isCurrent ? 'byline-workflow-stage-current' : '',
-      stage.isDone ? 'byline-workflow-stage-done' : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
-
-    return (
-      <label className={className} key={stage.id}>
-        <input
-          type="radio"
-          name="byline-workflow-stage"
-          value={stage.id}
-          checked={stage.isCurrent}
-          disabled={disabled}
-          onChange={() => onChange(stage.id)}
-        />
-        <span className="byline-workflow-stage-text">{stage.label}</span>
-      </label>
-    );
-  };
-
-  return (
-    <>
-      <fieldset className="byline-workflow-stages">
-        <legend>{__('Workflow', 'weekly-wildcat-headless')}</legend>
-        {main.map(renderStage)}
-      </fieldset>
-      {sidelined.length > 0 ? (
-        <fieldset className="byline-workflow-stages byline-workflow-stages-sidelined">
-          <legend>{__('Not in production', 'weekly-wildcat-headless')}</legend>
-          {sidelined.map(renderStage)}
-        </fieldset>
-      ) : null}
-    </>
-  );
-}
-
 type WorkflowControlsProps = ReturnType<typeof useEditorialWorkflow>;
 
 function WorkflowControls(workflow: WorkflowControlsProps) {
-  const { payload, load, save, clearSaveError, isLoading, isSaving, loadError, saveError, savedAt } = workflow;
+  const { payload, load, save, isLoading, isSaving, loadError, saveError, savedAt } = workflow;
+
+  if (loadError) {
+    return (
+      <div className="byline-workflow-panel">
+        <Notice status="warning" isDismissible={false}>
+          <p>{__('Workflow details could not be loaded.', 'weekly-wildcat-headless')}</p>
+          <p>{loadError}</p>
+          <Button variant="secondary" onClick={load}>
+            {__('Retry', 'weekly-wildcat-headless')}
+          </Button>
+        </Notice>
+      </div>
+    );
+  }
+
+  if (!payload) {
+    return (
+      <div className="byline-workflow-panel">
+        <Spinner />
+        <span className="screen-reader-text">{__('Loading editorial workflow', 'weekly-wildcat-headless')}</span>
+      </div>
+    );
+  }
+
+  const normalized = normalizeWorkflowPayload(payload, payload, payload.story.postId, '');
+  if (!normalized) return null;
+
+  const { story, statuses = [], capabilities, writer, editors = [], notes } = normalized;
+  const currentLabel = workflowStatusLabel(payload);
+  const published = story.isPublished || story.postStatus === 'publish';
+  const busy = isLoading || isSaving;
+  const canEditDates = capabilities.assign === true && capabilities.changeDeadline !== false;
+  const canEditPlannedPublication = capabilities.assign === true && capabilities.changePlannedPublication !== false;
+
+  const editorOptions = [
+    { label: __('Unassigned', 'weekly-wildcat-headless'), value: '0' },
+    ...editors.map((editor) => ({ label: editor.name, value: String(editor.id) })),
+  ];
+  const stageOptions = statuses
+    .filter((status) => status.selectable && status.group !== 'derived')
+    .map((status) => ({ label: status.label, value: status.id }));
+  const assignedEditorName = story.editor?.name ?? editors.find((editor) => Number(editor.id) === story.editorId)?.name ?? '';
+
+  return (
+    <div className="byline-workflow-panel">
+      <div className="byline-workflow-status-pair" aria-label={__('Story status', 'weekly-wildcat-headless')}>
+        <p className="byline-workflow-current">
+          <span className="byline-workflow-current-label">{__('Workflow', 'weekly-wildcat-headless')}</span>
+          <span className="byline-workflow-current-value">{currentLabel}</span>
+        </p>
+        <p className="byline-workflow-current">
+          <span className="byline-workflow-current-label">{__('WordPress publication', 'weekly-wildcat-headless')}</span>
+          <span className="byline-workflow-current-value">{publicationStatusLabel(story.postStatus)}</span>
+        </p>
+      </div>
+      <p className="byline-workflow-note">
+        {published
+          ? __('Published follows WordPress. The earlier editorial stage is kept if the story is unpublished.', 'weekly-wildcat-headless')
+          : __('Workflow changes save separately from the post content.', 'weekly-wildcat-headless')}
+      </p>
+
+      {!published ? (
+        <div className="byline-workflow-field">
+          <SelectControl
+            __nextHasNoMarginBottom
+            label={__('Stage', 'weekly-wildcat-headless')}
+            value={story.storedStatus ?? story.status}
+            options={stageOptions}
+            disabled={busy || !capabilities.changeStatus}
+            onChange={(status: string) => {
+              if (status) void save({ status });
+            }}
+            help={__('Published is a WordPress state, not an editorial stage.', 'weekly-wildcat-headless')}
+          />
+        </div>
+      ) : null}
+
+      <div className="byline-workflow-fields">
+        {writer ? (
+          <dl className="byline-workflow-readonly">
+            <dt>{__('Writer', 'weekly-wildcat-headless')}</dt>
+            <dd>{writer.name}</dd>
+          </dl>
+        ) : null}
+
+        {capabilities.assign ? (
+          <>
+            <div className="byline-workflow-field">
+              <SelectControl
+                __nextHasNoMarginBottom
+                label={__('Editor', 'weekly-wildcat-headless')}
+                value={String(story.editorId)}
+                options={editorOptions}
+                disabled={busy || !capabilities.assign}
+                onChange={(value: string) => void save({ editorId: Number.parseInt(value, 10) || 0 })}
+              />
+            </div>
+            <div className="byline-workflow-field">
+              <TextControl
+                __nextHasNoMarginBottom
+                type="date"
+                label={__('Deadline', 'weekly-wildcat-headless')}
+                help={__('An internal newsroom date. It does not schedule publication.', 'weekly-wildcat-headless')}
+                value={story.deadline?.slice(0, 10) ?? ''}
+                disabled={busy || !canEditDates}
+                onChange={(value: string) => void save({ deadline: value })}
+              />
+              {story.deadline && deadlineContext(story.deadline) ? (
+                <p className="byline-workflow-field-note">{deadlineContext(story.deadline)}</p>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <dl className="byline-workflow-readonly">
+            <dt>{__('Editor', 'weekly-wildcat-headless')}</dt>
+            <dd>{assignedEditorName || __('Unassigned', 'weekly-wildcat-headless')}</dd>
+            {story.deadline ? (
+              <>
+                <dt>{__('Deadline', 'weekly-wildcat-headless')}</dt>
+                <dd>
+                  {story.deadline}
+                  {deadlineContext(story.deadline) ? <small>{deadlineContext(story.deadline)}</small> : null}
+                </dd>
+              </>
+            ) : null}
+          </dl>
+        )}
+        <div className="byline-workflow-field">
+          <TextControl
+            __nextHasNoMarginBottom
+            type="date"
+            label={__('Planned publication', 'weekly-wildcat-headless')}
+            help={__('An editorial target; it does not schedule the WordPress post.', 'weekly-wildcat-headless')}
+            value={story.plannedPublication?.slice(0, 10) ?? ''}
+            disabled={busy || !canEditPlannedPublication}
+            onChange={(value: string) => void save({ plannedPublishAt: value || null })}
+          />
+        </div>
+      </div>
+
+      {notes?.available ? (
+        <div className="byline-workflow-inline-actions">
+          {notes.url ? <Button variant="secondary" href={notes.url}>{__('Open notes', 'weekly-wildcat-headless')}</Button> : null}
+        </div>
+      ) : null}
+
+      {saveError ? (
+        <Notice status="error" isDismissible={false}>
+          <p>{saveError}</p>
+        </Notice>
+      ) : null}
+
+      <p className="byline-workflow-status-line" aria-live="polite">
+        {isSaving
+          ? __('Saving workflow…', 'weekly-wildcat-headless')
+          : savedAt && !saveError
+            ? __('Workflow saved.', 'weekly-wildcat-headless')
+            : ''}
+      </p>
+    </div>
+  );
+}
+
+function publicationStatusLabel(status: string): string {
+  if (status === 'publish') return __('Published', 'weekly-wildcat-headless');
+  if (status === 'future') return __('Scheduled', 'weekly-wildcat-headless');
+  if (status === 'pending') return __('Pending review', 'weekly-wildcat-headless');
+  if (status === 'private') return __('Private', 'weekly-wildcat-headless');
+  if (status === 'draft') return __('Draft', 'weekly-wildcat-headless');
+  return status || __('Unknown', 'weekly-wildcat-headless');
+}
+
+function visualStatusLabel(story: EditorialWorkflowPayload['story']): string {
+  const status = story.visual?.status;
+  if (status === 'done') return __('Visuals complete', 'weekly-wildcat-headless');
+  if (status === 'needed') return __('Photo needed', 'weekly-wildcat-headless');
+  if (status === 'assigned') return __('Visual assigned', 'weekly-wildcat-headless');
+  if (status === 'in-progress') return __('Visuals in progress', 'weekly-wildcat-headless');
+  if (status === 'uploaded' || status === 'selected') return __('Visual uploaded', 'weekly-wildcat-headless');
+  return story.visuals?.trim() ? __('Visual note saved', 'weekly-wildcat-headless') : __('No visual request', 'weekly-wildcat-headless');
+}
+
+/**
+ * The visual note remains serialized even though it now lives in its own
+ * collapsed panel. This prevents navigation or a slower response from losing
+ * the editor's latest note.
+ */
+function VisualNeedsPanel({ workflow }: { workflow: WorkflowControlsProps }) {
+  const { payload, save, clearSaveError, isLoading, loadError } = workflow;
+  const normalized = payload ? normalizeWorkflowPayload(payload, payload, payload.story.postId, '') : null;
   const [visuals, setVisuals] = useState('');
   const [visualsDirty, setVisualsDirty] = useState(false);
   const [visualsSaving, setVisualsSaving] = useState(false);
@@ -308,210 +474,70 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
   }, [visualsDirty]);
 
   useEffect(() => {
-    if (payload && !visualsDirty && (!visualsInitializedRef.current || payload.story.visuals === latestVisualsRef.current)) {
-      setVisuals(payload.story.visuals);
-      latestVisualsRef.current = payload.story.visuals;
+    const nextVisuals = normalized?.story.visuals ?? '';
+    if (normalized && !visualsDirty && (!visualsInitializedRef.current || nextVisuals === latestVisualsRef.current)) {
+      setVisuals(nextVisuals);
+      latestVisualsRef.current = nextVisuals;
       visualsInitializedRef.current = true;
     }
-  }, [payload?.story.visuals, visualsDirty]);
+  }, [normalized?.story.visuals, visualsDirty]);
 
   if (loadError) {
-    return (
-      <div className="byline-workflow-panel">
-        <Notice status="warning" isDismissible={false}>
-          <p>{__('Workflow details could not be loaded.', 'weekly-wildcat-headless')}</p>
-          <p>{loadError}</p>
-          <Button variant="secondary" onClick={load}>
-            {__('Retry', 'weekly-wildcat-headless')}
-          </Button>
-        </Notice>
-      </div>
-    );
+    return <p className="byline-workflow-field-note">{__('Workflow details are unavailable, so visual notes cannot be edited yet.', 'weekly-wildcat-headless')}</p>;
+  }
+  if (!normalized) {
+    return isLoading ? <Spinner /> : <p className="byline-workflow-field-note">{__('Visual request unavailable.', 'weekly-wildcat-headless')}</p>;
   }
 
-  if (!payload) {
-    return (
-      <div className="byline-workflow-panel">
-        <Spinner />
-        <span className="screen-reader-text">{__('Loading editorial workflow', 'weekly-wildcat-headless')}</span>
-      </div>
-    );
-  }
-
-  const { story, statuses, capabilities, writer, editors, discord } = payload;
-  const currentLabel = workflowStatusLabel(payload);
-  const busy = isLoading || isSaving;
-
-  const editorOptions = [
-    { label: __('Unassigned', 'weekly-wildcat-headless'), value: '0' },
-    ...editors.map((editor) => ({ label: editor.name, value: String(editor.id) })),
-  ];
-  const assignedEditorName = editors.find((editor) => editor.id === story.editorId)?.name ?? '';
-
+  const canEdit = normalized.capabilities.changeStatus;
   return (
-    <>
-      <div className="byline-workflow-panel">
-        <p className="byline-workflow-current">
-          <span className="byline-workflow-current-label">{__('Current status', 'weekly-wildcat-headless')}</span>
-          <span className="byline-workflow-current-value">{currentLabel}</span>
-        </p>
-        {story.isPublished ? (
-          <p className="byline-workflow-note">
-            {__(
-              'This story is published, so its workflow follows the WordPress publication state. The earlier stage is kept in case it is unpublished.',
-              'weekly-wildcat-headless'
-            )}
-          </p>
-        ) : (
-          <p className="byline-workflow-note">
-            {__('Workflow changes save on their own, separately from the post content.', 'weekly-wildcat-headless')}
-          </p>
-        )}
-      </div>
-
-      {story.isPublished ? null : (
-        <div className="byline-workflow-panel">
-          <StageList
-            statuses={statuses}
-            current={story.storedStatus}
-            disabled={busy || !capabilities.changeStatus}
-            onChange={(status) => save({ status })}
-          />
-        </div>
-      )}
-
-      <div className="byline-workflow-panel">
-        {writer ? (
-          <dl className="byline-workflow-readonly">
-            <dt>{__('Writer', 'weekly-wildcat-headless')}</dt>
-            <dd>{writer.name}</dd>
-          </dl>
-        ) : null}
-
-        {capabilities.assign ? (
-          <>
-            <div className="byline-workflow-field">
-              <SelectControl
-                __nextHasNoMarginBottom
-                label={__('Editor', 'weekly-wildcat-headless')}
-                value={String(story.editorId)}
-                options={editorOptions}
-                disabled={busy}
-                onChange={(value: string) => save({ editorId: Number.parseInt(value, 10) || 0 })}
-              />
-            </div>
-            <div className="byline-workflow-field">
-              <TextControl
-                __nextHasNoMarginBottom
-                type="date"
-                label={__('Deadline', 'weekly-wildcat-headless')}
-                help={__('An internal newsroom date. It does not schedule publication.', 'weekly-wildcat-headless')}
-                value={story.deadline}
-                disabled={busy}
-                onChange={(value: string) => save({ deadline: value })}
-              />
-              {story.deadline && deadlineContext(story.deadline) ? (
-                <p className="byline-workflow-field-note">{deadlineContext(story.deadline)}</p>
-              ) : null}
-            </div>
-          </>
-        ) : (
-          <dl className="byline-workflow-readonly">
-            <dt>{__('Editor', 'weekly-wildcat-headless')}</dt>
-            <dd>{assignedEditorName || __('Unassigned', 'weekly-wildcat-headless')}</dd>
-            {story.deadline ? (
-              <>
-                <dt>{__('Deadline', 'weekly-wildcat-headless')}</dt>
-                <dd>
-                  {story.deadline}
-                  {deadlineContext(story.deadline) ? <small>{deadlineContext(story.deadline)}</small> : null}
-                </dd>
-              </>
-            ) : null}
-          </dl>
-        )}
-
-        <div className="byline-workflow-field">
-          <TextareaControl
-            __nextHasNoMarginBottom
-            label={__('Visual needs', 'weekly-wildcat-headless')}
-            help={__('Internal only. Never shown to readers.', 'weekly-wildcat-headless')}
-            rows={3}
-            value={visuals}
-            disabled={isLoading || !capabilities.changeStatus}
-            onChange={(value: string) => {
-              clearSaveError();
-              setVisualsSaveError(false);
-              setVisuals(value);
-              setVisualsDirty(true);
-              visualsDirtyRef.current = true;
-              latestVisualsRef.current = value;
-              if (visualsSaveTimerRef.current !== null) clearTimeout(visualsSaveTimerRef.current);
-              visualsSaveTimerRef.current = setTimeout(() => {
-                visualsSaveTimerRef.current = null;
-                enqueueVisualSave(value);
-              }, 650);
-            }}
-          />
-          <p className="byline-workflow-field-note" aria-live="polite">
-            {visualsDirty
-              ? visualsSaving
-                ? __('Saving visual needs…', 'weekly-wildcat-headless')
-                : visualsSaveError
-                  ? __('Couldn’t save visual needs. Your text is still here; try again.', 'weekly-wildcat-headless')
-                : __('Visual needs will save automatically.', 'weekly-wildcat-headless')
-              : ''}
-          </p>
-          {visualsSaveError ? (
-            <Button
-              variant="secondary"
-              disabled={visualsSaving}
-              onClick={() => {
-                clearSaveError();
-                setVisualsSaveError(false);
-                enqueueVisualSave(latestVisualsRef.current);
-              }}
-            >
-              {__('Retry visual needs', 'weekly-wildcat-headless')}
-            </Button>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="byline-workflow-panel">
-        <dl className="byline-workflow-readonly">
-          <dt>{__('Discussion', 'weekly-wildcat-headless')}</dt>
-          <dd>
-            {discord.threadId
-              ? (
-                <>
-                  {__('Discord thread linked.', 'weekly-wildcat-headless')}{' '}
-                  {discord.threadUrl ? (
-                    <a href={discord.threadUrl} target="_blank" rel="noreferrer">
-                      {__('Open in Discord', 'weekly-wildcat-headless')}
-                    </a>
-                  ) : null}
-                </>
-              )
-              : __('Not linked to a Discord thread yet.', 'weekly-wildcat-headless')}
-          </dd>
-        </dl>
-
-        {saveError ? (
-          <Notice status="error" isDismissible={false}>
-            <p>{saveError}</p>
-          </Notice>
-        ) : null}
-
-        <p className="byline-workflow-status-line" aria-live="polite">
-          {isSaving
-            ? __('Saving workflow…', 'weekly-wildcat-headless')
-            : savedAt && !saveError
-              ? __('Workflow saved.', 'weekly-wildcat-headless')
-              : ''}
-        </p>
-      </div>
-    </>
+    <div className="byline-workflow-visuals">
+      <p className="byline-workflow-panel-summary"><strong>{visualStatusLabel(normalized.story)}</strong></p>
+      {normalized.story.visual?.label ? <p className="byline-workflow-field-note">{normalized.story.visual.label}</p> : null}
+      <TextareaControl
+        __nextHasNoMarginBottom
+        label={__('Visual request or note', 'weekly-wildcat-headless')}
+        help={__('Internal only. A structured Media Desk request remains the source for its status.', 'weekly-wildcat-headless')}
+        rows={3}
+        value={visuals}
+        disabled={isLoading || !canEdit}
+        onChange={(value: string) => {
+          clearSaveError();
+          setVisualsSaveError(false);
+          setVisuals(value);
+          setVisualsDirty(true);
+          visualsDirtyRef.current = true;
+          latestVisualsRef.current = value;
+          if (visualsSaveTimerRef.current !== null) clearTimeout(visualsSaveTimerRef.current);
+          visualsSaveTimerRef.current = setTimeout(() => {
+            visualsSaveTimerRef.current = null;
+            enqueueVisualSave(value);
+          }, 650);
+        }}
+      />
+      <p className="byline-workflow-field-note" aria-live="polite">
+        {visualsDirty
+          ? visualsSaving
+            ? __('Saving visual note…', 'weekly-wildcat-headless')
+            : visualsSaveError
+              ? __('Couldn’t save visual note. Your text is still here; try again.', 'weekly-wildcat-headless')
+              : __('Visual notes save automatically.', 'weekly-wildcat-headless')
+          : ''}
+      </p>
+      {visualsSaveError ? (
+        <Button
+          variant="secondary"
+          disabled={visualsSaving}
+          onClick={() => {
+            clearSaveError();
+            setVisualsSaveError(false);
+            enqueueVisualSave(latestVisualsRef.current);
+          }}
+        >
+          {__('Retry visual note', 'weekly-wildcat-headless')}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -533,6 +559,38 @@ function numberValue(value: unknown, fallback = 0): number {
 function arrayValue(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
+
+/** Keep optional editorial REST calls behind the same protected transport. */
+function useEditorialRestClient() {
+  const fetcher = useMemo<ProtectedEditorialFetcher>(() => {
+    return async function protectedFetch<T>({ path, method, data }: ProtectedEditorialRequest): Promise<T> {
+      let nextData = data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const body = { ...(data as UnknownRecord) };
+        if (Object.prototype.hasOwnProperty.call(body, 'plannedPublication')) {
+          body.plannedPublishAt = body.plannedPublication;
+          delete body.plannedPublication;
+        }
+        if (path.includes('/corrections') && Object.prototype.hasOwnProperty.call(body, 'publicText')) {
+          body.text = body.publicText;
+          body.recordedAt = body.date;
+          delete body.publicText;
+          delete body.date;
+        }
+        nextData = body;
+      }
+      return apiFetch<unknown>({
+        path,
+        ...(method ? { method } : {}),
+        ...(nextData !== undefined ? { data: nextData } : {})
+      }) as Promise<T>;
+    };
+  }, []);
+
+  return useMemo(() => createEditorialRestClient(fetcher), [fetcher]);
+}
+
+type EditorialRestClient = ReturnType<typeof createEditorialRestClient>;
 
 function normalizeContributor(value: unknown): ContributorEntry | null {
   const item = record(value);
@@ -578,10 +636,12 @@ function normalizeWorkflowPayload(value: unknown, fallback: WorkflowPayload | nu
   const rawVisual = record(rawStory.visual ?? raw.media);
   const rawCoverage = arrayValue(rawStory.coverage ?? raw.coverage).map((item) => stringValue(record(item).slug || record(item).title || item)).filter(Boolean);
   const workflowStatus = stringValue(rawStory.status ?? fallbackStory.status, 'pitch');
+  const revision = numberValue(rawStory.revision ?? fallbackStory.revision, -1);
 
   return {
     story: {
       postId: numberValue(rawStory.postId ?? fallbackStory.postId, postId),
+      ...(revision >= 0 ? { revision } : {}),
       title: stringValue(rawStory.title, title),
       status: workflowStatus,
       storedStatus: stringValue(rawStory.storedStatus, workflowStatus),
@@ -625,19 +685,43 @@ function normalizeReadiness(value: unknown, storyId: number): ReadinessCheck[] {
   return arrayValue(raw.checks).map((check, index) => {
     const item = record(check);
     const status = stringValue(item.state || item.status, 'warning');
+    const fix = record(item.fix);
     return {
       id: stringValue(item.id, `check-${index}`),
       label: stringValue(item.label, 'Readiness check'),
       state: (status === 'pass' || status === 'error' ? status : 'warning') as 'pass' | 'warning' | 'error',
       explanation: stringValue(item.explanation, 'Review this check before publishing.'),
-      ...(record(item.fix).href || record(item.fix).label ? {
+      ...(fix.href || fix.url || fix.label ? {
         fix: {
-          label: stringValue(record(item.fix).label, 'Review'),
-          ...(stringValue(record(item.fix).href) ? { href: stringValue(record(item.fix).href) } : {})
+          label: stringValue(fix.label, 'Review'),
+          ...(stringValue(fix.href || fix.url) ? { href: stringValue(fix.href || fix.url) } : {})
         }
       } : {})
     };
   }).filter((check) => check.id && (storyId > 0));
+}
+
+type CompactReadinessSummary = {
+  passed: number;
+  warnings: number;
+  errors: number;
+  total: number;
+};
+
+function compactReadinessSummary(value: unknown): CompactReadinessSummary | null {
+  const raw = record(value);
+  if (raw.total == null || String(raw.total).trim() === '') return null;
+  return {
+    passed: numberValue(raw.passed, 0),
+    warnings: numberValue(raw.warnings, 0),
+    errors: numberValue(raw.errors, 0),
+    total: numberValue(raw.total, 0)
+  };
+}
+
+function summaryCount(value: unknown, fallback: number): number {
+  const raw = record(value);
+  return raw.count == null ? fallback : numberValue(raw.count, fallback);
 }
 
 function normalizeTask(value: unknown): EditorialTask | null {
@@ -689,20 +773,92 @@ function normalizeCorrections(value: unknown): CorrectionRecord[] {
   return normalized;
 }
 
-function normalizeDistribution(value: unknown, postId: number, headline: string, canonicalUrl: string, excerpt: string): {
+function normalizeActivity(value: unknown): EditorialActivityRecord[] {
+  const raw = record(value);
+  return arrayValue(raw.activity ?? raw.items ?? value).flatMap((entry) => {
+    const item = record(entry);
+    const id = item.id;
+    const summary = stringValue(item.summary);
+    if ((typeof id !== 'number' && typeof id !== 'string') || String(id) === '' || !summary) return [];
+    const actor = record(item.actor);
+    const story = record(item.story);
+    return [{
+      id,
+      action: stringValue(item.action || item.type),
+      type: stringValue(item.type || item.action),
+      storyId: numberValue(item.storyId, 0) || undefined,
+      summary,
+      occurredAt: stringValue(item.occurredAt),
+      actor: actor.id != null && stringValue(actor.name) ? { id: numberValue(actor.id), name: stringValue(actor.name) } : null,
+      story: story.id != null && stringValue(story.title) ? { id: numberValue(story.id), title: stringValue(story.title) } : null,
+      context: record(item.context)
+    }];
+  });
+}
+
+function activityTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value || __('Unknown time', 'weekly-wildcat-headless');
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function ActivityPanel({ records, isLoading, error, onRetry }: { records: EditorialActivityRecord[]; isLoading: boolean; error?: unknown; onRetry: () => void }) {
+  if (isLoading && records.length === 0) return <Spinner />;
+  return (
+    <div className="byline-editorial-activity">
+      {error ? (
+        <Notice status="warning" isDismissible={false}>
+          <p>{errorMessage(error)}</p>
+          <Button variant="secondary" onClick={onRetry}>{__('Try again', 'weekly-wildcat-headless')}</Button>
+        </Notice>
+      ) : records.length ? (
+        <ol className="byline-editorial-activity-list">
+          {records.map((item) => (
+            <li key={String(item.id)}>
+              <strong>{item.summary}</strong>
+              <small>
+                {item.actor?.name ? `${item.actor.name} · ` : ''}
+                <time dateTime={item.occurredAt}>{activityTime(item.occurredAt)}</time>
+              </small>
+            </li>
+          ))}
+        </ol>
+      ) : <p className="byline-editorial-muted">{__('No activity has been recorded for this story yet.', 'weekly-wildcat-headless')}</p>}
+    </div>
+  );
+}
+
+type WebsiteLifecycleStatus = 'not-published' | 'published' | 'building' | 'live' | 'failed' | 'unknown';
+
+type NormalizedDistribution = {
   channels: DistributionChannel[];
   capabilities: { addToNewsletter: boolean };
-} {
+  websiteStatus: WebsiteLifecycleStatus;
+  canRetryWebsite: boolean;
+};
+
+function websiteLifecycleStatus(value: unknown): WebsiteLifecycleStatus {
+  const status = stringValue(value).toLowerCase().replace(/_/g, '-');
+  if (status === 'not-published' || status === 'draft') return 'not-published';
+  if (status === 'published') return 'published';
+  if (status === 'rebuild-pending' || status === 'building' || status === 'pending' || status === 'queued') return 'building';
+  if (status === 'live') return 'live';
+  if (status === 'build-failed' || status === 'failed' || status === 'error') return 'failed';
+  return 'unknown';
+}
+
+function normalizeDistribution(value: unknown, postId: number, headline: string, canonicalUrl: string, excerpt: string): NormalizedDistribution {
   const raw = record(value);
   const source = record(raw.channels);
   const entries = Array.isArray(raw.channels) ? raw.channels : Object.entries(source).map(([id, channel]) => ({ ...record(channel), channelId: record(channel).channelId || id }));
   const channels = entries.map((entry) => {
     const item = record(entry);
-    const status = stringValue(item.status, 'not-configured');
+    const id = stringValue(item.id || item.channelId, 'channel');
+    const status = stringValue(item.status, 'not-configured').toLowerCase();
     return {
-      id: stringValue(item.id || item.channelId, 'channel'),
+      id,
       label: stringValue(item.label, 'Distribution'),
-      status: (status === 'sent' || status === 'pending' || status === 'failed' || status === 'skipped' || status === 'ready' ? status : status === 'live' || status === 'published' ? 'distributed' : 'not-configured') as DistributionChannel['status'],
+      status: (status === 'sent' || status === 'pending' || status === 'failed' || status === 'skipped' || status === 'ready' ? status : status === 'live' || status === 'published' ? 'distributed' : status === 'rebuild_pending' || status === 'building' ? 'pending' : 'not-configured') as DistributionChannel['status'],
       configured: Boolean(item.configured),
       capabilities: record(item.capabilities) as DistributionChannel['capabilities'],
       provider: stringValue(item.provider) || undefined,
@@ -711,10 +867,91 @@ function normalizeDistribution(value: unknown, postId: number, headline: string,
       lastError: stringValue(item.lastError) || null
     };
   });
+  const websiteEntry = entries.find((entry) => stringValue(record(entry).id || record(entry).channelId) === 'website');
+  const websiteStatus = websiteLifecycleStatus(websiteEntry ? record(websiteEntry).status : undefined);
+  const rawCapabilities = record(raw.capabilities);
+  const newsletter = channels.find((channel) => channel.id === 'newsletter');
   return {
     channels,
-    capabilities: { addToNewsletter: Boolean(channels.find((channel) => channel.id === 'newsletter')?.configured) && postId > 0 && Boolean(headline || canonicalUrl || excerpt) }
+    capabilities: {
+      addToNewsletter: rawCapabilities.addToNewsletter === true || (
+        rawCapabilities.addToNewsletter !== false &&
+        Boolean(newsletter?.configured) &&
+        postId > 0 &&
+        Boolean(headline || canonicalUrl || excerpt)
+      )
+    },
+    websiteStatus,
+    canRetryWebsite: websiteStatus === 'failed' && (
+      raw.canRetryWebsite === true ||
+      rawCapabilities.retryWebsite === true
+    )
   };
+}
+
+type EditorialPanelKey = 'tasks' | 'contributors' | 'corrections' | 'distribution' | 'activity';
+
+function emptyEditorialPanelState(): Record<EditorialPanelKey, boolean> {
+  return { tasks: false, contributors: false, corrections: false, distribution: false, activity: false };
+}
+
+function StorySummary({ payload, title }: { payload: WorkflowPayload | null; title: string }) {
+  const normalized = payload ? normalizeWorkflowPayload(payload, payload, payload.story.postId, title) : null;
+  const rawPayload = record(payload);
+  const readiness = compactReadinessSummary(rawPayload.readiness);
+  const contributorCount = summaryCount(rawPayload.contributors, normalizeContributors(rawPayload.contributors).length);
+
+  if (!normalized) {
+    return (
+      <section className="byline-story-summary" aria-labelledby="byline-story-summary-heading">
+        <span className="byline-editorial-eyebrow">{__('Story', 'weekly-wildcat-headless')}</span>
+        <h2 id="byline-story-summary-heading">{title || __('Untitled story', 'weekly-wildcat-headless')}</h2>
+        <p className="byline-editorial-muted">{__('Workflow details are loading.', 'weekly-wildcat-headless')}</p>
+      </section>
+    );
+  }
+
+  const { story } = normalized;
+  const writer = normalized.writer?.name || __('Unassigned', 'weekly-wildcat-headless');
+  const editor = story.editor?.name || __('Unassigned', 'weekly-wildcat-headless');
+  const due = story.deadline
+    ? `${story.deadline}${deadlineContext(story.deadline) ? ` · ${deadlineContext(story.deadline)}` : ''}`
+    : __('No deadline', 'weekly-wildcat-headless');
+
+  return (
+    <section className="byline-story-summary" aria-labelledby="byline-story-summary-heading">
+      <div className="byline-story-summary-heading">
+        <div>
+          <span className="byline-editorial-eyebrow">{__('Story', 'weekly-wildcat-headless')}</span>
+          <h2 id="byline-story-summary-heading">{story.title || title || __('Untitled story', 'weekly-wildcat-headless')}</h2>
+        </div>
+        <span className="byline-editorial-badge byline-story-summary-status">{workflowStatusLabel(payload)}</span>
+      </div>
+      <dl className="byline-story-summary-meta">
+        <div>
+          <dt>{__('Writer', 'weekly-wildcat-headless')}</dt>
+          <dd>{writer}</dd>
+        </div>
+        <div>
+          <dt>{__('Editor', 'weekly-wildcat-headless')}</dt>
+          <dd>{editor}</dd>
+        </div>
+        <div>
+          <dt>{__('Due', 'weekly-wildcat-headless')}</dt>
+          <dd>{due}</dd>
+        </div>
+        <div>
+          <dt>{__('WordPress', 'weekly-wildcat-headless')}</dt>
+          <dd>{publicationStatusLabel(story.postStatus)}</dd>
+        </div>
+      </dl>
+      <div className="byline-story-summary-counters" aria-live="polite">
+        {readiness && readiness.total > 0 ? <span>{sprintf(/* translators: 1: passed checks, 2: total checks. */ __('%1$d of %2$d checks ready', 'weekly-wildcat-headless'), readiness.passed, readiness.total)}</span> : null}
+        {typeof story.tasksOpen === 'number' ? <span>{sprintf(/* translators: %d: open task count. */ __('%d open tasks', 'weekly-wildcat-headless'), story.tasksOpen)}</span> : null}
+        {contributorCount > 0 ? <span>{sprintf(/* translators: %d: contributor count. */ __('%d contributors', 'weekly-wildcat-headless'), contributorCount)}</span> : null}
+      </div>
+    </section>
+  );
 }
 
 function EditorialNewsroomPanels({
@@ -722,171 +959,541 @@ function EditorialNewsroomPanels({
   title,
   canonicalUrl,
   excerpt,
-  legacyPayload
+  workflow,
+  client
 }: {
   postId: number;
   title: string;
   canonicalUrl: string;
   excerpt: string;
-  legacyPayload: WorkflowPayload | null;
+  workflow: WorkflowControlsProps;
+  client: EditorialRestClient;
 }) {
-  const fetcher = useMemo<ProtectedEditorialFetcher>(() => {
-    return async function protectedFetch<T>({ path, method, data }: ProtectedEditorialRequest): Promise<T> {
-      let nextData = data;
-      if (data && typeof data === 'object' && !Array.isArray(data)) {
-        const body = { ...(data as UnknownRecord) };
-        if (Object.prototype.hasOwnProperty.call(body, 'plannedPublication')) {
-          body.plannedPublishAt = body.plannedPublication;
-          delete body.plannedPublication;
-        }
-        if (path.includes('/corrections') && Object.prototype.hasOwnProperty.call(body, 'publicText')) {
-          body.text = body.publicText;
-          body.recordedAt = body.date;
-          delete body.publicText;
-          delete body.date;
-        }
-        nextData = body;
-      }
-      return apiFetch<unknown>({ path, ...(method ? { method } : {}), ...(nextData !== undefined ? { data: nextData } : {}) }) as Promise<T>;
-    };
-  }, []);
-  const client = useMemo(() => createEditorialRestClient(fetcher), [fetcher]);
-  const [workflowPayload, setWorkflowPayload] = useState<EditorialWorkflowPayload | null>(() => normalizeWorkflowPayload(legacyPayload, legacyPayload, postId, title));
-  const [readiness, setReadiness] = useState<ReadinessCheck[]>([]);
+  const { payload } = workflow;
+  const workflowForPanel = payload ? normalizeWorkflowPayload(payload, payload, postId, title) : null;
   const [tasks, setTasks] = useState<EditorialTask[]>([]);
   const [taskPeople, setTaskPeople] = useState<ContributorEntry[]>([]);
   const [contributors, setContributors] = useState<ContributorEntry[]>([]);
   const [availableContributors, setAvailableContributors] = useState<ContributorEntry[]>([]);
   const [corrections, setCorrections] = useState<CorrectionRecord[]>([]);
+  const [activity, setActivity] = useState<EditorialActivityRecord[]>([]);
   const [legacyCorrectionText, setLegacyCorrectionText] = useState<string | null>(null);
-  const [distribution, setDistribution] = useState<{ channels: DistributionChannel[]; capabilities: { addToNewsletter: boolean } }>({ channels: [], capabilities: { addToNewsletter: false } });
-  const [loading, setLoading] = useState<Record<string, boolean>>({});
-  const [errors, setErrors] = useState<Record<string, unknown>>({});
+  const [distribution, setDistribution] = useState<NormalizedDistribution>({
+    channels: [],
+    capabilities: { addToNewsletter: false },
+    websiteStatus: 'unknown',
+    canRetryWebsite: false
+  });
+  const [loading, setLoading] = useState<Record<EditorialPanelKey, boolean>>(emptyEditorialPanelState);
+  const [loaded, setLoaded] = useState<Record<EditorialPanelKey, boolean>>(emptyEditorialPanelState);
+  const [saving, setSaving] = useState<Record<EditorialPanelKey, boolean>>(emptyEditorialPanelState);
+  const [errors, setErrors] = useState<Partial<Record<EditorialPanelKey, unknown>>>({});
+  const requestedPanelsRef = useRef<Record<EditorialPanelKey, boolean>>(emptyEditorialPanelState());
+  const mountedRef = useRef(true);
+  const activePostIdRef = useRef(postId);
+  activePostIdRef.current = postId;
 
-  const load = useCallback(() => {
-    if (!postId) return;
-    let active = true;
-    const begin = (key: string) => {
-      setLoading((current) => ({ ...current, [key]: true }));
-      setErrors((current) => ({ ...current, [key]: undefined }));
-    };
-    const finish = (key: string, error?: unknown) => {
-      if (!active) return;
-      setLoading((current) => ({ ...current, [key]: false }));
-      if (error) setErrors((current) => ({ ...current, [key]: error }));
-    };
-    const run = <T,>(key: string, operation: () => Promise<T>, onValue: (value: T) => void) => {
-      begin(key);
-      void operation().then((value) => {
-        if (active) onValue(value);
-        finish(key);
-      }).catch((error: unknown) => finish(key, error));
-    };
-    run('workflow', () => client.getWorkflow(postId), (value) => setWorkflowPayload(normalizeWorkflowPayload(value, legacyPayload, postId, title)));
-    run('readiness', () => client.getReadiness(postId), (value) => setReadiness(normalizeReadiness(value, postId)));
-    run('tasks', () => client.listTasks(postId), (value) => {
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
+
+  const runPanel = useCallback(<T,>(
+    key: EditorialPanelKey,
+    operation: () => Promise<T>,
+    onValue: (value: T) => void
+  ) => {
+    if (!postId || requestedPanelsRef.current[key]) return;
+    requestedPanelsRef.current[key] = true;
+    setLoading((current) => ({ ...current, [key]: true }));
+    setErrors((current) => ({ ...current, [key]: undefined }));
+    void operation()
+      .then((value) => {
+        if (!mountedRef.current || activePostIdRef.current !== postId) return;
+        onValue(value);
+        setLoaded((current) => ({ ...current, [key]: true }));
+      })
+      .catch((error: unknown) => {
+        if (!mountedRef.current || activePostIdRef.current !== postId) return;
+        requestedPanelsRef.current[key] = false;
+        setErrors((current) => ({ ...current, [key]: error }));
+      })
+      .finally(() => {
+        if (mountedRef.current && activePostIdRef.current === postId) {
+          setLoading((current) => ({ ...current, [key]: false }));
+        }
+      });
+  }, [postId]);
+
+  const loadTasks = useCallback(() => {
+    runPanel('tasks', () => client.listTasks(postId), (value) => {
       setTasks(normalizeTasks(value));
-      const rawPeople = arrayValue(record(value).people).map(normalizeContributor).filter((item): item is ContributorEntry => item !== null);
-      setTaskPeople(rawPeople);
+      setTaskPeople(arrayValue(record(value).people).map(normalizeContributor).filter((item): item is ContributorEntry => item !== null));
     });
-    run('contributors', () => client.getContributors(postId), (value) => {
+  }, [client, postId, runPanel]);
+
+  const loadContributors = useCallback(() => {
+    runPanel('contributors', () => client.getContributors(postId), (value) => {
       const raw = record(value);
       setContributors(normalizeContributors(raw.contributors));
-      setAvailableContributors(normalizeContributors(raw.available ?? record(legacyPayload).editors));
+      setAvailableContributors(normalizeContributors(raw.available ?? record(payload).editors));
     });
-    run('corrections', () => client.getCorrections(postId), (value) => {
+  }, [client, payload, postId, runPanel]);
+
+  const loadCorrections = useCallback(() => {
+    runPanel('corrections', () => client.getCorrections(postId), (value) => {
       const raw = record(value);
       setCorrections(normalizeCorrections(value));
       setLegacyCorrectionText(stringValue(raw.legacyText) || null);
     });
-    run('distribution', () => client.getDistribution(postId), (value) => setDistribution(normalizeDistribution(value, postId, title, canonicalUrl, excerpt)));
-    return () => { active = false; };
-  }, [canonicalUrl, client, excerpt, legacyPayload, postId, title]);
+  }, [client, postId, runPanel]);
 
-  useEffect(() => load(), [load]);
+  const loadActivity = useCallback(() => {
+    runPanel('activity', () => client.getActivity(postId), (value) => {
+      setActivity(normalizeActivity(value));
+    });
+  }, [client, postId, runPanel]);
 
-  const refreshTasks = async () => {
+  const loadDistribution = useCallback(() => {
+    runPanel('distribution', () => client.getDistribution(postId), (value) => {
+      setDistribution(normalizeDistribution(value, postId, title, canonicalUrl, excerpt));
+    });
+  }, [canonicalUrl, client, excerpt, postId, runPanel, title]);
+
+  const refreshTasks = useCallback(async () => {
     const value = await client.listTasks(postId);
+    if (!mountedRef.current || activePostIdRef.current !== postId) return;
     setTasks(normalizeTasks(value));
-  };
-  const refreshCorrections = async () => {
+    setTaskPeople(arrayValue(record(value).people).map(normalizeContributor).filter((item): item is ContributorEntry => item !== null));
+  }, [client, postId]);
+
+  const refreshCorrections = useCallback(async () => {
     const value = await client.getCorrections(postId);
+    if (!mountedRef.current || activePostIdRef.current !== postId) return;
     const raw = record(value);
     setCorrections(normalizeCorrections(value));
     setLegacyCorrectionText(stringValue(raw.legacyText) || null);
-  };
-  const refreshDistribution = async () => setDistribution(normalizeDistribution(await client.getDistribution(postId), postId, title, canonicalUrl, excerpt));
+  }, [client, postId]);
+
+  const refreshDistribution = useCallback(async () => {
+    const value = await client.getDistribution(postId);
+    if (!mountedRef.current || activePostIdRef.current !== postId) return;
+    setDistribution(normalizeDistribution(value, postId, title, canonicalUrl, excerpt));
+  }, [canonicalUrl, client, excerpt, postId, title]);
 
   if (!postId) return null;
-  const workflowForPanel = workflowPayload ?? normalizeWorkflowPayload(legacyPayload, legacyPayload, postId, title);
-  const canEditStory = Boolean(legacyPayload?.capabilities.changeStatus ?? workflowForPanel?.capabilities.changeStatus);
-  const taskCapabilities = { canEditLinkedStory: canEditStory, canAssign: canEditStory && taskPeople.length > 0, canDelete: canEditStory, canManageUnlinked: false };
-  const contributorsCanEdit = Boolean(legacyPayload?.capabilities.assign ?? workflowForPanel?.capabilities.assign);
+
+  const rawPayload = record(payload);
+  const canEditStory = workflowForPanel?.capabilities.changeStatus === true;
+  const contributorsCanEdit = workflowForPanel?.capabilities.assign === true;
+  const taskCapabilities = {
+    canEditLinkedStory: canEditStory,
+    canAssign: canEditStory && taskPeople.length > 0,
+    canDelete: canEditStory,
+    canManageUnlinked: false
+  };
+  const taskCount = loaded.tasks ? tasks.filter((task) => task.state === 'open').length : workflowForPanel?.story.tasksOpen;
+  const contributorCount = loaded.contributors
+    ? contributors.length
+    : summaryCount(rawPayload.contributors, normalizeContributors(rawPayload.contributors).length);
+  const correctionCount = loaded.corrections
+    ? corrections.length
+    : summaryCount(rawPayload.corrections, normalizeCorrections(rawPayload.corrections).length);
+  const isPublished = Boolean(workflowForPanel?.story.isPublished || workflowForPanel?.story.postStatus === 'publish');
+  const discord = record(rawPayload.discord);
+  const discordThreadId = stringValue(discord.threadId);
+  const discordUrl = stringValue(discord.threadUrl);
+  const discordConfigured = discord.configured === true || discord.available === true || Boolean(discordThreadId || discordUrl);
 
   return (
-    <div className="byline-editorial-newsroom-panels">
-      {workflowForPanel ? (
-        <WorkflowPanel
-          story={workflowForPanel.story}
-          statuses={workflowForPanel.statuses}
-          capabilities={{ changeStatus: false, assign: false, changeDeadline: false, changePlannedPublication: false }}
-          editors={[]}
-          notes={workflowForPanel.notes}
-          isLoading={loading.workflow}
-          error={errors.workflow && !legacyPayload ? errors.workflow : undefined}
-          onMove={() => undefined}
+    <>
+      <PanelBody
+        className="byline-editorial-sidebar-panel"
+        title={__('Visuals', 'weekly-wildcat-headless')}
+        initialOpen={false}
+      >
+        {({ opened }) => opened ? <VisualNeedsPanel workflow={workflow} /> : null}
+      </PanelBody>
+
+      <PanelBody
+        className="byline-editorial-sidebar-panel"
+        title={taskCount ? sprintf(/* translators: %d: open task count. */ __('Tasks · %d open', 'weekly-wildcat-headless'), taskCount) : __('Tasks', 'weekly-wildcat-headless')}
+        initialOpen={false}
+        onToggle={(opened) => { if (opened) loadTasks(); }}
+      >
+        {({ opened }) => opened ? (
+          <TasksPanel
+            storyId={postId}
+            tasks={tasks}
+            people={taskPeople}
+            capabilities={taskCapabilities}
+            isLoading={loading.tasks}
+            error={errors.tasks}
+            onCreate={async (input: TaskInput) => { await client.createTask(input); await refreshTasks(); }}
+            onUpdate={async (taskId: number | string, patch: TaskPatch) => { await client.updateTask(taskId, patch); await refreshTasks(); }}
+            onDelete={async (taskId: number | string) => { await client.deleteTask(taskId); await refreshTasks(); }}
+          />
+        ) : null}
+      </PanelBody>
+
+      <PanelBody
+        className="byline-editorial-sidebar-panel"
+        title={contributorCount ? sprintf(/* translators: %d: contributor count. */ __('Contributors · %d', 'weekly-wildcat-headless'), contributorCount) : __('Contributors', 'weekly-wildcat-headless')}
+        initialOpen={false}
+        onToggle={(opened) => { if (opened) loadContributors(); }}
+      >
+        {({ opened }) => opened ? (
+          <ContributorsPanel
+            contributors={contributors}
+            availableContributors={availableContributors}
+            canEdit={contributorsCanEdit}
+            isLoading={loading.contributors}
+            isSaving={saving.contributors}
+            error={errors.contributors}
+            onChange={async (next) => {
+              setSaving((current) => ({ ...current, contributors: true }));
+              try {
+                const value = await client.saveContributors(postId, next);
+                if (mountedRef.current) setContributors(normalizeContributors(record(value).contributors));
+              } finally {
+                if (mountedRef.current) setSaving((current) => ({ ...current, contributors: false }));
+              }
+            }}
+          />
+        ) : null}
+      </PanelBody>
+
+      <PanelBody
+        className="byline-editorial-sidebar-panel"
+        title={correctionCount ? sprintf(/* translators: %d: correction and update count. */ __('Corrections · %d', 'weekly-wildcat-headless'), correctionCount) : __('Corrections and updates', 'weekly-wildcat-headless')}
+        initialOpen={false}
+        onToggle={(opened) => { if (opened) loadCorrections(); }}
+      >
+        {({ opened }) => opened ? (
+          <CorrectionsPanel
+            records={corrections}
+            legacyText={legacyCorrectionText}
+            canEdit={contributorsCanEdit}
+            isLoading={loading.corrections}
+            isSaving={saving.corrections}
+            error={errors.corrections}
+            onCreate={async (input) => { await client.createCorrection(postId, input); await refreshCorrections(); }}
+            onUpdate={async (id, input) => { await client.updateCorrection(postId, id, input); await refreshCorrections(); }}
+            onDelete={async (id) => { await client.deleteCorrection(postId, id); await refreshCorrections(); }}
+          />
+        ) : null}
+      </PanelBody>
+
+      <PanelBody
+        className="byline-editorial-sidebar-panel"
+        title={__('Activity', 'weekly-wildcat-headless')}
+        initialOpen={false}
+        onToggle={(opened) => { if (opened) loadActivity(); }}
+      >
+        {({ opened }) => opened ? (
+          <ActivityPanel records={activity} isLoading={loading.activity} error={errors.activity} onRetry={() => { requestedPanelsRef.current.activity = false; loadActivity(); }} />
+        ) : null}
+      </PanelBody>
+
+      {isPublished ? (
+        <PanelBody
+          className="byline-editorial-sidebar-panel"
+          title={__('Distribution', 'weekly-wildcat-headless')}
+          initialOpen={false}
+          onToggle={(opened) => { if (opened) loadDistribution(); }}
+        >
+          {({ opened }) => opened ? (
+            <DistributionPanel
+              headline={title}
+              canonicalUrl={canonicalUrl}
+              excerpt={excerpt}
+              channels={distribution.channels}
+              capabilities={distribution.capabilities}
+              isLoading={loading.distribution}
+              error={errors.distribution}
+              onAction={async (channelId, action) => { await client.distributionAction(postId, channelId, action); await refreshDistribution(); }}
+              onAddToNewsletter={async () => { await client.addToNewsletter(postId); await refreshDistribution(); }}
+            />
+          ) : null}
+        </PanelBody>
+      ) : null}
+
+      {discordConfigured ? (
+        <PanelBody
+          className="byline-editorial-sidebar-panel"
+          title={__('Discussion', 'weekly-wildcat-headless')}
+          initialOpen={false}
+        >
+          {({ opened }) => opened ? (
+            <div className="byline-editorial-discussion-summary">
+              <p>
+                {discordThreadId
+                  ? __('This story has a linked Discord discussion.', 'weekly-wildcat-headless')
+                  : __('Discord is connected, but this story is not linked to a thread yet.', 'weekly-wildcat-headless')}
+              </p>
+              {discordUrl ? <a href={discordUrl} target="_blank" rel="noreferrer">{__('Open Discord thread', 'weekly-wildcat-headless')}</a> : null}
+            </div>
+          ) : null}
+        </PanelBody>
+      ) : null}
+    </>
+  );
+}
+
+function PrePublishReadinessPanel({ postId, client }: { postId: number; client: EditorialRestClient }) {
+  const [checks, setChecks] = useState<ReadinessCheck[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
+
+  const load = useCallback(async (refresh = false) => {
+    if (refresh) setIsRefreshing(true);
+    else setIsLoading(true);
+    setError(null);
+    try {
+      const value = await client.getReadiness(postId);
+      if (mountedRef.current) setChecks(normalizeReadiness(value, postId));
+    } catch (caught: unknown) {
+      if (mountedRef.current) setError(caught);
+    } finally {
+      if (mountedRef.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    }
+  }, [client, postId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const summary = summarizeReadiness(checks);
+  const attention = checks.filter((check) => check.state !== 'pass');
+  const stateLabel = (state: ReadinessCheck['state']) => state === 'error'
+    ? __('Error', 'weekly-wildcat-headless')
+    : state === 'warning'
+      ? __('Warning', 'weekly-wildcat-headless')
+      : __('Pass', 'weekly-wildcat-headless');
+
+  if (isLoading && checks.length === 0) {
+    return (
+      <div className="byline-prepublish-readiness">
+        <Spinner />
+        <span className="screen-reader-text">{__('Checking publication readiness', 'weekly-wildcat-headless')}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="byline-prepublish-readiness">
+      <div className="byline-prepublish-readiness-summary" aria-live="polite">
+        <strong>{summary.errors > 0 ? __('Needs attention before publishing', 'weekly-wildcat-headless') : __('Ready to publish', 'weekly-wildcat-headless')}</strong>
+        <span>{sprintf(/* translators: 1: passed checks, 2: total checks. */ __('%1$d of %2$d checks pass', 'weekly-wildcat-headless'), summary.passed, summary.total)}</span>
+      </div>
+
+      {error ? (
+        <Notice status="warning" isDismissible={false}>
+          <p>{errorMessage(error)}</p>
+          <p>{__('The article remains publishable in WordPress; readiness could not be refreshed.', 'weekly-wildcat-headless')}</p>
+        </Notice>
+      ) : null}
+
+      {attention.length > 0 ? (
+        <ul className="byline-prepublish-check-list" aria-label={__('Readiness items needing attention', 'weekly-wildcat-headless')}>
+          {attention.map((check) => (
+            <li className={`byline-prepublish-check byline-prepublish-check-${check.state}`} key={check.id}>
+              <span className="byline-prepublish-check-state" aria-label={stateLabel(check.state)}>{stateLabel(check.state)}</span>
+              <div>
+                <strong>{check.label}</strong>
+                <p>{check.explanation}</p>
+              </div>
+              {check.fix?.href ? <a href={check.fix.href}>{check.fix.label}</a> : null}
+            </li>
+          ))}
+        </ul>
+      ) : checks.length > 0 ? (
+        <p className="byline-prepublish-success">{__('No blocking readiness issues were found.', 'weekly-wildcat-headless')}</p>
+      ) : (
+        <p className="byline-editorial-muted">{__('No readiness checks were returned. Recheck before publishing.', 'weekly-wildcat-headless')}</p>
+      )}
+
+      {summary.passed > 0 ? (
+        <details className="byline-prepublish-passed-details">
+          <summary>{sprintf(/* translators: %d: number of passed checks. */ __('Show %d passed checks', 'weekly-wildcat-headless'), summary.passed)}</summary>
+          <ul>
+            {checks.filter((check) => check.state === 'pass').map((check) => <li key={check.id}>{check.label}</li>)}
+          </ul>
+        </details>
+      ) : null}
+
+      <div className="byline-editorial-inline-actions">
+        <Button variant="secondary" disabled={isRefreshing || isLoading} onClick={() => void load(true)}>
+          {__('Recheck readiness', 'weekly-wildcat-headless')}
+        </Button>
+        <span className="byline-editorial-muted">{__('Warnings do not block WordPress publishing; errors need attention first.', 'weekly-wildcat-headless')}</span>
+      </div>
+    </div>
+  );
+}
+
+function postPublishStatusLabel(status: WebsiteLifecycleStatus, isPublished: boolean): string {
+  if (status === 'live') return __('Live', 'weekly-wildcat-headless');
+  if (status === 'building') return __('Building', 'weekly-wildcat-headless');
+  if (status === 'failed') return __('Website update failed', 'weekly-wildcat-headless');
+  if (status === 'published' || isPublished) return __('Published in Byline', 'weekly-wildcat-headless');
+  if (status === 'not-published') return __('Not published to Byline yet', 'weekly-wildcat-headless');
+  return __('Website status is unavailable', 'weekly-wildcat-headless');
+}
+
+function PostPublishLifecycle({
+  postId,
+  title,
+  canonicalUrl,
+  excerpt,
+  client,
+  isPublished
+}: {
+  postId: number;
+  title: string;
+  canonicalUrl: string;
+  excerpt: string;
+  client: EditorialRestClient;
+  isPublished: boolean;
+}) {
+  const [distribution, setDistribution] = useState<NormalizedDistribution | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<unknown>(null);
+  const [canRetry, setCanRetry] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const mountedRef = useRef(true);
+  const pollAttemptsRef = useRef(0);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
+
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const value = await client.getDistribution(postId);
+      if (mountedRef.current) setDistribution(normalizeDistribution(value, postId, title, canonicalUrl, excerpt));
+    } catch (caught: unknown) {
+      if (mountedRef.current) setError(caught);
+    } finally {
+      if (mountedRef.current) setIsLoading(false);
+    }
+  }, [canonicalUrl, client, excerpt, postId, title]);
+
+  useEffect(() => {
+    if (isPublished) void load();
+  }, [isPublished, load]);
+
+  const websiteStatus = distribution?.websiteStatus ?? (isPublished ? 'published' : 'unknown');
+
+  useEffect(() => {
+    pollAttemptsRef.current = 0;
+  }, [isPublished, postId]);
+
+  useEffect(() => {
+    if (!isPublished || websiteStatus === 'live' || websiteStatus === 'failed' || pollAttemptsRef.current >= 12) {
+      return undefined;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      if (!active) return;
+      pollAttemptsRef.current += 1;
+      void load();
+    }, 5000);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [isPublished, load, websiteStatus]);
+
+  useEffect(() => {
+    if (websiteStatus !== 'failed') return undefined;
+    if (distribution?.canRetryWebsite) {
+      setCanRetry(true);
+      return undefined;
+    }
+    let active = true;
+    void apiFetch<UnknownRecord>({ path: '/byline/v1/admin/deployment' })
+      .then((value) => {
+        if (active) setCanRetry(record(value).configured === true);
+      })
+      .catch(() => {
+        if (active) setCanRetry(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [distribution, websiteStatus]);
+
+  const retryWebsite = async () => {
+    if (!canRetry || isRetrying) return;
+    setIsRetrying(true);
+    setError(null);
+    try {
+      await apiFetch({ path: '/byline/v1/admin/deployment/trigger', method: 'POST' });
+      await load();
+    } catch (caught: unknown) {
+      if (mountedRef.current) setError(caught);
+    } finally {
+      if (mountedRef.current) setIsRetrying(false);
+    }
+  };
+
+  return (
+    <div className="byline-postpublish-lifecycle">
+      <div className="byline-postpublish-status" aria-live="polite">
+        <strong>{postPublishStatusLabel(websiteStatus, isPublished)}</strong>
+        {isLoading ? (
+          <>
+            <Spinner />
+            <span className="screen-reader-text">{__('Loading website lifecycle status', 'weekly-wildcat-headless')}</span>
+          </>
+        ) : null}
+      </div>
+      <p className="byline-editorial-muted">
+        {websiteStatus === 'failed'
+          ? __('WordPress publication succeeded; the Byline website update needs attention.', 'weekly-wildcat-headless')
+          : websiteStatus === 'building' || websiteStatus === 'published'
+            ? __('WordPress publication succeeded; Byline is checking the public manifest for the exact revision.', 'weekly-wildcat-headless')
+          : __('WordPress publication and the Byline website build are tracked separately.', 'weekly-wildcat-headless')}
+      </p>
+      {error ? <Notice status="warning" isDismissible={false}>{errorMessage(error)}</Notice> : null}
+      {websiteStatus === 'failed' ? (
+        <Notice status="error" isDismissible={false}>
+          <p>{__('The website build failed after publication.', 'weekly-wildcat-headless')}</p>
+          {canRetry ? (
+            <Button variant="secondary" disabled={isRetrying} onClick={() => void retryWebsite()}>
+              {isRetrying ? __('Retrying website update…', 'weekly-wildcat-headless') : __('Retry website update', 'weekly-wildcat-headless')}
+            </Button>
+          ) : (
+            <p>{__('Ask an integration manager to check Deployment settings before retrying.', 'weekly-wildcat-headless')}</p>
+          )}
+        </Notice>
+      ) : null}
+      {distribution ? (
+        <DistributionPanel
+          headline={title}
+          canonicalUrl={canonicalUrl}
+          excerpt={excerpt}
+          channels={distribution.channels}
+          capabilities={distribution.capabilities}
+          isLoading={isLoading}
+          error={error}
+          onAction={async (channelId, action) => { await client.distributionAction(postId, channelId, action); await load(); }}
+          onAddToNewsletter={async () => { await client.addToNewsletter(postId); await load(); }}
         />
-      ) : <Notice status="warning" isDismissible={false}>{describeProtectedRestFailure(errors.workflow)}</Notice>}
-      <TasksPanel
-        storyId={postId}
-        tasks={tasks}
-        people={taskPeople}
-        capabilities={taskCapabilities}
-        isLoading={loading.tasks}
-        error={errors.tasks}
-        onCreate={async (input: TaskInput) => { await client.createTask(input); await refreshTasks(); }}
-        onUpdate={async (taskId: number | string, patch: TaskPatch) => { await client.updateTask(taskId, patch); await refreshTasks(); }}
-        onDelete={async (taskId: number | string) => { await client.deleteTask(taskId); await refreshTasks(); }}
-      />
-      <ReadinessPanel
-        checks={readiness}
-        isLoading={loading.readiness}
-        error={errors.readiness}
-        onRefresh={async () => { setLoading((current) => ({ ...current, readiness: true })); try { setReadiness(normalizeReadiness(await client.getReadiness(postId), postId)); } finally { setLoading((current) => ({ ...current, readiness: false })); } }}
-      />
-      <ContributorsPanel
-        contributors={contributors}
-        availableContributors={availableContributors}
-        canEdit={contributorsCanEdit}
-        isLoading={loading.contributors}
-        isSaving={false}
-        error={errors.contributors}
-        onChange={async (next) => { const value = await client.saveContributors(postId, next); setContributors(normalizeContributors(record(value).contributors)); }}
-      />
-      <CorrectionsPanel
-        records={corrections}
-        legacyText={legacyCorrectionText}
-        canEdit={contributorsCanEdit}
-        isLoading={loading.corrections}
-        error={errors.corrections}
-        onCreate={async (input) => { await client.createCorrection(postId, input); await refreshCorrections(); }}
-        onUpdate={async (id, input) => { await client.updateCorrection(postId, id, input); await refreshCorrections(); }}
-        onDelete={async (id) => { await client.deleteCorrection(postId, id); await refreshCorrections(); }}
-      />
-      <DistributionPanel
-        headline={title}
-        canonicalUrl={canonicalUrl}
-        excerpt={excerpt}
-        channels={distribution.channels}
-        capabilities={distribution.capabilities}
-        isLoading={loading.distribution}
-        error={errors.distribution}
-        onAction={async (channelId, action) => {
-          await client.distributionAction(postId, channelId, action);
-          await refreshDistribution();
-        }}
-        onAddToNewsletter={async () => { await client.addToNewsletter(postId); await refreshDistribution(); }}
-      />
+      ) : null}
     </div>
   );
 }
@@ -907,6 +1514,7 @@ function EditorialWorkflowPlugin() {
 
   const workflow = useEditorialWorkflow(postId, isPublished);
   const { payload } = workflow;
+  const editorialClient = useEditorialRestClient();
 
   const currentLabel = useMemo(() => workflowStatusLabel(payload), [payload]);
 
@@ -918,11 +1526,9 @@ function EditorialWorkflowPlugin() {
   // see it, and the server does not load this bundle for them either.
   if (postType !== 'post') return null;
 
-  // The button's accessible name carries the current state, so a screen-reader
-  // user learns the workflow status without opening the sidebar.
-  const sidebarTitle = currentLabel
-    ? sprintf(/* translators: %s: current editorial workflow status. */ __('Workflow: %s', 'weekly-wildcat-headless'), currentLabel)
-    : __('Editorial Workflow', 'weekly-wildcat-headless');
+  // Keep the navigation label stable. The compact Story summary carries the
+  // current workflow and WordPress publication state inside the sidebar.
+  const sidebarTitle = __('Story', 'weekly-wildcat-headless');
 
   return (
     <>
@@ -952,17 +1558,46 @@ function EditorialWorkflowPlugin() {
         {sidebarTitle}
       </PluginSidebarMoreMenuItem>
 
-      <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={listView}>
-        <WorkflowControls key={postId} {...workflow} />
-        <EditorialNewsroomPanels
-          key={`newsroom-${postId}`}
-          postId={postId}
-          title={title}
-          canonicalUrl={canonicalUrl}
-          excerpt={excerpt}
-          legacyPayload={payload}
-        />
+      <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={listView} className="byline-editorial-sidebar">
+        <Panel className="byline-story-panel">
+          <StorySummary payload={payload} title={title} />
+          <PanelBody
+            className="byline-editorial-sidebar-panel byline-editorial-workflow-panel"
+            title={__('Workflow', 'weekly-wildcat-headless')}
+            initialOpen={true}
+          >
+            <WorkflowControls key={postId} {...workflow} />
+          </PanelBody>
+          <EditorialNewsroomPanels
+            key={`newsroom-${postId}`}
+            postId={postId}
+            title={title}
+            canonicalUrl={canonicalUrl}
+            excerpt={excerpt}
+            workflow={workflow}
+            client={editorialClient}
+          />
+        </Panel>
       </PluginSidebar>
+
+      {PluginPrePublishPanel ? (
+        <PluginPrePublishPanel className="byline-editorial-prepublish-panel">
+          <PrePublishReadinessPanel postId={postId} client={editorialClient} />
+        </PluginPrePublishPanel>
+      ) : null}
+
+      {PluginPostPublishPanel && isPublished ? (
+        <PluginPostPublishPanel className="byline-editorial-postpublish-panel">
+          <PostPublishLifecycle
+            postId={postId}
+            title={title}
+            canonicalUrl={canonicalUrl}
+            excerpt={excerpt}
+            client={editorialClient}
+            isPublished={isPublished}
+          />
+        </PluginPostPublishPanel>
+      ) : null}
     </>
   );
 }

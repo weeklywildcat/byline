@@ -168,7 +168,7 @@ if ($registered_menus['byline-studio'][0] !== 'Byline Studio') {
 $by_parent = submenus_by_parent();
 $byline_children = $by_parent['byline'] ?? [];
 $expected_children = [
-    'byline' => ['Overview', BYLINE_MANAGE_CAPABILITY],
+    'byline' => ['Home', BYLINE_MANAGE_CAPABILITY],
     'byline-publication' => ['Publication', BYLINE_MANAGE_CAPABILITY],
     'byline-theme' => ['Theme', BYLINE_MANAGE_CAPABILITY],
     'byline-integrations' => ['Integrations', BYLINE_MANAGE_INTEGRATIONS_CAPABILITY],
@@ -186,9 +186,9 @@ foreach ($expected_children as $slug => [$title, $capability]) {
     }
 }
 
-// The Byline Dashboard child is now Overview.
+// The Byline configuration landing child is now Home.
 if ($byline_children['byline'][2] === 'Dashboard') {
-    fail('The Byline Dashboard child should have been renamed to Overview.');
+    fail('The Byline Dashboard child should have been renamed to Home.');
 }
 
 // Byline must no longer own workflow screens.
@@ -240,6 +240,9 @@ $test_capabilities = ['edit_posts' => true];
 if (byline_admin_menu_capability() === 'edit_posts') {
     fail('A reporter who can only edit posts must not surface the Byline configuration menu.');
 }
+if (strpos(byline_admin_user_landing_url(), 'page=byline-planning') === false || strpos(byline_admin_user_landing_url(), 'tab=today') === false) {
+    fail('An editor landing on Byline must be sent to the Today surface.');
+}
 $test_capabilities = [BYLINE_EDIT_DESIGN_CAPABILITY => true];
 if (byline_admin_menu_capability() === BYLINE_EDIT_DESIGN_CAPABILITY) {
     fail('Design capability alone must not surface the Byline configuration menu.');
@@ -261,7 +264,9 @@ $test_capabilities = [
 // ---------------------------------------------------------------------------
 
 $urls = byline_admin_page_urls();
-if (strpos($urls['publication']['branding'], 'page=byline-publication') === false
+if (strpos($urls['planning']['today'], 'page=byline-planning') === false
+    || strpos($urls['planning']['today'], 'tab=today') === false
+    || strpos($urls['publication']['branding'], 'page=byline-publication') === false
     || strpos($urls['publication']['branding'], 'tab=branding') === false
     || strpos($urls['integrations']['deployment'], 'page=byline-integrations') === false
     || strpos($urls['integrations']['deployment'], 'tab=deployment') === false
@@ -289,7 +294,9 @@ if (strpos($native['sportsImport'], 'page=wwh-sports-import') === false
 }
 
 $legacy_urls = byline_admin_legacy_hash_urls($urls);
-if ($legacy_urls['/publication/branding'] !== $urls['publication']['branding']
+if (($legacy_urls['/home'] ?? '') !== $urls['planning']['today']
+    || ($legacy_urls['/planning/today'] ?? '') !== $urls['planning']['today']
+    || $legacy_urls['/publication/branding'] !== $urls['publication']['branding']
     || $legacy_urls['/design/revisions'] !== $urls['studioRevisions']
     || $legacy_urls['/design/studio'] !== $urls['studio']
     || $legacy_urls['/content/polls'] !== $urls['polls']

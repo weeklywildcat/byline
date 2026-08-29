@@ -361,6 +361,9 @@ function byline_set_story_coverage_ids(int $story_id, array $coverage_ids)
 
     if ($current !== $valid) {
         update_post_meta($story_id, BYLINE_STORY_COVERAGE_META, $valid);
+        if (function_exists('do_action')) {
+            do_action('byline_editorial_coverage_changed', $story_id, $current, $valid);
+        }
     }
 
     return $valid;

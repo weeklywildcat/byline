@@ -2,6 +2,7 @@ import apiFetch from "@wordpress/api-fetch";
 import { Button, Notice, SelectControl, Spinner } from "@wordpress/components";
 import { createPortal, useCallback, useEffect, useMemo, useRef, useState } from "@wordpress/element";
 import { Puck, type Config, type Data } from "@puckeditor/core";
+import "@puckeditor/core/puck.css";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { BYLINE_STUDIO_CATEGORIES, BYLINE_STUDIO_VIEWPORTS } from "@byline/studio-contract";
 import { sanitizeThemeTokenOverrides, type BylineThemeDefinition, type BylineThemeTokens } from "@byline/theme-contract";

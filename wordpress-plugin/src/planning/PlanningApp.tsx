@@ -10,6 +10,7 @@ import { MediaDesk } from "./MediaDesk";
 import { Performance } from "./Performance";
 import { StoryBoard } from "./StoryBoard";
 import { StoryList } from "./StoryList";
+import { preferredStoriesView, writeStoriesViewPreference } from "../home/navigation-model";
 import type { PlanningFetchers } from "./planning-api";
 import {
   applyPlanningMove,
@@ -43,6 +44,8 @@ export type PlanningAppProps = {
   /** An apiFetch-backed client created with createPlanningFetchers. */
   fetchers: PlanningFetchers;
   initialView?: PlanningView;
+  /** Restore the last Stories view only when the Stories route did not name one explicitly. */
+  rememberStoriesView?: boolean;
   initialFilters?: Partial<PlanningFilters>;
   initialSort?: PlanningSort;
   /** Optional server-provided response to avoid a duplicate first request. */
@@ -143,13 +146,18 @@ function sameFilters(left: PlanningFilters, right: PlanningFilters): boolean {
 export function PlanningApp({
   fetchers,
   initialView = "board",
+  rememberStoriesView = false,
   initialFilters,
   initialSort = DEFAULT_PLANNING_SORT,
   initialData,
   currentUserId,
   onOpenStory
 }: PlanningAppProps) {
-  const [view, setView] = useState<PlanningView>(initialView);
+  const [view, setView] = useState<PlanningView>(() => {
+    if (!rememberStoriesView || (initialView !== "board" && initialView !== "list" && initialView !== "calendar")) return initialView;
+    const storage = typeof window !== "undefined" ? window.localStorage : null;
+    return preferredStoriesView(initialView, storage);
+  });
   const [filters, setFilters] = useState<PlanningFilters>(() => normalizePlanningFilters(initialFilters));
   const [sort, setSort] = useState<PlanningSort>(initialSort);
   const [planning, setPlanning] = useState<PlanningResponse | null>(initialData || null);
@@ -230,6 +238,14 @@ export function PlanningApp({
     const story = stories.find((candidate) => candidate.id === storyId);
     if (story) onOpenStory?.(story);
   }, [onOpenStory, stories]);
+
+  const changeView = useCallback((nextView: PlanningView) => {
+    setView(nextView);
+    if (nextView === "board" || nextView === "list" || nextView === "calendar") {
+      const storage = typeof window !== "undefined" ? window.localStorage : null;
+      writeStoriesViewPreference(nextView, storage);
+    }
+  }, []);
 
   const updateFilter = useCallback(<K extends keyof PlanningFilters>(key: K, value: PlanningFilters[K]) => {
     setFilters((current) => normalizePlanningFilters({ ...current, [key]: value }));
@@ -391,7 +407,7 @@ export function PlanningApp({
 
       <nav className="byline-planning-view-tabs" aria-label={__("Planning views", "weekly-wildcat-headless")}>
         {(Object.keys(VIEW_LABELS) as PlanningView[]).map((item) => (
-          <Button key={item} variant={view === item ? "primary" : "secondary"} aria-current={view === item ? "page" : undefined} onClick={() => setView(item)}>
+          <Button key={item} variant={view === item ? "primary" : "secondary"} aria-current={view === item ? "page" : undefined} onClick={() => changeView(item)}>
             {VIEW_LABELS[item]}
           </Button>
         ))}
