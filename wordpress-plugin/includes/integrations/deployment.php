@@ -9,6 +9,18 @@ const BYLINE_DEPLOYMENT_HOOK_OPTION = 'byline_deployment_hook_url';
 const BYLINE_DEPLOYMENT_LAST_TRIGGERED_OPTION = 'byline_deployment_last_triggered_at';
 const BYLINE_DEPLOYMENT_LAST_STATUS_OPTION = 'byline_deployment_last_status';
 const BYLINE_DEPLOYMENT_EVENT = 'byline_trigger_deployment';
+/**
+ * The newest public revision that still has to reach the live site.
+ *
+ * This is recorded before anything is scheduled and independently of whether a
+ * deploy hook exists, so publishing a story always leaves durable evidence of
+ * the revision the website owes. Without it, an unconfigured install would lose
+ * the expected revision entirely and a merely reachable old manifest could be
+ * mistaken for a live one.
+ */
+const BYLINE_DEPLOYMENT_EXPECTED_REVISION_OPTION = 'byline_deployment_expected_revision';
+/** Counts manual retries so each one gets its own durable, idempotent job. */
+const BYLINE_DEPLOYMENT_MANUAL_RETRY_OPTION = 'byline_deployment_manual_retry_count';
 
 if (!defined('BYLINE_DEPLOYMENT_JOB_TYPE')) {
     define('BYLINE_DEPLOYMENT_JOB_TYPE', 'deployment');
@@ -103,11 +115,40 @@ function byline_deployment_job_status(): string
     return $job ? (string) $job['status'] : '';
 }
 
+/** The durably recorded revision the public site still owes, if any. */
+function byline_deployment_recorded_expected_revision(): int
+{
+    return max(0, absint(get_option(BYLINE_DEPLOYMENT_EXPECTED_REVISION_OPTION, 0)));
+}
+
+/**
+ * Record a public revision that needs deploying. Monotonic on purpose: a later
+ * change never lowers the bar the live manifest has to clear.
+ */
+function byline_deployment_record_expected_revision(int $revision): int
+{
+    $revision = max(0, $revision);
+    $recorded = byline_deployment_recorded_expected_revision();
+    if ($revision > $recorded) {
+        update_option(BYLINE_DEPLOYMENT_EXPECTED_REVISION_OPTION, $revision, false);
+        return $revision;
+    }
+    return $recorded;
+}
+
 function byline_deployment_expected_revision(): int
 {
     $job = byline_deployment_job_internal();
     $payload = is_array($job['payload'] ?? null) ? $job['payload'] : [];
-    return max(0, (int) ($payload['expectedRevision'] ?? 0));
+    return max(
+        byline_deployment_recorded_expected_revision(),
+        max(0, (int) ($payload['expectedRevision'] ?? 0))
+    );
+}
+
+function byline_deployment_actor_id(): int
+{
+    return function_exists('get_current_user_id') ? max(0, (int) get_current_user_id()) : 0;
 }
 
 function byline_deployment_cron_event_timestamp(): int
@@ -140,6 +181,16 @@ function byline_deployment_lifecycle_status(array $deployment, array $manifest =
     $manifest_reachable = !empty($manifest['reachable']);
     if ($expected > 0 && $manifest_reachable && $manifest_revision >= $expected) {
         return 'live';
+    }
+
+    // A public change with nowhere to deploy it is a configuration gap, not a
+    // build failure and certainly not a live site. Saying so keeps the recorded
+    // revision visible and gives the operator the one action that helps.
+    $configured = array_key_exists('configured', $deployment)
+        ? !empty($deployment['configured'])
+        : byline_deployment_hook_url() !== '';
+    if (!$configured && $expected > 0) {
+        return 'needs_configuration';
     }
 
     $job_status = (string) ($deployment['jobStatus'] ?? byline_deployment_job_status());
@@ -186,7 +237,65 @@ function byline_deployment_status(): array
     return $status;
 }
 
-function byline_schedule_deployment(string $reason = 'content', bool $revision_already_recorded = false, ?int $expected_revision = null): void
+/**
+ * Enqueue or coalesce the durable deployment job for one expected revision.
+ *
+ * Returns the job id, or 0 when durable storage is unavailable or refused the
+ * record. Never sends a hook request itself: execution belongs to the job
+ * runner so cron, WP-CLI, and REST all share one lifecycle.
+ */
+function byline_deployment_enqueue_job(string $reason, int $expected_revision, int $due_at, string $idempotency_key = ''): int
+{
+    if (!function_exists('byline_create_job') || !function_exists('byline_job_update_payload')) {
+        return 0;
+    }
+
+    $payload = [
+        'reason' => $reason,
+        'expectedRevision' => $expected_revision,
+        'requestedAt' => gmdate(DATE_ATOM),
+        'reasons' => [$reason],
+    ];
+    $job = byline_deployment_job_internal();
+    $job_id = 0;
+
+    if ($job && in_array($job['status'], ['queued', 'retry_waiting'], true)) {
+        $old_payload = is_array($job['payload'] ?? null) ? $job['payload'] : [];
+        $payload['reasons'] = array_values(array_unique(array_filter(array_merge(
+            (array) ($old_payload['reasons'] ?? []),
+            [(string) ($old_payload['reason'] ?? ''), $reason]
+        ))));
+        $payload['expectedRevision'] = max($expected_revision, (int) ($old_payload['expectedRevision'] ?? 0));
+        $updated = byline_job_update_payload((int) $job['id'], $payload, [
+            'idempotencyKey' => $idempotency_key !== '' ? $idempotency_key : 'deployment:' . $payload['expectedRevision'],
+            'dueAt' => $due_at,
+        ]);
+        if (!(function_exists('is_wp_error') && is_wp_error($updated))) {
+            $job_id = (int) $job['id'];
+        }
+    }
+
+    if ($job_id <= 0) {
+        $created = byline_create_job(BYLINE_DEPLOYMENT_JOB_TYPE, $payload, [
+            'idempotencyKey' => $idempotency_key !== '' ? $idempotency_key : 'deployment:' . $expected_revision,
+            'dueAt' => $due_at,
+            'maxAttempts' => 3,
+            'retryDelay' => 60,
+        ]);
+        if (function_exists('is_wp_error') && is_wp_error($created)) {
+            error_log('Byline: durable deploy job could not be stored.');
+            return 0;
+        }
+        $job_id = (int) ($created['id'] ?? 0);
+    }
+
+    if ($job_id > 0) {
+        update_option(BYLINE_DEPLOYMENT_JOB_OPTION, $job_id, false);
+    }
+    return $job_id;
+}
+
+function byline_schedule_deployment(string $reason = 'content', bool $revision_already_recorded = false, ?int $expected_revision = null, array $options = []): void
 {
     if ($expected_revision === null && function_exists('byline_public_content_revision')) {
         $expected_revision = $revision_already_recorded
@@ -194,55 +303,30 @@ function byline_schedule_deployment(string $reason = 'content', bool $revision_a
             : byline_bump_public_content_revision();
     }
     $expected_revision = max(0, (int) $expected_revision);
+    $reason = sanitize_key($reason) ?: 'content';
+
+    // Record the debt before anything else. The public artifact has already
+    // changed at this point, so this evidence has to survive an unconfigured
+    // deployment, a failed job insert, and a restart.
+    byline_deployment_record_expected_revision($expected_revision);
+
     if (byline_deployment_hook_url() === '') {
+        update_option(BYLINE_DEPLOYMENT_LAST_STATUS_OPTION, 'Not configured', false);
         return;
     }
 
-    $reason = sanitize_key($reason) ?: 'content';
-    if (function_exists('byline_create_job') && function_exists('byline_job_update_payload')) {
-        $job = byline_deployment_job_internal();
-        $payload = [
-            'reason' => $reason,
-            'expectedRevision' => $expected_revision,
-            'requestedAt' => gmdate(DATE_ATOM),
-            'reasons' => [$reason],
-        ];
-        $job_id = 0;
-        if ($job && in_array($job['status'], ['queued', 'retry_waiting'], true)) {
-            $old_payload = is_array($job['payload'] ?? null) ? $job['payload'] : [];
-            $reasons = array_values(array_unique(array_filter(array_merge(
-                (array) ($old_payload['reasons'] ?? []),
-                [(string) ($old_payload['reason'] ?? ''), $reason]
-            ))));
-            $payload['reasons'] = $reasons;
-            $payload['expectedRevision'] = max($expected_revision, (int) ($old_payload['expectedRevision'] ?? 0));
-            $updated = byline_job_update_payload((int) $job['id'], $payload, [
-                'idempotencyKey' => 'deployment:' . $payload['expectedRevision'],
-                'dueAt' => time() + 60,
-            ]);
-            if (!(function_exists('is_wp_error') && is_wp_error($updated))) {
-                $job_id = (int) $job['id'];
-            }
-        }
-        if ($job_id <= 0) {
-            $created = byline_create_job(BYLINE_DEPLOYMENT_JOB_TYPE, $payload, [
-                'idempotencyKey' => 'deployment:' . $expected_revision,
-                'dueAt' => time() + 60,
-                'maxAttempts' => 3,
-                'retryDelay' => 60,
-            ]);
-            if (function_exists('is_wp_error') && is_wp_error($created)) {
-                error_log('Byline: durable deploy job could not be stored.');
-                return;
-            }
-            $job_id = (int) ($created['id'] ?? 0);
-        }
-        if ($job_id > 0) {
-            update_option(BYLINE_DEPLOYMENT_JOB_OPTION, $job_id, false);
-        }
+    $due_at = isset($options['dueAt'])
+        ? max(time(), (int) $options['dueAt'])
+        : time() + 60;
+    $idempotency_key = isset($options['idempotencyKey']) ? (string) $options['idempotencyKey'] : '';
 
+    if (function_exists('byline_create_job') && function_exists('byline_job_update_payload')) {
+        $job_id = byline_deployment_enqueue_job($reason, $expected_revision, $due_at, $idempotency_key);
+        if ($job_id <= 0) {
+            return;
+        }
         if (function_exists('wp_schedule_single_event') && byline_deployment_cron_event_timestamp() <= 0) {
-            $scheduled = wp_schedule_single_event(time() + 60, BYLINE_DEPLOYMENT_EVENT, [$job_id]);
+            $scheduled = wp_schedule_single_event($due_at, BYLINE_DEPLOYMENT_EVENT, [$job_id]);
         } else {
             $scheduled = true;
         }
@@ -250,11 +334,78 @@ function byline_schedule_deployment(string $reason = 'content', bool $revision_a
         if (byline_deployment_cron_event_timestamp() > 0) {
             return;
         }
-        $scheduled = wp_schedule_single_event(time() + 60, BYLINE_DEPLOYMENT_EVENT, [$reason]);
+        $scheduled = wp_schedule_single_event($due_at, BYLINE_DEPLOYMENT_EVENT, [$reason]);
     }
     if (!$scheduled) {
         error_log('Byline: deploy-hook trigger could not be scheduled.');
     }
+}
+
+/**
+ * The one manual-retry path shared by REST, WP-CLI, and the admin UI.
+ *
+ * A retry always participates in the durable job lifecycle: it requeues the
+ * failed or cancelled job where one exists, and otherwise creates a tracked job
+ * for the revision the site still owes. Repeated calls are idempotent because
+ * an already queued or running job is reported back untouched instead of
+ * producing a second deploy request.
+ */
+function byline_retry_deployment(string $reason = 'manual'): array
+{
+    $reason = sanitize_key($reason) ?: 'manual';
+    $expected_revision = byline_deployment_expected_revision();
+
+    if (byline_deployment_hook_url() === '') {
+        // Keep the recorded revision; there is simply nowhere to send it yet.
+        update_option(BYLINE_DEPLOYMENT_LAST_STATUS_OPTION, 'Not configured', false);
+        return byline_deployment_status();
+    }
+
+    if (!function_exists('byline_create_job')) {
+        // A pre-jobs installation keeps its established direct behavior.
+        byline_trigger_deployment($reason);
+        return byline_deployment_status();
+    }
+
+    $job = byline_deployment_job_internal();
+    $actor_id = byline_deployment_actor_id();
+
+    if ($job && in_array($job['status'], ['queued', 'running'], true)) {
+        // Already tracked and on its way. A second click must not deploy twice.
+        if ($job['status'] === 'queued'
+            && $expected_revision > (int) (($job['payload']['expectedRevision'] ?? 0))) {
+            byline_deployment_enqueue_job($reason, $expected_revision, time());
+        }
+        return byline_deployment_status();
+    }
+
+    if ($job
+        && in_array($job['status'], ['failed', 'cancelled', 'retry_waiting'], true)
+        && function_exists('byline_retry_job')) {
+        $retried = byline_retry_job((int) $job['id'], $actor_id);
+        if (is_array($retried)) {
+            update_option(BYLINE_DEPLOYMENT_JOB_OPTION, (int) $job['id'], false);
+            // The requeued job keeps its attempts, actor, and timestamps; only
+            // the revision it must satisfy is refreshed when content moved on.
+            if ($expected_revision > (int) (($job['payload']['expectedRevision'] ?? 0))) {
+                byline_deployment_enqueue_job($reason, $expected_revision, time());
+            } elseif (function_exists('wp_schedule_single_event') && byline_deployment_cron_event_timestamp() <= 0) {
+                wp_schedule_single_event(time(), BYLINE_DEPLOYMENT_EVENT, [(int) $job['id']]);
+            }
+            return byline_deployment_status();
+        }
+    }
+
+    // No reusable job: the previous one already succeeded, or none was ever
+    // stored. Track this retry as its own durable job so its attempts, actor,
+    // and errors stay coherent instead of vanishing into an untracked request.
+    $retry_count = max(0, absint(get_option(BYLINE_DEPLOYMENT_MANUAL_RETRY_OPTION, 0))) + 1;
+    update_option(BYLINE_DEPLOYMENT_MANUAL_RETRY_OPTION, $retry_count, false);
+    byline_schedule_deployment($reason, true, $expected_revision, [
+        'dueAt' => time(),
+        'idempotencyKey' => 'deployment:' . $expected_revision . ':manual-' . $retry_count,
+    ]);
+    return byline_deployment_status();
 }
 
 function byline_send_deployment_request(string $reason = 'scheduled', int $expected_revision = 0, string $idempotency_key = '')
@@ -449,10 +600,16 @@ function byline_rest_update_deployment(WP_REST_Request $request)
     return rest_ensure_response(byline_deployment_status());
 }
 
+/**
+ * Manual retry from the admin UI or the article's post-publish panel.
+ *
+ * This deliberately does not send a hook request of its own: it hands the work
+ * to the durable job lifecycle so attempts, retries, timestamps, the actor, and
+ * any error stay visible in one record.
+ */
 function byline_rest_trigger_deployment(): WP_REST_Response
 {
-    byline_trigger_deployment('manual');
-    return rest_ensure_response(byline_deployment_status());
+    return rest_ensure_response(byline_retry_deployment('manual'));
 }
 
 function byline_register_deployment_routes(): void
@@ -476,3 +633,29 @@ function byline_register_deployment_routes(): void
     ]);
 }
 add_action('rest_api_init', 'byline_register_deployment_routes');
+
+if (defined('WP_CLI') && WP_CLI && class_exists('WP_CLI')) {
+    class Byline_Deployment_CLI_Command
+    {
+        /** Requeue the durable deployment job, exactly as REST and cron do. */
+        public function retry(array $args, array $assoc_args): void
+        {
+            $status = byline_retry_deployment(isset($assoc_args['reason']) ? (string) $assoc_args['reason'] : 'cli');
+            WP_CLI::line(sprintf(
+                'lifecycle=%s job=%s expectedRevision=%d publicRevision=%d',
+                (string) ($status['lifecycle'] ?? 'unknown'),
+                (string) ($status['jobId'] ?? 'none'),
+                (int) ($status['expectedRevision'] ?? 0),
+                (int) ($status['publicRevision'] ?? 0)
+            ));
+        }
+
+        public function status(array $args): void
+        {
+            $status = byline_deployment_status();
+            unset($status['hookUrl']);
+            WP_CLI::line((string) wp_json_encode($status));
+        }
+    }
+    WP_CLI::add_command('byline deployment', 'Byline_Deployment_CLI_Command');
+}

@@ -28,6 +28,9 @@ $job_test_handler_runs = 0;
 $job_test_flaky_runs = 0;
 $job_test_routes = [];
 $job_test_last_remote_args = [];
+$job_test_remote_code = 202;
+$job_test_remote_calls = 0;
+$job_test_manifest_revision = 7;
 
 class WP_REST_Server
 {
@@ -226,16 +229,18 @@ function wp_timezone(): DateTimeZone { return new DateTimeZone('UTC'); }
 function wp_date(string $format, int $timestamp, ?DateTimeZone $timezone = null): string { return gmdate($format, $timestamp); }
 function wp_safe_remote_post(string $url, array $args): array
 {
-    global $job_test_last_remote_args;
+    global $job_test_last_remote_args, $job_test_remote_code, $job_test_remote_calls;
     $job_test_last_remote_args = $args;
-    return ['response' => ['code' => 202]];
+    $job_test_remote_calls++;
+    return ['response' => ['code' => $job_test_remote_code]];
 }
 function wp_remote_retrieve_response_code(array $response): int { return (int) ($response['response']['code'] ?? 0); }
 function wp_safe_remote_get(string $url, array $args): array
 {
+    global $job_test_manifest_revision;
     return [
         'response' => ['code' => 200],
-        'body' => '{"protocolVersion":1,"publicationRevision":7,"designRevisions":{"home":4}}',
+        'body' => '{"protocolVersion":1,"publicationRevision":' . (int) $job_test_manifest_revision . ',"designRevisions":{"home":4}}',
     ];
 }
 function wp_remote_retrieve_body(array $response): string { return (string) ($response['body'] ?? ''); }
@@ -366,5 +371,111 @@ jobs_test_assert(byline_deployment_lifecycle_status($deployment_status, ['reacha
 require __DIR__ . '/../includes/core/diagnostics.php';
 $manifest_diagnostic = byline_public_manifest_diagnostic();
 jobs_test_assert($manifest_diagnostic['lifecycle'] === 'live' && $manifest_diagnostic['contentRevision'] === 7 && $manifest_diagnostic['expectedRevision'] === 7, 'Manifest diagnostics should prove the expected public revision before reporting live.');
+
+require __DIR__ . '/../includes/integrations/distribution.php';
+
+// --- published with no deployment hook --------------------------------------
+
+// The public artifact changed. That fact has to survive an install with no
+// deploy hook, or the expected revision is lost and a merely reachable old
+// manifest gets mistaken for a live site.
+$job_test_posts[500] = new WP_Post(500, ['post_type' => 'post', 'post_status' => 'publish']);
+$job_test_options[BYLINE_DEPLOYMENT_HOOK_OPTION] = '';
+$job_test_remote_calls = 0;
+byline_schedule_deployment('story-published');
+$unconfigured_revision = byline_public_content_revision();
+jobs_test_assert($unconfigured_revision === 8, 'Publishing should still advance the public content revision without a deploy hook.');
+jobs_test_assert(byline_deployment_recorded_expected_revision() === 8, 'An unconfigured deployment must still record the revision the site owes.');
+jobs_test_assert(byline_deployment_expected_revision() === 8, 'The expected revision must survive an unconfigured deployment.');
+jobs_test_assert($job_test_remote_calls === 0, 'An unconfigured deployment must never send a hook request.');
+
+$unconfigured_status = byline_deployment_status();
+jobs_test_assert($unconfigured_status['configured'] === false && $unconfigured_status['lifecycle'] === 'needs_configuration', 'An unconfigured deployment with a pending revision must report needs_configuration.');
+jobs_test_assert(strpos((string) wp_json_encode($unconfigured_status), 'deploy.example.test') === false, 'Deployment status must never expose a hook URL.');
+
+// The public manifest is reachable but still on the previous revision. That is
+// not Live, and the legacy reachable-manifest fallback must not say it is.
+$manifest = byline_public_manifest_diagnostic();
+jobs_test_assert($manifest['reachable'] === true && (int) $manifest['contentRevision'] === 7, 'The manifest double should be reachable at the previous revision.');
+jobs_test_assert($manifest['lifecycle'] === 'needs_configuration', 'A reachable but stale manifest must not be reported live.');
+
+$website = byline_distribution_channel_descriptors(500)['website'];
+jobs_test_assert($website['status'] === 'needs_configuration', 'Distribution reported a stale website as something other than needs_configuration: ' . $website['status']);
+jobs_test_assert((int) $website['evidence']['expectedRevision'] === 8 && (int) $website['evidence']['publicRevision'] === 7, 'The website channel must carry the exact expected and public revisions as evidence.');
+
+// A genuinely pre-revision installation keeps its established behavior.
+jobs_test_assert(
+    byline_deployment_lifecycle_status(['expectedRevision' => 0, 'configured' => false], ['reachable' => true, 'publicationRevision' => 0]) === 'unknown',
+    'An installation that predates revision-aware deployment must not be forced into needs_configuration.'
+);
+
+// --- configuring deployment, then retrying -----------------------------------
+
+$job_test_options[BYLINE_DEPLOYMENT_HOOK_OPTION] = 'https://deploy.example.test/hook';
+$deployment_job_count = static function (): int {
+    $count = 0;
+    foreach (byline_job_posts(['posts_per_page' => -1]) as $post) {
+        $job = byline_job_internal((int) $post->ID);
+        if ($job && $job['type'] === BYLINE_DEPLOYMENT_JOB_TYPE) {
+            $count++;
+        }
+    }
+    return $count;
+};
+$jobs_before_retry = $deployment_job_count();
+$job_test_remote_calls = 0;
+$retry_status = byline_retry_deployment('manual');
+jobs_test_assert($job_test_remote_calls === 0, 'A manual retry must not send an untracked hook request of its own.');
+jobs_test_assert($retry_status['lifecycle'] === 'queued', 'A manual retry should immediately report a queued deployment. Got: ' . $retry_status['lifecycle']);
+$retry_job_id = (int) get_option(BYLINE_DEPLOYMENT_JOB_OPTION, 0);
+$retry_job = byline_job_internal($retry_job_id);
+jobs_test_assert(is_array($retry_job) && $retry_job['status'] === 'queued', 'A manual retry must be represented by a durable queued job.');
+jobs_test_assert((int) ($retry_job['payload']['expectedRevision'] ?? 0) === 8, 'A manual retry must track the exact revision the site owes.');
+jobs_test_assert($deployment_job_count() === $jobs_before_retry + 1, 'A manual retry after a completed deployment should create exactly one new tracked job.');
+
+// Repeated clicks are idempotent: the queued job is reported back untouched.
+byline_retry_deployment('manual');
+byline_retry_deployment('manual');
+jobs_test_assert($deployment_job_count() === $jobs_before_retry + 1, 'Repeated manual retries must not create duplicate deployment jobs.');
+jobs_test_assert($job_test_remote_calls === 0, 'Repeated manual retries must not send duplicate deploy requests.');
+
+$job_test_now = time() + 120;
+byline_process_deployment_event($retry_job_id);
+$retry_done = byline_get_job($retry_job_id);
+jobs_test_assert(is_array($retry_done) && $retry_done['status'] === 'succeeded' && (int) $retry_done['attempts'] === 1, 'The retried deployment should run exactly once through the durable job runner.');
+jobs_test_assert(($job_test_last_remote_args['headers']['X-Byline-Expected-Revision'] ?? '') === '8', 'The retried deployment must request the exact expected revision.');
+jobs_test_assert(($job_test_last_remote_args['headers']['X-Byline-Idempotency'] ?? '') === 'deployment:8:manual-1', 'A manual retry must carry its own idempotency key.');
+jobs_test_assert(strpos((string) wp_json_encode($job_test_last_remote_args), 'deploy.example.test') === false, 'The deploy request must not echo its own hook URL back into the record.');
+
+// Once the manifest proves the revision, and only then, the site is live.
+$job_test_manifest_revision = 8;
+jobs_test_assert(byline_public_manifest_diagnostic()['lifecycle'] === 'live', 'A manifest at the expected revision should finally report live.');
+jobs_test_assert(byline_distribution_channel_descriptors(500)['website']['status'] === 'live', 'Distribution should report live once the manifest proves the expected revision.');
+
+// --- retrying a failed job reuses that job ----------------------------------
+
+$job_test_manifest_revision = 8;
+$job_test_remote_code = 400;
+byline_schedule_deployment('content');
+$failing_job_id = (int) get_option(BYLINE_DEPLOYMENT_JOB_OPTION, 0);
+jobs_test_assert($failing_job_id !== $retry_job_id, 'A new public revision should be tracked by its own deployment job.');
+$job_test_now = time() + 300;
+byline_process_deployment_event($failing_job_id);
+$failed_job = byline_job_internal($failing_job_id);
+jobs_test_assert(is_array($failed_job) && $failed_job['status'] === 'failed' && $failed_job['attempts'] === 1, 'A non-retryable deploy response should fail the durable job. Got: ' . (string) ($failed_job['status'] ?? 'missing'));
+jobs_test_assert(byline_deployment_status()['lifecycle'] === 'failed', 'A failed deployment job must be reported as failed.');
+
+$jobs_before_failed_retry = $deployment_job_count();
+$job_test_remote_code = 202;
+$failed_retry_status = byline_retry_deployment('manual');
+jobs_test_assert($deployment_job_count() === $jobs_before_failed_retry, 'Retrying a failed deployment must requeue that job, not create another one.');
+$requeued = byline_job_internal($failing_job_id);
+jobs_test_assert(is_array($requeued) && $requeued['status'] === 'queued' && $requeued['attempts'] === 1 && $requeued['lastActorId'] === 17, 'A requeued deployment job must keep its attempt history and record the actor.');
+jobs_test_assert($failed_retry_status['lifecycle'] === 'queued', 'A retried deployment should report queued rather than staying failed.');
+
+$job_test_now = time() + 600;
+byline_process_deployment_event($failing_job_id);
+$requeued_done = byline_get_job($failing_job_id);
+jobs_test_assert(is_array($requeued_done) && $requeued_done['status'] === 'succeeded' && (int) $requeued_done['attempts'] === 2, 'A requeued deployment job should complete as the same durable record.');
 
 echo "Byline durable jobs regression passed.\n";
