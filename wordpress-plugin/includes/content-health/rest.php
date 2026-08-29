@@ -102,6 +102,107 @@ function byline_content_health_filter_issues(array $issues, string $issue_type =
     }));
 }
 
+/**
+ * Expose only the small, private locator vocabulary understood by the editor
+ * bridge. Cached issue data may come from older plugin versions, so malformed
+ * or unknown targets are ignored and the legacy fixUrl remains usable.
+ *
+ * @return array<string,mixed>|null
+ */
+function byline_content_health_rest_fix_target(array $issue): ?array
+{
+    $data = is_array($issue['data'] ?? null) ? $issue['data'] : [];
+    $target = $issue['fixTarget'] ?? ($data['fixTarget'] ?? null);
+    if (!is_array($target) || !isset($target['kind'])) {
+        return null;
+    }
+
+    $kind = sanitize_key((string) $target['kind']);
+    if ($kind === 'featured-image') {
+        return ['kind' => 'featured-image'];
+    }
+
+    if ($kind === 'story-sidebar') {
+        $panel = sanitize_key((string) ($target['panel'] ?? ''));
+        if (!in_array($panel, ['tasks', 'visuals', 'contributors', 'workflow'], true)) {
+            return null;
+        }
+        return ['kind' => 'story-sidebar', 'panel' => $panel];
+    }
+
+    if ($kind === 'block') {
+        $raw_path = $target['blockPath'] ?? null;
+        if (!is_array($raw_path) || count($raw_path) < 1 || count($raw_path) > 32) {
+            return null;
+        }
+        $block_path = [];
+        foreach ($raw_path as $index) {
+            if (is_int($index)) {
+                $path_index = $index;
+            } elseif (is_string($index) && preg_match('/^(0|[1-9][0-9]*)$/', $index)) {
+                $path_index = (int) $index;
+            } else {
+                return null;
+            }
+            if ($path_index < 0 || $path_index > 10000) {
+                return null;
+            }
+            $block_path[] = $path_index;
+        }
+
+        $result = ['kind' => 'block', 'blockPath' => $block_path];
+        if (isset($target['blockName'])) {
+            $block_name = (string) $target['blockName'];
+            if (strlen($block_name) > 120 || !preg_match('/^[a-z0-9-]+\/[a-z0-9-]+$/i', $block_name)) {
+                return null;
+            }
+            $result['blockName'] = $block_name;
+        }
+        if (isset($target['attribute'])) {
+            $attribute = (string) $target['attribute'];
+            if (strlen($attribute) > 128 || !preg_match('/^[A-Za-z][A-Za-z0-9_.-]*$/', $attribute)) {
+                return null;
+            }
+            $result['attribute'] = $attribute;
+        }
+        if (isset($target['valueFingerprint'])) {
+            $fingerprint = strtolower((string) $target['valueFingerprint']);
+            if (!preg_match('/^[a-f0-9]{8,64}$/', $fingerprint)) {
+                return null;
+            }
+            $result['valueFingerprint'] = $fingerprint;
+        }
+        return $result;
+    }
+
+    if ($kind === 'settings') {
+        $url = trim((string) ($target['url'] ?? ''));
+        if ($url === '' || !function_exists('admin_url') || !function_exists('esc_url_raw')) {
+            return null;
+        }
+        $safe_url = esc_url_raw($url, ['http', 'https']);
+        $safe_admin = esc_url_raw((string) admin_url('/'), ['http', 'https']);
+        $url_parts = function_exists('wp_parse_url') ? wp_parse_url($safe_url) : parse_url($safe_url);
+        $admin_parts = function_exists('wp_parse_url') ? wp_parse_url($safe_admin) : parse_url($safe_admin);
+        if (!is_array($url_parts) || !is_array($admin_parts) || $safe_url === '' || $safe_admin === '') {
+            return null;
+        }
+        foreach (['scheme', 'host', 'port'] as $component) {
+            if (strtolower((string) ($url_parts[$component] ?? '')) !== strtolower((string) ($admin_parts[$component] ?? ''))) {
+                return null;
+            }
+        }
+        $admin_path = rtrim((string) ($admin_parts['path'] ?? ''), '/');
+        $url_path = (string) ($url_parts['path'] ?? '');
+        if ($admin_path === '' || ($url_path !== $admin_path && strpos($url_path, $admin_path . '/') !== 0)) {
+            return null;
+        }
+        return ['kind' => 'settings', 'url' => $safe_url];
+    }
+
+    return null;
+}
+
 /** @return array<string,mixed> */
 function byline_content_health_rest_issue(array $issue): array
 {
@@ -118,7 +219,7 @@ function byline_content_health_rest_issue(array $issue): array
         ];
     }
 
-    return [
+    $result = [
         'id' => sanitize_key((string) ($issue['id'] ?? 'content-issue')),
         'type' => sanitize_key((string) ($issue['type'] ?? $issue['id'] ?? 'content')),
         'severity' => $severity,
@@ -127,6 +228,11 @@ function byline_content_health_rest_issue(array $issue): array
         'lastCheckedAt' => (string) ($issue['lastCheckedAt'] ?? $issue['checkedAt'] ?? ''),
         'fixUrl' => !empty($issue['fixUrl']) ? esc_url_raw((string) $issue['fixUrl']) : ($story['editUrl'] ?? null),
     ];
+    $fix_target = $story !== null ? byline_content_health_rest_fix_target($issue) : null;
+    if ($fix_target !== null) {
+        $result['fixTarget'] = $fix_target;
+    }
+    return $result;
 }
 
 /** @param array<int,array<string,mixed>> $issues */
@@ -264,6 +370,232 @@ function byline_content_health_rest_scan($request)
     return rest_ensure_response(byline_content_health_scan_batch($limit, $cursor));
 }
 
+/**
+ * Add the small editor-side navigation bridge only to an authenticated post
+ * editor. It resolves a saved structural locator to the current runtime
+ * clientId, but never accepts or stores that clientId in a REST payload.
+ */
+function byline_content_health_enqueue_editor_navigation(string $hook): void
+{
+    if (!in_array($hook, ['post.php', 'post-new.php'], true)
+        || !function_exists('get_current_screen')
+        || !function_exists('wp_script_is')
+        || !function_exists('wp_add_inline_script')) {
+        return;
+    }
+
+    $screen = get_current_screen();
+    if (!is_object($screen)
+        || ($screen->base ?? '') !== 'post'
+        || ($screen->post_type ?? '') !== 'post'
+        || !method_exists($screen, 'is_block_editor')
+        || !$screen->is_block_editor()) {
+        return;
+    }
+
+    $handle = '';
+    foreach (['enqueued', 'registered'] as $state) {
+        foreach (['wp-edit-post', 'byline-editorial-workflow'] as $candidate) {
+            if (wp_script_is($candidate, $state)) {
+                $handle = $candidate;
+                break 2;
+            }
+        }
+    }
+    if ($handle === '') {
+        return;
+    }
+
+    static $added = false;
+    if ($added) {
+        return;
+    }
+    $added = true;
+
+    $messages = [
+        'stale' => function_exists('__')
+            ? __('This Content Health location may have moved. The story was opened normally; review it and recheck Content Health when ready.', 'weekly-wildcat-headless')
+            : 'This Content Health location may have moved. The story was opened normally; review it and recheck Content Health when ready.',
+    ];
+    $messages_json = function_exists('wp_json_encode') ? wp_json_encode($messages) : json_encode($messages);
+    if (!is_string($messages_json) || $messages_json === '') {
+        return;
+    }
+
+    $script = <<<'BYLINE_CONTENT_HEALTH_NAVIGATION'
+(function (window) {
+    'use strict';
+
+    var targetParam = 'byline_content_health_target';
+    var search = new URLSearchParams(window.location.search);
+    var encodedTarget = search.get(targetParam);
+    if (!encodedTarget) return;
+
+    search.delete(targetParam);
+    var cleanUrl = window.location.pathname + (search.toString() ? '?' + search.toString() : '') + window.location.hash;
+    try {
+        if (window.history && window.history.replaceState) window.history.replaceState({}, document.title, cleanUrl);
+    } catch (error) {
+        // A history API failure does not make editor navigation unsafe.
+    }
+
+    var messages = __BYLINE_CONTENT_HEALTH_MESSAGES__;
+    var target;
+    try {
+        target = JSON.parse(encodedTarget);
+    } catch (error) {
+        target = null;
+    }
+
+    function notifyStale() {
+        var dispatch = window.wp && window.wp.data && window.wp.data.dispatch;
+        var notices = typeof dispatch === 'function' ? dispatch('core/notices') : null;
+        if (notices && typeof notices.createNotice === 'function') {
+            notices.createNotice('warning', messages.stale, { isDismissible: true });
+        } else if (window.wp && window.wp.a11y && typeof window.wp.a11y.speak === 'function') {
+            window.wp.a11y.speak(messages.stale, 'assertive');
+        }
+    }
+
+    function validTarget(value) {
+        if (!value || typeof value !== 'object' || Object.prototype.hasOwnProperty.call(value, 'clientId')) return false;
+        if (value.kind === 'featured-image') return true;
+        if (value.kind === 'story-sidebar') return ['tasks', 'visuals', 'contributors', 'workflow'].indexOf(value.panel) !== -1;
+        if (value.kind !== 'block' || !Array.isArray(value.blockPath) || value.blockPath.length < 1 || value.blockPath.length > 32) return false;
+        if (value.blockPath.some(function (index) { return !Number.isInteger(index) || index < 0 || index > 10000; })) return false;
+        if (value.blockName !== undefined && (typeof value.blockName !== 'string' || value.blockName.length > 120 || !/^[a-z0-9-]+\/[a-z0-9-]+$/i.test(value.blockName))) return false;
+        if (value.attribute !== undefined && (typeof value.attribute !== 'string' || value.attribute.length > 128 || !/^[A-Za-z][A-Za-z0-9_.-]*$/.test(value.attribute))) return false;
+        if (value.valueFingerprint !== undefined && (typeof value.valueFingerprint !== 'string' || value.valueFingerprint.length > 64 || !/^[a-f0-9]{8,64}$/i.test(value.valueFingerprint))) return false;
+        return true;
+    }
+
+    function blockAtPath(blocks, path) {
+        var current = blocks;
+        var block = null;
+        for (var index = 0; index < path.length; index += 1) {
+            var position = path[index];
+            if (!Array.isArray(current) || position < 0 || position >= current.length) return null;
+            block = current[position];
+            current = Array.isArray(block && block.innerBlocks) ? block.innerBlocks : [];
+        }
+        return block;
+    }
+
+    function attributeValue(block, attribute) {
+        if (!attribute || !block || !block.attributes) return null;
+        var value = block.attributes;
+        var parts = attribute.split('.');
+        for (var index = 0; index < parts.length; index += 1) {
+            if (!value || typeof value !== 'object' || !Object.prototype.hasOwnProperty.call(value, parts[index])) return null;
+            value = value[parts[index]];
+        }
+        return typeof value === 'string' ? value : null;
+    }
+
+    function fingerprint(value) {
+        if (!window.crypto || !window.crypto.subtle || typeof window.TextEncoder !== 'function') return Promise.resolve(null);
+        return window.crypto.subtle.digest('SHA-256', new window.TextEncoder().encode(value)).then(function (digest) {
+            return Array.prototype.slice.call(new Uint8Array(digest), 0, 8).map(function (byte) {
+                return byte.toString(16).padStart(2, '0');
+            }).join('');
+        }).catch(function () {
+            return null;
+        });
+    }
+
+    function matchesBlock(block) {
+        if (!block || (target.blockName && block.name !== target.blockName)) return Promise.resolve(false);
+        if (!target.valueFingerprint) return Promise.resolve(true);
+        var value = attributeValue(block, target.attribute);
+        if (value === null) return Promise.resolve(false);
+        return fingerprint(value).then(function (actual) {
+            // Structural/name matching remains a safe fallback on older or
+            // non-secure admin origins where SubtleCrypto is unavailable.
+            return actual === null || actual.toLowerCase() === target.valueFingerprint.toLowerCase();
+        });
+    }
+
+    function navigate() {
+        var data = window.wp && window.wp.data;
+        if (!data || typeof data.select !== 'function' || typeof data.dispatch !== 'function') return Promise.resolve(null);
+
+        if (target.kind === 'block') {
+            var blockEditor = data.select('core/block-editor');
+            var blocks = blockEditor && typeof blockEditor.getBlocks === 'function' ? blockEditor.getBlocks() : null;
+            if (!Array.isArray(blocks)) return Promise.resolve(null);
+            var block = blockAtPath(blocks, target.blockPath);
+            if (!block) return Promise.resolve(false);
+            return matchesBlock(block).then(function (matches) {
+                if (!matches || typeof block.clientId !== 'string' || block.clientId === '') return false;
+                var actions = data.dispatch('core/block-editor');
+                if (!actions || typeof actions.selectBlock !== 'function') return null;
+                actions.selectBlock(block.clientId);
+                if (typeof actions.scrollIntoView === 'function') actions.scrollIntoView(block.clientId);
+                return true;
+            });
+        }
+
+        var editorActions = data.dispatch('core/edit-post');
+        if (!editorActions || typeof editorActions.openGeneralSidebar !== 'function') return Promise.resolve(null);
+        if (target.kind === 'featured-image') {
+            editorActions.openGeneralSidebar('edit-post/document');
+            return Promise.resolve(true);
+        }
+        if (target.kind === 'story-sidebar') {
+            editorActions.openGeneralSidebar('byline-editorial-workflow/byline-editorial-workflow-sidebar');
+            return Promise.resolve(true);
+        }
+        return Promise.resolve(false);
+    }
+
+    function start() {
+        if (!validTarget(target)) {
+            notifyStale();
+            return;
+        }
+        var attempts = 0;
+        var finished = false;
+        function attempt() {
+            if (finished) return;
+            attempts += 1;
+            navigate().then(function (result) {
+                if (finished) return;
+                if (result === true) {
+                    finished = true;
+                    return;
+                }
+                if (attempts >= 30) {
+                    finished = true;
+                    notifyStale();
+                    return;
+                }
+                window.setTimeout(attempt, 100);
+            }).catch(function () {
+                if (finished) return;
+                if (attempts >= 30) {
+                    finished = true;
+                    notifyStale();
+                } else {
+                    window.setTimeout(attempt, 100);
+                }
+            });
+        }
+        attempt();
+    }
+
+    if (window.wp && typeof window.wp.domReady === 'function') {
+        window.wp.domReady(start);
+    } else if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start, { once: true });
+    } else {
+        start();
+    }
+}(window));
+BYLINE_CONTENT_HEALTH_NAVIGATION;
+    $script = str_replace('__BYLINE_CONTENT_HEALTH_MESSAGES__', $messages_json, $script);
+    wp_add_inline_script($handle, $script, 'after');
+}
+
 function byline_content_health_readiness_records(array $records, int $post_id): array
 {
     $cached = byline_content_health_cached_story($post_id);
@@ -323,6 +655,7 @@ function byline_register_content_health_hooks(): void
 {
     if (function_exists('add_action')) {
         add_action('rest_api_init', 'byline_register_content_health_routes');
+        add_action('admin_enqueue_scripts', 'byline_content_health_enqueue_editor_navigation', 100);
         byline_register_content_health_scanner_hooks();
     }
     if (function_exists('add_filter')) {
