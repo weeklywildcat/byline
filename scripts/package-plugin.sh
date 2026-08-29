@@ -151,6 +151,9 @@ rsync -a "$plugin_root/" "$stage_root/weekly-wildcat-headless/" \
   --exclude '.env.*' \
   --exclude 'tests' \
   --exclude 'tests-js' \
+  --exclude 'e2e' \
+  --exclude '.wp-env.json' \
+  --exclude '.wp-env.override.json' \
   --exclude 'src' \
   --exclude 'scripts' \
   --exclude 'README.md' \
@@ -164,6 +167,9 @@ rsync -a "$plugin_root/" "$stage_root/weekly-wildcat-headless/" \
   --exclude '*.map' \
   --exclude '.DS_Store'
 
+# zip adds to an existing archive rather than replacing it, so a file that was
+# removed from the plugin would otherwise keep shipping in every later release.
+rm -f "$archive"
 (cd "$stage_root" && zip -qr "$archive" weekly-wildcat-headless)
 unzip -tq "$archive"
 
