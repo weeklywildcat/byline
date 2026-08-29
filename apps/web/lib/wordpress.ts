@@ -354,6 +354,24 @@ function publicPhoto(value: unknown) {
   };
 }
 
+function publicImageCredit(value: unknown): WordPressImageCredit | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const creditText = textValue(value.creditText ?? value.credit_text);
+  const creator = textValue(value.creator);
+  const copyrightNotice = textValue(value.copyrightNotice ?? value.copyright_notice);
+  const licenseUrl = publicUrl(value.licenseUrl ?? value.license_url);
+  const acquireLicensePage = publicUrl(value.acquireLicensePage ?? value.acquire_license_url);
+
+  if (!creditText && !creator && !copyrightNotice && !licenseUrl && !acquireLicensePage) {
+    return undefined;
+  }
+
+  return { creator, creditText, copyrightNotice, licenseUrl, acquireLicensePage };
+}
+
 function publicSocialLinks(value: unknown) {
   const entries = Array.isArray(value)
     ? value.flatMap((entry) => {
@@ -465,6 +483,8 @@ function publicMedia(value: unknown): WordPressMedia | null {
   }
 
   const details = isRecord(value.media_details) ? value.media_details : {};
+  const bylineImage = publicImageCredit(value.bylineImage);
+  const weeklyWildcatImage = publicImageCredit(value.weeklyWildcatImage);
   const sizes = isRecord(details.sizes)
     ? Object.fromEntries(Object.entries(details.sizes).flatMap(([key, size]) => {
         if (!isRecord(size) || !publicUrl(size.source_url)) return [];
@@ -495,6 +515,8 @@ function publicMedia(value: unknown): WordPressMedia | null {
       ...(typeof details.height === "number" ? { height: details.height } : {}),
       ...(sizes ? { sizes } : {})
     },
+    ...(bylineImage ? { bylineImage } : {}),
+    ...(weeklyWildcatImage ? { weeklyWildcatImage } : {}),
     source_url: sourceUrl
   };
 }

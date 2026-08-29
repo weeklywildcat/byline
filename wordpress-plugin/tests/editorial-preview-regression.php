@@ -56,7 +56,8 @@ foreach ([
 foreach ([
     '<StoryPreviewLaunch postId={postId}',
     'await savePost?.();',
-    'window.open(previewUrl.toString(), \'_blank\', \'noopener,noreferrer\')',
+    "window.open('about:blank', '_blank')",
+    'previewWindow.location.replace(previewUrl.toString())',
     'Preview as Byline',
     'Publishing and deployment actions are disabled there.',
 ] as $needle) {

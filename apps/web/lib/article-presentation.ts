@@ -48,7 +48,8 @@ function articleImage(image: WordPressMedia | null, sizes?: string, priority = f
   const captionHtml = image.caption?.rendered?.trim() || "";
   const fallbackCaption = stripHtml(image.media_details?.image_meta?.caption ?? "");
   const credit = stripHtml(
-    (image.bylineImage ?? image.weeklyWildcatImage)?.creditText ||
+    [image.bylineImage?.creditText, image.weeklyWildcatImage?.creditText]
+      .find((value) => Boolean(value?.trim())) ||
       image.media_details?.image_meta?.credit ||
       image.media_details?.image_meta?.copyright ||
       ""
@@ -142,13 +143,14 @@ function relatedPosts(post: WordPressPost, posts: WordPressPost[]) {
   const tagSlugs = new Set(getPostTags(post).map((tag) => tag.slug));
   return posts
     .filter((candidate) => candidate.id !== post.id)
-    .map((candidate) => ({
+    .map((candidate, index) => ({
       post: candidate,
       score: getPostCategories(candidate).filter((category) => categorySlugs.has(category.slug)).length +
-        getPostTags(candidate).filter((tag) => tagSlugs.has(tag.slug)).length * 2
+        getPostTags(candidate).filter((tag) => tagSlugs.has(tag.slug)).length * 2,
+      index
     }))
     .filter((candidate) => candidate.score > 0)
-    .sort((left, right) => right.score - left.score || new Date(right.post.date).getTime() - new Date(left.post.date).getTime())
+    .sort((left, right) => right.score - left.score || new Date(right.post.date).getTime() - new Date(left.post.date).getTime() || left.index - right.index)
     .slice(0, 3)
     .map(({ post: relatedPost }) => relatedPost);
 }
@@ -217,7 +219,6 @@ export function buildArticlePresentation({ post, allPosts, contributors, author 
     update: updated ? { modifiedAt: post.modified, label: `This story was updated after initial publication on ${formatDisplayDate(post.modified)}.` } : null,
     relatedStories: related.map(articleStoryCard),
     moreByAuthorStories: moreByAuthor.map(articleStoryCard),
-    publication: { shortName: publication.identity.shortName, contactHref: "/contact/" }
+    publication: { shortName: publication.identity.shortName, contactHref: publication.urls.contact }
   };
 }
-

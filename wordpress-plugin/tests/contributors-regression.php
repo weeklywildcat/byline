@@ -213,6 +213,13 @@ function wp_attachment_is_image(int $attachment_id): bool
     return in_array($attachment_id, [7, 8], true);
 }
 
+function wwh_media_image(int $attachment_id, string $size = 'large'): array
+{
+    return $attachment_id === 7
+        ? ['id' => 7, 'url' => 'https://images.example.test/guest.jpg', 'alt' => 'Guest', 'width' => 132, 'height' => 132]
+        : ['id' => 0, 'url' => '', 'alt' => '', 'width' => null, 'height' => null];
+}
+
 function get_posts(array $args = []): array
 {
     global $byline_contributor_test_posts;
@@ -405,6 +412,7 @@ contributors_test_assert(array_column($public_contributors, 'name') === ['Second
 contributors_test_assert(!array_key_exists('email', $public_contributors[0]), 'User projections must not expose account emails.');
 contributors_test_assert(strpos(serialize($public_contributors), 'private@example.test') === false, 'Private user profile email data must not leak through contributors.');
 contributors_test_assert(($public_contributors[1]['type'] ?? '') === 'guest', 'Guest entries must project as guest contributors.');
+contributors_test_assert(($public_contributors[1]['profilePhoto']['id'] ?? 0) === 7, 'Public guest contributors must expose the canonical safe profile photo shape.');
 
 $invalid = byline_set_story_contributors(10, [
     ['type' => 'user', 'id' => 9999],

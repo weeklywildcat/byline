@@ -400,7 +400,23 @@ function byline_get_public_guest_contributor(int $guest_id): ?array
         return null;
     }
 
-    return byline_get_guest_contributor($guest_id);
+    $guest = byline_get_guest_contributor($guest_id);
+    if (!is_array($guest)) {
+        return null;
+    }
+
+    // Keep the legacy imageId for compatibility, but also expose the same
+    // public-safe photo shape consumed by the static site's contributor model.
+    // The main plugin provides this canonical media projection at runtime.
+    $image_id = absint($guest['imageId'] ?? 0);
+    if ($image_id > 0 && function_exists('wwh_media_image')) {
+        $photo = wwh_media_image($image_id, 'medium');
+        if (is_array($photo) && trim((string) ($photo['url'] ?? '')) !== '') {
+            $guest['profilePhoto'] = $photo;
+        }
+    }
+
+    return $guest;
 }
 
 function byline_guest_public_url($value, array $protocols = ['http', 'https']): string
