@@ -23,6 +23,7 @@ $byline_abilities_test_posts = [];
 $byline_abilities_test_calls = [];
 $byline_abilities_test_domain_error = null;
 $byline_abilities_test_throw = false;
+$byline_abilities_test_revision = 4;
 
 class WP_Error
 {
@@ -197,14 +198,27 @@ function byline_get_editorial_story_state(int $post_id): array
 
 function byline_update_editorial_story_state(int $post_id, array $changes, ?int $user_id = null)
 {
-    global $byline_abilities_test_calls, $byline_abilities_test_domain_error, $byline_abilities_test_throw;
+    global $byline_abilities_test_calls, $byline_abilities_test_domain_error, $byline_abilities_test_throw, $byline_abilities_test_revision;
     if ($byline_abilities_test_throw) {
         throw new RuntimeException('secret implementation detail');
     }
     if ($byline_abilities_test_domain_error instanceof WP_Error) {
         return $byline_abilities_test_domain_error;
     }
+    $expected_revision = (int) ($changes['expectedRevision'] ?? -1);
+    if ($expected_revision !== $byline_abilities_test_revision) {
+        return new WP_Error(
+            'byline_editorial_conflict',
+            'This story changed while you were editing it.',
+            [
+                'status' => 409,
+                'expectedRevision' => $expected_revision,
+                'currentRevision' => $byline_abilities_test_revision,
+            ]
+        );
+    }
     $byline_abilities_test_calls[] = ['move', $post_id, $changes, $user_id];
+    $byline_abilities_test_revision++;
 
     return [
         'postId' => $post_id,
@@ -212,7 +226,7 @@ function byline_update_editorial_story_state(int $post_id, array $changes, ?int 
         'storedStatus' => (string) ($changes['status'] ?? 'writing'),
         'isPublished' => false,
         'postStatus' => 'draft',
-        'revision' => ((int) ($changes['expectedRevision'] ?? 0)) + 1,
+        'revision' => $byline_abilities_test_revision,
         'editorId' => 7,
         'deadline' => '',
         'visuals' => '',
@@ -312,6 +326,7 @@ foreach ($byline_abilities_test_registrations as $name => $definition) {
 $move_definition = $byline_abilities_test_registrations['byline/move-story'];
 abilities_assert(($move_definition['input_schema']['required'] ?? []) === ['postId', 'status', 'expectedRevision'], 'Move-story does not require an optimistic revision.');
 abilities_assert(!in_array('published', $move_definition['input_schema']['properties']['status']['enum'] ?? [], true), 'Move-story exposed the derived published status as selectable.');
+abilities_assert(($move_definition['meta']['annotations']['idempotent'] ?? null) === false, 'Move-story must not be declared idempotent when it consumes expectedRevision.');
 $task_definition = $byline_abilities_test_registrations['byline/create-task'];
 abilities_assert(($task_definition['input_schema']['required'] ?? []) === ['storyId', 'title'], 'Create-task does not require a linked story and title.');
 abilities_assert(($task_definition['output_schema']['properties']['id']['type'] ?? '') === 'integer', 'Create-task output is not typed.');
@@ -346,6 +361,9 @@ $moved = call_user_func($move_story, ['postId' => 42, 'status' => 'ready', 'expe
 abilities_assert(is_array($moved) && ($moved['status'] ?? '') === 'ready', 'Move-story did not return the domain result.');
 $move_call = end($byline_abilities_test_calls);
 abilities_assert(($move_call[0] ?? '') === 'move' && ($move_call[2]['expectedRevision'] ?? null) === 4, 'Move-story did not pass the expected revision to the domain.');
+$conflicting_move = call_user_func($move_story, ['postId' => 42, 'status' => 'ready', 'expectedRevision' => 4]);
+abilities_assert($conflicting_move instanceof WP_Error && $conflicting_move->get_error_code() === 'byline_editorial_conflict', 'A repeated move-story call with the consumed revision should conflict.');
+abilities_assert(($conflicting_move->get_error_data()['currentRevision'] ?? null) === 5, 'A move-story conflict should expose the current revision for recovery.');
 
 $create_task = $byline_abilities_test_registrations['byline/create-task']['execute_callback'];
 $task = call_user_func($create_task, ['storyId' => 42, 'title' => 'Review copy', 'priority' => 'high']);
@@ -358,7 +376,7 @@ $readiness = call_user_func($check_readiness, ['postId' => 42]);
 abilities_assert(is_array($readiness) && !empty($readiness['ready']), 'Check-readiness did not return the readiness domain result.');
 
 $byline_abilities_test_domain_error = new WP_Error('byline_domain_failure', 'A safe domain failure.');
-$domain_result = call_user_func($move_story, ['postId' => 42, 'status' => 'ready', 'expectedRevision' => 4]);
+$domain_result = call_user_func($move_story, ['postId' => 42, 'status' => 'ready', 'expectedRevision' => 5]);
 abilities_assert($domain_result === $byline_abilities_test_domain_error, 'Domain WP_Error was not returned unchanged.');
 $byline_abilities_test_domain_error = null;
 $byline_abilities_test_throw = true;

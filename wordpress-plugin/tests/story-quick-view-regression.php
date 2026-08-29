@@ -39,7 +39,7 @@ foreach ([
     '<StoryQuickView',
     'getStoryQuickView',
     'handleUpdateStory',
-    'setStories((items) => items.map',
+    'replacePlanningStory',
 ] as $needle) {
     $assert(strpos($planning . $api, $needle) !== false, "Quick View client contract missing: {$needle}");
 }

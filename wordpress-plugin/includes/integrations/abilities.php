@@ -587,7 +587,10 @@ function byline_ability_definitions(): array
             'output_schema' => byline_ability_story_state_output_schema(),
             'execute_callback' => 'byline_ability_move_story',
             'permission_callback' => 'byline_ability_can_move_story',
-            'meta' => byline_ability_metadata(['idempotent' => true]),
+            // expectedRevision is an optimistic-concurrency token. Repeating
+            // the same call with the consumed revision must conflict rather
+            // than be reported as a safe no-op.
+            'meta' => byline_ability_metadata([]),
         ],
         'byline/create-task' => [
             'label' => byline_ability_text('Create Story Task'),

@@ -123,7 +123,7 @@ function byline_editorial_notification_visible_preference_labels(int $user_id): 
         'storyReturned' => 'Stories returned from review',
         'mediaAssignments' => 'Media assignments',
         'highPriorityTasks' => 'High-priority task assignments',
-        'dueDigest' => 'Daily due/overdue task reminder',
+        'dueDigest' => 'Daily due/overdue story and task reminder',
     ];
     if (user_can($user_id, 'edit_others_posts') || user_can($user_id, 'manage_byline')) {
         $labels['publishingFailures'] = 'Public-site publication failures';
@@ -225,6 +225,10 @@ function byline_editorial_notification_can_deliver(int $user_id, array $payload)
         return false;
     }
 
+    if ($event === 'due-digest') {
+        return byline_editorial_notification_due_items($user_id) !== [];
+    }
+
     $story_id = absint($payload['storyId'] ?? 0);
     $task_id = absint($payload['taskId'] ?? 0);
     if ($task_id > 0) {
@@ -274,6 +278,64 @@ function byline_editorial_notification_task_title(int $task_id): string
     }
 
     return '';
+}
+
+function byline_editorial_notification_current_date(int $timestamp = 0): string
+{
+    if (function_exists('current_time')) {
+        $date = current_time('Y-m-d');
+        if (is_string($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1) {
+            return $date;
+        }
+    }
+
+    $timestamp = $timestamp > 0
+        ? $timestamp
+        : (function_exists('current_time') ? (int) current_time('timestamp', true) : time());
+
+    return gmdate('Y-m-d', $timestamp > 0 ? $timestamp : time());
+}
+
+/** @return array<string,mixed> */
+function byline_editorial_notification_story_state(int $story_id): array
+{
+    if (function_exists('byline_get_editorial_story_state')) {
+        $state = byline_get_editorial_story_state($story_id);
+        return is_array($state) ? $state : [];
+    }
+
+    $editor_key = defined('BYLINE_EDITORIAL_EDITOR_META')
+        ? BYLINE_EDITORIAL_EDITOR_META
+        : '_wwh_story_editor_user_id';
+    $deadline_key = defined('BYLINE_EDITORIAL_DEADLINE_META')
+        ? BYLINE_EDITORIAL_DEADLINE_META
+        : '_wwh_story_deadline';
+    $status_key = defined('BYLINE_EDITORIAL_STATUS_META')
+        ? BYLINE_EDITORIAL_STATUS_META
+        : '_wwh_story_status';
+
+    return [
+        'editorId' => function_exists('get_post_meta') ? absint(get_post_meta($story_id, $editor_key, true)) : 0,
+        'deadline' => function_exists('byline_get_editorial_deadline')
+            ? byline_get_editorial_deadline($story_id)
+            : (function_exists('get_post_meta') ? (string) get_post_meta($story_id, $deadline_key, true) : ''),
+        'storedStatus' => function_exists('get_post_meta') ? (string) get_post_meta($story_id, $status_key, true) : '',
+    ];
+}
+
+function byline_editorial_notification_story_due_label(string $deadline, string $today, string $tomorrow): string
+{
+    if ($deadline < $today) {
+        return 'overdue';
+    }
+    if ($deadline === $tomorrow) {
+        return 'due tomorrow';
+    }
+    if ($deadline === $today) {
+        return 'due today';
+    }
+
+    return 'due soon';
 }
 
 /** @return array<int,int> */
@@ -353,6 +415,115 @@ function byline_editorial_notification_due_tasks(int $user_id): array
     return $due;
 }
 
+/** @return array<int,array<string,mixed>> */
+function byline_editorial_notification_due_stories(int $user_id): array
+{
+    if (!function_exists('get_posts')) {
+        return [];
+    }
+
+    $now = function_exists('current_time') ? (int) current_time('timestamp', true) : time();
+    $today = byline_editorial_notification_current_date($now);
+    $today_date = DateTimeImmutable::createFromFormat('!Y-m-d', $today);
+    if (!$today_date instanceof DateTimeImmutable) {
+        return [];
+    }
+    $tomorrow = $today_date->modify('+1 day')->format('Y-m-d');
+    $due = [];
+
+    for ($page = 1; $page <= 100; $page++) {
+        $posts = get_posts([
+            'post_type' => 'post',
+            'post_status' => ['draft', 'pending', 'future', 'private'],
+            'posts_per_page' => 200,
+            'paged' => $page,
+            'no_found_rows' => true,
+        ]);
+        $posts = is_array($posts) ? $posts : [];
+        foreach ($posts as $post) {
+            if (!$post instanceof WP_Post || (string) ($post->post_type ?? '') !== 'post') {
+                continue;
+            }
+
+            $story_id = absint($post->ID ?? 0);
+            if ($story_id <= 0 || (string) ($post->post_status ?? '') === 'publish') {
+                continue;
+            }
+
+            $state = byline_editorial_notification_story_state($story_id);
+            if (!empty($state['isPublished']) || (string) ($state['postStatus'] ?? '') === 'publish') {
+                continue;
+            }
+            if (absint($state['editorId'] ?? 0) !== $user_id || !byline_editorial_notification_story_can_be_viewed($user_id, $story_id)) {
+                continue;
+            }
+
+            $deadline = (string) ($state['deadline'] ?? '');
+            if ($deadline === '' && function_exists('byline_get_editorial_deadline')) {
+                $deadline = (string) byline_get_editorial_deadline($story_id);
+            }
+            $deadline_date = DateTimeImmutable::createFromFormat('!Y-m-d', $deadline);
+            if (!$deadline_date instanceof DateTimeImmutable || $deadline_date->format('Y-m-d') !== $deadline || $deadline > $tomorrow) {
+                continue;
+            }
+
+            $due[] = [
+                'id' => $story_id,
+                'storyId' => $story_id,
+                'deadline' => $deadline,
+                '_dueTimestamp' => $deadline_date->getTimestamp(),
+                '_dueLabel' => byline_editorial_notification_story_due_label($deadline, $today, $tomorrow),
+            ];
+        }
+        if (count($posts) < 200) {
+            break;
+        }
+    }
+
+    usort($due, static function (array $left, array $right): int {
+        return ((int) ($left['_dueTimestamp'] ?? 0)) <=> ((int) ($right['_dueTimestamp'] ?? 0));
+    });
+
+    return $due;
+}
+
+/** @return array<int,array<string,mixed>> */
+function byline_editorial_notification_due_items(int $user_id): array
+{
+    $items = [];
+    foreach (byline_editorial_notification_due_tasks($user_id) as $task) {
+        $items[] = [
+            'kind' => 'task',
+            'id' => absint($task['id'] ?? 0),
+            'storyId' => absint($task['storyId'] ?? 0),
+            'title' => (string) ($task['title'] ?? ''),
+            'dueAt' => (string) ($task['dueAt'] ?? ''),
+            '_dueTimestamp' => (int) ($task['_dueTimestamp'] ?? 0),
+        ];
+    }
+    foreach (byline_editorial_notification_due_stories($user_id) as $story) {
+        $items[] = [
+            'kind' => 'story',
+            'id' => absint($story['id'] ?? 0),
+            'storyId' => absint($story['storyId'] ?? 0),
+            'deadline' => (string) ($story['deadline'] ?? ''),
+            '_dueTimestamp' => (int) ($story['_dueTimestamp'] ?? 0),
+            '_dueLabel' => (string) ($story['_dueLabel'] ?? 'due soon'),
+        ];
+    }
+
+    usort($items, static function (array $left, array $right): int {
+        $timestamp_order = ((int) ($left['_dueTimestamp'] ?? 0)) <=> ((int) ($right['_dueTimestamp'] ?? 0));
+        if ($timestamp_order !== 0) {
+            return $timestamp_order;
+        }
+        $kind_order = ((string) ($left['kind'] ?? '')) <=> ((string) ($right['kind'] ?? ''));
+        return $kind_order !== 0 ? $kind_order : ((int) ($left['id'] ?? 0) <=> (int) ($right['id'] ?? 0));
+    });
+
+    return $items;
+}
+
 /** @return array{subject:string,body:string}|WP_Error */
 function byline_editorial_notification_message(array $payload, WP_User $recipient)
 {
@@ -363,22 +534,28 @@ function byline_editorial_notification_message(array $payload, WP_User $recipien
     $greeting = $name !== '' ? "Hi {$name},\n\n" : '';
 
     if ($event === 'due-digest') {
-        $tasks = byline_editorial_notification_due_tasks((int) $recipient->ID);
-        if ($tasks === []) {
-            return new WP_Error('byline_notification_empty_digest', 'There are no current due tasks.', ['status' => 200, 'skip' => true]);
+        $items = byline_editorial_notification_due_items((int) $recipient->ID);
+        if ($items === []) {
+            return new WP_Error('byline_notification_empty_digest', 'There is no current due editorial work.', ['status' => 200, 'skip' => true]);
         }
         $lines = [];
-        foreach (array_slice($tasks, 0, 20) as $task) {
-            $title = byline_editorial_notification_safe_text($task['title'] ?? 'Untitled task', 180);
-            $story_title = byline_editorial_notification_story_title(absint($task['storyId'] ?? 0));
-            $due_at = strtotime((string) ($task['dueAt'] ?? ''));
+        foreach (array_slice($items, 0, 20) as $item) {
+            $story_title = byline_editorial_notification_story_title(absint($item['storyId'] ?? 0));
+            if (($item['kind'] ?? '') === 'story') {
+                $when = (string) ($item['_dueLabel'] ?? 'due soon');
+                $lines[] = '- Story deadline: ' . ($story_title !== '' ? $story_title : 'Untitled story') . ' (' . $when . ')';
+                continue;
+            }
+
+            $title = byline_editorial_notification_safe_text($item['title'] ?? 'Untitled task', 180);
+            $due_at = strtotime((string) ($item['dueAt'] ?? ''));
             $when = $due_at !== false && $due_at < time() ? 'overdue' : 'due soon';
             $suffix = $story_title !== '' ? ' — ' . $story_title : '';
             $lines[] = '- ' . $title . $suffix . ' (' . $when . ')';
         }
-        $body = $greeting . 'You have ' . count($tasks) . " open Byline task(s) that are due soon or overdue.\n\n"
+        $body = $greeting . 'You have ' . count($items) . " open Byline item(s) that are due soon or overdue.\n\n"
             . implode("\n", $lines) . "\n\nOpen Byline to review your work.\n";
-        return ['subject' => 'Byline due-task reminder', 'body' => $body];
+        return ['subject' => 'Byline due-work reminder', 'body' => $body];
     }
 
     $story_title = $story_id > 0 ? byline_editorial_notification_story_title($story_id) : '';
@@ -476,7 +653,7 @@ function byline_editorial_notification_queue_due_digest(): void
         if ($user_id <= 0 || !byline_editorial_notification_is_enabled($user_id, 'due-digest')) {
             continue;
         }
-        if (byline_editorial_notification_due_tasks($user_id) === []) {
+        if (byline_editorial_notification_due_items($user_id) === []) {
             continue;
         }
         byline_editorial_notification_enqueue('due-digest', $user_id, 0, 0, $bucket);

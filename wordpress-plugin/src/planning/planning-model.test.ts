@@ -6,6 +6,7 @@ import {
   filterPlanningStories,
   filterSavedViewsForUser,
   planningCalendarEvents,
+  replacePlanningStory,
   serializeSavedPlanningView,
   sortPlanningStories,
   storyDateSemantics,
@@ -72,6 +73,16 @@ describe("planning model", () => {
     expect(applyPlanningMove(draft, "ready", statuses).story.workflow.id).toBe("ready");
     expect(applyPlanningMove(draft, "published", statuses).moved).toBe(false);
     expect(applyPlanningMove(story({ wordpressState: { ...draft.wordpressState, isPublished: true } }), "ready", statuses).moved).toBe(false);
+  });
+
+  it("rolls back only the failed story and ignores a late response for a newer story state", () => {
+    const target = story({ id: 1, title: "Target" });
+    const sibling = story({ id: 2, title: "Sibling" });
+    const optimisticTarget = { ...target, deadline: "2026-09-01" };
+    const updatedSibling = { ...sibling, title: "Sibling updated elsewhere" };
+
+    expect(replacePlanningStory([optimisticTarget, updatedSibling], target.id, target, optimisticTarget)).toEqual([target, updatedSibling]);
+    expect(replacePlanningStory([{ ...optimisticTarget, deadline: "2026-09-02" }, updatedSibling], target.id, target, optimisticTarget)).toEqual([{ ...optimisticTarget, deadline: "2026-09-02" }, updatedSibling]);
   });
 
   it("isolates saved views by owner and round-trips their normalized payload", () => {

@@ -23,6 +23,7 @@ import {
   filterSavedViewsForUser,
   normalizePlanningFilters,
   optionalApiFallback,
+  replacePlanningStory,
   sortPlanningStories,
   type ContentHealthResponse,
   type CoverageResponse,
@@ -327,18 +328,17 @@ export function PlanningApp({
       return;
     }
 
-    const previous = stories;
     setMovingStoryId(story.id);
     setActionError(null);
     setNotice(null);
-    setStories((current) => current.map((candidate) => candidate.id === story.id ? result.story : candidate));
-    setPlanning((current) => current ? { ...current, stories: current.stories.map((candidate) => candidate.id === story.id ? result.story : candidate) } : current);
+    setStories((current) => replacePlanningStory(current, story.id, result.story));
+    setPlanning((current) => current ? { ...current, stories: replacePlanningStory(current.stories, story.id, result.story) } : current);
     try {
       await fetchers.moveStory(story.id, targetStatus);
       setNotice(__("Workflow stage updated.", "weekly-wildcat-headless"));
     } catch (error: unknown) {
-      setStories(previous);
-      setPlanning((current) => current ? { ...current, stories: previous } : current);
+      setStories((current) => replacePlanningStory(current, story.id, story, result.story));
+      setPlanning((current) => current ? { ...current, stories: replacePlanningStory(current.stories, story.id, story, result.story) } : current);
       setActionError(error && typeof error === "object" && "message" in error ? String((error as { message: unknown }).message) : __("The workflow move could not be saved. The previous stage was restored.", "weekly-wildcat-headless"));
     } finally {
       setMovingStoryId(null);
@@ -352,24 +352,23 @@ export function PlanningApp({
       throw unavailable;
     }
 
-    const previous = stories;
     const current = stories.find((candidate) => candidate.id === storyId);
     if (!current) return;
     const optimistic = applyQuickViewStoryUpdate(current, changes, {}, statuses, editors);
     setActionError(null);
     setNotice(null);
-    setStories((items) => items.map((item) => item.id === storyId ? optimistic : item));
-    setPlanning((value) => value ? { ...value, stories: value.stories.map((item) => item.id === storyId ? optimistic : item) } : value);
+    setStories((items) => replacePlanningStory(items, storyId, optimistic));
+    setPlanning((value) => value ? { ...value, stories: replacePlanningStory(value.stories, storyId, optimistic) } : value);
 
     try {
       const response = await fetchers.updateStory(storyId, changes);
       const authoritative = applyQuickViewStoryUpdate(optimistic, changes, response, statuses, editors);
-      setStories((items) => items.map((item) => item.id === storyId ? authoritative : item));
-      setPlanning((value) => value ? { ...value, stories: value.stories.map((item) => item.id === storyId ? authoritative : item) } : value);
+      setStories((items) => replacePlanningStory(items, storyId, authoritative, optimistic));
+      setPlanning((value) => value ? { ...value, stories: replacePlanningStory(value.stories, storyId, authoritative, optimistic) } : value);
       setNotice(__("Story details updated.", "weekly-wildcat-headless"));
     } catch (error: unknown) {
-      setStories(previous);
-      setPlanning((value) => value ? { ...value, stories: previous } : value);
+      setStories((items) => replacePlanningStory(items, storyId, current, optimistic));
+      setPlanning((value) => value ? { ...value, stories: replacePlanningStory(value.stories, storyId, current, optimistic) } : value);
       setActionError(describeEditorialError(error, __("The story details could not be saved. The previous values were restored.", "weekly-wildcat-headless")));
       throw error;
     }

@@ -13,6 +13,7 @@ class WP_Post
 {
     public $ID = 0;
     public $post_type = 'post';
+    public $post_status = 'draft';
     public $post_title = '';
     public $post_author = 0;
     public $post_parent = 0;
@@ -65,9 +66,17 @@ $notification_test_users = [
     1 => ['name' => 'Editor', 'email' => 'editor@example.test', 'canEdit' => true, 'canManage' => true],
     2 => ['name' => 'Writer', 'email' => 'writer@example.test', 'canEdit' => true, 'canManage' => false],
 ];
-$notification_test_posts = [10 => new WP_Post(10), 20 => new WP_Post(20)];
+$notification_test_posts = [
+    10 => new WP_Post(10, 'Tomorrow story', 1),
+    11 => new WP_Post(11, 'Overdue story', 1),
+    20 => new WP_Post(20),
+];
 $notification_test_posts[20]->post_type = 'byline_task';
 $notification_test_posts[20]->post_parent = 10;
+$notification_test_story_states = [
+    10 => ['editorId' => 2, 'deadline' => gmdate('Y-m-d', time() + 86400), 'isPublished' => false, 'postStatus' => 'draft'],
+    11 => ['editorId' => 2, 'deadline' => gmdate('Y-m-d', time() - 86400), 'isPublished' => false, 'postStatus' => 'draft'],
+];
 $notification_test_meta = [];
 $notification_test_actions = [];
 $notification_test_jobs = [];
@@ -146,7 +155,7 @@ function user_can(int $user_id, string $capability, ...$args): bool
     global $notification_test_users;
     $user = $notification_test_users[$user_id] ?? [];
     if ($capability === 'edit_post') {
-        return !empty($user['canEdit']) && (int) ($args[0] ?? 0) === 10;
+        return !empty($user['canEdit']) && in_array((int) ($args[0] ?? 0), [10, 11], true);
     }
     if ($capability === 'edit_posts') {
         return !empty($user['canEdit']);
@@ -193,7 +202,16 @@ function get_users(array $args = []): array
 function get_posts(array $args = []): array
 {
     global $notification_test_posts;
-    return [20 => $notification_test_posts[20]];
+    $post_type = (string) ($args['post_type'] ?? '');
+    return array_values(array_filter($notification_test_posts, static function (WP_Post $post) use ($post_type): bool {
+        return $post_type === '' || $post->post_type === $post_type;
+    }));
+}
+
+function byline_get_editorial_story_state(int $post_id): array
+{
+    global $notification_test_story_states;
+    return $notification_test_story_states[$post_id] ?? [];
 }
 
 function byline_get_task(int $task_id): array
@@ -305,12 +323,24 @@ byline_editorial_notification_on_task_changed(20, byline_get_task(20), 'changed'
 notification_test_assert(count($notification_test_jobs) === $before_task + 1, 'A high-priority task assignment should notify the assignee.');
 
 // The daily digest is one coalesced durable job per recipient/day, even when
-// cron invokes the queue callback more than once.
+// cron invokes the queue callback more than once. It includes both assigned
+// story deadlines and assigned tasks.
 $before_digest = count($notification_test_jobs);
 byline_editorial_notification_queue_due_digest();
 $digest = end($notification_test_jobs);
 byline_editorial_notification_queue_due_digest();
 $digest_again = end($notification_test_jobs);
 notification_test_assert(count($notification_test_jobs) === $before_digest + 1 && is_array($digest) && is_array($digest_again) && $digest['id'] === $digest_again['id'] && ($digest['payload']['event'] ?? '') === 'due-digest', 'Due-task digests should be coalesced by recipient and day.');
+
+$mail_before_digest = count($notification_test_mail_calls);
+$notification_test_users[2]['canEdit'] = false;
+$revoked_digest = $handler(['payload' => $digest['payload']]);
+notification_test_assert(is_array($revoked_digest) && !empty($revoked_digest['skipped']) && count($notification_test_mail_calls) === $mail_before_digest, 'A due digest must be skipped when the recipient loses story/task access before delivery.');
+
+$notification_test_users[2]['canEdit'] = true;
+$delivered_digest = $handler(['payload' => $digest['payload']]);
+$digest_mail = end($notification_test_mail_calls);
+notification_test_assert(is_array($delivered_digest) && !empty($delivered_digest['delivered']), 'A due digest with assigned story and task work should deliver.');
+notification_test_assert(($digest_mail['subject'] ?? '') === 'Byline due-work reminder' && strpos($digest_mail['body'] ?? '', 'Tomorrow story') !== false && strpos($digest_mail['body'] ?? '', 'Overdue story') !== false && strpos($digest_mail['body'] ?? '', 'overdue') !== false && strpos($digest_mail['body'] ?? '', 'due tomorrow') !== false, 'The daily digest should describe tomorrow and overdue story deadlines alongside task work.');
 
 echo "Editorial notifications regression passed.\n";

@@ -634,6 +634,20 @@ export function applyPlanningMove(
   return { moved: true, story: { ...story, workflow: target } };
 }
 
+/**
+ * Replace one story without restoring a captured Planning collection. The
+ * optional identity guard lets an in-flight mutation avoid overwriting a
+ * newer update for the same story when its response arrives late.
+ */
+export function replacePlanningStory(
+  stories: readonly PlanningStory[],
+  storyId: number,
+  nextStory: PlanningStory,
+  expectedCurrent?: PlanningStory
+): PlanningStory[] {
+  return stories.map((story) => story.id === storyId && (!expectedCurrent || story === expectedCurrent) ? nextStory : story);
+}
+
 export function filterSavedViewsForUser(views: SavedPlanningView[], ownerId: number): SavedPlanningView[] {
   return views.filter((view) => view.ownerId === ownerId);
 }
