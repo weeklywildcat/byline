@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createPlanningFetchers, type PlanningRequestOptions } from "../src/planning/planning-api";
+import { describeMediaDeskError, MEDIA_FEATURED_IN_USE_CODE } from "../src/planning/media-desk-errors";
 import {
   mergeMediaAttachmentIds,
   normalizeMediaAttachmentIds,
@@ -32,5 +33,13 @@ describe("Media Desk attachment workflow", () => {
       { path: "/byline/v1/admin/media/42", method: "POST", data: { featuredAttachmentId: 7 } },
       { path: "/byline/v1/admin/media/42", method: "POST", data: { status: "done" } }
     ]);
+  });
+
+  it("turns the featured-image conflict into a specific, actionable UI message", () => {
+    expect(describeMediaDeskError({ code: MEDIA_FEATURED_IN_USE_CODE, message: "Conflict" })).toBe(
+      "This image is the story's featured image. Choose another featured image or remove it as featured before unlinking it from the story."
+    );
+    expect(describeMediaDeskError({ code: MEDIA_FEATURED_IN_USE_CODE })).toContain("Choose another featured image");
+    expect(describeMediaDeskError({ code: "other_error", message: "Other media failure" })).toBe("Other media failure");
   });
 });

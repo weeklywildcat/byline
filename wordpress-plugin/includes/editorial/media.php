@@ -361,6 +361,19 @@ function byline_editorial_media_attachment_featured_id(int $post_id): int
     return absint(get_post_meta($post_id, '_thumbnail_id', true));
 }
 
+function byline_editorial_media_featured_in_use_error(int $post_id, int $attachment_id): WP_Error
+{
+    return new WP_Error(
+        'byline_editorial_media_featured_in_use',
+        "This image is the story's featured image. Choose another featured image or remove it as featured before unlinking it from the story.",
+        [
+            'status' => 409,
+            'storyId' => $post_id,
+            'attachmentId' => $attachment_id,
+        ]
+    );
+}
+
 /** @return array<string,mixed> */
 function byline_editorial_media_attachment_details(int $attachment_id): array
 {
@@ -646,6 +659,15 @@ function byline_set_editorial_media_request(int $post_id, array $value, ?int $us
     }
 
     $request = byline_editorial_sanitize_media_request($merged);
+    $previous_featured_id = byline_editorial_media_attachment_featured_id($post_id);
+    $previous_attachment_ids = array_values(array_map('absint', (array) ($current['attachmentIds'] ?? [])));
+    $next_attachment_ids = array_values(array_map('absint', (array) ($request['attachmentIds'] ?? [])));
+    if ($has_attachment_field
+        && $previous_featured_id > 0
+        && in_array($previous_featured_id, $previous_attachment_ids, true)
+        && !in_array($previous_featured_id, $next_attachment_ids, true)) {
+        return byline_editorial_media_featured_in_use_error($post_id, $previous_featured_id);
+    }
     if ($request['assigneeId'] > 0) {
         if (!get_user_by('id', $request['assigneeId'])) {
             return new WP_Error('byline_editorial_media_unknown_assignee', 'That media assignee does not exist.', ['status' => 400]);
@@ -680,15 +702,7 @@ function byline_set_editorial_media_request(int $post_id, array $value, ?int $us
         return $reconciled;
     }
 
-    $previous_featured_id = byline_editorial_media_attachment_featured_id($post_id);
     update_post_meta($post_id, BYLINE_EDITORIAL_MEDIA_REQUEST_META, $reconciled);
-    if ($previous_featured_id > 0 && !in_array($previous_featured_id, (array) $reconciled['attachmentIds'], true)) {
-        if (function_exists('delete_post_thumbnail')) {
-            delete_post_thumbnail($post_id);
-        } else {
-            delete_post_meta($post_id, '_thumbnail_id');
-        }
-    }
 
     $result = byline_get_editorial_media_request($post_id, $user_id);
     // The fourth argument is private transition context for integrations that

@@ -41,6 +41,28 @@ class WP_Error
     }
 }
 
+class WP_REST_Request
+{
+    private array $params;
+    private array $body;
+
+    public function __construct(array $params = [], array $body = [])
+    {
+        $this->params = $params;
+        $this->body = $body;
+    }
+
+    public function get_param(string $key)
+    {
+        return $this->params[$key] ?? null;
+    }
+
+    public function get_json_params(): array
+    {
+        return $this->body;
+    }
+}
+
 $editorial_test_posts = [];
 $editorial_test_meta = [];
 $editorial_test_user_meta = [];
@@ -250,7 +272,7 @@ function get_post_thumbnail_id(int $post_id): int
 
 function wp_attachment_is_image(int $attachment_id): bool
 {
-    return $attachment_id === 100;
+    return in_array($attachment_id, [100, 102], true);
 }
 
 function wp_get_attachment_image_alt(int $attachment_id): string
@@ -277,6 +299,7 @@ function set_post_thumbnail(int $post_id, int $attachment_id): bool
 {
     global $editorial_test_thumbnails;
     $editorial_test_thumbnails[$post_id] = $attachment_id;
+    update_post_meta($post_id, '_thumbnail_id', $attachment_id);
     return true;
 }
 
@@ -284,6 +307,7 @@ function delete_post_thumbnail(int $post_id): bool
 {
     global $editorial_test_thumbnails;
     unset($editorial_test_thumbnails[$post_id]);
+    delete_post_meta($post_id, '_thumbnail_id');
     return true;
 }
 
@@ -421,11 +445,13 @@ function get_posts(array $args = []): array
     return array_slice($posts, absint($args['offset'] ?? 0), absint($args['posts_per_page'] ?? 200));
 }
 
-require __DIR__ . '/../includes/editorial/workflow.php';
-require __DIR__ . '/../includes/editorial/planning.php';
-require __DIR__ . '/../includes/editorial/media.php';
-require __DIR__ . '/../includes/editorial/readiness.php';
-require __DIR__ . '/../includes/editorial/tasks.php';
+require_once __DIR__ . '/../includes/editorial/workflow.php';
+require_once __DIR__ . '/../includes/editorial/planning.php';
+require_once __DIR__ . '/../includes/editorial/media.php';
+function rest_ensure_response($value) { return $value; }
+require_once __DIR__ . '/../includes/editorial/rest.php';
+require_once __DIR__ . '/../includes/editorial/readiness.php';
+require_once __DIR__ . '/../includes/editorial/tasks.php';
 
 $story = new WP_Post();
 $story->ID = 10;
@@ -444,6 +470,11 @@ $attachment = new WP_Post();
 $attachment->ID = 100;
 $attachment->post_type = 'attachment';
 $editorial_test_posts[100] = $attachment;
+$replacement_attachment = new WP_Post();
+$replacement_attachment->ID = 102;
+$replacement_attachment->post_type = 'attachment';
+$replacement_attachment->post_title = 'Replacement photo';
+$editorial_test_posts[102] = $replacement_attachment;
 $editorial_test_meta[10]['_wwh_story_visuals'] = "Need crowd photo <script>alert(1)</script>";
 
 // Planning target is canonical UTC metadata and does not mutate post_date.
@@ -532,8 +563,33 @@ foreach ($invalid_readiness['checks'] as $check) {
 editorial_test_assert($invalid_readiness_by_id['media-invalid-attachment']['status'] === 'warning' && $invalid_readiness_by_id['visual-requirement']['status'] === 'warning', 'Readiness did not detect an invalid attachment left in stored media state.');
 update_post_meta(10, BYLINE_EDITORIAL_MEDIA_REQUEST_META, $stored_media);
 
-$unlinked_featured = byline_editorial_unlink_media_request_attachment(10, 100, 1);
-editorial_test_assert(is_array($unlinked_featured) && $unlinked_featured['attachmentIds'] === [] && $unlinked_featured['status'] === 'assigned' && get_post_thumbnail_id(10) === 0, 'Unlinking the featured attachment did not clear the thumbnail or reopen the request.');
+$linked_normal = byline_editorial_link_media_request_attachment(10, 101, 1);
+editorial_test_assert(is_array($linked_normal) && $linked_normal['attachmentIds'] === [100, 101] && get_post_thumbnail_id(10) === 100 && get_post_meta(10, '_thumbnail_id', true) === 100, 'Linking a normal attachment changed the current featured image.');
+$unlinked_normal = byline_editorial_unlink_media_request_attachment(10, 101, 1);
+editorial_test_assert(is_array($unlinked_normal) && $unlinked_normal['attachmentIds'] === [100] && get_post_thumbnail_id(10) === 100 && get_post_meta(10, '_thumbnail_id', true) === 100, 'Unlinking a normal attachment changed or removed the current featured image.');
+
+$media_before_featured_unlink = get_post_meta(10, BYLINE_EDITORIAL_MEDIA_REQUEST_META, true);
+$featured_unlink = byline_editorial_unlink_media_request_attachment(10, 100, 1);
+editorial_test_assert(is_wp_error($featured_unlink) && $featured_unlink->code === 'byline_editorial_media_featured_in_use', 'Unlinking the current featured attachment was not blocked with the stable error code.');
+editorial_test_assert($featured_unlink->message === "This image is the story's featured image. Choose another featured image or remove it as featured before unlinking it from the story.", 'The featured-image unlink error did not explain how to proceed.');
+editorial_test_assert(($featured_unlink->data['status'] ?? 0) === 409 && ($featured_unlink->data['attachmentId'] ?? 0) === 100, 'The featured-image unlink error did not include conflict metadata.');
+editorial_test_assert(get_post_meta(10, BYLINE_EDITORIAL_MEDIA_REQUEST_META, true) === $media_before_featured_unlink && get_post_thumbnail_id(10) === 100 && get_post_meta(10, '_thumbnail_id', true) === 100, 'A rejected featured unlink changed the media request or thumbnail.');
+
+$generic_featured_unlink = byline_set_editorial_media_request(10, ['attachmentIds' => []], 1);
+editorial_test_assert(is_wp_error($generic_featured_unlink) && $generic_featured_unlink->code === 'byline_editorial_media_featured_in_use' && get_post_thumbnail_id(10) === 100 && get_post_meta(10, '_thumbnail_id', true) === 100, 'The generic media-request setter could still remove a featured image.');
+$rest_featured_unlink = byline_editorial_rest_update_media(new WP_REST_Request(['id' => 10], ['attachmentIds' => []]));
+editorial_test_assert(is_wp_error($rest_featured_unlink) && $rest_featured_unlink->code === 'byline_editorial_media_featured_in_use' && get_post_thumbnail_id(10) === 100 && get_post_meta(10, '_thumbnail_id', true) === 100, 'The protected REST media update path did not preserve a featured image unlink conflict.');
+
+$linked_replacement = byline_editorial_link_media_request_attachment(10, 102, 1);
+editorial_test_assert(is_array($linked_replacement) && $linked_replacement['attachmentIds'] === [100, 102] && get_post_thumbnail_id(10) === 100, 'Linking a replacement image changed the existing featured image.');
+editorial_test_assert(is_array(byline_editorial_set_media_request_featured_image(10, 102, 1)) && get_post_thumbnail_id(10) === 102 && get_post_meta(10, '_thumbnail_id', true) === 102, 'Replacing the featured image did not update WordPress thumbnail state.');
+$unlinked_old_featured = byline_editorial_unlink_media_request_attachment(10, 100, 1);
+editorial_test_assert(is_array($unlinked_old_featured) && $unlinked_old_featured['attachmentIds'] === [102] && get_post_thumbnail_id(10) === 102 && get_post_meta(10, '_thumbnail_id', true) === 102, 'Unlinking the old featured image after replacement was not allowed or changed the new featured image.');
+
+delete_post_thumbnail(10);
+editorial_test_assert(get_post_thumbnail_id(10) === 0 && get_post_meta(10, '_thumbnail_id', true) === '', 'Explicit featured-image removal did not clear WordPress thumbnail state.');
+$unlinked_after_featured_removal = byline_editorial_unlink_media_request_attachment(10, 102, 1);
+editorial_test_assert(is_array($unlinked_after_featured_removal) && $unlinked_after_featured_removal['attachmentIds'] === [] && get_post_thumbnail_id(10) === 0 && get_post_meta(10, '_thumbnail_id', true) === '', 'Unlinking after explicit featured-image removal did not succeed safely.');
 $linked_non_image = byline_editorial_link_media_request_attachment(10, 101, 1);
 editorial_test_assert(is_array($linked_non_image) && byline_editorial_set_media_request_featured_image(10, 101, 1) instanceof WP_Error, 'A non-image attachment could be featured.');
 byline_editorial_unlink_media_request_attachment(10, 101, 1);

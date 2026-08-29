@@ -15,6 +15,7 @@ import {
   type PlanningVisualStatus,
   type PlanningVisualType
 } from "./planning-model";
+import { describeMediaDeskError } from "./media-desk-errors";
 import { PlanningDateValue, PlanningEmpty, PlanningNotice, PlanningStatusBadge, PlanningUnavailable, StoryLink, ViewHeader } from "./planning-ui";
 
 export type MediaDeskProps = {
@@ -78,7 +79,7 @@ function RequestCard({
     try {
       await updateRequest(request.id, changes);
     } catch (reason) {
-      setError(reason && typeof reason === "object" && "message" in reason ? String((reason as { message: unknown }).message) : __("Media request could not be updated.", "weekly-wildcat-headless"));
+      setError(describeMediaDeskError(reason));
     }
   };
 
