@@ -260,14 +260,14 @@ test.describe("Gutenberg Story sidebar", () => {
       await retry.click();
       const triggerResponse = await triggerResponsePromise;
       expect(triggerResponse.ok(), `Deployment retry failed with HTTP ${triggerResponse.status()}.`).toBe(true);
-      const triggerPayload = await triggerResponse.json() as { jobId?: number; lifecycle?: string };
-      expect(triggerPayload.jobId).toBeGreaterThan(0);
+      const triggerPayload = await triggerResponse.json() as { jobId?: string; lifecycle?: string };
+      expect(triggerPayload.jobId).toMatch(/^byline:\d+$/);
       // Retry participates in the durable lifecycle, so the panel leaves the
       // failed state immediately instead of waiting on an untracked hook.
       await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/building|queued/i);
       await expect.poll(() => triggerRequests.length).toBe(1);
 
-      const jobs = await adminSession.rest<{ jobs?: Array<{ id?: number; type?: string }> }>("/byline/v1/admin/jobs");
+      const jobs = await adminSession.rest<{ jobs?: Array<{ id?: string; type?: string }> }>("/byline/v1/admin/jobs");
       expect(jobs.ok).toBe(true);
       const deploymentJobs = (jobs.payload?.jobs ?? []).filter((job) => job.type === "deployment" && job.id === triggerPayload.jobId);
       expect(deploymentJobs).toHaveLength(1);

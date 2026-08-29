@@ -935,7 +935,11 @@ function normalizeDistribution(value: unknown, postId: number, headline: string,
     };
   });
   const websiteEntry = entries.find((entry) => stringValue(record(entry).id || record(entry).channelId) === 'website');
-  const websiteStatus = websiteLifecycleStatus(websiteEntry ? record(websiteEntry).status : undefined);
+  const website = websiteEntry ? record(websiteEntry) : {};
+  // The channel status is a compatibility projection. Newer responses carry
+  // the authoritative deployment lifecycle separately; prefer it so a stale
+  // channel label can never turn an in-progress build into "Published".
+  const websiteStatus = websiteLifecycleStatus(website.lifecycle || website.status);
   const rawCapabilities = record(raw.capabilities);
   const newsletter = channels.find((channel) => channel.id === 'newsletter');
   return {
@@ -1499,12 +1503,12 @@ function PrePublishReadinessPanel({ postId, client }: { postId: number; client: 
   );
 }
 
-function postPublishStatusLabel(status: WebsiteLifecycleStatus, isPublished: boolean): string {
+function postPublishStatusLabel(status: WebsiteLifecycleStatus): string {
   if (status === 'live') return __('Live', 'weekly-wildcat-headless');
   if (status === 'building') return __('Building', 'weekly-wildcat-headless');
   if (status === 'failed') return __('Website update failed', 'weekly-wildcat-headless');
   if (status === 'needs-configuration') return __('Website update requires configuration', 'weekly-wildcat-headless');
-  if (status === 'published' || isPublished) return __('Published in Byline', 'weekly-wildcat-headless');
+  if (status === 'published') return __('Published in Byline', 'weekly-wildcat-headless');
   if (status === 'not-published') return __('Not published to Byline yet', 'weekly-wildcat-headless');
   return __('Website status is unavailable', 'weekly-wildcat-headless');
 }
@@ -1648,7 +1652,7 @@ function PostPublishLifecycle({
   return (
     <div className="byline-postpublish-lifecycle">
       <div className="byline-postpublish-status" aria-live="polite">
-        <strong>{postPublishStatusLabel(websiteStatus, isPublished)}</strong>
+        <strong>{postPublishStatusLabel(websiteStatus)}</strong>
         {isLoading ? (
           <>
             <Spinner />
