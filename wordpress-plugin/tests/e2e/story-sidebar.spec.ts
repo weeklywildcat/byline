@@ -14,18 +14,7 @@
  *
  * Everything else about the sidebar is covered by the PHP and vitest suites.
  */
-import { expect, test, type Page } from "@playwright/test";
-
-const ADMIN_USER = process.env.WP_ADMIN_USER ?? "admin";
-const ADMIN_PASSWORD = process.env.WP_ADMIN_PASSWORD ?? "password";
-
-async function login(page: Page): Promise<void> {
-  await page.goto("/wp-login.php");
-  await page.fill("#user_login", ADMIN_USER);
-  await page.fill("#user_pass", ADMIN_PASSWORD);
-  await page.click("#wp-submit");
-  await expect(page.locator("#wpadminbar")).toBeVisible();
-}
+import { expect, test, type Page } from "./fixtures";
 
 async function newDraft(page: Page): Promise<void> {
   await page.goto("/wp-admin/post-new.php?post_type=post");
@@ -46,8 +35,7 @@ async function openStorySidebar(page: Page): Promise<void> {
 }
 
 test.describe("Gutenberg Story sidebar", () => {
-  test("a Stage change and an overlapping Visual Notes autosave both persist", async ({ page }) => {
-    await login(page);
+  test("a Stage change and an overlapping Visual Notes autosave both persist", async ({ adminPage: page }) => {
     await newDraft(page);
     await openStorySidebar(page);
 
@@ -84,8 +72,7 @@ test.describe("Gutenberg Story sidebar", () => {
     await expect(page.getByLabel(/visual request or note/i)).toHaveValue("Crowd photo from the east stand");
   });
 
-  test("secondary panels stay lazy until they are opened", async ({ page }) => {
-    await login(page);
+  test("secondary panels stay lazy until they are opened", async ({ adminPage: page }) => {
     await newDraft(page);
 
     const panelRequests: string[] = [];
@@ -100,8 +87,7 @@ test.describe("Gutenberg Story sidebar", () => {
     await expect.poll(() => panelRequests.some((url) => url.includes("/tasks"))).toBe(true);
   });
 
-  test("publishing reports queued, then Live only once the manifest proves the revision", async ({ page }) => {
-    await login(page);
+  test("publishing reports queued, then Live only once the manifest proves the revision", async ({ adminPage: page }) => {
     await newDraft(page);
 
     let manifestRevision = 0;
@@ -121,8 +107,7 @@ test.describe("Gutenberg Story sidebar", () => {
     await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/live/i, { timeout: 30_000 });
   });
 
-  test("a failed website update retries through the durable job system", async ({ page }) => {
-    await login(page);
+  test("a failed website update retries through the durable job system", async ({ adminPage: page }) => {
     await page.goto("/wp-admin/post.php?post=" + (process.env.WP_PUBLISHED_POST_ID ?? "1") + "&action=edit");
 
     await page.route("**/byline/v1/editorial/stories/*/distribution", async (route) => {
