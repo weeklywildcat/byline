@@ -153,3 +153,291 @@
 .byline-workflow-summary-value {
   font-weight: 600;
 }
+
+/*
+ * The editor sidebar has its own compact layout. These selectors are scoped to
+ * the SlotFill rather than to viewport width, so the same hierarchy survives
+ * narrow windows, zoom, and the native WordPress responsive shell.
+ */
+.byline-editorial-sidebar {
+  --byline-sidebar-border: #e0e0e0;
+}
+
+.byline-editorial-sidebar .byline-story-panel {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.byline-story-summary {
+  border-bottom: 1px solid var(--byline-sidebar-border);
+  padding: 16px;
+}
+
+.byline-story-summary-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.byline-story-summary-heading > div {
+  min-width: 0;
+}
+
+.byline-story-summary-heading h2 {
+  font-size: 16px;
+  line-height: 1.35;
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.byline-story-summary-status {
+  flex: 0 0 auto;
+  max-width: 45%;
+  overflow-wrap: anywhere;
+}
+
+.byline-story-summary-meta {
+  display: grid;
+  gap: 10px 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 16px 0 0;
+}
+
+.byline-story-summary-meta dt {
+  color: #757575;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.byline-story-summary-meta dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.byline-story-summary-counters {
+  color: #757575;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 4px 12px;
+  margin-top: 14px;
+}
+
+.byline-story-summary-counters span + span::before {
+  content: '·';
+  margin-right: 12px;
+}
+
+.byline-editorial-sidebar .byline-editorial-sidebar-panel {
+  border-top: 1px solid var(--byline-sidebar-border);
+  margin: 0;
+}
+
+.byline-editorial-sidebar .byline-editorial-sidebar-panel > .components-panel__body-title {
+  min-height: 44px;
+}
+
+.byline-editorial-sidebar .byline-editorial-sidebar-panel > .components-panel__body-title button {
+  font-weight: 600;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.byline-editorial-sidebar .byline-editorial-sidebar-panel .byline-editorial-panel {
+  border: 0;
+  margin: 0;
+  padding: 0 0 8px;
+}
+
+/* The native PanelBody title is authoritative; retain the inner heading for
+ * accessible labelling and keep its loading indicator visible. */
+.byline-editorial-sidebar .byline-editorial-panel-heading > div {
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.byline-editorial-sidebar .byline-editorial-panel-heading {
+  justify-content: flex-end;
+  min-height: 0;
+}
+
+.byline-editorial-sidebar .byline-editorial-task-form,
+.byline-editorial-sidebar .byline-editorial-form-grid,
+.byline-editorial-sidebar .byline-editorial-date-grid,
+.byline-editorial-sidebar .byline-editorial-correction-form {
+  grid-template-columns: 1fr;
+}
+
+.byline-editorial-sidebar .byline-editorial-task,
+.byline-editorial-sidebar .byline-editorial-task-controls {
+  grid-template-columns: 1fr;
+}
+
+.byline-editorial-sidebar .byline-editorial-contributor-row {
+  grid-template-columns: 28px minmax(0, 1fr);
+}
+
+.byline-editorial-sidebar .byline-editorial-contributor-row .byline-editorial-inline-actions {
+  grid-column: 1 / -1;
+}
+
+.byline-editorial-sidebar .byline-editorial-add-row,
+.byline-editorial-sidebar .byline-editorial-move-control,
+.byline-editorial-sidebar .byline-editorial-inline-actions {
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.byline-editorial-sidebar .byline-editorial-inline-actions > * {
+  max-width: 100%;
+}
+
+.byline-editorial-sidebar .components-base-control {
+  margin-bottom: 10px;
+}
+
+.byline-editorial-sidebar .components-panel__body-toggle:focus-visible,
+.byline-editorial-sidebar a:focus-visible,
+.byline-editorial-sidebar button:focus-visible,
+.byline-editorial-sidebar input:focus-visible,
+.byline-editorial-sidebar select:focus-visible,
+.byline-editorial-sidebar textarea:focus-visible {
+  outline: 2px solid var(--wp-admin-theme-color, #3858e9);
+  outline-offset: 2px;
+}
+
+.byline-editorial-discussion-summary p {
+  margin-top: 0;
+}
+
+.byline-editorial-prepublish-panel,
+.byline-editorial-postpublish-panel {
+  margin: 0;
+}
+
+.byline-prepublish-readiness,
+.byline-postpublish-lifecycle {
+  padding: 16px;
+}
+
+.byline-prepublish-readiness-summary,
+.byline-postpublish-status {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content: space-between;
+}
+
+.byline-prepublish-readiness-summary span,
+.byline-postpublish-status span {
+  color: #646970;
+  font-size: 12px;
+}
+
+.byline-prepublish-check-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+}
+
+.byline-prepublish-check {
+  align-items: flex-start;
+  border-left: 3px solid #dcdcde;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 8px 0 8px 10px;
+}
+
+.byline-prepublish-check-warning {
+  border-left-color: #dba617;
+}
+
+.byline-prepublish-check-error {
+  border-left-color: #d63638;
+}
+
+.byline-prepublish-check-state {
+  color: #646970;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.byline-prepublish-check p {
+  color: #646970;
+  margin: 3px 0 0;
+}
+
+.byline-prepublish-check a {
+  overflow-wrap: anywhere;
+}
+
+.byline-prepublish-success {
+  color: #1e6b37;
+  margin: 16px 0;
+}
+
+.byline-prepublish-passed-details {
+  border-top: 1px solid #dcdcde;
+  color: #646970;
+  margin: 16px 0;
+  padding-top: 12px;
+}
+
+.byline-prepublish-passed-details summary {
+  cursor: pointer;
+}
+
+.byline-prepublish-passed-details ul {
+  margin: 10px 0 0 18px;
+}
+
+.byline-postpublish-status strong {
+  font-size: 14px;
+}
+
+.byline-postpublish-lifecycle > .byline-editorial-panel {
+  border: 0;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.byline-editorial-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.byline-editorial-activity-list li {
+  border-top: 1px solid #dcdcde;
+  padding: 9px 0;
+}
+
+.byline-editorial-activity-list li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.byline-editorial-activity-list strong,
+.byline-editorial-activity-list small {
+  display: block;
+}
+
+.byline-editorial-activity-list small {
+  color: #646970;
+  margin-top: 3px;
+}

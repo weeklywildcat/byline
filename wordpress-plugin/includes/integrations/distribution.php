@@ -159,17 +159,30 @@ function byline_distribution_channel_descriptors(int $post_id = 0): array
         $website['status'] = 'published';
         $deployment = function_exists('byline_deployment_status') ? byline_deployment_status() : [];
         $manifest = function_exists('byline_public_manifest_diagnostic') ? byline_public_manifest_diagnostic() : [];
-        if (!empty($deployment['pending'])) {
+        $lifecycle = function_exists('byline_deployment_lifecycle_status')
+            ? byline_deployment_lifecycle_status($deployment, $manifest)
+            : 'unknown';
+        if ($lifecycle === 'queued' || $lifecycle === 'building' || !empty($deployment['pending'])) {
             $website['status'] = 'rebuild_pending';
-        } elseif (preg_match('/failed|no http status|http [45]\d\d/i', (string) ($deployment['lastStatus'] ?? '')) === 1) {
+        } elseif ($lifecycle === 'failed' || preg_match('/failed|no http status|http [45]\d\d/i', (string) ($deployment['lastStatus'] ?? '')) === 1) {
             $website['status'] = 'build_failed';
-        } elseif (!empty($manifest['reachable'])) {
+        } elseif ($lifecycle === 'live'
+            // Older installations have no recorded expected revision. Keep
+            // their established reachable-manifest behavior while enforcing
+            // exact revision matching as soon as Byline has a revision to
+            // prove.
+            || ($lifecycle === 'unknown'
+                && (int) ($deployment['expectedRevision'] ?? 0) <= 0
+                && !empty($manifest['reachable']))) {
             $website['status'] = 'live';
         }
+        $website['lifecycle'] = $lifecycle;
         $website['evidence'] = [
             'wordpressStatus' => byline_distribution_text($post->post_status ?? '', 32),
             'deploymentStatus' => byline_distribution_text($deployment['lastStatus'] ?? '', 80),
             'manifestStatus' => byline_distribution_text($manifest['status'] ?? '', 80),
+            'expectedRevision' => max(0, (int) ($deployment['expectedRevision'] ?? 0)),
+            'publicRevision' => max(0, (int) ($manifest['publicationRevision'] ?? $manifest['contentRevision'] ?? 0)),
         ];
     }
     $channels['website'] = $website;

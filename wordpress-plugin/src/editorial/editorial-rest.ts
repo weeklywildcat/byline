@@ -4,6 +4,7 @@ import type {
   CorrectionRecord,
   DistributionChannel,
   EditorialTask,
+  EditorialActivityPayload,
   EditorialWorkflowPayload,
   ReadinessCheck,
   TaskInput,
@@ -65,7 +66,8 @@ export type DistributionPayload = {
 
 export type EditorialRestClient = {
   getWorkflow: (storyId: number) => Promise<EditorialWorkflowPayload>;
-  updateWorkflow: (storyId: number, changes: { status?: string } & WorkflowDateChanges & { editorId?: number | null }) => Promise<EditorialWorkflowPayload>;
+  getWorkflowBootstrap: (storyId: number) => Promise<EditorialWorkflowPayload>;
+  updateWorkflow: (storyId: number, changes: { status?: string } & WorkflowDateChanges & { editorId?: number | null; visuals?: string | null; expectedRevision?: number }) => Promise<EditorialWorkflowPayload>;
   getReadiness: (storyId: number) => Promise<ReadinessPayload>;
   listTasks: (storyId?: number) => Promise<TaskPayload>;
   createTask: (input: TaskInput) => Promise<TaskPayload>;
@@ -77,6 +79,7 @@ export type EditorialRestClient = {
   createCorrection: (storyId: number, input: CorrectionInput) => Promise<CorrectionPayload>;
   updateCorrection: (storyId: number, correctionId: number | string, input: CorrectionInput) => Promise<CorrectionPayload>;
   deleteCorrection: (storyId: number, correctionId: number | string) => Promise<CorrectionPayload>;
+  getActivity: (storyId: number, limit?: number) => Promise<EditorialActivityPayload>;
   getDistribution: (storyId: number) => Promise<DistributionPayload>;
   distributionAction: (storyId: number, channelId: string, action: "send" | "schedule" | "markDistributed") => Promise<DistributionPayload>;
   addToNewsletter: (storyId: number) => Promise<DistributionPayload>;
@@ -93,6 +96,8 @@ const taskPath = (taskId: number | string) => `/byline/v1/editorial/tasks/${enco
 export function createEditorialRestClient(request: ProtectedEditorialFetcher): EditorialRestClient {
   return {
     getWorkflow: (storyId) => request<EditorialWorkflowPayload>({ path: storyPath(storyId) }),
+
+    getWorkflowBootstrap: (storyId) => request<EditorialWorkflowPayload>({ path: `${storyPath(storyId)}/bootstrap` }),
 
     updateWorkflow: (storyId, changes) => request<EditorialWorkflowPayload>({
       path: storyPath(storyId),
@@ -151,6 +156,10 @@ export function createEditorialRestClient(request: ProtectedEditorialFetcher): E
     deleteCorrection: (storyId, correctionId) => request<CorrectionPayload>({
       path: `${storyPath(storyId)}/corrections/${encodeURIComponent(String(correctionId))}`,
       method: "DELETE"
+    }),
+
+    getActivity: (storyId, limit = 20) => request<EditorialActivityPayload>({
+      path: `${storyPath(storyId)}/activity?limit=${Math.min(50, Math.max(1, Math.floor(limit)))}`
     }),
 
     getDistribution: (storyId) => request<DistributionPayload>({

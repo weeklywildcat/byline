@@ -71,8 +71,17 @@ function editorial_rest_test_assert(bool $condition, string $message): void
 
 editorial_rest_test_assert(function_exists('byline_editorial_register_extended_rest_routes'), 'The grouped editorial route registrar is undefined.');
 byline_editorial_register_extended_rest_routes();
+byline_editorial_register_rest_routes();
 
 $expected_routes = [
+    '/editorial/activity',
+    '/editorial/stories/(?P<id>\\d+)/activity',
+    '/editorial/presets',
+    '/editorial/presets/(?P<type>[a-z0-9_-]+)',
+    '/editorial/presets/(?P<type>[a-z0-9_-]+)/reset',
+    '/editorial/presets/(?P<type>[a-z0-9_-]+)/apply',
+    '/editorial/stories/(?P<id>\\d+)/bootstrap',
+    '/editorial/stories/(?P<id>\\d+)',
     '/editorial/planning',
     '/editorial/saved-views',
     '/editorial/saved-views/(?P<id>[A-Za-z0-9_-]+)',

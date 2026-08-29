@@ -1,0 +1,260 @@
+.byline-doctor-app {
+  color: #1d2327;
+  max-width: 960px;
+}
+
+.byline-doctor-header,
+.byline-doctor-status-heading,
+.byline-doctor-section-heading,
+.byline-doctor-action-row {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.byline-doctor-header {
+  margin: 22px 0 20px;
+}
+
+.byline-doctor-header h1,
+.byline-doctor-status-heading h2,
+.byline-doctor-section-heading h2,
+.byline-doctor-problem-card h2 {
+  line-height: 1.25;
+  margin: 0;
+}
+
+.byline-doctor-header h1 {
+  font-size: 28px;
+  font-weight: 500;
+}
+
+.byline-doctor-header p:last-child {
+  color: #50575e;
+  margin: 6px 0 0;
+}
+
+.byline-doctor-eyebrow {
+  color: #646970;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  margin: 0 0 5px;
+  text-transform: uppercase;
+}
+
+.byline-doctor-status-card {
+  border-left: 4px solid #646970;
+  margin-bottom: 18px;
+}
+
+.byline-doctor-status-good {
+  border-left-color: #008a20;
+}
+
+.byline-doctor-status-recommended {
+  border-left-color: #996800;
+}
+
+.byline-doctor-status-critical {
+  border-left-color: #b32d2e;
+}
+
+.byline-doctor-status-heading h2 {
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.byline-doctor-status-heading + p,
+.byline-doctor-setup-card p {
+  color: #50575e;
+}
+
+.byline-doctor-problem-card {
+  border-left: 4px solid #b32d2e;
+  margin: 18px 0;
+}
+
+.byline-doctor-problem-card h2 {
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.byline-doctor-problem-card p {
+  margin-bottom: 14px;
+}
+
+.byline-doctor-action-row {
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.byline-doctor-action-row [role="status"] {
+  color: #008a20;
+  font-weight: 600;
+}
+
+.byline-doctor-section-heading > span {
+  background: #f0f0f1;
+  border-radius: 999px;
+  color: #50575e;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.byline-doctor-check-list,
+.byline-doctor-setup-list {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+}
+
+.byline-doctor-check {
+  align-items: flex-start;
+  border-top: 1px solid #dcdcde;
+  display: flex;
+  gap: 11px;
+  padding: 13px 0;
+}
+
+.byline-doctor-check:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.byline-doctor-check-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.byline-doctor-check-copy span,
+.byline-doctor-check-copy small,
+.byline-doctor-setup-list small {
+  color: #646970;
+  display: block;
+  font-size: 12px;
+}
+
+.byline-doctor-check-copy small {
+  line-height: 1.45;
+}
+
+.byline-doctor-check-actions {
+  align-items: flex-end;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 5px;
+  margin-left: auto;
+}
+
+.byline-doctor-check-actions a,
+.byline-doctor-setup-list a {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.byline-doctor-mark {
+  align-items: center;
+  border-radius: 50%;
+  display: inline-flex;
+  flex: 0 0 20px;
+  font-size: 13px;
+  font-weight: 700;
+  height: 20px;
+  justify-content: center;
+  line-height: 1;
+  width: 20px;
+}
+
+.byline-doctor-mark-good {
+  background: #d7f0dc;
+  color: #008a20;
+}
+
+.byline-doctor-mark-recommended {
+  background: #f7e7b8;
+  color: #7a4d00;
+}
+
+.byline-doctor-mark-critical {
+  background: #f6d6d6;
+  color: #b32d2e;
+}
+
+.byline-doctor-setup-card {
+  margin-top: 20px;
+}
+
+.byline-doctor-setup-list li {
+  align-items: flex-start;
+  border-top: 1px solid #dcdcde;
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.byline-doctor-setup-list li:first-child {
+  border-top: 0;
+}
+
+.byline-doctor-setup-list li > span:not(.byline-doctor-mark) {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.byline-doctor-setup-list a {
+  margin-left: auto;
+}
+
+.byline-doctor-muted,
+.byline-doctor-all-clear {
+  color: #646970;
+}
+
+.byline-doctor-all-clear {
+  margin: 18px 0;
+}
+
+.byline-doctor-all-checks {
+  margin: 20px 0;
+}
+
+.byline-doctor-all-checks summary {
+  color: #2271b1;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.byline-doctor-report-card {
+  margin-top: 20px;
+}
+
+.byline-doctor-report-label {
+  display: block;
+  font-weight: 600;
+  margin: 16px 0 7px;
+}
+
+.byline-doctor-report {
+  box-sizing: border-box;
+  font-family: monospace;
+  max-width: 100%;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .byline-doctor-header,
+  .byline-doctor-check {
+    flex-direction: column;
+  }
+
+  .byline-doctor-check-actions {
+    align-items: flex-start;
+    margin-left: 31px;
+  }
+}

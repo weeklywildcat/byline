@@ -35,6 +35,8 @@ require_once __DIR__ . '/includes/editorial/corrections.php';
 require_once __DIR__ . '/includes/editorial/feedback.php';
 require_once __DIR__ . '/includes/editorial/contributors.php';
 require_once __DIR__ . '/includes/editorial/readiness.php';
+require_once __DIR__ . '/includes/editorial/activity.php';
+require_once __DIR__ . '/includes/editorial/presets.php';
 require_once __DIR__ . '/includes/editorial/rest.php';
 require_once __DIR__ . '/includes/editorial/admin.php';
 
@@ -260,6 +262,7 @@ const WWH_PRIMARY_GAME_META = 'weekly_wildcat_primary_game_id';
 
 require_once __DIR__ . '/includes/sports/teams.php';
 require_once __DIR__ . '/includes/sports/domain.php';
+require_once __DIR__ . '/includes/core/jobs.php';
 require_once __DIR__ . '/includes/integrations/deployment.php';
 
 /** Replace the WordPress mark with the configured publication identity. */

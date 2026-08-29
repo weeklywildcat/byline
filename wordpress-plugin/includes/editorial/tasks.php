@@ -289,7 +289,12 @@ function byline_create_task(array $input, ?int $user_id = null)
     update_post_meta($task_id, BYLINE_TASK_CREATOR_META, $user_id);
     update_post_meta($task_id, BYLINE_TASK_ORDER_META, byline_task_next_order($story_id, $coverage_id));
 
-    return byline_get_task($task_id);
+    $task = byline_get_task($task_id);
+    if (function_exists('do_action')) {
+        do_action('byline_editorial_task_changed', $task_id, $task, 'created');
+    }
+
+    return $task;
 }
 
 /** @return array<string,mixed>|WP_Error */
@@ -370,7 +375,13 @@ function byline_update_task(int $task_id, array $input, ?int $user_id = null)
         }
     }
 
-    return byline_get_task($task_id);
+    $task = byline_get_task($task_id);
+    if (function_exists('do_action')) {
+        $operation = (($task['state'] ?? '') === 'completed') ? 'completed' : 'changed';
+        do_action('byline_editorial_task_changed', $task_id, $task, $operation);
+    }
+
+    return $task;
 }
 
 function byline_complete_task(int $task_id, ?int $user_id = null)
@@ -385,14 +396,20 @@ function byline_reopen_task(int $task_id, ?int $user_id = null)
 
 function byline_delete_task(int $task_id, ?int $user_id = null)
 {
-    if (!byline_task_post($task_id) instanceof WP_Post) {
+    $task = byline_get_task($task_id);
+    if ($task === []) {
         return new WP_Error('byline_task_not_found', 'That task does not exist.', ['status' => 404]);
     }
     if (!byline_task_can_view($task_id, $user_id)) {
         return new WP_Error('byline_task_forbidden', 'You are not allowed to delete this task.', ['status' => 403]);
     }
 
-    return function_exists('wp_delete_post') && wp_delete_post($task_id, true)
+    $deleted = function_exists('wp_delete_post') && wp_delete_post($task_id, true);
+    if ($deleted && function_exists('do_action')) {
+        do_action('byline_editorial_task_changed', $task_id, $task, 'deleted');
+    }
+
+    return $deleted
         ? true
         : new WP_Error('byline_task_delete_failed', 'The task could not be deleted.', ['status' => 500]);
 }

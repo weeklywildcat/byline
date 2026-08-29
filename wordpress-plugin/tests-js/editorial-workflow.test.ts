@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createEditorialRestClient } from "../src/editorial/editorial-rest";
 import {
   WORKFLOW_FALLBACK_ERROR,
   createSerializedWorkflowSaveQueue,
@@ -123,6 +124,22 @@ describe("workflow transport", () => {
   it("addresses the capability-protected Byline editorial endpoint", () => {
     expect(workflowStoryPath(42)).toBe("/byline/v1/editorial/stories/42");
     expect(workflowStoryPath(42)).not.toContain("/wp/v2/");
+  });
+
+  it("keeps the lightweight bootstrap route separate from lazy panel routes", async () => {
+    const requests: Array<{ path: string; method?: string }> = [];
+    const client = createEditorialRestClient(async (request) => {
+      requests.push({ path: request.path, method: request.method });
+      return {} as never;
+    });
+
+    await client.getWorkflowBootstrap(42);
+    await client.listTasks(42);
+
+    expect(requests).toEqual([
+      { path: "/byline/v1/editorial/stories/42/bootstrap", method: undefined },
+      { path: "/byline/v1/editorial/stories/42/tasks", method: undefined }
+    ]);
   });
 });
 

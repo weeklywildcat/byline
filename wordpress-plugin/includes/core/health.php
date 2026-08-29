@@ -514,6 +514,72 @@ function byline_health_deployment_check(): ?array
 
     $cron_disabled = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
     $scheduler_ready = function_exists('wp_schedule_single_event') && function_exists('wp_next_scheduled');
+    if (function_exists('byline_jobs_cron_health')) {
+        $jobs_health = byline_jobs_cron_health();
+        $overdue = (int) ($jobs_health['overdueCount'] ?? 0);
+        $traffic_driven = !empty($jobs_health['trafficDriven']);
+        $details = 'overdue=' . $overdue
+            . ';cron_disabled=' . (!empty($jobs_health['cronDisabled']) ? 'true' : 'false')
+            . ';runner=' . sanitize_key((string) ($jobs_health['lastSource'] ?? 'unknown'))
+            . ';traffic_driven=' . ($traffic_driven ? 'true' : 'false');
+
+        if ($overdue > 0) {
+            return byline_health_check(
+                'deployment_cron',
+                'Deployment scheduling',
+                !empty($jobs_health['cronDisabled']) ? BYLINE_HEALTH_STATUS_CRITICAL : BYLINE_HEALTH_STATUS_RECOMMENDED,
+                'Scheduled publishing may run late.',
+                !empty($jobs_health['cronDisabled'])
+                    ? 'WordPress cron is disabled while Byline work is overdue; run the authenticated or WP-CLI catch-up hook.'
+                    : 'Byline is currently relying on traffic-triggered WP-Cron for catch-up. Run the authenticated or WP-CLI hook if this remains overdue.',
+                byline_health_admin_url('byline-integrations', ['tab' => 'deployment']),
+                $details
+            );
+        }
+        if (!empty($jobs_health['cronDisabled'])) {
+            return byline_health_check(
+                'deployment_cron',
+                'Deployment scheduling',
+                BYLINE_HEALTH_STATUS_CRITICAL,
+                'Deployment scheduling needs an external runner.',
+                'WordPress cron is disabled; use the authenticated or WP-CLI Byline job runner for scheduled publishing.',
+                byline_health_admin_url('byline-integrations', ['tab' => 'deployment']),
+                $details
+            );
+        }
+        if (($jobs_health['status'] ?? '') === 'critical' || !$scheduler_ready) {
+            return byline_health_check(
+                'deployment_cron',
+                'Deployment scheduling',
+                BYLINE_HEALTH_STATUS_CRITICAL,
+                'Deployment is configured but WordPress cron is unavailable.',
+                'Byline cannot coalesce content changes into a deploy request until WP-Cron is available or the deployment is triggered manually.',
+                byline_health_admin_url('byline-integrations', ['tab' => 'deployment']),
+                $details
+            );
+        }
+        if (($jobs_health['status'] ?? '') === 'recommended') {
+            return byline_health_check(
+                'deployment_cron',
+                'Deployment scheduling',
+                BYLINE_HEALTH_STATUS_RECOMMENDED,
+                (string) ($jobs_health['message'] ?? 'The recurring Byline job runner needs attention.'),
+                'Byline uses a durable queue and can be caught up through the authenticated or WP-CLI runner.',
+                byline_health_admin_url('byline-integrations', ['tab' => 'deployment']),
+                $details
+            );
+        }
+        return byline_health_check(
+            'deployment_cron',
+            'Deployment scheduling',
+            BYLINE_HEALTH_STATUS_GOOD,
+            'Deployment scheduling is available.',
+            'Byline can coalesce content changes and trigger the configured deploy hook.',
+            '',
+            $details
+        );
+    }
+
     if ($cron_disabled || !$scheduler_ready) {
         return byline_health_check(
             'deployment_cron',

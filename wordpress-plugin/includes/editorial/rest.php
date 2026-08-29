@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 // Loading the editorial domain modules from this already-registered transport
 // keeps the new slice available to both the plugin and focused standalone tests
 // without creating a second bootstrap path.
-foreach (['planning', 'media', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors'] as $byline_editorial_module) {
+foreach (['planning', 'media', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors', 'activity', 'presets'] as $byline_editorial_module) {
     $byline_editorial_module_file = __DIR__ . '/' . $byline_editorial_module . '.php';
     if (is_readable($byline_editorial_module_file)) {
         require_once $byline_editorial_module_file;
@@ -219,6 +219,84 @@ function byline_editorial_rest_get_story(WP_REST_Request $request)
     return rest_ensure_response(byline_editorial_rest_payload(absint($request->get_param('id'))));
 }
 
+/**
+ * Return the small protected read model needed to open an article workflow.
+ *
+ * The original story response remains intentionally unchanged for existing
+ * integrations. New editor clients can use this projection so corrections,
+ * contributor records, and other secondary collections stay lazy until an
+ * editor opens the relevant panel.
+ */
+function byline_editorial_rest_bootstrap_payload(int $post_id): array
+{
+    $state = byline_get_editorial_story_state($post_id);
+    $can_assign = byline_editorial_can_assign($post_id);
+    $post = get_post($post_id);
+    $author = $post instanceof WP_Post ? get_user_by('id', (int) $post->post_author) : false;
+    $media = function_exists('byline_get_editorial_media_request')
+        ? byline_get_editorial_media_request($post_id)
+        : [];
+    $readiness = function_exists('byline_get_story_readiness')
+        ? byline_get_story_readiness($post_id)
+        : [];
+    $coverage = function_exists('byline_get_story_coverage_summary')
+        ? byline_get_story_coverage_summary($post_id, null)
+        : [];
+    $contributor_count = function_exists('byline_get_story_contributor_entries')
+        ? count(byline_get_story_contributor_entries($post_id, true))
+        : (function_exists('byline_get_story_contributors') ? count(byline_get_story_contributors($post_id)) : 0);
+    $correction_count = function_exists('byline_count_corrections')
+        ? byline_count_corrections($post_id)
+        : 0;
+
+    return [
+        'story' => $state,
+        'statuses' => byline_editorial_rest_statuses(),
+        'capabilities' => [
+            'changeStatus' => byline_editorial_can_change_status($post_id),
+            'assign' => $can_assign,
+        ],
+        'writer' => $author instanceof WP_User
+            ? ['id' => (int) $author->ID, 'name' => (string) $author->display_name]
+            : null,
+        'editors' => $can_assign ? byline_editorial_assignable_editors() : [],
+        'plannedPublishAt' => function_exists('byline_get_editorial_planned_publish_at')
+            ? byline_get_editorial_planned_publish_at($post_id)
+            : '',
+        'media' => [
+            'type' => (string) ($media['type'] ?? 'none'),
+            'status' => (string) ($media['status'] ?? 'needed'),
+            'label' => (string) ($media['label'] ?? $media['notes'] ?? ''),
+            'isLegacy' => !empty($media['isLegacy']),
+        ],
+        'tasks' => [
+            'openCount' => function_exists('byline_task_count_for_story')
+                ? byline_task_count_for_story($post_id)
+                : 0,
+        ],
+        'coverage' => $coverage,
+        'contributors' => ['count' => $contributor_count],
+        'corrections' => ['count' => $correction_count],
+        'readiness' => $readiness === [] ? null : [
+            'passed' => (int) ($readiness['passed'] ?? 0),
+            'warnings' => (int) ($readiness['warnings'] ?? 0),
+            'errors' => (int) ($readiness['errors'] ?? 0),
+            'total' => (int) ($readiness['total'] ?? 0),
+            'ready' => !empty($readiness['ready']),
+        ],
+        'notes' => byline_editorial_rest_notes_support($post_id),
+        'discord' => [
+            'threadId' => byline_editorial_rest_discord_thread($post_id),
+            'threadUrl' => byline_editorial_rest_discord_thread_url($post_id),
+        ],
+    ];
+}
+
+function byline_editorial_rest_get_story_bootstrap(WP_REST_Request $request)
+{
+    return rest_ensure_response(byline_editorial_rest_bootstrap_payload(absint($request->get_param('id'))));
+}
+
 function byline_editorial_rest_update_story(WP_REST_Request $request)
 {
     $post_id = absint($request->get_param('id'));
@@ -241,8 +319,29 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
         }
     }
 
+    $expected_revision = null;
+    if (array_key_exists('expectedRevision', $body)) {
+        $raw_revision = $body['expectedRevision'];
+        if ((!is_int($raw_revision) && !is_numeric($raw_revision)) || (int) $raw_revision < 0) {
+            return new WP_Error(
+                'byline_editorial_invalid_revision',
+                'The story revision is invalid. Reload the story and try again.',
+                ['status' => 400]
+            );
+        }
+        $expected_revision = (int) $raw_revision;
+    }
+
     if ($changes === [] && $extended === []) {
         return new WP_Error('byline_editorial_empty_update', 'No editorial workflow changes were supplied.', ['status' => 400]);
+    }
+
+    // Check once before applying any of the grouped fields. Legacy callers can
+    // omit expectedRevision; current admin clients get a deterministic conflict
+    // instead of silently replacing a colleague's newer metadata.
+    $revision_check = byline_assert_editorial_revision($post_id, $expected_revision);
+    if ($revision_check !== true) {
+        return $revision_check;
     }
 
     if (array_key_exists('plannedPublishAt', $extended) && !byline_editorial_can_assign($post_id)) {
@@ -255,7 +354,62 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
         return new WP_Error('byline_editorial_invalid_planned_publish', 'Use a valid planned publication date/time.', ['status' => 400]);
     }
 
-    $result = $changes !== [] ? byline_update_editorial_story_state($post_id, $changes) : byline_get_editorial_story_state($post_id);
+    // Validate the shape and object references for every grouped field before
+    // applying the primary workflow state. This keeps a mixed request atomic
+    // from an editor's point of view: an invalid coverage/contributor/media
+    // change cannot leave status or assignment partially updated.
+    if (array_key_exists('media', $extended) || array_key_exists('visualRequest', $extended)) {
+        $media = $extended['media'] ?? $extended['visualRequest'];
+        if (!is_array($media)) {
+            return new WP_Error('byline_editorial_invalid_media', 'The media request must be an object.', ['status' => 400]);
+        }
+        if (function_exists('byline_editorial_sanitize_media_request')) {
+            $media_request = byline_editorial_sanitize_media_request($media);
+            if (($media_request['assigneeId'] ?? 0) > 0 && function_exists('get_user_by') && !get_user_by('id', (int) $media_request['assigneeId'])) {
+                return new WP_Error('byline_editorial_media_unknown_assignee', 'That media assignee does not exist.', ['status' => 400]);
+            }
+            if (($media_request['assigneeId'] ?? 0) > 0
+                && function_exists('byline_editorial_media_assignee_can_be_set')
+                && !byline_editorial_media_assignee_can_be_set($post_id, (int) $media_request['assigneeId'])) {
+                return new WP_Error('byline_editorial_media_assignment_forbidden', 'Only an editor can assign media work to another user.', ['status' => 403]);
+            }
+        }
+    }
+
+    if (array_key_exists('coverageIds', $extended)) {
+        if (!is_array($extended['coverageIds']) || !function_exists('byline_set_story_coverage_ids')) {
+            return new WP_Error('byline_editorial_invalid_coverage', 'Coverage membership could not be updated.', ['status' => 400]);
+        }
+        if (function_exists('byline_sanitize_coverage_ids') && function_exists('byline_coverage_exists')) {
+            foreach (byline_sanitize_coverage_ids($extended['coverageIds']) as $coverage_id) {
+                if (!byline_coverage_exists((int) $coverage_id)) {
+                    return new WP_Error('byline_coverage_not_found', 'One of the selected coverage objects does not exist.', ['status' => 404]);
+                }
+            }
+        }
+    }
+
+    if (array_key_exists('contributors', $extended)) {
+        if (!is_array($extended['contributors']) || !function_exists('byline_set_story_contributors')) {
+            return new WP_Error('byline_editorial_invalid_contributors', 'Contributors could not be updated.', ['status' => 400]);
+        }
+        if (function_exists('byline_sanitize_story_contributors') && function_exists('byline_story_contributor_reference_exists')) {
+            $normalised_contributors = byline_sanitize_story_contributors($extended['contributors']);
+            if (count($normalised_contributors) !== count($extended['contributors'])) {
+                return new WP_Error('byline_invalid_contributors', 'Every contributor must reference one existing user or guest contributor.', ['status' => 400]);
+            }
+            foreach ($normalised_contributors as $reference) {
+                if (!byline_story_contributor_reference_exists($reference)) {
+                    return new WP_Error('byline_unknown_contributor', 'One of the selected contributors no longer exists.', ['status' => 400]);
+                }
+            }
+        }
+    }
+
+    if ($expected_revision !== null) {
+        $changes['expectedRevision'] = $expected_revision;
+    }
+    $result = $changes !== [] ? byline_update_editorial_story_state($post_id, $changes, null, false) : byline_get_editorial_story_state($post_id);
 
     if (is_wp_error($result)) {
         return $result;
@@ -267,9 +421,6 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
 
     if (array_key_exists('media', $extended) || array_key_exists('visualRequest', $extended)) {
         $media = $extended['media'] ?? $extended['visualRequest'];
-        if (!is_array($media)) {
-            return new WP_Error('byline_editorial_invalid_media', 'The media request must be an object.', ['status' => 400]);
-        }
         $media_result = byline_set_editorial_media_request($post_id, $media);
         if (is_wp_error($media_result)) {
             return $media_result;
@@ -277,9 +428,6 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
     }
 
     if (array_key_exists('coverageIds', $extended)) {
-        if (!is_array($extended['coverageIds']) || !function_exists('byline_set_story_coverage_ids')) {
-            return new WP_Error('byline_editorial_invalid_coverage', 'Coverage membership could not be updated.', ['status' => 400]);
-        }
         $coverage_result = byline_set_story_coverage_ids($post_id, $extended['coverageIds']);
         if (is_wp_error($coverage_result)) {
             return $coverage_result;
@@ -287,13 +435,14 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
     }
 
     if (array_key_exists('contributors', $extended)) {
-        if (!is_array($extended['contributors']) || !function_exists('byline_set_story_contributors')) {
-            return new WP_Error('byline_editorial_invalid_contributors', 'Contributors could not be updated.', ['status' => 400]);
-        }
         $contributors_result = byline_set_story_contributors($post_id, $extended['contributors']);
         if (is_wp_error($contributors_result)) {
             return $contributors_result;
         }
+    }
+
+    if ($changes !== [] || $extended !== []) {
+        byline_bump_editorial_revision($post_id);
     }
 
     return rest_ensure_response(byline_editorial_rest_payload($post_id));
@@ -301,6 +450,13 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
 
 function byline_editorial_register_rest_routes(): void
 {
+    register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/stories/(?P<id>\d+)/bootstrap', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'byline_editorial_rest_get_story_bootstrap',
+        'permission_callback' => 'byline_editorial_rest_permission',
+        'args' => ['id' => ['type' => 'integer', 'required' => true, 'sanitize_callback' => 'absint']],
+    ]);
+
     register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/stories/(?P<id>\d+)', [
         [
             'methods' => WP_REST_Server::READABLE,
@@ -342,6 +498,27 @@ function byline_editorial_rest_body(WP_REST_Request $request): array
 function byline_editorial_rest_can_edit_posts(): bool
 {
     return current_user_can('edit_posts');
+}
+
+function byline_editorial_rest_can_view_activity_newsroom(): bool
+{
+    return function_exists('byline_activity_can_view_newsroom')
+        ? byline_activity_can_view_newsroom()
+        : (current_user_can('edit_others_posts') || current_user_can(defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline'));
+}
+
+function byline_editorial_rest_can_use_presets(): bool
+{
+    return function_exists('byline_editorial_presets_can_use')
+        ? byline_editorial_presets_can_use()
+        : byline_editorial_rest_can_edit_posts();
+}
+
+function byline_editorial_rest_can_edit_presets(): bool
+{
+    return function_exists('byline_editorial_presets_can_edit')
+        ? byline_editorial_presets_can_edit()
+        : current_user_can('manage_options');
 }
 
 function byline_editorial_rest_can_view_task(WP_REST_Request $request)
@@ -1710,8 +1887,202 @@ function byline_editorial_rest_can_edit_guest(WP_REST_Request $request)
         : new WP_Error('byline_guest_forbidden', 'You are not allowed to manage this guest contributor.', ['status' => rest_authorization_required_code()]);
 }
 
+/**
+ * Parse the deliberately small activity query vocabulary at the transport
+ * boundary. The domain helper applies the final action allowlist and limit.
+ *
+ * @return array{limit:int,types:array<int,string>,storyId:int}
+ */
+function byline_editorial_rest_activity_filters(WP_REST_Request $request): array
+{
+    $params = byline_editorial_rest_request_params($request);
+    $raw_types = $params['types'] ?? ($params['actions'] ?? []);
+    if (is_string($raw_types)) {
+        $raw_types = preg_split('/\s*,\s*/', $raw_types, -1, PREG_SPLIT_NO_EMPTY);
+    }
+    $types = is_array($raw_types)
+        ? array_values(array_filter(array_map('sanitize_key', $raw_types)))
+        : [];
+
+    return [
+        'limit' => min(200, max(1, absint($params['limit'] ?? 50))),
+        'types' => $types,
+        'storyId' => absint($params['storyId'] ?? 0),
+    ];
+}
+
+function byline_editorial_rest_story_activity(WP_REST_Request $request)
+{
+    $story_id = absint($request->get_param('id'));
+    if (!function_exists('byline_get_story_activity')) {
+        return new WP_Error('byline_activity_unavailable', 'Activity is not available on this site.', ['status' => 503]);
+    }
+
+    $filters = byline_editorial_rest_activity_filters($request);
+    $items = byline_get_story_activity($story_id, [
+        'limit' => min(50, $filters['limit']),
+        'types' => $filters['types'],
+    ]);
+
+    return rest_ensure_response([
+        'storyId' => $story_id,
+        'activity' => $items,
+        'items' => $items,
+    ]);
+}
+
+function byline_editorial_rest_newsroom_activity(WP_REST_Request $request)
+{
+    if (!function_exists('byline_list_newsroom_activity')) {
+        return new WP_Error('byline_activity_unavailable', 'Activity is not available on this site.', ['status' => 503]);
+    }
+
+    $filters = byline_editorial_rest_activity_filters($request);
+    $items = byline_list_newsroom_activity([
+        'limit' => $filters['limit'],
+        'storyId' => $filters['storyId'],
+        'types' => $filters['types'],
+    ]);
+
+    return rest_ensure_response([
+        'activity' => $items,
+        'items' => $items,
+    ]);
+}
+
+function byline_editorial_rest_presets_payload(): array
+{
+    $presets = function_exists('byline_get_editorial_presets')
+        ? byline_get_editorial_presets()
+        : [];
+    $revision = function_exists('byline_editorial_presets_revision') ? byline_editorial_presets_revision() : 0;
+
+    return [
+        'presets' => $presets,
+        'types' => function_exists('byline_editorial_preset_types') ? byline_editorial_preset_types() : array_keys($presets),
+        'revision' => $revision,
+    ];
+}
+
+function byline_editorial_rest_presets(WP_REST_Request $request)
+{
+    return rest_ensure_response(byline_editorial_rest_presets_payload());
+}
+
+function byline_editorial_rest_get_preset(WP_REST_Request $request)
+{
+    $type = (string) $request->get_param('type');
+    $preset = function_exists('byline_get_editorial_preset') ? byline_get_editorial_preset($type) : null;
+    if (!is_array($preset)) {
+        return new WP_Error('byline_unknown_preset', 'That newsroom preset does not exist.', ['status' => 404]);
+    }
+
+    return rest_ensure_response([
+        'preset' => $preset,
+        'revision' => function_exists('byline_editorial_presets_revision') ? byline_editorial_presets_revision() : 0,
+    ]);
+}
+
+function byline_editorial_rest_update_preset(WP_REST_Request $request)
+{
+    $body = byline_editorial_rest_body($request);
+    $changes = isset($body['changes']) && is_array($body['changes']) ? $body['changes'] : $body;
+    $type = (string) $request->get_param('type');
+    $result = function_exists('byline_update_editorial_preset')
+        ? byline_update_editorial_preset($type, $changes)
+        : new WP_Error('byline_preset_unavailable', 'Preset storage is unavailable.', ['status' => 503]);
+    if (is_wp_error($result)) {
+        return $result;
+    }
+
+    return rest_ensure_response([
+        'preset' => $result,
+        'revision' => function_exists('byline_editorial_presets_revision') ? byline_editorial_presets_revision() : 0,
+    ]);
+}
+
+function byline_editorial_rest_reset_preset(WP_REST_Request $request)
+{
+    $type = (string) $request->get_param('type');
+    $result = function_exists('byline_reset_editorial_preset')
+        ? byline_reset_editorial_preset($type)
+        : new WP_Error('byline_preset_unavailable', 'Preset storage is unavailable.', ['status' => 503]);
+    if (is_wp_error($result)) {
+        return $result;
+    }
+
+    return rest_ensure_response([
+        'preset' => $result,
+        'revision' => function_exists('byline_editorial_presets_revision') ? byline_editorial_presets_revision() : 0,
+    ]);
+}
+
+function byline_editorial_rest_apply_preset(WP_REST_Request $request)
+{
+    if (!function_exists('byline_apply_editorial_preset')) {
+        return new WP_Error('byline_preset_unavailable', 'Preset application is unavailable on this site.', ['status' => 503]);
+    }
+
+    $body = byline_editorial_rest_body($request);
+    $context = isset($body['context']) && is_array($body['context']) ? $body['context'] : [];
+    $overrides = isset($body['overrides']) && is_array($body['overrides']) ? $body['overrides'] : [];
+    $preset = byline_apply_editorial_preset((string) $request->get_param('type'), $context, $overrides);
+    if ($preset === []) {
+        return new WP_Error('byline_unknown_preset', 'That newsroom preset does not exist.', ['status' => 404]);
+    }
+
+    return rest_ensure_response(['preset' => $preset]);
+}
+
 function byline_editorial_register_extended_rest_routes(): void
 {
+    register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/activity', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'byline_editorial_rest_newsroom_activity',
+        'permission_callback' => 'byline_editorial_rest_can_view_activity_newsroom',
+    ]);
+    register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/stories/(?P<id>\d+)/activity', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'byline_editorial_rest_story_activity',
+        'permission_callback' => 'byline_editorial_rest_permission',
+        'args' => ['id' => ['type' => 'integer', 'required' => true, 'sanitize_callback' => 'absint']],
+    ]);
+
+    register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/presets', [
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'byline_editorial_rest_presets',
+        'permission_callback' => 'byline_editorial_rest_can_use_presets',
+    ]);
+    register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/presets/(?P<type>[a-z0-9_-]+)', [
+        [
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => 'byline_editorial_rest_get_preset',
+            'permission_callback' => 'byline_editorial_rest_can_use_presets',
+        ],
+        [
+            'methods' => WP_REST_Server::EDITABLE,
+            'callback' => 'byline_editorial_rest_update_preset',
+            'permission_callback' => 'byline_editorial_rest_can_edit_presets',
+        ],
+    ]);
+    register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/presets/(?P<type>[a-z0-9_-]+)/reset', [
+        [
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => 'byline_editorial_rest_reset_preset',
+            'permission_callback' => 'byline_editorial_rest_can_edit_presets',
+        ],
+        [
+            'methods' => 'DELETE',
+            'callback' => 'byline_editorial_rest_reset_preset',
+            'permission_callback' => 'byline_editorial_rest_can_edit_presets',
+        ],
+    ]);
+    register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/presets/(?P<type>[a-z0-9_-]+)/apply', [
+        'methods' => WP_REST_Server::CREATABLE,
+        'callback' => 'byline_editorial_rest_apply_preset',
+        'permission_callback' => 'byline_editorial_rest_can_use_presets',
+    ]);
+
     register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/planning', [
         'methods' => WP_REST_Server::READABLE,
         'callback' => 'byline_editorial_rest_planning',

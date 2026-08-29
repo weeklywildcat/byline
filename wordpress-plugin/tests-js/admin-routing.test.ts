@@ -17,12 +17,14 @@ describe("Byline admin local routing", () => {
     expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.publication, "features")).toBe("features");
     expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.publication, "invalid")).toBe("identity");
     expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.integrations, undefined)).toBe("discord");
+    expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.planning, undefined)).toBe("today");
     expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.settings, "invalid")).toBe("access");
     expect(normalizeStudioView("revisions")).toBe("revisions");
     expect(normalizeStudioView("invalid")).toBe("editor");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.publication, "branding")).toBe("/publication/branding");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.publication, "features")).toBe("/publication/features");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.integrations, "deployment")).toBe("/integrations/deployment");
+    expect(adminScreenRoute(ADMIN_PAGE_SLUGS.planning, "today")).toBe("/home");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.settings, "diagnostics")).toBe("/advanced/diagnostics");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.theme, undefined)).toBe("/design/theme");
   });
@@ -42,6 +44,10 @@ describe("Byline admin local routing", () => {
     expect(legacyHashDestination("#/design/revisions")).toEqual({
       page: ADMIN_PAGE_SLUGS.studio,
       view: "revisions"
+    });
+    expect(legacyHashDestination("#/home")).toEqual({
+      page: ADMIN_PAGE_SLUGS.planning,
+      tab: "today"
     });
     expect(legacyHashDestination("#/removed-route")).toEqual({
       page: ADMIN_PAGE_SLUGS.dashboard

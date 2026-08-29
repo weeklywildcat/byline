@@ -7,7 +7,7 @@ const BYLINE_MANAGE_CAPABILITY = 'manage_byline';
 const BYLINE_EDIT_DESIGN_CAPABILITY = 'edit_byline_design';
 const BYLINE_MANAGE_INTEGRATIONS_CAPABILITY = 'manage_byline_integrations';
 
-$capabilities = ['edit_posts' => true, 'manage_byline' => true, 'edit_byline_design' => true, 'manage_byline_integrations' => false];
+$capabilities = ['edit_posts' => true, 'upload_files' => true, 'edit_others_posts' => true, 'manage_byline' => true, 'edit_byline_design' => true, 'manage_byline_integrations' => false];
 $scripts = ['wp-commands' => true, 'wp-data' => true];
 $actions = [];
 
@@ -32,7 +32,26 @@ require __DIR__ . '/../includes/commands/commands.php';
 $commands = byline_command_palette_commands();
 $names = array_column($commands, 'name');
 command_assert(in_array('byline/new-story', $names, true) && in_array('byline/studio', $names, true), 'Authorized navigation commands were not registered.');
+foreach (['byline/find-story', 'byline/new-coverage', 'byline/upload-photos', 'byline/assign-story', 'byline/move-story', 'byline/content-health', 'byline/create-correction', 'byline/home', 'byline/health-check'] as $expected_command) {
+    command_assert(in_array($expected_command, $names, true), "Expected command {$expected_command} was not registered for an authorized user.");
+}
 command_assert(!in_array('byline/deployment', $names, true), 'Deployment command bypassed its integration capability gate.');
+command_assert(!in_array('byline/newsletters', $names, true), 'Disabled newsletter feature exposed a newsletter command.');
+
+$capabilities['edit_others_posts'] = false;
+$editor_commands = array_column(byline_command_palette_commands(), 'name');
+command_assert(!in_array('byline/assign-story', $editor_commands, true), 'Assign-story command bypassed the editor capability gate.');
+
+$capabilities['manage_byline'] = false;
+$editor_commands_with_home = byline_command_palette_commands();
+$editor_home = null;
+foreach ($editor_commands_with_home as $editor_command) {
+    if (($editor_command['name'] ?? '') === 'byline/home') {
+        $editor_home = $editor_command;
+        break;
+    }
+}
+command_assert(is_array($editor_home) && strpos((string) ($editor_home['url'] ?? ''), 'page=byline-planning') !== false && strpos((string) ($editor_home['url'] ?? ''), 'tab=today') !== false, 'Editor Home command did not preserve the permission-aware Today destination.');
 
 $scripts = ['wp-commands' => false, 'wp-data' => false];
 ob_start();

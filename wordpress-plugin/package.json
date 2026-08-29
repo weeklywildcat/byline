@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@byline/admin-runtime": "0.1.0",
     "@byline/content": "0.1.0",
     "@byline/core": "0.1.0",
     "@byline/design": "0.1.0",

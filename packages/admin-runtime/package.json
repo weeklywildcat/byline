@@ -1,0 +1,12 @@
+{
+  "name": "@byline/admin-runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run tests"
+  },
+  "devDependencies": {
+    "vitest": "4.1.11"
+  }
+}

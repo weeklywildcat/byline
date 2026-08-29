@@ -10,8 +10,10 @@ import {
   TextControl,
   ToggleControl
 } from "@wordpress/components";
-import { Component, createRoot, useEffect, useState } from "@wordpress/element";
-import "@puckeditor/core/puck.css";
+import { Component, createRoot, lazy, Suspense, useEffect, useState } from "@wordpress/element";
+// The publication stylesheet is also the stable stylesheet URL used by the
+// Studio preview iframe. Keep this small shared surface in the admin entry;
+// the much heavier Puck editor CSS remains lazy with Studio.
 import "@byline/theme-weekly-wildcat/styles.css";
 import {
   ADMIN_PAGE_SLUGS,
@@ -26,14 +28,24 @@ import {
   normalizeStudioView
 } from "./admin-routing";
 import { contrastRatio } from "./contrast";
-import { BylineDesignRevisions, BylineStudio } from "./studio";
 import { createNavigationItem, moveItem, navigationConflictKey, sectionSlugForName } from "./settings-model";
 import { PlanningApp, createPlanningFetchers, type PlanningView } from "./planning";
 import { NewsletterApp, createNewsletterFetchers } from "./newsletters";
 import type { NewsletterBranding } from "./newsletters/render";
 import { stripMarkupForText } from "./safe-text";
 import type { ReactNode } from "react";
+import { AdminNavigation, HomeApp, createHomeFetchers, storiesViewFromRoute } from "./home";
+import { DoctorApp, type DoctorActionId, type DoctorActionResponse, type DoctorDiagnostics } from "./doctor";
 import "./style.css";
+
+// Studio pulls in Puck and the preview themes, so keep that sizeable editor
+// out of the common admin entrypoint. The shared promise makes the edit and
+// revisions views reuse one chunk if an editor navigates between them.
+type StudioModule = typeof import("./studio");
+let studioModulePromise: Promise<StudioModule> | null = null;
+const loadStudioModule = () => studioModulePromise || (studioModulePromise = import("./studio"));
+const BylineDesignRevisions = lazy(() => loadStudioModule().then(({ BylineDesignRevisions }) => ({ default: BylineDesignRevisions })));
+const BylineStudio = lazy(() => loadStudioModule().then(({ BylineStudio }) => ({ default: BylineStudio })));
 
 type BylineAdminConfig = {
   page: string;
@@ -64,6 +76,8 @@ type BylineAdminConfig = {
     editDesign: boolean;
     publishDesign: boolean;
     manageIntegrations: boolean;
+    editPosts?: boolean;
+    editOthersPosts?: boolean;
   };
   features: Record<string, boolean>;
   themeIds: string[];
@@ -121,6 +135,7 @@ type NavigationPage = { id: number; title?: { rendered?: string }; link: string 
 type AdminUrls = {
   dashboard: string;
   planning: {
+    today: string;
     stories: string;
     calendar: string;
     media: string;
@@ -141,70 +156,6 @@ type AdminUrls = {
     issues: string;
     settings: string;
   };
-};
-
-type DiagnosticsPayload = {
-  pluginVersion: string;
-  protocolVersion: number;
-  publicationSchemaVersion: number;
-  designSchemaVersion: number;
-  themeApiVersion: number;
-  wordpressVersion: string;
-  phpVersion?: string;
-  siteUrl?: string;
-  homeUrl?: string;
-  theme: { id: string; version: number; compatible: boolean };
-  enabledModules: string[];
-  deployment: { provider?: string; providerLabel?: string; configured: boolean; lastTriggeredAt: string; lastStatus: string; pending: boolean };
-  publicManifest: { reachable: boolean; status: string; protocolVersion?: number; frontendVersion?: string; publicationRevision?: number; designRevisions?: Record<string, number> };
-  restHealth: boolean;
-  designsNeedingMigration: number;
-  schemaVersions?: Record<string, number | null>;
-  pageMigration?: {
-    legacyPages?: Array<{ id: number; title: string; editLink?: string }>;
-    correctionFailures?: Array<{ id: number; title: string; editLink?: string; reason?: string }>;
-  };
-  assetPresence?: Record<string, boolean>;
-  tablePresence?: Record<string, boolean>;
-  routePresence?: Record<string, boolean | null>;
-  cronAvailable?: boolean;
-  healthSummary?: HealthSummary;
-  healthChecks?: HealthCheck[];
-  sports?: SportsDiagnostics;
-  supportReport?: string;
-};
-
-type SportsDiagnostics = {
-  status: string;
-  healthy: boolean;
-  currentSeason: string;
-  teamCount: number;
-  activeTeamCount: number;
-  counts?: Record<string, number>;
-  issues?: Array<{ code?: string; severity?: string; message?: string }>;
-};
-
-type HealthCheck = {
-  id: string;
-  label: string;
-  status: "good" | "recommended" | "critical";
-  severity: string;
-  summary: string;
-  description: string;
-  remediationUrl?: string;
-  technicalDetail?: string;
-};
-
-type HealthSummary = {
-  status: "good" | "recommended" | "critical" | string;
-  good: number;
-  recommended: number;
-  critical: number;
-};
-
-type HealthPayload = {
-  summary: HealthSummary;
-  checks: HealthCheck[];
 };
 
 declare global {
@@ -270,18 +221,6 @@ function LoadingState({ label = "Loading Byline…" }: { label?: string }) {
       <Spinner />
       <span>{label}</span>
     </div>
-  );
-}
-
-function statusLabel(status: HealthCheck["status"]): string {
-  return status === "good" ? "Good" : status === "recommended" ? "Recommended" : "Critical";
-}
-
-function StatusMark({ status }: { status: HealthCheck["status"] }) {
-  return (
-    <span className={`byline-status-mark byline-status-${status}`} aria-label={statusLabel(status)}>
-      {status === "good" ? "✓" : status === "recommended" ? "!" : "×"}
-    </span>
   );
 }
 
@@ -425,6 +364,7 @@ function settingsTabs(): AdminTab[] {
 
 function planningTabs(): AdminTab[] {
   return [
+    { id: "today", label: "Today", href: adminUrl(config?.urls.planning?.today) },
     { id: "stories", label: "Stories", href: adminUrl(config?.urls.planning?.stories) },
     { id: "calendar", label: "Calendar", href: adminUrl(config?.urls.planning?.calendar) },
     { id: "media", label: "Media Desk", href: adminUrl(config?.urls.planning?.media) },
@@ -435,8 +375,13 @@ function planningTabs(): AdminTab[] {
   ];
 }
 
-function planningViewForTab(tab: string): PlanningView {
+function planningViewForTab(tab: string, requestedView = ""): PlanningView {
+  if (tab === "stories") {
+    const routeView = storiesViewFromRoute(requestedView);
+    if (routeView) return routeView;
+  }
   switch (tab) {
+    case "today": return "board";
     case "calendar": return "calendar";
     case "media": return "media";
     case "coverage": return "coverage";
@@ -465,6 +410,19 @@ function adminProtectedRequest<T>({ path, method, data }: { path: string; method
   return apiFetch({ path, method, data }) as Promise<T>;
 }
 
+function homeActionUrls() {
+  const canManage = Boolean(config?.capabilities.manage);
+  const canEditPosts = Boolean(config && config.capabilities.editPosts !== false);
+  return {
+    dashboard: canManage ? adminUrl(config?.urls.dashboard) : undefined,
+    planning: canEditPosts ? adminUrl(config?.urls.planning?.stories) : undefined,
+    contentHealth: canEditPosts || canManage ? adminUrl(config?.urls.planning?.contentHealth) : undefined,
+    feedback: config?.capabilities.editOthersPosts || canManage ? adminUrl(config?.urls.planning?.feedback) : undefined,
+    deployment: config?.capabilities.manageIntegrations ? adminUrl(config?.urls.integrations?.deployment) : undefined,
+    doctor: canManage ? adminUrl(config?.urls.settings?.diagnostics) : undefined
+  };
+}
+
 function newsletterBranding(publication: PublicationConfig | null): NewsletterBranding {
   const accentColor = publication?.appearance.tokenOverrides.accent || publication?.appearance.tokenOverrides.link;
   return {
@@ -472,193 +430,6 @@ function newsletterBranding(publication: PublicationConfig | null): NewsletterBr
     accentColor,
     logoUrl: publication?.branding.logo.url || publication?.branding.masthead.url || null
   };
-}
-
-function Dashboard({ publication, health }: { publication: PublicationConfig | null; health: HealthPayload | null }) {
-  const checks = health?.checks || [];
-  const checkById = Object.fromEntries(checks.map((check) => [check.id, check]));
-  const checklist = [
-    { id: "publication_identity", label: "Publication identity", href: config?.urls.publication.identity },
-    { id: "publication_urls", label: "Public and CMS URLs", href: config?.urls.publication.identity },
-    { id: "branding", label: "Branding", href: config?.urls.publication.branding },
-    { id: "theme", label: "Choose a theme", href: config?.urls.theme },
-    { id: "homepage_design", label: "Homepage", href: config?.urls.studio }
-  ].filter((item) => checkById[item.id]?.status !== undefined && checkById[item.id]?.status !== "good");
-  const overallStatus = health?.summary.status || "recommended";
-  const statusText = overallStatus === "good"
-    ? "Byline is ready."
-    : overallStatus === "critical"
-      ? "Byline needs attention before it is ready."
-      : "Byline is usable, with a few recommended setup steps.";
-  const featureEntries = Object.entries(publication?.features || {});
-
-  return (
-    <div className="byline-dashboard-grid byline-overview-grid">
-      <Card>
-        <CardBody>
-          <p className="byline-eyebrow">Publication</p>
-          <h2>{publication?.identity.name || "Publication not configured"}</h2>
-          <p>{publication?.identity.description || "Add the publication identity before publishing."}</p>
-          <dl className="byline-diagnostics-list">
-            <div><dt>Short name</dt><dd>{publication?.identity.shortName || "—"}</dd></div>
-            <div><dt>Public URL</dt><dd className="byline-breakable">{publication?.urls.publicSite || "—"}</dd></div>
-            <div><dt>CMS URL</dt><dd className="byline-breakable">{publication?.urls.cms || "—"}</dd></div>
-            <div><dt>Active theme</dt><dd>{publication?.appearance.theme || "—"}</dd></div>
-          </dl>
-        </CardBody>
-      </Card>
-      <Card>
-        <CardBody>
-          <p className="byline-eyebrow">Status</p>
-          <h2 className={`byline-overview-status byline-status-${overallStatus}`}>{statusText}</h2>
-          {health ? (
-            <ul className="byline-health-list">
-              {checks.map((check) => (
-                <li key={check.id}>
-                  <StatusMark status={check.status} />
-                  <span><strong>{check.label}</strong><small>{check.summary}</small></span>
-                  {check.status !== "good" && check.remediationUrl ? <a href={adminUrl(check.remediationUrl)}>Fix</a> : null}
-                </li>
-              ))}
-            </ul>
-          ) : <LoadingState label="Checking Byline health…" />}
-        </CardBody>
-      </Card>
-      <Card>
-        <CardBody>
-          <p className="byline-eyebrow">Setup checklist</p>
-          {checklist.length ? (
-            <ol className="byline-checklist">
-              {checklist.map((item) => (
-                <li key={item.id}>
-                  <StatusMark status={checkById[item.id]?.status || "recommended"} />
-                  <a href={adminUrl(item.href)}>{item.label}</a>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="byline-empty-state">No required setup steps remain.</p>
-          )}
-          {overallStatus === "good" ? <p className="byline-status-ok">Everything required for Byline is ready.</p> : null}
-        </CardBody>
-      </Card>
-      <Card>
-        <CardBody>
-          <p className="byline-eyebrow">Features</p>
-          <ul className="byline-feature-list">
-            {featureEntries.length ? featureEntries.map(([feature, enabled]) => (
-              <li key={feature}>
-                <span>{feature.charAt(0).toUpperCase() + feature.slice(1)}</span>
-                <strong className={enabled ? "byline-status-ok" : "byline-status-off"}>{enabled ? "Enabled" : "Disabled"}</strong>
-              </li>
-            )) : <li>No optional modules configured.</li>}
-          </ul>
-        </CardBody>
-      </Card>
-    </div>
-  );
-}
-
-function Diagnostics() {
-  const [diagnostics, setDiagnostics] = useState<DiagnosticsPayload | null>(null);
-  const [diagnosticError, setDiagnosticError] = useState("");
-  const [copied, setCopied] = useState(false);
-
-  const load = () => {
-    setDiagnosticError("");
-    setDiagnostics(null);
-    return apiFetch<DiagnosticsPayload>({ path: config?.diagnosticsPath || "/byline/v1/admin/diagnostics" })
-      .then(setDiagnostics)
-      .catch((error) => setDiagnosticError(safeRequestError(error, "Byline could not collect diagnostics. Try again or contact support.")));
-  };
-
-  useEffect(() => { void load(); }, []);
-
-  if (diagnosticError) {
-    return (
-      <Card>
-        <CardBody>
-          <Notice status="error" isDismissible={false}>{diagnosticError}</Notice>
-          <Button variant="secondary" onClick={() => void load()}>Retry</Button>
-        </CardBody>
-      </Card>
-    );
-  }
-  if (!diagnostics) return <LoadingState label="Collecting diagnostics…" />;
-
-  const rows = [
-    ["Plugin", diagnostics.pluginVersion],
-    ["WordPress", diagnostics.wordpressVersion],
-    ["PHP", diagnostics.phpVersion || "Unknown"],
-    ["Site URL", diagnostics.siteUrl || "Unknown"],
-    ["Home URL", diagnostics.homeUrl || "Unknown"],
-    ["Protocol", String(diagnostics.protocolVersion)],
-    ["Publication schema", String(diagnostics.publicationSchemaVersion)],
-    ["Design schema", String(diagnostics.designSchemaVersion)],
-    ["Theme API", String(diagnostics.themeApiVersion)],
-    ["Theme", `${diagnostics.theme.id} v${diagnostics.theme.version} (${diagnostics.theme.compatible ? "compatible" : "incompatible"})`],
-    ["Enabled modules", diagnostics.enabledModules.join(", ") || "None"],
-    ["Deployment", diagnostics.deployment.configured ? "Configured" : "Not configured"],
-    ["Last deployment", `${diagnostics.deployment.lastTriggeredAt} · ${diagnostics.deployment.lastStatus}`],
-    ["Deployment pending", diagnostics.deployment.pending ? "Yes" : "No"],
-    ["Public manifest", `${diagnostics.publicManifest.reachable ? "Reachable" : "Unavailable"} · ${diagnostics.publicManifest.status}`],
-    ["REST health", diagnostics.restHealth ? "Healthy" : "Unavailable"],
-    ["Designs needing migration", String(diagnostics.designsNeedingMigration)],
-    ...(diagnostics.pageMigration ? [["Page migration", `${diagnostics.pageMigration.correctionFailures?.length || 0} correction failures · ${diagnostics.pageMigration.legacyPages?.length || 0} legacy pages`]] : []),
-    ...(diagnostics.sports ? [["Sports integrity", `${diagnostics.sports.healthy ? "Healthy" : "Attention"} · ${diagnostics.sports.currentSeason}`]] : [])
-  ];
-
-  return (
-    <Card>
-      <CardBody>
-        <p>No secrets, hook URLs, tokens, or credentials are included below.</p>
-        <dl className="byline-diagnostics-list">
-          {rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
-        </dl>
-        {diagnostics.sports ? (
-          <div className="byline-diagnostics-sports">
-            <h2>Sports integrity</h2>
-            <p>{diagnostics.sports.teamCount} configured teams ({diagnostics.sports.activeTeamCount} active) · {diagnostics.sports.currentSeason}</p>
-            <p>{diagnostics.sports.counts?.error || 0} errors · {diagnostics.sports.counts?.recommended || 0} recommendations</p>
-            {diagnostics.sports.issues?.length ? <Button variant="secondary" href={adminUrl(config?.urls.teams)}>Open Sports Teams</Button> : null}
-          </div>
-        ) : null}
-        {diagnostics.healthChecks?.length ? (
-          <>
-            <h2>Health checks</h2>
-            <ul className="byline-health-list">
-              {diagnostics.healthChecks.map((check) => (
-                <li key={check.id}>
-                  <StatusMark status={check.status} />
-                  <span><strong>{check.label}</strong><small>{check.summary}</small></span>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : null}
-        <label className="byline-support-report-label" htmlFor="byline-support-report">Support report</label>
-        <textarea id="byline-support-report" className="byline-support-report" readOnly value={diagnostics.supportReport || ""} rows={14} />
-        <div className="byline-diagnostics-copy">
-          <Button variant="secondary" onClick={async () => {
-            try {
-              if (navigator.clipboard?.writeText) {
-                await navigator.clipboard.writeText(diagnostics.supportReport || "");
-              } else {
-                const report = document.getElementById("byline-support-report") as HTMLTextAreaElement | null;
-                report?.focus();
-                report?.select();
-                document.execCommand("copy");
-              }
-              setCopied(true);
-            } catch {
-              setDiagnosticError("Diagnostics are ready below, but the browser could not copy them automatically.");
-            }
-          }}>Copy diagnostics</Button>
-          {copied ? <span role="status">Diagnostics copied.</span> : null}
-        </div>
-      </CardBody>
-    </Card>
-  );
 }
 
 function MediaAssetControl({
@@ -1834,17 +1605,25 @@ function AdminPageFrame({
   title,
   tabs,
   activeTab,
+  activeRoute,
   error,
   children
 }: {
   title: string;
   tabs?: AdminTab[];
   activeTab?: string;
+  activeRoute?: string;
   error: string;
   children: ReactNode;
 }) {
   return (
     <main className="byline-admin-main">
+      <AdminNavigation
+        urls={config?.urls || {}}
+        capabilities={config?.capabilities || {}}
+        features={config?.features || {}}
+        activeRoute={activeRoute}
+      />
       <header className="byline-admin-header">
         <h1>{title}</h1>
       </header>
@@ -1893,7 +1672,6 @@ function Screen({
   view,
   protocol,
   publication,
-  health,
   error,
   onPublicationSaved
 }: {
@@ -1902,25 +1680,50 @@ function Screen({
   view: string;
   protocol: ProtocolManifest | null;
   publication: PublicationConfig | null;
-  health: HealthPayload | null;
   error: string;
   onPublicationSaved: (publication: PublicationConfig) => void;
 }) {
   if (page === ADMIN_PAGE_SLUGS.dashboard) {
     return (
-      <AdminPageFrame title="Overview" error={error}>
-        <Dashboard publication={publication} health={health} />
+      <AdminPageFrame title="Home" activeRoute="/dashboard" error={error}>
+        <HomeApp
+          fetchers={createHomeFetchers(adminProtectedRequest, {
+            health: config?.healthPath,
+            contentHealth: config?.contentHealthPath,
+            feedback: config?.feedbackPath,
+            deployment: config?.deploymentPath
+          }, config?.capabilities)}
+          currentUserId={config?.currentUserId}
+          actionUrls={homeActionUrls()}
+        />
       </AdminPageFrame>
     );
   }
 
   if (page === ADMIN_PAGE_SLUGS.planning) {
     const activeTab = normalizeAdminTab(page, tab);
+    if (activeTab === "today") {
+      return (
+        <AdminPageFrame title="Today" tabs={planningTabs()} activeTab={activeTab} activeRoute="/home" error={error}>
+          <HomeApp
+            fetchers={createHomeFetchers(adminProtectedRequest, {
+              health: config?.healthPath,
+              contentHealth: config?.contentHealthPath,
+              feedback: config?.feedbackPath,
+              deployment: config?.deploymentPath
+            }, config?.capabilities)}
+            currentUserId={config?.currentUserId}
+            actionUrls={homeActionUrls()}
+          />
+        </AdminPageFrame>
+      );
+    }
     return (
-      <AdminPageFrame title="Planning" tabs={planningTabs()} activeTab={activeTab} error={error}>
+      <AdminPageFrame title="Planning" tabs={planningTabs()} activeTab={activeTab} activeRoute={`/planning/${activeTab}`} error={error}>
         <PlanningApp
           fetchers={createPlanningFetchers(adminProtectedRequest)}
-          initialView={planningViewForTab(activeTab)}
+          initialView={planningViewForTab(activeTab, config?.view)}
+          rememberStoriesView={activeTab === "stories" && !storiesViewFromRoute(config?.view)}
           currentUserId={config?.currentUserId}
         />
       </AdminPageFrame>
@@ -1930,7 +1733,7 @@ function Screen({
   if (page === ADMIN_PAGE_SLUGS.newsletters) {
     const activeTab = normalizeAdminTab(page, tab);
     return (
-      <AdminPageFrame title="Newsletters" tabs={newsletterTabs()} activeTab={activeTab} error={error}>
+      <AdminPageFrame title="Newsletters" tabs={newsletterTabs()} activeTab={activeTab} activeRoute={`/newsletters/${activeTab}`} error={error}>
         <NewsletterApp
           fetchers={createNewsletterFetchers(adminProtectedRequest)}
           initialView={activeTab === "settings" ? "settings" : "list"}
@@ -1943,7 +1746,7 @@ function Screen({
   if (page === ADMIN_PAGE_SLUGS.publication) {
     const activeTab = normalizeAdminTab(page, tab);
     return (
-      <AdminPageFrame title="Publication" tabs={publicationTabs()} activeTab={activeTab} error={error}>
+      <AdminPageFrame title="Publication" tabs={publicationTabs()} activeTab={activeTab} activeRoute={`/publication/${activeTab}`} error={error}>
         <PublicationSettings route={adminScreenRoute(page, activeTab)} publication={publication} onSaved={onPublicationSaved} />
       </AdminPageFrame>
     );
@@ -1951,7 +1754,7 @@ function Screen({
 
   if (page === ADMIN_PAGE_SLUGS.theme) {
     return (
-      <AdminPageFrame title="Theme" error={error}>
+      <AdminPageFrame title="Theme" activeRoute="/design/theme" error={error}>
         <PublicationSettings route="/design/theme" publication={publication} onSaved={onPublicationSaved} />
       </AdminPageFrame>
     );
@@ -1965,7 +1768,7 @@ function Screen({
       : availableTabs[0]?.id || "deployment";
     const route = adminScreenRoute(page, activeTab);
     return (
-      <AdminPageFrame title="Integrations" tabs={integrationTabs()} activeTab={activeTab} error={error}>
+      <AdminPageFrame title="Integrations" tabs={integrationTabs()} activeTab={activeTab} activeRoute={route} error={error}>
         {route === "/integrations/deployment" ? <DeploymentSettings /> : <DiscordSettings />}
       </AdminPageFrame>
     );
@@ -1975,8 +1778,28 @@ function Screen({
     const activeTab = normalizeAdminTab(page, tab);
     const route = adminScreenRoute(page, activeTab);
     return (
-      <AdminPageFrame title="Settings" tabs={settingsTabs()} activeTab={activeTab} error={error}>
-        {route === "/advanced/diagnostics" ? <Diagnostics /> : <OperationalInfo route={route} protocol={protocol} />}
+      <AdminPageFrame title="Settings" tabs={settingsTabs()} activeTab={activeTab} activeRoute={route} error={error}>
+        {route === "/advanced/diagnostics" ? (
+          <DoctorApp
+            fetchers={{
+              getDiagnostics: () => apiFetch<DoctorDiagnostics>({ path: config?.diagnosticsPath || "/byline/v1/admin/diagnostics" }),
+              runAction: (action: DoctorActionId) => apiFetch<DoctorActionResponse>({
+                path: config?.diagnosticsPath || "/byline/v1/admin/diagnostics",
+                method: "POST",
+                data: { action }
+              })
+            }}
+            urls={{
+              deployment: adminUrl(config?.urls.integrations?.deployment),
+              publication: adminUrl(config?.urls.publication?.identity),
+              branding: adminUrl(config?.urls.publication?.branding),
+              theme: adminUrl(config?.urls.theme),
+              studio: adminUrl(config?.urls.studio),
+              doctor: adminUrl(config?.urls.settings?.diagnostics)
+            }}
+            canManageIntegrations={Boolean(config?.capabilities.manageIntegrations)}
+          />
+        ) : <OperationalInfo route={route} protocol={protocol} />}
       </AdminPageFrame>
     );
   }
@@ -1991,11 +1814,13 @@ function Screen({
     if (activeView === "revisions") {
       return (
         <AdminPageFrame title="Studio" tabs={studioTabs} activeTab={activeView} error={error}>
-          <BylineDesignRevisions
-            canEdit={Boolean(config?.capabilities.editDesign)}
-            backUrl={adminUrl(config?.urls.dashboard)}
-            studioUrl={adminUrl(config?.urls.studio)}
-          />
+          <Suspense fallback={<LoadingState label="Loading Studio…" />}>
+            <BylineDesignRevisions
+              canEdit={Boolean(config?.capabilities.editDesign)}
+              backUrl={adminUrl(config?.urls.dashboard)}
+              studioUrl={adminUrl(config?.urls.studio)}
+            />
+          </Suspense>
         </AdminPageFrame>
       );
     }
@@ -2005,31 +1830,33 @@ function Screen({
     // and wp-admin padding are exactly what was squeezing the canvas into a
     // narrow column. Studio provides its own toolbar and its own way out.
     return (
-      <BylineStudio
-        canEdit={Boolean(config?.capabilities.editDesign)}
-        canPublish={Boolean(config?.capabilities.publishDesign)}
-        publicationTheme={publication?.appearance.theme || "weekly-wildcat"}
-        previewStylesheetUrl={config?.previewStylesheetUrl || ""}
-        tokenOverrides={publication?.appearance.tokenOverrides || {}}
-        backUrl={adminUrl(config?.urls.dashboard)}
-        features={{
-          polls: publication?.features.polls !== false,
-          events: publication?.features.events !== false,
-          sports: publication?.features.sports !== false,
-          newsletter: publication?.features.newsletter !== false
-        }}
-        publicationShortName={publication?.identity.shortName || "Newsroom"}
-        publicationName={publication?.identity.name}
-        organizationName={publication?.identity.organizationName}
-        contactHref={publication?.urls.contact}
-        social={publication?.social}
-        calendarHeading={
-          publication?.appearance.theme === "weekly-wildcat"
-            ? "At NSHS"
-            : `At ${publication?.identity.organizationName || publication?.identity.shortName || "school"}`
-        }
-        publicSiteUrl={publication?.urls.publicSite}
-      />
+      <Suspense fallback={<LoadingState label="Loading Studio…" />}>
+        <BylineStudio
+          canEdit={Boolean(config?.capabilities.editDesign)}
+          canPublish={Boolean(config?.capabilities.publishDesign)}
+          publicationTheme={publication?.appearance.theme || "weekly-wildcat"}
+          previewStylesheetUrl={config?.previewStylesheetUrl || ""}
+          tokenOverrides={publication?.appearance.tokenOverrides || {}}
+          backUrl={adminUrl(config?.urls.dashboard)}
+          features={{
+            polls: publication?.features.polls !== false,
+            events: publication?.features.events !== false,
+            sports: publication?.features.sports !== false,
+            newsletter: publication?.features.newsletter !== false
+          }}
+          publicationShortName={publication?.identity.shortName || "Newsroom"}
+          publicationName={publication?.identity.name}
+          organizationName={publication?.identity.organizationName}
+          contactHref={publication?.urls.contact}
+          social={publication?.social}
+          calendarHeading={
+            publication?.appearance.theme === "weekly-wildcat"
+              ? "At NSHS"
+              : `At ${publication?.identity.organizationName || publication?.identity.shortName || "school"}`
+          }
+          publicSiteUrl={publication?.urls.publicSite}
+        />
+      </Suspense>
     );
   }
 
@@ -2050,7 +1877,6 @@ function BylineAdminApp() {
   const view = normalizeStudioView(config?.view);
   const [protocol, setProtocol] = useState<ProtocolManifest | null>(null);
   const [publication, setPublication] = useState<PublicationConfig | null>(null);
-  const [health, setHealth] = useState<HealthPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const legacyHash = window.location.hash;
@@ -2068,32 +1894,14 @@ function BylineAdminApp() {
   const load = () => {
     setLoading(true);
     setError("");
-    setHealth(null);
-    const unavailableHealth: HealthPayload = {
-      summary: { status: "recommended", good: 0, recommended: 1, critical: 0 },
-      checks: [{
-        id: "health_endpoint",
-        label: "Byline health checks",
-        status: "recommended",
-        severity: "recommended",
-        summary: "Health checks are temporarily unavailable.",
-        description: "Open Diagnostics to retry the health report.",
-        remediationUrl: config?.urls.settings.diagnostics || ""
-      }]
-    };
-    const healthRequest: Promise<HealthPayload | null> = page === ADMIN_PAGE_SLUGS.dashboard && config?.capabilities.manage
-      ? apiFetch<HealthPayload>({ path: config.healthPath || "/byline/v1/admin/health" }).catch(() => unavailableHealth)
-      : Promise.resolve(null);
 
     return Promise.all([
       apiFetch<ProtocolManifest>({ path: config?.restPath || "/byline/v1/capabilities/protocol" }),
-      apiFetch<PublicationConfig>({ path: config?.publicationPath || "/byline/v1/publication" }),
-      healthRequest
+      apiFetch<PublicationConfig>({ path: config?.publicationPath || "/byline/v1/publication" })
     ])
-      .then(([manifest, publicationConfig, healthPayload]) => {
+      .then(([manifest, publicationConfig]) => {
         setProtocol(manifest);
         setPublication(publicationConfig);
-        setHealth(healthPayload);
       })
       .catch((requestError) => setError(safeRequestError(requestError, "Byline could not load its settings. Try again or open Diagnostics.")))
       .finally(() => setLoading(false));
@@ -2138,7 +1946,6 @@ function BylineAdminApp() {
         view={view}
         protocol={protocol}
         publication={publication}
-        health={health}
         error={error}
         onPublicationSaved={setPublication}
       />
