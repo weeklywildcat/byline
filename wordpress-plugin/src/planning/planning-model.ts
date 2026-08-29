@@ -257,6 +257,34 @@ export type PerformanceResponse = {
 
 export type ContentHealthSeverity = "error" | "warning" | "info";
 
+export type ContentHealthFixTarget =
+  | {
+      kind: "block";
+      blockPath: number[];
+      blockName?: string;
+      attribute?: string;
+      valueFingerprint?: string;
+    }
+  | {
+      kind: "featured-image";
+    }
+  | {
+      kind: "story-sidebar";
+      panel: "tasks" | "visuals" | "contributors" | "workflow";
+    }
+  | {
+      kind: "settings";
+      url: string;
+    };
+
+/** The subset of a live Gutenberg block tree needed for safe navigation. */
+export type ContentHealthEditorBlock = {
+  name: string;
+  clientId?: string;
+  attributes?: Record<string, unknown>;
+  innerBlocks?: ContentHealthEditorBlock[];
+};
+
 export type ContentHealthIssue = {
   id: string;
   type: string;
@@ -265,6 +293,7 @@ export type ContentHealthIssue = {
   story?: { id: number; title: string; editUrl: string } | null;
   lastCheckedAt?: string | null;
   fixUrl?: string | null;
+  fixTarget?: ContentHealthFixTarget | null;
 };
 
 export type ContentHealthResponse = {
@@ -272,6 +301,29 @@ export type ContentHealthResponse = {
   lastRunAt?: string | null;
   scannerAvailable?: boolean;
 };
+
+/**
+ * Resolve a durable structural locator against the editor's current block
+ * tree. Runtime clientIds are deliberately read only from the resolved block;
+ * they are never part of the locator itself.
+ */
+export function resolveContentHealthBlockPath(
+  blocks: ContentHealthEditorBlock[],
+  target: Extract<ContentHealthFixTarget, { kind: "block" }>
+): ContentHealthEditorBlock | null {
+  if (!Array.isArray(target.blockPath) || target.blockPath.length === 0) return null;
+
+  let current = blocks;
+  let block: ContentHealthEditorBlock | undefined;
+  for (const index of target.blockPath) {
+    if (!Number.isInteger(index) || index < 0 || index >= current.length) return null;
+    block = current[index];
+    current = Array.isArray(block.innerBlocks) ? block.innerBlocks : [];
+  }
+
+  if (!block || (target.blockName && block.name !== target.blockName)) return null;
+  return block;
+}
 
 export type CalendarEventType = "deadline" | "planned" | "scheduled" | "published";
 

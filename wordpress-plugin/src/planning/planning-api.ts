@@ -1,6 +1,7 @@
 import {
   normalizePlanningFilters,
   type ContentHealthResponse,
+  type ContentHealthFixTarget,
   type ContentHealthSeverity,
   type CoverageResponse,
   type FeedbackResponse,
@@ -43,6 +44,57 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function isSafeBlockName(value: unknown): value is string {
+  return typeof value === "string" && /^[a-z0-9-]+\/[a-z0-9-]+$/i.test(value) && value.length <= 120;
+}
+
+function isSafeAttributePath(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(value);
+}
+
+function isSafeFingerprint(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{8,64}$/i.test(value);
+}
+
+export function normalizeContentHealthFixTarget(value: unknown): ContentHealthFixTarget | null {
+  if (!isRecord(value) || typeof value.kind !== "string") return null;
+
+  if (value.kind === "block") {
+    if (!Array.isArray(value.blockPath) || value.blockPath.length === 0 || value.blockPath.length > 32) return null;
+    const blockPath = value.blockPath.map((item) => typeof item === "number" && Number.isInteger(item) && item >= 0 && item <= 10000 ? item : null);
+    if (blockPath.some((item) => item === null)) return null;
+    const target: Extract<ContentHealthFixTarget, { kind: "block" }> = {
+      kind: "block",
+      blockPath: blockPath as number[]
+    };
+    if (value.blockName !== undefined) {
+      if (!isSafeBlockName(value.blockName)) return null;
+      target.blockName = value.blockName;
+    }
+    if (value.attribute !== undefined) {
+      if (!isSafeAttributePath(value.attribute)) return null;
+      target.attribute = value.attribute;
+    }
+    if (value.valueFingerprint !== undefined) {
+      if (!isSafeFingerprint(value.valueFingerprint)) return null;
+      target.valueFingerprint = value.valueFingerprint.toLowerCase();
+    }
+    return target;
+  }
+
+  if (value.kind === "featured-image") return { kind: "featured-image" };
+
+  if (value.kind === "story-sidebar" && ["tasks", "visuals", "contributors", "workflow"].includes(String(value.panel))) {
+    return { kind: "story-sidebar", panel: value.panel as "tasks" | "visuals" | "contributors" | "workflow" };
+  }
+
+  if (value.kind === "settings" && typeof value.url === "string" && value.url.trim() !== "") {
+    return { kind: "settings", url: value.url };
+  }
+
+  return null;
+}
+
 /**
  * The Content Health service predates Planning and intentionally keeps its
  * detailed check vocabulary (`good`, `message`, `objectId`). Normalize that
@@ -73,7 +125,8 @@ export function normalizeContentHealthResponse(payload: unknown): ContentHealthR
       problem: String(value.problem ?? value.message ?? value.label ?? "Content issue"),
       story,
       lastCheckedAt: value.lastCheckedAt == null ? (value.checkedAt == null ? null : String(value.checkedAt)) : String(value.lastCheckedAt),
-      fixUrl: value.fixUrl == null ? null : String(value.fixUrl)
+      fixUrl: value.fixUrl == null ? null : String(value.fixUrl),
+      fixTarget: normalizeContentHealthFixTarget(value.fixTarget ?? (isRecord(value.data) ? value.data.fixTarget : null))
     }];
   });
   const checkedAt = source.lastRunAt ?? source.checkedAt;
