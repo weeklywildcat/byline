@@ -276,6 +276,35 @@ function byline_editorial_notification_task_title(int $task_id): string
     return '';
 }
 
+/** @return array<int,int> */
+function byline_editorial_notification_user_ids(): array
+{
+    if (!function_exists('get_users')) {
+        return [];
+    }
+
+    $ids = [];
+    for ($page = 1; $page <= 100; $page++) {
+        $users = get_users([
+            'number' => 200,
+            'paged' => $page,
+            'fields' => 'ID',
+        ]);
+        $users = is_array($users) ? $users : [];
+        foreach ($users as $user) {
+            $user_id = absint(is_object($user) ? ($user->ID ?? 0) : $user);
+            if ($user_id > 0) {
+                $ids[$user_id] = $user_id;
+            }
+        }
+        if (count($users) < 200) {
+            break;
+        }
+    }
+
+    return array_values($ids);
+}
+
 /** @return array<int,array<string,mixed>> */
 function byline_editorial_notification_due_tasks(int $user_id): array
 {
@@ -285,29 +314,36 @@ function byline_editorial_notification_due_tasks(int $user_id): array
 
     $now = function_exists('current_time') ? (int) current_time('timestamp', true) : time();
     $cutoff = $now + 86400;
-    $posts = get_posts([
-        'post_type' => defined('BYLINE_TASK_POST_TYPE') ? BYLINE_TASK_POST_TYPE : 'byline_task',
-        'post_status' => 'private',
-        'posts_per_page' => 200,
-        'no_found_rows' => true,
-    ]);
     $due = [];
 
-    foreach (is_array($posts) ? $posts : [] as $post) {
-        $task_id = absint(is_object($post) ? ($post->ID ?? 0) : 0);
-        if ($task_id <= 0) {
-            continue;
+    for ($page = 1; $page <= 100; $page++) {
+        $posts = get_posts([
+            'post_type' => defined('BYLINE_TASK_POST_TYPE') ? BYLINE_TASK_POST_TYPE : 'byline_task',
+            'post_status' => 'private',
+            'posts_per_page' => 200,
+            'paged' => $page,
+            'no_found_rows' => true,
+        ]);
+        $posts = is_array($posts) ? $posts : [];
+        foreach ($posts as $post) {
+            $task_id = absint(is_object($post) ? ($post->ID ?? 0) : 0);
+            if ($task_id <= 0) {
+                continue;
+            }
+            $task = byline_get_task($task_id);
+            if (!is_array($task) || (string) ($task['state'] ?? '') !== 'open' || absint($task['assigneeId'] ?? 0) !== $user_id) {
+                continue;
+            }
+            $due_at = strtotime((string) ($task['dueAt'] ?? ''));
+            if ($due_at === false || $due_at > $cutoff || !byline_editorial_notification_task_can_be_viewed($user_id, $task_id, absint($task['storyId'] ?? 0))) {
+                continue;
+            }
+            $task['_dueTimestamp'] = (int) $due_at;
+            $due[] = $task;
         }
-        $task = byline_get_task($task_id);
-        if (!is_array($task) || (string) ($task['state'] ?? '') !== 'open' || absint($task['assigneeId'] ?? 0) !== $user_id) {
-            continue;
+        if (count($posts) < 200) {
+            break;
         }
-        $due_at = strtotime((string) ($task['dueAt'] ?? ''));
-        if ($due_at === false || $due_at > $cutoff || !byline_editorial_notification_task_can_be_viewed($user_id, $task_id, absint($task['storyId'] ?? 0))) {
-            continue;
-        }
-        $task['_dueTimestamp'] = (int) $due_at;
-        $due[] = $task;
     }
 
     usort($due, static function (array $left, array $right): int {
@@ -433,15 +469,10 @@ function byline_editorial_notification_run_job(array $job)
 
 function byline_editorial_notification_queue_due_digest(): void
 {
-    if (!function_exists('get_users')) {
-        return;
-    }
-
-    $users = get_users(['number' => 200, 'fields' => 'ID']);
     $now = function_exists('current_time') ? (int) current_time('timestamp', true) : time();
     $bucket = gmdate('Y-m-d', $now);
-    foreach (is_array($users) ? $users : [] as $user) {
-        $user_id = absint(is_object($user) ? ($user->ID ?? 0) : $user);
+    foreach (byline_editorial_notification_user_ids() as $user_id) {
+        $user_id = absint($user_id);
         if ($user_id <= 0 || !byline_editorial_notification_is_enabled($user_id, 'due-digest')) {
             continue;
         }
@@ -537,14 +568,10 @@ function byline_editorial_notification_on_task_changed(int $task_id, $task, stri
 
 function byline_editorial_notification_on_build_failed(string $reason, $result): void
 {
-    if (!function_exists('get_users')) {
-        return;
-    }
     $bucket = gmdate('Y-m-d-H-i');
-    $users = get_users(['number' => 200, 'fields' => 'ID']);
     $actor_id = byline_editorial_notification_current_user_id();
-    foreach (is_array($users) ? $users : [] as $user) {
-        $recipient_id = absint(is_object($user) ? ($user->ID ?? 0) : $user);
+    foreach (byline_editorial_notification_user_ids() as $user_id) {
+        $recipient_id = absint($user_id);
         if ($recipient_id <= 0 || $recipient_id === $actor_id || !function_exists('user_can')) {
             continue;
         }
