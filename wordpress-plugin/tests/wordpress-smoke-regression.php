@@ -337,6 +337,11 @@ function wp_enqueue_script(string $handle, string $src = '', array $deps = [], $
     $byline_smoke_scripts[$handle] = $deps;
 }
 
+function wp_localize_script(string $handle, string $object_name, array $data): bool
+{
+    return true;
+}
+
 function wp_enqueue_style(string $handle, $src = '', array $deps = [], $ver = false): void
 {
 }
