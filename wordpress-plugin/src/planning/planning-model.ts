@@ -176,6 +176,38 @@ export type PlanningResponse = {
   nextPage?: string | null;
 };
 
+export type MediaAttachmentChecks = {
+  alt: boolean;
+  credit: boolean;
+  rights: boolean;
+};
+
+export type MediaAttachment = {
+  id: number;
+  title?: string;
+  url?: string | null;
+  previewUrl?: string | null;
+  mimeType?: string | null;
+  isImage?: boolean;
+  alt?: string;
+  creator?: string;
+  creditText?: string;
+  copyrightNotice?: string;
+  licenseUrl?: string;
+  acquireLicensePage?: string;
+  checks?: MediaAttachmentChecks;
+};
+
+export type MediaReadiness = {
+  attachmentIds?: number[];
+  invalidAttachmentIds?: number[];
+  missingAltIds?: number[];
+  missingCreditIds?: number[];
+  missingRightsIds?: number[];
+  featuredAttachmentId?: number;
+  ready?: boolean;
+};
+
 export type MediaRequest = {
   id: number;
   story: { id: number; title: string; editUrl: string };
@@ -186,6 +218,9 @@ export type MediaRequest = {
   notes: string;
   legacyNotes?: string;
   attachmentIds: number[];
+  attachments?: MediaAttachment[];
+  invalidAttachmentIds?: number[];
+  mediaReadiness?: MediaReadiness | null;
   featuredAttachmentId?: number | null;
 };
 
@@ -194,6 +229,38 @@ export type MediaDeskResponse = {
   assignees?: PlanningPerson[];
   capabilities?: Pick<PlanningCapabilities, "canAssign" | "canManageMedia">;
 };
+
+function mediaAttachmentId(value: unknown): number | null {
+  const id = typeof value === "number"
+    ? value
+    : typeof value === "string" && /^\d+$/.test(value.trim())
+      ? Number(value)
+      : 0;
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+export function normalizeMediaAttachmentIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+
+  const ids: number[] = [];
+  value.forEach((item) => {
+    const id = mediaAttachmentId(item && typeof item === "object" ? (item as Record<string, unknown>).id ?? (item as Record<string, unknown>).attachmentId : item);
+    if (id !== null && !ids.includes(id)) ids.push(id);
+  });
+  return ids;
+}
+
+export function mergeMediaAttachmentIds(current: unknown, additions: unknown): number[] {
+  return normalizeMediaAttachmentIds([
+    ...normalizeMediaAttachmentIds(current),
+    ...normalizeMediaAttachmentIds(additions)
+  ]);
+}
+
+export function removeMediaAttachmentId(current: unknown, attachmentId: unknown): number[] {
+  const id = mediaAttachmentId(attachmentId);
+  return id === null ? normalizeMediaAttachmentIds(current) : normalizeMediaAttachmentIds(current).filter((item) => item !== id);
+}
 
 export type CoverageStatus = "active" | "upcoming" | "past" | "draft" | "archived";
 
