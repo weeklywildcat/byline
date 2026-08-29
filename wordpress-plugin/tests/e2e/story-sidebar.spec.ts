@@ -279,6 +279,11 @@ test.describe("Gutenberg Story sidebar", () => {
         response.request().method() === "POST"
         && response.url().includes("/byline/v1/admin/deployment/trigger")
       ));
+      const retryDistributionResponsePromise = page.waitForResponse((response) => (
+        response.request().method() === "GET"
+        && response.url().includes("/byline/v1/editorial/stories/")
+        && response.url().includes("/distribution")
+      ));
       await retry.click();
       const triggerResponse = await triggerResponsePromise;
       expect(triggerResponse.ok(), `Deployment retry failed with HTTP ${triggerResponse.status()}.`).toBe(true);
@@ -287,6 +292,10 @@ test.describe("Gutenberg Story sidebar", () => {
       // Retry participates in the durable lifecycle, so the panel leaves the
       // failed state immediately instead of waiting on an untracked hook.
       await expect(page.locator(".byline-postpublish-lifecycle")).toContainText(/building|queued/i);
+      // PostPublishLifecycle refreshes after the retry. Drain that request
+      // before removing the route so a late fulfill cannot race fixture
+      // teardown and make an otherwise passing test flaky.
+      await retryDistributionResponsePromise;
       await expect.poll(() => triggerRequests.length).toBe(1);
 
       const jobs = await adminSession.rest<{ jobs?: Array<{ id?: number; jobId?: string; type?: string }> }>("/byline/v1/admin/jobs");

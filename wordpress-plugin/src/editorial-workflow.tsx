@@ -1133,8 +1133,13 @@ function EditorialNewsroomPanels({
   const activePostIdRef = useRef(postId);
   activePostIdRef.current = postId;
 
-  useEffect(() => () => {
-    mountedRef.current = false;
+  useEffect(() => {
+    // Gutenberg can replay effects while mounting the editor. Re-arm the
+    // guard on every real/effect remount before accepting async responses.
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const runPanel = useCallback(<T,>(
@@ -1409,8 +1414,11 @@ function PrePublishReadinessPanel({ postId, client }: { postId: number; client: 
   const [error, setError] = useState<unknown>(null);
   const mountedRef = useRef(true);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const load = useCallback(async (refresh = false) => {
@@ -1537,8 +1545,11 @@ function PostPublishLifecycle({
   const mountedRef = useRef(true);
   const pollAttemptsRef = useRef(0);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const load = useCallback(async () => {
