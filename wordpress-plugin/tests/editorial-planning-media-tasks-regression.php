@@ -45,9 +45,9 @@ $editorial_test_posts = [];
 $editorial_test_meta = [];
 $editorial_test_user_meta = [];
 $editorial_test_users = [
-    1 => ['name' => 'Editor', 'editor' => true],
-    2 => ['name' => 'Writer', 'editor' => false],
-    3 => ['name' => 'Second Writer', 'editor' => false],
+    1 => ['name' => 'Editor', 'editor' => true, 'read_media' => true],
+    2 => ['name' => 'Writer', 'editor' => false, 'read_media' => true],
+    3 => ['name' => 'Second Writer', 'editor' => false, 'read_media' => true],
 ];
 $editorial_test_current_user = 2;
 $editorial_test_thumbnails = [];
@@ -156,7 +156,15 @@ function editorial_test_user_can(int $user_id, string $capability, ...$args): bo
     if ($capability === 'edit_post') {
         $post_id = absint($args[0] ?? 0);
         $post = $editorial_test_posts[$post_id] ?? null;
+        if ($post instanceof WP_Post && $post->post_type === 'attachment') {
+            return !empty($profile['editor']) && !empty($profile['read_media']);
+        }
         return $post instanceof WP_Post && ((int) $post->post_author === $user_id || !empty($profile['editor']));
+    }
+    if ($capability === 'read_post') {
+        $post_id = absint($args[0] ?? 0);
+        $post = $editorial_test_posts[$post_id] ?? null;
+        return $post instanceof WP_Post && ($post->post_type !== 'attachment' || !empty($profile['read_media']));
     }
     return false;
 }
@@ -245,10 +253,37 @@ function wp_attachment_is_image(int $attachment_id): bool
     return $attachment_id === 100;
 }
 
+function wp_get_attachment_image_alt(int $attachment_id): string
+{
+    return (string) get_post_meta($attachment_id, '_wp_attachment_image_alt', true);
+}
+
+function wp_get_attachment_metadata(int $attachment_id): array
+{
+    return (array) get_post_meta($attachment_id, '_wp_attachment_metadata', true);
+}
+
+function wp_get_attachment_url(int $attachment_id): string
+{
+    return 'https://media.example.test/' . $attachment_id . '.jpg';
+}
+
+function wp_get_attachment_image_src(int $attachment_id, string $size): array
+{
+    return ['https://media.example.test/' . $attachment_id . '-' . $size . '.jpg', 640, 360, true];
+}
+
 function set_post_thumbnail(int $post_id, int $attachment_id): bool
 {
     global $editorial_test_thumbnails;
     $editorial_test_thumbnails[$post_id] = $attachment_id;
+    return true;
+}
+
+function delete_post_thumbnail(int $post_id): bool
+{
+    global $editorial_test_thumbnails;
+    unset($editorial_test_thumbnails[$post_id]);
     return true;
 }
 
@@ -389,6 +424,7 @@ function get_posts(array $args = []): array
 require __DIR__ . '/../includes/editorial/workflow.php';
 require __DIR__ . '/../includes/editorial/planning.php';
 require __DIR__ . '/../includes/editorial/media.php';
+require __DIR__ . '/../includes/editorial/readiness.php';
 require __DIR__ . '/../includes/editorial/tasks.php';
 
 $story = new WP_Post();
@@ -437,6 +473,8 @@ editorial_test_assert(byline_editorial_delete_saved_view($view['id'], 2), 'A use
 // Structured media preserves the legacy note and sanitizes the structured one.
 $media = byline_get_editorial_media_request(10);
 editorial_test_assert($media['isLegacy'] === true && strpos($media['notes'], '<script>') === false, 'Legacy visual notes were not safely exposed as a fallback.');
+$assigned = byline_set_editorial_media_request(10, ['type' => 'photo', 'assigneeId' => 2], 2);
+editorial_test_assert(is_array($assigned) && $assigned['status'] === 'assigned', 'Assigning a media request did not reconcile it to assigned.');
 $media = byline_set_editorial_media_request(10, [
     'type' => 'photo',
     'status' => 'needed',
@@ -445,12 +483,66 @@ $media = byline_set_editorial_media_request(10, [
     'notes' => 'Use <b>the field</b>',
     'attachmentIds' => [100, 100],
 ], 2);
-editorial_test_assert(is_array($media) && $media['attachmentIds'] === [100] && strpos($media['notes'], '<b>') === false, 'Structured media request did not sanitize or deduplicate attachments.');
+editorial_test_assert(is_array($media) && $media['attachmentIds'] === [100] && $media['status'] === 'uploaded' && strpos($media['notes'], '<b>') === false, 'Structured media request did not sanitize, deduplicate, or reconcile linked attachments.');
 editorial_test_assert(get_post_meta(10, '_wwh_story_visuals', true) !== '', 'Structured media editing destroyed the legacy visual-needs field.');
+editorial_test_assert(byline_set_editorial_media_request(10, ['status' => 'in-progress'], 2)['attachmentIds'] === [100], 'A partial media update discarded linked attachments.');
+$before_invalid_media = get_post_meta(10, BYLINE_EDITORIAL_MEDIA_REQUEST_META, true);
+$invalid_media = byline_set_editorial_media_request(10, ['attachmentIds' => [999, 10]], 2);
+editorial_test_assert(is_wp_error($invalid_media) && $invalid_media->code === 'byline_editorial_media_invalid_attachment', 'Invalid or non-attachment media IDs were accepted.');
+editorial_test_assert(get_post_meta(10, BYLINE_EDITORIAL_MEDIA_REQUEST_META, true) === $before_invalid_media, 'An invalid media update partially changed the request.');
+$invalid_reconciliation = byline_editorial_reconcile_media_request_status(10, ['type' => 'photo', 'status' => 'needed', 'attachmentIds' => [999]], ['userId' => 2]);
+editorial_test_assert(is_wp_error($invalid_reconciliation) && $invalid_reconciliation->code === 'byline_editorial_media_invalid_attachment', 'The central media status reconciler silently discarded an invalid attachment.');
+
+$non_image_attachment = new WP_Post();
+$non_image_attachment->ID = 101;
+$non_image_attachment->post_type = 'attachment';
+$non_image_attachment->post_title = 'Scoreboard video';
+$editorial_test_posts[101] = $non_image_attachment;
+$linked_extra = byline_editorial_link_media_request_attachment(10, 101, 2);
+editorial_test_assert(is_array($linked_extra) && $linked_extra['attachmentIds'] === [100, 101] && $linked_extra['status'] === 'uploaded', 'Linking a second Media Library item did not reconcile the request to uploaded.');
+$unlinked_extra = byline_editorial_unlink_media_request_attachment(10, 101, 2);
+editorial_test_assert(is_array($unlinked_extra) && $unlinked_extra['attachmentIds'] === [100], 'Unlinking one media item removed the wrong attachments.');
 editorial_test_assert(byline_set_editorial_media_request(10, ['type' => 'photo', 'assigneeId' => 3], 2) instanceof WP_Error, 'A writer could assign media work to another user.');
 $editorial_test_current_user = 1;
 editorial_test_assert(is_array(byline_set_editorial_media_request(10, ['type' => 'photo', 'status' => 'selected', 'assigneeId' => 3, 'attachmentIds' => [100]], 1)), 'An editor could not assign structured media work.');
-editorial_test_assert(!is_wp_error(byline_editorial_set_media_request_featured_image(10, 100, 1)) && get_post_thumbnail_id(10) === 100, 'A linked media item could not become the featured image.');
+editorial_test_assert(!is_wp_error(byline_editorial_set_media_request_featured_image(10, 100, 1)) && get_post_thumbnail_id(10) === 100 && byline_get_editorial_media_request(10)['status'] === 'selected', 'A linked media item could not become the featured image or selected state.');
+editorial_test_assert(is_array(byline_editorial_complete_media_request(10, 1)) && byline_get_editorial_media_request(10)['status'] === 'done', 'Explicit media completion did not persist the done state.');
+
+$readiness_before_metadata = byline_get_story_readiness(10);
+$readiness_media = [];
+foreach ($readiness_before_metadata['checks'] as $check) {
+    $readiness_media[$check['id']] = $check;
+}
+editorial_test_assert($readiness_media['visual-requirement']['status'] === 'pass', 'A completed media request did not satisfy visual readiness.');
+editorial_test_assert($readiness_media['media-attachment-alt']['status'] === 'warning' && $readiness_media['media-attachment-credit']['status'] === 'warning' && $readiness_media['media-attachment-rights']['status'] === 'warning', 'Media readiness did not surface missing attachment metadata.');
+update_post_meta(100, '_wp_attachment_image_alt', 'Students at the field');
+update_post_meta(100, '_ww_image_credit_text', 'Newsroom photo');
+update_post_meta(100, '_ww_image_copyright_notice', '© Byline');
+$readiness_after_metadata = byline_get_editorial_media_request(10);
+editorial_test_assert($readiness_after_metadata['mediaReadiness']['ready'] === true, 'Media readiness did not reuse the canonical attachment credit, alt, and rights fields.');
+$stored_media = get_post_meta(10, BYLINE_EDITORIAL_MEDIA_REQUEST_META, true);
+$corrupt_media = $stored_media;
+$corrupt_media['attachmentIds'] = [100, 999];
+update_post_meta(10, BYLINE_EDITORIAL_MEDIA_REQUEST_META, $corrupt_media);
+$invalid_readiness = byline_get_story_readiness(10);
+$invalid_readiness_by_id = [];
+foreach ($invalid_readiness['checks'] as $check) {
+    $invalid_readiness_by_id[$check['id']] = $check;
+}
+editorial_test_assert($invalid_readiness_by_id['media-invalid-attachment']['status'] === 'warning' && $invalid_readiness_by_id['visual-requirement']['status'] === 'warning', 'Readiness did not detect an invalid attachment left in stored media state.');
+update_post_meta(10, BYLINE_EDITORIAL_MEDIA_REQUEST_META, $stored_media);
+
+$unlinked_featured = byline_editorial_unlink_media_request_attachment(10, 100, 1);
+editorial_test_assert(is_array($unlinked_featured) && $unlinked_featured['attachmentIds'] === [] && $unlinked_featured['status'] === 'assigned' && get_post_thumbnail_id(10) === 0, 'Unlinking the featured attachment did not clear the thumbnail or reopen the request.');
+$linked_non_image = byline_editorial_link_media_request_attachment(10, 101, 1);
+editorial_test_assert(is_array($linked_non_image) && byline_editorial_set_media_request_featured_image(10, 101, 1) instanceof WP_Error, 'A non-image attachment could be featured.');
+byline_editorial_unlink_media_request_attachment(10, 101, 1);
+$editorial_test_current_user = 3;
+editorial_test_assert(byline_set_editorial_media_request(10, ['attachmentIds' => [100]], 3) instanceof WP_Error, 'A user without story edit capability could change media links.');
+$editorial_test_users[3]['read_media'] = false;
+editorial_test_assert(!byline_editorial_media_attachment_is_allowed(100, 10, 3), 'A user without normal attachment read capability could link Media Library content.');
+$editorial_test_users[3]['read_media'] = true;
+$editorial_test_current_user = 2;
 
 // Linked tasks follow story capabilities; unlinked newsroom work and cross-user
 // assignment remain editor-only.

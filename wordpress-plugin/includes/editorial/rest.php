@@ -97,7 +97,7 @@ function byline_editorial_rest_payload(int $post_id): array
     $post = get_post($post_id);
     $author = $post instanceof WP_Post ? get_user_by('id', (int) $post->post_author) : false;
     $media = function_exists('byline_get_editorial_media_request')
-        ? byline_get_editorial_media_request($post_id)
+        ? byline_get_editorial_media_request($post_id, byline_editorial_rest_current_user_id())
         : [];
     $corrections = function_exists('byline_list_corrections')
         ? byline_list_corrections($post_id, false)
@@ -274,7 +274,7 @@ function byline_editorial_rest_bootstrap_payload(int $post_id): array
     $post = get_post($post_id);
     $author = $post instanceof WP_Post ? get_user_by('id', (int) $post->post_author) : false;
     $media = function_exists('byline_get_editorial_media_request')
-        ? byline_get_editorial_media_request($post_id)
+        ? byline_get_editorial_media_request($post_id, byline_editorial_rest_current_user_id())
         : [];
     $readiness = function_exists('byline_get_story_readiness')
         ? byline_get_story_readiness($post_id)
@@ -1013,7 +1013,7 @@ function byline_editorial_rest_delete_view(WP_REST_Request $request)
 
 function byline_editorial_rest_get_media(WP_REST_Request $request)
 {
-    return rest_ensure_response(byline_get_editorial_media_request(absint($request->get_param('id'))));
+    return rest_ensure_response(byline_get_editorial_media_request(absint($request->get_param('id')), byline_editorial_rest_current_user_id()));
 }
 
 /** @return array<string,mixed> */
@@ -1022,6 +1022,8 @@ function byline_editorial_rest_media_item(array $row): array
     $request = is_array($row['request'] ?? null) ? $row['request'] : [];
     $story_id = absint($row['storyId'] ?? 0);
     $featured = is_array($row['featuredImage'] ?? null) ? $row['featuredImage'] : [];
+    $media_readiness = is_array($request['mediaReadiness'] ?? null) ? $request['mediaReadiness'] : [];
+    $featured_attachment_id = absint($media_readiness['featuredAttachmentId'] ?? 0);
 
     return [
         // Media requests are additive story metadata, so the story ID is the
@@ -1039,7 +1041,14 @@ function byline_editorial_rest_media_item(array $row): array
         'notes' => (string) ($request['notes'] ?? ''),
         'legacyNotes' => (string) ($request['legacyNotes'] ?? ''),
         'attachmentIds' => array_values(array_map('absint', (array) ($request['attachmentIds'] ?? []))),
-        'featuredAttachmentId' => !empty($featured['isLinked']) ? absint($featured['attachmentId'] ?? 0) : null,
+        // These fields are additive and remain inside the protected editorial
+        // response. Attachment ownership and metadata stay in WordPress Media.
+        'attachments' => is_array($request['attachments'] ?? null) ? $request['attachments'] : [],
+        'invalidAttachmentIds' => array_values(array_map('absint', (array) ($request['invalidAttachmentIds'] ?? []))),
+        'mediaReadiness' => is_array($request['mediaReadiness'] ?? null) ? $request['mediaReadiness'] : null,
+        'featuredAttachmentId' => $featured_attachment_id > 0
+            ? $featured_attachment_id
+            : (!empty($featured['isLinked']) ? absint($featured['attachmentId'] ?? 0) : null),
     ];
 }
 
@@ -1067,7 +1076,14 @@ function byline_editorial_rest_update_media(WP_REST_Request $request)
 {
     $story_id = absint($request->get_param('id'));
     $body = byline_editorial_rest_body($request);
-    $result = byline_set_editorial_media_request($story_id, $body);
+    // Keep the existing update route useful for the Media Desk controls while
+    // delegating featured selection to the same canonical helper as the
+    // dedicated backwards-compatible featured route.
+    if (array_key_exists('featuredAttachmentId', $body) && absint($body['featuredAttachmentId']) > 0) {
+        $result = byline_editorial_set_media_request_featured_image($story_id, absint($body['featuredAttachmentId']));
+    } else {
+        $result = byline_set_editorial_media_request($story_id, $body);
+    }
 
     return is_wp_error($result) ? $result : rest_ensure_response($result);
 }
