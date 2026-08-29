@@ -1,0 +1,13 @@
+{
+  "core": "WordPress/WordPress#7.1",
+  "plugins": ["./wordpress-plugin"],
+  "mappings": {
+    "wp-content/mu-plugins": "./wordpress-plugin/tests/e2e/wp-fixtures"
+  },
+  "port": 8888,
+  "testsEnvironment": false,
+  "config": {
+    "WP_DEBUG": true,
+    "SCRIPT_DEBUG": true
+  }
+}

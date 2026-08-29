@@ -176,6 +176,38 @@ export type PlanningResponse = {
   nextPage?: string | null;
 };
 
+export type MediaAttachmentChecks = {
+  alt: boolean;
+  credit: boolean;
+  rights: boolean;
+};
+
+export type MediaAttachment = {
+  id: number;
+  title?: string;
+  url?: string | null;
+  previewUrl?: string | null;
+  mimeType?: string | null;
+  isImage?: boolean;
+  alt?: string;
+  creator?: string;
+  creditText?: string;
+  copyrightNotice?: string;
+  licenseUrl?: string;
+  acquireLicensePage?: string;
+  checks?: MediaAttachmentChecks;
+};
+
+export type MediaReadiness = {
+  attachmentIds?: number[];
+  invalidAttachmentIds?: number[];
+  missingAltIds?: number[];
+  missingCreditIds?: number[];
+  missingRightsIds?: number[];
+  featuredAttachmentId?: number;
+  ready?: boolean;
+};
+
 export type MediaRequest = {
   id: number;
   story: { id: number; title: string; editUrl: string };
@@ -186,6 +218,9 @@ export type MediaRequest = {
   notes: string;
   legacyNotes?: string;
   attachmentIds: number[];
+  attachments?: MediaAttachment[];
+  invalidAttachmentIds?: number[];
+  mediaReadiness?: MediaReadiness | null;
   featuredAttachmentId?: number | null;
 };
 
@@ -194,6 +229,38 @@ export type MediaDeskResponse = {
   assignees?: PlanningPerson[];
   capabilities?: Pick<PlanningCapabilities, "canAssign" | "canManageMedia">;
 };
+
+function mediaAttachmentId(value: unknown): number | null {
+  const id = typeof value === "number"
+    ? value
+    : typeof value === "string" && /^\d+$/.test(value.trim())
+      ? Number(value)
+      : 0;
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+export function normalizeMediaAttachmentIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+
+  const ids: number[] = [];
+  value.forEach((item) => {
+    const id = mediaAttachmentId(item && typeof item === "object" ? (item as Record<string, unknown>).id ?? (item as Record<string, unknown>).attachmentId : item);
+    if (id !== null && !ids.includes(id)) ids.push(id);
+  });
+  return ids;
+}
+
+export function mergeMediaAttachmentIds(current: unknown, additions: unknown): number[] {
+  return normalizeMediaAttachmentIds([
+    ...normalizeMediaAttachmentIds(current),
+    ...normalizeMediaAttachmentIds(additions)
+  ]);
+}
+
+export function removeMediaAttachmentId(current: unknown, attachmentId: unknown): number[] {
+  const id = mediaAttachmentId(attachmentId);
+  return id === null ? normalizeMediaAttachmentIds(current) : normalizeMediaAttachmentIds(current).filter((item) => item !== id);
+}
 
 export type CoverageStatus = "active" | "upcoming" | "past" | "draft" | "archived";
 
@@ -257,6 +324,34 @@ export type PerformanceResponse = {
 
 export type ContentHealthSeverity = "error" | "warning" | "info";
 
+export type ContentHealthFixTarget =
+  | {
+      kind: "block";
+      blockPath: number[];
+      blockName?: string;
+      attribute?: string;
+      valueFingerprint?: string;
+    }
+  | {
+      kind: "featured-image";
+    }
+  | {
+      kind: "story-sidebar";
+      panel: "tasks" | "visuals" | "contributors" | "workflow";
+    }
+  | {
+      kind: "settings";
+      url: string;
+    };
+
+/** The subset of a live Gutenberg block tree needed for safe navigation. */
+export type ContentHealthEditorBlock = {
+  name: string;
+  clientId?: string;
+  attributes?: Record<string, unknown>;
+  innerBlocks?: ContentHealthEditorBlock[];
+};
+
 export type ContentHealthIssue = {
   id: string;
   type: string;
@@ -265,6 +360,7 @@ export type ContentHealthIssue = {
   story?: { id: number; title: string; editUrl: string } | null;
   lastCheckedAt?: string | null;
   fixUrl?: string | null;
+  fixTarget?: ContentHealthFixTarget | null;
 };
 
 export type ContentHealthResponse = {
@@ -272,6 +368,29 @@ export type ContentHealthResponse = {
   lastRunAt?: string | null;
   scannerAvailable?: boolean;
 };
+
+/**
+ * Resolve a durable structural locator against the editor's current block
+ * tree. Runtime clientIds are deliberately read only from the resolved block;
+ * they are never part of the locator itself.
+ */
+export function resolveContentHealthBlockPath(
+  blocks: ContentHealthEditorBlock[],
+  target: Extract<ContentHealthFixTarget, { kind: "block" }>
+): ContentHealthEditorBlock | null {
+  if (!Array.isArray(target.blockPath) || target.blockPath.length === 0) return null;
+
+  let current = blocks;
+  let block: ContentHealthEditorBlock | undefined;
+  for (const index of target.blockPath) {
+    if (!Number.isInteger(index) || index < 0 || index >= current.length) return null;
+    block = current[index];
+    current = Array.isArray(block.innerBlocks) ? block.innerBlocks : [];
+  }
+
+  if (!block || (target.blockName && block.name !== target.blockName)) return null;
+  return block;
+}
 
 export type CalendarEventType = "deadline" | "planned" | "scheduled" | "published";
 
@@ -513,6 +632,20 @@ export function applyPlanningMove(
   const target = statuses.find((status) => status.id === targetStatus);
   if (!target) return { moved: false, story, error: "That workflow stage is not available for this story." };
   return { moved: true, story: { ...story, workflow: target } };
+}
+
+/**
+ * Replace one story without restoring a captured Planning collection. The
+ * optional identity guard lets an in-flight mutation avoid overwriting a
+ * newer update for the same story when its response arrives late.
+ */
+export function replacePlanningStory(
+  stories: readonly PlanningStory[],
+  storyId: number,
+  nextStory: PlanningStory,
+  expectedCurrent?: PlanningStory
+): PlanningStory[] {
+  return stories.map((story) => story.id === storyId && (!expectedCurrent || story === expectedCurrent) ? nextStory : story);
 }
 
 export function filterSavedViewsForUser(views: SavedPlanningView[], ownerId: number): SavedPlanningView[] {

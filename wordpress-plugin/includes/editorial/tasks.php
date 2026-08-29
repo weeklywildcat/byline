@@ -291,7 +291,7 @@ function byline_create_task(array $input, ?int $user_id = null)
 
     $task = byline_get_task($task_id);
     if (function_exists('do_action')) {
-        do_action('byline_editorial_task_changed', $task_id, $task, 'created');
+        do_action('byline_editorial_task_changed', $task_id, $task, 'created', $input);
     }
 
     return $task;
@@ -378,7 +378,7 @@ function byline_update_task(int $task_id, array $input, ?int $user_id = null)
     $task = byline_get_task($task_id);
     if (function_exists('do_action')) {
         $operation = (($task['state'] ?? '') === 'completed') ? 'completed' : 'changed';
-        do_action('byline_editorial_task_changed', $task_id, $task, $operation);
+        do_action('byline_editorial_task_changed', $task_id, $task, $operation, $input);
     }
 
     return $task;

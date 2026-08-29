@@ -4,7 +4,10 @@ import { __ } from "@wordpress/i18n";
 
 import {
   exactPlanningDate,
+  mergeMediaAttachmentIds,
+  removeMediaAttachmentId,
   relativePlanningDate,
+  type MediaAttachment,
   type MediaDeskResponse,
   type MediaRequest,
   type OptionalResource,
@@ -12,6 +15,7 @@ import {
   type PlanningVisualStatus,
   type PlanningVisualType
 } from "./planning-model";
+import { describeMediaDeskError } from "./media-desk-errors";
 import { PlanningDateValue, PlanningEmpty, PlanningNotice, PlanningStatusBadge, PlanningUnavailable, StoryLink, ViewHeader } from "./planning-ui";
 
 export type MediaDeskProps = {
@@ -75,8 +79,38 @@ function RequestCard({
     try {
       await updateRequest(request.id, changes);
     } catch (reason) {
-      setError(reason && typeof reason === "object" && "message" in reason ? String((reason as { message: unknown }).message) : __("Media request could not be updated.", "weekly-wildcat-headless"));
+      setError(describeMediaDeskError(reason));
     }
+  };
+
+  const attachments: MediaAttachment[] = request.attachments?.length
+    ? request.attachments
+    : request.attachmentIds.map((id) => ({ id }));
+  const featuredId = request.featuredAttachmentId || request.mediaReadiness?.featuredAttachmentId || 0;
+
+  const chooseMedia = () => {
+    if (!canManage || !updateRequest || !window.wp?.media) return;
+
+    const frame = window.wp.media({
+      title: __("Link WordPress media", "weekly-wildcat-headless"),
+      button: { text: __("Link selected media", "weekly-wildcat-headless") },
+      multiple: true
+    });
+    frame.on("select", () => {
+      const selection = frame.state().get("selection") as unknown as {
+        toJSON?: () => unknown;
+        models?: Array<{ get?: (key: string) => unknown; toJSON?: () => Record<string, unknown> }>;
+      };
+      const selected = typeof selection.toJSON === "function"
+        ? selection.toJSON()
+        : (selection.models || []).map((model) => typeof model.toJSON === "function" ? model.toJSON() : model.get?.("id"));
+      void update({ attachmentIds: mergeMediaAttachmentIds(request.attachmentIds, selected) });
+    });
+    frame.open();
+  };
+
+  const unlinkMedia = (attachmentId: number) => {
+    void update({ attachmentIds: removeMediaAttachmentId(request.attachmentIds, attachmentId) });
   };
 
   const story = { id: request.story.id, title: request.story.title, editUrl: request.story.editUrl, authors: [], writer: null, editor: null, workflow: { id: "", label: "", group: "main" as const, selectable: false }, wordpressState: { id: "", label: "", isPublished: false, isScheduled: false }, deadline: null, plannedPublication: null, modifiedAt: null, visual: { type: request.type, status: request.status }, openTaskCount: 0, coverage: [], featuredImage: null };
@@ -96,8 +130,52 @@ function RequestCard({
       <dl className="byline-planning-media-meta">
         <div><dt>{__("Due", "weekly-wildcat-headless")}</dt><dd><PlanningDateValue value={request.dueAt} relative empty={__("No due date", "weekly-wildcat-headless")} /></dd></div>
         <div><dt>{__("Attachments", "weekly-wildcat-headless")}</dt><dd>{request.attachmentIds.length ? request.attachmentIds.length : __("None selected", "weekly-wildcat-headless")}</dd></div>
-        <div><dt>{__("Featured", "weekly-wildcat-headless")}</dt><dd>{request.featuredAttachmentId ? __("Linked visual", "weekly-wildcat-headless") : __("Not linked", "weekly-wildcat-headless")}</dd></div>
+        <div><dt>{__("Featured", "weekly-wildcat-headless")}</dt><dd>{featuredId ? __("Linked visual", "weekly-wildcat-headless") : __("Not linked", "weekly-wildcat-headless")}</dd></div>
       </dl>
+      <div className="byline-planning-media-attachments">
+        {attachments.length ? attachments.map((attachment) => {
+          const isFeatured = featuredId === attachment.id;
+          const checks = attachment.checks;
+          return (
+            <div className="byline-planning-media-attachment" key={attachment.id}>
+              {attachment.previewUrl ? <img src={attachment.previewUrl} alt={attachment.alt || ""} width={64} height={48} /> : null}
+              <div>
+                <strong>{attachment.title || `Media ${attachment.id}`}</strong>
+                <div className="byline-planning-help">
+                  {checks && !checks.alt && __("Alt text missing", "weekly-wildcat-headless")}
+                  {checks && !checks.alt && (!checks.credit || !checks.rights) ? " · " : ""}
+                  {checks && !checks.credit && __("Credit missing", "weekly-wildcat-headless")}
+                  {checks && !checks.credit && !checks.rights ? " · " : ""}
+                  {checks && !checks.rights && __("Rights missing", "weekly-wildcat-headless")}
+                  {checks && checks.alt && checks.credit && checks.rights ? __("Metadata ready", "weekly-wildcat-headless") : null}
+                </div>
+              </div>
+              {attachment.url ? <a href={attachment.url} target="_blank" rel="noreferrer">{__("Preview", "weekly-wildcat-headless")}</a> : null}
+              {attachment.isImage ? (
+                <Button
+                  variant={isFeatured ? "primary" : "secondary"}
+                  disabled={!canManage || !updateRequest || isSaving}
+                  onClick={() => void update({ featuredAttachmentId: attachment.id })}
+                >
+                  {isFeatured ? __("Featured", "weekly-wildcat-headless") : __("Set featured", "weekly-wildcat-headless")}
+                </Button>
+              ) : null}
+              <Button
+                variant="tertiary"
+                isDestructive
+                disabled={!canManage || !updateRequest || isSaving}
+                onClick={() => unlinkMedia(attachment.id)}
+              >
+                {__("Unlink", "weekly-wildcat-headless")}
+              </Button>
+            </div>
+          );
+        }) : null}
+        {request.invalidAttachmentIds?.length ? <PlanningNotice status="warning">{__("Some linked media is no longer available. Relink the request.", "weekly-wildcat-headless")}</PlanningNotice> : null}
+        <Button variant="secondary" disabled={!canManage || !updateRequest || isSaving || !window.wp?.media} onClick={chooseMedia}>
+          {__("Link from Media Library", "weekly-wildcat-headless")}
+        </Button>
+      </div>
       <div className="byline-planning-media-controls">
         <SelectControl
           __nextHasNoMarginBottom
@@ -116,6 +194,7 @@ function RequestCard({
           onChange={(value: string) => void update({ assigneeId: value ? Number(value) : 0 })}
         />
       </div>
+      {request.status !== "done" ? <Button variant="primary" disabled={!canManage || !updateRequest || isSaving} onClick={() => void update({ status: "done" })}>{__("Mark complete", "weekly-wildcat-headless")}</Button> : null}
       {request.dueAt ? <p className="byline-planning-list-date-note" title={exactPlanningDate(request.dueAt)}>{relativePlanningDate(request.dueAt)}</p> : null}
       {error ? <PlanningNotice>{error}</PlanningNotice> : null}
       {!updateRequest ? <p className="byline-planning-help">{__("The protected media update API is not available in this install.", "weekly-wildcat-headless")}</p> : null}

@@ -37,7 +37,9 @@ require_once __DIR__ . '/includes/editorial/contributors.php';
 require_once __DIR__ . '/includes/editorial/readiness.php';
 require_once __DIR__ . '/includes/editorial/activity.php';
 require_once __DIR__ . '/includes/editorial/presets.php';
+require_once __DIR__ . '/includes/editorial/preview.php';
 require_once __DIR__ . '/includes/editorial/rest.php';
+require_once __DIR__ . '/includes/editorial/quick-view.php';
 require_once __DIR__ . '/includes/editorial/admin.php';
 
 // Design publication is shared by the immediate REST action and the
@@ -264,6 +266,9 @@ require_once __DIR__ . '/includes/sports/teams.php';
 require_once __DIR__ . '/includes/sports/domain.php';
 require_once __DIR__ . '/includes/core/jobs.php';
 require_once __DIR__ . '/includes/integrations/deployment.php';
+// Notifications use the durable job runner and only resolve private story
+// data at delivery time after rechecking the recipient's capabilities.
+require_once __DIR__ . '/includes/editorial/notifications.php';
 
 /** Replace the WordPress mark with the configured publication identity. */
 function wwh_login_logo_styles(): void
@@ -4736,12 +4741,20 @@ function wwh_rest_image_credit(array $attachment): array
 {
     $attachment_id = isset($attachment['id']) ? absint($attachment['id']) : 0;
 
+    $metadata = static function (string $field, string $legacy_key) use ($attachment_id): string {
+        if (function_exists('byline_editorial_media_attachment_meta_value')) {
+            return byline_editorial_media_attachment_meta_value($attachment_id, $field);
+        }
+
+        return wwh_image_meta_value($attachment_id, $legacy_key);
+    };
+
     return [
-        'creator' => wwh_image_meta_value($attachment_id, 'creator'),
-        'creditText' => wwh_image_meta_value($attachment_id, 'credit_text'),
-        'copyrightNotice' => wwh_image_meta_value($attachment_id, 'copyright_notice'),
-        'licenseUrl' => wwh_image_meta_value($attachment_id, 'license_url'),
-        'acquireLicensePage' => wwh_image_meta_value($attachment_id, 'acquire_license_url'),
+        'creator' => $metadata('creator', 'creator'),
+        'creditText' => $metadata('creditText', 'credit_text'),
+        'copyrightNotice' => $metadata('copyrightNotice', 'copyright_notice'),
+        'licenseUrl' => $metadata('licenseUrl', 'license_url'),
+        'acquireLicensePage' => $metadata('acquireLicensePage', 'acquire_license_url'),
     ];
 }
 

@@ -5,12 +5,7 @@ import { Puck, type Config, type Data } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { BYLINE_STUDIO_CATEGORIES, BYLINE_STUDIO_VIEWPORTS } from "@byline/studio-contract";
-import { sanitizeThemeTokenOverrides, type BylineThemeDefinition, type BylineThemeTokens } from "@byline/theme-contract";
-import { editorialTheme } from "@byline/theme-editorial";
-import { magazineTheme } from "@byline/theme-magazine";
-import { modernTheme } from "@byline/theme-modern";
-import { weeklyWildcatTheme } from "@byline/theme-weekly-wildcat";
-import { getBylineBlockPresentation, themeTokensToCssVariables } from "@byline/ui";
+import { getBylineBlockPresentation } from "@byline/ui";
 import {
   BriefPackagePreview,
   InFocusPackagePreview,
@@ -73,6 +68,15 @@ import {
 } from "./design-scheduling-model";
 import { subscribe as subscribeToStudioPreview } from "./studio-preview-model";
 import { useStudioAutosave, type StudioAutosaveRecord } from "./studio-autosave";
+import {
+  getPublicationThemeStylesheets,
+  getPublicationThemeVariables
+} from "./publication-theme";
+
+export {
+  getPublicationThemeStylesheets as getStudioThemeStylesheets,
+  getPublicationThemeVariables as getStudioThemeVariables
+} from "./publication-theme";
 
 // What Studio writes. Reading still accepts schema 1, but only as an input to
 // migration -- see loadDesignIntoEditor.
@@ -570,32 +574,12 @@ const studioConfigBase: Config = {
   components: components as unknown as Config["components"]
 };
 
-const previewThemes: Record<string, BylineThemeDefinition> = {
-  [weeklyWildcatTheme.id]: weeklyWildcatTheme,
-  [modernTheme.id]: modernTheme,
-  [editorialTheme.id]: editorialTheme,
-  [magazineTheme.id]: magazineTheme
-};
-
-export function getStudioThemeVariables(theme: string, overrides: Record<string, string>) {
-  const definition = previewThemes[theme] ?? weeklyWildcatTheme;
-  const tokens: BylineThemeTokens = {
-    ...definition.tokens,
-    ...sanitizeThemeTokenOverrides(overrides)
-  };
-  return themeTokensToCssVariables(tokens);
-}
-
-export function getStudioThemeStylesheets(theme: string) {
-  return [...((previewThemes[theme] ?? weeklyWildcatTheme).stylesheets ?? [])];
-}
-
 export function createStudioConfig(
   theme: string,
   overrides: Record<string, string>,
   context?: StudioPreviewContext
 ): Config {
-  const variables = getStudioThemeVariables(theme, overrides) as CSSProperties;
+  const variables = getPublicationThemeVariables(theme, overrides) as CSSProperties;
   const previewContext: StudioPreviewContext = context ?? {
     theme,
     features: { polls: true, events: true, sports: true, newsletter: true },
@@ -1054,7 +1038,7 @@ export function BylineStudio({
     [calendarHeading, featureFlags, publicationShortName, publicationTheme, tokenOverrides]
   );
   const previewStylesheets = useMemo(
-    () => [previewStylesheetUrl, ...getStudioThemeStylesheets(publicationTheme)].filter(Boolean),
+    () => [previewStylesheetUrl, ...getPublicationThemeStylesheets(publicationTheme)].filter(Boolean),
     [previewStylesheetUrl, publicationTheme]
   );
   const iframeOverride = useMemo(

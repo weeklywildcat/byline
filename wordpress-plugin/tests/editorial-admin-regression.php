@@ -50,6 +50,7 @@ $byline_meta = [];
 $byline_screen = null;
 $byline_meta_boxes = [];
 $byline_enqueued_scripts = [];
+$byline_localized_scripts = [];
 $byline_enqueued_styles = [];
 $byline_capabilities = ['edit_posts' => true, 'edit_post' => true, 'edit_others_posts' => true];
 $byline_meta_queries = 0;
@@ -94,6 +95,8 @@ function wp_enqueue_style(string $handle, $src = '', array $deps = [], $ver = fa
 function wp_register_style(string $handle, $src = false, array $deps = [], $ver = false): void {}
 function wp_add_inline_style(string $handle, string $css): void {}
 function wp_set_script_translations(...$args): void {}
+function wp_localize_script(string $handle, string $object_name, array $data): bool { global $byline_localized_scripts; $byline_localized_scripts[$handle][$object_name] = $data; return true; }
+function admin_url(string $path = ''): string { return 'https://example.test/wp-admin/' . ltrim($path, '/'); }
 function rest_authorization_required_code(): int { return 401; }
 
 require __DIR__ . '/../includes/editorial/workflow.php';
@@ -149,7 +152,7 @@ if ($build_available) {
 
     // WordPress must supply React and the editor packages; the plugin must not
     // ship its own copies into the post editor.
-    foreach (['wp-plugins', 'wp-editor', 'wp-element', 'wp-data', 'wp-components', 'wp-api-fetch'] as $required) {
+    foreach (['wp-plugins', 'wp-edit-post', 'wp-element', 'wp-data', 'wp-components', 'wp-api-fetch'] as $required) {
         if (!in_array($required, $deps, true)) {
             byline_test_fail("The workflow bundle does not declare the WordPress dependency {$required}.");
         }
@@ -158,6 +161,9 @@ if ($build_available) {
         if ($dependency === 'react' || $dependency === 'react-dom') {
             byline_test_fail('The workflow bundle bundles React instead of using the WordPress-provided copy.');
         }
+    }
+    if (($byline_localized_scripts[BYLINE_EDITORIAL_WORKFLOW_HANDLE]['bylineEditorialWorkflow']['previewUrl'] ?? '') === '') {
+        byline_test_fail('The workflow bundle did not receive a private preview launch URL.');
     }
 }
 

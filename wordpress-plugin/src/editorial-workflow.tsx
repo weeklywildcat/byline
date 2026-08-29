@@ -5,7 +5,8 @@
  *
  *  - `PluginPostStatusInfo` adds one summary row to the document Summary panel,
  *    next to — and clearly distinct from — the WordPress publication status.
- *  - `PluginSidebar` (with its More-menu item) holds the compact Story surface.
+ *  - `PluginSidebar` holds the compact Story surface and registers exactly one
+ *    "Story" entry in the editor's More menu by itself.
  *  - `PluginPrePublishPanel` and `PluginPostPublishPanel` provide publish-time
  *    readiness and website lifecycle context when the host editor supports them.
  *
@@ -24,7 +25,7 @@ import apiFetch from '@wordpress/api-fetch';
 import { Button, Notice, Panel, PanelBody, SelectControl, Spinner, TextControl, TextareaControl } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { useCallback, useEffect, useMemo, useRef, useState } from '@wordpress/element';
-import * as editorModule from '@wordpress/editor';
+import * as editPostModule from '@wordpress/edit-post';
 import { __, sprintf } from '@wordpress/i18n';
 import { listView } from '@wordpress/icons';
 import { registerPlugin } from '@wordpress/plugins';
@@ -55,21 +56,47 @@ import type {
 import { summarizeReadiness } from './editorial/editorial-model';
 
 import {
-  describeWorkflowError,
+  workflowDiscordState,
   workflowStatusLabel,
   workflowStoryPath,
+  createWorkflowMutationQueue,
   createWorkflowRequestTracker,
-  createSerializedWorkflowSaveQueue,
   type WorkflowChanges,
   type WorkflowPayload
 } from './editorial-workflow-model';
+import {
+  consumeStorySidebarNavigation,
+  createStorySidebarPanelOpenState,
+  focusStorySidebarPanel,
+  installStorySidebarNavigationBridge,
+  setStorySidebarPanelOpen,
+  subscribeToStorySidebarNavigation,
+  type StorySidebarPanel,
+  type StorySidebarPanelOpenState
+} from './editorial/story-sidebar-navigation';
 
 import './editorial-workflow.css';
 
 const PLUGIN_NAME = 'byline-editorial-workflow';
 const SIDEBAR_NAME = 'byline-editorial-workflow-sidebar';
 
-const { PluginPostStatusInfo, PluginSidebar, PluginSidebarMoreMenuItem } = editorModule;
+// Content Health can publish its command before React has mounted. Installing
+// the bridge during bundle evaluation gives the PHP inline script a stable,
+// typed hand-off point and retains pending state until the sidebar consumes it.
+installStorySidebarNavigationBridge();
+
+declare global {
+  interface Window {
+    bylineEditorialWorkflow?: {
+      previewUrl?: string;
+    };
+  }
+}
+
+// `PluginSidebar` registers its own entry in the editor's More menu, so no
+// separate `PluginSidebarMoreMenuItem` is rendered here: a second registration
+// would put two identical "Story" items in that menu.
+const { PluginPostStatusInfo, PluginSidebar } = editPostModule;
 
 /**
  * These fills are available in the WordPress editor runtime, but older
@@ -81,7 +108,7 @@ type EditorPanelSlotFill = ComponentType<{ className?: string; children?: ReactN
 const {
   PluginPrePublishPanel,
   PluginPostPublishPanel
-} = editorModule as typeof editorModule & {
+} = editPostModule as typeof editPostModule & {
   PluginPrePublishPanel?: EditorPanelSlotFill;
   PluginPostPublishPanel?: EditorPanelSlotFill;
 };
@@ -124,6 +151,11 @@ function deadlineContext(value: string): string {
 /**
  * Loads the workflow once per post and owns every write.
  *
+ * Every mutation — stage, editor, deadline, planned publication, visual notes —
+ * goes through one serialized, revision-aware queue per story, so two of this
+ * editor's own controls can never conflict with each other. Requests never
+ * block typing: a later edit simply coalesces into the next queued request.
+ *
  * A failure here is never fatal: `error` is surfaced as a dismissible notice
  * with a retry, and the editor keeps writing their article regardless.
  */
@@ -131,6 +163,7 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
   const [payload, setPayload] = useState<WorkflowPayload | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [hasConflict, setHasConflict] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -138,8 +171,6 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
   // must never make an unrelated workflow save look stale (or leave its busy
   // indicator stuck).
   const requestTrackerRef = useRef(createWorkflowRequestTracker());
-  const inFlightWritesRef = useRef(new Set<number>());
-  const revisionRef = useRef<number | null>(null);
   const activePostIdRef = useRef(postId);
   activePostIdRef.current = postId;
   const mountedRef = useRef(true);
@@ -151,26 +182,66 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
     };
   }, []);
 
-  useEffect(() => {
-    revisionRef.current = null;
-  }, [postId]);
+  // One queue per story. A queue captures its own post id, so a response for a
+  // story the editor already left can never be applied to the current one.
+  const queue = useMemo(() => createWorkflowMutationQueue<WorkflowPayload>({
+    send: (changes) => apiFetch<WorkflowPayload>({ path: storyPath(postId), method: 'POST', data: changes }),
+    readRevision: (next) => (typeof next.story?.revision === 'number' ? next.story.revision : null),
+    onSuccess: (next, { superseded }) => {
+      if (!mountedRef.current || activePostIdRef.current !== postId) return;
+      // A newer local edit is already queued behind this response. Applying it
+      // now would briefly put the sidebar back on the superseded values.
+      if (!superseded) setPayload(next);
+      setSaveError(null);
+      setSavedAt(Date.now());
+    },
+    onError: (error, { conflict }) => {
+      if (!mountedRef.current || activePostIdRef.current !== postId) return;
+      // The entered value is deliberately left in the field so the editor can
+      // retry rather than retyping it.
+      setSaveError(error.message);
+      if (conflict) setHasConflict(true);
+    },
+    onPendingChange: (pendingCount) => {
+      if (!mountedRef.current || activePostIdRef.current !== postId) return;
+      setIsSaving(pendingCount > 0);
+    },
+    errorOptions: {
+      title: __('Workflow error', 'weekly-wildcat-headless'),
+      message: __('Something went wrong. Please try again.', 'weekly-wildcat-headless')
+    },
+    conflictMessage: __('This story changed somewhere else. Reload the workflow before saving again.', 'weekly-wildcat-headless')
+  }), [postId]);
+
+  useEffect(() => () => queue.detach(), [queue]);
 
   const load = useCallback(() => {
     if (!postId) return;
 
     const requestTracker = requestTrackerRef.current;
     const requestId = requestTracker.beginRead();
-    const saveSequenceAtStart = requestTracker.writeVersion();
+    const settledWritesAtStart = queue.settledCount();
     setIsLoading(true);
     setLoadError(null);
 
     apiFetch<WorkflowPayload>({ path: `${storyPath(postId)}/bootstrap` })
       .then((next) => {
         if (!mountedRef.current || activePostIdRef.current !== postId || !requestTracker.isCurrentRead(requestId)) return;
-        // A save response is authoritative while it is in flight. Applying a
-        // slower GET here would put the sidebar back on the pre-save values.
-        if (inFlightWritesRef.current.size > 0 || requestTracker.writeVersion() !== saveSequenceAtStart) return;
-        if (typeof next.story?.revision === 'number') revisionRef.current = next.story.revision;
+        // A save that is queued, in flight, or that finished while this read
+        // was open is authoritative. Applying a slower GET here would put the
+        // sidebar back on pre-save values and — worse — would reset the
+        // revision the next mutation builds on, turning the editor's own write
+        // into a conflict. A conflicted queue is the exception: it is not
+        // sending anything, so a fresh read is exactly what reconciles it.
+        if (!queue.hasConflict() && (queue.pendingCount() > 0 || queue.settledCount() !== settledWritesAtStart)) return;
+        const revision = typeof next.story?.revision === 'number' ? next.story.revision : null;
+        // A completed read is also the reconciliation point for a conflict:
+        // this snapshot is now the revision the next mutation builds on.
+        queue.reconcile(revision);
+        setHasConflict(false);
+        // A reconciled read clears the stale conflict notice with it; the
+        // sidebar now shows the values the next save will build on.
+        setSaveError(null);
         setPayload(next);
       })
       .catch((error: unknown) => {
@@ -181,7 +252,7 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
         if (!mountedRef.current || activePostIdRef.current !== postId || !requestTracker.isCurrentRead(requestId)) return;
         setIsLoading(false);
       });
-  }, [postId]);
+  }, [postId, queue]);
 
   useEffect(load, [load]);
 
@@ -195,51 +266,21 @@ function useEditorialWorkflow(postId: number, isPublished: boolean) {
   const save = useCallback(
     (changes: WorkflowSaveChanges) => {
       if (!postId) return Promise.resolve(false);
-
-      const requestTracker = requestTrackerRef.current;
-      const requestPostId = postId;
-      const requestId = requestTracker.beginWrite();
-      inFlightWritesRef.current.add(requestId);
-      setIsSaving(true);
       setSaveError(null);
-
-      const requestChanges: WorkflowSaveChanges = changes.expectedRevision === undefined && revisionRef.current !== null
-        ? { ...changes, expectedRevision: revisionRef.current }
-        : changes;
-
-      return apiFetch<WorkflowPayload>({ path: storyPath(postId), method: 'POST', data: requestChanges })
-        .then((next) => {
-          if (!mountedRef.current || activePostIdRef.current !== requestPostId || !requestTracker.isCurrentWrite(requestId)) return false;
-          if (typeof next.story?.revision === 'number') revisionRef.current = next.story.revision;
-          setPayload(next);
-          setSavedAt(Date.now());
-          return true;
-        })
-        .catch((error: unknown) => {
-          // The entered value is deliberately left in the field so the editor
-          // can correct it and retry rather than retyping it.
-          if (mountedRef.current && activePostIdRef.current === requestPostId && requestTracker.isCurrentWrite(requestId)) setSaveError(errorMessage(error));
-          return false;
-        })
-        .finally(() => {
-          inFlightWritesRef.current.delete(requestId);
-          if (mountedRef.current && activePostIdRef.current === requestPostId && requestTracker.isCurrentWrite(requestId)) {
-            setIsSaving(inFlightWritesRef.current.size > 0);
-          }
-        });
+      return queue.enqueue(changes as Record<string, unknown>).then((outcome) => outcome.ok);
     },
-    [postId]
+    [postId, queue]
   );
 
   const clearSaveError = useCallback(() => setSaveError(null), []);
 
-  return { payload, load, save, clearSaveError, isLoading, isSaving, loadError, saveError, savedAt };
+  return { payload, load, save, clearSaveError, isLoading, isSaving, loadError, saveError, hasConflict, savedAt };
 }
 
 type WorkflowControlsProps = ReturnType<typeof useEditorialWorkflow>;
 
 function WorkflowControls(workflow: WorkflowControlsProps) {
-  const { payload, load, save, isLoading, isSaving, loadError, saveError, savedAt } = workflow;
+  const { payload, load, save, isLoading, isSaving, loadError, saveError, hasConflict, savedAt } = workflow;
 
   if (loadError) {
     return (
@@ -270,7 +311,10 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
   const { story, statuses = [], capabilities, writer, editors = [], notes } = normalized;
   const currentLabel = workflowStatusLabel(payload);
   const published = story.isPublished || story.postStatus === 'publish';
-  const busy = isLoading || isSaving;
+  // A save in flight never disables a control. Edits queue behind the request
+  // and are sent with the revision the previous response returned, so an editor
+  // is never made to wait to change a stage or type a date.
+  const busy = isLoading;
   const canEditDates = capabilities.assign === true && capabilities.changeDeadline !== false;
   const canEditPlannedPublication = capabilities.assign === true && capabilities.changePlannedPublication !== false;
 
@@ -387,8 +431,16 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
       ) : null}
 
       {saveError ? (
-        <Notice status="error" isDismissible={false}>
+        <Notice status={hasConflict ? 'warning' : 'error'} isDismissible={false}>
           <p>{saveError}</p>
+          {hasConflict ? (
+            <>
+              <p>{__('Your entries are still here. Reload the workflow to see the newer values before saving again.', 'weekly-wildcat-headless')}</p>
+              <Button variant="secondary" onClick={load}>
+                {__('Reload workflow', 'weekly-wildcat-headless')}
+              </Button>
+            </>
+          ) : null}
         </Notice>
       ) : null}
 
@@ -423,9 +475,11 @@ function visualStatusLabel(story: EditorialWorkflowPayload['story']): string {
 }
 
 /**
- * The visual note remains serialized even though it now lives in its own
- * collapsed panel. This prevents navigation or a slower response from losing
- * the editor's latest note.
+ * The visual note shares the story's single mutation queue. Autosave here and a
+ * Stage change in the panel above are the same editor's writes, so they are
+ * serialized against one another and each request carries the revision the
+ * previous response returned. That is what keeps an autosave from conflicting
+ * with its own author's previous write.
  */
 function VisualNeedsPanel({ workflow }: { workflow: WorkflowControlsProps }) {
   const { payload, save, clearSaveError, isLoading, loadError } = workflow;
@@ -439,20 +493,21 @@ function VisualNeedsPanel({ workflow }: { workflow: WorkflowControlsProps }) {
   const visualsDirtyRef = useRef(false);
   const visualsSaveCountRef = useRef(0);
   const visualsInitializedRef = useRef(false);
-  const visualsQueueRef = useRef(createSerializedWorkflowSaveQueue<string>((value) => save({ visuals: value })));
+  const saveRef = useRef(save);
+  saveRef.current = save;
 
   const enqueueVisualSave = useCallback((value: string) => {
     visualsSaveCountRef.current += 1;
     setVisualsSaving(true);
-    const request = visualsQueueRef.current.enqueue(value);
-    void request.then((saved) => {
+    void saveRef.current({ visuals: value }).then((saved) => {
       visualsSaveCountRef.current -= 1;
       if (visualsSaveCountRef.current === 0) setVisualsSaving(false);
-      if (saved && latestVisualsRef.current === value) {
+      if (latestVisualsRef.current !== value) return;
+      if (saved) {
         visualsDirtyRef.current = false;
         setVisualsDirty(false);
         setVisualsSaveError(false);
-      } else if (!saved && latestVisualsRef.current === value) {
+      } else {
         setVisualsSaveError(true);
       }
     });
@@ -828,13 +883,22 @@ function ActivityPanel({ records, isLoading, error, onRetry }: { records: Editor
   );
 }
 
-type WebsiteLifecycleStatus = 'not-published' | 'published' | 'building' | 'live' | 'failed' | 'unknown';
+type WebsiteLifecycleStatus =
+  | 'not-published'
+  | 'published'
+  | 'building'
+  | 'live'
+  | 'failed'
+  | 'needs-configuration'
+  | 'unknown';
 
 type NormalizedDistribution = {
   channels: DistributionChannel[];
   capabilities: { addToNewsletter: boolean };
   websiteStatus: WebsiteLifecycleStatus;
   canRetryWebsite: boolean;
+  /** True when the server answered the retry capability itself. */
+  retryWebsiteAnswered: boolean;
 };
 
 function websiteLifecycleStatus(value: unknown): WebsiteLifecycleStatus {
@@ -844,6 +908,9 @@ function websiteLifecycleStatus(value: unknown): WebsiteLifecycleStatus {
   if (status === 'rebuild-pending' || status === 'building' || status === 'pending' || status === 'queued') return 'building';
   if (status === 'live') return 'live';
   if (status === 'build-failed' || status === 'failed' || status === 'error') return 'failed';
+  // A published story with no deployment target is not a build failure and is
+  // certainly not live. It is a configuration gap, and it says so.
+  if (status === 'needs-configuration' || status === 'not-configured') return 'needs-configuration';
   return 'unknown';
 }
 
@@ -868,7 +935,11 @@ function normalizeDistribution(value: unknown, postId: number, headline: string,
     };
   });
   const websiteEntry = entries.find((entry) => stringValue(record(entry).id || record(entry).channelId) === 'website');
-  const websiteStatus = websiteLifecycleStatus(websiteEntry ? record(websiteEntry).status : undefined);
+  const website = websiteEntry ? record(websiteEntry) : {};
+  // The channel status is a compatibility projection. Newer responses carry
+  // the authoritative deployment lifecycle separately; prefer it so a stale
+  // channel label can never turn an in-progress build into "Published".
+  const websiteStatus = websiteLifecycleStatus(website.lifecycle || website.status);
   const rawCapabilities = record(raw.capabilities);
   const newsletter = channels.find((channel) => channel.id === 'newsletter');
   return {
@@ -882,10 +953,11 @@ function normalizeDistribution(value: unknown, postId: number, headline: string,
       )
     },
     websiteStatus,
-    canRetryWebsite: websiteStatus === 'failed' && (
+    canRetryWebsite: (websiteStatus === 'failed' || websiteStatus === 'needs-configuration') && (
       raw.canRetryWebsite === true ||
       rawCapabilities.retryWebsite === true
-    )
+    ),
+    retryWebsiteAnswered: rawCapabilities.retryWebsite !== undefined || raw.canRetryWebsite !== undefined
   };
 }
 
@@ -954,13 +1026,78 @@ function StorySummary({ payload, title }: { payload: WorkflowPayload | null; tit
   );
 }
 
+function StoryPreviewLaunch({ postId }: { postId: number }) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { savePost } = useDispatch('core/editor') as {
+    savePost?: () => unknown;
+  };
+
+  const openPreview = useCallback(async () => {
+    if (postId <= 0 || isSaving) return;
+
+    // Reserve the popup during the click gesture. Waiting for savePost() before
+    // calling window.open() is rejected by popup blockers in real browsers.
+    // The window stays blank until the save has completed, so the preview can
+    // never render an older draft snapshot as the result of this action.
+    const previewWindow = window.open('about:blank', '_blank');
+    if (!previewWindow) {
+      setError(__('The preview window was blocked. Allow pop-ups for this WordPress site and try again.', 'weekly-wildcat-headless'));
+      return;
+    }
+    try {
+      // This is a same-origin, trusted admin URL. Clear the opener before any
+      // later navigation so reserving the window does not create a reverse-tab
+      // navigation surface.
+      previewWindow.opener = null;
+    } catch {
+      // The navigation below remains safe even when a browser exposes a
+      // read-only opener property.
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await savePost?.();
+      const configuredUrl = window.bylineEditorialWorkflow?.previewUrl;
+      if (!configuredUrl) {
+        throw new Error(__('The private preview URL is not configured.', 'weekly-wildcat-headless'));
+      }
+
+      const previewUrl = new URL(configuredUrl, window.location.href);
+      previewUrl.searchParams.set('post', String(postId));
+      previewWindow.location.replace(previewUrl.toString());
+    } catch (nextError) {
+      previewWindow.close();
+      setError(errorMessage(nextError));
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isSaving, postId, savePost]);
+
+  return (
+    <div className="byline-editorial-preview-launch">
+      <Button variant="secondary" isBusy={isSaving} disabled={isSaving || postId <= 0} onClick={() => void openPreview()}>
+        {isSaving ? __('Saving and opening preview…', 'weekly-wildcat-headless') : __('Preview as Byline', 'weekly-wildcat-headless')}
+      </Button>
+      <p className="byline-editorial-preview-help">
+        {__('Save the current story, then open a private responsive preview. Publishing and deployment actions are disabled there.', 'weekly-wildcat-headless')}
+      </p>
+      {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
+    </div>
+  );
+}
+
 function EditorialNewsroomPanels({
   postId,
   title,
   canonicalUrl,
   excerpt,
   workflow,
-  client
+  client,
+  openPanels,
+  onPanelToggle
 }: {
   postId: number;
   title: string;
@@ -968,6 +1105,8 @@ function EditorialNewsroomPanels({
   excerpt: string;
   workflow: WorkflowControlsProps;
   client: EditorialRestClient;
+  openPanels: StorySidebarPanelOpenState;
+  onPanelToggle: (panel: StorySidebarPanel, opened: boolean) => void;
 }) {
   const { payload } = workflow;
   const workflowForPanel = payload ? normalizeWorkflowPayload(payload, payload, postId, title) : null;
@@ -982,7 +1121,8 @@ function EditorialNewsroomPanels({
     channels: [],
     capabilities: { addToNewsletter: false },
     websiteStatus: 'unknown',
-    canRetryWebsite: false
+    canRetryWebsite: false,
+    retryWebsiteAnswered: false
   });
   const [loading, setLoading] = useState<Record<EditorialPanelKey, boolean>>(emptyEditorialPanelState);
   const [loaded, setLoaded] = useState<Record<EditorialPanelKey, boolean>>(emptyEditorialPanelState);
@@ -993,8 +1133,13 @@ function EditorialNewsroomPanels({
   const activePostIdRef = useRef(postId);
   activePostIdRef.current = postId;
 
-  useEffect(() => () => {
-    mountedRef.current = false;
+  useEffect(() => {
+    // Gutenberg can replay effects while mounting the editor. Re-arm the
+    // guard on every real/effect remount before accepting async responses.
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const runPanel = useCallback(<T,>(
@@ -1080,6 +1225,17 @@ function EditorialNewsroomPanels({
     setDistribution(normalizeDistribution(value, postId, title, canonicalUrl, excerpt));
   }, [canonicalUrl, client, excerpt, postId, title]);
 
+  // A controlled PanelBody does not call onToggle when its `opened` prop is
+  // changed by a navigation command. Keep lazy secondary data lazy for normal
+  // renders, while making a Content Health deep link load the panel it opens.
+  useEffect(() => {
+    if (openPanels.tasks) loadTasks();
+  }, [loadTasks, openPanels.tasks]);
+
+  useEffect(() => {
+    if (openPanels.contributors) loadContributors();
+  }, [loadContributors, openPanels.contributors]);
+
   if (!postId) return null;
 
   const rawPayload = record(payload);
@@ -1100,9 +1256,9 @@ function EditorialNewsroomPanels({
     : summaryCount(rawPayload.corrections, normalizeCorrections(rawPayload.corrections).length);
   const isPublished = Boolean(workflowForPanel?.story.isPublished || workflowForPanel?.story.postStatus === 'publish');
   const discord = record(rawPayload.discord);
-  const discordThreadId = stringValue(discord.threadId);
   const discordUrl = stringValue(discord.threadUrl);
-  const discordConfigured = discord.configured === true || discord.available === true || Boolean(discordThreadId || discordUrl);
+  const discordState = workflowDiscordState(discord);
+  const discordCanCreateThread = discord.canCreateThread === true;
 
   return (
     <>
@@ -1110,6 +1266,8 @@ function EditorialNewsroomPanels({
         className="byline-editorial-sidebar-panel"
         title={__('Visuals', 'weekly-wildcat-headless')}
         initialOpen={false}
+        opened={openPanels.visuals}
+        onToggle={(opened) => onPanelToggle('visuals', opened)}
       >
         {({ opened }) => opened ? <VisualNeedsPanel workflow={workflow} /> : null}
       </PanelBody>
@@ -1118,7 +1276,8 @@ function EditorialNewsroomPanels({
         className="byline-editorial-sidebar-panel"
         title={taskCount ? sprintf(/* translators: %d: open task count. */ __('Tasks · %d open', 'weekly-wildcat-headless'), taskCount) : __('Tasks', 'weekly-wildcat-headless')}
         initialOpen={false}
-        onToggle={(opened) => { if (opened) loadTasks(); }}
+        opened={openPanels.tasks}
+        onToggle={(opened) => onPanelToggle('tasks', opened)}
       >
         {({ opened }) => opened ? (
           <TasksPanel
@@ -1139,7 +1298,8 @@ function EditorialNewsroomPanels({
         className="byline-editorial-sidebar-panel"
         title={contributorCount ? sprintf(/* translators: %d: contributor count. */ __('Contributors · %d', 'weekly-wildcat-headless'), contributorCount) : __('Contributors', 'weekly-wildcat-headless')}
         initialOpen={false}
-        onToggle={(opened) => { if (opened) loadContributors(); }}
+        opened={openPanels.contributors}
+        onToggle={(opened) => onPanelToggle('contributors', opened)}
       >
         {({ opened }) => opened ? (
           <ContributorsPanel
@@ -1217,7 +1377,10 @@ function EditorialNewsroomPanels({
         </PanelBody>
       ) : null}
 
-      {discordConfigured ? (
+      {/* Discord is optional. When it is not configured the Discussion panel is
+          not rendered at all, so an unused integration never adds a dead end to
+          the article sidebar. */}
+      {discordState !== 'not-configured' ? (
         <PanelBody
           className="byline-editorial-sidebar-panel"
           title={__('Discussion', 'weekly-wildcat-headless')}
@@ -1226,10 +1389,15 @@ function EditorialNewsroomPanels({
           {({ opened }) => opened ? (
             <div className="byline-editorial-discussion-summary">
               <p>
-                {discordThreadId
+                {discordState === 'linked'
                   ? __('This story has a linked Discord discussion.', 'weekly-wildcat-headless')
                   : __('Discord is connected, but this story is not linked to a thread yet.', 'weekly-wildcat-headless')}
               </p>
+              {discordState === 'configured-unlinked' && !discordCanCreateThread ? (
+                <p className="byline-editorial-muted">
+                  {__('Threads are created in Discord. This story links itself the next time the Byline bot syncs the storyboard.', 'weekly-wildcat-headless')}
+                </p>
+              ) : null}
               {discordUrl ? <a href={discordUrl} target="_blank" rel="noreferrer">{__('Open Discord thread', 'weekly-wildcat-headless')}</a> : null}
             </div>
           ) : null}
@@ -1246,8 +1414,11 @@ function PrePublishReadinessPanel({ postId, client }: { postId: number; client: 
   const [error, setError] = useState<unknown>(null);
   const mountedRef = useRef(true);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const load = useCallback(async (refresh = false) => {
@@ -1340,11 +1511,12 @@ function PrePublishReadinessPanel({ postId, client }: { postId: number; client: 
   );
 }
 
-function postPublishStatusLabel(status: WebsiteLifecycleStatus, isPublished: boolean): string {
+function postPublishStatusLabel(status: WebsiteLifecycleStatus): string {
   if (status === 'live') return __('Live', 'weekly-wildcat-headless');
   if (status === 'building') return __('Building', 'weekly-wildcat-headless');
   if (status === 'failed') return __('Website update failed', 'weekly-wildcat-headless');
-  if (status === 'published' || isPublished) return __('Published in Byline', 'weekly-wildcat-headless');
+  if (status === 'needs-configuration') return __('Website update requires configuration', 'weekly-wildcat-headless');
+  if (status === 'published') return __('Published in Byline', 'weekly-wildcat-headless');
   if (status === 'not-published') return __('Not published to Byline yet', 'weekly-wildcat-headless');
   return __('Website status is unavailable', 'weekly-wildcat-headless');
 }
@@ -1369,11 +1541,15 @@ function PostPublishLifecycle({
   const [error, setError] = useState<unknown>(null);
   const [canRetry, setCanRetry] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [retriedStatus, setRetriedStatus] = useState<WebsiteLifecycleStatus | null>(null);
   const mountedRef = useRef(true);
   const pollAttemptsRef = useRef(0);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const load = useCallback(async () => {
@@ -1381,7 +1557,13 @@ function PostPublishLifecycle({
     setError(null);
     try {
       const value = await client.getDistribution(postId);
-      if (mountedRef.current) setDistribution(normalizeDistribution(value, postId, title, canonicalUrl, excerpt));
+      if (mountedRef.current) {
+        const next = normalizeDistribution(value, postId, title, canonicalUrl, excerpt);
+        setDistribution(next);
+        // Once the server reports a lifecycle of its own, the optimistic
+        // post-retry state has done its job and must not mask a later failure.
+        if (next.websiteStatus !== 'failed' && next.websiteStatus !== 'needs-configuration') setRetriedStatus(null);
+      }
     } catch (caught: unknown) {
       if (mountedRef.current) setError(caught);
     } finally {
@@ -1393,14 +1575,23 @@ function PostPublishLifecycle({
     if (isPublished) void load();
   }, [isPublished, load]);
 
-  const websiteStatus = distribution?.websiteStatus ?? (isPublished ? 'published' : 'unknown');
+  // A retry answers with the durable job's own state, so the panel can move to
+  // queued/building immediately instead of showing "failed" while work runs.
+  const websiteStatus: WebsiteLifecycleStatus = retriedStatus
+    ?? distribution?.websiteStatus
+    ?? (isPublished ? 'published' : 'unknown');
+  const canRetryNow = canRetry || distribution?.canRetryWebsite === true;
 
   useEffect(() => {
     pollAttemptsRef.current = 0;
   }, [isPublished, postId]);
 
   useEffect(() => {
-    if (!isPublished || websiteStatus === 'live' || websiteStatus === 'failed' || pollAttemptsRef.current >= 12) {
+    if (!isPublished
+      || websiteStatus === 'live'
+      || websiteStatus === 'failed'
+      || websiteStatus === 'needs-configuration'
+      || pollAttemptsRef.current >= 12) {
       return undefined;
     }
 
@@ -1418,9 +1609,16 @@ function PostPublishLifecycle({
   }, [isPublished, load, websiteStatus]);
 
   useEffect(() => {
-    if (websiteStatus !== 'failed') return undefined;
+    if (websiteStatus !== 'failed' && websiteStatus !== 'needs-configuration') return undefined;
     if (distribution?.canRetryWebsite) {
       setCanRetry(true);
+      return undefined;
+    }
+    // The story's own distribution response reports whether this user may
+    // retry. When it has answered, do not also probe the integrations route
+    // that most editors are not allowed to read.
+    if (distribution?.retryWebsiteAnswered) {
+      setCanRetry(false);
       return undefined;
     }
     let active = true;
@@ -1436,15 +1634,27 @@ function PostPublishLifecycle({
     };
   }, [distribution, websiteStatus]);
 
+  /**
+   * Retry requeues the durable deployment job rather than firing an untracked
+   * hook request. Repeated clicks are guarded here and remain idempotent on the
+   * server, which requeues the existing job instead of creating a second one.
+   */
   const retryWebsite = async () => {
-    if (!canRetry || isRetrying) return;
+    if (!canRetryNow || isRetrying) return;
     setIsRetrying(true);
     setError(null);
     try {
-      await apiFetch({ path: '/byline/v1/admin/deployment/trigger', method: 'POST' });
+      const status = await apiFetch<UnknownRecord>({ path: '/byline/v1/admin/deployment/trigger', method: 'POST' });
+      if (mountedRef.current) {
+        const lifecycle = websiteLifecycleStatus(record(status).lifecycle);
+        setRetriedStatus(lifecycle === 'unknown' ? 'building' : lifecycle);
+      }
       await load();
     } catch (caught: unknown) {
-      if (mountedRef.current) setError(caught);
+      if (mountedRef.current) {
+        setRetriedStatus(null);
+        setError(caught);
+      }
     } finally {
       if (mountedRef.current) setIsRetrying(false);
     }
@@ -1453,7 +1663,7 @@ function PostPublishLifecycle({
   return (
     <div className="byline-postpublish-lifecycle">
       <div className="byline-postpublish-status" aria-live="polite">
-        <strong>{postPublishStatusLabel(websiteStatus, isPublished)}</strong>
+        <strong>{postPublishStatusLabel(websiteStatus)}</strong>
         {isLoading ? (
           <>
             <Spinner />
@@ -1464,15 +1674,21 @@ function PostPublishLifecycle({
       <p className="byline-editorial-muted">
         {websiteStatus === 'failed'
           ? __('WordPress publication succeeded; the Byline website update needs attention.', 'weekly-wildcat-headless')
+          : websiteStatus === 'needs-configuration'
+            ? __('WordPress publication succeeded. This change is recorded and will deploy once a deployment target is configured.', 'weekly-wildcat-headless')
           : websiteStatus === 'building' || websiteStatus === 'published'
             ? __('WordPress publication succeeded; Byline is checking the public manifest for the exact revision.', 'weekly-wildcat-headless')
           : __('WordPress publication and the Byline website build are tracked separately.', 'weekly-wildcat-headless')}
       </p>
       {error ? <Notice status="warning" isDismissible={false}>{errorMessage(error)}</Notice> : null}
-      {websiteStatus === 'failed' ? (
-        <Notice status="error" isDismissible={false}>
-          <p>{__('The website build failed after publication.', 'weekly-wildcat-headless')}</p>
-          {canRetry ? (
+      {websiteStatus === 'failed' || websiteStatus === 'needs-configuration' ? (
+        <Notice status={websiteStatus === 'failed' ? 'error' : 'warning'} isDismissible={false}>
+          <p>
+            {websiteStatus === 'failed'
+              ? __('The website build failed after publication.', 'weekly-wildcat-headless')
+              : __('No deployment target is configured, so the public website has not been rebuilt yet.', 'weekly-wildcat-headless')}
+          </p>
+          {canRetryNow ? (
             <Button variant="secondary" disabled={isRetrying} onClick={() => void retryWebsite()}>
               {isRetrying ? __('Retrying website update…', 'weekly-wildcat-headless') : __('Retry website update', 'weekly-wildcat-headless')}
             </Button>
@@ -1522,6 +1738,34 @@ function EditorialWorkflowPlugin() {
     openGeneralSidebar?: (name: string) => void;
   };
 
+  const [openPanels, setOpenPanels] = useState<StorySidebarPanelOpenState>(() => createStorySidebarPanelOpenState());
+  const onPanelToggle = useCallback((panel: StorySidebarPanel, opened: boolean) => {
+    setOpenPanels((current) => setStorySidebarPanelOpen(current, panel, opened));
+  }, []);
+  const openRequestedStoryPanel = useCallback((panel: StorySidebarPanel) => {
+    setOpenPanels((current) => focusStorySidebarPanel(current, panel));
+    openGeneralSidebar?.(`${PLUGIN_NAME}/${SIDEBAR_NAME}`);
+  }, [openGeneralSidebar]);
+
+  // Navigating between stories remounts the lazy newsroom panels, but the
+  // workflow PanelBody belongs to this entrypoint. Reset its controlled state
+  // so a panel requested for one story cannot remain focused on another.
+  useEffect(() => {
+    setOpenPanels(createStorySidebarPanelOpenState());
+  }, [postId]);
+
+  useEffect(() => {
+    if (postType !== 'post' || postId <= 0) return undefined;
+
+    installStorySidebarNavigationBridge();
+    const unsubscribe = subscribeToStorySidebarNavigation(window, (command) => {
+      openRequestedStoryPanel(command.panel);
+    });
+    const pending = consumeStorySidebarNavigation();
+    if (pending) openRequestedStoryPanel(pending.panel);
+    return unsubscribe;
+  }, [openRequestedStoryPanel, postId, postType]);
+
   // Workflow is a story concept. Pages and the other Byline post types never
   // see it, and the server does not load this bundle for them either.
   if (postType !== 'post') return null;
@@ -1554,17 +1798,16 @@ function EditorialWorkflowPlugin() {
         </div>
       </PluginPostStatusInfo>
 
-      <PluginSidebarMoreMenuItem target={SIDEBAR_NAME} icon={listView}>
-        {sidebarTitle}
-      </PluginSidebarMoreMenuItem>
-
       <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={listView} className="byline-editorial-sidebar">
         <Panel className="byline-story-panel">
           <StorySummary payload={payload} title={title} />
+          {postId > 0 ? <StoryPreviewLaunch postId={postId} /> : null}
           <PanelBody
             className="byline-editorial-sidebar-panel byline-editorial-workflow-panel"
             title={__('Workflow', 'weekly-wildcat-headless')}
             initialOpen={true}
+            opened={openPanels.workflow}
+            onToggle={(opened) => onPanelToggle('workflow', opened)}
           >
             <WorkflowControls key={postId} {...workflow} />
           </PanelBody>
@@ -1576,6 +1819,8 @@ function EditorialWorkflowPlugin() {
             excerpt={excerpt}
             workflow={workflow}
             client={editorialClient}
+            openPanels={openPanels}
+            onPanelToggle={onPanelToggle}
           />
         </Panel>
       </PluginSidebar>

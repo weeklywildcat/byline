@@ -34,6 +34,9 @@ export type HomeDeploymentStatus = {
   configured?: boolean;
   lastStatus?: string;
   pending?: boolean;
+  lifecycle?: string;
+  expectedRevision?: number;
+  publicRevision?: number;
 };
 
 export type HomeActivityPayload = EditorialActivityPayload;
@@ -238,24 +241,49 @@ function addFeedbackAttention(items: HomeAttentionItem[], feedback: FeedbackResp
 
 function addDeploymentAttention(items: HomeAttentionItem[], deployment: HomeDeploymentStatus | null): void {
   if (!deployment) return;
+  const lifecycle = deployment.lifecycle || "";
   const status = deployment.lastStatus || "";
-  if (deployment.pending) {
+  if (lifecycle === "live") return;
+
+  if (lifecycle === "queued" || lifecycle === "building" || deployment.pending) {
     items.push({
       id: "deployment-pending",
       title: "Website update",
-      detail: "Build request is queued",
+      detail: lifecycle === "building" ? "The public site is building" : "Build request is queued",
       severity: "info",
       source: "deployment"
     });
     return;
   }
 
-  if (/request failed|no http status|http [45]\d\d|not configured/i.test(status)) {
+  if (lifecycle === "needs_configuration" || (!deployment.configured && Number(deployment.expectedRevision || 0) > 0)) {
+    items.push({
+      id: "deployment-needs-configuration",
+      title: "Configure website publishing",
+      detail: "WordPress has a newer public revision, but no deployment provider is configured.",
+      severity: "critical",
+      source: "deployment"
+    });
+    return;
+  }
+
+  if (lifecycle === "failed" || /request failed|no http status|http [45]\d\d/i.test(status)) {
     items.push({
       id: "deployment-failed",
       title: "Website update failed",
       detail: "The story remains safely in WordPress. Retry the website update.",
       severity: "critical",
+      source: "deployment"
+    });
+    return;
+  }
+
+  if (Number(deployment.expectedRevision || 0) > 0 && Number(deployment.publicRevision || 0) < Number(deployment.expectedRevision || 0)) {
+    items.push({
+      id: "deployment-unverified",
+      title: "Public revision not verified",
+      detail: `The public site is at revision ${Number(deployment.publicRevision || 0)}; Byline expects revision ${Number(deployment.expectedRevision || 0)}.`,
+      severity: "warning",
       source: "deployment"
     });
   }

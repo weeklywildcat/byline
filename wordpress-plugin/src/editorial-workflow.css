@@ -201,7 +201,10 @@
 .byline-story-summary-meta {
   display: grid;
   gap: 10px 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Two columns while they stay readable, one column in a 280px sidebar.
+     Driven by the available width rather than the viewport, so it behaves the
+     same in a docked sidebar, a resized one, and at high zoom. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 132px), 1fr));
   margin: 16px 0 0;
 }
 
@@ -230,6 +233,23 @@
 .byline-story-summary-counters span + span::before {
   content: '·';
   margin-right: 12px;
+}
+
+.byline-editorial-preview-launch {
+  border-bottom: 1px solid var(--byline-sidebar-border);
+  padding: 12px 16px 16px;
+}
+
+.byline-editorial-preview-launch .components-button {
+  justify-content: center;
+  width: 100%;
+}
+
+.byline-editorial-preview-help {
+  color: #757575;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 8px 0 0;
 }
 
 .byline-editorial-sidebar .byline-editorial-sidebar-panel {
@@ -357,9 +377,19 @@
   align-items: flex-start;
   border-left: 3px solid #dcdcde;
   display: grid;
-  gap: 8px;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  /* The fix link takes its own row rather than squeezing the explanation into
+     an unreadable column in the narrow pre-publish panel. */
+  grid-template-columns: auto minmax(0, 1fr);
   padding: 8px 0 8px 10px;
+}
+
+.byline-prepublish-check > div {
+  min-width: 0;
+}
+
+.byline-prepublish-check a {
+  grid-column: 1 / -1;
 }
 
 .byline-prepublish-check-warning {
@@ -440,4 +470,124 @@
 .byline-editorial-activity-list small {
   color: #646970;
   margin-top: 3px;
+}
+
+
+/*
+ * Narrow-sidebar behaviour.
+ *
+ * The block editor sidebar is about 280px wide and can be dragged narrower
+ * still, so nothing here may depend on a comfortable width. These rules keep
+ * the Story panel to one scrolling axis: text wraps, controls shrink, and the
+ * busy indicators occupy their space whether or not they are visible, so a
+ * save never nudges the layout under the pointer.
+ */
+.byline-editorial-sidebar {
+  overflow-wrap: anywhere;
+}
+
+.byline-editorial-sidebar .components-panel__body > *,
+.byline-editorial-sidebar .byline-workflow-panel > *,
+.byline-editorial-sidebar .byline-story-summary > * {
+  max-width: 100%;
+}
+
+/* Grid and flex children default to min-content width, which is what pushes a
+   long word or a wide native control past the sidebar edge. */
+.byline-editorial-sidebar .components-base-control,
+.byline-editorial-sidebar .components-flex-item,
+.byline-editorial-sidebar .byline-workflow-field,
+.byline-editorial-sidebar .byline-editorial-panel > * {
+  min-width: 0;
+}
+
+/* Date and datetime controls have an intrinsic minimum width in several
+   browsers; without this they are the first thing to overflow at 280px. */
+.byline-editorial-sidebar input[type='date'],
+.byline-editorial-sidebar input[type='datetime-local'],
+.byline-editorial-sidebar input[type='time'],
+.byline-editorial-sidebar select,
+.byline-editorial-sidebar textarea,
+.byline-prepublish-readiness input,
+.byline-postpublish-lifecycle input {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* A long action label wraps instead of widening the panel. */
+.byline-editorial-sidebar .components-button,
+.byline-prepublish-readiness .components-button,
+.byline-postpublish-lifecycle .components-button {
+  height: auto;
+  max-width: 100%;
+  min-height: 30px;
+  white-space: normal;
+}
+
+/* Notices are full-bleed inside the panel and wrap their own long text. */
+.byline-editorial-sidebar .components-notice,
+.byline-prepublish-readiness .components-notice,
+.byline-postpublish-lifecycle .components-notice {
+  box-sizing: border-box;
+  margin-left: 0;
+  margin-right: 0;
+  max-width: 100%;
+}
+
+.byline-editorial-sidebar .components-notice__content,
+.byline-prepublish-readiness .components-notice__content,
+.byline-postpublish-lifecycle .components-notice__content {
+  margin-right: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Reserve the busy indicator's space so a save or a poll does not shift the
+   status line, the panel below it, or a control under the pointer. */
+.byline-postpublish-status,
+.byline-prepublish-readiness-summary {
+  min-height: 30px;
+}
+
+.byline-postpublish-status strong,
+.byline-prepublish-readiness-summary strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.byline-editorial-sidebar .components-spinner,
+.byline-prepublish-readiness .components-spinner,
+.byline-postpublish-lifecycle .components-spinner {
+  flex: none;
+  margin: 0;
+}
+
+/* Story summary counters and the status badge stay inside the panel. */
+.byline-story-summary-counters span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.byline-editorial-discussion-summary a,
+.byline-editorial-activity-list li,
+.byline-workflow-field-note,
+.byline-workflow-note {
+  overflow-wrap: anywhere;
+}
+
+/* The last resort at genuinely tiny widths: the summary heading stacks so a
+   long headline never competes with the stage badge for the same row. */
+@container (max-width: 300px) {
+  .byline-story-summary-heading {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .byline-story-summary-status {
+    max-width: 100%;
+  }
+}
+
+.byline-editorial-sidebar .byline-story-panel {
+  container-type: inline-size;
 }

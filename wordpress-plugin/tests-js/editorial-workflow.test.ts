@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import { createEditorialRestClient } from "../src/editorial/editorial-rest";
 import {
   WORKFLOW_FALLBACK_ERROR,
-  createSerializedWorkflowSaveQueue,
+  createWorkflowMutationQueue,
   createWorkflowRequestTracker,
   describeWorkflowError,
+  isWorkflowRevisionConflict,
+  workflowDiscordState,
   workflowStages,
   workflowStatusLabel,
   workflowStoryPath,
@@ -165,24 +167,265 @@ describe("workflow request ordering", () => {
   });
 });
 
-describe("workflow field autosave", () => {
-  it("serializes visual-needs values and continues after a failed request", async () => {
-    const requests: Array<{ value: string; resolve: (saved: boolean) => void }> = [];
-    const save = (value: string) => new Promise<boolean>((resolve) => requests.push({ value, resolve }));
-    const queue = createSerializedWorkflowSaveQueue(save);
 
-    const first = queue.enqueue("first note");
-    const second = queue.enqueue("latest note");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(requests.map((request) => request.value)).toEqual(["first note"]);
+type QueuedRequest = {
+  changes: Record<string, unknown>;
+  resolve: (payload: WorkflowPayload) => void;
+  reject: (error: unknown) => void;
+};
 
-    requests[0].resolve(false);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(requests.map((request) => request.value)).toEqual(["first note", "latest note"]);
+/** A transport that lets a test hold each request open, one at a time. */
+function controllableTransport() {
+  const requests: QueuedRequest[] = [];
+  let revision = 5;
 
-    requests[1].resolve(true);
-    await expect(first).resolves.toBe(false);
-    await expect(second).resolves.toBe(true);
-    await expect(queue.drain()).resolves.toBe(true);
+  const send = (changes: Record<string, unknown>) =>
+    new Promise<WorkflowPayload>((resolve, reject) => {
+      requests.push({ changes, resolve, reject });
+    });
+
+  const respond = (index: number, nextRevision?: number) => {
+    revision = nextRevision ?? revision + 1;
+    const next = payload("writing");
+    next.story.revision = revision;
+    requests[index].resolve(next);
+  };
+
+  return { requests, send, respond };
+}
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+// The race this suite exists for: a Stage change and a Visual Notes autosave
+// are the same editor's writes. They must never be sent with the same expected
+// revision, because the second would then conflict with the first.
+describe("workflow mutation queue", () => {
+  it("never lets a Visual Notes autosave conflict with the editor's own Stage change", async () => {
+    const transport = controllableTransport();
+    const queue = createWorkflowMutationQueue<WorkflowPayload>({
+      send: transport.send,
+      readRevision: (next) => next.story.revision ?? null,
+      initialRevision: 5
+    });
+
+    const stage = queue.enqueue({ status: "editing" });
+    await settle();
+    expect(transport.requests).toHaveLength(1);
+    expect(transport.requests[0].changes).toEqual({ status: "editing", expectedRevision: 5 });
+
+    // The autosave fires while the Stage request is still in flight.
+    const notes = queue.enqueue({ visuals: "Need a crowd photo" });
+    await settle();
+    expect(transport.requests).toHaveLength(1);
+
+    transport.respond(0, 6);
+    await expect(stage).resolves.toMatchObject({ ok: true });
+    await settle();
+
+    expect(transport.requests).toHaveLength(2);
+    // The queued edit is sent with the revision the previous response returned,
+    // never with the stale revision the editor's own write already consumed.
+    expect(transport.requests[1].changes).toEqual({ visuals: "Need a crowd photo", expectedRevision: 6 });
+
+    transport.respond(1, 7);
+    await expect(notes).resolves.toMatchObject({ ok: true });
+    expect(queue.getRevision()).toBe(7);
+  });
+
+  it("sends one request at a time and coalesces the edits queued behind it", async () => {
+    const transport = controllableTransport();
+    const queue = createWorkflowMutationQueue<WorkflowPayload>({
+      send: transport.send,
+      readRevision: (next) => next.story.revision ?? null,
+      initialRevision: 5
+    });
+
+    void queue.enqueue({ status: "editing" });
+    await settle();
+    void queue.enqueue({ visuals: "first" });
+    void queue.enqueue({ deadline: "2026-09-01" });
+    void queue.enqueue({ visuals: "second" });
+    await settle();
+    expect(transport.requests).toHaveLength(1);
+
+    transport.respond(0, 6);
+    await settle();
+
+    expect(transport.requests).toHaveLength(2);
+    // Coalesced into one follow-up request; the newest value of a repeated
+    // field wins, so no newer local edit is discarded by an older one.
+    expect(transport.requests[1].changes).toEqual({
+      visuals: "second",
+      deadline: "2026-09-01",
+      expectedRevision: 6
+    });
+  });
+
+  it("marks the response superseded when a newer edit is already queued", async () => {
+    const transport = controllableTransport();
+    const queue = createWorkflowMutationQueue<WorkflowPayload>({
+      send: transport.send,
+      readRevision: (next) => next.story.revision ?? null,
+      initialRevision: 5
+    });
+
+    const first = queue.enqueue({ status: "editing" });
+    await settle();
+    void queue.enqueue({ status: "ready" });
+    transport.respond(0, 6);
+
+    // The caller can refuse to apply a payload that a newer local edit already
+    // replaced, instead of flashing back to the superseded value.
+    await expect(first).resolves.toMatchObject({ ok: true, superseded: true });
+  });
+
+  it("keeps a retryable failure retryable and leaves the queue usable", async () => {
+    const transport = controllableTransport();
+    const errors: string[] = [];
+    const queue = createWorkflowMutationQueue<WorkflowPayload>({
+      send: transport.send,
+      readRevision: (next) => next.story.revision ?? null,
+      initialRevision: 5,
+      onError: (error) => errors.push(error.message)
+    });
+
+    const failing = queue.enqueue({ visuals: "a note" });
+    await settle();
+    transport.requests[0].reject(new TypeError("Failed to fetch"));
+    const outcome = await failing;
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.conflict).toBe(false);
+      expect(outcome.error.retryable).toBe(true);
+    }
+    expect(errors).toHaveLength(1);
+    // A failed request never advances the revision, so a retry of the same
+    // value is still sent against the revision the client knows about.
+    expect(queue.getRevision()).toBe(5);
+
+    const retried = queue.enqueue({ visuals: "a note" });
+    await settle();
+    expect(transport.requests[1].changes).toEqual({ visuals: "a note", expectedRevision: 5 });
+    transport.respond(1, 6);
+    await expect(retried).resolves.toMatchObject({ ok: true });
+  });
+
+  it("reports a real cross-user conflict and stops sending until the client reloads", async () => {
+    const transport = controllableTransport();
+    const queue = createWorkflowMutationQueue<WorkflowPayload>({
+      send: transport.send,
+      readRevision: (next) => next.story.revision ?? null,
+      initialRevision: 5
+    });
+
+    const conflicting = queue.enqueue({ status: "ready" });
+    await settle();
+    transport.requests[0].reject({
+      code: "byline_editorial_conflict",
+      message: "This story changed while you were editing it.",
+      data: { status: 409, currentRevision: 9 }
+    });
+
+    const outcome = await conflicting;
+    expect(outcome).toMatchObject({ ok: false, conflict: true });
+    expect(queue.hasConflict()).toBe(true);
+
+    // A further edit is refused locally rather than sent with a revision the
+    // server has already rejected.
+    const blocked = queue.enqueue({ visuals: "still typing" });
+    await settle();
+    expect(transport.requests).toHaveLength(1);
+    expect(await blocked).toMatchObject({ ok: false, conflict: true });
+
+    // Reloading the story reconciles the queue at the server's revision.
+    queue.reconcile(9);
+    expect(queue.hasConflict()).toBe(false);
+    const afterReload = queue.enqueue({ visuals: "still typing" });
+    await settle();
+    expect(transport.requests[1].changes).toEqual({ visuals: "still typing", expectedRevision: 9 });
+    transport.respond(1, 10);
+    await expect(afterReload).resolves.toMatchObject({ ok: true });
+  });
+
+  it("stops reporting to a detached owner without abandoning in-flight work", async () => {
+    const transport = controllableTransport();
+    const applied: number[] = [];
+    const queue = createWorkflowMutationQueue<WorkflowPayload>({
+      send: transport.send,
+      readRevision: (next) => next.story.revision ?? null,
+      initialRevision: 5,
+      onSuccess: (next) => applied.push(next.story.revision ?? 0)
+    });
+
+    const pending = queue.enqueue({ visuals: "saved on the way out" });
+    await settle();
+    // Switching posts or closing the sidebar must not let this response land on
+    // another story's state — but it must still reach the server.
+    queue.detach();
+    transport.respond(0, 6);
+
+    await expect(pending).resolves.toMatchObject({ ok: true });
+    expect(applied).toEqual([]);
+  });
+
+  it("omits expectedRevision until a revision is known, for legacy callers", async () => {
+    const transport = controllableTransport();
+    const queue = createWorkflowMutationQueue<WorkflowPayload>({
+      send: transport.send,
+      readRevision: (next) => next.story.revision ?? null
+    });
+
+    void queue.enqueue({ status: "editing" });
+    await settle();
+    expect(transport.requests[0].changes).toEqual({ status: "editing" });
+  });
+
+  it("lets a reload tell that a write landed while it was open", async () => {
+    const transport = controllableTransport();
+    const queue = createWorkflowMutationQueue<WorkflowPayload>({
+      send: transport.send,
+      readRevision: (next) => next.story.revision ?? null,
+      initialRevision: 5
+    });
+
+    // A bootstrap read starts here, so the sidebar records what it knew then.
+    const settledWritesAtReadStart = queue.settledCount();
+    void queue.enqueue({ status: "editing" });
+    await settle();
+    transport.respond(0, 6);
+    await settle();
+
+    // The read's response now describes revision 5, which is already stale. The
+    // caller must be able to see that and refuse to reset the queue's revision,
+    // because doing so would turn the editor's own next edit into a conflict.
+    expect(queue.settledCount()).not.toBe(settledWritesAtReadStart);
+    expect(queue.getRevision()).toBe(6);
+  });
+
+  it("recognises a revision conflict from either the code or the HTTP status", () => {
+    expect(isWorkflowRevisionConflict({ code: "byline_editorial_conflict" })).toBe(true);
+    expect(isWorkflowRevisionConflict({ data: { status: 409 } })).toBe(true);
+    expect(isWorkflowRevisionConflict({ code: "byline_editorial_forbidden", data: { status: 403 } })).toBe(false);
+    expect(isWorkflowRevisionConflict(new TypeError("Failed to fetch"))).toBe(false);
+  });
+});
+
+// The Discussion panel has to tell three different situations apart, and the
+// bootstrap response is the only thing that can distinguish them.
+describe("workflow Discord context", () => {
+  it("reports an unconfigured integration", () => {
+    expect(workflowDiscordState({ configured: false, threadId: "", threadUrl: "" })).toBe("not-configured");
+    expect(workflowDiscordState(undefined)).toBe("not-configured");
+  });
+
+  it("reports a configured integration with no thread for this story", () => {
+    expect(workflowDiscordState({ configured: true, threadId: "", threadUrl: "" })).toBe("configured-unlinked");
+  });
+
+  it("reports a linked thread", () => {
+    expect(workflowDiscordState({ configured: true, threadId: "123", threadUrl: "https://discord.com/channels/1/123" })).toBe("linked");
+    // A pre-capability server response still resolves to the linked state.
+    expect(workflowDiscordState({ threadId: "123" })).toBe("linked");
   });
 });

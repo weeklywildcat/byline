@@ -430,6 +430,12 @@ function byline_update_editorial_story_state(int $post_id, array $changes, ?int 
         return $revision_check;
     }
 
+    // Keep the transition context private to the post-update action. Consumers
+    // such as notifications may need to distinguish a review return from an
+    // ordinary forward move, while existing three-argument integrations remain
+    // fully compatible.
+    $previous_state = byline_get_editorial_story_state($post_id);
+
     if (array_key_exists('status', $changes)) {
         byline_set_editorial_status($post_id, (string) $changes['status']);
     }
@@ -456,7 +462,7 @@ function byline_update_editorial_story_state(int $post_id, array $changes, ?int 
      * integration itself, so a downstream service being unavailable can never
      * block an editorial change.
      */
-    do_action('byline_editorial_story_updated', $post_id, $state, $changes);
+    do_action('byline_editorial_story_updated', $post_id, $state, $changes, $previous_state);
 
     return $state;
 }

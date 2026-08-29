@@ -17,5 +17,9 @@ if (strpos($source, "current_user_can('edit_post'") === false || strpos($source,
     fwrite(STDERR, "Dashboard permission checks are missing.\n");
     exit(1);
 }
+if (strpos($source, 'byline_deployment_lifecycle_status') === false || strpos($source, "\$lifecycle === 'live'") === false) {
+    fwrite(STDERR, "Dashboard site status must use the exact deployment lifecycle.\n");
+    exit(1);
+}
 
 fwrite(STDOUT, "Byline newsroom dashboard regression passed.\n");

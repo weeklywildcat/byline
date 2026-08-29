@@ -2,6 +2,7 @@ import { Button, Notice, SelectControl } from "@wordpress/components";
 import { useMemo, useState } from "@wordpress/element";
 import { __ } from "@wordpress/i18n";
 
+import { contentHealthFixHref } from "./content-health-navigation";
 import type { ContentHealthIssue, ContentHealthResponse, ContentHealthSeverity, OptionalResource } from "./planning-model";
 import { PlanningEmpty, PlanningNotice, PlanningStatusBadge, PlanningUnavailable, ViewHeader } from "./planning-ui";
 
@@ -78,20 +79,23 @@ export function ContentHealth({ resource, onRetry, onRecheck }: ContentHealthPro
       {data.lastRunAt ? <p className="byline-planning-help">{__("Last checked", "weekly-wildcat-headless")} <time dateTime={data.lastRunAt}>{new Date(data.lastRunAt).toLocaleString()}</time></p> : null}
       {!issues.length ? <PlanningEmpty label={__("Content health issues", "weekly-wildcat-headless")} instructions={data.issues.length ? __("No issues match these filters.", "weekly-wildcat-headless") : __("No cached content health issues were returned.", "weekly-wildcat-headless")} /> : (
         <ul className="byline-planning-health-list" aria-label={__("Content health issues", "weekly-wildcat-headless")}>
-          {issues.map((issue) => (
-            <li className={`byline-planning-health-item byline-planning-health-item-${issue.severity}`} key={issue.id}>
-              <PlanningStatusBadge label={issue.severity} tone={severityTone(issue.severity)} />
-              <div className="byline-planning-health-copy">
-                <strong>{issueLabel(issue)}</strong>
-                {issue.story ? <a href={issue.story.editUrl}>{issue.story.title}</a> : null}
-                {issue.lastCheckedAt ? <time dateTime={issue.lastCheckedAt}>{new Date(issue.lastCheckedAt).toLocaleString()}</time> : null}
-              </div>
-              <div className="byline-planning-inline-actions">
-                {issue.fixUrl ? <Button variant="secondary" href={issue.fixUrl}>{__("Fix", "weekly-wildcat-headless")}</Button> : null}
-                {onRecheck ? <Button variant="tertiary" disabled={busyId !== null} onClick={() => recheck(issue.id)}>{busyId === issue.id ? __("Checking…", "weekly-wildcat-headless") : __("Recheck", "weekly-wildcat-headless")}</Button> : null}
-              </div>
-            </li>
-          ))}
+          {issues.map((issue) => {
+            const fixHref = contentHealthFixHref(issue);
+            return (
+              <li className={`byline-planning-health-item byline-planning-health-item-${issue.severity}`} key={issue.id}>
+                <PlanningStatusBadge label={issue.severity} tone={severityTone(issue.severity)} />
+                <div className="byline-planning-health-copy">
+                  <strong>{issueLabel(issue)}</strong>
+                  {issue.story ? <a href={issue.story.editUrl}>{issue.story.title}</a> : null}
+                  {issue.lastCheckedAt ? <time dateTime={issue.lastCheckedAt}>{new Date(issue.lastCheckedAt).toLocaleString()}</time> : null}
+                </div>
+                <div className="byline-planning-inline-actions">
+                  {fixHref ? <Button variant="secondary" href={fixHref}>{__("Fix", "weekly-wildcat-headless")}</Button> : null}
+                  {onRecheck ? <Button variant="tertiary" disabled={busyId !== null} onClick={() => recheck(issue.id)}>{busyId === issue.id ? __("Checking…", "weekly-wildcat-headless") : __("Recheck", "weekly-wildcat-headless")}</Button> : null}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

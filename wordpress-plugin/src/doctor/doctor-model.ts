@@ -9,6 +9,10 @@ export type DoctorDiagnostics = {
   publicManifest?: {
     reachable?: boolean;
     status?: string;
+    lifecycle?: string;
+    expectedRevision?: number;
+    publicationRevision?: number;
+    contentRevision?: number;
   };
   jobs?: {
     overdueCount?: number;
@@ -80,6 +84,7 @@ export function doctorStatus(diagnostics: DoctorDiagnostics | null): "good" | "r
   const explicit = diagnostics?.healthSummary?.status;
   const problems = doctorProblemChecks(diagnostics);
   if (problems.some((check) => check.status === "critical")) return "critical";
+  if (doctorManifestNeedsAttention(diagnostics)) return "recommended";
   if (problems.length) return "recommended";
   if (explicit === "good" || explicit === "recommended" || explicit === "critical") return explicit;
   return diagnostics ? "good" : "unknown";
@@ -109,5 +114,8 @@ export function doctorDeploymentNeedsAttention(diagnostics: DoctorDiagnostics | 
 
 export function doctorManifestNeedsAttention(diagnostics: DoctorDiagnostics | null): boolean {
   const manifest = diagnostics?.publicManifest;
-  return Boolean(manifest && !manifest.reachable);
+  if (!manifest) return false;
+  if (!manifest.reachable) return true;
+  if (manifest.lifecycle && manifest.lifecycle !== "live" && Number(manifest.expectedRevision || 0) > 0) return true;
+  return Number(manifest.expectedRevision || 0) > Number(manifest.publicationRevision ?? manifest.contentRevision ?? 0);
 }

@@ -283,10 +283,127 @@ function byline_content_health_image_credit(int $attachment_id): string
     return '';
 }
 
+/**
+ * Fingerprints are used only to confirm that a structural locator still points
+ * at the same saved attribute. The source value is never sent to the browser.
+ */
+function byline_content_health_fix_fingerprint(string $value): string
+{
+    return substr(hash('sha256', $value), 0, 16);
+}
+
+/**
+ * Find a stable block attribute containing the checked URL. Gutenberg recreates
+ * clientIds whenever content is parsed, so only a structural path and a small
+ * value fingerprint are persisted.
+ *
+ * @return array{attribute:string,valueFingerprint:string}|null
+ */
+function byline_content_health_block_attribute_locator(array $attributes, string $url, string $prefix = '', int $depth = 0): ?array
+{
+    if ($depth > 4) {
+        return null;
+    }
+
+    foreach ($attributes as $key => $value) {
+        $attribute = $prefix === '' ? (string) $key : $prefix . '.' . (string) $key;
+        if (is_string($value)) {
+            $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (strpos($value, $url) !== false || strpos($decoded, $url) !== false) {
+                return [
+                    'attribute' => $attribute,
+                    'valueFingerprint' => byline_content_health_fix_fingerprint($value),
+                ];
+            }
+            continue;
+        }
+        if (is_array($value)) {
+            $nested = byline_content_health_block_attribute_locator($value, $url, $attribute, $depth + 1);
+            if ($nested !== null) {
+                return $nested;
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Return the first block containing a checked URL. The returned path is made
+ * from sibling indexes in the saved tree and is intentionally clientId-free.
+ *
+ * @return array{kind:string,blockPath:array<int,int>,blockName?:string,attribute?:string,valueFingerprint?:string}|null
+ */
+function byline_content_health_find_link_block_target(array $blocks, string $url, array $path = []): ?array
+{
+    foreach ($blocks as $index => $block) {
+        if (!is_array($block) || count($path) >= 32) {
+            continue;
+        }
+
+        $block_path = array_merge($path, [(int) $index]);
+        $children = is_array($block['innerBlocks'] ?? null) ? $block['innerBlocks'] : [];
+        $child_target = byline_content_health_find_link_block_target($children, $url, $block_path);
+        if ($child_target !== null) {
+            return $child_target;
+        }
+
+        $block_name = (string) ($block['blockName'] ?? '');
+        if ($block_name === '') {
+            continue;
+        }
+
+        $locator = byline_content_health_block_attribute_locator(
+            is_array($block['attrs'] ?? null) ? $block['attrs'] : [],
+            $url
+        );
+        if ($locator === null) {
+            $inner_html = (string) ($block['innerHTML'] ?? '');
+            $decoded_inner_html = html_entity_decode($inner_html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (strpos($inner_html, $url) === false && strpos($decoded_inner_html, $url) === false) {
+                continue;
+            }
+        }
+
+        $target = [
+            'kind' => 'block',
+            'blockPath' => $block_path,
+            'blockName' => $block_name,
+        ];
+        if ($locator !== null) {
+            $target['attribute'] = $locator['attribute'];
+            $target['valueFingerprint'] = $locator['valueFingerprint'];
+        }
+        return $target;
+    }
+
+    return null;
+}
+
+/** @return array{kind:string,blockPath:array<int,int>,blockName?:string,attribute?:string,valueFingerprint?:string}|null */
+function byline_content_health_link_fix_target(string $content, string $url): ?array
+{
+    if ($content === '' || $url === '' || !function_exists('parse_blocks')) {
+        return null;
+    }
+
+    try {
+        $blocks = parse_blocks($content);
+    } catch (Throwable $exception) {
+        return null;
+    }
+
+    return is_array($blocks) ? byline_content_health_find_link_block_target($blocks, $url) : null;
+}
+
 function byline_content_health_issue(string $id, string $severity, string $label, string $message, int $post_id, string $fix_url = '', array $data = []): array
 {
     $severity = in_array($severity, ['good', 'warning', 'error'], true) ? $severity : 'warning';
-    return [
+    $fix_target = is_array($data['fixTarget'] ?? null) ? $data['fixTarget'] : null;
+    if ($fix_target !== null) {
+        unset($data['fixTarget']);
+    }
+    $issue = [
         'id' => sanitize_key($id),
         'severity' => $severity,
         'label' => byline_content_health_text($label, 120),
@@ -297,6 +414,10 @@ function byline_content_health_issue(string $id, string $severity, string $label
         'fixUrl' => $fix_url !== '' ? byline_content_health_text($fix_url, 512) : '',
         'data' => $data,
     ];
+    if ($fix_target !== null) {
+        $issue['fixTarget'] = $fix_target;
+    }
+    return $issue;
 }
 
 function byline_content_health_extract_links(string $content): array
@@ -330,19 +451,20 @@ function byline_content_health_story_results(int $post_id, array $options = []):
     $fix_url = function_exists('get_edit_post_link') ? (string) get_edit_post_link($post_id, 'raw') : '';
     $checks = [];
     $featured_id = byline_content_health_featured_image_id($post_id);
+    $featured_target = ['kind' => 'featured-image'];
     $checks[] = $featured_id > 0
-        ? byline_content_health_issue('featured-image', 'good', 'Featured image', 'A featured image is selected.', $post_id, $fix_url, ['attachmentId' => $featured_id])
-        : byline_content_health_issue('featured-image', 'warning', 'Featured image', 'This published story has no featured image.', $post_id, $fix_url);
+        ? byline_content_health_issue('featured-image', 'good', 'Featured image', 'A featured image is selected.', $post_id, $fix_url, ['attachmentId' => $featured_id, 'fixTarget' => $featured_target])
+        : byline_content_health_issue('featured-image', 'warning', 'Featured image', 'This published story has no featured image.', $post_id, $fix_url, ['fixTarget' => $featured_target]);
     if ($featured_id > 0) {
         $checks[] = byline_content_health_image_alt($featured_id) !== ''
-            ? byline_content_health_issue('featured-image-alt', 'good', 'Featured image alt text', 'The featured image has alt text.', $post_id, $fix_url)
-            : byline_content_health_issue('featured-image-alt', 'warning', 'Featured image alt text', 'Add descriptive alt text for the featured image.', $post_id, $fix_url, ['attachmentId' => $featured_id]);
+            ? byline_content_health_issue('featured-image-alt', 'good', 'Featured image alt text', 'The featured image has alt text.', $post_id, $fix_url, ['fixTarget' => $featured_target])
+            : byline_content_health_issue('featured-image-alt', 'warning', 'Featured image alt text', 'Add descriptive alt text for the featured image.', $post_id, $fix_url, ['attachmentId' => $featured_id, 'fixTarget' => $featured_target]);
         $checks[] = byline_content_health_image_credit($featured_id) !== ''
-            ? byline_content_health_issue('image-credit', 'good', 'Image credit', 'The featured image has a credit.', $post_id, $fix_url)
-            : byline_content_health_issue('image-credit', 'warning', 'Image credit', 'Add a credit or confirm the publication-wide default.', $post_id, $fix_url, ['attachmentId' => $featured_id]);
+            ? byline_content_health_issue('image-credit', 'good', 'Image credit', 'The featured image has a credit.', $post_id, $fix_url, ['fixTarget' => $featured_target])
+            : byline_content_health_issue('image-credit', 'warning', 'Image credit', 'Add a credit or confirm the publication-wide default.', $post_id, $fix_url, ['attachmentId' => $featured_id, 'fixTarget' => $featured_target]);
     } else {
-        $checks[] = byline_content_health_issue('featured-image-alt', 'warning', 'Featured image alt text', 'Alt text can be checked after a featured image is selected.', $post_id, $fix_url);
-        $checks[] = byline_content_health_issue('image-credit', 'warning', 'Image credit', 'A credit can be checked after a featured image is selected.', $post_id, $fix_url);
+        $checks[] = byline_content_health_issue('featured-image-alt', 'warning', 'Featured image alt text', 'Alt text can be checked after a featured image is selected.', $post_id, $fix_url, ['fixTarget' => $featured_target]);
+        $checks[] = byline_content_health_issue('image-credit', 'warning', 'Image credit', 'A credit can be checked after a featured image is selected.', $post_id, $fix_url, ['fixTarget' => $featured_target]);
     }
 
     $content = (string) ($post->post_content ?? '');
@@ -352,6 +474,11 @@ function byline_content_health_story_results(int $post_id, array $options = []):
             $link = byline_content_health_check_url($url, !empty($options['refresh']));
             $links_checked++;
             $safe_url = byline_content_health_display_url((string) $url);
+            $link_data = ['url' => $safe_url, 'status' => (int) ($link['status'] ?? 0), 'cached' => !empty($link['cached'])];
+            $link_target = byline_content_health_link_fix_target($content, (string) $url);
+            if ($link_target !== null) {
+                $link_data['fixTarget'] = $link_target;
+            }
             $checks[] = byline_content_health_issue(
                 'link-' . substr(hash('sha256', (string) $url), 0, 12),
                 !empty($link['ok']) ? 'good' : 'error',
@@ -359,7 +486,7 @@ function byline_content_health_story_results(int $post_id, array $options = []):
                 (string) ($link['message'] ?? 'The link could not be checked.'),
                 $post_id,
                 $fix_url,
-                ['url' => $safe_url, 'status' => (int) ($link['status'] ?? 0), 'cached' => !empty($link['cached'])]
+                $link_data
             );
         }
     }

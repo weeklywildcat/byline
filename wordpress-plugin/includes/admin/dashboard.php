@@ -153,14 +153,20 @@ function byline_dashboard_site_status(): void
     $deployment = function_exists('byline_deployment_status') ? byline_deployment_status() : [];
     $manifest = function_exists('byline_public_manifest_diagnostic') ? byline_public_manifest_diagnostic() : [];
     $last_status = (string) ($deployment['lastStatus'] ?? '');
+    $lifecycle = function_exists('byline_deployment_lifecycle_status')
+        ? byline_deployment_lifecycle_status($deployment, $manifest)
+        : '';
     $failed = preg_match('/request failed|http [45]\d\d|no http status/i', $last_status) === 1;
-    if ($failed) {
+    if ($failed || $lifecycle === 'failed') {
         $label = __('Build failed', 'weekly-wildcat-headless');
         $class = 'is-error';
-    } elseif (!empty($deployment['pending'])) {
+    } elseif ($lifecycle === 'queued' || $lifecycle === 'building' || !empty($deployment['pending'])) {
         $label = __('Building', 'weekly-wildcat-headless');
         $class = 'is-warning';
-    } elseif (!empty($manifest['reachable'])) {
+    } elseif ($lifecycle === 'needs_configuration') {
+        $label = __('Needs configuration', 'weekly-wildcat-headless');
+        $class = 'is-warning';
+    } elseif ($lifecycle === 'live' || ($lifecycle === '' && !empty($manifest['reachable']))) {
         $label = __('Live', 'weekly-wildcat-headless');
         $class = 'is-success';
     } else {

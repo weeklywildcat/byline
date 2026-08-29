@@ -89,9 +89,13 @@ function byline_readiness_image_credit(int $attachment_id): string
         if ($credit !== '') {
             return $credit;
         }
+        $creator = wwh_image_meta_value($attachment_id, 'creator');
+        if ($creator !== '') {
+            return $creator;
+        }
     }
 
-    foreach (['_ww_image_credit_text', '_byline_image_credit_text', '_byline_story_image_credit'] as $key) {
+    foreach (['_ww_image_credit_text', '_ww_image_creator', '_byline_image_credit_text', '_byline_story_image_credit'] as $key) {
         $credit = trim((string) get_post_meta($attachment_id, $key, true));
         if ($credit !== '') {
             return $credit;
@@ -229,6 +233,9 @@ function byline_story_readiness_checks(int $post_id, array $context = []): array
     }
 
     $visual_text = function_exists('byline_get_editorial_visuals') ? byline_get_editorial_visuals($post_id) : '';
+    $media_request = function_exists('byline_get_editorial_media_request')
+        ? byline_get_editorial_media_request($post_id)
+        : null;
     $visual_records = [];
     foreach (['byline_get_story_visual_requests', 'byline_get_story_media_requests', 'byline_get_editorial_media_requests', 'byline_get_editorial_media_request'] as $provider) {
         if (function_exists($provider)) {
@@ -241,15 +248,42 @@ function byline_story_readiness_checks(int $post_id, array $context = []): array
             break;
         }
     }
-    $visual_open = $visual_text !== '';
-    foreach ($visual_records as $visual) {
-        if (!is_array($visual)) {
-            continue;
+
+    $media_is_structured = is_array($media_request) && empty($media_request['isLegacy']);
+    if ($media_is_structured) {
+        $media_readiness = is_array($media_request['mediaReadiness'] ?? null)
+            ? $media_request['mediaReadiness']
+            : [];
+        $invalid_media_ids = array_values(array_filter(array_map('absint', (array) ($media_readiness['invalidAttachmentIds'] ?? $media_request['invalidAttachmentIds'] ?? []))));
+        $missing_alt_ids = array_values(array_filter(array_map('absint', (array) ($media_readiness['missingAltIds'] ?? []))));
+        $missing_credit_ids = array_values(array_filter(array_map('absint', (array) ($media_readiness['missingCreditIds'] ?? []))));
+        $missing_rights_ids = array_values(array_filter(array_map('absint', (array) ($media_readiness['missingRightsIds'] ?? []))));
+
+        $visual_open = $invalid_media_ids !== []
+            || (($media_request['type'] ?? 'none') !== 'none' && ($media_request['status'] ?? 'needed') !== 'done');
+        if ($invalid_media_ids !== []) {
+            $checks[] = byline_readiness_check('media-invalid-attachment', 'Media attachments', 'warning', 'One or more linked media items is no longer available or readable. Relink the request to a valid WordPress Media Library item.', $fix_url);
         }
-        $status = sanitize_key((string) ($visual['status'] ?? 'needed'));
-        if (in_array($status, ['needed', 'assigned', 'in-progress'], true)) {
-            $visual_open = true;
-            break;
+        if ($missing_alt_ids !== []) {
+            $checks[] = byline_readiness_check('media-attachment-alt', 'Linked image alt text', 'warning', 'Add descriptive alt text to every linked image.', $fix_url);
+        }
+        if ($missing_credit_ids !== []) {
+            $checks[] = byline_readiness_check('media-attachment-credit', 'Linked image credit', 'warning', 'Add a creator or display credit to every linked image.', $fix_url);
+        }
+        if ($missing_rights_ids !== []) {
+            $checks[] = byline_readiness_check('media-attachment-rights', 'Linked image rights', 'warning', 'Add attachment rights or confirm the publication-wide license defaults.', $fix_url);
+        }
+    } else {
+        $visual_open = $visual_text !== '';
+        foreach ($visual_records as $visual) {
+            if (!is_array($visual)) {
+                continue;
+            }
+            $status = sanitize_key((string) ($visual['status'] ?? 'needed'));
+            if (in_array($status, ['needed', 'assigned', 'in-progress'], true)) {
+                $visual_open = true;
+                break;
+            }
         }
     }
     $checks[] = !$visual_open

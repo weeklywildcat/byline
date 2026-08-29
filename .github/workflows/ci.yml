@@ -87,3 +87,34 @@ jobs:
           name: weekly-wildcat-headless
           path: wordpress-plugin/release/weekly-wildcat-headless.zip
           if-no-files-found: error
+
+  wordpress-e2e:
+    name: WordPress E2E (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [primary, legacy]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Build plugin assets
+        run: npm run build:plugin
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start WordPress and run browser smoke tests
+        run: npm run test:e2e:${{ matrix.environment }} --workspace @byline/wordpress-plugin

@@ -1,0 +1,71 @@
+{
+  "story": {
+    "id": 100,
+    "title": "Parity Story",
+    "titleHtml": "Parity <em>Story</em>",
+    "excerptHtml": "<p>A saved excerpt.</p>",
+    "contentIncludes": "A saved body for parity.",
+    "category": {
+      "label": "News",
+      "href": "/category/news/"
+    },
+    "contributors": [
+      {
+        "id": "user-7-alex-rivera",
+        "name": "Alex Rivera",
+        "role": "Editor",
+        "bio": "Reporter bio",
+        "founder": true,
+        "contactHref": "mailto:alex@example.test",
+        "photo": {
+          "path": "/uploads/alex.jpg",
+          "alt": "Alex"
+        },
+        "coverage": ["News", "Arts", "Sports"]
+      },
+      {
+        "id": "guest-44-jordan-guest",
+        "name": "Jordan Guest",
+        "role": "Community contributor",
+        "bio": "Guest bio",
+        "founder": false,
+        "contactHref": "",
+        "photo": {
+          "path": "/uploads/jordan.jpg",
+          "alt": "Jordan"
+        },
+        "coverage": ["News", "Arts", "Sports"]
+      }
+    ],
+    "featuredImage": {
+      "path": "/uploads/hero.jpg",
+      "alt": "Hero alt",
+      "captionHtml": "<p>Hero caption <strong>HTML</strong>.</p>",
+      "fallbackCaption": "Fallback caption",
+      "credit": "Canonical Photographer"
+    },
+    "topics": [
+      { "id": "post_tag-11", "name": "Sport: Basketball" },
+      { "id": "post_tag-12", "name": "Campus" }
+    ],
+    "corrections": [
+      {
+        "id": "701",
+        "label": "Clarification",
+        "date": "2026-08-28T09:00:00Z",
+        "dateLabel": "August 28, 2026",
+        "text": "We clarified the record."
+      }
+    ],
+    "relatedIds": [104, 101, 108],
+    "moreByAuthorIds": [103, 105],
+    "athleteMeta": ["Athlete of the Week", "Basketball"],
+    "publishedDateLabel": "August 20, 2026",
+    "update": null,
+    "readingTime": "1 min read",
+    "publication": {
+      "shortName": "Weekly Wildcat",
+      "contactHref": "/contact/"
+    }
+  }
+}

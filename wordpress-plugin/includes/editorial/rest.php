@@ -97,7 +97,7 @@ function byline_editorial_rest_payload(int $post_id): array
     $post = get_post($post_id);
     $author = $post instanceof WP_Post ? get_user_by('id', (int) $post->post_author) : false;
     $media = function_exists('byline_get_editorial_media_request')
-        ? byline_get_editorial_media_request($post_id)
+        ? byline_get_editorial_media_request($post_id, byline_editorial_rest_current_user_id())
         : [];
     $corrections = function_exists('byline_list_corrections')
         ? byline_list_corrections($post_id, false)
@@ -142,10 +142,7 @@ function byline_editorial_rest_payload(int $post_id): array
             'ready' => !empty($readiness['ready']),
         ],
         'notes' => byline_editorial_rest_notes_support($post_id),
-        'discord' => [
-            'threadId' => byline_editorial_rest_discord_thread($post_id),
-            'threadUrl' => byline_editorial_rest_discord_thread_url($post_id),
-        ],
+        'discord' => byline_editorial_rest_discord_context($post_id),
     ];
 }
 
@@ -214,6 +211,49 @@ function byline_editorial_rest_discord_thread_url(int $post_id): string
     return 'https://discord.com/channels/' . rawurlencode($guild_id) . '/' . rawurlencode($thread_id);
 }
 
+/**
+ * Whether this publication has Discord set up at all.
+ *
+ * Only the fact of configuration is derived here — never a token, a webhook, a
+ * bot URL, or any other credential. A story that already carries a thread is
+ * treated as configured too, so an install whose Discord settings live only in
+ * the bot's environment is not reported as disconnected.
+ */
+function byline_editorial_rest_discord_configured(int $post_id): bool
+{
+    if (byline_editorial_rest_discord_thread($post_id) !== '') {
+        return true;
+    }
+    if (function_exists('byline_discord_enabled') && byline_discord_enabled()) {
+        return true;
+    }
+    if (function_exists('byline_discord_setting')) {
+        return byline_discord_setting('guildId') !== '' && byline_discord_setting('storyboardChannelId') !== '';
+    }
+    return false;
+}
+
+/**
+ * The safe Discord projection for one story.
+ *
+ * The editor needs to tell three states apart: Discord is not configured, it is
+ * configured but this story has no thread, and this story has a linked thread.
+ * `canCreateThread` stays false because Byline has no WordPress-side API that
+ * creates a storyboard thread; threads are created in Discord and linked by the
+ * bot's reconciliation.
+ *
+ * @return array<string,mixed>
+ */
+function byline_editorial_rest_discord_context(int $post_id): array
+{
+    return [
+        'configured' => byline_editorial_rest_discord_configured($post_id),
+        'threadId' => byline_editorial_rest_discord_thread($post_id),
+        'threadUrl' => byline_editorial_rest_discord_thread_url($post_id),
+        'canCreateThread' => false,
+    ];
+}
+
 function byline_editorial_rest_get_story(WP_REST_Request $request)
 {
     return rest_ensure_response(byline_editorial_rest_payload(absint($request->get_param('id'))));
@@ -234,7 +274,7 @@ function byline_editorial_rest_bootstrap_payload(int $post_id): array
     $post = get_post($post_id);
     $author = $post instanceof WP_Post ? get_user_by('id', (int) $post->post_author) : false;
     $media = function_exists('byline_get_editorial_media_request')
-        ? byline_get_editorial_media_request($post_id)
+        ? byline_get_editorial_media_request($post_id, byline_editorial_rest_current_user_id())
         : [];
     $readiness = function_exists('byline_get_story_readiness')
         ? byline_get_story_readiness($post_id)
@@ -285,10 +325,7 @@ function byline_editorial_rest_bootstrap_payload(int $post_id): array
             'ready' => !empty($readiness['ready']),
         ],
         'notes' => byline_editorial_rest_notes_support($post_id),
-        'discord' => [
-            'threadId' => byline_editorial_rest_discord_thread($post_id),
-            'threadUrl' => byline_editorial_rest_discord_thread_url($post_id),
-        ],
+        'discord' => byline_editorial_rest_discord_context($post_id),
     ];
 }
 
@@ -409,36 +446,129 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
     if ($expected_revision !== null) {
         $changes['expectedRevision'] = $expected_revision;
     }
-    $result = $changes !== [] ? byline_update_editorial_story_state($post_id, $changes, null, false) : byline_get_editorial_story_state($post_id);
+
+    // A grouped update writes to unrelated WordPress storage that cannot be
+    // wrapped in a real transaction, so this does not pretend otherwise. Each
+    // write registers how to undo itself; if a later write fails, the earlier
+    // ones are restored and the request truly leaves nothing behind. Only when
+    // a restore itself fails does the story keep changed state — and then the
+    // revision is bumped and the client is told to reload, so it can never
+    // believe the old revision is still authoritative.
+    $rollbacks = [];
+    $undo_all = static function () use (&$rollbacks): bool {
+        $restored = true;
+        foreach (array_reverse($rollbacks) as $undo) {
+            try {
+                if ($undo() === false) {
+                    $restored = false;
+                }
+            } catch (Throwable $exception) {
+                $restored = false;
+            }
+        }
+        $rollbacks = [];
+        return $restored;
+    };
+    $fail = static function ($error) use ($post_id, $undo_all) {
+        if ($undo_all()) {
+            return $error;
+        }
+        byline_bump_editorial_revision($post_id);
+        return new WP_Error(
+            'byline_editorial_partial_update',
+            'Part of this change was saved before a later step failed, and it could not be undone. Reload the story to see what is stored now.',
+            [
+                'status' => 409,
+                'currentRevision' => byline_get_editorial_revision($post_id),
+            ]
+        );
+    };
+
+    $previous_state = byline_get_editorial_story_state($post_id);
+    $result = $changes !== [] ? byline_update_editorial_story_state($post_id, $changes, null, false) : $previous_state;
 
     if (is_wp_error($result)) {
         return $result;
     }
 
+    if ($changes !== []) {
+        $rollbacks[] = static function () use ($post_id, $changes, $previous_state): void {
+            // Restore through the storage setters rather than the validating
+            // update path: this is a repair of state the server itself wrote,
+            // and it must not re-announce an editorial change that never held.
+            if (array_key_exists('status', $changes)) {
+                byline_set_editorial_status($post_id, (string) $previous_state['storedStatus']);
+            }
+            if (array_key_exists('editorId', $changes)) {
+                byline_set_editorial_editor_id($post_id, (int) $previous_state['editorId']);
+            }
+            if (array_key_exists('deadline', $changes)) {
+                byline_set_editorial_deadline($post_id, (string) $previous_state['deadline']);
+            }
+            if (array_key_exists('visuals', $changes)) {
+                byline_set_editorial_visuals($post_id, (string) $previous_state['visuals']);
+            }
+        };
+    }
+
     if (array_key_exists('plannedPublishAt', $extended)) {
-        byline_set_editorial_planned_publish_at($post_id, $extended['plannedPublishAt']);
+        $previous_planned = function_exists('byline_get_editorial_planned_publish_at')
+            ? byline_get_editorial_planned_publish_at($post_id)
+            : '';
+        if (byline_set_editorial_planned_publish_at($post_id, $extended['plannedPublishAt']) === false) {
+            return $fail(new WP_Error('byline_editorial_invalid_planned_publish', 'Use a valid planned publication date/time.', ['status' => 400]));
+        }
+        $rollbacks[] = static function () use ($post_id, $previous_planned) {
+            return byline_set_editorial_planned_publish_at($post_id, $previous_planned) !== false;
+        };
     }
 
     if (array_key_exists('media', $extended) || array_key_exists('visualRequest', $extended)) {
         $media = $extended['media'] ?? $extended['visualRequest'];
+        $media_meta_key = defined('BYLINE_EDITORIAL_MEDIA_REQUEST_META') ? BYLINE_EDITORIAL_MEDIA_REQUEST_META : '';
+        $media_existed = $media_meta_key !== '' && function_exists('metadata_exists')
+            ? (bool) metadata_exists('post', $post_id, $media_meta_key)
+            : false;
+        $media_previous = $media_meta_key !== '' ? get_post_meta($post_id, $media_meta_key, true) : '';
         $media_result = byline_set_editorial_media_request($post_id, $media);
         if (is_wp_error($media_result)) {
-            return $media_result;
+            return $fail($media_result);
+        }
+        if ($media_meta_key !== '') {
+            $rollbacks[] = static function () use ($post_id, $media_meta_key, $media_existed, $media_previous): void {
+                if ($media_existed) {
+                    update_post_meta($post_id, $media_meta_key, $media_previous);
+                    return;
+                }
+                delete_post_meta($post_id, $media_meta_key);
+            };
         }
     }
 
     if (array_key_exists('coverageIds', $extended)) {
+        $previous_coverage = function_exists('byline_get_story_coverage_ids')
+            ? byline_get_story_coverage_ids($post_id)
+            : [];
         $coverage_result = byline_set_story_coverage_ids($post_id, $extended['coverageIds']);
         if (is_wp_error($coverage_result)) {
-            return $coverage_result;
+            return $fail($coverage_result);
         }
+        $rollbacks[] = static function () use ($post_id, $previous_coverage) {
+            return !is_wp_error(byline_set_story_coverage_ids($post_id, $previous_coverage));
+        };
     }
 
     if (array_key_exists('contributors', $extended)) {
+        $previous_contributors = function_exists('byline_get_story_contributor_entries')
+            ? byline_get_story_contributor_entries($post_id, false)
+            : [];
         $contributors_result = byline_set_story_contributors($post_id, $extended['contributors']);
         if (is_wp_error($contributors_result)) {
-            return $contributors_result;
+            return $fail($contributors_result);
         }
+        $rollbacks[] = static function () use ($post_id, $previous_contributors) {
+            return !is_wp_error(byline_set_story_contributors($post_id, $previous_contributors));
+        };
     }
 
     if ($changes !== [] || $extended !== []) {
@@ -883,7 +1013,7 @@ function byline_editorial_rest_delete_view(WP_REST_Request $request)
 
 function byline_editorial_rest_get_media(WP_REST_Request $request)
 {
-    return rest_ensure_response(byline_get_editorial_media_request(absint($request->get_param('id'))));
+    return rest_ensure_response(byline_get_editorial_media_request(absint($request->get_param('id')), byline_editorial_rest_current_user_id()));
 }
 
 /** @return array<string,mixed> */
@@ -892,6 +1022,8 @@ function byline_editorial_rest_media_item(array $row): array
     $request = is_array($row['request'] ?? null) ? $row['request'] : [];
     $story_id = absint($row['storyId'] ?? 0);
     $featured = is_array($row['featuredImage'] ?? null) ? $row['featuredImage'] : [];
+    $media_readiness = is_array($request['mediaReadiness'] ?? null) ? $request['mediaReadiness'] : [];
+    $featured_attachment_id = absint($media_readiness['featuredAttachmentId'] ?? 0);
 
     return [
         // Media requests are additive story metadata, so the story ID is the
@@ -909,7 +1041,14 @@ function byline_editorial_rest_media_item(array $row): array
         'notes' => (string) ($request['notes'] ?? ''),
         'legacyNotes' => (string) ($request['legacyNotes'] ?? ''),
         'attachmentIds' => array_values(array_map('absint', (array) ($request['attachmentIds'] ?? []))),
-        'featuredAttachmentId' => !empty($featured['isLinked']) ? absint($featured['attachmentId'] ?? 0) : null,
+        // These fields are additive and remain inside the protected editorial
+        // response. Attachment ownership and metadata stay in WordPress Media.
+        'attachments' => is_array($request['attachments'] ?? null) ? $request['attachments'] : [],
+        'invalidAttachmentIds' => array_values(array_map('absint', (array) ($request['invalidAttachmentIds'] ?? []))),
+        'mediaReadiness' => is_array($request['mediaReadiness'] ?? null) ? $request['mediaReadiness'] : null,
+        'featuredAttachmentId' => $featured_attachment_id > 0
+            ? $featured_attachment_id
+            : (!empty($featured['isLinked']) ? absint($featured['attachmentId'] ?? 0) : null),
     ];
 }
 
@@ -937,7 +1076,14 @@ function byline_editorial_rest_update_media(WP_REST_Request $request)
 {
     $story_id = absint($request->get_param('id'));
     $body = byline_editorial_rest_body($request);
-    $result = byline_set_editorial_media_request($story_id, $body);
+    // Keep the existing update route useful for the Media Desk controls while
+    // delegating featured selection to the same canonical helper as the
+    // dedicated backwards-compatible featured route.
+    if (array_key_exists('featuredAttachmentId', $body) && absint($body['featuredAttachmentId']) > 0) {
+        $result = byline_editorial_set_media_request_featured_image($story_id, absint($body['featuredAttachmentId']));
+    } else {
+        $result = byline_set_editorial_media_request($story_id, $body);
+    }
 
     return is_wp_error($result) ? $result : rest_ensure_response($result);
 }
@@ -1779,6 +1925,14 @@ function byline_editorial_rest_story_distribution_payload(int $post_id): array
         'channels' => $channels,
         'capabilities' => [
             'addToNewsletter' => !empty($state['channels']['newsletter']['configured']),
+            // Reported so the article panel never has to probe an integration
+            // route it is not allowed to read just to decide whether to offer
+            // Retry. The retry route remains the authorization boundary.
+            'retryWebsite' => current_user_can(
+                defined('BYLINE_MANAGE_INTEGRATIONS_CAPABILITY')
+                    ? BYLINE_MANAGE_INTEGRATIONS_CAPABILITY
+                    : 'manage_byline_integrations'
+            ),
         ],
     ];
 }

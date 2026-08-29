@@ -40,6 +40,10 @@ build_assets=(
   build/editorial-workflow.js
   build/editorial-workflow.asset.php
   build/editorial-workflow.css
+  # Authenticated article preview runs in its own admin page and iframe.
+  build/article-preview.js
+  build/article-preview.asset.php
+  build/article-preview.css
   # The normal Page editor settings panel is separate from the story workflow.
   build/page-editor.js
   build/page-editor.asset.php
@@ -120,7 +124,7 @@ done
 # WordPress-provided packages rather than bundling a second React or a second
 # copy of the editor packages.
 workflow_dependencies="$(php -r '$asset = include $argv[1]; echo implode("\n", $asset["dependencies"] ?? []);' "$plugin_root/build/editorial-workflow.asset.php")"
-for editor_dependency in wp-plugins wp-editor wp-element wp-data wp-components wp-api-fetch; do
+for editor_dependency in wp-plugins wp-edit-post wp-element wp-data wp-components wp-api-fetch; do
   if ! grep -qx "$editor_dependency" <<<"$workflow_dependencies"; then
     echo "WordPress dependency $editor_dependency is missing from the workflow editor asset manifest." >&2
     exit 1
@@ -151,6 +155,9 @@ rsync -a "$plugin_root/" "$stage_root/weekly-wildcat-headless/" \
   --exclude '.env.*' \
   --exclude 'tests' \
   --exclude 'tests-js' \
+  --exclude 'e2e' \
+  --exclude '.wp-env.json' \
+  --exclude '.wp-env.override.json' \
   --exclude 'src' \
   --exclude 'scripts' \
   --exclude 'README.md' \
@@ -164,6 +171,9 @@ rsync -a "$plugin_root/" "$stage_root/weekly-wildcat-headless/" \
   --exclude '*.map' \
   --exclude '.DS_Store'
 
+# zip adds to an existing archive rather than replacing it, so a file that was
+# removed from the plugin would otherwise keep shipping in every later release.
+rm -f "$archive"
 (cd "$stage_root" && zip -qr "$archive" weekly-wildcat-headless)
 unzip -tq "$archive"
 
@@ -173,6 +183,9 @@ grep -qx 'weekly-wildcat-headless/build/index.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.asset.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/editorial-workflow.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/editorial-workflow.asset.php' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/article-preview.js' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/article-preview.asset.php' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/article-preview.css' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/page-editor.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/page-editor.asset.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/block.json' <<<"$archive_files"

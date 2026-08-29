@@ -1068,10 +1068,10 @@ function PublicationSettings({
               <ToggleControl
                 label={feature.charAt(0).toUpperCase() + feature.slice(1)}
                 checked={enabled}
-                onChange={(checked) => {
-                  if (!checked && !window.confirm(`${feature.charAt(0).toUpperCase() + feature.slice(1)} content will be hidden, not deleted. Continue?`)) return;
-                  setDraft({ ...draft, features: { ...draft.features, [feature]: checked } });
-                }}
+                // Toggling a feature only edits an unsaved draft, and turning it
+                // back on restores the surface, so this needs no confirmation:
+                // the note above already explains that content is kept.
+                onChange={(checked) => setDraft({ ...draft, features: { ...draft.features, [feature]: checked } })}
               />
               <p className="byline-field-note">{featureDescriptions[feature]}</p>
             </div>

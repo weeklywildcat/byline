@@ -91,6 +91,14 @@ function byline_editorial_enqueue_editor_assets(string $hook): void
     }
 
     wp_set_script_translations(BYLINE_EDITORIAL_WORKFLOW_HANDLE, 'weekly-wildcat-headless');
+
+    // The editor uses this only as a launch target. The preview page performs
+    // its own post-level capability check and reads no draft data in public.
+    wp_localize_script(BYLINE_EDITORIAL_WORKFLOW_HANDLE, 'bylineEditorialWorkflow', [
+        'previewUrl' => function_exists('byline_editorial_preview_page_url')
+            ? byline_editorial_preview_page_url()
+            : admin_url('admin.php?page=byline-article-preview'),
+    ]);
 }
 add_action('admin_enqueue_scripts', 'byline_editorial_enqueue_editor_assets');
 

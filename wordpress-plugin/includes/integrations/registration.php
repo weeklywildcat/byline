@@ -27,6 +27,7 @@ function byline_register_optional_backend_slice(array $options = []): void
             dirname(__DIR__) . '/content-health/scanner.php',
             dirname(__DIR__) . '/content-health/rest.php',
             dirname(__DIR__) . '/commands/commands.php',
+            __DIR__ . '/abilities.php',
         ];
         foreach ($files as $file) {
             if (is_string($file) && file_exists($file)) {
@@ -53,6 +54,9 @@ function byline_register_optional_backend_slice(array $options = []): void
     }
     if (($options['commands'] ?? true) && function_exists('byline_register_command_palette_hooks')) {
         byline_register_command_palette_hooks();
+    }
+    if (($options['abilities'] ?? true) && function_exists('byline_register_abilities_hooks')) {
+        byline_register_abilities_hooks();
     }
 }
 

@@ -86,6 +86,23 @@ function get_post_meta(int $post_id, string $key, $single = false) { global $pos
 function get_post_thumbnail_id(int $post_id): int { return absint(get_post_meta($post_id, '_thumbnail_id', true)); }
 function get_post(int $post_id) { global $posts; return $posts[$post_id] ?? null; }
 function get_edit_post_link(int $post_id, string $context = 'display'): string { return 'https://cms.example.test/wp-admin/post.php?post=' . $post_id . '&action=edit'; }
+function parse_blocks(string $content): array
+{
+    if (strpos($content, 'https://public.example.test/story') === false) {
+        return [];
+    }
+    return [[
+        'blockName' => 'core/group',
+        'attrs' => [],
+        'innerBlocks' => [[
+            'blockName' => 'core/paragraph',
+            'attrs' => ['content' => 'A link https://public.example.test/story.'],
+            'innerBlocks' => [],
+            'innerHTML' => '<p>A link <a href="https://public.example.test/story">story</a>.</p>',
+        ]],
+        'innerHTML' => '<div><p>A link <a href="https://public.example.test/story">story</a>.</p></div>',
+    ]];
+}
 function get_transient(string $key) { global $transients; return $transients[$key] ?? false; }
 function set_transient(string $key, $value, int $expiration = 0): bool { global $transients; $transients[$key] = $value; return true; }
 function get_option(string $key, $default = false) { global $options; return array_key_exists($key, $options) ? $options[$key] : $default; }
@@ -166,7 +183,39 @@ health_assert($failed_link['severity'] === 'error' && $failed_link['status'] ===
 $health = byline_content_health_check_story(5, ['checkLinks' => false]);
 $ids = array_column($health['issues'], 'id');
 health_assert(in_array('featured-image', $ids, true) && in_array('image-credit', $ids, true), 'Missing featured-image/content-credit checks were not returned.');
+foreach ($health['issues'] as $issue) {
+    if (in_array($issue['id'], ['featured-image', 'featured-image-alt', 'image-credit'], true)) {
+        health_assert(($issue['fixTarget']['kind'] ?? '') === 'featured-image', 'Featured-image issues did not receive a structured featured-image target.');
+        health_assert(!isset($issue['fixTarget']['clientId']), 'A featured-image target unexpectedly exposed a clientId.');
+    }
+}
 health_assert($remote_count === 2, 'A normal story check unexpectedly made a remote link request.');
+$link_health = byline_content_health_check_story(5, ['checkLinks' => true]);
+$link_issue = null;
+foreach ($link_health['issues'] as $issue) {
+    if (strpos((string) ($issue['id'] ?? ''), 'link-') === 0) {
+        $link_issue = $issue;
+        break;
+    }
+}
+health_assert(is_array($link_issue), 'The link-health regression fixture did not produce a link issue.');
+health_assert(($link_issue['fixTarget']['kind'] ?? '') === 'block', 'A link issue did not receive a block locator.');
+health_assert(($link_issue['fixTarget']['blockPath'] ?? []) === [0, 0], 'The link locator did not preserve the saved nested block path.');
+health_assert(($link_issue['fixTarget']['blockName'] ?? '') === 'core/paragraph', 'The link locator did not preserve the block name.');
+health_assert(!isset($link_issue['fixTarget']['clientId']), 'A link locator unexpectedly exposed a clientId.');
+$projected_link_issue = byline_content_health_rest_issue(array_merge($link_issue, ['postId' => 5]));
+health_assert(($projected_link_issue['fixTarget']['blockPath'] ?? []) === [0, 0], 'The private REST projection dropped the structured block locator.');
+health_assert(!isset($projected_link_issue['fixTarget']['clientId']), 'The private REST projection exposed a clientId.');
+health_assert(($projected_link_issue['fixUrl'] ?? '') === $link_issue['fixUrl'], 'The private REST projection changed the legacy fixUrl.');
+$sanitized_target = byline_content_health_rest_fix_target([
+    'fixTarget' => [
+        'kind' => 'block',
+        'blockPath' => ['0', '0'],
+        'blockName' => 'core/paragraph',
+        'clientId' => 'session-only',
+    ],
+]);
+health_assert(($sanitized_target['blockPath'] ?? []) === [0, 0] && !isset($sanitized_target['clientId']), 'The REST locator sanitizer did not discard an ephemeral clientId.');
 $post_meta[6]['_thumbnail_id'] = 44;
 $post_meta[44]['_wp_attachment_image_alt'] = '';
 $post_meta[44]['_ww_image_credit_text'] = '';
@@ -196,6 +245,7 @@ health_assert(($last_query['posts_per_page'] ?? 100) <= 25 && $scan['scanned'] <
 
 byline_register_content_health_hooks();
 health_assert(isset($actions['rest_api_init']) && isset($actions[BYLINE_CONTENT_HEALTH_SCAN_HOOK]), 'Content-health registration hooks were not explicit and discoverable.');
+health_assert(isset($actions['admin_enqueue_scripts']) && in_array('byline_content_health_enqueue_editor_navigation', $actions['admin_enqueue_scripts'], true), 'Content-health editor navigation was not registered on the admin enqueue hook.');
 byline_register_content_health_routes();
 $summary_route = $routes['byline/v1/admin/content-health'] ?? null;
 $recheck_route = $routes['byline/v1/admin/content-health/recheck/(?P<id>\\d+)'] ?? null;

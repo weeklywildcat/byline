@@ -10,6 +10,7 @@ import { MediaDesk } from "./MediaDesk";
 import { Performance } from "./Performance";
 import { StoryBoard } from "./StoryBoard";
 import { StoryList } from "./StoryList";
+import { StoryQuickView } from "./StoryQuickView";
 import { preferredStoriesView, writeStoriesViewPreference } from "../home/navigation-model";
 import type { PlanningFetchers } from "./planning-api";
 import {
@@ -22,6 +23,7 @@ import {
   filterSavedViewsForUser,
   normalizePlanningFilters,
   optionalApiFallback,
+  replacePlanningStory,
   sortPlanningStories,
   type ContentHealthResponse,
   type CoverageResponse,
@@ -30,6 +32,7 @@ import {
   type OptionalResource,
   type PerformanceResponse,
   type PlanningFilters,
+  type PlanningPerson,
   type PlanningResponse,
   type PlanningSort,
   type PlanningSortKey,
@@ -38,6 +41,7 @@ import {
   type PlanningWorkflowStatus,
   type SavedPlanningView
 } from "./planning-model";
+import { describeEditorialError } from "../editorial/editorial-model";
 import { PlanningEmpty, PlanningLoading, PlanningNotice, ViewHeader } from "./planning-ui";
 
 export type PlanningAppProps = {
@@ -143,6 +147,48 @@ function sameFilters(left: PlanningFilters, right: PlanningFilters): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function numericValue(value: unknown): number {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(number) && number > 0 ? number : 0;
+}
+
+function applyQuickViewStoryUpdate(
+  story: PlanningStory,
+  changes: Record<string, unknown>,
+  response: unknown,
+  statuses: PlanningWorkflowStatus[],
+  knownEditors: PlanningPerson[]
+): PlanningStory {
+  const payload = recordValue(response);
+  const state = recordValue(payload.story);
+  const statusId = String(state.status ?? changes.status ?? story.workflow.id);
+  const workflow = statuses.find((status) => status.id === statusId) || story.workflow;
+  const editorId = state.editorId !== undefined ? numericValue(state.editorId) : numericValue(changes.editorId);
+  const responseEditors = Array.isArray(payload.editors)
+    ? payload.editors.flatMap((value) => {
+        const editor = recordValue(value);
+        const id = numericValue(editor.id);
+        const name = typeof editor.name === "string" ? editor.name : "";
+        return id > 0 && name ? [{ id, name }] : [];
+      })
+    : [];
+  const editor = editorId > 0
+    ? [...responseEditors, ...knownEditors].find((candidate) => candidate.id === editorId) || { id: editorId, name: `User ${editorId}` }
+    : null;
+
+  return {
+    ...story,
+    workflow,
+    editor,
+    deadline: state.deadline !== undefined ? (String(state.deadline) || null) : changes.deadline !== undefined ? (String(changes.deadline) || null) : story.deadline,
+    plannedPublication: payload.plannedPublishAt !== undefined ? (String(payload.plannedPublishAt) || null) : changes.plannedPublishAt !== undefined ? (String(changes.plannedPublishAt) || null) : story.plannedPublication
+  };
+}
+
 export function PlanningApp({
   fetchers,
   initialView = "board",
@@ -166,11 +212,13 @@ export function PlanningApp({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [undoDeletedView, setUndoDeletedView] = useState<(() => Promise<void>) | null>(null);
   const [movingStoryId, setMovingStoryId] = useState<number | null>(null);
   const [savedViews, setSavedViews] = useState<SavedPlanningView[]>(initialData?.savedViews || []);
   const [selectedSavedViewId, setSelectedSavedViewId] = useState("");
   const [savedViewName, setSavedViewName] = useState("");
   const [isSavingView, setIsSavingView] = useState(false);
+  const [quickViewStoryId, setQuickViewStoryId] = useState<number | null>(null);
   const loadGeneration = useRef(0);
 
   const media = useOptionalResource<MediaDeskResponse>(fetchers.getMediaDesk, "Media Desk");
@@ -234,10 +282,15 @@ export function PlanningApp({
   const writers = useMemo(() => uniquePeople(stories, "writer"), [stories]);
   const editors = useMemo(() => uniquePeople(stories, "editor"), [stories]);
 
+  const openStory = useCallback((story: PlanningStory) => {
+    setQuickViewStoryId(story.id);
+    onOpenStory?.(story);
+  }, [onOpenStory]);
+
   const openStoryById = useCallback((storyId: number) => {
     const story = stories.find((candidate) => candidate.id === storyId);
-    if (story) onOpenStory?.(story);
-  }, [onOpenStory, stories]);
+    if (story) openStory(story);
+  }, [openStory, stories]);
 
   const changeView = useCallback((nextView: PlanningView) => {
     setView(nextView);
@@ -275,23 +328,55 @@ export function PlanningApp({
       return;
     }
 
-    const previous = stories;
     setMovingStoryId(story.id);
     setActionError(null);
     setNotice(null);
-    setStories((current) => current.map((candidate) => candidate.id === story.id ? result.story : candidate));
-    setPlanning((current) => current ? { ...current, stories: current.stories.map((candidate) => candidate.id === story.id ? result.story : candidate) } : current);
+    setStories((current) => replacePlanningStory(current, story.id, result.story));
+    setPlanning((current) => current ? { ...current, stories: replacePlanningStory(current.stories, story.id, result.story) } : current);
     try {
       await fetchers.moveStory(story.id, targetStatus);
       setNotice(__("Workflow stage updated.", "weekly-wildcat-headless"));
     } catch (error: unknown) {
-      setStories(previous);
-      setPlanning((current) => current ? { ...current, stories: previous } : current);
+      setStories((current) => replacePlanningStory(current, story.id, story, result.story));
+      setPlanning((current) => current ? { ...current, stories: replacePlanningStory(current.stories, story.id, story, result.story) } : current);
       setActionError(error && typeof error === "object" && "message" in error ? String((error as { message: unknown }).message) : __("The workflow move could not be saved. The previous stage was restored.", "weekly-wildcat-headless"));
+      // Quick View owns its modal-local error surface. Re-throw after the
+      // collection rollback so it can show the failure above the modal too;
+      // board/list callers explicitly absorb this rejection below.
+      throw error;
     } finally {
       setMovingStoryId(null);
     }
   }, [fetchers, statuses, stories]);
+
+  const handleUpdateStory = useCallback(async (storyId: number, changes: Record<string, unknown>) => {
+    if (!fetchers.updateStory) {
+      const unavailable = new Error(__("Story updates are not available in this install.", "weekly-wildcat-headless"));
+      setActionError(unavailable.message);
+      throw unavailable;
+    }
+
+    const current = stories.find((candidate) => candidate.id === storyId);
+    if (!current) return;
+    const optimistic = applyQuickViewStoryUpdate(current, changes, {}, statuses, editors);
+    setActionError(null);
+    setNotice(null);
+    setStories((items) => replacePlanningStory(items, storyId, optimistic));
+    setPlanning((value) => value ? { ...value, stories: replacePlanningStory(value.stories, storyId, optimistic) } : value);
+
+    try {
+      const response = await fetchers.updateStory(storyId, changes);
+      const authoritative = applyQuickViewStoryUpdate(optimistic, changes, response, statuses, editors);
+      setStories((items) => replacePlanningStory(items, storyId, authoritative, optimistic));
+      setPlanning((value) => value ? { ...value, stories: replacePlanningStory(value.stories, storyId, authoritative, optimistic) } : value);
+      setNotice(__("Story details updated.", "weekly-wildcat-headless"));
+    } catch (error: unknown) {
+      setStories((items) => replacePlanningStory(items, storyId, current, optimistic));
+      setPlanning((value) => value ? { ...value, stories: replacePlanningStory(value.stories, storyId, current, optimistic) } : value);
+      setActionError(describeEditorialError(error, __("The story details could not be saved. The previous values were restored.", "weekly-wildcat-headless")));
+      throw error;
+    }
+  }, [editors, fetchers, statuses, stories]);
 
   const selectSavedView = (id: string) => {
     setSelectedSavedViewId(id);
@@ -327,25 +412,55 @@ export function PlanningApp({
       setSavedViewName(saved.name);
       setNotice(__("Saved view updated.", "weekly-wildcat-headless"));
     } catch (error: unknown) {
-      setActionError(error && typeof error === "object" && "message" in error ? String((error as { message: unknown }).message) : __("The saved view could not be saved.", "weekly-wildcat-headless"));
+      setActionError(describeEditorialError(error, __("The saved view could not be saved.", "weekly-wildcat-headless")));
     } finally {
       setIsSavingView(false);
     }
   };
 
+  /**
+   * Deleting a saved view is reversible: the same id, name, filters, and sort
+   * can be written straight back through the save endpoint. So it happens
+   * immediately and offers Undo, instead of stopping the user with a dialog.
+   */
   const deleteView = async () => {
     const selected = visibleSavedViews.find((savedView) => savedView.id === selectedSavedViewId);
     if (!selected || !fetchers.deleteSavedView) return;
-    if (typeof window !== "undefined" && !window.confirm(__("Delete this saved view?", "weekly-wildcat-headless"))) return;
+    const restoreSavedView = fetchers.saveSavedView;
     setIsSavingView(true);
+    setActionError(null);
+    setUndoDeletedView(null);
     try {
       await fetchers.deleteSavedView(selected.id);
       setSavedViews((current) => current.filter((item) => item.id !== selected.id));
       setSelectedSavedViewId("");
       setSavedViewName("");
       setNotice(__("Saved view deleted.", "weekly-wildcat-headless"));
+      if (restoreSavedView) {
+        setUndoDeletedView(() => async () => {
+          setIsSavingView(true);
+          setActionError(null);
+          try {
+            const restored = await restoreSavedView({
+              id: selected.id,
+              name: selected.name,
+              filters: selected.filters,
+              sort: selected.sort
+            });
+            setSavedViews((current) => [restored, ...current.filter((item) => item.id !== restored.id)]);
+            setSelectedSavedViewId(restored.id);
+            setSavedViewName(restored.name);
+            setNotice(__("Saved view restored.", "weekly-wildcat-headless"));
+            setUndoDeletedView(null);
+          } catch (error: unknown) {
+            setActionError(describeEditorialError(error, __("The saved view could not be restored.", "weekly-wildcat-headless")));
+          } finally {
+            setIsSavingView(false);
+          }
+        });
+      }
     } catch (error: unknown) {
-      setActionError(error && typeof error === "object" && "message" in error ? String((error as { message: unknown }).message) : __("The saved view could not be deleted.", "weekly-wildcat-headless"));
+      setActionError(describeEditorialError(error, __("The saved view could not be deleted.", "weekly-wildcat-headless")));
     } finally {
       setIsSavingView(false);
     }
@@ -389,10 +504,12 @@ export function PlanningApp({
   const renderStories = () => {
     if (isLoading && !planning) return <PlanningLoading label={__("Loading Planning stories…", "weekly-wildcat-headless")} />;
     if (loadError && !planning) return <PlanningEmpty label={__("Planning stories", "weekly-wildcat-headless")} instructions={loadError} />;
-    if (view === "board") return <StoryBoard stories={visibleStories} statuses={statuses} canMoveStories={planning?.capabilities.canMoveStories ?? false} movingStoryId={movingStoryId} error={actionError} onMoveStory={(story, status) => void handleMoveStory(story, status)} onOpenStory={onOpenStory} />;
-    if (view === "list") return <StoryList stories={visibleStories} statuses={statuses} sort={sort} canMoveStories={planning?.capabilities.canMoveStories ?? false} movingStoryId={movingStoryId} onSortChange={handleSortChange} onMoveStory={(story, status) => void handleMoveStory(story, status)} onOpenStory={onOpenStory} />;
-    return <PlanningCalendar stories={visibleStories} onOpenStory={onOpenStory} />;
+    if (view === "board") return <StoryBoard stories={visibleStories} statuses={statuses} canMoveStories={planning?.capabilities.canMoveStories ?? false} movingStoryId={movingStoryId} error={actionError} onMoveStory={(story, status) => { void handleMoveStory(story, status).catch(() => undefined); }} onOpenStory={openStory} />;
+    if (view === "list") return <StoryList stories={visibleStories} statuses={statuses} sort={sort} canMoveStories={planning?.capabilities.canMoveStories ?? false} movingStoryId={movingStoryId} onSortChange={handleSortChange} onMoveStory={(story, status) => { void handleMoveStory(story, status).catch(() => undefined); }} onOpenStory={openStory} />;
+    return <PlanningCalendar stories={visibleStories} onOpenStory={openStory} />;
   };
+
+  const quickViewStory = quickViewStoryId === null ? null : stories.find((story) => story.id === quickViewStoryId) || null;
 
   return (
     <div className="byline-planning-app">
@@ -426,18 +543,41 @@ export function PlanningApp({
 
       {actionError ? <PlanningNotice onRemove={() => setActionError(null)}>{actionError}</PlanningNotice> : null}
       {loadError && planning ? <PlanningNotice status="warning" onRemove={() => setLoadError(null)}>{loadError}</PlanningNotice> : null}
-      {notice ? <PlanningNotice status="success" onRemove={() => setNotice(null)}>{notice}</PlanningNotice> : null}
+      {notice ? (
+        <PlanningNotice status="success" onRemove={() => { setNotice(null); setUndoDeletedView(null); }}>
+          {notice}
+          {undoDeletedView ? (
+            <>
+              {" "}
+              <Button variant="link" disabled={isSavingView} onClick={() => void undoDeletedView()}>
+                {__("Undo", "weekly-wildcat-headless")}
+              </Button>
+            </>
+          ) : null}
+        </PlanningNotice>
+      ) : null}
 
       {renderFilters()}
 
       <main className="byline-planning-app-content">
         {viewIsStories(view) ? renderStories() : null}
         {view === "media" ? (media.isLoading && !media.resource.data ? <PlanningLoading label={__("Loading Media Desk…", "weekly-wildcat-headless")} /> : <MediaDesk resource={media.resource} onRetry={media.load} updateRequest={fetchers.updateMediaRequest ? async (id, changes) => { await fetchers.updateMediaRequest!(id, changes); await media.load(); } : undefined} onOpenStory={openStoryById} />) : null}
-        {view === "coverage" ? (coverage.isLoading && !coverage.resource.data ? <PlanningLoading label={__("Loading Coverage…", "weekly-wildcat-headless")} /> : <Coverage resource={coverage.resource} stories={stories} onRetry={coverage.load} onOpenStory={onOpenStory} onCreateCoverage={fetchers.createCoverage ? async (input) => { const result = await fetchers.createCoverage!(input); await coverage.load(); return result; } : undefined} onAddStory={fetchers.addStoryToCoverage ? async (coverageId, storyId) => { const result = await fetchers.addStoryToCoverage!(coverageId, storyId); await coverage.load(); return result; } : undefined} onRemoveStory={fetchers.removeStoryFromCoverage ? async (coverageId, storyId) => { const result = await fetchers.removeStoryFromCoverage!(coverageId, storyId); await coverage.load(); return result; } : undefined} onCreateStory={fetchers.createCoverageStory ? async (coverageId, title) => { const result = await fetchers.createCoverageStory!(coverageId, title); await coverage.load(); return result; } : undefined} />) : null}
+        {view === "coverage" ? (coverage.isLoading && !coverage.resource.data ? <PlanningLoading label={__("Loading Coverage…", "weekly-wildcat-headless")} /> : <Coverage resource={coverage.resource} stories={stories} onRetry={coverage.load} onOpenStory={openStory} onCreateCoverage={fetchers.createCoverage ? async (input) => { const result = await fetchers.createCoverage!(input); await coverage.load(); return result; } : undefined} onAddStory={fetchers.addStoryToCoverage ? async (coverageId, storyId) => { const result = await fetchers.addStoryToCoverage!(coverageId, storyId); await coverage.load(); return result; } : undefined} onRemoveStory={fetchers.removeStoryFromCoverage ? async (coverageId, storyId) => { const result = await fetchers.removeStoryFromCoverage!(coverageId, storyId); await coverage.load(); return result; } : undefined} onCreateStory={fetchers.createCoverageStory ? async (coverageId, title) => { const result = await fetchers.createCoverageStory!(coverageId, title); await coverage.load(); return result; } : undefined} />) : null}
         {view === "feedback" ? (feedback.isLoading && !feedback.resource.data ? <PlanningLoading label={__("Loading Feedback…", "weekly-wildcat-headless")} /> : <Feedback resource={feedback.resource} onRetry={feedback.load} onUpdateStatus={fetchers.updateFeedback ? async (id, status) => { const result = await fetchers.updateFeedback!(id, status); await feedback.load(); return result; } : undefined} onCreateCorrection={fetchers.createCorrectionFromFeedback ? async (id, input) => { const result = await fetchers.createCorrectionFromFeedback!(id, input); await feedback.load(); return result; } : undefined} onOpenStory={openStoryById} />) : null}
         {view === "performance" ? (performance.isLoading && !performance.resource.data ? <PlanningLoading label={__("Loading Performance…", "weekly-wildcat-headless")} /> : <Performance resource={performance.resource} onRetry={performance.load} />) : null}
         {view === "content-health" ? (contentHealth.isLoading && !contentHealth.resource.data ? <PlanningLoading label={__("Loading Content Health…", "weekly-wildcat-headless")} /> : <ContentHealth resource={contentHealth.resource} onRetry={contentHealth.load} onRecheck={fetchers.recheckContentHealth ? async (issueId) => { const result = await fetchers.recheckContentHealth!(issueId); await contentHealth.load(); return result; } : undefined} />) : null}
       </main>
+
+      {quickViewStory ? (
+        <StoryQuickView
+          story={quickViewStory}
+          statuses={statuses}
+          fetchers={fetchers}
+          onClose={() => setQuickViewStoryId(null)}
+          onMoveStory={handleMoveStory}
+          onUpdateStory={handleUpdateStory}
+        />
+      ) : null}
 
       <p className="byline-planning-app-status" role="status" aria-live="polite">
         {isLoading ? __("Refreshing protected planning data…", "weekly-wildcat-headless") : `${visibleStories.length} ${visibleStories.length === 1 ? __("story", "weekly-wildcat-headless") : __("stories", "weekly-wildcat-headless")} in this view.`}

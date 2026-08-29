@@ -41,4 +41,18 @@ describe("Byline Doctor model", () => {
     expect(doctorDeploymentNeedsAttention(current)).toBe(false);
     expect(doctorDeploymentNeedsAttention({ deployment: { pending: false, lastStatus: "Request failed" } })).toBe(true);
   });
+
+  it("does not treat a reachable stale manifest as healthy", () => {
+    const stale = diagnostics({
+      healthSummary: { status: "good", good: 4, recommended: 0, critical: 0 },
+      healthChecks: [],
+      publicManifest: {
+        reachable: true,
+        lifecycle: "unknown",
+        expectedRevision: 12,
+        publicationRevision: 11
+      }
+    });
+    expect(doctorStatus(stale)).toBe("recommended");
+  });
 });

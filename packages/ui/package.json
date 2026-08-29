@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./article.css": "./article.css",
     "./page-blocks.css": "./src/page-blocks.css",
     "./newsroom-blocks.css": "./src/newsroom-blocks.css"
   },

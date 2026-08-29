@@ -40,20 +40,58 @@ options and both legacy deployment event names remain valid. The existing
 `byline_publication_revision` option is the monotonic public build revision;
 the deployment payload records the exact `expectedRevision`. The diagnostic
 manifest compares that value with its `publicationRevision` and reports the
-safe lifecycle `queued`, `building`, `live`, `failed`, or `unknown`.
+safe lifecycle `queued`, `building`, `live`, `failed`, `needs_configuration`,
+or `unknown`.
 
-The legacy distribution `status` values remain unchanged. New consumers can
-use `deployment.lifecycle`, `deployment.expectedRevision`, and the matching
-public-manifest fields without exposing the deploy-hook URL.
+### The revision a published site still owes
+
+Every public change records the revision it needs deployed in
+`byline_deployment_expected_revision` **before** anything is scheduled, and
+independently of whether a deploy hook exists. Publishing on an install with no
+deployment target therefore does not lose the expected revision: the lifecycle
+becomes `needs_configuration`, the Distribution website channel reports
+`needs_configuration`, and the article's post-publish panel says the website
+update requires configuration and offers Retry once a target is set up.
+
+The reachable-manifest fallback — treating any reachable manifest as live —
+now applies only to installations that predate revision-aware deployment, that
+is, only when there is no recorded expected revision at all. Every revision a
+current Byline generates is recorded durably, so a reachable but stale manifest
+can no longer be reported as Live.
+
+### Manual retry
+
+`POST /byline/v1/admin/deployment/trigger`, `wp byline deployment retry`, and
+the Retry action in the article post-publish panel all call
+`byline_retry_deployment()`, which:
+
+- requeues an existing failed, cancelled, or backing-off deployment job through
+  `byline_retry_job()`, keeping its attempts, actor, timestamps, and errors;
+- returns an already queued or running job untouched, so repeated clicks cannot
+  produce a second deploy request;
+- otherwise creates a new tracked job for the revision the site owes, with its
+  own `deployment:<revision>:manual-<n>` idempotency key;
+- never sends a deploy-hook request itself. Execution belongs to the job runner,
+  so REST, WP-Cron, and WP-CLI share one lifecycle.
+
+The one remaining direct-request path is `byline_trigger_deployment()`, kept for
+the pre-adapter legacy cron event and for installations without durable job
+storage.
+
+The legacy distribution `status` values remain unchanged, with
+`needs_configuration` added. New consumers can use `deployment.lifecycle`,
+`deployment.expectedRevision`, and the matching public-manifest fields without
+exposing the deploy-hook URL.
 
 ## Running and health
 
 The plugin registers a five-minute best-effort WP-Cron runner and a one-shot
 job wake event. Protected WordPress REST routes are available under
 `/byline/v1/admin/jobs`; when WP-CLI is available, the equivalent command is
-`wp byline jobs run`, with `status`, `retry`, and `cancel` subcommands. Both
-paths use the same lease-aware runner and omit payloads, lease tokens, and
-protected configuration.
+`wp byline jobs run`, with `status`, `retry`, and `cancel` subcommands, plus
+`wp byline deployment retry` and `wp byline deployment status`. Every path uses
+the same lease-aware runner and omits payloads, lease tokens, and protected
+configuration.
 
 Diagnostics report status counts, overdue work, runner source, and whether
 catch-up is recommended. Health marks overdue traffic-driven WP-Cron work and
