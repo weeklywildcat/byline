@@ -1,0 +1,14 @@
+.byline-article-preview-page { max-width: 1440px; }
+.byline-preview-app { background: #f0f0f1; border: 1px solid #dcdcde; min-height: 760px; padding: 18px; }
+.byline-preview-toolbar { align-items: center; background: #fff; border: 1px solid #dcdcde; display: flex; gap: 20px; justify-content: space-between; margin-bottom: 18px; padding: 14px 16px; }
+.byline-preview-toolbar > div:first-child { display: grid; gap: 4px; min-width: 0; }
+.byline-preview-toolbar span { color: #646970; font-size: 13px; }
+.byline-preview-viewport-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.byline-preview-device { background: #fff; border: 1px solid #8c8f94; box-shadow: 0 10px 28px rgb(0 0 0 / .12); margin: 0 auto; width: 100%; }
+.byline-preview-device-label { background: #1d2327; color: #fff; font-size: 11px; letter-spacing: .04em; padding: 6px 10px; text-transform: uppercase; }
+.byline-preview-frame { border: 0; display: block; width: 100%; }
+@media (max-width: 760px) {
+  .byline-preview-app { padding: 10px; }
+  .byline-preview-toolbar { align-items: flex-start; flex-direction: column; }
+  .byline-preview-viewport-buttons { justify-content: flex-start; }
+}

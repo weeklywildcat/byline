@@ -37,6 +37,7 @@ require_once __DIR__ . '/includes/editorial/contributors.php';
 require_once __DIR__ . '/includes/editorial/readiness.php';
 require_once __DIR__ . '/includes/editorial/activity.php';
 require_once __DIR__ . '/includes/editorial/presets.php';
+require_once __DIR__ . '/includes/editorial/preview.php';
 require_once __DIR__ . '/includes/editorial/rest.php';
 require_once __DIR__ . '/includes/editorial/admin.php';
 

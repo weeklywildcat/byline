@@ -40,6 +40,10 @@ build_assets=(
   build/editorial-workflow.js
   build/editorial-workflow.asset.php
   build/editorial-workflow.css
+  # Authenticated article preview runs in its own admin page and iframe.
+  build/article-preview.js
+  build/article-preview.asset.php
+  build/article-preview.css
   # The normal Page editor settings panel is separate from the story workflow.
   build/page-editor.js
   build/page-editor.asset.php
@@ -179,6 +183,9 @@ grep -qx 'weekly-wildcat-headless/build/index.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.asset.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/editorial-workflow.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/editorial-workflow.asset.php' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/article-preview.js' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/article-preview.asset.php' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/article-preview.css' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/page-editor.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/page-editor.asset.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/block.json' <<<"$archive_files"

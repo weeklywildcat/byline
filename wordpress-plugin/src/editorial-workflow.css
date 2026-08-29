@@ -235,6 +235,23 @@
   margin-right: 12px;
 }
 
+.byline-editorial-preview-launch {
+  border-bottom: 1px solid var(--byline-sidebar-border);
+  padding: 12px 16px 16px;
+}
+
+.byline-editorial-preview-launch .components-button {
+  justify-content: center;
+  width: 100%;
+}
+
+.byline-editorial-preview-help {
+  color: #757575;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 8px 0 0;
+}
+
 .byline-editorial-sidebar .byline-editorial-sidebar-panel {
   border-top: 1px solid var(--byline-sidebar-border);
   margin: 0;

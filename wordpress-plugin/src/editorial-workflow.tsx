@@ -70,6 +70,14 @@ import './editorial-workflow.css';
 const PLUGIN_NAME = 'byline-editorial-workflow';
 const SIDEBAR_NAME = 'byline-editorial-workflow-sidebar';
 
+declare global {
+  interface Window {
+    bylineEditorialWorkflow?: {
+      previewUrl?: string;
+    };
+  }
+}
+
 // `PluginSidebar` registers its own entry in the editor's More menu, so no
 // separate `PluginSidebarMoreMenuItem` is rendered here: a second registration
 // would put two identical "Story" items in that menu.
@@ -999,6 +1007,52 @@ function StorySummary({ payload, title }: { payload: WorkflowPayload | null; tit
   );
 }
 
+function StoryPreviewLaunch({ postId }: { postId: number }) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { savePost } = useDispatch('core/editor') as {
+    savePost?: () => unknown;
+  };
+
+  const openPreview = useCallback(async () => {
+    if (postId <= 0 || isSaving) return;
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await savePost?.();
+      const configuredUrl = window.bylineEditorialWorkflow?.previewUrl;
+      if (!configuredUrl) {
+        throw new Error(__('The private preview URL is not configured.', 'weekly-wildcat-headless'));
+      }
+
+      const previewUrl = new URL(configuredUrl, window.location.href);
+      previewUrl.searchParams.set('post', String(postId));
+      const previewWindow = window.open(previewUrl.toString(), '_blank', 'noopener,noreferrer');
+      if (!previewWindow) {
+        throw new Error(__('The preview window was blocked. Allow pop-ups for this WordPress site and try again.', 'weekly-wildcat-headless'));
+      }
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isSaving, postId, savePost]);
+
+  return (
+    <div className="byline-editorial-preview-launch">
+      <Button variant="secondary" isBusy={isSaving} disabled={isSaving || postId <= 0} onClick={() => void openPreview()}>
+        {isSaving ? __('Saving and opening preview…', 'weekly-wildcat-headless') : __('Preview as Byline', 'weekly-wildcat-headless')}
+      </Button>
+      <p className="byline-editorial-preview-help">
+        {__('Save the current story, then open a private responsive preview. Publishing and deployment actions are disabled there.', 'weekly-wildcat-headless')}
+      </p>
+      {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
+    </div>
+  );
+}
+
 function EditorialNewsroomPanels({
   postId,
   title,
@@ -1652,6 +1706,7 @@ function EditorialWorkflowPlugin() {
       <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={listView} className="byline-editorial-sidebar">
         <Panel className="byline-story-panel">
           <StorySummary payload={payload} title={title} />
+          {postId > 0 ? <StoryPreviewLaunch postId={postId} /> : null}
           <PanelBody
             className="byline-editorial-sidebar-panel byline-editorial-workflow-panel"
             title={__('Workflow', 'weekly-wildcat-headless')}
