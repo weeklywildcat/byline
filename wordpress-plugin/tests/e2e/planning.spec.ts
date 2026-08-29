@@ -45,7 +45,7 @@ test.describe("Planning Story Quick View", () => {
       releaseFirstMove = resolve;
     });
     let firstMoveStarted = false;
-    const firstStoryRoute = `**/byline/v1/editorial/stories/${first.id}`;
+    const firstStoryRoute = `**/byline/v1/editorial/stories/${first.id}**`;
     await page.route(firstStoryRoute, async (route) => {
       if (route.request().method() !== "POST") return route.continue();
       let body: Record<string, unknown> = {};

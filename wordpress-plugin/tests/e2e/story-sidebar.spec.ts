@@ -221,7 +221,7 @@ test.describe("Gutenberg Story sidebar", () => {
 
     let expectedRevision = 0;
     const observedRevisions: Array<{ expected: number; public: number }> = [];
-    const distributionRoute = "**/byline/v1/editorial/stories/*/distribution";
+    const distributionRoute = "**/byline/v1/editorial/stories/*/distribution**";
     await page.route(distributionRoute, async (route) => {
       const response = await route.fetch();
       const payload = await response.json();
@@ -260,7 +260,7 @@ test.describe("Gutenberg Story sidebar", () => {
     await createEditorDraft(page, adminSession.registerTestPost, "retry");
 
     let failedDistributionResponses = 0;
-    const distributionRoute = "**/byline/v1/editorial/stories/*/distribution";
+    const distributionRoute = "**/byline/v1/editorial/stories/*/distribution**";
     await page.route(distributionRoute, async (route) => {
       const response = await route.fetch();
       const payload = await response.json();

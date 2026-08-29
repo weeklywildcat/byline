@@ -359,7 +359,11 @@ export async function waitForCurrentPostId(page: Page): Promise<number> {
 /** Open the one native Story sidebar registration through Gutenberg's More menu. */
 export async function openStorySidebar(page: Page): Promise<Locator> {
   await waitForBylineEditorReady(page);
-  const existing = page.getByRole("region", { name: /^Story$/i }).first();
+  // WordPress 6.6 and the modern editor expose the PluginSidebar region with
+  // slightly different accessible names ("Story" vs. "Story sidebar"). The
+  // plugin-owned semantic name is stable; do not couple the helper to one
+  // Gutenberg wording variant.
+  const existing = page.getByRole("region", { name: /story/i }).first();
   if (await existing.isVisible().catch(() => false)) return existing;
 
   const topBar = page.getByRole("region", { name: /editor top bar/i });
