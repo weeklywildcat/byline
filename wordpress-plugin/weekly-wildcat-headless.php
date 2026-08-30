@@ -4211,7 +4211,7 @@ function wwh_author_meta_value(int $user_id, string $key, string $default = ''):
 
 function wwh_author_profile_photo(int $attachment_id): array
 {
-    return wwh_media_image($attachment_id, 'medium');
+    return wwh_media_image($attachment_id);
 }
 
 function wwh_author_avatar_data(array $args, $id_or_email): array
