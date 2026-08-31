@@ -59,6 +59,13 @@ export type PlanningAppProps = {
   onOpenStory?: (story: PlanningStory) => void;
 };
 
+/**
+ * Board, List and Calendar are views of Stories, so they stay as local tabs.
+ * The other views are destinations of their own in the WordPress sidebar and
+ * are reached by their `page=byline-planning&tab=...` URL.
+ */
+const STORIES_VIEWS = ["board", "list", "calendar"] as const;
+
 const VIEW_LABELS: Record<PlanningView, string> = {
   board: "Board",
   list: "List",
@@ -522,13 +529,15 @@ export function PlanningApp({
         <Button variant="secondary" onClick={() => void loadPlanning(filters)} disabled={isLoading}>{__("Refresh", "weekly-wildcat-headless")}</Button>
       </header>
 
-      <nav className="byline-planning-view-tabs" aria-label={__("Planning views", "weekly-wildcat-headless")}>
-        {(Object.keys(VIEW_LABELS) as PlanningView[]).map((item) => (
-          <Button key={item} variant={view === item ? "primary" : "secondary"} aria-current={view === item ? "page" : undefined} onClick={() => changeView(item)}>
-            {VIEW_LABELS[item]}
-          </Button>
-        ))}
-      </nav>
+      {viewIsStories(view) ? (
+        <nav className="byline-planning-view-tabs" aria-label={__("Stories views", "weekly-wildcat-headless")}>
+          {STORIES_VIEWS.map((item) => (
+            <Button key={item} variant={view === item ? "primary" : "secondary"} aria-current={view === item ? "page" : undefined} onClick={() => changeView(item)}>
+              {VIEW_LABELS[item]}
+            </Button>
+          ))}
+        </nav>
+      ) : null}
 
       {viewIsStories(view) ? (
         <section className="byline-planning-saved-view-bar" aria-labelledby="byline-planning-saved-view-heading">

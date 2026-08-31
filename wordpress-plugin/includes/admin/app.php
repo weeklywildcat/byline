@@ -121,6 +121,72 @@ function byline_admin_page_definitions(): array
 }
 
 /**
+ * Planning's destinations. These are real WordPress submenu entries so the
+ * sidebar is the only place a user has to look for Stories, Calendar, Media
+ * Desk, Coverage, Performance, Content Health, or Feedback. They reuse the
+ * existing `page=byline-planning&tab=...` URLs: navigation hierarchy and URL
+ * ownership stay independent.
+ */
+function byline_admin_planning_menu_items(): array
+{
+    return [
+        // The landing entry reuses the parent slug, which is how WordPress is
+        // told not to add a second "Planning" child above it.
+        'today' => 'Today',
+        'stories' => 'Stories',
+        'calendar' => 'Calendar',
+        'media' => 'Media Desk',
+        'coverage' => 'Coverage',
+        'performance' => 'Performance',
+        'content-health' => 'Content Health',
+        'feedback' => 'Feedback',
+    ];
+}
+
+/**
+ * Planning itself requires `edit_posts`; only Feedback narrows that further.
+ */
+function byline_admin_planning_menu_capability(string $tab): string
+{
+    return $tab === 'feedback' ? byline_admin_feedback_capability() : 'edit_posts';
+}
+
+/**
+ * Feedback is an editor surface: it is available to a user who can edit other
+ * people's posts or administer Byline, which is exactly what the feedback REST
+ * routes enforce. add_submenu_page() takes a single capability, so resolve the
+ * one this user actually holds, the same way the Byline menu resolves its own.
+ */
+function byline_admin_feedback_capability(): string
+{
+    return current_user_can('edit_others_posts') ? 'edit_others_posts' : BYLINE_MANAGE_CAPABILITY;
+}
+
+/**
+ * Menu slug for a Planning destination. WordPress treats a slug containing a
+ * query string as a relative admin URL, so the canonical tab URLs are reused
+ * verbatim instead of minting new page slugs.
+ */
+function byline_admin_planning_menu_slug(string $tab): string
+{
+    if ($tab === 'today' || !array_key_exists($tab, byline_admin_planning_menu_items())) {
+        return BYLINE_ADMIN_PLANNING_PAGE;
+    }
+
+    return 'admin.php?page=' . BYLINE_ADMIN_PLANNING_PAGE . '&tab=' . $tab;
+}
+
+/**
+ * Byline Doctor is the diagnostics surface of the Settings screen. It keeps its
+ * own sidebar entry, and its own name, because it is a destination people are
+ * sent to by support instructions rather than a view of Settings.
+ */
+function byline_admin_doctor_menu_slug(): string
+{
+    return 'admin.php?page=' . BYLINE_ADMIN_SETTINGS_PAGE . '&tab=diagnostics';
+}
+
+/**
  * Byline is configuration, so its top-level entry is visible to a user who can
  * administer the publication or its integrations. Being able to edit posts or
  * design pages is deliberately not enough. Individual submenu registrations
@@ -204,6 +270,20 @@ function byline_register_admin_app(): void
         );
     }
 
+    // Planning destinations are submenu entries of the Planning menu. No
+    // callback is passed: every one of them resolves to the already registered
+    // byline-planning page, which authorizes itself.
+    foreach (byline_admin_planning_menu_items() as $planning_tab => $planning_title) {
+        add_submenu_page(
+            BYLINE_ADMIN_PLANNING_PAGE,
+            $planning_title,
+            $planning_title,
+            byline_admin_planning_menu_capability($planning_tab),
+            byline_admin_planning_menu_slug($planning_tab),
+            ''
+        );
+    }
+
     foreach (byline_admin_page_definitions() as $slug => $page) {
         add_submenu_page(
             BYLINE_ADMIN_PAGE,
@@ -214,6 +294,17 @@ function byline_register_admin_app(): void
             $page['callback']
         );
     }
+
+    // Byline Doctor is a deep link into the Settings screen rather than a page
+    // of its own, so it carries the Settings capability and no callback.
+    add_submenu_page(
+        BYLINE_ADMIN_PAGE,
+        'Byline Doctor',
+        'Byline Doctor',
+        byline_admin_page_capability(BYLINE_ADMIN_SETTINGS_PAGE),
+        byline_admin_doctor_menu_slug(),
+        ''
+    );
 }
 add_action('admin_menu', 'byline_register_admin_app');
 
@@ -566,8 +657,15 @@ function byline_sports_utility_page_for_screen(?object $screen): string
  */
 function byline_admin_parent_file(?string $parent_file): ?string
 {
-    if (in_array(byline_admin_current_page(), byline_admin_config_pages(), true)) {
+    $page = byline_admin_current_page();
+    if (in_array($page, byline_admin_config_pages(), true)) {
         return BYLINE_ADMIN_PAGE;
+    }
+
+    // Every Planning tab is a child of the Planning menu, including the ones
+    // reached by a direct link or a refresh.
+    if ($page === BYLINE_ADMIN_PLANNING_PAGE) {
+        return BYLINE_ADMIN_PLANNING_PAGE;
     }
 
     $screen = get_current_screen();
@@ -595,6 +693,17 @@ add_filter('parent_file', 'byline_admin_parent_file');
 function byline_admin_submenu_file(?string $submenu_file): ?string
 {
     $page = byline_admin_current_page();
+    $tab = byline_admin_query_key('tab');
+
+    if ($page === BYLINE_ADMIN_PLANNING_PAGE) {
+        return byline_admin_planning_menu_slug($tab);
+    }
+
+    // Diagnostics highlights Byline Doctor, its own entry, not Settings.
+    if ($page === BYLINE_ADMIN_SETTINGS_PAGE && $tab === 'diagnostics') {
+        return byline_admin_doctor_menu_slug();
+    }
+
     if (in_array($page, byline_admin_config_pages(), true)) {
         return $page;
     }

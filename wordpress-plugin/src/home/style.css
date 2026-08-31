@@ -3,65 +3,6 @@
   color: #1d2327;
 }
 
-.byline-primary-nav {
-  align-items: flex-start;
-  border-bottom: 1px solid #dcdcde;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  margin: 0 0 18px;
-  padding: 0 0 14px;
-}
-
-.byline-primary-nav-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.byline-primary-nav-group-label {
-  color: #646970;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .06em;
-  padding: 4px 0;
-  text-transform: uppercase;
-}
-
-.byline-primary-nav-group ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.byline-primary-nav-group a {
-  border-radius: 3px;
-  display: inline-block;
-  padding: 4px 7px;
-  text-decoration: none;
-}
-
-.byline-primary-nav-group a:hover,
-.byline-primary-nav-group a:focus-visible {
-  background: #f0f0f1;
-}
-
-.byline-primary-nav-group a.is-active {
-  background: #e5f5fa;
-  box-shadow: inset 0 -2px 0 #135e96;
-  color: #135e96;
-  font-weight: 600;
-}
-
-@media (max-width: 800px) {
-  .byline-primary-nav {
-    gap: 8px 16px;
-  }
-}
-
 .byline-home-header,
 .byline-home-section-heading {
   align-items: flex-start;
