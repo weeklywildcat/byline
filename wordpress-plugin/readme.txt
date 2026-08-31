@@ -4,7 +4,7 @@ Tags: newsroom, editorial, journalism, headless, student-journalism
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.2.14
+Stable tag: 0.2.15
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,21 @@ WordPress publication state, a Studio for homepage design, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==
+
+= 0.2.15 =
+
+**Makes the WordPress sidebar the only place you navigate Byline.**
+
+* Removes the Byline header that repeated the sidebar as HOME, WORK, DESK,
+  INSIGHTS, DESIGN, and SETTINGS groups, leaving one persistent navigation
+  beneath WordPress's own admin chrome.
+* Adds Planning's destinations - Today, Stories, Calendar, Media Desk,
+  Coverage, Performance, Content Health, and Feedback - and Byline Doctor as
+  native sidebar entries, each highlighting itself on direct links, refresh,
+  and browser back.
+* Keeps local tabs only for views of a screen: Stories keeps Board, List, and
+  Calendar, and Settings keeps Access, API, and Compatibility.
+* Serves author profile photos at full size instead of the medium size.
 
 = 0.2.14 =
 
@@ -165,6 +180,12 @@ makes Studio a real homepage editor.**
 * Homepage designs saved while these settings existed continue to load.
 
 == Upgrade Notice ==
+
+= 0.2.15 =
+Byline's admin navigation is now the WordPress sidebar alone. Every screen keeps
+its existing URL, so bookmarks and deep links still work, and capabilities,
+roles, and stored data are unchanged. Nothing needs reconfiguring after
+updating.
 
 = 0.2.14 =
 Editorial notifications and deployment revisions are now stored durably, so the
