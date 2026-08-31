@@ -7,7 +7,7 @@ import { createEditorDraft } from "./story-helpers";
 
 async function openPlanningStory(page: Parameters<typeof openStorySidebar>[0], title: string) {
   await page.goto("/wp-admin/admin.php?page=byline-planning&tab=stories", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("navigation", { name: "Planning views", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Stories views", exact: true })).toBeVisible();
 
   const storyLink = page.getByRole("link", { name: title, exact: true });
   await expect(storyLink).toBeVisible();

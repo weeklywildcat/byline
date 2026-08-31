@@ -34,7 +34,7 @@ import { NewsletterApp, createNewsletterFetchers } from "./newsletters";
 import type { NewsletterBranding } from "./newsletters/render";
 import { stripMarkupForText } from "./safe-text";
 import type { ReactNode } from "react";
-import { AdminNavigation, HomeApp, createHomeFetchers, storiesViewFromRoute } from "./home";
+import { HomeApp, createHomeFetchers, storiesViewFromRoute } from "./home";
 import { DoctorApp, type DoctorActionId, type DoctorActionResponse, type DoctorDiagnostics } from "./doctor";
 import "./style.css";
 
@@ -348,6 +348,10 @@ function integrationTabs(): AdminTab[] {
   return tabs;
 }
 
+/**
+ * Diagnostics is deliberately absent: it is the Byline Doctor destination in
+ * the WordPress sidebar, not a view of Settings. Its URL is unchanged.
+ */
 function settingsTabs(): AdminTab[] {
   const labels: Record<(typeof SETTINGS_TABS)[number], string> = {
     access: "Access",
@@ -355,24 +359,11 @@ function settingsTabs(): AdminTab[] {
     compatibility: "Compatibility",
     diagnostics: "Diagnostics"
   };
-  return SETTINGS_TABS.map((id) => ({
+  return SETTINGS_TABS.filter((id) => id !== "diagnostics").map((id) => ({
     id,
     label: labels[id],
     href: adminUrl(config?.urls.settings[id])
   }));
-}
-
-function planningTabs(): AdminTab[] {
-  return [
-    { id: "today", label: "Today", href: adminUrl(config?.urls.planning?.today) },
-    { id: "stories", label: "Stories", href: adminUrl(config?.urls.planning?.stories) },
-    { id: "calendar", label: "Calendar", href: adminUrl(config?.urls.planning?.calendar) },
-    { id: "media", label: "Media Desk", href: adminUrl(config?.urls.planning?.media) },
-    { id: "coverage", label: "Coverage", href: adminUrl(config?.urls.planning?.coverage) },
-    { id: "performance", label: "Performance", href: adminUrl(config?.urls.planning?.performance) },
-    { id: "content-health", label: "Content Health", href: adminUrl(config?.urls.planning?.contentHealth) },
-    { id: "feedback", label: "Feedback", href: adminUrl(config?.urls.planning?.feedback) }
-  ];
 }
 
 function planningViewForTab(tab: string, requestedView = ""): PlanningView {
@@ -1601,32 +1592,34 @@ function OperationalInfo({ route, protocol }: { route: string; protocol: Protoco
   );
 }
 
+/**
+ * Byline's own screens sit inside WordPress admin chrome, which already owns
+ * persistent navigation. The frame therefore renders a page heading, optional
+ * local tabs for views of this page, and the page itself.
+ */
 function AdminPageFrame({
   title,
+  heading = true,
   tabs,
   activeTab,
-  activeRoute,
   error,
   children
 }: {
   title: string;
+  /** Screens that render their own page header opt out so the h1 is not duplicated. */
+  heading?: boolean;
   tabs?: AdminTab[];
   activeTab?: string;
-  activeRoute?: string;
   error: string;
   children: ReactNode;
 }) {
   return (
     <main className="byline-admin-main">
-      <AdminNavigation
-        urls={config?.urls || {}}
-        capabilities={config?.capabilities || {}}
-        features={config?.features || {}}
-        activeRoute={activeRoute}
-      />
-      <header className="byline-admin-header">
-        <h1>{title}</h1>
-      </header>
+      {heading ? (
+        <header className="byline-admin-header">
+          <h1>{title}</h1>
+        </header>
+      ) : null}
       {tabs && activeTab ? <AdminLocalTabs label={title} active={activeTab} tabs={tabs} /> : null}
       {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
       {children}
@@ -1685,7 +1678,7 @@ function Screen({
 }) {
   if (page === ADMIN_PAGE_SLUGS.dashboard) {
     return (
-      <AdminPageFrame title="Home" activeRoute="/dashboard" error={error}>
+      <AdminPageFrame title="Home" error={error}>
         <HomeApp
           fetchers={createHomeFetchers(adminProtectedRequest, {
             health: config?.healthPath,
@@ -1704,7 +1697,7 @@ function Screen({
     const activeTab = normalizeAdminTab(page, tab);
     if (activeTab === "today") {
       return (
-        <AdminPageFrame title="Today" tabs={planningTabs()} activeTab={activeTab} activeRoute="/home" error={error}>
+        <AdminPageFrame title="Today" heading={false} error={error}>
           <HomeApp
             fetchers={createHomeFetchers(adminProtectedRequest, {
               health: config?.healthPath,
@@ -1719,7 +1712,7 @@ function Screen({
       );
     }
     return (
-      <AdminPageFrame title="Planning" tabs={planningTabs()} activeTab={activeTab} activeRoute={`/planning/${activeTab}`} error={error}>
+      <AdminPageFrame title="Planning" heading={false} error={error}>
         <PlanningApp
           fetchers={createPlanningFetchers(adminProtectedRequest)}
           initialView={planningViewForTab(activeTab, config?.view)}
@@ -1733,7 +1726,7 @@ function Screen({
   if (page === ADMIN_PAGE_SLUGS.newsletters) {
     const activeTab = normalizeAdminTab(page, tab);
     return (
-      <AdminPageFrame title="Newsletters" tabs={newsletterTabs()} activeTab={activeTab} activeRoute={`/newsletters/${activeTab}`} error={error}>
+      <AdminPageFrame title="Newsletters" tabs={newsletterTabs()} activeTab={activeTab} error={error}>
         <NewsletterApp
           fetchers={createNewsletterFetchers(adminProtectedRequest)}
           initialView={activeTab === "settings" ? "settings" : "list"}
@@ -1746,7 +1739,7 @@ function Screen({
   if (page === ADMIN_PAGE_SLUGS.publication) {
     const activeTab = normalizeAdminTab(page, tab);
     return (
-      <AdminPageFrame title="Publication" tabs={publicationTabs()} activeTab={activeTab} activeRoute={`/publication/${activeTab}`} error={error}>
+      <AdminPageFrame title="Publication" tabs={publicationTabs()} activeTab={activeTab} error={error}>
         <PublicationSettings route={adminScreenRoute(page, activeTab)} publication={publication} onSaved={onPublicationSaved} />
       </AdminPageFrame>
     );
@@ -1754,7 +1747,7 @@ function Screen({
 
   if (page === ADMIN_PAGE_SLUGS.theme) {
     return (
-      <AdminPageFrame title="Theme" activeRoute="/design/theme" error={error}>
+      <AdminPageFrame title="Theme" error={error}>
         <PublicationSettings route="/design/theme" publication={publication} onSaved={onPublicationSaved} />
       </AdminPageFrame>
     );
@@ -1768,7 +1761,7 @@ function Screen({
       : availableTabs[0]?.id || "deployment";
     const route = adminScreenRoute(page, activeTab);
     return (
-      <AdminPageFrame title="Integrations" tabs={integrationTabs()} activeTab={activeTab} activeRoute={route} error={error}>
+      <AdminPageFrame title="Integrations" tabs={integrationTabs()} activeTab={activeTab} error={error}>
         {route === "/integrations/deployment" ? <DeploymentSettings /> : <DiscordSettings />}
       </AdminPageFrame>
     );
@@ -1777,9 +1770,15 @@ function Screen({
   if (page === ADMIN_PAGE_SLUGS.settings) {
     const activeTab = normalizeAdminTab(page, tab);
     const route = adminScreenRoute(page, activeTab);
+    const isDoctor = route === "/advanced/diagnostics";
     return (
-      <AdminPageFrame title="Settings" tabs={settingsTabs()} activeTab={activeTab} activeRoute={route} error={error}>
-        {route === "/advanced/diagnostics" ? (
+      <AdminPageFrame
+        title={isDoctor ? "Byline Doctor" : "Settings"}
+        tabs={isDoctor ? undefined : settingsTabs()}
+        activeTab={isDoctor ? undefined : activeTab}
+        error={error}
+      >
+        {isDoctor ? (
           <DoctorApp
             fetchers={{
               getDiagnostics: () => apiFetch<DoctorDiagnostics>({ path: config?.diagnosticsPath || "/byline/v1/admin/diagnostics" }),

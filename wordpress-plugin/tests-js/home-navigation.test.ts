@@ -7,7 +7,6 @@ import {
   type HomeData
 } from "../src/home/home-model";
 import {
-  buildAdminNavigation,
   preferredStoriesView,
   readStoriesViewPreference,
   storiesViewFromRoute,
@@ -199,31 +198,6 @@ describe("Byline Home permissions and navigation", () => {
     expect(fetchers.retryDeployment).toBeDefined();
     await fetchers.retryDeployment?.();
     expect(requests).toContainEqual({ path: "/deployment/trigger", method: "POST" });
-  });
-
-  it("groups destinations and hides settings/features without permission", () => {
-    const urls = {
-      dashboard: "/home",
-      planning: { today: "/today", stories: "/stories", calendar: "/calendar", media: "/media", coverage: "/coverage", performance: "/performance", contentHealth: "/health", feedback: "/feedback" },
-      studio: "/studio",
-      publication: { identity: "/publication" },
-      integrations: { deployment: "/integrations" },
-      settings: { access: "/settings", diagnostics: "/doctor" },
-      newsletters: { issues: "/newsletters" }
-    };
-    const reporter = buildAdminNavigation(urls, { editPosts: true }, { newsletter: false });
-    expect(reporter.map((group) => group.id)).toEqual(["home", "work", "desk", "insights"]);
-    expect(reporter.find((group) => group.id === "home")?.items[0].href).toBe("/today");
-    expect(reporter.flatMap((group) => group.items).map((item) => item.id)).not.toContain("newsletters");
-
-    const manager = buildAdminNavigation(urls, {
-      manage: true,
-      editPosts: true,
-      editDesign: true,
-      manageIntegrations: true
-    }, { newsletter: true });
-    expect(manager.find((group) => group.id === "home")?.items[0].href).toBe("/home");
-    expect(manager.find((group) => group.id === "settings")?.items.map((item) => item.id)).toEqual(["publication", "integrations", "settings", "doctor"]);
   });
 
   it("preserves a valid Stories view and ignores unsafe route/storage values", () => {

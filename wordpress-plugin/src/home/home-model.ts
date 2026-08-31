@@ -109,17 +109,6 @@ export type HomeData = {
   activity: HomeResourceState<HomeActivityPayload>;
 };
 
-export type HomeNavigationUrls = {
-  dashboard?: string;
-  planning?: Partial<Record<"today" | "stories" | "calendar" | "media" | "coverage" | "performance" | "contentHealth" | "feedback", string>>;
-  studio?: string;
-  publication?: Partial<Record<"identity" | "branding" | "navigation" | "features" | "social", string>>;
-  integrations?: Partial<Record<"discord" | "deployment", string>>;
-  settings?: Partial<Record<"access" | "api" | "compatibility" | "diagnostics", string>>;
-  newsletters?: Partial<Record<"issues" | "settings", string>>;
-  theme?: string;
-};
-
 export type HomeNavigationCapabilities = {
   manage?: boolean;
   editDesign?: boolean;
@@ -127,8 +116,6 @@ export type HomeNavigationCapabilities = {
   editPosts?: boolean;
   editOthersPosts?: boolean;
 };
-
-export type HomeNavigationFeatures = Record<string, boolean | undefined>;
 
 const HEALTH_STATUS_RANK: Record<HomeAttentionSeverity, number> = {
   critical: 0,
