@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 import {
   getLeadPackageRenderer,
@@ -38,6 +39,8 @@ describe("theme variants render the same package differently", () => {
     // Weekly Wildcat keeps the production three-column front.
     expect(wwHtml).toContain("top-stories-layout");
     expect(wwHtml).toContain("top-stories-rail");
+    const wwLayout = new JSDOM(wwHtml).window.document.querySelector(".top-stories-layout");
+    expect(wwLayout?.firstElementChild?.className).toBe("live-lead");
     // Editorial uses its own structure entirely.
     expect(edHtml).toContain("editorial-lead-strip");
     expect(edHtml).not.toContain("top-stories-layout");
