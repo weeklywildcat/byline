@@ -3,13 +3,22 @@ import path from "node:path";
 
 const baseline = JSON.parse(await readFile(path.resolve(process.argv[2]), "utf8"));
 const candidate = JSON.parse(await readFile(path.resolve(process.argv[3]), "utf8"));
-const fields = ["title", "canonical", "description", "openGraphUrl"];
-const decode = (value = "") => value
-  .replace(/&#x27;|&#39;/gi, "'")
-  .replace(/&quot;/gi, '"')
-  .replace(/&amp;/gi, "&")
-  .replace(/&lt;/gi, "<")
-  .replace(/&gt;/gi, ">");
+const fields = [
+  "title", "canonical", "description", "openGraphUrl", "openGraphImage", "openGraphImageWidths", "openGraphImageHeights",
+  "openGraphImageAlts", "articleSection", "articlePublishedTime", "articleModifiedTime", "articleAuthors", "articleTags", "twitterImageAlts"
+];
+const decode = (value = "") => {
+  if (Array.isArray(value)) {
+    return value.map((item) => decode(item));
+  }
+
+  return String(value)
+    .replace(/&#x27;|&#39;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+};
 const byRoute = new Map(candidate.map((entry) => [entry.route, entry]));
 const differences = [];
 for (const before of baseline) {
@@ -20,7 +29,12 @@ for (const before of baseline) {
     continue;
   }
   for (const field of fields) {
-    if (decode(before[field]) !== decode(after[field])) differences.push({ route: before.route, field, before: decode(before[field]), after: decode(after[field]) });
+    if (!(field in before) || !(field in after)) continue;
+    const beforeValue = decode(before[field]);
+    const afterValue = decode(after[field]);
+    if (JSON.stringify(beforeValue) !== JSON.stringify(afterValue)) {
+      differences.push({ route: before.route, field, before: beforeValue, after: afterValue });
+    }
   }
 }
 console.log(JSON.stringify({ compared: baseline.length, differences }, null, 2));

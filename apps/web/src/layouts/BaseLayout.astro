@@ -6,13 +6,12 @@ import "@byline/ui/article.css";
 import "../../views/globals.css";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import { getOrganizationSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
+import { absoluteUrl, getOrganizationSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
+import { serializeMetadata, type Metadata } from "@/lib/metadata";
 import { getPublicationConfig } from "@/lib/publication";
 import { getActiveTheme, getThemeCssVariables } from "@/lib/theme";
-import { absoluteUrl } from "@/lib/seo";
 
-type MetadataValue = Record<string, any>;
-interface Props { metadata?: MetadataValue; themeColor?: string; noCanonical?: boolean; }
+interface Props { metadata?: Metadata; themeColor?: string; noCanonical?: boolean; }
 const { metadata = {}, themeColor, noCanonical = false } = Astro.props;
 const publication = getPublicationConfig();
 const activeTheme = getActiveTheme();
@@ -24,8 +23,6 @@ const canonical = absoluteUrl(typeof canonicalValue === "string" ? canonicalValu
 const openGraph = metadata.openGraph ?? {};
 const twitter = metadata.twitter ?? {};
 const robots = metadata.robots ?? {};
-const ogImages = Array.isArray(openGraph.images) ? openGraph.images : [];
-const twitterImages = Array.isArray(twitter.images) ? twitter.images : [];
 const robotContent = robots.index === false ? `noindex,${robots.follow === false ? "nofollow" : "follow"}` : "index,follow";
 const googleBot = robots.googleBot;
 const googleContent = googleBot ? [
@@ -35,6 +32,28 @@ const googleContent = googleBot ? [
   googleBot["max-image-preview"] ? `max-image-preview:${googleBot["max-image-preview"]}` : "",
   typeof googleBot["max-video-preview"] === "number" ? `max-video-preview:${googleBot["max-video-preview"]}` : ""
 ].filter(Boolean).join(",") : "";
+const socialMetadataTags = serializeMetadata({
+  openGraph: {
+    title: openGraph.title ?? rawTitle,
+    description: openGraph.description ?? description,
+    ...(noCanonical ? {} : { url: openGraph.url ?? canonical }),
+    siteName: openGraph.siteName ?? publication.identity.name,
+    locale: openGraph.locale ?? publication.locale.replace(/-/g, "_"),
+    type: openGraph.type ?? "website",
+    images: openGraph.images,
+    publishedTime: openGraph.publishedTime,
+    modifiedTime: openGraph.modifiedTime,
+    authors: openGraph.authors,
+    section: openGraph.section,
+    tags: openGraph.tags
+  },
+  twitter: {
+    card: twitter.card ?? "summary_large_image",
+    title: twitter.title ?? rawTitle,
+    description: twitter.description ?? description,
+    images: twitter.images
+  }
+});
 const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key, value]) => `${key}:${value}`).join(";");
 ---
 <!doctype html>
@@ -50,21 +69,9 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
     {!noCanonical && <link rel="canonical" href={canonical} />}
     {publication.branding.icons.map((icon) => <link rel={icon.width === 180 ? "apple-touch-icon" : "icon"} href={icon.url} sizes={icon.width && icon.height ? `${icon.width}x${icon.height}` : undefined} />)}
     {activeTheme.stylesheets?.map((href) => <link rel="stylesheet" href={href} />)}
-    <meta property="og:title" content={openGraph.title ?? rawTitle} />
-    <meta property="og:description" content={openGraph.description ?? description} />
-    {!noCanonical && <meta property="og:url" content={openGraph.url ?? canonical} />}
-    <meta property="og:site_name" content={openGraph.siteName ?? publication.identity.name} />
-    <meta property="og:locale" content={openGraph.locale ?? publication.locale.replace(/-/g, "_")} />
-    <meta property="og:type" content={openGraph.type ?? "website"} />
-    {openGraph.publishedTime && <meta property="article:published_time" content={openGraph.publishedTime} />}
-    {openGraph.modifiedTime && <meta property="article:modified_time" content={openGraph.modifiedTime} />}
-    {openGraph.authors?.map((author: string) => <meta property="article:author" content={author} />)}
-    {openGraph.tags?.map((tag: string) => <meta property="article:tag" content={tag} />)}
-    {ogImages.map((image: any) => <meta property="og:image" content={typeof image === "string" ? image : image.url} />)}
-    <meta name="twitter:card" content={twitter.card ?? "summary_large_image"} />
-    <meta name="twitter:title" content={twitter.title ?? rawTitle} />
-    <meta name="twitter:description" content={twitter.description ?? description} />
-    {twitterImages.map((image: any) => <meta name="twitter:image" content={typeof image === "string" ? image : image.url} />)}
+    {socialMetadataTags.map((tag) => tag.kind === "property"
+      ? <meta property={tag.key} content={tag.content} />
+      : <meta name={tag.key} content={tag.content} />)}
     <script id="organization-json-ld" type="application/ld+json" set:html={serializeJsonLd(getOrganizationSchema())}></script>
   </head>
   <body>

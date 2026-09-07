@@ -21,6 +21,15 @@ describe("Astro static frontend contract", () => {
     expect(manifest.scripts.postbuild).toContain("copy-wordpress-media-to-out.mjs");
   });
 
+  it("routes the Metadata model through the shared social-tag serializer", () => {
+    const layout = read("src/layouts/BaseLayout.astro");
+    const metadata = read("lib/metadata.ts");
+    expect(layout).toContain("serializeMetadata");
+    expect(metadata).toContain('"article:section"');
+    expect(metadata).toContain('"og:image:width"');
+    expect(metadata).toContain("image:alt");
+  });
+
   it("removes the runnable Next route tree after cutover", () => {
     const manifest = JSON.parse(read("package.json"));
     expect(existsSync(path.join(webRoot, "app"))).toBe(false);
