@@ -1,15 +1,14 @@
-import { optionalBuildData } from "@/lib/build-data";
 import type { Metadata } from "@/lib/metadata";
 import { SearchPageClient, type SearchIndexItem } from "@/components/SearchPageClient";
+import { getBuildSnapshot } from "@/lib/build-snapshot";
 import { filterVisibleContentPosts, getPrimaryVisibleCategory, getPublicTopicTags } from "@/lib/content";
 import { formatDisplayDate, stripHtml } from "@/lib/format";
-import { getAllSportsGames, getAllSportsRosters, getSportsTeams } from "@/lib/headless";
 import { buildPageMetadata } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import { getBylineRestUrl } from "@/lib/byline-rest";
 import { toSearchFacetValue } from "@/lib/search";
-import { buildTeams, getGameHref, getSeasonHref, getTeamHubHref } from "@/lib/sports";
-import { getAllPosts, getPostContributors, getPostHref } from "@/lib/wordpress";
+import { getGameHref, getSeasonHref, getTeamHubHref } from "@/lib/sports";
+import { getPostContributors, getPostHref } from "@/lib/wordpress";
 
 const publication = getPublicationConfig();
 
@@ -36,20 +35,10 @@ function getSearchExcerpt(value: string) {
 }
 
 export async function getSearchPageProps() {
-  const [posts, games, rosters, teamRecords] = await Promise.all([
-    getAllPosts(),
-    publication.features.sports
-      ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-games", getAllSportsGames, [])
-      : [],
-    publication.features.sports
-      ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-rosters", getAllSportsRosters, [])
-      : [],
-    publication.features.sports
-      ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-teams", getSportsTeams, [])
-      : []
-  ]);
+  const snapshot = await getBuildSnapshot();
+  const { posts, sports } = snapshot;
+  const { games, teams } = sports;
   const visiblePosts = filterVisibleContentPosts(posts);
-  const teams = buildTeams(games, rosters, teamRecords);
   const storyItems: SearchIndexItem[] = visiblePosts.map((post) => {
     const title = stripHtml(post.title.rendered);
     const excerpt = getSearchExcerpt(post.excerpt.rendered || post.content.rendered);
@@ -79,19 +68,7 @@ export async function getSearchPageProps() {
       topics: topicEntries.map((topic) => topic.value),
       topicLabels: Object.fromEntries(topicEntries.map((topic) => [topic.value, topic.label])),
       date: formatDisplayDate(post.date),
-      sortDate: post.date,
-      searchText: [
-        title,
-        excerpt,
-        sectionLabel,
-        category?.slug,
-        authorName,
-        ...contributors.flatMap((contributor) => [contributor.name, contributor.slug]),
-        ...topicEntries.flatMap((topic) => [topic.label, topic.value])
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
+      sortDate: post.date
     };
   });
   const teamItems: SearchIndexItem[] = teams.map((team) => ({
@@ -107,7 +84,7 @@ export async function getSearchPageProps() {
     authorKey: toSearchFacetValue(`${publication.identity.shortName} Sports`),
     date: team.latestSeason,
     sortDate: team.latestSeason,
-    searchText: [team.slug, team.name, team.shortName, ...team.sportKeys, ...team.seasons].join(" ").toLowerCase()
+    searchTokens: [team.slug, team.shortName, ...team.sportKeys, ...team.seasons]
   }));
   const seasonItems: SearchIndexItem[] = teams.flatMap((team) =>
     team.seasons.map((year) => ({
@@ -123,7 +100,7 @@ export async function getSearchPageProps() {
       authorKey: toSearchFacetValue(`${publication.identity.shortName} Sports`),
       date: year,
       sortDate: `${year}-01-01`,
-      searchText: [team.slug, team.name, team.shortName, year, "schedule", "scores", "results"].join(" ").toLowerCase()
+      searchTokens: [team.slug, team.shortName, "schedule", "scores", "results"]
     }))
   );
   const gameItems: SearchIndexItem[] = games.map((game) => ({
@@ -139,25 +116,18 @@ export async function getSearchPageProps() {
     authorKey: toSearchFacetValue(game.display.sportLevel || game.sportLabel || `${publication.identity.shortName} Sports`),
     date: game.display.date || game.startDate,
     sortDate: game.startDate,
-    searchText: [
-      game.id,
+    searchTokens: [
+      String(game.id),
       game.sportKey,
       game.sport,
-      game.sportLabel,
       game.level,
       game.teamLabel,
       game.opponent,
       game.site,
       game.locationName,
       game.locationAddress,
-      game.startDate,
-      game.display.matchup,
-      game.display.status,
-      game.display.score
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase()
+      game.startDate
+    ].filter((value): value is string => Boolean(value))
   }));
   const items = [...teamItems, ...seasonItems, ...storyItems, ...gameItems];
 
@@ -169,10 +139,10 @@ export async function getSearchPageProps() {
 }
 
 export default async function SearchPage() {
-  const props = await getSearchPageProps();
+  const { publicationName, searchGapEndpoint } = await getSearchPageProps();
   return (
     <main className="search-page-shell">
-      <SearchPageClient {...props} />
+      <SearchPageClient publicationName={publicationName} searchGapEndpoint={searchGapEndpoint} />
     </main>
   );
 }

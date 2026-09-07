@@ -18,6 +18,7 @@ import {
   type SearchIndexItem,
   type SearchUrlState
 } from "@/lib/search";
+import { parseSearchIndexDocument, SEARCH_INDEX_URL } from "@/lib/search-index";
 
 export type { SearchIndexItem } from "@/lib/search";
 export {
@@ -30,9 +31,9 @@ export {
 } from "@/lib/search";
 
 type SearchPageClientProps = {
-  items: SearchIndexItem[];
   publicationName: string;
   searchGapEndpoint?: string;
+  searchIndexUrl?: string;
 };
 
 type SearchFacetKey = "section" | "author" | "topic";
@@ -92,14 +93,46 @@ function FacetSelect({
   );
 }
 
-export function SearchPageClient({ items, publicationName, searchGapEndpoint }: SearchPageClientProps) {
+export function SearchPageClient({ publicationName, searchGapEndpoint, searchIndexUrl = SEARCH_INDEX_URL }: SearchPageClientProps) {
+  const [items, setItems] = useState<SearchIndexItem[] | null>(null);
+  const [loadError, setLoadError] = useState("");
   const [searchState, setSearchState] = useState<SearchUrlState>(DEFAULT_SEARCH_STATE);
   const inputRef = useRef<HTMLInputElement>(null);
   const hydratedRef = useRef(false);
-  const facets = useMemo(() => buildSearchFacets(items), [items]);
+  const facets = useMemo(() => items ? buildSearchFacets(items) : { sections: [], authors: [], topics: [] }, [items]);
   const terms = useMemo(() => getSearchTerms(searchState.query), [searchState.query]);
-  const results = useMemo(() => searchIndex(items, searchState), [items, searchState]);
+  const results = useMemo(() => items ? searchIndex(items, searchState) : [], [items, searchState]);
   const hasQuery = terms.length > 0;
+  const isLoading = items === null && !loadError;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setItems(null);
+    setLoadError("");
+    void fetch(searchIndexUrl, { headers: { Accept: "application/json" } })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Search index request failed with ${response.status}.`);
+        }
+
+        return parseSearchIndexDocument(await response.json());
+      })
+      .then((document) => {
+        if (!cancelled) {
+          setItems(document.items);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setLoadError(error instanceof Error ? error.message : "The search index could not be loaded.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchIndexUrl]);
 
   useEffect(() => {
     const applyUrlState = () => {
@@ -114,7 +147,7 @@ export function SearchPageClient({ items, publicationName, searchGapEndpoint }: 
   }, [facets]);
 
   useEffect(() => {
-    if (!hasQuery || results.length > 0) {
+    if (!items || loadError || !hasQuery || results.length > 0) {
       return;
     }
 
@@ -123,7 +156,7 @@ export function SearchPageClient({ items, publicationName, searchGapEndpoint }: 
     const timer = window.setTimeout(() => reportZeroResultSearch(searchState.query, { endpoint: searchGapEndpoint }), 350);
 
     return () => window.clearTimeout(timer);
-  }, [hasQuery, results.length, searchGapEndpoint, searchState.author, searchState.query, searchState.section, searchState.topic, searchState.type]);
+  }, [hasQuery, items, loadError, results.length, searchGapEndpoint, searchState.author, searchState.query, searchState.section, searchState.topic, searchState.type]);
 
   function updateSearchState(patch: Partial<SearchUrlState>, mode: "push" | "replace" = "replace") {
     const nextState = { ...searchState, ...patch };
@@ -145,7 +178,11 @@ export function SearchPageClient({ items, publicationName, searchGapEndpoint }: 
     : searchState.type === "story" || searchState.type === "all"
       ? "Latest Stories and Hubs"
       : "Browse";
-  const resultStatus = `${results.length} ${resultLabel}`;
+  const resultStatus = isLoading
+    ? "Loading search index"
+    : loadError
+      ? "Search unavailable"
+      : `${results.length} ${resultLabel}`;
 
   return (
     <section className="search-page" aria-labelledby="search-page-heading">
@@ -252,7 +289,11 @@ export function SearchPageClient({ items, publicationName, searchGapEndpoint }: 
       </div>
 
       <div id="search-results" aria-describedby="search-results-status">
-        {results.length > 0 ? (
+        {isLoading ? (
+          <p className="empty-state search-empty" role="status">Loading search index…</p>
+        ) : loadError ? (
+          <p className="empty-state search-empty" role="alert">Search is temporarily unavailable. Please try again later.</p>
+        ) : results.length > 0 ? (
           <div className="search-result-list">
             {results.map((item) => (
               <article className="search-result" key={item.id}>

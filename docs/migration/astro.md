@@ -41,7 +41,8 @@ The build writes its expected route inventory and timing data to the disposable
 public manifests, materializes the legacy `/404/` artifact, then rejects missing
 routes, stale routes, broken local asset references, missing required metadata,
 or missing materialized media. Reports are available in
-`apps/web/out/_byline/{routes,seo,media-manifest,build-metrics}.json`.
+`apps/web/out/_byline/{routes,seo,media-manifest,build-metrics}.json`; the
+versioned client search index is `apps/web/out/_byline/search-index.json`.
 
 ## Local development
 
@@ -72,6 +73,27 @@ The suite starts the lightweight static server in
 `apps/web/scripts/serve-static.mjs` automatically. It covers the desktop and
 mobile homepage geometry, static article/category/sports output, interactive
 search and schedule controls, article islands, and the public 404 page.
+
+### Current search payload measurement
+
+The historical migration measurement remains in
+`migration/astro-page-assets.json`; it recorded the production-content search
+HTML at 3,571,082 bytes. It is intentionally not rewritten. A deterministic
+Weekly Wildcat fixture measurement before and after moving the index is shown
+below (raw file sizes; the build metrics report records the current index
+schema and byte count):
+
+| Measurement | `/search/` HTML | Search JS assets | Static index |
+| --- | ---: | ---: | ---: |
+| Fixture before PR 3 | 19,449 B | 15,500 B | inline in HTML |
+| Current post-endpoint fixture | 12,828 B | 15,742 B | 5,157 B raw / 889 B gzip / 744 B Brotli |
+
+The post-change index is emitted at `out/_byline/search-index.json`, carries
+`schemaVersion: 1`, and is fetched same-origin after the lightweight search
+shell hydrates. The before/after fixture builds measured 1,416 ms and 883 ms
+locally respectively; the current post-endpoint fixture build measured 1,253
+ms. These timings are directional local measurements, not a production
+benchmark.
 
 For live CMS content, copy `apps/web/.env.example` to `.env.local`. The main
 inputs are `NEXT_PUBLIC_WP_API_URL` and `NEXT_PUBLIC_SITE_URL`; the names are

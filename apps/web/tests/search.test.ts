@@ -26,7 +26,7 @@ function item(overrides: Partial<SearchIndexItem> = {}): SearchIndexItem {
     topicLabels: { campus: "Campus" },
     date: "January 1, 2026",
     sortDate: "2026-01-01T00:00:00Z",
-    searchText: "a story a short excerpt news alex reporter campus",
+    searchTokens: [],
     ...overrides
   };
 }
@@ -42,9 +42,9 @@ const defaultState: SearchUrlState = {
 describe("public search helpers", () => {
   it("keeps AND-match inclusion independent of query term order", () => {
     const items = [
-      item({ id: "both", title: "Foo bar", searchText: "foo bar news" }),
-      item({ id: "foo-only", title: "Foo only", searchText: "foo news" }),
-      item({ id: "bar-only", title: "Bar only", searchText: "bar news" })
+      item({ id: "both", title: "Foo bar" }),
+      item({ id: "foo-only", title: "Foo only" }),
+      item({ id: "bar-only", title: "Bar only" })
     ];
 
     const fooBar = searchIndex(items, { ...defaultState, query: "foo bar" }).map((result) => result.id);
@@ -58,13 +58,22 @@ describe("public search helpers", () => {
   it("supports a bounded typo match without replacing exact matches", () => {
     const results = searchIndex(
       [
-        item({ id: "exact", title: "Football preview", searchText: "football preview news" }),
-        item({ id: "typo", title: "Footbal notes", searchText: "footbal notes news" })
+        item({ id: "exact", title: "Football preview" }),
+        item({ id: "typo", title: "Footbal notes" })
       ],
       { ...defaultState, query: "football" }
     );
 
     expect(results.map((result) => result.id)).toEqual(["exact", "typo"]);
+  });
+
+  it("keeps compact extra tokens searchable without duplicating display text", () => {
+    const results = searchIndex(
+      [item({ id: "team", kind: "team", title: "Football", searchTokens: ["gridiron", "football-varsity"] })],
+      { ...defaultState, query: "gridiron" }
+    );
+
+    expect(results.map((result) => result.id)).toEqual(["team"]);
   });
 
   it("parses, validates, and serializes shareable search state", () => {

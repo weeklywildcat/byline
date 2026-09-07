@@ -59,6 +59,55 @@ const actualRoutes = routeFiles.map(publicPath).sort();
 const expectedEntries = JSON.parse(await readFile(path.join(buildRoot, "expected-routes.json"), "utf8"));
 const expectedRoutes = expectedEntries.map((entry) => entry.path).sort();
 const expectedByPath = new Map(expectedEntries.map((entry) => [entry.path, entry]));
+const searchIndexFile = path.join(outputRoot, "_byline", "search-index.json");
+let searchIndex;
+try {
+  searchIndex = JSON.parse(await readFile(searchIndexFile, "utf8"));
+} catch (error) {
+  throw new Error(`Search index verification failed: ${error instanceof Error ? error.message : String(error)}`);
+}
+
+if (searchIndex?.schemaVersion !== 1 || !Array.isArray(searchIndex.items)) {
+  throw new Error("Search index verification failed: expected schemaVersion 1 and an items array.");
+}
+
+const searchItemKinds = new Set(["story", "team", "season", "game"]);
+for (const [index, item] of searchIndex.items.entries()) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    throw new Error(`Search index verification failed: item ${index} is not an object.`);
+  }
+
+  if ("searchText" in item) {
+    throw new Error(`Search index verification failed: item ${index} still contains the removed searchText field.`);
+  }
+
+  for (const field of ["id", "title", "excerpt", "href", "category", "author", "date"]) {
+    const valid = field === "id"
+      ? typeof item[field] === "string" || typeof item[field] === "number"
+      : typeof item[field] === "string";
+    if (!valid) {
+      throw new Error(`Search index verification failed: item ${index} is missing required field ${field}.`);
+    }
+  }
+
+  if (item.kind !== undefined && !searchItemKinds.has(item.kind)) {
+    throw new Error(`Search index verification failed: item ${index} has unsupported kind ${String(item.kind)}.`);
+  }
+
+  if (item.searchTokens !== undefined && (!Array.isArray(item.searchTokens) || item.searchTokens.some((token) => typeof token !== "string"))) {
+    throw new Error(`Search index verification failed: item ${index} has invalid searchTokens.`);
+  }
+
+  try {
+    const href = new URL(item.href, "https://byline.invalid");
+    if (href.origin === "https://byline.invalid" && !expectedRoutes.includes(href.pathname)) {
+      throw new Error(`local route ${href.pathname} is not in the route manifest`);
+    }
+  } catch (error) {
+    throw new Error(`Search index verification failed: item ${index} has an invalid href (${String(error)}).`);
+  }
+}
+
 const removed = expectedRoutes.filter((route) => !actualRoutes.includes(route));
 const unexpected = actualRoutes.filter((route) => !expectedRoutes.includes(route));
 if (removed.length || unexpected.length) {
@@ -144,6 +193,11 @@ const metrics = {
     materializationMs: Math.round([...mediaDurations.values()].reduce((sum, duration) => sum + duration, 0) * 100) / 100
   },
   routes: { expected: expectedRoutes.length, generated: actualRoutes.length },
+  searchIndex: {
+    schemaVersion: searchIndex.schemaVersion,
+    items: searchIndex.items.length,
+    bytes: (await stat(searchIndexFile)).size
+  },
   outputBytes: sizes
 };
 

@@ -19,6 +19,7 @@ describe("Astro static frontend contract", () => {
     expect(manifest.scripts.build).toContain("astro-with-publication");
     expect(manifest.scripts.postbuild).toContain("verify-build.mjs");
     expect(manifest.scripts.postbuild).toContain("copy-wordpress-media-to-out.mjs");
+    expect(read("scripts/verify-static-export.mjs")).toContain("_byline/search-index.json");
   });
 
   it("routes the Metadata model through the shared social-tag serializer", () => {
@@ -44,7 +45,19 @@ describe("Astro static frontend contract", () => {
     expect(article).toContain("NewsroomPollHydrator client:load");
     expect(article).toMatch(/<ReaderFeedbackForm\b[^>]*\bclient:visible/);
     expect(article).toContain("NewsletterSignupForm client:visible");
-    expect(read("src/pages/search/index.astro")).toMatch(/<SearchPageClient\b[^>]*\bclient:load/);
+    const searchPage = read("src/pages/search/index.astro");
+    expect(searchPage).toMatch(/<SearchPageClient\b[^>]*\bclient:load/);
+    expect(searchPage).not.toContain("writeSearchIndex");
+    expect(searchPage).not.toContain("<SearchPageClient {...");
+    expect(read("views/search/page.tsx")).not.toContain("<SearchPageClient {...");
+    expect(existsSync(path.join(webRoot, "lib", "search-index-build.ts"))).toBe(false);
+    const searchIndexEndpoint = read("src/pages/[...path].json.ts");
+    expect(searchIndexEndpoint).toContain("export const prerender = true");
+    expect(searchIndexEndpoint).toContain('path: "_byline/search-index"');
+    expect(searchIndexEndpoint).toContain("createSearchIndexDocument");
+    expect(searchIndexEndpoint).toContain('"Content-Type": "application/json; charset=utf-8"');
+    expect(read("lib/search-index.ts")).toContain("SEARCH_INDEX_SCHEMA_VERSION");
+    expect(read("lib/search-index.ts")).toContain("/_byline/search-index.json");
     expect(read("src/pages/sports/schedule/index.astro")).toMatch(/<SportsScheduleArchive\b[^>]*\bclient:load/);
   });
 
