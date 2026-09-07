@@ -67,6 +67,15 @@ jobs:
           BYLINE_DISCORD_CLIENT_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
         run: npm run build:frontend
 
+      - name: Install Chromium for public Astro browser tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Run public Astro browser tests
+        env:
+          BYLINE_PUBLICATION_FILE: tests/fixtures/weekly-wildcat-publication.json
+          BYLINE_CONTENT_MODE: weekly-wildcat-fixture
+        run: npm run test:frontend:browser
+
       - name: Build plugin and Discord workspaces
         run: |
           npm run build:plugin

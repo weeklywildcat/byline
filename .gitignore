@@ -8,6 +8,7 @@
 .byline-build/
 .wrangler/
 out/
+apps/web/test-results/
 node_modules/
 wordpress/
 public/_wordpress-media/
