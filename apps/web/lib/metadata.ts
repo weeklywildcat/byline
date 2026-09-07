@@ -74,32 +74,77 @@ function addMetadataTag(
   tags.push({ kind, key, content });
 }
 
+type NormalizedSocialImage = {
+  url: string;
+  width?: number;
+  height?: number;
+  alt?: string;
+};
+
+function normalizeSocialImage(image: SocialImage | undefined): NormalizedSocialImage | undefined {
+  const candidate = typeof image === "string" ? { url: image } : image;
+  const url = cleanMetadataValue(candidate?.url);
+
+  if (!url) {
+    return undefined;
+  }
+
+  const width = typeof candidate?.width === "number" && Number.isFinite(candidate.width) && candidate.width > 0
+    ? candidate.width
+    : undefined;
+  const height = typeof candidate?.height === "number" && Number.isFinite(candidate.height) && candidate.height > 0
+    ? candidate.height
+    : undefined;
+  const alt = cleanMetadataValue(candidate?.alt);
+
+  return {
+    url,
+    ...(width === undefined ? {} : { width }),
+    ...(height === undefined ? {} : { height }),
+    ...(alt === undefined ? {} : { alt })
+  };
+}
+
+function socialImageGroupKey(image: NormalizedSocialImage) {
+  return JSON.stringify([image.url, image.width ?? null, image.height ?? null, image.alt ?? null]);
+}
+
 function addSocialImageTags(
   tags: SerializedMetadataTag[],
   prefix: "og" | "twitter",
-  image: SocialImage | undefined
+  image: SocialImage | undefined,
+  seenGroups: Set<string>
 ) {
-  const normalized = typeof image === "string" ? { url: image } : image;
-  const url = cleanMetadataValue(normalized?.url);
+  const normalized = normalizeSocialImage(image);
 
-  if (!url) {
+  if (!normalized) {
     return;
   }
 
+  const groupKey = socialImageGroupKey(normalized);
+
+  if (seenGroups.has(groupKey)) {
+    return;
+  }
+
+  seenGroups.add(groupKey);
+
   const kind = prefix === "og" ? "property" : "name";
-  addMetadataTag(tags, kind, prefix + ":image", url);
+  tags.push({ kind, key: prefix + ":image", content: normalized.url });
 
   if (prefix === "og") {
-    if (typeof normalized?.width === "number" && Number.isFinite(normalized.width) && normalized.width > 0) {
-      addMetadataTag(tags, "property", "og:image:width", normalized.width);
+    if (normalized.width !== undefined) {
+      tags.push({ kind: "property", key: "og:image:width", content: String(normalized.width) });
     }
 
-    if (typeof normalized?.height === "number" && Number.isFinite(normalized.height) && normalized.height > 0) {
-      addMetadataTag(tags, "property", "og:image:height", normalized.height);
+    if (normalized.height !== undefined) {
+      tags.push({ kind: "property", key: "og:image:height", content: String(normalized.height) });
     }
   }
 
-  addMetadataTag(tags, kind, prefix + ":image:alt", normalized?.alt);
+  if (normalized.alt !== undefined) {
+    tags.push({ kind, key: prefix + ":image:alt", content: normalized.alt });
+  }
 }
 
 /**
@@ -122,13 +167,15 @@ export function serializeMetadata(metadata: Metadata): SerializedMetadataTag[] {
   addMetadataTag(tags, "property", "article:modified_time", openGraph?.modifiedTime);
   openGraph?.authors?.forEach((author) => addMetadataTag(tags, "property", "article:author", author));
   openGraph?.tags?.forEach((tag) => addMetadataTag(tags, "property", "article:tag", tag));
-  openGraph?.images?.forEach((image) => addSocialImageTags(tags, "og", image));
+  const openGraphImageGroups = new Set<string>();
+  openGraph?.images?.forEach((image) => addSocialImageTags(tags, "og", image, openGraphImageGroups));
 
   const twitter = metadata.twitter;
   addMetadataTag(tags, "name", "twitter:card", twitter?.card);
   addMetadataTag(tags, "name", "twitter:title", twitter?.title);
   addMetadataTag(tags, "name", "twitter:description", twitter?.description);
-  twitter?.images?.forEach((image) => addSocialImageTags(tags, "twitter", image));
+  const twitterImageGroups = new Set<string>();
+  twitter?.images?.forEach((image) => addSocialImageTags(tags, "twitter", image, twitterImageGroups));
 
   return tags;
 }

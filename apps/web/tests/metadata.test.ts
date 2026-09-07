@@ -6,7 +6,7 @@ function values(tags: SerializedMetadataTag[], key: string) {
 }
 
 describe("HTML metadata serialization", () => {
-  it("serializes complete article image and article metadata without duplicates", () => {
+  it("serializes complete article and social metadata without duplicate scalar tags", () => {
     const metadata: Metadata = {
       openGraph: {
         title: "Fixture article",
@@ -59,6 +59,56 @@ describe("HTML metadata serialization", () => {
     expect(tags.find((tag) => tag.key === "og:image")?.kind).toBe("property");
     expect(tags.find((tag) => tag.key === "twitter:image")?.kind).toBe("name");
     expect(tags.find((tag) => tag.key === "twitter:image:alt")?.kind).toBe("name");
+  });
+
+  it("preserves structured properties for every distinct Open Graph image group", () => {
+    const tags = serializeMetadata({
+      openGraph: {
+        images: [
+          {
+            url: "https://example.test/uploads/a.jpg",
+            width: 1200,
+            height: 630,
+            alt: "Image A"
+          },
+          {
+            url: "https://example.test/uploads/b.jpg",
+            width: 1200,
+            height: 630,
+            alt: "Image B"
+          }
+        ]
+      }
+    });
+
+    expect(tags.filter((tag) => tag.key.startsWith("og:image")).map((tag) => [tag.key, tag.content])).toEqual([
+      ["og:image", "https://example.test/uploads/a.jpg"],
+      ["og:image:width", "1200"],
+      ["og:image:height", "630"],
+      ["og:image:alt", "Image A"],
+      ["og:image", "https://example.test/uploads/b.jpg"],
+      ["og:image:width", "1200"],
+      ["og:image:height", "630"],
+      ["og:image:alt", "Image B"]
+    ]);
+  });
+
+  it("keeps Open Graph image groups distinct when the URL is repeated with different alt text", () => {
+    const tags = serializeMetadata({
+      openGraph: {
+        images: [
+          { url: "https://example.test/uploads/shared.jpg", alt: "First description" },
+          { url: "https://example.test/uploads/shared.jpg", alt: "Second description" }
+        ]
+      }
+    });
+
+    expect(tags.filter((tag) => tag.key.startsWith("og:image")).map((tag) => [tag.key, tag.content])).toEqual([
+      ["og:image", "https://example.test/uploads/shared.jpg"],
+      ["og:image:alt", "First description"],
+      ["og:image", "https://example.test/uploads/shared.jpg"],
+      ["og:image:alt", "Second description"]
+    ]);
   });
 
   it("keeps website and profile metadata supported without inventing article fields", () => {
