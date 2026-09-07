@@ -56,6 +56,23 @@ npm run build:frontend
 npm run test:frontend:second-publication
 ```
 
+The browser regression suite exercises the built Weekly Wildcat output in
+`apps/web/out`, separately from the WordPress E2E suite. After building the
+deterministic fixture, install Chromium once and run:
+
+```sh
+BYLINE_PUBLICATION_FILE=tests/fixtures/weekly-wildcat-publication.json \
+BYLINE_CONTENT_MODE=weekly-wildcat-fixture \
+npm run build:frontend
+npx playwright install chromium
+npm run test:frontend:browser
+```
+
+The suite starts the lightweight static server in
+`apps/web/scripts/serve-static.mjs` automatically. It covers the desktop and
+mobile homepage geometry, static article/category/sports output, interactive
+search and schedule controls, article islands, and the public 404 page.
+
 For live CMS content, copy `apps/web/.env.example` to `.env.local`. The main
 inputs are `NEXT_PUBLIC_WP_API_URL` and `NEXT_PUBLIC_SITE_URL`; the names are
 retained for deployment compatibility. Deterministic local/CI fixtures use
