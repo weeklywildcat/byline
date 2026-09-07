@@ -38,4 +38,15 @@ describe("Astro static frontend contract", () => {
     expect(read("src/pages/search/index.astro")).toMatch(/<SearchPageClient\b[^>]*\bclient:load/);
     expect(read("src/pages/sports/schedule/index.astro")).toMatch(/<SportsScheduleArchive\b[^>]*\bclient:load/);
   });
+
+  it("keeps the homepage hero rail limiter outside the CSS grid", () => {
+    const homepage = read("src/pages/index.astro");
+    const mainEnd = homepage.indexOf("</main>");
+    const limiter = homepage.indexOf("<HomepageHeroRailLimiter client:load />");
+
+    expect(homepage).toMatch(/railLimiter:\s*\(\) => null/);
+    expect(homepage).not.toContain("home-rail-");
+    expect(mainEnd).toBeGreaterThan(-1);
+    expect(limiter).toBeGreaterThan(mainEnd);
+  });
 });
