@@ -36,6 +36,14 @@ function attr(source, name) {
   return tag?.match(/content=(["'])(.*?)\1/i)?.[2] ?? "";
 }
 
+function attrs(source, name) {
+  return [...source.matchAll(/<meta\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .filter((candidate) => candidate.match(/(?:name|property)=(["'])(.*?)\1/i)?.[2] === name)
+    .map((candidate) => candidate.match(/content=(["'])(.*?)\1/i)?.[2] ?? "")
+    .filter(Boolean);
+}
+
 function link(source, rel) {
   const tag = [...source.matchAll(/<link\b[^>]*>/gi)].map((match) => match[0]).find((candidate) => candidate.match(/rel=(["'])(.*?)\1/i)?.[2] === rel);
   return tag?.match(/href=(["'])(.*?)\1/i)?.[2] ?? "";
@@ -85,8 +93,12 @@ for (const file of files.filter((candidate) => candidate.endsWith(".html"))) {
   seo.push({
     route, title, canonical, description,
     openGraphTitle: attr(source, "og:title"), openGraphDescription: attr(source, "og:description"),
-    openGraphImage: attr(source, "og:image"), openGraphUrl: attr(source, "og:url"),
-    twitterCard: attr(source, "twitter:card"), robots: attr(source, "robots"),
+    openGraphImage: attr(source, "og:image"), openGraphImageWidths: attrs(source, "og:image:width"),
+    openGraphImageHeights: attrs(source, "og:image:height"), openGraphImageAlts: attrs(source, "og:image:alt"),
+    openGraphUrl: attr(source, "og:url"), articleSection: attr(source, "article:section"),
+    articlePublishedTime: attr(source, "article:published_time"), articleModifiedTime: attr(source, "article:modified_time"),
+    articleAuthors: attrs(source, "article:author"), articleTags: attrs(source, "article:tag"),
+    twitterCard: attr(source, "twitter:card"), twitterImageAlts: attrs(source, "twitter:image:alt"), robots: attr(source, "robots"),
     structuredDataCount: [...source.matchAll(/type=["']application\/ld\+json["']/gi)].length
   });
 }

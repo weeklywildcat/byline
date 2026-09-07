@@ -20,12 +20,20 @@ for (const file of files.filter((file) => file.endsWith(".html"))) {
   const source = await readFile(file, "utf8");
   const find = (pattern) => source.match(pattern)?.[1] ?? "";
   const attribute = (tag, name) => tag.match(new RegExp(`${name}=(["'])(.*?)\\1`, "i"))?.[2] ?? "";
-  const meta = (name) => {
-    const tag = [...source.matchAll(/<meta\b[^>]*>/gi)].map((match) => match[0]).find((candidate) => attribute(candidate, "(?:name|property)") === name);
-    return tag ? attribute(tag, "content") : "";
-  };
+  const metas = (name) => [...source.matchAll(/<meta\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .filter((candidate) => attribute(candidate, "(?:name|property)") === name)
+    .map((candidate) => attribute(candidate, "content"))
+    .filter(Boolean);
+  const meta = (name) => metas(name)[0] ?? "";
   const canonicalTag = [...source.matchAll(/<link\b[^>]*>/gi)].map((match) => match[0]).find((candidate) => attribute(candidate, "rel") === "canonical");
-  seo.push({ route: routeFor(file), title: find(/<title>([\s\S]*?)<\/title>/i), canonical: canonicalTag ? attribute(canonicalTag, "href") : "", description: meta("description"), openGraphUrl: meta("og:url") });
+  seo.push({
+    route: routeFor(file), title: find(/<title>([\s\S]*?)<\/title>/i), canonical: canonicalTag ? attribute(canonicalTag, "href") : "", description: meta("description"),
+    openGraphUrl: meta("og:url"), openGraphImage: meta("og:image"), openGraphImageWidths: metas("og:image:width"),
+    openGraphImageHeights: metas("og:image:height"), openGraphImageAlts: metas("og:image:alt"), articleSection: meta("article:section"),
+    articlePublishedTime: meta("article:published_time"), articleModifiedTime: meta("article:modified_time"), articleAuthors: metas("article:author"),
+    articleTags: metas("article:tag"), twitterImageAlts: metas("twitter:image:alt")
+  });
 }
 const sizes = { total: 0, html: 0, js: 0, css: 0, media: 0 };
 for (const file of files) {

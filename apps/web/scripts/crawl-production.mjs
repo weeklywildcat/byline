@@ -5,10 +5,14 @@ const queue = [origin.href];
 const seen = new Set();
 const records = [];
 function attribute(tag, name) { return tag.match(new RegExp(`${name}=(["'])(.*?)\\1`, "i"))?.[2] ?? ""; }
-function meta(source, name) {
-  const tag = [...source.matchAll(/<meta\b[^>]*>/gi)].map((match) => match[0]).find((candidate) => attribute(candidate, "(?:name|property)") === name);
-  return tag ? attribute(tag, "content") : "";
+function metas(source, name) {
+  return [...source.matchAll(/<meta\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .filter((candidate) => attribute(candidate, "(?:name|property)") === name)
+    .map((candidate) => attribute(candidate, "content"))
+    .filter(Boolean);
 }
+function meta(source, name) { return metas(source, name)[0] ?? ""; }
 while (queue.length && records.length < limit) {
   const url = queue.shift();
   if (!url || seen.has(url)) continue;
@@ -17,7 +21,13 @@ while (queue.length && records.length < limit) {
   const text = (response.headers.get("content-type") || "").includes("text/html") ? await response.text() : "";
   const find = (pattern) => text.match(pattern)?.[1] ?? "";
   const canonicalTag = [...text.matchAll(/<link\b[^>]*>/gi)].map((match) => match[0]).find((candidate) => attribute(candidate, "rel") === "canonical");
-  records.push({ url, status: response.status, location: response.headers.get("location"), title: find(/<title>([\s\S]*?)<\/title>/i), canonical: canonicalTag ? attribute(canonicalTag, "href") : "", description: meta(text, "description"), openGraphUrl: meta(text, "og:url") });
+  records.push({
+    url, status: response.status, location: response.headers.get("location"), title: find(/<title>([\s\S]*?)<\/title>/i), canonical: canonicalTag ? attribute(canonicalTag, "href") : "", description: meta(text, "description"),
+    openGraphUrl: meta(text, "og:url"), openGraphImage: meta(text, "og:image"), openGraphImageWidths: metas(text, "og:image:width"),
+    openGraphImageHeights: metas(text, "og:image:height"), openGraphImageAlts: metas(text, "og:image:alt"), articleSection: meta(text, "article:section"),
+    articlePublishedTime: meta(text, "article:published_time"), articleModifiedTime: meta(text, "article:modified_time"), articleAuthors: metas(text, "article:author"),
+    articleTags: metas(text, "article:tag"), twitterImageAlts: metas(text, "twitter:image:alt")
+  });
   for (const match of text.matchAll(/href=["']([^"'#]+)["']/gi)) {
     try { const next = new URL(match[1], url); next.hash = ""; if (next.origin === origin.origin && !seen.has(next.href)) queue.push(next.href); } catch {}
   }
