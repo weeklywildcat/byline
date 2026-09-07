@@ -1,8 +1,8 @@
 // Byline static export depends on required publication data being genuinely
 // resolvable. Historically these loaders used `.catch(() => [])`, which turned a
-// CMS/API outage into a legitimate-looking empty dataset. Next then failed much
-// later and much less usefully with "generateStaticParams() returned an empty
-// array", pointing at the route instead of the endpoint that actually broke.
+// CMS/API outage into a legitimate-looking empty dataset. The renderer then
+// failed much later at route generation, pointing at a route instead of the
+// endpoint that actually broke.
 //
 // This module keeps the two states distinct:
 //   - the endpoint answered, and the publication genuinely has no rows  -> []

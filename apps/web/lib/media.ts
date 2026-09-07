@@ -1,8 +1,9 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, rename, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { stripHtml } from "@/lib/format";
+import { deterministicMediaPath, MEDIA_CACHE_VERSION, stableDigest } from "@byline/content";
 
 const DEFAULT_WP_API_URL = "https://cms.weeklywildcat.com/wp-json/wp/v2";
 const DEFAULT_SITE_URL = "https://weeklywildcat.com";
@@ -227,15 +228,26 @@ function sanitizeFilename(value: string) {
 }
 
 function getMirroredMediaPath(url: string) {
-  const { pathname } = new URL(url);
-  const basename = sanitizeFilename(path.posix.basename(pathname));
-  const hash = createHash("sha256").update(url).digest("hex").slice(0, 16);
-  const filename = `${hash}-${basename}`;
+  const publicPath = deterministicMediaPath(url, MEDIA_CACHE_VERSION);
+  const filename = sanitizeFilename(path.posix.basename(publicPath));
 
   return {
     filePath: path.join(WORDPRESS_MEDIA_PUBLIC_DIR, filename),
     publicPath: `${WORDPRESS_MEDIA_PUBLIC_ROUTE}/${filename}`
   };
+}
+
+async function recordMediaManifest(sourceUrl: string, localPath: string, status: "materialized" | "external-fallback", durationMs: number) {
+  const buildDirectory = path.join(process.cwd(), ".byline-build");
+  await mkdir(buildDirectory, { recursive: true });
+  await appendFile(path.join(buildDirectory, "media-manifest.ndjson"), `${JSON.stringify({
+    sourceUrl,
+    localPath,
+    sourceDigest: stableDigest(sourceUrl),
+    transformVersion: MEDIA_CACHE_VERSION,
+    status,
+    durationMs
+  })}\n`);
 }
 
 async function hasDownloadedFile(filePath: string) {
@@ -352,6 +364,7 @@ function warnMissingWordPressMedia(value: string, fallbackUrl: string, error: un
 }
 
 export async function mirrorWordPressMediaUrl(value: string, attachmentId?: string): Promise<string> {
+  const started = performance.now();
   const media = normalizeWordPressMediaUrl(value);
 
   if (!media || !shouldMirrorWordPressMedia()) {
@@ -374,16 +387,17 @@ export async function mirrorWordPressMediaUrl(value: string, attachmentId?: stri
         return await mirrorAttachmentMediaUrl(value, attachmentId, error);
       } catch (attachmentError) {
         warnMissingWordPressMedia(value, media.cacheUrl, attachmentError);
-
+        await recordMediaManifest(media.cacheUrl, mirrored.publicPath, "external-fallback", Math.round((performance.now() - started) * 100) / 100);
         return media.cacheUrl;
       }
     }
 
     warnMissingWordPressMedia(value, media.cacheUrl, error);
-
+    await recordMediaManifest(media.cacheUrl, mirrored.publicPath, "external-fallback", Math.round((performance.now() - started) * 100) / 100);
     return media.cacheUrl;
   }
 
+  await recordMediaManifest(media.cacheUrl, mirrored.publicPath, "materialized", Math.round((performance.now() - started) * 100) / 100);
   return mirrored.publicPath;
 }
 

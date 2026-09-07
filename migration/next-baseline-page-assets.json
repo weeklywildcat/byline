@@ -1,0 +1,32 @@
+{
+  "/": {
+    "htmlBytes": 80240,
+    "jsBytes": 601400,
+    "cssBytes": 156332,
+    "inlineScriptBytes": 51172
+  },
+  "/2026/08/29/sports/wildcats-edge-landrum-28-26-after-storm-delays-game-overnight/": {
+    "htmlBytes": 77535,
+    "jsBytes": 606231,
+    "cssBytes": 156332,
+    "inlineScriptBytes": 51690
+  },
+  "/category/news/": {
+    "htmlBytes": 44071,
+    "jsBytes": 587878,
+    "cssBytes": 156332,
+    "inlineScriptBytes": 28616
+  },
+  "/sports/football-varsity/": {
+    "htmlBytes": 57209,
+    "jsBytes": 588472,
+    "cssBytes": 156332,
+    "inlineScriptBytes": 36151
+  },
+  "/search/": {
+    "htmlBytes": 2463327,
+    "jsBytes": 599286,
+    "cssBytes": 156332,
+    "inlineScriptBytes": 2450238
+  }
+}

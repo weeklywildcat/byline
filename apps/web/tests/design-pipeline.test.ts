@@ -16,7 +16,7 @@ import {
 //   Studio editor state
 //     -> schema 2 document
 //       -> WordPress design envelope (/byline/v1/design/home)
-//         -> BYLINE_DESIGNS_JSON (written by next-with-publication)
+//         -> BYLINE_DESIGNS_JSON (written by astro-with-publication)
 //           -> lib/designs parser
 //             -> homepage design selection
 //               -> lead package resolver

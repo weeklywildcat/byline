@@ -1,0 +1,12 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { getMetadata } from "@/views/sports/[teamSlug]/page";
+import { getBuildSnapshot } from "@/lib/build-snapshot";
+export async function getStaticPaths() {
+  const snapshot = await getBuildSnapshot();
+  return snapshot.sports.teams.map((team) => ({ params: { teamSlug: team.slug } }));
+}
+const params = { teamSlug: Astro.params.teamSlug! };
+const metadata = await getMetadata({ params: Promise.resolve(params) });
+---
+<BaseLayout metadata={metadata}><Page params={Promise.resolve(params)} /></BaseLayout>

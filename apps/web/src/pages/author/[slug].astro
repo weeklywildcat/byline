@@ -1,0 +1,12 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { getMetadata } from "@/views/author/[slug]/page";
+import { getBuildSnapshot } from "@/lib/build-snapshot";
+export async function getStaticPaths() {
+  const snapshot = await getBuildSnapshot();
+  return snapshot.contributors.map((contributor) => ({ params: { slug: contributor.slug } }));
+}
+const params = { slug: Astro.params.slug! };
+const metadata = await getMetadata({ params: Promise.resolve(params) });
+---
+<BaseLayout metadata={metadata}><Page params={Promise.resolve(params)} /></BaseLayout>

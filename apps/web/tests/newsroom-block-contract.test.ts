@@ -27,8 +27,8 @@ describe("Gutenberg newsroom library contract", () => {
     const main = await readPlugin("weekly-wildcat-headless.php");
     const webpack = await readPlugin("webpack.config.js");
     const packageScript = await readFile(new URL("../../../scripts/package-plugin.sh", import.meta.url), "utf8");
-    const article = await readFile(new URL("../app/[segment]/[month]/[day]/[category]/[articleSlug]/page.tsx", import.meta.url), "utf8");
-    const page = await readFile(new URL("../app/[segment]/page.tsx", import.meta.url), "utf8");
+    const article = await readFile(new URL("../views/[segment]/[month]/[day]/[category]/[articleSlug]/page.tsx", import.meta.url), "utf8");
+    const page = await readFile(new URL("../views/[segment]/page.tsx", import.meta.url), "utf8");
 
     ["byline_newsroom_render_stories", "byline_newsroom_render_people", "byline_newsroom_render_sports_schedule", "byline_newsroom_render_events", "byline_newsroom_render_poll", "byline_newsroom_render_game_score", "byline_newsroom_game_score_game_ids"].forEach((name) => expect(renderer).toContain(name));
     expect(renderer).toContain("register_block_bindings_source");

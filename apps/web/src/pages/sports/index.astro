@@ -1,0 +1,9 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { metadata } from "@/views/sports/page";
+import NotFound from "@/views/not-found";
+import { getPublicationConfig } from "@/lib/publication";
+const enabled = getPublicationConfig().features.sports;
+const pageMetadata = enabled ? metadata : { title: getPublicationConfig().seo.defaultTitle, robots: { index: false, follow: false } };
+---
+<BaseLayout metadata={pageMetadata} noCanonical={!enabled}>{enabled ? <Page /> : <NotFound />}</BaseLayout>

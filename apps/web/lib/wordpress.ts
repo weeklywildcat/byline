@@ -1,5 +1,5 @@
 import { mirrorWordPressMediaInValue } from "@/lib/media";
-import { getBylineRestUrl, getNamespaceApiUrl, getWordPressApiUrl } from "@/lib/byline-rest";
+import { getNamespaceApiUrl, getWordPressApiUrl } from "@/lib/byline-rest";
 import { stripHtml } from "@/lib/format";
 import { getPublicationConfig } from "@/lib/publication";
 import northStarContent from "@/tests/fixtures/north-star-content.json";
@@ -20,6 +20,18 @@ const WORDPRESS_PAGE_CONCURRENCY = Math.min(
 );
 const BYLINE_API_NAMESPACE = "byline/v1";
 const LEGACY_API_NAMESPACE = "weekly-wildcat/v1";
+const buildDataPromises = new Map<string, Promise<unknown>>();
+
+function memoizedBuildData<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const existing = buildDataPromises.get(key) as Promise<T> | undefined;
+  if (existing) return existing;
+  const promise = load().catch((error) => {
+    buildDataPromises.delete(key);
+    throw error;
+  });
+  buildDataPromises.set(key, promise);
+  return promise;
+}
 
 type QueryValue = string | number | boolean | undefined | null;
 
@@ -782,6 +794,9 @@ async function headlessWpFetch<T>(path: string, query: Record<string, QueryValue
   if (process.env.BYLINE_CONTENT_MODE === "empty") {
     return [] as T;
   }
+  if (process.env.BYLINE_CONTENT_MODE?.endsWith("-fixture")) {
+    return fixtureData<T>(path === "/authors" ? "/users" : path, query);
+  }
   const url = new URL(`${getHeadlessApiUrl()}/${path.replace(/^\//, "")}`);
 
   Object.entries(query).forEach(([key, value]) => {
@@ -810,83 +825,57 @@ async function headlessWpFetch<T>(path: string, query: Record<string, QueryValue
 }
 
 export async function getLatestPosts(count = 12) {
-  const { data } = await wpFetch<WordPressPost[]>("/posts", {
-    _embed: 1,
-    status: "publish",
-    per_page: count,
-    page: 1,
-    orderby: "date",
-    order: "desc"
-  });
-
-  return data;
+  return (await getAllPosts()).slice(0, count);
 }
 
 export async function getAllPosts() {
-  return wpFetchCollection<WordPressPost>("/posts", {
+  return memoizedBuildData("posts", () => wpFetchCollection<WordPressPost>("/posts", {
     _embed: 1,
     status: "publish",
     orderby: "date",
     order: "desc"
-  });
+  }));
 }
 
 export async function getPostBySlug(slug: string) {
-  const { data } = await wpFetch<WordPressPost[]>("/posts", {
-    _embed: 1,
-    status: "publish",
-    slug,
-    per_page: 100
-  });
-
-  return data[0] ?? null;
+  return (await getAllPosts()).find((post) => post.slug === slug) ?? null;
 }
 
 export async function getAllPages() {
-  return wpFetchCollection<WordPressPage>("/pages", {
+  return memoizedBuildData("pages", () => wpFetchCollection<WordPressPage>("/pages", {
     status: "publish",
     orderby: "menu_order",
     order: "asc"
-  });
+  }));
 }
 
 export async function getPageBySlug(slug: string) {
-  const { data } = await wpFetch<WordPressPage[]>("/pages", {
-    status: "publish",
-    slug,
-    per_page: 100
-  });
-  return data[0] ?? null;
+  return (await getAllPages()).find((page) => page.slug === slug) ?? null;
 }
 
 export async function getAllCategories() {
-  return wpFetchCollection<WordPressCategory>("/categories", {
+  return memoizedBuildData("categories", () => wpFetchCollection<WordPressCategory>("/categories", {
     orderby: "name",
     order: "asc"
-  });
+  }));
+}
+
+export async function getAllTags() {
+  return memoizedBuildData("tags", () => wpFetchCollection<WordPressTag>("/tags", {
+    orderby: "name",
+    order: "asc"
+  }));
 }
 
 export async function getAllAuthors() {
-  try {
+  return memoizedBuildData("authors", async () => { try {
     return await headlessWpFetch<WordPressAuthor[]>("/authors");
   } catch {
     return wpFetchCollection<WordPressAuthor>("/users", {
       orderby: "name",
       order: "asc"
     });
-  }
-}
-
-function normalizePublicContributor(value: unknown): WordPressContributor | null {
-  if (isRecord(value)) {
-    const type = String(value.type ?? value.kind ?? "").toLowerCase();
-
-    if (type === "guest" || type === "contributor" || isRecord(value.guest)) {
-      return normalizeGuestContributor(value);
-    }
-  }
-
-  return publicAuthor(value);
+  }});
 }
 
 function uniqueContributorSlugs(authors: WordPressAuthor[], guests: WordPressGuestContributor[]) {
@@ -912,7 +901,7 @@ function uniqueContributorSlugs(authors: WordPressAuthor[], guests: WordPressGue
 }
 
 export async function getAllGuestContributors() {
-  try {
+  return memoizedBuildData("guest-contributors", async () => { try {
     const records = await publicCollection(["/contributors/guests", "/contributors", "/guests"], {
       public: 1,
       status: "publish"
@@ -926,19 +915,18 @@ export async function getAllGuestContributors() {
     // Guest contributors are optional. A missing endpoint must not prevent the
     // normal WordPress author directory from building.
     return [];
-  }
+  }});
 }
 
 export async function getAllPublicContributors(): Promise<WordPressContributor[]> {
-  const [authors, guests] = await Promise.all([getAllAuthors(), getAllGuestContributors()]);
-
-  return [...authors, ...uniqueContributorSlugs(authors, guests)];
+  return memoizedBuildData("public-contributors", async () => {
+    const [authors, guests] = await Promise.all([getAllAuthors(), getAllGuestContributors()]);
+    return [...authors, ...uniqueContributorSlugs(authors, guests)];
+  });
 }
 
 export async function getAuthorById(authorId: number) {
-  const { data } = await wpFetch<WordPressAuthor>(`/users/${authorId}`);
-
-  return data ?? null;
+  return (await getAllAuthors()).find((author) => author.id === authorId) ?? null;
 }
 
 export async function getAuthorBySlug(slug: string) {
@@ -964,45 +952,18 @@ export async function getContributorBySlug(slug: string): Promise<WordPressContr
 }
 
 export async function getCategoryBySlug(slug: string) {
-  const { data } = await wpFetch<WordPressCategory[]>("/categories", {
-    slug,
-    per_page: 100
-  });
-
-  return data[0] ?? null;
+  return (await getAllCategories()).find((category) => category.slug === slug) ?? null;
 }
 
 export async function getPostsByCategory(categoryId: number) {
-  return wpFetchCollection<WordPressPost>("/posts", {
-    _embed: 1,
-    status: "publish",
-    categories: categoryId,
-    orderby: "date",
-    order: "desc"
-  });
+  return (await getAllPosts()).filter((post) => post.categories.includes(categoryId));
 }
 
 export async function getPostsByAuthor(authorId: number) {
-  const primaryPosts = await wpFetchCollection<WordPressPost>("/posts", {
-    _embed: 1,
-    status: "publish",
-    author: authorId,
-    orderby: "date",
-    order: "desc"
-  });
-
-  try {
-    const allPosts = await getAllPosts();
-    const matchingPosts = allPosts.filter((post) =>
-      post.author === authorId || getPostContributors(post).some((contributor) =>
-        !isGuestContributor(contributor) && contributor.id === authorId
-      )
-    );
-
-    return matchingPosts.length > 0 || allPosts.length === 0 ? matchingPosts : primaryPosts;
-  } catch {
-    return primaryPosts;
-  }
+  const allPosts = await getAllPosts();
+  return allPosts.filter((post) => post.author === authorId || getPostContributors(post).some((contributor) =>
+    !isGuestContributor(contributor) && contributor.id === authorId
+  ));
 }
 
 export async function getPostsByContributor(contributor: WordPressContributor) {
@@ -1391,7 +1352,7 @@ export function normalizePublicCoverage(value: unknown): WordPressCoverage | nul
 }
 
 export async function getAllPublicCoverages() {
-  const records = await publicCollection(["/coverage", "/coverages"], {
+  return memoizedBuildData("coverages", async () => { const records = await publicCollection(["/coverage", "/coverages"], {
     public: 1,
     _embed: 1
   });
@@ -1399,6 +1360,7 @@ export async function getAllPublicCoverages() {
   return records.flatMap((record) => {
     const coverage = normalizePublicCoverage(record);
     return coverage ? [coverage] : [];
+  });
   });
 }
 
@@ -1409,7 +1371,7 @@ export async function getPublicCoverageBySlug(slug: string) {
 }
 
 export async function getAllPublicCorrections() {
-  const records = await publicCollection(["/corrections"], {
+  return memoizedBuildData("corrections", async () => { const records = await publicCollection(["/corrections"], {
     public: 1,
     status: "publish",
     per_page: 100
@@ -1418,6 +1380,7 @@ export async function getAllPublicCorrections() {
   return records.flatMap((record, index) => {
     const correction = normalizePublicCorrection(record, index);
     return correction ? [correction] : [];
+  });
   });
 }
 

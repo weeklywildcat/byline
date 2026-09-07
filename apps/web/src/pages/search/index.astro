@@ -1,0 +1,9 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import { getSearchPageProps, metadata } from "@/views/search/page";
+import { SearchPageClient } from "@/components/SearchPageClient";
+const props = await getSearchPageProps();
+---
+<BaseLayout metadata={metadata}>
+  <main class="search-page-shell"><SearchPageClient {...props} client:load /></main>
+</BaseLayout>

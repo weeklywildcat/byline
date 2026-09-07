@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import postcss from "postcss";
 
 const sharedPath = "packages/theme-weekly-wildcat/src/styles.css";
-const globalsPath = "apps/web/app/globals.css";
+const globalsPath = "apps/web/views/globals.css";
 const sharedCss = await readFile(sharedPath, "utf8");
 const globalsCss = await readFile(globalsPath, "utf8");
 const sharedRoot = postcss.parse(sharedCss, { from: sharedPath });
@@ -69,8 +69,8 @@ globalsRoot.walkRules((rule) => {
   }
 });
 
-const webLayout = await readFile("apps/web/app/layout.tsx", "utf8");
-const webHomepage = await readFile("apps/web/app/page.tsx", "utf8");
+const webLayout = await readFile("apps/web/src/layouts/BaseLayout.astro", "utf8");
+const webHomepage = await readFile("apps/web/src/pages/index.astro", "utf8");
 const studioEntry = await readFile("wordpress-plugin/src/index.tsx", "utf8");
 const studio = await readFile("wordpress-plugin/src/studio.tsx", "utf8");
 const adminApp = await readFile("wordpress-plugin/includes/admin/app.php", "utf8");

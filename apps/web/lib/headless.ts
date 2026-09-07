@@ -11,6 +11,18 @@ const HEADLESS_PAGE_CONCURRENCY = Math.min(
   16,
   Math.max(1, Number.parseInt(process.env.BYLINE_WORDPRESS_FETCH_CONCURRENCY || "4", 10) || 4)
 );
+const headlessPromises = new Map<string, Promise<unknown>>();
+
+function memoizedHeadless<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const existing = headlessPromises.get(key) as Promise<T> | undefined;
+  if (existing) return existing;
+  const promise = load().catch((error) => {
+    headlessPromises.delete(key);
+    throw error;
+  });
+  headlessPromises.set(key, promise);
+  return promise;
+}
 
 type QueryValue = string | number | boolean | undefined | null;
 
@@ -280,9 +292,9 @@ const weeklyWildcatFixtureTeams: SportsTeamMedia[] = [
     active: true,
     currentSeason: "2026-27",
     seasons: ["2026-27"],
-    headerImage: { id: 901, url: "/_wordpress-media/1b98507584cd2e0d-GirlsSoccerCelebration-1024x683.jpeg", alt: "Girls soccer players celebrate", width: 1024, height: 683 },
+    headerImage: { id: 901, url: "/brand/weekly-wildcat-wide-logo.svg", alt: "Girls soccer players celebrate", width: 1024, height: 683 },
     headerImageFocalPoint: { x: 48, y: 34 },
-    logo: { id: 902, url: "/_wordpress-media/a9427e486a41193a-NS-Soccer-Logo-300x300.png", alt: "Girls Soccer", width: 300, height: 300 },
+    logo: { id: 902, url: "/brand/weekly-wildcat-logo.svg", alt: "Girls Soccer", width: 300, height: 300 },
     accentColor: "#8b1e2d"
   }
 ];
@@ -311,7 +323,7 @@ const weeklyWildcatFixtureRoster: SportsRoster = {
     { id: "ath_fixture02", name: "Jordan Lee", number: "4", position: "Midfielder", grade: "12th" }
   ],
   staff: [
-    { id: "staff_fixture01", name: "Alexandra Montgomery-Washington", role: "Head Coach", imageId: 904, image: { id: 904, url: "/_wordpress-media/26c97631a396129c-SyReannas-profile-photo-300x300.png", alt: "Alexandra Montgomery-Washington", width: 300, height: 300 } },
+    { id: "staff_fixture01", name: "Alexandra Montgomery-Washington", role: "Head Coach", imageId: 904, image: { id: 904, url: "/brand/weekly-wildcat-logo.svg", alt: "Alexandra Montgomery-Washington", width: 300, height: 300 } },
     { id: "staff_fixture02", name: "Morgan Lee", role: "Assistant Coach — Goalkeepers and Defensive Development", imageId: 0, image: null },
     { id: "staff_fixture03", name: "Taylor Brooks", role: "Student Manager", imageId: 0, image: null },
     { id: "staff_fixture04", name: "Cameron Green", role: "Assistant Coach", imageId: 0, image: null },
@@ -423,21 +435,21 @@ async function fetchAllHeadlessPages<T>(path: string) {
 export function getSportsGames(query?: number | SportsGameQuery) {
   const normalizedQuery = normalizeSportsGameQuery(query, 20);
 
-  return headlessFetch<SportsGame[]>("/sports-games", {
+  return memoizedHeadless(`sports-games:${JSON.stringify(normalizedQuery)}`, () => headlessFetch<SportsGame[]>("/sports-games", {
     per_page: normalizedQuery.limit,
     page: normalizedQuery.page,
     sportKey: normalizedQuery.sportKey,
     teamKey: normalizedQuery.teamKey,
     season: normalizedQuery.season,
     year: normalizedQuery.year
-  });
+  }));
 }
 
 // Sports archive pages build team hubs and season URLs from the canonical
 // ww_sports_game records, so a game edit updates every dependent static page on
 // the next WordPress-triggered rebuild without duplicating schedule data.
 export function getAllSportsGames() {
-  return fetchAllHeadlessPages<SportsGame>("/sports-games");
+  return memoizedHeadless("all-sports-games", () => fetchAllHeadlessPages<SportsGame>("/sports-games"));
 }
 
 export function getGameCenterHref(game: Pick<SportsGame, "id">) {
@@ -452,51 +464,50 @@ export async function getSportsGameById(gameId: number | string) {
   }
 
   try {
-    // Single-game lookups keep article cards tied to the canonical schedule record.
-    return await headlessFetch<SportsGame>(`/sports-games/${id}`);
+    return (await getAllSportsGames()).find((game) => game.id === id) ?? null;
   } catch {
     return null;
   }
 }
 
 export function getSportsGameFacets() {
-  return headlessFetch<SportsGameFacets>("/sports-games/facets");
+  return memoizedHeadless("sports-game-facets", () => headlessFetch<SportsGameFacets>("/sports-games/facets"));
 }
 
 export function getSportsTeams() {
-  return headlessFetch<SportsTeamMedia[]>("/sports-teams");
+  return memoizedHeadless("sports-teams", () => headlessFetch<SportsTeamMedia[]>("/sports-teams"));
 }
 
 export function getAllSportsRosters() {
-  return fetchAllHeadlessPages<SportsRoster>("/sports-rosters");
+  return memoizedHeadless("all-sports-rosters", () => fetchAllHeadlessPages<SportsRoster>("/sports-rosters"));
 }
 
 export function getUpcomingSportsGames(query?: number | SportsGameQuery) {
   const normalizedQuery = normalizeSportsGameQuery(query, 10);
 
-  return headlessFetch<SportsGame[]>("/sports-games/upcoming", {
+  return memoizedHeadless(`upcoming-sports-games:${JSON.stringify(normalizedQuery)}`, () => headlessFetch<SportsGame[]>("/sports-games/upcoming", {
     per_page: normalizedQuery.limit,
     page: normalizedQuery.page,
     sportKey: normalizedQuery.sportKey,
     teamKey: normalizedQuery.teamKey,
     season: normalizedQuery.season,
     year: normalizedQuery.year
-  });
+  }));
 }
 
 export function getRecentSportsGames(query?: number | SportsGameQuery) {
   const normalizedQuery = normalizeSportsGameQuery(query, 10);
 
-  return headlessFetch<SportsGame[]>("/sports-games/recent", {
+  return memoizedHeadless(`recent-sports-games:${JSON.stringify(normalizedQuery)}`, () => headlessFetch<SportsGame[]>("/sports-games/recent", {
     per_page: normalizedQuery.limit,
     page: normalizedQuery.page,
     sportKey: normalizedQuery.sportKey,
     teamKey: normalizedQuery.teamKey,
     season: normalizedQuery.season,
     year: normalizedQuery.year
-  });
+  }));
 }
 
 export function getSchoolEvents(limit = 20) {
-  return headlessFetch<SchoolEvent[]>("/school-events", { per_page: limit });
+  return memoizedHeadless(`school-events:${limit}`, () => headlessFetch<SchoolEvent[]>("/school-events", { per_page: limit }));
 }

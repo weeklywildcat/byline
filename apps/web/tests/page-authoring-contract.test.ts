@@ -6,8 +6,9 @@ function readSource(relativePath: string) {
   return readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), "utf8");
 }
 
-const pageRoute = readSource("../app/[segment]/page.tsx");
-const sitemap = readSource("../app/sitemap.ts");
+const pageRoute = readSource("../views/[segment]/page.tsx");
+const buildSnapshot = readSource("../lib/build-snapshot.ts");
+const sitemap = readSource("../views/sitemap.ts");
 const wordpress = readSource("../lib/wordpress.ts");
 const pageBlocks = readSource("../../../wordpress-plugin/includes/content/page-blocks.php");
 const pageMigration = readSource("../../../wordpress-plugin/includes/content/pages.php");
@@ -18,7 +19,7 @@ describe("native WordPress Page authoring contract", () => {
     expect(existsSync(fileURLToPath(new URL("../lib/static-pages.ts", import.meta.url)))).toBe(false);
     expect(pageRoute).not.toContain("STATIC_PAGES");
     expect(pageRoute).not.toContain("getStaticPage");
-    expect(pageRoute).toContain("requireBuildData(\"/wp-json/wp/v2/pages\", getAllPages)");
+    expect(buildSnapshot).toContain('pages: () => requireBuildData("/wp-json/wp/v2/pages", getAllPages)');
     expect(pageRoute).toContain("wordpressPage.content.rendered");
     expect(pageRoute).toContain("wordpressPage.bylinePage?.eyebrow?.trim() || \"\"");
   });

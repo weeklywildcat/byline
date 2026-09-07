@@ -4,6 +4,8 @@
 .dev.vars*
 !.dev.vars.example
 .next/
+.astro/
+.byline-build/
 .wrangler/
 out/
 node_modules/

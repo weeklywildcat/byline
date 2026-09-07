@@ -3,15 +3,16 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/next-with-publication.mjs dev",
-    "build": "node scripts/next-with-publication.mjs build",
-    "postbuild": "node scripts/copy-wordpress-media-to-out.mjs && node scripts/generate-byline-manifest.mjs && node scripts/verify-static-export.mjs",
+    "dev": "node scripts/astro-with-publication.mjs dev",
+    "build": "node scripts/astro-with-publication.mjs build",
+    "postbuild": "node scripts/materialize-static-compatibility.mjs && node scripts/copy-wordpress-media-to-out.mjs && node scripts/generate-byline-manifest.mjs && node scripts/verify-static-export.mjs && node scripts/verify-build.mjs",
     "test": "vitest run",
     "test:packages": "vitest run tests/shared-contracts.test.ts",
     "test:second-publication": "BYLINE_PUBLICATION_FILE=tests/fixtures/north-star-publication.json BYLINE_DESIGNS_FILE=tests/fixtures/north-star-designs.json BYLINE_CONTENT_MODE=north-star-fixture npm run build && node scripts/verify-second-publication.mjs",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "astro check && tsc --noEmit"
   },
   "dependencies": {
+    "@astrojs/react": "6.0.5",
     "@byline/content": "0.1.0",
     "@byline/core": "0.1.0",
     "@byline/design": "0.1.0",
@@ -23,11 +24,12 @@
     "@byline/theme-weekly-wildcat": "0.1.0",
     "@byline/ui": "0.1.0",
     "@iconify/react": "^6.0.2",
-    "next": "^16.3.2",
+    "astro": "7.3.1",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@astrojs/check": "0.9.10",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",

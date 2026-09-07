@@ -1,0 +1,11 @@
+{
+  "routeCount": 404,
+  "htmlCount": 401,
+  "outputBytes": {
+    "total": 51754999,
+    "html": 10791009,
+    "js": 249775,
+    "css": 155949,
+    "media": 36817736
+  }
+}

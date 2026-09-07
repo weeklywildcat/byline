@@ -22,7 +22,7 @@ const studioPreview = readSource("../../../wordpress-plugin/src/studio-preview.t
 // resolutions can be compared directly.
 const studioPreviewModel = readSource("../../../wordpress-plugin/src/studio-preview-model.ts");
 const studioConfig = readSource("../../../wordpress-plugin/src/studio.tsx");
-const homepage = readSource("../app/page.tsx");
+const homepage = readSource("../views/page.tsx");
 
 // The invariant this whole phase exists to prove: one renderer, two hosts.
 describe("shared rendering contract", () => {

@@ -1,0 +1,17 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import { getSportsSchedulePageData, metadata } from "@/views/sports/schedule/page";
+import { SportsScheduleArchive } from "@/components/SportsScheduleArchive";
+import { serializeJsonLd } from "@/lib/seo";
+import NotFound from "@/views/not-found";
+import { getPublicationConfig } from "@/lib/publication";
+const enabled = getPublicationConfig().features.sports;
+const data = enabled ? await getSportsSchedulePageData() : null;
+const pageMetadata = enabled ? metadata : { title: getPublicationConfig().seo.defaultTitle, robots: { index: false, follow: false } };
+---
+<BaseLayout metadata={pageMetadata} noCanonical={!enabled}>
+  {data ? <main class="schedule-page-shell">
+    <script id="sports-schedule-breadcrumb-json-ld" type="application/ld+json" set:html={serializeJsonLd(data.breadcrumbSchema)}></script>
+    <SportsScheduleArchive {...data.archiveProps} client:load />
+  </main> : <NotFound />}
+</BaseLayout>

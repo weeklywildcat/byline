@@ -1,15 +1,15 @@
 # Byline
 
 Byline is an open-source publishing platform for static news sites. This is the
-canonical monorepo for the public Next.js app, WordPress control-plane plugin,
+canonical monorepo for the public Astro static site, WordPress control-plane plugin,
 shared contracts and themes, Byline Studio, and the optional Discord newsroom
 service. Weekly Wildcat remains the compatibility/default publication; other
 publications supply the same versioned contracts without forking the platform.
 
 ## Repository layout
 
-- `apps/web/` — public Next.js app. It reads published WordPress contracts and
-  produces a static export; it has no auth, database, SSR, or runtime Next server.
+- `apps/web/` — public Astro app. It reads one normalized build snapshot and
+  produces a static export; it has no auth, database, SSR, or runtime app server.
 - `apps/discord-bot/` — separately deployed, stateless Discord newsroom service.
 - `wordpress-plugin/` — WordPress control plane and Studio. The installable
   folder remains `weekly-wildcat-headless/` and the main file remains
@@ -62,12 +62,14 @@ externals.
 
 Copy `apps/web/.env.example` to `apps/web/.env.local` when using a CMS directly.
 The app reads `/byline/v1/publication` and published design endpoints before the
-Next build. Fixture/CI builds can use `BYLINE_PUBLICATION_FILE`,
+Astro build. Fixture/CI builds can use `BYLINE_PUBLICATION_FILE`,
 `BYLINE_PUBLICATION_JSON`, and `BYLINE_DESIGNS_FILE`.
 
-`apps/web/next.config.ts` intentionally keeps `output: "export"`, trailing
-slashes, and unoptimized images. The result is `apps/web/out/`; it includes safe
-publication/design manifests and requires no public Byline server.
+`apps/web/astro.config.mjs` intentionally uses static output, trailing slashes,
+and the existing `apps/web/out/` deployment directory. The result includes safe
+publication/design manifests and requires no public Byline server. The old Next
+route tree and runnable exporter were removed at cutover; the tagged rollback
+point remains the authoritative copy of that implementation.
 
 Polls are the only runtime state the published site reads. WordPress owns poll
 definitions and vote records; `apps/web/src/worker.js` is a thin same-origin
@@ -117,6 +119,8 @@ ZIP.
 ## Architecture and extension points
 
 - [Architecture](docs/architecture.md)
+- [Astro frontend operations and rollback](docs/migration/astro.md)
+- [Astro migration benchmark](docs/migration/astro-benchmark.md)
 - [Polls: WordPress storage, REST, proxy, and D1 migration](docs/polls.md)
 - [Extension contracts](docs/extensions.md)
 - [Updater bridge and retirement criteria](docs/updater-transition.md)

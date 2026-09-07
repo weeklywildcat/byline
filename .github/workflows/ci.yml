@@ -58,7 +58,7 @@ jobs:
       - name: Test all workspaces
         run: npm test
 
-      - name: Build Weekly Wildcat static export
+      - name: Build and verify Weekly Wildcat Astro static export
         env:
           BYLINE_PUBLICATION_FILE: tests/fixtures/weekly-wildcat-publication.json
           BYLINE_CONTENT_MODE: weekly-wildcat-fixture
