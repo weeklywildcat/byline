@@ -7,17 +7,20 @@ const fields = [
   "title", "canonical", "description", "openGraphUrl", "openGraphImage", "openGraphImageWidths", "openGraphImageHeights",
   "openGraphImageAlts", "articleSection", "articlePublishedTime", "articleModifiedTime", "articleAuthors", "articleTags", "twitterImageAlts"
 ];
+const entities = new Map([
+  ["&#x27;", "'"],
+  ["&#39;", "'"],
+  ["&quot;", '"'],
+  ["&amp;", "&"],
+  ["&lt;", "<"],
+  ["&gt;", ">"]
+]);
 const decode = (value = "") => {
   if (Array.isArray(value)) {
     return value.map((item) => decode(item));
   }
 
-  return String(value)
-    .replace(/&#x27;|&#39;/gi, "'")
-    .replace(/&quot;/gi, '"')
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
+  return String(value).replace(/&#x27;|&#39;|&quot;|&amp;|&lt;|&gt;/gi, (entity) => entities.get(entity.toLowerCase()) ?? entity);
 };
 const byRoute = new Map(candidate.map((entry) => [entry.route, entry]));
 const differences = [];
