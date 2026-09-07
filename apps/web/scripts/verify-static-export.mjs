@@ -14,7 +14,7 @@ async function exists(target) {
   }
 }
 
-for (const required of ["index.html", "_byline/manifest.json", "_byline/publication.json", "_byline/designs.json"]) {
+for (const required of ["index.html", "_byline/manifest.json", "_byline/publication.json", "_byline/designs.json", "_byline/search-index.json"]) {
   if (!(await exists(path.join(output, required)))) throw new Error(`Static export is missing ${required}.`);
 }
 

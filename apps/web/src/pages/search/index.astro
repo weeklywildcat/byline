@@ -2,8 +2,10 @@
 import BaseLayout from "@/src/layouts/BaseLayout.astro";
 import { getSearchPageProps, metadata } from "@/views/search/page";
 import { SearchPageClient } from "@/components/SearchPageClient";
-const props = await getSearchPageProps();
+import { writeSearchIndex } from "@/lib/search-index-build";
+const { items, publicationName, searchGapEndpoint } = await getSearchPageProps();
+await writeSearchIndex(items);
 ---
 <BaseLayout metadata={metadata}>
-  <main class="search-page-shell"><SearchPageClient {...props} client:load /></main>
+  <main class="search-page-shell"><SearchPageClient publicationName={publicationName} searchGapEndpoint={searchGapEndpoint} client:load /></main>
 </BaseLayout>

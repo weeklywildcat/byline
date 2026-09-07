@@ -26,7 +26,8 @@ export type SearchIndexItem = {
   date: string;
   /** ISO-like value used for stable sorting and the recency nudge. */
   sortDate?: string;
-  searchText: string;
+  /** Additional searchable tokens not already represented by display fields. */
+  searchTokens?: string[];
 };
 
 export type SearchUrlState = {
@@ -290,13 +291,21 @@ function matchSearchTerm(item: SearchIndexItem, term: string): SearchTermMatch {
   const section = normalizeSearch(`${item.category} ${item.sectionLabel ?? ""} ${item.section ?? ""}`);
   const author = normalizeSearch(`${item.author} ${item.authorKey ?? ""}`);
   const topics = getTopicEntries(item).flatMap((topic) => [topic.value, topic.label]);
-  const broad = normalizeSearch(`${item.searchText} ${section} ${author} ${topics.join(" ")}`);
+  const additionalTokens = item.searchTokens ?? [];
+  const broad = normalizeSearch([
+    item.title,
+    item.excerpt,
+    section,
+    author,
+    ...topics,
+    ...additionalTokens
+  ].join(" "));
   const titleMatch = title.includes(term);
   const sectionMatch = section.includes(term);
   const authorMatch = author.includes(term);
   const topicMatch = topics.some((topic) => normalizeSearch(topic).includes(term));
   const broadMatch = broad.includes(term);
-  const fuzzy = !broadMatch && hasTypoMatch(term, [title, section, author, ...topics, item.searchText]);
+  const fuzzy = !broadMatch && hasTypoMatch(term, [title, section, author, ...topics, ...additionalTokens]);
 
   return {
     matched: broadMatch || fuzzy,
