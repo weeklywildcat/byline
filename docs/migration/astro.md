@@ -86,13 +86,14 @@ schema and byte count):
 | Measurement | `/search/` HTML | Search JS assets | Static index |
 | --- | ---: | ---: | ---: |
 | Fixture before PR 3 | 19,449 B | 15,500 B | inline in HTML |
-| Fixture after PR 3 | 12,623 B | 15,742 B | 2,755 B raw / 727 B gzip / 601 B Brotli |
+| Current post-endpoint fixture | 12,828 B | 15,742 B | 5,157 B raw / 889 B gzip / 744 B Brotli |
 
 The post-change index is emitted at `out/_byline/search-index.json`, carries
 `schemaVersion: 1`, and is fetched same-origin after the lightweight search
 shell hydrates. The before/after fixture builds measured 1,416 ms and 883 ms
-locally respectively; those timings are directional local measurements, not a
-production benchmark.
+locally respectively; the current post-endpoint fixture build measured 1,253
+ms. These timings are directional local measurements, not a production
+benchmark.
 
 For live CMS content, copy `apps/web/.env.example` to `.env.local`. The main
 inputs are `NEXT_PUBLIC_WP_API_URL` and `NEXT_PUBLIC_SITE_URL`; the names are
