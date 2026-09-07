@@ -1,0 +1,13 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { getMetadata } from "@/views/[segment]/page";
+import { getBuildSnapshot } from "@/lib/build-snapshot";
+import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
+export async function getStaticPaths() {
+  const snapshot = await getBuildSnapshot();
+  return snapshot.pages.map((page) => ({ params: { segment: page.slug } }));
+}
+const params = { segment: Astro.params.segment! };
+const metadata = await getMetadata({ params: Promise.resolve(params) });
+---
+<BaseLayout metadata={metadata}><Page params={Promise.resolve(params)} /><NewsroomPollHydrator client:load /></BaseLayout>

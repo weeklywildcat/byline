@@ -21,8 +21,8 @@ let sportsArchiveDataPromise: Promise<SportsArchiveData> | null = null;
 // during local development and static export generation.
 export function getSportsArchiveData() {
   // These are required build inputs. A failure here previously became `[]`, which
-  // surfaced later as an unhelpful "generateStaticParams() returned an empty
-  // array" on whichever sports route happened to build first. Each request is now
+  // surfaced later as an unhelpful empty route set on whichever sports route
+  // happened to build first. Each request is now
   // attributed to its endpoint so a build log names the thing that actually broke.
   sportsArchiveDataPromise ??= Promise.all([
     requireBuildData("/wp-json/weekly-wildcat/v1/sports-games", getAllSportsGames),

@@ -1,0 +1,86 @@
+---
+import "@byline/theme-weekly-wildcat/styles.css";
+import "@byline/ui/page-blocks.css";
+import "@byline/ui/newsroom-blocks.css";
+import "@byline/ui/article.css";
+import "../../views/globals.css";
+import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
+import { getOrganizationSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
+import { getPublicationConfig } from "@/lib/publication";
+import { getActiveTheme, getThemeCssVariables } from "@/lib/theme";
+import { absoluteUrl } from "@/lib/seo";
+
+type MetadataValue = Record<string, any>;
+interface Props { metadata?: MetadataValue; themeColor?: string; noCanonical?: boolean; }
+const { metadata = {}, themeColor, noCanonical = false } = Astro.props;
+const publication = getPublicationConfig();
+const activeTheme = getActiveTheme();
+const rawTitle = typeof metadata.title === "string" ? metadata.title : publication.seo.defaultTitle;
+const title = rawTitle === publication.seo.defaultTitle ? rawTitle : `${rawTitle} | ${publication.identity.shortName}`;
+const description = typeof metadata.description === "string" ? metadata.description : SITE_DESCRIPTION;
+const canonicalValue = metadata.alternates?.canonical;
+const canonical = absoluteUrl(typeof canonicalValue === "string" ? canonicalValue : Astro.url.pathname);
+const openGraph = metadata.openGraph ?? {};
+const twitter = metadata.twitter ?? {};
+const robots = metadata.robots ?? {};
+const ogImages = Array.isArray(openGraph.images) ? openGraph.images : [];
+const twitterImages = Array.isArray(twitter.images) ? twitter.images : [];
+const robotContent = robots.index === false ? `noindex,${robots.follow === false ? "nofollow" : "follow"}` : "index,follow";
+const googleBot = robots.googleBot;
+const googleContent = googleBot ? [
+  googleBot.index === false ? "noindex" : "index",
+  googleBot.follow === false ? "nofollow" : "follow",
+  typeof googleBot["max-snippet"] === "number" ? `max-snippet:${googleBot["max-snippet"]}` : "",
+  googleBot["max-image-preview"] ? `max-image-preview:${googleBot["max-image-preview"]}` : "",
+  typeof googleBot["max-video-preview"] === "number" ? `max-video-preview:${googleBot["max-video-preview"]}` : ""
+].filter(Boolean).join(",") : "";
+const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key, value]) => `${key}:${value}`).join(";");
+---
+<!doctype html>
+<html lang={publication.locale} data-byline-theme={activeTheme.id} data-byline-density={activeTheme.tokens.density} style={style}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {themeColor && <meta name="theme-color" content={themeColor} />}
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content={robotContent} />
+    {googleContent && <meta name="googlebot" content={googleContent} />}
+    {!noCanonical && <link rel="canonical" href={canonical} />}
+    {publication.branding.icons.map((icon) => <link rel={icon.width === 180 ? "apple-touch-icon" : "icon"} href={icon.url} sizes={icon.width && icon.height ? `${icon.width}x${icon.height}` : undefined} />)}
+    {activeTheme.stylesheets?.map((href) => <link rel="stylesheet" href={href} />)}
+    <meta property="og:title" content={openGraph.title ?? rawTitle} />
+    <meta property="og:description" content={openGraph.description ?? description} />
+    {!noCanonical && <meta property="og:url" content={openGraph.url ?? canonical} />}
+    <meta property="og:site_name" content={openGraph.siteName ?? publication.identity.name} />
+    <meta property="og:locale" content={openGraph.locale ?? publication.locale.replace(/-/g, "_")} />
+    <meta property="og:type" content={openGraph.type ?? "website"} />
+    {openGraph.publishedTime && <meta property="article:published_time" content={openGraph.publishedTime} />}
+    {openGraph.modifiedTime && <meta property="article:modified_time" content={openGraph.modifiedTime} />}
+    {openGraph.authors?.map((author: string) => <meta property="article:author" content={author} />)}
+    {openGraph.tags?.map((tag: string) => <meta property="article:tag" content={tag} />)}
+    {ogImages.map((image: any) => <meta property="og:image" content={typeof image === "string" ? image : image.url} />)}
+    <meta name="twitter:card" content={twitter.card ?? "summary_large_image"} />
+    <meta name="twitter:title" content={twitter.title ?? rawTitle} />
+    <meta name="twitter:description" content={twitter.description ?? description} />
+    {twitterImages.map((image: any) => <meta name="twitter:image" content={typeof image === "string" ? image : image.url} />)}
+    <script id="organization-json-ld" type="application/ld+json" set:html={serializeJsonLd(getOrganizationSchema())}></script>
+  </head>
+  <body>
+    <SiteHeader />
+    <slot />
+    <SiteFooter />
+    {activeTheme.id === "weekly-wildcat" && <script is:inline>
+      (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i+"?ref=bwt";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y)})(window,document,"clarity","script","xi1qesbixb");
+    </script>}
+    <script is:inline>
+      document.addEventListener("change", (event) => {
+        const select = event.target;
+        if (!(select instanceof HTMLSelectElement) || !select.closest(".team-hub-selector")) return;
+        const href = select.selectedOptions[0]?.dataset.href;
+        if (href) window.location.assign(href);
+      });
+    </script>
+  </body>
+</html>

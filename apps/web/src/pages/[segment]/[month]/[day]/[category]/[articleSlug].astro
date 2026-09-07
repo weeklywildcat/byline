@@ -1,0 +1,76 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import React from "react";
+import { getMetadata } from "@/views/[segment]/[month]/[day]/[category]/[articleSlug]/page";
+import { getBuildSnapshot } from "@/lib/build-snapshot";
+import { getPrimaryVisibleCategory, isVisibleContentPost } from "@/lib/content";
+import { buildArticlePresentation } from "@/lib/article-presentation";
+import { getBylineRestUrl } from "@/lib/byline-rest";
+import { getPublicationConfig } from "@/lib/publication";
+import { absoluteUrl, getBreadcrumbSchema, getNewsArticleSchema, serializeJsonLd } from "@/lib/seo";
+import { getPostContributors, getPostGameScoreGameIds, getPostHref, getPostPrimaryGameId, getPostRouteParts, isGuestContributor, type WordPressAuthor } from "@/lib/wordpress";
+import { stripHtml, decodeHtml } from "@/lib/format";
+import { ArticleView } from "@byline/ui";
+import { ArticleGameCard } from "@/components/ArticleGameCard";
+import { ArticleShareActions } from "@/components/ArticleShareActions";
+import { ReaderFeedbackForm } from "@/components/ReaderFeedbackForm";
+import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
+import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
+export async function getStaticPaths() {
+  const snapshot = await getBuildSnapshot();
+  return snapshot.posts.filter(isVisibleContentPost).flatMap((post) => {
+    const route = getPostRouteParts(post);
+    return route ? [{ params: { segment: route.year, month: route.month, day: route.day, category: route.category, articleSlug: route.slug } }] : [];
+  });
+}
+const params = { segment: Astro.params.segment!, month: Astro.params.month!, day: Astro.params.day!, category: Astro.params.category!, articleSlug: Astro.params.articleSlug! };
+const metadata = await getMetadata({ params: Promise.resolve(params) });
+const snapshot = await getBuildSnapshot();
+const post = snapshot.indexes.postsBySlug.get(params.articleSlug)!;
+const embeddedContributors = getPostContributors(post);
+const contributors = embeddedContributors.map((embedded) => snapshot.contributors.find((candidate) =>
+  isGuestContributor(candidate) === isGuestContributor(embedded) && (candidate.id === embedded.id || candidate.slug === embedded.slug)
+) ?? embedded);
+const author = contributors.find((contributor): contributor is WordPressAuthor => !isGuestContributor(contributor)) ?? null;
+const contributorKeys = contributors.map((contributor) => `${isGuestContributor(contributor) ? "guest" : "user"}:${contributor.id}`);
+const authorPosts = [...new Map(contributorKeys.flatMap((key) => snapshot.indexes.postsByContributor.get(key) ?? []).map((candidate) => [candidate.id, candidate])).values()].filter(isVisibleContentPost);
+const relatedPosts = [...new Map([
+  ...post.categories.flatMap((id) => snapshot.indexes.postsByCategory.get(id) ?? []),
+  ...post.tags.flatMap((id) => snapshot.indexes.postsByTag.get(id) ?? [])
+].map((candidate) => [candidate.id, candidate])).values()].filter(isVisibleContentPost);
+const presentation = buildArticlePresentation({ post, allPosts: snapshot.posts, contributors, author, visiblePosts: snapshot.posts.filter(isVisibleContentPost), authorPosts, relatedCandidates: relatedPosts });
+const primaryGameId = getPostPrimaryGameId(post);
+const primaryGame = primaryGameId ? snapshot.games.find((game) => game.id === primaryGameId) ?? null : null;
+const showPrimaryGame = Boolean(primaryGame && !getPostGameScoreGameIds(post).includes(primaryGame.id));
+const title = stripHtml(post.title.rendered);
+const articleUrl = absoluteUrl(getPostHref(post));
+const category = getPrimaryVisibleCategory(post);
+const publication = getPublicationConfig();
+const slots = {
+  shareActions: React.createElement("div", { id: "article-share-island-slot" }),
+  primaryGame: showPrimaryGame && primaryGame ? React.createElement(ArticleGameCard, { game: primaryGame, className: "article-primary-game-card" }) : null,
+  poll: React.createElement("div", { id: "article-poll-island-slot" }),
+  feedback: publication.features.readerFeedback !== false ? React.createElement("div", { id: "article-feedback-island-slot" }) : null,
+  newsletter: React.createElement("div", { id: "article-newsletter-island-slot" })
+};
+---
+<BaseLayout metadata={metadata} themeColor="#fbfaf7">
+  <script id="newsarticle-json-ld" type="application/ld+json" set:html={serializeJsonLd(getNewsArticleSchema(post))}></script>
+  <script id="article-breadcrumb-json-ld" type="application/ld+json" set:html={serializeJsonLd(getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    ...(category ? [{ name: decodeHtml(category.name), path: `/category/${category.slug}/` }] : []),
+    { name: title, path: getPostHref(post) }
+  ]))}></script>
+  <ArticleView presentation={presentation} slots={slots} />
+  <div class="astro-island-relocation" data-target="article-share-island-slot"><ArticleShareActions title={title} url={articleUrl} client:idle /></div>
+  <div class="astro-island-relocation" data-target="article-poll-island-slot"><NewsroomPollHydrator client:load /></div>
+  {publication.features.readerFeedback !== false && <div class="astro-island-relocation" data-target="article-feedback-island-slot"><ReaderFeedbackForm postId={post.id} articleTitle={title} articleUrl={articleUrl} endpointCandidates={[getBylineRestUrl("/feedback"), getBylineRestUrl("/feedback", true)]} client:visible /></div>}
+  <div class="astro-island-relocation" data-target="article-newsletter-island-slot"><NewsletterSignupForm client:visible /></div>
+  <script is:inline>
+    document.querySelectorAll('.astro-island-relocation[data-target]').forEach((source) => {
+      const target = document.getElementById(source.dataset.target);
+      if (target) target.replaceChildren(...source.childNodes);
+      source.remove();
+    });
+  </script>
+</BaseLayout>

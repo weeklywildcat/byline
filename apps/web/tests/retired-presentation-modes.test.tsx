@@ -19,10 +19,11 @@ function readSource(relativePath: string) {
   return readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), "utf8");
 }
 
-const articleRoute = readSource("../app/[segment]/[month]/[day]/[category]/[articleSlug]/page.tsx");
+const articleRoute = readSource("../views/[segment]/[month]/[day]/[category]/[articleSlug]/page.tsx");
+const astroArticleRoute = readSource("../src/pages/[segment]/[month]/[day]/[category]/[articleSlug].astro");
 const articleRenderer = readSource("../../../packages/ui/src/article-view.tsx");
-const homepageRoute = readSource("../app/page.tsx");
-const globalCss = readSource("../app/globals.css");
+const homepageRoute = readSource("../views/page.tsx");
+const globalCss = readSource("../views/globals.css");
 const weeklyWildcatCss = readSource("../../../packages/theme-weekly-wildcat/src/styles.css");
 const studioConfig = readSource("../../../wordpress-plugin/src/studio.tsx");
 const pluginSource = readSource("../../../wordpress-plugin/weekly-wildcat-headless.php");
@@ -113,7 +114,7 @@ describe("the custom article hero is gone", () => {
   });
 
   it("no longer derives the browser theme colour from a story", () => {
-    expect(articleRoute).toContain('themeColor: "#fbfaf7"');
+    expect(astroArticleRoute).toContain('themeColor="#fbfaf7"');
     expect(articleRoute).not.toContain("backgroundColor");
   });
 

@@ -160,10 +160,13 @@ export type BuildArticlePresentationOptions = {
   allPosts: WordPressPost[];
   contributors: WordPressContributor[];
   author: WordPressAuthor | null;
+  visiblePosts?: WordPressPost[];
+  authorPosts?: WordPressPost[];
+  relatedCandidates?: WordPressPost[];
 };
 
 /** Build the public route's normalized model without importing any renderer. */
-export function buildArticlePresentation({ post, allPosts, contributors, author }: BuildArticlePresentationOptions): ArticlePresentation {
+export function buildArticlePresentation({ post, allPosts, contributors, author, visiblePosts: indexedVisiblePosts, authorPosts: indexedAuthorPosts, relatedCandidates }: BuildArticlePresentationOptions): ArticlePresentation {
   const category = getPrimaryVisibleCategory(post);
   const image = articleImage(getFeaturedMedia(post), "(max-width: 900px) 100vw, 900px", true);
   const topicTags = getPublicTopicTags(post);
@@ -173,17 +176,17 @@ export function buildArticlePresentation({ post, allPosts, contributors, author 
   const publicCorrections = getPublicCorrectionsForPost(post);
   const hasPublicCorrectionNotice = publicCorrections.length > 0;
   const updated = hasArticleUpdatedDate(post) && !hasPublicCorrectionNotice;
-  const visiblePosts = allPosts.filter(isVisibleContentPost);
+  const visiblePosts = indexedVisiblePosts ?? allPosts.filter(isVisibleContentPost);
   const displayContributors = contributors.length > 0 ? contributors : author ? [author] : [];
   const coverageAreas = getCoverageAreas(
     displayContributors.length > 0
       ? visiblePosts.filter((candidate) => displayContributors.some((contributor) => postHasContributor(candidate, contributor)))
       : []
   );
-  const authorPosts = displayContributors.length > 0
+  const authorPosts = indexedAuthorPosts ?? (displayContributors.length > 0
     ? visiblePosts.filter((candidate) => displayContributors.some((contributor) => postHasContributor(candidate, contributor)))
-    : [];
-  const related = relatedPosts(post, visiblePosts);
+    : []);
+  const related = relatedPosts(post, relatedCandidates ?? visiblePosts);
   const relatedIds = new Set(related.map((relatedPost) => relatedPost.id));
   const moreByAuthor = authorPosts.filter((candidate) => candidate.id !== post.id && !relatedIds.has(candidate.id)).slice(0, 3);
   const athleteSpotlight = isAthleteSpotlightPost(post);

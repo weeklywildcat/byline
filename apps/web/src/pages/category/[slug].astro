@@ -1,0 +1,13 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { getMetadata } from "@/views/category/[slug]/page";
+import { getBuildSnapshot } from "@/lib/build-snapshot";
+import { isHiddenCategory } from "@/lib/content";
+export async function getStaticPaths() {
+  const snapshot = await getBuildSnapshot();
+  return snapshot.categories.filter((category) => !isHiddenCategory(category)).map((category) => ({ params: { slug: category.slug } }));
+}
+const params = { slug: Astro.params.slug! };
+const metadata = await getMetadata({ params: Promise.resolve(params) });
+---
+<BaseLayout metadata={metadata}><Page params={Promise.resolve(params)} /></BaseLayout>

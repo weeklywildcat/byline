@@ -16,6 +16,7 @@ type DesignHomepageProps = {
     upcomingGames: SportsGame[];
     schoolEvents: SchoolEvent[];
   };
+  interactivePlaceholders?: boolean;
 };
 
 function heading(block: ResolvedDesignContentBlock<WordPressPost>, fallback: string) {
@@ -27,7 +28,7 @@ function heading(block: ResolvedDesignContentBlock<WordPressPost>, fallback: str
  * published v1 document while its preserved legacy blocks still need the old
  * visible behavior. New schema-v2 documents never enter this component.
  */
-export function DesignHomepage({ blocks, sportsSchedule, theme }: DesignHomepageProps) {
+export function DesignHomepage({ blocks, sportsSchedule, theme, interactivePlaceholders = false }: DesignHomepageProps) {
   const firstSportsIndex = blocks.findIndex((block) => getBylineBlockPresentation(block.type)?.layout === "sports");
 
   return (
@@ -138,8 +139,8 @@ export function DesignHomepage({ blocks, sportsSchedule, theme }: DesignHomepage
           ) : null;
         }
 
-        if (presentation.layout === "poll") return <section className="byline-design-utility" key={key}><PollWidget /></section>;
-        if (presentation.layout === "newsletter") return <section id={`newsletter-${key}`} className="home-newsletter-section" key={key}><NewsletterSignupForm /></section>;
+        if (presentation.layout === "poll") return <section className="byline-design-utility" key={key}>{interactivePlaceholders ? <div id={`home-poll-${key}-slot`} /> : <PollWidget />}</section>;
+        if (presentation.layout === "newsletter") return <section id={`newsletter-${key}`} className="home-newsletter-section" key={key}>{interactivePlaceholders ? <div id={`home-newsletter-${key}-slot`} /> : <NewsletterSignupForm />}</section>;
         if (presentation.layout === "divider") return <hr className="byline-design-divider" key={key} />;
         if (presentation.layout === "structure") return null;
         return null;

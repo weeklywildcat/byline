@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import { BylineBuildDataError, optionalBuildData, requireBuildData } from "@/lib/build-data";
-import { BYLINE_EMPTY_ROUTE_SLUG, isBylineEmptyRouteSlug, withEmptyRouteFallback } from "@/lib/static-params";
 
 // These tests encode the distinction that the previous `.catch(() => [])` model
 // destroyed: an API failure and a genuinely empty publication are not the same
@@ -47,29 +46,5 @@ describe("optional build data", () => {
 
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("/wp-json/weekly-wildcat/v1/sports-games"));
     warn.mockRestore();
-  });
-});
-
-describe("empty route fallback", () => {
-  it("keeps real params untouched", () => {
-    const params = [{ slug: "news" }, { slug: "sports" }];
-
-    expect(withEmptyRouteFallback(params, { slug: BYLINE_EMPTY_ROUTE_SLUG })).toBe(params);
-  });
-
-  it("emits exactly one reserved placeholder when a publication is genuinely empty", () => {
-    const result = withEmptyRouteFallback<{ slug: string }>([], { slug: BYLINE_EMPTY_ROUTE_SLUG });
-
-    // `output: export` rejects a zero-length result, so one route must exist.
-    expect(result).toHaveLength(1);
-    expect(isBylineEmptyRouteSlug(result[0].slug)).toBe(true);
-  });
-
-  it("uses a slug that cannot collide with CMS content", () => {
-    // WordPress sanitises slugs to lowercase alphanumerics and hyphens, so a
-    // slug containing underscores can never be produced by real content.
-    expect(BYLINE_EMPTY_ROUTE_SLUG).toMatch(/^__.*__$/);
-    expect(isBylineEmptyRouteSlug("news")).toBe(false);
-    expect(isBylineEmptyRouteSlug(undefined)).toBe(false);
   });
 });

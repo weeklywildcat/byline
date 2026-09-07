@@ -1,0 +1,7 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page from "@/views/not-found";
+import { getPublicationConfig } from "@/lib/publication";
+const metadata = { title: getPublicationConfig().seo.defaultTitle, robots: { index: false, follow: false } };
+---
+<BaseLayout metadata={metadata} noCanonical><Page /></BaseLayout>

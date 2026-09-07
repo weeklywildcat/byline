@@ -6,6 +6,7 @@ import { StoryTeaser } from "@/components/StoryTeaser";
 import type { SportsGame, SportsRoster, SportsTeamMedia } from "@/lib/headless";
 import { formatDisplayDate } from "@/lib/format";
 import { getPublicationConfig } from "@/lib/publication";
+import { WEEKLY_WILDCAT_SOCCER_HERO_PATH } from "@/lib/sports-fallback-media";
 import {
   calculateRecord,
   formatRecord,
@@ -176,7 +177,7 @@ function getTeamHeroImage(team: TeamSummary, teamMedia: SportsTeamMedia | null) 
   const metadata = getSportMetadataForTeam(team);
   const publication = getPublicationConfig();
   if (publication.appearance.theme === "weekly-wildcat" && metadata.family === "soccer") {
-    return "/_wordpress-media/67f6b648d387a344-GirlsSoccerCelebration.jpeg";
+    return WEEKLY_WILDCAT_SOCCER_HERO_PATH;
   }
 
   return null;

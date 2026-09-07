@@ -1,0 +1,12 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { getMetadata } from "@/views/sports/[teamSlug]/[year]/page";
+import { getBuildSnapshot } from "@/lib/build-snapshot";
+export async function getStaticPaths() {
+  const snapshot = await getBuildSnapshot();
+  return snapshot.sports.teams.flatMap((team) => team.seasons.map((year) => ({ params: { teamSlug: team.slug, year } })));
+}
+const params = { teamSlug: Astro.params.teamSlug!, year: Astro.params.year! };
+const metadata = await getMetadata({ params: Promise.resolve(params) });
+---
+<BaseLayout metadata={metadata}><Page params={Promise.resolve(params)} /></BaseLayout>

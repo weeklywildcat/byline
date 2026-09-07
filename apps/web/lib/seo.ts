@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata } from "@/lib/metadata";
 import { getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, stripHtml } from "@/lib/format";
 import { getPublicationConfig } from "@/lib/publication";

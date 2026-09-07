@@ -72,11 +72,11 @@ function paginatedFetchTracker() {
 }
 
 describe("WordPress build load controls", () => {
-  it("passes one cache key from the publication wrapper to all Next workers", async () => {
-    const source = await readFile(path.join(appRoot, "scripts", "next-with-publication.mjs"), "utf8");
+  it("passes one cache key from the publication wrapper to the Astro build", async () => {
+    const source = await readFile(path.join(appRoot, "scripts", "astro-with-publication.mjs"), "utf8");
 
-    expect(source).toContain("const buildFetchCacheKey = wordpressFetchCacheKey();");
-    expect(source).toContain("WORDPRESS_FETCH_CACHE_KEY: buildFetchCacheKey");
+    expect(source).toContain("WORDPRESS_FETCH_CACHE_KEY:");
+    expect(source).toContain("process.env.CF_PAGES_COMMIT_SHA");
     expect(source).toContain("`local-build-${Date.now()}`");
   });
 

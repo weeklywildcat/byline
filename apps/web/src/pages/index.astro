@@ -1,0 +1,45 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import React from "react";
+import { getHomepagePageData, metadata } from "@/views/page";
+import { DesignHomepage } from "@/components/DesignHomepage";
+import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
+import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
+import { PollWidget } from "@/components/PollWidget";
+import { HomepagePackages, ThisWeekCard, packageHeadingId, getBylineBlockPresentation } from "@byline/ui";
+import { toCalendarEntries } from "@/lib/homepage-packages";
+import { getPublicationConfig } from "@/lib/publication";
+import { serializeJsonLd } from "@/lib/seo";
+const data = await getHomepagePageData();
+const publication = getPublicationConfig();
+const v1Entries = data.mode === "v1" ? data.designBlocks.map((block, index) => {
+  const key = typeof block.props.id === "string" ? block.props.id : `${block.type}-${index}`;
+  return { key, layout: getBylineBlockPresentation(block.type)?.layout };
+}) : [];
+const v2LeadPackages = data.mode === "v2" ? data.resolvedHome.packages.filter((entry) => entry.type === "lead-package") : [];
+const v2NewsletterPackages = data.mode === "v2" ? data.resolvedHome.packages.filter((entry) => entry.type === "newsletter-package") : [];
+const relocateScript = `document.querySelectorAll('.astro-island-relocation[data-target]').forEach((source)=>{const target=document.getElementById(source.dataset.target);if(target)target.replaceChildren(...source.childNodes);source.remove()});`;
+---
+<BaseLayout metadata={metadata}>
+  <script id="website-json-ld" type="application/ld+json" set:html={serializeJsonLd(data.websiteSchema)}></script>
+  {data.mode === "v1" ? (
+    <DesignHomepage blocks={data.designBlocks} sportsSchedule={data.sportsSchedule} theme={publication.appearance.theme} interactivePlaceholders />
+  ) : (
+    <main class="byline-publication-preview live-home-shell" data-theme={publication.appearance.theme}>
+      <HomepagePackages packages={data.resolvedHome.packages} theme={publication.appearance.theme} slots={{
+        railLimiter: ({ packageId }) => React.createElement("div", { id: `home-rail-${packageId}-slot` }),
+        poll: ({ packageId }) => React.createElement("div", { id: `home-poll-${packageId}-slot` }),
+        calendar: ({ package: resolvedPackage, packageId }) => "latest" in resolvedPackage ? React.createElement(ThisWeekCard, { entries: toCalendarEntries(data.sportsSchedule.schoolEvents, data.sportsSchedule.upcomingGames, resolvedPackage.utility.calendarLimit ?? 3), heading: resolvedPackage.utility.calendarHeading ?? "At NSHS", scheduleHref: "/sports/schedule/", headingId: packageHeadingId(`${packageId}-calendar`, "this-week-heading") }) : null,
+        newsletter: ({ packageId }) => React.createElement("div", { id: `home-newsletter-${packageId}-slot` })
+      }} />
+    </main>
+  )}
+  {v1Entries.filter((entry) => entry.layout === "poll").map((entry) => <div class="astro-island-relocation" data-target={`home-poll-${entry.key}-slot`}><PollWidget client:visible /></div>)}
+  {v1Entries.filter((entry) => entry.layout === "newsletter").map((entry) => <div class="astro-island-relocation" data-target={`home-newsletter-${entry.key}-slot`}><NewsletterSignupForm client:visible /></div>)}
+  {v2LeadPackages.map((entry) => <>
+    <div class="astro-island-relocation" data-target={`home-rail-${entry.package.packageId}-slot`}><HomepageHeroRailLimiter client:load /></div>
+    <div class="astro-island-relocation" data-target={`home-poll-${entry.package.packageId}-slot`}><PollWidget headingId={packageHeadingId(`${entry.package.packageId}-poll`, "homepage-poll-heading")} inputName={`${entry.package.packageId}-poll`} client:visible /></div>
+  </>)}
+  {v2NewsletterPackages.map((entry) => <div class="astro-island-relocation" data-target={`home-newsletter-${entry.package.packageId}-slot`}><NewsletterSignupForm headingId={packageHeadingId(`${entry.package.packageId}-heading`, "article-newsletter-heading")} heading={entry.package.heading} showLabel={entry.package.presentation.showLabel} client:visible /></div>)}
+  <script is:inline set:html={relocateScript}></script>
+</BaseLayout>
