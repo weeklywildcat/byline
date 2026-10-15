@@ -10,6 +10,8 @@ export type StoryImageView = {
   alt: string;
   width: number | null;
   height: number | null;
+  // Photographer or source line, already plain text. Shown under larger images.
+  credit?: string;
 };
 
 export type StoryView = {

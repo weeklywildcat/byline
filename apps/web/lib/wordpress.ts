@@ -1396,6 +1396,21 @@ export function getFeaturedMedia(post: WordPressPost) {
   return post._embedded?.["wp:featuredmedia"]?.[0] ?? null;
 }
 
+// The photographer or source credit for an image: the Byline credit first, then
+// the legacy Weekly Wildcat credit, then whatever the file's own metadata says.
+export function getMediaCredit(image: WordPressMedia | null | undefined) {
+  if (!image) {
+    return "";
+  }
+
+  return stripHtml(
+    [image.bylineImage?.creditText, image.weeklyWildcatImage?.creditText].find((value) => Boolean(value?.trim())) ||
+      image.media_details?.image_meta?.credit ||
+      image.media_details?.image_meta?.copyright ||
+      ""
+  ).trim();
+}
+
 export function getPostDateParts(post: WordPressPost) {
   const [date] = post.date.split("T");
   const [year, month, day] = date.split("-");

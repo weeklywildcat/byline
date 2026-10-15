@@ -48,6 +48,7 @@ export function StoryTeaser({ post, variant = "standard", showImage = true, prio
           image={image}
           priority={priority}
           showCaption={false}
+          showCredit={variant === "lead" || variant === "standard"}
           sizes={getStoryTeaserImageSizes(variant)}
         />
       ) : null}

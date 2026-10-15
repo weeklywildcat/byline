@@ -31,6 +31,19 @@ export type StoryCardProps = {
   fallbackAuthorName: string;
 };
 
+// Variants whose image is large enough to carry a credit line. Thumbnails
+// (briefing, row, more-compact) stay clean.
+const CREDITED_VARIANTS = new Set<StoryCardVariant>([
+  "lead",
+  "brief-lead",
+  "focus",
+  "opinion-lead",
+  "field",
+  "more-lead",
+  "special",
+  "athlete"
+]);
+
 export function StoryCard({
   story,
   variant,
@@ -61,6 +74,9 @@ export function StoryCard({
             height={story.image.height ?? undefined}
             loading={priority ? "eager" : "lazy"}
           />
+          {story.image.credit && CREDITED_VARIANTS.has(variant) ? (
+            <span className="home-story-credit">Photo: {story.image.credit}</span>
+          ) : null}
         </a>
       ) : null}
 

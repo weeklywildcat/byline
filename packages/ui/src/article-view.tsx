@@ -109,9 +109,12 @@ function initial(name: string) {
 
 function ArticleImage({ image, priority = false, showCaption = true }: { image: ArticleImageView; priority?: boolean; showCaption?: boolean }): ReactNode {
   const hasCaption = Boolean(image.captionHtml || image.fallbackCaption || image.credit);
+  // A vertical lead photo would run several screens tall at article width, so
+  // the stylesheet crops it to a landscape frame.
+  const isPortrait = Boolean(image.width && image.height && image.height > image.width * 1.1);
 
   return (
-    <figure className="featured-image">
+    <figure className={isPortrait ? "featured-image featured-image-portrait" : "featured-image"}>
       <div className="featured-image-frame">
         <img
           src={image.src}
@@ -133,7 +136,7 @@ function ArticleImage({ image, priority = false, showCaption = true }: { image: 
             ) : image.fallbackCaption ? (
               <div className="featured-image-caption">{image.fallbackCaption}</div>
             ) : null}
-            {image.credit ? <p className="photo-credit">Credit: {image.credit}</p> : null}
+            {image.credit ? <p className="photo-credit">Photo: {image.credit}</p> : null}
           </div>
         </figcaption>
       ) : null}

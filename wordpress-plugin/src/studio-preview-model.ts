@@ -55,7 +55,13 @@ export type PreviewPost = {
   tags?: number[];
   author?: number;
   _embedded?: {
-    "wp:featuredmedia"?: Array<{ source_url?: string; alt_text?: string; media_details?: { width?: number; height?: number } }>;
+    "wp:featuredmedia"?: Array<{
+      source_url?: string;
+      alt_text?: string;
+      media_details?: { width?: number; height?: number; image_meta?: { credit?: string; copyright?: string } };
+      bylineImage?: { creditText?: string };
+      weeklyWildcatImage?: { creditText?: string };
+    }>;
     "wp:term"?: Array<Array<{ id?: number; taxonomy: string; name: string; slug: string }>>;
     author?: Array<{ name: string; link: string }>;
   };
@@ -90,6 +96,12 @@ function toStoryView(post: PreviewPost): StoryView {
   const media = post._embedded?.["wp:featuredmedia"]?.[0];
   const category = post._embedded?.["wp:term"]?.flat().find((term) => term?.taxonomy === "category") ?? null;
   const author = post._embedded?.author?.[0] ?? null;
+  const credit = stripTags(
+    [media?.bylineImage?.creditText, media?.weeklyWildcatImage?.creditText].find((value) => Boolean(value?.trim())) ||
+      media?.media_details?.image_meta?.credit ||
+      media?.media_details?.image_meta?.copyright ||
+      ""
+  );
   const path = (() => {
     try {
       return new URL(post.link).pathname;
@@ -118,7 +130,8 @@ function toStoryView(post: PreviewPost): StoryView {
           src: media.source_url,
           alt: media.alt_text || "",
           width: media.media_details?.width ?? null,
-          height: media.media_details?.height ?? null
+          height: media.media_details?.height ?? null,
+          ...(credit ? { credit } : {})
         }
       : null
   };

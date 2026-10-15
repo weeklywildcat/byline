@@ -4,6 +4,7 @@ import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import {
   getAuthorHref,
   getFeaturedMedia,
+  getMediaCredit,
   getPostAuthor,
   getPostHref,
   type WordPressPost
@@ -32,6 +33,7 @@ export function toStoryView(post: WordPressPost, options: StoryViewOptions = {})
   const author = getPostAuthor(post);
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
+  const credit = getMediaCredit(image);
   const cleanDeck = options.cleanDeck ?? false;
 
   return {
@@ -50,7 +52,8 @@ export function toStoryView(post: WordPressPost, options: StoryViewOptions = {})
           src: image.source_url,
           alt: image.alt_text || stripHtml(image.title.rendered ?? ""),
           width: image.media_details?.width ?? null,
-          height: image.media_details?.height ?? null
+          height: image.media_details?.height ?? null,
+          ...(credit ? { credit } : {})
         }
       : null
   };
@@ -82,6 +85,7 @@ function getAthleteBlurb(post: WordPressPost) {
 
 export function toAthleteSpotlightView(post: WordPressPost): AthleteSpotlightView {
   const image = getFeaturedMedia(post);
+  const credit = getMediaCredit(image);
   const blurb = getAthleteBlurb(post);
 
   return {
@@ -96,7 +100,8 @@ export function toAthleteSpotlightView(post: WordPressPost): AthleteSpotlightVie
           src: image.source_url,
           alt: image.alt_text || stripHtml(image.title.rendered ?? ""),
           width: image.media_details?.width ?? null,
-          height: image.media_details?.height ?? null
+          height: image.media_details?.height ?? null,
+          ...(credit ? { credit } : {})
         }
       : null
   };

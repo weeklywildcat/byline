@@ -122,13 +122,23 @@
 }
 
 :where(.byline-publication-preview) .home-story-image {
-  background: var(--ww-image-fill);
   display: block;
   overflow: hidden;
 }
 
+:where(.byline-publication-preview) .home-story-credit {
+  color: var(--soft-muted);
+  display: block;
+  font-family: var(--font-serif);
+  font-size: 0.85rem;
+  font-style: italic;
+  line-height: 1.35;
+  padding-top: 7px;
+}
+
 :where(.byline-publication-preview) .home-story-image img {
   aspect-ratio: 3 / 2;
+  background: var(--ww-image-fill);
   height: 100%;
   object-fit: cover;
   transition: transform 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -463,8 +473,12 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-:where(.byline-publication-preview) .home-story-focus .home-story-image {
+:where(.byline-publication-preview) .home-story-focus .home-story-image img {
   background: #262626;
+}
+
+:where(.byline-publication-preview) .home-story-focus .home-story-credit {
+  color: var(--ww-on-ink-muted);
 }
 
 :where(.byline-publication-preview) .home-story-focus .home-story-category,
@@ -762,12 +776,12 @@
 }
 
 :where(.byline-publication-preview) .sports-athlete-image {
-  background: var(--ww-image-fill);
   display: block;
   overflow: hidden;
 }
 
 :where(.byline-publication-preview) .sports-athlete-image img {
+  background: var(--ww-image-fill);
   aspect-ratio: 4 / 5;
   height: 100%;
   object-fit: cover;
