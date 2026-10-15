@@ -1062,16 +1062,15 @@ img {
   border-top: 1px solid var(--rule);
   display: flex;
   flex-wrap: wrap;
-  font-family: var(--font-ui);
-  font-size: 0.8rem;
-  font-stretch: 85%;
-  font-weight: 800;
+  font-family: "Libre Franklin", "Libre Franklin Fallback", Arial, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
   gap: 0 32px;
   justify-content: center;
-  letter-spacing: 0.07em;
+  letter-spacing: 0;
   border-bottom: 1px solid var(--rule-strong);
   padding: 2px 0;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .section-nav a {

@@ -65,18 +65,17 @@ export function ArticleShareActions({ title, url }: ArticleShareActionsProps) {
 
   return (
     <div className="article-share-actions" aria-label="Share this story">
-      <button type="button" onClick={handleShare} title="Share this story">
-        <SiteIcon name="ph:share-fat" width={16} height={16} />
-        <span>Share</span>
+      <button type="button" onClick={handleShare} title="Share this story" aria-label="Share this story">
+        <SiteIcon name="ph:share-fat" width={18} height={18} />
       </button>
-      <button type="button" onClick={handleCopy} title="Copy story link">
+      <button type="button" onClick={handleCopy} title={copyLabel} aria-label={copyLabel}>
         <SiteIcon
           name={copyStatus === "copied" ? "ph:check" : copyStatus === "failed" ? "ph:warning-circle" : "ph:link"}
-          width={16}
-          height={16}
+          width={18}
+          height={18}
         />
-        <span>{copyLabel}</span>
       </button>
+      <span className="article-share-status" role="status">{copyStatus === "idle" ? "" : copyLabel}</span>
     </div>
   );
 }

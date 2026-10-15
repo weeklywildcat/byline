@@ -56,7 +56,7 @@ const socialMetadataTags = serializeMetadata({
   }
 });
 const preloadedFonts = activeTheme.id === "weekly-wildcat"
-  ? ["mona-sans-normal-latin", "newsreader-normal-latin", "erode-normal-600"].map((name) => `/fonts/${name}.woff2`)
+  ? ["mona-sans-normal-latin", "newsreader-normal-latin", "erode-normal-600", "libre-franklin-normal-latin"].map((name) => `/fonts/${name}.woff2`)
   : [];
 const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key, value]) => `${key}:${value}`).join(";");
 ---
