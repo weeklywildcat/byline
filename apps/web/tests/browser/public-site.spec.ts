@@ -45,7 +45,7 @@ async function openWithoutJavaScript(browser: Browser, route: string) {
 }
 
 test.describe("public Astro site", () => {
-  test("desktop homepage keeps the lead and rails in the top row", async ({ page }) => {
+  test("desktop homepage keeps the lead above the Latest ribbon", async ({ page }) => {
     const errors = collectBrowserErrors(page);
     const response = await page.goto("/", { waitUntil: "domcontentloaded" });
 
@@ -53,7 +53,7 @@ test.describe("public Astro site", () => {
     await expect(page.locator(".site-header")).toBeVisible();
     await expect(page.locator("[data-homepage-top-stories]")).toBeVisible();
     await expect(page.locator(".live-lead")).toContainText("Weekly Wildcat fixture story");
-    await expect(page.locator(".top-stories-left-rail")).toBeVisible();
+    await expect(page.locator(".top-stories-left-rail")).toHaveCount(0);
     await expect(page.locator(".top-stories-rail")).toBeVisible();
     await expect(page.locator(".right-now-list .home-story")).toHaveCount(1);
 
@@ -66,25 +66,13 @@ test.describe("public Astro site", () => {
     expect(directChildren.filter((child) => child.className.includes("live-lead"))).toHaveLength(1);
     expect(directChildren.some((child) => child.tagName === "ASTRO-ISLAND")).toBe(false);
 
-    const boxes = await page.locator(".live-lead, .top-stories-rail, .top-stories-left-rail").evaluateAll((elements) =>
-      Object.fromEntries(elements.map((element) => [
-        element.className,
-        {
-          top: element.getBoundingClientRect().top,
-          layoutTop: element.parentElement?.getBoundingClientRect().top ?? 0
-        }
-      ]))
-    );
-    const lead = boxes["live-lead"];
-    const rail = boxes["top-stories-rail"];
-    const utility = boxes["top-stories-left-rail"];
+    const lead = await page.locator(".live-lead").boundingBox();
+    const latest = await page.locator(".top-stories-rail").boundingBox();
 
     expect(lead).toBeTruthy();
-    expect(rail).toBeTruthy();
-    expect(utility).toBeTruthy();
-    expect(Math.abs(lead.top - rail.top)).toBeLessThan(120);
-    expect(Math.abs(lead.top - utility.top)).toBeLessThan(120);
-    expect(lead.top - lead.layoutTop).toBeLessThan(160);
+    expect(latest).toBeTruthy();
+    expect(latest!.y).toBeGreaterThanOrEqual(lead!.y + lead!.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
     await expectNoBrowserErrors(errors);
   });
@@ -99,9 +87,9 @@ test.describe("public Astro site", () => {
       expect(response?.status()).toBe(200);
       await expect(page.locator(".live-lead .home-story-lead h2 a")).toBeVisible();
       await expect(page.locator(".top-stories-rail")).toBeVisible();
-      await expect(page.locator(".top-stories-left-rail")).toBeVisible();
+      await expect(page.locator(".top-stories-left-rail")).toHaveCount(0);
 
-      const positions = await page.locator("[data-homepage-top-stories] > .live-lead, [data-homepage-top-stories] > .top-stories-rail, [data-homepage-top-stories] > .top-stories-left-rail").evaluateAll((elements) =>
+      const positions = await page.locator("[data-homepage-top-stories] > .live-lead, [data-homepage-top-stories] > .top-stories-rail").evaluateAll((elements) =>
         elements.map((element) => ({
           className: element.className,
           top: element.getBoundingClientRect().top
@@ -109,11 +97,9 @@ test.describe("public Astro site", () => {
       );
       expect(positions.map((entry) => entry.className)).toEqual([
         "live-lead",
-        "top-stories-rail",
-        "top-stories-left-rail"
+        "top-stories-rail"
       ]);
       expect(positions[0].top).toBeLessThanOrEqual(positions[1].top);
-      expect(positions[1].top).toBeLessThanOrEqual(positions[2].top);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
       await expectNoBrowserErrors(errors);

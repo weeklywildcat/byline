@@ -1,23 +1,14 @@
-import { Icon } from "./Icon";
 import { packageHeadingId } from "./package-dom";
 import { StoryCard } from "./StoryCard";
-import {
-  sportsPackageHasContent,
-  type AthleteSpotlightView,
-  type ResolvedSportsPackage,
-  type SportsFixtureView,
-  type SportsResultView,
-  type SportsScheduleView
-} from "./sports-view";
+import { sportsPackageHasContent, type AthleteSpotlightView, type ResolvedSportsPackage } from "./sports-view";
 
 export type SportsPackageProps = {
   package: ResolvedSportsPackage;
 };
 
-// Extracted from apps/web/app/page.tsx, apps/web/components/SportsSchedulePanel.tsx
-// and apps/web/components/SportsAthleteFeature.tsx. Class names, element order,
-// heading ids and ARIA attributes are reproduced exactly: the Weekly Wildcat
-// stylesheet targets them, so this is an extraction, not a redesign.
+// Extracted from apps/web/app/page.tsx and apps/web/components/SportsAthleteFeature.tsx.
+// The homepage sports package is stories only: scores and fixtures live on the
+// sports schedule page, not in this package.
 
 function AthleteFeature({ athlete }: { athlete: AthleteSpotlightView }) {
   return (
@@ -48,113 +39,6 @@ function AthleteFeature({ athlete }: { athlete: AthleteSpotlightView }) {
   );
 }
 
-function ResultCard({ result }: { result: SportsResultView }) {
-  return (
-    <article className="field-result-card">
-      <div className="field-result-summary">
-        <span className="field-sport-icon">
-          <Icon name={result.iconName} width={28} height={28} />
-        </span>
-        <div>
-          <p className="field-card-label">{result.sportLabel}</p>
-          <h4>{result.matchup}</h4>
-        </div>
-      </div>
-      <div className="field-scoreboard" aria-label={result.scoreLabel ?? undefined}>
-        <div className={`field-score-team${result.team.isWinner ? " field-score-team-winner" : ""}`}>
-          <span>{result.team.label}</span>
-          <strong>{result.team.score}</strong>
-        </div>
-        <div className={`field-score-team${result.opponent.isWinner ? " field-score-team-winner" : ""}`}>
-          <span>{result.opponent.label}</span>
-          <strong>{result.opponent.score}</strong>
-        </div>
-      </div>
-      <div className="field-result-footer">
-        <p>{result.verdict}</p>
-        {result.context ? <span>{result.context}</span> : null}
-      </div>
-      {result.recapHref ? (
-        <a className="field-game-link" href={result.recapHref}>
-          Read recap →
-        </a>
-      ) : null}
-    </article>
-  );
-}
-
-function FixtureRow({ fixture }: { fixture: SportsFixtureView }) {
-  return (
-    <article className="field-upcoming-game">
-      <div className="field-upcoming-date">
-        {fixture.displayDate ? <time dateTime={fixture.isoDate}>{fixture.displayDate}</time> : null}
-        {fixture.siteLabel ? <span>{fixture.siteLabel}</span> : null}
-      </div>
-      <div className="field-upcoming-main">
-        <p>{fixture.sportLabel}</p>
-        <h5>{fixture.matchup}</h5>
-        {fixture.location ? <span>{fixture.location}</span> : null}
-      </div>
-    </article>
-  );
-}
-
-/**
- * The schedule panel.
- *
- * The column arithmetic is presentation, not selection: the resolver decided
- * which games qualify, and this decides how many columns they occupy. The
- * "Upcoming" column deliberately still renders when there are finals but no
- * fixtures, carrying the empty message -- that is the pre-Studio behaviour.
- */
-function SchedulePanel({ schedule, packageId }: { schedule: SportsScheduleView; packageId: string }) {
-  const hasResults = schedule.results.length > 0;
-  const hasUpcoming = schedule.upcoming.length > 0;
-  const showUpcomingColumn = hasUpcoming || hasResults;
-  const columnCount = [hasResults, showUpcomingColumn].filter(Boolean).length;
-
-  const scheduleHeadingId = packageHeadingId(`${packageId}-schedule`, "field-schedule-heading");
-  const resultsHeadingId = packageHeadingId(`${packageId}-results`, "recent-scores-heading");
-  const upcomingHeadingId = packageHeadingId(`${packageId}-upcoming`, "upcoming-games-heading");
-
-  return (
-    <aside className="field-schedule" aria-labelledby={scheduleHeadingId}>
-      <div className="field-schedule-header">
-        <h3 id={scheduleHeadingId}>{schedule.panelHeading}</h3>
-        <a href={schedule.fullScheduleLink.href}>{schedule.fullScheduleLink.label}</a>
-      </div>
-
-      <div className={`field-schedule-layout field-schedule-layout-${columnCount}`}>
-        {hasResults ? (
-          <section className="field-schedule-result" aria-labelledby={resultsHeadingId}>
-            <h4 id={resultsHeadingId}>{schedule.scoresHeading}</h4>
-            <div className="field-result-list">
-              {schedule.results.map((result) => (
-                <ResultCard key={result.id} result={result} />
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {showUpcomingColumn ? (
-          <section className="field-schedule-upcoming" aria-labelledby={upcomingHeadingId}>
-            <h4 id={upcomingHeadingId}>{schedule.upcomingHeading}</h4>
-            {hasUpcoming ? (
-              <div className="field-game-list">
-                {schedule.upcoming.map((fixture) => (
-                  <FixtureRow key={fixture.id} fixture={fixture} />
-                ))}
-              </div>
-            ) : (
-              <p className="field-upcoming-empty">{schedule.emptyUpcomingMessage}</p>
-            )}
-          </section>
-        ) : null}
-      </div>
-    </aside>
-  );
-}
-
 export function SportsPackage({ package: resolved }: SportsPackageProps) {
   // The pre-Studio homepage rendered nothing at all when the package had no
   // content -- not an empty state -- so this reproduces that rather than
@@ -163,9 +47,15 @@ export function SportsPackage({ package: resolved }: SportsPackageProps) {
     return null;
   }
 
-  const { lead, rail, athleteSpotlight, schedule, presentation } = resolved;
+  const { lead, rail, athleteSpotlight, presentation } = resolved;
   const content = resolved.content ?? "full";
   const hasStories = Boolean(lead) || rail.length > 0;
+  // Schedule-only packages and packages whose only content was the scoreboard
+  // have nothing left to show now that the homepage carries stories only.
+  if (content === "schedule" || (!hasStories && !athleteSpotlight)) {
+    return null;
+  }
+
   const hasRail = rail.length > 0 || Boolean(athleteSpotlight);
   const simpleStory = content === "story" && Boolean(lead) && !hasRail;
   const sectionHeadingId = packageHeadingId(resolved.packageId, "field-heading");
@@ -177,7 +67,7 @@ export function SportsPackage({ package: resolved }: SportsPackageProps) {
         {resolved.sectionLink ? <a href={resolved.sectionLink.href}>{resolved.sectionLink.label}</a> : null}
       </div>
 
-      {content !== "schedule" && (hasStories || athleteSpotlight) ? simpleStory ? (
+      {simpleStory ? (
         <StoryCard
           story={lead!}
           variant="field"
@@ -213,9 +103,7 @@ export function SportsPackage({ package: resolved }: SportsPackageProps) {
             </div>
           ) : null}
         </div>
-      ) : null}
-
-      {content !== "story" && schedule ? <SchedulePanel schedule={schedule} packageId={resolved.packageId} /> : null}
+      )}
     </section>
   );
 }

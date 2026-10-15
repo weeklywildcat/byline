@@ -346,6 +346,7 @@ export function resolveMorePackage(
         publicationLabel: publication.shortName,
         joinStaff: {
           ...config.utility.joinStaff,
+          copy: publicationText(config.utility.joinStaff.copy, publication),
           links: [
             utilityLink("Join the newsroom", "/join/", "ph:pencil-line"),
             utilityLink("Meet the staff", "/authors/", "ph:users-three")
@@ -353,6 +354,7 @@ export function resolveMorePackage(
         },
         stayConnected: {
           ...config.utility.stayConnected,
+          copy: publicationText(config.utility.stayConnected.copy, publication),
           links: [
             ...publication.social.map((social) => utilityLink(social.label, social.url, `ph:${social.service}-logo`, true)),
             utilityLink("Contact", publication.contactHref, "ph:envelope-simple"),
