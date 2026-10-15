@@ -4,6 +4,7 @@
 .byline-article-view .article-header { border-bottom: 1px solid var(--rule); margin-bottom: 30px; padding-bottom: 26px; }
 .byline-article-view .article-section-label { color: var(--accent); display: inline-flex; font-family: var(--font-ui); font-size: .78rem; font-weight: 700; text-transform: uppercase; }
 .byline-article-view .article-header h1 { font-family: var(--font-ui); font-size: 4rem; font-weight: 400; line-height: 1.04; margin: 16px 0 18px; }
+html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1 { font-family: "Newsreader", var(--font-serif); font-weight: 500; letter-spacing: -0.01em; }
 .byline-article-view .article-header .featured-image { margin-top: 26px; }
 .byline-article-view .article-excerpt { color: var(--muted); font-family: var(--font-ui); font-size: 1.12rem; font-weight: 400; }
 .byline-article-view .article-excerpt p { margin: 10px 0 0; }
