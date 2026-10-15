@@ -2558,6 +2558,68 @@ img {
   line-height: 0.9;
 }
 
+.media-kit-font-sample-headline {
+  font-family: var(--font-headline);
+  font-size: 1.9rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.06;
+}
+
+.media-kit-font-sample-serif {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  line-height: 1.45;
+}
+
+.media-kit-font-sample-label {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-stretch: 85%;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+}
+
+.media-kit-font-sample-nav {
+  font-family: "Libre Franklin", "Libre Franklin Fallback", Arial, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.media-kit-color-grid {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.media-kit-color-card {
+  align-content: start;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.media-kit-color-swatch {
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--rule);
+  margin-bottom: 6px;
+}
+
+.media-kit-color-card h3 {
+  font-family: var(--font-body);
+  font-size: 1.08rem;
+  font-weight: 800;
+  line-height: 1.08;
+  margin: 0;
+}
+
+.media-kit-color-card > p:last-child {
+  color: var(--muted);
+  margin: 0;
+}
+
 .media-kit-broll-panel {
   align-items: center;
   border-top: 1px solid var(--rule);
@@ -4226,6 +4288,10 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
 .media-kit-font-grid {
 	    grid-template-columns: 1fr;
 	  }
+
+  .media-kit-color-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
   .secondary-stack,
   .latest-rail,

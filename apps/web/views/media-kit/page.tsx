@@ -93,23 +93,39 @@ const weeklyWildcatFontAssets = [
     sample: "logo"
   },
   {
-    name: "Aktiv Grotesk",
-    role: "Headlines, decks and body copy",
+    name: "Erode",
+    role: "Headlines",
+    sample: "Ninety Six Shuts Out Thornwell, 63-0",
+    className: "media-kit-font-sample-headline"
+  },
+  {
+    name: "Newsreader",
+    role: "Decks, story text and photo credits",
     sample: "Weekly Wildcat covers school stories with clarity and energy.",
-    className: "media-kit-font-sample-body"
+    className: "media-kit-font-sample-serif"
   },
   {
-    name: "News Gothic Std",
-    role: "Navigation, labels, metadata and buttons",
-    sample: "NEWS  SPORTS  OPINION  FEATURES",
-    className: "media-kit-font-sample-ui"
+    name: "Mona Sans",
+    role: "Section labels, bylines, metadata and buttons",
+    sample: "THE LATEST  SPORTS  OPINION",
+    className: "media-kit-font-sample-label"
   },
   {
-    name: "Alternate Gothic Condensed A",
-    role: "Major package titles and section mastheads",
-    sample: "Weekly Wildcat",
-    className: "media-kit-font-sample-display"
+    name: "Libre Franklin",
+    role: "Section navigation",
+    sample: "News  Sports  Opinion  Features",
+    className: "media-kit-font-sample-nav"
   }
+];
+
+// The Weekly Wildcat palette: maroon is the only accent, on white and ink.
+const weeklyWildcatColors = [
+  { name: "Wildcat Maroon", hex: "#73192a", role: "The accent: section labels, links, highlights" },
+  { name: "Deep Maroon", hex: "#4a0f1a", role: "Hover and pressed states, maroon bands" },
+  { name: "Ink", hex: "#121212", role: "Headlines, body text, heavy rules, dark bands" },
+  { name: "White", hex: "#ffffff", role: "Page background" },
+  { name: "Gray", hex: "#545454", role: "Decks, metadata and secondary text" },
+  { name: "Rule", hex: "#e2e2e2", role: "Hairlines between stories" }
 ];
 
 const publication = getPublicationConfig();
@@ -283,6 +299,28 @@ export default async function MediaKitPage() {
           ))}
         </div>
       </section>
+
+      {isWeeklyWildcatTheme ? (
+        <section className="media-kit-section" aria-labelledby="media-kit-colors-heading">
+          <div className="media-kit-section-heading">
+            <h2 id="media-kit-colors-heading">Colors</h2>
+            <p>
+              Maroon is the only accent color. Pair it with white and ink; do not add a second brand color such as gold.
+            </p>
+          </div>
+
+          <div className="media-kit-color-grid">
+            {weeklyWildcatColors.map((color) => (
+              <article className="media-kit-color-card" key={color.hex}>
+                <div className="media-kit-color-swatch" style={{ background: color.hex }} />
+                <p className="media-kit-card-meta">{color.hex.toUpperCase()}</p>
+                <h3>{color.name}</h3>
+                <p>{color.role}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="media-kit-section" aria-labelledby="media-kit-images-heading">
         <div className="media-kit-section-heading">
