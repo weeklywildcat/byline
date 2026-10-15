@@ -4852,3 +4852,36 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
   font-weight: 600;
   letter-spacing: -0.022em;
 }
+
+/* Photo credits: serif italic under every image, matching the article pages. */
+.featured-image figcaption,
+.article-body figcaption {
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.photo-credit {
+  color: var(--soft-muted);
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.photo-credit-solo {
+  margin: 0;
+  max-width: none;
+  text-align: left;
+}
+
+.story-teaser .featured-image figcaption {
+  margin-top: 6px;
+}
+
+.story-teaser-lead .featured-image img,
+.story-teaser-standard .featured-image img {
+  display: block;
+}
