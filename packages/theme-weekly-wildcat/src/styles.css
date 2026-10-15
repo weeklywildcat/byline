@@ -7,7 +7,7 @@
  *
  * The 2026 system: Erode headlines (--font-headline), Newsreader decks and body
  * copy (--font-serif), Mona Sans labels and UI (--font-ui), on white. Maroon is
- * the accent everywhere; gold appears only on ink, and only for sports.
+ * the accent everywhere.
  */
 
 :where(.byline-publication-preview) {
@@ -15,7 +15,6 @@
   --ww-on-ink: #ffffff;
   --ww-on-ink-muted: #b4b4b4;
   --ww-on-ink-rule: rgba(255, 255, 255, 0.18);
-  --ww-gold: #c9a440;
   --ww-image-fill: #efefef;
   --ww-gap: 24px;
   background: var(--page);
@@ -687,28 +686,11 @@
 }
 
 /* --- sports ------------------------------------------------------------------
-   Stories only. The section opens on an ink bar with the name in gold: the
-   one place the gold appears. */
+   Stories only, on the same white page and type as every other package; a
+   heavy ink rule over the section name is its only distinction. */
 
 :where(.byline-publication-preview) .from-field .section-header-row {
-  align-items: center;
-  background: var(--ww-ink);
-  border-top: 0;
-  margin-bottom: 26px;
-  padding: 12px 16px;
-}
-
-:where(.byline-publication-preview) .from-field .section-header-row h2 {
-  color: var(--ww-gold);
-  font-size: 1rem;
-}
-
-:where(.byline-publication-preview) .from-field .section-header-row a {
-  color: var(--ww-on-ink);
-}
-
-:where(.byline-publication-preview) .from-field .section-header-row a:hover {
-  color: var(--ww-gold);
+  border-top: 3px solid var(--ink);
 }
 
 :where(.byline-publication-preview) .field-layout {
@@ -743,7 +725,7 @@
 }
 
 :where(.byline-publication-preview) .home-story-field.home-story-no-image {
-  border-left: 3px solid var(--ww-ink);
+  border-left: 4px solid var(--accent);
   padding-left: 22px;
 }
 
@@ -1460,10 +1442,6 @@
   :where(.byline-publication-preview) .opinion-rail .home-story-opinion:nth-child(2) {
     border-top: 1px solid var(--rule);
     padding-top: 18px;
-  }
-
-  :where(.byline-publication-preview) .from-field .section-header-row {
-    padding: 10px 12px;
   }
 
   :where(.byline-publication-preview) .more-story-grid {
