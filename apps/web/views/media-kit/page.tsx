@@ -105,14 +105,8 @@ const weeklyWildcatFontAssets = [
     className: "media-kit-font-sample-serif"
   },
   {
-    name: "Mona Sans",
-    role: "Section labels, bylines, metadata and buttons",
-    sample: "THE LATEST  SPORTS  OPINION",
-    className: "media-kit-font-sample-label"
-  },
-  {
     name: "Libre Franklin",
-    role: "Section navigation",
+    role: "Navigation, section labels, bylines, metadata and buttons",
     sample: "News  Sports  Opinion  Features",
     className: "media-kit-font-sample-nav"
   }

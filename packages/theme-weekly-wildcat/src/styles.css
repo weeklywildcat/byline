@@ -6,7 +6,7 @@
  * cannot inherit publication typography, links, media, or layout.
  *
  * The 2026 system: Erode headlines (--font-headline), Newsreader decks and body
- * copy (--font-serif), Mona Sans labels and UI (--font-ui), on white. Maroon is
+ * copy (--font-serif), Libre Franklin labels and UI (--font-ui), on white. Maroon is
  * the accent everywhere.
  */
 
@@ -60,7 +60,7 @@
 
 /* --- section headers ------------------------------------------------------
    Every package opens the same way: a hairline in ink, the section name in
-   condensed Mona Sans, and an optional archive link on the right. */
+   Libre Franklin, and an optional archive link on the right. */
 
 :where(.byline-publication-preview) .section-header-row,
 :where(.byline-publication-preview) .more-weekly-header,
@@ -84,7 +84,6 @@
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: 0.9rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.06em;
   line-height: 1;
@@ -169,7 +168,6 @@
 :where(.byline-publication-preview) .home-story-category {
   color: var(--accent);
   font-size: 0.72rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -642,7 +640,6 @@
 :where(.byline-publication-preview) .home-story-opinion .home-story-author {
   color: var(--accent);
   font-size: 0.8rem;
-  font-stretch: 85%;
   letter-spacing: 0.06em;
   margin: 0 0 10px;
   order: -1;
@@ -779,7 +776,6 @@
   color: var(--accent);
   font-family: var(--font-ui);
   font-size: 0.72rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.07em;
   margin: 0;
@@ -965,7 +961,6 @@
   color: var(--accent);
   font-family: var(--font-ui);
   font-size: 0.75rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.07em;
   line-height: 1;
@@ -1134,7 +1129,6 @@
   color: var(--accent);
   font-family: var(--font-ui);
   font-size: 0.7rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1198,7 +1192,6 @@
   color: rgba(255, 255, 255, 0.78);
   font-family: var(--font-ui);
   font-size: 0.78rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.08em;
   margin: 0 0 10px;

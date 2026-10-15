@@ -2575,7 +2575,6 @@ img {
 .media-kit-font-sample-label {
   font-family: var(--font-ui);
   font-size: 1rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.06em;
   line-height: 1.2;
@@ -4301,19 +4300,17 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
 .footer-link-group h2 {
   color: #ffffff;
   font-family: var(--font-ui);
-  font-size: 0.78rem;
-  font-stretch: 85%;
-  font-weight: 800;
-  letter-spacing: 0.07em;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.2;
   margin: 0 0 12px;
-  text-transform: uppercase;
 }
 
 .footer-links {
   display: flex;
   flex-direction: column;
-  font-family: var(--font-body);
-  font-size: 0.84rem;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
   font-weight: 400;
   gap: 6px;
   text-transform: none;
