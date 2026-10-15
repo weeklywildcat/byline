@@ -1282,45 +1282,6 @@
   min-height: 0;
 }
 
-:where(.byline-publication-preview[data-theme="byline-editorial"]) .section-header-row,
-:where(.byline-publication-preview[data-theme="byline-editorial"]) .more-weekly-header,
-:where(.byline-publication-preview[data-theme="byline-editorial"]) .opinion-package-header {
-  border-bottom: 3px double var(--rule-strong);
-  border-top: 1px solid var(--rule-strong);
-  padding: 8px 0;
-}
-
-:where(.byline-publication-preview[data-theme="byline-editorial"]) .home-story h2 {
-  font-family: var(--font-headline);
-  letter-spacing: -0.02em;
-}
-
-:where(.byline-publication-preview[data-theme="byline-magazine"]) .top-stories,
-:where(.byline-publication-preview[data-theme="byline-magazine"]) .in-focus,
-:where(.byline-publication-preview[data-theme="byline-magazine"]) .special-coverage {
-  border: 0;
-  border-radius: var(--radius-medium);
-  overflow: hidden;
-}
-
-:where(.byline-publication-preview[data-theme="byline-magazine"]) .home-story-lead h2,
-:where(.byline-publication-preview[data-theme="byline-magazine"]) .home-story-focus h2,
-:where(.byline-publication-preview[data-theme="byline-magazine"]) .home-story-special h2 {
-  font-family: var(--font-display);
-  font-size: clamp(2.6rem, 6vw, 5.8rem);
-  letter-spacing: -0.055em;
-  line-height: 0.9;
-}
-
-:where(.byline-publication-preview[data-theme="byline-magazine"]) .more-weekly-layout,
-:where(.byline-publication-preview[data-theme="byline-magazine"]) .special-coverage-layout {
-  gap: clamp(28px, 5vw, 64px);
-}
-
-:where(.byline-publication-preview[data-theme="byline-modern"]) .home-story-image img {
-  border-radius: var(--radius-small);
-}
-
 @media (max-width: 1040px) {
   :where(.byline-publication-preview) .top-stories-layout {
     grid-template-columns: 1fr;

@@ -19,16 +19,7 @@ function byline_publication_asset(string $url, string $alt, ?int $width = null, 
 
 function byline_publication_theme_ids(): array
 {
-    $themes = ['byline-editorial', 'byline-magazine', 'byline-modern', 'weekly-wildcat'];
-    if (function_exists('apply_filters')) {
-        $filtered = apply_filters('byline_theme_ids', $themes);
-        if (is_array($filtered)) {
-            $themes = array_values(array_unique(array_filter($filtered, static fn($theme): bool =>
-                is_string($theme) && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $theme) === 1
-            )));
-        }
-    }
-    return $themes;
+    return ['weekly-wildcat'];
 }
 
 function byline_is_legacy_weekly_wildcat_installation(): bool
@@ -76,7 +67,7 @@ function byline_generic_publication_config(): array
             'defaultSocialImage' => byline_publication_asset('', $name),
         ],
         'appearance' => [
-            'theme' => 'byline-modern',
+            'theme' => 'weekly-wildcat',
             'tokenOverrides' => [],
         ],
         'sections' => [],
@@ -255,7 +246,6 @@ function byline_normalize_publication_config($input): array
     $location = is_array($input['location'] ?? null) ? $input['location'] : [];
     $urls = is_array($input['urls'] ?? null) ? $input['urls'] : [];
     $branding = is_array($input['branding'] ?? null) ? $input['branding'] : [];
-    $appearance = is_array($input['appearance'] ?? null) ? $input['appearance'] : [];
     $licensing = is_array($input['licensing'] ?? null) ? $input['licensing'] : [];
     $seo = is_array($input['seo'] ?? null) ? $input['seo'] : [];
 
@@ -302,28 +292,7 @@ function byline_normalize_publication_config($input): array
         }
     }
 
-    $theme = is_string($appearance['theme'] ?? null) ? sanitize_key($appearance['theme']) : '';
-    $normalized['appearance']['theme'] = in_array($theme, byline_publication_theme_ids(), true)
-        ? $theme
-        : $defaults['appearance']['theme'];
-    $color_tokens = ['background', 'surface', 'text', 'mutedText', 'mutedTextSoft', 'accent', 'accentStrong', 'link', 'border', 'borderStrong'];
-    $font_tokens = ['fontDisplay', 'fontHeadline', 'fontBody', 'fontUI', 'fontEditorial'];
-    $length_tokens = ['contentWidth', 'articleWidth', 'radiusSmall', 'radiusMedium'];
-    $normalized['appearance']['tokenOverrides'] = [];
-    foreach (is_array($appearance['tokenOverrides'] ?? null) ? $appearance['tokenOverrides'] : [] as $key => $value) {
-        if (!is_string($value)) {
-            continue;
-        }
-        if (in_array($key, $color_tokens, true) && preg_match('/^#[0-9a-f]{6}$/i', $value) === 1) {
-            $normalized['appearance']['tokenOverrides'][$key] = $value;
-        } elseif (in_array($key, $font_tokens, true) && preg_match('/^[A-Za-z0-9 \'".,_-]{1,200}$/', $value) === 1) {
-            $normalized['appearance']['tokenOverrides'][$key] = $value;
-        } elseif (in_array($key, $length_tokens, true) && preg_match('/^\d+(?:\.\d+)?(?:px|rem|em|ch|vw|%)$/', $value) === 1) {
-            $normalized['appearance']['tokenOverrides'][$key] = $value;
-        } elseif ($key === 'density' && in_array($value, ['compact', 'comfortable', 'spacious'], true)) {
-            $normalized['appearance']['tokenOverrides'][$key] = $value;
-        }
-    }
+    $normalized['appearance'] = ['theme' => 'weekly-wildcat', 'tokenOverrides' => []];
 
     $normalized['sections'] = [];
     foreach (array_slice(is_array($input['sections'] ?? null) ? $input['sections'] : $defaults['sections'], 0, 30) as $item) {
@@ -490,21 +459,6 @@ function byline_validate_publication_config($input)
     foreach (['publicSite' => 'Public URL', 'cms' => 'CMS URL'] as $key => $label) {
         if (!byline_publication_is_http_url($urls[$key] ?? null)) {
             return byline_publication_validation_error('urls.' . $key, sprintf(__('%s must be a valid http or https URL.', 'weekly-wildcat-headless'), $label));
-        }
-    }
-
-    $appearance = is_array($input['appearance'] ?? null) ? $input['appearance'] : [];
-    $theme = is_string($appearance['theme'] ?? null) ? sanitize_key($appearance['theme']) : '';
-    if (!in_array($theme, byline_publication_theme_ids(), true)) {
-        return byline_publication_validation_error('appearance.theme', __('Choose one of the installed Byline themes.', 'weekly-wildcat-headless'));
-    }
-
-    $token_overrides = is_array($appearance['tokenOverrides'] ?? null) ? $appearance['tokenOverrides'] : [];
-    foreach (['accent', 'link', 'background', 'surface', 'text'] as $token) {
-        if (array_key_exists($token, $token_overrides)
-            && $token_overrides[$token] !== ''
-            && (!is_string($token_overrides[$token]) || preg_match('/^#[0-9a-f]{6}$/i', $token_overrides[$token]) !== 1)) {
-            return byline_publication_validation_error('appearance.tokenOverrides.' . $token, __('Color overrides must use six-digit hex values such as #008b95.', 'weekly-wildcat-headless'));
         }
     }
 

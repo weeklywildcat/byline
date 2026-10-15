@@ -51,19 +51,6 @@ export const WEEKLY_WILDCAT_MORE_DEFAULTS: MorePackageProps = {
   presentation: { showDeck: true, cleanDeck: true }
 };
 
-export const NEUTRAL_MORE_DEFAULTS: MorePackageProps = {
-  heading: "More Stories",
-  source: { type: "latest" },
-  limit: 4,
-  archiveLink: { enabled: true, href: "/stories/", label: "View all stories →" },
-  utility: {
-    enabled: false,
-    joinStaff: { enabled: false, heading: "Join the newsroom", copy: "" },
-    stayConnected: { enabled: false, heading: "Stay connected", copy: "" }
-  },
-  presentation: { showDeck: true, cleanDeck: false }
-};
-
 const MAX_STORIES = 50;
 
 function boundedCount(value: unknown, fallback: number) {

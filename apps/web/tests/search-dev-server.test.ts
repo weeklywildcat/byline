@@ -75,7 +75,7 @@ describe("Astro dev search index endpoint", () => {
     );
     devServer = spawn(
       process.execPath,
-      ["scripts/astro-with-publication.mjs", "dev", "--host", "127.0.0.1", "--port", String(port)],
+      ["scripts/astro-with-publication.mjs", "dev", "--ignore-lock", "--host", "127.0.0.1", "--port", String(port)],
       {
         cwd: webRoot,
         env: {

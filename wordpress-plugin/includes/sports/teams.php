@@ -392,161 +392,22 @@ function byline_validate_sports_team_input(array $input, string $exclude_key = '
     return array_values(array_unique($errors));
 }
 
-function byline_sports_team_write_entity(array $entity, string $target_key): array
-{
-    $stored = byline_sports_raw_team_registry();
-    if (!is_array($stored)) {
-        $stored = [];
-    }
-
-    $target_key = byline_sanitize_team_key($target_key);
-    $replaced = false;
-    $updated = [];
-
-    foreach ($stored as $stored_key => $record) {
-        $fallback_key = is_string($stored_key) ? $stored_key : '';
-        $record_key = is_array($record)
-            ? byline_sanitize_team_key($record['key'] ?? $record['id'] ?? $fallback_key)
-            : byline_sanitize_team_key($fallback_key);
-
-        if (!$replaced && $record_key === $target_key) {
-            $updated[$stored_key] = $entity;
-            $replaced = true;
-            continue;
-        }
-
-        // Keep unrelated legacy records byte-for-byte as they were stored.
-        $updated[$stored_key] = $record;
-    }
-
-    if (!$replaced) {
-        $updated[$target_key] = $entity;
-    }
-
-    update_option(BYLINE_SPORTS_TEAMS_OPTION, $updated, false);
-
-    return byline_get_sports_teams();
-}
-
 /**
  * Update one identity record in place. The stable key is never taken from the
  * submitted fields, and unrelated (including malformed) registry records are
  * not rebuilt from browser state.
  */
-function byline_update_sports_team(string $team_key, array $changes)
-{
-    $team_key = byline_sanitize_team_key($team_key);
-    $existing = byline_get_sports_team($team_key);
-    if ($team_key === '' || !is_array($existing)) {
-        return byline_sports_team_error('byline_team_not_found', 'The selected team could not be found.');
-    }
-
-    $input = $existing;
-    $input['key'] = $team_key;
-    foreach (['sport', 'displayName', 'shortName', 'scoreboardName', 'level', 'genderDivision', 'slug', 'active'] as $field) {
-        if (array_key_exists($field, $changes)) {
-            $input[$field] = $changes[$field];
-        }
-    }
-
-    $errors = byline_validate_sports_team_input($input, $team_key);
-    if ($errors !== []) {
-        return byline_sports_team_error('byline_invalid_team', implode(' ', $errors));
-    }
-
-    $entity = byline_sanitize_sports_team($input, $team_key);
-    byline_sports_team_write_entity($entity, $team_key);
-
-    return byline_get_sports_team($team_key);
-}
 
 /**
  * Create an identity record without requiring branding. Slug and key checks
  * include inactive historical records so an archive can never be shadowed.
  */
-function byline_create_sports_team(array $input)
-{
-    $errors = byline_validate_sports_team_input($input);
-    if ($errors !== []) {
-        return byline_sports_team_error('byline_invalid_team', implode(' ', $errors));
-    }
-
-    $entity = byline_sanitize_sports_team(array_merge($input, ['active' => true]));
-    if ($entity === []) {
-        return byline_sports_team_error('byline_invalid_team', 'The team identity could not be saved.');
-    }
-
-    byline_sports_team_write_entity($entity, $entity['key']);
-
-    return byline_get_sports_team($entity['key']);
-}
-
-function byline_set_sports_team_active(string $team_key, bool $active)
-{
-    return byline_update_sports_team($team_key, ['active' => $active]);
-}
 
 /**
  * Update only the selected team's compatibility presentation record. Omitted
  * fields stay untouched, which preserves legacy attachment IDs and focal
  * coordinates when an identity-only edit is submitted.
  */
-function byline_update_sports_team_presentation(string $team_key, array $changes)
-{
-    $team_key = byline_sanitize_team_key($team_key);
-    if ($team_key === '' || !is_array(byline_get_sports_team($team_key))) {
-        return byline_sports_team_error('byline_team_not_found', 'The selected team could not be found.');
-    }
-
-    $settings = get_option(byline_sports_team_option_name(), []);
-    if (!is_array($settings)) {
-        $settings = [];
-    }
-    $current = is_array($settings[$team_key] ?? null) ? $settings[$team_key] : [];
-
-    if (array_key_exists('headerImageId', $changes)) {
-        $header_id = byline_sports_team_attachment_id($changes['headerImageId']);
-        if ($header_id > 0) {
-            $current['headerImageId'] = $header_id;
-            $current['headerFocalX'] = function_exists('wwh_normalize_focal_coordinate')
-                ? wwh_normalize_focal_coordinate($changes['headerFocalX'] ?? ($current['headerFocalX'] ?? 50))
-                : (float) ($changes['headerFocalX'] ?? ($current['headerFocalX'] ?? 50));
-            $current['headerFocalY'] = function_exists('wwh_normalize_focal_coordinate')
-                ? wwh_normalize_focal_coordinate($changes['headerFocalY'] ?? ($current['headerFocalY'] ?? 50))
-                : (float) ($changes['headerFocalY'] ?? ($current['headerFocalY'] ?? 50));
-        } else {
-            unset($current['headerImageId'], $current['headerFocalX'], $current['headerFocalY']);
-        }
-    }
-
-    if (array_key_exists('logoId', $changes)) {
-        $logo_id = byline_sports_team_attachment_id($changes['logoId']);
-        if ($logo_id > 0) {
-            $current['logoId'] = $logo_id;
-        } else {
-            unset($current['logoId']);
-        }
-    }
-
-    if (array_key_exists('accentColor', $changes)) {
-        $accent_source = $changes['accentColor'];
-        $accent = sanitize_hex_color(is_scalar($accent_source) ? (string) $accent_source : '');
-        if ($accent) {
-            $current['accentColor'] = $accent;
-        } else {
-            unset($current['accentColor']);
-        }
-    }
-
-    if ($current === []) {
-        unset($settings[$team_key]);
-    } else {
-        $settings[$team_key] = $current;
-    }
-    update_option(byline_sports_team_option_name(), $settings, false);
-
-    return byline_get_sports_team($team_key);
-}
 
 /**
  * Surface malformed raw identity/presentation data to Sports health without
@@ -673,21 +534,6 @@ function byline_sports_team_integrity_records(): array
  * Replacing the list never destroys an established key: omitted teams are kept
  * as inactive compatibility records so existing games and rosters still resolve.
  */
-function byline_replace_sports_teams(array $teams): array
-{
-    $replacement = byline_normalize_sports_teams($teams);
-    foreach (byline_get_sports_teams() as $key => $existing) {
-        if (!isset($replacement[$key])) {
-            $existing['active'] = false;
-            $replacement[$key] = $existing;
-        }
-    }
-
-    uasort($replacement, static fn(array $left, array $right): int => strcasecmp($left['displayName'], $right['displayName']));
-    update_option(BYLINE_SPORTS_TEAMS_OPTION, $replacement, false);
-
-    return $replacement;
-}
 
 function byline_can_manage_sports_teams(): bool
 {
@@ -706,36 +552,6 @@ function byline_rest_sports_teams(): WP_REST_Response
     return rest_ensure_response($teams);
 }
 
-function byline_rest_update_sports_teams(WP_REST_Request $request)
-{
-    $payload = $request->get_json_params();
-    $teams = is_array($payload['teams'] ?? null) ? $payload['teams'] : (is_array($payload) ? $payload : []);
-
-    if (count($teams) > 100) {
-        return new WP_Error('byline_too_many_teams', 'A publication may configure at most 100 sports teams.', ['status' => 400]);
-    }
-
-    foreach ($teams as $team) {
-        if (!is_array($team) || byline_sanitize_sports_team($team) === []) {
-            return new WP_Error('byline_invalid_team', 'Every team requires a stable key, sport, and display name.', ['status' => 400]);
-        }
-    }
-
-    $validation_errors = byline_validate_sports_teams($teams);
-    if ($validation_errors !== []) {
-        return new WP_Error('byline_invalid_team_collection', implode(' ', $validation_errors), ['status' => 400, 'errors' => $validation_errors]);
-    }
-
-    $updated = byline_replace_sports_teams($teams);
-    if (function_exists('byline_schedule_deployment')) {
-        byline_schedule_deployment('sports-teams');
-    } elseif (function_exists('wwh_schedule_cloudflare_deploy')) {
-        wwh_schedule_cloudflare_deploy();
-    }
-
-    return rest_ensure_response(['teams' => array_values($updated)]);
-}
-
 function byline_register_sports_team_routes(): void
 {
     register_rest_route(BYLINE_REST_NAMESPACE, '/sports/teams', [
@@ -743,11 +559,6 @@ function byline_register_sports_team_routes(): void
             'methods' => WP_REST_Server::READABLE,
             'callback' => 'byline_rest_sports_teams',
             'permission_callback' => '__return_true',
-        ],
-        [
-            'methods' => WP_REST_Server::EDITABLE,
-            'callback' => 'byline_rest_update_sports_teams',
-            'permission_callback' => 'byline_can_manage_sports_teams',
         ],
     ]);
 }

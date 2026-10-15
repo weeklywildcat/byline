@@ -30,7 +30,7 @@ function isSearchIndexItem(value: unknown): value is SearchIndexItem {
   return (
     !("searchText" in value) &&
     (typeof value.id === "string" || typeof value.id === "number") &&
-    (value.kind === undefined || value.kind === "story" || value.kind === "team" || value.kind === "season" || value.kind === "game") &&
+    (value.kind === undefined || value.kind === "story" || value.kind === "archive" || value.kind === "team" || value.kind === "season" || value.kind === "game") &&
     typeof value.title === "string" &&
     typeof value.excerpt === "string" &&
     typeof value.href === "string" &&

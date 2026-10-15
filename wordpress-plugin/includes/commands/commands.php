@@ -59,10 +59,6 @@ function byline_command_palette_commands(): array
         if (current_user_can('edit_others_posts') || current_user_can(defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline')) {
             $add($commands, 'byline/create-correction', 'Create a correction', byline_command_palette_url('byline-planning', ['tab' => 'feedback']));
         }
-        if ($feature_enabled('sports')) {
-            $post_type = defined('WWH_SPORTS_GAME_POST_TYPE') ? WWH_SPORTS_GAME_POST_TYPE : 'ww_sports_game';
-            $add($commands, 'byline/add-game', 'Add game', function_exists('admin_url') ? admin_url('post-new.php?post_type=' . rawurlencode($post_type)) : 'post-new.php?post_type=' . rawurlencode($post_type));
-        }
     }
     $manage_capability = defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline';
     if (current_user_can($manage_capability) || current_user_can('edit_posts')) {
@@ -74,9 +70,6 @@ function byline_command_palette_commands(): array
     }
     if (current_user_can($manage_capability)) {
         $add($commands, 'byline/health-check', 'Run Byline health check', byline_command_palette_url(defined('BYLINE_ADMIN_SETTINGS_PAGE') ? BYLINE_ADMIN_SETTINGS_PAGE : 'byline-settings', ['tab' => 'diagnostics']));
-    }
-    if (current_user_can(defined('BYLINE_EDIT_DESIGN_CAPABILITY') ? BYLINE_EDIT_DESIGN_CAPABILITY : 'edit_byline_design')) {
-        $add($commands, 'byline/studio', 'Open Homepage Studio', byline_command_palette_url('byline-studio'));
     }
     if (current_user_can(defined('BYLINE_MANAGE_INTEGRATIONS_CAPABILITY') ? BYLINE_MANAGE_INTEGRATIONS_CAPABILITY : 'manage_byline_integrations')) {
         $deployment_url = byline_command_palette_url('byline-integrations', ['tab' => 'deployment']);

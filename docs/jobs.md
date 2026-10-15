@@ -29,9 +29,7 @@ lease is recovered by the next runner. Retryable failures use bounded
 exponential backoff, while manual retry requeues a failed or cancelled job
 without changing its identity. Cancellation of a running job is cooperative.
 
-Existing `byline_design_job` records are not rewritten. They are available in
-the protected job listing through `byline:design-schedule:<id>` and retain the
-design scheduler's immutable snapshot, lock, conflict, and reschedule rules.
+Historical `byline_design_job` records remain stored but are no longer listed or executed. Homepage composition is maintained in code.
 
 ## Deployment and revisions
 
@@ -102,6 +100,6 @@ source for operators.
 
 The article post-publish panel and Byline Doctor surface the safe deployment
 lifecycle, expected/public revision evidence, and cron catch-up health. A
-dedicated jobs history table is intentionally not duplicated in Studio: the
+dedicated jobs history table is not duplicated in another editor: the
 protected `/byline/v1/admin/jobs` routes and `wp byline jobs` commands remain
 the operator interface for detailed status, retry, cancel, and run actions.

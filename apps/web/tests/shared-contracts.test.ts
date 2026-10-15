@@ -1,25 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  getPublicationNavigation,
-  normalizePublicationConfig,
-  type BylinePublicationConfig
-} from "@byline/core";
-import {
   consumeResolvedStories,
   createContentResolutionContext,
   normalizeStoryQuery,
   resolveDesignContentBlocks
 } from "@byline/content";
-import { BYLINE_STUDIO_CATEGORIES, BYLINE_STUDIO_VIEWPORTS } from "@byline/studio-contract";
-import { CORE_BYLINE_BLOCK_IDS, defineBylineExtension, defineBylineTheme, sanitizeThemeTokenOverrides } from "@byline/theme-contract";
-import { editorialTheme } from "@byline/theme-editorial";
-import { magazineTheme } from "@byline/theme-magazine";
-import { modernTheme } from "@byline/theme-modern";
+import { CORE_BYLINE_BLOCK_IDS, defineBylineTheme, sanitizeThemeTokenOverrides } from "@byline/theme-contract";
 import { weeklyWildcatTheme } from "@byline/theme-weekly-wildcat";
-import { parsePublishedBylineDesign } from "@byline/design";
 import { BYLINE_BLOCK_PRESENTATIONS, getBylineBlockPresentation, themeTokensToCssVariables } from "@byline/ui";
-import northStarFixture from "./fixtures/north-star-publication.json";
-import weeklyWildcatFixture from "./fixtures/weekly-wildcat-publication.json";
 
 describe("shared Byline contracts", () => {
   it("normalizes bounded StoryQuery values and rejects unsafe limits", () => {
@@ -52,11 +40,8 @@ describe("shared Byline contracts", () => {
     expect(blocks.map((block) => block.stories.map(({ id }) => id))).toEqual([[1], [2, 3], [1]]);
   });
 
-  it("keeps the stable core block vocabulary across Studio and the Weekly Wildcat theme", () => {
-    const studioBlocks = Object.values(BYLINE_STUDIO_CATEGORIES).flat();
-    expect(new Set(studioBlocks)).toEqual(new Set(CORE_BYLINE_BLOCK_IDS));
+  it("keeps the stable core block vocabulary in the Weekly Wildcat theme", () => {
     expect(new Set(weeklyWildcatTheme.capabilities.supportedBlocks)).toEqual(new Set(CORE_BYLINE_BLOCK_IDS));
-    expect(BYLINE_STUDIO_VIEWPORTS.map(({ width }) => width)).toEqual([360, 768, 1280, "100%"]);
     expect(new Set(Object.keys(BYLINE_BLOCK_PRESENTATIONS))).toEqual(new Set(CORE_BYLINE_BLOCK_IDS));
     expect(getBylineBlockPresentation("photo-feature")?.layout).toBe("feature");
   });
@@ -71,25 +56,7 @@ describe("shared Byline contracts", () => {
     ).toThrow(/duplicate supported blocks/i);
   });
 
-  it("accepts namespaced Level 3 extension packages and rejects cross-vendor blocks", () => {
-    const renderer = () => null;
-    expect(defineBylineExtension({
-      id: "schoolpress/newsroom-tools",
-      version: 1,
-      blocks: [{ id: "schoolpress/weather-card", name: "Weather", version: 1, renderer, defaultProps: {} }]
-    }).blocks?.[0].id).toBe("schoolpress/weather-card");
-    expect(() => defineBylineExtension({
-      id: "schoolpress/newsroom-tools",
-      version: 1,
-      blocks: [{ id: "another/weather-card", name: "Weather", version: 1, renderer, defaultProps: {} }]
-    })).toThrow(/vendor namespace/i);
-  });
-
-  it("ships distinct first-party themes and refuses CSS injection in token overrides", () => {
-    expect([editorialTheme.id, magazineTheme.id, modernTheme.id, weeklyWildcatTheme.id]).toEqual([
-      "byline-editorial", "byline-magazine", "byline-modern", "weekly-wildcat"
-    ]);
-    expect("stylesheets" in editorialTheme).toBe(false);
+  it("keeps the Weekly Wildcat fonts and refuses CSS injection in token overrides", () => {
     expect(weeklyWildcatTheme.stylesheets).toEqual([
       "https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@75..100,400..900&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&display=swap",
       "https://api.fontshare.com/v2/css?f[]=erode@400,500,600,700,401,501,601&display=swap"
@@ -99,24 +66,8 @@ describe("shared Byline contracts", () => {
       background: "url(https://tracker.example/pixel)",
       fontBody: "Arial; background: red"
     })).toEqual({ accent: "#008b95" });
-    expect(themeTokensToCssVariables(modernTheme.tokens)["--accent"]).toBe("#008b95");
+    expect(themeTokensToCssVariables(weeklyWildcatTheme.tokens)["--accent"]).toBe(weeklyWildcatTheme.tokens.accent);
   });
 
-  it("normalizes a second publication without leaking Weekly Wildcat identity or disabled modules", () => {
-    const publication = normalizePublicationConfig(
-      northStarFixture,
-      weeklyWildcatFixture as BylinePublicationConfig
-    );
-    expect(publication.identity.name).toBe("North Star News");
-    expect(publication.appearance.tokenOverrides.accent).toBe("#008b95");
-    expect(getPublicationNavigation(publication, "header").map(({ label }) => label)).toEqual(["Campus", "Ideas"]);
-    expect(JSON.stringify(publication)).not.toContain("Weekly Wildcat");
-  });
 
-  it("fails clearly on incompatible published design schemas", () => {
-    expect(() => parsePublishedBylineDesign({
-      revision: 4,
-      document: { schemaVersion: 99, template: "home", theme: "weekly-wildcat", editor: { engine: "puck", version: "0.23.0" }, layout: { root: {}, content: [] } }
-    }, "home")).toThrow(/unsupported schema 99/i);
-  });
 });

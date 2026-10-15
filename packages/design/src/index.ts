@@ -9,6 +9,4 @@ export * from "./sports-package";
 export * from "./more-package";
 export * from "./newsletter-package";
 export * from "./pins";
-export * from "./migrate";
-export * from "./published";
 export * from "./home-design";

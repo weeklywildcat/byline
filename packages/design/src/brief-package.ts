@@ -19,13 +19,6 @@ export const WEEKLY_WILDCAT_BRIEF_DEFAULTS: BriefPackageProps = {
   presentation: { showAuthor: true, showDeck: true }
 };
 
-export const NEUTRAL_BRIEF_DEFAULTS: BriefPackageProps = {
-  heading: "Latest stories",
-  source: { type: "latest" },
-  limit: 4,
-  presentation: { showAuthor: true, showDeck: true }
-};
-
 const MAX_STORIES = 50;
 
 function boundedCount(value: unknown, fallback: number) {

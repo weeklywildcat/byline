@@ -667,9 +667,9 @@ function byline_get_weekly_page_migration_report(): array
 function byline_register_page_rest_fields(): void
 {
     register_rest_field('page', 'bylinePage', [
-        'get_callback' => static fn(array $object): array => [
+        'get_callback' => static fn(array $object): array => array_merge([
             'eyebrow' => sanitize_text_field((string) get_post_meta((int) $object['id'], BYLINE_PAGE_EYEBROW_META, true)),
-        ],
+        ], function_exists('byline_sports_archive_page_metadata') ? byline_sports_archive_page_metadata((int) $object['id']) : []),
         'schema' => [
             'description' => 'Byline presentation metadata for a WordPress Page.',
             'type' => 'object',

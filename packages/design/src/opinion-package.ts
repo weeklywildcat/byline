@@ -27,15 +27,6 @@ export const WEEKLY_WILDCAT_OPINION_DEFAULTS: OpinionPackageProps = {
   presentation: { showAuthor: true, showDeck: true }
 };
 
-export const NEUTRAL_OPINION_DEFAULTS: OpinionPackageProps = {
-  heading: "Opinion",
-  description: "Perspectives, columns, and commentary from {publication.shortName} writers.",
-  source: { type: "section", slug: "opinion" },
-  limit: 3,
-  archiveLink: { enabled: true, href: "/category/opinion/", label: "View all opinion →" },
-  presentation: { showAuthor: true, showDeck: true }
-};
-
 const MAX_STORIES = 50;
 
 function boundedCount(value: unknown, fallback: number) {

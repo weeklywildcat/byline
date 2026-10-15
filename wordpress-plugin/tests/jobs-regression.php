@@ -335,9 +335,6 @@ jobs_test_assert($cron_health['overdueCount'] === 1 && $cron_health['catchUpReco
 $revision = byline_bump_public_content_revision();
 jobs_test_assert($revision === 5 && byline_public_content_revision() === 5, 'Public build revisions should advance monotonically in the existing option.');
 
-$legacy = byline_job_from_design_schedule(901);
-jobs_test_assert(is_array($legacy) && $legacy['jobId'] === 'byline:design-schedule:901' && $legacy['status'] === BYLINE_JOB_STATUS_RUNNING && $legacy['attempts'] === 2, 'The design scheduler should be exposed through a read-only durable-job adapter.');
-jobs_test_assert(!isset($legacy['document']) && $legacy['legacyStorage'] === 'byline_design_schedule', 'The design adapter must not copy the immutable document or rewrite legacy storage.');
 
 byline_register_job_routes();
 jobs_test_assert(isset($job_test_routes['byline/v1/admin/jobs']) && $job_test_routes['byline/v1/admin/jobs']['permission_callback']() === false, 'Job REST routes must be capability protected.');

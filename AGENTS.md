@@ -4,11 +4,12 @@ Guidance for future work in the canonical Byline monorepo.
 
 ## Architecture
 
-- `apps/web/` is a statically exported Next.js public site.
-- `wordpress-plugin/` is the WordPress control plane and authenticated Studio.
+- `apps/web/` is the static Astro public site; the legacy Next.js export
+  configuration remains a compatibility guard.
+- `wordpress-plugin/` is the WordPress control plane and authenticated newsroom tools.
 - `apps/discord-bot/` is an optional, separately deployed service.
-- `packages/` is the canonical source for shared contracts, themes, and UI
-  presentation metadata used by both Studio and the frontend.
+- `packages/` is the canonical source for shared contracts, the Weekly Wildcat theme, and UI
+  presentation metadata.
 - `schemas/`, `docs/`, and `scripts/` are repository-wide.
 
 Do not recreate the former two-repository architecture or add divergent copies
@@ -20,7 +21,12 @@ historical/update compatibility infrastructure only.
 
 - Keep `apps/web/next.config.ts` on `output: "export"`. Do not add SSR, server
   actions, frontend auth/database, image optimization, or a runtime Next server.
-- Studio must function from WordPress admin without loading the public site.
+- WordPress admin tools must work without loading the public site.
+- Sports records are a fixed archive in native Pages. Do not reintroduce custom
+  games, teams, roster editors, imports, or live sports schedules. Preserve legacy
+  source records and public read aliases; see `docs/sports-archive.md`.
+- Keep the homepage composition in code and use only the Weekly Wildcat theme.
+  Do not reintroduce a layout designer, design publishing, or generic themes.
 - Keep the installed plugin folder `weekly-wildcat-headless`, main file
   `weekly-wildcat-headless.php`, updater slug `weekly-wildcat-headless`, and
   release asset `weekly-wildcat-headless.zip`.
@@ -44,7 +50,6 @@ npm ci
 npm run typecheck
 npm test
 npm run build
-npm run test:frontend:second-publication
 npm run package:plugin
 node scripts/verify-updater-transition.mjs
 ```
@@ -56,7 +61,7 @@ The plugin packaging command must pass before any plugin tag is pushed.
 ## Change discipline
 
 - Keep pure moves separate from functional changes when reorganizing paths.
-- Update shared packages when behavior belongs to both Studio and production.
+- Update shared packages for shared content and presentation behavior.
 - Add regression coverage for storage, REST, updater, privacy, or static-export
   compatibility changes.
 - Do not force-push `main`, rewrite imported history/tags, or flatten plugin

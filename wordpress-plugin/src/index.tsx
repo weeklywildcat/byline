@@ -10,10 +10,8 @@ import {
   TextControl,
   ToggleControl
 } from "@wordpress/components";
-import { Component, createRoot, lazy, Suspense, useEffect, useState } from "@wordpress/element";
-// The publication stylesheet is also the stable stylesheet URL used by the
-// Studio preview iframe. Keep this small shared surface in the admin entry;
-// the much heavier Puck editor CSS remains lazy with Studio.
+import { Component, createRoot, useEffect, useState } from "@wordpress/element";
+// Scoped publication styles used by shared admin presentation components.
 import "@byline/theme-weekly-wildcat/styles.css";
 import {
   ADMIN_PAGE_SLUGS,
@@ -24,10 +22,8 @@ import {
   legacyHashDestination,
   normalizeAdminPage,
   normalizeAdminRoute,
-  normalizeAdminTab,
-  normalizeStudioView
+  normalizeAdminTab
 } from "./admin-routing";
-import { contrastRatio } from "./contrast";
 import { createNavigationItem, moveItem, navigationConflictKey, sectionSlugForName } from "./settings-model";
 import { PlanningApp, createPlanningFetchers, type PlanningView } from "./planning";
 import { NewsletterApp, createNewsletterFetchers } from "./newsletters";
@@ -37,15 +33,6 @@ import type { ReactNode } from "react";
 import { HomeApp, createHomeFetchers, storiesViewFromRoute } from "./home";
 import { DoctorApp, type DoctorActionId, type DoctorActionResponse, type DoctorDiagnostics } from "./doctor";
 import "./style.css";
-
-// Studio pulls in Puck and the preview themes, so keep that sizeable editor
-// out of the common admin entrypoint. The shared promise makes the edit and
-// revisions views reuse one chunk if an editor navigates between them.
-type StudioModule = typeof import("./studio");
-let studioModulePromise: Promise<StudioModule> | null = null;
-const loadStudioModule = () => studioModulePromise || (studioModulePromise = import("./studio"));
-const BylineDesignRevisions = lazy(() => loadStudioModule().then(({ BylineDesignRevisions }) => ({ default: BylineDesignRevisions })));
-const BylineStudio = lazy(() => loadStudioModule().then(({ BylineStudio }) => ({ default: BylineStudio })));
 
 type BylineAdminConfig = {
   page: string;
@@ -59,7 +46,6 @@ type BylineAdminConfig = {
   discordPath: string;
   nonce: string;
   pluginVersion: string;
-  previewStylesheetUrl: string;
   planningPath?: string;
   tasksPath?: string;
   readinessPath?: string;
@@ -73,8 +59,6 @@ type BylineAdminConfig = {
   currentUserId?: number;
   capabilities: {
     manage: boolean;
-    editDesign: boolean;
-    publishDesign: boolean;
     manageIntegrations: boolean;
     editPosts?: boolean;
     editOthersPosts?: boolean;
@@ -144,8 +128,6 @@ type AdminUrls = {
     contentHealth: string;
     feedback: string;
   };
-  studio: string;
-  studioRevisions: string;
   theme: string;
   publication: Record<(typeof PUBLICATION_TABS)[number], string>;
   integrations: Record<(typeof INTEGRATION_TABS)[number], string>;
@@ -615,146 +597,7 @@ function PublicationSettings({
 
   let fields;
 
-  if (route === "/design/theme") {
-    const colorTokens = [
-      ["accent", "Accent"],
-      ["link", "Links"],
-      ["background", "Page background"],
-      ["surface", "Surface"],
-      ["text", "Text"]
-    ] as const;
-    const themeDefaults: Record<string, { background: string; text: string; accent: string }> = {
-      "byline-editorial": { background: "#f8f5ef", text: "#191714", accent: "#9a2725" },
-      "byline-magazine": { background: "#f4f1ec", text: "#171717", accent: "#d94b32" },
-      "byline-modern": { background: "#f7f9fa", text: "#14212b", accent: "#008b95" },
-      "weekly-wildcat": { background: "#fbfaf7", text: "#151515", accent: "#b11f24" }
-    };
-    const defaults = themeDefaults[draft.appearance.theme] || themeDefaults["byline-modern"];
-    const background = draft.appearance.tokenOverrides.background || defaults.background;
-    const textColor = draft.appearance.tokenOverrides.text || defaults.text;
-    const accent = draft.appearance.tokenOverrides.accent || defaults.accent;
-    const textContrast = contrastRatio(textColor, background);
-    const accentContrast = contrastRatio(accent, background);
-    const fontPairings: Record<string, Record<string, string>> = {
-      editorial: {
-        fontDisplay: "Georgia, 'Times New Roman', serif",
-        fontHeadline: "Georgia, 'Times New Roman', serif",
-        fontBody: "Georgia, 'Times New Roman', serif",
-        fontUI: "Arial, Helvetica, sans-serif",
-        fontEditorial: "Georgia, 'Times New Roman', serif"
-      },
-      modern: {
-        fontDisplay: "Arial, Helvetica, sans-serif",
-        fontHeadline: "Arial, Helvetica, sans-serif",
-        fontBody: "Arial, Helvetica, sans-serif",
-        fontUI: "Arial, Helvetica, sans-serif",
-        fontEditorial: "Georgia, 'Times New Roman', serif"
-      },
-      contrast: {
-        fontDisplay: "Arial Black, Arial, Helvetica, sans-serif",
-        fontHeadline: "Arial, Helvetica, sans-serif",
-        fontBody: "Georgia, 'Times New Roman', serif",
-        fontUI: "Arial, Helvetica, sans-serif",
-        fontEditorial: "Georgia, 'Times New Roman', serif"
-      }
-    };
-    const fontPairing = (Object.entries(fontPairings).find(([, tokens]) =>
-      Object.entries(tokens).every(([key, value]) => draft.appearance.tokenOverrides[key] === value)
-    )?.[0] || "theme") as "theme" | "editorial" | "modern" | "contrast";
-    fields = (
-      <>
-        <Notice status="info" isDismissible={false}>
-          Theme changes keep existing layouts and take effect on the next static build. All current first-party themes support the core Byline blocks.
-        </Notice>
-        {textContrast !== null && textContrast < 4.5 ? (
-          <Notice status="warning" isDismissible={false}>Body text contrast is {textContrast.toFixed(2)}:1. Aim for at least 4.5:1.</Notice>
-        ) : null}
-        {accentContrast !== null && accentContrast < 3 ? (
-          <Notice status="warning" isDismissible={false}>Accent contrast is {accentContrast.toFixed(2)}:1. Some links and controls may be difficult to see.</Notice>
-        ) : null}
-        <SelectControl
-          label="Theme"
-          help={fieldHelp(validationErrors["appearance.theme"])}
-          value={draft.appearance.theme as "byline-editorial" | "byline-magazine" | "byline-modern" | "weekly-wildcat"}
-          options={(config?.themeIds || Object.keys(themeDefaults)).map((theme) => ({
-            label: theme.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ").replace(/^Byline /, ""),
-            value: theme
-          }))}
-          onChange={(theme) => setDraft({ ...draft, appearance: { ...draft.appearance, theme } })}
-        />
-        <div className="byline-settings-grid">
-          <SelectControl
-            label="Font pairing"
-            value={fontPairing}
-            options={[
-              { label: "Theme default", value: "theme" },
-              { label: "Editorial serif", value: "editorial" },
-              { label: "Modern sans", value: "modern" },
-              { label: "Display and serif contrast", value: "contrast" }
-            ]}
-            onChange={(pairing) => {
-              const tokenOverrides = { ...draft.appearance.tokenOverrides };
-              for (const key of ["fontDisplay", "fontHeadline", "fontBody", "fontUI", "fontEditorial"]) delete tokenOverrides[key];
-              if (pairing !== "theme") Object.assign(tokenOverrides, fontPairings[pairing]);
-              setDraft({ ...draft, appearance: { ...draft.appearance, tokenOverrides } });
-            }}
-          />
-          <SelectControl
-            label="Layout density"
-            value={(draft.appearance.tokenOverrides.density || "theme") as "theme" | "compact" | "comfortable" | "spacious"}
-            options={[
-              { label: "Theme default", value: "theme" },
-              { label: "Compact", value: "compact" },
-              { label: "Comfortable", value: "comfortable" },
-              { label: "Spacious", value: "spacious" }
-            ]}
-            onChange={(density) => {
-              const tokenOverrides = { ...draft.appearance.tokenOverrides };
-              if (density === "theme") delete tokenOverrides.density;
-              else tokenOverrides.density = density;
-              setDraft({ ...draft, appearance: { ...draft.appearance, tokenOverrides } });
-            }}
-          />
-        </div>
-        <h3>Appearance colors</h3>
-        <p>Choose a color or enter an exact six-digit hex value. Leave a field empty to use the theme default.</p>
-        <div className="byline-settings-grid">
-          {colorTokens.map(([key, label]) => {
-            const value = draft.appearance.tokenOverrides[key] || "";
-            const fallback = key === "accent" ? defaults.accent : key === "text" ? defaults.text : defaults.background;
-            const pickerValue = /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
-            const updateColor = (nextValue: string) => {
-              const tokenOverrides = { ...draft.appearance.tokenOverrides };
-              if (nextValue) tokenOverrides[key] = nextValue;
-              else delete tokenOverrides[key];
-              setDraft({ ...draft, appearance: { ...draft.appearance, tokenOverrides } });
-            };
-            return (
-              <div className="byline-color-control" key={key}>
-                <label>
-                  <span>{label}</span>
-                  <input
-                    type="color"
-                    aria-label={`${label} color picker`}
-                    value={pickerValue}
-                    onChange={(event) => updateColor(event.target.value)}
-                  />
-                </label>
-                <TextControl
-                  label={`${label} hex`}
-                  help={fieldHelp(validationErrors[`appearance.tokenOverrides.${key}`])}
-                  value={value}
-                  placeholder="#000000"
-                  onChange={updateColor}
-                />
-                {value ? <Button variant="link" onClick={() => updateColor("")}>Use theme default</Button> : null}
-              </div>
-            );
-          })}
-        </div>
-      </>
-    );
-  } else if (route === "/publication/identity") {
+  if (route === "/publication/identity") {
     const identityFields: Array<[keyof PublicationConfig["identity"], string]> = [
       ["name", "Publication name"],
       ["shortName", "Short name"],
@@ -1044,7 +887,7 @@ function PublicationSettings({
     );
   } else if (route === "/publication/features") {
     const featureDescriptions: Record<string, string> = {
-      sports: "Show sports schedules, scores, rosters, and sports navigation.",
+      sports: "Show sports reporting and sports navigation. Historical records are preserved in archive Pages.",
       polls: "Enable newsroom polls and their public voting surfaces.",
       events: "Show the publication events calendar and event blocks.",
       newsletter: "Enable newsletter signup blocks and navigation links."
@@ -1193,7 +1036,7 @@ function DeploymentSettings() {
       <CardBody className="byline-settings-card">
         {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
         {message ? <Notice status="success" isDismissible={false}>{message}</Notice> : null}
-        <p>Byline sends an HTTPS POST after content or design changes. It works with Cloudflare, Netlify, Vercel, GitHub Actions, and any compatible build hook.</p>
+        <p>Byline sends an HTTPS POST after content changes. It works with Cloudflare, Netlify, Vercel, GitHub Actions, and any compatible build hook.</p>
         {status ? (
           <dl className="byline-diagnostics-list">
             <div><dt>Provider</dt><dd>{status.providerLabel}</dd></div>
@@ -1565,7 +1408,7 @@ function OperationalInfo({ route, protocol }: { route: string; protocol: Protoco
   const content: Record<string, { title: string; body: string; legacy?: boolean }> = {
     "/advanced/access": {
       title: "Capability-based access",
-      body: `Manage publication: ${config?.capabilities.manage ? "allowed" : "not allowed"}; edit designs: ${config?.capabilities.editDesign ? "allowed" : "not allowed"}; publish designs: ${config?.capabilities.publishDesign ? "allowed" : "not allowed"}; manage integrations: ${config?.capabilities.manageIntegrations ? "allowed" : "not allowed"}.`
+      body: `Manage publication: ${config?.capabilities.manage ? "allowed" : "not allowed"}; manage integrations: ${config?.capabilities.manageIntegrations ? "allowed" : "not allowed"}.`
     },
     "/advanced/api": {
       title: "Versioned API",
@@ -1745,13 +1588,6 @@ function Screen({
     );
   }
 
-  if (page === ADMIN_PAGE_SLUGS.theme) {
-    return (
-      <AdminPageFrame title="Theme" error={error}>
-        <PublicationSettings route="/design/theme" publication={publication} onSaved={onPublicationSaved} />
-      </AdminPageFrame>
-    );
-  }
 
   if (page === ADMIN_PAGE_SLUGS.integrations) {
     const availableTabs = integrationTabs();
@@ -1792,70 +1628,13 @@ function Screen({
               deployment: adminUrl(config?.urls.integrations?.deployment),
               publication: adminUrl(config?.urls.publication?.identity),
               branding: adminUrl(config?.urls.publication?.branding),
-              theme: adminUrl(config?.urls.theme),
-              studio: adminUrl(config?.urls.studio),
+              theme: adminUrl(config?.urls.publication?.branding),
               doctor: adminUrl(config?.urls.settings?.diagnostics)
             }}
             canManageIntegrations={Boolean(config?.capabilities.manageIntegrations)}
           />
         ) : <OperationalInfo route={route} protocol={protocol} />}
       </AdminPageFrame>
-    );
-  }
-
-  if (page === ADMIN_PAGE_SLUGS.studio) {
-    const activeView = normalizeStudioView(view);
-    const studioTabs: AdminTab[] = [
-      { id: "editor", label: "Edit", href: adminUrl(config?.urls.studio) },
-      { id: "revisions", label: "Revisions", href: adminUrl(config?.urls.studioRevisions) }
-    ];
-
-    if (activeView === "revisions") {
-      return (
-        <AdminPageFrame title="Studio" tabs={studioTabs} activeTab={activeView} error={error}>
-          <Suspense fallback={<LoadingState label="Loading Studio…" />}>
-            <BylineDesignRevisions
-              canEdit={Boolean(config?.capabilities.editDesign)}
-              backUrl={adminUrl(config?.urls.dashboard)}
-              studioUrl={adminUrl(config?.urls.studio)}
-            />
-          </Suspense>
-        </AdminPageFrame>
-      );
-    }
-
-    // The editor is deliberately not wrapped in the admin page frame. A visual
-    // page builder needs the whole viewport, and the frame's heading, tab bar
-    // and wp-admin padding are exactly what was squeezing the canvas into a
-    // narrow column. Studio provides its own toolbar and its own way out.
-    return (
-      <Suspense fallback={<LoadingState label="Loading Studio…" />}>
-        <BylineStudio
-          canEdit={Boolean(config?.capabilities.editDesign)}
-          canPublish={Boolean(config?.capabilities.publishDesign)}
-          publicationTheme={publication?.appearance.theme || "weekly-wildcat"}
-          previewStylesheetUrl={config?.previewStylesheetUrl || ""}
-          tokenOverrides={publication?.appearance.tokenOverrides || {}}
-          backUrl={adminUrl(config?.urls.dashboard)}
-          features={{
-            polls: publication?.features.polls !== false,
-            events: publication?.features.events !== false,
-            sports: publication?.features.sports !== false,
-            newsletter: publication?.features.newsletter !== false
-          }}
-          publicationShortName={publication?.identity.shortName || "Newsroom"}
-          publicationName={publication?.identity.name}
-          organizationName={publication?.identity.organizationName}
-          contactHref={publication?.urls.contact}
-          social={publication?.social}
-          calendarHeading={
-            publication?.appearance.theme === "weekly-wildcat"
-              ? "At NSHS"
-              : `At ${publication?.identity.organizationName || publication?.identity.shortName || "school"}`
-          }
-          publicSiteUrl={publication?.urls.publicSite}
-        />
-      </Suspense>
     );
   }
 
@@ -1873,7 +1652,7 @@ function Screen({
 function BylineAdminApp() {
   const page = normalizeAdminPage(config?.page);
   const tab = normalizeAdminTab(page, config?.tab);
-  const view = normalizeStudioView(config?.view);
+  const view = config?.view || "";
   const [protocol, setProtocol] = useState<ProtocolManifest | null>(null);
   const [publication, setPublication] = useState<PublicationConfig | null>(null);
   const [loading, setLoading] = useState(true);

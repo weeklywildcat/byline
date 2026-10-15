@@ -2,7 +2,6 @@ import { mirrorWordPressMediaInValue } from "@/lib/media";
 import { getNamespaceApiUrl, getWordPressApiUrl } from "@/lib/byline-rest";
 import { stripHtml } from "@/lib/format";
 import { getPublicationConfig } from "@/lib/publication";
-import northStarContent from "@/tests/fixtures/north-star-content.json";
 import weeklyWildcatContent from "@/tests/fixtures/weekly-wildcat-content.json";
 
 const DEFAULT_SITE_URL = "https://weeklywildcat.com";
@@ -36,9 +35,7 @@ function memoizedBuildData<T>(key: string, load: () => Promise<T>): Promise<T> {
 type QueryValue = string | number | boolean | undefined | null;
 
 function fixtureData<T>(path: string, query: Record<string, QueryValue>): T {
-  const fixture = process.env.BYLINE_CONTENT_MODE === "weekly-wildcat-fixture"
-    ? weeklyWildcatContent
-    : northStarContent;
+  const fixture = weeklyWildcatContent;
   const fixtureRecord = fixture as unknown as Record<string, unknown>;
   if (path === "/posts") {
     let posts = [...fixture.posts];
@@ -155,6 +152,7 @@ export type WordPressPage = {
   content: RenderedText;
   bylinePage?: {
     eyebrow?: string;
+    sportsArchive?: { key: string; routes: Record<string, string> };
   };
 };
 

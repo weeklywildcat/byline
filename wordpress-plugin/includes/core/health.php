@@ -164,7 +164,6 @@ function byline_health_route_check(): array
     $expected = [
         '/byline/v1/capabilities/protocol',
         '/byline/v1/publication',
-        '/byline/v1/designs',
         '/byline/v1/admin/diagnostics',
         '/byline/v1/admin/health',
     ];
@@ -208,7 +207,7 @@ function byline_health_route_check(): array
         'REST API',
         BYLINE_HEALTH_STATUS_GOOD,
         'Required REST routes are registered.',
-        'The Byline protocol, publication, design, diagnostics, and health routes are registered with WordPress.',
+        'The Byline protocol, publication, diagnostics, and health routes are registered with WordPress.',
         '',
         'registered_routes=' . count($expected)
     );
@@ -276,8 +275,8 @@ function byline_health_publication_checks(array $publication): array
         'Active theme',
         $theme_ready ? BYLINE_HEALTH_STATUS_GOOD : BYLINE_HEALTH_STATUS_CRITICAL,
         $theme_ready ? 'A supported Byline theme is active.' : 'The active Byline theme is missing or unsupported.',
-        'The selected theme must be available to the frontend and Studio.',
-        byline_health_admin_url('byline-theme'),
+        'The public site uses the fixed Weekly Wildcat theme.',
+        byline_health_admin_url('byline-publication'),
         'theme=' . sanitize_key($theme)
     );
 
@@ -296,83 +295,6 @@ function byline_health_publication_checks(array $publication): array
     return $checks;
 }
 
-function byline_health_homepage_design_check(): array
-{
-    if (!function_exists('byline_get_design_post') || !function_exists('get_post')) {
-        return byline_health_check(
-            'homepage_design',
-            'Homepage design',
-            BYLINE_HEALTH_STATUS_RECOMMENDED,
-            'Homepage design could not be inspected in this request.',
-            'Open Studio to inspect or publish the homepage design.',
-            byline_health_admin_url('byline-studio'),
-            'design_storage_unavailable'
-        );
-    }
-
-    $post = byline_get_design_post('home');
-    if (!$post || !is_object($post) || (string) ($post->post_status ?? '') !== 'publish') {
-        return byline_health_check(
-            'homepage_design',
-            'Homepage design',
-            BYLINE_HEALTH_STATUS_RECOMMENDED,
-            'No homepage design has been published.',
-            'The public site will not have a managed homepage layout until Studio publishes one.',
-            byline_health_admin_url('byline-studio'),
-            'published_home_design=false'
-        );
-    }
-
-    $document = json_decode((string) ($post->post_content ?? ''), true);
-    if (!is_array($document)) {
-        return byline_health_check(
-            'homepage_design',
-            'Homepage design',
-            BYLINE_HEALTH_STATUS_CRITICAL,
-            'The published homepage design is unreadable.',
-            'Studio must repair and republish the homepage design before the public build can safely use it.',
-            byline_health_admin_url('byline-studio'),
-            'published_home_design=json_invalid'
-        );
-    }
-
-    if (function_exists('byline_validate_design_document')) {
-        try {
-            $validation = byline_validate_design_document($document, 'home');
-        } catch (Throwable $exception) {
-            return byline_health_check(
-                'homepage_design',
-                'Homepage design',
-                BYLINE_HEALTH_STATUS_CRITICAL,
-                'The published homepage design could not be validated.',
-                'Studio must repair and republish the homepage design before the public build can safely use it.',
-                byline_health_admin_url('byline-studio'),
-                'published_home_design=validation_exception'
-            );
-        }
-        if ($validation instanceof WP_Error) {
-            return byline_health_check(
-                'homepage_design',
-                'Homepage design',
-                BYLINE_HEALTH_STATUS_CRITICAL,
-                'The published homepage design failed validation.',
-                'Studio must repair and republish the homepage design before the public build can safely use it.',
-                byline_health_admin_url('byline-studio'),
-                'published_home_design=invalid;code=' . sanitize_key($validation->get_error_code())
-            );
-        }
-    }
-
-    return byline_health_check(
-        'homepage_design',
-        'Homepage design',
-        BYLINE_HEALTH_STATUS_GOOD,
-        'A readable homepage design is published.',
-        'The published homepage document passed Byline storage validation.',
-        '',
-        'published_home_design=true;schema=' . (int) ($document['schemaVersion'] ?? 0)
-    );
-}
 
 function byline_health_capabilities_check(): array
 {
@@ -445,49 +367,17 @@ function byline_health_optional_module_checks(array $features): array
         );
     }
 
-    if (!empty($features['sports'])) {
-        $games_ready = function_exists('post_type_exists')
-            ? post_type_exists(WWH_SPORTS_GAME_POST_TYPE) && post_type_exists(WWH_SPORTS_ROSTER_POST_TYPE)
-            : true;
-        $teams_configured = get_option(BYLINE_SPORTS_TEAMS_OPTION, null) !== null;
+    if (defined('BYLINE_SPORTS_ARCHIVE_VERSION_OPTION')) {
+        $converted = (int) get_option(BYLINE_SPORTS_ARCHIVE_VERSION_OPTION, 0) >= BYLINE_SPORTS_ARCHIVE_VERSION;
         $checks[] = byline_health_check(
-            'sports',
-            'Sports module',
-            !$games_ready ? BYLINE_HEALTH_STATUS_CRITICAL : ($teams_configured ? BYLINE_HEALTH_STATUS_GOOD : BYLINE_HEALTH_STATUS_RECOMMENDED),
-            !$games_ready ? 'Sports content types are not registered.' : ($teams_configured ? 'Sports content is ready.' : 'Sports teams have not been configured.'),
-            'Games, teams, and rosters use the existing WordPress content model and stable team keys.',
-            byline_health_admin_url('byline-publication', ['tab' => 'navigation']),
-            'post_types=' . ($games_ready ? 'ready' : 'missing') . ';teams=' . ($teams_configured ? 'present' : 'missing')
+            'sports_archive',
+            'Sports archive',
+            $converted ? BYLINE_HEALTH_STATUS_GOOD : BYLINE_HEALTH_STATUS_RECOMMENDED,
+            $converted ? 'Historical sports records have been converted to Pages.' : 'Sports archive conversion is pending or needs a retry.',
+            'Original game and roster records remain stored. Sports editing has been retired.',
+            admin_url('edit.php?post_type=page&s=Sports+Archive'),
+            'converted=' . ($converted ? 'yes' : 'no')
         );
-
-        if (function_exists('byline_sports_health')) {
-            try {
-                $sports_health = byline_sports_health();
-            } catch (Throwable $exception) {
-                $sports_health = [
-                    'counts' => ['error' => 1, 'recommended' => 0],
-                    'status' => 'attention',
-                ];
-            }
-            $counts = is_array($sports_health['counts'] ?? null) ? $sports_health['counts'] : [];
-            $errors = (int) ($counts['error'] ?? 0);
-            $recommendations = (int) ($counts['recommended'] ?? 0);
-            $integrity_status = $errors > 0
-                ? BYLINE_HEALTH_STATUS_CRITICAL
-                : ($recommendations > 0 ? BYLINE_HEALTH_STATUS_RECOMMENDED : BYLINE_HEALTH_STATUS_GOOD);
-            $integrity_url = function_exists('wwh_sports_overview_page_url')
-                ? wwh_sports_overview_page_url()
-                : byline_health_admin_url('byline-settings', ['tab' => 'diagnostics']);
-            $checks[] = byline_health_check(
-                'sports_integrity',
-                'Sports integrity',
-                $integrity_status,
-                $errors > 0 ? 'Sports relationships need repair.' : ($recommendations > 0 ? 'Sports data has recommendations.' : 'Sports relationships are healthy.'),
-                'Team references, school-year values, published roster uniqueness, linked game stories, and current-season readiness are checked together.',
-                $integrity_url,
-                'current_season=' . sanitize_key((string) ($sports_health['currentSeason'] ?? '')) . ';errors=' . $errors . ';recommended=' . $recommendations
-            );
-        }
     }
 
     if (!empty($features['events'])) {
@@ -723,7 +613,6 @@ function byline_get_health_checks(): array
 
     $publication = function_exists('byline_get_publication_config') ? byline_get_publication_config() : [];
     $checks = array_merge($checks, byline_health_publication_checks($publication));
-    $checks[] = byline_health_homepage_design_check();
     $checks[] = byline_health_route_check();
     $legacy_page_check = byline_health_legacy_page_check();
     if ($legacy_page_check !== null) {

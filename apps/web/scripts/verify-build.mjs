@@ -71,7 +71,7 @@ if (searchIndex?.schemaVersion !== 1 || !Array.isArray(searchIndex.items)) {
   throw new Error("Search index verification failed: expected schemaVersion 1 and an items array.");
 }
 
-const searchItemKinds = new Set(["story", "team", "season", "game"]);
+const searchItemKinds = new Set(["story", "archive", "team", "season", "game"]);
 for (const [index, item] of searchIndex.items.entries()) {
   if (!item || typeof item !== "object" || Array.isArray(item)) {
     throw new Error(`Search index verification failed: item ${index} is not an object.`);
@@ -136,7 +136,18 @@ for (const file of files.filter((candidate) => candidate.endsWith(".html"))) {
   const title = source.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? "";
   const canonical = link(source, "canonical");
   const description = attr(source, "description");
-  if (expectedByPath.get(route)?.kind !== "not-found" && (!title || !canonical || !description)) {
+  const expected = expectedByPath.get(route);
+  if (expected?.kind === "redirect") {
+    const target = expected.redirectTo;
+    if (typeof target !== "string" || !/^\/(?!\/)[a-z0-9/#-]+$/i.test(target) || canonical !== target
+      || !source.includes(`content="0;url=${target}"`) || attr(source, "robots") !== "noindex"
+      || !(await exists(path.join(outputRoot, target.split("#")[0], "index.html")))) {
+      throw new Error(`Invalid static redirect from ${route} to ${String(target)}`);
+    }
+    seo.push({ route, canonical, redirectTo: target });
+    continue;
+  }
+  if (expected?.kind !== "not-found" && (!title || !canonical || !description)) {
     throw new Error(`SEO verification failed for ${route}: title=${Boolean(title)} canonical=${Boolean(canonical)} description=${Boolean(description)}`);
   }
   seo.push({

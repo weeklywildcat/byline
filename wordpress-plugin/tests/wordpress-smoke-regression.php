@@ -366,12 +366,12 @@ function wp_safe_redirect(string $location): void
 require __DIR__ . '/../includes/admin/app.php';
 
 byline_register_admin_app();
-foreach (['byline-studio', 'byline'] as $slug) {
+foreach (['byline-planning', 'byline'] as $slug) {
     if (!isset($byline_smoke_menus[$slug])) {
         byline_smoke_fail("Smoke harness did not register {$slug}.");
     }
 }
-foreach (['byline', 'byline-publication', 'byline-theme', 'byline-integrations', 'byline-settings'] as $slug) {
+foreach (['byline', 'byline-publication', 'byline-integrations', 'byline-settings'] as $slug) {
     if (!isset($byline_smoke_submenus[$slug])) {
         byline_smoke_fail("Smoke harness did not register {$slug}.");
     }
@@ -400,7 +400,7 @@ foreach ([
 
 // Representative native and Byline-owned screens are all safe to resolve.
 $screens = [
-    ['page' => 'byline-studio', 'screen' => ['id' => 'toplevel_page_byline-studio', 'post_type' => null]],
+    ['page' => 'byline-planning', 'screen' => ['id' => 'toplevel_page_byline-planning', 'post_type' => null]],
     ['page' => '', 'screen' => ['id' => 'edit-' . WWH_SPORTS_GAME_POST_TYPE, 'post_type' => WWH_SPORTS_GAME_POST_TYPE]],
     ['page' => '', 'screen' => ['id' => WWH_SPORTS_GAME_POST_TYPE . '_page_wwh-sports-team-settings', 'post_type' => WWH_SPORTS_GAME_POST_TYPE]],
     ['page' => '', 'screen' => ['id' => 'edit-' . WWH_SPORTS_ROSTER_POST_TYPE, 'post_type' => WWH_SPORTS_ROSTER_POST_TYPE]],
@@ -408,7 +408,6 @@ $screens = [
     ['page' => '', 'screen' => ['id' => 'edit-' . WWH_SCHOOL_EVENT_POST_TYPE, 'post_type' => WWH_SCHOOL_EVENT_POST_TYPE]],
     ['page' => 'byline', 'screen' => ['id' => 'byline_page_byline', 'post_type' => null]],
     ['page' => 'byline-publication', 'screen' => ['id' => 'byline_page_byline-publication', 'post_type' => null]],
-    ['page' => 'byline-theme', 'screen' => ['id' => 'byline_page_byline-theme', 'post_type' => null]],
     ['page' => 'byline-settings', 'screen' => ['id' => 'byline_page_byline-settings', 'post_type' => null]],
 ];
 

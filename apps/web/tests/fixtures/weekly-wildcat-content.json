@@ -27,10 +27,92 @@
       "slug": "about",
       "date": "2026-08-01T12:00:00",
       "modified": "2026-08-20T12:00:00",
-      "title": { "rendered": "About" },
-      "excerpt": { "rendered": "About the Weekly Wildcat newsroom." },
-      "content": { "rendered": "<p>Weekly Wildcat is the student newspaper of Ninety Six High School.</p>" },
-      "bylinePage": { "eyebrow": "Weekly Wildcat" }
+      "title": {
+        "rendered": "About"
+      },
+      "excerpt": {
+        "rendered": "About the Weekly Wildcat newsroom."
+      },
+      "content": {
+        "rendered": "<p>Weekly Wildcat is the student newspaper of Ninety Six High School.</p>"
+      },
+      "bylinePage": {
+        "eyebrow": "Weekly Wildcat"
+      }
+    },
+    {
+      "id": 9013,
+      "slug": "sports-archive-football-2",
+      "date": "2026-10-15T12:00:00",
+      "modified": "2026-10-15T12:00:00",
+      "title": {
+        "rendered": "Football Archive"
+      },
+      "excerpt": {
+        "rendered": "Football Archive: historical schedules, results, and rosters."
+      },
+      "content": {
+        "rendered": "<!-- byline-sports-archive:football --><!-- wp:paragraph --><p>Historical records preserved from the sports database. This is a fixed archive, not a live schedule.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><a href=\"#season-2025-26\">2025-26</a></p><!-- /wp:paragraph --><!-- wp:paragraph --><p><a href=\"#season-2024-25\">2024-25</a></p><!-- /wp:paragraph --><!-- wp:heading {\"level\":2,\"anchor\":\"season-2025-26\"} --><h2 class=\"wp-block-heading\" id=\"season-2025-26\">2025-26</h2><!-- /wp:heading --><!-- wp:heading {\"level\":3} --><h3 class=\"wp-block-heading\">Football JV</h3><!-- /wp:heading --><!-- wp:heading {\"level\":4,\"anchor\":\"game-2\"} --><h4 class=\"wp-block-heading\" id=\"game-2\">Date TBA \u2014 Academy</h4><!-- /wp:heading --><!-- wp:paragraph --><p>Canceled \u00b7 Time TBA</p><!-- /wp:paragraph --><!-- wp:paragraph --><p>&lt;script&gt;alert(1)&lt;/script&gt;</p><!-- /wp:paragraph --><!-- wp:heading {\"level\":3} --><h3 class=\"wp-block-heading\">Football Varsity</h3><!-- /wp:heading --><!-- wp:heading {\"level\":4,\"anchor\":\"game-1\"} --><h4 class=\"wp-block-heading\" id=\"game-1\">2025-09-01 \u2014 Academy</h4><!-- /wp:heading --><!-- wp:paragraph --><p>Final \u00b7 19:30:00</p><!-- /wp:paragraph --><!-- wp:paragraph --><p>Wildcats 0 \u2014 Academy 7</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><a href=\"/story-10/\">Record 10</a></p><!-- /wp:paragraph --><!-- wp:heading {\"level\":4,\"anchor\":\"roster-7\"} --><h4 class=\"wp-block-heading\" id=\"roster-7\">Record 7</h4><!-- /wp:heading --><!-- wp:table {\"hasFixedLayout\":false} --><figure class=\"wp-block-table\"><table><thead><tr><th>Number</th><th>Name</th><th>Position</th><th>Grade</th></tr></thead><tbody><tr><td>0</td><td>O&#039;Neil</td><td>QB</td><td>12</td></tr></tbody></table></figure><!-- /wp:table --><!-- wp:table {\"hasFixedLayout\":false} --><figure class=\"wp-block-table\"><table><thead><tr><th>Staff</th><th>Role</th></tr></thead><tbody><tr><td>Coach</td><td>Head coach</td></tr></tbody></table></figure><!-- /wp:table --><!-- wp:heading {\"level\":4,\"anchor\":\"roster-8\"} --><h4 class=\"wp-block-heading\" id=\"roster-8\">Record 8</h4><!-- /wp:heading --><!-- wp:table {\"hasFixedLayout\":false} --><figure class=\"wp-block-table\"><table><thead><tr><th>Number</th><th>Name</th><th>Position</th><th>Grade</th></tr></thead><tbody><tr><td></td><td>Second roster</td><td></td><td></td></tr></tbody></table></figure><!-- /wp:table --><!-- wp:heading {\"level\":2,\"anchor\":\"season-2024-25\"} --><h2 class=\"wp-block-heading\" id=\"season-2024-25\">2024-25</h2><!-- /wp:heading --><!-- wp:heading {\"level\":3} --><h3 class=\"wp-block-heading\">Football Varsity</h3><!-- /wp:heading --><!-- wp:heading {\"level\":4,\"anchor\":\"game-3\"} --><h4 class=\"wp-block-heading\" id=\"game-3\">2025-09-01 \u2014 Academy</h4><!-- /wp:heading --><!-- wp:paragraph --><p>Forfeit \u00b7 19:30:00</p><!-- /wp:paragraph -->"
+      },
+      "bylinePage": {
+        "sportsArchive": {
+          "key": "football",
+          "routes": {
+            "/sports/football-varsity/": "",
+            "/sports/football-varsity/2025-26/": "season-2025-26",
+            "/sports/football-jv/": "",
+            "/sports/football-jv/2025-26/": "season-2025-26",
+            "/sports/football-varsity/2024-25/": "season-2024-25"
+          }
+        }
+      }
+    },
+    {
+      "id": 9014,
+      "slug": "sports-archive-other-sports",
+      "date": "2026-10-15T12:00:00",
+      "modified": "2026-10-15T12:00:00",
+      "title": {
+        "rendered": "Other Sports Archive"
+      },
+      "excerpt": {
+        "rendered": "Other Sports Archive: historical schedules, results, and rosters."
+      },
+      "content": {
+        "rendered": "<!-- byline-sports-archive:other-sports --><!-- wp:paragraph --><p>Historical records preserved from the sports database. This is a fixed archive, not a live schedule.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><a href=\"#season-undated\">Undated records</a></p><!-- /wp:paragraph --><!-- wp:heading {\"level\":2,\"anchor\":\"season-undated\"} --><h2 class=\"wp-block-heading\" id=\"season-undated\">Undated records</h2><!-- /wp:heading --><!-- wp:heading {\"level\":3} --><h3 class=\"wp-block-heading\">orphan-team</h3><!-- /wp:heading --><!-- wp:heading {\"level\":4,\"anchor\":\"roster-9\"} --><h4 class=\"wp-block-heading\" id=\"roster-9\">Record 9</h4><!-- /wp:heading --><!-- wp:table {\"hasFixedLayout\":false} --><figure class=\"wp-block-table\"><table><thead><tr><th>Number</th><th>Name</th><th>Position</th><th>Grade</th></tr></thead><tbody><tr><td></td><td>Orphan player</td><td></td><td></td></tr></tbody></table></figure><!-- /wp:table -->"
+      },
+      "bylinePage": {
+        "sportsArchive": {
+          "key": "other-sports",
+          "routes": {
+            "/sports/orphan-team/": ""
+          }
+        }
+      }
+    },
+    {
+      "id": 9015,
+      "slug": "sports-archive",
+      "date": "2026-10-15T12:00:00",
+      "modified": "2026-10-15T12:00:00",
+      "title": {
+        "rendered": "Sports Archive"
+      },
+      "excerpt": {
+        "rendered": "Historical schedules, results, and rosters organized by sport."
+      },
+      "content": {
+        "rendered": "<!-- byline-sports-archive:index --><!-- wp:paragraph --><p>Historical schedules, results, and rosters, organized by sport and season. These records are a fixed archive; follow current sports reporting for new coverage.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><a href=\"/category/sports/\">Current sports coverage</a></p><!-- /wp:paragraph --><!-- wp:heading {\"level\":2} --><h2 class=\"wp-block-heading\">Football</h2><!-- /wp:heading --><!-- wp:paragraph --><p><a href=\"/sports-archive-football-2/\">View Football records</a></p><!-- /wp:paragraph --><!-- wp:heading {\"level\":2} --><h2 class=\"wp-block-heading\">Other Sports</h2><!-- /wp:heading --><!-- wp:paragraph --><p><a href=\"/sports-archive-other-sports/\">View Other Sports records</a></p><!-- /wp:paragraph -->"
+      },
+      "bylinePage": {
+        "sportsArchive": {
+          "key": "index",
+          "routes": {
+            "/sports/": "",
+            "/sports/schedule/": ""
+          }
+        }
+      }
     }
   ],
   "posts": [
@@ -44,17 +126,47 @@
       "status": "publish",
       "type": "post",
       "link": "https://weeklywildcat.com/2026/08/20/news/weekly-wildcat-fixture-story/",
-      "title": { "rendered": "Weekly Wildcat fixture story" },
-      "content": { "rendered": "<p>A deterministic story used to validate the static Weekly Wildcat build.</p>" },
-      "excerpt": { "rendered": "<p>Static-build acceptance coverage for Weekly Wildcat.</p>" },
+      "title": {
+        "rendered": "Weekly Wildcat fixture story"
+      },
+      "content": {
+        "rendered": "<p>A deterministic story used to validate the static Weekly Wildcat build.</p>"
+      },
+      "excerpt": {
+        "rendered": "<p>Static-build acceptance coverage for Weekly Wildcat.</p>"
+      },
       "author": 1,
       "featured_media": 0,
-      "categories": [2],
+      "categories": [
+        2
+      ],
       "tags": [],
       "sticky": true,
       "_embedded": {
-        "author": [{ "id": 1, "name": "Weekly Wildcat Staff", "slug": "weekly-wildcat-staff", "description": "Student journalists serving the Ninety Six community.", "avatar_urls": {} }],
-        "wp:term": [[{ "id": 2, "count": 6, "description": "Weekly Wildcat campus reporting.", "link": "https://weeklywildcat.com/category/news/", "name": "News", "slug": "news", "taxonomy": "category", "parent": 0 }], []]
+        "author": [
+          {
+            "id": 1,
+            "name": "Weekly Wildcat Staff",
+            "slug": "weekly-wildcat-staff",
+            "description": "Student journalists serving the Ninety Six community.",
+            "avatar_urls": {}
+          }
+        ],
+        "wp:term": [
+          [
+            {
+              "id": 2,
+              "count": 6,
+              "description": "Weekly Wildcat campus reporting.",
+              "link": "https://weeklywildcat.com/category/news/",
+              "name": "News",
+              "slug": "news",
+              "taxonomy": "category",
+              "parent": 0
+            }
+          ],
+          []
+        ]
       }
     },
     {
@@ -67,17 +179,47 @@
       "status": "publish",
       "type": "post",
       "link": "https://weeklywildcat.com/2026/08/19/news/weekly-wildcat-latest-fixture-story/",
-      "title": { "rendered": "Weekly Wildcat latest fixture story" },
-      "content": { "rendered": "<p>A second deterministic story keeps the latest homepage rail and category list populated.</p>" },
-      "excerpt": { "rendered": "<p>A second story for browser acceptance coverage.</p>" },
+      "title": {
+        "rendered": "Weekly Wildcat latest fixture story"
+      },
+      "content": {
+        "rendered": "<p>A second deterministic story keeps the latest homepage rail and category list populated.</p>"
+      },
+      "excerpt": {
+        "rendered": "<p>A second story for browser acceptance coverage.</p>"
+      },
       "author": 1,
       "featured_media": 0,
-      "categories": [2],
+      "categories": [
+        2
+      ],
       "tags": [],
       "sticky": false,
       "_embedded": {
-        "author": [{ "id": 1, "name": "Weekly Wildcat Staff", "slug": "weekly-wildcat-staff", "description": "Student journalists serving the Ninety Six community.", "avatar_urls": {} }],
-        "wp:term": [[{ "id": 2, "count": 6, "description": "Weekly Wildcat campus reporting.", "link": "https://weeklywildcat.com/category/news/", "name": "News", "slug": "news", "taxonomy": "category", "parent": 0 }], []]
+        "author": [
+          {
+            "id": 1,
+            "name": "Weekly Wildcat Staff",
+            "slug": "weekly-wildcat-staff",
+            "description": "Student journalists serving the Ninety Six community.",
+            "avatar_urls": {}
+          }
+        ],
+        "wp:term": [
+          [
+            {
+              "id": 2,
+              "count": 6,
+              "description": "Weekly Wildcat campus reporting.",
+              "link": "https://weeklywildcat.com/category/news/",
+              "name": "News",
+              "slug": "news",
+              "taxonomy": "category",
+              "parent": 0
+            }
+          ],
+          []
+        ]
       }
     },
     {
@@ -90,17 +232,47 @@
       "status": "publish",
       "type": "post",
       "link": "https://weeklywildcat.com/2026/08/18/news/weekly-wildcat-browser-fixture-three/",
-      "title": { "rendered": "Weekly Wildcat browser fixture three" },
-      "content": { "rendered": "<p>A deterministic supporting story for browser acceptance coverage.</p>" },
-      "excerpt": { "rendered": "<p>A supporting browser fixture story.</p>" },
+      "title": {
+        "rendered": "Weekly Wildcat browser fixture three"
+      },
+      "content": {
+        "rendered": "<p>A deterministic supporting story for browser acceptance coverage.</p>"
+      },
+      "excerpt": {
+        "rendered": "<p>A supporting browser fixture story.</p>"
+      },
       "author": 1,
       "featured_media": 0,
-      "categories": [2],
+      "categories": [
+        2
+      ],
       "tags": [],
       "sticky": false,
       "_embedded": {
-        "author": [{ "id": 1, "name": "Weekly Wildcat Staff", "slug": "weekly-wildcat-staff", "description": "Student journalists serving the Ninety Six community.", "avatar_urls": {} }],
-        "wp:term": [[{ "id": 2, "count": 6, "description": "Weekly Wildcat campus reporting.", "link": "https://weeklywildcat.com/category/news/", "name": "News", "slug": "news", "taxonomy": "category", "parent": 0 }], []]
+        "author": [
+          {
+            "id": 1,
+            "name": "Weekly Wildcat Staff",
+            "slug": "weekly-wildcat-staff",
+            "description": "Student journalists serving the Ninety Six community.",
+            "avatar_urls": {}
+          }
+        ],
+        "wp:term": [
+          [
+            {
+              "id": 2,
+              "count": 6,
+              "description": "Weekly Wildcat campus reporting.",
+              "link": "https://weeklywildcat.com/category/news/",
+              "name": "News",
+              "slug": "news",
+              "taxonomy": "category",
+              "parent": 0
+            }
+          ],
+          []
+        ]
       }
     },
     {
@@ -113,17 +285,47 @@
       "status": "publish",
       "type": "post",
       "link": "https://weeklywildcat.com/2026/08/17/news/weekly-wildcat-browser-fixture-four/",
-      "title": { "rendered": "Weekly Wildcat browser fixture four" },
-      "content": { "rendered": "<p>Another deterministic supporting story for browser acceptance coverage.</p>" },
-      "excerpt": { "rendered": "<p>Another supporting browser fixture story.</p>" },
+      "title": {
+        "rendered": "Weekly Wildcat browser fixture four"
+      },
+      "content": {
+        "rendered": "<p>Another deterministic supporting story for browser acceptance coverage.</p>"
+      },
+      "excerpt": {
+        "rendered": "<p>Another supporting browser fixture story.</p>"
+      },
       "author": 1,
       "featured_media": 0,
-      "categories": [2],
+      "categories": [
+        2
+      ],
       "tags": [],
       "sticky": false,
       "_embedded": {
-        "author": [{ "id": 1, "name": "Weekly Wildcat Staff", "slug": "weekly-wildcat-staff", "description": "Student journalists serving the Ninety Six community.", "avatar_urls": {} }],
-        "wp:term": [[{ "id": 2, "count": 6, "description": "Weekly Wildcat campus reporting.", "link": "https://weeklywildcat.com/category/news/", "name": "News", "slug": "news", "taxonomy": "category", "parent": 0 }], []]
+        "author": [
+          {
+            "id": 1,
+            "name": "Weekly Wildcat Staff",
+            "slug": "weekly-wildcat-staff",
+            "description": "Student journalists serving the Ninety Six community.",
+            "avatar_urls": {}
+          }
+        ],
+        "wp:term": [
+          [
+            {
+              "id": 2,
+              "count": 6,
+              "description": "Weekly Wildcat campus reporting.",
+              "link": "https://weeklywildcat.com/category/news/",
+              "name": "News",
+              "slug": "news",
+              "taxonomy": "category",
+              "parent": 0
+            }
+          ],
+          []
+        ]
       }
     },
     {
@@ -136,17 +338,47 @@
       "status": "publish",
       "type": "post",
       "link": "https://weeklywildcat.com/2026/08/16/news/weekly-wildcat-browser-fixture-five/",
-      "title": { "rendered": "Weekly Wildcat browser fixture five" },
-      "content": { "rendered": "<p>A fifth deterministic story keeps the homepage fixture representative.</p>" },
-      "excerpt": { "rendered": "<p>A fifth supporting browser fixture story.</p>" },
+      "title": {
+        "rendered": "Weekly Wildcat browser fixture five"
+      },
+      "content": {
+        "rendered": "<p>A fifth deterministic story keeps the homepage fixture representative.</p>"
+      },
+      "excerpt": {
+        "rendered": "<p>A fifth supporting browser fixture story.</p>"
+      },
       "author": 1,
       "featured_media": 0,
-      "categories": [2],
+      "categories": [
+        2
+      ],
       "tags": [],
       "sticky": false,
       "_embedded": {
-        "author": [{ "id": 1, "name": "Weekly Wildcat Staff", "slug": "weekly-wildcat-staff", "description": "Student journalists serving the Ninety Six community.", "avatar_urls": {} }],
-        "wp:term": [[{ "id": 2, "count": 6, "description": "Weekly Wildcat campus reporting.", "link": "https://weeklywildcat.com/category/news/", "name": "News", "slug": "news", "taxonomy": "category", "parent": 0 }], []]
+        "author": [
+          {
+            "id": 1,
+            "name": "Weekly Wildcat Staff",
+            "slug": "weekly-wildcat-staff",
+            "description": "Student journalists serving the Ninety Six community.",
+            "avatar_urls": {}
+          }
+        ],
+        "wp:term": [
+          [
+            {
+              "id": 2,
+              "count": 6,
+              "description": "Weekly Wildcat campus reporting.",
+              "link": "https://weeklywildcat.com/category/news/",
+              "name": "News",
+              "slug": "news",
+              "taxonomy": "category",
+              "parent": 0
+            }
+          ],
+          []
+        ]
       }
     },
     {
@@ -159,17 +391,47 @@
       "status": "publish",
       "type": "post",
       "link": "https://weeklywildcat.com/2026/08/15/news/weekly-wildcat-browser-fixture-six/",
-      "title": { "rendered": "Weekly Wildcat browser fixture six" },
-      "content": { "rendered": "<p>The final deterministic supporting story completes the homepage rail fixture.</p>" },
-      "excerpt": { "rendered": "<p>The final supporting browser fixture story.</p>" },
+      "title": {
+        "rendered": "Weekly Wildcat browser fixture six"
+      },
+      "content": {
+        "rendered": "<p>The final deterministic supporting story completes the homepage rail fixture.</p>"
+      },
+      "excerpt": {
+        "rendered": "<p>The final supporting browser fixture story.</p>"
+      },
       "author": 1,
       "featured_media": 0,
-      "categories": [2],
+      "categories": [
+        2
+      ],
       "tags": [],
       "sticky": false,
       "_embedded": {
-        "author": [{ "id": 1, "name": "Weekly Wildcat Staff", "slug": "weekly-wildcat-staff", "description": "Student journalists serving the Ninety Six community.", "avatar_urls": {} }],
-        "wp:term": [[{ "id": 2, "count": 6, "description": "Weekly Wildcat campus reporting.", "link": "https://weeklywildcat.com/category/news/", "name": "News", "slug": "news", "taxonomy": "category", "parent": 0 }], []]
+        "author": [
+          {
+            "id": 1,
+            "name": "Weekly Wildcat Staff",
+            "slug": "weekly-wildcat-staff",
+            "description": "Student journalists serving the Ninety Six community.",
+            "avatar_urls": {}
+          }
+        ],
+        "wp:term": [
+          [
+            {
+              "id": 2,
+              "count": 6,
+              "description": "Weekly Wildcat campus reporting.",
+              "link": "https://weeklywildcat.com/category/news/",
+              "name": "News",
+              "slug": "news",
+              "taxonomy": "category",
+              "parent": 0
+            }
+          ],
+          []
+        ]
       }
     }
   ]

@@ -4,7 +4,7 @@ This is the canonical installation and first-deployment guide for Byline.
 Byline has two cooperating parts:
 
 - WordPress is the private control plane. It owns stories, publication
-  settings, designs, jobs, and the deployment revision the public site owes.
+  settings, jobs, and the deployment revision the public site owes.
 - `apps/web/` is a static Next.js export. A provider publishes the contents of
   `apps/web/out/`; it does not run a Next.js server.
 
@@ -80,9 +80,7 @@ Complete at least these fields:
 
 - **Identity:** publication name, short name, and description.
 - **URLs:** public site URL and CMS URL.
-- **Appearance:** one of the installed Byline theme IDs:
-  `byline-editorial`, `byline-magazine`, `byline-modern`, or
-  `weekly-wildcat`.
+The appearance is fixed to `weekly-wildcat`; homepage composition and theme changes are maintained in source code.
 
 For a new publication, a typical configuration is:
 
@@ -138,13 +136,9 @@ Optional build settings are only needed for a specific deployment:
 | `WORDPRESS_MEDIA_MIRROR` | Set to `0` only when the deployment must not mirror WordPress media into the static output. |
 | `NEXT_PUBLIC_SEARCH_GAP_ENDPOINT` | Optional endpoint for the search-gap integration. |
 
-Do not hand-set `BYLINE_PUBLICATION_REVISION` or `BYLINE_DESIGN_REVISIONS` for
-ordinary production builds. The publication and published design endpoints
-provide those values; those variables exist for fixtures and controlled
-replays.
+Do not hand-set `BYLINE_PUBLICATION_REVISION` for ordinary production builds. The publication endpoint supplies it.
 
-Likewise, do not set `BYLINE_PUBLICATION_FILE`, `BYLINE_PUBLICATION_JSON`,
-`BYLINE_DESIGNS_FILE`, or `BYLINE_DESIGNS_JSON` in a live CMS build. Those are
+Likewise, do not set `BYLINE_PUBLICATION_FILE` or `BYLINE_PUBLICATION_JSON` in a live CMS build. Those are
 fixture/override inputs for tests and local replays and can hide a CMS access
 problem or publish stale configuration.
 
@@ -161,12 +155,11 @@ The equivalent workspace command is:
 npm run build --workspace @byline/web
 ```
 
-The build fetches the publication and published designs before running Next.js.
+The build fetches publication settings before running Astro.
 The postbuild checks then write and verify these files:
 
 ```text
 apps/web/out/_byline/publication.json
-apps/web/out/_byline/designs.json
 apps/web/out/_byline/manifest.json
 ```
 
@@ -227,7 +220,7 @@ public build variable, paste it into a public issue, or include it in support
 logs. If it is exposed, revoke it at the provider and save the replacement in
 WordPress.
 
-Byline sends a `POST` after content or design changes, normally after a short
+Byline sends a `POST` after content changes, normally after a short
 coalescing window. The request may include these headers:
 
 ```text
@@ -318,7 +311,7 @@ curl -fsS "$CMS_URL/wp-json/byline/v1/publication" \
   | jq '{revision, urls}'
 
 curl -fsS "$PUBLIC_URL/_byline/manifest.json" \
-  | jq '{protocolVersion, publicationSchemaVersion, frontendVersion, publicationRevision, designRevisions}'
+  | jq '{protocolVersion, publicationSchemaVersion, frontendVersion, publicationRevision}'
 ```
 
 The exact proof for a current install is:

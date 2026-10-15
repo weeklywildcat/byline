@@ -24,14 +24,6 @@ export const WEEKLY_WILDCAT_SPECIAL_COVERAGE_DEFAULTS: SpecialCoveragePackagePro
   supportingPresentation: { showAuthor: true, showDeck: true }
 };
 
-export const NEUTRAL_SPECIAL_COVERAGE_DEFAULTS: SpecialCoveragePackageProps = {
-  heading: "Special coverage",
-  source: { type: "latest" },
-  limit: 3,
-  leadPresentation: { showAuthor: true, showDeck: true },
-  supportingPresentation: { showAuthor: false, showDeck: false }
-};
-
 const MAX_STORIES = 50;
 
 function boundedCount(value: unknown, fallback: number) {

@@ -3,8 +3,6 @@ import type { SitemapEntry } from "@/lib/metadata";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { PUBLIC_SECTIONS } from "@/lib/sections";
 import { absoluteUrl } from "@/lib/seo";
-import { getAllSportsGames, getAllSportsRosters, getSportsTeams } from "@/lib/headless";
-import { buildTeams, getSeasonHref, getTeamHubHref } from "@/lib/sports";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getAllAuthors,
@@ -38,18 +36,9 @@ function getPageSitemapDate(page: { modified?: string; modified_gmt?: string }) 
 
 export default async function sitemap(): Promise<SitemapEntry[]> {
   const publication = getPublicationConfig();
-  const [allPosts, authors, sportsGames, sportsRosters, sportsTeamRecords, wordpressPages, coverages] = await Promise.all([
+  const [allPosts, authors, wordpressPages, coverages] = await Promise.all([
     requireBuildData("/wp-json/wp/v2/posts", getAllPosts),
     requireBuildData("/wp-json/wp/v2/users", getAllAuthors),
-    publication.features.sports
-      ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-games", getAllSportsGames, [])
-      : [],
-    publication.features.sports
-      ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-rosters", getAllSportsRosters, [])
-      : [],
-    publication.features.sports
-      ? optionalBuildData("/wp-json/weekly-wildcat/v1/sports-teams", getSportsTeams, [])
-      : [],
     requireBuildData("/wp-json/wp/v2/pages", getAllPages),
     optionalBuildData("/wp-json/byline/v1/coverage", getAllPublicCoverages, [])
   ]);
@@ -59,7 +48,6 @@ export default async function sitemap(): Promise<SitemapEntry[]> {
     authors
   );
   const posts = filterVisibleContentPosts(allPosts);
-  const sportsTeams = buildTeams(sportsGames, sportsRosters, sportsTeamRecords);
   const latestModifiedPost = posts.reduce<(typeof posts)[number] | undefined>((latestPost, post) => {
     if (!latestPost) {
       return post;
@@ -80,7 +68,7 @@ export default async function sitemap(): Promise<SitemapEntry[]> {
       priority: 1
     },
     ...PUBLIC_SECTIONS.filter((section) => section.slug !== "sports" || publication.features.sports).map((section) => ({
-      url: absoluteUrl(section.href),
+      url: absoluteUrl((section.slug === "sports" ? "/category/sports/" : section.href)),
       lastModified: latestModified,
       changeFrequency: "daily" as const,
       priority: 0.7
@@ -103,12 +91,6 @@ export default async function sitemap(): Promise<SitemapEntry[]> {
       changeFrequency: "weekly" as const,
       priority: 0.5
     },
-    ...(publication.features.sports ? [{
-      url: absoluteUrl("/sports/schedule/"),
-      lastModified: latestModified,
-      changeFrequency: "daily" as const,
-      priority: 0.7
-    }] : []),
     {
       url: absoluteUrl("/media-kit/"),
       lastModified: latestModified,
@@ -148,20 +130,5 @@ export default async function sitemap(): Promise<SitemapEntry[]> {
     priority: 0.6
   }));
 
-  const sportsPages: SitemapEntry[] = sportsTeams.flatMap((team) => [
-    {
-      url: absoluteUrl(getTeamHubHref(team)),
-      lastModified: latestModified,
-      changeFrequency: "daily" as const,
-      priority: 0.7
-    },
-    ...team.seasons.map((year) => ({
-      url: absoluteUrl(getSeasonHref(team, year)),
-      lastModified: latestModified,
-      changeFrequency: year === team.latestSeason ? ("daily" as const) : ("monthly" as const),
-      priority: year === team.latestSeason ? 0.65 : 0.45
-    }))
-  ]);
-
-  return [...applicationPages, ...authoredPages, ...sportsPages, ...articlePages, ...authorPages, ...coveragePages];
+  return [...applicationPages, ...authoredPages, ...articlePages, ...authorPages, ...coveragePages];
 }

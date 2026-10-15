@@ -1,5 +1,7 @@
 # Byline hard-coding inventory
 
+Historical migration notes: the layout designer, design APIs, and generic themes have since been removed. The current site uses the fixed Weekly Wildcat layout; see [architecture](../architecture.md).
+
 Status: Phase 0 baseline, audited against `byline` at `80faf7c` and
 `byline-plugin` at `9f35bb8` on 2026-08-25.
 

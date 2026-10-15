@@ -81,8 +81,6 @@ jobs:
           npm run build:plugin
           npm run build:discord
 
-      - name: Build second-publication acceptance fixture
-        run: npm run test:frontend:second-publication
 
       - name: Verify compatibility and updater transition
         run: npm run verify:contracts

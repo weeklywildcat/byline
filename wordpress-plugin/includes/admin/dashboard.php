@@ -187,12 +187,6 @@ function byline_dashboard_quick_actions(): void
     if (current_user_can('upload_files')) {
         $actions[] = ['url' => admin_url('media-new.php'), 'label' => __('Upload photos', 'weekly-wildcat-headless')];
     }
-    if (function_exists('wwh_can_manage_bulk_sports_data') && wwh_can_manage_bulk_sports_data()) {
-        $actions[] = ['url' => admin_url(byline_sports_menu_parent() . '&page=wwh-sports-import'), 'label' => __('Add game', 'weekly-wildcat-headless')];
-    }
-    if (current_user_can(BYLINE_EDIT_DESIGN_CAPABILITY)) {
-        $actions[] = ['url' => byline_admin_page_url(BYLINE_ADMIN_STUDIO_PAGE), 'label' => __('Open Studio', 'weekly-wildcat-headless')];
-    }
     if ($actions === []) {
         echo '<p class="byline-dashboard-empty">' . esc_html__('No newsroom actions are available for your account.', 'weekly-wildcat-headless') . '</p>';
         return;

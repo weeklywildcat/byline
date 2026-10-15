@@ -98,7 +98,7 @@ export function doctorStatusHeading(status: ReturnType<typeof doctorStatus>): st
 }
 
 export function doctorSetupSteps(diagnostics: DoctorDiagnostics | null): DoctorCheck[] {
-  const preferred = ["publication_identity", "publication_urls", "branding", "theme", "homepage_design"];
+  const preferred = ["publication_identity", "publication_urls", "branding", "theme"];
   const checks = doctorChecks(diagnostics);
   return preferred
     .map((id) => checks.find((check) => check.id === id))

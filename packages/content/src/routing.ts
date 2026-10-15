@@ -1,11 +1,12 @@
 export type RouteKind =
   | "home" | "article" | "page" | "category" | "author" | "coverage"
-  | "sports" | "search" | "feed" | "sitemap" | "robots" | "not-found" | "other";
+  | "redirect" | "sports" | "search" | "feed" | "sitemap" | "robots" | "not-found" | "other";
 
 export type RouteManifestEntry = {
   path: string;
   kind: RouteKind;
   digest?: string;
+  redirectTo?: string;
 };
 
 export function normalizePublicRoute(value: string) {

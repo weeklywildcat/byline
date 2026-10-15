@@ -45,14 +45,6 @@ if (count($weekly) !== 23 || !isset($weekly['girls-soccer']) || $weekly['girls-s
     exit(1);
 }
 
-$updated = byline_replace_sports_teams([
-    ['key' => 'sailing-varsity', 'sport' => 'Sailing', 'displayName' => 'Sailing - Varsity', 'shortName' => 'Sailing', 'level' => 'Varsity', 'slug' => 'sailing'],
-]);
-if (!isset($updated['sailing-varsity']) || ($updated['girls-soccer']['active'] ?? true) !== false) {
-    fwrite(STDERR, "Replacing teams must retain omitted legacy keys as inactive compatibility records.\n");
-    exit(1);
-}
-
 $options = [];
 $legacy_install = false;
 byline_migrate_sports_teams();
@@ -63,13 +55,8 @@ if (byline_get_sports_teams() !== []) {
 
 byline_register_sports_team_routes();
 $route = $routes['byline/v1/sports/teams'] ?? null;
-if (!is_array($route) || count($route) !== 2 || $route[1]['permission_callback']() !== false) {
-    fwrite(STDERR, "Sports-team REST writes must be registered and capability protected.\n");
-    exit(1);
-}
-$can_manage = true;
-if ($route[1]['permission_callback']() !== true) {
-    fwrite(STDERR, "Authorized Byline administrators must be allowed to update sports teams.\n");
+if (!is_array($route) || count($route) !== 1 || $route[0]['methods'] !== WP_REST_Server::READABLE) {
+    fwrite(STDERR, "Historical team REST reads must remain available without any write route.\n");
     exit(1);
 }
 

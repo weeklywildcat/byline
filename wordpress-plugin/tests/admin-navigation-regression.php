@@ -138,7 +138,6 @@ byline_register_admin_app();
 
 $expected_top_level = [
     'byline-planning' => ['title' => 'Planning', 'capability' => 'edit_posts', 'position' => 26],
-    'byline-studio' => ['title' => 'Studio', 'capability' => BYLINE_EDIT_DESIGN_CAPABILITY, 'position' => 27],
     'byline' => ['title' => 'Byline', 'capability' => BYLINE_MANAGE_CAPABILITY, 'position' => 100],
 ];
 foreach ($expected_top_level as $slug => $expected) {
@@ -155,14 +154,6 @@ foreach ($expected_top_level as $slug => $expected) {
     if ($menu[6] !== $expected['position']) {
         fail("Top-level menu {$slug} should sit at position {$expected['position']}.");
     }
-}
-
-// Studio must not be labelled "Byline Studio" in the sidebar.
-if ($registered_menus['byline-studio'][1] === 'Byline Studio') {
-    fail('Studio should read as "Studio" in the sidebar.');
-}
-if ($registered_menus['byline-studio'][0] !== 'Byline Studio') {
-    fail('The Studio screen title should still read "Byline Studio".');
 }
 
 // Planning owns its destinations as native submenu entries, so the sidebar is
@@ -211,7 +202,6 @@ $byline_children = $by_parent['byline'] ?? [];
 $expected_children = [
     'byline' => ['Home', BYLINE_MANAGE_CAPABILITY],
     'byline-publication' => ['Publication', BYLINE_MANAGE_CAPABILITY],
-    'byline-theme' => ['Theme', BYLINE_MANAGE_CAPABILITY],
     'byline-integrations' => ['Integrations', BYLINE_MANAGE_INTEGRATIONS_CAPABILITY],
     'byline-settings' => ['Settings', BYLINE_MANAGE_CAPABILITY],
 ];
@@ -266,8 +256,8 @@ if (count($byline_children) !== count($expected_children) + 1) {
 reset_menu_state();
 $test_features = ['polls' => false, 'sports' => false, 'events' => false];
 byline_register_admin_app();
-if (!isset($registered_menus['byline-studio']) || !isset($registered_menus['byline'])) {
-    fail('Studio and Byline must remain registered regardless of optional features.');
+if (isset($registered_menus['byline-studio']) || !isset($registered_menus['byline'])) {
+    fail('Studio must stay removed and Byline must remain registered.');
 }
 
 // Polls are now the byline_poll post type, whose own registration gates the
@@ -350,34 +340,21 @@ if (strpos($urls['planning']['today'], 'page=byline-planning') === false
     || strpos($urls['integrations']['deployment'], 'page=byline-integrations') === false
     || strpos($urls['integrations']['deployment'], 'tab=deployment') === false
     || strpos($urls['settings']['diagnostics'], 'page=byline-settings') === false
-    || strpos($urls['settings']['diagnostics'], 'tab=diagnostics') === false
-    || strpos($urls['studio'], 'page=byline-studio') === false
-    || strpos($urls['studioRevisions'], 'page=byline-studio') === false
-    || strpos($urls['studioRevisions'], 'view=revisions') === false) {
+    || strpos($urls['settings']['diagnostics'], 'tab=diagnostics') === false) {
     fail('Native Byline page URLs did not preserve deep-linkable tabs/views.');
 }
 
 $native = byline_admin_native_urls();
-if (strpos($native['games'], 'post_type=' . WWH_SPORTS_GAME_POST_TYPE) === false
-    || strpos($native['rosters'], 'post_type=' . WWH_SPORTS_ROSTER_POST_TYPE) === false
+if (isset($native['games']) || isset($native['rosters']) || isset($native['sportsImport']) || isset($native['sportsExport'])
+    || strpos($native['teams'], 'post_type=page') === false
     || strpos($native['events'], 'post_type=' . WWH_SCHOOL_EVENT_POST_TYPE) === false) {
-    fail('Native CPT URLs must not change when their parent menu changes.');
-}
-if (strpos($native['teams'], 'page=wwh-sports-team-settings') === false
-    || strpos($native['teams'], 'post_type=' . WWH_SPORTS_GAME_POST_TYPE) === false) {
-    fail('Teams should resolve to the native Sports team settings screen.');
-}
-if (strpos($native['sportsImport'], 'page=wwh-sports-import') === false
-    || strpos($native['sportsExport'], 'page=wwh-sports-export') === false) {
-    fail('Sports import/export URLs are missing from the admin bridge.');
+    fail('Sports editing destinations must be removed; legacy Teams links should lead to archive Pages.');
 }
 
 $legacy_urls = byline_admin_legacy_hash_urls($urls);
 if (($legacy_urls['/home'] ?? '') !== $urls['planning']['today']
     || ($legacy_urls['/planning/today'] ?? '') !== $urls['planning']['today']
     || $legacy_urls['/publication/branding'] !== $urls['publication']['branding']
-    || $legacy_urls['/design/revisions'] !== $urls['studioRevisions']
-    || $legacy_urls['/design/studio'] !== $urls['studio']
     || $legacy_urls['/content/polls'] !== $urls['polls']
     || $legacy_urls['/content/teams'] !== $urls['teams']
     || $legacy_urls['/advanced/diagnostics'] !== $urls['settings']['diagnostics']) {
@@ -392,8 +369,8 @@ try {
 } catch (RuntimeException $exception) {
     // wp_safe_redirect throws in this harness.
 }
-if (!is_string($redirected_to) || strpos($redirected_to, 'page=wwh-sports-team-settings') === false || strpos($redirected_to, 'page=byline-teams') !== false) {
-    fail('The retired byline-teams URL must redirect to the Sports team screen.');
+if (!is_string($redirected_to) || strpos($redirected_to, 'post_type=page') === false || strpos($redirected_to, 'page=byline-teams') !== false) {
+    fail('The retired byline-teams URL must redirect to native archive Pages.');
 }
 
 $_GET = ['page' => 'byline-publication'];
@@ -438,7 +415,7 @@ foreach ([
 }
 
 // Byline configuration screens highlight Byline plus their own child.
-foreach (['byline', 'byline-publication', 'byline-theme', 'byline-integrations', 'byline-settings'] as $config_page) {
+foreach (['byline', 'byline-publication', 'byline-integrations', 'byline-settings'] as $config_page) {
     $_GET = ['page' => $config_page];
     $test_screen = (object) ['id' => 'byline_page_' . $config_page, 'post_type' => null];
     if (byline_admin_parent_file('') !== 'byline' || byline_admin_submenu_file('') !== $config_page) {
@@ -499,7 +476,7 @@ if (byline_admin_submenu_file('') !== 'admin.php?page=byline-planning&tab=storie
     fail('A Stories view deep link must still highlight Stories.');
 }
 
-// Studio and Polls are their own top-level menus, so Byline must not claim them.
+// Polls and retired Studio URLs must not activate the Byline configuration menu.
 foreach (['byline-studio', 'byline-polls'] as $workflow_page) {
     $_GET = ['page' => $workflow_page];
     $test_screen = (object) ['id' => 'toplevel_page_' . $workflow_page, 'post_type' => null];
@@ -507,53 +484,6 @@ foreach (['byline-studio', 'byline-polls'] as $workflow_page) {
         fail("{$workflow_page} must not highlight the Byline configuration menu.");
     }
 }
-
-// Studio revisions keep Studio active.
-$_GET = ['page' => 'byline-studio', 'view' => 'revisions'];
-$test_screen = (object) ['id' => 'toplevel_page_byline-studio', 'post_type' => null];
-if (byline_admin_parent_file('byline-studio') !== 'byline-studio') {
-    fail('Studio revisions must keep the Studio menu active.');
-}
-
-// Sports content screens.
-$_GET = [];
-$test_screen = (object) ['id' => 'edit-' . WWH_SPORTS_GAME_POST_TYPE, 'post_type' => WWH_SPORTS_GAME_POST_TYPE];
-if (byline_admin_parent_file('edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE) !== 'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE) {
-    fail('Games must stay under the native Sports parent.');
-}
-
-$test_screen = (object) ['id' => 'edit-' . WWH_SPORTS_ROSTER_POST_TYPE, 'post_type' => WWH_SPORTS_ROSTER_POST_TYPE];
-if (byline_admin_parent_file('edit.php?post_type=' . WWH_SPORTS_ROSTER_POST_TYPE) !== 'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE
-    || byline_admin_submenu_file('') !== 'edit.php?post_type=' . WWH_SPORTS_ROSTER_POST_TYPE) {
-    fail('Rosters must highlight Sports > Rosters.');
-}
-
-// Each sports utility highlights itself, not the Games list.
-foreach ([
-    'wwh-sports-import',
-    'wwh-sports-export',
-    'wwh-sports-roster-import',
-    'wwh-sports-team-settings',
-] as $utility) {
-    $test_screen = (object) ['id' => WWH_SPORTS_GAME_POST_TYPE . '_page_' . $utility, 'post_type' => WWH_SPORTS_GAME_POST_TYPE];
-    if (byline_admin_parent_file('') !== 'edit.php?post_type=' . WWH_SPORTS_GAME_POST_TYPE) {
-        fail("Sports utility {$utility} must sit under the Sports parent.");
-    }
-    if (byline_admin_submenu_file('') !== $utility) {
-        fail("Sports utility {$utility} must highlight its own submenu entry, not the Games list.");
-    }
-}
-
-// With sports disabled there is no Sports menu, so the filters stay out of it.
-$test_features = ['polls' => true, 'sports' => false, 'events' => false];
-$test_screen = (object) ['id' => 'edit-' . WWH_SPORTS_ROSTER_POST_TYPE, 'post_type' => WWH_SPORTS_ROSTER_POST_TYPE];
-if (byline_admin_parent_file('edit.php?post_type=' . WWH_SPORTS_ROSTER_POST_TYPE) !== 'edit.php?post_type=' . WWH_SPORTS_ROSTER_POST_TYPE) {
-    fail('Rosters must not be pointed at a Sports menu that is not registered.');
-}
-if (byline_admin_parent_file(null) !== null) {
-    fail('Disabled sports must still preserve null parent state.');
-}
-$test_features = ['polls' => true, 'sports' => true, 'events' => true, 'discord' => true];
 
 // Events are their own top-level menu, so Byline must not claim them.
 $test_screen = (object) ['id' => 'edit-' . WWH_SCHOOL_EVENT_POST_TYPE, 'post_type' => WWH_SCHOOL_EVENT_POST_TYPE];
@@ -587,7 +517,7 @@ try {
     $studio_rejected = true;
 }
 if (!$studio_rejected) {
-    fail('Studio must reject a user without the design capability even though it is top-level.');
+    fail('A retired Studio URL must not authorize users with only edit_posts.');
 }
 
 $_GET = ['page' => 'byline-polls'];
@@ -664,30 +594,18 @@ if (preg_match("/'show_in_menu'\\s*=>\\s*'byline'/", $game_source)
     fail('Sports/Events post types must no longer be registered under the Byline menu.');
 }
 
-// Sports and Events own their top-level menus, gated on their feature flags.
-if (!preg_match("/'show_in_menu'\\s*=>\\s*byline_admin_feature_enabled\\('sports'\\)/", $game_source)
-    || !preg_match("/'menu_position'\\s*=>\\s*BYLINE_MENU_POSITION_SPORTS/", $game_source)) {
-    fail('The Sports Games post type must own a feature-gated top-level Sports menu.');
+// Historical sports storage stays hidden and cannot be edited. Events remain independent.
+foreach ([$game_source, $roster_source] as $source) {
+    if (strpos($source, "'show_ui' => false") === false
+        || strpos($source, "'capabilities' => byline_sports_archive_capabilities()") === false) {
+        fail('Legacy sports post types must be retained without an editor.');
+    }
 }
-if (!preg_match("/'show_in_menu'\\s*=>\\s*byline_admin_feature_enabled\\('events'\\)/", $game_source)
-    || !preg_match("/'menu_position'\\s*=>\\s*BYLINE_MENU_POSITION_EVENTS/", $game_source)) {
-    fail('The School Event post type must own a feature-gated top-level Events menu.');
+if (!preg_match("/'show_in_menu'\\s*=>\\s*byline_admin_feature_enabled\\('events'\\)/", $game_source)) {
+    fail('Events must retain their native menu.');
 }
-if (!preg_match("/'show_in_menu'\\s*=>\\s*byline_admin_feature_enabled\\('sports'\\)\\s*\\?\\s*byline_sports_menu_parent\\(\\)\\s*:\\s*false/", $roster_source)) {
-    fail('Rosters must be registered beneath the Sports menu and hidden when sports is off.');
-}
-
-// Sports utility screens must not register when the feature is disabled.
-if (!preg_match("/if \\(!byline_admin_feature_enabled\\('sports'\\)\\)/", $game_source)
-    || !preg_match("/if \\(!byline_admin_feature_enabled\\('sports'\\)\\)/", $roster_source)) {
-    fail('Sports utility submenus must be gated on the sports feature.');
-}
-
-// The sidebar labels the workflow, not the implementation owner.
-if (strpos($game_source, "'menu_name' => 'Sports'") === false
-    || strpos($game_source, "'all_items' => 'Games'") === false
-    || strpos($roster_source, "'menu_name' => 'Rosters'") === false) {
-    fail('Sports menu labels should read as the newsroom workflow.');
+foreach (['wwh_render_sports_import_page', 'wwh_save_sports_game', 'wwh_create_sports_team'] as $removed) {
+    if (strpos($game_source, 'function ' . $removed . '(') !== false) fail('Retired sports editor function remains: ' . $removed);
 }
 
 // Menu section headings must not be faked by mutating core menu globals.

@@ -17,12 +17,6 @@ export const WEEKLY_WILDCAT_IN_FOCUS_DEFAULTS: InFocusPackageProps = {
   presentation: { showAuthor: true, showDeck: true }
 };
 
-export const NEUTRAL_IN_FOCUS_DEFAULTS: InFocusPackageProps = {
-  heading: "Featured",
-  source: { type: "latest" },
-  presentation: { showAuthor: true, showDeck: true }
-};
-
 function heading(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, 80) : fallback;
 }

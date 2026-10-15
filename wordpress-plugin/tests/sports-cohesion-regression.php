@@ -83,20 +83,10 @@ if (byline_migrate_sports_teams() !== true || byline_get_sports_teams() !== []) 
     sports_cohesion_fail('A generic Byline sports registry should start empty and migrate successfully.');
 }
 
-byline_replace_sports_teams([
+update_option(BYLINE_SPORTS_TEAMS_OPTION, byline_normalize_sports_teams([
     ['key' => 'football-varsity', 'sport' => 'Football', 'level' => 'Varsity', 'displayName' => 'Football Varsity', 'slug' => 'football-varsity'],
     ['key' => 'football-jv', 'sport' => 'Football', 'level' => 'JV', 'displayName' => 'Football JV', 'slug' => 'football-jv'],
-]);
-
-$renamed = byline_replace_sports_teams([
-    ['key' => 'football-varsity', 'sport' => 'Football', 'level' => 'Varsity', 'displayName' => 'Football First Team', 'slug' => 'football-varsity'],
-]);
-
-if (($renamed['football-varsity']['displayName'] ?? '') !== 'Football First Team'
-    || ($renamed['football-jv']['active'] ?? true) !== false
-    || byline_get_sports_team('football-varsity')['key'] !== 'football-varsity') {
-    sports_cohesion_fail('Team display-name changes must preserve stable keys, and omitted teams must remain inactive history.');
-}
+]));
 
 $slug_errors = byline_validate_sports_teams([
     ['key' => 'girls-soccer', 'sport' => 'Soccer', 'displayName' => 'Girls Soccer', 'slug' => 'soccer'],
@@ -158,41 +148,6 @@ $previous_game = byline_sports_previous_game([
 ]);
 if (($next_game['id'] ?? 0) !== 3 || ($previous_game['id'] ?? 0) !== 6) {
     sports_cohesion_fail('Sports context must choose the nearest dated upcoming game and latest dated result even when TBA or input order comes first.');
-}
-
-$valid_csv = wwh_parse_sports_roster_csv(implode("\n", [
-    'team_key,team_name,season,row_type,athlete_id,name,number,position,grade,role,sort_order',
-    'football-varsity,Football First Team,2026/2027,athlete,ath_returning,Jordan Lee,7,QB,12,,2',
-    'football-varsity,Football First Team,2026/2027,athlete,ath_second,Jordan Lee,21,WR,10,,1',
-]));
-
-if ($valid_csv['errors'] !== []
-    || ($valid_csv['groups']['football-varsity|2026-27']['players'][0]['id'] ?? '') !== 'ath_second') {
-    sports_cohesion_fail('Roster CSV import must normalize seasons, preserve IDs, and preserve explicit order.');
-}
-
-$staff_csv = wwh_parse_sports_roster_csv(implode("\n", [
-    'team_key,season,row_type,row_id,name,role,image_id,sort_order',
-    'football-varsity,2026-27,staff,staff_returning,Alex Coach,Head Coach,42,1',
-    'football-varsity,2026-27,staff,staff_returning,Jordan Manager,Student Manager,999,2',
-]));
-$staff_rows = $staff_csv['groups']['football-varsity|2026-27']['staff'] ?? [];
-if ($staff_csv['errors'] !== []
-    || count($staff_csv['warnings']) !== 2
-    || ($staff_rows[0]['id'] ?? '') !== 'staff_returning'
-    || ($staff_rows[1]['id'] ?? '') === 'staff_returning'
-    || ($staff_rows[0]['imageId'] ?? 0) !== 42
-    || ($staff_rows[1]['imageId'] ?? 1) !== 0) {
-    sports_cohesion_fail('Roster CSV must preserve staff IDs/photos and deliberately warn when regenerating invalid values.');
-}
-
-$unknown_csv = wwh_parse_sports_roster_csv(implode("\n", [
-    'team_key,season,row_type,name',
-    'made-up-team,2026-27,athlete,Unknown Team Player',
-]));
-
-if ($unknown_csv['errors'] === []) {
-    sports_cohesion_fail('Roster imports must fail clearly for unknown team keys instead of guessing or creating teams.');
 }
 
 echo "Sports cohesion regression passed.\n";

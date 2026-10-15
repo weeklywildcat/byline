@@ -1,9 +1,7 @@
 export const ADMIN_PAGE_SLUGS = {
   dashboard: "byline",
   planning: "byline-planning",
-  studio: "byline-studio",
   publication: "byline-publication",
-  theme: "byline-theme",
   integrations: "byline-integrations",
   settings: "byline-settings",
   newsletters: "byline-newsletters",
@@ -17,7 +15,6 @@ export const INTEGRATION_TABS = ["discord", "deployment"] as const;
 export const SETTINGS_TABS = ["access", "api", "compatibility", "diagnostics"] as const;
 export const PLANNING_TABS = ["today", "stories", "calendar", "media", "coverage", "performance", "content-health", "feedback"] as const;
 export const NEWSLETTER_TABS = ["issues", "settings"] as const;
-export const STUDIO_VIEWS = ["editor", "revisions"] as const;
 
 const knownPageSlugs = new Set<string>(Object.values(ADMIN_PAGE_SLUGS));
 
@@ -42,16 +39,11 @@ export function normalizeAdminTab(page: string, tab: string | undefined) {
   return tabs[0] || "";
 }
 
-export function normalizeStudioView(view: string | undefined) {
-  return STUDIO_VIEWS.includes(view as never) ? view as (typeof STUDIO_VIEWS)[number] : "editor";
-}
-
 export function adminScreenRoute(page: string, tab: string | undefined) {
   const normalizedPage = normalizeAdminPage(page);
   const normalizedTab = normalizeAdminTab(normalizedPage, tab);
 
   if (normalizedPage === ADMIN_PAGE_SLUGS.publication) return `/publication/${normalizedTab}`;
-  if (normalizedPage === ADMIN_PAGE_SLUGS.theme) return "/design/theme";
   if (normalizedPage === ADMIN_PAGE_SLUGS.integrations) return `/integrations/${normalizedTab}`;
   if (normalizedPage === ADMIN_PAGE_SLUGS.settings) return `/advanced/${normalizedTab}`;
   if (normalizedPage === ADMIN_PAGE_SLUGS.planning) return normalizedTab === "today" ? "/home" : `/planning/${normalizedTab}`;
@@ -72,7 +64,6 @@ export function normalizeAdminRoute(hash: string) {
 export type LegacyAdminDestination = {
   page: AdminPageSlug;
   tab?: string;
-  view?: (typeof STUDIO_VIEWS)[number];
 };
 
 const legacyDestinations: Record<string, LegacyAdminDestination> = {
@@ -93,9 +84,6 @@ const legacyDestinations: Record<string, LegacyAdminDestination> = {
   "/publication/navigation": { page: ADMIN_PAGE_SLUGS.publication, tab: "navigation" },
   "/publication/features": { page: ADMIN_PAGE_SLUGS.publication, tab: "features" },
   "/publication/social": { page: ADMIN_PAGE_SLUGS.publication, tab: "social" },
-  "/design/theme": { page: ADMIN_PAGE_SLUGS.theme },
-  "/design/studio": { page: ADMIN_PAGE_SLUGS.studio, view: "editor" },
-  "/design/revisions": { page: ADMIN_PAGE_SLUGS.studio, view: "revisions" },
   "/content/polls": { page: ADMIN_PAGE_SLUGS.polls },
   "/integrations/discord": { page: ADMIN_PAGE_SLUGS.integrations, tab: "discord" },
   "/integrations/deployment": { page: ADMIN_PAGE_SLUGS.integrations, tab: "deployment" },

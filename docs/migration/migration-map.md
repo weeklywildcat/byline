@@ -1,5 +1,7 @@
 # Byline migration map
 
+Historical migration notes: the layout designer, design APIs, and generic themes have since been removed. The current site uses the fixed Weekly Wildcat layout; see [architecture](../architecture.md).
+
 The migration is additive until an equivalent path is exercised. Weekly
 Wildcat remains the reference installation throughout.
 

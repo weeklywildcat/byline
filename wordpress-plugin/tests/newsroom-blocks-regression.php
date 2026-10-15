@@ -332,7 +332,7 @@ newsroom_assert(isset($newsroom_test['routes']['byline/v1/editor/polls']), 'The 
 newsroom_assert($newsroom_test['routes']['byline/v1/editor/polls']['permission_callback']() === true, 'The editor poll picker route should be capability-protected.');
 
 byline_newsroom_register_patterns();
-foreach (['byline/information-page', 'byline/about-mission-page', 'byline/policy-standards-page', 'byline/join-recruiting-page', 'byline/contact-feedback-page', 'byline/leadership-page', 'byline/staff-directory', 'byline/special-coverage', 'byline/sports-coverage', 'byline/event-campaign', 'byline/photo-led-page', 'byline/resource-page', 'byline/faq-page', 'byline/two-column-image-text', 'byline/featured-cta', 'byline/fact-box', 'byline/key-numbers', 'byline/quote-callout', 'byline/related-resources', 'byline/corrections-feedback-cta', 'byline/sports-game-recap', 'byline/sports-game-preview', 'byline/correction-notice'] as $name) {
+foreach (['byline/information-page', 'byline/about-mission-page', 'byline/policy-standards-page', 'byline/join-recruiting-page', 'byline/contact-feedback-page', 'byline/leadership-page', 'byline/staff-directory', 'byline/special-coverage', 'byline/event-campaign', 'byline/photo-led-page', 'byline/resource-page', 'byline/faq-page', 'byline/two-column-image-text', 'byline/featured-cta', 'byline/fact-box', 'byline/key-numbers', 'byline/quote-callout', 'byline/related-resources', 'byline/corrections-feedback-cta', 'byline/correction-notice'] as $name) {
     newsroom_assert(isset($newsroom_test['patterns'][$name]), "Missing newsroom pattern {$name}.");
 }
 foreach ($newsroom_test['patterns'] as $name => $pattern) {
@@ -340,7 +340,7 @@ foreach ($newsroom_test['patterns'] as $name => $pattern) {
     newsroom_assert(strpos($pattern['content'] ?? '', 'Weekly Wildcat') === false && strpos($pattern['content'] ?? '', 'Ninety Six') === false, "Pattern {$name} must remain publication-neutral.");
 }
 newsroom_assert(substr_count($newsroom_test['patterns']['byline/information-page']['content'], '<!-- wp:byline/page-section') === 4, 'The information starter should use four canonical Page Sections.');
-foreach (['byline/information-page', 'byline/about-mission-page', 'byline/policy-standards-page', 'byline/join-recruiting-page', 'byline/contact-feedback-page', 'byline/leadership-page', 'byline/staff-directory', 'byline/special-coverage', 'byline/sports-coverage', 'byline/event-campaign', 'byline/photo-led-page', 'byline/resource-page', 'byline/faq-page', 'byline/two-column-image-text', 'byline/featured-cta', 'byline/fact-box', 'byline/key-numbers', 'byline/quote-callout', 'byline/related-resources', 'byline/corrections-feedback-cta'] as $name) {
+foreach (['byline/information-page', 'byline/about-mission-page', 'byline/policy-standards-page', 'byline/join-recruiting-page', 'byline/contact-feedback-page', 'byline/leadership-page', 'byline/staff-directory', 'byline/special-coverage', 'byline/event-campaign', 'byline/photo-led-page', 'byline/resource-page', 'byline/faq-page', 'byline/two-column-image-text', 'byline/featured-cta', 'byline/fact-box', 'byline/key-numbers', 'byline/quote-callout', 'byline/related-resources', 'byline/corrections-feedback-cta'] as $name) {
     $content = (string) $newsroom_test['patterns'][$name]['content'];
     newsroom_assert(strpos($content, '<section') === false, "Page pattern {$name} must not persist a Page Section wrapper.");
     foreach (parse_blocks($content) as $block) {

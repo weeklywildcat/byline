@@ -1,219 +1,42 @@
-# Byline admin navigation
+# Admin navigation
 
-Byline's WordPress admin uses native `wp-admin` navigation. React remains the
-rendering layer for Byline's own configuration screens, but it does not own
-primary navigation or route state, and native post-type screens stay native.
+WordPress owns the sidebar. Byline does not add a second global navigation shell inside its React screens.
 
-There is exactly one persistent navigation layer:
+## Destinations
 
-```
-WordPress admin chrome -> the WordPress sidebar -> local tabs, where a page has
-several views of itself -> page content
-```
+- Posts, Media, Pages, and Users remain native WordPress screens.
+- Planning is the newsroom workflow menu. Today, Stories, Calendar, Media Desk, Coverage, Performance, Content Health, and Feedback are native submenu links to `admin.php?page=byline-planning&tab=...`.
+- Polls is a native post type with its own capability family and menu.
+- School Events retains its native post type, editor, and menu when enabled.
+- Newsletters provides Issues and Settings when the module is enabled.
+- Byline contains Home, Publication, Integrations, Settings, and Byline Doctor. Doctor is the diagnostics tab of Settings, with its own sidebar link.
 
-Byline does not render a second application-level navigation of its own. The
-custom header that repeated the sidebar as `HOME`, `WORK`, `DESK`, `INSIGHTS`,
-`DESIGN` and `SETTINGS` groups has been removed; its destinations are sidebar
-entries instead.
+The Studio, Theme, and custom Sports menus have been removed. Historical games and rosters are converted to normal Pages, grouped by sport and season. There are no Games, Teams, Rosters, schedule imports/exports, or bulk reset screens. See [sports archive](sports-archive.md).
 
-## The organising principle
+## Permissions
 
-The WordPress sidebar expresses the user's **job**, not which plugin implements
-a feature. "Implemented by Byline" does not mean "appears underneath Byline".
+Planning requires `edit_posts`; Feedback follows the protected feedback REST capability. Publication and Settings require `manage_byline`. Integrations requires `manage_byline_integrations`. Polls uses its mapped poll capabilities. Every callback checks its capability independently of whether a menu item is visible.
 
-- Content and workflow concepts become first-class WordPress menus.
-- Publication and platform configuration lives under `Byline`.
+Byline's top-level configuration entry resolves to the capability the current user actually holds. An integration manager lands in Integrations; a writer lands in Planning. Retired design capabilities alone grant no admin destination.
 
-This mirrors how WordPress itself separates daily content work (Posts, Media,
-Pages, Comments) from site administration (Appearance, Plugins, Users, Tools,
-Settings).
+Archived sports post types remain registered privately with `show_ui` and `show_in_rest` disabled and editing/deletion capabilities set to `do_not_allow`. Normal archive Pages use the ordinary Page editor for corrections. Public sports REST read aliases remain available for existing article embeds and data consumers.
 
-## Final sidebar structure
+## URLs and compatibility
 
-```
-Dashboard
-Posts
-Media
-Pages
-Comments
-Planning                      26
-  Today
-  Stories
-  Calendar
-  Media Desk
-  Coverage
-  Performance
-  Content Health
-  Feedback
-Studio                        27
-Sports                        28
-  Games / Add Game
-  Rosters
-  Import
-  Export
-  Teams
-  Roster Import / Export
-Polls                         29   (only when the polls feature is enabled)
-  Polls / Add Poll
-Events                        30   (only when the events feature is enabled)
-Newsletters                   31   (only when the newsletter feature is enabled)
---------------------------------   WordPress's administration boundary
-Appearance
-Plugins
-Users
-Tools
-Settings
-Byline                        100
-  Home
-  Publication
-  Theme
-  Integrations
-  Settings
-  Byline Doctor
-```
-
-### Menu positions
-
-Core content menus occupy 5 (Posts) through 25 (Comments), and the first core
-separator sits at 59. Byline's workflow menus therefore claim 26-31, reading as
-a continuation of the content block without displacing core items. WordPress
-advances to the next free slot when another plugin already holds a position, so
-nothing here depends on exact numbering.
-
-Byline configuration sits at 100, below the last core separator (99), which
-places it after Settings (80) in the administration block.
-
-## Capabilities
-
-Each top-level menu carries its own minimum capability. Menu visibility is
-never authorization: every page callback re-checks the same capability, and
-REST permissions are unchanged.
-
-| Menu | Capability |
+| Destination | URL |
 | --- | --- |
-| Planning | `edit_posts`; the Feedback entry needs `edit_others_posts` or `manage_byline` |
-| Studio | `edit_byline_design` |
-| Sports | post-type capabilities (`edit_posts`); utilities keep their own |
-| Polls | poll capabilities (`edit_byline_polls`, `publish_byline_polls`, ...) |
-| Events | post-type capabilities (`edit_posts`) |
-| Newsletters | `edit_posts` for issue workflow; integration settings require `manage_byline_integrations` |
-| Byline | `manage_byline`, or `manage_byline_integrations` |
-
-Being able to edit posts is deliberately **not** enough to see the Byline
-configuration menu, and being able to administer Byline does not by itself
-grant Studio. This supports role shapes like a writer who sees only Posts,
-Media, and Polls, or a design editor who sees Studio but no configuration.
-
-## Screens and URLs
-
-Canonical URLs are unchanged by the reparenting. Navigation hierarchy and URL
-ownership are independent.
-
-| Screen | URL |
-| --- | --- |
-| Planning (Today) | `admin.php?page=byline-planning` (also `&tab=today`) |
-| Stories | `admin.php?page=byline-planning&tab=stories` (`&view=` `board`, `list` or `calendar`) |
-| Calendar | `admin.php?page=byline-planning&tab=calendar` |
-| Media Desk | `admin.php?page=byline-planning&tab=media` |
-| Coverage | `admin.php?page=byline-planning&tab=coverage` |
-| Performance | `admin.php?page=byline-planning&tab=performance` |
-| Content Health | `admin.php?page=byline-planning&tab=content-health` |
-| Feedback | `admin.php?page=byline-planning&tab=feedback` |
-| Studio | `admin.php?page=byline-studio` (`view=revisions` for Revisions) |
-| Newsletters | `admin.php?page=byline-newsletters` |
+| Home | `admin.php?page=byline` |
+| Planning | `admin.php?page=byline-planning&tab=today` |
+| Publication | `admin.php?page=byline-publication&tab=identity` |
+| Integrations | `admin.php?page=byline-integrations&tab=deployment` |
+| Settings | `admin.php?page=byline-settings&tab=access` |
+| Doctor | `admin.php?page=byline-settings&tab=diagnostics` |
 | Polls | `edit.php?post_type=byline_poll` |
-| Byline Home | `admin.php?page=byline` |
-| Publication | `admin.php?page=byline-publication` |
-| Theme | `admin.php?page=byline-theme` |
-| Integrations | `admin.php?page=byline-integrations` |
-| Settings | `admin.php?page=byline-settings` |
-| Byline Doctor | `admin.php?page=byline-settings&tab=diagnostics` |
-| Games | `edit.php?post_type=ww_sports_game` |
-| Rosters | `edit.php?post_type=ww_sports_roster` |
 | Events | `edit.php?post_type=ww_school_event` |
-| Teams | `edit.php?post_type=ww_sports_game&page=wwh-sports-team-settings` |
+| Sports archive Pages | `edit.php?post_type=page&s=Sports+Archive` |
 
-`Home` replaces the former Byline child named `Dashboard`, because WordPress
-already owns a top-level Dashboard. The page renders the same component.
+Former Byline-owned Polls links redirect to the native Polls list. Former Teams links open the archive Pages list. The old hash parser translates known bookmarks to current native screens; retired Studio destinations resolve to Home. Current screens do not use hash state for navigation.
 
-Sports has no separate `Settings` child: the existing team management screen
-*is* the sports settings screen, so it appears once, as `Teams`. No empty
-screens were added to round out the outline.
+`parent_file` and `submenu_file` keep Planning, Doctor, and configuration highlighting consistent. Unrelated WordPress screens, including those passing `null`, retain their existing values. Feature flags gate optional workflows without changing stored content or legacy identifiers.
 
-## Menu ownership
-
-The Sports Games post type owns the top-level `Sports` menu directly
-(`show_in_menu => true` with a tuned `menu_name`/`all_items`), so clicking
-`Sports` lands on the Games list rather than a synthetic dashboard. Rosters
-attach with `show_in_menu => 'edit.php?post_type=ww_sports_game'`, and the
-import/export/team utilities were already registered against that parent.
-School Events own a top-level `Events` menu the same way, and the Byline Poll
-post type owns `Polls`.
-
-`Polls` was an informational screen before polls became WordPress content. The
-retired `admin.php?page=byline-polls` URL now redirects to the poll list table
-rather than duplicating a screen, exactly as the retired Byline-owned Teams page
-redirects to Sports.
-
-Planning's destinations are registered with `add_submenu_page()` using the
-canonical tab URL as the menu slug (`admin.php?page=byline-planning&tab=...`),
-which is how WordPress registers a submenu entry that points at an existing
-screen. The landing entry reuses the parent slug so WordPress does not add a
-duplicate `Planning > Planning` child, and none of them registers a second
-render callback: `byline-planning` is one page that authorizes itself once.
-`Byline Doctor` is registered the same way against the diagnostics tab of
-Settings, so the screen keeps its name without owning a page slug.
-
-Because the destinations are sidebar entries, Byline's own screens no longer
-repeat them. Planning renders local tabs only for the views of Stories
-(`Board`, `List`, `Calendar`), and Settings renders `Access`, `API` and
-`Compatibility` — Diagnostics is Byline Doctor in the sidebar.
-
-Authors intentionally remain in the native Users screen; Byline does not add an
-Authors menu.
-
-Themes stay under Byline rather than Appearance: Byline themes are publication
-frontend design-system configuration, not WordPress PHP themes.
-
-## Feature flags
-
-`Sports`, `Polls`, and `Events` register only when the publication enables the
-matching feature, and their utility submenus are gated the same way, so no dead
-entries remain when a module is off. Capability checks are enforced separately
-from feature flags.
-
-## Legacy links and active state
-
-Bookmarked hash routes from the former `admin.php?page=byline#/...` SPA are
-translated once in the browser to their native page URL. The retired
-`admin.php?page=byline-teams` URL redirects on `admin_init` to the canonical
-Sports team screen rather than keeping a second copy of that screen alive. The
-legacy `wwh-settings` options page remains callable.
-
-`parent_file` and `submenu_file` filters keep highlighting correct for Rosters,
-the sports utility screens, each Planning destination, and Byline Doctor;
-everything else highlights natively. Highlighting is derived from the `page`
-and `tab` query arguments, so a direct link, a refresh, and browser back all
-show the same current entry, and an unrecognised tab falls back to the Planning
-landing entry exactly as the screen itself normalizes it. Each
-sports utility highlights **its own** entry rather than the Games list.
-
-Both filters take and return nullable values. WordPress legitimately passes
-`null` for `submenu_file` on many core screens, and a non-nullable signature
-here caused the 0.2.5 production fatal. The regression suite asserts that both
-filters accept `null` and hand unrelated screens — `plugins.php`, `users.php`,
-`edit.php`, `options-general.php` — back exactly as they arrived.
-
-## Constraints observed
-
-Byline renders no persistent navigation of its own. Local tabs inside a screen
-are allowed, but only for views of that screen: they choose a view within where
-the user already is, while the sidebar chooses where in Byline they are.
-
-The implementation uses only mature WordPress admin APIs (`add_menu_page`,
-`add_submenu_page`, `register_post_type( ... show_in_menu ... )`, and admin
-parent/submenu filters). It does not fabricate labelled sidebar sections,
-mutate `$GLOBALS['menu']`, inject separator labels, rearrange the sidebar with
-JavaScript, or style wp-admin navigation. Because the menus are native,
-WordPress manages responsive collapse on narrow screens; there is no custom
-Byline sidebar or second navigation shell.
+Run `npm run test:php` for callback registration, navigation, capability, archive-conversion, and WordPress smoke regressions.

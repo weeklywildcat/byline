@@ -29,7 +29,6 @@ export type DoctorAppProps = {
     publication?: string;
     branding?: string;
     theme?: string;
-    studio?: string;
     doctor?: string;
   };
   canManageIntegrations?: boolean;

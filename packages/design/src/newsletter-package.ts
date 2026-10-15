@@ -14,12 +14,6 @@ export const WEEKLY_WILDCAT_NEWSLETTER_DEFAULTS: NewsletterPackageProps = {
   presentation: { showLabel: true }
 };
 
-export const NEUTRAL_NEWSLETTER_DEFAULTS: NewsletterPackageProps = {
-  label: "Newsletter signup",
-  heading: "Get {publication.shortName} in your inbox",
-  presentation: { showLabel: true }
-};
-
 function text(value: unknown, fallback: string, max = 120) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
 }

@@ -92,6 +92,7 @@ function configuredPublication(): unknown {
 }
 
 const publication = normalizePublicationConfig(configuredPublication(), WEEKLY_WILDCAT_PUBLICATION);
+publication.appearance = { theme: "weekly-wildcat", tokenOverrides: {} };
 
 export function getPublicationConfig() {
   return publication;

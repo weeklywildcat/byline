@@ -238,9 +238,7 @@ export function SearchPageClient({ publicationName, searchGapEndpoint, searchInd
         {[
           { label: "All", value: "all" },
           { label: "Stories", value: "story" },
-          { label: "Teams", value: "team" },
-          { label: "Seasons", value: "season" },
-          { label: "Games", value: "game" }
+          { label: "Archives", value: "archive" }
         ].map((option) => (
           <button
             aria-pressed={searchState.type === option.value}

@@ -120,7 +120,7 @@ if ($defaults['identity']['name'] !== 'Weekly Wildcat'
 $test_home_url = 'https://cms.example.test';
 $generic_defaults = byline_default_publication_config();
 if ($generic_defaults['identity']['name'] !== 'Example Gazette'
-    || $generic_defaults['appearance']['theme'] !== 'byline-modern'
+    || $generic_defaults['appearance']['theme'] !== 'weekly-wildcat'
     || $generic_defaults['navigation'] !== []
     || $generic_defaults['features']['sports'] !== false
     || strpos(json_encode($generic_defaults), 'Weekly Wildcat') !== false) {
@@ -169,7 +169,7 @@ if ($normalized['identity']['name'] !== 'North Star News'
     || $normalized['timezone'] !== 'Europe/Paris'
     || $normalized['urls']['publicSite'] !== $defaults['urls']['publicSite']
     || $normalized['appearance']['theme'] !== 'weekly-wildcat'
-    || $normalized['appearance']['tokenOverrides'] !== ['accent' => '#008b95']
+    || $normalized['appearance']['tokenOverrides'] !== []
     || $normalized['sections'] !== [['name' => 'Campus Life', 'slug' => 'campus-life', 'description' => 'Student news', 'active' => true]]
     || $normalized['navigation'] !== [['label' => 'Campus', 'url' => '/campus/', 'locations' => ['header', 'footer'], 'group' => 'Sections']]
     || $normalized['social'][0]['service'] !== 'bluesky'
