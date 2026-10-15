@@ -2960,43 +2960,42 @@ img {
 
 .static-page-shell {
   margin: 0 auto;
-  max-width: 900px;
-  padding: 42px 20px 72px;
-}
-
-.static-page {
-  border-top: 1px solid var(--rule-strong);
+  max-width: 780px;
+  padding: 48px 20px 88px;
 }
 
 .static-page-header {
   border-bottom: 1px solid var(--rule);
-  padding: 22px 0 26px;
+  margin-bottom: 14px;
+  padding-bottom: 32px;
 }
 
 .static-page-header p {
   color: var(--accent);
   font-family: var(--font-ui);
-  font-size: 0.76rem;
-  font-weight: 800;
-  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 0 0 14px;
   text-transform: uppercase;
 }
 
 .static-page-header h1 {
   font-family: var(--font-display);
-  font-size: 4rem;
+  font-size: 3.6rem;
   font-weight: 800;
-  line-height: 0.94;
+  line-height: 1.02;
   margin: 0;
+  text-wrap: balance;
 }
 
 .static-page-deck {
   color: var(--muted);
-  font-family: var(--font-body);
-  font-size: 1.14rem;
+  font-family: var(--font-serif);
+  font-size: 1.24rem;
   line-height: 1.45;
-  margin-top: 14px;
-  max-width: 720px;
+  margin-top: 18px;
+  text-wrap: pretty;
 }
 
 .static-page-content {
@@ -4339,9 +4338,9 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
 .schedule-game-card,
 .author-card-grid,
 .media-kit-intro,
+.media-kit-section-heading,
 .open-source-featured-grid,
 .open-source-more-grid,
-.media-kit-section-heading,
 .media-kit-logo-grid,
 .media-kit-image-grid,
 .media-kit-font-grid {
@@ -4401,7 +4400,7 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
   }
 
   .static-page-header h1 {
-    font-size: 3.2rem;
+    font-size: 3.1rem;
   }
 
   .live-home-shell {
@@ -4693,11 +4692,15 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
   }
 
   .static-page-shell {
-    padding: 30px 16px 56px;
+    padding: 28px 16px 64px;
+  }
+
+  .static-page-header {
+    padding-bottom: 24px;
   }
 
   .static-page-deck {
-    font-size: 1.02rem;
+    font-size: 1.1rem;
   }
 
   .story-teaser-lead h2 {
