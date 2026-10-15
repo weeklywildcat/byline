@@ -44,6 +44,10 @@ build_assets=(
   # The normal Page editor settings panel is separate from the story workflow.
   build/page-editor.js
   build/page-editor.asset.php
+  # Post editing canvas. The stylesheet references the bundled fonts below.
+  build/editor-canvas.js
+  build/editor-canvas.asset.php
+  build/editor-canvas.css
   # Metadata, editor script, and shared block CSS are all runtime assets.
   build/blocks/page-section/block.json
   build/blocks/page-section/index.js
@@ -197,6 +201,15 @@ grep -qx 'weekly-wildcat-headless/build/blocks/page-section/index.js' <<<"$archi
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/index.asset.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/render.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/style-index.css' <<<"$archive_files"
+
+# The editor canvas stylesheet loads Weekly Wildcat fonts from build/fonts. If the
+# build stops emitting them the editor silently falls back to system fonts.
+for font_family in erode-normal-600 newsreader-normal-latin mona-sans-normal-latin; do
+  if ! grep -qE "^weekly-wildcat-headless/build/fonts/${font_family}\.[0-9a-f]+\.woff2$" <<<"$archive_files"; then
+    echo "Plugin archive is missing the bundled editor font $font_family." >&2
+    exit 1
+  fi
+done
 
 for newsroom_block in stories people sports-schedule events poll game-score correction-notice; do
   grep -qx "weekly-wildcat-headless/build/blocks/$newsroom_block/block.json" <<<"$archive_files"
