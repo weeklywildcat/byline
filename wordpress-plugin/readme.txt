@@ -4,7 +4,7 @@ Tags: newsroom, editorial, journalism, headless, student-journalism
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.2.15
+Stable tag: 0.3.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,27 @@ WordPress publication state, a fixed Weekly Wildcat homepage, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==
+
+= 0.3.0 =
+
+**Keeps the Weekly Wildcat homepage in code and turns the sports records into
+a fixed archive.**
+
+* Retires Byline Studio, generic themes, and design publishing and scheduling.
+  The homepage layout and the Weekly Wildcat theme now live in code. Stored
+  historical designs are kept.
+* Retires the Games, Teams, Rosters, import/export, reset, and game-linking
+  editors. On upgrade, published sports records are converted once into
+  normal WordPress Pages: an archive index and one Page per sport, grouped by
+  season and team level. Source records are preserved, later Page edits are
+  left alone, and existing embeds and public read aliases keep working.
+* Styles the block editor for Posts like the public article: Erode headlines,
+  Newsreader body text at the article width, and the site's headings, quotes,
+  lists, images, and captions in Weekly Wildcat colors. Pages and the classic
+  editor are unchanged.
+* Widens the Story sidebar in the Post editor so the workflow, dates, and task
+  controls have room. Narrow windows keep the native width.
+* Article and editor previews use the refreshed Weekly Wildcat fonts.
 
 = 0.2.15 =
 
@@ -180,6 +201,12 @@ makes Studio a real homepage editor.**
 * Homepage designs saved while these settings existed continue to load.
 
 == Upgrade Notice ==
+
+= 0.3.0 =
+Studio and the custom sports editors are retired. After updating, open
+WordPress admin once so the sports records convert to archive Pages; Byline
+Doctor reports when the conversion has finished. Source records, public URLs,
+and embeds are preserved.
 
 = 0.2.15 =
 Byline's admin navigation is now the WordPress sidebar alone. Every screen keeps
