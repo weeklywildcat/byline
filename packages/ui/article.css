@@ -97,3 +97,14 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .story-teaser h2, 
   .byline-article-view .article-header h1 { font-size: 2.55rem; }
   .byline-article-view .article-body { font-size: 1.08rem; }
 }
+
+/* Photo credits are set in the reading serif under every image. The credit is a
+   second line in italic rather than shouting capitals, and a portrait lead photo
+   is cropped to a landscape frame so it doesn't run past the first screen. */
+.byline-article-view .featured-image figcaption,
+.byline-article-view .article-body figcaption { font-family: var(--font-serif); font-size: .9rem; line-height: 1.4; }
+.byline-article-view .photo-credit { color: var(--soft-muted); font-family: var(--font-serif); font-size: .9rem; font-style: italic; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.byline-article-view .featured-image-portrait img { aspect-ratio: 4 / 3; height: auto; object-fit: cover; object-position: center 38%; }
+@media (max-width: 640px) {
+  .byline-article-view .featured-image-portrait img { aspect-ratio: 1 / 1; }
+}
