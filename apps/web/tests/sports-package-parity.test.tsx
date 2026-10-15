@@ -88,8 +88,12 @@ function homepagePosts(options: { athlete?: boolean } = {}) {
   ];
 }
 
-describe("the extracted sports package reproduces the pre-extraction markup", () => {
-  it("matches for the full package: lead, rail, athlete, finals and fixtures", () => {
+// The homepage sports package is stories only. Game records still reach the
+// resolver, so each case feeds finals and fixtures to the shared renderer and
+// compares it with the pre-extraction stories rendered without a schedule: the
+// story markup must be unchanged and the scoreboard must never appear.
+describe("the sports package keeps the pre-extraction story markup and drops the scoreboard", () => {
+  it("matches for the full package: lead, rail and athlete", () => {
     const posts = homepagePosts({ athlete: true });
     const selection = resolveWeeklyWildcatHomepage(posts);
 
@@ -100,14 +104,13 @@ describe("the extracted sports package reproduces the pre-extraction markup", ()
 
     const baseline = renderBaseline({
       fieldPosts: selection.fieldPosts,
-      athleteSpotlightPost: selection.athleteSpotlightPost,
-      recentScores: FINALS,
-      upcomingGames: FIXTURES
+      athleteSpotlightPost: selection.athleteSpotlightPost
     });
+    const extracted = renderExtracted({ posts, recentScores: FINALS, upcomingGames: FIXTURES });
 
-    expect(renderExtracted({ posts, recentScores: FINALS, upcomingGames: FIXTURES })).toBe(baseline);
-    expect(baseline).toContain("sports-athlete-feature");
-    expect(baseline).toContain("field-schedule-layout-2");
+    expect(extracted).toBe(baseline);
+    expect(extracted).toContain("sports-athlete-feature");
+    expect(extracted).not.toContain("field-schedule");
   });
 
   it("matches with no athlete spotlight, which is the current live shape", () => {
@@ -117,11 +120,7 @@ describe("the extracted sports package reproduces the pre-extraction markup", ()
     expect(selection.athleteSpotlightPost).toBeNull();
 
     expect(renderExtracted({ posts, recentScores: FINALS, upcomingGames: FIXTURES })).toBe(
-      renderBaseline({
-        fieldPosts: selection.fieldPosts,
-        recentScores: FINALS,
-        upcomingGames: FIXTURES
-      })
+      renderBaseline({ fieldPosts: selection.fieldPosts })
     );
   });
 
@@ -131,12 +130,7 @@ describe("the extracted sports package reproduces the pre-extraction markup", ()
 
     expect(selection.fieldPosts).toHaveLength(0);
 
-    const baseline = renderBaseline({
-      fieldPosts: [],
-      athleteSpotlightPost: selection.athleteSpotlightPost,
-      recentScores: FINALS,
-      upcomingGames: FIXTURES
-    });
+    const baseline = renderBaseline({ fieldPosts: [], athleteSpotlightPost: selection.athleteSpotlightPost });
 
     // The pre-extraction markup still opened .field-layout for a spotlight with
     // no lead story. That awkward shape has to survive.
@@ -145,47 +139,27 @@ describe("the extracted sports package reproduces the pre-extraction markup", ()
     expect(renderExtracted({ posts, recentScores: FINALS, upcomingGames: FIXTURES })).toBe(baseline);
   });
 
-  it("matches when there are finals but no upcoming fixtures", () => {
-    const posts = homepagePosts();
-    const selection = resolveWeeklyWildcatHomepage(posts);
-    const baseline = renderBaseline({ fieldPosts: selection.fieldPosts, recentScores: FINALS });
-
-    // Two columns, with the empty message in the second.
-    expect(baseline).toContain("field-schedule-layout-2");
-    expect(baseline).toContain("No upcoming games");
-    expect(renderExtracted({ posts, recentScores: FINALS })).toBe(baseline);
-  });
-
-  it("matches when there are upcoming fixtures but no finals", () => {
-    const posts = homepagePosts();
-    const selection = resolveWeeklyWildcatHomepage(posts);
-    const baseline = renderBaseline({ fieldPosts: selection.fieldPosts, upcomingGames: FIXTURES });
-
-    expect(baseline).toContain("field-schedule-layout-1");
-    expect(baseline).not.toContain("field-schedule-result");
-    expect(renderExtracted({ posts, upcomingGames: FIXTURES })).toBe(baseline);
-  });
-
   it("matches when there are stories but no structured sports data at all", () => {
     const posts = homepagePosts();
     const selection = resolveWeeklyWildcatHomepage(posts);
-    const baseline = renderBaseline({ fieldPosts: selection.fieldPosts });
 
-    expect(baseline).not.toContain("field-schedule");
-    expect(renderExtracted({ posts })).toBe(baseline);
+    expect(renderExtracted({ posts })).toBe(renderBaseline({ fieldPosts: selection.fieldPosts }));
   });
 
-  it("matches when only the schedule has anything to show", () => {
+  it("renders nothing when only the schedule has anything to show", () => {
     const posts = [post(1, "news", { sticky: true }), post(9, "news")];
     const selection = resolveWeeklyWildcatHomepage(posts);
 
     expect(selection.fieldPosts).toHaveLength(0);
+    expect(renderExtracted({ posts, recentScores: FINALS, upcomingGames: FIXTURES })).toBe("");
+  });
 
-    const baseline = renderBaseline({ fieldPosts: [], recentScores: FINALS, upcomingGames: FIXTURES });
+  it("renders nothing for a schedule-only package", () => {
+    const posts = homepagePosts();
 
-    // Header plus panel, and no .field-layout at all.
-    expect(baseline).not.toContain("field-layout");
-    expect(renderExtracted({ posts, recentScores: FINALS, upcomingGames: FIXTURES })).toBe(baseline);
+    expect(
+      renderExtracted({ posts, recentScores: FINALS, upcomingGames: FIXTURES, props: { content: "schedule" } })
+    ).toBe("");
   });
 
   it("matches when the publication has no sports module: both render nothing", () => {
@@ -212,32 +186,5 @@ describe("the extracted sports package reproduces the pre-extraction markup", ()
         props: { stories: { limit: 0 }, athleteSpotlight: { enabled: false } }
       })
     ).toBe(baseline);
-  });
-
-  it("matches when a game record is missing scores, opponent and a formatted date", () => {
-    const posts = homepagePosts();
-    const selection = resolveWeeklyWildcatHomepage(posts);
-    const broken = [game(9200, "", { blank: true })];
-    const brokenFixture = [game(9201, "", { upcoming: true, blank: true })];
-
-    const baseline = renderBaseline({
-      fieldPosts: selection.fieldPosts,
-      recentScores: broken,
-      upcomingGames: brokenFixture
-    });
-
-    expect(baseline).toContain("—");
-    expect(baseline).toContain("Opponent");
-    expect(renderExtracted({ posts, recentScores: broken, upcomingGames: brokenFixture })).toBe(baseline);
-  });
-
-  it("matches for canceled and postponed games, which the schedule endpoints still return", () => {
-    const posts = homepagePosts();
-    const selection = resolveWeeklyWildcatHomepage(posts);
-    const odd = [game(9300, "soccer", { status: "postponed" }), game(9301, "football", { status: "canceled" })];
-
-    expect(renderExtracted({ posts, recentScores: odd, upcomingGames: odd })).toBe(
-      renderBaseline({ fieldPosts: selection.fieldPosts, recentScores: odd, upcomingGames: odd })
-    );
   });
 });

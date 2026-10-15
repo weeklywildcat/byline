@@ -58,12 +58,13 @@ describe("Studio is a full-viewport editor", () => {
     // published render.
     expect(studio).toContain('className="byline-publication-preview live-home-shell"');
     expect(publicationStyles).toContain('.byline-publication-preview[data-byline-preview-surface="studio"] > * {');
-    // The published separator sets the section's own padding-top, replacing it.
-    // On the editor surface the separator is on the wrapper, so the section's
-    // padding must be zeroed or the package measures taller than it renders.
+    // The separator is a margin on both hosts: the published section's own, and
+    // the editor wrapper's. Neither touches the section's padding, which the
+    // full-bleed bands rely on.
     expect(publicationStyles).toContain(
-      '.byline-publication-preview[data-byline-preview-surface="studio"] > *:has(section) + *:has(section) > section'
+      '.byline-publication-preview[data-byline-preview-surface="studio"] > *:has(section) + *:has(section) {'
     );
+    expect(publicationStyles).not.toContain("> *:has(section) + *:has(section) > section");
     // The shell must not reintroduce a width or gap of its own.
     const root = /root: \{[\s\S]*?\n    \}/.exec(studio)?.[0] ?? "";
     expect(root).not.toMatch(/maxWidth|padding:|gap:/);

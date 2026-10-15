@@ -35,7 +35,8 @@ export type LeadPackageProps = {
   package: ResolvedLeadPackage;
   // The two utility modules are host-supplied: the poll is client-interactive and
   // the calendar's entries come from a different endpoint than stories do. Both
-  // hosts pass the shared PollCard/ThisWeekCard components.
+  // hosts pass the shared PollCard/ThisWeekCard components. They only render in
+  // the standalone "poll" and "calendar" modes; the content layout is stories only.
   pollSlot?: ReactNode;
   calendarSlot?: ReactNode;
   // Production mounts a small client script that trims the rail to the lead's
@@ -87,8 +88,8 @@ export function LeadPackage({ package: resolved, pollSlot, calendarSlot, railLim
   // markup pointed at an id="lead-heading" that no element has ever had, which
   // leaves the section with no accessible name at all -- a dangling reference is
   // worse than none, because it also suppresses the fallback. There is no single
-  // visible heading to point at either: the package holds the lead, The Latest
-  // and the utility rail, so a literal name is the honest one.
+  // visible heading to point at either: the package holds the lead and The
+  // Latest, so a literal name is the honest one.
   return (
     <section
       className={hasLatest ? "top-stories" : "top-stories top-stories-single"}
@@ -126,12 +127,6 @@ export function LeadPackage({ package: resolved, pollSlot, calendarSlot, railLim
           </aside>
         ) : null}
 
-        {hasUtility ? (
-          <aside className="top-stories-left-rail" aria-label="Poll and school calendar">
-            {utility.poll ? pollSlot : null}
-            {utility.calendar ? calendarSlot : null}
-          </aside>
-        ) : null}
       </div>
     </section>
   );
