@@ -2639,6 +2639,63 @@ img {
   padding-bottom: 0;
 }
 
+.open-source-featured-grid,
+.open-source-more-grid {
+  display: grid;
+  gap: 22px;
+}
+
+.open-source-featured-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.open-source-more-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.open-source-card {
+  align-content: start;
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+}
+
+.open-source-card h3 {
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1.08;
+  margin: 0;
+}
+
+.open-source-card-featured {
+  border-top: 3px solid var(--ink);
+}
+
+.open-source-card-featured h3 {
+  font-size: 1.6rem;
+}
+
+.open-source-card > p:not(.media-kit-card-meta) {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.open-source-card ul {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.4;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.open-source-card .media-kit-card-actions {
+  padding-top: 6px;
+}
+
 .search-page-shell {
   margin: 0 auto;
   max-width: 1040px;
@@ -4282,6 +4339,8 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
 .schedule-game-card,
 .author-card-grid,
 .media-kit-intro,
+.open-source-featured-grid,
+.open-source-more-grid,
 .media-kit-section-heading,
 .media-kit-logo-grid,
 .media-kit-image-grid,
