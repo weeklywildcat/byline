@@ -83,6 +83,13 @@
   .byline-article-view .article-newsletter-signup { grid-template-columns: 1fr; }
   .byline-article-view .article-tip-callout { align-items: flex-start; flex-direction: column; }
 }
+/* Weekly Wildcat: Erode headlines, Newsreader reading text. Scoped to the theme
+   root, which both the public site and Studio's article preview set. */
+html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1 { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.022em; line-height: 1.04; text-wrap: balance; }
+html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-excerpt { font-family: var(--font-serif); font-size: 1.22rem; line-height: 1.45; }
+html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body { font-family: var(--font-serif); }
+html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body h2, html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body h3, html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body h4 { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.012em; }
+html[data-byline-theme="weekly-wildcat"] .byline-article-view .story-teaser h2, html[data-byline-theme="weekly-wildcat"] .byline-article-view .about-writer-body h3, html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-tip-callout h2 { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.01em; }
 @media (max-width: 640px) {
   .byline-article-view { padding-left: 16px; padding-right: 16px; }
   .byline-article-view .featured-image-caption-row { display: grid; gap: 5px; }

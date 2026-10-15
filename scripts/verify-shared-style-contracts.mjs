@@ -14,7 +14,6 @@ const requiredClasses = [
   "top-stories-layout",
   "live-lead",
   "top-stories-rail",
-  "top-stories-left-rail",
   "right-now-list",
   "home-story",
   "home-story-image",
@@ -39,13 +38,7 @@ const requiredClasses = [
   "field-rail",
   "sports-athlete-feature",
   "sports-athlete-image",
-  "sports-athlete-body",
-  "field-schedule",
-  "field-schedule-layout",
-  "field-result-card",
-  "field-scoreboard",
-  "field-score-team",
-  "field-upcoming-game"
+  "sports-athlete-body"
 ];
 
 for (const className of requiredClasses) {

@@ -32,7 +32,10 @@ describe("Byline Studio contract", () => {
     expect(config.root?.render).toBeTypeOf("function");
     expect(config.categories?.Stories?.defaultExpanded).toBe(true);
     expect(getStudioThemeVariables("byline-magazine", { accent: "#123456" })["--accent"]).toBe("#123456");
-    expect(getStudioThemeStylesheets("weekly-wildcat")).toEqual(["https://use.typekit.net/zxb8gbj.css"]);
+    expect(getStudioThemeStylesheets("weekly-wildcat")).toEqual([
+      "https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@75..100,400..900&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&display=swap",
+      "https://api.fontshare.com/v2/css?f[]=erode@400,500,600,700,401,501,601&display=swap"
+    ]);
 
     const root = config.root?.render?.({ children: "Preview" } as never) as {
       props?: Record<string, unknown>;

@@ -45,13 +45,15 @@ describe("theme variants render the same package differently", () => {
     expect(edHtml).toContain("editorial-lead-strip");
     expect(edHtml).not.toContain("top-stories-layout");
 
-    // Both render the same content: a theme changes presentation only.
+    // Both render the same stories: a theme changes presentation only.
     for (const html of [wwHtml, edHtml]) {
       expect(html).toContain("Lead headline");
       expect(html).toContain("Second story");
       expect(html).toContain("The Latest");
-      expect(html).toContain('id="poll"');
     }
+    // Weekly Wildcat's front is stories only; the poll renders in its own
+    // standalone package instead of a utility rail.
+    expect(wwHtml).not.toContain('id="poll"');
   });
 });
 

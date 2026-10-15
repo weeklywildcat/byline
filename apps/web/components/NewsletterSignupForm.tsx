@@ -46,7 +46,7 @@ export function NewsletterSignupForm({
       <div className="article-newsletter-copy">
         {showLabel ? <p className="article-newsletter-kicker">Newsletter</p> : null}
         <h2 id={headingId}>{heading ?? `Get ${publication.identity.shortName} in your inbox`}</h2>
-        <p>Catch the newest stories, scores, and campus updates when they publish.</p>
+        <p>Catch the newest stories and campus updates when they publish.</p>
       </div>
 
       {usesLegacyKitForm ? <div className="article-newsletter-kit" ref={embedRef} /> : (
