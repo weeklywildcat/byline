@@ -1,0 +1,11 @@
+---
+import { getBuildSnapshot } from "@/lib/build-snapshot";
+import { getSportsArchiveRedirects } from "@/lib/sports-archive";
+export async function getStaticPaths() {
+  const snapshot = await getBuildSnapshot();
+  return getSportsArchiveRedirects(snapshot.pages)
+    .filter(({ path }) => path !== "/sports/" && path !== "/sports/schedule/")
+    .map(({ path, target }) => ({ params: { archivePath: path.slice("/sports/".length).replace(/\/$/, "") }, props: { target } }));
+}
+return Astro.redirect(Astro.props.target, 301);
+---

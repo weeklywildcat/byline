@@ -106,6 +106,7 @@ export type SportsRoster = {
 
 export type SportsGame = {
   id: number;
+  archiveUrl?: string;
   title: string;
   slug: string;
   sportKey: string;
@@ -369,7 +370,7 @@ async function headlessFetchPage<T>(path: string, query: Record<string, QueryVal
   if (process.env.BYLINE_CONTENT_MODE === "weekly-wildcat-fixture") {
     return { data: weeklyWildcatHeadlessFixture<T>(path), totalPages: 1 };
   }
-  if (process.env.BYLINE_CONTENT_MODE === "empty" || process.env.BYLINE_CONTENT_MODE === "north-star-fixture") {
+  if (process.env.BYLINE_CONTENT_MODE === "empty") {
     // Not every headless endpoint is collection-shaped. Returning `[]` for an
     // object-shaped endpoint (such as the schedule facets) produced a malformed
     // response that crashed prerendering rather than rendering an empty archive.
@@ -452,7 +453,8 @@ export function getAllSportsGames() {
   return memoizedHeadless("all-sports-games", () => fetchAllHeadlessPages<SportsGame>("/sports-games"));
 }
 
-export function getGameCenterHref(game: Pick<SportsGame, "id">) {
+export function getGameCenterHref(game: Pick<SportsGame, "id" | "archiveUrl">) {
+  if (game.archiveUrl && /^\/[a-z0-9-]+\/#game-\d+$/.test(game.archiveUrl)) return game.archiveUrl;
   return `/sports/schedule/#game-${game.id}`;
 }
 

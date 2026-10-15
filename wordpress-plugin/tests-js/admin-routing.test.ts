@@ -5,8 +5,7 @@ import {
   legacyHashDestination,
   normalizeAdminPage,
   normalizeAdminRoute,
-  normalizeAdminTab,
-  normalizeStudioView
+  normalizeAdminTab
 } from "../src/admin-routing";
 
 describe("Byline admin local routing", () => {
@@ -19,14 +18,11 @@ describe("Byline admin local routing", () => {
     expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.integrations, undefined)).toBe("discord");
     expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.planning, undefined)).toBe("today");
     expect(normalizeAdminTab(ADMIN_PAGE_SLUGS.settings, "invalid")).toBe("access");
-    expect(normalizeStudioView("revisions")).toBe("revisions");
-    expect(normalizeStudioView("invalid")).toBe("editor");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.publication, "branding")).toBe("/publication/branding");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.publication, "features")).toBe("/publication/features");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.integrations, "deployment")).toBe("/integrations/deployment");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.planning, "today")).toBe("/home");
     expect(adminScreenRoute(ADMIN_PAGE_SLUGS.settings, "diagnostics")).toBe("/advanced/diagnostics");
-    expect(adminScreenRoute(ADMIN_PAGE_SLUGS.theme, undefined)).toBe("/design/theme");
   });
 
   it("keeps the former hash parser only for bookmarked-link compatibility", () => {
@@ -41,10 +37,7 @@ describe("Byline admin local routing", () => {
       page: ADMIN_PAGE_SLUGS.publication,
       tab: "features"
     });
-    expect(legacyHashDestination("#/design/revisions")).toEqual({
-      page: ADMIN_PAGE_SLUGS.studio,
-      view: "revisions"
-    });
+    expect(legacyHashDestination("#/design/revisions")).toEqual({ page: ADMIN_PAGE_SLUGS.dashboard });
     expect(legacyHashDestination("#/home")).toEqual({
       page: ADMIN_PAGE_SLUGS.planning,
       tab: "today"

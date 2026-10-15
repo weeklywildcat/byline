@@ -5,7 +5,7 @@ import {
   type BylineDesignDocumentV2
 } from "@byline/design";
 import { WEEKLY_WILDCAT_PUBLICATION } from "@/lib/publication";
-import { getWeeklyWildcatCompatibilityDesign } from "@/lib/homepage-design";
+import { getWeeklyWildcatHomeDesign } from "@/lib/homepage-design";
 import { getHomepageDataRequirements, resolveHomepageDocument } from "@/lib/homepage-resolution";
 import { toCalendarEntries } from "@/lib/homepage-packages";
 import type { ResolvedHomepagePackage } from "@byline/ui";
@@ -50,7 +50,7 @@ function fixturePosts() {
   ];
 }
 
-function resolve(document = getWeeklyWildcatCompatibilityDesign("weekly-wildcat")) {
+function resolve(document = getWeeklyWildcatHomeDesign("weekly-wildcat")) {
   return resolveHomepageDocument({
     document,
     posts: fixturePosts(),
@@ -113,7 +113,7 @@ describe("homepage package orchestration", () => {
   });
 
   it("reserves a late manual pin before automatic compatibility selection", () => {
-    const base = getWeeklyWildcatCompatibilityDesign("weekly-wildcat");
+    const base = getWeeklyWildcatHomeDesign("weekly-wildcat");
     const document: BylineDesignDocumentV2 = {
       ...base,
       packages: base.packages.map((entry) => entry.id === "home-more"
@@ -130,7 +130,7 @@ describe("homepage package orchestration", () => {
   });
 
   it("follows a reordered or reduced document without inventing packages", () => {
-    const base = getWeeklyWildcatCompatibilityDesign("weekly-wildcat");
+    const base = getWeeklyWildcatHomeDesign("weekly-wildcat");
     const document: BylineDesignDocumentV2 = {
       ...base,
       packages: [

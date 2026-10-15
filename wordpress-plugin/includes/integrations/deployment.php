@@ -490,7 +490,7 @@ function byline_execute_deployment_job(array $job)
 /**
  * Published content is the deployable public artifact. Queue its build from
  * WordPress's status transition hook so Gutenberg, imports, and other writers
- * share the same durable lifecycle as settings and design changes.
+ * share the same durable lifecycle as publication settings.
  */
 function byline_schedule_story_deployment_on_status($new_status, $old_status, $post): void
 {

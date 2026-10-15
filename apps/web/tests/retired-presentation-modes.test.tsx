@@ -25,7 +25,6 @@ const articleRenderer = readSource("../../../packages/ui/src/article-view.tsx");
 const homepageRoute = readSource("../views/page.tsx");
 const globalCss = readSource("../views/globals.css");
 const weeklyWildcatCss = readSource("../../../packages/theme-weekly-wildcat/src/styles.css");
-const studioConfig = readSource("../../../wordpress-plugin/src/studio.tsx");
 const pluginSource = readSource("../../../wordpress-plugin/weekly-wildcat-headless.php");
 
 function category(id: number, slug: string): WordPressCategory {
@@ -245,13 +244,6 @@ describe("the homepage opinion lead treatment is gone", () => {
 
     expect(resolved).not.toHaveProperty("leadHasOpinionTreatment");
     expect(resolved.packages).toHaveLength(1);
-  });
-
-  it("removes the Studio control", () => {
-    expect(studioConfig).not.toContain("opinionTreatment");
-    expect(studioConfig).not.toContain("Opinion treatment");
-    // The rest of the lead package's presentation settings stay configurable.
-    expect(studioConfig).toContain("showDeck");
   });
 
   it("drops the per-story treatment from the presentation-neutral view model", () => {

@@ -4197,45 +4197,6 @@ img {
   text-underline-offset: 4px;
 }
 
-/* Official generic themes change hierarchy and composition, not just color tokens. */
-html[data-byline-theme="byline-editorial"] .site-header {
-  border-bottom: 4px double var(--rule-strong);
-}
-
-html[data-byline-theme="byline-editorial"] .live-home-shell,
-html[data-byline-theme="byline-editorial"] .section-page-shell {
-  max-width: min(var(--max-width), calc(100% - 32px));
-}
-
-html[data-byline-theme="byline-editorial"] .section-page-shell h1,
-html[data-byline-theme="byline-editorial"] .section-page-shell h2 {
-  font-family: var(--font-headline);
-  letter-spacing: -0.02em;
-}
-
-html[data-byline-theme="byline-magazine"] .live-home-shell {
-  gap: clamp(48px, 7vw, 88px);
-}
-
-html[data-byline-theme="byline-modern"] .live-home-shell > section,
-html[data-byline-theme="byline-modern"] .category-story-layout,
-html[data-byline-theme="byline-modern"] .sports-landing-card {
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-medium);
-  box-shadow: 0 12px 32px rgb(20 33 43 / 0.06);
-  padding: clamp(18px, 3vw, 32px);
-}
-
-html[data-byline-theme="byline-modern"] .site-header,
-html[data-byline-theme="byline-modern"] .site-footer {
-  border-color: var(--accent);
-}
-
-html[data-byline-theme="byline-modern"] .story-teaser-image img {
-  border-radius: var(--radius-small);
-}
-
 @media (max-width: 900px) {
   .front-page,
 .lead-layout,

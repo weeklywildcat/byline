@@ -8,16 +8,16 @@ Stable tag: 0.2.15
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Open-source publishing tools, design management, and integrations for student newsrooms.
+Publishing tools and integrations for the Weekly Wildcat newsroom.
 
 == Description ==
 
 Byline turns WordPress into the control plane for a student newsroom. WordPress
 stays canonical for stories, people, pages, sports, events, polls, publication
-settings, and designs; the public site is built separately as a static export.
+and settings; the public site is built separately as a static export.
 
 Byline adds an editorial workflow that is deliberately separate from the
-WordPress publication state, a Studio for homepage design, sports and events
+WordPress publication state, a fixed Weekly Wildcat homepage, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==

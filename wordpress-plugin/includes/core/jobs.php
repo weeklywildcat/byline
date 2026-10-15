@@ -7,8 +7,7 @@
  * envelope and mutable execution metadata. Ordinary payloads stay immutable;
  * a queued deployment may be coalesced to the newest revision. WordPress cron
  * only carries the job ID, so an expired or missing cron event cannot lose the
- * work. Existing design schedules intentionally remain on their established
- * storage and are exposed through a read-only adapter below.
+ * work.
  */
 
 if (!defined('ABSPATH')) {
@@ -900,16 +899,6 @@ function byline_jobs_run_due(int $limit = 10, ?int $now = null, string $source =
         }
     }
 
-    // The established design scheduler remains authoritative for its own
-    // snapshot and lock metadata. The common runner is only a catch-up entry
-    // point for it; no design record is migrated or rewritten here.
-    if (function_exists('byline_execute_due_design_schedules')) {
-        try {
-            byline_execute_due_design_schedules();
-        } catch (Throwable $exception) {
-            update_option(BYLINE_JOBS_LAST_ERROR_OPTION, byline_job_error_text($exception), false);
-        }
-    }
     update_option(BYLINE_JOBS_LAST_SUCCESS_OPTION, $now, false);
     return $results;
 }
@@ -992,27 +981,6 @@ function byline_jobs_status_counts(int $now): array
         }
     }
 
-    // Count due legacy design records without calling their reader. This keeps
-    // a diagnostics request read-only even when a legacy record is malformed.
-    if (function_exists('get_posts') && function_exists('get_post_meta') && defined('BYLINE_DESIGN_SCHEDULE_POST_TYPE')) {
-        $design_posts = get_posts([
-            'post_type' => BYLINE_DESIGN_SCHEDULE_POST_TYPE,
-            'post_status' => 'any',
-            'posts_per_page' => -1,
-        ]);
-        foreach ((array) $design_posts as $post) {
-            $id = (int) ($post->ID ?? 0);
-            $status = (string) get_post_meta($id, defined('BYLINE_DESIGN_SCHEDULE_STATUS_META') ? BYLINE_DESIGN_SCHEDULE_STATUS_META : '_byline_design_job_status', true);
-            $scheduled_at = get_post_meta($id, defined('BYLINE_DESIGN_SCHEDULED_AT_META') ? BYLINE_DESIGN_SCHEDULED_AT_META : '_byline_design_job_scheduled_at', true);
-            $due = byline_job_parse_timestamp($scheduled_at, 0);
-            $scheduled = defined('BYLINE_DESIGN_SCHEDULE_STATUS_SCHEDULED') ? BYLINE_DESIGN_SCHEDULE_STATUS_SCHEDULED : 'scheduled';
-            $processing = defined('BYLINE_DESIGN_SCHEDULE_STATUS_PROCESSING') ? BYLINE_DESIGN_SCHEDULE_STATUS_PROCESSING : 'processing';
-            if (in_array($status, [$scheduled, $processing], true) && $due > 0 && $due <= $now) {
-                $overdue++;
-                $oldest = $oldest === 0 ? $due : min($oldest, $due);
-            }
-        }
-    }
     return ['counts' => $counts, 'overdueCount' => $overdue, 'oldestOverdueAt' => $oldest];
 }
 
@@ -1076,95 +1044,6 @@ function byline_jobs_diagnostics(): array
     ];
 }
 
-function byline_job_legacy_design_status(string $status): string
-{
-    if ($status === (defined('BYLINE_DESIGN_SCHEDULE_STATUS_SCHEDULED') ? BYLINE_DESIGN_SCHEDULE_STATUS_SCHEDULED : 'scheduled')) {
-        return BYLINE_JOB_STATUS_QUEUED;
-    }
-    if ($status === (defined('BYLINE_DESIGN_SCHEDULE_STATUS_PROCESSING') ? BYLINE_DESIGN_SCHEDULE_STATUS_PROCESSING : 'processing')) {
-        return BYLINE_JOB_STATUS_RUNNING;
-    }
-    if ($status === (defined('BYLINE_DESIGN_SCHEDULE_STATUS_PUBLISHED') ? BYLINE_DESIGN_SCHEDULE_STATUS_PUBLISHED : 'published')) {
-        return BYLINE_JOB_STATUS_SUCCEEDED;
-    }
-    if ($status === (defined('BYLINE_DESIGN_SCHEDULE_STATUS_CANCELLED') ? BYLINE_DESIGN_SCHEDULE_STATUS_CANCELLED : 'cancelled')) {
-        return BYLINE_JOB_STATUS_CANCELLED;
-    }
-    return BYLINE_JOB_STATUS_FAILED;
-}
-
-function byline_job_from_design_schedule(int $schedule_id): ?array
-{
-    if ($schedule_id <= 0 || !function_exists('byline_get_design_schedule')) {
-        return null;
-    }
-    $schedule = byline_get_design_schedule($schedule_id);
-    if (!is_array($schedule)) {
-        return null;
-    }
-    $execution = is_array($schedule['execution'] ?? null) ? $schedule['execution'] : [];
-    $scheduled_at = byline_job_parse_timestamp($schedule['scheduledAt'] ?? null, 0);
-    $post = function_exists('get_post') ? get_post($schedule_id) : null;
-    $created_at = byline_job_parse_timestamp($post->post_date_gmt ?? null, $scheduled_at);
-    $lock = [];
-    if (function_exists('get_post_meta') && defined('BYLINE_DESIGN_SCHEDULE_LOCK_META')) {
-        $stored_lock = get_post_meta($schedule_id, BYLINE_DESIGN_SCHEDULE_LOCK_META, true);
-        $lock = is_array($stored_lock) ? $stored_lock : (is_string($stored_lock) ? (json_decode($stored_lock, true) ?: []) : []);
-    }
-    $lock_at = (int) ($lock['at'] ?? 0);
-    $lock_seconds = defined('BYLINE_DESIGN_SCHEDULE_LOCK_SECONDS') ? BYLINE_DESIGN_SCHEDULE_LOCK_SECONDS : 900;
-    return [
-        'id' => $schedule_id,
-        'jobId' => 'byline:design-schedule:' . $schedule_id,
-        'type' => 'design_schedule',
-        'status' => byline_job_legacy_design_status((string) ($schedule['status'] ?? 'failed')),
-        'legacyStatus' => (string) ($schedule['status'] ?? 'failed'),
-        'createdAt' => byline_job_format_timestamp($created_at),
-        'dueAt' => byline_job_format_timestamp($scheduled_at),
-        'startedAt' => byline_job_format_timestamp(byline_job_parse_timestamp($execution['startedAt'] ?? null, 0)),
-        'completedAt' => byline_job_format_timestamp(byline_job_parse_timestamp($execution['completedAt'] ?? null, 0)),
-        'attempts' => max(0, (int) ($execution['attempts'] ?? 0)),
-        'maxAttempts' => null,
-        'retryDelay' => null,
-        'lastError' => byline_job_safe_text($schedule['error'] ?? ''),
-        'nextAttemptAt' => null,
-        'actorId' => max(0, (int) ($schedule['scheduledBy'] ?? 0)),
-        'lastActorId' => max(0, (int) ($schedule['scheduledBy'] ?? 0)),
-        'cancelledAt' => null,
-        'cancelRequested' => false,
-        'leaseActive' => $lock_at > 0 && $lock_at + $lock_seconds > byline_job_now(),
-        'leaseExpiresAt' => $lock_at > 0 ? byline_job_format_timestamp($lock_at + $lock_seconds) : null,
-        'canCancel' => in_array((string) ($schedule['status'] ?? ''), ['scheduled', 'processing'], true),
-        'canRetry' => false,
-        'idempotencyKey' => byline_job_safe_text($schedule['idempotencyKey'] ?? '', 191),
-        'payloadHash' => byline_job_safe_text($schedule['snapshotHash'] ?? '', 128),
-        'baseLiveRevision' => max(0, (int) ($schedule['baseLiveRevision'] ?? 0)),
-        'resultingRevision' => isset($schedule['resultingRevision']) ? (int) $schedule['resultingRevision'] : null,
-        'legacyStorage' => 'byline_design_schedule',
-    ];
-}
-
-function byline_job_legacy_design_records(): array
-{
-    if (!function_exists('get_posts') || !defined('BYLINE_DESIGN_SCHEDULE_POST_TYPE')) {
-        return [];
-    }
-    $records = [];
-    foreach (get_posts([
-        'post_type' => BYLINE_DESIGN_SCHEDULE_POST_TYPE,
-        'post_status' => 'any',
-        'posts_per_page' => -1,
-        'orderby' => 'ID',
-        'order' => 'ASC',
-    ]) as $post) {
-        $record = byline_job_from_design_schedule((int) ($post->ID ?? 0));
-        if ($record) {
-            $records[] = $record;
-        }
-    }
-    return $records;
-}
-
 function byline_list_jobs(array $args = []): array
 {
     $limit = min(100, max(1, (int) ($args['limit'] ?? 50)));
@@ -1174,9 +1053,6 @@ function byline_list_jobs(array $args = []): array
         if ($record) {
             $records[] = $record;
         }
-    }
-    if (!empty($args['includeLegacyDesign'])) {
-        $records = array_merge($records, byline_job_legacy_design_records());
     }
     usort($records, static function (array $left, array $right): int {
         return strcmp((string) ($right['createdAt'] ?? ''), (string) ($left['createdAt'] ?? ''));
@@ -1222,7 +1098,6 @@ function byline_rest_list_jobs(WP_REST_Request $request): WP_REST_Response
     return rest_ensure_response([
         'jobs' => byline_list_jobs([
             'limit' => byline_job_request_param($request, 'limit', 50),
-            'includeLegacyDesign' => true,
         ]),
         'cronHealth' => byline_jobs_cron_health(),
     ]);

@@ -3,7 +3,6 @@ import {
   articleRouteDigest,
   buildSnapshot,
   memoizeBuildSnapshot,
-  sportsRouteDigest,
   type BylineBuildSnapshot,
   type RouteManifestEntry
 } from "@byline/content";
@@ -11,12 +10,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { optionalBuildData, requireBuildData } from "@/lib/build-data";
 import { isHiddenCategory, isVisibleContentPost } from "@/lib/content";
-import { getAllSportsGames, getAllSportsRosters, getSportsTeams, type SportsGame, type SportsRoster, type SportsTeamMedia } from "@/lib/headless";
-import { mirrorWordPressMediaUrl } from "@/lib/media";
+import { type SportsGame, type SportsRoster, type SportsTeamMedia } from "@/lib/headless";
 import { getPublicationConfig } from "@/lib/publication";
 import { getGameSeason } from "@/lib/sports-season";
-import { buildTeams, getSeasonHref, getTeamHubHref, type TeamSummary } from "@/lib/sports";
-import { WEEKLY_WILDCAT_SOCCER_HERO_SOURCE } from "@/lib/sports-fallback-media";
+import { getSportsArchiveRedirects, getSportsArchiveHref } from "@/lib/sports-archive";
+import { type TeamSummary } from "@/lib/sports";
 import {
   getAllCategories,
   getAllPages,
@@ -74,7 +72,7 @@ function routeEntries(input: {
   pages: WordPressPage[];
   sports: BylineSportsSnapshot;
 }): RouteManifestEntry[] {
-  const sportsRouteKind = publication.features.sports ? "sports" as const : "not-found" as const;
+  const archiveHref = getSportsArchiveHref(input.pages);
   const fixed: RouteManifestEntry[] = [
     { path: "/", kind: "home" },
     { path: "/authors/", kind: "author" },
@@ -82,8 +80,8 @@ function routeEntries(input: {
     { path: "/coverage/", kind: "coverage" },
     { path: "/media-kit/", kind: "page" },
     { path: "/search/", kind: "search" },
-    { path: "/sports/", kind: sportsRouteKind },
-    { path: "/sports/schedule/", kind: sportsRouteKind },
+    { path: "/sports/", kind: "redirect", redirectTo: archiveHref },
+    { path: "/sports/schedule/", kind: "redirect", redirectTo: archiveHref },
     { path: "/stories/", kind: "other" },
     { path: "/news-sitemap.xml", kind: "feed" },
     { path: "/sitemap.xml", kind: "sitemap" },
@@ -107,12 +105,9 @@ function routeEntries(input: {
     digest: archiveRouteDigest([contributor, input.posts.filter((post) => postContributorIdentities(post).includes(contributorIdentity(contributor))).map((post) => post.id)])
   }));
   const coverages = input.sports.coverages.map((coverage) => ({ path: `/coverage/${coverage.slug}/`, kind: "coverage" as const, digest: archiveRouteDigest(coverage) }));
-  const sports: RouteManifestEntry[] = publication.features.sports ? [
-    ...input.sports.teams.flatMap((team) => [
-      { path: getTeamHubHref(team), kind: "sports" as const, digest: sportsRouteDigest(team) },
-      ...team.seasons.map((year) => ({ path: getSeasonHref(team, year), kind: "sports" as const, digest: sportsRouteDigest([team.teamKey, year, team.games.filter((game) => getGameSeason(game) === year)] ) }))
-    ])
-  ] : [];
+  const sports: RouteManifestEntry[] = getSportsArchiveRedirects(input.pages)
+    .filter(({ path }) => path !== "/sports/" && path !== "/sports/schedule/")
+    .map(({ path, target }) => ({ path, kind: "redirect" as const, redirectTo: target }));
   return [...fixed, ...articles, ...pages, ...categories, ...authors, ...coverages, ...sports];
 }
 
@@ -137,16 +132,8 @@ async function loadSnapshot(): Promise<WebBuildSnapshot> {
       corrections: () => optionalBuildData("/wp-json/byline/v1/corrections", getAllPublicCorrections, []),
       pages: () => requireBuildData("/wp-json/wp/v2/pages", getAllPages),
       sports: async () => {
-        const [games, rosters, teamMedia, coverages] = await Promise.all([
-          publication.features.sports ? requireBuildData("/wp-json/weekly-wildcat/v1/sports-games", getAllSportsGames) : [],
-          publication.features.sports ? requireBuildData("/wp-json/weekly-wildcat/v1/sports-rosters", getAllSportsRosters) : [],
-          publication.features.sports ? requireBuildData("/wp-json/weekly-wildcat/v1/sports-teams", getSportsTeams) : [],
-          optionalBuildData("/wp-json/byline/v1/coverage", getAllPublicCoverages, [])
-        ]);
-        if (publication.features.sports && publication.appearance.theme === "weekly-wildcat" && !process.env.BYLINE_CONTENT_MODE?.endsWith("-fixture")) {
-          await mirrorWordPressMediaUrl(WEEKLY_WILDCAT_SOCCER_HERO_SOURCE);
-        }
-        return { games, rosters, teamMedia, teams: buildTeams(games, rosters, teamMedia), coverages };
+        const coverages = await optionalBuildData("/wp-json/byline/v1/coverage", getAllPublicCoverages, []);
+        return { games: [], rosters: [], teamMedia: [], teams: [], coverages };
       },
       games: (sports) => sports.games
     },
@@ -168,7 +155,7 @@ async function loadSnapshot(): Promise<WebBuildSnapshot> {
       gameDate: (game) => game.startDate.split("T")[0]
     },
     routes: routeEntries,
-    required: { sports: publication.features.sports },
+    required: { sports: false },
     globalDependencies: { publication }
   });
 }

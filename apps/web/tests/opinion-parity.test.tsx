@@ -1,20 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { getWeeklyWildcatCompatibilityDesign, OPINION_PACKAGE_TYPE } from "@byline/design";
-import { resolveHomepageDocument as resolveSharedHomepageDocument } from "@byline/content";
+import { getWeeklyWildcatHomeDesign, OPINION_PACKAGE_TYPE } from "@byline/design";
 import { getOpinionPackageRenderer, type ResolvedOpinionPackage, type StoryView } from "@byline/ui";
 import { WEEKLY_WILDCAT_PUBLICATION } from "@/lib/publication";
 import { resolveHomepageDocument } from "@/lib/homepage-resolution";
-import { getFeaturedMedia, getPostCategories, getPostTags, type WordPressPost } from "@/lib/wordpress";
-import { toPreviewData, type PreviewPost } from "../../../wordpress-plugin/src/studio-preview-model";
+import { type WordPressPost } from "@/lib/wordpress";
 import { post } from "./fixtures/sports-fixture";
-
-// Opinion is the package that looked wrong in production Studio -- visibly
-// taller than the live section. Height is not something to clamp; it is a
-// consequence of how many stories a package holds, which ones, and which card
-// variant each gets. This file asserts those three things are identical in both
-// hosts by rendering both resolutions through the one shared renderer and
-// comparing the markup.
 
 function posts(): WordPressPost[] {
   return [
@@ -33,42 +24,6 @@ function posts(): WordPressPost[] {
   ];
 }
 
-function toPreviewPost(source: WordPressPost): PreviewPost {
-  const media = getFeaturedMedia(source);
-
-  return {
-    id: source.id,
-    title: { rendered: source.title.rendered },
-    excerpt: { rendered: source.excerpt.rendered },
-    content: { rendered: source.content.rendered },
-    date: source.date,
-    link: source.link,
-    sticky: source.sticky,
-    categories: source.categories,
-    tags: source.tags,
-    author: source.author,
-    _embedded: {
-      "wp:featuredmedia": media
-        ? [{ source_url: media.source_url, alt_text: media.alt_text, media_details: media.media_details }]
-        : [],
-      "wp:term": [
-        getPostCategories(source).map((category) => ({
-          id: category.id,
-          taxonomy: "category",
-          name: category.name,
-          slug: category.slug
-        })),
-        getPostTags(source).map((entry) => ({ id: entry.id, taxonomy: "post_tag", name: entry.name, slug: entry.slug }))
-      ]
-    }
-  };
-}
-
-/**
- * Collapses the fields that legitimately differ between a build-time record and
- * a REST record -- link formatting, locale date rendering, embedded author and
- * term payloads -- so what remains to compare is the resolution itself.
- */
 function normalizeStory(story: StoryView): StoryView {
   return {
     ...story,
@@ -100,7 +55,7 @@ function opinionMarkup(resolved: ResolvedOpinionPackage) {
 
 function productionOpinion() {
   const entry = resolveHomepageDocument({
-    document: getWeeklyWildcatCompatibilityDesign("weekly-wildcat"),
+    document: getWeeklyWildcatHomeDesign("weekly-wildcat"),
     posts: posts(),
     publication: WEEKLY_WILDCAT_PUBLICATION,
     sportsSchedule: { recentScores: [], upcomingGames: [], schoolEvents: [] }
@@ -111,48 +66,7 @@ function productionOpinion() {
   return entry.package;
 }
 
-function studioOpinion() {
-  const data = toPreviewData({ posts: posts().map(toPreviewPost) });
-  const entry = resolveSharedHomepageDocument({
-    document: getWeeklyWildcatCompatibilityDesign("weekly-wildcat"),
-    stories: data.stories,
-    publication: {
-      shortName: WEEKLY_WILDCAT_PUBLICATION.identity.shortName,
-      name: WEEKLY_WILDCAT_PUBLICATION.identity.name,
-      organizationName: WEEKLY_WILDCAT_PUBLICATION.identity.organizationName,
-      contactHref: WEEKLY_WILDCAT_PUBLICATION.urls.contact,
-      social: WEEKLY_WILDCAT_PUBLICATION.social,
-      features: {
-        polls: WEEKLY_WILDCAT_PUBLICATION.features.polls,
-        events: WEEKLY_WILDCAT_PUBLICATION.features.events,
-        sports: WEEKLY_WILDCAT_PUBLICATION.features.sports,
-        newsletter: WEEKLY_WILDCAT_PUBLICATION.features.newsletter
-      },
-      calendarHeading: "At NSHS"
-    },
-    sportsSchedule: { recentScores: [], upcomingGames: [] }
-  }).packages.find((item) => item.type === OPINION_PACKAGE_TYPE);
-
-  if (entry?.type !== OPINION_PACKAGE_TYPE) throw new Error("Studio resolved no Opinion package.");
-
-  return entry.package;
-}
-
-describe("Opinion parity between Studio and production", () => {
-  it("renders identical markup through the one shared renderer", () => {
-    expect(opinionMarkup(studioOpinion())).toBe(opinionMarkup(productionOpinion()));
-  });
-
-  it("holds the same stories in the same order", () => {
-    const production = productionOpinion();
-    const studio = studioOpinion();
-
-    expect([studio.lead?.id, ...studio.rail.map((story) => story.id)]).toEqual([
-      production.lead?.id,
-      ...production.rail.map((story) => story.id)
-    ]);
-  });
-
+describe("Weekly Wildcat Opinion layout", () => {
   it("uses one opinion-lead card and one opinion card per remaining story", () => {
     const markup = opinionMarkup(productionOpinion());
     const production = productionOpinion();

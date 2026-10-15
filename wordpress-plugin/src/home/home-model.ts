@@ -111,7 +111,6 @@ export type HomeData = {
 
 export type HomeNavigationCapabilities = {
   manage?: boolean;
-  editDesign?: boolean;
   manageIntegrations?: boolean;
   editPosts?: boolean;
   editOthersPosts?: boolean;

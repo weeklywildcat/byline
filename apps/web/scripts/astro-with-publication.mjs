@@ -38,25 +38,8 @@ async function loadPublication() {
   }
 }
 
-async function loadDesigns(publication) {
-  if (process.env.BYLINE_DESIGNS_FILE) return JSON.parse(await readFile(path.resolve(projectRoot, process.env.BYLINE_DESIGNS_FILE), "utf8"));
-  if (process.env.BYLINE_DESIGNS_JSON) return JSON.parse(process.env.BYLINE_DESIGNS_JSON);
-  if (!publication || process.env.BYLINE_PUBLICATION_FILE) return {};
-  const endpoint = publicationEndpoint().replace(/\/publication\/?$/, "/designs");
-  const response = await fetch(endpoint, { signal: AbortSignal.timeout(10000) });
-  if (!response.ok) throw new Error(`Byline could not load published designs: ${response.status} ${response.statusText}`);
-  const summaries = await response.json();
-  if (!Array.isArray(summaries)) throw new Error("Byline design index was malformed.");
-  const designs = await Promise.all(summaries.map(async ({ template }) => {
-    const designResponse = await fetch(`${endpoint.replace(/\/designs\/?$/, "/design")}/${encodeURIComponent(template)}`, { signal: AbortSignal.timeout(10000) });
-    if (!designResponse.ok) throw new Error(`Byline could not load design ${template}: ${designResponse.status}`);
-    return [template, await designResponse.json()];
-  }));
-  return Object.fromEntries(designs);
-}
-
 const publication = await loadPublication();
-const designs = await loadDesigns(publication);
+if (publication) publication.appearance = { theme: "weekly-wildcat", tokenOverrides: {} };
 if (astroArguments[0] === "build") {
   const buildDirectory = path.join(projectRoot, ".byline-build");
   await rm(buildDirectory, { recursive: true, force: true });
@@ -70,8 +53,7 @@ const child = spawnSync(process.execPath, [astroCommand, ...astroArguments], {
     WORDPRESS_FETCH_CACHE_KEY: process.env.WORDPRESS_FETCH_CACHE_KEY || process.env.CF_PAGES_COMMIT_SHA || `local-build-${Date.now()}`,
     ...(publication ? { BYLINE_PUBLICATION_JSON: JSON.stringify(publication) } : {}),
     ...(publication?.urls?.publicSite && !process.env.NEXT_PUBLIC_SITE_URL ? { NEXT_PUBLIC_SITE_URL: publication.urls.publicSite } : {}),
-    ...(publication?.urls?.cms && !process.env.NEXT_PUBLIC_WP_API_URL ? { NEXT_PUBLIC_WP_API_URL: `${String(publication.urls.cms).replace(/\/$/, "")}/wp-json/wp/v2` } : {}),
-    ...(Object.keys(designs).length ? { BYLINE_DESIGNS_JSON: JSON.stringify(designs) } : {})
+    ...(publication?.urls?.cms && !process.env.NEXT_PUBLIC_WP_API_URL ? { NEXT_PUBLIC_WP_API_URL: `${String(publication.urls.cms).replace(/\/$/, "")}/wp-json/wp/v2` } : {})
   },
   stdio: "inherit"
 });
@@ -84,5 +66,4 @@ if (astroArguments[0] === "build") {
   const outputDirectory = path.join(projectRoot, "out", "_byline");
   await mkdir(outputDirectory, { recursive: true });
   await writeFile(path.join(outputDirectory, "publication.json"), `${JSON.stringify(activePublication, null, 2)}\n`);
-  await writeFile(path.join(outputDirectory, "designs.json"), `${JSON.stringify(designs, null, 2)}\n`);
 }

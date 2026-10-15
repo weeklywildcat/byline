@@ -1128,16 +1128,6 @@ function byline_editorial_activity_on_build_live($expected_revision = 0, $manife
     }
 }
 
-function byline_editorial_activity_on_design_published($template, $revision = 0, $source = ''): void
-{
-    byline_record_activity(0, 'design_published', [
-        'objectType' => 'design',
-        'template' => $template,
-        'revision' => $revision,
-        'source' => is_scalar($source) ? $source : 'system',
-    ]);
-}
-
 function byline_editorial_activity_on_newsletter_requested($post_id, $payload = [], $request_id = ''): void
 {
     byline_record_activity(byline_activity_absint($post_id), 'newsletter_scheduled', [
@@ -1170,7 +1160,6 @@ function byline_register_editorial_activity_hooks(): void
     add_action('byline_editorial_build_started', 'byline_editorial_activity_on_build_started', 10, 2);
     add_action('byline_editorial_build_failed', 'byline_editorial_activity_on_build_failed', 10, 2);
     add_action('byline_editorial_build_live', 'byline_editorial_activity_on_build_live', 10, 2);
-    add_action('byline_design_published', 'byline_editorial_activity_on_design_published', 10, 3);
     add_action('byline_distribution_newsletter_requested', 'byline_editorial_activity_on_newsletter_requested', 10, 3);
 }
 

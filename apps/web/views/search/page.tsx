@@ -7,7 +7,6 @@ import { buildPageMetadata } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import { getBylineRestUrl } from "@/lib/byline-rest";
 import { toSearchFacetValue } from "@/lib/search";
-import { getGameHref, getSeasonHref, getTeamHubHref } from "@/lib/sports";
 import { getPostContributors, getPostHref } from "@/lib/wordpress";
 
 const publication = getPublicationConfig();
@@ -36,8 +35,7 @@ function getSearchExcerpt(value: string) {
 
 export async function getSearchPageProps() {
   const snapshot = await getBuildSnapshot();
-  const { posts, sports } = snapshot;
-  const { games, teams } = sports;
+  const { posts, pages } = snapshot;
   const visiblePosts = filterVisibleContentPosts(posts);
   const storyItems: SearchIndexItem[] = visiblePosts.map((post) => {
     const title = stripHtml(post.title.rendered);
@@ -71,65 +69,16 @@ export async function getSearchPageProps() {
       sortDate: post.date
     };
   });
-  const teamItems: SearchIndexItem[] = teams.map((team) => ({
-    id: `team-${team.slug}`,
-    kind: "team",
-    title: team.name,
-    excerpt: `${team.seasons.length} season${team.seasons.length === 1 ? "" : "s"} available. Latest season: ${team.latestSeason}.`,
-    href: getTeamHubHref(team),
-    category: "Team Hub",
-    section: "sports",
-    sectionLabel: "Sports",
-    author: `${publication.identity.shortName} Sports`,
-    authorKey: toSearchFacetValue(`${publication.identity.shortName} Sports`),
-    date: team.latestSeason,
-    sortDate: team.latestSeason,
-    searchTokens: [team.slug, team.shortName, ...team.sportKeys, ...team.seasons]
+  const archiveItems: SearchIndexItem[] = pages.filter((page) => page.bylinePage?.sportsArchive).map((page) => ({
+    id: `archive-${page.id}`,
+    kind: "archive",
+    title: stripHtml(page.title.rendered),
+    excerpt: getSearchExcerpt(page.excerpt.rendered || page.content.rendered),
+    href: `/${page.slug}/`, category: "Sports Archive", section: "sports", sectionLabel: "Sports",
+    author: "", authorKey: "", date: "", sortDate: page.modified,
+    searchTokens: [...new Set(stripHtml(page.content.rendered).split(/\s+/).filter(Boolean))]
   }));
-  const seasonItems: SearchIndexItem[] = teams.flatMap((team) =>
-    team.seasons.map((year) => ({
-      id: `season-${team.slug}-${year}`,
-      kind: "season" as const,
-      title: `${team.name} ${year}`,
-      excerpt: `Schedule and results for the ${year} ${team.name} season.`,
-      href: getSeasonHref(team, year),
-      category: "Season Archive",
-      section: "sports",
-      sectionLabel: "Sports",
-      author: `${publication.identity.shortName} Sports`,
-      authorKey: toSearchFacetValue(`${publication.identity.shortName} Sports`),
-      date: year,
-      sortDate: `${year}-01-01`,
-      searchTokens: [team.slug, team.shortName, "schedule", "scores", "results"]
-    }))
-  );
-  const gameItems: SearchIndexItem[] = games.map((game) => ({
-    id: `game-${game.id}`,
-    kind: "game",
-    title: game.display.matchup || game.title,
-    excerpt: [game.display.date, game.display.location, game.display.status, game.display.score].filter(Boolean).join(" · "),
-    href: getGameHref(game),
-    category: "Game",
-    section: "sports",
-    sectionLabel: "Sports",
-    author: game.display.sportLevel || game.sportLabel || `${publication.identity.shortName} Sports`,
-    authorKey: toSearchFacetValue(game.display.sportLevel || game.sportLabel || `${publication.identity.shortName} Sports`),
-    date: game.display.date || game.startDate,
-    sortDate: game.startDate,
-    searchTokens: [
-      String(game.id),
-      game.sportKey,
-      game.sport,
-      game.level,
-      game.teamLabel,
-      game.opponent,
-      game.site,
-      game.locationName,
-      game.locationAddress,
-      game.startDate
-    ].filter((value): value is string => Boolean(value))
-  }));
-  const items = [...teamItems, ...seasonItems, ...storyItems, ...gameItems];
+  const items = [...storyItems, ...archiveItems];
 
   return {
     items,

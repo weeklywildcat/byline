@@ -7,7 +7,7 @@ static public presentation.
 
 - WordPress plus the legacy-compatible Byline plugin are the control plane.
   WordPress owns stories, people, pages, sports, events, polls and poll votes,
-  publication settings, designs, revisions, capabilities, and protected
+  publication settings, capabilities, and protected
   integration credentials.
 - The Astro app is a static build client. It reads public `/byline/v1` and
   legacy-compatible sports contracts through a single memoized build snapshot,
@@ -18,9 +18,9 @@ static public presentation.
   route normalization, redirect validation, snapshot construction, and media
   identities. Astro pages consume those contracts instead of independently
   rediscovering WordPress relationships.
-- Shared workspace packages define publication, content-query, design, Studio,
-  theme, and React 18/19-compatible UI contracts. Official themes consume data
-  through normalized props and never fetch WordPress directly.
+- Shared workspace packages define publication, content-query, homepage package,
+  Weekly Wildcat theme, and React UI contracts. Renderers consume normalized
+  props and never fetch WordPress directly.
 - Editorial workflow is a first-class Byline domain, separate from WordPress
   publication state. It owns a story's stage, assigned editor, deadline, and
   visual needs, and integrations consume it rather than owning it. See
@@ -36,53 +36,22 @@ metadata, options, routes, and environment names so existing installations are
 not stranded. The standalone repository remains available for historical
 releases and the updater bridge.
 
-## Three customization levels
+## Homepage and publication settings
 
-1. **Configure** — administrators use the Byline WordPress area for identity,
-   location/language, branding and Media Library assets, semantic appearance
-   tokens, sections, navigation/footer groups, social links, licensing/SEO,
-   optional modules, teams, and deployment. Public configuration is versioned
-   and excludes secrets.
-2. **Design** — Byline Studio bundles Puck inside a normal authenticated
-   WordPress admin page. It uses cookie/nonce REST, an isolated preview iframe,
-   newspaper block IDs, bounded queries/IDs, autosaves, publish capabilities,
-   revisions, and optimistic locking. Designs wrap Puck data in the Byline
-   schema and never store generated HTML, CSS, or executable code.
-3. **Extend** — trusted administrator-installed packages register namespaced
-   themes, blocks, variants, and optional-module mappings. See
-   [extensions.md](extensions.md). Level 1 and 2 input remains strictly
-   allowlisted and cannot inject executable code.
+The homepage always uses `getWeeklyWildcatHomeDesign` in `packages/design/src/home-design.ts`. Its fixed order is Lead, Brief, In Focus, Special Coverage, Opinion, Sports, More, and Newsletter. Shared content resolvers select stories automatically with layout-wide deduplication and the sticky lead rule. Missing optional content collapses its section.
 
-## Publication and design lifecycle
-
-The public publication payload drives identity, URLs, theme tokens, sections,
-navigation, social links, feature gates, licensing, and SEO. A fresh install is
-seeded from WordPress locale/timezone and site identity. Only a recognized
-Weekly Wildcat host receives the exact compatibility fixture.
-
-Published design documents and per-user autosaves are separate. Publishing
-validates schema/size/blocks/queries/features, compares the submitted base
-revision, creates a WordPress revision, promotes the document, clears that
-user's autosave, and coalesces a deployment trigger. Restoring a revision creates
-an unpublished draft. Static builds read only published documents and fail
-clearly on incompatible schemas or unsupported theme blocks.
-
-Story blocks store `StoryQuery` rules or WordPress IDs. Production resolution
-walks blocks in order with one layout-wide used-ID set; duplicates are excluded
-unless `allowDuplicates` is explicitly enabled. Missing optional data collapses
-the block, while incompatible required contracts fail the build.
+The Weekly Wildcat theme is the only theme. Appearance overrides and stored designs cannot alter the public layout. WordPress still owns identity, branding, navigation, feature flags, and editorial content. Historical design posts remain registered privately; no design read, autosave, publish, or scheduling routes are registered. Pending historical design schedules no longer run. No stored records are deleted.
 
 ## Security and operations
 
-Public responses and build artifacts contain only versionable publication and
-design state. Deploy hooks, Discord/OAuth/bridge secrets, and API credentials
+Public responses and build artifacts contain only public publication settings. Deploy hooks, Discord/OAuth/bridge secrets, and API credentials
 remain in protected WordPress options, constants, or service environments.
 Privileged REST routes require explicit Byline capabilities and WordPress
 cookie/nonce authentication. Diagnostics expose versions, health, compatibility,
 module and deployment status, but never raw URLs, tokens, or credentials.
 
 Deployment uses a provider filter and ships a generic HTTPS POST hook with
-Cloudflare, Netlify, Vercel, and GitHub Actions as examples. The CMS and Studio
+Cloudflare, Netlify, Vercel, and GitHub Actions as examples. The CMS admin tools
 remain usable before the first deployment and whenever the public site is
 unreachable.
 
@@ -90,6 +59,10 @@ The Cloudflare Worker and `wrangler.jsonc` are unchanged by the renderer switch:
 static assets still come from `apps/web/out`, while `/api/*` continues through
 the poll proxy. See [migration/astro.md](migration/astro.md) for the build graph,
 verification reports, cache invalidation, and rollback procedure.
+
+## Sports archive
+
+Custom sports management has been removed. A versioned plugin upgrade converts published game and roster records into ordinary Pages, grouped by sport, season, and team level. The original records and read APIs remain available; editing is denied. Astro renders the Pages, indexes their contents for search, and redirects historical team and season URLs. See [sports-archive.md](sports-archive.md) for conversion and recovery details.
 
 ## Runtime poll state
 

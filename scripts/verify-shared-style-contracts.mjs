@@ -71,37 +71,22 @@ globalsRoot.walkRules((rule) => {
 
 const webLayout = await readFile("apps/web/src/layouts/BaseLayout.astro", "utf8");
 const webHomepage = await readFile("apps/web/src/pages/index.astro", "utf8");
-const studioEntry = await readFile("wordpress-plugin/src/index.tsx", "utf8");
-const studio = await readFile("wordpress-plugin/src/studio.tsx", "utf8");
-const adminApp = await readFile("wordpress-plugin/includes/admin/app.php", "utf8");
 const leadPackage = await readFile("packages/ui/src/LeadPackage.tsx", "utf8");
-const editorialLeadPackage = await readFile("packages/ui/src/EditorialLeadPackage.tsx", "utf8");
 
-for (const [host, source] of [["frontend", webLayout], ["Studio", studioEntry]]) {
+for (const [host, source] of [["frontend", webLayout]]) {
   if (!source.includes('@byline/theme-weekly-wildcat/styles.css')) {
     throw new Error(`${host} does not consume the canonical Weekly Wildcat package stylesheet.`);
   }
 }
 
-if (!webHomepage.includes("byline-publication-preview") || !studio.includes("byline-publication-preview")) {
-  throw new Error("Both production and Studio must mount shared packages inside the publication style scope.");
+if (!webHomepage.includes("byline-publication-preview")) {
+  throw new Error("Production must mount shared packages inside the publication style scope.");
 }
 if (!leadPackage.includes('className="byline-package-empty-state"')
-  || !editorialLeadPackage.includes('className="byline-package-empty-state"')
   || !globalsCss.includes(".empty-state {")) {
   throw new Error("Package and app-page empty-state contracts must remain separate.");
 }
 if (sharedCss.includes("html[data-byline-theme")) {
   throw new Error("Shared theme variants must use the publication root's data-theme attribute across document boundaries.");
 }
-if (!studio.includes("overrides={{ iframe: iframeOverride }}")
-  || !studio.includes("createPortal")
-  || !studio.includes("document.head")
-  || !studio.includes("syncHostStyles: false")) {
-  throw new Error("Studio must load publication styles through Puck's supported iframe override without mirroring host CSS.");
-}
-if (!adminApp.includes("'previewStylesheetUrl' => plugins_url('build/index.css'")) {
-  throw new Error("WordPress does not expose the built shared stylesheet URL to the Puck iframe.");
-}
-
-console.log("Shared package CSS ownership, scoping, host loading, and Puck iframe contracts verified.");
+console.log("Shared package CSS ownership, scoping, and frontend loading verified.");

@@ -183,27 +183,23 @@ test.describe("public Astro site", () => {
     await expectNoBrowserErrors(errors);
   });
 
-  test("sports schedule has static content and a working filter", async ({ page, browser }) => {
-    const errors = collectBrowserErrors(page);
-    const response = await page.goto("/sports/schedule/", { waitUntil: "domcontentloaded" });
-
+  test("sports records are normal static Pages, including with JavaScript disabled", async ({ page, browser }) => {
+    const response = await page.goto("/sports-archive/", { waitUntil: "domcontentloaded" });
     expect(response?.status()).toBe(200);
-    await expect(page.locator(".schedule-game-card")).toContainText("Fixture Academy");
-    await expect(page.locator('select[aria-label="Sport"]')).toBeVisible();
-
-    await page.route("**/weekly-wildcat/v1/sports-games**", (route) => route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: "[]"
-    }));
-    await page.locator('select[aria-label="Sport"]').selectOption("football-varsity");
-    await expect(page.locator('select[aria-label="Sport"]')).toHaveValue("football-varsity");
-    await expect(page.locator(".schedule-archive-stats")).toContainText("0 games");
-    await expectNoBrowserErrors(errors);
-
-    const noJs = await openWithoutJavaScript(browser, "/sports/schedule/");
+    await expect(page.getByRole("heading", { name: "Sports Archive", exact: true })).toBeVisible();
+    await page.getByRole("link", { name: "View Football records" }).click();
+    await expect(page.getByRole("heading", { name: "Football Archive", exact: true })).toBeVisible();
+    await expect(page.locator(".static-page-content")).toContainText("Wildcats 0");
+    await expect(page.locator(".static-page-content")).toContainText("Football JV");
+    await expect(page.locator("table").filter({ hasText: "Head coach" })).toBeVisible();
+    await page.goto("/sports/football-varsity/2025-26/", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/sports-archive-football-2\/#season-2025-26$/);
+    await page.goto("/search/?q=Coach&type=archive", { waitUntil: "domcontentloaded" });
+    await expect(page.locator(".search-result")).toContainText("Football Archive");
+    const noJs = await openWithoutJavaScript(browser, "/sports-archive-football-2/");
     try {
-      await expect(noJs.page.locator(".schedule-game-card")).toContainText("Fixture Academy");
+      await expect(noJs.page.locator(".static-page-content")).toContainText("Wildcats 0");
+      await expect(noJs.page.getByRole("heading", { name: "Football Archive", exact: true })).toBeVisible();
     } finally {
       await noJs.context.close();
     }

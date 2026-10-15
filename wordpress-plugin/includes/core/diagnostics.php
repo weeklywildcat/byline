@@ -60,32 +60,12 @@ function byline_public_manifest_diagnostic(): array
 
     $code = (int) wp_remote_retrieve_response_code($response);
     $manifest = json_decode((string) wp_remote_retrieve_body($response), true);
-    $design_revisions = [];
-    if (is_array($manifest) && is_array($manifest['designRevisions'] ?? null)) {
-        foreach ($manifest['designRevisions'] as $template => $revision) {
-            if (!is_scalar($template) || !is_scalar($revision)) {
-                continue;
-            }
-            // Section templates contain a colon (section:slug), which
-            // sanitize_key() would remove and make impossible to match to the
-            // frontend manifest. Validate the known template grammar without
-            // changing the key we compare.
-            $template = strtolower(trim((string) $template));
-            if (preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*(?::[a-z0-9]+(?:-[a-z0-9]+)*)?$/', $template) !== 1
-                || (function_exists('byline_is_design_template') && !byline_is_design_template($template))) {
-                continue;
-            }
-            $design_revisions[$template] = absint($revision);
-        }
-    }
-
     $diagnostic = [
         'reachable' => $code >= 200 && $code < 300 && is_array($manifest),
         'status' => 'HTTP ' . $code,
         'protocolVersion' => is_array($manifest) ? (int) ($manifest['protocolVersion'] ?? 0) : 0,
         'frontendVersion' => is_array($manifest) ? sanitize_text_field((string) ($manifest['frontendVersion'] ?? '')) : '',
         'publicationRevision' => is_array($manifest) ? (int) ($manifest['publicationRevision'] ?? $manifest['contentRevision'] ?? 0) : 0,
-        'designRevisions' => $design_revisions,
     ];
     $diagnostic['contentRevision'] = $diagnostic['publicationRevision'];
     $diagnostic['expectedRevision'] = $expected_revision;
@@ -100,24 +80,6 @@ function byline_public_manifest_diagnostic(): array
         do_action('byline_editorial_build_live', (int) $diagnostic['expectedRevision'], $diagnostic);
     }
     return $diagnostic;
-}
-
-function byline_design_migration_count(): int
-{
-    $posts = get_posts([
-        'post_type' => BYLINE_DESIGN_POST_TYPE,
-        'post_status' => 'publish',
-        'posts_per_page' => -1,
-        'fields' => 'ids',
-    ]);
-    $count = 0;
-    foreach ($posts as $post_id) {
-        $document = json_decode((string) get_post_field('post_content', $post_id), true);
-        if (!is_array($document) || (int) ($document['schemaVersion'] ?? 0) !== BYLINE_DESIGN_SCHEMA_VERSION) {
-            $count++;
-        }
-    }
-    return $count;
 }
 
 /**
@@ -141,7 +103,6 @@ function byline_diagnostics_safe_runtime(): array
         foreach ([
             'protocol' => '/byline/v1/capabilities/protocol',
             'publication' => '/byline/v1/publication',
-            'designs' => '/byline/v1/designs',
             'diagnostics' => '/byline/v1/admin/diagnostics',
             'health' => '/byline/v1/admin/health',
             'jobs' => '/byline/v1/admin/jobs',
@@ -279,7 +240,6 @@ function byline_diagnostics_payload(): array
         'deployment' => $deployment,
         'publicManifest' => byline_public_manifest_diagnostic(),
         'restHealth' => $rest_health,
-        'designsNeedingMigration' => byline_design_migration_count(),
         'polls' => function_exists('byline_poll_diagnostics') ? byline_poll_diagnostics() : null,
         'schemaVersions' => $runtime['schemaVersions'],
         'pageMigration' => $page_migration,
@@ -289,7 +249,9 @@ function byline_diagnostics_payload(): array
         'cronAvailable' => $runtime['cronAvailable'],
         'jobs' => function_exists('byline_jobs_diagnostics') ? byline_jobs_diagnostics() : null,
         'healthChecks' => $health_checks,
-        'sports' => function_exists('byline_sports_health') ? byline_sports_health() : null,
+        'sportsArchive' => defined('BYLINE_SPORTS_ARCHIVE_VERSION_OPTION') ? [
+            'converted' => (int) get_option(BYLINE_SPORTS_ARCHIVE_VERSION_OPTION, 0) >= BYLINE_SPORTS_ARCHIVE_VERSION,
+        ] : null,
     ];
 
     $payload['healthSummary'] = function_exists('byline_health_summary')

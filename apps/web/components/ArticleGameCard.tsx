@@ -96,7 +96,7 @@ export function ArticleGameCard({ game, display = "full", className = "" }: Arti
       ) : null}
 
       <a className="article-game-link" href={getGameCenterHref(game)}>
-        View Game Center →
+        View archived record →
       </a>
     </aside>
   );

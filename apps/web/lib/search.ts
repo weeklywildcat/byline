@@ -1,4 +1,4 @@
-export const SEARCH_ITEM_KINDS = ["story", "team", "season", "game"] as const;
+export const SEARCH_ITEM_KINDS = ["story", "archive", "team", "season", "game"] as const;
 
 export type SearchItemKind = (typeof SEARCH_ITEM_KINDS)[number];
 export type SearchFilter = "all" | SearchItemKind;
@@ -78,6 +78,7 @@ export function getItemKind(item: SearchIndexItem): SearchItemKind {
 }
 
 export function getResultLabel(kind: SearchItemKind) {
+  if (kind === "archive") return "Archive";
   if (kind === "team") return "Team";
   if (kind === "season") return "Season";
   if (kind === "game") return "Game";
@@ -399,12 +400,14 @@ export function matchesSearchFilters(item: SearchIndexItem, state: SearchUrlStat
 export function limitMixedResults(results: SearchIndexItem[]) {
   const counts: Record<SearchItemKind, number> = {
     story: 0,
+    archive: 0,
     team: 0,
     season: 0,
     game: 0
   };
   const caps: Record<SearchItemKind, number> = {
     story: 12,
+    archive: 8,
     team: 8,
     season: 8,
     game: 4

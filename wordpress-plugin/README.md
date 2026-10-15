@@ -1,10 +1,11 @@
 # Byline for WordPress
 
-WordPress control plane for the open-source Byline publishing platform.
+WordPress control plane for Weekly Wildcat.
 
-The plugin provides publication settings, first-party theme selection, Byline
-Studio, private design storage with autosaves and revisions, sports/events
-content, and integrations. Its versioned `/byline/v1` API separates public
+The plugin provides publication settings, newsroom workflows, sports/events
+content, and integrations. The public homepage uses a fixed Weekly Wildcat
+layout maintained in code. Historical design posts remain private and stored;
+the designer, design APIs, publishing, and scheduling have been removed. Its versioned `/byline/v1` API separates public
 static-build data from capability-protected admin operations.
 
 The legacy installed folder, `weekly-wildcat-headless.php` entrypoint,
@@ -13,21 +14,19 @@ remain unchanged. The live `v0.2.1` bridge moved future update checks from the
 standalone plugin repository to the canonical Byline monorepo.
 
 The admin bundle uses WordPress-provided React through `@wordpress/element` and
-dependency extraction. It does not ship a second React runtime. Puck and its
-styles are compiled into release assets.
+dependency extraction. It does not ship a second React runtime.
 
 ## What It Adds
 
-- Admin sidebar item: Sports Games
+- Fixed Sports Archive Pages generated once from published historical game and roster records
 - Admin sidebar item: School Events
 - Admin sidebar item: Polls
-- Custom post type: `ww_sports_game`
+- Retained private, read-only source post types: `ww_sports_game` and `ww_sports_roster`
 - Custom post type: `ww_school_event`
 - Custom post type: `byline_poll`
 - Custom table: `{prefix}byline_poll_votes`
 - Public read-only REST endpoints:
   - `/wp-json/byline/v1/publication`
-  - `/wp-json/byline/v1/designs`
   - `/wp-json/byline/v1/polls/active`
   - `/wp-json/byline/v1/polls/{id}/results`
   - `/wp-json/byline/v1/sports/teams`
@@ -179,19 +178,11 @@ npm run test:php
 npm run package:plugin
 ```
 
-## Notes
+## Historical sports records
 
-- Sports Games use one record for scheduled games, final scores, ties, forfeits, postponements, and cancellations.
-- Teams are configurable entities with stable keys, names, level/division, slug, active state, marks, focal point, and accent color. Existing Weekly Wildcat keys migrate unchanged, and removing a team from a replacement payload retains it as inactive so old games and rosters continue to resolve.
-- Sports Games expose `sportKey`, `sportLabel`, location name, address, latitude, longitude, and optional Apple Maps place ID.
-- Sports Team Settings support a click-to-position header image focal point. The sports team endpoint exposes it as `headerImageFocalPoint.x` and `headerImageFocalPoint.y` percentages for CSS `object-position`.
-- Team Rosters store one published roster per controlled team and `YYYY-YY` school year, with ordered student-athlete and staff rows. Editors can manage rows manually or preview and replace rosters through CSV import/export.
-- The public sports roster endpoint accepts optional `teamKey` and `season` filters and excludes draft rosters.
-- Scores are returned publicly only when a game status is `final` or `tie`; forfeits are exposed as status-only results.
-- School Events support scheduled and canceled statuses.
-- The Next.js frontend has typed helpers in `lib/headless.ts`.
-- Author profile data is exposed on public user REST responses as `weeklyWildcatProfile`.
-- Authors are exposed through `/weekly-wildcat/v1/authors` so contributors can appear before publishing a story. The author directory visibility checkbox is enabled by default and can be unchecked per user.
+The custom Games, Teams, Rosters, imports/exports, and game-linking editors are removed. A versioned upgrade converts published records into normal Pages: a Sports Archive index and a Page for each sport, grouped by season and team level. These Pages publish through the static frontend and remain editable through the normal Page editor for corrections.
+
+Original post types, metadata/options, public read APIs, media, and existing article embeds remain available. No source records are deleted. School Events remain editable independently. See [sports archive migration and recovery](../docs/sports-archive.md).
 
 ## Discord newsroom integration
 

@@ -22,9 +22,11 @@ or other normal-page prose.
   editable blocks and placeholder copy; they are not publication-specific
   templates.
 
-Studio remains the authoring surface for homepage composition and saved
-homepage presentation. The post editor's editorial workflow remains for
-stories. Neither replaces the native Page editor.
+The homepage composition is maintained in code under `packages/design/src/home-design.ts`. The post editor's editorial workflow remains for stories.
+
+## Sports archive Pages
+
+Published historical games and rosters are converted once into normal Pages grouped by sport and season. The archive uses native headings, paragraphs, links, and tables, with no sports editor or dynamic schedule dependency. See [sports-archive.md](sports-archive.md).
 
 ## Migration behavior
 

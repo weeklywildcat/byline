@@ -1,15 +1,4 @@
-/**
- * Two independent WordPress entries.
- *
- * `index` is the Byline admin/Studio application. It is large by nature — Puck,
- * the shared theme packages, the whole design surface — and it belongs only on
- * Byline's own admin screens.
- *
- * `editorial-workflow` is the block-editor integration. It loads on every post
- * editor, so it stays deliberately small: WordPress packages are externalised by
- * the default @wordpress/scripts configuration, which means this entry ships no
- * React and no component library of its own.
- */
+// Admin, article preview, and Gutenberg entries share the local WordPress build.
 const defaultConfig = require('@wordpress/scripts/config/webpack.config');
 const path = require('path');
 

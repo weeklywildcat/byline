@@ -45,11 +45,6 @@ for (const retired of ["POLLS_DB", "poll_votes", "poll_options", "voter_key", "S
   }
 }
 
-const studioSource = await readFile("wordpress-plugin/src/studio.tsx", "utf8");
-if (/https?:\/\/|NEXT_PUBLIC_SITE_URL|NEXT_PUBLIC_WP_API_URL/.test(studioSource)) {
-  throw new Error("Studio must not load or depend on the public frontend.");
-}
-
 const outputRoot = "apps/web/out";
 const forbiddenPublicValues = [
   "BYLINE_TEST_SECRET_DO_NOT_EXPORT",
@@ -71,4 +66,4 @@ for (const file of await textFiles(outputRoot)) {
   }
 }
 
-console.log("Static-export, Studio independence, legacy storage, and public-secret contracts verified.");
+console.log("Static-export, legacy storage, and public-secret contracts verified.");

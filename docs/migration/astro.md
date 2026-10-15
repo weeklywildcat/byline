@@ -1,5 +1,7 @@
 # Astro frontend operations
 
+Historical migration notes: the layout designer, design APIs, and generic themes have since been removed. The current site uses the fixed Weekly Wildcat layout; see [architecture](../architecture.md).
+
 Byline's production frontend is a static Astro build. WordPress remains the
 control plane and authoritative content store; Cloudflare remains a static host
 plus the existing poll proxy.

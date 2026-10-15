@@ -12,9 +12,6 @@ public.
 - **Editorial workflow** tracks pitch, assignment, reporting, writing, editing,
   ready for review, on hold, dropped, and derived published state. It is
   separate from WordPress `post_status`.
-- **Studio** owns shared homepage/design documents. Publishers can publish now
-  or schedule a document, then reschedule, cancel, or rebase it when the live
-  revision has changed.
 - **Coverage** is a first-class public collection. The static `/coverage/`
   index links to each published `/coverage/<slug>/` page; coverage records and
   their linked stories are read from the public Byline API at build time.
@@ -37,20 +34,12 @@ and integration endpoints are protected by WordPress capabilities and should
 fail closed: an unauthenticated or unauthorized request must receive no
 private records and must not mutate state.
 
-Planned publication time is distinct from a story deadline and from
-`post_date`. A schedule stores an immutable document snapshot, the base live
-revision, an idempotency key, and its execution state. A revision conflict
-requires an explicit rebase or cancellation; it must never silently publish a
-stale snapshot.
-
 ## Publisher runbook
 
 1. Use Planning to filter the queue by workflow, editor, deadline, planned
    publication, coverage, or readiness. Treat the Calendar as the publication
    plan, not as a replacement for WordPress post status.
-2. In Studio, verify the document preview and current live revision. Schedule
-   with the intended timezone and confirm the resulting status. If the live
-   revision changes, inspect the diff and rebase deliberately before retrying.
+2. Review the fixed homepage after the static build. Story placement follows automatic selection rules, including the sticky lead.
 3. Before a public launch, run readiness and Content Health checks, confirm
    media requests are resolved, and review corrections/notes and contributor
    attribution.

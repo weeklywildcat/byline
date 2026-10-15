@@ -21,7 +21,6 @@
     "test:admin-runtime": "npm run test --workspace @byline/admin-runtime",
     "test:frontend": "npm run test --workspace @byline/web",
     "test:frontend:browser": "npm run test:browser --workspace @byline/web",
-    "test:frontend:second-publication": "npm run test:second-publication --workspace @byline/web",
     "test:plugin": "npm run test --workspace @byline/wordpress-plugin",
     "test:php": "bash scripts/test-plugin-php.sh",
     "test:discord": "npm run test --workspace @byline/discord-bot",

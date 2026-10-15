@@ -86,6 +86,15 @@ function byline_upgrade_steps(): array
         ];
     }
 
+    if (defined('BYLINE_SPORTS_ARCHIVE_VERSION_OPTION')) {
+        $steps['sportsArchive'] = [
+            'label' => 'fixed sports archive Pages',
+            'option' => BYLINE_SPORTS_ARCHIVE_VERSION_OPTION,
+            'version' => BYLINE_SPORTS_ARCHIVE_VERSION,
+            'callback' => 'byline_migrate_sports_archive',
+        ];
+    }
+
     return $steps;
 }
 
@@ -168,6 +177,7 @@ function byline_upgrade_failure_message(string $step): string
         'polls' => 'Poll database schema could not be upgraded.',
         'secrets' => 'Byline internal secrets could not be initialized.',
         'sports' => 'Sports configuration could not be upgraded.',
+        'sportsArchive' => 'Sports archive Pages could not be converted. Original records have been retained.',
         'rosterIdentities' => 'Roster row identities could not be upgraded.',
         'pages' => 'Publication pages could not be migrated.',
         'searchGaps' => 'Anonymous search-gap aggregate storage could not be installed.',

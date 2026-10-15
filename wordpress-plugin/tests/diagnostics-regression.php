@@ -66,9 +66,7 @@ if (!is_string($serialized)
     || strpos($serialized, 'secret.example.test') !== false
     || strpos($serialized, 'deployHook') !== false
     || $diagnostics['deployment']['configured'] !== true
-    || $diagnostics['publicManifest']['reachable'] !== true
-    || !isset($diagnostics['publicManifest']['designRevisions'])
-    || $diagnostics['publicManifest']['designRevisions'] !== ['home' => 12, 'section:news' => 13]) {
+    || $diagnostics['publicManifest']['reachable'] !== true) {
     fwrite(STDERR, "Diagnostics exposed secrets or omitted safe health information.\n");
     exit(1);
 }

@@ -23,10 +23,7 @@ poll_files=(
 )
 
 admin_assets=(
-  assets/game-linking.js
   assets/google-signin-light.png
-  assets/sports-rosters.css
-  assets/sports-rosters.js
   assets/weekly-wildcat-logo.svg
 )
 
@@ -113,7 +110,9 @@ if ! grep -qE "^= ${plugin_header_version//./\.} =$" "$plugin_root/readme.txt"; 
 fi
 
 asset_dependencies="$(php -r '$asset = include $argv[1]; echo implode("\n", $asset["dependencies"] ?? []);' "$plugin_root/build/index.asset.php")"
-for external_dependency in react react-dom react-jsx-runtime wp-element; do
+# The admin app uses WordPress element APIs. Direct react/react-dom imports
+# disappeared with the layout designer; JSX and element remain WP externals.
+for external_dependency in react-jsx-runtime wp-element; do
   if ! grep -qx "$external_dependency" <<<"$asset_dependencies"; then
     echo "React external $external_dependency is missing from the WordPress asset manifest." >&2
     exit 1
@@ -178,6 +177,11 @@ rm -f "$archive"
 unzip -tq "$archive"
 
 archive_files="$(unzip -Z1 "$archive")"
+if grep -qE '^weekly-wildcat-headless/includes/design/(schema|rest|publishing|scheduling)\.php$' <<<"$archive_files"; then
+  echo "Retired design runtime must not ship in the plugin archive." >&2
+  exit 1
+fi
+grep -qx 'weekly-wildcat-headless/includes/design/post-type.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/weekly-wildcat-headless.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.asset.php' <<<"$archive_files"

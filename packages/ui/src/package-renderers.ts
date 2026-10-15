@@ -1,7 +1,5 @@
 import type { ComponentType } from "react";
 import { BriefPackage, type BriefPackageProps, type ResolvedBriefPackage } from "./BriefPackage";
-import { EditorialLeadPackage } from "./EditorialLeadPackage";
-import { EditorialSportsPackage } from "./EditorialSportsPackage";
 import { InFocusPackage, type InFocusPackageProps, type ResolvedInFocusPackage } from "./InFocusPackage";
 import { LeadPackage, type LeadPackageProps, type ResolvedLeadPackage } from "./LeadPackage";
 import { MorePackage, type MorePackageRendererProps, type ResolvedMorePackage } from "./MorePackage";
@@ -24,113 +22,37 @@ export type ResolvedHomepagePackage =
 // This union keeps the canonical renderer models tied to their semantic package
 // types while package ordering and dispatch stay in one place.
 
-// Maps a theme to its renderer for a semantic package.
-//
-// This is the contract that makes themes meaningful: the design document, the
-// resolver and the resolved model are all theme-independent, and only the last
-// step differs. It is also what stops a theme from being able to change what an
-// editor configured -- a theme can only choose how to draw it.
-const LEAD_PACKAGE_RENDERERS: Record<string, ComponentType<LeadPackageProps>> = {
-  "weekly-wildcat": LeadPackage,
-  "byline-editorial": EditorialLeadPackage,
-  editorial: EditorialLeadPackage
-};
-
-/**
- * Returns the lead renderer for a theme.
- *
- * Themes without a bespoke treatment fall back to the Weekly Wildcat structure
- * rather than rendering nothing: a missing variant must degrade, never delete
- * the package. Callers can use `themeHasLeadPackageVariant` to warn in Studio
- * when a theme is falling back.
- */
-export function getLeadPackageRenderer(themeId: string): ComponentType<LeadPackageProps> {
-  return LEAD_PACKAGE_RENDERERS[themeId] ?? LeadPackage;
+// Retain the renderer helpers for existing package consumers; all use Weekly Wildcat.
+export function getLeadPackageRenderer(_themeId: string): ComponentType<LeadPackageProps> {
+  return LeadPackage;
 }
 
-export function themeHasLeadPackageVariant(themeId: string) {
-  return themeId in LEAD_PACKAGE_RENDERERS;
+export function getSportsPackageRenderer(_themeId: string): ComponentType<SportsPackageProps> {
+  return SportsPackage;
 }
 
-const SPORTS_PACKAGE_RENDERERS: Record<string, ComponentType<SportsPackageProps>> = {
-  "weekly-wildcat": SportsPackage,
-  "byline-editorial": EditorialSportsPackage,
-  editorial: EditorialSportsPackage
-};
-
-/**
- * Returns the sports renderer for a theme.
- *
- * Same degradation rule as the lead package: a theme with no bespoke sports
- * treatment falls back to the Weekly Wildcat structure rather than dropping the
- * package off the page.
- */
-export function getSportsPackageRenderer(themeId: string): ComponentType<SportsPackageProps> {
-  return SPORTS_PACKAGE_RENDERERS[themeId] ?? SportsPackage;
+export function getBriefPackageRenderer(_themeId: string): ComponentType<BriefPackageProps> {
+  return BriefPackage;
 }
 
-export function themeHasSportsPackageVariant(themeId: string) {
-  return themeId in SPORTS_PACKAGE_RENDERERS;
+export function getInFocusPackageRenderer(_themeId: string): ComponentType<InFocusPackageProps> {
+  return InFocusPackage;
 }
 
-const BRIEF_PACKAGE_RENDERERS: Record<string, ComponentType<BriefPackageProps>> = {
-  "weekly-wildcat": BriefPackage,
-  "byline-editorial": BriefPackage,
-  editorial: BriefPackage
-};
-
-export function getBriefPackageRenderer(themeId: string): ComponentType<BriefPackageProps> {
-  return BRIEF_PACKAGE_RENDERERS[themeId] ?? BriefPackage;
+export function getSpecialCoveragePackageRenderer(_themeId: string): ComponentType<SpecialCoveragePackageProps> {
+  return SpecialCoveragePackage;
 }
 
-const IN_FOCUS_PACKAGE_RENDERERS: Record<string, ComponentType<InFocusPackageProps>> = {
-  "weekly-wildcat": InFocusPackage,
-  "byline-editorial": InFocusPackage,
-  editorial: InFocusPackage
-};
-
-export function getInFocusPackageRenderer(themeId: string): ComponentType<InFocusPackageProps> {
-  return IN_FOCUS_PACKAGE_RENDERERS[themeId] ?? InFocusPackage;
+export function getOpinionPackageRenderer(_themeId: string): ComponentType<OpinionPackageProps> {
+  return OpinionPackage;
 }
 
-const SPECIAL_COVERAGE_PACKAGE_RENDERERS: Record<string, ComponentType<SpecialCoveragePackageProps>> = {
-  "weekly-wildcat": SpecialCoveragePackage,
-  "byline-editorial": SpecialCoveragePackage,
-  editorial: SpecialCoveragePackage
-};
-
-export function getSpecialCoveragePackageRenderer(themeId: string): ComponentType<SpecialCoveragePackageProps> {
-  return SPECIAL_COVERAGE_PACKAGE_RENDERERS[themeId] ?? SpecialCoveragePackage;
+export function getMorePackageRenderer(_themeId: string): ComponentType<MorePackageRendererProps> {
+  return MorePackage;
 }
 
-const OPINION_PACKAGE_RENDERERS: Record<string, ComponentType<OpinionPackageProps>> = {
-  "weekly-wildcat": OpinionPackage,
-  "byline-editorial": OpinionPackage,
-  editorial: OpinionPackage
-};
-
-export function getOpinionPackageRenderer(themeId: string): ComponentType<OpinionPackageProps> {
-  return OPINION_PACKAGE_RENDERERS[themeId] ?? OpinionPackage;
-}
-
-const MORE_PACKAGE_RENDERERS: Record<string, ComponentType<MorePackageRendererProps>> = {
-  "weekly-wildcat": MorePackage,
-  "byline-editorial": MorePackage,
-  editorial: MorePackage
-};
-
-export function getMorePackageRenderer(themeId: string): ComponentType<MorePackageRendererProps> {
-  return MORE_PACKAGE_RENDERERS[themeId] ?? MorePackage;
-}
-
-const NEWSLETTER_PACKAGE_RENDERERS: Record<string, ComponentType<NewsletterPackageProps>> = {
-  "weekly-wildcat": NewsletterPackage,
-  "byline-editorial": NewsletterPackage,
-  editorial: NewsletterPackage
-};
-
-export function getNewsletterPackageRenderer(themeId: string): ComponentType<NewsletterPackageProps> {
-  return NEWSLETTER_PACKAGE_RENDERERS[themeId] ?? NewsletterPackage;
+export function getNewsletterPackageRenderer(_themeId: string): ComponentType<NewsletterPackageProps> {
+  return NewsletterPackage;
 }
 
 export function getHomepagePackageRenderer(type: ResolvedHomepagePackage["type"], themeId: string) {

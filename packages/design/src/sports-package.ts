@@ -77,17 +77,6 @@ export const WEEKLY_WILDCAT_SPORTS_DEFAULTS: SportsPackageProps = {
   archiveLink: { enabled: true, href: "/sports/", label: "All Sports →" }
 };
 
-export const NEUTRAL_SPORTS_DEFAULTS: SportsPackageProps = {
-  heading: "Sports",
-  stories: { source: { type: "section", slug: "sports" }, limit: 3 },
-  athleteSpotlight: { enabled: false, source: { type: "athlete-spotlight" } },
-  scores: { enabled: true, limit: 2 },
-  upcoming: { enabled: true, limit: 3 },
-  presentation: { showDeck: true, showBylines: true, showReadLink: true, cleanDeck: true },
-  content: "full",
-  archiveLink: { enabled: true, href: "/sports/", label: "All Sports →" }
-};
-
 const MAX_STORIES = 12;
 const MAX_SCORES = 8;
 const MAX_UPCOMING = 12;

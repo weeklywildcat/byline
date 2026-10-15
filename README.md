@@ -1,24 +1,18 @@
 # Byline
 
-Byline is an open-source publishing platform for static news sites. This is the
-canonical monorepo for the public Astro static site, WordPress control-plane plugin,
-shared contracts and themes, Byline Studio, and the optional Discord newsroom
-service. Weekly Wildcat remains the compatibility/default publication; other
-publications supply the same versioned contracts without forking the platform.
+Byline powers the Weekly Wildcat newsroom and static public site. This monorepo contains the Astro frontend, WordPress admin tools, shared packages, and optional Discord service. The homepage uses one custom layout maintained in code.
 
 ## Repository layout
 
 - `apps/web/` — public Astro app. It reads one normalized build snapshot and
   produces a static export; it has no auth, database, SSR, or runtime app server.
 - `apps/discord-bot/` — separately deployed, stateless Discord newsroom service.
-- `wordpress-plugin/` — WordPress control plane and Studio. The installable
+- `wordpress-plugin/` — WordPress control plane and newsroom tools. The installable
   folder remains `weekly-wildcat-headless/` and the main file remains
   `weekly-wildcat-headless.php`.
-- `packages/` — canonical publication, content, design, Studio, UI, and theme
-  contracts plus first-party themes. Studio and the public frontend consume the
-  same block presentations, viewports, theme definitions, and CSS-token mapping.
+- `packages/` — canonical publication, content, homepage package, UI, and Weekly Wildcat theme contracts.
 - `schemas/` — versioned JSON schemas.
-- `docs/` — architecture, extension, compatibility, and migration guidance.
+- `docs/` — architecture, compatibility, and migration guidance.
 - `scripts/` — root validation and release packaging utilities.
 
 ## Setup and root commands
@@ -40,7 +34,6 @@ Useful scoped commands:
 npm run typecheck:frontend
 npm run test:frontend
 npm run build:frontend
-npm run test:frontend:second-publication
 
 npm run test:plugin
 npm run typecheck:plugin
@@ -61,13 +54,13 @@ externals.
 ## Frontend
 
 Copy `apps/web/.env.example` to `apps/web/.env.local` when using a CMS directly.
-The app reads `/byline/v1/publication` and published design endpoints before the
+The app reads `/byline/v1/publication` before the
 Astro build. Fixture/CI builds can use `BYLINE_PUBLICATION_FILE`,
-`BYLINE_PUBLICATION_JSON`, and `BYLINE_DESIGNS_FILE`.
+and `BYLINE_PUBLICATION_JSON`.
 
 `apps/web/astro.config.mjs` intentionally uses static output, trailing slashes,
 and the existing `apps/web/out/` deployment directory. The result includes safe
-publication/design manifests and requires no public Byline server. The old Next
+publication and build manifests and requires no public Byline server. The old Next
 route tree and runnable exporter were removed at cutover; the tagged rollback
 point remains the authoritative copy of that implementation.
 
@@ -76,17 +69,15 @@ definitions and vote records; `apps/web/src/worker.js` is a thin same-origin
 proxy from the relative `/api/polls/*` contract to `/byline/v1/polls/*`. It has
 no database binding. See [docs/polls.md](docs/polls.md).
 
-The North Star acceptance command builds a second publication from local
-fixtures and scans HTML, JSON, and XML for Weekly Wildcat identity, theme, or
-disabled-module leakage.
-
-## WordPress plugin and Studio
+## WordPress plugin
 
 The plugin owns durable editorial settings, legacy sports/events storage,
 publication configuration, protected deployment/Discord integrations, and
-private Studio drafts/revisions. Public static builds read published designs
-only. Studio runs within authenticated WordPress admin and never depends on the
-public site being reachable.
+newsroom workflows. Admin tools work without the public site being reachable.
+The fixed homepage follows automatic selection rules, including the sticky lead.
+Sports management is retired; the plugin converts published game and roster records to fixed archive Pages grouped by sport and season. See [sports archive](docs/sports-archive.md).
+There is no layout editor, manual homepage pinning, or design scheduling.
+Historical design posts remain stored privately and are no longer read or published.
 
 Legacy CPTs, metadata/options, REST aliases, installed slug, main file, and ZIP
 name are compatibility contracts. Do not rename them as cleanup. See
@@ -101,7 +92,7 @@ Future WordPress releases are published from `weeklywildcat/byline`:
 2. Merge the tested change to `main`.
 3. Create and push a matching `vX.Y.Z` tag without rewriting existing tags.
 4. `.github/workflows/release-plugin.yml` runs JS/TS and PHP validation, builds
-   Studio, validates the production ZIP, and publishes
+   admin assets, validates the production ZIP, and publishes
    `weekly-wildcat-headless.zip`.
 
 Historical plugin tags imported into this repository are prefixed `plugin-` so
@@ -116,13 +107,12 @@ store. Its `.env.example`, Dockerfile, and compose example document deployment.
 It is tested and built by monorepo CI but is always excluded from the WordPress
 ZIP.
 
-## Architecture and extension points
+## Architecture and operations
 
 - [Architecture](docs/architecture.md)
 - [Astro frontend operations and rollback](docs/migration/astro.md)
 - [Astro migration benchmark](docs/migration/astro-benchmark.md)
 - [Polls: WordPress storage, REST, proxy, and D1 migration](docs/polls.md)
-- [Extension contracts](docs/extensions.md)
 - [Updater bridge and retirement criteria](docs/updater-transition.md)
 - [Legacy compatibility contracts](docs/migration/current-contracts.md)
 

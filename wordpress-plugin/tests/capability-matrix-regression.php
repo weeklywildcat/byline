@@ -133,13 +133,11 @@ function register_rest_route(string $namespace, string $route, $args): void
 require __DIR__ . '/../includes/admin/app.php';
 require __DIR__ . '/../includes/core/compatibility.php';
 require __DIR__ . '/../includes/publication/config.php';
-require __DIR__ . '/../includes/design/rest.php';
 require __DIR__ . '/../includes/integrations/deployment.php';
 require __DIR__ . '/../includes/sports/teams.php';
 
 byline_register_admin_app();
 byline_register_publication_routes();
-byline_register_design_routes();
 byline_register_deployment_routes();
 byline_register_sports_team_routes();
 
@@ -205,10 +203,10 @@ $profiles = [
 ];
 
 $expected_menus = [
-    'administrator' => ['byline-planning', 'byline-studio', 'byline'],
+    'administrator' => ['byline-planning', 'byline'],
     'editor' => ['byline-planning'],
     'author' => ['byline-planning'],
-    'design-only' => ['byline-studio'],
+    'design-only' => [],
     'sports-content-editor' => ['byline-planning'],
     'poll-editor' => [],
     'integration-manager' => ['byline'],
@@ -226,7 +224,7 @@ foreach ($profiles as $role => $capabilities) {
 
 // Direct screen access follows the same capability model as menu visibility.
 byline_matrix_set_role('administrator', $profiles['administrator']);
-foreach (['byline', 'byline-planning', 'byline-studio', 'byline-publication', 'byline-theme', 'byline-integrations', 'byline-settings'] as $page) {
+foreach (['byline', 'byline-planning', 'byline-publication', 'byline-integrations', 'byline-settings'] as $page) {
     byline_matrix_expect_mount($page);
 }
 
@@ -236,8 +234,8 @@ foreach (['editor', 'author', 'sports-content-editor'] as $role) {
 }
 
 byline_matrix_set_role('design-only', $profiles['design-only']);
-byline_matrix_expect_mount('byline-studio');
-byline_matrix_expect_redirect('byline', 'page=byline-studio');
+byline_matrix_expect_denied('byline-studio');
+byline_matrix_expect_denied('byline');
 byline_matrix_expect_denied('byline-publication');
 
 byline_matrix_set_role('integration-manager', $profiles['integration-manager']);
@@ -255,25 +253,25 @@ foreach (['editor', 'author', 'poll-editor'] as $role) {
     byline_matrix_expect_denied('byline-settings');
 }
 
+foreach (array_keys($byline_matrix_routes) as $route) {
+    byline_matrix_assert(strpos($route, '/design') === false && strpos($route, '/admin/design') === false, 'Design routes must not be registered.');
+}
+byline_matrix_assert(!isset($byline_matrix_menus['byline-studio']), 'The removed Studio menu must not be registered.');
+
 // REST write permissions are checked independently of menu visibility.
 $route_permissions = [
     'publication' => $byline_matrix_routes['/publication'][1]['permission_callback'],
-    'designAutosave' => $byline_matrix_routes['/admin/design/(?P<template>[a-z0-9:-]+)/autosave'][0]['permission_callback'],
-    // Discarding a draft is an editing capability, never a publishing one.
-    'designAutosaveDelete' => $byline_matrix_routes['/admin/design/(?P<template>[a-z0-9:-]+)/autosave'][1]['permission_callback'],
-    'designPublish' => $byline_matrix_routes['/admin/design/(?P<template>[a-z0-9:-]+)/publish']['permission_callback'],
     'deployment' => $byline_matrix_routes['/admin/deployment'][1]['permission_callback'],
-    'sportsTeams' => $byline_matrix_routes['/sports/teams'][1]['permission_callback'],
 ];
 
 $expected_permissions = [
-    'administrator' => [true, true, true, true, true, true],
-    'editor' => [false, false, false, false, false, false],
-    'author' => [false, false, false, false, false, false],
-    'design-only' => [false, true, true, true, false, false],
-    'sports-content-editor' => [false, false, false, false, false, false],
-    'poll-editor' => [false, false, false, false, false, false],
-    'integration-manager' => [false, false, false, false, true, false],
+    'administrator' => [true, true],
+    'editor' => [false, false],
+    'author' => [false, false],
+    'design-only' => [false, false],
+    'sports-content-editor' => [false, false],
+    'poll-editor' => [false, false],
+    'integration-manager' => [false, true],
 ];
 
 foreach ($expected_permissions as $role => $expected) {
