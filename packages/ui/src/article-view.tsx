@@ -107,6 +107,30 @@ function initial(name: string) {
   return name.trim().slice(0, 1).toUpperCase() || "W";
 }
 
+function bylineSeparator(index: number, count: number) {
+  if (index === 0) return "";
+  return index === count - 1 ? " and " : ", ";
+}
+
+function BylineAvatar({ contributor }: { contributor: ArticleContributorView }): ReactNode {
+  const photo = contributor.photo;
+  return photo?.src ? (
+    <img
+      className="article-byline-avatar author-avatar"
+      src={photo.src}
+      srcSet={photo.srcSet}
+      sizes="44px"
+      alt=""
+      width={44}
+      height={44}
+      loading="eager"
+      decoding="async"
+    />
+  ) : (
+    <span className="article-byline-avatar author-avatar author-avatar-fallback">{initial(contributor.name)}</span>
+  );
+}
+
 function ArticleImage({ image, priority = false, showCaption = true }: { image: ArticleImageView; priority?: boolean; showCaption?: boolean }): ReactNode {
   const hasCaption = Boolean(image.captionHtml || image.fallbackCaption || image.credit);
   // A vertical lead photo would run several screens tall at article width, so
@@ -239,20 +263,27 @@ export function ArticleView({ presentation, slots = {}, className = "" }: Articl
             </div>
           ) : null}
           <div className="article-meta-block">
-            <p className="article-author-line">
-              By {presentation.contributors.length > 0
-                ? presentation.contributors.map((contributor, index) => (
-                    <span key={contributor.id}>{index > 0 ? ", " : ""}<a href={contributor.href}>{contributor.name}</a></span>
-                  ))
-                : <span>{presentation.fallbackByline}</span>}
-            </p>
-            <div className="article-timing">
-              <time dateTime={presentation.publishedAt}>Published {presentation.publishedLabel}</time>
-              {presentation.modifiedAt && presentation.modifiedLabel ? <time dateTime={presentation.modifiedAt}>Updated {presentation.modifiedLabel}</time> : null}
-              <span>{presentation.readingTime}</span>
+            <div className="article-avatars" aria-hidden="true">
+              {presentation.contributors.length > 0
+                ? presentation.contributors.map((contributor) => <BylineAvatar key={contributor.id} contributor={contributor} />)
+                : <span className="article-byline-avatar author-avatar author-avatar-fallback">{initial(presentation.fallbackByline)}</span>}
             </div>
+            <div className="article-byline-text">
+              <p className="article-author-line">
+                By {presentation.contributors.length > 0
+                  ? presentation.contributors.map((contributor, index) => (
+                      <span key={contributor.id}>{bylineSeparator(index, presentation.contributors.length)}<a href={contributor.href}>{contributor.name}</a></span>
+                    ))
+                  : <span>{presentation.fallbackByline}</span>}
+              </p>
+              <div className="article-timing">
+                <time dateTime={presentation.publishedAt}>Published {presentation.publishedLabel}</time>
+                {presentation.modifiedAt && presentation.modifiedLabel ? <time dateTime={presentation.modifiedAt}>Updated {presentation.modifiedLabel}</time> : null}
+                <span>{presentation.readingTime}</span>
+              </div>
+            </div>
+            {slots.shareActions}
           </div>
-          {slots.shareActions}
           {presentation.image?.src ? <ArticleImage image={presentation.image} priority /> : null}
         </header>
 
