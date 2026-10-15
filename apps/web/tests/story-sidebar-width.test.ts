@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const css = readFileSync(new URL("../src/editorial-workflow.css", import.meta.url), "utf8");
+const css = readFileSync(new URL("../../../wordpress-plugin/src/editorial-workflow.css", import.meta.url), "utf8");
 
 describe("Story sidebar width", () => {
   it("widens the plugin sidebar beyond WordPress's fixed 280px, only for the Story sidebar", () => {

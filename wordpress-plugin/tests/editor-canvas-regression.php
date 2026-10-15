@@ -6,7 +6,17 @@ $canvas_test = ['actions' => [], 'scripts' => [], 'styles' => [], 'admin' => tru
 
 class WP_Screen
 {
-    public function __construct(public string $base, public string $post_type, private bool $block_editor = true) {}
+    public $base;
+    public $post_type;
+    private $block_editor;
+
+    public function __construct(string $base, string $post_type, bool $block_editor = true)
+    {
+        $this->base = $base;
+        $this->post_type = $post_type;
+        $this->block_editor = $block_editor;
+    }
+
     public function is_block_editor(): bool { return $this->block_editor; }
 }
 
