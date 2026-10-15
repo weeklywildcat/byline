@@ -3,6 +3,7 @@ import "@byline/theme-weekly-wildcat/styles.css";
 import "@byline/ui/page-blocks.css";
 import "@byline/ui/newsroom-blocks.css";
 import "@byline/ui/article.css";
+import "../../views/fonts.css";
 import "../../views/globals.css";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -54,6 +55,9 @@ const socialMetadataTags = serializeMetadata({
     images: twitter.images
   }
 });
+const preloadedFonts = activeTheme.id === "weekly-wildcat"
+  ? ["mona-sans-normal-latin", "newsreader-normal-latin", "erode-normal-600"].map((name) => `/fonts/${name}.woff2`)
+  : [];
 const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key, value]) => `${key}:${value}`).join(";");
 ---
 <!doctype html>
@@ -68,7 +72,8 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
     {googleContent && <meta name="googlebot" content={googleContent} />}
     {!noCanonical && <link rel="canonical" href={canonical} />}
     {publication.branding.icons.map((icon) => <link rel={icon.width === 180 ? "apple-touch-icon" : "icon"} href={icon.url} sizes={icon.width && icon.height ? `${icon.width}x${icon.height}` : undefined} />)}
-    {activeTheme.stylesheets?.map((href) => <link rel="stylesheet" href={href} />)}
+    {/* Fonts are self-hosted (views/fonts.css); the theme's CDN stylesheets are only for Studio previews. */}
+    {preloadedFonts.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin="anonymous" />)}
     {socialMetadataTags.map((tag) => tag.kind === "property"
       ? <meta property={tag.key} content={tag.content} />
       : <meta name={tag.key} content={tag.content} />)}
