@@ -9,7 +9,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { absoluteUrl, getOrganizationSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
 import { serializeMetadata, type Metadata } from "@/lib/metadata";
 import { getPublicationConfig } from "@/lib/publication";
-import { getActiveTheme, getThemeCssVariables } from "@/lib/theme";
+import { getActiveTheme, getThemeCssVariables, SELF_HOSTED_FONTS } from "@/lib/theme";
 
 interface Props { metadata?: Metadata; themeColor?: string; noCanonical?: boolean; }
 const { metadata = {}, themeColor, noCanonical = false } = Astro.props;
@@ -68,7 +68,8 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
     {googleContent && <meta name="googlebot" content={googleContent} />}
     {!noCanonical && <link rel="canonical" href={canonical} />}
     {publication.branding.icons.map((icon) => <link rel={icon.width === 180 ? "apple-touch-icon" : "icon"} href={icon.url} sizes={icon.width && icon.height ? `${icon.width}x${icon.height}` : undefined} />)}
-    {activeTheme.stylesheets?.map((href) => <link rel="stylesheet" href={href} />)}
+    {SELF_HOSTED_FONTS.preload.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin="anonymous" />)}
+    <link rel="stylesheet" href={SELF_HOSTED_FONTS.stylesheet} />
     {socialMetadataTags.map((tag) => tag.kind === "property"
       ? <meta property={tag.key} content={tag.content} />
       : <meta name={tag.key} content={tag.content} />)}
