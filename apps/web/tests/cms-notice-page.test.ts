@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAllPages, isCmsNoticePage } from "@/lib/wordpress";
+import { excludeCmsNoticePages, isCmsNoticePage } from "@/lib/wordpress";
 
 describe("CMS Notice page", () => {
   it("recognizes the editor landing page by its title", () => {
@@ -9,9 +9,13 @@ describe("CMS Notice page", () => {
     expect(isCmsNoticePage({ title: { rendered: "About" } })).toBe(false);
   });
 
-  it("is kept out of the page list that feeds routes and the sitemap", async () => {
-    const pages = await getAllPages();
+  it("is dropped from the page list that feeds routes and the sitemap", () => {
+    const pages = [
+      { slug: "about", title: { rendered: "About" } },
+      { slug: "78-2", title: { rendered: "CMS Notice" } },
+      { slug: "contact", title: { rendered: "Contact" } }
+    ];
 
-    expect(pages.some(isCmsNoticePage)).toBe(false);
+    expect(excludeCmsNoticePages(pages).map((page) => page.slug)).toEqual(["about", "contact"]);
   });
 });

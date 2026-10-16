@@ -845,6 +845,10 @@ export function isCmsNoticePage(page: Pick<WordPressPage, "title">) {
   return stripHtml(page.title.rendered).trim().toLowerCase() === "cms notice";
 }
 
+export function excludeCmsNoticePages<T extends Pick<WordPressPage, "title">>(pages: T[]) {
+  return pages.filter((page) => !isCmsNoticePage(page));
+}
+
 export async function getAllPages() {
   const pages = await memoizedBuildData("pages", () => wpFetchCollection<WordPressPage>("/pages", {
     status: "publish",
@@ -852,7 +856,7 @@ export async function getAllPages() {
     order: "asc"
   }));
 
-  return pages.filter((page) => !isCmsNoticePage(page));
+  return excludeCmsNoticePages(pages);
 }
 
 export async function getPageBySlug(slug: string) {
