@@ -303,6 +303,16 @@ export default async function AboutPage() {
               the adults responsible for them. A morning announcement tells students what is happening. We can also ask why.
             </p>
           </div>
+          <div className="about-prose about-prose-wide">
+            <p>
+              Coverage reaches past campus. We have written about a{" "}
+              <StoryRef story={story("megsHouse")}>donation drive for Meg&rsquo;s House</StoryRef>, a domestic violence
+              shelter; a <StoryRef story={story("fca")}>breakfast for student athletes</StoryRef> that the Fellowship of
+              Christian Athletes hosted at First Baptist Church; and a{" "}
+              <StoryRef story={story("edgewood")}>middle school team&rsquo;s second-place finish</StoryRef> at a national
+              competition.
+            </p>
+          </div>
           {sportsPhoto || culturePhoto ? (
             <div className="about-photo-pair">
               <Photo photo={sportsPhoto} />
@@ -341,51 +351,6 @@ export default async function AboutPage() {
               <p>
                 Original photographs are licensed under Creative Commons Attribution 4.0 unless a caption says otherwise. The{" "}
                 <a href="/image-license/">image license page</a> explains how to credit them.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="about-section" id="school-and-community" aria-labelledby="school-and-community-heading">
-        <h2 id="school-and-community-heading">The school and the community</h2>
-        <div className="about-section-body">
-          <div className="about-columns">
-            <div className="about-prose">
-              <h3>The school</h3>
-              <p>
-                Students lead the paper. Student editors decide what needs coverage, assign stories, review drafts and make
-                sure work is ready for readers. A faculty adviser works with the staff; Dan Mackin, a teacher at{" "}
-                {schoolName}, was named adviser when the newsroom relaunched in 2026.
-              </p>
-              <p>
-                {publication.identity.shortName} is also the school&rsquo;s official student newspaper. It runs with the
-                school&rsquo;s permission and under school and district rules, though without school funding, so it is not independent of the school in the way
-                a commercial newspaper is independent of the institutions it covers. Readers should keep that in mind when we
-                write about the school&rsquo;s own decisions.
-              </p>
-              <p>
-                We do not yet have a published policy on whether the adviser or administrators review stories before they
-                run, or on how a disagreement between them and the editors would be resolved. If you want to know how a
-                decision about a particular story was made, ask the editors.
-              </p>
-            </div>
-            <div className="about-prose">
-              <h3>The community</h3>
-              <p>
-                Most of our readers are tied to the school, but the paper is not only about campus. We have written about a{" "}
-                <StoryRef story={story("megsHouse")}>donation drive for Meg&rsquo;s House</StoryRef>, a domestic violence
-                shelter, a new{" "}
-                <StoryRef story={story("fca")}>breakfast for student athletes</StoryRef> that the Fellowship of Christian
-                Athletes hosted at First Baptist Church, and a{" "}
-                <StoryRef story={story("edgewood")}>middle school team&rsquo;s second-place finish</StoryRef> at a national
-                competition.
-              </p>
-              <p>
-                We try to look past the people who are easiest to quote and the most visible teams and clubs, and to cover
-                students whose stories do not usually get front-page treatment. Our{" "}
-                <a href="/diversity-inclusion/">Diversity &amp; Inclusion page</a> explains that commitment and how readers
-                can hold us to it. Readers can send story ideas, and can share a concern without attaching a name.
               </p>
             </div>
           </div>
