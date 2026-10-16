@@ -172,6 +172,7 @@ export function SearchPageClient({ publicationName, searchGapEndpoint, searchInd
     updateSearchState({ [key]: value } as Partial<SearchUrlState>, "push");
   }
 
+  const hasActiveFilters = searchState.type !== "all" || Boolean(searchState.section || searchState.author || searchState.topic);
   const resultLabel = results.length === 1 ? "result" : "results";
   const resultHeading = hasQuery
     ? "Search Results"
@@ -187,8 +188,7 @@ export function SearchPageClient({ publicationName, searchGapEndpoint, searchInd
   return (
     <section className="search-page" aria-labelledby="search-page-heading">
       <header className="search-page-header">
-        <p>Search</p>
-        <h1 id="search-page-heading">Find {publicationName} Stories</h1>
+        <h1 id="search-page-heading">Search {publicationName}</h1>
       </header>
 
       <form
@@ -215,7 +215,7 @@ export function SearchPageClient({ publicationName, searchGapEndpoint, searchInd
               updateSearchState({ query: "" }, "replace");
             }
           }}
-          placeholder="Search by headline, author, section, or topic"
+          placeholder="Headline, author, section, or topic"
           aria-label={`Search ${publicationName} stories`}
           aria-controls="search-results"
         />
@@ -233,50 +233,57 @@ export function SearchPageClient({ publicationName, searchGapEndpoint, searchInd
         ) : null}
       </form>
 
-      <fieldset className="search-kind-filter">
-        <legend className="search-visually-hidden">Filter by result type</legend>
-        {[
-          { label: "All", value: "all" },
-          { label: "Stories", value: "story" },
-          { label: "Archives", value: "archive" }
-        ].map((option) => (
-          <button
-            aria-pressed={searchState.type === option.value}
-            aria-controls="search-results"
-            key={option.value}
-            onClick={() => updateSearchState({ type: option.value as SearchFilter }, "push")}
-            type="button"
-          >
-            {option.label}
-          </button>
-        ))}
-      </fieldset>
+      <div className="search-filters">
+        <fieldset className="search-kind-filter">
+          <legend className="search-visually-hidden">Filter by result type</legend>
+          {[
+            { label: "All", value: "all" },
+            { label: "Stories", value: "story" },
+            { label: "Archives", value: "archive" }
+          ].map((option) => (
+            <button
+              aria-pressed={searchState.type === option.value}
+              aria-controls="search-results"
+              key={option.value}
+              onClick={() => updateSearchState({ type: option.value as SearchFilter }, "push")}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </fieldset>
 
-      <div className="search-facet-filters" aria-label="Filter search results">
-        <FacetSelect
-          id="search-section-filter"
-          label="Section"
-          value={searchState.section}
-          options={facets.sections}
-          emptyLabel="All sections"
-          onChange={(value) => updateFacet("section", value)}
-        />
-        <FacetSelect
-          id="search-author-filter"
-          label="Author"
-          value={searchState.author}
-          options={facets.authors}
-          emptyLabel="All authors"
-          onChange={(value) => updateFacet("author", value)}
-        />
-        <FacetSelect
-          id="search-topic-filter"
-          label="Topic"
-          value={searchState.topic}
-          options={facets.topics}
-          emptyLabel="All topics"
-          onChange={(value) => updateFacet("topic", value)}
-        />
+        <div className="search-facet-filters" role="group" aria-label="Filter search results">
+          <FacetSelect
+            id="search-section-filter"
+            label="Section"
+            value={searchState.section}
+            options={facets.sections}
+            emptyLabel="All sections"
+            onChange={(value) => updateFacet("section", value)}
+          />
+          <FacetSelect
+            id="search-author-filter"
+            label="Author"
+            value={searchState.author}
+            options={facets.authors}
+            emptyLabel="All authors"
+            onChange={(value) => updateFacet("author", value)}
+          />
+          <FacetSelect
+            id="search-topic-filter"
+            label="Topic"
+            value={searchState.topic}
+            options={facets.topics}
+            emptyLabel="All topics"
+            onChange={(value) => updateFacet("topic", value)}
+          />
+        </div>
+        {hasActiveFilters ? (
+          <button className="search-reset" type="button" onClick={() => updateSearchState({ type: "all", section: "", author: "", topic: "" }, "push")}>
+            Reset filters
+          </button>
+        ) : null}
       </div>
 
       <div className="search-results-header">
@@ -296,15 +303,19 @@ export function SearchPageClient({ publicationName, searchGapEndpoint, searchInd
             {results.map((item) => (
               <article className="search-result" key={item.id}>
                 <div className="search-result-meta">
-                  <span>{getResultLabel(getItemKind(item))}</span>
-                  {item.category ? <span><HighlightedText value={item.category} terms={terms} /></span> : null}
-                  {item.author ? <span><HighlightedText value={item.author} terms={terms} /></span> : null}
-                  <time dateTime={item.sortDate}>{item.date}</time>
+                  {getItemKind(item) !== "story" ? <span className="search-result-kind">{getResultLabel(getItemKind(item))}</span> : null}
+                  {item.category && getItemKind(item) === "story" ? <span className="search-result-section"><HighlightedText value={item.category} terms={terms} /></span> : null}
                 </div>
                 <h3>
                   <a href={item.href}><HighlightedText value={item.title} terms={terms} /></a>
                 </h3>
                 {item.excerpt ? <p><HighlightedText value={item.excerpt} terms={terms} /></p> : null}
+                {item.author || item.date ? (
+                  <p className="search-result-byline">
+                    {item.author ? <span><HighlightedText value={item.author} terms={terms} /></span> : null}
+                    {item.date ? <time dateTime={item.sortDate}>{item.date}</time> : null}
+                  </p>
+                ) : null}
               </article>
             ))}
           </div>
