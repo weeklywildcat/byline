@@ -11,6 +11,7 @@ import path from "node:path";
 import { optionalBuildData, requireBuildData } from "@/lib/build-data";
 import { isHiddenCategory, isVisibleContentPost } from "@/lib/content";
 import { type SportsGame, type SportsRoster, type SportsTeamMedia } from "@/lib/headless";
+import { CODE_ROUTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { getPublicationConfig } from "@/lib/publication";
 import { getGameSeason } from "@/lib/sports-season";
 import { getSportsArchiveRedirects, getSportsArchiveHref } from "@/lib/sports-archive";
@@ -78,6 +79,7 @@ function routeEntries(input: {
     { path: "/authors/", kind: "author" },
     { path: "/corrections/", kind: "other" },
     { path: "/coverage/", kind: "coverage" },
+    ...CODE_ROUTED_PAGE_SLUGS.map((slug): RouteManifestEntry => ({ path: `/${slug}/`, kind: "page" })),
     { path: "/media-kit/", kind: "page" },
     { path: "/open-source/", kind: "page" },
     { path: "/search/", kind: "search" },
@@ -94,7 +96,7 @@ function routeEntries(input: {
     const route = getPostRouteParts(post);
     return route ? [{ path: getPostHref(post), kind: "article" as const, digest: articleRouteDigest(post) }] : [];
   });
-  const pages = input.pages.map((page) => ({ path: `/${page.slug}/`, kind: "page" as const, digest: archiveRouteDigest(page) }));
+  const pages = input.pages.filter((page) => !CODE_ROUTED_PAGE_SLUGS.includes(page.slug)).map((page) => ({ path: `/${page.slug}/`, kind: "page" as const, digest: archiveRouteDigest(page) }));
   const categories = input.categories.filter((category) => !isHiddenCategory(category)).map((category) => ({
     path: `/category/${category.slug}/`,
     kind: "category" as const,

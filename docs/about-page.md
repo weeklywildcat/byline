@@ -2,7 +2,7 @@
 
 `/about/` is rendered by code, not from the CMS page with the slug `about`. The route is
 `apps/web/src/pages/about.astro`; the CMS page of the same slug is skipped in
-`apps/web/src/pages/[segment].astro` (`codeRoutedSlugs`) so only one page is generated.
+`apps/web/lib/code-routes.ts` (`CODE_ROUTED_PAGE_SLUGS`, used by `[segment].astro` and the route manifest) so only one page is generated. Add a slug there whenever a CMS page gets a dedicated route.
 Editing "About Us" in WordPress no longer changes the public page.
 
 | File | What it holds |
@@ -57,8 +57,6 @@ document in the repository or the CMS establishes them. Confirm or reword before
 - The September 2025 date and the "approved" milestone, which come from the newsroom, not a published source.
 - Dan Mackin as the current adviser, and the adviser's role. The page says only that an adviser "works with the
   staff."
-- The sentence admitting there is no published policy on adviser or administrator review. Replace it with a link
-  once a policy exists.
 
 ## Not on the page because nothing verifies it
 

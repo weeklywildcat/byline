@@ -2,12 +2,11 @@
 import BaseLayout from "@/src/layouts/BaseLayout.astro";
 import Page, { getMetadata } from "@/views/[segment]/page";
 import { getBuildSnapshot } from "@/lib/build-snapshot";
+import { CODE_ROUTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
 export async function getStaticPaths() {
-  // Pages with a dedicated route in src/pages are rendered by code, not from the CMS page of the same slug.
-  const codeRoutedSlugs = new Set(["about", "join"]);
   const snapshot = await getBuildSnapshot();
-  return snapshot.pages.filter((page) => !codeRoutedSlugs.has(page.slug)).map((page) => ({ params: { segment: page.slug } }));
+  return snapshot.pages.filter((page) => !CODE_ROUTED_PAGE_SLUGS.includes(page.slug)).map((page) => ({ params: { segment: page.slug } }));
 }
 const params = { segment: Astro.params.segment! };
 const metadata = await getMetadata({ params: Promise.resolve(params) });

@@ -12,7 +12,6 @@ export const CONTENTS = [
   { id: "history", label: "Our history" },
   { id: "coverage", label: "What we cover" },
   { id: "standards", label: "Standards and corrections" },
-  { id: "school-and-community", label: "The school and the community" },
   { id: "funding", label: "Money and independence" },
   { id: "technology", label: "Behind the website" },
   { id: "get-involved", label: "Get involved" },
