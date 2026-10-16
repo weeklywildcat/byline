@@ -2148,7 +2148,7 @@ img {
   display: grid;
   gap: 20px 28px;
   grid-template-columns: auto minmax(0, 1fr);
-  margin-bottom: 26px;
+  margin-bottom: 22px;
   padding: 28px 0 0;
 }
 
@@ -2269,11 +2269,27 @@ img {
   text-transform: uppercase;
 }
 
+.author-about {
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 12px;
+  margin-bottom: 26px;
+  padding-top: 22px;
+}
+
+.author-about h2 {
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0;
+}
+
 .author-bio {
   color: var(--ink);
-  font-family: var(--font-serif);
-  font-size: 1.1rem;
-  grid-column: 1 / -1;
+  font-family: var(--font-body);
+  font-size: 1.02rem;
   line-height: 1.6;
   margin: 0;
   max-width: 66ch;
@@ -5179,7 +5195,7 @@ html[data-byline-theme="weekly-wildcat"] .story-teaser-lead h2 {
   line-height: 1.04;
 }
 
-html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-profile h1, .author-card h2, .search-page-header h1, .search-result h3, .static-page-header h1, .not-found h1) {
+html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-profile h1, .author-about h2, .author-card h2, .search-page-header h1, .search-result h3, .static-page-header h1, .not-found h1) {
   font-family: var(--font-headline);
   font-weight: 600;
   letter-spacing: -0.022em;
