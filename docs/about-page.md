@@ -57,8 +57,6 @@ document in the repository or the CMS establishes them. Confirm or reword before
 - The September 2025 date and the "approved" milestone, which come from the newsroom, not a published source.
 - Dan Mackin as the current adviser, and the adviser's role. The page says only that an adviser "works with the
   staff."
-- The sentence admitting there is no published policy on adviser or administrator review. Replace it with a link
-  once a policy exists.
 
 ## Not on the page because nothing verifies it
 
