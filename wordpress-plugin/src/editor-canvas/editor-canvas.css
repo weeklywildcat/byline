@@ -1,0 +1,146 @@
+/*
+ * Editing canvas for Posts: makes the block editor look like the public article.
+ *
+ * Nothing here is shared with the Astro site, so the site never depends on it.
+ * Instead it is kept honest from the other side:
+ *   - Colours and font stacks are the theme tokens (--ink, --font-serif, ...),
+ *     injected by index.ts from @byline/theme-weekly-wildcat.
+ *   - Fonts come straight from apps/web/views/fonts.css, imported by index.ts
+ *     (a direct import, so webpack.config.js can rewrite its /fonts URLs).
+ *   - Typography metrics mirror packages/ui/article.css. The mapping lives in
+ *     scripts/verify-editor-canvas-contract.mjs, which fails CI if they drift.
+ *
+ * Selectors are written out with .editor-styles-wrapper because this file is
+ * enqueued with enqueue_block_assets, which does not prefix them for the iframe.
+ */
+
+.editor-styles-wrapper {
+  background: var(--page);
+  color: var(--ink);
+}
+
+/* Title: the article headline. */
+.editor-styles-wrapper .edit-post-visual-editor__post-title-wrapper,
+.editor-styles-wrapper .is-root-container {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: var(--article-width);
+}
+
+.editor-styles-wrapper .editor-post-title,
+.editor-styles-wrapper .editor-post-title__input,
+.editor-styles-wrapper .wp-block-post-title {
+  color: var(--ink);
+  font-family: var(--font-headline);
+  font-size: 2.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+/* Body: Newsreader at the article measure. */
+.editor-styles-wrapper .is-root-container {
+  font-family: var(--font-serif);
+  font-size: 1.17rem;
+  line-height: 1.72;
+}
+
+.editor-styles-wrapper .is-root-container a {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.editor-styles-wrapper .is-root-container p,
+.editor-styles-wrapper .is-root-container ul,
+.editor-styles-wrapper .is-root-container ol,
+.editor-styles-wrapper .is-root-container blockquote,
+.editor-styles-wrapper .is-root-container figure {
+  margin: 0 0 1.35em;
+}
+
+.editor-styles-wrapper .is-root-container ul,
+.editor-styles-wrapper .is-root-container ol {
+  padding-left: 1.3em;
+}
+
+.editor-styles-wrapper .is-root-container li + li {
+  margin-top: 0.35em;
+}
+
+.editor-styles-wrapper .is-root-container h2,
+.editor-styles-wrapper .is-root-container h3,
+.editor-styles-wrapper .is-root-container h4 {
+  font-family: var(--font-headline);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.1;
+  margin: 1.5em 0 0.55em;
+}
+
+.editor-styles-wrapper .is-root-container h2 {
+  font-size: 1.75rem;
+}
+
+.editor-styles-wrapper .is-root-container h3 {
+  font-size: 1.42rem;
+}
+
+.editor-styles-wrapper .is-root-container blockquote,
+.editor-styles-wrapper .is-root-container .wp-block-quote {
+  border-left: 4px solid var(--accent);
+  color: #33302c;
+  font-size: 1.28rem;
+  line-height: 1.45;
+  padding-left: 18px;
+}
+
+.editor-styles-wrapper .is-root-container .wp-block-pullquote {
+  border-bottom: 1px solid var(--rule);
+  border-top: 1px solid var(--rule);
+  font-size: 1.45rem;
+  line-height: 1.35;
+  margin: 2em 0;
+  padding: 20px 0;
+  text-align: left;
+}
+
+.editor-styles-wrapper .is-root-container .wp-block-pullquote blockquote {
+  border-left: 0;
+  margin-bottom: 0;
+  padding-left: 0;
+}
+
+/* Images and captions. */
+.editor-styles-wrapper .is-root-container .wp-block-image img,
+.editor-styles-wrapper .is-root-container figure img {
+  border: 1px solid var(--rule);
+}
+
+.editor-styles-wrapper .is-root-container figcaption {
+  color: var(--muted);
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin-top: 8px;
+}
+
+/* WordPress caps root-level blocks at its own default width; the container
+   above already sets the article measure. */
+.editor-styles-wrapper .is-root-container > .wp-block {
+  max-width: none;
+}
+
+@media (max-width: 640px) {
+  .editor-styles-wrapper .editor-post-title,
+  .editor-styles-wrapper .editor-post-title__input,
+  .editor-styles-wrapper .wp-block-post-title {
+    font-size: 2rem;
+  }
+
+  .editor-styles-wrapper .is-root-container {
+    font-size: 1.08rem;
+  }
+}

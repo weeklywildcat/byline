@@ -31,7 +31,7 @@ async function getAuthorCards() {
   return authorPosts.sort((a, b) => b.posts.length - a.posts.length || a.contributor.name.localeCompare(b.contributor.name));
 }
 
-function AuthorCard({ contributor, storyCount }: { contributor: WordPressContributor; storyCount: number }) {
+function AuthorCard({ contributor, storyCount, showDescription }: { contributor: WordPressContributor; storyCount: number; showDescription: boolean }) {
   const profile = !isGuestContributor(contributor) ? contributor.bylineProfile ?? contributor.weeklyWildcatProfile : null;
   const photo = getContributorPhoto(contributor);
   const description = stripHtml(getContributorDescription(contributor)) || `${getPublicationConfig().identity.shortName} contributor`;
@@ -52,7 +52,7 @@ function AuthorCard({ contributor, storyCount }: { contributor: WordPressContrib
             {profile?.founder ? <AuthorBadge label="Founder" /> : null}
           </div>
           <h2>{contributor.name}</h2>
-          <p>{description}</p>
+          {showDescription ? <p>{description}</p> : null}
           <span className="author-card-stat">{storyCount === 1 ? "1 story" : `${storyCount} stories`}</span>
         </div>
       </a>
@@ -62,15 +62,18 @@ function AuthorCard({ contributor, storyCount }: { contributor: WordPressContrib
 
 type AuthorDirectoryProps = {
   className?: string;
+  // The bio, or a generic fallback when there is none. The author's own page
+  // carries the full bio, so the directory can leave it out.
+  showDescriptions?: boolean;
 };
 
-export async function AuthorDirectory({ className }: AuthorDirectoryProps) {
+export async function AuthorDirectory({ className, showDescriptions = true }: AuthorDirectoryProps) {
   const authorCards = await getAuthorCards();
 
   return (
     <div className={className ? `author-card-grid ${className}` : "author-card-grid"}>
       {authorCards.map(({ contributor, posts }) => (
-        <AuthorCard key={`${isGuestContributor(contributor) ? "guest" : "user"}-${contributor.id}-${contributor.slug}`} contributor={contributor} storyCount={posts.length} />
+        <AuthorCard key={`${isGuestContributor(contributor) ? "guest" : "user"}-${contributor.id}-${contributor.slug}`} contributor={contributor} storyCount={posts.length} showDescription={showDescriptions} />
       ))}
     </div>
   );

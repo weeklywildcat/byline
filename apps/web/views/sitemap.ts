@@ -97,6 +97,12 @@ export default async function sitemap(): Promise<SitemapEntry[]> {
       changeFrequency: "monthly" as const,
       priority: 0.5
     },
+    {
+      url: absoluteUrl("/open-source/"),
+      lastModified: latestModified,
+      changeFrequency: "monthly" as const,
+      priority: 0.4
+    },
   ];
 
   const applicationUrls = new Set(applicationPages.map((page) => page.url));

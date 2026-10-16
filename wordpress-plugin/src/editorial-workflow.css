@@ -163,6 +163,28 @@
   --byline-sidebar-border: #e0e0e0;
 }
 
+/*
+ * WordPress gives every plugin sidebar a fixed 280px, which is too tight for
+ * the Story panels (dates, editors, tasks). Widen it only while the Story
+ * sidebar is the active one: the class lands on the complementary area itself
+ * in some editor builds and on a child in others, so both are matched. The
+ * min() keeps it from crowding the canvas on a small window, and it stays
+ * resizable where the editor supports that.
+ */
+.interface-complementary-area.byline-editorial-sidebar,
+.interface-complementary-area:has(.byline-editorial-sidebar),
+.interface-interface-skeleton__sidebar:has(.byline-editorial-sidebar) {
+  width: min(400px, 40vw);
+}
+
+@media (max-width: 782px) {
+  .interface-complementary-area.byline-editorial-sidebar,
+  .interface-complementary-area:has(.byline-editorial-sidebar),
+  .interface-interface-skeleton__sidebar:has(.byline-editorial-sidebar) {
+    width: auto;
+  }
+}
+
 .byline-editorial-sidebar .byline-story-panel {
   border: 0;
   margin: 0;

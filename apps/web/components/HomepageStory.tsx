@@ -36,6 +36,7 @@ type HomepageStoryProps = {
   showDeck?: boolean;
   showReadingTime?: boolean;
   showReadLink?: boolean;
+  showCategory?: boolean;
   priority?: boolean;
 };
 
@@ -87,6 +88,7 @@ export function HomepageStory({
   showDeck = false,
   showReadingTime = false,
   showReadLink = false,
+  showCategory = true,
   priority = false
 }: HomepageStoryProps) {
   const contributors = getPostContributors(post);
@@ -132,7 +134,7 @@ export function HomepageStory({
 
       <div className="home-story-body">
         <div className="home-story-meta">
-          {category ? (
+          {showCategory && category ? (
             <a className="home-story-category" href={`/category/${category.slug}/`}>
               {decodeHtml(category.name)}
             </a>

@@ -129,9 +129,10 @@ describe("pre-Gutenberg Page design parity", () => {
     const paragraph = body.querySelector("p") as HTMLElement;
     const featured = dom.window.document.querySelector(".is-style-featured") as HTMLElement;
     expect(dom.window.getComputedStyle(standard).display).toBe("grid");
-    expect(dom.window.getComputedStyle(standard).gap).toBe("24px");
+    expect(dom.window.getComputedStyle(standard).gap).toBe("14px");
+    expect(dom.window.getComputedStyle(standard).gridTemplateColumns).toBe("minmax(0, 1fr)");
     expect(dom.window.getComputedStyle(body).display).toBe("grid");
-    expect(dom.window.getComputedStyle(body).gap).toBe("12px");
+    expect(dom.window.getComputedStyle(body).gap).toBe("18px");
     expect(dom.window.getComputedStyle(paragraph).marginBottom).toBe("0px");
     expect(dom.window.getComputedStyle(featured).backgroundColor).toBe("rgb(23, 26, 33)");
     expect(pageBlocksCss).not.toContain("!important");

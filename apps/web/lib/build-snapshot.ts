@@ -79,6 +79,7 @@ function routeEntries(input: {
     { path: "/corrections/", kind: "other" },
     { path: "/coverage/", kind: "coverage" },
     { path: "/media-kit/", kind: "page" },
+    { path: "/open-source/", kind: "page" },
     { path: "/search/", kind: "search" },
     { path: "/sports/", kind: "redirect", redirectTo: archiveHref },
     { path: "/sports/schedule/", kind: "redirect", redirectTo: archiveHref },

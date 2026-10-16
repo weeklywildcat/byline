@@ -26,10 +26,25 @@ export type StoryCardProps = {
   showDeck?: boolean;
   showReadingTime?: boolean;
   showReadLink?: boolean;
+  // Off inside a section's own package, where every story shares the label.
+  showCategory?: boolean;
   priority?: boolean;
   // Falls back to the publication's staff byline when a story has no author.
   fallbackAuthorName: string;
 };
+
+// Variants whose image is large enough to carry a credit line. Thumbnails
+// (briefing, row, more-compact) stay clean.
+const CREDITED_VARIANTS = new Set<StoryCardVariant>([
+  "lead",
+  "brief-lead",
+  "focus",
+  "opinion-lead",
+  "field",
+  "more-lead",
+  "special",
+  "athlete"
+]);
 
 export function StoryCard({
   story,
@@ -38,6 +53,7 @@ export function StoryCard({
   showDeck = false,
   showReadingTime = false,
   showReadLink = false,
+  showCategory = true,
   priority = false,
   fallbackAuthorName
 }: StoryCardProps): ReactNode {
@@ -61,12 +77,15 @@ export function StoryCard({
             height={story.image.height ?? undefined}
             loading={priority ? "eager" : "lazy"}
           />
+          {story.image.credit && CREDITED_VARIANTS.has(variant) ? (
+            <span className="home-story-credit">Photo: {story.image.credit}</span>
+          ) : null}
         </a>
       ) : null}
 
       <div className="home-story-body">
         <div className="home-story-meta">
-          {story.category ? (
+          {showCategory && story.category ? (
             <a className="home-story-category" href={story.category.href}>
               {story.category.name}
             </a>

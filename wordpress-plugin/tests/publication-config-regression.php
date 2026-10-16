@@ -186,13 +186,13 @@ $retained_feature_data = byline_normalize_publication_config([
         ['name' => 'Sports', 'slug' => 'sports', 'description' => '', 'active' => true],
     ],
     'navigation' => [
-        ['label' => 'Sports', 'url' => '/sports/', 'locations' => ['header'], 'feature' => 'sports'],
+        ['label' => 'Sports', 'url' => '/category/sports/', 'locations' => ['header'], 'feature' => 'sports'],
     ],
     'features' => ['sports' => false],
 ]);
 if ($retained_feature_data['features']['sports'] !== false
     || $retained_feature_data['sections'][0]['slug'] !== 'sports'
-    || $retained_feature_data['navigation'][0]['url'] !== '/sports/'
+    || $retained_feature_data['navigation'][0]['url'] !== '/category/sports/'
     || $retained_feature_data['navigation'][0]['feature'] !== 'sports') {
     fwrite(STDERR, "Disabling a feature must retain its stored sections and navigation data.\n");
     exit(1);

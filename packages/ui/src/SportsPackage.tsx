@@ -71,6 +71,7 @@ export function SportsPackage({ package: resolved }: SportsPackageProps) {
         <StoryCard
           story={lead!}
           variant="field"
+          showCategory={false}
           showDeck={presentation.showDeck}
           showAuthor={presentation.showBylines}
           showReadLink={presentation.showReadLink !== false}
@@ -82,6 +83,7 @@ export function SportsPackage({ package: resolved }: SportsPackageProps) {
             <StoryCard
               story={lead}
               variant="field"
+              showCategory={false}
               showDeck={presentation.showDeck}
               showAuthor={presentation.showBylines}
               showReadLink={presentation.showReadLink !== false}
@@ -95,6 +97,7 @@ export function SportsPackage({ package: resolved }: SportsPackageProps) {
                   key={story.id}
                   story={story}
                   variant="briefing"
+                  showCategory={false}
                   showAuthor={presentation.showBylines}
                   fallbackAuthorName={resolved.fallbackAuthorName}
                 />

@@ -6,8 +6,8 @@
  * cannot inherit publication typography, links, media, or layout.
  *
  * The 2026 system: Erode headlines (--font-headline), Newsreader decks and body
- * copy (--font-serif), Mona Sans labels and UI (--font-ui), on white. Maroon is
- * the accent everywhere; gold appears only on ink, and only for sports.
+ * copy (--font-serif), Libre Franklin labels and UI (--font-ui), on white. Maroon is
+ * the accent everywhere.
  */
 
 :where(.byline-publication-preview) {
@@ -15,7 +15,6 @@
   --ww-on-ink: #ffffff;
   --ww-on-ink-muted: #b4b4b4;
   --ww-on-ink-rule: rgba(255, 255, 255, 0.18);
-  --ww-gold: #c9a440;
   --ww-image-fill: #efefef;
   --ww-gap: 24px;
   background: var(--page);
@@ -61,7 +60,7 @@
 
 /* --- section headers ------------------------------------------------------
    Every package opens the same way: a hairline in ink, the section name in
-   condensed Mona Sans, and an optional archive link on the right. */
+   Libre Franklin, and an optional archive link on the right. */
 
 :where(.byline-publication-preview) .section-header-row,
 :where(.byline-publication-preview) .more-weekly-header,
@@ -85,7 +84,6 @@
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: 0.9rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.06em;
   line-height: 1;
@@ -122,13 +120,24 @@
 }
 
 :where(.byline-publication-preview) .home-story-image {
-  background: var(--ww-image-fill);
   display: block;
   overflow: hidden;
 }
 
+:where(.byline-publication-preview) .home-story-credit {
+  color: var(--soft-muted);
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.35;
+  padding-top: 7px;
+}
+
 :where(.byline-publication-preview) .home-story-image img {
   aspect-ratio: 3 / 2;
+  background: var(--ww-image-fill);
   height: 100%;
   object-fit: cover;
   transition: transform 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -160,7 +169,6 @@
 :where(.byline-publication-preview) .home-story-category {
   color: var(--accent);
   font-size: 0.72rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -247,8 +255,8 @@
 :where(.byline-publication-preview) .home-story-lead {
   align-items: center;
   display: grid;
-  gap: var(--ww-gap) 32px;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 8fr);
+  gap: var(--ww-gap) 40px;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 7fr);
 }
 
 :where(.byline-publication-preview) .home-story-lead .home-story-image {
@@ -270,24 +278,26 @@
 }
 
 :where(.byline-publication-preview) .home-story-lead h2 {
-  font-size: clamp(2.1rem, 3.3vw, 3.2rem);
-  letter-spacing: -0.022em;
-  line-height: 1.04;
-  margin-top: 12px;
+  font-size: clamp(2.1rem, 4vw, 3.7rem);
+  letter-spacing: -0.024em;
+  line-height: 1.03;
+  margin-top: 14px;
+  text-wrap: balance;
 }
 
 :where(.byline-publication-preview) .home-story-lead .home-story-deck {
   display: -webkit-box;
-  font-size: 1.12rem;
+  font-size: 1.2rem;
   line-height: 1.5;
-  margin-top: 14px;
+  margin-top: 18px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
   overflow: hidden;
 }
 
-:where(.byline-publication-preview) .home-story-lead .home-story-author {
-  margin-top: 16px;
+:where(.byline-publication-preview) .home-story-lead .home-story-read-link {
+  display: inline-block;
+  margin-top: 20px;
 }
 
 :where(.byline-publication-preview) .top-stories-single .home-story-lead {
@@ -463,8 +473,12 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-:where(.byline-publication-preview) .home-story-focus .home-story-image {
+:where(.byline-publication-preview) .home-story-focus .home-story-image img {
   background: #262626;
+}
+
+:where(.byline-publication-preview) .home-story-focus .home-story-credit {
+  color: var(--ww-on-ink-muted);
 }
 
 :where(.byline-publication-preview) .home-story-focus .home-story-category,
@@ -629,7 +643,6 @@
 :where(.byline-publication-preview) .home-story-opinion .home-story-author {
   color: var(--accent);
   font-size: 0.8rem;
-  font-stretch: 85%;
   letter-spacing: 0.06em;
   margin: 0 0 10px;
   order: -1;
@@ -673,28 +686,11 @@
 }
 
 /* --- sports ------------------------------------------------------------------
-   Stories only. The section opens on an ink bar with the name in gold: the
-   one place the gold appears. */
+   Stories only, on the same white page and type as every other package; a
+   heavy ink rule over the section name is its only distinction. */
 
 :where(.byline-publication-preview) .from-field .section-header-row {
-  align-items: center;
-  background: var(--ww-ink);
-  border-top: 0;
-  margin-bottom: 26px;
-  padding: 12px 16px;
-}
-
-:where(.byline-publication-preview) .from-field .section-header-row h2 {
-  color: var(--ww-gold);
-  font-size: 1rem;
-}
-
-:where(.byline-publication-preview) .from-field .section-header-row a {
-  color: var(--ww-on-ink);
-}
-
-:where(.byline-publication-preview) .from-field .section-header-row a:hover {
-  color: var(--ww-gold);
+  border-top: 3px solid var(--ink);
 }
 
 :where(.byline-publication-preview) .field-layout {
@@ -729,7 +725,7 @@
 }
 
 :where(.byline-publication-preview) .home-story-field.home-story-no-image {
-  border-left: 3px solid var(--ww-ink);
+  border-left: 4px solid var(--accent);
   padding-left: 22px;
 }
 
@@ -762,12 +758,12 @@
 }
 
 :where(.byline-publication-preview) .sports-athlete-image {
-  background: var(--ww-image-fill);
   display: block;
   overflow: hidden;
 }
 
 :where(.byline-publication-preview) .sports-athlete-image img {
+  background: var(--ww-image-fill);
   aspect-ratio: 4 / 5;
   height: 100%;
   object-fit: cover;
@@ -783,7 +779,6 @@
   color: var(--accent);
   font-family: var(--font-ui);
   font-size: 0.72rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.07em;
   margin: 0;
@@ -969,7 +964,6 @@
   color: var(--accent);
   font-family: var(--font-ui);
   font-size: 0.75rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.07em;
   line-height: 1;
@@ -1138,7 +1132,6 @@
   color: var(--accent);
   font-family: var(--font-ui);
   font-size: 0.7rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1202,7 +1195,6 @@
   color: rgba(255, 255, 255, 0.78);
   font-family: var(--font-ui);
   font-size: 0.78rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.08em;
   margin: 0 0 10px;
@@ -1383,10 +1375,6 @@
     --ww-gap: 18px;
   }
 
-  :where(.byline-publication-preview) .home-story-lead .home-story-image {
-    margin-inline: calc(-1 * var(--ww-shell-inline, 16px));
-  }
-
   :where(.byline-publication-preview) .home-story-lead h2 {
     font-size: 2rem;
     line-height: 1.06;
@@ -1446,10 +1434,6 @@
   :where(.byline-publication-preview) .opinion-rail .home-story-opinion:nth-child(2) {
     border-top: 1px solid var(--rule);
     padding-top: 18px;
-  }
-
-  :where(.byline-publication-preview) .from-field .section-header-row {
-    padding: 10px 12px;
   }
 
   :where(.byline-publication-preview) .more-story-grid {

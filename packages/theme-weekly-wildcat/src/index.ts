@@ -7,7 +7,7 @@ export const weeklyWildcatTheme = defineBylineTheme({
   version: 1,
   themeApiVersion: BYLINE_THEME_API_VERSION,
   stylesheets: [
-    "https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@75..100,400..900&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&display=swap",
+    "https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@100..900&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&display=swap",
     "https://api.fontshare.com/v2/css?f[]=erode@400,500,600,700,401,501,601&display=swap"
   ],
   tokens: {

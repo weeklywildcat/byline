@@ -16,10 +16,9 @@
 
 .byline-page-content .wp-block-byline-page-section,
 .editor-styles-wrapper .wp-block-byline-page-section {
-  border-bottom: 1px solid var(--rule, #d0d7de);
   display: grid;
-  gap: 24px;
-  grid-template-columns: minmax(160px, 0.35fr) minmax(0, 1fr);
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
   padding: 22px 0;
 }
 
@@ -27,19 +26,21 @@
 .editor-styles-wrapper .wp-block-byline-page-section > .wp-block-heading,
 .byline-page-content .byline-page-section > :is(h2, h3, h4) {
   color: var(--ink, #1f2328);
-  font-family: var(--font-ui, Arial, Helvetica, sans-serif);
-  font-size: 0.82rem;
-  font-weight: 800;
-  line-height: 1.1;
+  font-family: var(--font-headline, Georgia, serif);
+  font-size: 1.65rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.15;
   margin: 0;
-  text-transform: uppercase;
+  text-transform: none;
+  text-wrap: balance;
 }
 
 .byline-page-content .wp-block-byline-page-section__body,
 .editor-styles-wrapper .wp-block-byline-page-section__body,
 .byline-page-content .byline-page-section-body {
   display: grid;
-  gap: 12px;
+  gap: 18px;
   min-width: 0;
 }
 
@@ -68,9 +69,27 @@
 .byline-page-content :is(p, li),
 .editor-styles-wrapper :is(p, li) {
   color: var(--ink, #1f2328);
-  font-family: var(--font-body, Arial, Helvetica, sans-serif);
-  font-size: 1.02rem;
-  line-height: 1.58;
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1.15rem;
+  line-height: 1.65;
+}
+
+.byline-page-content li + li,
+.editor-styles-wrapper li + li {
+  margin-top: 0.35em;
+}
+
+.byline-page-content li::marker,
+.editor-styles-wrapper li::marker {
+  color: var(--accent, #b11f24);
+}
+
+.byline-page-content :is(p, li) a:not(.wp-block-button__link),
+.editor-styles-wrapper :is(p, li) a:not(.wp-block-button__link) {
+  color: var(--accent, #b11f24);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 }
 
 .byline-page-content :is(ul, ol),
@@ -86,15 +105,23 @@
 .byline-page-content :is(h2, h3, h4),
 .editor-styles-wrapper :is(h2, h3, h4) {
   color: var(--ink, #1f2328);
-  font-family: var(--font-ui, Arial, Helvetica, sans-serif);
-  font-weight: 800;
-  line-height: 1.1;
+  font-family: var(--font-headline, Georgia, serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
   margin: 0 0 0.6em;
 }
 
 .byline-page-content > :is(h2, h3, h4) {
-  font-size: clamp(1.45rem, 3vw, 2rem);
+  font-size: 1.65rem;
+  margin-top: 1.2em;
   text-transform: none;
+}
+
+.byline-page-content .wp-block-byline-page-section__body :is(h3, h4),
+.editor-styles-wrapper .wp-block-byline-page-section__body :is(h3, h4) {
+  font-size: 1.25rem;
+  margin: 0.4em 0 0;
 }
 
 .byline-page-content :is(blockquote, .wp-block-quote),
@@ -170,15 +197,18 @@
 .editor-styles-wrapper .wp-block-button__link {
   background: var(--accent, #b11f24);
   border: 1px solid var(--accent, #b11f24);
+  border-radius: 0;
   color: #fff;
   display: inline-block;
   font-family: var(--font-ui, Arial, Helvetica, sans-serif);
-  font-size: 0.76rem;
-  font-weight: 800;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   line-height: 1.2;
-  padding: 10px 12px;
+  padding: 12px 18px;
   text-decoration: none;
   text-transform: uppercase;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
 .byline-page-content .wp-block-button__link:hover,
@@ -197,11 +227,13 @@
   background: transparent;
   border: 1px solid var(--rule-strong, #1f2328);
   color: var(--ink, #1f2328);
-  padding: 9px 12px;
+  padding: 11px 18px;
 }
 
 .byline-page-content .wp-block-buttons.is-style-page-actions,
 .editor-styles-wrapper .wp-block-buttons.is-style-page-actions {
+  border-top: 1px solid var(--rule, #d0d7de);
+  margin-top: 22px;
   padding-top: 20px;
 }
 
@@ -217,11 +249,10 @@
 .byline-page-content .wp-block-byline-page-section.is-style-featured,
 .editor-styles-wrapper .wp-block-byline-page-section.is-style-featured {
   background: #171a21;
-  border-bottom: 0;
   color: #fff;
-  gap: 28px;
-  margin: 20px 0;
-  padding: 24px;
+  gap: 14px;
+  margin: 22px 0;
+  padding: 32px 36px;
 }
 
 .byline-page-content .wp-block-byline-page-section.is-style-featured > .wp-block-heading,
@@ -234,7 +265,6 @@
 .byline-page-content .wp-block-byline-page-section.is-style-featured :is(p, li),
 .editor-styles-wrapper .wp-block-byline-page-section.is-style-featured :is(p, li) {
   color: #eee8e1;
-  font-size: 1.08rem;
 }
 
 .byline-page-content .wp-block-byline-page-section.is-style-featured :is(blockquote, .wp-block-quote),
@@ -251,6 +281,11 @@
   color: #171a21;
 }
 
+.byline-page-content > .wp-block-buttons:not(.is-style-page-actions),
+.editor-styles-wrapper .is-root-container > .wp-block-buttons:not(.is-style-page-actions) {
+  padding-top: 18px;
+}
+
 .byline-page-content .wp-block-byline-page-section__body > .wp-block-buttons:not(.is-style-page-actions),
 .editor-styles-wrapper .wp-block-byline-page-section__body > .wp-block-buttons:not(.is-style-page-actions) {
   padding-top: 4px;
@@ -260,20 +295,18 @@
  * dynamic Page Section class above; these selectors can be removed once the
  * legacy markup health warning is no longer needed. */
 .byline-page-content .byline-page-section {
-  border-bottom: 1px solid var(--rule, #d0d7de);
   display: grid;
-  gap: 24px;
-  grid-template-columns: minmax(160px, 0.35fr) minmax(0, 1fr);
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
   padding: 22px 0;
 }
 
 .byline-page-content .byline-page-section.is-style-featured {
   background: #171a21;
-  border-bottom: 0;
   color: #fff;
-  gap: 28px;
-  margin: 20px 0;
-  padding: 24px;
+  gap: 14px;
+  margin: 22px 0;
+  padding: 32px 36px;
 }
 
 .byline-page-content .byline-page-section.is-style-featured > :is(h2, h3, h4),
@@ -283,7 +316,6 @@
 
 .byline-page-content .byline-page-section.is-style-featured :is(p, li) {
   color: #eee8e1;
-  font-size: 1.08rem;
 }
 
 .byline-page-content .byline-page-section-actions {
@@ -294,9 +326,10 @@
   background: var(--accent, #b11f24);
   color: #fff;
   font-family: var(--font-ui, Arial, Helvetica, sans-serif);
-  font-size: 0.76rem;
-  font-weight: 800;
-  padding: 10px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 12px 18px;
   text-transform: uppercase;
 }
 
@@ -309,12 +342,6 @@
 }
 
 @media (max-width: 900px) {
-  .byline-page-content .wp-block-byline-page-section,
-  .editor-styles-wrapper .wp-block-byline-page-section,
-  .byline-page-content .byline-page-section {
-    grid-template-columns: 1fr;
-  }
-
   .byline-page-content .alignwide,
   .editor-styles-wrapper .alignwide {
     margin-left: 0;
@@ -327,15 +354,26 @@
   .byline-page-content .wp-block-byline-page-section,
   .editor-styles-wrapper .wp-block-byline-page-section,
   .byline-page-content .byline-page-section {
-    gap: 9px;
-    padding: 18px 0;
+    gap: 10px;
+    padding: 16px 0;
+  }
+
+  .byline-page-content .byline-page-section > :is(h2, h3, h4),
+  .byline-page-content .wp-block-byline-page-section > .wp-block-heading,
+  .editor-styles-wrapper .wp-block-byline-page-section > .wp-block-heading {
+    font-size: 1.4rem;
+  }
+
+  .byline-page-content :is(p, li),
+  .editor-styles-wrapper :is(p, li) {
+    font-size: 1.08rem;
   }
 
   .byline-page-content .wp-block-byline-page-section.is-style-featured,
   .editor-styles-wrapper .wp-block-byline-page-section.is-style-featured,
   .byline-page-content .byline-page-section.is-style-featured {
-    gap: 14px;
+    gap: 10px;
     margin: 16px 0;
-    padding: 18px;
+    padding: 22px 20px;
   }
 }

@@ -3,6 +3,7 @@ import { getResponsiveImageProps } from "@/lib/media";
 import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory, getPublicTopicTags, isAthleteSpotlightPost, isHiddenCategory, isVisibleContentPost } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { absoluteUrl } from "@/lib/seo";
+import { getMediaCredit } from "@/lib/wordpress";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getAuthorProfile,
@@ -47,13 +48,7 @@ function articleImage(image: WordPressMedia | null, sizes?: string, priority = f
   if (!responsive) return null;
   const captionHtml = image.caption?.rendered?.trim() || "";
   const fallbackCaption = stripHtml(image.media_details?.image_meta?.caption ?? "");
-  const credit = stripHtml(
-    [image.bylineImage?.creditText, image.weeklyWildcatImage?.creditText]
-      .find((value) => Boolean(value?.trim())) ||
-      image.media_details?.image_meta?.credit ||
-      image.media_details?.image_meta?.copyright ||
-      ""
-  );
+  const credit = getMediaCredit(image);
 
   return {
     src: responsive.src,
