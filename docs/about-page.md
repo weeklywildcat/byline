@@ -2,7 +2,7 @@
 
 `/about/` is rendered by code, not from the CMS page with the slug `about`. The route is
 `apps/web/src/pages/about.astro`; the CMS page of the same slug is skipped in
-`apps/web/src/pages/[segment].astro` (`codeRoutedSlugs`) so only one page is generated.
+`apps/web/lib/code-routes.ts` (`CODE_ROUTED_PAGE_SLUGS`, used by `[segment].astro` and the route manifest) so only one page is generated. Add a slug there whenever a CMS page gets a dedicated route.
 Editing "About Us" in WordPress no longer changes the public page.
 
 | File | What it holds |

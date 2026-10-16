@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { JSDOM } from "jsdom";
 import { describe, expect, it, vi } from "vitest";
 import { EXPLORE, NEWSROOM_PHOTOS, PHOTOS, SHOW_NEWSROOM_TODAY, STORY_SLUGS, TIMELINE } from "@/views/about/content";
+import { CODE_ROUTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { getNavigation } from "@/lib/publication";
 
 const story = (slug: string) => ({ title: `Story ${slug}`, href: `/2026/01/01/news/${slug}/`, date: "2026-01-01T00:00:00" });
@@ -131,8 +132,8 @@ describe("about page", () => {
     const route = readFileSync(new URL("../src/pages/[segment].astro", import.meta.url), "utf8");
     const about = readFileSync(new URL("../src/pages/about.astro", import.meta.url), "utf8");
 
-    expect(route).toMatch(/codeRoutedSlugs = new Set\(\["about", "join"\]\)/);
-    expect(route.indexOf("codeRoutedSlugs")).toBeGreaterThan(route.indexOf("export async function getStaticPaths"));
-    expect(about).toContain('@/views/about/page');
+    expect(CODE_ROUTED_PAGE_SLUGS).toEqual(expect.arrayContaining(["about", "join"]));
+    expect(route).toContain("CODE_ROUTED_PAGE_SLUGS");
+    expect(about).toContain("@/views/about/page");
   });
 });
