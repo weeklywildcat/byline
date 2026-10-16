@@ -39,6 +39,7 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .featured-image figcaption p, .byline-article-view .article-body figcaption p { margin: 0; }
 .byline-article-view .photo-credit { color: var(--soft-muted); flex: 0 0 auto; font-weight: 800; max-width: 40%; text-align: right; text-transform: uppercase; }
 .byline-article-view .article-body { font-size: 1.17rem; line-height: 1.72; }
+.byline-article-view .article-body p { text-wrap: pretty; }
 .byline-article-view .article-body > *:first-child { margin-top: 0; }
 .byline-article-view .article-body a { color: var(--link); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .byline-article-view .article-body p, .byline-article-view .article-body ul, .byline-article-view .article-body ol, .byline-article-view .article-body blockquote, .byline-article-view .article-body figure, .byline-article-view .article-body .wp-block-image, .byline-article-view .article-body .wp-block-embed { margin: 0 0 1.35em; }

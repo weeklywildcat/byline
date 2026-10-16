@@ -74,10 +74,14 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
     {socialMetadataTags.map((tag) => tag.kind === "property"
       ? <meta property={tag.key} content={tag.content} />
       : <meta name={tag.key} content={tag.content} />)}
+    <script type="speculationrules" is:inline set:html={JSON.stringify({ prefetch: [{ where: { and: [{ href_matches: "/*" }, { not: { href_matches: ["/_wordpress-media/*", "/_byline/*", "/brand/*", "/*.xml", "/*.txt"] } }] }, eagerness: "moderate" }] })}></script>
     <script id="organization-json-ld" type="application/ld+json" set:html={serializeJsonLd(getOrganizationSchema())}></script>
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    {stickyLogo && <div class="read-progress" aria-hidden="true"><span data-read-progress></span></div>}
     <SiteHeader sticky={stickyLogo ? "logo" : stickyNav ? "nav" : undefined} />
+    <span id="main-content" tabindex="-1"></span>
     {stickyNav && <script is:inline>
       (function () {
         var nav = document.querySelector(".site-header--nav > .section-nav");
@@ -137,6 +141,48 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
     </script>}
     <slot />
     <SiteFooter />
+    <button class="back-to-top" type="button" aria-label="Back to top" data-back-to-top>
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 15 7-7 7 7" /></svg>
+    </button>
+    <script is:inline>
+      (function () {
+        var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+        var toTop = document.querySelector("[data-back-to-top]");
+        var story = document.querySelector(".article-story");
+        var progress = document.querySelector("[data-read-progress]");
+
+        // Back to top appears once the reader is well down a long page; a thin
+        // bar across the top of an article tracks how far through it they are.
+        function update() {
+          var y = window.scrollY;
+          var viewport = window.innerHeight;
+          toTop.classList.toggle("is-visible", y > viewport * 1.5 && document.documentElement.scrollHeight > viewport * 3);
+          if (story && progress) {
+            var box = story.getBoundingClientRect();
+            var total = box.height - viewport * 0.6;
+            var done = total > 0 ? Math.min(1, Math.max(0, -box.top / total)) : 0;
+            progress.style.transform = "scaleX(" + done + ")";
+            progress.parentElement.classList.toggle("is-visible", y > 40);
+          }
+        }
+        toTop.addEventListener("click", function () {
+          window.scrollTo({ top: 0, behavior: reduceMotion.matches ? "auto" : "smooth" });
+        });
+        window.addEventListener("scroll", update, { passive: true });
+        window.addEventListener("resize", update);
+        update();
+
+        // "/" jumps to search, the way most news sites and web apps do.
+        document.addEventListener("keydown", function (event) {
+          if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
+          var target = event.target;
+          if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+          event.preventDefault();
+          var field = document.getElementById("search-query");
+          if (field) { field.focus(); field.select(); } else { window.location.assign("/search/"); }
+        });
+      })();
+    </script>
     {activeTheme.id === "weekly-wildcat" && <script is:inline>
       (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i+"?ref=bwt";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y)})(window,document,"clarity","script","xi1qesbixb");
     </script>}
