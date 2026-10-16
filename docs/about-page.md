@@ -73,3 +73,22 @@ roles and photo styles (the `about-*` classes in `globals.css`).
 FAQ answers that come from the newsroom, not a published page: anyone at Ninety Six High School can join, Mr. Mackin
 or gibson@weeklywildcat.com as the way to start, any time of year, hybrid and flexible meetings, pitching from day one,
 and clips but no course credit. Service hours are deliberately not mentioned.
+
+## Diversity & Inclusion page
+
+`/diversity-inclusion/` is also rendered by code (`apps/web/views/diversity-inclusion/`), with the CMS page of that
+slug skipped through `CODE_ROUTED_PAGE_SLUGS`. It reuses the About page's masthead, section, prose, photo and band
+styles, and the shared `ExploreCards` component for its four related-page cards (Phosphor icons live in
+`apps/web/lib/phosphor-icons.ts`).
+
+Written in the voice of an editorial standards statement, but it records the newsroom's working approach, not a
+formal adopted policy. Nothing here establishes a committee, a process or a
+guarantee. Confirm before treating these as established practice: editors considering whether coverage reflects the range of students and activities; including someone subject to a
+rule and members of a group being covered; asking sources how they wish to be described; keeping assumptions about background, abilities or home
+life out of stories; spelling out acronyms for non-student readers; the editors reviewing each concern and correcting the record when
+warranted. Verified against other pages: any student
+can join with no experience or tryout, meetings are flexible and hybrid, loaner equipment, editors chosen from the
+staff, names kept private on request, corrections page and story feedback form.
+
+Not claimed because it is not verified: that photographs have alt text (most media-library items have none, so adding
+descriptions to new photographs is worth doing), screen reader testing, or any accessibility audit.
