@@ -72,6 +72,7 @@ export function LeadPackage({ package: resolved, pollSlot, calendarSlot, railLim
           story={lead}
           variant="lead"
           showDeck={presentation.showDeck}
+          showReadLink
           priority
           fallbackAuthorName={resolved.fallbackAuthorName}
         />
@@ -102,6 +103,7 @@ export function LeadPackage({ package: resolved, pollSlot, calendarSlot, railLim
             story={lead}
             variant="lead"
             showDeck={presentation.showDeck}
+            showReadLink
             priority
             fallbackAuthorName={resolved.fallbackAuthorName}
           />

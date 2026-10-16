@@ -58,7 +58,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   ]);
 
   return (
-    <main className="section-page-shell">
+    <main className="section-page-shell category-page-shell">
       <script
         id="category-breadcrumb-json-ld"
         type="application/ld+json"
@@ -68,11 +68,11 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
       {leadPost ? (
         <div className={hasStoryList ? "category-story-layout" : "category-story-layout category-story-layout-single"}>
-          <StoryTeaser post={leadPost} variant="lead" priority />
+          <StoryTeaser post={leadPost} variant="lead" showCategory={false} priority />
           {hasStoryList ? (
             <div className="category-story-list">
               {remainingPosts.map((post) => (
-                <StoryTeaser key={post.id} post={post} variant="compact" />
+                <StoryTeaser key={post.id} post={post} variant="compact" showCategory={false} />
               ))}
             </div>
           ) : null}

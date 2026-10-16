@@ -46,14 +46,14 @@ export const WEEKLY_WILDCAT_PUBLICATION: BylinePublicationConfig = {
   ],
   navigation: [
     { label: "News", url: "/category/news/", locations: ["header"] },
-    { label: "Sports", url: "/sports/", locations: ["header"], feature: "sports" },
+    { label: "Sports", url: "/category/sports/", locations: ["header"], feature: "sports" },
     { label: "Opinion", url: "/category/opinion/", locations: ["header"] },
     { label: "Features", url: "/category/features/", locations: ["header"] },
     { label: "News", url: "/category/news/", locations: ["footer"], group: "Columns" },
     { label: "Features", url: "/category/features/", locations: ["footer"], group: "Columns" },
     { label: "Opinion", url: "/category/opinion/", locations: ["footer"], group: "Columns" },
     { label: "Arts & Culture", url: "/category/culture/", locations: ["footer"], group: "Columns" },
-    { label: "Sports", url: "/sports/", locations: ["footer"], group: "Columns", feature: "sports" },
+    { label: "Sports", url: "/category/sports/", locations: ["footer"], group: "Columns", feature: "sports" },
     { label: "Terms & Service", url: "/terms/", locations: ["footer"], group: "Policies" },
     { label: "Privacy Policy", url: "/privacy/", locations: ["footer"], group: "Policies" },
     { label: "About us", url: "/about/", locations: ["footer"], group: "About" },
@@ -94,6 +94,11 @@ function configuredPublication(): unknown {
 
 const publication = normalizePublicationConfig(configuredPublication(), WEEKLY_WILDCAT_PUBLICATION);
 publication.appearance = { theme: "weekly-wildcat", tokenOverrides: {} };
+// /sports/ only redirects to the fixed sports archive. Navigation saved before
+// the archive retirement still points there, so send it to current coverage.
+publication.navigation = publication.navigation.map((item) =>
+  item.url === "/sports/" ? { ...item, url: "/category/sports/" } : item
+);
 
 export function getPublicationConfig() {
   return publication;

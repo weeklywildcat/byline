@@ -44,6 +44,7 @@ export default async function StaticPage({ params }: StaticPageProps) {
   const title = stripHtml(wordpressPage.title.rendered);
   const description = stripHtml(wordpressPage.excerpt.rendered || wordpressPage.content.rendered);
   const eyebrow = wordpressPage.bylinePage?.eyebrow?.trim() || "";
+  const isSportsArchive = Boolean(wordpressPage.bylinePage?.sportsArchive);
 
   const pageSchema = {
     "@context": "https://schema.org",
@@ -75,6 +76,15 @@ export default async function StaticPage({ params }: StaticPageProps) {
           <h1>{title}</h1>
           <div className="static-page-deck">{description}</div>
         </header>
+
+        {isSportsArchive ? (
+          <aside className="static-page-notice" aria-label="About this archive">
+            <p>
+              This is our historical sports data aggregation and is no longer maintained. For current sports
+              coverage, visit <a href="/category/sports/">Sports</a>.
+            </p>
+          </aside>
+        ) : null}
 
         <div
           className="static-page-content byline-page-content"

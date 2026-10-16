@@ -14,6 +14,7 @@ import { SportsAthleteFeature } from "./pre-extraction-athlete-feature";
 //
 // Nothing here may be "fixed". If this markup is wrong, the shared renderer has
 // to be wrong in the same way until the two are changed together, deliberately.
+// Changed deliberately: the section's stories no longer repeat the "Sports" label.
 
 export type PreExtractionSportsProps = {
   fieldPosts: WordPressPost[];
@@ -52,12 +53,12 @@ export function PreExtractionSports({
       {fieldPosts.length > 0 || athleteSpotlightPost ? (
         <div className="field-layout">
           {fieldLeadPost ? (
-            <HomepageStory post={fieldLeadPost} variant="field" showDeck cleanDeck showAuthor showReadLink />
+            <HomepageStory post={fieldLeadPost} variant="field" showCategory={false} showDeck cleanDeck showAuthor showReadLink />
           ) : null}
           {fieldRailPosts.length > 0 || athleteSpotlightPost ? (
             <div className="field-rail">
               {fieldRailPosts.map((post) => (
-                <HomepageStory key={post.id} post={post} variant="briefing" showAuthor />
+                <HomepageStory key={post.id} post={post} variant="briefing" showCategory={false} showAuthor />
               ))}
               {athleteSpotlightPost ? <SportsAthleteFeature post={athleteSpotlightPost} /> : null}
             </div>

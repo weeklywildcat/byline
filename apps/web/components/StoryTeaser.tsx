@@ -15,6 +15,8 @@ type StoryTeaserProps = {
   post: WordPressPost;
   variant?: StoryTeaserVariant;
   showImage?: boolean;
+  // Off on a section's own page, where every story shares the section label.
+  showCategory?: boolean;
   priority?: boolean;
 };
 
@@ -30,7 +32,7 @@ function getStoryTeaserImageSizes(variant: StoryTeaserVariant) {
   return "(max-width: 900px) 100vw, 45vw";
 }
 
-export function StoryTeaser({ post, variant = "standard", showImage = true, priority = false }: StoryTeaserProps) {
+export function StoryTeaser({ post, variant = "standard", showImage = true, showCategory = true, priority = false }: StoryTeaserProps) {
   const href = getPostHref(post);
   const image = getFeaturedMedia(post);
   const contributors = getPostContributors(post);
@@ -53,7 +55,7 @@ export function StoryTeaser({ post, variant = "standard", showImage = true, prio
         />
       ) : null}
       <div className="story-teaser-body">
-        <ArticleByline contributors={contributors} category={category} date={post.date} />
+        <ArticleByline contributors={contributors} category={showCategory ? category : null} date={post.date} />
         <h2>
           <a href={href}>{title}</a>
         </h2>

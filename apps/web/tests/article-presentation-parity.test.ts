@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildArticlePresentation } from "@/lib/article-presentation";
-import { getPostContributors, type WordPressAuthor, type WordPressPost } from "@/lib/wordpress";
+import { getMediaCredit, getPostContributors, type WordPressAuthor, type WordPressPost } from "@/lib/wordpress";
 import paritySnapshot from "../../../tests/fixtures/article-presentation-parity.json";
 
 const category = (id: number, name: string, slug: string) => ({
@@ -194,5 +194,24 @@ describe("public article presentation parity fixture", () => {
     expect(presentation.publishedLabel).toBe(expected.publishedDateLabel);
     expect(presentation.readingTime).toBe(expected.readingTime);
     expect(presentation.publication).toEqual(expected.publication);
+  });
+});
+
+describe("getMediaCredit", () => {
+  const media = (byline: Partial<{ creator: string; creditText: string }>, meta: { credit?: string } = {}) =>
+    ({
+      source_url: "https://example.test/a.jpg",
+      bylineImage: { creator: "", creditText: "", copyrightNotice: "", licenseUrl: "", acquireLicensePage: "", ...byline },
+      media_details: { image_meta: meta }
+    }) as unknown as Parameters<typeof getMediaCredit>[0];
+
+  it("uses the photographer from the plugin's Image Creator field first", () => {
+    expect(getMediaCredit(media({ creator: "Maycie Krajewski", creditText: "Photo by Someone Else / Weekly Wildcat" }))).toBe("Maycie Krajewski");
+  });
+
+  it("drops a leading Photo by label from free-text credits", () => {
+    expect(getMediaCredit(media({ creditText: "Photo by Jane Doe" }))).toBe("Jane Doe");
+    expect(getMediaCredit(media({ creditText: "Photo: Jane Doe" }))).toBe("Jane Doe");
+    expect(getMediaCredit(media({}, { credit: "Credit: Jane Doe" }))).toBe("Jane Doe");
   });
 });
