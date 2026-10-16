@@ -1,5 +1,4 @@
 import { getNavigation, getPublicationConfig } from "@/lib/publication";
-import { SiteIcon } from "./SiteIcon";
 
 const publication = getPublicationConfig();
 const headerNavigation = getNavigation("header");
@@ -32,14 +31,14 @@ export function SiteHeader() {
         <span>{publication.location.display}</span>
         <time dateTime={dateTime}>{headerDate}</time>
         <div className="header-tools" aria-label="Site tools">
-        <a className="header-donate" href={DONATE_URL}>
-          Donate
-          <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 12h15M13 6l6 6-6 6" />
-          </svg>
-        </a>
+          <a className="header-donate" href={DONATE_URL}>
+            Donate
+          </a>
           <a className="search-button" href="/search/" aria-label="Search">
-            <SiteIcon name="ph:magnifying-glass" width={17} height={17} />
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
           </a>
         </div>
       </div>

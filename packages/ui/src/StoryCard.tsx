@@ -26,6 +26,8 @@ export type StoryCardProps = {
   showDeck?: boolean;
   showReadingTime?: boolean;
   showReadLink?: boolean;
+  // Off inside a section's own package, where every story shares the label.
+  showCategory?: boolean;
   priority?: boolean;
   // Falls back to the publication's staff byline when a story has no author.
   fallbackAuthorName: string;
@@ -51,6 +53,7 @@ export function StoryCard({
   showDeck = false,
   showReadingTime = false,
   showReadLink = false,
+  showCategory = true,
   priority = false,
   fallbackAuthorName
 }: StoryCardProps): ReactNode {
@@ -82,7 +85,7 @@ export function StoryCard({
 
       <div className="home-story-body">
         <div className="home-story-meta">
-          {story.category ? (
+          {showCategory && story.category ? (
             <a className="home-story-category" href={story.category.href}>
               {story.category.name}
             </a>

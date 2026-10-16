@@ -1025,19 +1025,10 @@ img {
   text-decoration: none;
 }
 
-.header-donate svg {
-  transition: transform 0.15s ease;
-}
-
 .header-donate:hover,
 .header-donate:focus-visible {
   text-decoration: underline;
   text-underline-offset: 3px;
-}
-
-.header-donate:hover svg,
-.header-donate:focus-visible svg {
-  transform: translateX(3px);
 }
 
 .header-tools {
@@ -1203,6 +1194,42 @@ img {
   font-weight: 800;
   line-height: 0.96;
   text-transform: none;
+}
+
+/* Category pages carry no hairlines of their own: the masthead nav already closes
+   the header, and whitespace separates the stories. */
+.category-page-shell > .section-heading {
+  border-bottom: 0;
+  border-top: 0;
+  margin-bottom: 36px;
+  padding: 10px 0 0;
+}
+
+.category-page-shell > .section-heading p {
+  margin-top: 10px;
+}
+
+.category-page-shell .category-story-list {
+  align-content: start;
+  border-left: 0;
+  gap: 24px;
+  padding-left: 0;
+}
+
+.category-page-shell .story-teaser {
+  border-top: 0;
+  padding: 0;
+}
+
+.category-page-shell .article-byline > * + *::before {
+  content: "\00b7";
+}
+
+@media (max-width: 900px) {
+  .category-page-shell .category-story-list {
+    border-top: 0;
+    padding-top: 0;
+  }
 }
 
 .lead-layout {
@@ -3050,6 +3077,28 @@ img {
   line-height: 1.45;
   margin-top: 18px;
   text-wrap: pretty;
+}
+
+.static-page-notice {
+  background: var(--page);
+  border-radius: 6px;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin: 0 0 28px;
+  padding: 14px 18px;
+}
+
+.static-page-notice p {
+  margin: 0;
+}
+
+.static-page-notice a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .static-page-content {
