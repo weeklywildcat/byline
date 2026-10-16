@@ -998,7 +998,7 @@ img {
   align-items: center;
   color: var(--accent);
   display: inline-flex;
-  font-weight: 700;
+  font-weight: 500;
   gap: 5px;
   text-decoration: none;
 }

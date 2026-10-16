@@ -65,7 +65,7 @@ function articleImage(image: WordPressMedia | null, sizes?: string, priority = f
 
 function articleStoryCard(post: WordPressPost): ArticleStoryCardView {
   const category = getPrimaryVisibleCategory(post);
-  const image = articleImage(getFeaturedMedia(post), "92px");
+  const image = articleImage(getFeaturedMedia(post), "(max-width: 900px) 100vw, 360px");
   return {
     id: post.id,
     title: stripHtml(post.title.rendered),
