@@ -73,3 +73,20 @@ roles and photo styles (the `about-*` classes in `globals.css`).
 FAQ answers that come from the newsroom, not a published page: anyone at Ninety Six High School can join, Mr. Mackin
 or gibson@weeklywildcat.com as the way to start, any time of year, hybrid and flexible meetings, pitching from day one,
 and clips but no course credit. Service hours are deliberately not mentioned.
+
+## Diversity & Inclusion page
+
+`/diversity-inclusion/` is also rendered by code (`apps/web/views/diversity-inclusion/`), with the CMS page of that
+slug skipped through `CODE_ROUTED_PAGE_SLUGS`. It reuses the About page's masthead, section, prose, photo and band
+styles, and the shared `ExploreCards` component for its four related-page cards (Phosphor icons live in
+`apps/web/lib/phosphor-icons.ts`).
+
+Written in the newsroom's own voice, reusing wording from the previous CMS page (the "easiest voices to quote" passage,
+the accessibility paragraph, "Help us do better" and the join invitation). Nothing here establishes a committee, a
+process or a guarantee. Beyond the old page, the additions are: talking directly to the people a story affects and
+asking how they would like to be described; any student can join with no tryout; new staff can start with one
+assignment; editors are chosen from the staff; asking readers for the page and what happened on accessibility
+problems. Confirm those before treating them as established practice.
+
+Not claimed because it is not verified: that photographs have alt text (most media-library items have none, so adding
+descriptions to new photographs is worth doing), screen reader testing, or any accessibility audit.

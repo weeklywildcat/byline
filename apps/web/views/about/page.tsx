@@ -1,6 +1,6 @@
-import { Icon } from "@iconify/react/offline";
 import type { ReactNode } from "react";
 import type { Metadata } from "@/lib/metadata";
+import { ExploreCards } from "@/components/ExploreCards";
 import { getPublicationConfig } from "@/lib/publication";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import {
@@ -16,7 +16,6 @@ import {
   STORY_SLUGS,
   TIMELINE
 } from "./content";
-import { ABOUT_ICONS } from "./icons";
 import { getAboutData, type AboutData, type AboutPhoto, type AboutStory } from "./data";
 
 const publication = getPublicationConfig();
@@ -446,18 +445,7 @@ export default async function AboutPage() {
           <h2 id="explore-heading">Explore the {publication.identity.shortName}</h2>
           <p>More about the newsroom, its people and how to reach it.</p>
         </div>
-        <ul className="about-explore-grid">
-          {EXPLORE.map((card) => (
-            <li key={card.href}>
-              <a href={card.href}>
-                <Icon className="about-explore-icon" icon={ABOUT_ICONS[card.icon]} width={28} height={28} aria-hidden="true" />
-                <span className="about-explore-title">{card.title}</span>
-                <span className="about-explore-text">{card.text}</span>
-                <Icon className="about-explore-arrow" icon={ABOUT_ICONS["arrow-right"]} width={20} height={20} aria-hidden="true" />
-              </a>
-            </li>
-          ))}
-        </ul>
+        <ExploreCards cards={EXPLORE} />
       </section>
     </main>
   );
