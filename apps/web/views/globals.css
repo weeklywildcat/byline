@@ -2278,38 +2278,6 @@ img {
   max-width: 660px;
 }
 
-.author-stats {
-  align-items: baseline;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 22px;
-  margin: 14px 0 0;
-}
-
-.author-stats div {
-  align-items: baseline;
-  display: flex;
-  gap: 6px;
-}
-
-.author-stats dt {
-  color: var(--soft-muted);
-  font-family: var(--font-ui);
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.author-stats dd {
-  color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  margin: 0;
-}
-
 .author-social-links {
   display: flex;
   flex-wrap: wrap;
