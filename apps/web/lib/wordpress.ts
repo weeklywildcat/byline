@@ -839,12 +839,20 @@ export async function getPostBySlug(slug: string) {
   return (await getAllPosts()).find((post) => post.slug === slug) ?? null;
 }
 
+// The CMS ships a "CMS Notice" page for editors who land on the WordPress
+// front end. It is not reader content, so it never becomes a public route.
+export function isCmsNoticePage(page: Pick<WordPressPage, "title">) {
+  return stripHtml(page.title.rendered).trim().toLowerCase() === "cms notice";
+}
+
 export async function getAllPages() {
-  return memoizedBuildData("pages", () => wpFetchCollection<WordPressPage>("/pages", {
+  const pages = await memoizedBuildData("pages", () => wpFetchCollection<WordPressPage>("/pages", {
     status: "publish",
     orderby: "menu_order",
     order: "asc"
   }));
+
+  return pages.filter((page) => !isCmsNoticePage(page));
 }
 
 export async function getPageBySlug(slug: string) {
