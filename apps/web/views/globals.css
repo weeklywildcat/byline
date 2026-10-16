@@ -982,16 +982,16 @@ img {
   align-items: center;
   color: var(--muted);
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr auto;
   font-family: var(--font-ui);
   font-size: 0.75rem;
   font-weight: 500;
+  left: 20px;
   letter-spacing: 0.01em;
   min-height: 30px;
-}
-
-.site-utility time {
-  justify-self: center;
+  position: absolute;
+  right: 20px;
+  top: 8px;
 }
 
 .header-donate {
@@ -1040,7 +1040,7 @@ img {
 
 .masthead-logo {
   display: block;
-  margin: 10px auto 18px;
+  margin: 0 auto 14px;
   max-width: 470px;
   width: 100%;
 }
@@ -1049,6 +1049,19 @@ img {
   height: auto;
   object-fit: contain;
   width: 100%;
+}
+
+.masthead-tagline {
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  line-height: 30px;
+  margin: 0 auto;
+  padding-left: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
 }
 
 .section-nav {
@@ -4541,17 +4554,15 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
 
   .site-utility {
     align-items: center;
-    grid-template-columns: 1fr auto;
+    justify-items: end;
+    left: auto;
     min-height: 28px;
+    position: static;
     text-align: left;
   }
 
   .site-utility > span {
     display: none;
-  }
-
-  .site-utility time {
-    justify-self: start;
   }
 
   .header-tools {
@@ -4561,6 +4572,15 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
   .masthead-logo {
     margin: 6px auto 12px;
     max-width: 300px;
+  }
+
+  .masthead-tagline {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.3;
+    padding-left: 0;
+    text-transform: none;
   }
 
   .masthead-logo img {
