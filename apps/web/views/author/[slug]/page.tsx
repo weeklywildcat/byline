@@ -128,7 +128,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
 
       {bio ? (
         <section className="author-about" aria-labelledby="author-about-heading">
-          <h2 id="author-about-heading">About {contributor.name}</h2>
+          <h2 id="author-about-heading">About</h2>
           <p className="author-bio">{bio}</p>
         </section>
       ) : null}
