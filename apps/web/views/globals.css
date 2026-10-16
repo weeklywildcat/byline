@@ -2364,7 +2364,7 @@ img {
 
 .author-card h2 {
   font-family: var(--font-body);
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   font-weight: 800;
   line-height: 1.1;
   margin: 0;
@@ -5177,7 +5177,7 @@ html[data-byline-theme="weekly-wildcat"] .story-teaser-lead h2 {
   line-height: 1.04;
 }
 
-html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-profile h1, .search-page-header h1, .search-result h3, .static-page-header h1, .not-found h1) {
+html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-profile h1, .author-card h2, .search-page-header h1, .search-result h3, .static-page-header h1, .not-found h1) {
   font-family: var(--font-headline);
   font-weight: 600;
   letter-spacing: -0.022em;
