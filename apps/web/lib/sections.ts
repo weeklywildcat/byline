@@ -14,7 +14,7 @@ export const PUBLIC_SECTIONS: PublicSection[] = publication.sections
   .map((section) => ({
     name: section.name,
     slug: section.slug,
-    href: section.slug === "sports" ? "/sports/" : `/category/${section.slug}/`
+    href: `/category/${section.slug}/`
   }));
 
 export const PUBLIC_SECTION_SLUGS = new Set(PUBLIC_SECTIONS.map((section) => section.slug));

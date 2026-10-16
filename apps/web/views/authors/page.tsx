@@ -33,7 +33,7 @@ export default async function AuthorsPage() {
         </div>
       </header>
 
-      <AuthorDirectory />
+      <AuthorDirectory showDescriptions={false} />
     </main>
   );
 }

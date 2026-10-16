@@ -32,10 +32,10 @@
 .editor-styles-wrapper .wp-block-post-title {
   color: var(--ink);
   font-family: var(--font-headline);
-  font-size: 4rem;
+  font-size: 2.75rem;
   font-weight: 600;
-  letter-spacing: -0.022em;
-  line-height: 1.04;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
   text-wrap: balance;
 }
 
@@ -137,7 +137,7 @@
   .editor-styles-wrapper .editor-post-title,
   .editor-styles-wrapper .editor-post-title__input,
   .editor-styles-wrapper .wp-block-post-title {
-    font-size: 2.55rem;
+    font-size: 2rem;
   }
 
   .editor-styles-wrapper .is-root-container {

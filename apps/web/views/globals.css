@@ -1016,6 +1016,21 @@ img {
   justify-self: center;
 }
 
+.header-donate {
+  align-items: center;
+  color: var(--accent);
+  display: inline-flex;
+  font-weight: 700;
+  gap: 5px;
+  text-decoration: none;
+}
+
+.header-donate:hover,
+.header-donate:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .header-tools {
   align-items: center;
   display: flex;
@@ -1179,6 +1194,101 @@ img {
   font-weight: 800;
   line-height: 0.96;
   text-transform: none;
+}
+
+/* Category pages: one rule closes the heading, thin rules separate the stories
+   beside the lead, and the rest of the section runs as a grid of cards. */
+.category-page-shell > .section-heading {
+  border-top: 0;
+  margin-bottom: 28px;
+  padding: 10px 0 18px;
+}
+
+.category-page-shell > .section-heading p {
+  margin-top: 10px;
+}
+
+.category-page-shell .category-story-layout {
+  gap: 48px;
+}
+
+.category-page-shell .category-story-list {
+  align-content: start;
+  border-left: 0;
+  padding-left: 0;
+}
+
+.category-page-shell .category-story-list .story-teaser {
+  padding: 16px 0;
+}
+
+.category-page-shell .category-story-list .story-teaser:first-child {
+  padding-top: 0;
+}
+
+.category-page-shell .article-byline > * + *::before {
+  content: "\00b7";
+}
+
+.category-more {
+  border-top: 1px solid var(--rule-strong);
+  margin-top: 48px;
+  padding-top: 14px;
+}
+
+.category-more > h2 {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin: 0 0 22px;
+  text-transform: uppercase;
+}
+
+.category-more-grid {
+  display: grid;
+  gap: 36px 28px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.category-more-grid .story-teaser {
+  align-content: start;
+  border-top: 0;
+  grid-template-columns: 1fr;
+  padding: 0;
+}
+
+.category-more-grid .story-teaser h2 {
+  font-size: 1.3rem;
+  line-height: 1.15;
+}
+
+.category-more-grid .photo-credit {
+  display: none;
+}
+
+.category-more-grid .story-excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+@media (max-width: 900px) {
+  .category-page-shell .category-story-list {
+    border-top: 1px solid var(--rule);
+    padding-top: 16px;
+  }
+
+  .category-more-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .category-more-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .lead-layout {
@@ -1480,10 +1590,10 @@ img {
 
 .article-header h1 {
   font-family: var(--font-ui);
-  font-size: 4rem;
+  font-size: 2.75rem;
   font-weight: 400;
-  line-height: 1.04;
-  margin: 16px 0 18px;
+  line-height: 1.1;
+  margin: 12px 0 14px;
 }
 
 .article-header .featured-image {
@@ -3026,6 +3136,28 @@ img {
   line-height: 1.45;
   margin-top: 18px;
   text-wrap: pretty;
+}
+
+.static-page-notice {
+  background: var(--page);
+  border-radius: 6px;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin: 0 0 28px;
+  padding: 14px 18px;
+}
+
+.static-page-notice p {
+  margin: 0;
+}
+
+.static-page-notice a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .static-page-content {
@@ -4751,7 +4883,7 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
   }
 
   .article-header h1 {
-    font-size: 2.55rem;
+    font-size: 2rem;
   }
 
   .article-game-card {
@@ -5019,7 +5151,7 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
   letter-spacing: -0.022em;
 }
 
-/* Photo credits: serif italic under every image, matching the article pages. */
+/* Photo credits: Libre Franklin under every image, matching the article pages. */
 .featured-image figcaption,
 .article-body figcaption {
   font-family: var(--font-serif);
@@ -5029,10 +5161,10 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
 
 .photo-credit {
   color: var(--soft-muted);
-  font-family: var(--font-serif);
-  font-size: 0.9rem;
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
 }

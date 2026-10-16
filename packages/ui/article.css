@@ -1,9 +1,9 @@
 /* Shared article presentation styles. Hosts provide theme variables. */
 .byline-article-view { margin: 0 auto; max-width: 1040px; padding: 38px 20px 72px; }
 .byline-article-view .article-story { margin: 0 auto; max-width: var(--article-width, 760px); }
-.byline-article-view .article-header { border-bottom: 1px solid var(--rule); margin-bottom: 30px; padding-bottom: 26px; }
+.byline-article-view .article-header { border-bottom: 1px solid var(--rule); margin-bottom: 24px; padding-bottom: 20px; }
 .byline-article-view .article-section-label { color: var(--accent); display: inline-flex; font-family: var(--font-ui); font-size: .78rem; font-weight: 700; text-transform: uppercase; }
-.byline-article-view .article-header h1 { font-family: var(--font-ui); font-size: 4rem; font-weight: 400; line-height: 1.04; margin: 16px 0 18px; }
+.byline-article-view .article-header h1 { font-family: var(--font-ui); font-size: 2.75rem; font-weight: 400; line-height: 1.1; margin: 12px 0 14px; }
 html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1 { font-family: "Newsreader", var(--font-serif); font-weight: 500; letter-spacing: -0.01em; }
 .byline-article-view .article-header .featured-image { margin-top: 26px; }
 .byline-article-view .article-excerpt { color: var(--muted); font-family: var(--font-ui); font-size: 1.12rem; font-weight: 400; }
@@ -96,8 +96,8 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 }
 /* Weekly Wildcat: Erode headlines, Newsreader reading text. Scoped to the theme
    root, which both the public site and Studio's article preview set. */
-html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1 { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.022em; line-height: 1.04; text-wrap: balance; }
-html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-excerpt { font-family: var(--font-serif); font-size: 1.22rem; line-height: 1.45; }
+html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1 { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; text-wrap: balance; }
+html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-excerpt { font-family: var(--font-serif); font-size: 1.1rem; line-height: 1.45; }
 html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body { font-family: var(--font-serif); }
 html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body h2, html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body h3, html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body h4 { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.012em; }
 html[data-byline-theme="weekly-wildcat"] .byline-article-view .story-teaser h2, html[data-byline-theme="weekly-wildcat"] .byline-article-view .about-writer-body h3, html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-tip-callout h2 { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.01em; }
@@ -105,7 +105,7 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .story-teaser h2, 
   .byline-article-view { padding-left: 16px; padding-right: 16px; }
   .byline-article-view .featured-image-caption-row { display: grid; gap: 5px; }
   .byline-article-view .photo-credit { max-width: none; text-align: left; }
-  .byline-article-view .article-header h1 { font-size: 2.55rem; }
+  .byline-article-view .article-header h1 { font-size: 2rem; }
   .byline-article-view .article-meta-block { column-gap: 10px; }
   .byline-article-view .article-byline-avatar { height: 36px; width: 36px; }
   .byline-article-view .article-byline-avatar + .article-byline-avatar { margin-left: -12px; }
@@ -113,12 +113,12 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .story-teaser h2, 
   .byline-article-view .article-body { font-size: 1.08rem; }
 }
 
-/* Photo credits are set in the reading serif under every image. The credit is a
-   second line in italic rather than shouting capitals, and a portrait lead photo
+/* Photo credits are set in Libre Franklin under every image, as "Photo: Name"
+   rather than shouting capitals, and a portrait lead photo
    is cropped to a landscape frame so it doesn't run past the first screen. */
 .byline-article-view .featured-image figcaption,
 .byline-article-view .article-body figcaption { font-family: var(--font-serif); font-size: .9rem; line-height: 1.4; }
-.byline-article-view .photo-credit { color: var(--soft-muted); font-family: var(--font-serif); font-size: .9rem; font-style: italic; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.byline-article-view .photo-credit { color: var(--soft-muted); font-family: var(--font-ui); font-size: .78rem; font-style: normal; font-weight: 500; letter-spacing: 0; text-transform: none; }
 .byline-article-view .featured-image-portrait img { aspect-ratio: 4 / 3; height: auto; object-fit: cover; object-position: center 38%; }
 @media (max-width: 640px) {
   .byline-article-view .featured-image-portrait img { aspect-ratio: 1 / 1; }
