@@ -3,9 +3,7 @@ import { ExploreCards } from "@/components/ExploreCards";
 import { getPublicationConfig } from "@/lib/publication";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { NEWSROOM_PHOTOS } from "@/views/about/content";
-import { getAboutData, type AboutStory } from "@/views/about/data";
-import { DI_STORIES, RELATED } from "./content";
-import type { ReactNode } from "react";
+import { RELATED } from "./content";
 
 const publication = getPublicationConfig();
 
@@ -16,12 +14,7 @@ export const metadata: Metadata = {
   ...buildPageMetadata({ title, description, path: "/diversity-inclusion/" })
 };
 
-function StoryRef({ story, children }: { story?: AboutStory; children: ReactNode }) {
-  return story ? <a href={story.href}>{children}</a> : <>{children}</>;
-}
-
-export default async function DiversityInclusionPage() {
-  const about = await getAboutData();
+export default function DiversityInclusionPage() {
   const photo = NEWSROOM_PHOTOS[0];
   const pageSchema = {
     "@context": "https://schema.org",
@@ -45,68 +38,44 @@ export default async function DiversityInclusionPage() {
       />
 
       <header className="di-masthead">
-        <p className="about-kicker">Editorial standards</p>
+        <p className="about-kicker">Standards</p>
         <h1>{title}</h1>
         <p className="about-lede">
-          The {publication.identity.shortName} is produced by students at {publication.identity.organizationName} and serves
-          the school and the surrounding community. This statement describes how the newsroom approaches representation,
-          fairness, participation and accessibility in its work.
+          {publication.identity.shortName} believes every student deserves to see their school and community represented
+          accurately, fairly and fully. We want our newsroom to include voices, experiences and stories that are often
+          overlooked.
         </p>
       </header>
 
-      <section className="about-section" aria-labelledby="di-cover-heading">
-        <h2 id="di-cover-heading">Representation in coverage</h2>
+      <section className="about-section" aria-labelledby="di-reporting-heading">
+        <h2 id="di-reporting-heading">In our reporting</h2>
         <div className="about-section-body">
           <div className="about-prose about-prose-wide">
             <p>
-              The {publication.identity.shortName} covers {publication.identity.organizationName} and the community around it,
-              including teams, clubs, classes and students that receive little attention. Editors consider whether coverage
-              reflects the range of students and activities at the school, not only those that are most visible.
+              We look beyond the easiest voices to quote and the most visible clubs, teams and leadership groups. That means
+              seeking a range of perspectives, covering issues that affect different groups of students, avoiding stereotypes
+              or tokenism, and making room for students whose stories are not always treated as front-page stories.
             </p>
             <p>
-              Recent coverage includes{" "}
-              <StoryRef story={about.story(DI_STORIES.directors)}>a theatre class production directed by three juniors</StoryRef>{" "}
-              and <StoryRef story={about.story(DI_STORIES.edgewood)}>a middle school team&rsquo;s second-place finish at a
-              national competition</StoryRef>.
+              We talk directly to the people a story affects, and we ask how they would like to be described.
             </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="about-section" aria-labelledby="di-perspectives-heading">
-        <h2 id="di-perspectives-heading">Sources and perspectives</h2>
-        <div className="about-section-body">
-          <div className="about-split">
-            <p className="di-pull">Reporters speak with the people a story affects.</p>
-            <div className="about-prose">
-              <p>
-                Reporters seek out the people directly affected by an issue and quote them in their own words. A story about a
-                rule or policy includes someone subject to it, in addition to the person who enforces it. A story about a
-                group includes members of that group, and no individual is presented as speaking for everyone like them.
-              </p>
-              <p>
-                Reporters ask sources how they wish to be described. Assumptions about a person&rsquo;s background, abilities
-                or home life are not included in a story unless the person provided the information and agreed to its
-                publication.
-              </p>
-            </div>
           </div>
         </div>
       </section>
 
       <section className="about-section" aria-labelledby="di-staff-heading">
-        <h2 id="di-staff-heading">Newsroom participation</h2>
+        <h2 id="di-staff-heading">In the newsroom</h2>
         <div className="about-section-body">
           <div className="about-split about-split-media di-staff">
             <div className="about-prose">
               <p>
-                Any {publication.identity.organizationName} student may join the staff, in any grade and without prior
-                experience or a tryout. Meetings are held in person and online, and equipment is available to borrow for
-                students who need it. New members may begin with a single assignment and take on more responsibility over
-                time. Editors are selected from the staff.
+                {publication.identity.shortName} is open to students of any background or experience level. Any{" "}
+                {publication.identity.organizationName} student can join, with no tryout, and new staff can start with a
+                single assignment and take on more over time. Editors are chosen from the staff.
               </p>
               <p>
-                Requirements and answers to common questions are on the <a href="/join/">Join page</a>.
+                We need writers, photographers, designers, illustrators, video creators, social media contributors and
+                students with story ideas. See the <a href="/join/">Join page</a> for how to start.
               </p>
             </div>
             <figure className="about-photo di-photo">
@@ -134,13 +103,9 @@ export default async function DiversityInclusionPage() {
         <div className="about-section-body">
           <div className="about-prose about-prose-wide">
             <p>
-              The newsroom writes for readers beyond the student body. Reporters are expected to spell out acronyms and explain
-              school terminology, and photographs carry captions and credits.
-            </p>
-            <p>
-              The newsroom relies on reader reports to identify accessibility problems. Readers who find content that is
-              difficult to read or navigate, or that does not work on their device or assistive technology, are asked to
-              tell the editors which page is affected and what the problem is.
+              Readers should be able to follow {publication.identity.shortName} without fighting the page. If something is
+              hard to read, hard to navigate, missing useful context or not working well on your device, we want to hear
+              about it so we can make the site better. Tell us which page it was and what happened.
             </p>
           </div>
         </div>
@@ -148,11 +113,12 @@ export default async function DiversityInclusionPage() {
 
       <section className="about-band di-feedback" aria-labelledby="di-feedback-heading">
         <div className="about-band-inner">
-          <h2 id="di-feedback-heading">Concerns and feedback</h2>
+          <h2 id="di-feedback-heading">Help us do better</h2>
           <p>
-            Readers may contact the editors about a story or perspective the paper has not covered, coverage that appears
-            unfair or inaccurate, a representation they consider mistaken, or an accessibility problem on the site. The
-            editors review each concern and correct the record when it is warranted.
+            Readers can suggest stories, flag coverage that felt inaccurate or exclusionary, request a correction, report an
+            accessibility issue or share a concern without attaching their name. When you reach out, tell us what happened
+            and how you would like your name handled. We will review the concern carefully and correct the record when
+            needed.
           </p>
           <p className="di-feedback-actions">
             <a className="about-button" href="/contact/">
@@ -160,9 +126,8 @@ export default async function DiversityInclusionPage() {
             </a>
           </p>
           <p className="di-feedback-note">
-            Concerns may be submitted without a name, or with instructions on how a name should be handled. Factual errors
-            can also be reported through the feedback form on each story. Published corrections are listed on the{" "}
-            <a href="/corrections/">corrections page</a>.
+            To report a mistake in a story, you can also use the feedback form on the story. Published corrections are listed
+            on the <a href="/corrections/">corrections page</a>.
           </p>
         </div>
       </section>

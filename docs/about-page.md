@@ -81,14 +81,12 @@ slug skipped through `CODE_ROUTED_PAGE_SLUGS`. It reuses the About page's masthe
 styles, and the shared `ExploreCards` component for its four related-page cards (Phosphor icons live in
 `apps/web/lib/phosphor-icons.ts`).
 
-Written in the voice of an editorial standards statement, but it records the newsroom's working approach, not a
-formal adopted policy. Nothing here establishes a committee, a process or a
-guarantee. Confirm before treating these as established practice: editors considering whether coverage reflects the range of students and activities; including someone subject to a
-rule and members of a group being covered; asking sources how they wish to be described; keeping assumptions about background, abilities or home
-life out of stories; spelling out acronyms for non-student readers; the editors reviewing each concern and correcting the record when
-warranted. Verified against other pages: any student
-can join with no experience or tryout, meetings are flexible and hybrid, loaner equipment, editors chosen from the
-staff, names kept private on request, corrections page and story feedback form.
+Written in the newsroom's own voice, reusing wording from the previous CMS page (the "easiest voices to quote" passage,
+the accessibility paragraph, "Help us do better" and the join invitation). Nothing here establishes a committee, a
+process or a guarantee. Beyond the old page, the additions are: talking directly to the people a story affects and
+asking how they would like to be described; any student can join with no tryout; new staff can start with one
+assignment; editors are chosen from the staff; asking readers for the page and what happened on accessibility
+problems. Confirm those before treating them as established practice.
 
 Not claimed because it is not verified: that photographs have alt text (most media-library items have none, so adding
 descriptions to new photographs is worth doing), screen reader testing, or any accessibility audit.

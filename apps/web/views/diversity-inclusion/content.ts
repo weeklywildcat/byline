@@ -1,11 +1,5 @@
 import type { ExploreCard } from "@/components/ExploreCards";
 
-// Stories the page points to, by slug. If one is unpublished the link is dropped.
-export const DI_STORIES = {
-  directors: "three-juniors-take-on-a-new-role-directing-their-classmates-in-need-a-lift",
-  edgewood: "from-a-last-minute-video-to-a-national-finish"
-} as const;
-
 export const RELATED: readonly ExploreCard[] = [
   {
     title: "About the Weekly Wildcat",
