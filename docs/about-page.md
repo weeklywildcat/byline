@@ -81,10 +81,12 @@ slug skipped through `CODE_ROUTED_PAGE_SLUGS`. It reuses the About page's masthe
 styles, and the shared `ExploreCards` component for its four related-page cards (Phosphor icons live in
 `apps/web/lib/phosphor-icons.ts`).
 
-Written as the newsroom's working approach, not as policy. Nothing here establishes a committee, a process or a
-guarantee. Confirm before treating these as established practice: asking who else is part of a team, club or rule
-being covered; asking people how they want to be described; keeping assumptions about background, abilities or home
-life out of stories; trying to spell out acronyms for non-student readers. Verified against other pages: any student
+Written in the voice of an editorial standards statement, but it records the newsroom's working approach, not a
+formal adopted policy. Nothing here establishes a committee, a process or a
+guarantee. Confirm before treating these as established practice: editors considering whether coverage reflects the range of students and activities; including someone subject to a
+rule and members of a group being covered; asking sources how they wish to be described; keeping assumptions about background, abilities or home
+life out of stories; spelling out acronyms for non-student readers; the editors reviewing each concern and correcting the record when
+warranted. Verified against other pages: any student
 can join with no experience or tryout, meetings are flexible and hybrid, loaner equipment, editors chosen from the
 staff, names kept private on request, corrections page and story feedback form.
 

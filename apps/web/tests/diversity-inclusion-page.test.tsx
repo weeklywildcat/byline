@@ -41,13 +41,13 @@ describe("diversity and inclusion page", () => {
     expect(document.querySelectorAll(".about-explore-grid svg")).toHaveLength(8);
   });
 
-  it("invites readers to contact the editors, with a way to stay anonymous", async () => {
+  it("invites readers to contact the editors, with a way to withhold a name", async () => {
     const document = await render();
     const feedback = document.querySelector(".di-feedback")!;
 
-    expect(feedback.querySelector("h2")!.textContent).toBe("What are we missing?");
+    expect(feedback.querySelector("h2")!.textContent).toBe("Concerns and feedback");
     expect(feedback.querySelector('a[href="/contact/"]')).not.toBeNull();
-    expect(feedback.textContent).toContain("keep your name private");
+    expect(feedback.textContent).toContain("without a name");
   });
 
   it("links stories that resolve and gives the photograph alt text and a credit", async () => {
@@ -62,7 +62,7 @@ describe("diversity and inclusion page", () => {
   it("avoids stock diversity-statement language", async () => {
     const text = (await render()).querySelector("main")!.textContent!.toLowerCase();
 
-    for (const phrase of ["belonging", "celebrate", "tapestry", "empower", "amplif", "voices matter", "melting pot"]) {
+    for (const phrase of ["belonging", "celebrate", "tapestry", "empower", "amplif", "voices matter", "melting pot", "?"]) {
       expect(text).not.toContain(phrase);
     }
   });
