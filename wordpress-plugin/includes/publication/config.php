@@ -137,6 +137,7 @@ function byline_weekly_wildcat_publication_config(): array
             ['label' => 'Privacy Policy', 'url' => '/privacy/', 'locations' => ['footer'], 'group' => 'Policies'],
             ['label' => 'About us', 'url' => '/about/', 'locations' => ['footer'], 'group' => 'About'],
             ['label' => 'Media Kit', 'url' => '/media-kit/', 'locations' => ['footer'], 'group' => 'About'],
+            ['label' => 'Open Source', 'url' => '/open-source/', 'locations' => ['footer'], 'group' => 'About'],
             ['label' => 'Advertise with Us', 'url' => '/advertise/', 'locations' => ['footer'], 'group' => 'About'],
             ['label' => 'Join our team', 'url' => '/join/', 'locations' => ['footer'], 'group' => 'About'],
             ['label' => 'Leadership', 'url' => '/leadership/', 'locations' => ['footer'], 'group' => 'About'],

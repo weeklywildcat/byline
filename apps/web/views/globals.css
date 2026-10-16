@@ -2575,7 +2575,6 @@ img {
 .media-kit-font-sample-label {
   font-family: var(--font-ui);
   font-size: 1rem;
-  font-stretch: 85%;
   font-weight: 800;
   letter-spacing: 0.06em;
   line-height: 1.2;
@@ -2637,6 +2636,94 @@ img {
 
 .media-kit-team-section {
   padding-bottom: 0;
+}
+
+.open-source-projects {
+  display: grid;
+}
+
+.open-source-project {
+  border-bottom: 1px solid var(--rule);
+  display: grid;
+  gap: 14px;
+  padding: 34px 0;
+}
+
+.open-source-project:last-child {
+  border-bottom: 0;
+}
+
+.open-source-project-label {
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.open-source-project h2 {
+  font-family: var(--font-headline);
+  font-size: 2.4rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.02;
+  margin: -4px 0 0;
+}
+
+.open-source-project > p:not(.open-source-project-label),
+.open-source-project li {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.open-source-project ul {
+  margin: 0;
+  padding-left: 1.3em;
+}
+
+.open-source-project li + li {
+  margin-top: 0.35em;
+}
+
+.open-source-project li::marker {
+  color: var(--accent);
+}
+
+.open-source-project-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.open-source-project-links a {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  padding: 12px 18px;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.open-source-project-links a:first-child {
+  background: var(--accent);
+  color: #fff;
+}
+
+.open-source-project-links a:hover,
+.open-source-project-links a:focus-visible {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
 }
 
 .search-page-shell {
@@ -2903,43 +2990,42 @@ img {
 
 .static-page-shell {
   margin: 0 auto;
-  max-width: 900px;
-  padding: 42px 20px 72px;
-}
-
-.static-page {
-  border-top: 1px solid var(--rule-strong);
+  max-width: 780px;
+  padding: 48px 20px 88px;
 }
 
 .static-page-header {
   border-bottom: 1px solid var(--rule);
-  padding: 22px 0 26px;
+  margin-bottom: 14px;
+  padding-bottom: 32px;
 }
 
 .static-page-header p {
   color: var(--accent);
   font-family: var(--font-ui);
-  font-size: 0.76rem;
-  font-weight: 800;
-  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 0 0 14px;
   text-transform: uppercase;
 }
 
 .static-page-header h1 {
   font-family: var(--font-display);
-  font-size: 4rem;
+  font-size: 3.6rem;
   font-weight: 800;
-  line-height: 0.94;
+  line-height: 1.02;
   margin: 0;
+  text-wrap: balance;
 }
 
 .static-page-deck {
   color: var(--muted);
-  font-family: var(--font-body);
-  font-size: 1.14rem;
+  font-family: var(--font-serif);
+  font-size: 1.24rem;
   line-height: 1.45;
-  margin-top: 14px;
-  max-width: 720px;
+  margin-top: 18px;
+  text-wrap: pretty;
 }
 
 .static-page-content {
@@ -4214,19 +4300,17 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
 .footer-link-group h2 {
   color: #ffffff;
   font-family: var(--font-ui);
-  font-size: 0.78rem;
-  font-stretch: 85%;
-  font-weight: 800;
-  letter-spacing: 0.07em;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.2;
   margin: 0 0 12px;
-  text-transform: uppercase;
 }
 
 .footer-links {
   display: flex;
   flex-direction: column;
-  font-family: var(--font-body);
-  font-size: 0.84rem;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
   font-weight: 400;
   gap: 6px;
   text-transform: none;
@@ -4342,7 +4426,7 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
   }
 
   .static-page-header h1 {
-    font-size: 3.2rem;
+    font-size: 3.1rem;
   }
 
   .live-home-shell {
@@ -4634,11 +4718,28 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
   }
 
   .static-page-shell {
-    padding: 30px 16px 56px;
+    padding: 28px 16px 64px;
+  }
+
+  .static-page-header {
+    padding-bottom: 24px;
+  }
+
+  .open-source-project {
+    padding: 26px 0;
+  }
+
+  .open-source-project h2 {
+    font-size: 1.9rem;
+  }
+
+  .open-source-project > p:not(.open-source-project-label),
+  .open-source-project li {
+    font-size: 1.08rem;
   }
 
   .static-page-deck {
-    font-size: 1.02rem;
+    font-size: 1.1rem;
   }
 
   .story-teaser-lead h2 {

@@ -204,7 +204,7 @@ grep -qx 'weekly-wildcat-headless/build/blocks/page-section/style-index.css' <<<
 
 # The editor canvas stylesheet loads Weekly Wildcat fonts from build/fonts. If the
 # build stops emitting them the editor silently falls back to system fonts.
-for font_family in erode-normal-600 newsreader-normal-latin mona-sans-normal-latin; do
+for font_family in erode-normal-600 newsreader-normal-latin libre-franklin-normal-latin; do
   if ! grep -qE "^weekly-wildcat-headless/build/fonts/${font_family}\.[0-9a-f]+\.woff2$" <<<"$archive_files"; then
     echo "Plugin archive is missing the bundled editor font $font_family." >&2
     exit 1
