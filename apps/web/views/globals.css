@@ -1196,39 +1196,98 @@ img {
   text-transform: none;
 }
 
-/* Category pages carry no hairlines of their own: the masthead nav already closes
-   the header, and whitespace separates the stories. */
+/* Category pages: one rule closes the heading, thin rules separate the stories
+   beside the lead, and the rest of the section runs as a grid of cards. */
 .category-page-shell > .section-heading {
-  border-bottom: 0;
   border-top: 0;
-  margin-bottom: 36px;
-  padding: 10px 0 0;
+  margin-bottom: 28px;
+  padding: 10px 0 18px;
 }
 
 .category-page-shell > .section-heading p {
   margin-top: 10px;
 }
 
+.category-page-shell .category-story-layout {
+  gap: 48px;
+}
+
 .category-page-shell .category-story-list {
   align-content: start;
   border-left: 0;
-  gap: 24px;
   padding-left: 0;
 }
 
-.category-page-shell .story-teaser {
-  border-top: 0;
-  padding: 0;
+.category-page-shell .category-story-list .story-teaser {
+  padding: 16px 0;
+}
+
+.category-page-shell .category-story-list .story-teaser:first-child {
+  padding-top: 0;
 }
 
 .category-page-shell .article-byline > * + *::before {
   content: "\00b7";
 }
 
+.category-more {
+  border-top: 1px solid var(--rule-strong);
+  margin-top: 48px;
+  padding-top: 14px;
+}
+
+.category-more > h2 {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin: 0 0 22px;
+  text-transform: uppercase;
+}
+
+.category-more-grid {
+  display: grid;
+  gap: 36px 28px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.category-more-grid .story-teaser {
+  align-content: start;
+  border-top: 0;
+  grid-template-columns: 1fr;
+  padding: 0;
+}
+
+.category-more-grid .story-teaser h2 {
+  font-size: 1.3rem;
+  line-height: 1.15;
+}
+
+.category-more-grid .photo-credit {
+  display: none;
+}
+
+.category-more-grid .story-excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 @media (max-width: 900px) {
   .category-page-shell .category-story-list {
-    border-top: 0;
-    padding-top: 0;
+    border-top: 1px solid var(--rule);
+    padding-top: 16px;
+  }
+
+  .category-more-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .category-more-grid {
+    grid-template-columns: 1fr;
   }
 }
 

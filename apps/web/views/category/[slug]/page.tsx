@@ -15,6 +15,8 @@ type CategoryPageProps = {
 };
 
 const publication = getPublicationConfig();
+// Stories beside the lead; the rest of the section runs in a grid below.
+const RAIL_STORY_COUNT = 4;
 
 export async function getMetadata({ params }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -51,7 +53,9 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const [leadPost, ...remainingPosts] = posts;
   const categoryName = decodeHtml(category.name);
   const categoryDescription = category.description ? stripHtml(category.description) : `${posts.length} published stories`;
-  const hasStoryList = remainingPosts.length > 0;
+  const railPosts = remainingPosts.slice(0, RAIL_STORY_COUNT);
+  const morePosts = remainingPosts.slice(RAIL_STORY_COUNT);
+  const hasStoryList = railPosts.length > 0;
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", path: "/" },
     { name: categoryName, path: `/category/${category.slug}/` }
@@ -71,7 +75,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           <StoryTeaser post={leadPost} variant="lead" showCategory={false} priority />
           {hasStoryList ? (
             <div className="category-story-list">
-              {remainingPosts.map((post) => (
+              {railPosts.map((post) => (
                 <StoryTeaser key={post.id} post={post} variant="compact" showCategory={false} />
               ))}
             </div>
@@ -80,6 +84,17 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       ) : (
         <p className="empty-state">No published posts are available in {categoryName} yet.</p>
       )}
+
+      {morePosts.length > 0 ? (
+        <section className="category-more" aria-labelledby="category-more-heading">
+          <h2 id="category-more-heading">More in {categoryName}</h2>
+          <div className="category-more-grid">
+            {morePosts.map((post) => (
+              <StoryTeaser key={post.id} post={post} variant="standard" showCategory={false} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }
