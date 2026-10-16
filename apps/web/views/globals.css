@@ -2144,12 +2144,12 @@ img {
 }
 
 .author-profile {
-  align-items: start;
+  align-items: center;
   display: grid;
-  gap: 24px;
+  gap: 20px 28px;
   grid-template-columns: auto minmax(0, 1fr);
   margin-bottom: 26px;
-  padding: 24px 0 0;
+  padding: 28px 0 0;
 }
 
 .author-avatar {
@@ -2270,12 +2270,14 @@ img {
 }
 
 .author-bio {
-  color: var(--muted);
-  font-family: var(--font-body);
-  font-size: 1rem;
-  line-height: 1.45;
-  margin: 8px 0 0;
-  max-width: 660px;
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  grid-column: 1 / -1;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 66ch;
+  white-space: pre-line;
 }
 
 .author-social-links {

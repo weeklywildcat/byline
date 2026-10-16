@@ -113,7 +113,6 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
           </div>
           <h1>{contributor.name}</h1>
           {profile?.pronouns ? <p className="author-pronouns">{profile.pronouns}</p> : null}
-          <p className="author-bio">{description}</p>
           {socialLinks.length > 0 ? (
               <div className="author-social-links" aria-label={`${contributor.name} social links`}>
               {socialLinks.map((link) => (
@@ -124,6 +123,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
             </div>
           ) : null}
         </div>
+        <p className="author-bio">{description}</p>
       </header>
 
       <section className="author-story-section" aria-labelledby="author-stories-heading">
