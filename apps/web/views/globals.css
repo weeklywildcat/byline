@@ -1016,6 +1016,30 @@ img {
   justify-self: center;
 }
 
+.header-donate {
+  align-items: center;
+  color: var(--accent);
+  display: inline-flex;
+  font-weight: 700;
+  gap: 5px;
+  text-decoration: none;
+}
+
+.header-donate svg {
+  transition: transform 0.15s ease;
+}
+
+.header-donate:hover,
+.header-donate:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.header-donate:hover svg,
+.header-donate:focus-visible svg {
+  transform: translateX(3px);
+}
+
 .header-tools {
   align-items: center;
   display: flex;
@@ -1480,10 +1504,10 @@ img {
 
 .article-header h1 {
   font-family: var(--font-ui);
-  font-size: 4rem;
+  font-size: 2.75rem;
   font-weight: 400;
-  line-height: 1.04;
-  margin: 16px 0 18px;
+  line-height: 1.1;
+  margin: 12px 0 14px;
 }
 
 .article-header .featured-image {
@@ -4751,7 +4775,7 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
   }
 
   .article-header h1 {
-    font-size: 2.55rem;
+    font-size: 2rem;
   }
 
   .article-game-card {
@@ -5019,7 +5043,7 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
   letter-spacing: -0.022em;
 }
 
-/* Photo credits: serif italic under every image, matching the article pages. */
+/* Photo credits: Libre Franklin under every image, matching the article pages. */
 .featured-image figcaption,
 .article-body figcaption {
   font-family: var(--font-serif);
@@ -5029,10 +5053,10 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
 
 .photo-credit {
   color: var(--soft-muted);
-  font-family: var(--font-serif);
-  font-size: 0.9rem;
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
 }
