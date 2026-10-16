@@ -6050,3 +6050,140 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
   }
 
 }
+
+/* Diversity & Inclusion page. Shares the About page's masthead, sections, prose,
+   photo, band and card styles. */
+.di-masthead {
+  padding-bottom: 52px;
+}
+
+.di-masthead h1 {
+  font-family: var(--font-headline);
+  font-size: clamp(2.6rem, 6vw, 4.5rem);
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.02;
+  margin: 14px 0 26px;
+  text-wrap: balance;
+}
+
+.di-masthead .about-lede {
+  margin-bottom: 0;
+  max-width: 36em;
+}
+
+.di-pull {
+  border-top: 3px solid var(--accent);
+  font-family: var(--font-headline);
+  font-size: clamp(1.45rem, 2.6vw, 1.95rem);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  margin: 0;
+  padding-top: 16px;
+  text-wrap: balance;
+}
+
+.di-staff {
+  align-items: start;
+}
+
+.di-photo {
+  max-width: 420px;
+}
+
+.di-photo img {
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+}
+
+.di-feedback.about-band {
+  margin-bottom: 68px;
+  margin-top: 8px;
+}
+
+.di-feedback .about-band-inner {
+  padding: 40px 36px 36px;
+}
+
+.di-feedback h2 {
+  color: #ffffff;
+  font-family: var(--font-headline);
+  font-size: clamp(2rem, 4.5vw, 3.1rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  margin: 0 0 18px;
+  text-transform: none;
+}
+
+.di-feedback p {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  line-height: 1.5;
+  margin: 0 0 20px;
+  max-width: 36em;
+}
+
+.di-feedback .di-feedback-actions {
+  margin-bottom: 22px;
+}
+
+.di-feedback .di-feedback-note {
+  color: #b4b4b4;
+  font-size: 1.02rem;
+  margin: 0;
+}
+
+.di-feedback .di-feedback-note a {
+  color: #ffffff;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.about-page .about-button {
+  background: #ffffff;
+  border: 2px solid #ffffff;
+  color: var(--ink);
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: 0.98rem;
+  font-weight: 700;
+  padding: 12px 22px;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.about-page .about-button:hover {
+  background: transparent;
+  color: #ffffff;
+}
+
+@media (min-width: 1041px) {
+  .about-explore-grid-four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1040px) {
+  .about-explore-grid-four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .di-feedback .about-band-inner {
+    padding: 28px 20px 26px;
+  }
+
+  .di-photo {
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-page .about-button {
+    transition: none;
+  }
+}

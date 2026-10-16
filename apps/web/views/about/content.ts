@@ -1,4 +1,4 @@
-import type { AboutIconName } from "./icons";
+import type { PhosphorIconName } from "@/lib/phosphor-icons";
 
 // Copy that changes with the newsroom lives here, apart from the page markup, so
 // a future editor can update the timeline, standards or links without touching
@@ -158,7 +158,7 @@ export const EXPLORE: readonly {
   title: string;
   text: string;
   href: string;
-  icon: AboutIconName;
+  icon: PhosphorIconName;
 }[] = [
   {
     title: "Diversity & Inclusion",
