@@ -121,9 +121,9 @@ describe("the custom article hero is gone", () => {
     for (const selector of ["article-custom-hero", "article-story-custom-hero", "article-immersive", "article-story-content"]) {
       expect(globalCss).not.toContain(selector);
     }
-    // The shared heading animation belongs to every page header and stays.
-    expect(globalCss).toContain("page-heading-enter");
-    expect(globalCss).toContain(".article-header h1,");
+    // Page headings no longer fade and slide in: the entrance animation made the
+    // late font swap more visible, so it was removed from every page header.
+    expect(globalCss).not.toContain("page-heading-enter");
   });
 
   it("stops emitting the retired settings from WordPress", () => {
