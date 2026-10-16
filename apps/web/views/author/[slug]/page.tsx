@@ -60,7 +60,8 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
   const profile = !isGuestContributor(contributor) ? contributor.bylineProfile ?? contributor.weeklyWildcatProfile : null;
   const photo = getContributorPhoto(contributor);
   const socialLinks = getContributorSocialLinks(contributor);
-  const description = stripHtml(getContributorDescription(contributor)) || `${publication.identity.shortName} contributor`;
+  const bio = stripHtml(getContributorDescription(contributor));
+  const description = bio || `${publication.identity.shortName} contributor`;
   const authorSchema = {
     "@context": "https://schema.org",
     "@type": "ProfilePage",
@@ -113,7 +114,6 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
           </div>
           <h1>{contributor.name}</h1>
           {profile?.pronouns ? <p className="author-pronouns">{profile.pronouns}</p> : null}
-          <p className="author-bio">{description}</p>
           {socialLinks.length > 0 ? (
               <div className="author-social-links" aria-label={`${contributor.name} social links`}>
               {socialLinks.map((link) => (
@@ -125,6 +125,13 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
           ) : null}
         </div>
       </header>
+
+      {bio ? (
+        <section className="author-about" aria-labelledby="author-about-heading">
+          <h2 id="author-about-heading">About</h2>
+          <p className="author-bio">{bio}</p>
+        </section>
+      ) : null}
 
       <section className="author-story-section" aria-labelledby="author-stories-heading">
         <div className="section-heading">
