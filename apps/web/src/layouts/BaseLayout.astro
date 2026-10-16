@@ -12,8 +12,8 @@ import { serializeMetadata, type Metadata } from "@/lib/metadata";
 import { getPublicationConfig } from "@/lib/publication";
 import { getActiveTheme, getThemeCssVariables, SELF_HOSTED_FONTS } from "@/lib/theme";
 
-interface Props { metadata?: Metadata; themeColor?: string; noCanonical?: boolean; }
-const { metadata = {}, themeColor, noCanonical = false } = Astro.props;
+interface Props { metadata?: Metadata; themeColor?: string; noCanonical?: boolean; stickyLogo?: boolean; stickyNav?: boolean; }
+const { metadata = {}, themeColor, noCanonical = false, stickyLogo = false, stickyNav = false } = Astro.props;
 const publication = getPublicationConfig();
 const activeTheme = getActiveTheme();
 const rawTitle = typeof metadata.title === "string" ? metadata.title : publication.seo.defaultTitle;
@@ -77,7 +77,64 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
     <script id="organization-json-ld" type="application/ld+json" set:html={serializeJsonLd(getOrganizationSchema())}></script>
   </head>
   <body>
-    <SiteHeader />
+    <SiteHeader sticky={stickyLogo ? "logo" : stickyNav ? "nav" : undefined} />
+    {stickyNav && <script is:inline>
+      (function () {
+        var nav = document.querySelector(".site-header--nav > .section-nav");
+        if (!nav) return;
+        // Mark the nav while it is pinned so its shadow only shows then.
+        function update() { nav.classList.toggle("is-stuck", nav.getBoundingClientRect().top <= 0.5); }
+        window.addEventListener("scroll", update, { passive: true });
+        window.addEventListener("resize", update);
+        update();
+      })();
+    </script>}
+    {stickyLogo && <script is:inline>
+      (function () {
+        var bar = document.querySelector("[data-sticky-logo-bar]");
+        var link = document.querySelector(".site-header--logo > .masthead-logo");
+        var utility = document.querySelector(".site-header--logo > .site-utility");
+        var logo = link && link.querySelector("img");
+        if (!bar || !logo || !utility) return;
+
+        // Pinning itself is native position: sticky (compositor-driven, so it
+        // never lags or overshoots on momentum scrolling). This only sets the
+        // size, tied to scroll: the logo shrinks into the bar as it pins.
+        var BAR_HEIGHT = 46;   // docked bar height
+        var LOGO_HEIGHT = 26;  // docked logo height
+        var RAMP = 150;        // scroll distance over which the logo shrinks
+        var STICK_TOP = 10;    // matches the logo's sticky top in CSS
+        var start = 0;         // scroll position where the logo begins to pin
+        var logoHeight = 0;
+        var barHeight = 0;
+
+        function measure() {
+          var top = utility.getBoundingClientRect().bottom + window.scrollY;
+          var margin = parseFloat(getComputedStyle(link).marginTop) || 0;
+          logoHeight = logo.offsetHeight;
+          barHeight = margin + logoHeight;
+          start = top + margin - STICK_TOP;
+          // The strip covers the logo's resting box and overlaps it, so nothing shifts.
+          bar.style.height = barHeight + "px";
+          bar.style.marginBottom = -barHeight + "px";
+        }
+
+        function update() {
+          if (!logoHeight) return;
+          var p = Math.max(0, Math.min(1, (window.scrollY - start) / RAMP));
+          var e = p * p * (3 - 2 * p);
+          logo.style.transform = "scale(" + (1 + e * (LOGO_HEIGHT / logoHeight - 1)) + ")";
+          bar.style.transform = "scaleY(" + (1 + e * (BAR_HEIGHT / barHeight - 1)) + ")";
+          bar.style.setProperty("--dock", e);
+        }
+
+        function refresh() { measure(); update(); }
+        window.addEventListener("scroll", update, { passive: true });
+        window.addEventListener("resize", refresh);
+        window.addEventListener("load", refresh);
+        refresh();
+      })();
+    </script>}
     <slot />
     <SiteFooter />
     {activeTheme.id === "weekly-wildcat" && <script is:inline>

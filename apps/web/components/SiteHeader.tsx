@@ -24,9 +24,16 @@ const dateTime = `${dateParts.find((part) => part.type === "year")?.value}-${
   dateParts.find((part) => part.type === "month")?.value
 }-${dateParts.find((part) => part.type === "day")?.value}`;
 
-export function SiteHeader() {
+type SiteHeaderProps = {
+  // "nav" pins the section nav (homepage); "logo" pins and shrinks the masthead
+  // logo (articles). Both lift the header's children into the body so
+  // position: sticky can last the whole page.
+  sticky?: "nav" | "logo";
+};
+
+export function SiteHeader({ sticky }: SiteHeaderProps) {
   return (
-    <header className="site-header">
+    <header className={sticky ? `site-header site-header--flat site-header--${sticky}` : "site-header"}>
       <div className="site-utility" aria-label="Publication details">
         <span>{publication.location.display}</span>
         <time dateTime={dateTime}>{headerDate}</time>
@@ -43,6 +50,7 @@ export function SiteHeader() {
         </div>
       </div>
 
+      {sticky === "logo" ? <div className="sticky-logo-bar" data-sticky-logo-bar aria-hidden="true" /> : null}
       <a className="masthead-logo" href="/" aria-label={`${publication.identity.name} home`}>
         <img src={publication.branding.masthead.url} alt={publication.branding.masthead.alt} />
       </a>
