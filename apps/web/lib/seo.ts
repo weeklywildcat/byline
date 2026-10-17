@@ -1,6 +1,8 @@
 import type { Metadata } from "@/lib/metadata";
 import { getPrimaryVisibleCategory } from "@/lib/content";
+import { getWordPressIsoTimestamp } from "@/lib/dates";
 import { decodeHtml, stripHtml } from "@/lib/format";
+import { getMeaningfulImageAlt } from "@/lib/image-alt";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getFeaturedMedia,
@@ -46,6 +48,8 @@ type BreadcrumbItem = {
 
 type PageMetadataOptions = {
   title: string;
+  /** Use the title as written instead of appending " | Weekly Wildcat" (the homepage). */
+  absoluteTitle?: boolean;
   description: string;
   path: string;
   type?: "website" | "article" | "profile";
@@ -62,6 +66,7 @@ type BasicSeoImage = {
 
 type SeoImage = WordPressMedia | BasicSeoImage;
 
+/** Resolve a site path (or protocol-relative URL) against the public origin; absolute URLs pass through untouched. */
 export function absoluteUrl(path: string) {
   const siteUrl = getSiteUrl();
 
@@ -69,11 +74,31 @@ export function absoluteUrl(path: string) {
     return path;
   }
 
+  if (path.startsWith("//")) {
+    return `https:${path}`;
+  }
+
   return `${siteUrl}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 export function serializeJsonLd(data: unknown) {
   return JSON.stringify(data).replace(/</g, "\\u003c");
+}
+
+/**
+ * The homepage title says what the publication is, not just its name. A
+ * title configured in the CMS (anything other than the bare name) wins;
+ * otherwise it is built from the publication's own identity.
+ */
+export function getHomepageTitle() {
+  const { defaultTitle } = publication.seo;
+  const { shortName, organizationName } = publication.identity;
+
+  if (defaultTitle && defaultTitle !== shortName) {
+    return defaultTitle;
+  }
+
+  return organizationName ? `${shortName} | ${organizationName} Student Newspaper` : defaultTitle || shortName;
 }
 
 export function getSeoDescription(value: string, fallback = SITE_DESCRIPTION) {
@@ -118,18 +143,24 @@ function getMediaAlt(image: SeoImage | null | undefined) {
     return image.alt || undefined;
   }
 
-  return image.alt_text || stripHtml(image.title?.rendered ?? "") || undefined;
+  return getMeaningfulImageAlt(image) || undefined;
 }
 
+/**
+ * Social crawlers fetch these URLs from outside the site, so they must be
+ * absolute. Mirrored WordPress media is stored as /_wordpress-media/... and is
+ * resolved against the public origin here; URLs that are already absolute
+ * (including the CMS fallback when mirroring failed) are left alone.
+ */
 export function buildSocialImageMetadata(image?: SeoImage | null) {
-  const imageUrl = getImageUrl(image);
+  const imageUrl = getImageUrl(image)?.trim();
 
   if (image && imageUrl) {
     return [
       {
-        url: imageUrl,
-        width: getImageWidth(image),
-        height: getImageHeight(image),
+        url: absoluteUrl(imageUrl),
+        width: getImageWidth(image) || undefined,
+        height: getImageHeight(image) || undefined,
         alt: getMediaAlt(image)
       }
     ];
@@ -147,6 +178,7 @@ export function buildSocialImageMetadata(image?: SeoImage | null) {
 
 export function buildPageMetadata({
   title,
+  absoluteTitle = false,
   description,
   path,
   type = "website",
@@ -158,7 +190,7 @@ export function buildPageMetadata({
   const images = buildSocialImageMetadata(image);
 
   return {
-    title,
+    title: absoluteTitle ? { absolute: title } : title,
     description: trimmedDescription,
     alternates: {
       canonical: path
@@ -194,24 +226,83 @@ export function buildPageMetadata({
   };
 }
 
-export function getPublisherSchema() {
+const ORGANIZATION_TYPE = "NewsMediaOrganization";
+
+export function getOrganizationId() {
+  return `${getSiteUrl()}/#organization`;
+}
+
+export function getWebsiteId() {
+  return `${getSiteUrl()}/#website`;
+}
+
+function getOrganizationLogoSchema() {
   return {
-    "@type": publication.seo.organizationType,
-    name: SITE_NAME,
-    url: getSiteUrl(),
-    logo: {
-      "@type": "ImageObject",
-      url: absoluteUrl(ORGANIZATION_LOGO_PATH),
-      width: ORGANIZATION_LOGO_WIDTH ?? undefined,
-      height: ORGANIZATION_LOGO_HEIGHT ?? undefined
-    }
+    "@type": "ImageObject",
+    url: absoluteUrl(ORGANIZATION_LOGO_PATH),
+    width: ORGANIZATION_LOGO_WIDTH ?? undefined,
+    height: ORGANIZATION_LOGO_HEIGHT ?? undefined
   };
 }
 
+/**
+ * The compact form of the publication entity used inside other nodes (an
+ * article's publisher). It carries the same @id as the full entity on the
+ * homepage, so every page points at one logical organization, while still
+ * including the name and logo that Google reads from a single page.
+ */
+export function getPublisherSchema() {
+  return {
+    "@type": ORGANIZATION_TYPE,
+    "@id": getOrganizationId(),
+    name: SITE_NAME,
+    url: `${getSiteUrl()}/`,
+    logo: getOrganizationLogoSchema()
+  };
+}
+
+function getPostalAddress() {
+  const { address, city, region, country } = publication.location;
+
+  if (!address && !city) {
+    return undefined;
+  }
+
+  // The configured address is one line ("640 South Cambridge Street, Ninety Six, SC").
+  const cityIndex = city ? address.toLowerCase().indexOf(`, ${city.toLowerCase()}`) : -1;
+  const streetAddress = cityIndex > 0 ? address.slice(0, cityIndex).trim() : undefined;
+
+  return {
+    "@type": "PostalAddress",
+    streetAddress,
+    addressLocality: city || undefined,
+    addressRegion: region || undefined,
+    addressCountry: country || undefined
+  };
+}
+
+/** The full publication entity. Emitted once, on the homepage. */
 export function getOrganizationSchema() {
+  const sameAs = publication.social.map((profile) => profile.url.trim()).filter((url) => /^https:\/\//i.test(url));
+  const parentName = publication.identity.organizationName.trim();
+
   return {
     "@context": "https://schema.org",
-    ...getPublisherSchema()
+    ...getPublisherSchema(),
+    description: publication.identity.description || SITE_DESCRIPTION,
+    address: getPostalAddress(),
+    sameAs: sameAs.length > 0 ? sameAs : undefined,
+    contactPoint: publication.urls.contact
+      ? {
+          "@type": "ContactPoint",
+          contactType: "editorial",
+          url: absoluteUrl(publication.urls.contact)
+        }
+      : undefined,
+    parentOrganization: parentName && parentName !== SITE_NAME
+      ? { "@type": "Organization", name: parentName }
+      : undefined,
+    correctionsPolicy: absoluteUrl("/corrections/")
   };
 }
 
@@ -219,8 +310,11 @@ export function getWebsiteSchema() {
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
+    "@id": getWebsiteId(),
     name: SITE_NAME,
-    url: getSiteUrl()
+    url: `${getSiteUrl()}/`,
+    inLanguage: publication.locale,
+    publisher: { "@id": getOrganizationId() }
   };
 }
 
@@ -249,6 +343,45 @@ export function getBreadcrumbSchema(items: BreadcrumbItem[]) {
   };
 }
 
+// Google asks for article images in several aspect ratios, each at least 50K pixels.
+const GOOGLE_IMAGE_RATIOS = [16 / 9, 4 / 3, 1];
+const GOOGLE_IMAGE_RATIO_TOLERANCE = 0.02;
+const GOOGLE_IMAGE_MIN_PIXELS = 50_000;
+
+type ImageCandidate = { url: string; width: number; height: number };
+
+/**
+ * The original plus the largest registered WordPress size in each of Google's
+ * preferred ratios (16:9, 4:3, 1:1) that the upload already has. WordPress sizes
+ * keep the photo's own proportions, so a 16:9 photo yields 16:9 variants, a 4:3
+ * photo 4:3 variants, and so on. No crops are generated here.
+ */
+export function getArticleImageCandidates(image: WordPressMedia): ImageCandidate[] {
+  const original: ImageCandidate | null = image.source_url && image.media_details?.width && image.media_details?.height
+    ? { url: image.source_url, width: image.media_details.width, height: image.media_details.height }
+    : null;
+  const sized = Object.values(image.media_details?.sizes ?? {})
+    .filter((size) => size.source_url && size.width > 0 && size.height > 0)
+    .map((size) => ({ url: size.source_url, width: size.width, height: size.height }));
+  const best = new Map<number, ImageCandidate>();
+
+  for (const candidate of [...(original ? [original] : []), ...sized]) {
+    if (candidate.width * candidate.height < GOOGLE_IMAGE_MIN_PIXELS) continue;
+    const ratio = GOOGLE_IMAGE_RATIOS.find((target) => Math.abs(candidate.width / candidate.height - target) / target <= GOOGLE_IMAGE_RATIO_TOLERANCE);
+    if (ratio === undefined) continue;
+    const current = best.get(ratio);
+    if (!current || candidate.width > current.width) best.set(ratio, candidate);
+  }
+
+  // The original always leads, whatever its ratio.
+  const candidates = original ? [original] : [];
+  for (const candidate of best.values()) {
+    if (!candidates.some((existing) => existing.url === candidate.url)) candidates.push(candidate);
+  }
+
+  return candidates.length > 0 ? candidates : [{ url: image.source_url, width: 0, height: 0 }];
+}
+
 function getArticleImageSchema(image: WordPressMedia | null) {
   if (!image?.source_url) {
     return [
@@ -266,7 +399,6 @@ function getArticleImageSchema(image: WordPressMedia | null) {
   }
 
   const imageCredit = image.bylineImage ?? image.weeklyWildcatImage;
-  const imageUrl = absoluteUrl(image.source_url);
   const creator = imageCredit?.creator;
   const copyrightNotice =
     imageCredit?.copyrightNotice ||
@@ -275,15 +407,18 @@ function getArticleImageSchema(image: WordPressMedia | null) {
   const creditText =
     imageCredit?.creditText ||
     stripHtml(image.media_details?.image_meta?.credit || image.media_details?.image_meta?.copyright || "");
+  const caption = stripHtml(image.caption?.rendered ?? image.media_details?.image_meta?.caption ?? "") || undefined;
 
-  return [
-    {
+  return getArticleImageCandidates(image).map((candidate) => {
+    const imageUrl = absoluteUrl(candidate.url);
+
+    return {
       "@type": "ImageObject",
       contentUrl: imageUrl,
       url: imageUrl,
-      width: image.media_details?.width,
-      height: image.media_details?.height,
-      caption: stripHtml(image.caption?.rendered ?? image.media_details?.image_meta?.caption ?? "") || undefined,
+      width: candidate.width || undefined,
+      height: candidate.height || undefined,
+      caption,
       creator: creator
         ? {
             "@type": "Person",
@@ -294,8 +429,23 @@ function getArticleImageSchema(image: WordPressMedia | null) {
       copyrightNotice,
       license: imageCredit?.licenseUrl || absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH),
       acquireLicensePage: imageCredit?.acquireLicensePage || absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH)
-    }
-  ];
+    };
+  });
+}
+
+/** Timezone-aware ISO timestamps for a post, for JSON-LD and Open Graph. */
+export function getPostTimestamps(post: Pick<WordPressPost, "date" | "date_gmt" | "modified" | "modified_gmt">) {
+  const published = getWordPressIsoTimestamp({ gmt: post.date_gmt, local: post.date }, publication.timezone);
+  const modified = getWordPressIsoTimestamp({ gmt: post.modified_gmt, local: post.modified }, publication.timezone);
+
+  return { published, modified: modified ?? published };
+}
+
+/** Canonical profile URLs for the contributors who have a public profile page. One-off guests have none. */
+export function getArticleAuthorProfileUrls(post: WordPressPost) {
+  return getPostContributors(post)
+    .filter(contributorHasProfilePage)
+    .map((contributor) => absoluteUrl(getContributorHref(contributor)));
 }
 
 export function getNewsArticleSchema(post: WordPressPost) {
@@ -306,6 +456,7 @@ export function getNewsArticleSchema(post: WordPressPost) {
   const headline = stripHtml(post.title.rendered);
   const description = getSeoDescription(post.excerpt.rendered || post.content.rendered);
   const articleBody = stripHtml(post.content.rendered);
+  const timestamps = getPostTimestamps(post);
   const keywords = post._embedded?.["wp:term"]
     ?.flat()
     .filter((term): term is { name: string; taxonomy: string } => "name" in term && term.taxonomy === "post_tag")
@@ -318,7 +469,7 @@ export function getNewsArticleSchema(post: WordPressPost) {
 
     return {
       "@type": "Person",
-      name: getContributorName(contributor),
+      name: decodeHtml(getContributorName(contributor)),
       url: contributorHasProfilePage(contributor) ? absoluteUrl(getContributorHref(contributor)) : undefined,
       jobTitle: getContributorRole(contributor) || undefined,
       description: getContributorDescription(contributor) || undefined,
@@ -342,8 +493,8 @@ export function getNewsArticleSchema(post: WordPressPost) {
     headline,
     description,
     url: articleUrl,
-    datePublished: post.date,
-    dateModified: post.modified,
+    datePublished: timestamps.published,
+    dateModified: timestamps.modified,
     author: authors.length === 1 ? authors[0] : authors,
     publisher: getPublisherSchema(),
     articleSection: category ? decodeHtml(category.name) : undefined,

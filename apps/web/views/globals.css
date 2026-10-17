@@ -1126,6 +1126,21 @@ html {
   justify-self: center;
 }
 
+/* Article pages drop the masthead date; keep the tools in the last column. */
+.site-utility--undated > .header-tools {
+  grid-column: -2 / -1;
+}
+
+/* On the homepage the masthead is the h1, so the logo link sits inside it. */
+.masthead-logo > a {
+  display: block;
+}
+
+h1.masthead-logo {
+  font: inherit;
+  line-height: 0;
+}
+
 .header-donate {
   align-items: center;
   color: var(--accent);
@@ -2335,6 +2350,23 @@ html {
 
 .article-newsletter-kit {
   align-self: center;
+}
+
+.article-newsletter-preferred {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.article-newsletter-preferred a {
+  color: rgba(255, 255, 255, 0.86);
+  text-underline-offset: 3px;
+}
+
+.article-newsletter-preferred a:hover,
+.article-newsletter-preferred a:focus-visible {
+  color: #ffffff;
 }
 
 .article-newsletter-kit > * {

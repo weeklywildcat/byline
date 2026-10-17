@@ -10,20 +10,18 @@ import { getPrimaryVisibleCategory, getPublicTopicTags, isVisibleContentPost } f
 import { stripHtml, decodeHtml } from "@/lib/format";
 import { buildArticlePresentation } from "@/lib/article-presentation";
 import { getSportsGameById } from "@/lib/headless";
-import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, getNewsArticleSchema, serializeJsonLd } from "@/lib/seo";
+import { absoluteUrl, buildPageMetadata, getArticleAuthorProfileUrls, getBreadcrumbSchema, getNewsArticleSchema, getPostTimestamps, serializeJsonLd } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getAllPosts,
   getBylineRestUrl,
   getFeaturedMedia,
   getPostBySlug,
-  getPostContributors,
   getPostContributorsWithProfiles,
   getPostGameScoreGameIds,
   getPostHref,
   getPostPrimaryGameId,
   getPostRouteParts,
-  getContributorName,
   getPostAuthorWithProfile,
   isGuestContributor,
   type WordPressAuthor
@@ -49,17 +47,18 @@ export async function getMetadata({ params }: ArticlePageProps): Promise<Metadat
   const image = getFeaturedMedia(post);
   const title = stripHtml(post.title.rendered);
   const category = getPrimaryVisibleCategory(post);
-  const contributors = getPostContributors(post);
   const tags = getPublicTopicTags(post).map((tag) => stripHtml(tag.name));
   const metadata = buildPageMetadata({ title, description: post.excerpt.rendered || post.content.rendered, path: getPostHref(post), type: "article", image });
+  const timestamps = getPostTimestamps(post);
+  const authorProfiles = getArticleAuthorProfileUrls(post);
   return {
     ...metadata,
     openGraph: {
       ...metadata.openGraph,
       type: "article",
-      publishedTime: post.date,
-      modifiedTime: post.modified,
-      authors: contributors.length > 0 ? contributors.map((contributor) => getContributorName(contributor)) : undefined,
+      publishedTime: timestamps.published,
+      modifiedTime: timestamps.modified,
+      authors: authorProfiles.length > 0 ? authorProfiles : undefined,
       section: category ? decodeHtml(category.name) : undefined,
       tags
     }

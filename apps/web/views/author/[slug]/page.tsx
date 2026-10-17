@@ -33,8 +33,11 @@ export async function getMetadata({ params }: AuthorPageProps): Promise<Metadata
     return {};
   }
 
-  const description = stripHtml(getContributorDescription(contributor))
-    || `Stories by ${contributor.name} for ${publication.identity.shortName}.`;
+  const bio = stripHtml(getContributorDescription(contributor));
+  // A bio of a couple of emoji says nothing in a search result.
+  const description = bio.length >= 20 && /\p{L}{3}/u.test(bio)
+    ? bio
+    : `Stories by ${contributor.name} for ${publication.identity.shortName}.`;
   const photo = getContributorPhoto(contributor);
 
   return buildPageMetadata({

@@ -16,12 +16,13 @@ import {
 } from "@/lib/homepage-resolution";
 import { toCalendarEntries } from "@/lib/homepage-packages";
 import { getPublicationConfig } from "@/lib/publication";
-import { buildPageMetadata, getWebsiteSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
+import { buildPageMetadata, getHomepageTitle, getOrganizationSchema, getWebsiteSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
 import { getAllPosts, getAllPublicCoverages } from "@/lib/wordpress";
 
 const publication = getPublicationConfig();
 export const metadata: Metadata = buildPageMetadata({
-  title: publication.seo.defaultTitle,
+  title: getHomepageTitle(),
+  absoluteTitle: true,
   description: SITE_DESCRIPTION,
   path: "/"
 });
@@ -47,9 +48,10 @@ async function getHomepageSportsSchedule(requirements: ReturnType<typeof getHome
 
 export default async function HomePage() {
   const data = await getHomepagePageData();
-  const { resolvedHome, sportsSchedule, websiteSchema } = data;
+  const { resolvedHome, sportsSchedule, websiteSchema, organizationSchema } = data;
   return (
     <main className="byline-publication-preview live-home-shell" data-theme={publication.appearance.theme}>
+      <script id="organization-json-ld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationSchema) }} />
       <script id="website-json-ld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteSchema) }} />
       <HomepagePackages
         packages={resolvedHome.packages}
@@ -74,6 +76,7 @@ export async function getHomepagePageData() {
     getHomepageSportsSchedule(requirements)
   ]);
   const websiteSchema = getWebsiteSchema();
+  const organizationSchema = getOrganizationSchema();
   const posts = filterPublicHomepagePosts(allPosts);
 
   const resolvedHome = resolveHomepageDocument({
@@ -84,5 +87,5 @@ export async function getHomepagePageData() {
     sportsSchedule
   });
 
-  return { resolvedHome, sportsSchedule, websiteSchema };
+  return { resolvedHome, sportsSchedule, websiteSchema, organizationSchema };
 }

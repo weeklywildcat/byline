@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { getPreferredSourceUrl } from "@/lib/preferred-source";
 import { getPublicationConfig } from "@/lib/publication";
 
 const kitScriptSrc = "https://weekly-wildcat.kit.com/d1eb6ce2f7/index.js";
@@ -52,6 +53,12 @@ export function NewsletterSignupForm({
       {usesLegacyKitForm ? <div className="article-newsletter-kit" ref={embedRef} /> : (
         <a className="article-newsletter-generic-link" href={publication.urls.contact}>Ask about newsletter subscriptions</a>
       )}
+
+      <p className="article-newsletter-preferred">
+        <a href={getPreferredSourceUrl(publication.urls.publicSite)} target="_blank" rel="noopener">
+          Add {publication.identity.shortName} as a preferred source on Google
+        </a>
+      </p>
     </aside>
   );
 }

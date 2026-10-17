@@ -15,7 +15,8 @@ const leadPackages = data.resolvedHome.packages.filter((entry) => entry.type ===
 const newsletterPackages = data.resolvedHome.packages.filter((entry) => entry.type === "newsletter-package");
 const relocateScript = `document.querySelectorAll('.astro-island-relocation[data-target]').forEach((source)=>{const target=document.getElementById(source.dataset.target);if(target)target.replaceChildren(...source.childNodes);source.remove()});`;
 ---
-<BaseLayout metadata={metadata} stickyNav>
+<BaseLayout metadata={metadata} stickyNav homepage>
+  <script id="organization-json-ld" type="application/ld+json" set:html={serializeJsonLd(data.organizationSchema)}></script>
   <script id="website-json-ld" type="application/ld+json" set:html={serializeJsonLd(data.websiteSchema)}></script>
   <main class="byline-publication-preview live-home-shell" data-theme={publication.appearance.theme}>
       <HomepagePackages packages={data.resolvedHome.packages} theme={publication.appearance.theme} slots={{
