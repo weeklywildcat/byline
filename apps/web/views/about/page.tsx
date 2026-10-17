@@ -204,7 +204,7 @@ export default async function AboutPage() {
                 </ul>
                 <p>
                   <a href="/leadership/">How leadership works</a>
-                  <a href="/authors/">All contributors</a>
+                  <a href="/staff/">All contributors</a>
                 </p>
               </div>
             ) : null}

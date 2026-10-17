@@ -187,7 +187,7 @@ function byline_editorial_preview_contributor(array $contributor, int $index, ar
     $profile = $type === 'user' ? byline_editorial_preview_author_profile($id) : [];
     $href = $type === 'user' && $id > 0 && function_exists('get_author_posts_url')
         ? get_author_posts_url($id, $slug)
-        : byline_editorial_preview_public_url('/author/' . $slug . '/', '/authors/');
+        : byline_editorial_preview_public_url('/author/' . $slug . '/', '/staff/');
     // Guests without a profile page are credited by name and photo only.
     if ($type === 'guest' && array_key_exists('hasProfilePage', $contributor) && !$contributor['hasProfilePage']) {
         $href = '';

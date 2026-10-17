@@ -124,7 +124,7 @@ uses "More From {shortName}" + "View All Stories →" to `/stories/`.
   default; configured package limits are resolved in full up to the schema
   safety maximum.
 - **Newsroom utility rail** (`.more-utility-rail`), a fixed editorial fixture:
-  - "Join the Staff" block with links to `/join/` and `/authors/`.
+  - "Join the Staff" block with links to `/join/` and `/staff/`.
   - "Stay Connected" block listing `publication.social` entries, a contact link,
     and a newsletter anchor when `features.newsletter`.
 

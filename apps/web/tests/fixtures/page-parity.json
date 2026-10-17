@@ -22,7 +22,7 @@
       { "heading": "Be Part of It", "featured": false }
     ],
     "actions": [
-      { "label": "Meet Our Writers", "href": "/authors/" },
+      { "label": "Meet Our Writers", "href": "/staff/" },
       { "label": "Join the Staff", "href": "/join/" }
     ]
   },

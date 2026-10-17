@@ -349,7 +349,7 @@ export function resolveMorePackage(
           copy: publicationText(config.utility.joinStaff.copy, publication),
           links: [
             utilityLink("Join the newsroom", "/join/", "ph:pencil-line"),
-            utilityLink("Meet the staff", "/authors/", "ph:users-three")
+            utilityLink("Meet the staff", "/staff/", "ph:users-three")
           ]
         },
         stayConnected: {

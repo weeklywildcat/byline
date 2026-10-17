@@ -26,7 +26,7 @@ Written by hand: everything else. When a story or photograph named in `content.t
 page drops that link or figure instead of failing. Update the slug.
 
 Leadership is not duplicated here. Only people whose directory role contains "Editor" appear, and the page links to
-`/leadership/` and `/authors/` for the rest.
+`/leadership/` and `/staff/` for the rest.
 
 ## Where each claim comes from
 

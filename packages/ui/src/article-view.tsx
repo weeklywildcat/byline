@@ -190,7 +190,7 @@ function AboutWriters({ presentation }: { presentation: ArticlePresentation }): 
     : [{
         id: "staff",
         name: presentation.fallbackByline,
-        href: "/authors/",
+        href: "/staff/",
         role: "Writer",
         bio: `Stories reported by the ${presentation.publication.shortName} newsroom.`,
         coverage: []
