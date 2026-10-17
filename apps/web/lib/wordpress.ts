@@ -1,3 +1,4 @@
+import { REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { mirrorWordPressMediaInValue } from "@/lib/media";
 import { getNamespaceApiUrl, getWordPressApiUrl } from "@/lib/byline-rest";
 import { stripHtml } from "@/lib/format";
@@ -153,6 +154,8 @@ export type WordPressPage = {
   content: RenderedText;
   bylinePage?: {
     eyebrow?: string;
+    /** "public" (default), "noindex" or "internal"; set in the Byline Page panel. */
+    indexing?: string;
     sportsArchive?: { key: string; routes: Record<string, string> };
   };
 };
@@ -611,9 +614,9 @@ function publicPost(value: unknown): WordPressPost | null {
   return {
     id,
     date,
-    date_gmt: typeof value.date_gmt === "string" ? value.date_gmt : date,
+    date_gmt: typeof value.date_gmt === "string" ? value.date_gmt : "",
     modified,
-    modified_gmt: typeof value.modified_gmt === "string" ? value.modified_gmt : modified,
+    modified_gmt: typeof value.modified_gmt === "string" ? value.modified_gmt : "",
     slug,
     status: "publish",
     type: "post",
@@ -847,6 +850,33 @@ export function isCmsNoticePage(page: Pick<WordPressPage, "title">) {
   return stripHtml(page.title.rendered).trim().toLowerCase() === "cms notice";
 }
 
+/**
+ * How a CMS Page takes part in search:
+ *  - public: a normal page; in the sitemap and indexable (the default)
+ *  - noindex: still published and linkable, but out of the sitemap and marked noindex
+ *  - internal: operational pages that are not published on the public site at all
+ * Editors choose this in the Byline Page panel (`bylinePage.indexing`). The known
+ * operational page below is also protected by identity in case the field is unset.
+ */
+export type PageIndexing = "public" | "noindex" | "internal";
+
+const INTERNAL_PAGE_SLUGS = new Set(["78-2"]);
+
+export function getPageIndexing(page: Pick<WordPressPage, "title" | "slug" | "bylinePage">): PageIndexing {
+  const configured = page.bylinePage?.indexing;
+
+  if (configured === "internal" || configured === "noindex" || configured === "public") {
+    // Even an explicit "public" cannot expose the editors' landing page.
+    return configured === "public" && (isCmsNoticePage(page) || INTERNAL_PAGE_SLUGS.has(page.slug)) ? "internal" : configured;
+  }
+
+  return isCmsNoticePage(page) || INTERNAL_PAGE_SLUGS.has(page.slug) ? "internal" : "public";
+}
+
+export function excludeInternalPages<T extends Pick<WordPressPage, "title" | "slug" | "bylinePage">>(pages: T[]) {
+  return pages.filter((page) => getPageIndexing(page) !== "internal");
+}
+
 export function excludeCmsNoticePages<T extends Pick<WordPressPage, "title">>(pages: T[]) {
   return pages.filter((page) => !isCmsNoticePage(page));
 }
@@ -858,7 +888,7 @@ export async function getAllPages() {
     order: "asc"
   }));
 
-  return excludeCmsNoticePages(pages);
+  return excludeInternalPages(pages).filter((page) => !(page.slug in REDIRECTED_PAGE_SLUGS));
 }
 
 export async function getPageBySlug(slug: string) {

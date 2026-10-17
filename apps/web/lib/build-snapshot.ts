@@ -11,7 +11,7 @@ import path from "node:path";
 import { optionalBuildData, requireBuildData } from "@/lib/build-data";
 import { isHiddenCategory, isVisibleContentPost } from "@/lib/content";
 import { type SportsGame, type SportsRoster, type SportsTeamMedia } from "@/lib/headless";
-import { CODE_ROUTED_PAGE_SLUGS } from "@/lib/code-routes";
+import { CODE_ROUTED_PAGE_SLUGS, REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { getPublicationConfig } from "@/lib/publication";
 import { getGameSeason } from "@/lib/sports-season";
 import { getSportsArchiveRedirects, getSportsArchiveHref } from "@/lib/sports-archive";
@@ -86,6 +86,8 @@ function routeEntries(input: {
     { path: "/sports/", kind: "redirect", redirectTo: archiveHref },
     { path: "/sports/schedule/", kind: "redirect", redirectTo: archiveHref },
     { path: "/stories/", kind: "other" },
+    ...Object.entries(REDIRECTED_PAGE_SLUGS).map(([slug, target]): RouteManifestEntry => ({ path: `/${slug}/`, kind: "redirect", redirectTo: target })),
+    { path: "/feed.xml", kind: "feed" },
     { path: "/news-sitemap.xml", kind: "feed" },
     { path: "/sitemap.xml", kind: "sitemap" },
     { path: "/robots.txt", kind: "robots" },

@@ -3,7 +3,7 @@ import { notFound } from "@/lib/static-not-found";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { stripHtml } from "@/lib/format";
 import { requireBuildData } from "@/lib/build-data";
-import { getPageBySlug } from "@/lib/wordpress";
+import { getPageBySlug, getPageIndexing } from "@/lib/wordpress";
 import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
 
 type StaticPageProps = {
@@ -28,7 +28,8 @@ export async function getMetadata({ params }: StaticPageProps): Promise<Metadata
   return buildPageMetadata({
     title,
     description,
-    path: `/${segment}/`
+    path: `/${segment}/`,
+    noIndex: wordpressPage ? getPageIndexing(wordpressPage) === "noindex" : false
   });
 }
 

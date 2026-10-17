@@ -13,6 +13,12 @@ or other normal-page prose.
 - Use the Byline Page document panel for the optional `_byline_page_eyebrow`
   label shown above the title. The same value is exposed by the compatible
   `bylinePage.eyebrow` REST field.
+- Use the **Search engines** setting in the same panel (`_byline_page_indexing`,
+  exposed as `bylinePage.indexing`) to decide how the page takes part in search:
+  *Public* (default: in the sitemap and indexable), *Hidden* (`noindex`:
+  published and linkable, but out of the sitemap and marked noindex) or
+  *Internal* (not published on the public site at all). The editors' "CMS
+  Notice" page is always treated as internal.
 - Use `Byline → Page Section` for the common heading/body layout. Its heading
   level and wide alignment are editable, and its `Default` and `Featured`
   styles are presentation-only. Core paragraphs, headings, lists, images,
@@ -42,5 +48,7 @@ an editor can convert them manually.
 
 The Pages endpoint is a required build input. If it cannot be fetched, the
 build fails rather than silently restoring source-owned page content. The
-sitemap includes every published WordPress Page with that page's own modified
-date, excluding only URLs already owned by application routes.
+sitemap includes each *public* WordPress Page with that page's own modified
+date. Hidden and internal pages, redirected legacy pages (see
+`REDIRECTED_PAGE_SLUGS` in `lib/code-routes.ts`), and URLs already owned by
+application routes are not listed twice. See [seo.md](seo.md).
