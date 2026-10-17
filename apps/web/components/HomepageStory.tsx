@@ -99,7 +99,7 @@ export function HomepageStory({
   const href = getPostHref(post);
   const excerpt = cleanDeck ? getCleanDeck(post) : post.excerpt.rendered.trim();
   const imageProps = image
-    ? getResponsiveImageProps(image, { priority, sizes: getHomepageStoryImageSizes(variant) })
+    ? getResponsiveImageProps(image, { priority, sizes: getHomepageStoryImageSizes(variant), imageSearchVisibility: "presentation" })
     : null;
   // Keep the exact legacy markup for attachments without usable size
   // metadata. Responsive attributes are added when WordPress provides real
