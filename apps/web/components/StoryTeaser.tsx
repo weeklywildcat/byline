@@ -52,6 +52,7 @@ export function StoryTeaser({ post, variant = "standard", showImage = true, show
           showCaption={false}
           showCredit={variant === "lead" || variant === "standard"}
           sizes={getStoryTeaserImageSizes(variant)}
+          imageSearchVisibility="presentation"
         />
       ) : null}
       <div className="story-teaser-body">
