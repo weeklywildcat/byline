@@ -1,5 +1,6 @@
 import { MediaUpload, MediaUploadCheck } from '@wordpress/block-editor';
-import { Button, TextControl } from '@wordpress/components';
+import { Button } from '@wordpress/components';
+import { StoryTextControl } from './fields';
 import apiFetch from '@wordpress/api-fetch';
 import { useRef, useEffect, useState } from '@wordpress/element';
 import { imageFromMedia, type StoryImage } from './models';
@@ -23,7 +24,7 @@ export function StoryMedia({ image, onChange, label }: { image?: StoryImage; onC
     }} render={({ open }: any) => <Button variant="secondary" onClick={open}>{image?.url ? `Replace ${label}` : `Choose ${label}`}</Button>} /></MediaUploadCheck>
     {image?.url && <>
       <img src={image.url} alt={image.alt} style={{ maxHeight: 260, maxWidth: '100%', width: 'auto', height: 'auto' }} />
-      <TextControl __nextHasNoMarginBottom label={`${label} alt text`} help="Describe the image for readers who cannot see it. Captions and credits are separate." value={image.alt} onChange={(alt: string) => { selection.current++; onChange({ ...image, alt }); }} />
+      <StoryTextControl label={`${label} alt text`} help="Describe the image for readers who cannot see it. Captions and credits are separate." value={image.alt} onChange={(alt: string) => { selection.current++; onChange({ ...image, alt }); }} />
       {image.credit && <p>Photo: {image.credit}</p>}
       <Button variant="tertiary" isDestructive onClick={() => { selection.current++; onChange({ url: '', alt: '' }); }}>Remove {label}</Button>
     </>}

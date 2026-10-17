@@ -10,6 +10,18 @@ describe('visualization provider boundary', () => {
     expect(visualizationUrl('https://www.openstreetmap.org/export/embed.html?bbox=1,2,3,4')).toMatchObject({ provider: 'openstreetmap' });
     for (const input of ['javascript:alert(1)','data:text/html,hello','http://datawrapper.dwcdn.net/AbCdE/','https://datawrapper.dwcdn.net.evil.com/AbCdE/', 'https://evil.com','https://datawrapper.dwcdn.net@evil.com/AbCdE/', 'https://www.google.com/search?q=hello', 'https://flo.uri.sh/evil', 'https://datawrapper.dwcdn.net:444/AbCdE/']) expect(visualizationUrl(input), input).toBeNull();
   });
+  it('accepts Google Maps only on its own embed endpoints and rejects look-alike hosts', () => {
+    for (const input of ['https://www.google.com/maps/embed?pb=!1m18', 'https://www.google.com/maps/embed/v1/place?key=abc&q=Campus', 'https://maps.google.com/maps/embed?pb=x']) expect(visualizationUrl(input), input).toMatchObject({ provider: 'google-maps', src: input });
+    // The saved URL never keeps a fragment.
+    expect(visualizationUrl('https://www.google.com/maps/embed?pb=x#frag')!.src).toBe('https://www.google.com/maps/embed?pb=x');
+    for (const input of [
+      'https://www.google.com.evil.example/maps/embed?pb=x', 'https://maps.google.com.evil.example/maps/embed?pb=x', 'https://evil.example/maps/embed?pb=x',
+      'https://www.google.com@evil.example/maps/embed?pb=x', 'https://www.google.com:8443/maps/embed?pb=x', 'http://www.google.com/maps/embed?pb=x',
+      'https://google.com/maps/embed?pb=x', 'https://www.google.co.uk/maps/embed?pb=x', 'https://notgoogle.com/maps/embed?pb=x', 'https://www.google.com/maps/embed',
+      'https://www.google.com/maps/embed/v1/unknown?key=abc', 'https://www.google.com/maps?pb=x', 'https://www.google.com/maps/d/embed?mid=1', 'https://www.google.com/url?q=https://evil.example&pb=x',
+      'https://user:pass@www.google.com/maps/embed?pb=x', 'javascript://www.google.com/maps/embed?pb=x', 'https://www.google.com/maps/embed/../search?pb=x'
+    ]) expect(visualizationUrl(input), input).toBeNull();
+  });
   it('maps semantic heights and bounds authenticated resize payloads', () => {
     expect(['compact','standard','tall','map','invalid'].map(visualizationHeight)).toEqual([320,480,680,560,480]);
     expect(visualizationMessageHeight({ 'datawrapper-height': { AbCdE: 611 } }, 'datawrapper','AbCdE')).toBe(611);

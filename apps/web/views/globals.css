@@ -5223,7 +5223,9 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
     margin-left: 50%;
     padding: 16px 6px;
     transform: translateX(-50%);
-    width: min(100vw - 8px, 420px);
+    /* The article shell's content box plus its 20px gutters, less 4px a side.
+       100vw would include a drawn scrollbar and overflow the page by 4px. */
+    width: min(100cqw + 32px, 420px);
   }
 
   .article-newsletter-copy h2 {

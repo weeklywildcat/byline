@@ -1374,14 +1374,16 @@
 :is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-visual-chapter .wp-block-cover__inner-container { max-width: var(--article-width); }
 :is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-visual-chapter :is(h2,h3,p) { color: inherit; margin: 0 0 .5em; }
 :is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-visual-chapter h2 { font-size: clamp(2rem, 4.5vw, 4rem); line-height: 1.08; text-wrap: balance; }
-.wp-block-cover.is-position-top-left { align-items: flex-start; justify-content: flex-start; }
-.wp-block-cover.is-position-top-center { align-items: flex-start; }
-.wp-block-cover.is-position-top-right { align-items: flex-start; justify-content: flex-end; }
-.wp-block-cover.is-position-center-left { justify-content: flex-start; }
-.wp-block-cover.is-position-center-right { justify-content: flex-end; }
-.wp-block-cover.is-position-bottom-left { align-items: flex-end; justify-content: flex-start; }
-.wp-block-cover.is-position-bottom-center { align-items: flex-end; }
-.wp-block-cover.is-position-bottom-right { align-items: flex-end; justify-content: flex-end; }
+/* Core's content-position control. Scoped like the structural rules above so the
+   chosen position wins over the centred default. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-top-left { align-items: flex-start; justify-content: flex-start; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-top-center { align-items: flex-start; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-top-right { align-items: flex-start; justify-content: flex-end; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-center-left { justify-content: flex-start; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-center-right { justify-content: flex-end; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-bottom-left { align-items: flex-end; justify-content: flex-start; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-bottom-center { align-items: flex-end; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-bottom-right { align-items: flex-end; justify-content: flex-end; }
 
 /* One restrained system for reported context. */
 :is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-margin-note, .is-style-byline-evidence) {
@@ -1450,12 +1452,39 @@
 .byline-before-after.is-enhanced .byline-comparison-images { display: grid; grid-template-columns: 1fr; gap: 0; position: relative; isolation: isolate; }
 .byline-before-after.is-enhanced .byline-comparison-image { grid-area: 1 / 1; margin: 0; display: grid; }
 .byline-before-after.is-enhanced .byline-comparison-image img { grid-area: 1 / 1; height: 100%; width: 100%; min-height: 0; object-fit: contain; }
-.byline-before-after.is-enhanced .byline-comparison-image:nth-child(2) { clip-path: inset(0 calc(100% - var(--comparison-position, 50%)) 0 0); background: var(--page, #fff); }
+.byline-before-after.is-enhanced .byline-comparison-image:nth-child(2) { clip-path: inset(0 calc(100% - var(--comparison-edge)) 0 0); background: var(--page, #fff); }
 .byline-before-after.is-enhanced .byline-comparison-image strong { position: absolute; top: 12px; left: 12px; background: #fff; color: #111; padding: 4px 8px; z-index: 1; }
 .byline-before-after.is-enhanced .byline-comparison-image:first-child strong { left: auto; right: 12px; }
-.byline-before-after.is-enhanced .byline-comparison-images::after { content: ''; position: absolute; top: 0; bottom: 0; left: var(--comparison-position,50%); border-left: 2px solid #fff; box-shadow: 1px 0 #111; pointer-events: none; }
-.byline-comparison-control { display: grid; gap: 8px; font: .85rem var(--font-ui); margin-block: 16px; }
-.byline-comparison-control input { width: 100%; accent-color: var(--accent); min-height: 32px; }
+/* The native range is the control and sits on the photograph. Its thumb is the
+   handle; the divider line tracks the same value. --comparison-ratio (0-1) is
+   written by the enhancer next to --comparison-position (percent). The thumb's
+   centre travels from half its width to the other half, so the line and the
+   revealed edge use the same --comparison-edge. */
+.byline-before-after { --comparison-thumb: 48px; --comparison-ratio: .5; --comparison-edge: calc(var(--comparison-thumb) / 2 + (100% - var(--comparison-thumb)) * var(--comparison-ratio)); }
+.byline-comparison-divider { position: absolute; top: 0; bottom: 0; left: var(--comparison-edge); width: 0; border-left: 2px solid #fff; box-shadow: 1px 0 #111, -1px 0 #111; pointer-events: none; z-index: 2; }
+.byline-comparison-range {
+  position: absolute; inset: 0; z-index: 3; box-sizing: border-box; width: 100%; height: 100%; margin: 0; padding: 0;
+  background: transparent; cursor: ew-resize; touch-action: pan-y; -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none; appearance: none;
+}
+.byline-comparison-range::-webkit-slider-runnable-track { background: transparent; border: 0; }
+.byline-comparison-range::-moz-range-track { background: transparent; border: 0; }
+.byline-comparison-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; box-sizing: border-box; width: var(--comparison-thumb); height: var(--comparison-thumb);
+  border: 2px solid #111; border-radius: 50%; background: #fff var(--comparison-handle) center / 28px no-repeat; box-shadow: 0 1px 6px rgb(0 0 0 / .45);
+}
+.byline-comparison-range::-moz-range-thumb {
+  box-sizing: border-box; width: var(--comparison-thumb); height: var(--comparison-thumb);
+  border: 2px solid #111; border-radius: 50%; background: #fff var(--comparison-handle) center / 28px no-repeat; box-shadow: 0 1px 6px rgb(0 0 0 / .45);
+}
+.byline-comparison-range:focus { outline: none; }
+.byline-comparison-range:focus-visible::-webkit-slider-thumb { outline: 3px solid var(--accent, #b11f24); outline-offset: 3px; }
+.byline-comparison-range:focus-visible::-moz-range-thumb { outline: 3px solid var(--accent, #b11f24); outline-offset: 3px; }
+.byline-before-after .byline-comparison-images:has(.byline-comparison-range:focus-visible) { outline: 3px solid var(--accent, #b11f24); outline-offset: 3px; }
+.byline-before-after { --comparison-handle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M9 8 3 14l6 6M19 8l6 6-6 6' fill='none' stroke='%23111' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+@media (forced-colors: active) {
+  .byline-comparison-range::-webkit-slider-thumb { forced-color-adjust: none; }
+}
 .byline-scrolly { display: flow-root; }
 .byline-scrolly-step { margin-block: 2em; }
 .byline-scrolly-media img { display: block; max-height: 75svh; height: auto; width: auto; max-width: 100%; margin-inline: auto; }

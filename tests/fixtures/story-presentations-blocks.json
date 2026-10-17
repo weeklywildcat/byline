@@ -432,6 +432,65 @@
     ]
   },
   {
+    "name": "core/cover",
+    "attributes": {
+      "className": "is-style-byline-visual-chapter",
+      "align": "full",
+      "url": "/test-assets/landscape.svg",
+      "dimRatio": 70,
+      "overlayColor": "black",
+      "isDark": true,
+      "focalPoint": {
+        "x": 0.2,
+        "y": 0.8
+      },
+      "contentPosition": "top left",
+      "minHeight": 520,
+      "minHeightUnit": "px"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/heading",
+        "attributes": {
+          "level": 2,
+          "content": "A deliberately long chapter heading that wraps across several lines on a phone without being clipped or overflowing"
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/cover",
+    "attributes": {
+      "className": "is-style-byline-visual-chapter",
+      "align": "full",
+      "url": "/test-assets/portrait.mp4",
+      "backgroundType": "video",
+      "dimRatio": 0,
+      "overlayColor": "black",
+      "isDark": true,
+      "focalPoint": {
+        "x": 0.7,
+        "y": 0.3
+      },
+      "contentPosition": "bottom right"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/heading",
+        "attributes": {
+          "level": 2,
+          "content": "A video chapter"
+        }
+      },
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "Moving context sits behind the words."
+        }
+      }
+    ]
+  },
+  {
     "name": "core/image",
     "attributes": {
       "align": "wide",
@@ -1022,6 +1081,27 @@
   {
     "name": "byline/visualization",
     "attributes": {
+      "title": "District map",
+      "description": "A graphic supporting the reporting.",
+      "mode": "embed",
+      "embedUrl": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3000!2d-82!3d34!2m3!1f0!2f0!3f0",
+      "provider": "google-maps",
+      "image": {
+        "url": "/test-assets/landscape.svg",
+        "alt": "A campus plan",
+        "width": 900,
+        "height": 600,
+        "credit": "Staff"
+      },
+      "type": "map",
+      "heightPreset": "compact",
+      "source": "District records",
+      "notes": "Figures checked by the newsroom."
+    }
+  },
+  {
+    "name": "byline/visualization",
+    "attributes": {
       "title": "Static graphic",
       "mode": "static",
       "image": {
@@ -1184,6 +1264,34 @@
             "name": "core/paragraph",
             "attributes": {
               "content": "The renovation changes the public space."
+            }
+          }
+        ]
+      },
+      {
+        "name": "byline/scrolly-step",
+        "attributes": {
+          "image": {
+            "url": "/test-assets/panorama.svg",
+            "alt": "A campus panorama",
+            "width": 1800,
+            "height": 900,
+            "credit": "Staff"
+          },
+          "caption": "The third scene."
+        },
+        "innerBlocks": [
+          {
+            "name": "core/heading",
+            "attributes": {
+              "level": 2,
+              "content": "The last scene"
+            }
+          },
+          {
+            "name": "core/paragraph",
+            "attributes": {
+              "content": "The panorama shows how the pieces fit together."
             }
           }
         ]

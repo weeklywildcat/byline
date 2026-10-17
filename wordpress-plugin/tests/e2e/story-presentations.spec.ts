@@ -171,6 +171,45 @@ test("newsroom presets save valid Core content and match the private preview at 
       await expect(frame.locator('.byline-visualization-placeholder').first()).toHaveCSS('height', '480px');
       expect(await frame.locator('body').evaluate((body) => body.ownerDocument.location.href)).toBe('about:srcdoc');
     }
+    // The private preview runs the same enhancer in its own document: the local controls work
+    // there while outgoing navigation stays blocked.
+    await preview.getByRole("button", { name: "Desktop", exact: true }).click();
+    const frame = preview.frameLocator('iframe[title="Byline article preview"]');
+    const methodology = frame.locator('.is-style-byline-methodology');
+    await methodology.scrollIntoViewIfNeeded();
+    await expect(methodology).not.toHaveAttribute('open');
+    await methodology.locator('summary').click();
+    await expect(methodology).toHaveAttribute('open', '');
+
+    const range = frame.locator('.byline-before-after input[type=range]');
+    await range.scrollIntoViewIfNeeded();
+    await range.focus(); await preview.keyboard.press('ArrowRight');
+    await expect(range).toHaveValue('51');
+    await expect.poll(() => frame.locator('.byline-before-after').evaluate((node) => (node as HTMLElement).style.getPropertyValue('--comparison-position'))).toBe('51%');
+    const rangeBox = (await range.boundingBox())!;
+    await preview.mouse.click(rangeBox.x + rangeBox.width * 0.75, rangeBox.y + rangeBox.height / 2);
+    await expect.poll(async () => Number(await range.inputValue())).toBeGreaterThan(65);
+    await expect(frame.locator('.byline-before-after .byline-comparison-control')).toHaveCount(0);
+
+    const markers = frame.locator('.byline-annotation-marker');
+    await markers.nth(1).click();
+    await expect(frame.locator('.byline-annotations > li').nth(1)).toHaveClass(/is-active/);
+    await expect(markers.nth(1)).toHaveAttribute('aria-current', 'true');
+    expect(await frame.locator('body').evaluate((body) => body.ownerDocument.location.href)).toBe('about:srcdoc');
+
+    const scrolly = frame.locator('.byline-scrolly');
+    await expect(scrolly).toHaveClass(/is-enhanced/);
+    const stage = scrolly.locator('.byline-scrolly-stage');
+    await expect(stage).toHaveAttribute('data-step', '0');
+    // Scroll inside the preview document until step 3 crosses the reading line the stage advertises.
+    await scrolly.evaluate((story) => {
+      const view = story.ownerDocument.defaultView!;
+      const line = Number((story.querySelector('.byline-scrolly-stage') as HTMLElement).dataset.activationLine);
+      const step = story.querySelectorAll(':scope > .byline-scrolly-step')[2];
+      view.scrollTo({ top: step.getBoundingClientRect().top + view.scrollY - (view.innerHeight * line) / 100 + 20, behavior: 'instant' });
+    });
+    await expect(stage).toHaveAttribute('data-step', '2');
+    await expect(stage.locator('img')).toHaveAttribute('src', /panorama\.svg/);
   } finally { await preview.close(); }
 });
 

@@ -1,5 +1,5 @@
 import { InnerBlocks, useBlockProps } from '@wordpress/block-editor';
-import { TextControl } from '@wordpress/components';
+import { StoryTextControl } from '../story/fields';
 import { registerBlockType } from '@wordpress/blocks';
 import { StoryMedia } from '../story/media';
 import { ScrollyStepSave } from './save';
@@ -9,7 +9,7 @@ export const STEP_CONTENT = ['core/heading','core/paragraph','core/list','core/q
 function Edit({ attributes: a, setAttributes }: any) {
   return <section {...useBlockProps({ className: 'byline-scrolly-step' })}>
     <StoryMedia label="step image" image={a.image} onChange={(image) => setAttributes({ image })} />
-    <TextControl __nextHasNoMarginBottom label="Step image caption" value={a.caption} onChange={(caption: string) => setAttributes({ caption })} />
+    <StoryTextControl label="Step image caption" value={a.caption} onChange={(caption: string) => setAttributes({ caption })} />
     <InnerBlocks allowedBlocks={STEP_CONTENT} template={[["core/heading", { level: 2, placeholder: 'Step heading…' }], ["core/paragraph", { placeholder: 'Continue the reporting…' }]]} />
   </section>;
 }
