@@ -69,6 +69,7 @@ function byline_guests_print_styles(): void
         }
         .byline-guest-initial { align-items: center; background: #dcdcde; color: #50575e; display: flex; font-weight: 600; justify-content: center; }
         .byline-guest-photo-preview { border-radius: 50%; display: block; height: 80px; margin-bottom: 8px; object-fit: cover; width: 80px; }
+        .byline-guest-photo-preview[hidden] { display: none; }
         .byline-guest-merge-list { margin: 1em 0; max-width: 640px; }
         .byline-guest-merge-list label { display: block; padding: 6px 0; }
         .column-byline_stories, .column-byline_page, .column-byline_status { width: 12%; }
@@ -346,9 +347,15 @@ function byline_guests_print_photo_script(): void
             var remove = document.getElementById('byline-guest-photo-remove');
             var input = document.getElementById('byline-guest-image-id');
             var preview = document.getElementById('byline-guest-photo-preview');
-            if (!select || !window.wp || !wp.media) { return; }
+            if (!select) { return; }
+            // wp.media is loaded after this inline script runs, so look for it
+            // when the button is clicked rather than when the page is parsed.
             select.addEventListener('click', function (event) {
                 event.preventDefault();
+                if (!window.wp || !wp.media) {
+                    window.alert(<?php echo wp_json_encode(__('The media library could not be loaded. Reload the page and try again.', 'weekly-wildcat-headless')); ?>);
+                    return;
+                }
                 var frame = wp.media({ title: <?php echo wp_json_encode(__('Choose a photo for this guest', 'weekly-wildcat-headless')); ?>, button: { text: <?php echo wp_json_encode(__('Use this photo', 'weekly-wildcat-headless')); ?> }, library: { type: 'image' }, multiple: false });
                 frame.on('select', function () {
                     var attachment = frame.state().get('selection').first().toJSON();
