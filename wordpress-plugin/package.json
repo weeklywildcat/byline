@@ -1,6 +1,6 @@
 {
   "name": "@byline/wordpress-plugin",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "private": true,
   "scripts": {
     "build": "wp-scripts build",
