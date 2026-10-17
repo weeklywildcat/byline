@@ -2,6 +2,7 @@ import { getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { getResponsiveImageProps } from "@/lib/media";
 import {
+  contributorHasProfilePage,
   getContributorHref,
   getContributorName,
   getFeaturedMedia,
@@ -162,7 +163,9 @@ export function HomepageStory({
               contributors.map((contributor, index) => (
                 <span key={`${contributor.id}-${contributor.slug}`}>
                   {index > 0 ? ", " : null}
-                  <a href={getContributorHref(contributor)}>{getContributorName(contributor)}</a>
+                  {contributorHasProfilePage(contributor)
+                    ? <a href={getContributorHref(contributor)}>{getContributorName(contributor)}</a>
+                    : getContributorName(contributor)}
                 </span>
               ))
             ) : (

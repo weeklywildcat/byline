@@ -1791,7 +1791,9 @@ function byline_editorial_rest_public_guests(WP_REST_Request $request)
             continue;
         }
         $item = byline_get_public_guest_contributor((int) $post->ID);
-        if ($item !== null) {
+        // Guests without a profile page are byline-only: they appear on the
+        // story that credits them, never in the public directory.
+        if ($item !== null && !empty($item['hasProfilePage'])) {
             $items[] = $item;
         }
     }
@@ -1803,7 +1805,7 @@ function byline_editorial_rest_create_guest(WP_REST_Request $request)
 {
     $result = byline_create_guest_contributor(byline_editorial_rest_body($request), function_exists('get_current_user_id') ? absint(get_current_user_id()) : null);
 
-    return is_wp_error($result) ? $result : rest_ensure_response($result);
+    return is_wp_error($result) ? $result : rest_ensure_response($result + byline_guest_editor_person($result));
 }
 
 function byline_editorial_rest_get_guest(WP_REST_Request $request)
@@ -1832,7 +1834,22 @@ function byline_editorial_rest_delete_guest(WP_REST_Request $request)
 
 function byline_editorial_rest_story_contributors_payload(int $story_id): array
 {
-    $contributors = byline_get_story_contributors($story_id);
+    // Editors who manage guests also see draft guests here, so a guest they
+    // just created does not vanish from the list before it is published.
+    $include_draft_guests = function_exists('byline_guest_can_manage') && byline_guest_can_manage();
+    $contributors = [];
+    foreach (byline_get_story_contributor_entries($story_id, true) as $reference) {
+        $contributor = $include_draft_guests && ($reference['type'] ?? '') === 'guest'
+            ? byline_get_guest_contributor(absint($reference['id'] ?? 0))
+            : byline_project_public_contributor($reference);
+        if (!is_array($contributor)) {
+            continue;
+        }
+        if (($contributor['type'] ?? '') === 'guest' && function_exists('byline_guest_editor_person')) {
+            $contributor = byline_guest_editor_person($contributor) + $contributor;
+        }
+        $contributors[] = $contributor;
+    }
     $available = [];
     if (function_exists('byline_editorial_assignable_editors')) {
         foreach (byline_editorial_assignable_editors() as $person) {
@@ -1844,11 +1861,16 @@ function byline_editorial_rest_story_contributors_payload(int $story_id): array
         }
     }
 
+    if (function_exists('byline_list_available_guests')) {
+        $available = array_merge($available, byline_list_available_guests());
+    }
+
     return [
         'storyId' => $story_id,
         'contributors' => $contributors,
         'available' => $available,
         'canEdit' => current_user_can('edit_post', $story_id),
+        'canCreateGuests' => function_exists('byline_guest_can_create') && byline_guest_can_create(),
     ];
 }
 

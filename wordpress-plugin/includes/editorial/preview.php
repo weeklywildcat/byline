@@ -188,6 +188,10 @@ function byline_editorial_preview_contributor(array $contributor, int $index, ar
     $href = $type === 'user' && $id > 0 && function_exists('get_author_posts_url')
         ? get_author_posts_url($id, $slug)
         : byline_editorial_preview_public_url('/author/' . $slug . '/', '/authors/');
+    // Guests without a profile page are credited by name and photo only.
+    if ($type === 'guest' && array_key_exists('hasProfilePage', $contributor) && !$contributor['hasProfilePage']) {
+        $href = '';
+    }
     $photo_id = absint($contributor['imageId'] ?? 0);
     if ($photo_id <= 0 && is_array($profile['profilePhoto'] ?? null)) {
         $photo_id = absint($profile['profilePhoto']['id'] ?? 0);
@@ -206,7 +210,7 @@ function byline_editorial_preview_contributor(array $contributor, int $index, ar
     $bio = byline_editorial_preview_plain_text((string) ($contributor['bio'] ?? $contributor['description'] ?? ''));
     $publication = byline_get_publication_config();
     $short_name = byline_editorial_preview_plain_text((string) ($publication['identity']['shortName'] ?? 'Byline'));
-    if ($bio === '') {
+    if ($bio === '' && $href !== '') {
         $bio = 'Stories reported by the ' . $short_name . ' newsroom.';
     }
 
@@ -224,7 +228,7 @@ function byline_editorial_preview_contributor(array $contributor, int $index, ar
     return [
         'id' => $type . '-' . ($id > 0 ? (string) $id : (string) $index) . '-' . $slug,
         'name' => $name !== '' ? $name : 'Contributor',
-        'href' => (string) esc_url_raw($href),
+        'href' => $href === '' ? '' : (string) esc_url_raw($href),
         'role' => $role,
         'bio' => $bio,
         'photo' => byline_editorial_preview_image($photo_id, '132px', false),

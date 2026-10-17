@@ -83,6 +83,8 @@ export type WordPressGuestContributor = {
   id: number | string;
   name: string;
   slug: string;
+  /** False for one-off guests credited by name and photo only. Absent means a legacy guest with a page. */
+  hasProfilePage?: boolean;
   description?: string;
   role?: string;
   profilePhoto?: {
@@ -442,6 +444,7 @@ export function normalizeGuestContributor(value: unknown): WordPressGuestContrib
     id,
     name,
     slug,
+    ...(source.hasProfilePage === false || source.hasProfilePage === "0" ? { hasProfilePage: false } : {}),
     ...(description ? { description } : {}),
     ...(role ? { role } : {}),
     ...(profilePhoto ? { profilePhoto } : {}),
@@ -918,7 +921,7 @@ export async function getAllGuestContributors() {
 
     return records.flatMap((record) => {
       const contributor = normalizeGuestContributor(record);
-      return contributor ? [contributor] : [];
+      return contributor && contributorHasProfilePage(contributor) ? [contributor] : [];
     });
   } catch {
     // Guest contributors are optional. A missing endpoint must not prevent the
@@ -1122,6 +1125,11 @@ export async function getPostContributorsWithProfiles(post: WordPressPost) {
 
     return (await getAuthorById(contributor.id)) ?? contributor;
   }));
+}
+
+/** One-off guests have no /author/ page, so bylines render them as plain text. */
+export function contributorHasProfilePage(contributor: WordPressContributor) {
+  return !isGuestContributor(contributor) || contributor.hasProfilePage !== false;
 }
 
 export function getContributorHref(contributor: WordPressContributor) {

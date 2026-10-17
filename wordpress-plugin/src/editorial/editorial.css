@@ -424,3 +424,116 @@
     grid-column: 1 / -1;
   }
 }
+
+/*
+ * Typography: use the WordPress admin font stack rather than anything the
+ * theme or browser default would supply. Form controls and buttons do not
+ * inherit a font-family by default, so they are set explicitly.
+ */
+.byline-editorial-panel,
+.byline-editorial-sidebar {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+.byline-editorial-panel button,
+.byline-editorial-panel input,
+.byline-editorial-panel select,
+.byline-editorial-panel textarea,
+.byline-editorial-sidebar button,
+.byline-editorial-sidebar input,
+.byline-editorial-sidebar select,
+.byline-editorial-sidebar textarea {
+  font-family: inherit;
+}
+
+.byline-editorial-contributor-row {
+  padding: 8px 10px;
+}
+
+.byline-editorial-contributor-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.byline-editorial-contributor-photo {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.byline-editorial-contributor-initial {
+  display: grid;
+  place-items: center;
+  background: #f0f0f1;
+  color: #50575e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.byline-editorial-contributor-copy strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.byline-editorial-contributor-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.byline-editorial-guest-trigger {
+  margin-bottom: 16px;
+}
+
+.byline-editorial-guest-trigger .components-button {
+  justify-content: center;
+  width: 100%;
+}
+
+.byline-editorial-guest-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #dcdcde;
+  border-radius: 2px;
+  background: #f6f7f7;
+}
+
+.byline-editorial-guest-form > strong {
+  font-size: 13px;
+}
+
+.byline-editorial-guest-form .byline-editorial-muted {
+  margin: 0;
+}
+
+.byline-editorial-guest-form .components-base-control,
+.byline-editorial-guest-form .components-base-control__field {
+  margin-bottom: 0;
+}
+
+.byline-editorial-guest-photo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.byline-editorial-guest-photo img {
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.byline-editorial-guest-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

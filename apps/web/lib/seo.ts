@@ -5,6 +5,7 @@ import { getPublicationConfig } from "@/lib/publication";
 import {
   getFeaturedMedia,
   getContributorDescription,
+  contributorHasProfilePage,
   getContributorHref,
   getContributorName,
   getContributorRole,
@@ -318,7 +319,7 @@ export function getNewsArticleSchema(post: WordPressPost) {
     return {
       "@type": "Person",
       name: getContributorName(contributor),
-      url: absoluteUrl(getContributorHref(contributor)),
+      url: contributorHasProfilePage(contributor) ? absoluteUrl(getContributorHref(contributor)) : undefined,
       jobTitle: getContributorRole(contributor) || undefined,
       description: getContributorDescription(contributor) || undefined,
       sameAs: socialLinks.length > 0 ? socialLinks : undefined

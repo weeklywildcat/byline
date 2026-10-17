@@ -27,6 +27,7 @@ const BYLINE_GUEST_ROLE_META = '_byline_guest_role';
 const BYLINE_GUEST_BIO_META = '_byline_guest_bio';
 const BYLINE_GUEST_IMAGE_ID_META = '_byline_guest_image_id';
 const BYLINE_GUEST_LINKS_META = '_byline_guest_public_links';
+const BYLINE_GUEST_PROFILE_PAGE_META = '_byline_guest_profile_page';
 
 const BYLINE_CONTRIBUTOR_MAX_PER_STORY = 32;
 const BYLINE_GUEST_MAX_PUBLIC_LINKS = 8;
@@ -343,6 +344,22 @@ function byline_guest_slug_is_available(string $slug, int $exclude_guest_id = 0)
     return byline_guest_sanitize_slug($slug) !== '' && byline_guest_slug_conflicts($slug, $exclude_guest_id) === [];
 }
 
+/**
+ * Whether a guest gets a public /author/ page and directory entry.
+ *
+ * Records without the meta predate the option and keep their page. The editor
+ * form always writes an explicit value, defaulting one-off guests to no page.
+ */
+function byline_guest_has_profile_page(int $guest_id): bool
+{
+    $value = get_post_meta($guest_id, BYLINE_GUEST_PROFILE_PAGE_META, true);
+    if ($value === '' || $value === null) {
+        return true;
+    }
+
+    return $value === true || $value === 1 || $value === '1';
+}
+
 function byline_guest_public_slug(int $guest_id): string
 {
     $post = byline_guest_contributor_post($guest_id);
@@ -391,6 +408,8 @@ function byline_get_guest_contributor(int $guest_id): ?array
         'bio' => byline_guest_sanitize_bio(get_post_meta($guest_id, BYLINE_GUEST_BIO_META, true)),
         'imageId' => byline_guest_sanitize_image_id(get_post_meta($guest_id, BYLINE_GUEST_IMAGE_ID_META, true)),
         'links' => byline_guest_sanitize_links(get_post_meta($guest_id, BYLINE_GUEST_LINKS_META, true)),
+        'hasProfilePage' => byline_guest_has_profile_page($guest_id),
+        'status' => (string) $post->post_status,
     ];
 }
 
@@ -417,6 +436,94 @@ function byline_get_public_guest_contributor(int $guest_id): ?array
     }
 
     return $guest;
+}
+
+function byline_guest_image_url(int $image_id, string $size = 'thumbnail'): string
+{
+    $image_id = byline_guest_sanitize_image_id($image_id);
+    if ($image_id <= 0) {
+        return '';
+    }
+
+    if (function_exists('wwh_media_image')) {
+        $photo = wwh_media_image($image_id, $size);
+        if (is_array($photo) && trim((string) ($photo['url'] ?? '')) !== '') {
+            return (string) $photo['url'];
+        }
+    }
+
+    $url = function_exists('wp_get_attachment_image_url') ? wp_get_attachment_image_url($image_id, $size) : '';
+
+    return is_string($url) ? $url : '';
+}
+
+/**
+ * Editor-facing person shape for a guest: only what the sidebar needs, never
+ * the bio or links.
+ *
+ * @param array<string,mixed> $guest Output of byline_get_guest_contributor().
+ * @return array<string,mixed>
+ */
+function byline_guest_editor_person(array $guest): array
+{
+    $person = [
+        'id' => absint($guest['id'] ?? 0),
+        'kind' => 'guest',
+        'name' => (string) ($guest['name'] ?? ''),
+        'slug' => (string) ($guest['slug'] ?? ''),
+        'status' => (string) ($guest['status'] ?? 'publish'),
+        'hasProfilePage' => !array_key_exists('hasProfilePage', $guest) || (bool) $guest['hasProfilePage'],
+    ];
+
+    if ((string) ($guest['role'] ?? '') !== '') {
+        $person['role'] = (string) $guest['role'];
+    }
+
+    $image_url = byline_guest_image_url(absint($guest['imageId'] ?? 0));
+    if ($image_url === '' && is_array($guest['profilePhoto'] ?? null)) {
+        $image_url = (string) ($guest['profilePhoto']['url'] ?? '');
+    }
+    if ($image_url !== '') {
+        $person['imageUrl'] = $image_url;
+    }
+
+    return $person;
+}
+
+/**
+ * Guests an editor can attach to a story. Drafts are only offered to people
+ * who can manage guest profiles, because a draft guest is not public yet.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function byline_list_available_guests(?int $user_id = null): array
+{
+    if (!function_exists('get_posts')) {
+        return [];
+    }
+
+    $statuses = byline_guest_can_manage($user_id) ? ['publish', 'draft'] : ['publish'];
+    $posts = get_posts([
+        'post_type' => BYLINE_GUEST_POST_TYPE,
+        'post_status' => $statuses,
+        'posts_per_page' => 200,
+        'numberposts' => 200,
+        'orderby' => 'title',
+        'order' => 'ASC',
+    ]);
+
+    $guests = [];
+    foreach (is_array($posts) ? $posts : [] as $post) {
+        if (!$post instanceof WP_Post) {
+            continue;
+        }
+        $guest = byline_get_guest_contributor((int) $post->ID);
+        if (is_array($guest)) {
+            $guests[] = byline_guest_editor_person($guest);
+        }
+    }
+
+    return $guests;
 }
 
 function byline_guest_public_url($value, array $protocols = ['http', 'https']): string
@@ -754,6 +861,7 @@ function byline_register_contributor_meta(): void
         BYLINE_GUEST_BIO_META => ['type' => 'string', 'sanitize_callback' => 'byline_guest_sanitize_bio'],
         BYLINE_GUEST_IMAGE_ID_META => ['type' => 'integer', 'sanitize_callback' => 'byline_guest_sanitize_image_id'],
         BYLINE_GUEST_LINKS_META => ['type' => 'array', 'sanitize_callback' => 'byline_guest_sanitize_links'],
+        BYLINE_GUEST_PROFILE_PAGE_META => ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field'],
     ] as $key => $definition) {
         register_post_meta(BYLINE_GUEST_POST_TYPE, $key, [
             'single' => true,
@@ -782,6 +890,7 @@ function byline_normalize_guest_input(array $input, string $fallback_title = '')
         'bio' => byline_guest_sanitize_bio($input['bio'] ?? $input['shortBio'] ?? ''),
         'imageId' => byline_guest_sanitize_image_id($input['imageId'] ?? $input['profileImageId'] ?? 0),
         'links' => byline_guest_sanitize_links($input['links'] ?? $input['publicLinks'] ?? []),
+        'hasProfilePage' => filter_var($input['hasProfilePage'] ?? true, FILTER_VALIDATE_BOOLEAN),
     ];
 }
 
@@ -807,6 +916,10 @@ function byline_guest_store_fields(int $guest_id, array $data): void
         } else {
             update_post_meta($guest_id, $key, $value);
         }
+    }
+
+    if (array_key_exists('hasProfilePage', $data)) {
+        update_post_meta($guest_id, BYLINE_GUEST_PROFILE_PAGE_META, $data['hasProfilePage'] ? '1' : '0');
     }
 }
 
@@ -838,7 +951,21 @@ function byline_create_guest_contributor(array $input, ?int $user_id = null)
     }
 
     if (!byline_guest_slug_is_available($data['slug'])) {
-        return new WP_Error('byline_guest_slug_conflict', 'That guest contributor slug is already used by a user or guest contributor.', ['status' => 409]);
+        // A slug derived from the name must not make a second "Alex Smith"
+        // impossible to add; an explicitly requested slug still fails loudly.
+        $explicit_slug = byline_guest_sanitize_slug($input['slug'] ?? '') !== '';
+        $available_slug = '';
+        for ($suffix = 2; !$explicit_slug && $suffix <= 20; $suffix++) {
+            $candidate = byline_guest_sanitize_slug($data['slug'] . '-' . $suffix);
+            if ($candidate !== '' && byline_guest_slug_is_available($candidate)) {
+                $available_slug = $candidate;
+                break;
+            }
+        }
+        if ($available_slug === '') {
+            return new WP_Error('byline_guest_slug_conflict', 'That guest contributor slug is already used by a user or guest contributor.', ['status' => 409]);
+        }
+        $data['slug'] = $available_slug;
     }
 
     if (!function_exists('wp_insert_post')) {
@@ -948,6 +1075,9 @@ function byline_update_guest_contributor(int $guest_id, array $input, ?int $user
     }
     if (array_key_exists('links', $input) || array_key_exists('publicLinks', $input)) {
         $field_input['links'] = $data['links'];
+    }
+    if (array_key_exists('hasProfilePage', $input)) {
+        $field_input['hasProfilePage'] = $data['hasProfilePage'];
     }
     if ($field_input !== []) {
         byline_guest_store_fields($guest_id, $field_input);

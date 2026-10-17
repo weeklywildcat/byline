@@ -27,6 +27,7 @@ export type ArticleLinkView = {
 export type ArticleContributorView = {
   id: string;
   name: string;
+  /** Empty for one-off guests, who are credited without a profile page. */
   href: string;
   role: string;
   bio: string;
@@ -230,12 +231,14 @@ function AboutWriters({ presentation }: { presentation: ArticlePresentation }): 
                   ))}
                 </p>
               ) : null}
-              <p>{contributor.bio}</p>
-              <div className="about-writer-links">
-                <a href={contributor.href}>View full profile</a>
-                <a href={`${contributor.href}#author-stories-heading`}>More stories by {contributor.name === presentation.fallbackByline ? "the staff" : contributor.name}</a>
-                {contributor.contactHref ? <a href={contributor.contactHref}>Contact</a> : null}
-              </div>
+              {contributor.bio ? <p>{contributor.bio}</p> : null}
+              {contributor.href || contributor.contactHref ? (
+                <div className="about-writer-links">
+                  {contributor.href ? <a href={contributor.href}>View full profile</a> : null}
+                  {contributor.href ? <a href={`${contributor.href}#author-stories-heading`}>More stories by {contributor.name === presentation.fallbackByline ? "the staff" : contributor.name}</a> : null}
+                  {contributor.contactHref ? <a href={contributor.contactHref}>Contact</a> : null}
+                </div>
+              ) : null}
             </div>
           </div>
         ))}
@@ -270,7 +273,7 @@ export function ArticleView({ presentation, slots = {}, className = "" }: Articl
               <p className="article-author-line">
                 By {presentation.contributors.length > 0
                   ? presentation.contributors.map((contributor, index) => (
-                      <span key={contributor.id}>{bylineSeparator(index, presentation.contributors.length)}<a href={contributor.href}>{contributor.name}</a></span>
+                      <span key={contributor.id}>{bylineSeparator(index, presentation.contributors.length)}{contributor.href ? <a href={contributor.href}>{contributor.name}</a> : contributor.name}</span>
                     ))
                   : <span>{presentation.fallbackByline}</span>}
               </p>

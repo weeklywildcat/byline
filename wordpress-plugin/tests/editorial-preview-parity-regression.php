@@ -392,6 +392,12 @@ preview_parity_assert($contributors[1]['contactHref'] === $expected['contributor
 preview_parity_assert(array_column($contributors[0]['coverage'], 'label') === $expected['contributors'][0]['coverage'], 'Preview coverage areas did not use the public count/order rule.');
 preview_parity_assert($contributors[0]['coverage'] === $contributors[1]['coverage'], 'Preview did not apply the same effective coverage areas to every contributor.');
 
+$one_off_view = byline_editorial_preview_contributor(['type' => 'guest', 'id' => 45, 'name' => 'Alex Smith', 'slug' => 'alex-smith', 'role' => 'Photographer', 'hasProfilePage' => false], 0);
+preview_parity_assert($one_off_view['href'] === '', 'Preview linked a one-off guest to a profile page that does not exist.');
+preview_parity_assert($one_off_view['bio'] === '', 'Preview invented a newsroom bio for a one-off guest.');
+$paged_guest_view = byline_editorial_preview_contributor(['type' => 'guest', 'id' => 46, 'name' => 'Pat Page', 'slug' => 'pat-page', 'hasProfilePage' => true], 0);
+preview_parity_assert($paged_guest_view['href'] !== '', 'Preview dropped the profile link for a guest that has a page.');
+
 $normalized_contributors = array_map(static function (array $contributor): array {
     $photo = is_array($contributor['photo'] ?? null) ? $contributor['photo'] : [];
     $path = parse_url((string) ($photo['src'] ?? ''), PHP_URL_PATH);

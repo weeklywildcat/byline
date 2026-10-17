@@ -8,6 +8,7 @@ import { getPublicationConfig } from "@/lib/publication";
 import {
   getAuthorProfile,
   getContributorDescription,
+  contributorHasProfilePage,
   getContributorHref,
   getContributorName,
   getContributorPhoto,
@@ -109,9 +110,9 @@ function contributorView(contributor: WordPressContributor, coverage: ReturnType
   return {
     id: `${isGuestContributor(contributor) ? "guest" : "user"}-${contributor.id}-${contributor.slug}`,
     name: getContributorName(contributor),
-    href: getContributorHref(contributor),
+    href: contributorHasProfilePage(contributor) ? getContributorHref(contributor) : "",
     role: getContributorRole(contributor),
-    bio: stripHtml(getContributorDescription(contributor)) || `Stories reported by the ${publication.identity.shortName} newsroom.`,
+    bio: stripHtml(getContributorDescription(contributor)) || (contributorHasProfilePage(contributor) ? `Stories reported by the ${publication.identity.shortName} newsroom.` : ""),
     photo: photo ? articleImage({
       id: typeof photo.id === "number" ? photo.id : 0,
       date: "",
