@@ -3,6 +3,8 @@ import { mkdir, stat } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
+import { parseRedirectsFile } from "./redirects.mts";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputRoot = path.resolve(process.env.BYLINE_STATIC_ROOT || path.join(projectRoot, "out"));
@@ -21,6 +23,16 @@ const contentTypes = new Map([
   [".webp", "image/webp"],
   [".xml", "application/xml; charset=utf-8"]
 ]);
+
+// Mirror Cloudflare's _redirects handling, which runs before asset lookup.
+function loadRedirects() {
+  try {
+    return parseRedirectsFile(readFileSync(path.join(outputRoot, "_redirects"), "utf8"));
+  } catch {
+    return new Map();
+  }
+}
+const redirects = loadRedirects();
 
 async function fileStat(filePath) {
   try {
@@ -78,6 +90,13 @@ async function resolveRequest(pathname) {
 
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || "/", "http://" + (request.headers.host || host + ":" + port));
+  const redirect = redirects.get(requestUrl.pathname);
+  if (redirect) {
+    response.writeHead(redirect.status, { Location: redirect.to });
+    response.end();
+    return;
+  }
+
   const resolved = await resolveRequest(requestUrl.pathname);
 
   if (resolved.status === 308) {

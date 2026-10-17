@@ -58,7 +58,7 @@ describe("Astro static frontend contract", () => {
     expect(searchIndexEndpoint).toContain('"Content-Type": "application/json; charset=utf-8"');
     expect(read("lib/search-index.ts")).toContain("SEARCH_INDEX_SCHEMA_VERSION");
     expect(read("lib/search-index.ts")).toContain("/_byline/search-index.json");
-    expect(read("src/pages/sports/schedule/index.astro")).toContain("Astro.redirect");
+    expect(existsSync(path.join(webRoot, "src", "pages", "sports"))).toBe(false);
   });
 
   it("keeps the homepage hero rail limiter outside the CSS grid", () => {

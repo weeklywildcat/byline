@@ -1,6 +1,7 @@
 import { access, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { MAX_STATIC_REDIRECTS, parseRedirectsFile } from "./redirects.mts";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputRoot = path.join(projectRoot, "out");
@@ -57,7 +58,10 @@ const files = await filesBelow(outputRoot);
 const routeFiles = files.filter((file) => /\.(?:html|xml|txt)$/.test(file) && !file.includes(`${path.sep}_astro${path.sep}`));
 const actualRoutes = routeFiles.map(publicPath).sort();
 const expectedEntries = JSON.parse(await readFile(path.join(buildRoot, "expected-routes.json"), "utf8"));
+const isEdgeRedirect = (entry) => entry.kind === "redirect" && entry.delivery === "edge";
+// Edge redirects are rules in out/_redirects, not files, so they are not part of file closure.
 const expectedRoutes = expectedEntries.map((entry) => entry.path).sort();
+const expectedFileRoutes = expectedEntries.filter((entry) => !isEdgeRedirect(entry)).map((entry) => entry.path).sort();
 const expectedByPath = new Map(expectedEntries.map((entry) => [entry.path, entry]));
 const searchIndexFile = path.join(outputRoot, "_byline", "search-index.json");
 let searchIndex;
@@ -108,10 +112,28 @@ for (const [index, item] of searchIndex.items.entries()) {
   }
 }
 
-const removed = expectedRoutes.filter((route) => !actualRoutes.includes(route));
-const unexpected = actualRoutes.filter((route) => !expectedRoutes.includes(route));
+const removed = expectedFileRoutes.filter((route) => !actualRoutes.includes(route));
+const unexpected = actualRoutes.filter((route) => !expectedFileRoutes.includes(route));
 if (removed.length || unexpected.length) {
   throw new Error(`Route closure failed.\nMissing (${removed.length}): ${removed.join(", ") || "none"}\nUnexpected (${unexpected.length}): ${unexpected.join(", ") || "none"}`);
+}
+
+// Edge redirects: every one is a 301 rule (with and without the trailing slash)
+// that lands on a generated page, and none has regenerated as an HTML file.
+const edgeRedirects = expectedEntries.filter(isEdgeRedirect);
+const redirectRules = parseRedirectsFile(await readFile(path.join(outputRoot, "_redirects"), "utf8").catch(() => ""));
+if (redirectRules.size > MAX_STATIC_REDIRECTS) throw new Error(`_redirects has ${redirectRules.size} rules; Cloudflare allows ${MAX_STATIC_REDIRECTS}.`);
+for (const entry of edgeRedirects) {
+  const target = entry.redirectTo;
+  const targetRoute = typeof target === "string" ? target.split("#")[0] : "";
+  for (const source of entry.path === "/" ? [entry.path] : [entry.path, entry.path.slice(0, -1)]) {
+    const rule = redirectRules.get(source);
+    if (rule?.to !== target || rule.status !== 301) throw new Error(`_redirects is missing a 301 from ${source} to ${String(target)}.`);
+  }
+  if (!/^\/(?!\/)[a-z0-9/#_-]+$/i.test(String(target)) || !expectedFileRoutes.includes(targetRoute)) {
+    throw new Error(`Edge redirect from ${entry.path} points at ${String(target)}, which is not a generated page.`);
+  }
+  if (actualRoutes.includes(entry.path)) throw new Error(`Edge redirect source ${entry.path} was generated as a file.`);
 }
 
 const missingAssets = [];
@@ -137,7 +159,7 @@ for (const file of files.filter((candidate) => candidate.endsWith(".html"))) {
   const canonical = link(source, "canonical");
   const description = attr(source, "description");
   const expected = expectedByPath.get(route);
-  if (expected?.kind === "redirect") {
+  if (expected?.kind === "redirect" && expected.delivery !== "edge") {
     const target = expected.redirectTo;
     if (typeof target !== "string" || !/^\/(?!\/)[a-z0-9/#-]+$/i.test(target) || canonical !== target
       || !source.includes(`content="0;url=${target}"`) || attr(source, "robots") !== "noindex"
@@ -203,7 +225,7 @@ const metrics = {
     externalFallbacks: [...mediaItems.values()].filter((item) => item.status === "external-fallback").length,
     materializationMs: Math.round([...mediaDurations.values()].reduce((sum, duration) => sum + duration, 0) * 100) / 100
   },
-  routes: { expected: expectedRoutes.length, generated: actualRoutes.length },
+  routes: { expected: expectedRoutes.length, generated: actualRoutes.length, edgeRedirects: edgeRedirects.length },
   searchIndex: {
     schemaVersion: searchIndex.schemaVersion,
     items: searchIndex.items.length,

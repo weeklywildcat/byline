@@ -7,6 +7,11 @@ export type RouteManifestEntry = {
   kind: RouteKind;
   digest?: string;
   redirectTo?: string;
+  /**
+   * How a redirect is delivered. "static" (the default) is a generated HTML page;
+   * "edge" is a real HTTP redirect rule in out/_redirects with no file of its own.
+   */
+  delivery?: "static" | "edge";
 };
 
 export function normalizePublicRoute(value: string) {

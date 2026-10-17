@@ -1,6 +1,0 @@
----
-import { getBuildSnapshot } from "@/lib/build-snapshot";
-import { getSportsArchiveHref } from "@/lib/sports-archive";
-const snapshot = await getBuildSnapshot();
-return Astro.redirect(getSportsArchiveHref(snapshot.pages), 301);
----
