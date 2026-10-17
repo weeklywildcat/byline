@@ -1847,6 +1847,17 @@ function byline_editorial_rest_story_contributors_payload(int $story_id): array
         }
         if (($contributor['type'] ?? '') === 'guest' && function_exists('byline_guest_editor_person')) {
             $contributor = byline_guest_editor_person($contributor) + $contributor;
+        } elseif (($contributor['type'] ?? '') === 'user') {
+            // Staff show their profile photo, or their WordPress avatar.
+            $user_id = absint($contributor['id'] ?? 0);
+            $image_url = function_exists('byline_guest_image_url') ? byline_guest_image_url(absint($contributor['imageId'] ?? 0)) : '';
+            if ($image_url === '' && $user_id > 0 && function_exists('get_avatar_url')) {
+                $avatar = get_avatar_url($user_id, ['size' => 64]);
+                $image_url = is_string($avatar) ? $avatar : '';
+            }
+            if ($image_url !== '') {
+                $contributor['imageUrl'] = $image_url;
+            }
         }
         $contributors[] = $contributor;
     }

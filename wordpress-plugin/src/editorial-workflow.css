@@ -326,8 +326,16 @@
 }
 
 .byline-editorial-sidebar .byline-editorial-contributor-row {
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 6px 8px;
+}
+
+/* In the narrow sidebar the controls sit under the name, so the role and
+   status text keeps the full row width instead of wrapping mid-word. */
+.byline-editorial-sidebar .byline-editorial-contributor-actions {
+  grid-column: 2;
+  justify-self: start;
+  margin-left: -6px;
 }
 
 .byline-editorial-sidebar .byline-editorial-add-row,
