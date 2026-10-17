@@ -39,7 +39,10 @@ describe("shared article presentation", () => {
     expect(markup).toContain("Public records guide");
     expect(markup).toContain("The public story.");
     expect(markup).toContain("Clarification");
-    expect(markup).not.toContain("About the Writer");
+    expect(markup).toContain("About the Writers");
+    expect(markup).toContain("Alex Rivera");
+    expect(markup).toContain("Jordan Guest");
+    expect(markup).not.toContain("A public guest bio.");
     expect(markup).not.toContain("privateNote");
   });
 });
