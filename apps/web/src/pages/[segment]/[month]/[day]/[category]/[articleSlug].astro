@@ -61,7 +61,7 @@ const slots = {
     ...(category ? [{ name: decodeHtml(category.name), path: `/category/${category.slug}/` }] : []),
     { name: title, path: getPostHref(post) }
   ]))}></script>
-  <ArticleView presentation={presentation} slots={slots} />
+  <ArticleView presentation={presentation} slots={slots} className={category?.slug === "opinion" ? "article-shell-opinion" : ""} />
   <div class="astro-island-relocation" data-target="article-share-island-slot"><ArticleShareActions title={title} url={articleUrl} client:idle /></div>
   <div class="astro-island-relocation" data-target="article-poll-island-slot"><NewsroomPollHydrator client:load /></div>
   {publication.features.readerFeedback !== false && <div class="astro-island-relocation" data-target="article-feedback-island-slot"><ReaderFeedbackForm postId={post.id} articleTitle={title} articleUrl={articleUrl} endpointCandidates={[getBylineRestUrl("/feedback"), getBylineRestUrl("/feedback", true)]} client:visible /></div>}

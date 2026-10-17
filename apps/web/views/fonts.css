@@ -81,3 +81,20 @@
   descent-override: 22.4%;
   line-gap-override: 9.2%;
 }
+
+/* Libre Caslon Condensed (Google Fonts static builds, latin only): opinion
+ * headlines on articles and the homepage. */
+@font-face {
+  font-family: "Libre Caslon Condensed";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/libre-caslon-condensed-normal-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Libre Caslon Condensed";
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/libre-caslon-condensed-italic-500.woff2") format("woff2");
+}

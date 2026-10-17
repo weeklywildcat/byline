@@ -623,15 +623,15 @@
 
 :where(.byline-publication-preview) .home-story-opinion-lead h2,
 :where(.byline-publication-preview) .home-story-opinion h2 {
-  font-style: italic;
+  font-family: "Libre Caslon Condensed", Georgia, "Times New Roman", serif;
   font-weight: 500;
   margin-top: 0;
 }
 
 :where(.byline-publication-preview) .home-story-opinion-lead h2 {
-  font-size: clamp(1.9rem, 2.9vw, 2.75rem);
-  letter-spacing: -0.02em;
-  line-height: 1.06;
+  font-size: clamp(2.1rem, 3.3vw, 3.1rem);
+  letter-spacing: 0;
+  line-height: 1.04;
 }
 
 :where(.byline-publication-preview) .home-story-opinion-lead .home-story-deck {
@@ -677,8 +677,8 @@
 }
 
 :where(.byline-publication-preview) .home-story-opinion h2 {
-  font-size: 1.3rem;
-  line-height: 1.16;
+  font-size: 1.45rem;
+  line-height: 1.12;
 }
 
 :where(.byline-publication-preview) .home-story-opinion .home-story-deck {
@@ -1424,7 +1424,7 @@
   }
 
   :where(.byline-publication-preview) .home-story-opinion-lead h2 {
-    font-size: 1.75rem;
+    font-size: 2rem;
   }
 
   :where(.byline-publication-preview) .opinion-rail {
