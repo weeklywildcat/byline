@@ -161,6 +161,7 @@ export function auditPage(html: string, route: string, { origin, siteName }: Pag
   for (const key of ["og:image", "twitter:image"]) {
     for (const image of values(page, key)) {
       if (!/^https?:\/\//i.test(image)) fail(`${key} is not an absolute URL: ${image}`);
+      if (image.includes("/_byline/presentation-media/")) fail(`${key} must not use presentation-only media: ${image}`);
     }
   }
   for (const key of ["og:image:width", "og:image:height"]) {
@@ -185,6 +186,7 @@ export function auditPage(html: string, route: string, { origin, siteName }: Pag
     for (const [key, url] of urlStrings(node)) {
       if (key === "sameAs" || !/^(?:https?:)?\/\//i.test(url) && !url.startsWith("/")) continue;
       if (!/^https?:\/\//i.test(url)) fail(`structured data ${key} is not absolute: ${url}`);
+      if (url.includes("/_byline/presentation-media/")) fail(`structured data ${key} must not use presentation-only media: ${url}`);
     }
   }
 
@@ -209,6 +211,14 @@ export function auditPage(html: string, route: string, { origin, siteName }: Pag
       }
       if (!article.headline) fail("NewsArticle.headline is missing");
       if (!article.author) fail("NewsArticle.author is missing");
+      if (article["@id"] !== `${canonical}#article`) fail(`NewsArticle.@id should be ${canonical}#article`);
+      const articleAuthors = ([] as unknown[]).concat(article.author ?? []).filter((value): value is Record<string, unknown> => Boolean(value && typeof value === "object"));
+      for (const author of articleAuthors) {
+        const authorUrl = typeof author.url === "string" ? author.url : "";
+        if (authorUrl.includes("/author/") && author["@id"] !== `${authorUrl}#person`) {
+          fail(`NewsArticle author @id should be ${authorUrl}#person`);
+        }
+      }
       const publisher = article.publisher as Record<string, unknown> | undefined;
       if (publisher?.["@id"] !== `${origin}/#organization`) fail("NewsArticle.publisher does not reference the shared organization entity");
       const main = article.mainEntityOfPage as Record<string, unknown> | undefined;
@@ -219,6 +229,24 @@ export function auditPage(html: string, route: string, { origin, siteName }: Pag
     }
     if (!nodes.some((node) => typesOf(node).includes("BreadcrumbList"))) fail("missing BreadcrumbList JSON-LD");
     if (page.mastheadHasTime) fail("the masthead build date <time> is rendered on an article page");
+  }
+
+  if (/^\/author\/[^/]+\/$/.test(route)) {
+    if (values(page, "og:type")[0] !== "profile") fail(`og:type should be profile, found "${values(page, "og:type")[0] ?? ""}"`);
+    const profilePage = nodes.find((node) => typesOf(node).includes("ProfilePage"));
+    if (!profilePage) {
+      fail("missing ProfilePage JSON-LD");
+    } else {
+      if (profilePage["@id"] !== canonical) fail(`ProfilePage.@id should be the canonical URL: ${canonical}`);
+      const person = profilePage.mainEntity as Record<string, unknown> | undefined;
+      if (!person || !typesOf(person).includes("Person")) {
+        fail("ProfilePage.mainEntity should be a Person");
+      } else {
+        if (person["@id"] !== `${canonical}#person`) fail(`ProfilePage Person.@id should be ${canonical}#person`);
+        if (person.url !== canonical) fail("ProfilePage Person.url should match the canonical URL");
+      }
+    }
+    if (!nodes.some((node) => typesOf(node).includes("BreadcrumbList"))) fail("missing BreadcrumbList JSON-LD");
   }
 
   if (route === "/") {

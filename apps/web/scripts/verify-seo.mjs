@@ -1,7 +1,7 @@
 import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { auditFeed, auditNewsSitemap, auditPage, auditSitemap, auditSitemapImages, decodeEntities, parsePage, sitemapImageLocations } from "./seo-audit.mts";
+import { auditFeed, auditNewsSitemap, auditPage, auditSitemap, auditSitemapImages, decodeEntities, parsePage, sitemapImageLocations, sitemapLocations } from "./seo-audit.mts";
 
 // Fails the build when generated pages drift from the search/social contract:
 // absolute canonical and social URLs, timezone-aware dates, a sitemap that lists
@@ -67,6 +67,21 @@ for (const [name, audit] of [
   issues.push(...audit(await readFile(file, "utf8")));
 }
 
+const sitemapXml = await readFile(path.join(outputRoot, "sitemap.xml"), "utf8");
+const sitemapUrls = new Set(sitemapLocations(sitemapXml));
+
+// The sitemap is also the declaration of which generated HTML pages are meant
+// for search. Catch the inverse drift too: an indexable canonical page that is
+// silently omitted is just as broken as a noindex page that leaks into it.
+for (const [route, page] of pages) {
+  if (page.kind === "redirect" || page.kind === "not-found" || route === "/404.html") continue;
+  if (page.robots !== "index,follow") continue;
+  if (!page.canonical || !page.canonical.startsWith(origin)) continue;
+  if (!sitemapUrls.has(page.canonical)) {
+    issues.push({ route, message: `indexable canonical page is missing from sitemap: ${page.canonical}` });
+  }
+}
+
 // Media contract: every photograph the sitemap advertises and every full-size
 // source the lightbox or a media link can open must be a file in this export.
 // Markup that names a mirrored file the build did not copy is a broken deploy.
@@ -101,6 +116,9 @@ for (const file of htmlFiles) {
 const robots = await readFile(path.join(outputRoot, "robots.txt"), "utf8");
 for (const sitemap of ["sitemap.xml", "news-sitemap.xml"]) {
   if (!robots.includes(`Sitemap: ${origin}/${sitemap}`)) issues.push({ route: "/robots.txt", message: `does not advertise ${origin}/${sitemap}` });
+}
+if (!robots.includes("Disallow: /_byline/presentation-media/")) {
+  issues.push({ route: "/robots.txt", message: "does not exclude presentation-only media from crawling" });
 }
 
 if (issues.length) {

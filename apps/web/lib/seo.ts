@@ -10,11 +10,13 @@ import {
   contributorHasProfilePage,
   getContributorHref,
   getContributorName,
+  getContributorPhoto,
   getContributorRole,
   getContributorSocialLinks,
   getPostContributors,
   getPostHref,
   getSiteUrl,
+  type WordPressContributor,
   type WordPressMedia,
   type WordPressPost
 } from "@/lib/wordpress";
@@ -223,7 +225,7 @@ export function buildPageMetadata({
       images
     },
     twitter: {
-      card: "summary_large_image",
+      card: type === "profile" ? "summary" : "summary_large_image",
       title,
       description: trimmedDescription,
       images
@@ -239,6 +241,16 @@ export function getOrganizationId() {
 
 export function getWebsiteId() {
   return `${getSiteUrl()}/#website`;
+}
+
+export function getContributorPersonId(contributor: WordPressContributor) {
+  return contributorHasProfilePage(contributor)
+    ? `${absoluteUrl(getContributorHref(contributor))}#person`
+    : undefined;
+}
+
+export function getNewsArticleId(post: WordPressPost) {
+  return `${absoluteUrl(getPostHref(post))}#article`;
 }
 
 function getOrganizationLogoSchema() {
@@ -387,20 +399,12 @@ export function getArticleImageCandidates(image: WordPressMedia): ImageCandidate
   return candidates.length > 0 ? candidates : [{ url: image.source_url, width: 0, height: 0 }];
 }
 
-function getArticleImageSchema(image: WordPressMedia | null) {
+function getArticleImageSchema(image: WordPressMedia | null, articleUrl: string) {
+  // The generic social card is appropriate for link previews, but it is not a
+  // photograph of an imageless story. Advertising it as NewsArticle.image makes
+  // search engines associate the same brand artwork with unrelated articles.
   if (!image?.source_url) {
-    return [
-      {
-        "@type": "ImageObject",
-        contentUrl: absoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
-        url: absoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
-        width: DEFAULT_SOCIAL_IMAGE_WIDTH ?? undefined,
-        height: DEFAULT_SOCIAL_IMAGE_HEIGHT ?? undefined,
-        copyrightNotice: DEFAULT_IMAGE_COPYRIGHT_NOTICE,
-        license: absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH),
-        acquireLicensePage: absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH)
-      }
-    ];
+    return [];
   }
 
   const imageCredit = image.bylineImage ?? image.weeklyWildcatImage;
@@ -417,11 +421,12 @@ function getArticleImageSchema(image: WordPressMedia | null) {
     stripHtml(image.media_details?.image_meta?.credit || image.media_details?.image_meta?.copyright || "");
   const caption = stripHtml(image.caption?.rendered ?? image.media_details?.image_meta?.caption ?? "") || undefined;
 
-  return getArticleImageCandidates(image).map((candidate) => {
+  return getArticleImageCandidates(image).map((candidate, index) => {
     const imageUrl = absoluteUrl(candidate.url);
 
     return {
       "@type": "ImageObject",
+      "@id": index === 0 ? `${articleUrl}#primaryimage` : undefined,
       contentUrl: imageUrl,
       url: imageUrl,
       width: candidate.width || undefined,
@@ -456,6 +461,57 @@ export function getArticleAuthorProfileUrls(post: WordPressPost) {
     .map((contributor) => absoluteUrl(getContributorHref(contributor)));
 }
 
+export function getProfilePageSchema(contributor: WordPressContributor, posts: WordPressPost[]) {
+  const profileUrl = absoluteUrl(getContributorHref(contributor));
+  const personId = getContributorPersonId(contributor) ?? `${profileUrl}#person`;
+  const photo = getContributorPhoto(contributor);
+  const profileImageId = photo?.url ? `${profileUrl}#profile-image` : undefined;
+  const socialLinks = getContributorSocialLinks(contributor)
+    .map((link) => link.href.trim())
+    .filter((href) => !href.toLowerCase().startsWith("mailto:") && (/^https?:\/\//i.test(href) || (href.startsWith("/") && !href.startsWith("//"))))
+    .map((href) => absoluteUrl(href));
+  const recentPosts = [...posts]
+    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+    .slice(0, 20);
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    "@id": profileUrl,
+    url: profileUrl,
+    mainEntity: {
+      "@type": "Person",
+      "@id": personId,
+      name: decodeHtml(getContributorName(contributor)),
+      description: stripHtml(getContributorDescription(contributor)) || `${publication.identity.shortName} contributor`,
+      jobTitle: getContributorRole(contributor) || undefined,
+      url: profileUrl,
+      image: photo?.url
+        ? {
+            "@type": "ImageObject",
+            "@id": profileImageId,
+            url: absoluteUrl(photo.url),
+            contentUrl: absoluteUrl(photo.url),
+            width: photo.width ?? undefined,
+            height: photo.height ?? undefined
+          }
+        : undefined,
+      sameAs: socialLinks.length > 0 ? socialLinks : undefined
+    },
+    primaryImageOfPage: profileImageId ? { "@id": profileImageId } : undefined,
+    hasPart: recentPosts.length > 0
+      ? recentPosts.map((post) => ({
+          "@type": "NewsArticle",
+          "@id": getNewsArticleId(post),
+          headline: stripHtml(post.title.rendered),
+          url: absoluteUrl(getPostHref(post)),
+          datePublished: getPostTimestamps(post).published,
+          author: { "@id": personId }
+        }))
+      : undefined
+  };
+}
+
 export function getNewsArticleSchema(post: WordPressPost) {
   const contributors = getPostContributors(post);
   const category = getPrimaryVisibleCategory(post);
@@ -465,6 +521,7 @@ export function getNewsArticleSchema(post: WordPressPost) {
   const description = getSeoDescription(post.excerpt.rendered || post.content.rendered);
   const articleBody = stripHtml(post.content.rendered);
   const timestamps = getPostTimestamps(post);
+  const imageSchema = getArticleImageSchema(image, articleUrl);
   const keywords = post._embedded?.["wp:term"]
     ?.flat()
     .filter((term): term is { name: string; taxonomy: string } => "name" in term && term.taxonomy === "post_tag")
@@ -477,10 +534,11 @@ export function getNewsArticleSchema(post: WordPressPost) {
 
     return {
       "@type": "Person",
+      "@id": getContributorPersonId(contributor),
       name: decodeHtml(getContributorName(contributor)),
       url: contributorHasProfilePage(contributor) ? absoluteUrl(getContributorHref(contributor)) : undefined,
       jobTitle: getContributorRole(contributor) || undefined,
-      description: getContributorDescription(contributor) || undefined,
+      description: stripHtml(getContributorDescription(contributor)) || undefined,
       sameAs: socialLinks.length > 0 ? socialLinks : undefined
     };
   });
@@ -494,6 +552,7 @@ export function getNewsArticleSchema(post: WordPressPost) {
   return {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
+    "@id": `${articleUrl}#article`,
     mainEntityOfPage: {
       "@type": "WebPage",
       "@id": articleUrl
@@ -507,7 +566,8 @@ export function getNewsArticleSchema(post: WordPressPost) {
     publisher: getPublisherSchema(),
     articleSection: category ? decodeHtml(category.name) : undefined,
     keywords: keywords?.length ? keywords.join(", ") : undefined,
-    image: getArticleImageSchema(image),
+    image: imageSchema.length > 0 ? imageSchema : undefined,
+    primaryImageOfPage: imageSchema[0]?.["@id"] ? { "@id": imageSchema[0]["@id"] } : undefined,
     isAccessibleForFree: true,
     articleBody: articleBody || undefined
   };

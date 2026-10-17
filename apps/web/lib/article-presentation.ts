@@ -1,5 +1,5 @@
 import type { ArticleImageView, ArticlePresentation, ArticleStoryCardView } from "@byline/ui";
-import { getResponsiveImageProps } from "@/lib/media";
+import { getResponsiveImageProps, type ImageSearchVisibility } from "@/lib/media";
 import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory, getPublicTopicTags, isAthleteSpotlightPost, isHiddenCategory, isVisibleContentPost } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { absoluteUrl } from "@/lib/seo";
@@ -43,9 +43,9 @@ export function hasArticleUpdatedDate(post: WordPressPost) {
   return Number.isFinite(published) && Number.isFinite(modified) && modified - published > 60 * 60 * 1000;
 }
 
-function articleImage(image: WordPressMedia | null, sizes?: string, priority = false): ArticleImageView | null {
+function articleImage(image: WordPressMedia | null, sizes?: string, priority = false, imageSearchVisibility: ImageSearchVisibility = "canonical"): ArticleImageView | null {
   if (!image?.source_url) return null;
-  const responsive = getResponsiveImageProps(image, { sizes, priority });
+  const responsive = getResponsiveImageProps(image, { sizes, priority, imageSearchVisibility });
   if (!responsive) return null;
   const captionHtml = image.caption?.rendered?.trim() || "";
   const fallbackCaption = stripHtml(image.media_details?.image_meta?.caption ?? "");
@@ -66,7 +66,7 @@ function articleImage(image: WordPressMedia | null, sizes?: string, priority = f
 
 function articleStoryCard(post: WordPressPost): ArticleStoryCardView {
   const category = getPrimaryVisibleCategory(post);
-  const image = articleImage(getFeaturedMedia(post), "(max-width: 900px) 100vw, 360px");
+  const image = articleImage(getFeaturedMedia(post), "(max-width: 900px) 100vw, 360px", false, "presentation");
   return {
     id: post.id,
     title: stripHtml(post.title.rendered),
@@ -127,7 +127,7 @@ function contributorView(contributor: WordPressContributor, coverage: ReturnType
       mime_type: "image",
       media_details: { width: photo.width ?? undefined, height: photo.height ?? undefined },
       source_url: photo.url
-    }, "132px") : null,
+    }, "132px", false, "presentation") : null,
     ...(contactLink?.href ? { contactHref: contactLink.href } : {}),
     coverage
   };

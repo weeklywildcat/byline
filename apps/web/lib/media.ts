@@ -9,6 +9,7 @@ const DEFAULT_WP_API_URL = "https://cms.weeklywildcat.com/wp-json/wp/v2";
 const DEFAULT_SITE_URL = "https://weeklywildcat.com";
 const WORDPRESS_MEDIA_PATH_PREFIX = "/wp-content/uploads/";
 const WORDPRESS_MEDIA_PUBLIC_ROUTE = "/_wordpress-media";
+const WORDPRESS_MEDIA_PRESENTATION_ROUTE = "/_byline/presentation-media";
 const WORDPRESS_MEDIA_PUBLIC_DIR = path.join(process.cwd(), "public", WORDPRESS_MEDIA_PUBLIC_ROUTE);
 const WORDPRESS_MEDIA_USER_AGENT = "Byline Static Site Builder";
 const ABSOLUTE_URL_PATTERN = /https?:\/\/[^\s"'<>),]+/gi;
@@ -49,12 +50,16 @@ export type ResponsiveWordPressMedia = {
   };
 };
 
+export type ImageSearchVisibility = "canonical" | "presentation";
+
 export type ResponsiveImageOptions = {
   alt?: string;
   sizes?: string;
   priority?: boolean;
   loading?: "eager" | "lazy";
   fetchPriority?: "high" | "low" | "auto";
+  /** Presentation-only copies stay visible in the UI without becoming canonical image-search URLs. */
+  imageSearchVisibility?: ImageSearchVisibility;
 };
 
 export type ResponsiveImageProps = {
@@ -78,6 +83,40 @@ function positiveInteger(value: unknown) {
 }
 
 /**
+ * Give mirrored media a presentation-only URL. The postbuild step materializes
+ * these aliases and robots.txt excludes them from crawling, so cards and avatars
+ * can reuse an image without competing with the page that owns its canonical
+ * image-search context. External/CMS fallbacks stay unchanged.
+ */
+export function getPresentationMediaUrl(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) return value;
+
+  if (trimmed.startsWith(`${WORDPRESS_MEDIA_PUBLIC_ROUTE}/`)) {
+    return `${WORDPRESS_MEDIA_PRESENTATION_ROUTE}/${trimmed.slice(WORDPRESS_MEDIA_PUBLIC_ROUTE.length + 1)}`;
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      if (url.origin === getSiteOrigin() && url.pathname.startsWith(`${WORDPRESS_MEDIA_PUBLIC_ROUTE}/`)) {
+        url.pathname = `${WORDPRESS_MEDIA_PRESENTATION_ROUTE}/${url.pathname.slice(WORDPRESS_MEDIA_PUBLIC_ROUTE.length + 1)}`;
+        return url.toString();
+      }
+    } catch {
+      return value;
+    }
+  }
+
+  return value;
+}
+
+function mediaUrlForImageSearchVisibility(value: string, visibility: ImageSearchVisibility) {
+  return visibility === "presentation" ? getPresentationMediaUrl(value) : value;
+}
+
+/**
  * Build normal HTML image attributes from mirrored WordPress media metadata.
  *
  * The build pipeline mirrors every WordPress media URL before this helper is
@@ -93,7 +132,9 @@ export function getResponsiveImageProps(
     return null;
   }
 
-  const src = image.source_url?.trim();
+  const canonicalSrc = image.source_url?.trim();
+  const imageSearchVisibility = options.imageSearchVisibility ?? "canonical";
+  const src = canonicalSrc ? mediaUrlForImageSearchVisibility(canonicalSrc, imageSearchVisibility) : "";
 
   if (!src) {
     return null;
@@ -102,7 +143,8 @@ export function getResponsiveImageProps(
   const candidates = new Map<number, { sourceUrl: string; width: number; height?: number }>();
 
   for (const size of Object.values(image.media_details?.sizes ?? {})) {
-    const sourceUrl = size.source_url?.trim();
+    const canonicalSourceUrl = size.source_url?.trim();
+    const sourceUrl = canonicalSourceUrl ? mediaUrlForImageSearchVisibility(canonicalSourceUrl, imageSearchVisibility) : "";
     const width = positiveInteger(size.width);
 
     if (!sourceUrl || !width || candidates.has(width)) {

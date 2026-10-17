@@ -2,7 +2,7 @@ import { optionalBuildData, requireBuildData } from "@/lib/build-data";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { formatDisplayDate, stripHtml } from "@/lib/format";
 import { getSportsArchiveHref } from "@/lib/sports-archive";
-import { getResponsiveImageProps, type ResponsiveImageProps } from "@/lib/media";
+import { getPresentationMediaUrl, getResponsiveImageProps, type ResponsiveImageProps } from "@/lib/media";
 import {
   getAllPages,
   getAllPosts,
@@ -99,7 +99,7 @@ export async function getAboutData(): Promise<AboutData> {
         name: contributor.name,
         role: getContributorRole(contributor),
         href: getContributorHref(contributor),
-        photo: photo?.url ? { url: photo.url, width: photo.width ?? null, height: photo.height ?? null } : null
+        photo: photo?.url ? { url: getPresentationMediaUrl(photo.url), width: photo.width ?? null, height: photo.height ?? null } : null
       };
     });
 
@@ -122,7 +122,7 @@ export async function getAboutData(): Promise<AboutData> {
     photo: (slug, alt, sizes) => {
       const post = bySlug.get(slug);
       const media = post ? getFeaturedMedia(post) : null;
-      const image = media ? getResponsiveImageProps(media, { alt, sizes, loading: "lazy" }) : null;
+      const image = media ? getResponsiveImageProps(media, { alt, sizes, loading: "lazy", imageSearchVisibility: "presentation" }) : null;
 
       if (!post || !media || !image) return null;
 

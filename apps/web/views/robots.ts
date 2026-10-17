@@ -6,7 +6,8 @@ export default function robots(): RobotsDocument {
   return {
     rules: {
       userAgent: "*",
-      allow: "/"
+      allow: "/",
+      disallow: "/_byline/presentation-media/"
     },
     host: getSiteUrl(),
     sitemap: [absoluteUrl("/sitemap.xml"), absoluteUrl("/news-sitemap.xml")]

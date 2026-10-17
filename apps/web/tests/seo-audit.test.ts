@@ -28,10 +28,12 @@ function head(overrides: { remove?: string[]; extra?: string; title?: string } =
 }
 
 const articleJson = {
-  "@context": "https://schema.org", "@type": "NewsArticle", headline: "Homecoming week",
+  "@context": "https://schema.org", "@type": "NewsArticle", "@id": `${url}#article`, headline: "Homecoming week",
   mainEntityOfPage: { "@type": "WebPage", "@id": url }, datePublished: "2026-10-14T22:15:00.000Z", dateModified: "2026-10-14T23:00:00.000Z",
-  author: { "@type": "Person", name: "Gibson Bell" }, publisher: { "@type": "NewsMediaOrganization", "@id": `${origin}/#organization`, name: "Weekly Wildcat" },
-  image: [{ "@type": "ImageObject", url: `${origin}/_wordpress-media/a.jpg` }]
+  author: { "@type": "Person", "@id": `${origin}/author/gibson/#person`, name: "Gibson Bell", url: `${origin}/author/gibson/` },
+  publisher: { "@type": "NewsMediaOrganization", "@id": `${origin}/#organization`, name: "Weekly Wildcat" },
+  image: [{ "@type": "ImageObject", "@id": `${url}#primaryimage`, url: `${origin}/_wordpress-media/a.jpg` }],
+  primaryImageOfPage: { "@id": `${url}#primaryimage` }
 };
 const breadcrumbJson = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, item: { "@id": `${origin}/` } }] };
 const ld = (value: unknown) => `<script type="application/ld+json">${JSON.stringify(value)}</script>`;
@@ -82,6 +84,31 @@ describe("page audit", () => {
     expect(messages(anonymous)).toEqual(expect.arrayContaining([expect.stringContaining("shared organization entity")]));
     const relativeImage = articlePage({}, `${ld({ ...articleJson, image: [{ url: "/_wordpress-media/a.jpg" }] })}${ld(breadcrumbJson)}`);
     expect(messages(relativeImage)).toEqual(expect.arrayContaining([expect.stringContaining("structured data url is not absolute")]));
+  });
+
+  it("rejects presentation-only media in social or structured metadata", () => {
+    const social = articlePage({ remove: ["ogimage"], extra: `<meta property="og:image" content="${origin}/_byline/presentation-media/a.jpg"><meta name="twitter:image" content="${origin}/_byline/presentation-media/a.jpg">` });
+    expect(messages(social)).toEqual(expect.arrayContaining([expect.stringContaining("must not use presentation-only media")]));
+
+    const structured = articlePage({}, `${ld({ ...articleJson, image: [{ url: `${origin}/_byline/presentation-media/a.jpg` }] })}${ld(breadcrumbJson)}`);
+    expect(messages(structured)).toEqual(expect.arrayContaining([expect.stringContaining("structured data url must not use presentation-only media")]));
+  });
+
+  it("validates the canonical ProfilePage and Person identity on author pages", () => {
+    const authorRoute = "/author/gibson/";
+    const authorUrl = `${origin}${authorRoute}`;
+    const authorHead = head({
+      remove: ["ogurl", "ogtype", "canonical", "published", "modified", "section", "author"],
+      extra: `<meta property="og:url" content="${authorUrl}"><meta property="og:type" content="profile"><link rel="canonical" href="${authorUrl}">`
+    });
+    const profile = {
+      "@context": "https://schema.org",
+      "@type": "ProfilePage",
+      "@id": authorUrl,
+      mainEntity: { "@type": "Person", "@id": `${authorUrl}#person`, name: "Gibson Bell", url: authorUrl }
+    };
+    const html = `<html>${authorHead}<body>${ld(profile)}${ld(breadcrumbJson)}</body></html>`;
+    expect(messages(html, authorRoute)).toEqual([]);
   });
 
   it("flags invalid JSON-LD and double-escaped metadata", () => {

@@ -1,6 +1,7 @@
 import type { Metadata } from "@/lib/metadata";
 import { optionalBuildData } from "@/lib/build-data";
 import { formatDisplayDate } from "@/lib/format";
+import { getPresentationMediaUrl } from "@/lib/media";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import {
@@ -11,13 +12,20 @@ import {
 
 const publication = getPublicationConfig();
 
-export const metadata: Metadata = {
-  ...buildPageMetadata({
+export async function getMetadata(): Promise<Metadata> {
+  const coverages = await optionalBuildData(
+    "/wp-json/byline/v1/coverage",
+    getAllPublicCoverages,
+    []
+  );
+
+  return buildPageMetadata({
     title: "Coverage",
     description: `Special coverage, explainers, and ongoing reporting from ${publication.identity.shortName}.`,
-    path: "/coverage/"
-  })
-};
+    path: "/coverage/",
+    noIndex: coverages.length === 0
+  });
+}
 
 function coverageSortValue(coverage: WordPressCoverage) {
   return coverage.modified || coverage.startDate || "";
@@ -37,7 +45,7 @@ function CoverageCard({ coverage }: { coverage: WordPressCoverage }) {
       {coverage.artwork ? (
         <img
           className="coverage-artwork"
-          src={coverage.artwork.url}
+          src={getPresentationMediaUrl(coverage.artwork.url)}
           alt={coverage.artwork.alt}
           width={coverage.artwork.width ?? undefined}
           height={coverage.artwork.height ?? undefined}

@@ -60,6 +60,8 @@ function CoverageStory({ post }: { post: WordPressPost }) {
 
 function getCoverageSchema(coverage: WordPressCoverage) {
   const path = getCoverageHref(coverage);
+  const pageUrl = absoluteUrl(path);
+  const imageId = coverage.artwork?.url ? `${pageUrl}#primaryimage` : undefined;
   const stories = coverage.stories.map((story, index) => ({
     "@type": "ListItem",
     position: index + 1,
@@ -70,10 +72,21 @@ function getCoverageSchema(coverage: WordPressCoverage) {
   return {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    "@id": absoluteUrl(path),
+    "@id": pageUrl,
     name: coverage.title,
     description: coverage.description || coverage.overview || undefined,
-    url: absoluteUrl(path),
+    url: pageUrl,
+    image: coverage.artwork?.url
+      ? {
+          "@type": "ImageObject",
+          "@id": imageId,
+          url: absoluteUrl(coverage.artwork.url),
+          contentUrl: absoluteUrl(coverage.artwork.url),
+          width: coverage.artwork.width ?? undefined,
+          height: coverage.artwork.height ?? undefined
+        }
+      : undefined,
+    primaryImageOfPage: imageId ? { "@id": imageId } : undefined,
     mainEntity: {
       "@type": "ItemList",
       numberOfItems: stories.length,

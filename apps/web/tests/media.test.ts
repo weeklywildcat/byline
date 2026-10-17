@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getResponsiveImageProps, type ResponsiveWordPressMedia } from "@/lib/media";
+import { getPresentationMediaUrl, getResponsiveImageProps, type ResponsiveWordPressMedia } from "@/lib/media";
 
 function image(overrides: Partial<ResponsiveWordPressMedia> = {}): ResponsiveWordPressMedia {
   return {
@@ -116,5 +116,22 @@ describe("responsive WordPress media", () => {
     );
 
     expect(result).toMatchObject({ width: 768, height: 432 });
+  });
+
+  it("rewrites presentation-only src and every srcSet candidate without changing canonical media", () => {
+    const canonical = getResponsiveImageProps(image());
+    const presentation = getResponsiveImageProps(image(), { imageSearchVisibility: "presentation" });
+
+    expect(canonical?.src).toBe("/_wordpress-media/hero.jpg");
+    expect(presentation?.src).toBe("/_byline/presentation-media/hero.jpg");
+    expect(presentation?.srcSet).toBe(
+      "/_byline/presentation-media/hero-150.jpg 150w, /_byline/presentation-media/hero-768.jpg 768w, /_byline/presentation-media/hero-1024.jpg 1024w, /_byline/presentation-media/hero.jpg 1600w"
+    );
+    expect(getPresentationMediaUrl("https://weeklywildcat.com/_wordpress-media/hero.jpg")).toBe(
+      "https://weeklywildcat.com/_byline/presentation-media/hero.jpg"
+    );
+    expect(getPresentationMediaUrl("https://cms.weeklywildcat.com/wp-content/uploads/hero.jpg")).toBe(
+      "https://cms.weeklywildcat.com/wp-content/uploads/hero.jpg"
+    );
   });
 });

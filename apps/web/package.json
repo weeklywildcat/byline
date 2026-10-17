@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node scripts/astro-with-publication.mjs dev",
     "build": "node scripts/astro-with-publication.mjs build",
-    "postbuild": "node scripts/materialize-static-compatibility.mjs && node scripts/copy-wordpress-media-to-out.mjs && node scripts/generate-redirects.mjs && node scripts/generate-byline-manifest.mjs && node scripts/verify-static-export.mjs && node scripts/verify-build.mjs && node scripts/verify-seo.mjs",
+    "postbuild": "node scripts/materialize-static-compatibility.mjs && node scripts/copy-wordpress-media-to-out.mjs && node scripts/materialize-presentation-media.mjs && node scripts/generate-redirects.mjs && node scripts/generate-byline-manifest.mjs && node scripts/verify-static-export.mjs && node scripts/verify-build.mjs && node scripts/verify-seo.mjs",
     "test": "vitest run",
     "test:browser": "playwright test --config playwright.public.config.ts",
     "test:packages": "vitest run tests/shared-contracts.test.ts",

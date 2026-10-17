@@ -29,12 +29,14 @@ test.describe("WordPress-rendered story presentations on Astro", () => {
         const columns = (selector: string) => getComputedStyle(q(selector)).gridTemplateColumns.split(" ").length;
         const pair = q('.is-style-byline-photo-pair');
         const media = q('.is-style-byline-portrait-text');
-        // Classic scrollbars (Linux CI) consume layout space; overlay
-        // scrollbars (macOS) do not. Measure the usable page in both cases.
-        const viewportWidth = document.documentElement.clientWidth;
+        // The page sets `scrollbar-gutter: stable`, so Linux CI reserves a
+        // 15px gutter that clientWidth still counts when the headless scrollbar
+        // is hidden. The <html> box is the width content actually lays out in;
+        // macOS (no gutter) reports the same value as clientWidth.
+        const viewportWidth = document.documentElement.getBoundingClientRect().width;
         return {
           viewportWidth,
-          overflow: document.documentElement.scrollWidth > viewportWidth + 1,
+          overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
           pairColumns: columns('.is-style-byline-photo-pair'), galleryColumns: columns('.is-style-byline-photo-gallery'),
           legacyColumns: columns('.is-style-byline-news-grid'), mediaColumns: columns('.is-style-byline-portrait-text'),
           wide: rect(pair), media: rect(media), portraitMedia: rect(media.querySelector('figure')!), portraitText: rect(media.querySelector('.wp-block-media-text__content')!),

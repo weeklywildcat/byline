@@ -1,5 +1,6 @@
 import { filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
+import { getPresentationMediaUrl } from "@/lib/media";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getAllPosts,
@@ -39,7 +40,7 @@ function AuthorCard({ contributor, storyCount, showDescription }: { contributor:
     <article className="author-card">
       <a className="author-card-link" href={getContributorHref(contributor)}>
         {photo ? (
-          <img className="author-avatar" src={photo.url} alt={photo.alt || ""} width={photo.width ?? 96} height={photo.height ?? 96} />
+          <img className="author-avatar" src={getPresentationMediaUrl(photo.url)} alt={photo.alt || contributor.name} width={photo.width ?? 96} height={photo.height ?? 96} />
         ) : (
           <div className="author-avatar author-avatar-fallback" aria-hidden="true">
             {contributor.name.slice(0, 1)}
