@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "@/src/layouts/BaseLayout.astro";
-import Page, { metadata } from "@/views/coverage/page";
+import Page, { getMetadata } from "@/views/coverage/page";
+const metadata = await getMetadata();
 ---
 <BaseLayout metadata={metadata}><Page /></BaseLayout>
