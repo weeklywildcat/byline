@@ -25,6 +25,21 @@ describe("diversity and inclusion page", () => {
     levels.slice(1).forEach((level, index) => expect(level - levels[index]).toBeLessThanOrEqual(1));
   });
 
+  it("opens on a fullscreen hero with the statement, then the page content", async () => {
+    const document = await render();
+    const hero = document.querySelector(".di-hero")!;
+    const content = document.querySelector(".di-content")!;
+
+    expect(hero.querySelector("h1")).not.toBeNull();
+    expect(hero.querySelector(".di-hero-statement")!.textContent).toContain("represented accurately, fairly and fully");
+    expect(hero.querySelector("img.di-hero-image")!.getAttribute("alt")).toBe("");
+    expect(hero.querySelector('a[href="#di-content"]')).not.toBeNull();
+    expect(content.id).toBe("di-content");
+    expect(hero.compareDocumentPosition(content) & 4).toBeTruthy();
+    expect(content.querySelector("#di-reporting-heading")).not.toBeNull();
+    expect(content.querySelector("h1")).toBeNull();
+  });
+
   it("links the four related pages as whole-card links with icons", async () => {
     const document = await render();
     const cards = [...document.querySelectorAll(".about-explore-grid a")];
