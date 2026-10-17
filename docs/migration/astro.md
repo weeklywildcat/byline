@@ -157,7 +157,13 @@ not participate in cold-build correctness today.
 - Broken local image or stylesheet: the asset verifier prints both the page and
   unresolved path. Check `out/_byline/media-manifest.json` for download status.
 - SEO mismatch: recapture the candidate and run `compare-seo-parity.mjs`; it
-  reports the route and field.
+  reports the route and field. The Next baseline is a historical snapshot and
+  intentionally differs from the live site in places where matching it would
+  preserve a bug: `article:published_time`/`modified_time` are now timezone-aware
+  ISO timestamps, `article:author` is a profile URL, social image URLs are
+  absolute, the homepage title names the publication, and section descriptions
+  are no longer placeholders. `scripts/verify-seo.mjs` (run by `postbuild`) is the
+  current contract.
 - Slow or failed CMS input: inspect `out/_byline/build-metrics.json`. Snapshot
   timings are split into posts, contributors, categories, tags, corrections,
   pages, sports, media materialization, indexing, digest generation, and route
