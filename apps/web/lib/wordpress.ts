@@ -100,7 +100,6 @@ export type WordPressContributor = WordPressAuthor | WordPressGuestContributor;
 export type WordPressAuthorProfile = {
   pronouns: string;
   role: string;
-  founder: boolean;
   showInDirectory?: boolean;
   profilePhoto?: {
     id: number;

@@ -87,7 +87,6 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .author-avatar-fallback { align-items: center; color: var(--accent-dark); display: flex; font-family: var(--font-ui); font-size: 1.55rem; font-weight: 800; justify-content: center; text-transform: uppercase; }
 .byline-article-view .author-profile-meta { align-items: center; display: flex; gap: 8px; }
 .byline-article-view .profile-kicker { color: var(--accent); font-family: var(--font-ui); font-size: .76rem; font-weight: 800; margin: 0 0 5px; text-transform: uppercase; }
-.byline-article-view .author-badge { color: var(--accent); font-family: var(--font-ui); font-size: .68rem; font-weight: 800; text-transform: uppercase; }
 .byline-article-view .story-excerpt { color: var(--muted); font-family: var(--font-serif); font-size: 1rem; line-height: 1.52; }
 .byline-article-view .story-excerpt p { margin: 10px 0 0; }
 @media (max-width: 900px) {

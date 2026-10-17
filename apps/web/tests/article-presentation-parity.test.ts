@@ -33,7 +33,6 @@ const author: WordPressAuthor = {
   bylineProfile: {
     pronouns: "",
     role: "Editor",
-    founder: true,
     profilePhoto: { id: 600, url: "/uploads/alex.jpg", alt: "Alex", width: 132, height: 132 },
     socials: { website: "", email: "alex@example.test", instagram: "", tiktok: "", linkedin: "", x: "" }
   }
@@ -172,7 +171,6 @@ describe("public article presentation parity fixture", () => {
       name: value.name,
       role: value.role,
       bio: value.bio,
-      founder: value.founder,
       contactHref: value.contactHref ?? "",
       photo: value.photo ? { path: new URL(value.photo.src, "https://example.test").pathname, alt: value.photo.alt } : null,
       coverage: value.coverage?.map((area) => area.label) ?? []

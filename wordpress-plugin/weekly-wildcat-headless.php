@@ -2210,15 +2210,6 @@ function wwh_render_author_profile_fields(WP_User $user): void
             </td>
         </tr>
         <tr>
-            <th>Founder Badge</th>
-            <td>
-                <label>
-                    <input type="checkbox" name="ww_author_founder" value="1" <?php checked(wwh_author_meta_value($user->ID, '_ww_author_founder'), '1'); ?>>
-                    Show Founder badge on this author profile
-                </label>
-            </td>
-        </tr>
-        <tr>
             <th>Author Directory</th>
             <td>
                 <label>
@@ -2256,7 +2247,6 @@ function wwh_save_author_profile_fields(int $user_id): void
 
     wwh_update_user_meta($user_id, '_ww_author_role', wwh_request_value('ww_author_role'));
     wwh_update_user_meta($user_id, '_ww_author_pronouns', wwh_request_value('ww_author_pronouns'));
-    wwh_update_user_meta($user_id, '_ww_author_founder', isset($_POST['ww_author_founder']) ? '1' : '');
     update_user_meta($user_id, '_ww_author_show_in_directory', isset($_POST['ww_author_show_in_directory']) ? '1' : '0');
 
     $photo_id = isset($_POST['ww_author_photo_id']) ? absint($_POST['ww_author_photo_id']) : 0;
@@ -2559,7 +2549,6 @@ function wwh_rest_author_profile(array $user): array
     return [
         'pronouns' => wwh_author_meta_value($user_id, '_ww_author_pronouns'),
         'role' => wwh_author_meta_value($user_id, '_ww_author_role'),
-        'founder' => wwh_author_meta_value($user_id, '_ww_author_founder') === '1',
         'showInDirectory' => wwh_author_visible_in_directory($user_id),
         'profilePhoto' => wwh_author_profile_photo($photo_id),
         'socials' => $socials,

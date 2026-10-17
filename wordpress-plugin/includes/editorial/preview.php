@@ -172,7 +172,6 @@ function byline_editorial_preview_author_profile(int $user_id): array
 
     return [
         'role' => function_exists('get_user_meta') ? (string) get_user_meta($user_id, '_ww_author_role', true) : '',
-        'founder' => function_exists('get_user_meta') && (string) get_user_meta($user_id, '_ww_author_founder', true) === '1',
         'profilePhoto' => [],
         'socials' => [],
     ];
@@ -229,7 +228,6 @@ function byline_editorial_preview_contributor(array $contributor, int $index, ar
         'role' => $role,
         'bio' => $bio,
         'photo' => byline_editorial_preview_image($photo_id, '132px', false),
-        'founder' => $type === 'user' && !empty($profile['founder']),
         'contactHref' => $contact,
         'coverage' => $coverage,
     ];

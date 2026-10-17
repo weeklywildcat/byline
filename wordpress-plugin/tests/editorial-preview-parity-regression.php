@@ -338,11 +338,10 @@ $preview_parity['contributors'] = [
 $preview_parity['profiles'] = [
     7 => [
         'role' => 'Editor',
-        'founder' => true,
         'profilePhoto' => ['id' => 600],
         'socials' => ['email' => 'alex@example.test'],
     ],
-    9 => ['role' => 'Writer', 'founder' => false, 'profilePhoto' => [], 'socials' => []],
+    9 => ['role' => 'Writer', 'profilePhoto' => [], 'socials' => []],
 ];
 $preview_parity['corrections'][107] = [
     ['id' => 701, 'type' => 'clarification', 'recordedAt' => '2026-08-28T09:00:00Z', 'text' => 'We clarified the record.'],
@@ -388,7 +387,6 @@ preview_parity_assert($presentation['topics'] === $expected['topics'], 'Preview 
 $contributors = $presentation['contributors'];
 preview_parity_assert(array_column($contributors, 'name') === array_column($expected['contributors'], 'name'), 'Preview changed effective contributor order.');
 preview_parity_assert($contributors[0]['role'] === $expected['contributors'][0]['role'] && $contributors[0]['bio'] === $expected['contributors'][0]['bio'], 'Preview lost the canonical user role or bio.');
-preview_parity_assert($contributors[0]['founder'] === $expected['contributors'][0]['founder'], 'Preview lost the canonical founder flag.');
 preview_parity_assert($contributors[0]['contactHref'] === $expected['contributors'][0]['contactHref'], 'Preview did not project the canonical user contact link.');
 preview_parity_assert($contributors[1]['contactHref'] === $expected['contributors'][1]['contactHref'], 'Preview exposed a private guest email link.');
 preview_parity_assert(array_column($contributors[0]['coverage'], 'label') === $expected['contributors'][0]['coverage'], 'Preview coverage areas did not use the public count/order rule.');
@@ -403,7 +401,6 @@ $normalized_contributors = array_map(static function (array $contributor): array
         'name' => (string) ($contributor['name'] ?? ''),
         'role' => (string) ($contributor['role'] ?? ''),
         'bio' => (string) ($contributor['bio'] ?? ''),
-        'founder' => (bool) ($contributor['founder'] ?? false),
         'contactHref' => (string) ($contributor['contactHref'] ?? ''),
         'photo' => $photo === [] ? null : [
             'path' => is_string($path) ? $path : '',

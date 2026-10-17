@@ -56,7 +56,7 @@ support revisions through their current native post-type configuration.
 - Sports roster `_ww_roster_team_key`, `_ww_roster_season`, ordered players,
   and ordered staff.
 - School event type, start/end/all-day, location, description, URL, and status.
-- Author role, pronouns, profile photo, founder/directory flags, social fields,
+- Author role, pronouns, profile photo, directory flag, social fields,
   and Discord/Google linkage metadata.
 - Post `weekly_wildcat_primary_game_id`, Byline editorial workflow metadata
   (see `docs/editorial-workflow.md`), and Discord link metadata. The retired

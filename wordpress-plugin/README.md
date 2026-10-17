@@ -46,7 +46,7 @@ dependency extraction. It does not ship a second React runtime.
 - Capability-protected editorial endpoint: `/wp-json/byline/v1/editorial/stories/{id}`
 - Editorial workflow in the post editor, the classic editor, and the Posts list
 - WordPress user profile fields for author profiles:
-  - role, pronouns, Media Library profile photo, Founder badge, author directory visibility, and social links
+  - role, pronouns, Media Library profile photo, author directory visibility, and social links
 
 The plugin does not render anything on the WordPress frontend. Editing stays inside the normal WordPress admin.
 

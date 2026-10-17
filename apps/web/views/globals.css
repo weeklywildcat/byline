@@ -2443,66 +2443,6 @@ html {
   margin: 0;
 }
 
-.author-badge-wrap {
-  display: inline-flex;
-  outline: none;
-  position: relative;
-}
-
-.author-badge {
-  align-items: center;
-  border: 1px solid var(--accent);
-  color: var(--accent-dark);
-  cursor: help;
-  display: inline-flex;
-  font-family: var(--font-ui);
-  font-size: 0.64rem;
-  font-weight: 800;
-  gap: 4px;
-  line-height: 1;
-  padding: 4px 6px;
-  text-transform: uppercase;
-}
-
-.author-badge-star {
-  color: var(--accent);
-  flex: 0 0 auto;
-  height: 11px;
-  line-height: 1;
-  width: 11px;
-}
-
-.author-badge-tooltip {
-  background: #171a21;
-  color: #ffffff;
-  font-family: var(--font-body);
-  font-size: 0.76rem;
-  font-weight: 600;
-  left: 0;
-  line-height: 1.25;
-  opacity: 0;
-  padding: 8px 9px;
-  pointer-events: none;
-  position: absolute;
-  top: calc(100% + 7px);
-  transform: translateY(-2px);
-  transition: opacity 140ms ease, transform 140ms ease;
-  width: min(240px, 80vw);
-  z-index: 20;
-}
-
-.author-badge-wrap:hover .author-badge-tooltip,
-.author-badge-wrap:focus .author-badge-tooltip,
-.author-badge-wrap:focus-within .author-badge-tooltip {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.author-badge-wrap:focus .author-badge {
-  outline: 2px solid rgba(177, 31, 36, 0.24);
-  outline-offset: 2px;
-}
-
 .author-profile h1 {
   font-family: var(--font-display);
   font-size: 3.4rem;
@@ -2645,12 +2585,6 @@ html {
   flex-wrap: wrap;
   gap: 4px 8px;
   margin-top: 4px;
-}
-
-.author-card-meta .author-badge {
-  color: var(--accent-dark);
-  font-size: 0.6rem;
-  padding: 3px 5px;
 }
 
 .author-card p {
@@ -5142,12 +5076,6 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
   .author-card .author-avatar {
     height: 58px;
     width: 58px;
-  }
-
-  .author-card .author-badge-tooltip {
-    left: auto;
-    right: 0;
-    width: min(240px, calc(100vw - 32px));
   }
 
   .static-page-shell {
