@@ -400,20 +400,11 @@ export function getArticleImageCandidates(image: WordPressMedia): ImageCandidate
 }
 
 function getArticleImageSchema(image: WordPressMedia | null, articleUrl: string) {
+  // The generic social card is appropriate for link previews, but it is not a
+  // photograph of an imageless story. Advertising it as NewsArticle.image makes
+  // search engines associate the same brand artwork with unrelated articles.
   if (!image?.source_url) {
-    return [
-      {
-        "@type": "ImageObject",
-        "@id": `${articleUrl}#primaryimage`,
-        contentUrl: absoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
-        url: absoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
-        width: DEFAULT_SOCIAL_IMAGE_WIDTH ?? undefined,
-        height: DEFAULT_SOCIAL_IMAGE_HEIGHT ?? undefined,
-        copyrightNotice: DEFAULT_IMAGE_COPYRIGHT_NOTICE,
-        license: absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH),
-        acquireLicensePage: absoluteUrl(DEFAULT_IMAGE_LICENSE_PATH)
-      }
-    ];
+    return [];
   }
 
   const imageCredit = image.bylineImage ?? image.weeklyWildcatImage;
@@ -575,7 +566,7 @@ export function getNewsArticleSchema(post: WordPressPost) {
     publisher: getPublisherSchema(),
     articleSection: category ? decodeHtml(category.name) : undefined,
     keywords: keywords?.length ? keywords.join(", ") : undefined,
-    image: imageSchema,
+    image: imageSchema.length > 0 ? imageSchema : undefined,
     primaryImageOfPage: imageSchema[0]?.["@id"] ? { "@id": imageSchema[0]["@id"] } : undefined,
     isAccessibleForFree: true,
     articleBody: articleBody || undefined
