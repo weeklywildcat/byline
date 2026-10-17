@@ -673,9 +673,9 @@ function byline_editorial_preview_presentation(int $post_id): array
     $excerpt = trim(wp_kses_post((string) get_the_excerpt($post)));
     $all_posts = byline_editorial_preview_public_posts();
     $contributors = byline_editorial_preview_story_contributors($post_id);
-    $coverage = byline_editorial_preview_coverage_areas($contributors, $all_posts);
     $contributor_views = [];
     foreach ($contributors as $index => $contributor) {
+        $coverage = byline_editorial_preview_coverage_areas([$contributor], $all_posts);
         $contributor_views[] = byline_editorial_preview_contributor($contributor, (int) $index, $coverage);
     }
 

@@ -133,7 +133,10 @@ const parityPosts: WordPressPost[] = [
     tags: [12],
     _embedded: { author: [author], "wp:term": [[news], [campus]] }
   },
-  post(103, "2026-08-26T09:00:00", "Guest story", sports, [guest]),
+  {
+    ...post(103, "2026-08-26T09:00:00", "Guest story", sports, [guest]),
+    _embedded: { author: [], "wp:term": [[sports], []] }
+  },
   {
     ...post(101, "2026-08-25T09:00:00", "Related one", news, [{ type: "user", id: 7 }]),
     _embedded: { author: [author], "wp:term": [[news], [campus]] },

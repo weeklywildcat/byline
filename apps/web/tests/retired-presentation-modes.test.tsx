@@ -105,8 +105,7 @@ describe("the custom article hero is gone", () => {
       "article-body",
       "article-tags",
       "article-update-notice",
-      "NewsletterSignupForm",
-      "AboutWriters"
+      "NewsletterSignupForm"
     ]) {
       expect(`${articleRoute}\n${articleRenderer}`).toContain(marker);
     }

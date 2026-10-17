@@ -390,7 +390,7 @@ preview_parity_assert($contributors[0]['role'] === $expected['contributors'][0][
 preview_parity_assert($contributors[0]['contactHref'] === $expected['contributors'][0]['contactHref'], 'Preview did not project the canonical user contact link.');
 preview_parity_assert($contributors[1]['contactHref'] === $expected['contributors'][1]['contactHref'], 'Preview exposed a private guest email link.');
 preview_parity_assert(array_column($contributors[0]['coverage'], 'label') === $expected['contributors'][0]['coverage'], 'Preview coverage areas did not use the public count/order rule.');
-preview_parity_assert($contributors[0]['coverage'] === $contributors[1]['coverage'], 'Preview did not apply the same effective coverage areas to every contributor.');
+preview_parity_assert(array_column($contributors[1]['coverage'], 'label') === $expected['contributors'][1]['coverage'], 'Preview coverage areas for a contributor included other contributors\' stories.');
 
 $one_off_view = byline_editorial_preview_contributor(['type' => 'guest', 'id' => 45, 'name' => 'Alex Smith', 'slug' => 'alex-smith', 'role' => 'Photographer', 'hasProfilePage' => false], 0);
 preview_parity_assert($one_off_view['href'] === '', 'Preview linked a one-off guest to a profile page that does not exist.');

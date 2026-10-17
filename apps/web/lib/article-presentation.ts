@@ -173,11 +173,6 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
   const updated = hasArticleUpdatedDate(post) && !hasPublicCorrectionNotice;
   const visiblePosts = indexedVisiblePosts ?? allPosts.filter(isVisibleContentPost);
   const displayContributors = contributors.length > 0 ? contributors : author ? [author] : [];
-  const coverageAreas = getCoverageAreas(
-    displayContributors.length > 0
-      ? visiblePosts.filter((candidate) => displayContributors.some((contributor) => postHasContributor(candidate, contributor)))
-      : []
-  );
   const authorPosts = indexedAuthorPosts ?? (displayContributors.length > 0
     ? visiblePosts.filter((candidate) => displayContributors.some((contributor) => postHasContributor(candidate, contributor)))
     : []);
@@ -198,7 +193,7 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
     contentHtml: post.content.rendered.trim(),
     category: category ? { label: decodeHtml(category.name), href: `/category/${category.slug}/` } : null,
     athleteMeta,
-    contributors: displayContributors.map((contributor) => contributorView(contributor, coverageAreas)),
+    contributors: displayContributors.map((contributor) => contributorView(contributor, getCoverageAreas(visiblePosts.filter((candidate) => postHasContributor(candidate, contributor))))),
     fallbackByline: `${publication.identity.shortName} Staff`,
     publishedAt: post.date,
     publishedLabel: formatDisplayDate(post.date),
