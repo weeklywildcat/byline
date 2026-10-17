@@ -2302,17 +2302,20 @@ function wwh_register_rest_routes(): void
         'schema' => ['description' => 'Byline author profile fields.', 'type' => 'object', 'context' => ['view', 'edit']],
     ]);
 
+    // The static build reads a story's featured image through `_embed`, and WordPress
+    // embeds linked resources with context=embed, so these fields must include it or
+    // the credit silently falls back to the file's EXIF data (the camera owner).
     register_rest_field('attachment', 'weeklyWildcatImage', [
         'get_callback' => 'wwh_rest_image_credit',
         'schema' => [
             'description' => 'Byline image credit and license metadata (legacy field name retained).',
             'type' => 'object',
-            'context' => ['view', 'edit'],
+            'context' => ['view', 'edit', 'embed'],
         ],
     ]);
     register_rest_field('attachment', 'bylineImage', [
         'get_callback' => 'wwh_rest_image_credit',
-        'schema' => ['description' => 'Byline image credit and license metadata.', 'type' => 'object', 'context' => ['view', 'edit']],
+        'schema' => ['description' => 'Byline image credit and license metadata.', 'type' => 'object', 'context' => ['view', 'edit', 'embed']],
     ]);
 
     register_rest_field('post', 'weeklyWildcat', [

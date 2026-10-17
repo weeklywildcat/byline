@@ -97,6 +97,15 @@ foreach (['weeklyWildcatImage', 'bylineImage'] as $field) {
     }
 }
 
+// The static build reads featured images through `_embed`, which requests
+// context=embed. Without it the credit fields vanish and the public site
+// credits the photo to whoever owns the camera (the EXIF copyright).
+if (substr_count((string) $entrypoint, "'context' => ['view', 'edit', 'embed']") < 2
+    || strpos((string) $entrypoint, "'type' => 'object', 'context' => ['view', 'edit', 'embed']") === false) {
+    fwrite(STDERR, "The attachment image credit REST fields must include the embed context.\n");
+    exit(1);
+}
+
 if (!isset($defined['wwh_rest_image_credit'])) {
     fwrite(STDERR, "wwh_rest_image_credit() is missing; /wp/v2/media responses would fatal.\n");
     exit(1);
