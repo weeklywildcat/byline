@@ -1,5 +1,6 @@
 import { InspectorControls, useBlockProps } from "@wordpress/block-editor";
 import { Button, PanelBody, RangeControl, SearchControl, SelectControl, TextControl, ToggleControl } from "@wordpress/components";
+import { useSelect } from "@wordpress/data";
 import { registerBlockType } from "@wordpress/blocks";
 import { __ } from "@wordpress/i18n";
 import { useMemo, useState } from "@wordpress/element";
@@ -28,6 +29,7 @@ const sourceOptions = [
 ];
 
 const layoutOptions = [
+  { label: __("Related Coverage", "weekly-wildcat-headless"), value: "related" },
   { label: __("Grid", "weekly-wildcat-headless"), value: "grid" },
   { label: __("List", "weekly-wildcat-headless"), value: "list" },
   { label: __("Featured + list", "weekly-wildcat-headless"), value: "featured" }
@@ -63,6 +65,8 @@ function StoriesEdit({ attributes, setAttributes }: any) {
   const [termSearch, setTermSearch] = useState("");
   const [authorSearch, setAuthorSearch] = useState("");
   const [manualSearch, setManualSearch] = useState("");
+  const currentId = useSelect((select: any) => Number(select("core/editor")?.getCurrentPostId?.() || 0), []);
+  const maxStories = attributes.layout === "related" ? 3 : 12;
   const source = String(attributes.source || "latest");
   const taxonomy = source === "tag" ? "tags" : "categories";
   const stories = useBylineApi<PreviewStory[]>(postsPath(attributes));
@@ -89,7 +93,7 @@ function StoriesEdit({ attributes, setAttributes }: any) {
 
   function toggleStory(id: number) {
     const next = selectedIds.includes(id) ? selectedIds.filter((selected: number) => selected !== id) : [...selectedIds, id];
-    setAttributes({ postIds: next.slice(0, 12) });
+    setAttributes({ postIds: next.filter((id: number) => attributes.layout !== "related" || id !== currentId).slice(0, maxStories) });
   }
 
   const previewEmpty = source === "manual" && selectedIds.length === 0
@@ -124,21 +128,23 @@ function StoriesEdit({ attributes, setAttributes }: any) {
           <RangeControl
             __nextHasNoMarginBottom
             label={__("Story count", "weekly-wildcat-headless")}
-            value={boundedNumber(attributes.limit, 6, 1, 12)}
+            value={boundedNumber(attributes.limit, 6, 1, maxStories)}
             min={1}
-            max={12}
-            onChange={(limit) => setAttributes({ limit: boundedNumber(limit, 6, 1, 12) })}
+            max={maxStories}
+            onChange={(limit) => setAttributes({ limit: boundedNumber(limit, 6, 1, maxStories) })}
           />
           <SelectControl
             __nextHasNoMarginBottom
             label={__("Layout", "weekly-wildcat-headless")}
             value={attributes.layout || "grid"}
             options={layoutOptions}
-            onChange={(layout: string) => setAttributes({ layout })}
+            onChange={(layout: string) => setAttributes({ layout, ...(layout === "related" ? { limit: 3, showExcerpt: false, showByline: false } : {}) })}
           />
           <ToggleControl __nextHasNoMarginBottom label={__("Show images", "weekly-wildcat-headless")} checked={attributes.showImage !== false} onChange={(showImage) => setAttributes({ showImage })} />
+          {attributes.layout !== "related" ? <>
           <ToggleControl __nextHasNoMarginBottom label={__("Show excerpts", "weekly-wildcat-headless")} checked={Boolean(attributes.showExcerpt)} onChange={(showExcerpt) => setAttributes({ showExcerpt })} />
           <ToggleControl __nextHasNoMarginBottom label={__("Show bylines", "weekly-wildcat-headless")} checked={attributes.showByline !== false} onChange={(showByline) => setAttributes({ showByline })} />
+          </> : null}
           <ToggleControl __nextHasNoMarginBottom label={__("Show dates", "weekly-wildcat-headless")} checked={attributes.showDate !== false} onChange={(showDate) => setAttributes({ showDate })} />
         </PanelBody>
         {source === "category" || source === "tag" ? (
@@ -166,7 +172,7 @@ function StoriesEdit({ attributes, setAttributes }: any) {
         {source === "manual" ? (
           <PanelBody title={__("Choose stories", "weekly-wildcat-headless")} initialOpen>
             <SearchControl value={manualSearch} onChange={setManualSearch} placeholder={__("Search published stories…", "weekly-wildcat-headless")} />
-            {(manualStories.data || []).map((story) => (
+            {(manualStories.data || []).filter((story) => attributes.layout !== "related" || story.id !== currentId).map((story) => (
               <Button key={story.id} variant={selectedIds.includes(story.id) ? "primary" : "secondary"} onClick={() => toggleStory(story.id)}>
                 <span dangerouslySetInnerHTML={{ __html: story.title?.rendered || __("Untitled story", "weekly-wildcat-headless") }} />
               </Button>
@@ -179,15 +185,15 @@ function StoriesEdit({ attributes, setAttributes }: any) {
         <PreviewFrame label={__("Stories preview", "weekly-wildcat-headless")} isLoading={stories.isLoading} error={stories.error} empty={previewEmpty}>
           <div className={`byline-newsroom-stories byline-newsroom-stories-layout-${attributes.layout || "grid"}`}>
             <h2>{attributes.heading || __("Stories", "weekly-wildcat-headless")}</h2>
-            <div className={attributes.layout === "list" ? "byline-newsroom-stories-list" : attributes.layout === "featured" ? "byline-newsroom-stories-featured-list" : "byline-newsroom-stories-grid"}>
-              {(stories.data || []).map((story, index) => (
+            <div className={attributes.layout === "related" ? "byline-newsroom-stories-related" : attributes.layout === "list" ? "byline-newsroom-stories-list" : attributes.layout === "featured" ? "byline-newsroom-stories-featured-list" : "byline-newsroom-stories-grid"}>
+              {(stories.data || []).filter((story) => attributes.layout !== "related" || story.id !== currentId).slice(0, boundedNumber(attributes.limit, 6, 1, maxStories)).map((story, index) => (
                 <StoryPreviewCard
                   key={story.id}
                   story={story}
-                  variant={attributes.layout === "featured" && index === 0 ? "lead" : attributes.layout === "list" ? "list" : "standard"}
+                  variant={attributes.layout === "related" ? "related" : attributes.layout === "featured" && index === 0 ? "lead" : attributes.layout === "list" ? "list" : "standard"}
                   showImage={attributes.showImage !== false}
-                  showExcerpt={Boolean(attributes.showExcerpt)}
-                  showByline={attributes.showByline !== false}
+                  showExcerpt={attributes.layout !== "related" && Boolean(attributes.showExcerpt)}
+                  showByline={attributes.layout !== "related" && attributes.showByline !== false}
                   showDate={attributes.showDate !== false}
                 />
               ))}

@@ -9,6 +9,7 @@
 .wrangler/
 out/
 apps/web/test-results/
+wordpress-plugin/test-results/
 node_modules/
 wordpress/
 public/_wordpress-media/

@@ -15,6 +15,8 @@
  */
 
 .editor-styles-wrapper {
+  container: byline-content / inline-size;
+  padding-inline: 20px;
   background: var(--page);
   color: var(--ink);
 }

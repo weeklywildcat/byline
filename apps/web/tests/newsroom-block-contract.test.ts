@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-const blockNames = ["stories", "people", "sports-schedule", "events", "poll", "game-score", "correction-notice"];
+const blockNames = ["stories", "people", "sports-schedule", "events", "poll", "game-score", "correction-notice", "timeline"];
 
 async function readPlugin(path: string) {
   return readFile(new URL(`../../../wordpress-plugin/${path}`, import.meta.url), "utf8");

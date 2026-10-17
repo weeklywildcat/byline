@@ -313,12 +313,12 @@ function newsroom_assert_no_nested_anchors(string $html, string $message): void
 }
 
 byline_newsroom_register_block_types();
-newsroom_assert(count($newsroom_test['blocks']) === 7, 'All seven newsroom blocks should be registered.');
-newsroom_assert(count(array_filter(array_keys($newsroom_test['blocks']), static fn(string $path): bool => strpos($path, '/blocks/') !== false)) === 7, 'Newsroom block registration should be metadata-driven.');
+newsroom_assert(count($newsroom_test['blocks']) === 8, 'All eight newsroom blocks should be registered.');
+newsroom_assert(count(array_filter(array_keys($newsroom_test['blocks']), static fn(string $path): bool => strpos($path, '/blocks/') !== false)) === 8, 'Newsroom block registration should be metadata-driven.');
 
 byline_newsroom_register_core_styles();
 $style_names = array_merge(...array_values($newsroom_test['styles']));
-foreach (['byline-editorial-callout', 'byline-soft-callout', 'byline-rule-top', 'byline-primary', 'byline-outline', 'byline-text-link', 'byline-standard-cta', 'byline-compact', 'byline-editorial-quote', 'byline-source-quote', 'byline-feature-quote', 'byline-editorial-rule', 'byline-heavy-rule', 'byline-faq', 'byline-editorial', 'byline-feature', 'byline-news-grid', 'byline-feature-grid', 'byline-resource-list', 'byline-link-list'] as $name) {
+foreach (['byline-editorial-callout', 'byline-soft-callout', 'byline-rule-top', 'byline-primary', 'byline-outline', 'byline-text-link', 'byline-standard-cta', 'byline-compact', 'byline-editorial-quote', 'byline-source-quote', 'byline-feature-quote', 'byline-editorial-rule', 'byline-heavy-rule', 'byline-faq', 'byline-editorial', 'byline-feature', 'byline-news-grid', 'byline-feature-grid', 'byline-resource-list', 'byline-link-list', 'byline-key-facts', 'byline-photo-essay', 'byline-portrait-text', 'byline-photo-pair', 'byline-photo-gallery', 'byline-document', 'byline-story-audio', 'byline-story-video'] as $name) {
     newsroom_assert(in_array($name, array_column($style_names, 'name'), true), "Missing reusable Core style {$name}.");
 }
 
@@ -332,7 +332,7 @@ newsroom_assert(isset($newsroom_test['routes']['byline/v1/editor/polls']), 'The 
 newsroom_assert($newsroom_test['routes']['byline/v1/editor/polls']['permission_callback']() === true, 'The editor poll picker route should be capability-protected.');
 
 byline_newsroom_register_patterns();
-foreach (['byline/information-page', 'byline/about-mission-page', 'byline/policy-standards-page', 'byline/join-recruiting-page', 'byline/contact-feedback-page', 'byline/leadership-page', 'byline/staff-directory', 'byline/special-coverage', 'byline/event-campaign', 'byline/photo-led-page', 'byline/resource-page', 'byline/faq-page', 'byline/two-column-image-text', 'byline/featured-cta', 'byline/fact-box', 'byline/key-numbers', 'byline/quote-callout', 'byline/related-resources', 'byline/corrections-feedback-cta', 'byline/correction-notice'] as $name) {
+foreach (['byline/information-page', 'byline/about-mission-page', 'byline/policy-standards-page', 'byline/join-recruiting-page', 'byline/contact-feedback-page', 'byline/leadership-page', 'byline/staff-directory', 'byline/special-coverage', 'byline/event-campaign', 'byline/photo-led-page', 'byline/resource-page', 'byline/faq-page', 'byline/two-column-image-text', 'byline/featured-cta', 'byline/fact-box', 'byline/key-numbers', 'byline/quote-callout', 'byline/related-resources', 'byline/corrections-feedback-cta', 'byline/correction-notice', 'byline/photo-essay', 'byline/fact-box-post', 'byline/quote-callout-post'] as $name) {
     newsroom_assert(isset($newsroom_test['patterns'][$name]), "Missing newsroom pattern {$name}.");
 }
 foreach ($newsroom_test['patterns'] as $name => $pattern) {
@@ -384,6 +384,24 @@ $stories = byline_newsroom_render_stories(['source' => 'manual', 'postIds' => [1
 newsroom_assert(strpos($stories, 'Second Story') !== false && strpos($stories, 'First Story') !== false, 'Stories should render selected published posts.');
 newsroom_assert(strpos($stories, 'Draft Story') === false, 'Stories must never render draft posts.');
 newsroom_assert(strpos($stories, 'story-teaser-list') !== false, 'Stories should render the requested list layout.');
+
+newsroom_assert(isset($newsroom_test['blocks'][dirname(__DIR__) . '/build/blocks/timeline']), 'Timeline must register from its metadata.');
+$essay = $newsroom_test['patterns']['byline/photo-essay']['content'];
+newsroom_assert(substr_count($essay, '<!-- wp:image') === 3 && substr_count($essay, '<!-- wp:paragraph') === 2, 'Photo Essay must contain editable native images and paragraphs.');
+newsroom_assert(strpos($essay, 'wp-block-group alignwide is-style-byline-photo-essay') !== false && strpos($essay, 'templateLock') === false, 'Photo Essay must use a wide, unlocked group.');
+$related = byline_newsroom_render_stories(['source' => 'manual', 'postIds' => [101, 103, 102], 'limit' => 12, 'layout' => 'related', 'showExcerpt' => true, 'showByline' => true]);
+newsroom_assert(strpos($related, 'byline-newsroom-stories-related') !== false && strpos($related, 'Second Story') !== false, 'Related layout should use the existing public stories renderer.');
+newsroom_assert(strpos($related, 'First Story') === false && strpos($related, 'Draft Story') === false, 'Inline related coverage excludes the current story and unpublished stories.');
+newsroom_assert(strpos($related, 'story-excerpt') === false && strpos($related, 'Alex Reporter') === false, 'Related coverage should remain compact.');
+for ($i = 0; $i < 5; $i++) {
+    $newsroom_test['posts'][] = new WP_Post(['ID' => 8000 + $i, 'post_type' => 'post', 'post_status' => 'publish', 'post_author' => 0, 'post_name' => 'related-' . $i, 'post_title' => 'Related ' . $i, 'post_date' => '2026-08-20', 'post_date_gmt' => '2026-08-20']);
+}
+$newsroom_test['posts'][] = new WP_Post(['ID' => 8098, 'post_type' => 'post', 'post_status' => 'private', 'post_title' => 'Private coverage']);
+$newsroom_test['posts'][] = new WP_Post(['ID' => 8099, 'post_type' => 'post', 'post_status' => 'publish', 'post_password' => 'secret', 'post_title' => 'Protected coverage']);
+$related = byline_newsroom_render_stories(['source' => 'manual', 'postIds' => [8000, 8001, 8002, 8003, 8004], 'limit' => 99, 'layout' => 'related']);
+newsroom_assert(substr_count($related, '<article ') === 3, 'Related coverage is capped at three server-side.');
+$related = byline_newsroom_render_stories(['source' => 'manual', 'postIds' => [8098, 8099], 'layout' => 'related']);
+newsroom_assert(strpos($related, 'Private coverage') === false && strpos($related, 'Protected coverage') === false, 'Related coverage rejects private and password-protected content.');
 
 $people = byline_newsroom_render_people(['source' => 'all', 'roleFilter' => 'editor', 'layout' => 'portrait-grid']);
 newsroom_assert(strpos($people, 'Sam Editor') === false && strpos($people, 'Alex Reporter') !== false, 'People should filter against canonical public profile roles.');

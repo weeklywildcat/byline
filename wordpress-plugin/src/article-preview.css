@@ -6,9 +6,13 @@
 .byline-preview-viewport-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .byline-preview-device { background: #fff; border: 1px solid #8c8f94; box-shadow: 0 10px 28px rgb(0 0 0 / .12); margin: 0 auto; width: 100%; }
 .byline-preview-device-label { background: #1d2327; color: #fff; font-size: 11px; letter-spacing: .04em; padding: 6px 10px; text-transform: uppercase; }
-.byline-preview-frame { border: 0; display: block; width: 100%; }
+.byline-preview-viewport { overflow: hidden; }
+.byline-preview-frame { border: 0; display: block; max-width: none; transform-origin: top left; }
 @media (max-width: 760px) {
   .byline-preview-app { padding: 10px; }
   .byline-preview-toolbar { align-items: flex-start; flex-direction: column; }
   .byline-preview-viewport-buttons { justify-content: flex-start; }
 }
+
+/* Embedded reader actions stay disabled in the authenticated layout preview. */
+.byline-preview-article .article-body iframe { pointer-events: none; }

@@ -1,0 +1,403 @@
+[
+  {
+    "name": "core/media-text",
+    "attributes": {
+      "className": "is-style-byline-portrait-text",
+      "align": "wide",
+      "mediaWidth": 40,
+      "mediaPosition": "left",
+      "mediaUrl": "/test-assets/portrait.svg",
+      "mediaType": "image",
+      "mediaAlt": "A portrait from the newsroom",
+      "imageFill": false,
+      "isStackedOnMobile": true
+    },
+    "innerBlocks": [
+      {
+        "name": "core/heading",
+        "attributes": {
+          "level": 3,
+          "content": "Behind the reporting"
+        }
+      },
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "Meet the people documenting our community. This passage stays readable beside a portrait and stacks beneath it on a phone."
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/gallery",
+    "attributes": {
+      "className": "is-style-byline-photo-pair",
+      "align": "wide",
+      "columns": 2,
+      "imageCrop": false,
+      "randomOrder": false,
+      "linkTo": "media"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/portrait.svg",
+          "alt": "Portrait composition",
+          "caption": "A photograph from the field. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/portrait.svg",
+          "sizeSlug": "large"
+        }
+      },
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/landscape.svg",
+          "alt": "Landscape composition",
+          "caption": "A photograph from the field. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/landscape.svg",
+          "sizeSlug": "large"
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/gallery",
+    "attributes": {
+      "className": "is-style-byline-photo-gallery",
+      "align": "wide",
+      "columns": 3,
+      "imageCrop": false,
+      "randomOrder": false,
+      "linkTo": "media"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/portrait.svg",
+          "alt": "Portrait composition",
+          "caption": "A portrait, with a caption that remains readable on narrow screens. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/portrait.svg",
+          "sizeSlug": "large"
+        }
+      },
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/landscape.svg",
+          "alt": "Landscape composition",
+          "caption": "A photograph from the field. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/landscape.svg",
+          "sizeSlug": "large"
+        }
+      },
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/landscape.svg",
+          "alt": "Landscape composition",
+          "caption": "A photograph from the field. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/landscape.svg",
+          "sizeSlug": "large"
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/gallery",
+    "attributes": {
+      "className": "is-style-byline-news-grid",
+      "align": "wide",
+      "columns": 3,
+      "imageCrop": false,
+      "randomOrder": false,
+      "linkTo": "media"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/portrait.svg",
+          "alt": "Portrait composition",
+          "caption": "A portrait, with a caption that remains readable on narrow screens. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/portrait.svg",
+          "sizeSlug": "large"
+        }
+      },
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/landscape.svg",
+          "alt": "Landscape composition",
+          "caption": "A photograph from the field. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/landscape.svg",
+          "sizeSlug": "large"
+        }
+      },
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/landscape.svg",
+          "alt": "Landscape composition",
+          "caption": "A photograph from the field. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/landscape.svg",
+          "sizeSlug": "large"
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/gallery",
+    "attributes": {
+      "className": "is-style-byline-feature-grid",
+      "align": "wide",
+      "columns": 3,
+      "imageCrop": false,
+      "randomOrder": false,
+      "linkTo": "media"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/portrait.svg",
+          "alt": "Portrait composition",
+          "caption": "A portrait, with a caption that remains readable on narrow screens. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/portrait.svg",
+          "sizeSlug": "large"
+        }
+      },
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/landscape.svg",
+          "alt": "Landscape composition",
+          "caption": "A photograph from the field. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/landscape.svg",
+          "sizeSlug": "large"
+        }
+      },
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/landscape.svg",
+          "alt": "Landscape composition",
+          "caption": "A photograph from the field. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/landscape.svg",
+          "sizeSlug": "large"
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/quote",
+    "attributes": {
+      "className": "is-style-byline-source-quote",
+      "citation": "A reported source"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "The reporting begins with listening."
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/pullquote",
+    "attributes": {
+      "className": "is-style-byline-feature-quote",
+      "value": "Every photograph adds another piece of the story.",
+      "citation": "Staff photographer"
+    }
+  },
+  {
+    "name": "core/group",
+    "attributes": {
+      "className": "is-style-byline-key-facts"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/heading",
+        "attributes": {
+          "level": 3,
+          "content": "Key facts"
+        }
+      },
+      {
+        "name": "core/list",
+        "attributes": {},
+        "innerBlocks": [
+          {
+            "name": "core/list-item",
+            "attributes": {
+              "content": "The first verified fact."
+            }
+          },
+          {
+            "name": "core/list-item",
+            "attributes": {
+              "content": "The second fact includes <a href=\"/about/\">a source</a>."
+            }
+          },
+          {
+            "name": "core/list-item",
+            "attributes": {
+              "content": "The reporting continues."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "byline/timeline",
+    "attributes": {}
+  },
+  {
+    "name": "core/file",
+    "attributes": {
+      "className": "is-style-byline-document",
+      "href": "/test-assets/document.pdf",
+      "fileName": "Public meeting records",
+      "fileId": "presentation-document",
+      "textLinkHref": "/test-assets/document.pdf",
+      "displayPreview": true,
+      "previewHeight": 640,
+      "showDownloadButton": true,
+      "downloadButtonText": "Download"
+    }
+  },
+  {
+    "name": "core/file",
+    "attributes": {
+      "className": "is-style-byline-document",
+      "href": "/test-assets/records.csv",
+      "fileName": "Plain text records",
+      "fileId": "presentation-text",
+      "textLinkHref": "/test-assets/records.csv",
+      "displayPreview": false,
+      "showDownloadButton": true,
+      "downloadButtonText": "Download"
+    }
+  },
+  {
+    "name": "byline/stories",
+    "attributes": {
+      "heading": "Related coverage",
+      "source": "manual",
+      "layout": "related",
+      "postIds": [],
+      "limit": 3,
+      "showImage": true,
+      "showExcerpt": false,
+      "showByline": false,
+      "showDate": false
+    }
+  },
+  {
+    "name": "core/audio",
+    "attributes": {
+      "className": "is-style-byline-story-audio",
+      "src": "/test-assets/audio.wav",
+      "caption": "Listen to the reporting.",
+      "autoplay": false,
+      "loop": false,
+      "preload": "metadata"
+    }
+  },
+  {
+    "name": "core/video",
+    "attributes": {
+      "className": "is-style-byline-story-video",
+      "src": "/test-assets/portrait.mp4",
+      "caption": "A vertical report from the scene.",
+      "controls": true,
+      "autoplay": false,
+      "loop": false,
+      "preload": "metadata",
+      "playsInline": true,
+      "tracks": [
+        {
+          "src": "/test-assets/captions.vtt",
+          "kind": "captions",
+          "srcLang": "en",
+          "label": "English"
+        }
+      ]
+    }
+  },
+  {
+    "name": "core/html",
+    "attributes": {
+      "content": "<figure class=\"wp-block-embed is-type-video wp-embed-aspect-16-9 wp-has-aspect-ratio\"><div class=\"wp-block-embed__wrapper\"><iframe title=\"Embedded report\" src=\"/test-assets/embed.svg\" width=\"560\" height=\"315\"></iframe></div><figcaption>Responsive external video</figcaption></figure>"
+    }
+  },
+  {
+    "name": "core/group",
+    "attributes": {
+      "className": "is-style-byline-photo-essay",
+      "align": "wide"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/landscape.svg",
+          "alt": "Landscape composition",
+          "caption": "A photograph from the field. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/landscape.svg",
+          "sizeSlug": "large"
+        }
+      },
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "A short passage carries the visual narrative forward."
+        }
+      },
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/portrait.svg",
+          "alt": "Portrait composition",
+          "caption": "A photograph from the field. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/portrait.svg",
+          "sizeSlug": "large"
+        }
+      },
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "The story returns to its setting."
+        }
+      },
+      {
+        "name": "core/image",
+        "attributes": {
+          "url": "/test-assets/landscape.svg",
+          "alt": "Landscape composition",
+          "caption": "A photograph from the field. Photo: Staff",
+          "linkDestination": "media",
+          "href": "/test-assets/landscape.svg",
+          "sizeSlug": "large"
+        }
+      }
+    ]
+  }
+]

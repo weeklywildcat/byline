@@ -1,5 +1,5 @@
 /* Shared article presentation styles. Hosts provide theme variables. */
-.byline-article-view { margin: 0 auto; max-width: 1040px; padding: 38px 20px 72px; }
+.byline-article-view.article-shell { margin: 0 auto; max-width: 1080px; container: byline-content / inline-size; padding: 38px 20px 72px; }
 .byline-article-view .article-story { margin: 0 auto; max-width: var(--article-width, 760px); }
 .byline-article-view .article-header { border-bottom: 1px solid var(--rule); margin-bottom: 24px; padding-bottom: 20px; }
 .byline-article-view .article-section-label { color: var(--accent); display: inline-flex; font-family: var(--font-ui); font-size: .78rem; font-weight: 700; text-transform: uppercase; }
@@ -53,7 +53,7 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .article-body .wp-block-pullquote blockquote { border-left: 0; margin-bottom: 0; padding-left: 0; }
 .byline-article-view .article-body .wp-block-image img, .byline-article-view .article-body figure img { border: 1px solid var(--rule); }
 .byline-article-view .article-body .wp-block-embed__wrapper { width: 100%; }
-.byline-article-view .article-body iframe, .byline-article-view .article-body video { aspect-ratio: 16 / 9; max-width: 100%; width: 100%; }
+.byline-article-view .article-body iframe, .byline-article-view .article-body video { max-width: 100%; }
 .byline-article-view .article-tags { border-top: 1px solid var(--rule); margin-top: 36px; padding-top: 16px; }
 .byline-article-view .article-tags h2, .byline-article-view .article-update-notice h2 { color: var(--soft-muted); font-family: var(--font-ui); font-size: .72rem; font-weight: 800; margin: 0 0 10px; text-transform: uppercase; }
 .byline-article-view .article-tags span { border: 1px solid var(--rule); color: var(--muted); font-family: var(--font-ui); font-size: .72rem; font-weight: 800; padding: 7px 9px; text-transform: uppercase; }

@@ -19,3 +19,12 @@ It stays in step through three things rather than copies:
 - **Typography:** `scripts/verify-editor-canvas-contract.mjs` (part of `npm run verify:contracts`) compares the editor's sizes, spacing and weights with `packages/ui/article.css`. When article typography changes it fails and names the rule to update in `editor-canvas.css`.
 
 `includes/content/editor-canvas.php` loads it for the block editor on Posts only. The byline row, dates and share icons are not blocks, so they appear in the Article Preview screen, not on the canvas.
+
+## Authored story blocks
+
+`packages/ui/src/newsroom-blocks.css` owns the minimal Core markup compatibility
+and semantic newsroom presentation shared by Astro, Gutenberg, and Preview as
+Byline. It is emitted by the existing block asset pipeline and imported directly
+by the authenticated preview entry. The article shell establishes a 1040px wide
+content container around the 760px prose measure; the editor establishes the
+same container contract. See `newsroom-blocks.md` for presets and breakpoints.
