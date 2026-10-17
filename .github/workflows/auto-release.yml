@@ -1,0 +1,83 @@
+name: Automatic Plugin Release
+
+# When a merge to main changes anything that ships in the plugin ZIP, bump the
+# patch version, write the readme.txt release notes from the merged pull request
+# titles, and publish through release-plugin.yml, which validates the release
+# before it creates the tag. Merges that only touch
+# the public site, docs, or CI never produce a plugin release.
+#
+# A version bumped by hand in a pull request (a minor or major release, or a
+# hand-written changelog) is released as written, without a second bump.
+# scripts/prepare-release.mjs makes that decision.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "wordpress-plugin/**"
+      - "packages/**"
+      - "schemas/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# One release at a time, and never cancel one halfway through its bump.
+concurrency:
+  group: automatic-plugin-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Decide and tag
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.prepare.outputs.release }}
+      tag: ${{ steps.prepare.outputs.tag }}
+      sha: ${{ steps.commit.outputs.sha }}
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Prepare the release
+        id: prepare
+        run: node scripts/prepare-release.mjs
+
+      - name: Commit the version bump
+        if: steps.prepare.outputs.release == 'true' && steps.prepare.outputs.bumped == 'true'
+        env:
+          VERSION: ${{ steps.prepare.outputs.version }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json wordpress-plugin
+          git commit -m "chore(release): Byline ${VERSION}" -m "Automatic patch release. The changelog entry lists the pull requests merged since the previous release."
+          git push origin "HEAD:${BRANCH}"
+
+      # The release workflow validates this exact commit and only then creates
+      # the tag, so a failed release leaves no tag and is retried by the next run.
+      - name: Record the release commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: Publish ${{ needs.prepare.outputs.tag }}
+    needs: prepare
+    if: needs.prepare.outputs.release == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-plugin.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+      sha: ${{ needs.prepare.outputs.sha }}

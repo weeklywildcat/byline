@@ -4,9 +4,26 @@ on:
   push:
     tags:
       - "v*"
+  # The automatic release workflow calls this one directly: tags pushed with the
+  # repository token do not start other workflows. The tag is created here, at
+  # the end, so a release that fails validation leaves no tag behind.
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to publish, for example v0.3.2.
+        required: true
+        type: string
+      sha:
+        description: Commit the tag is created on.
+        required: true
+        type: string
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  RELEASE_SHA: ${{ inputs.sha || github.sha }}
 
 jobs:
   php-compatibility:
@@ -20,6 +37,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.ref }}
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -38,6 +57,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -53,7 +74,7 @@ jobs:
       - name: Validate release version
         run: |
           PLUGIN_VERSION="$(grep -E '^[[:space:]]*\* Version:' wordpress-plugin/weekly-wildcat-headless.php | head -n 1 | sed -E 's/.*Version:[[:space:]]*//')"
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${RELEASE_TAG#v}"
           PACKAGE_VERSION="$(node -p "require('./wordpress-plugin/package.json').version")"
 
           test -n "$PLUGIN_VERSION"
@@ -83,7 +104,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "$RELEASE_TAG" \
             "wordpress-plugin/release/weekly-wildcat-headless.zip#weekly-wildcat-headless.zip" \
-            --title "$GITHUB_REF_NAME" \
+            --target "$RELEASE_SHA" \
+            --title "$RELEASE_TAG" \
             --notes "Byline WordPress plugin $PLUGIN_VERSION"

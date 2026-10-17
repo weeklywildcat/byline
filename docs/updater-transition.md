@@ -64,15 +64,29 @@ checks, then creates and inspects a production ZIP simulation.
 
 ## Canonical release procedure
 
+Merging a pull request that changes `wordpress-plugin/`, `packages/`, or
+`schemas/` releases automatically; see `.github/workflows/auto-release.yml` and
+`scripts/prepare-release.mjs`. It bumps the patch version everywhere it lives
+(plugin header, protocol constant, `wordpress-plugin/package.json`, lockfile,
+`readme.txt` stable tag), writes the changelog and upgrade notice, and calls
+the release workflow, which tags `vX.Y.Z` once validation passes. The sections below are the manual
+equivalent, used for minor or major releases and as the fallback.
+
 1. Bump both the plugin header and `wordpress-plugin/package.json`.
 2. Run `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, and
    `npm run package:plugin` from the monorepo root.
-3. Merge to `main` normally.
-4. Push a matching `vX.Y.Z` tag. Imported standalone tags are intentionally
-   named `plugin-vX.Y.Z` and are not canonical update releases.
+3. Merge to `main` normally. The automatic workflow releases a version that has
+   no tag yet as written instead of bumping again.
+4. Otherwise push a matching `vX.Y.Z` tag. Imported standalone tags are
+   intentionally named `plugin-vX.Y.Z` and are not canonical update releases.
 5. Verify the GitHub release asset remotely by downloading it, testing the ZIP,
    confirming the installed path/version/updater values, and checking all
    exclusions.
+
+Because the canonical tag still goes through `release-plugin.yml`, every
+automatic release runs the full validation, ZIP checks, and updater-transition
+verification before anything is published. If that validation fails after the
+bump commit has landed, no tag is created; the next qualifying merge, or a manual run of the workflow from the Actions tab, finds a version with no tag and retries it.
 
 ## Standalone repository retirement
 

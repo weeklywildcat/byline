@@ -86,14 +86,27 @@ name are compatibility contracts. Do not rename them as cleanup. See
 
 ## Plugin releases
 
-Future WordPress releases are published from `weeklywildcat/byline`:
+Future WordPress releases are published from `weeklywildcat/byline`.
 
-1. Bump the plugin header and `wordpress-plugin/package.json` to the same version.
-2. Merge the tested change to `main`.
-3. Create and push a matching `vX.Y.Z` tag without rewriting existing tags.
-4. `.github/workflows/release-plugin.yml` runs JS/TS and PHP validation, builds
-   admin assets, validates the production ZIP, and publishes
-   `weekly-wildcat-headless.zip`.
+**Automatic patch releases.** Merging a pull request that changes
+`wordpress-plugin/`, `packages/`, or `schemas/` releases a new patch version
+with no further steps. `.github/workflows/auto-release.yml` runs
+`scripts/prepare-release.mjs`, which bumps the plugin header, protocol constant,
+`wordpress-plugin/package.json`, and lockfile, adds a `readme.txt` changelog
+entry from the merged pull request titles, commits that to `main`, and publishes it.
+Write pull request titles as you want them to read in WordPress's "View version
+details". Merges that only change the public site, docs, or CI do not release.
+
+**Minor and major releases, or hand-written notes.** Bump the version and write
+the `readme.txt` entry in the pull request itself. The automatic workflow sees a
+version with no tag and releases it as written, without a second bump.
+
+**Manual release.** Pushing a matching `vX.Y.Z` tag (never rewriting existing
+tags) still works and runs the same publish workflow.
+
+Either way, `.github/workflows/release-plugin.yml` runs JS/TS and PHP
+validation, builds admin assets, validates the production ZIP, and publishes
+`weekly-wildcat-headless.zip`.
 
 Historical plugin tags imported into this repository are prefixed `plugin-` so
 they cannot collide with canonical releases. The standalone `byline-plugin`
