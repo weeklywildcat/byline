@@ -225,7 +225,7 @@ export function buildPageMetadata({
       images
     },
     twitter: {
-      card: "summary_large_image",
+      card: type === "profile" ? "summary" : "summary_large_image",
       title,
       description: trimmedDescription,
       images
@@ -483,7 +483,7 @@ export function getProfilePageSchema(contributor: WordPressContributor, posts: W
       "@type": "Person",
       "@id": personId,
       name: decodeHtml(getContributorName(contributor)),
-      description: getContributorDescription(contributor) || `${publication.identity.shortName} contributor`,
+      description: stripHtml(getContributorDescription(contributor)) || `${publication.identity.shortName} contributor`,
       jobTitle: getContributorRole(contributor) || undefined,
       url: profileUrl,
       image: photo?.url
@@ -538,7 +538,7 @@ export function getNewsArticleSchema(post: WordPressPost) {
       name: decodeHtml(getContributorName(contributor)),
       url: contributorHasProfilePage(contributor) ? absoluteUrl(getContributorHref(contributor)) : undefined,
       jobTitle: getContributorRole(contributor) || undefined,
-      description: getContributorDescription(contributor) || undefined,
+      description: stripHtml(getContributorDescription(contributor)) || undefined,
       sameAs: socialLinks.length > 0 ? socialLinks : undefined
     };
   });
