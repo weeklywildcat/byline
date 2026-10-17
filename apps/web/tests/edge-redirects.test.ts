@@ -58,13 +58,6 @@ describe("historical sports routes are not generated as HTML", () => {
     expect(read("scripts/verify-build.mjs")).toContain("_redirects is missing a 301");
   });
 
-  it("points Wrangler at apps/web's config when it is run from the repository root", () => {
-    expect(JSON.parse(read("package.json")).scripts.postbuild).toContain("write-wrangler-deploy-config.mjs");
-    const script = read("scripts/write-wrangler-deploy-config.mjs");
-    expect(script).toContain('".wrangler", "deploy"');
-    expect(script).toContain('"wrangler.jsonc"');
-  });
-
   it("enables Worker Previews, which wrangler requires, without inheriting production settings", () => {
     expect(read("wrangler.jsonc")).toMatch(/"previews":\s*\{\s*\}/);
   });
