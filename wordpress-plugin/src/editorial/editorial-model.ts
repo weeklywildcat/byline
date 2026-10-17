@@ -46,6 +46,18 @@ export type ContributorRef = {
   email?: string;
   internalNotes?: string;
   order?: number;
+  /** Guests only: "draft" guests are not public until a publisher publishes them. */
+  status?: string;
+  /** Guests only: false for one-offs credited by name and photo without a profile page. */
+  hasProfilePage?: boolean;
+};
+
+/** Fields the editor collects when adding a one-off guest from the story sidebar. */
+export type GuestInput = {
+  name: string;
+  role?: string;
+  imageId?: number;
+  hasProfilePage: boolean;
 };
 
 export type PublicContributor = {

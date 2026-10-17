@@ -1,6 +1,7 @@
 import { decodeHtml, formatDisplayDate } from "@/lib/format";
 import { isHiddenCategory } from "@/lib/content";
 import {
+  contributorHasProfilePage,
   getContributorHref,
   getContributorName,
   getCategoryHref,
@@ -36,7 +37,9 @@ export function ArticleByline({ author, contributors, category, date }: ArticleB
           {bylineContributors.map((contributor, index) => (
             <span key={`${isGuestContributor(contributor) ? "guest" : "user"}-${contributor.id}-${contributor.slug}`}>
               {index > 0 ? ", " : null}
-              <a href={getContributorHref(contributor)}>{getContributorName(contributor)}</a>
+              {contributorHasProfilePage(contributor)
+                ? <a href={getContributorHref(contributor)}>{getContributorName(contributor)}</a>
+                : getContributorName(contributor)}
             </span>
           ))}
         </span>

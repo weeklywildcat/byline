@@ -326,11 +326,8 @@
 }
 
 .byline-editorial-sidebar .byline-editorial-contributor-row {
-  grid-template-columns: 28px minmax(0, 1fr);
-}
-
-.byline-editorial-sidebar .byline-editorial-contributor-row .byline-editorial-inline-actions {
-  grid-column: 1 / -1;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 8px;
 }
 
 .byline-editorial-sidebar .byline-editorial-add-row,

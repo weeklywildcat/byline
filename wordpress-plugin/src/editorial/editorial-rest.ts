@@ -1,5 +1,6 @@
 import type {
   ContributorEntry,
+  GuestInput,
   CorrectionInput,
   CorrectionRecord,
   DistributionChannel,
@@ -44,6 +45,7 @@ export type ContributorPayload = {
   contributors: ContributorEntry[];
   available?: ContributorEntry[];
   canEdit: boolean;
+  canCreateGuests?: boolean;
 };
 
 export type CorrectionPayload = {
@@ -75,6 +77,7 @@ export type EditorialRestClient = {
   deleteTask: (taskId: number | string) => Promise<void>;
   getContributors: (storyId: number) => Promise<ContributorPayload>;
   saveContributors: (storyId: number, contributors: ContributorEntry[]) => Promise<ContributorPayload>;
+  createGuest: (input: GuestInput) => Promise<Record<string, unknown>>;
   getCorrections: (storyId: number) => Promise<CorrectionPayload>;
   createCorrection: (storyId: number, input: CorrectionInput) => Promise<CorrectionPayload>;
   updateCorrection: (storyId: number, correctionId: number | string, input: CorrectionInput) => Promise<CorrectionPayload>;
@@ -135,6 +138,12 @@ export function createEditorialRestClient(request: ProtectedEditorialFetcher): E
       path: `${storyPath(storyId)}/contributors`,
       method: "POST",
       data: { contributors }
+    }),
+
+    createGuest: (input) => request<Record<string, unknown>>({
+      path: "/byline/v1/admin/contributors/guests",
+      method: "POST",
+      data: input
     }),
 
     getCorrections: (storyId) => request<CorrectionPayload>({

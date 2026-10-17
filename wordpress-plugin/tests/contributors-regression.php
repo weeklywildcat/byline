@@ -378,6 +378,33 @@ contributors_test_assert(is_wp_error($user_slug_collision) && $user_slug_collisi
 $guest_slug_collision = byline_create_guest_contributor(['name' => 'Duplicate Guest', 'slug' => 'guest-contributor'], 1);
 contributors_test_assert(is_wp_error($guest_slug_collision) && $guest_slug_collision->get_error_code() === 'byline_guest_slug_conflict', 'Guest slugs must be unique among guest records.');
 
+// One-off guests: byline name and photo only, no public profile page.
+contributors_test_assert(($guest['hasProfilePage'] ?? null) === true, 'Guests created without the option keep a profile page.');
+$one_off = byline_create_guest_contributor(['name' => 'Alex Smith', 'role' => 'Photographer', 'imageId' => 7, 'hasProfilePage' => false], 1);
+contributors_test_assert(!is_wp_error($one_off) && ($one_off['hasProfilePage'] ?? null) === false, 'A one-off guest must be stored without a profile page.');
+contributors_test_assert(($one_off['slug'] ?? '') === 'alex-smith', 'A one-off guest slug should be derived from the name.');
+$one_off_public = byline_get_public_guest_contributor((int) $one_off['id']);
+contributors_test_assert(is_array($one_off_public) && ($one_off_public['hasProfilePage'] ?? null) === false, 'The public projection must tell the site this guest has no page.');
+contributors_test_assert(($one_off_public['profilePhoto']['id'] ?? 0) === 7, 'A one-off guest still exposes their photo for the byline.');
+
+$same_name = byline_create_guest_contributor(['name' => 'Alex Smith', 'hasProfilePage' => false], 1);
+contributors_test_assert(!is_wp_error($same_name) && ($same_name['slug'] ?? '') === 'alex-smith-2', 'A second guest with the same name must get a unique derived slug.');
+$explicit_clash = byline_create_guest_contributor(['name' => 'Alex Smith', 'slug' => 'alex-smith'], 1);
+contributors_test_assert(is_wp_error($explicit_clash) && $explicit_clash->get_error_code() === 'byline_guest_slug_conflict', 'An explicitly requested duplicate slug must still be rejected.');
+
+unset($byline_contributor_test_meta[(int) $guest['id']][BYLINE_GUEST_PROFILE_PAGE_META]);
+contributors_test_assert(byline_guest_has_profile_page((int) $guest['id']) === true, 'Legacy guests without the meta must keep their page.');
+$promoted = byline_update_guest_contributor((int) $one_off['id'], ['hasProfilePage' => true], 1);
+contributors_test_assert(!is_wp_error($promoted) && ($promoted['hasProfilePage'] ?? null) === true, 'A one-off guest can be given a profile page later.');
+$demoted = byline_update_guest_contributor((int) $one_off['id'], ['hasProfilePage' => false], 1);
+contributors_test_assert(($demoted['hasProfilePage'] ?? null) === false && ($demoted['role'] ?? '') === 'Photographer', 'Toggling the page option must not touch other guest fields.');
+
+$person = byline_guest_editor_person($one_off);
+contributors_test_assert(($person['kind'] ?? '') === 'guest' && ($person['imageUrl'] ?? '') === 'https://images.example.test/guest.jpg', 'The editor person shape must carry kind and a photo URL.');
+contributors_test_assert(!array_key_exists('bio', $person) && !array_key_exists('links', $person), 'The editor person shape must not carry bio or links.');
+$available_guests = array_column(byline_list_available_guests(1), 'name');
+contributors_test_assert(in_array('Alex Smith', $available_guests, true), 'Existing guests must be offered in the story sidebar.');
+
 // Old stories have no contributor meta and resolve to post_author without a
 // migration write. New lists retain that primary user while preserving order.
 $fallback = byline_get_story_contributor_entries(10);

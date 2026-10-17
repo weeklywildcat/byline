@@ -660,8 +660,39 @@ function normalizeContributor(value: unknown): ContributorEntry | null {
     ...(stringValue(item.slug) ? { slug: stringValue(item.slug) } : {}),
     ...(stringValue(item.imageUrl || item.avatarUrl) ? { imageUrl: stringValue(item.imageUrl || item.avatarUrl) } : {}),
     ...(stringValue(item.publicUrl) ? { publicUrl: stringValue(item.publicUrl) } : {}),
-    ...(numberValue(item.order, -1) >= 0 ? { order: numberValue(item.order) } : {})
+    ...(numberValue(item.order, -1) >= 0 ? { order: numberValue(item.order) } : {}),
+    ...(kind === 'guest' && stringValue(item.status) ? { status: stringValue(item.status) } : {}),
+    ...(kind === 'guest' && item.hasProfilePage === false ? { hasProfilePage: false } : {})
   };
+}
+
+/** Open the Media Library for a single image and resolve with the choice, or null if cancelled. */
+function chooseMediaImage(title: string): Promise<{ id: number; url: string } | null> {
+  return new Promise((resolve) => {
+    if (!window.wp?.media) {
+      resolve(null);
+      return;
+    }
+    let settled = false;
+    const frame = window.wp.media({
+      title,
+      button: { text: __('Use this photo', 'weekly-wildcat-headless') },
+      library: { type: 'image' },
+      multiple: false
+    });
+    frame.on('select', () => {
+      settled = true;
+      const selected = frame.state().get('selection').first().toJSON();
+      const sizes = record(selected.sizes);
+      const url = stringValue(record(sizes.thumbnail).url) || stringValue(selected.url);
+      const id = typeof selected.id === 'number' ? selected.id : 0;
+      resolve(id > 0 && url ? { id, url } : null);
+    });
+    frame.on('close', () => {
+      if (!settled) resolve(null);
+    });
+    frame.open();
+  });
 }
 
 function normalizeContributors(value: unknown): ContributorEntry[] {
@@ -1114,6 +1145,7 @@ function EditorialNewsroomPanels({
   const [taskPeople, setTaskPeople] = useState<ContributorEntry[]>([]);
   const [contributors, setContributors] = useState<ContributorEntry[]>([]);
   const [availableContributors, setAvailableContributors] = useState<ContributorEntry[]>([]);
+  const [canCreateGuests, setCanCreateGuests] = useState(false);
   const [corrections, setCorrections] = useState<CorrectionRecord[]>([]);
   const [activity, setActivity] = useState<EditorialActivityRecord[]>([]);
   const [legacyCorrectionText, setLegacyCorrectionText] = useState<string | null>(null);
@@ -1181,6 +1213,7 @@ function EditorialNewsroomPanels({
       const raw = record(value);
       setContributors(normalizeContributors(raw.contributors));
       setAvailableContributors(normalizeContributors(raw.available ?? record(payload).editors));
+      setCanCreateGuests(raw.canCreateGuests === true);
     });
   }, [client, payload, postId, runPanel]);
 
@@ -1309,6 +1342,14 @@ function EditorialNewsroomPanels({
             isLoading={loading.contributors}
             isSaving={saving.contributors}
             error={errors.contributors}
+            canCreateGuest={canCreateGuests}
+            onChoosePhoto={() => chooseMediaImage(__('Choose a photo for this guest', 'weekly-wildcat-headless'))}
+            onCreateGuest={async (input) => {
+              const created = normalizeContributor({ ...record(await client.createGuest(input)), kind: 'guest' });
+              if (!created) throw new Error(__('The guest could not be created.', 'weekly-wildcat-headless'));
+              if (mountedRef.current) setAvailableContributors((current) => [...current, created]);
+              return created;
+            }}
             onChange={async (next) => {
               setSaving((current) => ({ ...current, contributors: true }));
               try {
