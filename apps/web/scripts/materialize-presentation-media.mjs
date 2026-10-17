@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const outputRoot = path.join(projectRoot, "out");
+const outputRoot = path.resolve(process.env.BYLINE_STATIC_ROOT || path.join(projectRoot, "out"));
 const canonicalDir = path.join(outputRoot, "_wordpress-media");
 const presentationDir = path.join(outputRoot, "_byline", "presentation-media");
 
@@ -31,7 +31,7 @@ await rm(presentationDir, { recursive: true, force: true });
 const filenames = new Set();
 for (const file of await htmlFilesBelow(outputRoot)) {
   const html = await readFile(file, "utf8");
-  for (const match of html.matchAll(/\/_byline\/presentation-media\/([^"'\\s<>)?#]+)/g)) {
+  for (const match of html.matchAll(/\/_byline\/presentation-media\/([^"'\s<>)?#]+)/g)) {
     filenames.add(match[1]);
   }
 }
