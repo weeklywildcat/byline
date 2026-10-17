@@ -58,7 +58,7 @@ describe("shared Byline contracts", () => {
 
   it("keeps the Weekly Wildcat fonts and refuses CSS injection in token overrides", () => {
     expect(weeklyWildcatTheme.stylesheets).toEqual([
-      "https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@100..900&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&display=swap",
+      "https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@100..900&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=Libre+Caslon+Condensed:ital,wght@0,500;1,500&display=swap",
       "https://api.fontshare.com/v2/css?f[]=erode@400,500,600,700,401,501,601&display=swap"
     ]);
     expect(sanitizeThemeTokenOverrides({
