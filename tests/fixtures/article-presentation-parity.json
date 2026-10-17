@@ -15,7 +15,6 @@
         "name": "Alex Rivera",
         "role": "Editor",
         "bio": "Reporter bio",
-        "founder": true,
         "contactHref": "mailto:alex@example.test",
         "photo": {
           "path": "/uploads/alex.jpg",
@@ -28,7 +27,6 @@
         "name": "Jordan Guest",
         "role": "Community contributor",
         "bio": "Guest bio",
-        "founder": false,
         "contactHref": "",
         "photo": {
           "path": "/uploads/jordan.jpg",

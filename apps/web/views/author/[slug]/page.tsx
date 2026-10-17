@@ -1,6 +1,5 @@
 import type { Metadata } from "@/lib/metadata";
 import { notFound } from "@/lib/static-not-found";
-import { AuthorBadge } from "@/components/AuthorBadge";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
@@ -110,7 +109,6 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
         <div>
           <div className="author-profile-meta">
             <p className="profile-kicker">{getContributorRole(contributor)}</p>
-            {profile?.founder ? <AuthorBadge label="Founder" /> : null}
           </div>
           <h1>{contributor.name}</h1>
           {profile?.pronouns ? <p className="author-pronouns">{profile.pronouns}</p> : null}

@@ -1,4 +1,3 @@
-import { AuthorBadge } from "@/components/AuthorBadge";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
 import { getPublicationConfig } from "@/lib/publication";
@@ -50,10 +49,9 @@ function AuthorCard({ contributor, storyCount, showDescription }: { contributor:
           <span className="author-card-role">{getContributorRole(contributor)}</span>
           <h2>{contributor.name}</h2>
           {showDescription ? <p>{description}</p> : null}
-          {profile?.founder || storyCount > 0 ? (
+          {storyCount > 0 ? (
             <div className="author-card-meta">
-              {profile?.founder ? <AuthorBadge label="Founder" /> : null}
-              {storyCount > 0 ? <span className="author-card-stat">{storyCount === 1 ? "1 story" : `${storyCount} stories`}</span> : null}
+              <span className="author-card-stat">{storyCount === 1 ? "1 story" : `${storyCount} stories`}</span>
             </div>
           ) : null}
         </div>

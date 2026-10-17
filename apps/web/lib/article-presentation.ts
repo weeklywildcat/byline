@@ -127,7 +127,6 @@ function contributorView(contributor: WordPressContributor, coverage: ReturnType
       media_details: { width: photo.width ?? undefined, height: photo.height ?? undefined },
       source_url: photo.url
     }, "132px") : null,
-    founder: Boolean(profile?.founder),
     ...(contactLink?.href ? { contactHref: contactLink.href } : {}),
     coverage
   };

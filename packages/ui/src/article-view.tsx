@@ -31,7 +31,6 @@ export type ArticleContributorView = {
   role: string;
   bio: string;
   photo?: ArticleImageView | null;
-  founder?: boolean;
   contactHref?: string;
   coverage?: ArticleLinkView[];
 };
@@ -220,7 +219,6 @@ function AboutWriters({ presentation }: { presentation: ArticlePresentation }): 
             <div className="about-writer-body">
               <div className="author-profile-meta">
                 <p className="profile-kicker">{contributor.role}</p>
-                {contributor.founder ? <span className="author-badge">Founder</span> : null}
               </div>
               <h3>{contributor.name}</h3>
               {contributor.coverage?.length ? (
