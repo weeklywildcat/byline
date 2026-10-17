@@ -234,6 +234,22 @@ describe("NewsArticle image variants", () => {
     expect(image.license).toBe(`${ORIGIN}/image-license/`);
   });
 
+  it("does not advertise the generic social card as an imageless article's primary image", () => {
+    const article = getNewsArticleSchema(post());
+
+    expect(article.image).toBeUndefined();
+    expect(article.primaryImageOfPage).toBeUndefined();
+
+    const social = buildPageMetadata({
+      title: "Imageless story",
+      description: "A story without a featured image.",
+      path: "/2026/10/14/news/homecoming-week/",
+      type: "article"
+    });
+    expect(tagValues(social, "og:image")[0]).toMatch(/open-graph-social\.png$/);
+    expect(tagValues(social, "twitter:image")[0]).toMatch(/open-graph-social\.png$/);
+  });
+
   it("credits the recorded creator, not the camera owner in the file's EXIF data", () => {
     const exif = { copyright: "Gibson Bell", credit: "Gibson Bell" };
     const credit = { creator: "Zoe Rush", creditText: "", copyrightNotice: "", licenseUrl: "", acquireLicensePage: "" };
