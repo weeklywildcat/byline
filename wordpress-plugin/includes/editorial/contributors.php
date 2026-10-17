@@ -1108,3 +1108,163 @@ function byline_delete_guest_contributor(int $guest_id, ?int $user_id = null, bo
 
     return (bool) wp_delete_post($guest_id, $force);
 }
+
+/**
+ * Story IDs that credit at least one guest, with the guest IDs each credits.
+ *
+ * Reads the stored typed references rather than querying the serialized meta,
+ * so a stale reference to a deleted guest is ignored.
+ *
+ * @return array<int,array<int,int>> Story ID => guest IDs.
+ */
+function byline_guest_story_map(): array
+{
+    if (!function_exists('get_posts')) {
+        return [];
+    }
+
+    $story_ids = get_posts([
+        'post_type' => 'post',
+        'post_status' => 'any',
+        'posts_per_page' => -1,
+        'numberposts' => -1,
+        'fields' => 'ids',
+        'no_found_rows' => true,
+        'meta_key' => BYLINE_STORY_CONTRIBUTORS_META,
+    ]);
+
+    $map = [];
+    foreach (is_array($story_ids) ? $story_ids : [] as $story) {
+        $story_id = is_object($story) ? absint($story->ID ?? 0) : absint($story);
+        if ($story_id <= 0) {
+            continue;
+        }
+        foreach (byline_get_story_contributor_entries($story_id, false) as $reference) {
+            if (($reference['type'] ?? '') === 'guest') {
+                $map[$story_id][] = absint($reference['id']);
+            }
+        }
+    }
+
+    return $map;
+}
+
+/**
+ * Every guest the management screen should list, ordered by name.
+ *
+ * @return array<int,array<string,mixed>> Guest records plus `storyCount`.
+ */
+function byline_list_guest_contributors(): array
+{
+    if (!function_exists('get_posts')) {
+        return [];
+    }
+
+    $posts = get_posts([
+        'post_type' => BYLINE_GUEST_POST_TYPE,
+        'post_status' => ['publish', 'draft'],
+        'posts_per_page' => -1,
+        'numberposts' => -1,
+        'orderby' => 'title',
+        'order' => 'ASC',
+    ]);
+
+    $counts = [];
+    foreach (byline_guest_story_map() as $guest_ids) {
+        foreach (array_unique($guest_ids) as $guest_id) {
+            $counts[$guest_id] = ($counts[$guest_id] ?? 0) + 1;
+        }
+    }
+
+    $guests = [];
+    foreach (is_array($posts) ? $posts : [] as $post) {
+        if (!$post instanceof WP_Post) {
+            continue;
+        }
+        $guest = byline_get_guest_contributor((int) $post->ID);
+        if (is_array($guest)) {
+            $guest['storyCount'] = $counts[(int) $post->ID] ?? 0;
+            $guests[] = $guest;
+        }
+    }
+
+    return $guests;
+}
+
+/**
+ * Fold duplicate guests into one.
+ *
+ * Every story that credits a duplicate is pointed at the primary guest instead,
+ * in the same position and without crediting the primary twice, and then the
+ * duplicates are deleted. Duplicates are only deleted once every story has been
+ * updated, so a story the user may not edit stops the merge with nothing lost.
+ *
+ * @param array<int,int|string> $duplicate_ids
+ * @return array{primaryId:int,mergedIds:array<int,int>,storiesUpdated:int}|WP_Error
+ */
+function byline_merge_guest_contributors(int $primary_id, array $duplicate_ids, ?int $user_id = null)
+{
+    if (!byline_guest_can_manage($user_id)) {
+        return new WP_Error('byline_guest_forbidden', 'You cannot merge guest contributors.', ['status' => 403]);
+    }
+
+    $primary_id = absint($primary_id);
+    $duplicate_ids = array_values(array_unique(array_filter(array_map('absint', $duplicate_ids), static function (int $id) use ($primary_id): bool {
+        return $id > 0 && $id !== $primary_id;
+    })));
+
+    if (!(byline_guest_contributor_post($primary_id) instanceof WP_Post) || $duplicate_ids === []) {
+        return new WP_Error('byline_guest_merge_invalid', 'Choose one guest to keep and at least one different guest to merge into it.', ['status' => 400]);
+    }
+    foreach ($duplicate_ids as $duplicate_id) {
+        if (!(byline_guest_contributor_post($duplicate_id) instanceof WP_Post)) {
+            return new WP_Error('byline_guest_not_found', 'One of the guests to merge does not exist.', ['status' => 404]);
+        }
+    }
+
+    $updates = [];
+    foreach (byline_guest_story_map() as $story_id => $guest_ids) {
+        if (array_intersect($guest_ids, $duplicate_ids) === []) {
+            continue;
+        }
+
+        $next = [];
+        $has_primary = false;
+        foreach (byline_get_story_contributor_entries($story_id, false) as $reference) {
+            $is_guest = ($reference['type'] ?? '') === 'guest';
+            $id = absint($reference['id'] ?? 0);
+            if ($is_guest && ($id === $primary_id || in_array($id, $duplicate_ids, true))) {
+                if ($has_primary) {
+                    continue;
+                }
+                $has_primary = true;
+                $reference = ['type' => 'guest', 'id' => $primary_id];
+            }
+            $next[] = $reference;
+        }
+        $updates[$story_id] = $next;
+    }
+
+    // Check every story first so a failure cannot leave a half-merged byline.
+    foreach (array_keys($updates) as $story_id) {
+        if (!byline_story_contributors_can_edit($story_id, $user_id)) {
+            return new WP_Error('byline_contributors_forbidden', 'You cannot edit every story that credits these guests, so nothing was merged.', ['status' => 403]);
+        }
+    }
+
+    foreach ($updates as $story_id => $next) {
+        $result = byline_set_story_contributors($story_id, $next, $user_id);
+        if (is_wp_error($result)) {
+            return $result;
+        }
+    }
+
+    foreach ($duplicate_ids as $duplicate_id) {
+        $deleted = byline_delete_guest_contributor($duplicate_id, $user_id, true);
+        if (is_wp_error($deleted)) {
+            return $deleted;
+        }
+    }
+
+    return ['primaryId' => $primary_id, 'mergedIds' => $duplicate_ids, 'storiesUpdated' => count($updates)];
+}

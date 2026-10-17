@@ -40,6 +40,7 @@ require_once __DIR__ . '/includes/editorial/preview.php';
 require_once __DIR__ . '/includes/editorial/rest.php';
 require_once __DIR__ . '/includes/editorial/quick-view.php';
 require_once __DIR__ . '/includes/editorial/admin.php';
+require_once __DIR__ . '/includes/editorial/guests-admin.php';
 
 // Polls are WordPress-native content with their own vote table. WordPress is
 // the only datastore for poll definitions, lifecycle, and votes.

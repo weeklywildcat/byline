@@ -460,4 +460,52 @@ $safe_user = byline_project_user_contributor(1);
 contributors_test_assert(is_array($safe_user) && !array_key_exists('email', $safe_user), 'The user public projection must omit email even when legacy email metadata exists.');
 contributors_test_assert(($safe_user['links']['website'] ?? '') === 'https://writer.example.test/about', 'Allowed public profile links should be retained.');
 
+// Merging duplicate guests: stories are re-pointed, nothing is credited twice,
+// order is kept, and the duplicates are deleted only after every story succeeds.
+$keep = byline_create_guest_contributor(['name' => 'Sam Rivera', 'hasProfilePage' => false], 1);
+$dupe_one = byline_create_guest_contributor(['name' => 'Sam Rivera', 'hasProfilePage' => false], 1);
+$dupe_two = byline_create_guest_contributor(['name' => 'S. Rivera', 'hasProfilePage' => false], 1);
+$keep_id = (int) $keep['id'];
+$dupe_one_id = (int) $dupe_one['id'];
+$dupe_two_id = (int) $dupe_two['id'];
+
+byline_set_story_contributors(10, [
+    ['type' => 'user', 'id' => 2],
+    ['type' => 'guest', 'id' => $dupe_one_id],
+    ['type' => 'guest', 'id' => $keep_id],
+    ['type' => 'guest', 'id' => $dupe_two_id],
+    ['type' => 'user', 'id' => 1],
+], 1);
+
+$counts = array_column(byline_list_guest_contributors(), 'storyCount', 'id');
+contributors_test_assert(($counts[$dupe_one_id] ?? 0) === 1 && ($counts[$keep_id] ?? 0) === 1, 'The guest list must count the stories that credit each guest.');
+
+$invalid_merge = byline_merge_guest_contributors($keep_id, [$keep_id], 1);
+contributors_test_assert(is_wp_error($invalid_merge) && $invalid_merge->get_error_code() === 'byline_guest_merge_invalid', 'Merging a guest into itself must be rejected.');
+$missing_merge = byline_merge_guest_contributors($keep_id, [999999], 1);
+contributors_test_assert(is_wp_error($missing_merge), 'Merging a guest that does not exist must be rejected.');
+
+$byline_contributor_test_capabilities['user:1:edit_post'][10] = false;
+$blocked_merge = byline_merge_guest_contributors($keep_id, [$dupe_one_id, $dupe_two_id], 1);
+$byline_contributor_test_capabilities['user:1:edit_post'][10] = true;
+contributors_test_assert(is_wp_error($blocked_merge) && $blocked_merge->get_error_code() === 'byline_contributors_forbidden', 'A merge must stop when the user cannot edit a story that credits a duplicate.');
+contributors_test_assert(byline_guest_contributor_post($dupe_one_id) instanceof WP_Post, 'A blocked merge must not delete any guest.');
+
+$merged = byline_merge_guest_contributors($keep_id, [$dupe_one_id, $dupe_two_id], 1);
+contributors_test_assert(!is_wp_error($merged) && $merged['storiesUpdated'] === 1, 'A merge should report how many stories it updated.');
+contributors_test_assert(byline_get_story_contributor_entries(10, false) === [
+    ['type' => 'user', 'id' => 2],
+    ['type' => 'guest', 'id' => $keep_id],
+    ['type' => 'user', 'id' => 1],
+], 'A merge must credit the kept guest once, at the first merged position.');
+contributors_test_assert(!(byline_guest_contributor_post($dupe_one_id) instanceof WP_Post) && !(byline_guest_contributor_post($dupe_two_id) instanceof WP_Post), 'Merged duplicates must be deleted.');
+contributors_test_assert(byline_guest_contributor_post($keep_id) instanceof WP_Post, 'The kept guest must survive a merge.');
+
+$byline_contributor_test_capabilities['user:1:manage_byline'] = false;
+$byline_contributor_test_capabilities['user:1:edit_others_posts'] = false;
+$forbidden_merge = byline_merge_guest_contributors($keep_id, [$dupe_one_id], 1);
+contributors_test_assert(is_wp_error($forbidden_merge) && $forbidden_merge->get_error_code() === 'byline_guest_forbidden', 'Users who cannot manage guests must not merge them.');
+$byline_contributor_test_capabilities['user:1:manage_byline'] = true;
+unset($byline_contributor_test_capabilities['user:1:edit_others_posts']);
+
 echo "Ordered contributors and guest model regression passed.\n";
