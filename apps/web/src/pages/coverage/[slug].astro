@@ -1,10 +1,11 @@
 ---
+import { routeCacheKey } from "@/lib/route-cache";
 import BaseLayout from "@/src/layouts/BaseLayout.astro";
 import Page, { getMetadata } from "@/views/coverage/[slug]/page";
 import { getBuildSnapshot } from "@/lib/build-snapshot";
 export async function getStaticPaths() {
   const snapshot = await getBuildSnapshot();
-  return snapshot.sports.coverages.map((coverage) => ({ params: { slug: coverage.slug } }));
+  return snapshot.sports.coverages.map((coverage) => ({ params: { slug: coverage.slug }, cacheKey: routeCacheKey(snapshot, "coverage", coverage.slug) }));
 }
 const params = { slug: Astro.params.slug! };
 const metadata = await getMetadata({ params: Promise.resolve(params) });

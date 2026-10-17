@@ -1,5 +1,8 @@
 # Byline deployment recipes
 
+Production uses [Cloudflare Workers Builds](cloudflare-workers.md) with
+[prepared public snapshots](../../docs/build-snapshots.md).
+
 These recipes are maintained against the repository's current build contract.
 They cover the static public site and the WordPress Generic Deploy Hook. Start
 with [the canonical getting-started guide](../../docs/getting-started.md) for
@@ -7,8 +10,9 @@ the full installation and revision-verification flow.
 
 ## Shared contract
 
-Run every build from the repository root—the directory containing the root
-`package.json` and `package-lock.json`:
+Run repository-level build commands from the root containing `package.json` and
+`package-lock.json`. The Workers recipe instead sets `apps/web` as its framework
+project root; npm still resolves the monorepo lockfile/workspaces:
 
 ```sh
 npm ci

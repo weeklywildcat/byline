@@ -189,6 +189,7 @@ whole monorepo.
 Choose a provider recipe and use the same production branch for the provider
 build and the WordPress deploy hook:
 
+- [Cloudflare Workers Builds](../examples/deployment/cloudflare-workers.md) (production static host + thin Worker)
 - [Cloudflare Pages](../examples/deployment/cloudflare-pages.md)
 - [Netlify](../examples/deployment/netlify.md)
 - [Vercel](../examples/deployment/vercel.md)

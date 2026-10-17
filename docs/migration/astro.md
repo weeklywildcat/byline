@@ -7,11 +7,12 @@ control plane and authoritative content store; Cloudflare remains a static host
 plus the existing poll proxy.
 
 ```text
-WordPress REST + sports APIs
+WordPress durable deployment job
+  prepare immutable snapshot before hook
             |
             v
-  memoized BuildSnapshot
-  indexes + route digests
+  pointer + one verified artifact
+  local indexes + complete render cache keys
             |
             v
        Astro static build
@@ -119,20 +120,24 @@ and production call `npm run build:frontend`; that command now invokes Astro and
 still publishes `apps/web/out`, so `wrangler.jsonc` and the Worker entry point do
 not change.
 
-Publication configuration may fall back to the checked compatibility defaults
-when its discovery endpoint is unavailable, matching previous behavior. Posts,
-contributors, categories, pages, and enabled sports datasets are required build
-inputs: a failure names the endpoint and stops the export instead of silently
-publishing an incomplete site. Corrections and coverage are explicitly optional
-modules and log a warning when absent. A media download failure is recorded as
-an external CMS fallback; all successfully materialized media must exist in the
-current artifact or verification fails.
+Production now fails closed on missing/corrupt/stale/incompatible prepared
+snapshots. Publication configuration comes from the same artifact; required
+corrections/coverage/event arrays can be empty but cannot be absent. The old
+publication-default/REST behavior is retained only for development and the
+explicit `BYLINE_LEGACY_REST_BUILD=1` rollout escape hatch. Media failures retain
+the established explicit external fallback, and every materialized asset remains
+subject to closure verification.
 
-No Astro incremental route cache is enabled. Every build is a correct cold build
-and deletes `.byline-build` first. The mirrored media directory is an optional
-download cache only: deleting `apps/web/public/_wordpress-media` makes the next
-build slower, not incomplete. To force a completely cold local build, delete
-that ignored directory and run `npm run build:frontend`.
+Astro incremental builds are enabled for dynamic routes with complete render
+dependency keys, independent of the older route digests. Static routes continue
+to render each build. `.byline-build` is recreated; `node_modules/.astro` is the
+supported persistent framework cache. Media is materialized afresh in production,
+with sitewide deduplication and bounded downloads. Read [snapshot operations](../build-snapshots.md)
+for schema/revisions, atomic generation, race handling, retention, force rebuilds,
+recovery, and the required [Workers dashboard settings](../../examples/deployment/cloudflare-workers.md).
+
+Fresh measurements are in [the October build-performance report](build-performance-2026-10.md).
+The earlier migration benchmark below is historical, not the current route count.
 
 ## Versioned invalidation
 

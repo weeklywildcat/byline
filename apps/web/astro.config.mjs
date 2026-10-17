@@ -3,6 +3,7 @@ import react from "@astrojs/react";
 
 export default defineConfig({
   output: "static",
+  experimental: { incrementalBuild: true },
   outDir: "./out",
   trailingSlash: "always",
   integrations: [react()],

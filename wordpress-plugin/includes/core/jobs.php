@@ -1063,12 +1063,29 @@ function byline_list_jobs(array $args = []): array
 function byline_public_content_revision(): int
 {
     $option = defined('BYLINE_PUBLICATION_REVISION_OPTION') ? BYLINE_PUBLICATION_REVISION_OPTION : 'byline_publication_revision';
+    // Long-running snapshot generation must observe writes by other PHP
+    // requests, not a value held in this request's option/object cache.
+    global $wpdb;
+    if (isset($wpdb) && isset($wpdb->options) && method_exists($wpdb, 'get_var')) {
+        $value = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $option));
+        if (!empty($wpdb->last_error)) throw new RuntimeException('Cannot read the public content revision.');
+        return max(0, (int) $value);
+    }
     return max(0, (int) get_option($option, 0));
 }
 
 function byline_bump_public_content_revision(): int
 {
     $option = defined('BYLINE_PUBLICATION_REVISION_OPTION') ? BYLINE_PUBLICATION_REVISION_OPTION : 'byline_publication_revision';
+    global $wpdb;
+    if (isset($wpdb) && isset($wpdb->options) && method_exists($wpdb, 'query')) {
+        add_option($option, 0, '', false);
+        // Atomic increment: concurrent public writers cannot lose a revision.
+        $updated = $wpdb->query($wpdb->prepare("UPDATE {$wpdb->options} SET option_value = CAST(option_value AS UNSIGNED) + 1 WHERE option_name = %s", $option));
+        if ($updated === false) throw new RuntimeException('Cannot advance the public content revision.');
+        wp_cache_delete($option, 'options');
+        return byline_public_content_revision();
+    }
     $revision = byline_public_content_revision() + 1;
     update_option($option, $revision, false);
     return $revision;

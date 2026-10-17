@@ -28,5 +28,6 @@ cleanup() {
 trap cleanup EXIT
 
 wp-env start --config="$config"
+wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/build-snapshot.php
 WP_BASE_URL="${WP_BASE_URL:-http://localhost:8888}" \
   playwright test --config=wordpress-plugin/e2e/playwright.config.ts "$@"

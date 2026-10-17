@@ -393,7 +393,7 @@ function byline_correction_register_meta(): void
 
     foreach ([
         BYLINE_CORRECTION_TYPE_META => ['type' => 'string', 'sanitize_callback' => 'byline_sanitize_correction_type'],
-        BYLINE_CORRECTION_TEXT_META => ['type' => 'string', 'sanitize_callback' => 'byline_sanitize_correction_text'],
+        BYLINE_CORRECTION_TEXT_META => ['type' => 'string', 'sanitize_callback' => static fn($value): string => byline_sanitize_correction_text($value)],
         BYLINE_CORRECTION_RECORDED_AT_META => ['type' => 'string', 'sanitize_callback' => 'byline_sanitize_correction_datetime'],
         BYLINE_CORRECTION_UPDATED_AT_META => ['type' => 'string', 'sanitize_callback' => 'byline_sanitize_correction_datetime'],
     ] as $key => $definition) {

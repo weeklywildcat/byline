@@ -1,3 +1,4 @@
+import { getLocalBuildSnapshot } from "./prepared-snapshot";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { appendFile, mkdir, rename, stat, writeFile } from "node:fs/promises";
@@ -315,11 +316,13 @@ async function downloadWordPressMedia(urls: string[], filePath: string) {
     const response = await fetch(url, {
       headers: {
         "User-Agent": WORDPRESS_MEDIA_USER_AGENT
-      }
+      },
+      signal: AbortSignal.timeout(30000)
     });
 
     if (!response.ok) {
       errors.push(`${response.status} ${response.statusText} (${url})`);
+      await response.body?.cancel();
       continue;
     }
 
@@ -331,6 +334,7 @@ async function downloadWordPressMedia(urls: string[], filePath: string) {
 
     if (!contentType.startsWith("image/")) {
       errors.push(`unexpected content-type "${contentType || "unknown"}" (${url})`);
+      await response.body?.cancel();
       continue;
     }
 
@@ -348,6 +352,10 @@ async function downloadWordPressMedia(urls: string[], filePath: string) {
 async function getAttachmentMediaUrls(attachmentId: string) {
   let request = attachmentUrlPromises.get(attachmentId);
 
+  if (!request && process.env.BYLINE_PREPARED_SNAPSHOT_FILE) {
+    const media = getLocalBuildSnapshot()!.datasets.attachments.find((item) => String(item.id) === attachmentId);
+    return media ? [...Object.values(media.media_details?.sizes ?? {}).map((size) => size.source_url), media.source_url].filter((url) => Boolean(normalizeWordPressMediaUrl(url))) : [];
+  }
   if (!request) {
     request = fetch(`${getWordPressApiUrl()}/media/${attachmentId}`, {
       headers: {
@@ -405,7 +413,17 @@ function warnMissingWordPressMedia(value: string, fallbackUrl: string, error: un
   );
 }
 
-export async function mirrorWordPressMediaUrl(value: string, attachmentId?: string): Promise<string> {
+const mirrorPromises = new Map<string, Promise<string>>();
+export function mirrorWordPressMediaUrl(value: string, attachmentId?: string): Promise<string> {
+  const key = `${value}:${attachmentId ?? ""}`;
+  let promise = mirrorPromises.get(key);
+  if (!promise) {
+    promise = materializeWordPressMediaUrl(value, attachmentId);
+    mirrorPromises.set(key, promise);
+  }
+  return promise;
+}
+async function materializeWordPressMediaUrl(value: string, attachmentId?: string): Promise<string> {
   const started = performance.now();
   const media = normalizeWordPressMediaUrl(value);
 
@@ -510,4 +528,46 @@ export async function mirrorWordPressMediaInValue<T>(value: T): Promise<T> {
   );
 
   return Object.fromEntries(entries) as T;
+}
+
+/** Discover the complete reference set before downloading. A single large body
+ * must not serialize its images, nor can many bodies create unbounded requests. */
+export async function materializeSnapshotMedia<T>(value: T) {
+  const discoveryStarted = performance.now();
+  const references = new Map<string, { url: string; attachmentId?: string }>();
+  function discover(item: unknown): void {
+    if (typeof item === "string") {
+      for (const match of item.matchAll(ABSOLUTE_URL_PATTERN)) {
+        if (!normalizeWordPressMediaUrl(match[0])) continue;
+        const attachmentId = getAttachmentIdForUrlMatch(item, match.index ?? 0);
+        const previous = references.get(match[0]);
+        references.set(match[0], { url: match[0], attachmentId: attachmentId ?? previous?.attachmentId });
+      }
+    } else if (item && typeof item === "object") {
+      for (const child of Object.values(item)) discover(child);
+    }
+  }
+  discover(value);
+  const discoveryMs = performance.now() - discoveryStarted;
+  const downloadStarted = performance.now();
+  const queue = [...references.values()];
+  const replacements = new Map<string, string>();
+  let next = 0;
+  const concurrency = Math.min(16, Math.max(1, Number(process.env.BYLINE_MEDIA_CONCURRENCY) || 8));
+  await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+    while (next < queue.length) {
+      const reference = queue[next++];
+      replacements.set(reference.url, await mirrorWordPressMediaUrl(reference.url, reference.attachmentId));
+    }
+  }));
+  const materializationMs = performance.now() - downloadStarted;
+  const rewriteStarted = performance.now();
+  function rewrite(item: unknown): unknown {
+    if (typeof item === "string") return item.replace(ABSOLUTE_URL_PATTERN, (url) => replacements.get(url) ?? url);
+    if (Array.isArray(item)) return item.map(rewrite);
+    if (item && typeof item === "object") return Object.fromEntries(Object.entries(item).map(([key, child]) => [key, rewrite(child)]));
+    return item;
+  }
+  const rewritten = rewrite(value) as T;
+  return { value: rewritten, metrics: { discoveryMs, materializationMs, rewriteMs: performance.now() - rewriteStarted, uniqueReferences: queue.length, concurrency } };
 }

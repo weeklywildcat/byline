@@ -1,5 +1,8 @@
 # Astro migration benchmark
 
+Historical September migration data. See [October build-performance measurements](build-performance-2026-10.md)
+for the current route count, prepared snapshots and incremental builds.
+
 Measurements were taken against the same live Weekly Wildcat CMS snapshot on
 September 6, 2026, using Node 26 on the same local machine. Next was measured
 before cutover; Astro was measured after a cold `.byline-build` reset. Network

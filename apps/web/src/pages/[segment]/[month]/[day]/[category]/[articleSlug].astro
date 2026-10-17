@@ -1,14 +1,14 @@
 ---
+import { articleRenderInputs, routeCacheKey } from "@/lib/route-cache";
 import BaseLayout from "@/src/layouts/BaseLayout.astro";
 import React from "react";
 import { getMetadata } from "@/views/[segment]/[month]/[day]/[category]/[articleSlug]/page";
 import { getBuildSnapshot } from "@/lib/build-snapshot";
 import { getPrimaryVisibleCategory, isVisibleContentPost } from "@/lib/content";
-import { buildArticlePresentation } from "@/lib/article-presentation";
 import { getBylineRestUrl } from "@/lib/byline-rest";
 import { getPublicationConfig } from "@/lib/publication";
 import { absoluteUrl, getBreadcrumbSchema, getNewsArticleSchema, serializeJsonLd } from "@/lib/seo";
-import { getPostContributors, getPostGameScoreGameIds, getPostHref, getPostPrimaryGameId, getPostRouteParts, isGuestContributor, type WordPressAuthor } from "@/lib/wordpress";
+import { getPostGameScoreGameIds, getPostHref, getPostRouteParts } from "@/lib/wordpress";
 import { stripHtml, decodeHtml } from "@/lib/format";
 import { ArticleView } from "@byline/ui";
 import { ArticleGameCard } from "@/components/ArticleGameCard";
@@ -20,27 +20,14 @@ export async function getStaticPaths() {
   const snapshot = await getBuildSnapshot();
   return snapshot.posts.filter(isVisibleContentPost).flatMap((post) => {
     const route = getPostRouteParts(post);
-    return route ? [{ params: { segment: route.year, month: route.month, day: route.day, category: route.category, articleSlug: route.slug } }] : [];
+    return route ? [{ params: { segment: route.year, month: route.month, day: route.day, category: route.category, articleSlug: route.slug }, cacheKey: routeCacheKey(snapshot, "article", post.id) }] : [];
   });
 }
 const params = { segment: Astro.params.segment!, month: Astro.params.month!, day: Astro.params.day!, category: Astro.params.category!, articleSlug: Astro.params.articleSlug! };
 const metadata = await getMetadata({ params: Promise.resolve(params) });
 const snapshot = await getBuildSnapshot();
 const post = snapshot.indexes.postsBySlug.get(params.articleSlug)!;
-const embeddedContributors = getPostContributors(post);
-const contributors = embeddedContributors.map((embedded) => snapshot.contributors.find((candidate) =>
-  isGuestContributor(candidate) === isGuestContributor(embedded) && (candidate.id === embedded.id || candidate.slug === embedded.slug)
-) ?? embedded);
-const author = contributors.find((contributor): contributor is WordPressAuthor => !isGuestContributor(contributor)) ?? null;
-const contributorKeys = contributors.map((contributor) => `${isGuestContributor(contributor) ? "guest" : "user"}:${contributor.id}`);
-const authorPosts = [...new Map(contributorKeys.flatMap((key) => snapshot.indexes.postsByContributor.get(key) ?? []).map((candidate) => [candidate.id, candidate])).values()].filter(isVisibleContentPost);
-const relatedPosts = [...new Map([
-  ...post.categories.flatMap((id) => snapshot.indexes.postsByCategory.get(id) ?? []),
-  ...post.tags.flatMap((id) => snapshot.indexes.postsByTag.get(id) ?? [])
-].map((candidate) => [candidate.id, candidate])).values()].filter(isVisibleContentPost);
-const presentation = buildArticlePresentation({ post, allPosts: snapshot.posts, contributors, author, visiblePosts: snapshot.posts.filter(isVisibleContentPost), authorPosts, relatedCandidates: relatedPosts });
-const primaryGameId = getPostPrimaryGameId(post);
-const primaryGame = primaryGameId ? snapshot.games.find((game) => game.id === primaryGameId) ?? null : null;
+const { presentation, primaryGame } = articleRenderInputs(snapshot, post);
 const showPrimaryGame = Boolean(primaryGame && !getPostGameScoreGameIds(post).includes(primaryGame.id));
 const title = stripHtml(post.title.rendered);
 const articleUrl = absoluteUrl(getPostHref(post));

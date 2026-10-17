@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://byline.pub/schemas/public-build-snapshot.schema.json",
+  "title": "Byline immutable public build snapshot v1",
+  "description": "Exact-byte SHA-256 and byte length are carried by the discovery pointer, avoiding a self-referential artifact digest. Dataset counts must match array lengths; publication.revision must equal revision.",
+  "type": "object",
+  "required": ["schemaVersion", "revision", "generatedAt", "sourceTimezone", "publication", "datasets", "counts"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "sourceTimezone": { "type": "string", "description": "WordPress timezone used for canonical school-event filtering." },
+    "publication": { "$ref": "publication.schema.json" },
+    "counts": { "type": "object", "required": ["posts", "authors", "guests", "categories", "tags", "pages", "corrections", "coverages", "schoolEvents", "attachments"], "additionalProperties": { "type": "integer", "minimum": 0 } },
+    "datasets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["posts", "authors", "guests", "categories", "tags", "pages", "corrections", "coverages", "schoolEvents", "attachments"],
+      "properties": {
+        "posts": { "type": "array", "items": { "$ref": "#/$defs/post" } },
+        "pages": { "type": "array", "items": { "$ref": "#/$defs/page" } },
+        "authors": { "type": "array", "items": { "$ref": "#/$defs/person" } },
+        "guests": { "type": "array", "items": { "$ref": "#/$defs/person" } },
+        "categories": { "type": "array", "items": { "$ref": "#/$defs/term" } },
+        "tags": { "type": "array", "items": { "$ref": "#/$defs/term" } },
+        "corrections": { "type": "array", "items": { "type": "object", "required": ["id", "type", "text", "date", "storyId", "story"], "properties": { "id": { "$ref": "#/$defs/id" }, "type": { "enum": ["correction", "clarification", "editors-note", "substantive-update"] }, "text": { "type": "string" }, "date": { "type": "string" }, "storyId": { "type": "integer" }, "story": { "type": "object", "required": ["id", "title", "url", "slug"] } }, "additionalProperties": false } },
+        "coverages": { "type": "array", "items": { "type": "object", "required": ["id", "slug", "title", "description", "overview", "status", "artwork", "stories"], "properties": { "id": { "$ref": "#/$defs/id" }, "slug": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" }, "overview": { "type": "string" }, "startAt": { "type": "string" }, "endAt": { "type": "string" }, "status": { "type": "string" }, "artwork": { "type": ["object", "null"] }, "stories": { "type": "array", "items": { "type": "object", "required": ["id", "slug", "title", "url", "excerpt", "publishedAt", "modifiedAt"] } } }, "additionalProperties": false } },
+        "schoolEvents": { "type": "array", "items": { "type": "object", "required": ["id", "title", "slug", "startDate", "endDate", "allDay", "display"], "properties": { "id": { "type": "integer" }, "title": { "type": "string" }, "slug": { "type": "string" }, "eventType": { "type": "string" }, "startDate": { "type": "string" }, "endDate": { "type": "string" }, "allDay": { "type": "boolean" }, "location": { "type": "string" }, "description": { "type": "string" }, "externalUrl": { "type": "string" }, "status": { "enum": ["scheduled", "canceled"] }, "display": { "type": "object", "required": ["date", "time", "status"] } }, "additionalProperties": false } },
+        "attachments": { "type": "array", "items": { "type": "object", "required": ["id", "source_url", "media_details", "title", "caption", "alt_text"], "properties": { "id": { "type": "integer" }, "source_url": { "type": "string" }, "media_details": { "type": "object" }, "title": { "$ref": "#/$defs/rendered" }, "caption": { "$ref": "#/$defs/rendered" }, "alt_text": { "type": "string" } } } }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": ["integer", "string"] },
+    "rendered": { "type": "object", "required": ["rendered"], "properties": { "rendered": { "type": "string" } }, "additionalProperties": false },
+    "person": { "type": "object", "required": ["id", "name", "slug"], "properties": { "id": { "$ref": "#/$defs/id" }, "name": { "type": "string" }, "slug": { "type": "string" } }, "description": "Allowlisted public canonical author or guest projection, including public profile photo, role, bio and socials; never raw WP_User records." },
+    "term": { "type": "object", "required": ["id", "name", "slug", "taxonomy"], "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "slug": { "type": "string" }, "taxonomy": { "enum": ["category", "post_tag"] } } },
+    "page": { "type": "object", "required": ["id", "slug", "status", "title", "excerpt", "content", "date", "modified"], "properties": { "id": { "type": "integer" }, "slug": { "type": "string" }, "status": { "const": "publish" }, "title": { "$ref": "#/$defs/rendered" }, "excerpt": { "$ref": "#/$defs/rendered" }, "content": { "$ref": "#/$defs/rendered" }, "date": { "type": "string" }, "modified": { "type": "string" }, "bylinePage": { "type": "object" } } },
+    "post": { "allOf": [{ "$ref": "#/$defs/page" }, { "type": "object", "required": ["type", "author", "featured_media", "categories", "tags", "sticky", "_embedded", "contributors", "corrections"], "properties": { "type": { "const": "post" }, "author": { "type": "integer" }, "featured_media": { "type": "integer" }, "categories": { "type": "array", "items": { "type": "integer" } }, "tags": { "type": "array", "items": { "type": "integer" } }, "sticky": { "type": "boolean" }, "_embedded": { "type": "object", "required": ["author", "wp:featuredmedia", "wp:term"] }, "contributors": { "type": "array", "items": { "$ref": "#/$defs/person" } }, "corrections": { "type": "array" } } }] }
+  }
+}
