@@ -27,7 +27,7 @@ import { useDispatch, useSelect } from '@wordpress/data';
 import { useCallback, useEffect, useMemo, useRef, useState } from '@wordpress/element';
 import * as editPostModule from '@wordpress/edit-post';
 import { __, sprintf } from '@wordpress/i18n';
-import { listView } from '@wordpress/icons';
+import { formatBold } from '@wordpress/icons';
 import { registerPlugin } from '@wordpress/plugins';
 import type { ComponentType, ReactNode } from 'react';
 
@@ -1839,7 +1839,7 @@ function EditorialWorkflowPlugin() {
         </div>
       </PluginPostStatusInfo>
 
-      <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={listView} className="byline-editorial-sidebar">
+      <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={formatBold} className="byline-editorial-sidebar">
         <Panel className="byline-story-panel">
           <StorySummary payload={payload} title={title} />
           {postId > 0 ? <StoryPreviewLaunch postId={postId} /> : null}
