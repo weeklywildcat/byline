@@ -39,6 +39,7 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .featured-image figcaption, .byline-article-view .article-body figcaption { color: var(--muted); display: grid; gap: 4px; font-family: var(--font-ui); font-size: .8rem; line-height: 1.45; margin-top: 8px; }
 .byline-article-view .featured-image figcaption p, .byline-article-view .article-body figcaption p { margin: 0; }
 .byline-article-view .photo-credit { color: var(--soft-muted); flex: 0 0 auto; font-weight: 800; max-width: 40%; text-align: right; text-transform: uppercase; }
+.byline-article-view .article-body figcaption .photo-credit { max-width: none; text-align: left; }
 .byline-article-view .article-body { font-size: 1.17rem; line-height: 1.72; }
 .byline-article-view .article-body p { text-wrap: pretty; }
 .byline-article-view .article-body > *:first-child { margin-top: 0; }
