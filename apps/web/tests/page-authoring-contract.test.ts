@@ -8,7 +8,7 @@ function readSource(relativePath: string) {
 
 const pageRoute = readSource("../views/[segment]/page.tsx");
 const buildSnapshot = readSource("../lib/build-snapshot.ts");
-const sitemap = readSource("../views/sitemap.ts");
+const sitemap = readSource("../views/sitemap.ts") + readSource("../lib/sitemap.ts");
 const wordpress = readSource("../lib/wordpress.ts");
 const pageBlocks = readSource("../../../wordpress-plugin/includes/content/page-blocks.php");
 const pageMigration = readSource("../../../wordpress-plugin/includes/content/pages.php");
@@ -27,7 +27,8 @@ describe("native WordPress Page authoring contract", () => {
   it("includes each WordPress Page in the sitemap with its own modified date", () => {
     expect(sitemap).not.toContain("STATIC_PAGES");
     expect(sitemap).toContain("getAllPages");
-    expect(sitemap).toContain("getPageSitemapDate(page)");
+    expect(sitemap).toContain("modifiedAt(page, timeZone)");
+    expect(sitemap).toContain("getPageIndexing(page) !== \"public\"");
     expect(sitemap).toContain("modified_gmt");
   });
 

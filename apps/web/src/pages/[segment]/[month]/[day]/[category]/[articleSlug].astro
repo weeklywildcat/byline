@@ -54,7 +54,7 @@ const slots = {
   newsletter: React.createElement("div", { id: "article-newsletter-island-slot" })
 };
 ---
-<BaseLayout metadata={metadata} themeColor="#fbfaf7" stickyLogo>
+<BaseLayout metadata={metadata} themeColor="#fbfaf7" stickyLogo hideMastheadDate>
   <script id="newsarticle-json-ld" type="application/ld+json" set:html={serializeJsonLd(getNewsArticleSchema(post))}></script>
   <script id="article-breadcrumb-json-ld" type="application/ld+json" set:html={serializeJsonLd(getBreadcrumbSchema([
     { name: "Home", path: "/" },

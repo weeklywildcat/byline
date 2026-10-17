@@ -5,7 +5,7 @@ import { StoryTeaser } from "@/components/StoryTeaser";
 import { filterVisibleContentPosts, isHiddenCategory } from "@/lib/content";
 import { decodeHtml, stripHtml } from "@/lib/format";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
-import { getPublicationConfig } from "@/lib/publication";
+import { getCategorySeoDescription } from "@/lib/sections";
 import { getCategoryBySlug, getPostsByCategory } from "@/lib/wordpress";
 
 type CategoryPageProps = {
@@ -14,7 +14,6 @@ type CategoryPageProps = {
   }>;
 };
 
-const publication = getPublicationConfig();
 // Stories beside the lead; the rest of the section runs in a grid below.
 const RAIL_STORY_COUNT = 4;
 
@@ -31,7 +30,7 @@ export async function getMetadata({ params }: CategoryPageProps): Promise<Metada
 
   return buildPageMetadata({
     title: categoryName,
-    description: category.description ? stripHtml(category.description) : `Latest ${categoryName} stories from ${publication.identity.shortName}.`,
+    description: getCategorySeoDescription({ slug: category.slug, name: categoryName, description: stripHtml(category.description ?? "") }),
     path: `/category/${category.slug}/`
   });
 }

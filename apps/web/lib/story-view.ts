@@ -1,6 +1,7 @@
 import { cleanDeckText, stripBracketedEllipsis, type AthleteSpotlightView, type StoryView } from "@byline/ui";
 import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
+import { getMeaningfulImageAlt } from "@/lib/image-alt";
 import {
   getAuthorHref,
   getFeaturedMedia,
@@ -50,7 +51,7 @@ export function toStoryView(post: WordPressPost, options: StoryViewOptions = {})
     image: image?.source_url
       ? {
           src: image.source_url,
-          alt: image.alt_text || stripHtml(image.title.rendered ?? ""),
+          alt: getMeaningfulImageAlt(image),
           width: image.media_details?.width ?? null,
           height: image.media_details?.height ?? null,
           ...(credit ? { credit } : {})
@@ -98,7 +99,7 @@ export function toAthleteSpotlightView(post: WordPressPost): AthleteSpotlightVie
     image: image?.source_url
       ? {
           src: image.source_url,
-          alt: image.alt_text || stripHtml(image.title.rendered ?? ""),
+          alt: getMeaningfulImageAlt(image),
           width: image.media_details?.width ?? null,
           height: image.media_details?.height ?? null,
           ...(credit ? { credit } : {})

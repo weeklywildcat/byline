@@ -13,7 +13,8 @@ behavior preserved by the additive Byline 0.2 contracts.
 - Category routes: `/category/{slug}/`; author routes: `/author/{slug}/` and
   `/authors/`; sports routes: `/sports/`, `/sports/schedule/`, team hubs, and
   team-season archives.
-- Static sitemap, news sitemap, robots, NewsArticle schema, Organization schema,
+- Static sitemap, news sitemap, RSS feed (`/feed.xml`), robots, NewsArticle schema,
+  NewsMediaOrganization schema,
   image licensing fields, OpenGraph/Twitter metadata, and normal `<img>` media.
 - Homepage post selection reserves the athlete spotlight, prioritizes a sticky
   lead, and mutates one layout-wide used-ID set so later modules do not repeat

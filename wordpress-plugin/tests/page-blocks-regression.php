@@ -62,6 +62,13 @@ page_blocks_assert($meta['sanitize_callback'] === 'sanitize_text_field', 'The pa
 page_blocks_assert(($meta['auth_callback'])(false, BYLINE_PAGE_EYEBROW_META, 42, 7) === true, 'The page eyebrow meta auth callback should allow page editors.');
 page_blocks_assert(($meta['auth_callback'])(false, BYLINE_PAGE_EYEBROW_META, 42, 8) === false, 'The page eyebrow meta auth callback should reject other users.');
 
+$indexing_meta = $page_block_test['meta']['page'][BYLINE_PAGE_INDEXING_META] ?? null;
+page_blocks_assert(is_array($indexing_meta) && $indexing_meta['show_in_rest'] === true && $indexing_meta['default'] === 'public', 'The page indexing meta must be registered in REST and default to public.');
+page_blocks_assert(($indexing_meta['auth_callback'])(false, BYLINE_PAGE_INDEXING_META, 42, 7) === true, 'The page indexing meta auth callback should allow page editors.');
+page_blocks_assert(($indexing_meta['auth_callback'])(false, BYLINE_PAGE_INDEXING_META, 42, 8) === false, 'The page indexing meta auth callback should reject other users.');
+page_blocks_assert(byline_page_indexing_value('NOINDEX ') === 'noindex' && byline_page_indexing_value('internal') === 'internal', 'Known indexing values must be preserved.');
+page_blocks_assert(byline_page_indexing_value('') === 'public' && byline_page_indexing_value('anything-else') === 'public' && byline_page_indexing_value(null) === 'public', 'Unknown indexing values must fall back to public.');
+
 byline_enable_page_excerpt_support();
 page_blocks_assert(in_array('excerpt', $page_block_test['post_type_supports']['page'] ?? [], true), 'Pages must support native excerpts.');
 

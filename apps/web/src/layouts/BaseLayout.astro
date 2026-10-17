@@ -7,17 +7,28 @@ import "../../views/fonts.css";
 import "../../views/globals.css";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import { absoluteUrl, getOrganizationSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
-import { serializeMetadata, type Metadata } from "@/lib/metadata";
+import { absoluteUrl, SITE_DESCRIPTION } from "@/lib/seo";
+import { serializeMetadata, type Metadata, type SocialImage } from "@/lib/metadata";
 import { getPublicationConfig } from "@/lib/publication";
 import { getActiveTheme, getThemeCssVariables, SELF_HOSTED_FONTS } from "@/lib/theme";
 
-interface Props { metadata?: Metadata; themeColor?: string; noCanonical?: boolean; stickyLogo?: boolean; stickyNav?: boolean; }
-const { metadata = {}, themeColor, noCanonical = false, stickyLogo = false, stickyNav = false } = Astro.props;
+interface Props {
+  metadata?: Metadata;
+  themeColor?: string;
+  noCanonical?: boolean;
+  stickyLogo?: boolean;
+  stickyNav?: boolean;
+  // Article pages omit the masthead's build date; the homepage masthead is its h1.
+  hideMastheadDate?: boolean;
+  homepage?: boolean;
+}
+const { metadata = {}, themeColor, noCanonical = false, stickyLogo = false, stickyNav = false, hideMastheadDate = false, homepage = false } = Astro.props;
 const publication = getPublicationConfig();
 const activeTheme = getActiveTheme();
-const rawTitle = typeof metadata.title === "string" ? metadata.title : publication.seo.defaultTitle;
-const title = rawTitle === publication.seo.defaultTitle ? rawTitle : `${rawTitle} | ${publication.identity.shortName}`;
+const metadataTitle = metadata.title;
+const absoluteTitle = typeof metadataTitle === "object" && metadataTitle !== null && "absolute" in metadataTitle ? metadataTitle.absolute : undefined;
+const rawTitle = absoluteTitle ?? (typeof metadataTitle === "string" ? metadataTitle : publication.seo.defaultTitle);
+const title = absoluteTitle !== undefined || rawTitle === publication.seo.defaultTitle ? rawTitle : `${rawTitle} | ${publication.identity.shortName}`;
 const description = typeof metadata.description === "string" ? metadata.description : SITE_DESCRIPTION;
 const canonicalValue = metadata.alternates?.canonical;
 const canonical = absoluteUrl(typeof canonicalValue === "string" ? canonicalValue : Astro.url.pathname);
@@ -33,6 +44,10 @@ const googleContent = googleBot ? [
   googleBot["max-image-preview"] ? `max-image-preview:${googleBot["max-image-preview"]}` : "",
   typeof googleBot["max-video-preview"] === "number" ? `max-video-preview:${googleBot["max-video-preview"]}` : ""
 ].filter(Boolean).join(",") : "";
+// Crawlers fetch these from outside the site, so no relative path may reach a tag.
+function socialImages(images: SocialImage[] | undefined) {
+  return images?.map((image) => typeof image === "string" ? absoluteUrl(image) : { ...image, url: absoluteUrl(image.url) });
+}
 const socialMetadataTags = serializeMetadata({
   openGraph: {
     title: openGraph.title ?? rawTitle,
@@ -41,7 +56,7 @@ const socialMetadataTags = serializeMetadata({
     siteName: openGraph.siteName ?? publication.identity.name,
     locale: openGraph.locale ?? publication.locale.replace(/-/g, "_"),
     type: openGraph.type ?? "website",
-    images: openGraph.images,
+    images: socialImages(openGraph.images),
     publishedTime: openGraph.publishedTime,
     modifiedTime: openGraph.modifiedTime,
     authors: openGraph.authors,
@@ -52,7 +67,7 @@ const socialMetadataTags = serializeMetadata({
     card: twitter.card ?? "summary_large_image",
     title: twitter.title ?? rawTitle,
     description: twitter.description ?? description,
-    images: twitter.images
+    images: socialImages(twitter.images)
   }
 });
 const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key, value]) => `${key}:${value}`).join(";");
@@ -68,6 +83,7 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
     <meta name="robots" content={robotContent} />
     {googleContent && <meta name="googlebot" content={googleContent} />}
     {!noCanonical && <link rel="canonical" href={canonical} />}
+    <link rel="alternate" type="application/rss+xml" title={publication.identity.name} href={absoluteUrl("/feed.xml")} />
     {publication.branding.icons.map((icon) => <link rel={icon.width === 180 ? "apple-touch-icon" : "icon"} href={icon.url} sizes={icon.width && icon.height ? `${icon.width}x${icon.height}` : undefined} />)}
     {SELF_HOSTED_FONTS.preload.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin="anonymous" />)}
     <link rel="stylesheet" href={SELF_HOSTED_FONTS.stylesheet} />
@@ -75,12 +91,11 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
       ? <meta property={tag.key} content={tag.content} />
       : <meta name={tag.key} content={tag.content} />)}
     <script type="speculationrules" is:inline set:html={JSON.stringify({ prefetch: [{ where: { and: [{ href_matches: "/*" }, { not: { href_matches: ["/_wordpress-media/*", "/_byline/*", "/brand/*", "/*.xml", "/*.txt"] } }] }, eagerness: "moderate" }] })}></script>
-    <script id="organization-json-ld" type="application/ld+json" set:html={serializeJsonLd(getOrganizationSchema())}></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
     {stickyLogo && <div class="read-progress" aria-hidden="true"><span data-read-progress></span></div>}
-    <SiteHeader sticky={stickyLogo ? "logo" : stickyNav ? "nav" : undefined} />
+    <SiteHeader sticky={stickyLogo ? "logo" : stickyNav ? "nav" : undefined} showDate={!hideMastheadDate} homepage={homepage} />
     <span id="main-content" tabindex="-1"></span>
     {stickyNav && <script is:inline>
       (function () {

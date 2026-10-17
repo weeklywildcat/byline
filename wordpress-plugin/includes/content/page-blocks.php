@@ -77,6 +77,17 @@ function byline_register_page_meta(): void
             return user_can((int) $user_id, 'edit_post', (int) $post_id);
         },
     ]);
+
+    register_post_meta('page', BYLINE_PAGE_INDEXING_META, [
+        'single' => true,
+        'type' => 'string',
+        'default' => 'public',
+        'sanitize_callback' => 'byline_page_indexing_value',
+        'show_in_rest' => true,
+        'auth_callback' => static function ($allowed, $meta_key, $post_id, $user_id): bool {
+            return user_can((int) $user_id, 'edit_post', (int) $post_id);
+        },
+    ]);
 }
 add_action('init', 'byline_register_page_meta', 10);
 

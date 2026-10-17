@@ -18,6 +18,7 @@ describe("Astro static frontend contract", () => {
     const manifest = JSON.parse(read("package.json"));
     expect(manifest.scripts.build).toContain("astro-with-publication");
     expect(manifest.scripts.postbuild).toContain("verify-build.mjs");
+    expect(manifest.scripts.postbuild).toContain("verify-seo.mjs");
     expect(manifest.scripts.postbuild).toContain("copy-wordpress-media-to-out.mjs");
     expect(read("scripts/verify-static-export.mjs")).toContain("_byline/search-index.json");
   });
@@ -29,6 +30,13 @@ describe("Astro static frontend contract", () => {
     expect(metadata).toContain('"article:section"');
     expect(metadata).toContain('"og:image:width"');
     expect(metadata).toContain("image:alt");
+  });
+
+  it("advertises the RSS feed and keeps the feed and news sitemap static", () => {
+    expect(read("src/layouts/BaseLayout.astro")).toContain('type="application/rss+xml"');
+    expect(read("src/pages/feed.xml.ts")).toContain("export const prerender = true");
+    expect(read("src/pages/news-sitemap.xml.ts")).toContain("export const prerender = true");
+    expect(read("lib/build-snapshot.ts")).toContain('{ path: "/feed.xml", kind: "feed" }');
   });
 
   it("removes the runnable Next route tree after cutover", () => {

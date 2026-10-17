@@ -15,7 +15,7 @@ export type RobotsPolicy = {
 
 export type Metadata = {
   metadataBase?: URL;
-  title?: string | { default: string; template: string };
+  title?: string | { absolute: string } | { default: string; template: string };
   description?: string;
   alternates?: { canonical?: string; types?: Record<string, string> };
   robots?: RobotsPolicy & { googleBot?: RobotsPolicy };
@@ -33,6 +33,7 @@ export type Metadata = {
     images?: SocialImage[];
     publishedTime?: string;
     modifiedTime?: string;
+    /** Profile URLs (absolute) of the article's authors, per the Open Graph article spec. */
     authors?: string[];
     section?: string;
     tags?: string[];

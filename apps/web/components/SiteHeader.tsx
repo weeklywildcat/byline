@@ -29,14 +29,21 @@ type SiteHeaderProps = {
   // logo (articles). Both lift the header's children into the body so
   // position: sticky can last the whole page.
   sticky?: "nav" | "logo";
+  // The masthead date is the day the site was built, not a story date. Article
+  // pages leave it out so the only date a crawler finds there is the story's.
+  showDate?: boolean;
+  // The homepage has no headline of its own, so its masthead is the page's h1.
+  homepage?: boolean;
 };
 
-export function SiteHeader({ sticky }: SiteHeaderProps) {
+export function SiteHeader({ sticky, showDate = true, homepage = false }: SiteHeaderProps) {
+  const mastheadImage = <img src={publication.branding.masthead.url} alt={publication.branding.masthead.alt} />;
+
   return (
     <header className={sticky ? `site-header site-header--flat site-header--${sticky}` : "site-header"}>
-      <div className="site-utility" aria-label="Publication details">
+      <div className={showDate ? "site-utility" : "site-utility site-utility--undated"} aria-label="Publication details">
         <span>{publication.location.display}</span>
-        <time dateTime={dateTime}>{headerDate}</time>
+        {showDate ? <time dateTime={dateTime}>{headerDate}</time> : null}
         <div className="header-tools" aria-label="Site tools">
           <a className="header-donate" href={DONATE_URL}>
             Donate
@@ -51,9 +58,15 @@ export function SiteHeader({ sticky }: SiteHeaderProps) {
       </div>
 
       {sticky === "logo" ? <div className="sticky-logo-bar" data-sticky-logo-bar aria-hidden="true" /> : null}
-      <a className="masthead-logo" href="/" aria-label={`${publication.identity.name} home`}>
-        <img src={publication.branding.masthead.url} alt={publication.branding.masthead.alt} />
-      </a>
+      {homepage ? (
+        <h1 className="masthead-logo">
+          <a href="/">{mastheadImage}</a>
+        </h1>
+      ) : (
+        <a className="masthead-logo" href="/" aria-label={`${publication.identity.name} home`}>
+          {mastheadImage}
+        </a>
+      )}
 
       <nav aria-label="Sections" className="section-nav">
         {headerNavigation.map((section) => (

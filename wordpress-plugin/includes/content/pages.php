@@ -9,6 +9,7 @@ const BYLINE_WEEKLY_PAGE_SEED_VERSION = 2;
 const BYLINE_WEEKLY_PAGE_MIGRATION_VERSION = 3;
 const BYLINE_PAGE_CORRECTION_FAILURE_OPTION = 'byline_page_correction_failures';
 const BYLINE_PAGE_EYEBROW_META = '_byline_page_eyebrow';
+const BYLINE_PAGE_INDEXING_META = '_byline_page_indexing';
 const BYLINE_PAGE_SEED_HASH_META = '_byline_legacy_seed_hash';
 
 function byline_weekly_page_seed(): array
@@ -664,11 +665,24 @@ function byline_get_weekly_page_migration_report(): array
     ];
 }
 
+/**
+ * How a Page takes part in search on the public site: `public` (default),
+ * `noindex` (published and linkable, but marked noindex and left out of the
+ * sitemap), or `internal` (operational; not published on the public site).
+ */
+function byline_page_indexing_value($value): string
+{
+    $value = is_string($value) ? strtolower(trim($value)) : '';
+
+    return in_array($value, ['noindex', 'internal'], true) ? $value : 'public';
+}
+
 function byline_register_page_rest_fields(): void
 {
     register_rest_field('page', 'bylinePage', [
         'get_callback' => static fn(array $object): array => array_merge([
             'eyebrow' => sanitize_text_field((string) get_post_meta((int) $object['id'], BYLINE_PAGE_EYEBROW_META, true)),
+            'indexing' => byline_page_indexing_value(get_post_meta((int) $object['id'], BYLINE_PAGE_INDEXING_META, true)),
         ], function_exists('byline_sports_archive_page_metadata') ? byline_sports_archive_page_metadata((int) $object['id']) : []),
         'schema' => [
             'description' => 'Byline presentation metadata for a WordPress Page.',

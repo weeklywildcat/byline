@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { appendFile, mkdir, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { stripHtml } from "@/lib/format";
+import { getMeaningfulImageAlt } from "@/lib/image-alt";
 import { deterministicMediaPath, MEDIA_CACHE_VERSION, stableDigest } from "@byline/content";
 
 const DEFAULT_WP_API_URL = "https://cms.weeklywildcat.com/wp-json/wp/v2";
@@ -146,7 +146,7 @@ export function getResponsiveImageProps(
     sizes: options.sizes ?? DEFAULT_RESPONSIVE_IMAGE_SIZES,
     width,
     height,
-    alt: options.alt ?? (image.alt_text?.trim() || stripHtml(image.title?.rendered ?? "")),
+    alt: options.alt ?? getMeaningfulImageAlt(image),
     loading: options.loading ?? (options.priority ? "eager" : "lazy"),
     decoding: "async",
     fetchPriority: options.fetchPriority ?? (options.priority ? "high" : "auto")
