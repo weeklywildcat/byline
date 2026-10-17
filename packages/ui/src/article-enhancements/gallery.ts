@@ -63,7 +63,14 @@ function sourcesFor(item: GalleryItem, base: string): string[] {
 }
 
 function captionFor(image: HTMLImageElement) {
-  return image.closest("figure")?.querySelector("figcaption")?.textContent?.trim() || "";
+  const figcaption = image.closest("figure")?.querySelector("figcaption");
+  if (!figcaption) return "";
+  // The photo credit is its own paragraph; keep it apart from the caption text
+  // rather than running the two together ("...SaturdayPhoto: Name").
+  const clone = figcaption.cloneNode(true) as HTMLElement;
+  const credit = [...clone.querySelectorAll(".photo-credit")].map((node) => node.textContent?.trim() || "").filter(Boolean);
+  clone.querySelectorAll(".photo-credit").forEach((node) => node.remove());
+  return [clone.textContent?.trim() || "", ...credit].filter(Boolean).join(" — ");
 }
 
 export function enhanceArticleGalleries(root: ParentNode = document): () => void {

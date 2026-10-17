@@ -104,6 +104,13 @@ describe('Photo Gallery lightbox (#137 contract)', () => {
     expect(dialog()!.querySelector('[role="status"]')!.textContent).toBe('Photograph 1 of 3');
   });
 
+  it('keeps the photo credit apart from the caption in the lightbox', () => {
+    root.innerHTML = gallery('<figure class="wp-block-image"><a href="' + base + '/a.jpg"><img data-byline-full-url="' + base + '/a.jpg" src="' + base + '/a-1024x683.jpg" alt=""></a><figcaption>a caption<p class="photo-credit">Photo: Jane Doe</p></figcaption></figure>');
+    enhanceArticleGalleries(root);
+    root.querySelector<HTMLAnchorElement>('a')!.click();
+    expect(dialog()!.querySelector('figcaption')!.textContent).toBe('a caption — Photo: Jane Doe');
+  });
+
   it('resolves the source in order: full-url attribute, image link, widest srcset, currentSrc, src', () => {
     const open = (html: string, current = '') => {
       root.innerHTML = gallery(html);

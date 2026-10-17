@@ -307,6 +307,14 @@ Patterns are unlocked starters; they are not article formats or templates.
   Text fields in the new blocks keep what is typed locally, so fast typing never
   loses characters while the editor catches up.
 
+**Photo credits on body images.** Core's Image and Media & Text blocks do not
+print credit, so `wordpress-plugin/includes/content/photo-credits.php` adds
+`<p class="photo-credit">Photo: Name</p>` to the figure's caption at render time
+(never to saved content). The name is the attachment's Image Creator, then its
+credit line, the same order as the lead image. Because it runs in WordPress, the
+static export, REST `content.rendered` and Preview as Byline all agree.
+Image-fill Portrait + Text blocks are backgrounds and carry no credit line.
+
 Media retain attachment IDs plus stable image snapshots (URL, dimensions,
 responsive sources, alt and canonical photo credit). Credit comes from the
 existing Byline attachment metadata resolver, also used by Preview as Byline.
