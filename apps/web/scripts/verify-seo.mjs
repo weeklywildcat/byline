@@ -1,7 +1,7 @@
 import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { auditFeed, auditNewsSitemap, auditPage, auditSitemap, parsePage, sitemapLocations } from "./seo-audit.mts";
+import { auditFeed, auditNewsSitemap, auditPage, auditSitemap, auditSitemapImages, decodeEntities, parsePage, sitemapImageLocations, sitemapLocations } from "./seo-audit.mts";
 
 // Fails the build when generated pages drift from the search/social contract:
 // absolute canonical and social URLs, timezone-aware dates, a sitemap that lists
@@ -55,7 +55,7 @@ for (const file of htmlFiles) {
 }
 
 for (const [name, audit] of [
-  ["sitemap.xml", (xml) => auditSitemap(xml, pages, origin)],
+  ["sitemap.xml", (xml) => [...auditSitemap(xml, pages, origin), ...auditSitemapImages(xml, origin)]],
   ["news-sitemap.xml", (xml) => auditNewsSitemap(xml, pages, origin, Date.now())],
   ["feed.xml", (xml) => auditFeed(xml, pages, origin)]
 ]) {
@@ -79,6 +79,37 @@ for (const [route, page] of pages) {
   if (!page.canonical || !page.canonical.startsWith(origin)) continue;
   if (!sitemapUrls.has(page.canonical)) {
     issues.push({ route, message: `indexable canonical page is missing from sitemap: ${page.canonical}` });
+  }
+}
+
+// Media contract: every photograph the sitemap advertises and every full-size
+// source the lightbox or a media link can open must be a file in this export.
+// Markup that names a mirrored file the build did not copy is a broken deploy.
+async function publishedFileExists(url) {
+  let pathname;
+  try { pathname = decodeURIComponent(new URL(url, `${origin}/`).pathname); } catch { return false; }
+  return pathname.startsWith("/") && exists(path.join(outputRoot, pathname));
+}
+const sitemapFile = path.join(outputRoot, "sitemap.xml");
+if (await exists(sitemapFile)) {
+  for (const [page, images] of sitemapImageLocations(await readFile(sitemapFile, "utf8"))) {
+    for (const image of images) {
+      if (!(await publishedFileExists(image))) issues.push({ route: page, message: `sitemap image is not in the export: ${image}` });
+    }
+  }
+}
+for (const file of htmlFiles) {
+  const html = await readFile(file, "utf8");
+  const route = publicPath(file);
+  for (const tag of html.match(/<img\b[^>]*\bdata-byline-full-url=[^>]*>/gi) ?? []) {
+    const full = tag.match(/data-byline-full-url="([^"]*)"/i)?.[1];
+    if (full && full.includes("/_wordpress-media/") && !(await publishedFileExists(decodeEntities(full)))) {
+      issues.push({ route, message: `full-size photograph is not in the export: ${full}` });
+    }
+  }
+  for (const link of html.match(/<a\b[^>]*\bhref="[^"]*\/_wordpress-media\/[^"]*"[^>]*><img\b/gi) ?? []) {
+    const href = link.match(/href="([^"]*)"/i)?.[1];
+    if (href && !(await publishedFileExists(decodeEntities(href)))) issues.push({ route, message: `media link target is not in the export: ${href}` });
   }
 }
 

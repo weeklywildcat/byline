@@ -89,11 +89,69 @@ ordinary Gutenberg blocks; there is no second article format or layout builder.
 | Story Video | `core/video` variation/style | Self-hosted video with native controls/text tracks; no autoplay | Intrinsic proportions, including portrait |
 
 Photo Pair is intended for two images; Core still permits adding/removing them.
-Photo Gallery defaults to media links. On the public article, a small lazy-loaded
-native dialog enhances image-file links in galleries only: Previous/Next,
-arrow keys, Escape, Close, and restored focus. Without JavaScript, those links
-still open the files. Captions and alt text remain separate. Unrelated image
-links are not enhanced. Private preview keeps reader actions disabled.
+Photo Gallery defaults to media links.
+
+### Photo Gallery media delivery
+
+One photograph plays several roles, and each layer does one job:
+
+| Layer | Markup | Job |
+| --- | --- | --- |
+| Visible page | `<img src>` | An ordinary crawlable image and browser fallback |
+| Responsive delivery | `srcset` + `sizes` | Lets the browser pick a candidate for the rendered size and screen density |
+| Full media link | `<a href="FULL">` | Direct access and no-JavaScript enlargement for new galleries |
+| Byline metadata | `data-byline-full-url` | A reliable full-size source for the progressive lightbox |
+| Image sitemap | `<image:loc>FULL</image:loc>` in `/sitemap.xml` | Tells Google about the high-resolution editorial photograph |
+| Existing SEO | `NewsArticle.image`, Open Graph | Identifies the representative article image (unchanged) |
+
+**Why the inline image is not the full original.** The article uses responsive
+candidates (300, 768, 1024, 1536, 2048px as WordPress generates them) so a
+three-column gallery does not download several multi-megabyte photographs.
+Byline exposes the canonical original separately, to the lightbox and to the
+image sitemap. "Full" is whatever `wp_get_attachment_image_url($id, 'full')`
+returns (WordPress's `-scaled` file for very large uploads); filenames are never
+edited to guess an original.
+
+- **Responsive inline images.** WordPress supplies `src`, `srcset`, `width` and
+  `height`. Byline adds a `sizes` hint matching the grid (one column to 540px,
+  two to 900px, then the configured columns inside the 1040px measure), so a
+  ~335px cell on a 2x screen gets a 768px candidate, not the original. Photo
+  Pair gets the same hint for two columns.
+- **Full link and lightbox source.** At render time (saved content is never
+  rewritten), every attachment image gets `data-byline-full-url`. In a Photo
+  Gallery, a media link that points at another size of the same attachment is
+  rewritten to the full URL; custom links, attachment pages and unlinked images
+  are left alone. The attribute is deliberately not named `...-src`: core's
+  `wp_filter_content_tags()` finds an image's source with the unanchored pattern
+  `/src="([^"]+)"/`, and an attribute ending in `src` ahead of `src` makes it
+  compute `width`, `height` and `srcset` from the original.
+- **Enlargement.** Every image in a Photo Gallery enlarges with JavaScript,
+  linked or not. Linked images keep their ordinary link (modified clicks still
+  open normally). Unlinked images are wrapped in a generated button with
+  `aria-haspopup="dialog"`, an accessible name, keyboard activation and focus
+  styling. Other galleries keep the earlier rule: only images already linked to
+  an image file are enhanced. A link to anything other than an image file is the
+  writer's choice and is left alone.
+- **Lazy loading.** Nothing larger than the inline candidate loads with the
+  article. Opening a photograph loads its source in this order: the validated
+  `data-byline-full-url`, a full media link, the widest `srcset` candidate,
+  `currentSrc`, `src`. Only after the dialog opens are the previous and next
+  photographs warmed.
+- **No JavaScript.** Linked gallery images open the full file. Legacy unlinked
+  images simply stay images; new Photo Galleries default to media links.
+- **Google Images.** Do not rely on `data-*` attributes for discovery. The page
+  keeps normal `<img src>`, `srcset`, alt text and captions, and `/sitemap.xml`
+  carries `<image:image>` entries (`xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"`)
+  for each article: the featured image, then every editorial image in the body,
+  once, as the full mirrored URL. Related-story thumbnails, logos and other page
+  furniture are excluded, up to Google's 1,000 images per page. Only images on
+  the site's own origin are listed (a failed media mirror is left out). The build
+  fails if a listed image, a full-size source or a media link names a file that is
+  not in the export.
+- **Image CSS.** WordPress marks lazy images `sizes="auto, ..."`, which browsers
+  lay out as a 300x150 placeholder unless the image has a definite width. Gallery
+  images therefore do not set `width: auto` or `aspect-ratio: auto`; the
+  `width`/`height` attributes give the width cap and the aspect ratio.
 
 Timeline starts with two entries, permits up to 25, and provides inline Add,
 Remove, Move up/down controls with focus following the changed entry. Its date
@@ -156,6 +214,9 @@ with `BYLINE_UPDATE_STORY_FIXTURE=1` when run against the primary environment.
 The public fixture build publishes that WordPress-rendered content through the
 actual Astro article route. Public geometry checks cover 1440, 1200, 768, 390,
 and 320px, plus keyboard lightbox behavior and no-JavaScript file links.
+`apps/web/tests/browser/gallery-media.spec.ts` covers real JPEG galleries (srcset/sizes,
+Retina, lazy originals, navigation, sitemap); `wordpress-plugin/tests/e2e/gallery-media.spec.ts`
+covers WordPress rendering for new and existing galleries.
 
 ## Static-site and accessibility rules
 
