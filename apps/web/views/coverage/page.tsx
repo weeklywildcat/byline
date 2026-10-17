@@ -12,13 +12,20 @@ import {
 
 const publication = getPublicationConfig();
 
-export const metadata: Metadata = {
-  ...buildPageMetadata({
+export async function getMetadata(): Promise<Metadata> {
+  const coverages = await optionalBuildData(
+    "/wp-json/byline/v1/coverage",
+    getAllPublicCoverages,
+    []
+  );
+
+  return buildPageMetadata({
     title: "Coverage",
     description: `Special coverage, explainers, and ongoing reporting from ${publication.identity.shortName}.`,
-    path: "/coverage/"
-  })
-};
+    path: "/coverage/",
+    noIndex: coverages.length === 0
+  });
+}
 
 function coverageSortValue(coverage: WordPressCoverage) {
   return coverage.modified || coverage.startDate || "";
