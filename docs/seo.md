@@ -32,8 +32,8 @@ below is generated at build time and checked by `apps/web/scripts/verify-seo.mjs
 - The publication is one `NewsMediaOrganization` (`/#organization`), described in full
   on the homepage and referenced by `@id` (with name and logo) as each article's
   publisher. The `WebSite` entity (`/#website`) is named "Weekly Wildcat".
-- The homepage title is "Weekly Wildcat | Ninety Six High School Student Newspaper"
-  (built from the publication identity unless the CMS sets a custom default title) and
+- The homepage title is "Weekly Wildcat, Ninety Six High School's Official Student Newspaper"
+  (the site name plus the publication tagline, unless the CMS sets a custom default title) and
   the masthead is the page's single `h1`.
 - Image alt text is the editor's alt text, or an attachment title only if it reads like
   a description. Filename-like titles never become alt text.
