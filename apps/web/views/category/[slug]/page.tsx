@@ -27,11 +27,13 @@ export async function getMetadata({ params }: CategoryPageProps): Promise<Metada
   }
 
   const categoryName = decodeHtml(category.name);
+  const posts = filterVisibleContentPosts(await getPostsByCategory(category.id));
 
   return buildPageMetadata({
     title: categoryName,
     description: getCategorySeoDescription({ slug: category.slug, name: categoryName, description: stripHtml(category.description ?? "") }),
-    path: `/category/${category.slug}/`
+    path: `/category/${category.slug}/`,
+    noIndex: posts.length === 0
   });
 }
 
