@@ -12,6 +12,7 @@ export const CONTENTS = [
   { id: "history", label: "Our history" },
   { id: "coverage", label: "What we cover" },
   { id: "standards", label: "Standards and corrections" },
+  { id: "ai", label: "Artificial intelligence" },
   { id: "funding", label: "Money and independence" },
   { id: "technology", label: "Behind the website" },
   { id: "get-involved", label: "Get involved" },
@@ -201,23 +202,10 @@ export const EXPLORE: readonly {
 // Stories cited in the prose and photographs shown on the page, by slug.
 export const STORY_SLUGS = {
   relaunch: "a-new-era-for-student-journalism-nshs",
-  websiteUpgrade: "moving-weekly-wildcat-from-wordpress-to-next-js",
-  parking: "no-parking-pass-no-parking",
-  attendance: "why-being-here-matters-mrs-bennett-on-attendance",
-  megsHouse: "wildcat-courage-funding-the-fight-for-safety",
-  fca: "fca-athlete-breakfast-2026",
-  edgewood: "from-a-last-minute-video-to-a-national-finish"
+  websiteUpgrade: "moving-weekly-wildcat-from-wordpress-to-next-js"
 } as const;
 
 export const PHOTOS = {
-  sports: {
-    slug: "ninety-six-shuts-out-thornwell-63-0-its-fourth-straight-win",
-    alt: "A Ninety Six football player in a maroon No. 52 jersey high-fives a coach on the sideline at night, with the stadium scoreboard behind them."
-  },
-  culture: {
-    slug: "finding-a-place-in-the-spotlight",
-    alt: "Student performers stand in a line on a stage with their hands joined and raised, taking a bow after a show."
-  },
   website: {
     slug: "moving-weekly-wildcat-from-wordpress-to-next-js",
     alt: "A hand holds an iPhone showing the Weekly Wildcat homepage in front of a background of code."

@@ -12,7 +12,6 @@ import {
   getContributorRole,
   getFeaturedMedia,
   getMediaCredit,
-  getPostCategories,
   getPostHref,
   type WordPressPage,
   type WordPressPost
@@ -44,7 +43,6 @@ export type AboutStats = {
 export type AboutData = {
   stats: AboutStats;
   editors: AboutEditor[];
-  latestBySection: Record<string, AboutStory | undefined>;
   story: (slug: string) => AboutStory | undefined;
   photo: (slug: string, alt: string, sizes: string) => AboutPhoto | null;
 };
@@ -83,8 +81,6 @@ function getArchiveStats(pages: WordPressPage[]): AboutStats["archive"] {
   };
 }
 
-export const ABOUT_SECTION_SLUGS = ["news", "sports", "features", "culture", "opinion"] as const;
-
 export async function getAboutData(): Promise<AboutData> {
   const [allPosts, contributors, pages] = await Promise.all([
     requireBuildData("/wp-json/wp/v2/posts", getAllPosts),
@@ -94,12 +90,6 @@ export async function getAboutData(): Promise<AboutData> {
 
   const posts = filterVisibleContentPosts(allPosts).sort((a, b) => b.date.localeCompare(a.date));
   const oldest = posts.at(-1);
-
-  const latestBySection: AboutData["latestBySection"] = {};
-  for (const slug of ABOUT_SECTION_SLUGS) {
-    const post = posts.find((candidate) => getPostCategories(candidate).some((category) => category.slug === slug));
-    if (post) latestBySection[slug] = toStory(post);
-  }
 
   const editors = contributors
     .filter((contributor) => /editor/i.test(getContributorRole(contributor)))
@@ -123,7 +113,6 @@ export async function getAboutData(): Promise<AboutData> {
       archive: getArchiveStats(pages)
     },
     editors,
-    latestBySection,
     // Stories and photos are named by slug. If a story is ever unpublished the
     // page drops the link or the figure instead of breaking.
     story: (slug) => {

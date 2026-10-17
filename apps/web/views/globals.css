@@ -5509,7 +5509,6 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
 .about-kicker,
 .about-contents > p,
 .about-involvement-audience,
-.about-latest span,
 .about-timeline-when,
 .about-standards dt {
   font-family: var(--font-ui);
@@ -5874,74 +5873,56 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
 }
 
 .about-sections {
-  list-style: none;
   margin: 0;
-  padding: 0;
 }
 
-.about-sections li {
+.about-sections div {
   align-items: baseline;
   border-top: 1px solid var(--rule);
   display: grid;
-  gap: 8px 32px;
-  grid-template-columns: 170px minmax(0, 1fr) minmax(0, 0.9fr);
-  padding: 18px 0 20px;
+  gap: 4px 32px;
+  grid-template-columns: 170px minmax(0, 1fr);
+  padding: 14px 0 16px;
 }
 
-.about-sections li:first-child {
+.about-sections div:first-child {
   border-top-color: var(--rule-strong);
 }
 
-.about-sections h3 {
+.about-sections dt {
   font-family: var(--font-headline);
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   font-weight: 600;
   letter-spacing: -0.012em;
   line-height: 1.15;
-  margin: 0;
 }
 
-.about-sections h3 a {
+.about-sections dt a {
   color: var(--ink);
   text-decoration: none;
 }
 
-.about-sections h3 a:hover {
+.about-sections dt a:hover {
   color: var(--accent);
 }
 
-.about-sections p {
+.about-sections dd {
   font-family: var(--font-serif);
   font-size: 1.04rem;
   line-height: 1.5;
   margin: 0;
 }
 
-.about-sections .about-latest {
-  display: grid;
-  gap: 4px;
+.about-ai {
+  align-items: flex-start;
+  display: flex;
+  gap: 20px;
 }
 
-.about-latest span {
-  color: var(--soft-muted);
-  font-size: 0.68rem;
-}
-
-.about-latest a {
-  color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: 0.94rem;
-  font-weight: 600;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-  text-decoration: underline;
-  text-decoration-color: var(--rule);
-  text-decoration-thickness: 1px;
-}
-
-.about-latest a:hover {
+.about-ai-icon {
   color: var(--accent);
-  text-decoration-color: currentColor;
+  flex: none;
+  margin-top: 2px;
 }
 
 .about-photo {
@@ -6199,12 +6180,8 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .about-sections li {
+  .about-sections div {
     grid-template-columns: 150px minmax(0, 1fr);
-  }
-
-  .about-sections .about-latest {
-    grid-column: 2;
   }
 }
 
@@ -6261,12 +6238,8 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
     columns: 1;
   }
 
-  .about-sections li {
+  .about-sections div {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .about-sections .about-latest {
-    grid-column: auto;
   }
 
   .about-photo-pair,
