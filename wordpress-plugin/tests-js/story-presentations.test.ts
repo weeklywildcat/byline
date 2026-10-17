@@ -73,4 +73,26 @@ describe("Timeline", () => {
     expect(validateBlock(parsed)[0]).toBe(true);
     expect(serialize(parsed)).toBe(markup);
   });
+  it("omits blank event headings while preserving labels, explanations and round-trip validity", () => {
+    if (!getBlockType("byline/timeline")) registerBlockType(timelineMetadata as any, { save: TimelineSave as any });
+    const values = [
+      { label: "Fall 2026", title: "", body: "" },
+      { label: "", title: " \t\n ", body: 'More <em>context</em> with <a href="/coverage/">reporting</a>.' },
+      { label: "Now", title: "Decision", body: "The event continues." }
+    ];
+    const markup = serialize(createBlock("byline/timeline", { items: values }));
+    const fragment = document.createElement("div");
+    fragment.innerHTML = markup;
+    expect(fragment.querySelectorAll("ol > li")).toHaveLength(3);
+    expect(fragment.querySelectorAll("h3")).toHaveLength(1);
+    expect(fragment.querySelector("h3")!.textContent).toBe("Decision");
+    expect(fragment.querySelector("li:first-child .byline-timeline-label")!.textContent).toBe("Fall 2026");
+    expect(fragment.querySelector("li:nth-child(2) .byline-timeline-body em")!.textContent).toBe("context");
+    expect(fragment.querySelector("li:nth-child(2) a")!.getAttribute("href")).toBe("/coverage/");
+    const [parsed] = parse(markup);
+    expect(parsed.attributes.items).toEqual(values);
+    expect(validateBlock(parsed)[0]).toBe(true);
+    expect(serialize(parsed)).toBe(markup);
+  });
+
 });
