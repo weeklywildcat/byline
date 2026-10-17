@@ -6,8 +6,11 @@ import {
   buildSocialImageMetadata,
   getArticleAuthorProfileUrls,
   getArticleImageCandidates,
+  getContributorPersonId,
   getHomepageTitle,
+  getNewsArticleId,
   getNewsArticleSchema,
+  getProfilePageSchema,
   getOrganizationSchema,
   getPostTimestamps,
   getPublisherSchema,
@@ -114,10 +117,47 @@ describe("article authors", () => {
     expect(getArticleAuthorProfileUrls(multiAuthor)).toEqual([`${ORIGIN}/author/gibson/`, `${ORIGIN}/author/syreanna-dukes/`]);
   });
 
-  it("keeps readable names in JSON-LD Person nodes, with profile URLs only where a profile exists", () => {
-    const authors = getNewsArticleSchema(multiAuthor).author as Array<{ name: string; url?: string }>;
+  it("keeps readable names in JSON-LD Person nodes, with stable IDs only where a profile exists", () => {
+    const authors = getNewsArticleSchema(multiAuthor).author as Array<{ name: string; url?: string; "@id"?: string }>;
     expect(authors.map((entry) => entry.name)).toEqual(["Gibson Bell", "Sy'Reanna Dukes", "Pat O'Neil"]);
     expect(authors.map((entry) => entry.url)).toEqual([`${ORIGIN}/author/gibson/`, `${ORIGIN}/author/syreanna-dukes/`, undefined]);
+    expect(authors.map((entry) => entry["@id"])).toEqual([
+      `${ORIGIN}/author/gibson/#person`,
+      `${ORIGIN}/author/syreanna-dukes/#person`,
+      undefined
+    ]);
+  });
+
+  it("uses the same Person identity on the profile page and authored stories", () => {
+    const contributor = {
+      ...author(1, "Gibson Bell", "gibson"),
+      description: "Editor-in-chief of the Weekly Wildcat.",
+      bylineProfile: {
+        pronouns: "",
+        role: "Editor-in-Chief",
+        showInDirectory: true,
+        profilePhoto: { id: 99, url: "/_wordpress-media/gibson.jpg", alt: "Gibson Bell", width: 800, height: 800 },
+        socials: { website: "", email: "", instagram: "", tiktok: "", linkedin: "", x: "" }
+      }
+    };
+    const story = post({ _embedded: { author: [contributor], "wp:term": [[category(2, "News", "news")], []] } });
+    const profile = getProfilePageSchema(contributor, [story]);
+    const person = profile.mainEntity as Record<string, unknown>;
+    const hasPart = profile.hasPart as Array<Record<string, unknown>>;
+    const articleAuthor = getNewsArticleSchema(story).author as Record<string, unknown>;
+
+    expect(getContributorPersonId(contributor)).toBe(`${ORIGIN}/author/gibson/#person`);
+    expect(person["@id"]).toBe(`${ORIGIN}/author/gibson/#person`);
+    expect(person.image).toMatchObject({
+      "@type": "ImageObject",
+      "@id": `${ORIGIN}/author/gibson/#profile-image`,
+      url: `${ORIGIN}/_wordpress-media/gibson.jpg`
+    });
+    expect(profile.primaryImageOfPage).toEqual({ "@id": `${ORIGIN}/author/gibson/#profile-image` });
+    expect(hasPart[0]["@id"]).toBe(getNewsArticleId(story));
+    expect(hasPart[0].author).toEqual({ "@id": `${ORIGIN}/author/gibson/#person` });
+    expect(articleAuthor["@id"]).toBe(`${ORIGIN}/author/gibson/#person`);
+    expect(articleAuthor).not.toHaveProperty("image");
   });
 });
 
@@ -186,6 +226,9 @@ describe("NewsArticle image variants", () => {
       }
     }));
     const [image] = article.image as Array<Record<string, unknown>>;
+    expect(article["@id"]).toBe(`${ORIGIN}/2026/10/14/news/homecoming-week/#article`);
+    expect(image["@id"]).toBe(`${ORIGIN}/2026/10/14/news/homecoming-week/#primaryimage`);
+    expect(article.primaryImageOfPage).toEqual({ "@id": `${ORIGIN}/2026/10/14/news/homecoming-week/#primaryimage` });
     expect(image.contentUrl).toBe(`${ORIGIN}/_wordpress-media/2026/10/photo.jpg`);
     expect(image.creator).toEqual({ "@type": "Person", name: "Gibson Bell" });
     expect(image.license).toBe(`${ORIGIN}/image-license/`);
