@@ -3,6 +3,7 @@ import { AuthorDirectory } from "@/components/AuthorDirectory";
 import { SectionHeader } from "@/components/SectionHeader";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
+import { getPresentationMediaUrl } from "@/lib/media";
 import { getPublicationConfig } from "@/lib/publication";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getAllPosts, getFeaturedMedia, getPostHref, type WordPressMedia, type WordPressPost } from "@/lib/wordpress";
@@ -332,7 +333,7 @@ export default async function MediaKitPage() {
                 <article className="media-kit-image-card" key={`${post.id}-${image.id}`}>
                   <a className="media-kit-image-frame" href={storyHref}>
                     <img
-                      src={image.source_url}
+                      src={getPresentationMediaUrl(image.source_url)}
                       alt={getImageAlt(image)}
                       width={image.media_details?.width}
                       height={image.media_details?.height}
