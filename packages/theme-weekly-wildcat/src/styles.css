@@ -1013,8 +1013,8 @@
 
 :where(.byline-publication-preview) .homepage-poll-card button {
   appearance: none;
-  background: var(--ink);
-  border: 1px solid var(--ink);
+  background: var(--surface-inverse, var(--ink));
+  border: 1px solid var(--surface-inverse, var(--ink));
   color: #ffffff;
   cursor: pointer;
   font-family: var(--font-ui);
@@ -1171,7 +1171,7 @@
    that carries its own inline styles, so its fields are overridden firmly. */
 
 :where(.byline-publication-preview) .home-newsletter-section {
-  border-image: linear-gradient(var(--accent) 0 0) fill 0 / 0 / 0 100vmax;
+  border-image: linear-gradient(var(--surface-accent, var(--accent)) 0 0) fill 0 / 0 / 0 100vmax;
   color: #ffffff;
   padding-block: 48px;
 }

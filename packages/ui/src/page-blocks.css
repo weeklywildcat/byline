@@ -195,8 +195,8 @@
 
 .byline-page-content .wp-block-button__link,
 .editor-styles-wrapper .wp-block-button__link {
-  background: var(--accent, #b11f24);
-  border: 1px solid var(--accent, #b11f24);
+  background: var(--surface-accent, var(--accent, #b11f24));
+  border: 1px solid var(--surface-accent, var(--accent, #b11f24));
   border-radius: 0;
   color: #fff;
   display: inline-block;
@@ -215,8 +215,8 @@
 .byline-page-content .wp-block-button__link:focus-visible,
 .editor-styles-wrapper .wp-block-button__link:hover,
 .editor-styles-wrapper .wp-block-button__link:focus-visible {
-  background: var(--ink, #1f2328);
-  border-color: var(--ink, #1f2328);
+  background: var(--surface-inverse, var(--ink, #1f2328));
+  border-color: var(--surface-inverse, var(--ink, #1f2328));
   color: #fff;
 }
 
@@ -323,7 +323,7 @@
 }
 
 .byline-page-content .byline-page-section-actions a {
-  background: var(--accent, #b11f24);
+  background: var(--surface-accent, var(--accent, #b11f24));
   color: #fff;
   font-family: var(--font-ui, Arial, Helvetica, sans-serif);
   font-size: 0.78rem;
