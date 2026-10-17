@@ -12,6 +12,10 @@ const port = Number(process.env.PORT || 4173);
 const host = process.env.HOST || "127.0.0.1";
 
 const contentTypes = new Map([
+  [".mp4", "video/mp4"],
+  [".pdf", "application/pdf"],
+  [".wav", "audio/wav"],
+  [".vtt", "text/vtt; charset=utf-8"],
   [".css", "text/css; charset=utf-8"],
   [".html", "text/html; charset=utf-8"],
   [".ico", "image/x-icon"],

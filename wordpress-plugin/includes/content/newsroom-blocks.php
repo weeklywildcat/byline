@@ -73,6 +73,7 @@ function byline_newsroom_post_is_public($post, string $post_type = ''): bool
 {
     return $post instanceof WP_Post
         && $post->post_status === 'publish'
+        && empty($post->post_password)
         && ($post_type === '' || $post->post_type === $post_type);
 }
 
@@ -115,6 +116,9 @@ function byline_newsroom_story_posts(array $attributes): array
 
     $source = byline_newsroom_attr_string($attributes, 'source', 'latest');
     $limit = byline_newsroom_limit($attributes['limit'] ?? 6, 6);
+    if (($attributes['layout'] ?? '') === 'related') {
+        $limit = min(3, $limit);
+    }
     if (in_array($source, ['category', 'tag'], true) && absint($attributes['termId'] ?? 0) <= 0) {
         return [];
     }
@@ -129,6 +133,7 @@ function byline_newsroom_story_posts(array $attributes): array
         'orderby' => 'date',
         'order' => 'DESC',
         'ignore_sticky_posts' => true,
+        'has_password' => false,
         'no_found_rows' => true,
         'suppress_filters' => false,
     ];
@@ -200,12 +205,24 @@ function byline_newsroom_story_card(WP_Post $post, string $variant, array $attri
 function byline_newsroom_render_stories(array $attributes = [], string $content = '', $block = null): string
 {
     $layout = byline_newsroom_attr_string($attributes, 'layout', 'grid');
-    if (!in_array($layout, ['grid', 'list', 'featured'], true)) {
+    if (!in_array($layout, ['grid', 'list', 'featured', 'related'], true)) {
         $layout = 'grid';
     }
+    if ($layout === 'related') {
+        $attributes['limit'] = min(3, byline_newsroom_limit($attributes['limit'] ?? 3, 3));
+        $attributes['showExcerpt'] = false;
+        $attributes['showByline'] = false;
+        $current_id = byline_newsroom_block_post_id($block);
+        if (is_array($attributes['postIds'] ?? null)) {
+            $attributes['postIds'] = array_values(array_filter($attributes['postIds'], static fn($id): bool => absint($id) !== $current_id));
+        }
+    }
     $posts = byline_newsroom_story_posts($attributes);
+    if ($layout === 'related') {
+        $posts = array_slice(array_values(array_filter($posts, static fn($post): bool => (int) $post->ID !== $current_id)), 0, 3);
+    }
     $heading = byline_newsroom_attr_string($attributes, 'heading', 'Stories');
-    $wrapper = $layout === 'list' ? 'byline-newsroom-stories-list' : ($layout === 'featured' ? 'byline-newsroom-stories-featured-list' : 'byline-newsroom-stories-grid');
+    $wrapper = $layout === 'related' ? 'byline-newsroom-stories-related' : ($layout === 'list' ? 'byline-newsroom-stories-list' : ($layout === 'featured' ? 'byline-newsroom-stories-featured-list' : 'byline-newsroom-stories-grid'));
 
     if ($posts === []) {
         return '<section class="byline-newsroom-stories byline-newsroom-stories-layout-' . esc_attr($layout) . '">' . byline_newsroom_render_heading($heading, 'Stories') . '<p class="byline-newsroom-empty">No published stories match these settings.</p></section>';
@@ -213,7 +230,7 @@ function byline_newsroom_render_stories(array $attributes = [], string $content 
 
     $cards = [];
     foreach ($posts as $index => $post) {
-        $variant = $layout === 'list' ? 'list' : ($layout === 'featured' && $index === 0 ? 'lead' : 'standard');
+        $variant = $layout === 'related' ? 'related' : ($layout === 'list' ? 'list' : ($layout === 'featured' && $index === 0 ? 'lead' : 'standard'));
         $cards[] = byline_newsroom_story_card($post, $variant, $attributes);
     }
 
@@ -707,6 +724,7 @@ function byline_newsroom_register_block_types(): void
         register_block_type($root . '/' . $slug, ['render_callback' => $callback]);
     }
     register_block_type($root . '/correction-notice');
+    register_block_type($root . '/timeline');
 }
 add_action('init', 'byline_newsroom_register_block_types', 30);
 
@@ -734,6 +752,8 @@ function byline_newsroom_register_core_styles(): void
             ['name' => 'byline-editorial-callout', 'label' => 'Editorial Callout'],
             ['name' => 'byline-soft-callout', 'label' => 'Soft Callout'],
             ['name' => 'byline-rule-top', 'label' => 'Rule Top'],
+            ['name' => 'byline-key-facts', 'label' => 'Key Facts'],
+            ['name' => 'byline-photo-essay', 'label' => 'Photo Essay'],
         ],
         'core/button' => [
             ['name' => 'byline-primary', 'label' => 'Primary'],
@@ -762,7 +782,13 @@ function byline_newsroom_register_core_styles(): void
             ['name' => 'byline-editorial', 'label' => 'Editorial'],
             ['name' => 'byline-feature', 'label' => 'Feature'],
         ],
+        'core/media-text' => [['name' => 'byline-portrait-text', 'label' => 'Portrait + Text']],
+        'core/file' => [['name' => 'byline-document', 'label' => 'Document Viewer']],
+        'core/audio' => [['name' => 'byline-story-audio', 'label' => 'Story Audio']],
+        'core/video' => [['name' => 'byline-story-video', 'label' => 'Story Video']],
         'core/gallery' => [
+            ['name' => 'byline-photo-pair', 'label' => 'Photo Pair'],
+            ['name' => 'byline-photo-gallery', 'label' => 'Photo Gallery'],
             ['name' => 'byline-news-grid', 'label' => 'News Grid'],
             ['name' => 'byline-feature-grid', 'label' => 'Feature Grid'],
         ],
@@ -913,7 +939,7 @@ function byline_newsroom_button(string $text, string $url = '/'): string
 function byline_newsroom_group(string $content, array $attributes = []): string
 {
     $class_name = trim((string) ($attributes['className'] ?? ''));
-    $classes = trim('wp-block-group ' . $class_name);
+    $classes = trim('wp-block-group ' . (!empty($attributes['align']) ? 'align' . sanitize_html_class($attributes['align']) . ' ' : '') . $class_name);
 
     return byline_newsroom_block_markup('core/group', $attributes, '<div class="' . esc_attr($classes) . '">' . $content . '</div>');
 }
@@ -1041,7 +1067,12 @@ function byline_newsroom_register_patterns(): void
             ],
         ],
     ];
+    $essay_image = byline_newsroom_image('Describe the photograph', 'large');
     $patterns = [
+        'byline/photo-essay' => byline_newsroom_post_pattern('Photo Essay', 'An editable visual narrative. Add captions to each image; duplicate, reorder, or remove any block.', byline_newsroom_group(
+            $essay_image . byline_newsroom_paragraph('Set the scene in a short passage.') . $essay_image . byline_newsroom_paragraph('Continue the reporting behind the photographs.') . $essay_image,
+            ['align' => 'wide', 'className' => 'is-style-byline-photo-essay']
+        )),
         'byline/information-page' => byline_newsroom_page_pattern('Information Page', 'A clear page starter for public information.', byline_newsroom_page_section('Information', byline_newsroom_paragraph('Introduce the purpose of this page, then add the details readers need.')) . byline_newsroom_page_section('Details', byline_newsroom_paragraph('Add the dates, process, contacts, or supporting context that belongs here.')) . byline_newsroom_page_section('What to expect', byline_newsroom_paragraph('Describe the next steps or useful background for readers.')) . byline_newsroom_page_section('Contact', byline_newsroom_paragraph('Add a public contact route or invitation for questions.'))),
         'byline/about-mission-page' => byline_newsroom_page_pattern('About / Mission Page', 'A page starter for an organization story and mission.', byline_newsroom_page_section('About the publication', byline_newsroom_paragraph('Explain who you are, what you cover, and how your work serves readers.')) . byline_newsroom_page_section('Mission', byline_newsroom_paragraph('Add the principles that guide this publication.')) . byline_newsroom_page_section('Values', byline_newsroom_paragraph('Describe the commitments readers should expect from this newsroom.')) . byline_newsroom_page_section('Get involved', byline_newsroom_paragraph('Invite readers or contributors to take a next step.') . byline_newsroom_button('Get in touch', '/contact/'), true)),
         'byline/policy-standards-page' => byline_newsroom_page_pattern('Policy / Standards Page', 'A structured page for standards, policies, or public commitments.', byline_newsroom_page_section('Standards', byline_newsroom_paragraph('State the policy in plain language.')) . byline_newsroom_page_section('Corrections and transparency', byline_newsroom_paragraph('Explain how the newsroom handles corrections, updates, and questions.')) . byline_newsroom_page_section('Questions', byline_newsroom_paragraph('Explain how readers can ask for clarification or report a concern.'))),
@@ -1071,3 +1102,16 @@ function byline_newsroom_register_patterns(): void
     }
 }
 add_action('init', 'byline_newsroom_register_patterns', 33);
+
+/** Inserter presets load only in Gutenberg; no dependency on the public site. */
+function byline_newsroom_enqueue_variations(): void
+{
+    $root = dirname(__DIR__, 2);
+    $file = $root . '/build/story-block-variations.asset.php';
+    if (!file_exists($file)) {
+        return;
+    }
+    $asset = include $file;
+    wp_enqueue_script('byline-story-block-variations', plugins_url('build/story-block-variations.js', $root . '/weekly-wildcat-headless.php'), $asset['dependencies'], $asset['version'], true);
+}
+add_action('enqueue_block_editor_assets', 'byline_newsroom_enqueue_variations');

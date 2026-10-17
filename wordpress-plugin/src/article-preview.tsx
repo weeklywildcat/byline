@@ -1,10 +1,11 @@
 import { Button, Notice } from "@wordpress/components";
-import { createRoot, useMemo, useRef, useState } from "@wordpress/element";
+import { createRoot, useEffect, useMemo, useRef, useState } from "@wordpress/element";
 import { __ } from "@wordpress/i18n";
 import { ArticleView, type ArticlePresentation } from "@byline/ui";
 import { getPublicationTheme, getPublicationThemeStylesheets, getPublicationThemeVariables } from "./publication-theme";
 
 import "@byline/ui/article.css";
+import "@byline/ui/newsroom-blocks.css";
 import "./article-preview.css";
 
 type PreviewConfig = {
@@ -61,37 +62,52 @@ function PreviewFrame({
   viewport: ViewportId;
 }) {
   const rootRef = useRef<ReturnType<typeof createRoot> | null>(null);
+  const deviceRef = useRef<HTMLDivElement>(null);
+  const [availableWidth, setAvailableWidth] = useState(1200);
+  useEffect(() => {
+    const element = deviceRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => setAvailableWidth(element.clientWidth));
+    observer.observe(element);
+    setAvailableWidth(element.clientWidth);
+    return () => observer.disconnect();
+  }, []);
   const frameSize = VIEWPORTS[viewport];
+  const scale = Math.min(1, availableWidth / frameSize.width);
   const srcDoc = useMemo(
     () => previewDocument(stylesheetUrl, themeId, tokenOverrides),
     [stylesheetUrl, themeId, tokenOverrides]
   );
 
   return (
-    <div className="byline-preview-device" style={{ maxWidth: frameSize.width }}>
+    <div className="byline-preview-device" ref={deviceRef} style={{ maxWidth: frameSize.width }}>
       <div className="byline-preview-device-label">{frameSize.label} · {frameSize.width}px</div>
-      <iframe
-        title={__("Byline article preview", "weekly-wildcat-headless")}
-        className="byline-preview-frame"
-        srcDoc={srcDoc}
-        style={{ height: frameSize.height, maxWidth: frameSize.width }}
-        onLoad={(event) => {
-          const frameDocument = event.currentTarget.contentDocument;
-          const mount = frameDocument?.getElementById("byline-article-preview-frame-root");
-          if (!frameDocument || !mount) return;
-          rootRef.current?.unmount();
-          rootRef.current = createRoot(mount);
-          rootRef.current.render(<ArticleView presentation={model} className="byline-preview-article" />);
-          const stopNavigation = (click: Event) => {
-            const target = click.target instanceof Element ? click.target.closest("a,button,form") : null;
-            if (!target) return;
-            click.preventDefault();
-            click.stopPropagation();
-          };
-          frameDocument.addEventListener("click", stopNavigation, true);
-          frameDocument.addEventListener("submit", stopNavigation, true);
-        }}
-      />
+      <div className="byline-preview-viewport" style={{ height: frameSize.height * scale }}>
+        <iframe
+          title={__("Byline article preview", "weekly-wildcat-headless")}
+          className="byline-preview-frame"
+          srcDoc={srcDoc}
+          style={{ height: frameSize.height, width: frameSize.width, transform: `scale(${scale})` }}
+          onLoad={(event) => {
+            const frameDocument = event.currentTarget.contentDocument;
+            const mount = frameDocument?.getElementById("byline-article-preview-frame-root");
+            if (!frameDocument || !mount) return;
+            rootRef.current?.unmount();
+            rootRef.current = createRoot(mount);
+            rootRef.current.render(<ArticleView presentation={model} className="byline-preview-article" />);
+            const stopNavigation = (click: Event) => {
+              // The target belongs to the iframe realm, so parent instanceof
+              // Element checks would silently allow navigation.
+              const target = (click.target as Element | null)?.closest?.("a,button,form");
+              if (!target) return;
+              click.preventDefault();
+              click.stopPropagation();
+            };
+            frameDocument.addEventListener("click", stopNavigation, true);
+            frameDocument.addEventListener("submit", stopNavigation, true);
+          }}
+        />
+      </div>
     </div>
   );
 }

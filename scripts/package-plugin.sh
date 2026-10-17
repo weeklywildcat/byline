@@ -45,6 +45,12 @@ build_assets=(
   build/page-editor.js
   build/page-editor.asset.php
   # Post editing canvas. The stylesheet references the bundled fonts below.
+  build/story-block-variations.js
+  build/story-block-variations.asset.php
+  build/blocks/timeline/block.json
+  build/blocks/timeline/index.js
+  build/blocks/timeline/index.asset.php
+  build/blocks/timeline/style-index.css
   build/editor-canvas.js
   build/editor-canvas.asset.php
   build/editor-canvas.css

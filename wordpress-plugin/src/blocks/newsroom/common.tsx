@@ -192,7 +192,7 @@ export function StoryPreviewCard({
   showDate = true
 }: {
   story: PreviewStory;
-  variant?: "lead" | "standard" | "list";
+  variant?: "lead" | "standard" | "list" | "related";
   showImage?: boolean;
   showExcerpt?: boolean;
   showByline?: boolean;

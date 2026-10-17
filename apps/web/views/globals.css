@@ -2255,9 +2255,7 @@ h1.masthead-logo {
 
 .article-body iframe,
 .article-body video {
-  aspect-ratio: 16 / 9;
   max-width: 100%;
-  width: 100%;
 }
 
 .article-tags {

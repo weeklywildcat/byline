@@ -31,6 +31,43 @@ function byline_editorial_preview_can_view(int $post_id): bool
         && current_user_can('edit_post', $post_id);
 }
 
+/** Keep media geometry in private preview without enabling embedded actions.
+ * KSES still owns the HTML allowlist. PDF objects become sandboxed frames;
+ * other frames lose active attributes and cannot execute scripts/navigate out.
+ */
+function byline_editorial_preview_content(string $html): string
+{
+    if (!class_exists('WP_HTML_Tag_Processor') || !function_exists('wp_kses_allowed_html')) {
+        return trim(wp_kses_post($html));
+    }
+    $html = preg_replace_callback('#<object\\b[^>]*>.*?</object>#is', static function (array $match): string {
+        $tag = new WP_HTML_Tag_Processor($match[0]);
+        if (!$tag->next_tag('OBJECT') || $tag->get_attribute('type') !== 'application/pdf') {
+            return '';
+        }
+        $src = byline_editorial_preview_public_url((string) $tag->get_attribute('data'));
+        if ($src === '') {
+            return '';
+        }
+        $height = 640;
+        if (preg_match('/(?:^|;)\\s*height:\\s*(\\d+)px/i', (string) $tag->get_attribute('style'), $dimensions)) {
+            $height = max(200, min(1200, (int) $dimensions[1]));
+        }
+        return '<iframe class="wp-block-file__embed" src="' . esc_url($src) . '" title="' . esc_attr((string) $tag->get_attribute('aria-label')) . '" style="width:100%;height:' . $height . 'px" sandbox="" tabindex="-1"></iframe>';
+    }, $html);
+    $allowed = wp_kses_allowed_html('post');
+    $allowed['iframe'] = array_fill_keys(['src', 'title', 'class', 'width', 'height', 'style', 'loading', 'sandbox', 'tabindex'], true);
+    $safe = wp_kses((string) $html, $allowed);
+    $tags = new WP_HTML_Tag_Processor($safe);
+    while ($tags->next_tag('IFRAME')) {
+        $src = byline_editorial_preview_public_url((string) $tags->get_attribute('src'));
+        $tags->set_attribute('src', $src);
+        $tags->set_attribute('sandbox', '');
+        $tags->set_attribute('tabindex', '-1');
+    }
+    return trim($tags->get_updated_html());
+}
+
 function byline_editorial_preview_public_url(string $value, string $fallback = ''): string
 {
     $value = trim($value);
@@ -669,7 +706,7 @@ function byline_editorial_preview_presentation(int $post_id): array
     $has_update = $published_timestamp !== false
         && $modified_timestamp !== false
         && $modified_timestamp - $published_timestamp > (defined('HOUR_IN_SECONDS') ? HOUR_IN_SECONDS : 3600);
-    $content = trim(wp_kses_post(apply_filters('the_content', (string) $post->post_content)));
+    $content = byline_editorial_preview_content((string) apply_filters('the_content', (string) $post->post_content));
     $excerpt = trim(wp_kses_post((string) get_the_excerpt($post)));
     $all_posts = byline_editorial_preview_public_posts();
     $contributors = byline_editorial_preview_story_contributors($post_id);

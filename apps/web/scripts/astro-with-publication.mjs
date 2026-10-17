@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -62,6 +62,9 @@ if (child.status !== 0) process.exit(child.status ?? 1);
 
 if (astroArguments[0] === "build") {
   await writeFile(path.join(projectRoot, ".byline-build", "build-duration.json"), `${JSON.stringify({ durationMs: Math.round((performance.now() - buildStarted) * 100) / 100 }, null, 2)}\n`);
+  if (process.env.BYLINE_CONTENT_MODE?.endsWith("-fixture")) {
+    await cp(path.resolve(projectRoot, "../../tests/fixtures/story-media"), path.join(projectRoot, "out/test-assets"), { recursive: true });
+  }
   const activePublication = publication ?? JSON.parse(await readFile(path.join(projectRoot, "tests", "fixtures", "weekly-wildcat-publication.json"), "utf8"));
   const outputDirectory = path.join(projectRoot, "out", "_byline");
   await mkdir(outputDirectory, { recursive: true });

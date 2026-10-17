@@ -1,0 +1,47 @@
+{
+  "apiVersion": 3,
+  "name": "byline/timeline",
+  "version": "1.0.0",
+  "title": "Timeline",
+  "category": "byline",
+  "description": "A vertical chronology with editorial date labels and reporting.",
+  "keywords": [
+    "chronology",
+    "dates",
+    "history",
+    "events"
+  ],
+  "icon": "list-view",
+  "textdomain": "weekly-wildcat-headless",
+  "attributes": {
+    "items": {
+      "type": "array",
+      "default": [
+        {
+          "label": "Earlier",
+          "title": "How it began",
+          "body": "Add the context behind this event."
+        },
+        {
+          "label": "Now",
+          "title": "What happened next",
+          "body": "Explain the next development."
+        }
+      ],
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "supports": {
+    "anchor": true,
+    "html": false
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "postTypes": [
+    "post",
+    "page"
+  ]
+}

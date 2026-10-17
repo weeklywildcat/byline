@@ -22,6 +22,7 @@
     "showByline": { "type": "boolean", "default": true },
     "showDate": { "type": "boolean", "default": true }
   },
+  "usesContext": ["postId", "postType"],
   "supports": {
     "align": ["wide"],
     "anchor": true,

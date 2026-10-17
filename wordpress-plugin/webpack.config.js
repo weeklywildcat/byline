@@ -27,6 +27,8 @@ module.exports = {
     'editorial-workflow': path.resolve(__dirname, 'src/editorial-workflow.tsx'),
     'article-preview': path.resolve(__dirname, 'src/article-preview.tsx'),
     'page-editor': path.resolve(__dirname, 'src/page-editor.tsx'),
+    'story-block-variations': path.resolve(__dirname, 'src/story-block-variations/index.ts'),
+    'blocks/timeline/index': path.resolve(__dirname, 'src/blocks/timeline/index.tsx'),
     'editor-canvas': path.resolve(__dirname, 'src/editor-canvas/index.ts'),
     'blocks/page-section/index': path.resolve(__dirname, 'src/blocks/page-section/index.tsx'),
     'blocks/stories/index': path.resolve(__dirname, 'src/blocks/stories/index.tsx'),

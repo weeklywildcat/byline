@@ -1,6 +1,7 @@
 declare module "*.css";
 
 declare module "@wordpress/blocks" {
+  export function registerBlockVariation(blockName: string, variation: { name: string; title: string; description?: string; icon?: any; keywords?: string[]; scope?: string[]; attributes?: Record<string, unknown>; innerBlocks?: any; isActive?: (attributes: Record<string, unknown>) => boolean }): void;
   export function __unstableGetInnerBlocksProps(...args: any[]): any;
   export function createBlock(...args: any[]): any;
   export function getBlockType(...args: any[]): any;

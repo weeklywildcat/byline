@@ -375,7 +375,7 @@ export async function openStorySidebar(page: Page): Promise<Locator> {
   // slightly different accessible names ("Story" vs. "Story sidebar"). The
   // plugin-owned semantic name is stable; do not couple the helper to one
   // Gutenberg wording variant.
-  const existing = page.getByRole("region", { name: /story/i }).first();
+  const existing = page.getByRole("region", { name: /^story(?: sidebar)?$/i }).first();
   const ownedSurface = page.locator(".byline-editorial-sidebar").first();
   if (await existing.isVisible().catch(() => false)) return existing;
   if (await ownedSurface.isVisible().catch(() => false)) return ownedSurface;
@@ -452,7 +452,7 @@ export async function openStoryPanel(page: Page, panel: StoryPanel): Promise<Loc
 }
 
 export async function closeStorySidebar(page: Page): Promise<void> {
-  const sidebar = page.getByRole("region", { name: /story/i }).first();
+  const sidebar = page.getByRole("region", { name: /^story(?: sidebar)?$/i }).first();
   const ownedSurface = page.locator(".byline-editorial-sidebar").first();
   const surface = await sidebar.isVisible().catch(() => false) ? sidebar : ownedSurface;
   if (!(await surface.isVisible().catch(() => false))) return;

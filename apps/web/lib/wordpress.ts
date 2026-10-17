@@ -4,6 +4,7 @@ import { getNamespaceApiUrl, getWordPressApiUrl } from "@/lib/byline-rest";
 import { stripHtml } from "@/lib/format";
 import { getPublicationConfig } from "@/lib/publication";
 import weeklyWildcatContent from "@/tests/fixtures/weekly-wildcat-content.json";
+import storyPresentations from "../../../tests/fixtures/story-presentations.json";
 
 const DEFAULT_SITE_URL = "https://weeklywildcat.com";
 const WORDPRESS_FETCH_CACHE_KEY =
@@ -39,7 +40,7 @@ function fixtureData<T>(path: string, query: Record<string, QueryValue>): T {
   const fixture = weeklyWildcatContent;
   const fixtureRecord = fixture as unknown as Record<string, unknown>;
   if (path === "/posts") {
-    let posts = [...fixture.posts];
+    let posts = fixture.posts.map((post) => post.id === 4 ? { ...post, content: { rendered: post.content.rendered + storyPresentations.rendered } } : post);
     if (query.slug) posts = posts.filter((post) => post.slug === String(query.slug));
     if (query.author) posts = posts.filter((post) => post.author === Number(query.author));
     if (query.categories) posts = posts.filter((post) => post.categories.includes(Number(query.categories)));
