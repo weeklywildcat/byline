@@ -76,7 +76,8 @@ function routeEntries(input: {
   const archiveHref = getSportsArchiveHref(input.pages);
   const fixed: RouteManifestEntry[] = [
     { path: "/", kind: "home" },
-    { path: "/authors/", kind: "author" },
+    { path: "/staff/", kind: "author" },
+    { path: "/authors/", kind: "redirect", redirectTo: "/staff/", delivery: "edge" },
     { path: "/corrections/", kind: "other" },
     { path: "/coverage/", kind: "coverage" },
     ...CODE_ROUTED_PAGE_SLUGS.map((slug): RouteManifestEntry => ({ path: `/${slug}/`, kind: "page" })),

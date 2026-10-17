@@ -79,7 +79,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
   };
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", path: "/" },
-    { name: "Authors", path: "/authors/" },
+    { name: "Staff", path: "/staff/" },
     { name: contributor.name, path: getContributorHref(contributor) }
   ]);
 

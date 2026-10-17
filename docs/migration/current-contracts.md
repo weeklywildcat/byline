@@ -11,7 +11,7 @@ behavior preserved by the additive Byline 0.2 contracts.
   `/{year}/{month}/{day}/{category}/{articleSlug}/`, derived from the original
   WordPress post date and first routable category.
 - Category routes: `/category/{slug}/`; author routes: `/author/{slug}/` and
-  `/authors/`; sports routes: `/sports/`, `/sports/schedule/`, team hubs, and
+  `/staff/`; sports routes: `/sports/`, `/sports/schedule/`, team hubs, and
   team-season archives.
 - Static sitemap, news sitemap, RSS feed (`/feed.xml`), robots, NewsArticle schema,
   NewsMediaOrganization schema,

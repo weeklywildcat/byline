@@ -55,6 +55,10 @@ on the public site). The "CMS Notice" page and slug `78-2` are always internal.
 `/media-assets/` (two logo downloads that the Media Kit already offers) redirects to
 `/media-kit/`. Add further retired page slugs to `REDIRECTED_PAGE_SLUGS`.
 
+The staff directory lives at `/staff/`; its former URL `/authors/` is a 301 in the generated
+`_redirects` file (an edge redirect in the route manifest). Individual profiles stay at
+`/author/<slug>/`.
+
 ## Preferred sources
 
 The newsletter block links to Google's no-JavaScript preferred-source deeplink

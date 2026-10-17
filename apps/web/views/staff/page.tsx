@@ -7,16 +7,16 @@ const publication = getPublicationConfig();
 
 export const metadata: Metadata = {
   ...buildPageMetadata({
-    title: "Authors",
+    title: "Staff",
     description: `Meet the ${publication.identity.shortName} writers and contributors.`,
-    path: "/authors/"
+    path: "/staff/"
   })
 };
 
-export default async function AuthorsPage() {
+export default async function StaffPage() {
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", path: "/" },
-    { name: "Authors", path: "/authors/" }
+    { name: "Staff", path: "/staff/" }
   ]);
 
   return (
@@ -28,7 +28,7 @@ export default async function AuthorsPage() {
       />
       <header className="section-heading">
         <div>
-          <h1>Authors</h1>
+          <h1>Staff</h1>
           <p>Meet the {publication.identity.shortName} writers and contributors.</p>
         </div>
       </header>

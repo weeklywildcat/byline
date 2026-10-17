@@ -38,7 +38,7 @@ export type SitemapInput = {
  * redirect sources, search, 404 and internal CMS pages are deliberately absent.
  */
 const APPLICATION_PAGES: Array<{ path: string; changeFrequency: SitemapEntry["changeFrequency"]; priority: number }> = [
-  { path: "/authors/", changeFrequency: "weekly", priority: 0.6 },
+  { path: "/staff/", changeFrequency: "weekly", priority: 0.6 },
   { path: "/stories/", changeFrequency: "daily", priority: 0.7 },
   { path: "/corrections/", changeFrequency: "weekly", priority: 0.5 },
   { path: "/media-kit/", changeFrequency: "monthly", priority: 0.5 },

@@ -62,3 +62,16 @@ describe("historical sports routes are not generated as HTML", () => {
     expect(read("wrangler.jsonc")).toMatch(/"previews":\s*\{\s*\}/);
   });
 });
+
+describe("the staff directory", () => {
+  it("lives at /staff/ and leaves /authors/ as an edge redirect rather than a page", () => {
+    const snapshot = read("lib/build-snapshot.ts");
+    expect(snapshot).toContain('{ path: "/staff/", kind: "author" }');
+    expect(snapshot).toContain('{ path: "/authors/", kind: "redirect", redirectTo: "/staff/", delivery: "edge" }');
+    expect(existsSync(path.join(webRoot, "src", "pages", "staff", "index.astro"))).toBe(true);
+    expect(existsSync(path.join(webRoot, "src", "pages", "authors"))).toBe(false);
+    const rules = parseRedirectsFile(buildRedirectsFile([{ from: "/authors/", to: "/staff/" }]));
+    expect(rules.get("/authors/")).toEqual({ to: "/staff/", status: 301 });
+    expect(rules.get("/authors")).toEqual({ to: "/staff/", status: 301 });
+  });
+});
