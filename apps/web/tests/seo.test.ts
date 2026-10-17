@@ -190,6 +190,23 @@ describe("NewsArticle image variants", () => {
     expect(image.creator).toEqual({ "@type": "Person", name: "Gibson Bell" });
     expect(image.license).toBe(`${ORIGIN}/image-license/`);
   });
+
+  it("credits the recorded creator, not the camera owner in the file's EXIF data", () => {
+    const exif = { copyright: "Gibson Bell", credit: "Gibson Bell" };
+    const credit = { creator: "Zoe Rush", creditText: "", copyrightNotice: "", licenseUrl: "", acquireLicensePage: "" };
+    const schema = (image: ReturnType<typeof media>) => (getNewsArticleSchema(post({
+      featured_media: 90,
+      _embedded: { author: [author(1, "Gibson Bell", "gibson")], "wp:featuredmedia": [image], "wp:term": [[category(2, "News", "news")], []] }
+    })).image as Array<Record<string, unknown>>)[0];
+
+    const credited = schema(media({ bylineImage: credit, media_details: { image_meta: exif } }));
+    expect(credited.creator).toEqual({ "@type": "Person", name: "Zoe Rush" });
+    expect(credited.creditText).toBe("Zoe Rush");
+    expect(credited.copyrightNotice).not.toContain("Gibson Bell");
+
+    const uncredited = schema(media({ bylineImage: { ...credit, creator: "" }, media_details: { image_meta: exif } }));
+    expect(uncredited.creditText).toBe("Gibson Bell");
+  });
 });
 
 describe("metadata escaping", () => {

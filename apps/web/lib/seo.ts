@@ -405,12 +405,15 @@ function getArticleImageSchema(image: WordPressMedia | null) {
 
   const imageCredit = image.bylineImage ?? image.weeklyWildcatImage;
   const creator = imageCredit?.creator;
+  // The file's own EXIF credit and copyright name the camera's owner, who is not
+  // always the photographer, so they only stand in when no creator is recorded.
   const copyrightNotice =
     imageCredit?.copyrightNotice ||
-    stripHtml(image.media_details?.image_meta?.copyright ?? "") ||
+    (creator ? "" : stripHtml(image.media_details?.image_meta?.copyright ?? "")) ||
     DEFAULT_IMAGE_COPYRIGHT_NOTICE;
   const creditText =
     imageCredit?.creditText ||
+    creator ||
     stripHtml(image.media_details?.image_meta?.credit || image.media_details?.image_meta?.copyright || "");
   const caption = stripHtml(image.caption?.rendered ?? image.media_details?.image_meta?.caption ?? "") || undefined;
 
