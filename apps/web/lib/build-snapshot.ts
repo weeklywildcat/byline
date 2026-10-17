@@ -83,8 +83,8 @@ function routeEntries(input: {
     { path: "/media-kit/", kind: "page" },
     { path: "/open-source/", kind: "page" },
     { path: "/search/", kind: "search" },
-    { path: "/sports/", kind: "redirect", redirectTo: archiveHref },
-    { path: "/sports/schedule/", kind: "redirect", redirectTo: archiveHref },
+    { path: "/sports/", kind: "redirect", redirectTo: archiveHref, delivery: "edge" },
+    { path: "/sports/schedule/", kind: "redirect", redirectTo: archiveHref, delivery: "edge" },
     { path: "/stories/", kind: "other" },
     { path: "/news-sitemap.xml", kind: "feed" },
     { path: "/sitemap.xml", kind: "sitemap" },
@@ -110,7 +110,7 @@ function routeEntries(input: {
   const coverages = input.sports.coverages.map((coverage) => ({ path: `/coverage/${coverage.slug}/`, kind: "coverage" as const, digest: archiveRouteDigest(coverage) }));
   const sports: RouteManifestEntry[] = getSportsArchiveRedirects(input.pages)
     .filter(({ path }) => path !== "/sports/" && path !== "/sports/schedule/")
-    .map(({ path, target }) => ({ path, kind: "redirect" as const, redirectTo: target }));
+    .map(({ path, target }) => ({ path, kind: "redirect" as const, redirectTo: target, delivery: "edge" as const }));
   return [...fixed, ...articles, ...pages, ...categories, ...authors, ...coverages, ...sports];
 }
 

@@ -4,6 +4,11 @@
   "compatibility_date": "2026-06-30",
   "keep_vars": true,
 
+  // Required by `wrangler preview` (branch previews in Workers Builds). Previews
+  // do not inherit production vars or bindings; this Worker has none that a
+  // preview needs, and the assets directory below is shared.
+  "previews": {},
+
   "assets": {
     "directory": "./out",
     "binding": "ASSETS",
