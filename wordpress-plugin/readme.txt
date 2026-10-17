@@ -4,7 +4,7 @@ Tags: newsroom, editorial, journalism, headless, student-journalism
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.3.0
+Stable tag: 0.3.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,31 @@ WordPress publication state, a fixed Weekly Wildcat homepage, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==
+
+= 0.3.1 =
+
+**Adds one-off guest contributors to the Story sidebar and retires the Founder
+badge.**
+
+* Adds an "Add a new guest" form to the Authors and contributors panel in the
+  Post editor. Enter a name, an optional role, and a photo from the Media
+  Library to credit someone who is not on staff, such as a yearbook
+  photographer, without leaving the story. The guest picker now lists existing
+  guests too, and editors who cannot publish create guests as drafts that a
+  publisher publishes before they appear on the site.
+* Guests can be credited without a profile page, which is the default for
+  one-offs. They appear by name and photo only: no author link, no entry in the
+  authors directory, and no profile URL in the sitemap or article metadata.
+  Guests created before this release keep their profile pages.
+* Two guests with the same name now get distinct profile addresses
+  automatically.
+* The contributor list uses the WordPress admin font and compact icon buttons
+  for reordering and removing.
+* Removes the Founder badge, including the checkbox on the WordPress user
+  profile. Existing saved values are left in place and are no longer used.
+* Matches the editor's post title size to the smaller article headline.
+* New installs default the header Sports link to the Sports category and add
+  an Open Source link to the footer. Existing menus are unchanged.
 
 = 0.3.0 =
 
@@ -201,6 +226,11 @@ makes Studio a real homepage editor.**
 * Homepage designs saved while these settings existed continue to load.
 
 == Upgrade Notice ==
+
+= 0.3.1 =
+Adds one-off guest contributors to the Story sidebar. Nothing needs
+reconfiguring: existing guests keep their profile pages, and the Founder badge
+checkbox is removed from user profiles.
 
 = 0.3.0 =
 Studio and the custom sports editors are retired. After updating, open
