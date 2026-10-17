@@ -11,14 +11,21 @@ function collectBrowserErrors(page: Page) {
   });
   page.on("console", (message) => {
     const sourceUrl = message.location().url;
+    // Chromium only reports NotSameOrigin for a cross-origin request that the
+    // other site's Cross-Origin-Resource-Policy refused, so it can never come
+    // from a resource this site serves. In the fixture build that is the
+    // third-party analytics script's follow-on requests, which succeed or are
+    // blocked depending on the network the run happens to have.
+    const isBlockedThirdPartyRequest = message.text().includes("ERR_BLOCKED_BY_RESPONSE.NotSameOrigin");
     const isExpectedFixtureNetworkNoise =
       sourceUrl.includes("clarity.ms/tag/") ||
-      sourceUrl.endsWith("/api/polls/active");
+      sourceUrl.endsWith("/api/polls/active") ||
+      isBlockedThirdPartyRequest;
 
     // The static fixture server intentionally does not emulate the Cloudflare
     // poll proxy, and the fixture's third-party analytics script is not part
-    // of this browser contract. Keep those two known network failures out of
-    // the uncaught-error signal while still failing on application errors and
+    // of this browser contract. Keep those known network failures out of the
+    // uncaught-error signal while still failing on application errors and
     // unexpected missing local resources.
     if (message.type() === "error" && !isExpectedFixtureNetworkNoise) {
       errors.push(`console.error: ${message.text()}`);
