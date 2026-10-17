@@ -71,6 +71,9 @@ const robots = await readFile(path.join(outputRoot, "robots.txt"), "utf8");
 for (const sitemap of ["sitemap.xml", "news-sitemap.xml"]) {
   if (!robots.includes(`Sitemap: ${origin}/${sitemap}`)) issues.push({ route: "/robots.txt", message: `does not advertise ${origin}/${sitemap}` });
 }
+if (!robots.includes("Disallow: /_byline/presentation-media/")) {
+  issues.push({ route: "/robots.txt", message: "does not exclude presentation-only media from crawling" });
+}
 
 if (issues.length) {
   throw new Error(`SEO verification failed (${issues.length}):\n${issues.map((issue) => `  ${issue.route}: ${issue.message}`).join("\n")}`);
