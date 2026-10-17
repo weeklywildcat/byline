@@ -69,6 +69,26 @@ add_option('byline_snapshot_writer_orphan_regression', time(), '', false);
 $recovered = byline_prepare_build_snapshot();
 byline_snapshot_integration_assert(!is_wp_error($recovered) && $recovered['revision'] > $before_recovery, 'An interrupted writer must recover under a new revision once the DB lock proves it inactive.');
 $first = $recovered;
+// Simulate a request whose runtime option cache was primed before another
+// writer changed the authoritative row and revision.
+global $wpdb;
+$publication_before = get_option(BYLINE_PUBLICATION_OPTION);
+$publication_changed = $publication_before;
+$publication_changed['identity']['name'] = 'Snapshot fresh-cache publication';
+wp_cache_set(BYLINE_PUBLICATION_OPTION, $publication_before, 'options');
+$wpdb->update($wpdb->options, ['option_value' => maybe_serialize($publication_changed)], ['option_name' => BYLINE_PUBLICATION_OPTION]);
+byline_bump_public_content_revision();
+$fresh = byline_prepare_build_snapshot();
+byline_snapshot_integration_assert(!is_wp_error($fresh), 'Fresh runtime-cache preparation must succeed.');
+$fresh_data = json_decode(file_get_contents($location['path'] . '/' . basename($fresh['url'])), true);
+byline_snapshot_integration_assert($fresh_data['publication']['identity']['name'] === 'Snapshot fresh-cache publication', 'A primed option cache must not mix old configuration into a new revision.');
+update_option(BYLINE_PUBLICATION_OPTION, $publication_before, false);
+byline_flush_public_mutations();
+$version_before = byline_public_content_revision();
+update_option(BYLINE_BUILD_SNAPSHOT_SOURCE_OPTION, 'outdated-renderer', false);
+$first = byline_prepare_build_snapshot();
+byline_snapshot_integration_assert(!is_wp_error($first) && $first['revision'] > $version_before, 'A producer/Core version change must receive a new public revision.');
+
 
 // Force a true revision change while the canonical serializer is gathering data.
 $race = static function ($content) { byline_bump_public_content_revision(); return $content; };

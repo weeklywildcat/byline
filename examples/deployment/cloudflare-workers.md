@@ -35,7 +35,8 @@ NEXT_PUBLIC_WP_API_URL=https://cms.example.edu/wp-json/wp/v2
 Normally no extra snapshot variable is necessary: the wrapper derives
 `/wp-json/byline/v1/build-snapshot` from the existing endpoint. An override is
 `BYLINE_BUILD_SNAPSHOT_URL=https://cms.example.edu/wp-json/byline/v1/build-snapshot`.
-Remove any rollout `BYLINE_LEGACY_REST_BUILD=1`; do not configure fixture variables
+Remove a manually pinned `BYLINE_PUBLICATION_REVISION` (the verified artifact owns
+the revision). Remove any rollout `BYLINE_LEGACY_REST_BUILD=1`; do not configure fixture variables
 or `BYLINE_BUILD_SNAPSHOT_FILE` in production. Publication configuration comes
 from the snapshot. `WORKERS_CI_BUILD_UUID`, `WORKERS_CI_COMMIT_SHA` and
 `WORKERS_CI_BRANCH` are supplied by Workers, not manually maintained settings.

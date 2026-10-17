@@ -1,13 +1,14 @@
 {
   "schemaVersion": 1,
-  "measuredAt": "2026-10-17T22:03:41.105Z",
-  "baselineCommit": "3444049948464bdf9c86eb0cdb8f88d647e4a6d7",
+  "measuredAt": "2026-10-17T22:39:18.152Z",
+  "baselineCommit": "e99a17b3af59f30a854e61ff7f4748661955b0c4",
+  "initialAuditCommit": "3444049948464bdf9c86eb0cdb8f88d647e4a6d7",
   "environment": {
     "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
     "node": "v26.7.0",
     "npm": "11.19.0",
     "astro": "7.3.1",
-    "transport": "Recorded public REST content and exact media bytes served over loopback HTTP; cold frontend media in every scenario; only Astro cache retained."
+    "transport": "Recorded public content and exact media bytes over loopback HTTP; cold media and project type/Vite cache each scenario; only Astro incremental cache retained. Command wall includes npm startup, all postbuild work and reporting."
   },
   "content": {
     "posts": 21,
@@ -21,19 +22,22 @@
     "snapshotBytes": 1544938
   },
   "baseline": {
-    "totalMs": 2830,
-    "astroWrapperMs": 1791.64,
-    "legacyContentAndMediaSnapshotMs": 439.34,
+    "commandWallMs": 2830,
+    "astroWrapperMs": 1896.92,
+    "legacyContentAndMediaSnapshotMs": 449.11,
     "cmsRequests": 10,
     "rendered": 70,
     "restored": 0,
-    "outputBytes": 147407198,
-    "bootstrapIoMs": 15,
-    "cmsIoBusyMs": 111,
-    "mediaIoBusyMs": 289
+    "outputBytes": 147430960,
+    "bootstrapIoMs": 11,
+    "cmsIoBusyMs": 123,
+    "cmsIoSummedMs": 292,
+    "mediaIoBusyMs": 269,
+    "mediaIoSummedMs": 8135,
+    "mediaAttempts": 318
   },
   "dependencyInstall": {
-    "baselineNpmCiSeconds": 18.56,
+    "initialFullNpmCiSeconds": 18.56,
     "pinnedWranglerFullNpmCiSeconds": 20.2,
     "workspaceScopedNpmCiSeconds": 14.58,
     "workspaceLinksResolved": true,
@@ -43,1533 +47,499 @@
   "results": [
     {
       "scenario": "cold",
-      "acquisitionMs": 50.537749999999996,
-      "downloadMs": 8.050000000000004,
-      "parseMs": 19.981624999999994,
+      "commandWallMs": 3059.433833,
+      "acquisitionMs": 50.754749999999994,
+      "downloadMs": 8.981166000000002,
+      "parseMs": 15.064582999999999,
       "snapshotBytes": 1544938,
       "cmsRequests": 2,
-      "astroExcludingMediaMs": 1402.7790830000001,
-      "postbuildMs": 697,
-      "totalFrontendMs": 2465,
-      "outputBytes": 147406583,
+      "astroExcludingMediaMs": 1658.311375,
+      "postbuildMs": 769,
+      "totalFrontendMs": 2808,
+      "outputBytes": 147430708,
       "media": {
-        "discoveryMs": 5.747125000000096,
-        "materializationMs": 252.2973750000001,
-        "rewriteMs": 2.579291000000012,
+        "discoveryMs": 6.152749999999969,
+        "materializationMs": 264.2172499999999,
+        "rewriteMs": 2.747833000000128,
         "uniqueReferences": 317,
         "concurrency": 8,
-        "totalMs": 260.7117079999998
+        "totalMs": 273.2255419999999
       },
       "routes": {
         "rendered": 70,
         "restored": 0,
         "emitted": 70
       },
-      "routeResults": [
-        {
-          "path": "/404.html",
-          "restored": false
-        },
-        {
-          "path": "/about/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/adam/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/addyson/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/caroline/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/evan/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/gibson/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/jeremy/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/matt/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/maycie/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/molly/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/sy/index.html",
-          "restored": false
-        },
-        {
-          "path": "/category/culture/index.html",
-          "restored": false
-        },
-        {
-          "path": "/category/features/index.html",
-          "restored": false
-        },
-        {
-          "path": "/category/news/index.html",
-          "restored": false
-        },
-        {
-          "path": "/category/opinion/index.html",
-          "restored": false
-        },
-        {
-          "path": "/category/sports/index.html",
-          "restored": false
-        },
-        {
-          "path": "/corrections/index.html",
-          "restored": false
-        },
-        {
-          "path": "/coverage/index.html",
-          "restored": false
-        },
-        {
-          "path": "/diversity-inclusion/index.html",
-          "restored": false
-        },
-        {
-          "path": "/feed.xml",
-          "restored": false
-        },
-        {
-          "path": "/join/index.html",
-          "restored": false
-        },
-        {
-          "path": "/media-assets/index.html",
-          "restored": false
-        },
-        {
-          "path": "/media-kit/index.html",
-          "restored": false
-        },
-        {
-          "path": "/news-sitemap.xml",
-          "restored": false
-        },
-        {
-          "path": "/open-source/index.html",
-          "restored": false
-        },
-        {
-          "path": "/robots.txt",
-          "restored": false
-        },
-        {
-          "path": "/search/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sitemap.xml",
-          "restored": false
-        },
-        {
-          "path": "/staff/index.html",
-          "restored": false
-        },
-        {
-          "path": "/stories/index.html",
-          "restored": false
-        },
-        {
-          "path": "/index.html",
-          "restored": false
-        },
-        {
-          "path": "/_byline/search-index.json",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/16/sports/in-photos-wildcats-c-team-football-undefeated-season/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/14/culture/three-juniors-take-on-a-new-role-directing-their-classmates-in-need-a-lift/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/10/sports/ninety-six-shuts-out-thornwell-63-0-its-fourth-straight-win/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/29/sports/wildcats-edge-landrum-28-26-after-storm-delays-game-overnight/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/20/news/fca-athlete-breakfast-2026/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/05/13/culture/finding-a-place-in-the-spotlight/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/26/features/no-parking-pass-no-parking/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/04/sports/soccer-season-is-kicking-off/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/24/features/sneak-peak-of-prom/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/23/news/winter-storm-to-blast-the-upstate/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/23/sports/support-from-wildcat-to-wildcat/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/22/news/a-new-era-for-student-journalism-nshs/index.html",
-          "restored": false
-        },
-        {
-          "path": "/advertise/index.html",
-          "restored": false
-        },
-        {
-          "path": "/leadership/index.html",
-          "restored": false
-        },
-        {
-          "path": "/image-license/index.html",
-          "restored": false
-        },
-        {
-          "path": "/terms/index.html",
-          "restored": false
-        },
-        {
-          "path": "/privacy/index.html",
-          "restored": false
-        },
-        {
-          "path": "/contact/index.html",
-          "restored": false
-        },
-        {
-          "path": "/wildcat-marching-band-concessions-2026/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-baseball/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-boys-basketball/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-boys-soccer/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-football/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-girls-basketball/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-girls-soccer/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-softball/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-volleyball/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive/index.html",
-          "restored": false
-        }
-      ]
+      "renderedPaths": [
+        "/404.html",
+        "/about/index.html",
+        "/author/adam/index.html",
+        "/author/addyson/index.html",
+        "/author/caroline/index.html",
+        "/author/evan/index.html",
+        "/author/gibson/index.html",
+        "/author/jeremy/index.html",
+        "/author/matt/index.html",
+        "/author/maycie/index.html",
+        "/author/molly/index.html",
+        "/author/sy/index.html",
+        "/category/culture/index.html",
+        "/category/features/index.html",
+        "/category/news/index.html",
+        "/category/opinion/index.html",
+        "/category/sports/index.html",
+        "/corrections/index.html",
+        "/coverage/index.html",
+        "/diversity-inclusion/index.html",
+        "/feed.xml",
+        "/join/index.html",
+        "/media-assets/index.html",
+        "/media-kit/index.html",
+        "/news-sitemap.xml",
+        "/open-source/index.html",
+        "/robots.txt",
+        "/search/index.html",
+        "/sitemap.xml",
+        "/staff/index.html",
+        "/stories/index.html",
+        "/index.html",
+        "/_byline/search-index.json",
+        "/2026/10/16/sports/in-photos-wildcats-c-team-football-undefeated-season/index.html",
+        "/2026/10/14/culture/three-juniors-take-on-a-new-role-directing-their-classmates-in-need-a-lift/index.html",
+        "/2026/10/10/sports/ninety-six-shuts-out-thornwell-63-0-its-fourth-straight-win/index.html",
+        "/2026/08/29/sports/wildcats-edge-landrum-28-26-after-storm-delays-game-overnight/index.html",
+        "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/index.html",
+        "/2026/08/20/news/fca-athlete-breakfast-2026/index.html",
+        "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/index.html",
+        "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/index.html",
+        "/2026/05/13/culture/finding-a-place-in-the-spotlight/index.html",
+        "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/index.html",
+        "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/index.html",
+        "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/index.html",
+        "/2026/02/26/features/no-parking-pass-no-parking/index.html",
+        "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/index.html",
+        "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/index.html",
+        "/2026/02/04/sports/soccer-season-is-kicking-off/index.html",
+        "/2026/01/24/features/sneak-peak-of-prom/index.html",
+        "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/index.html",
+        "/2026/01/23/news/winter-storm-to-blast-the-upstate/index.html",
+        "/2026/01/23/sports/support-from-wildcat-to-wildcat/index.html",
+        "/2026/01/22/news/a-new-era-for-student-journalism-nshs/index.html",
+        "/advertise/index.html",
+        "/leadership/index.html",
+        "/image-license/index.html",
+        "/terms/index.html",
+        "/privacy/index.html",
+        "/contact/index.html",
+        "/wildcat-marching-band-concessions-2026/index.html",
+        "/sports-archive-baseball/index.html",
+        "/sports-archive-boys-basketball/index.html",
+        "/sports-archive-boys-soccer/index.html",
+        "/sports-archive-football/index.html",
+        "/sports-archive-girls-basketball/index.html",
+        "/sports-archive-girls-soccer/index.html",
+        "/sports-archive-softball/index.html",
+        "/sports-archive-volleyball/index.html",
+        "/sports-archive/index.html"
+      ],
+      "restoredPaths": []
     },
     {
       "scenario": "warm-noop",
-      "acquisitionMs": 43.64804099999999,
-      "downloadMs": 8.502584000000006,
-      "parseMs": 13.546125000000004,
+      "commandWallMs": 2412.6320830000004,
+      "acquisitionMs": 51.528375000000004,
+      "downloadMs": 9.907708999999997,
+      "parseMs": 15.644499999999994,
       "snapshotBytes": 1544938,
       "cmsRequests": 2,
-      "astroExcludingMediaMs": 840.670333,
-      "postbuildMs": 702,
-      "totalFrontendMs": 1873,
-      "outputBytes": 147406551,
+      "astroExcludingMediaMs": 1051.3679579999998,
+      "postbuildMs": 753,
+      "totalFrontendMs": 2215,
+      "outputBytes": 147430728,
       "media": {
-        "discoveryMs": 5.893708000000061,
-        "materializationMs": 226.0835840000001,
-        "rewriteMs": 2.574459000000047,
+        "discoveryMs": 6.180582999999956,
+        "materializationMs": 286.59837500000003,
+        "rewriteMs": 2.7710829999998623,
         "uniqueReferences": 317,
         "concurrency": 8,
-        "totalMs": 234.651167
+        "totalMs": 295.66712500000006
       },
       "routes": {
         "rendered": 18,
         "restored": 52,
         "emitted": 70
       },
-      "routeResults": [
-        {
-          "path": "/404.html",
-          "restored": false
-        },
-        {
-          "path": "/about/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/adam/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/addyson/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/caroline/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/evan/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/gibson/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/jeremy/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/matt/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/maycie/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/molly/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/sy/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/culture/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/features/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/news/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/opinion/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/sports/index.html",
-          "restored": true
-        },
-        {
-          "path": "/corrections/index.html",
-          "restored": false
-        },
-        {
-          "path": "/coverage/index.html",
-          "restored": false
-        },
-        {
-          "path": "/diversity-inclusion/index.html",
-          "restored": false
-        },
-        {
-          "path": "/feed.xml",
-          "restored": false
-        },
-        {
-          "path": "/join/index.html",
-          "restored": false
-        },
-        {
-          "path": "/media-assets/index.html",
-          "restored": false
-        },
-        {
-          "path": "/media-kit/index.html",
-          "restored": false
-        },
-        {
-          "path": "/news-sitemap.xml",
-          "restored": false
-        },
-        {
-          "path": "/open-source/index.html",
-          "restored": false
-        },
-        {
-          "path": "/robots.txt",
-          "restored": false
-        },
-        {
-          "path": "/search/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sitemap.xml",
-          "restored": false
-        },
-        {
-          "path": "/staff/index.html",
-          "restored": false
-        },
-        {
-          "path": "/stories/index.html",
-          "restored": false
-        },
-        {
-          "path": "/index.html",
-          "restored": false
-        },
-        {
-          "path": "/_byline/search-index.json",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/16/sports/in-photos-wildcats-c-team-football-undefeated-season/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/10/14/culture/three-juniors-take-on-a-new-role-directing-their-classmates-in-need-a-lift/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/10/10/sports/ninety-six-shuts-out-thornwell-63-0-its-fourth-straight-win/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/08/29/sports/wildcats-edge-landrum-28-26-after-storm-delays-game-overnight/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/08/20/news/fca-athlete-breakfast-2026/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/05/13/culture/finding-a-place-in-the-spotlight/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/02/26/features/no-parking-pass-no-parking/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/02/04/sports/soccer-season-is-kicking-off/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/01/24/features/sneak-peak-of-prom/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/01/23/news/winter-storm-to-blast-the-upstate/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/01/23/sports/support-from-wildcat-to-wildcat/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/01/22/news/a-new-era-for-student-journalism-nshs/index.html",
-          "restored": true
-        },
-        {
-          "path": "/advertise/index.html",
-          "restored": true
-        },
-        {
-          "path": "/leadership/index.html",
-          "restored": true
-        },
-        {
-          "path": "/image-license/index.html",
-          "restored": true
-        },
-        {
-          "path": "/terms/index.html",
-          "restored": true
-        },
-        {
-          "path": "/privacy/index.html",
-          "restored": true
-        },
-        {
-          "path": "/contact/index.html",
-          "restored": true
-        },
-        {
-          "path": "/wildcat-marching-band-concessions-2026/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-baseball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-boys-basketball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-boys-soccer/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-football/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-girls-basketball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-girls-soccer/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-softball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-volleyball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive/index.html",
-          "restored": true
-        }
+      "renderedPaths": [
+        "/404.html",
+        "/about/index.html",
+        "/corrections/index.html",
+        "/coverage/index.html",
+        "/diversity-inclusion/index.html",
+        "/feed.xml",
+        "/join/index.html",
+        "/media-assets/index.html",
+        "/media-kit/index.html",
+        "/news-sitemap.xml",
+        "/open-source/index.html",
+        "/robots.txt",
+        "/search/index.html",
+        "/sitemap.xml",
+        "/staff/index.html",
+        "/stories/index.html",
+        "/index.html",
+        "/_byline/search-index.json"
+      ],
+      "restoredPaths": [
+        "/author/adam/index.html",
+        "/author/addyson/index.html",
+        "/author/caroline/index.html",
+        "/author/evan/index.html",
+        "/author/gibson/index.html",
+        "/author/jeremy/index.html",
+        "/author/matt/index.html",
+        "/author/maycie/index.html",
+        "/author/molly/index.html",
+        "/author/sy/index.html",
+        "/category/culture/index.html",
+        "/category/features/index.html",
+        "/category/news/index.html",
+        "/category/opinion/index.html",
+        "/category/sports/index.html",
+        "/2026/10/16/sports/in-photos-wildcats-c-team-football-undefeated-season/index.html",
+        "/2026/10/14/culture/three-juniors-take-on-a-new-role-directing-their-classmates-in-need-a-lift/index.html",
+        "/2026/10/10/sports/ninety-six-shuts-out-thornwell-63-0-its-fourth-straight-win/index.html",
+        "/2026/08/29/sports/wildcats-edge-landrum-28-26-after-storm-delays-game-overnight/index.html",
+        "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/index.html",
+        "/2026/08/20/news/fca-athlete-breakfast-2026/index.html",
+        "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/index.html",
+        "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/index.html",
+        "/2026/05/13/culture/finding-a-place-in-the-spotlight/index.html",
+        "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/index.html",
+        "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/index.html",
+        "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/index.html",
+        "/2026/02/26/features/no-parking-pass-no-parking/index.html",
+        "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/index.html",
+        "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/index.html",
+        "/2026/02/04/sports/soccer-season-is-kicking-off/index.html",
+        "/2026/01/24/features/sneak-peak-of-prom/index.html",
+        "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/index.html",
+        "/2026/01/23/news/winter-storm-to-blast-the-upstate/index.html",
+        "/2026/01/23/sports/support-from-wildcat-to-wildcat/index.html",
+        "/2026/01/22/news/a-new-era-for-student-journalism-nshs/index.html",
+        "/advertise/index.html",
+        "/leadership/index.html",
+        "/image-license/index.html",
+        "/terms/index.html",
+        "/privacy/index.html",
+        "/contact/index.html",
+        "/wildcat-marching-band-concessions-2026/index.html",
+        "/sports-archive-baseball/index.html",
+        "/sports-archive-boys-basketball/index.html",
+        "/sports-archive-boys-soccer/index.html",
+        "/sports-archive-football/index.html",
+        "/sports-archive-girls-basketball/index.html",
+        "/sports-archive-girls-soccer/index.html",
+        "/sports-archive-softball/index.html",
+        "/sports-archive-volleyball/index.html",
+        "/sports-archive/index.html"
       ]
     },
     {
       "scenario": "single-article",
-      "acquisitionMs": 42.391084000000006,
-      "downloadMs": 7.814707999999996,
-      "parseMs": 13.535415999999998,
+      "commandWallMs": 2379.4685,
+      "acquisitionMs": 46.863125,
+      "downloadMs": 8.574250000000006,
+      "parseMs": 14.578708000000006,
       "snapshotBytes": 1545011,
       "cmsRequests": 2,
-      "astroExcludingMediaMs": 871.621417,
-      "postbuildMs": 700,
-      "totalFrontendMs": 1883,
-      "outputBytes": 147407806,
+      "astroExcludingMediaMs": 1039.4557920000002,
+      "postbuildMs": 800,
+      "totalFrontendMs": 2189,
+      "outputBytes": 147431970,
       "media": {
-        "discoveryMs": 5.777625000000057,
-        "materializationMs": 203.777917,
-        "rewriteMs": 2.521250000000009,
+        "discoveryMs": 6.093000000000075,
+        "materializationMs": 239.115459,
+        "rewriteMs": 2.6295000000000073,
         "uniqueReferences": 317,
         "concurrency": 8,
-        "totalMs": 212.178583
+        "totalMs": 247.933583
       },
       "routes": {
         "rendered": 34,
         "restored": 36,
         "emitted": 70
       },
-      "routeResults": [
-        {
-          "path": "/404.html",
-          "restored": false
-        },
-        {
-          "path": "/about/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/adam/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/addyson/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/caroline/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/evan/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/gibson/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/jeremy/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/matt/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/maycie/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/molly/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/sy/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/culture/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/features/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/news/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/opinion/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/sports/index.html",
-          "restored": false
-        },
-        {
-          "path": "/corrections/index.html",
-          "restored": false
-        },
-        {
-          "path": "/coverage/index.html",
-          "restored": false
-        },
-        {
-          "path": "/diversity-inclusion/index.html",
-          "restored": false
-        },
-        {
-          "path": "/feed.xml",
-          "restored": false
-        },
-        {
-          "path": "/join/index.html",
-          "restored": false
-        },
-        {
-          "path": "/media-assets/index.html",
-          "restored": false
-        },
-        {
-          "path": "/media-kit/index.html",
-          "restored": false
-        },
-        {
-          "path": "/news-sitemap.xml",
-          "restored": false
-        },
-        {
-          "path": "/open-source/index.html",
-          "restored": false
-        },
-        {
-          "path": "/robots.txt",
-          "restored": false
-        },
-        {
-          "path": "/search/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sitemap.xml",
-          "restored": false
-        },
-        {
-          "path": "/staff/index.html",
-          "restored": false
-        },
-        {
-          "path": "/stories/index.html",
-          "restored": false
-        },
-        {
-          "path": "/index.html",
-          "restored": false
-        },
-        {
-          "path": "/_byline/search-index.json",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/16/sports/in-photos-wildcats-c-team-football-undefeated-season/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/14/culture/three-juniors-take-on-a-new-role-directing-their-classmates-in-need-a-lift/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/10/sports/ninety-six-shuts-out-thornwell-63-0-its-fourth-straight-win/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/29/sports/wildcats-edge-landrum-28-26-after-storm-delays-game-overnight/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/20/news/fca-athlete-breakfast-2026/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/05/13/culture/finding-a-place-in-the-spotlight/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/26/features/no-parking-pass-no-parking/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/04/sports/soccer-season-is-kicking-off/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/24/features/sneak-peak-of-prom/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/01/23/news/winter-storm-to-blast-the-upstate/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/01/23/sports/support-from-wildcat-to-wildcat/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/22/news/a-new-era-for-student-journalism-nshs/index.html",
-          "restored": false
-        },
-        {
-          "path": "/advertise/index.html",
-          "restored": true
-        },
-        {
-          "path": "/leadership/index.html",
-          "restored": true
-        },
-        {
-          "path": "/image-license/index.html",
-          "restored": true
-        },
-        {
-          "path": "/terms/index.html",
-          "restored": true
-        },
-        {
-          "path": "/privacy/index.html",
-          "restored": true
-        },
-        {
-          "path": "/contact/index.html",
-          "restored": true
-        },
-        {
-          "path": "/wildcat-marching-band-concessions-2026/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-baseball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-boys-basketball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-boys-soccer/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-football/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-girls-basketball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-girls-soccer/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-softball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-volleyball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive/index.html",
-          "restored": true
-        }
+      "renderedPaths": [
+        "/404.html",
+        "/about/index.html",
+        "/author/gibson/index.html",
+        "/category/sports/index.html",
+        "/corrections/index.html",
+        "/coverage/index.html",
+        "/diversity-inclusion/index.html",
+        "/feed.xml",
+        "/join/index.html",
+        "/media-assets/index.html",
+        "/media-kit/index.html",
+        "/news-sitemap.xml",
+        "/open-source/index.html",
+        "/robots.txt",
+        "/search/index.html",
+        "/sitemap.xml",
+        "/staff/index.html",
+        "/stories/index.html",
+        "/index.html",
+        "/_byline/search-index.json",
+        "/2026/10/16/sports/in-photos-wildcats-c-team-football-undefeated-season/index.html",
+        "/2026/10/14/culture/three-juniors-take-on-a-new-role-directing-their-classmates-in-need-a-lift/index.html",
+        "/2026/10/10/sports/ninety-six-shuts-out-thornwell-63-0-its-fourth-straight-win/index.html",
+        "/2026/08/29/sports/wildcats-edge-landrum-28-26-after-storm-delays-game-overnight/index.html",
+        "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/index.html",
+        "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/index.html",
+        "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/index.html",
+        "/2026/05/13/culture/finding-a-place-in-the-spotlight/index.html",
+        "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/index.html",
+        "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/index.html",
+        "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/index.html",
+        "/2026/02/04/sports/soccer-season-is-kicking-off/index.html",
+        "/2026/01/23/sports/support-from-wildcat-to-wildcat/index.html",
+        "/2026/01/22/news/a-new-era-for-student-journalism-nshs/index.html"
+      ],
+      "restoredPaths": [
+        "/author/adam/index.html",
+        "/author/addyson/index.html",
+        "/author/caroline/index.html",
+        "/author/evan/index.html",
+        "/author/jeremy/index.html",
+        "/author/matt/index.html",
+        "/author/maycie/index.html",
+        "/author/molly/index.html",
+        "/author/sy/index.html",
+        "/category/culture/index.html",
+        "/category/features/index.html",
+        "/category/news/index.html",
+        "/category/opinion/index.html",
+        "/2026/08/20/news/fca-athlete-breakfast-2026/index.html",
+        "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/index.html",
+        "/2026/02/26/features/no-parking-pass-no-parking/index.html",
+        "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/index.html",
+        "/2026/01/24/features/sneak-peak-of-prom/index.html",
+        "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/index.html",
+        "/2026/01/23/news/winter-storm-to-blast-the-upstate/index.html",
+        "/advertise/index.html",
+        "/leadership/index.html",
+        "/image-license/index.html",
+        "/terms/index.html",
+        "/privacy/index.html",
+        "/contact/index.html",
+        "/wildcat-marching-band-concessions-2026/index.html",
+        "/sports-archive-baseball/index.html",
+        "/sports-archive-boys-basketball/index.html",
+        "/sports-archive-boys-soccer/index.html",
+        "/sports-archive-football/index.html",
+        "/sports-archive-girls-basketball/index.html",
+        "/sports-archive-girls-soccer/index.html",
+        "/sports-archive-softball/index.html",
+        "/sports-archive-volleyball/index.html",
+        "/sports-archive/index.html"
       ]
     },
     {
       "scenario": "global-change",
-      "acquisitionMs": 42.38649999999999,
-      "downloadMs": 7.703416999999995,
-      "parseMs": 13.666332999999995,
+      "commandWallMs": 2678.8046250000007,
+      "acquisitionMs": 49.137625,
+      "downloadMs": 8.883624999999995,
+      "parseMs": 15.280167000000006,
       "snapshotBytes": 1545039,
       "cmsRequests": 2,
-      "astroExcludingMediaMs": 925.7403750000001,
-      "postbuildMs": 712,
-      "totalFrontendMs": 1955,
-      "outputBytes": 147409799,
+      "astroExcludingMediaMs": 1213.3646250000002,
+      "postbuildMs": 837,
+      "totalFrontendMs": 2480,
+      "outputBytes": 147433959,
       "media": {
-        "discoveryMs": 5.80541699999992,
-        "materializationMs": 211.52825000000007,
-        "rewriteMs": 2.528124999999932,
+        "discoveryMs": 6.03449999999998,
+        "materializationMs": 304.36325,
+        "rewriteMs": 3.057790999999952,
         "uniqueReferences": 317,
         "concurrency": 8,
-        "totalMs": 219.96170800000004
+        "totalMs": 313.59395799999993
       },
       "routes": {
         "rendered": 70,
         "restored": 0,
         "emitted": 70
       },
-      "routeResults": [
-        {
-          "path": "/404.html",
-          "restored": false
-        },
-        {
-          "path": "/about/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/adam/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/addyson/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/caroline/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/evan/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/gibson/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/jeremy/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/matt/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/maycie/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/molly/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/sy/index.html",
-          "restored": false
-        },
-        {
-          "path": "/category/culture/index.html",
-          "restored": false
-        },
-        {
-          "path": "/category/features/index.html",
-          "restored": false
-        },
-        {
-          "path": "/category/news/index.html",
-          "restored": false
-        },
-        {
-          "path": "/category/opinion/index.html",
-          "restored": false
-        },
-        {
-          "path": "/category/sports/index.html",
-          "restored": false
-        },
-        {
-          "path": "/corrections/index.html",
-          "restored": false
-        },
-        {
-          "path": "/coverage/index.html",
-          "restored": false
-        },
-        {
-          "path": "/diversity-inclusion/index.html",
-          "restored": false
-        },
-        {
-          "path": "/feed.xml",
-          "restored": false
-        },
-        {
-          "path": "/join/index.html",
-          "restored": false
-        },
-        {
-          "path": "/media-assets/index.html",
-          "restored": false
-        },
-        {
-          "path": "/media-kit/index.html",
-          "restored": false
-        },
-        {
-          "path": "/news-sitemap.xml",
-          "restored": false
-        },
-        {
-          "path": "/open-source/index.html",
-          "restored": false
-        },
-        {
-          "path": "/robots.txt",
-          "restored": false
-        },
-        {
-          "path": "/search/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sitemap.xml",
-          "restored": false
-        },
-        {
-          "path": "/staff/index.html",
-          "restored": false
-        },
-        {
-          "path": "/stories/index.html",
-          "restored": false
-        },
-        {
-          "path": "/index.html",
-          "restored": false
-        },
-        {
-          "path": "/_byline/search-index.json",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/16/sports/in-photos-wildcats-c-team-football-undefeated-season/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/14/culture/three-juniors-take-on-a-new-role-directing-their-classmates-in-need-a-lift/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/10/sports/ninety-six-shuts-out-thornwell-63-0-its-fourth-straight-win/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/29/sports/wildcats-edge-landrum-28-26-after-storm-delays-game-overnight/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/20/news/fca-athlete-breakfast-2026/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/05/13/culture/finding-a-place-in-the-spotlight/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/26/features/no-parking-pass-no-parking/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/04/sports/soccer-season-is-kicking-off/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/24/features/sneak-peak-of-prom/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/23/news/winter-storm-to-blast-the-upstate/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/23/sports/support-from-wildcat-to-wildcat/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/22/news/a-new-era-for-student-journalism-nshs/index.html",
-          "restored": false
-        },
-        {
-          "path": "/advertise/index.html",
-          "restored": false
-        },
-        {
-          "path": "/leadership/index.html",
-          "restored": false
-        },
-        {
-          "path": "/image-license/index.html",
-          "restored": false
-        },
-        {
-          "path": "/terms/index.html",
-          "restored": false
-        },
-        {
-          "path": "/privacy/index.html",
-          "restored": false
-        },
-        {
-          "path": "/contact/index.html",
-          "restored": false
-        },
-        {
-          "path": "/wildcat-marching-band-concessions-2026/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-baseball/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-boys-basketball/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-boys-soccer/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-football/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-girls-basketball/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-girls-soccer/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-softball/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive-volleyball/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sports-archive/index.html",
-          "restored": false
-        }
-      ]
+      "renderedPaths": [
+        "/404.html",
+        "/about/index.html",
+        "/author/adam/index.html",
+        "/author/addyson/index.html",
+        "/author/caroline/index.html",
+        "/author/evan/index.html",
+        "/author/gibson/index.html",
+        "/author/jeremy/index.html",
+        "/author/matt/index.html",
+        "/author/maycie/index.html",
+        "/author/molly/index.html",
+        "/author/sy/index.html",
+        "/category/culture/index.html",
+        "/category/features/index.html",
+        "/category/news/index.html",
+        "/category/opinion/index.html",
+        "/category/sports/index.html",
+        "/corrections/index.html",
+        "/coverage/index.html",
+        "/diversity-inclusion/index.html",
+        "/feed.xml",
+        "/join/index.html",
+        "/media-assets/index.html",
+        "/media-kit/index.html",
+        "/news-sitemap.xml",
+        "/open-source/index.html",
+        "/robots.txt",
+        "/search/index.html",
+        "/sitemap.xml",
+        "/staff/index.html",
+        "/stories/index.html",
+        "/index.html",
+        "/_byline/search-index.json",
+        "/2026/10/16/sports/in-photos-wildcats-c-team-football-undefeated-season/index.html",
+        "/2026/10/14/culture/three-juniors-take-on-a-new-role-directing-their-classmates-in-need-a-lift/index.html",
+        "/2026/10/10/sports/ninety-six-shuts-out-thornwell-63-0-its-fourth-straight-win/index.html",
+        "/2026/08/29/sports/wildcats-edge-landrum-28-26-after-storm-delays-game-overnight/index.html",
+        "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/index.html",
+        "/2026/08/20/news/fca-athlete-breakfast-2026/index.html",
+        "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/index.html",
+        "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/index.html",
+        "/2026/05/13/culture/finding-a-place-in-the-spotlight/index.html",
+        "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/index.html",
+        "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/index.html",
+        "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/index.html",
+        "/2026/02/26/features/no-parking-pass-no-parking/index.html",
+        "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/index.html",
+        "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/index.html",
+        "/2026/02/04/sports/soccer-season-is-kicking-off/index.html",
+        "/2026/01/24/features/sneak-peak-of-prom/index.html",
+        "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/index.html",
+        "/2026/01/23/news/winter-storm-to-blast-the-upstate/index.html",
+        "/2026/01/23/sports/support-from-wildcat-to-wildcat/index.html",
+        "/2026/01/22/news/a-new-era-for-student-journalism-nshs/index.html",
+        "/advertise/index.html",
+        "/leadership/index.html",
+        "/image-license/index.html",
+        "/terms/index.html",
+        "/privacy/index.html",
+        "/contact/index.html",
+        "/wildcat-marching-band-concessions-2026/index.html",
+        "/sports-archive-baseball/index.html",
+        "/sports-archive-boys-basketball/index.html",
+        "/sports-archive-boys-soccer/index.html",
+        "/sports-archive-football/index.html",
+        "/sports-archive-girls-basketball/index.html",
+        "/sports-archive-girls-soccer/index.html",
+        "/sports-archive-softball/index.html",
+        "/sports-archive-volleyball/index.html",
+        "/sports-archive/index.html"
+      ],
+      "restoredPaths": []
     },
     {
       "scenario": "unpublish",
-      "acquisitionMs": 41.807958,
-      "downloadMs": 7.543666000000002,
-      "parseMs": 13.787000000000006,
+      "commandWallMs": 2433.121916,
+      "acquisitionMs": 58.15333400000001,
+      "downloadMs": 10.492083000000008,
+      "parseMs": 18.209874999999997,
       "snapshotBytes": 1512929,
       "cmsRequests": 2,
-      "astroExcludingMediaMs": 866.3600830000003,
-      "postbuildMs": 637,
-      "totalFrontendMs": 1755,
-      "outputBytes": 106995462,
+      "astroExcludingMediaMs": 1096.507417,
+      "postbuildMs": 738,
+      "totalFrontendMs": 2190,
+      "outputBytes": 107019616,
       "media": {
-        "discoveryMs": 5.052249999999958,
-        "materializationMs": 151.123292,
-        "rewriteMs": 2.42454100000009,
+        "discoveryMs": 5.478665999999976,
+        "materializationMs": 222.14424999999994,
+        "rewriteMs": 2.5079169999999067,
         "uniqueReferences": 213,
         "concurrency": 8,
-        "totalMs": 158.6847499999999
+        "totalMs": 230.26158299999997
       },
       "routes": {
         "rendered": 33,
         "restored": 36,
         "emitted": 69
       },
-      "routeResults": [
-        {
-          "path": "/404.html",
-          "restored": false
-        },
-        {
-          "path": "/about/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/adam/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/addyson/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/caroline/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/evan/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/gibson/index.html",
-          "restored": false
-        },
-        {
-          "path": "/author/jeremy/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/matt/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/maycie/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/molly/index.html",
-          "restored": true
-        },
-        {
-          "path": "/author/sy/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/culture/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/features/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/news/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/opinion/index.html",
-          "restored": true
-        },
-        {
-          "path": "/category/sports/index.html",
-          "restored": false
-        },
-        {
-          "path": "/corrections/index.html",
-          "restored": false
-        },
-        {
-          "path": "/coverage/index.html",
-          "restored": false
-        },
-        {
-          "path": "/diversity-inclusion/index.html",
-          "restored": false
-        },
-        {
-          "path": "/feed.xml",
-          "restored": false
-        },
-        {
-          "path": "/join/index.html",
-          "restored": false
-        },
-        {
-          "path": "/media-assets/index.html",
-          "restored": false
-        },
-        {
-          "path": "/media-kit/index.html",
-          "restored": false
-        },
-        {
-          "path": "/news-sitemap.xml",
-          "restored": false
-        },
-        {
-          "path": "/open-source/index.html",
-          "restored": false
-        },
-        {
-          "path": "/robots.txt",
-          "restored": false
-        },
-        {
-          "path": "/search/index.html",
-          "restored": false
-        },
-        {
-          "path": "/sitemap.xml",
-          "restored": false
-        },
-        {
-          "path": "/staff/index.html",
-          "restored": false
-        },
-        {
-          "path": "/stories/index.html",
-          "restored": false
-        },
-        {
-          "path": "/index.html",
-          "restored": false
-        },
-        {
-          "path": "/_byline/search-index.json",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/14/culture/three-juniors-take-on-a-new-role-directing-their-classmates-in-need-a-lift/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/10/10/sports/ninety-six-shuts-out-thornwell-63-0-its-fourth-straight-win/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/29/sports/wildcats-edge-landrum-28-26-after-storm-delays-game-overnight/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/08/20/news/fca-athlete-breakfast-2026/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/05/13/culture/finding-a-place-in-the-spotlight/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/26/features/no-parking-pass-no-parking/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/02/04/sports/soccer-season-is-kicking-off/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/24/features/sneak-peak-of-prom/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/01/23/news/winter-storm-to-blast-the-upstate/index.html",
-          "restored": true
-        },
-        {
-          "path": "/2026/01/23/sports/support-from-wildcat-to-wildcat/index.html",
-          "restored": false
-        },
-        {
-          "path": "/2026/01/22/news/a-new-era-for-student-journalism-nshs/index.html",
-          "restored": false
-        },
-        {
-          "path": "/advertise/index.html",
-          "restored": true
-        },
-        {
-          "path": "/leadership/index.html",
-          "restored": true
-        },
-        {
-          "path": "/image-license/index.html",
-          "restored": true
-        },
-        {
-          "path": "/terms/index.html",
-          "restored": true
-        },
-        {
-          "path": "/privacy/index.html",
-          "restored": true
-        },
-        {
-          "path": "/contact/index.html",
-          "restored": true
-        },
-        {
-          "path": "/wildcat-marching-band-concessions-2026/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-baseball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-boys-basketball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-boys-soccer/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-football/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-girls-basketball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-girls-soccer/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-softball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive-volleyball/index.html",
-          "restored": true
-        },
-        {
-          "path": "/sports-archive/index.html",
-          "restored": true
-        }
+      "renderedPaths": [
+        "/404.html",
+        "/about/index.html",
+        "/author/gibson/index.html",
+        "/category/sports/index.html",
+        "/corrections/index.html",
+        "/coverage/index.html",
+        "/diversity-inclusion/index.html",
+        "/feed.xml",
+        "/join/index.html",
+        "/media-assets/index.html",
+        "/media-kit/index.html",
+        "/news-sitemap.xml",
+        "/open-source/index.html",
+        "/robots.txt",
+        "/search/index.html",
+        "/sitemap.xml",
+        "/staff/index.html",
+        "/stories/index.html",
+        "/index.html",
+        "/_byline/search-index.json",
+        "/2026/10/14/culture/three-juniors-take-on-a-new-role-directing-their-classmates-in-need-a-lift/index.html",
+        "/2026/10/10/sports/ninety-six-shuts-out-thornwell-63-0-its-fourth-straight-win/index.html",
+        "/2026/08/29/sports/wildcats-edge-landrum-28-26-after-storm-delays-game-overnight/index.html",
+        "/2026/08/20/news/from-a-last-minute-video-to-a-national-finish/index.html",
+        "/2026/07/12/news/who-could-replace-lindsey-graham-in-the-senate/index.html",
+        "/2026/06/29/news/moving-weekly-wildcat-from-wordpress-to-next-js/index.html",
+        "/2026/05/13/culture/finding-a-place-in-the-spotlight/index.html",
+        "/2026/03/18/opinion/is-south-carolina-ready-for-a-senate-shake-up/index.html",
+        "/2026/02/26/sports/ninety-six-girls-soccer-team-kicks-off-season-with-win/index.html",
+        "/2026/02/06/news/seniors-dont-miss-your-yearbook-moment/index.html",
+        "/2026/02/04/sports/soccer-season-is-kicking-off/index.html",
+        "/2026/01/23/sports/support-from-wildcat-to-wildcat/index.html",
+        "/2026/01/22/news/a-new-era-for-student-journalism-nshs/index.html"
+      ],
+      "restoredPaths": [
+        "/author/adam/index.html",
+        "/author/addyson/index.html",
+        "/author/caroline/index.html",
+        "/author/evan/index.html",
+        "/author/jeremy/index.html",
+        "/author/matt/index.html",
+        "/author/maycie/index.html",
+        "/author/molly/index.html",
+        "/author/sy/index.html",
+        "/category/culture/index.html",
+        "/category/features/index.html",
+        "/category/news/index.html",
+        "/category/opinion/index.html",
+        "/2026/08/20/news/fca-athlete-breakfast-2026/index.html",
+        "/2026/03/19/culture/building-the-wildcat-identity-the-pledge-that-started-it/index.html",
+        "/2026/02/26/features/no-parking-pass-no-parking/index.html",
+        "/2026/02/20/features/wildcat-courage-funding-the-fight-for-safety/index.html",
+        "/2026/01/24/features/sneak-peak-of-prom/index.html",
+        "/2026/01/24/features/why-being-here-matters-mrs-bennett-on-attendance/index.html",
+        "/2026/01/23/news/winter-storm-to-blast-the-upstate/index.html",
+        "/advertise/index.html",
+        "/leadership/index.html",
+        "/image-license/index.html",
+        "/terms/index.html",
+        "/privacy/index.html",
+        "/contact/index.html",
+        "/wildcat-marching-band-concessions-2026/index.html",
+        "/sports-archive-baseball/index.html",
+        "/sports-archive-boys-basketball/index.html",
+        "/sports-archive-boys-soccer/index.html",
+        "/sports-archive-football/index.html",
+        "/sports-archive-girls-basketball/index.html",
+        "/sports-archive-girls-soccer/index.html",
+        "/sports-archive-softball/index.html",
+        "/sports-archive-volleyball/index.html",
+        "/sports-archive/index.html"
       ]
     }
   ]

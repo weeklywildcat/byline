@@ -1,12 +1,19 @@
 # October 2026 build-performance measurements
 
 Measured October 17, 2026 against current `main`
-`3444049948464bdf9c86eb0cdb8f88d647e4a6d7` and this implementation. Node 26.7.0,
+`e99a17b3af59f30a854e61ff7f4748661955b0c4` and this implementation. Node 26.7.0,
 npm 11.19.0, Astro 7.3.1, same macOS machine. These are local build measurements,
 not hosted Cloudflare queue/install/upload/deployment latency measurements.
 [Machine-readable results](build-performance-2026-10.json) include actual route
 render/restore paths and phase data. The [September migration benchmark](astro-benchmark.md)
 is historical and is not reused as the baseline.
+
+The audit started at `3444049`; `main` advanced during the task with immersive
+storytelling and the 0.3.16 release. This branch was rebased, the new Gutenberg
+paths audited, and the final controlled comparison/validation rerun on `e99a17b`.
+The new blocks use canonical rendered HTML and local enhancement scripts, with no
+additional public build dataset. Initial live-network observations below remain
+labelled separately.
 
 ## Dataset and correctness
 
@@ -27,7 +34,7 @@ producer payload measurement.
 
 All **66 HTML documents are byte-for-byte identical** between baseline and cold
 snapshot output. Route inventories have zero additions/removals and semantic SEO
-comparison has zero differences. HTML is 2,810,880 B, JS 250,360 B, CSS 191,144 B,
+comparison has zero differences. HTML is 2,810,880 B, JS 257,716 B, CSS 207,933 B,
 and mirrored media 100,581,917 B in both. Overall output is about 140.6 MiB;
 small differences are diagnostic JSON/manifest timestamps and media timing records.
 No route, SEO, asset, media, or static compatibility check was removed.
@@ -40,29 +47,35 @@ and one immutable artifact, plus the same media transport. Every binary is still
 downloaded/materialized in each build; this is not a warm media-cache measurement.
 
 <!-- BENCHMARK_TABLE -->
-| Scenario | Frontend total | Acquisition | Media discovery + materialization + rewrite | Astro excluding media | Postbuild | CMS acquisition requests | Rendered / restored |
+| Scenario | Complete command wall | Acquisition | Media discovery + materialization + rewrite | Astro excluding media | Postbuild | CMS acquisition requests | Rendered / restored |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Baseline cold | 2.83 s | Legacy overlap; see below | Legacy overlap; see below | 1.79 s wrapper including content/media | Included in total | 10 | 70 / 0 |
-| Snapshot cold | 2.465 s | 0.051 s | 0.261 s | 1.403 s | 0.697 s | 2 | 70 / 0 |
-| Warm no-op | 1.873 s | 0.044 s | 0.235 s | 0.841 s | 0.702 s | 2 | 18 / 52 |
-| Single article edit | 1.883 s | 0.042 s | 0.212 s | 0.872 s | 0.700 s | 2 | 34 / 36 |
-| Global change | 1.955 s | 0.042 s | 0.220 s | 0.926 s | 0.712 s | 2 | 70 / 0 |
-| Unpublish | 1.755 s | 0.042 s | 0.159 s | 0.866 s | 0.637 s | 2 | 33 / 36 |
+| Baseline cold | 2.830 s | Legacy overlap; see below | Legacy overlap; see below | 1.897 s wrapper including content/media | Included in total | 10 | 70 / 0 |
+| Snapshot cold | 3.059 s | 0.051 s | 0.273 s | 1.658 s | 0.769 s | 2 | 70 / 0 |
+| Warm no-op | 2.413 s | 0.052 s | 0.296 s | 1.051 s | 0.753 s | 2 | 18 / 52 |
+| Single article edit | 2.379 s | 0.047 s | 0.248 s | 1.039 s | 0.800 s | 2 | 34 / 36 |
+| Global change | 2.679 s | 0.049 s | 0.314 s | 1.213 s | 0.837 s | 2 | 70 / 0 |
+| Unpublish | 2.433 s | 0.058 s | 0.230 s | 1.097 s | 0.738 s | 2 | 33 / 36 |
 <!-- END_BENCHMARK_TABLE -->
 
 Acquisition includes discovery, download, integrity/shape checks and parse. The
-cold artifact download was 8.05 ms and validation/parse 19.98 ms. All content is
+cold artifact download was 8.98 ms and validation/parse 15.06 ms. All content is
 local thereafter; the renderer's attempted CMS REST request count is zero. Astro
 excluding media includes compilation, local snapshot loading/indexing and rendering,
 not just prerender CPU time. Postbuild includes compatibility materialization,
-closed-set copying, redirects, manifests and all existing verification. Small
-process/bootstrap overhead explains why columns do not sum exactly to total.
+closed-set copying, redirects, manifests and all existing verification. Complete command wall is measured around the same `npm run build` in `apps/web`
+for both versions, including npm startup and reporting. Internal `totalFrontendMs`
+starts in the wrapper, so it is reported separately in JSON. Concurrent/network
+phases overlap and columns do not sum exactly to command wall.
+
+The controlled cold command is slightly slower (3.06 s versus 2.83 s); snapshot
+validation and populating the incremental cache have a cost. The warm single-story
+command is 2.38 s and restores 36 routes. No cold replay speedup is claimed.
 
 The baseline did not have separate phase boundaries: its snapshot loader spent
-439.34 ms acquiring content **and** mirroring media, inside a 1,791.64 ms Astro
-wrapper. Transport instrumentation measured 10 CMS requests (111 ms combined busy
-wall time; 267 ms summed overlapping request durations), including 15 ms publication
-bootstrap; 318 media attempts occupied 289 ms busy wall time (9,192 ms summed
+449.11 ms acquiring content **and** mirroring media, inside a 1896.92 ms Astro
+wrapper. Transport instrumentation measured 10 CMS requests (123 ms combined busy
+wall time; 292 ms summed overlapping request durations), including 11 ms publication
+bootstrap; 318 media attempts occupied 269 ms busy wall time (8135 ms summed
 parallel durations). These overlap and must not be added as sequential phases.
 The new named boundaries remove that ambiguity.
 
@@ -79,7 +92,7 @@ between comparable scenarios, so more fallbacks cannot masquerade as an improvem
 
 ## Live-network observations and limitations
 
-The initial fresh live baseline was **24.53 s**, with 10 CMS requests, a 417 ms
+The initial fresh live baseline at `3444049` was **24.53 s**, with 10 CMS requests, a 417 ms
 publication fetch, and 20.54 s in the old combined content/media snapshot loader.
 A first complete snapshot-backed live-media replay matrix measured 21.33 s cold,
 18.45 s no-op, 17.38 s single-story, and 18.85 s global; every one retained the same

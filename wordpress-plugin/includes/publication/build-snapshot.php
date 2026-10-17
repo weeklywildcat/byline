@@ -3,6 +3,7 @@
 if (!defined('ABSPATH')) { exit; }
 const BYLINE_BUILD_SNAPSHOT_SCHEMA = 1;
 const BYLINE_BUILD_SNAPSHOT_OPTION = 'byline_completed_build_snapshot_v1';
+const BYLINE_BUILD_SNAPSHOT_SOURCE_OPTION = 'byline_build_snapshot_source_version';
 
 function byline_snapshot_pick(array $value, array $fields): array
 {
@@ -268,6 +269,11 @@ function byline_snapshot_stable_revision(): int
     return byline_public_content_revision();
 }
 
+function byline_build_snapshot_source_version(): string
+{
+    return BYLINE_BUILD_SNAPSHOT_SCHEMA . ':' . BYLINE_PLUGIN_VERSION . ':' . (string) ($GLOBALS['wp_version'] ?? '');
+}
+
 function byline_prepare_build_snapshot(int $required_revision = 0)
 {
     try {
@@ -285,11 +291,24 @@ function byline_prepare_build_snapshot(int $required_revision = 0)
             if (isset($GLOBALS['byline_snapshot_writer']) || !byline_snapshot_database_lock(true)) throw new RuntimeException('A public writer is active; retry snapshot preparation.');
             $database_locked = true;
             $revision = byline_snapshot_stable_revision();
+            $source_version = byline_build_snapshot_source_version();
+            if (get_option(BYLINE_BUILD_SNAPSHOT_SOURCE_OPTION, '') !== $source_version) {
+                // A renderer/Core upgrade can change canonical HTML without a
+                // post save. It must not reuse the previous revision's body.
+                $revision = byline_bump_public_content_revision();
+                byline_deployment_record_expected_revision($revision);
+                update_option(BYLINE_BUILD_SNAPSHOT_SOURCE_OPTION, $source_version, false);
+                if (get_option(BYLINE_BUILD_SNAPSHOT_SOURCE_OPTION, '') !== $source_version) throw new RuntimeException('Could not record the snapshot producer version.');
+            }
             if ($revision < $required_revision) throw new RuntimeException('Public revision is behind the deployment requirement.');
             $previous = get_option(BYLINE_BUILD_SNAPSHOT_OPTION, []);
             $previous_file = $location['path'] . '/' . basename((string) ($previous['url'] ?? ''));
             if (($previous['schemaVersion'] ?? 0) === BYLINE_BUILD_SNAPSHOT_SCHEMA && (int) ($previous['revision'] ?? -1) === $revision && is_file($previous_file)
                 && filesize($previous_file) === (int) $previous['bytes'] && hash_file('sha256', $previous_file) === $previous['digest']) return $previous;
+            // This PHP request may have primed content/options before another
+            // writer advanced R. Drop runtime caches before canonical reads.
+            $flushed = function_exists('wp_cache_flush_runtime') ? wp_cache_flush_runtime() : wp_cache_flush();
+            if ($flushed === false) throw new RuntimeException('Could not refresh the WordPress runtime cache for snapshot generation.');
             $snapshot = byline_collect_public_build_snapshot($revision);
             byline_validate_public_build_snapshot($snapshot);
             $result = byline_store_build_snapshot($snapshot, $location['path'], $location['url'], 'byline_snapshot_stable_revision');
@@ -299,6 +318,8 @@ function byline_prepare_build_snapshot(int $required_revision = 0)
             if (byline_snapshot_stable_revision() !== $revision) return new WP_Error('byline_snapshot_revision_race', 'Public content changed before snapshot promotion.', ['retryable' => true]);
             $result['preparationMs'] = round((microtime(true) - $preparation_started) * 1000, 2);
             update_option(BYLINE_BUILD_SNAPSHOT_OPTION, $result, false);
+            $saved = get_option(BYLINE_BUILD_SNAPSHOT_OPTION, []);
+            if (($saved['digest'] ?? '') !== $result['digest'] || ($saved['revision'] ?? -1) !== $revision || ($saved['bytes'] ?? -1) !== $result['bytes']) throw new RuntimeException('Could not promote the completed snapshot pointer.');
             // Serving hosts that honor .htaccess get immutable artifact caching.
             // The REST pointer always has no-store independently of this file.
             file_put_contents($location['path'] . '/.htaccess', "<IfModule mod_headers.c>\n<FilesMatch \"^snapshot-v[0-9]+-r[0-9]+-[a-f0-9]+\\.json$\">\nHeader set Cache-Control \"public, max-age=31536000, immutable\"\n</FilesMatch>\n</IfModule>\n");
@@ -326,7 +347,7 @@ function byline_prepare_build_snapshot(int $required_revision = 0)
 function byline_rest_build_snapshot()
 {
     $pointer = get_option(BYLINE_BUILD_SNAPSHOT_OPTION, []);
-    if (($pointer['schemaVersion'] ?? 0) !== BYLINE_BUILD_SNAPSHOT_SCHEMA || (int) ($pointer['revision'] ?? -1) !== byline_public_content_revision()) {
+    if (get_option(BYLINE_BUILD_SNAPSHOT_SOURCE_OPTION, '') !== byline_build_snapshot_source_version() || ($pointer['schemaVersion'] ?? 0) !== BYLINE_BUILD_SNAPSHOT_SCHEMA || (int) ($pointer['revision'] ?? -1) !== byline_public_content_revision()) {
         $response = new WP_REST_Response(['code' => 'byline_snapshot_not_ready', 'message' => 'No completed snapshot for the current public revision. Retry the deployment job.'], 503);
     } else {
         $response = new WP_REST_Response($pointer);

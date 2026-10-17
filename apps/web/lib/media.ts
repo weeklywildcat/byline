@@ -322,6 +322,7 @@ async function downloadWordPressMedia(urls: string[], filePath: string) {
 
     if (!response.ok) {
       errors.push(`${response.status} ${response.statusText} (${url})`);
+      await response.body?.cancel();
       continue;
     }
 
@@ -333,6 +334,7 @@ async function downloadWordPressMedia(urls: string[], filePath: string) {
 
     if (!contentType.startsWith("image/")) {
       errors.push(`unexpected content-type "${contentType || "unknown"}" (${url})`);
+      await response.body?.cancel();
       continue;
     }
 

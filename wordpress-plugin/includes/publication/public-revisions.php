@@ -179,3 +179,15 @@ add_filter('pre_update_option_' . BYLINE_PUBLICATION_OPTION, static function ($v
     if ($value !== $old) byline_public_mutation('publication');
     return $value;
 }, 20, 2);
+
+// Canonical rendered HTML also depends on Core configuration and renderer code.
+foreach (['timezone_string', 'gmt_offset', 'permalink_structure', 'category_base', 'tag_base', 'date_format', 'time_format', 'home', 'siteurl', 'blogname', 'blogdescription'] as $option) {
+    add_filter('pre_update_option_' . $option, static function ($value, $old) {
+        if ($value !== $old) byline_public_mutation('public-render-settings');
+        return $value;
+    }, 20, 2);
+}
+add_action('upgrader_process_complete', static function ($upgrader, $context): void {
+    if (is_array($context) && in_array($context['type'] ?? '', ['plugin', 'theme', 'core'], true)) byline_public_mutation('public-renderer');
+}, 20, 2);
+foreach (['activated_plugin', 'deactivated_plugin', 'switch_theme'] as $hook) add_action($hook, static function (): void { byline_public_mutation('public-renderer'); });

@@ -29,6 +29,11 @@ The OS/DB release locks after a crashed request. A private writer marker additio
 Once the DB lock proves no writer remains active, orphan markers are removed and
 the settled CMS state receives a new revision before snapshot generation. The generator rereads revisions directly from the DB,
 so an in-process WordPress object cache cannot conceal another writer's revision.
+Before canonical serialization, the generator clears WordPress runtime caches so
+values primed before a concurrent writer cannot enter a newer revision. Producer/
+Core version changes advance the revision and invalidate discovery until a new
+artifact is prepared. Normal plugin/theme/Core upgrades and rendering-related
+Core settings participate in the same public-change lifecycle.
 Revision increments and expected-revision maxima use atomic SQL against existing
 WordPress options. There are no new tables.
 
@@ -163,6 +168,9 @@ stable request identity. `WORKERS_CI_BRANCH` is recorded. Older provider variabl
 remain supported; local builds get a UUID instead of a time-based cache identity.
 
 ## Rollout, recovery and force rebuild
+
+Run WP-CLI as the WordPress filesystem user, or ensure the public snapshot
+directory remains writable by both CLI and the web/cron process.
 
 1. Install the updated WordPress plugin **before** the frontend cutover.
 2. Run `wp byline build-snapshot prepare`, then `wp byline build-snapshot status`.

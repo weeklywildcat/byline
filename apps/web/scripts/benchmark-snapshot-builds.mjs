@@ -33,12 +33,16 @@ async function build(name, snapshot, cold = false) {
   // Cloudflare persists Astro's cache, not this public media directory. Every
   // scenario therefore starts with cold media, even the warm incremental runs.
   await rm(path.join(web, "public/_wordpress-media"), { recursive: true, force: true });
+  await rm(path.join(web, ".astro"), { recursive: true, force: true });
+  await rm(path.join(web, "node_modules/.vite"), { recursive: true, force: true });
   if (cold) await rm(path.join(web, "node_modules/.astro"), { recursive: true, force: true });
   const { BYLINE_BUILD_SNAPSHOT_FILE, BYLINE_CONTENT_MODE, BYLINE_PUBLICATION_JSON, BYLINE_PUBLICATION_FILE, BYLINE_LEGACY_REST_BUILD, NODE_OPTIONS, ...environment } = process.env;
   let output = "";
+  const commandStarted = performance.now();
   const child = spawn("npm", ["run", "build"], { cwd: web, env: { ...environment, BYLINE_BUILD_SNAPSHOT_URL: `http://127.0.0.1:${server.address().port}/wp-json/byline/v1/build-snapshot`, WORKERS_CI_BUILD_UUID: `benchmark-${name}`, WORKERS_CI_COMMIT_SHA: "same-code", WORKERS_CI_BRANCH: "benchmark", ...(environment.BYLINE_BENCHMARK_REPLAY_ORIGIN ? { NODE_OPTIONS: `--import=${path.join(web, "scripts/benchmark-replay-network.mjs")}` } : {}) }, stdio: ["ignore", "pipe", "pipe"] });
   child.stdout.on("data", (chunk) => { output += chunk; }); child.stderr.on("data", (chunk) => { output += chunk; });
   const status = await new Promise((resolve, reject) => { child.on("error", reject); child.on("close", resolve); });
+  const commandWallMs = performance.now() - commandStarted;
   await writeFile(path.join(destination, `${name}.log`), output);
   if (status !== 0) throw new Error(`${name} failed; see ${destination}/${name}.log`);
   if (requests.length !== 2 || !requests[0].startsWith("/wp-json/byline/v1/build-snapshot")) throw new Error(`${name}: expected exactly pointer + artifact; got ${requests}`);
@@ -49,7 +53,7 @@ async function build(name, snapshot, cold = false) {
     const reference = results[0].mediaStatuses;
     for (const [url, status] of Object.entries(mediaStatuses)) if (reference[url] !== status) throw new Error(`${name}: media outcome changed for ${url}; benchmark is not comparable`);
   }
-  results.push({ scenario: name, requests, mediaStatuses, ...metrics });
+  results.push({ scenario: name, requests, mediaStatuses, commandWallMs, ...metrics });
   await cp(path.join(web, ".byline-build"), path.join(destination, name), { recursive: true });
   if (name === "cold") await cp(path.join(web, "out"), path.join(destination, "cold-output"), { recursive: true });
   console.log(`${name}: ${(metrics.totalFrontendMs / 1000).toFixed(2)}s; ${metrics.routes.rendered} rendered / ${metrics.routes.restored} restored`);
