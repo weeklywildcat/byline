@@ -378,6 +378,22 @@ contributors_test_assert(is_wp_error($user_slug_collision) && $user_slug_collisi
 $guest_slug_collision = byline_create_guest_contributor(['name' => 'Duplicate Guest', 'slug' => 'guest-contributor'], 1);
 contributors_test_assert(is_wp_error($guest_slug_collision) && $guest_slug_collision->get_error_code() === 'byline_guest_slug_conflict', 'Guest slugs must be unique among guest records.');
 
+// WordPress calls a meta sanitize callback with (value, meta key, object type,
+// subtype). A callback whose second parameter is typed, like the length in
+// byline_guest_sanitize_text(), throws a TypeError on the real hook and crashed
+// every guest save. Replay the real call shape for every registered guest meta.
+foreach ($byline_contributor_test_post_meta[BYLINE_GUEST_POST_TYPE] ?? [] as $meta_key => $meta_definition) {
+    $callback = $meta_definition['sanitize_callback'] ?? null;
+    if (!is_string($callback)) {
+        continue;
+    }
+    try {
+        $callback('Sample value', $meta_key, 'post', BYLINE_GUEST_POST_TYPE);
+    } catch (Throwable $error) {
+        contributors_test_assert(false, 'Sanitize callback for ' . $meta_key . ' must accept the arguments WordPress passes: ' . $error->getMessage());
+    }
+}
+
 // One-off guests: byline name and photo only, no public profile page.
 contributors_test_assert(($guest['hasProfilePage'] ?? null) === true, 'Guests created without the option keep a profile page.');
 $one_off = byline_create_guest_contributor(['name' => 'Alex Smith', 'role' => 'Photographer', 'imageId' => 7, 'hasProfilePage' => false], 1);

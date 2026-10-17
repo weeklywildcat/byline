@@ -688,8 +688,13 @@ function chooseMediaImage(title: string): Promise<{ id: number; url: string } | 
       const id = typeof selected.id === 'number' ? selected.id : 0;
       resolve(id > 0 && url ? { id, url } : null);
     });
+    // WordPress fires `close` just before `select` when a photo is chosen, so
+    // treating `close` as a cancel at once would discard the selection. Wait a
+    // tick; a real selection has settled by then.
     frame.on('close', () => {
-      if (!settled) resolve(null);
+      window.setTimeout(() => {
+        if (!settled) resolve(null);
+      }, 0);
     });
     frame.open();
   });

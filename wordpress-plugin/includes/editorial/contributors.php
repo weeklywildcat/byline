@@ -94,6 +94,21 @@ function byline_guest_sanitize_text($value, int $max_length = 240): string
     return substr($value, 0, $max_length);
 }
 
+/**
+ * Sanitize callback for registered text meta.
+ *
+ * WordPress calls a meta sanitize callback with the value, the meta key, the
+ * object type and the subtype. byline_guest_sanitize_text() takes a length as
+ * its second argument, so passing it directly receives the key and throws a
+ * TypeError. This wrapper keeps only the value.
+ *
+ * @param mixed $value
+ */
+function byline_guest_sanitize_meta_text($value): string
+{
+    return byline_guest_sanitize_text($value, 120);
+}
+
 function byline_guest_sanitize_bio($value): string
 {
     if (!is_scalar($value)) {
@@ -856,8 +871,8 @@ function byline_register_contributor_meta(): void
     ]);
 
     foreach ([
-        BYLINE_GUEST_DISPLAY_NAME_META => ['type' => 'string', 'sanitize_callback' => 'byline_guest_sanitize_text'],
-        BYLINE_GUEST_ROLE_META => ['type' => 'string', 'sanitize_callback' => 'byline_guest_sanitize_text'],
+        BYLINE_GUEST_DISPLAY_NAME_META => ['type' => 'string', 'sanitize_callback' => 'byline_guest_sanitize_meta_text'],
+        BYLINE_GUEST_ROLE_META => ['type' => 'string', 'sanitize_callback' => 'byline_guest_sanitize_meta_text'],
         BYLINE_GUEST_BIO_META => ['type' => 'string', 'sanitize_callback' => 'byline_guest_sanitize_bio'],
         BYLINE_GUEST_IMAGE_ID_META => ['type' => 'integer', 'sanitize_callback' => 'byline_guest_sanitize_image_id'],
         BYLINE_GUEST_LINKS_META => ['type' => 'array', 'sanitize_callback' => 'byline_guest_sanitize_links'],
