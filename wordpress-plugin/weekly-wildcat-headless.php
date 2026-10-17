@@ -53,56 +53,11 @@ require_once __DIR__ . '/includes/polls/admin.php';
 require_once __DIR__ . '/includes/polls/migration.php';
 require_once __DIR__ . '/includes/polls/cli.php';
 
-const WWH_CONTRIBUTOR_COOKIE = 'wwh_contributor_seen';
-
 function wwh_auth_cookie_expiration(int $length, int $user_id, bool $remember): int
 {
     return DAY_IN_SECONDS;
 }
 add_filter('auth_cookie_expiration', 'wwh_auth_cookie_expiration', 10, 3);
-
-function wwh_contributor_cookie_value(int $issued_at): string
-{
-    return $issued_at . '.' . hash_hmac('sha256', (string) $issued_at, wp_salt('auth'));
-}
-
-function wwh_mark_successful_contributor_login(string $user_login, WP_User $user): void
-{
-    $issued_at = time();
-    $value = wwh_contributor_cookie_value($issued_at);
-    setcookie(
-        WWH_CONTRIBUTOR_COOKIE,
-        $value,
-        [
-            'expires' => $issued_at + YEAR_IN_SECONDS,
-            'path' => COOKIEPATH ?: '/',
-            'domain' => COOKIE_DOMAIN,
-            'secure' => is_ssl(),
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]
-    );
-    $_COOKIE[WWH_CONTRIBUTOR_COOKIE] = $value;
-}
-add_action('wp_login', 'wwh_mark_successful_contributor_login', 10, 2);
-
-function wwh_has_contributor_cookie(): bool
-{
-    $value = isset($_COOKIE[WWH_CONTRIBUTOR_COOKIE])
-        ? sanitize_text_field(wp_unslash($_COOKIE[WWH_CONTRIBUTOR_COOKIE]))
-        : '';
-    if ($value === '' || preg_match('/^(\d+)\.([a-f0-9]{64})$/', $value, $matches) !== 1) {
-        return false;
-    }
-
-    $issued_at = (int) $matches[1];
-    if ($issued_at <= 0 || $issued_at > time() + MINUTE_IN_SECONDS || $issued_at < time() - YEAR_IN_SECONDS) {
-        return false;
-    }
-
-    $expected = wwh_contributor_cookie_value($issued_at);
-    return hash_equals($expected, $value);
-}
 
 function wwh_redirect_cms_frontend(): void
 {
@@ -125,122 +80,10 @@ function wwh_redirect_cms_frontend(): void
         exit;
     }
 
-    if (wwh_has_contributor_cookie()) {
-        wp_safe_redirect(wp_login_url(admin_url()));
-        exit;
-    }
-
-    wwh_render_cms_redirect_page();
+    wp_safe_redirect(wp_login_url(admin_url()));
     exit;
 }
 add_action('template_redirect', 'wwh_redirect_cms_frontend', 1);
-
-function wwh_render_cms_redirect_page(): void
-{
-    $publication = byline_get_publication_config();
-    $public_url = rtrim($publication['urls']['publicSite'], '/') . '/';
-    $login_url = wp_login_url(admin_url());
-    $logo_url = byline_publication_absolute_url($publication['branding']['masthead']['url']);
-    $photo = wwh_unsplash_photo('ZeGQ22v9Zhk');
-
-    status_header(200);
-    nocache_headers();
-    header('X-Robots-Tag: noindex, nofollow', true);
-    ?>
-    <!doctype html>
-    <html <?php language_attributes(); ?>>
-    <head>
-        <meta charset="<?php bloginfo('charset'); ?>">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="robots" content="noindex, nofollow">
-        <meta http-equiv="refresh" content="5;url=<?php echo esc_url($public_url); ?>">
-        <title><?php echo esc_html($publication['identity']['name']); ?> CMS</title>
-        <style>
-            * { box-sizing: border-box; }
-            body {
-                align-items: center;
-                background-color: #27272a;
-                <?php if ($photo !== []) : ?>
-                background-image: linear-gradient(rgba(0, 0, 0, .42), rgba(0, 0, 0, .58)), url('<?php echo esc_url($photo['imageUrl']); ?>');
-                background-position: center;
-                background-repeat: no-repeat;
-                background-size: cover;
-                <?php endif; ?>
-                color: #18181b;
-                display: flex;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                justify-content: center;
-                margin: 0;
-                min-height: 100vh;
-                padding: 24px;
-            }
-            main {
-                background: #fff;
-                border: 1px solid #e4e4e7;
-                border-radius: 16px;
-                box-shadow: 0 20px 55px rgba(24, 24, 27, .1);
-                max-width: 520px;
-                padding: 38px;
-                text-align: center;
-                width: 100%;
-            }
-            .logo { display: block; height: auto; margin: 0 auto 28px; max-width: 260px; width: 100%; }
-            h1 { font-size: 25px; line-height: 1.25; margin: 0 0 10px; }
-            p { color: #52525b; font-size: 15px; line-height: 1.5; margin: 0 0 24px; }
-            .countdown { color: #18181b; font-weight: 600; }
-            .login-link {
-                background: #18181b;
-                border-radius: 7px;
-                color: #fff;
-                display: inline-block;
-                font-size: 15px;
-                font-weight: 600;
-                padding: 12px 18px;
-                text-decoration: none;
-            }
-            .login-link:hover, .login-link:focus { background: #3f3f46; }
-            .photo-credit {
-                background: rgba(0, 0, 0, .48);
-                border-radius: 4px;
-                bottom: 12px;
-                color: rgba(255, 255, 255, .86);
-                font-size: 11px;
-                padding: 5px 8px;
-                position: fixed;
-                right: 12px;
-            }
-            .photo-credit a { color: #fff; }
-            @media (max-width: 520px) { main { padding: 30px 22px; } }
-        </style>
-    </head>
-    <body>
-        <main>
-            <img class="logo" src="<?php echo esc_url($logo_url); ?>" alt="<?php echo esc_attr($publication['branding']['masthead']['alt']); ?>">
-            <h1>This site is for contributors only</h1>
-            <p class="countdown" aria-live="polite">Redirecting in <span id="wwh-countdown">5</span> seconds</p>
-            <a class="login-link" href="<?php echo esc_url($login_url); ?>">Contributor sign in</a>
-        </main>
-        <?php if ($photo !== []) : ?>
-            <div class="photo-credit">Photo by <a href="<?php echo esc_url($photo['photographerUrl']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($photo['photographer']); ?></a> on <a href="<?php echo esc_url($photo['photoUrl']); ?>" target="_blank" rel="noopener noreferrer">Unsplash</a></div>
-        <?php endif; ?>
-        <script>
-            (function () {
-                var remaining = 5;
-                var output = document.getElementById('wwh-countdown');
-                var timer = window.setInterval(function () {
-                    remaining -= 1;
-                    output.textContent = String(Math.max(remaining, 0));
-                    if (remaining <= 0) {
-                        window.clearInterval(timer);
-                        window.location.replace(<?php echo wp_json_encode($public_url); ?>);
-                    }
-                }, 1000);
-            }());
-        </script>
-    </body>
-    </html>
-    <?php
-}
 
 const WWH_SPORTS_GAME_POST_TYPE = 'ww_sports_game';
 const WWH_SPORTS_ROSTER_POST_TYPE = 'ww_sports_roster';
