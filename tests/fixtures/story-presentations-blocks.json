@@ -399,5 +399,801 @@
         }
       }
     ]
+  },
+  {
+    "name": "byline/table-of-contents",
+    "attributes": {}
+  },
+  {
+    "name": "core/cover",
+    "attributes": {
+      "className": "is-style-byline-visual-chapter",
+      "align": "full",
+      "url": "/test-assets/landscape.svg",
+      "dimRatio": 40,
+      "overlayColor": "black",
+      "isDark": true,
+      "contentPosition": "center center"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/heading",
+        "attributes": {
+          "level": 2,
+          "content": "A visual chapter"
+        }
+      },
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "A new passage in the campus story."
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/image",
+    "attributes": {
+      "align": "wide",
+      "className": "is-style-byline-wide-photo",
+      "url": "/test-assets/panorama.svg",
+      "alt": "Campus landscape",
+      "caption": "Reporting from the campus. Photo: Staff"
+    }
+  },
+  {
+    "name": "core/image",
+    "attributes": {
+      "align": "full",
+      "className": "is-style-byline-full-photo",
+      "url": "/test-assets/panorama.svg",
+      "alt": "Campus landscape",
+      "caption": "Reporting from the campus. Photo: Staff"
+    }
+  },
+  {
+    "name": "core/image",
+    "attributes": {
+      "align": "full",
+      "className": "is-style-byline-full-photo",
+      "url": "/test-assets/portrait.svg",
+      "alt": "Campus portrait",
+      "caption": "Reporting from the campus. Photo: Staff"
+    }
+  },
+  {
+    "name": "core/video",
+    "attributes": {
+      "align": "full",
+      "className": "is-style-byline-full-video",
+      "src": "/test-assets/portrait.mp4",
+      "controls": true,
+      "autoplay": false,
+      "caption": "A full editorial video.",
+      "preload": "metadata"
+    }
+  },
+  {
+    "name": "core/group",
+    "attributes": {
+      "tagName": "aside",
+      "className": "is-style-byline-context"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/heading",
+        "attributes": {
+          "level": 3,
+          "content": "Context"
+        }
+      },
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "The reporting provides background for the community. "
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/group",
+    "attributes": {
+      "tagName": "aside",
+      "className": "is-style-byline-why-it-matters"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/heading",
+        "attributes": {
+          "level": 3,
+          "content": "Why It Matters"
+        }
+      },
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "The reporting provides background for the community. "
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/group",
+    "attributes": {
+      "tagName": "aside",
+      "className": "is-style-byline-margin-note"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/heading",
+        "attributes": {
+          "level": 3,
+          "content": "Margin Note"
+        }
+      },
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "The reporting provides background for the community. A long margin note remains readable alongside this passage. A long margin note remains readable alongside this passage. A long margin note remains readable alongside this passage. A long margin note remains readable alongside this passage. A long margin note remains readable alongside this passage. "
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/paragraph",
+    "attributes": {
+      "content": "This paragraph follows the margin note. Reporters explain the consequences of the decision with records, sources and context. Reporters explain the consequences of the decision with records, sources and context. Reporters explain the consequences of the decision with records, sources and context. Reporters explain the consequences of the decision with records, sources and context. Reporters explain the consequences of the decision with records, sources and context. Reporters explain the consequences of the decision with records, sources and context. Reporters explain the consequences of the decision with records, sources and context. Reporters explain the consequences of the decision with records, sources and context. "
+    }
+  },
+  {
+    "name": "core/image",
+    "attributes": {
+      "align": "wide",
+      "className": "is-style-byline-wide-photo",
+      "url": "/test-assets/panorama.svg",
+      "alt": "Campus landscape",
+      "caption": "Reporting from the campus. Photo: Staff"
+    }
+  },
+  {
+    "name": "core/heading",
+    "attributes": {
+      "level": 2,
+      "content": "The records behind the story"
+    }
+  },
+  {
+    "name": "core/table",
+    "attributes": {
+      "align": "wide",
+      "className": "is-style-byline-data-table",
+      "hasFixedLayout": false,
+      "head": [
+        {
+          "cells": [
+            {
+              "content": "Department",
+              "tag": "th"
+            },
+            {
+              "content": "Last year",
+              "tag": "th"
+            },
+            {
+              "content": "This year",
+              "tag": "th"
+            },
+            {
+              "content": "Change",
+              "tag": "th"
+            },
+            {
+              "content": "Students",
+              "tag": "th"
+            },
+            {
+              "content": "Notes",
+              "tag": "th"
+            }
+          ]
+        }
+      ],
+      "body": [
+        {
+          "cells": [
+            {
+              "content": "Learning resources",
+              "tag": "td"
+            },
+            {
+              "content": "$120,000",
+              "tag": "td"
+            },
+            {
+              "content": "$132,000",
+              "tag": "td"
+            },
+            {
+              "content": "10%",
+              "tag": "td"
+            },
+            {
+              "content": "1,245",
+              "tag": "td"
+            },
+            {
+              "content": "Audited district records",
+              "tag": "td"
+            }
+          ]
+        }
+      ],
+      "caption": "Source: District budget. Scroll this table to read all six columns."
+    }
+  },
+  {
+    "name": "core/table",
+    "attributes": {
+      "align": "wide",
+      "className": "is-style-byline-comparison-table",
+      "hasFixedLayout": false,
+      "head": [
+        {
+          "cells": [
+            {
+              "content": "Department",
+              "tag": "th"
+            },
+            {
+              "content": "Last year",
+              "tag": "th"
+            },
+            {
+              "content": "This year",
+              "tag": "th"
+            },
+            {
+              "content": "Change",
+              "tag": "th"
+            },
+            {
+              "content": "Students",
+              "tag": "th"
+            },
+            {
+              "content": "Notes",
+              "tag": "th"
+            }
+          ]
+        }
+      ],
+      "body": [
+        {
+          "cells": [
+            {
+              "content": "Learning resources",
+              "tag": "td"
+            },
+            {
+              "content": "$120,000",
+              "tag": "td"
+            },
+            {
+              "content": "$132,000",
+              "tag": "td"
+            },
+            {
+              "content": "10%",
+              "tag": "td"
+            },
+            {
+              "content": "1,245",
+              "tag": "td"
+            },
+            {
+              "content": "Audited district records",
+              "tag": "td"
+            }
+          ]
+        }
+      ],
+      "caption": "Source: District budget. Scroll this table to read all six columns."
+    }
+  },
+  {
+    "name": "core/details",
+    "attributes": {
+      "className": "is-style-byline-read-more",
+      "summary": "Read More"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "The newsroom reviewed meeting records, interviewed participants and checked the data. <a href=\"/about/\">Read about the newsroom</a>."
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/details",
+    "attributes": {
+      "className": "is-style-byline-methodology",
+      "summary": "Methodology"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "The newsroom reviewed meeting records, interviewed participants and checked the data. <a href=\"/about/\">Read about the newsroom</a>."
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/details",
+    "attributes": {
+      "className": "is-style-byline-full-statement",
+      "summary": "Full Statement"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "The newsroom reviewed meeting records, interviewed participants and checked the data. <a href=\"/about/\">Read about the newsroom</a>."
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/columns",
+    "attributes": {
+      "align": "wide",
+      "className": "is-style-byline-comparison"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/column",
+        "attributes": {},
+        "innerBlocks": [
+          {
+            "name": "core/heading",
+            "attributes": {
+              "level": 3,
+              "content": "Reported perspective"
+            }
+          },
+          {
+            "name": "core/paragraph",
+            "attributes": {
+              "content": "A verified fact with context."
+            }
+          }
+        ]
+      },
+      {
+        "name": "core/column",
+        "attributes": {},
+        "innerBlocks": [
+          {
+            "name": "core/heading",
+            "attributes": {
+              "level": 3,
+              "content": "Reported perspective"
+            }
+          },
+          {
+            "name": "core/paragraph",
+            "attributes": {
+              "content": "A verified fact with context."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "core/columns",
+    "attributes": {
+      "align": "wide",
+      "className": "is-style-byline-main-aside"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/column",
+        "attributes": {
+          "width": "65%"
+        },
+        "innerBlocks": [
+          {
+            "name": "core/heading",
+            "attributes": {
+              "level": 3,
+              "content": "Reported perspective"
+            }
+          },
+          {
+            "name": "core/paragraph",
+            "attributes": {
+              "content": "A verified fact with context."
+            }
+          }
+        ]
+      },
+      {
+        "name": "core/column",
+        "attributes": {
+          "width": "35%"
+        },
+        "innerBlocks": [
+          {
+            "name": "core/heading",
+            "attributes": {
+              "level": 3,
+              "content": "Reported perspective"
+            }
+          },
+          {
+            "name": "core/paragraph",
+            "attributes": {
+              "content": "A verified fact with context."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "core/columns",
+    "attributes": {
+      "align": "wide",
+      "className": "is-style-byline-key-numbers"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/column",
+        "attributes": {
+          "width": ""
+        },
+        "innerBlocks": [
+          {
+            "name": "core/heading",
+            "attributes": {
+              "level": 3,
+              "content": "00"
+            }
+          },
+          {
+            "name": "core/paragraph",
+            "attributes": {
+              "content": "A verified fact with context."
+            }
+          }
+        ]
+      },
+      {
+        "name": "core/column",
+        "attributes": {
+          "width": ""
+        },
+        "innerBlocks": [
+          {
+            "name": "core/heading",
+            "attributes": {
+              "level": 3,
+              "content": "00"
+            }
+          },
+          {
+            "name": "core/paragraph",
+            "attributes": {
+              "content": "A verified fact with context."
+            }
+          }
+        ]
+      },
+      {
+        "name": "core/column",
+        "attributes": {
+          "width": ""
+        },
+        "innerBlocks": [
+          {
+            "name": "core/heading",
+            "attributes": {
+              "level": 3,
+              "content": "00"
+            }
+          },
+          {
+            "name": "core/paragraph",
+            "attributes": {
+              "content": "A verified fact with context."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "core/group",
+    "attributes": {
+      "className": "is-style-byline-qa"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/heading",
+        "attributes": {
+          "level": 3,
+          "content": "Q: What did the records show?"
+        }
+      },
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "The sources described a change in priorities."
+        }
+      },
+      {
+        "name": "core/heading",
+        "attributes": {
+          "level": 3,
+          "content": "Q: What happens next?"
+        }
+      },
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "The board meets next month."
+        }
+      }
+    ]
+  },
+  {
+    "name": "core/heading",
+    "attributes": {
+      "level": 2,
+      "content": "Data and geography"
+    }
+  },
+  {
+    "name": "byline/visualization",
+    "attributes": {
+      "title": "School budget",
+      "description": "A graphic supporting the reporting.",
+      "mode": "embed",
+      "embedUrl": "https://datawrapper.dwcdn.net/AbCdE/1/",
+      "provider": "datawrapper",
+      "image": {
+        "url": "/test-assets/landscape.svg",
+        "alt": "A campus plan",
+        "width": 900,
+        "height": 600,
+        "credit": "Staff"
+      },
+      "type": "chart",
+      "heightPreset": "standard",
+      "source": "District records",
+      "notes": "Figures checked by the newsroom."
+    }
+  },
+  {
+    "name": "byline/visualization",
+    "attributes": {
+      "title": "Enrollment trends",
+      "description": "A graphic supporting the reporting.",
+      "mode": "embed",
+      "embedUrl": "https://public.flourish.studio/visualisation/1234/",
+      "provider": "flourish",
+      "image": {
+        "url": "/test-assets/landscape.svg",
+        "alt": "A campus plan",
+        "width": 900,
+        "height": 600,
+        "credit": "Staff"
+      },
+      "type": "chart",
+      "heightPreset": "standard",
+      "source": "District records",
+      "notes": "Figures checked by the newsroom."
+    }
+  },
+  {
+    "name": "byline/visualization",
+    "attributes": {
+      "title": "Campus map",
+      "description": "A graphic supporting the reporting.",
+      "mode": "embed",
+      "embedUrl": "https://www.openstreetmap.org/export/embed.html?bbox=-82,34,-81,35",
+      "provider": "openstreetmap",
+      "image": {
+        "url": "/test-assets/landscape.svg",
+        "alt": "A campus plan",
+        "width": 900,
+        "height": 600,
+        "credit": "Staff"
+      },
+      "type": "map",
+      "heightPreset": "map",
+      "source": "District records",
+      "notes": "Figures checked by the newsroom."
+    }
+  },
+  {
+    "name": "byline/visualization",
+    "attributes": {
+      "title": "Static graphic",
+      "mode": "static",
+      "image": {
+        "url": "/test-assets/landscape.svg",
+        "alt": "A campus plan",
+        "width": 900,
+        "height": 600,
+        "credit": "Staff"
+      },
+      "source": "Public records"
+    }
+  },
+  {
+    "name": "core/group",
+    "attributes": {
+      "className": "is-style-byline-evidence"
+    },
+    "innerBlocks": [
+      {
+        "name": "core/heading",
+        "attributes": {
+          "level": 3,
+          "content": "From the record"
+        }
+      },
+      {
+        "name": "core/quote",
+        "attributes": {
+          "className": "is-style-byline-source-quote",
+          "citation": "District budget, page 4"
+        },
+        "innerBlocks": [
+          {
+            "name": "core/paragraph",
+            "attributes": {
+              "content": "The board will review the campus plan."
+            }
+          }
+        ]
+      },
+      {
+        "name": "core/paragraph",
+        "attributes": {
+          "content": "The source passage explains the timeline."
+        }
+      }
+    ]
+  },
+  {
+    "name": "byline/annotated-image",
+    "attributes": {
+      "image": {
+        "url": "/test-assets/landscape.svg",
+        "alt": "A campus plan",
+        "width": 900,
+        "height": 600,
+        "credit": "Staff"
+      },
+      "caption": "The proposed campus changes.",
+      "annotations": [
+        {
+          "id": "campus-entrance",
+          "x": 25,
+          "y": 40,
+          "title": "New entrance",
+          "body": "The entrance faces the main street."
+        },
+        {
+          "id": "campus-library",
+          "x": 73,
+          "y": 65,
+          "title": "Library",
+          "body": "A new reading room adds public space."
+        }
+      ]
+    }
+  },
+  {
+    "name": "byline/before-after",
+    "attributes": {
+      "before": {
+        "url": "/test-assets/landscape.svg",
+        "alt": "A campus plan",
+        "width": 900,
+        "height": 600,
+        "credit": "Staff"
+      },
+      "after": {
+        "url": "/test-assets/landscape-after.svg",
+        "alt": "Campus after renovation",
+        "width": 900,
+        "height": 600,
+        "credit": "Staff"
+      },
+      "caption": "The campus renovation."
+    }
+  },
+  {
+    "name": "core/heading",
+    "attributes": {
+      "level": 2,
+      "content": "A walk through the campus"
+    }
+  },
+  {
+    "name": "byline/scrolly",
+    "attributes": {
+      "align": "full"
+    },
+    "innerBlocks": [
+      {
+        "name": "byline/scrolly-step",
+        "attributes": {
+          "image": {
+            "url": "/test-assets/landscape.svg",
+            "alt": "A campus plan",
+            "width": 900,
+            "height": 600,
+            "credit": "Staff"
+          },
+          "caption": "The first scene."
+        },
+        "innerBlocks": [
+          {
+            "name": "core/heading",
+            "attributes": {
+              "level": 2,
+              "content": "Arriving on campus"
+            }
+          },
+          {
+            "name": "core/paragraph",
+            "attributes": {
+              "content": "The original entrance anchors the reporting."
+            }
+          }
+        ]
+      },
+      {
+        "name": "byline/scrolly-step",
+        "attributes": {
+          "image": {
+            "url": "/test-assets/landscape-after.svg",
+            "alt": "A campus plan",
+            "width": 900,
+            "height": 600,
+            "credit": "Staff"
+          },
+          "caption": "The second scene."
+        },
+        "innerBlocks": [
+          {
+            "name": "core/heading",
+            "attributes": {
+              "level": 2,
+              "content": "The next scene"
+            }
+          },
+          {
+            "name": "core/paragraph",
+            "attributes": {
+              "content": "The renovation changes the public space."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "core/paragraph",
+    "attributes": {
+      "content": "A footnote adds the source behind this claim."
+    }
   }
 ]

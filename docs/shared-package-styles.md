@@ -25,6 +25,48 @@ It stays in step through three things rather than copies:
 `packages/ui/src/newsroom-blocks.css` owns the minimal Core markup compatibility
 and semantic newsroom presentation shared by Astro, Gutenberg, and Preview as
 Byline. It is emitted by the existing block asset pipeline and imported directly
-by the authenticated preview entry. The article shell establishes a 1040px wide
-content container around the 760px prose measure; the editor establishes the
-same container contract. See `newsroom-blocks.md` for presets and breakpoints.
+by the authenticated preview entry. The article shell establishes a 1440px editorial canvas around the 760px
+prose measure and 1040px wide measure; the editor establishes the same
+container contract. See `newsroom-blocks.md` for presets and breakpoints.
+
+
+## Editorial width and progressive interaction contracts
+
+The shared width variables are `--article-width: 760px`,
+`--article-wide-width: 1040px` and `--article-full-width: 1440px`. `article.css`
+owns the article shell and typography. `newsroom-blocks.css` owns authored Core
+compatibility and story elements. The Post editor supplies the same variables
+on its canvas; editor-only controls remain under `src/editor-canvas/`.
+
+Direct authored `alignwide` and `alignfull` blocks use container-query units
+and centered margins, shrinking to the shell's available width without `100vw`
+overflow. The header/byline and prose stay at 760px. Post-article sections stay
+at 1040px. Nested columns do not escape their own layout context. Wide/full
+blocks clear floated margin notes. Tables scroll inside their own figure.
+
+`@byline/ui/article-enhancements` exports `enhanceArticleStory(root, options)`.
+Astro imports it only when the article contains a gallery link, embedded
+visualization, annotated image, comparison or scrolly system. Static graphics,
+Core tables, chapters and prose need no enhancement JavaScript. The module is
+framework-free and idempotent, returns cleanup for iframe/unmount hosts, and
+uses the root's owning document/window for preview breakpoint and event parity.
+
+The authenticated preview mounts the same enhancer after ArticleView commits
+inside its real 1200/768/390px iframe. Local range/disclosure/annotation and
+scrolly interactions work; outgoing navigation and gallery actions remain
+blocked. Third-party graphics use their authored fallback in private preview.
+
+Gallery dialogs, source/origin-validated provider resize listeners, annotation
+synchronization, native comparison ranges and IntersectionObserver scrolly
+stages share this lifecycle. Flourish uses its documented `?auto=1` and JSON
+`Flourish` / `iframe.resize` messages; Datawrapper uses `datawrapper-height`.
+Both require the registered iframe's exact source and origin, matching chart
+identity where supplied, and a numeric height between 100 and 2400px. The
+shared `visualization.ts` allowlist runs both during saving and before browser
+iframe construction. No third-party scripts are serialized into content.
+
+This is progressive enhancement of semantic WordPress HTML, not a React article
+runtime. Images, reporting, annotations, source links and linear scrolly steps
+remain useful if the enhancer fails. Sticky duplicate visuals are decorative;
+original step media stays in accessibility order. Reduced-motion and narrow
+screens use the linear story. Astro remains a static export.

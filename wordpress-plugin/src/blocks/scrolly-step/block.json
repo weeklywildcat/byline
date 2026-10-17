@@ -1,0 +1,45 @@
+{
+  "apiVersion": 3,
+  "name": "byline/scrolly-step",
+  "version": "1.0.0",
+  "title": "Story Step",
+  "description": "An image and its reporting. Reorder steps with normal block controls.",
+  "category": "byline",
+  "icon": "format-image",
+  "keywords": [
+    "story",
+    "journalism"
+  ],
+  "textdomain": "weekly-wildcat-headless",
+  "attributes": {
+    "image": {
+      "type": "object",
+      "default": {}
+    },
+    "caption": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "supports": {
+    "html": false,
+    "anchor": true,
+    "align": false,
+    "inserter": true
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "postTypes": [
+    "post"
+  ],
+  "parent": [
+    "byline/scrolly"
+  ],
+  "allowedBlocks": [
+    "core/heading",
+    "core/paragraph",
+    "core/list",
+    "core/quote"
+  ]
+}

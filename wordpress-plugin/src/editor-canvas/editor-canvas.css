@@ -15,6 +15,9 @@
  */
 
 .editor-styles-wrapper {
+  --article-width: 760px;
+  --article-wide-width: 1040px;
+  --article-full-width: 1440px;
   container: byline-content / inline-size;
   padding-inline: 20px;
   background: var(--page);

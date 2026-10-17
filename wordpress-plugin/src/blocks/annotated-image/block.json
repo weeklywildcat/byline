@@ -1,0 +1,49 @@
+{
+  "apiVersion": 3,
+  "name": "byline/annotated-image",
+  "version": "1.0.0",
+  "title": "Annotated Image",
+  "description": "A photograph or plan with numbered, accessible annotations.",
+  "category": "byline",
+  "icon": "format-image",
+  "keywords": [
+    "story",
+    "journalism"
+  ],
+  "textdomain": "weekly-wildcat-headless",
+  "attributes": {
+    "image": {
+      "type": "object",
+      "default": {}
+    },
+    "caption": {
+      "type": "string",
+      "default": ""
+    },
+    "annotations": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object"
+      }
+    },
+    "align": {
+      "type": "string",
+      "default": "wide"
+    }
+  },
+  "supports": {
+    "html": false,
+    "anchor": true,
+    "align": [
+      "wide",
+      "full"
+    ]
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "postTypes": [
+    "post"
+  ]
+}

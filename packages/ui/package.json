@@ -6,7 +6,10 @@
     ".": "./src/index.ts",
     "./article.css": "./article.css",
     "./page-blocks.css": "./src/page-blocks.css",
-    "./newsroom-blocks.css": "./src/newsroom-blocks.css"
+    "./newsroom-blocks.css": "./src/newsroom-blocks.css",
+    "./article-enhancements": "./src/article-enhancements/index.ts",
+    "./visualization": "./src/visualization.ts",
+    "./article-enhancement-selector": "./src/article-enhancements/selector.ts"
   },
   "dependencies": {
     "@byline/theme-contract": "0.1.0",

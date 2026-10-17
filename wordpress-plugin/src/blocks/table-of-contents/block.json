@@ -1,0 +1,44 @@
+{
+  "apiVersion": 3,
+  "name": "byline/table-of-contents",
+  "version": "1.0.0",
+  "title": "In This Story",
+  "description": "Automatic contents navigation from the story\u2019s H2/H3 headings.",
+  "category": "byline",
+  "icon": "list-view",
+  "keywords": [
+    "contents",
+    "navigation",
+    "headings"
+  ],
+  "textdomain": "weekly-wildcat-headless",
+  "attributes": {
+    "title": {
+      "type": "string",
+      "default": "In this story"
+    },
+    "maxLevel": {
+      "type": "number",
+      "default": 3
+    },
+    "ordered": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "html": false,
+    "anchor": false,
+    "align": false
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "postTypes": [
+    "post"
+  ],
+  "usesContext": [
+    "postId",
+    "postType"
+  ]
+}

@@ -156,8 +156,8 @@ edited to guess an original.
 Timeline starts with two entries, permits up to 25, and provides inline Add,
 Remove, Move up/down controls with focus following the changed entry. Its date
 labels are editorial text (such as “Fall 2026”), not fabricated machine dates.
-Only this content model requires a new custom block; saved output is an ordered
-list and requires no reader JavaScript.
+Timeline uses a custom content model; its saved output is an ordered list
+and requires no reader JavaScript.
 
 Related Coverage reuses the existing selector and PHP renderer. The selector
 requests published Posts; the server checks visibility again, excludes the
@@ -178,7 +178,8 @@ through the plugin's existing block assets, and imported by
 shell and typography, not a separate set of authored block layouts.
 
 Normal prose uses `--article-width` (760px). Direct `.alignwide` blocks can
-break out to 1040px, centered within the article shell's available width. The
+break out to `--article-wide-width` (1040px); `.alignfull` uses
+`--article-full-width` (1440px). Both center within the shell’s available canvas. The
 editor canvas establishes the equivalent width container, including in its
 iframe. Media shrink naturally; portrait photographs are contained rather
 than cropped unless the editor deliberately chooses Core's crop/image-fill
@@ -227,3 +228,82 @@ plain explanatory state, malformed dates are ignored, scores are shown only
 when the canonical record supplies them, and upcoming games never display
 invented scores or live status. Lists, headings, forms, labels, time values,
 focus states, and responsive layouts are part of the shared contract.
+
+## Immersive reporting tools
+
+The Story Presentation Library also supports investigations, explainers and
+visual features. Core presets remain ordinary editable Gutenberg blocks.
+Patterns are unlocked starters; they are not article formats or templates.
+
+| Editor-facing name | Underlying block | Model | Intended use | Reader interaction | Mobile | Without JavaScript |
+| --- | --- | --- | --- | --- | --- | --- |
+| Visual Chapter | `core/cover` | Core style/variation | Chapter divider with image/video, H2 and optional dek | None | 320–520px minimum height; text can grow | Complete chapter |
+| Wide Photo / Full-Bleed Photo | `core/image` | Core variations | 1040px / 1440px photography | Ordinary media links | Contained intrinsic image | Complete image and caption |
+| Full-Bleed Video | `core/video` | Core variation | Large native video, including portrait | Native controls/tracks | Intrinsic ratio | Native playback |
+| Context / Why It Matters / What's Next / How We Know / Editor's Note | `core/group` | Core variations/styles | Background and reporting context | Ordinary links | Inline aside | Complete reporting |
+| Margin Note | `core/group` | Core variation/style | Supporting context beside following prose | Ordinary links | Inline below 1100px canvas | Complete note |
+| Data Table / Comparison Table | `core/table` | Core variations/styles | Numbers, budgets, surveys, comparisons | Local horizontal scroll | Table scrolls within article | Complete semantic table |
+| Footnotes | `core/footnotes` and native Footnote format | Core | References, sources and backlinks | Local anchors | Long URLs wrap | Complete references/backlinks |
+| Read More / Methodology / Full Statement | `core/details` | Core variations/styles | Supporting reporting and statements | Native disclosure | One column | Native disclosure |
+| Comparison / Main + Aside / Three Key Numbers | `core/columns` | Core presets; existing Key Numbers pattern reused | Curated editable column arrangements | None | Stack at 700px | Complete DOM order |
+| Q&A / Interview | Group, Heading, Paragraph | Pattern | Interviews | Ordinary links | One column | Complete interview |
+| What We Know / What We Don't Know; Pros / Cons | Columns, Heading, Paragraph | Patterns | Reported comparisons | None | Stack at 700px | Complete reporting |
+| Three Things to Know | Heading, List | Pattern | Short explainer | Ordinary links | One column | Complete list |
+| Source Highlight / Document Evidence | Group, Quote, Paragraph; existing Document Viewer or Image | Patterns | Evidence with citation and context | Ordinary source/document links | Inline | Complete source and context |
+| Chart / Data Visualization; Map | `byline/visualization` | Custom block and Map variation | Supported provider embed or static exported graphic | Lazy iframe where validated | Full available width | Image, title/dek, source/notes and direct link |
+| In This Story | `byline/table-of-contents` | Dynamic custom block | H2/H3 contents navigation | Local anchors | One column | Complete nav |
+| Annotated Image | `byline/annotated-image` | Custom | Plans/photos with up to 12 stable annotation records | Marker/list synchronization, keyboard focus | List below image | Marker anchors and complete annotation list |
+| Before / After | `byline/before-after` | Custom | Two photographs showing change | Native keyboard range | Slider remains usable | Both complete labeled images |
+| Scrollytelling / Story Step | `byline/scrolly`, `byline/scrolly-step` | Custom parent/child system | Linear image-based visual narrative | Sticky decorative image switches with IntersectionObserver | Linear under 900px; reduced motion always linear | Every image, caption and text in sequence |
+
+### Authoring
+
+- **Footnotes:** Place the cursor after a claim, open the text toolbar's More
+  menu and choose Footnote. Type the source in Core's generated Footnotes area.
+  Core owns the reference IDs, post `footnotes` metadata and backlinks. Both
+  WordPress 7.1 and 6.6 render an ordered `.wp-block-footnotes` list with note
+  IDs and `#ID-link` backlinks. No extra heading is inserted by Byline.
+- **Visual Chapter:** Search Visual Chapter; select media with Core's library.
+  Use Core's focal point, overlay and content-position controls. Keep text
+  concise and check contrast against the selected photograph; native overlay
+  controls remain editable. A chapter heading is normally H2.
+- **Visualization:** Search Chart / Data Visualization or Map. Choose embed or
+  static. For embeds paste an HTTPS Datawrapper/Flourish share or embed URL, a
+  Google Maps embed URL, or an OpenStreetMap export/embed URL. Select Compact,
+  Standard, Tall or Map height. Add title, description, fallback graphic with
+  separate alt text, source, notes and credit. Static graphics use the normal
+  media library and require no reader JavaScript. Private preview shows the
+  same fallback and width, without third-party loading.
+- **In This Story:** Add H2/H3 headings anywhere in Groups/Columns. The editor
+  assigns unique native anchors only to eligible headings lacking anchors.
+  Existing anchors remain stable after text edits. Two valid saved heading
+  anchors are required for a public nav; malformed/duplicate anchors are skipped.
+  Core 6.6 may store the anchor only in the saved heading HTML; Byline reads
+  those real IDs as well as newer Core comment attributes.
+- **Annotated Image:** Select the image in the media library. Add an annotation
+  by button or by clicking the canvas. Select/drag a marker or set precise X/Y
+  percentages with keyboard-accessible controls. Add a title and explanation;
+  move annotations up/down or remove them. IDs stay stable while numbering
+  follows order. Duplicating an annotation block gives the copy distinct IDs.
+- **Before / After:** Choose both photographs and write separate alt text and
+  labels. Similar framing works best. Different proportions produce a warning
+  and use contained images, preserving the complete evidence in the fallback.
+- **Scrollytelling:** Start with two Story Steps. Each has one image, optional
+  caption and ordinary text blocks. Add/reorder steps through normal block
+  controls or List View. Choose complete-image or explicit crop/fill for the
+  sticky stage. There are no scroll locks or interactive iframes in the stage.
+
+Media retain attachment IDs plus stable image snapshots (URL, dimensions,
+responsive sources, alt and canonical photo credit). Credit comes from the
+existing Byline attachment metadata resolver, also used by Preview as Byline.
+Captions are never copied into alt text.
+
+Document Evidence intentionally starts with explanatory text rather than an
+unselected File block: insert the existing Document Viewer or Image into its
+unlocked Group and select the source. Social/oEmbed markup retains its direct
+links and explicit aspect-ratio classes; Byline does not execute arbitrary
+saved script tags to hydrate unsupported social providers.
+
+The public test harness intercepts provider URLs. CI never requires live
+Datawrapper, Flourish, Google Maps or OpenStreetMap responses. Production URL
+validation is unchanged by fixture configuration.

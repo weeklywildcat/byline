@@ -2,6 +2,9 @@ import { getBlockType, registerBlockVariation } from "@wordpress/blocks";
 import { subscribe } from "@wordpress/data";
 import { storyVariations, supportedAttributes, isStoryVariationActive } from "./definitions";
 
+function filterInnerBlocks(blocks: NonNullable<import("./definitions").StoryVariation["innerBlocks"]>): unknown[] {
+  return blocks.map(([name, attributes, children]) => [name, supportedAttributes(attributes || {}, getBlockType(name)?.attributes || {}), ...(children ? [filterInnerBlocks(children as any)] : [])]);
+}
 const registered = new Set<string>();
 let stopWatching: (() => void) | undefined;
 function registerAvailableVariations() {
@@ -13,7 +16,7 @@ function registerAvailableVariations() {
       name: variation.name, title: variation.title, description: variation.title,
       icon: variation.icon as any, keywords: variation.keywords, scope: ["inserter"],
       attributes: supportedAttributes(variation.attributes, type.attributes || {}),
-      ...(variation.innerBlocks ? { innerBlocks: variation.innerBlocks as any } : {}),
+      ...(variation.innerBlocks ? { innerBlocks: filterInnerBlocks(variation.innerBlocks) as any } : {}),
       isActive: (attributes) => isStoryVariationActive(variation, attributes)
     });
   }

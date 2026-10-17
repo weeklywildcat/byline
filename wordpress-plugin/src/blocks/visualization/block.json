@@ -1,0 +1,80 @@
+{
+  "apiVersion": 3,
+  "name": "byline/visualization",
+  "version": "1.0.0",
+  "title": "Chart / Data Visualization",
+  "description": "Embed a supported chart or map, or select a static graphic.",
+  "category": "byline",
+  "icon": "format-image",
+  "keywords": [
+    "chart",
+    "data",
+    "map",
+    "interactive"
+  ],
+  "textdomain": "weekly-wildcat-headless",
+  "attributes": {
+    "title": {
+      "type": "string",
+      "default": ""
+    },
+    "description": {
+      "type": "string",
+      "default": ""
+    },
+    "type": {
+      "type": "string",
+      "default": "chart"
+    },
+    "mode": {
+      "type": "string",
+      "default": "embed"
+    },
+    "embedUrl": {
+      "type": "string",
+      "default": ""
+    },
+    "provider": {
+      "type": "string",
+      "default": ""
+    },
+    "heightPreset": {
+      "type": "string",
+      "default": "standard"
+    },
+    "source": {
+      "type": "string",
+      "default": ""
+    },
+    "notes": {
+      "type": "string",
+      "default": ""
+    },
+    "credit": {
+      "type": "string",
+      "default": ""
+    },
+    "image": {
+      "type": "object",
+      "default": {}
+    },
+    "align": {
+      "type": "string",
+      "default": "wide"
+    }
+  },
+  "supports": {
+    "html": false,
+    "anchor": true,
+    "align": [
+      "wide",
+      "full"
+    ]
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "postTypes": [
+    "post"
+  ]
+}

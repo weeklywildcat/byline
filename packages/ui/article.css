@@ -1,5 +1,6 @@
 /* Shared article presentation styles. Hosts provide theme variables. */
-.byline-article-view.article-shell { margin: 0 auto; max-width: 1080px; container: byline-content / inline-size; padding: 38px 20px 72px; }
+:root { --article-width: 760px; --article-wide-width: 1040px; --article-full-width: 1440px; }
+.byline-article-view.article-shell { margin: 0 auto; max-width: calc(var(--article-full-width) + 40px); container: byline-content / inline-size; padding: 38px 20px 72px; }
 .byline-article-view .article-story { margin: 0 auto; max-width: var(--article-width, 760px); }
 .byline-article-view .article-header { border-bottom: 1px solid var(--rule); margin-bottom: 24px; padding-bottom: 20px; }
 .byline-article-view .article-section-label { color: var(--accent); display: inline-flex; font-family: var(--font-ui); font-size: .78rem; font-weight: 700; text-transform: uppercase; }
@@ -59,7 +60,7 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .article-tags span { border: 1px solid var(--rule); color: var(--muted); font-family: var(--font-ui); font-size: .72rem; font-weight: 800; padding: 7px 9px; text-transform: uppercase; }
 .byline-article-view .article-update-notice { border-bottom: 1px solid var(--rule); border-top: 1px solid var(--rule); margin-top: 22px; padding: 14px 0; }
 .byline-article-view .article-update-notice p { color: var(--muted); font-family: var(--font-body); font-size: .96rem; line-height: 1.45; margin: 0; }
-.byline-article-view .article-after { display: grid; gap: 28px; margin-top: 46px; }
+.byline-article-view .article-after { width: 100%; max-width: var(--article-wide-width); margin-inline: auto; display: grid; gap: 28px; margin-top: 46px; }
 .byline-article-view .article-after-section { padding-top: 0; }
 .byline-article-view .about-writer-layout { align-items: start; display: grid; gap: 18px; grid-template-columns: auto minmax(0, 1fr); }
 .byline-article-view .about-writer-avatar { height: 104px; width: 104px; }

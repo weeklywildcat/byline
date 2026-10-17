@@ -970,10 +970,11 @@
  * The same rules load in Gutenberg and the private article preview.
  * The article shell/editor canvas establishes the byline-content container. */
 :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) {
-  --article-wide-width: 1040px;
+  display: flow-root;
   overflow-wrap: break-word;
 }
-:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) > .alignwide {
+:is(.byline-article-view .article-story .article-body, .editor-styles-wrapper .is-root-container) > .alignwide {
+  clear: both;
   box-sizing: border-box;
   width: min(var(--article-wide-width), 100cqw);
   max-width: none;
@@ -1328,3 +1329,165 @@
 .byline-gallery-dialog button { font: inherit; color: inherit; background: transparent; border: 1px solid var(--rule-strong, #aab2bb); padding: 8px 12px; min-height: 44px; cursor: pointer; }
 .byline-gallery-dialog button:focus-visible { outline: 2px solid var(--accent, #b11f24); outline-offset: 2px; }
 .byline-gallery-dialog figure { margin: 0; }
+
+/* The outer shell supplies the editorial canvas; nested layouts never escape
+   their own column. Shared across the editor, static article and private frame. */
+:is(.byline-article-view .article-story .article-body, .editor-styles-wrapper .is-root-container) > .alignfull {
+  clear: both;
+  box-sizing: border-box;
+  width: min(var(--article-full-width), 100cqw);
+  max-width: none;
+  margin-inline: calc((100% - min(var(--article-full-width), 100cqw)) / 2);
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is(.alignfull, .alignwide) { min-width: 0; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is(.alignfull, .alignwide) > figcaption {
+  max-width: var(--article-width); margin-inline: auto;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-image:is(.alignfull, .alignwide):not(.is-style-rounded) img:not([style*="object-fit:cover"]):not([style*="object-fit: cover"]) {
+  width: auto; height: auto; max-width: 100%; max-height: 85svh; margin-inline: auto;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-video video { display: block; width: auto; height: auto; max-height: 85svh; margin-inline: auto; }
+
+/* Core Cover structural compatibility. Core's inline focal/object position,
+   overlay colour/opacity and minimum-height controls remain authoritative. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  min-height: 430px; padding: clamp(24px, 5%, 64px); overflow: clip; isolation: isolate; color: #fff; box-sizing: border-box;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover :is(.wp-block-cover__image-background, .wp-block-cover__video-background, .wp-block-cover__background) {
+  position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; margin: 0; border: 0; object-fit: cover; z-index: -2;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .wp-block-cover__background { background: #000; opacity: .4; z-index: -1; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-0 { opacity: 0; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-10 { opacity: .1; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-20 { opacity: .2; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-30 { opacity: .3; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-40 { opacity: .4; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-50 { opacity: .5; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-60 { opacity: .6; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-70 { opacity: .7; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-80 { opacity: .8; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-90 { opacity: .9; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-100 { opacity: 1; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover__inner-container { width: 100%; min-width: 0; z-index: 1; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-style-byline-visual-chapter { min-height: clamp(420px, 68svh, 720px); }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-visual-chapter .wp-block-cover__inner-container { max-width: var(--article-width); }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-visual-chapter :is(h2,h3,p) { color: inherit; margin: 0 0 .5em; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-visual-chapter h2 { font-size: clamp(2rem, 4.5vw, 4rem); line-height: 1.08; text-wrap: balance; }
+.wp-block-cover.is-position-top-left { align-items: flex-start; justify-content: flex-start; }
+.wp-block-cover.is-position-top-center { align-items: flex-start; }
+.wp-block-cover.is-position-top-right { align-items: flex-start; justify-content: flex-end; }
+.wp-block-cover.is-position-center-left { justify-content: flex-start; }
+.wp-block-cover.is-position-center-right { justify-content: flex-end; }
+.wp-block-cover.is-position-bottom-left { align-items: flex-end; justify-content: flex-start; }
+.wp-block-cover.is-position-bottom-center { align-items: flex-end; }
+.wp-block-cover.is-position-bottom-right { align-items: flex-end; justify-content: flex-end; }
+
+/* One restrained system for reported context. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-margin-note, .is-style-byline-evidence) {
+  border-block-start: 2px solid var(--accent, currentColor); padding: 18px 0; margin-block: 1.6em; display: flow-root;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-margin-note, .is-style-byline-evidence) > :is(h2,h3) {
+  font-family: var(--font-ui); font-size: .8rem; line-height: 1.4; letter-spacing: .04em; text-transform: uppercase; margin: 0 0 .7em;
+}
+@container byline-content (min-width: 1100px) {
+  :is(.article-body, .is-root-container) > .wp-block-group.is-style-byline-margin-note {
+    float: right; width: 280px; margin: .5em -210px 1.5em 30px; padding: 14px; background: var(--page, #fff); font-size: 1rem;
+  }
+}
+/* Clear floats before story-wide material, keeping all following prose legible. */
+:is(.article-body, .is-root-container) > :is(.alignwide, .alignfull) { clear: both; }
+
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-table { overflow-x: auto; max-width: 100%; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-table:is(.is-style-byline-data-table, .is-style-byline-comparison-table) table { border-collapse: collapse; width: 100%; font-size: 1rem; font-variant-numeric: tabular-nums; }
+:is(.is-style-byline-data-table, .is-style-byline-comparison-table) :is(th,td) { border: 0; border-bottom: 1px solid var(--rule); padding: .65em .85em; min-width: 9em; vertical-align: top; text-align: start; }
+:is(.is-style-byline-data-table, .is-style-byline-comparison-table) thead { border-block: 2px solid var(--ink); font-family: var(--font-ui); }
+.is-style-byline-comparison-table :is(td,th):first-child { font-weight: 700; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) sup.fn { font-size: .72em; line-height: 0; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is(.wp-block-footnotes, .byline-table-of-contents) { border-block-start: 1px solid var(--rule); padding-block: 20px; font-size: 1rem; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-footnotes { overflow-wrap: anywhere; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is([id], .fn) { scroll-margin-top: 100px; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is(a,summary,input,button,[tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is(.wp-block-footnotes li:target, .fn:target) { background: color-mix(in srgb, var(--accent) 10%, var(--page)); }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-details:is(.is-style-byline-read-more, .is-style-byline-methodology, .is-style-byline-full-statement) { border-block: 1px solid var(--rule); padding: 14px 0; margin-block: 1.6em; }
+:is(.is-style-byline-read-more, .is-style-byline-methodology, .is-style-byline-full-statement) summary { cursor: pointer; font-weight: 700; }
+:is(.is-style-byline-read-more, .is-style-byline-methodology, .is-style-byline-full-statement)[open] summary { margin-bottom: 1em; }
+
+/* Core inline flex-basis/width choices stay editable. Mobile DOM order stays intact. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-columns { display: flex; gap: var(--wp--style--block-gap, 28px); align-items: stretch; margin-block: 1.6em; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-column { flex-grow: 1; flex-basis: 0; min-width: 0; overflow-wrap: anywhere; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-column[style*="flex-basis"] { flex-grow: 0; }
+.wp-block-columns.are-vertically-aligned-top, .wp-block-column.is-vertically-aligned-top { align-items: flex-start; align-self: flex-start; }
+.wp-block-columns.are-vertically-aligned-center, .wp-block-column.is-vertically-aligned-center { align-items: center; align-self: center; }
+.wp-block-columns.are-vertically-aligned-bottom, .wp-block-column.is-vertically-aligned-bottom { align-items: flex-end; align-self: flex-end; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-key-numbers h3 { font-size: clamp(2rem, 4vw, 3.5rem); margin: 0; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-qa h3 { border-top: 1px solid var(--rule); padding-top: 16px; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .byline-table-of-contents h2 { font-family: var(--font-ui); font-size: 1rem; }
+.byline-table-of-contents .byline-toc-level-3 { margin-inline-start: 1.3em; }
+.byline-visualization { border-block-start: 1px solid var(--rule); padding-top: 18px; }
+.byline-visualization-media { min-width: 0; }
+.byline-visualization-frame { display: block; width: 100%; border: 0; }
+.byline-visualization-fallback-image img { width: auto; max-width: 100%; height: auto; margin-inline: auto; }
+.byline-visualization figcaption, .byline-visualization-link { overflow-wrap: anywhere; }
+.byline-visualization [hidden] { display: none; }
+.byline-annotation-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.byline-annotation-canvas { position: relative; min-width: 0; }
+.byline-annotation-canvas > img { display: block; width: 100%; height: auto; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .byline-annotation-marker {
+  position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center;
+  width: 32px; height: 32px; border: 2px solid #fff; border-radius: 50%; background: #111; color: #fff;
+  box-shadow: 0 0 0 1px #111; font: 700 14px/1 var(--font-ui); text-decoration: none;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .byline-annotation-marker.is-active { background: var(--accent); outline: 3px solid var(--ink); }
+.byline-annotations { min-width: 0; }
+.byline-annotations > li { padding: .5em; border-block-start: 1px solid var(--rule); scroll-margin-top: 100px; }
+.byline-annotations > li.is-active { border-inline-start: 3px solid var(--accent); }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .byline-annotations h3 { margin: 0 0 .4em; font-size: 1.12rem; }
+.byline-comparison-images { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.byline-comparison-image { min-width: 0; }
+.byline-comparison-image img { display: block; width: 100%; height: auto; }
+.byline-comparison-image strong { font-family: var(--font-ui); font-size: .85rem; }
+.byline-before-after.is-enhanced .byline-comparison-images { display: grid; grid-template-columns: 1fr; gap: 0; position: relative; isolation: isolate; }
+.byline-before-after.is-enhanced .byline-comparison-image { grid-area: 1 / 1; margin: 0; display: grid; }
+.byline-before-after.is-enhanced .byline-comparison-image img { grid-area: 1 / 1; height: 100%; width: 100%; min-height: 0; object-fit: contain; }
+.byline-before-after.is-enhanced .byline-comparison-image:nth-child(2) { clip-path: inset(0 calc(100% - var(--comparison-position, 50%)) 0 0); background: var(--page, #fff); }
+.byline-before-after.is-enhanced .byline-comparison-image strong { position: absolute; top: 12px; left: 12px; background: #fff; color: #111; padding: 4px 8px; z-index: 1; }
+.byline-before-after.is-enhanced .byline-comparison-image:first-child strong { left: auto; right: 12px; }
+.byline-before-after.is-enhanced .byline-comparison-images::after { content: ''; position: absolute; top: 0; bottom: 0; left: var(--comparison-position,50%); border-left: 2px solid #fff; box-shadow: 1px 0 #111; pointer-events: none; }
+.byline-comparison-control { display: grid; gap: 8px; font: .85rem var(--font-ui); margin-block: 16px; }
+.byline-comparison-control input { width: 100%; accent-color: var(--accent); min-height: 32px; }
+.byline-scrolly { display: flow-root; }
+.byline-scrolly-step { margin-block: 2em; }
+.byline-scrolly-media img { display: block; max-height: 75svh; height: auto; width: auto; max-width: 100%; margin-inline: auto; }
+.byline-scrolly.is-enhanced { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 0 4%; position: relative; }
+.byline-scrolly-stage { grid-column: 1; grid-row: 1 / span 1000; position: sticky; top: 100px; height: 72svh; align-self: start; display: grid; align-items: center; }
+.byline-scrolly-stage img { max-width: 100%; width: 100%; height: 100%; max-height: 72svh; object-fit: contain; }
+.byline-scrolly[data-fit="cover"] .byline-scrolly-stage img { object-fit: cover; }
+.byline-scrolly.is-enhanced > .byline-scrolly-step { grid-column: 2; min-width: 0; min-height: 65svh; padding-block: 12svh; margin: 0; }
+/* Visually hide duplicated originals only. They remain in accessible DOM order. */
+.byline-scrolly.is-enhanced .byline-scrolly-media { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-embed { min-width: 0; overflow-wrap: anywhere; }
+.wp-block-embed__wrapper > :is(blockquote,div) { max-width: 100%; margin-inline: auto; }
+@media (max-width: 700px) {
+  :is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-columns { flex-direction: column; }
+  :is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-column { flex-basis: auto !important; width: 100%; }
+  .byline-annotation-layout { grid-template-columns: 1fr; }
+  .byline-comparison-images { grid-template-columns: 1fr; }
+  :is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-style-byline-visual-chapter { min-height: clamp(320px, 60svh, 520px); }
+}
+
+.byline-before-after.is-enhanced .byline-comparison-image strong { visibility: hidden; }
+.byline-comparison-labels { position: absolute; inset: 12px 12px auto; display: flex; flex-direction: row-reverse; justify-content: space-between; pointer-events: none; z-index: 2; font: 700 .85rem var(--font-ui); }
+.byline-comparison-labels span { background: #fff; color: #111; padding: 4px 8px; }
+.byline-scrolly-stage { grid-template-rows: minmax(0,1fr) auto; }
+.byline-scrolly-stage-caption { font-size: .9rem; line-height: 1.4; margin: 8px 0; }
+
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .has-text-align-center { text-align: center; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .has-text-align-right { text-align: right; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .has-text-align-left { text-align: left; }
+
+/* Keep the initial public and private embed slot the same size. The no-JS
+   figure stays intrinsic; only the enhanced fallback is contained in a slot. */
+.byline-visualization-media.is-enhanced { position: relative; }
+.byline-visualization-media.is-enhanced .byline-visualization-fallback-image { position: absolute; inset: 0; background: var(--page, #fff); }
+.byline-visualization-media.is-enhanced .byline-visualization-fallback-image img { width: 100%; height: 100%; object-fit: contain; }
