@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import { Icon } from "@iconify/react/offline";
 import type { Metadata } from "@/lib/metadata";
 import { ExploreCards } from "@/components/ExploreCards";
+import { PHOSPHOR_ICONS } from "@/lib/phosphor-icons";
 import { getPublicationConfig } from "@/lib/publication";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import {
@@ -53,8 +55,6 @@ export default async function AboutPage() {
   const about: AboutData = await getAboutData();
   const { stats, editors } = about;
   const story = (key: keyof typeof STORY_SLUGS) => about.story(STORY_SLUGS[key]);
-  const sportsPhoto = about.photo(PHOTOS.sports.slug, PHOTOS.sports.alt, "(max-width: 760px) 100vw, 520px");
-  const culturePhoto = about.photo(PHOTOS.culture.slug, PHOTOS.culture.alt, "(max-width: 760px) 100vw, 520px");
   const websitePhoto = about.photo(PHOTOS.website.slug, PHOTOS.website.alt, "(max-width: 760px) 100vw, 440px");
   const schoolName = publication.identity.organizationName;
 
@@ -272,52 +272,16 @@ export default async function AboutPage() {
               student&rsquo;s day. We also report on the town and the wider area when a story reaches students and families.
             </p>
           </div>
-          <ul className="about-sections">
-            {SECTIONS.map((section) => {
-              const latest = about.latestBySection[section.slug];
-
-              return (
-                <li key={section.slug}>
-                  <h3>
-                    <a href={section.href}>{section.label}</a>
-                  </h3>
-                  <p>{section.text}</p>
-                  {latest ? (
-                    <p className="about-latest">
-                      <span>Latest</span>
-                      <a href={latest.href}>{latest.title}</a>
-                    </p>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-          <div className="about-prose about-prose-wide">
-            <p>
-              Reporting here means more than relaying announcements. A school decision becomes a story when it changes
-              something for students, such as a parking rule or an attendance policy, and we can ask who made it, why, and
-              what it means for the people affected. Our stories on{" "}
-              <StoryRef story={story("parking")}>parking passes</StoryRef> and{" "}
-              <StoryRef story={story("attendance")}>attendance</StoryRef> explain rules students live with, in the words of
-              the adults responsible for them. A morning announcement tells students what is happening. We can also ask why.
-            </p>
-          </div>
-          <div className="about-prose about-prose-wide">
-            <p>
-              Coverage reaches past campus. We have written about a{" "}
-              <StoryRef story={story("megsHouse")}>donation drive for Meg&rsquo;s House</StoryRef>, a domestic violence
-              shelter; a <StoryRef story={story("fca")}>breakfast for student athletes</StoryRef> that the Fellowship of
-              Christian Athletes hosted at First Baptist Church; and a{" "}
-              <StoryRef story={story("edgewood")}>middle school team&rsquo;s second-place finish</StoryRef> at a national
-              competition.
-            </p>
-          </div>
-          {sportsPhoto || culturePhoto ? (
-            <div className="about-photo-pair">
-              <Photo photo={sportsPhoto} />
-              <Photo photo={culturePhoto} />
-            </div>
-          ) : null}
+          <dl className="about-sections">
+            {SECTIONS.map((section) => (
+              <div key={section.slug}>
+                <dt>
+                  <a href={section.href}>{section.label}</a>
+                </dt>
+                <dd>{section.text}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
@@ -351,6 +315,22 @@ export default async function AboutPage() {
                 Original photographs are licensed under Creative Commons Attribution 4.0 unless a caption says otherwise. The{" "}
                 <a href="/image-license/">image license page</a> explains how to credit them.
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="about-section" id="ai" aria-labelledby="ai-heading">
+        <h2 id="ai-heading">Artificial intelligence</h2>
+        <div className="about-section-body">
+          <div className="about-ai">
+            <Icon className="about-ai-icon" icon={PHOSPHOR_ICONS.sparkle} width={32} height={32} aria-hidden="true" />
+            <div className="about-prose">
+              <p>
+                Technology is changing how people work, including in journalism. We use AI for technical and
+                behind-the-scenes work, including coding, transcription, research help and reviewing work for problems.
+              </p>
+              <p>Our rule is simple: if we expect someone to take the time to read something, we should take the time to write it.</p>
             </div>
           </div>
         </div>

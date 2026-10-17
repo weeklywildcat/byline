@@ -17,7 +17,6 @@ vi.mock("@/views/about/data", () => ({
       archive: { games: 3859, sports: 8, earliestSeason: "1915–16", href: "/sports-archive/" }
     },
     editors: [{ name: "Test Editor", role: "Editor-in-chief", href: "/author/test/", photo: null }],
-    latestBySection: { news: story("latest-news") },
     story,
     photo: (slug: string, alt: string) => ({
       image: { src: `/${slug}.jpg`, sizes: "100vw", width: 800, height: 600, alt, loading: "lazy", decoding: "async", fetchPriority: "auto" },

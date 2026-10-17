@@ -9,7 +9,7 @@ Editing "About Us" in WordPress no longer changes the public page.
 | --- | --- |
 | `apps/web/views/about/page.tsx` | Layout and the long-form prose |
 | `apps/web/views/about/content.ts` | Timeline, standards, coverage sections, links, and the stories and photographs the page names by slug |
-| `apps/web/views/about/data.ts` | Build-time data: story counts, the editors, latest story per section, sports archive figures, photographs |
+| `apps/web/views/about/data.ts` | Build-time data: story counts, the editors, sports archive figures, photographs |
 | `apps/web/public/newsroom/` | Staff photographs for "Who we are" (three widths each, metadata stripped; credits follow the files' own metadata) |
 | `apps/web/views/about/icons.ts` | Phosphor icons bundled for the cards. The site's `SiteIcon` loads icons after hydration, which leaves them blank in static HTML |
 | `apps/web/tests/about-page.test.tsx` | Heading outline, links, alt text, computed figures, banned phrases |
@@ -19,7 +19,7 @@ The "newsroom today" band (figures and editors) is switched off with `SHOW_NEWSR
 ## What is computed and what is written
 
 Computed at build time, so it cannot drift: stories published and the date of the first one, contributors in the
-directory, the editors shown in "The newsroom today", the latest story in each section, and the sports archive
+directory, the editors shown in "The newsroom today", and the sports archive
 figures (game records, sports, earliest season, counted from the archive Pages).
 
 Written by hand: everything else. When a story or photograph named in `content.ts` is unpublished or renamed, the
