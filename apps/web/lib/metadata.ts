@@ -186,6 +186,8 @@ export type SitemapEntry = {
   lastModified?: string | Date;
   changeFrequency?: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
   priority?: number;
+  /** Absolute public URLs of the page's editorial photographs, for the image sitemap. */
+  images?: string[];
 };
 
 export type RobotsDocument = {

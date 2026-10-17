@@ -1,5 +1,6 @@
 import { CODE_ROUTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { getWordPressInstant } from "@/lib/dates";
+import { getPostSitemapImages } from "@/lib/sitemap-images";
 import type { SitemapEntry } from "@/lib/metadata";
 import {
   contributorHasProfilePage,
@@ -113,7 +114,8 @@ export function buildSitemapEntries(input: SitemapInput): SitemapEntry[] {
 
   for (const post of posts) {
     if (!getPostRouteParts(post)) continue;
-    add({ url: url(getPostHref(post)), lastModified: postDates.get(post.id), changeFrequency: "weekly", priority: 0.8 });
+    const images = getPostSitemapImages(post, siteUrl);
+    add({ url: url(getPostHref(post)), lastModified: postDates.get(post.id), changeFrequency: "weekly", priority: 0.8, ...(images.length ? { images } : {}) });
   }
 
   for (const contributor of input.contributors) {
