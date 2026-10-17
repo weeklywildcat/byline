@@ -47,6 +47,18 @@ describe("Astro static frontend contract", () => {
     expect(Object.values(manifest.scripts).join(" ")).not.toMatch(/next-with-publication|next build/);
   });
 
+  it("resolves the color scheme before paint and exposes the footer toggle without hydration", () => {
+    const layout = read("src/layouts/BaseLayout.astro");
+    const head = layout.slice(layout.indexOf("<head>"), layout.indexOf("</head>"));
+    expect(head).toContain("prefers-color-scheme: dark");
+    expect(head).toContain('"data-color-scheme"');
+    expect(layout).toContain('import "../../views/dark.css"');
+    const footer = read("components/SiteFooter.tsx");
+    for (const choice of ["auto", "light", "dark"]) expect(footer).toContain(`id: "${choice}"`);
+    expect(footer).toContain("data-color-choice-set");
+    expect(read("views/dark.css")).toContain(':root[data-color-scheme="dark"]');
+  });
+
   it("hydrates only the explicitly interactive route components", () => {
     const article = read("src/pages/[segment]/[month]/[day]/[category]/[articleSlug].astro");
     expect(article).toMatch(/<ArticleShareActions\b[^>]*\bclient:idle/);

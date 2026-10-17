@@ -5,6 +5,7 @@ import "@byline/ui/newsroom-blocks.css";
 import "@byline/ui/article.css";
 import "../../views/fonts.css";
 import "../../views/globals.css";
+import "../../views/dark.css";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { absoluteUrl, SITE_DESCRIPTION } from "@/lib/seo";
@@ -90,6 +91,42 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
     {socialMetadataTags.map((tag) => tag.kind === "property"
       ? <meta property={tag.key} content={tag.content} />
       : <meta name={tag.key} content={tag.content} />)}
+    <script is:inline>
+      // Resolve the color scheme before first paint so a dark reader never sees a
+      // white flash. The footer toggle stores "light" or "dark"; with nothing
+      // stored the site follows the system setting.
+      (function () {
+        var KEY = "byline-color-scheme";
+        var root = document.documentElement;
+        var query = window.matchMedia("(prefers-color-scheme: dark)");
+        function stored() {
+          try { var value = localStorage.getItem(KEY); return value === "light" || value === "dark" ? value : null; } catch (error) { return null; }
+        }
+        function apply() {
+          var choice = stored();
+          root.setAttribute("data-color-scheme", choice || (query.matches ? "dark" : "light"));
+          root.setAttribute("data-color-choice", choice || "auto");
+          var buttons = document.querySelectorAll("[data-color-choice-set]");
+          for (var i = 0; i < buttons.length; i++) {
+            buttons[i].setAttribute("aria-pressed", String(buttons[i].getAttribute("data-color-choice-set") === (choice || "auto")));
+          }
+        }
+        apply();
+        document.addEventListener("DOMContentLoaded", apply);
+        if (query.addEventListener) query.addEventListener("change", apply);
+        window.addEventListener("storage", function (event) { if (event.key === KEY) apply(); });
+        document.addEventListener("click", function (event) {
+          var button = event.target instanceof Element ? event.target.closest("[data-color-choice-set]") : null;
+          if (!button) return;
+          var choice = button.getAttribute("data-color-choice-set");
+          try {
+            if (choice === "light" || choice === "dark") localStorage.setItem(KEY, choice);
+            else localStorage.removeItem(KEY);
+          } catch (error) {}
+          apply();
+        });
+      })();
+    </script>
     <script type="speculationrules" is:inline set:html={JSON.stringify({ prefetch: [{ where: { and: [{ href_matches: "/*" }, { not: { href_matches: ["/_wordpress-media/*", "/_byline/*", "/brand/*", "/*.xml", "/*.txt"] } }] }, eagerness: "moderate" }] })}></script>
   </head>
   <body>

@@ -154,7 +154,7 @@
 }
 
 .reader-feedback button {
-  background: var(--ink);
+  background: var(--surface-inverse, var(--ink));
   border: 0;
   color: #fff;
   cursor: pointer;
@@ -439,7 +439,7 @@
 
 .team-next-game {
   align-items: center;
-  background: var(--ink);
+  background: var(--surface-inverse, var(--ink));
   border: 0;
   color: #fff;
   display: grid;
@@ -1005,7 +1005,7 @@ html {
 }
 
 .skip-link {
-  background: var(--ink);
+  background: var(--surface-inverse, var(--ink));
   color: #ffffff;
   font-family: var(--font-ui);
   font-size: 0.85rem;
@@ -2294,7 +2294,7 @@ h1.masthead-logo {
 }
 
 .article-newsletter-signup {
-  background: var(--accent);
+  background: var(--surface-accent, var(--accent));
   color: #ffffff;
   display: grid;
   gap: 24px;
@@ -3017,14 +3017,14 @@ h1.masthead-logo {
 }
 
 .open-source-project-links a:first-child {
-  background: var(--accent);
+  background: var(--surface-accent, var(--accent));
   color: #fff;
 }
 
 .open-source-project-links a:hover,
 .open-source-project-links a:focus-visible {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--surface-inverse, var(--ink));
+  border-color: var(--surface-inverse, var(--ink));
   color: #fff;
 }
 
@@ -3156,7 +3156,7 @@ h1.masthead-logo {
 }
 
 .search-kind-filter button[aria-pressed="true"] {
-  background: var(--ink);
+  background: var(--surface-inverse, var(--ink));
   color: #ffffff;
 }
 
@@ -3298,7 +3298,7 @@ h1.masthead-logo {
 }
 
 .search-result-kind {
-  background: var(--ink);
+  background: var(--surface-inverse, var(--ink));
   border-radius: 2px;
   color: #ffffff;
   padding: 3px 6px;
@@ -3535,7 +3535,7 @@ h1.masthead-logo {
 }
 
 .team-hub-header {
-  background: var(--ink);
+  background: var(--surface-inverse, var(--ink));
   color: #ffffff;
   display: grid;
   height: clamp(260px, 28vw, 320px);
@@ -4065,8 +4065,8 @@ h1.masthead-logo {
 }
 
 .sports-season-selector a.sports-season-current {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--surface-inverse, var(--ink));
+  border-color: var(--surface-inverse, var(--ink));
   color: #ffffff;
 }
 
@@ -4150,7 +4150,7 @@ h1.masthead-logo {
 
 .sports-location-note:hover::after,
 .sports-location-note:focus-visible::after {
-  background: var(--ink);
+  background: var(--surface-inverse, var(--ink));
   color: #ffffff;
   content: "Unconfirmed";
   font-family: var(--font-ui);
@@ -4748,6 +4748,58 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
   text-underline-offset: 4px;
 }
 
+/* Appearance toggle. It needs the layout's inline script, so it stays hidden
+   until that script has marked <html>. */
+.footer-theme {
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  color: #c4c4c4;
+  display: flex;
+  flex-wrap: wrap;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  gap: 10px 14px;
+  padding-top: 16px;
+}
+
+html:not([data-color-scheme]) .footer-theme {
+  display: none;
+}
+
+.theme-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  display: inline-flex;
+}
+
+.theme-toggle button {
+  background: transparent;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.28);
+  color: #c4c4c4;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 7px 14px;
+}
+
+.theme-toggle button:first-child {
+  border-left: 0;
+}
+
+.theme-toggle button:hover {
+  color: #ffffff;
+}
+
+.theme-toggle button[aria-pressed="true"] {
+  background: #ffffff;
+  color: #121212;
+}
+
+.theme-toggle button:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
 @media (max-width: 900px) {
   .front-page,
 .lead-layout,
@@ -5257,7 +5309,7 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
 
 .team-next-game {
   align-items: center;
-  background: var(--ink);
+  background: var(--surface-inverse, var(--ink));
   border: 0;
   color: #fff;
   display: grid;
@@ -5657,7 +5709,7 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
 
 /* The dark band: the figures and the editors, the only inverted block on the page. */
 .about-band {
-  background: var(--ink);
+  background: var(--surface-inverse, var(--ink));
   color: #ffffff;
   margin-bottom: 56px;
 }
@@ -6457,7 +6509,7 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
 .about-page .about-button {
   background: #ffffff;
   border: 2px solid #ffffff;
-  color: var(--ink);
+  color: #121212;
   display: inline-block;
   font-family: var(--font-ui);
   font-size: 0.98rem;

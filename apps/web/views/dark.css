@@ -1,0 +1,82 @@
+/* Dark color scheme.
+ *
+ * The inline script in BaseLayout.astro resolves the reader's choice (the footer
+ * toggle, else the system setting) and puts it on <html data-color-scheme>
+ * before first paint. Everything here is keyed on that attribute, so a reader
+ * without JavaScript simply gets the light site.
+ *
+ * Almost all of the site reads its colors from the token variables the layout
+ * sets inline on <html>, so redefining them is most of the work; !important is
+ * what lets this sheet outrank those inline values. The rest of the file is the
+ * few places that use a token as a *surface behind white text* (--ink, --accent)
+ * or hard-code a light color. Those would otherwise flip to light-on-light.
+ */
+
+:root[data-color-scheme="dark"] {
+  color-scheme: dark;
+
+  --page: #121212 !important;
+  --paper: #1b1b1b !important;
+  --ink: #ececec !important;
+  --muted: #b0b0b0 !important;
+  --soft-muted: #8f8f8f !important;
+  --rule: #343434 !important;
+  --rule-strong: #ececec !important;
+  --accent: #e8909f !important;
+  --accent-dark: #f2b6c0 !important;
+  --link: #e8909f !important;
+
+  /* Surfaces that carry white text in the light scheme. */
+  --surface-inverse: #2a2a2a;
+  --surface-accent: #73192a;
+  --on-surface: #ffffff;
+  --image-fill: #262626;
+  --ww-image-fill: #262626;
+}
+
+:root[data-color-scheme="light"] {
+  color-scheme: light;
+}
+
+/* The masthead is a black SVG; the footer logo is a mask, so it already follows
+   the footer's own colors. */
+:root[data-color-scheme="dark"] .masthead-logo img {
+  filter: invert(1);
+}
+
+/* Panels the light scheme paints white. */
+:root[data-color-scheme="dark"] :is(
+  .team-hub-navigation,
+  .search-control,
+  .search-facet-filter select,
+  .team-hub-selector select,
+  .sports-landing-card,
+  .sports-location-note,
+  .article-game-card
+) {
+  background: var(--paper);
+}
+
+/* Tinted placeholders behind photos and avatars. */
+:root[data-color-scheme="dark"] :is(
+  .featured-image img,
+  .author-avatar,
+  .article-byline-avatar,
+  .media-kit-image-frame
+) {
+  background: var(--image-fill);
+}
+
+/* Poll results. */
+:root[data-color-scheme="dark"] .homepage-poll-bar {
+  background: #3a2329;
+}
+
+:root[data-color-scheme="dark"] .homepage-poll-bar-fill {
+  background: #6b6b6b;
+}
+
+:root[data-color-scheme="dark"] .article-athlete-meta span:first-child {
+  background: var(--surface-inverse);
+  border-color: var(--surface-inverse);
+}

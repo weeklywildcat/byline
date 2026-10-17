@@ -13,6 +13,14 @@ const footerGroups = Object.entries(
   )
 ).map(([title, links]) => ({ title, links }));
 
+// "Auto" follows the system setting; the other two pin it. BaseLayout's inline
+// script owns the state and keeps aria-pressed in sync.
+const THEME_CHOICES = [
+  { id: "auto", label: "Auto" },
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" }
+] as const;
+
 export function SiteFooter() {
   return (
     <footer className="site-footer">
@@ -45,6 +53,17 @@ export function SiteFooter() {
               </div>
             </nav>
           ))}
+        </div>
+
+        <div className="footer-theme">
+          <span id="footer-theme-label">Appearance</span>
+          <div className="theme-toggle" role="group" aria-labelledby="footer-theme-label">
+            {THEME_CHOICES.map((choice) => (
+              <button key={choice.id} type="button" data-color-choice-set={choice.id} aria-pressed="false">
+                {choice.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </footer>
