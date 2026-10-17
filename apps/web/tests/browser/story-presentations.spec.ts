@@ -29,8 +29,12 @@ test.describe("WordPress-rendered story presentations on Astro", () => {
         const columns = (selector: string) => getComputedStyle(q(selector)).gridTemplateColumns.split(" ").length;
         const pair = q('.is-style-byline-photo-pair');
         const media = q('.is-style-byline-portrait-text');
+        // Classic scrollbars (Linux CI) consume layout space; overlay
+        // scrollbars (macOS) do not. Measure the usable page in both cases.
+        const viewportWidth = document.documentElement.clientWidth;
         return {
-          overflow: document.documentElement.scrollWidth > innerWidth + 1,
+          viewportWidth,
+          overflow: document.documentElement.scrollWidth > viewportWidth + 1,
           pairColumns: columns('.is-style-byline-photo-pair'), galleryColumns: columns('.is-style-byline-photo-gallery'),
           legacyColumns: columns('.is-style-byline-news-grid'), mediaColumns: columns('.is-style-byline-portrait-text'),
           wide: rect(pair), media: rect(media), portraitMedia: rect(media.querySelector('figure')!), portraitText: rect(media.querySelector('.wp-block-media-text__content')!),
@@ -43,7 +47,7 @@ test.describe("WordPress-rendered story presentations on Astro", () => {
           related: Array.from(body.querySelectorAll('.byline-newsroom-stories-related article')).map(rect),
           essayProse: rect(q('.is-style-byline-photo-essay > p')),
           captions: Array.from(body.querySelectorAll('figcaption')).map((element) => ({ ...rect(element), clipped: element.scrollHeight > element.clientHeight + 1 })),
-          overwideMedia: Array.from(body.querySelectorAll('img, video, audio')).filter((element) => { const r = element.getBoundingClientRect(); return r.x < -1 || r.right > innerWidth + 1; }).length
+          overwideMedia: Array.from(body.querySelectorAll('img, video, audio')).filter((element) => { const r = element.getBoundingClientRect(); return r.x < -1 || r.right > viewportWidth + 1; }).length
         };
       });
       expect(data.overflow).toBe(false);
@@ -53,8 +57,8 @@ test.describe("WordPress-rendered story presentations on Astro", () => {
       expect(data.legacyColumns).toBe(data.galleryColumns);
       expect(data.mediaColumns).toBe(width <= 700 ? 1 : 2);
       expect(data.wide.x).toBeGreaterThanOrEqual(0);
-      expect(data.wide.right).toBeLessThanOrEqual(width);
-      expect(Math.abs((data.wide.x + data.wide.right) / 2 - width / 2)).toBeLessThan(2);
+      expect(data.wide.right).toBeLessThanOrEqual(data.viewportWidth);
+      expect(Math.abs((data.wide.x + data.wide.right) / 2 - data.viewportWidth / 2)).toBeLessThan(2);
       if (width >= 1200) expect(data.wide.width).toBeCloseTo(1040, 0);
       if (width <= 700) expect(data.portraitText.y).toBeGreaterThanOrEqual(data.portraitMedia.y + data.portraitMedia.height);
       expect(data.portrait.height / data.portrait.width).toBeCloseTo(1.5, 1);
@@ -73,7 +77,7 @@ test.describe("WordPress-rendered story presentations on Astro", () => {
       expect(data.thumbnail.width).toBeLessThanOrEqual(96);
       expect(data.relatedHeadingSize).toBeLessThan(16);
       expect(data.related[1].y).toBeGreaterThan(data.related[0].y);
-      expect(data.captions.every((caption) => !caption.clipped && caption.width > 0 && caption.right <= width + 1)).toBe(true);
+      expect(data.captions.every((caption) => !caption.clipped && caption.width > 0 && caption.right <= data.viewportWidth + 1)).toBe(true);
       await expect(page.locator('.is-style-byline-document a:not([download])').first()).toBeVisible();
       await expect(page.locator('.is-style-byline-document a[download]').first()).toBeVisible();
       await expect(page.locator('video track[kind="captions"]')).toHaveCount(1);
