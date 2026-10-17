@@ -145,9 +145,9 @@ describe("publication structured data", () => {
   });
 
   it("titles the homepage for what the publication is while the site name stays put", () => {
-    expect(getHomepageTitle()).toBe("Weekly Wildcat | Ninety Six High School Student Newspaper");
+    expect(getHomepageTitle()).toBe("Weekly Wildcat, Ninety Six High School's Official Student Newspaper");
     const metadata = buildPageMetadata({ title: getHomepageTitle(), absoluteTitle: true, description: "d", path: "/" });
-    expect(metadata.title).toEqual({ absolute: "Weekly Wildcat | Ninety Six High School Student Newspaper" });
+    expect(metadata.title).toEqual({ absolute: "Weekly Wildcat, Ninety Six High School's Official Student Newspaper" });
     expect(tagValues(metadata, "og:site_name")).toEqual(["Weekly Wildcat"]);
   });
 });

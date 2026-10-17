@@ -92,13 +92,18 @@ export function serializeJsonLd(data: unknown) {
  */
 export function getHomepageTitle() {
   const { defaultTitle } = publication.seo;
-  const { shortName, organizationName } = publication.identity;
+  const { shortName, tagline, organizationName } = publication.identity;
 
   if (defaultTitle && defaultTitle !== shortName) {
     return defaultTitle;
   }
 
-  return organizationName ? `${shortName} | ${organizationName} Student Newspaper` : defaultTitle || shortName;
+  // "Weekly Wildcat, Ninety Six High School's Official Student Newspaper"
+  if (tagline) {
+    return `${shortName}, ${tagline}`;
+  }
+
+  return organizationName ? `${shortName}, the student newspaper of ${organizationName}` : defaultTitle || shortName;
 }
 
 export function getSeoDescription(value: string, fallback = SITE_DESCRIPTION) {

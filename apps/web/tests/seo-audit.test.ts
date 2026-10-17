@@ -99,9 +99,9 @@ describe("page audit", () => {
     const homeHead = (title: string) => head({ title, remove: ["ogtype", "canonical", "ogurl", "published", "modified", "section", "author"], extra: `<meta property="og:type" content="website"><link rel="canonical" href="${origin}/"><meta property="og:url" content="${origin}/">` });
     const org = { "@type": "NewsMediaOrganization", "@id": `${origin}/#organization`, name: "Weekly Wildcat" };
     const site = { "@type": "WebSite", name: "Weekly Wildcat" };
-    const good = `<html>${homeHead("Weekly Wildcat | Ninety Six High School Student Newspaper")}<body><h1 class="masthead-logo"><a href="/"><img alt="Weekly Wildcat"></a></h1>${ld(org)}${ld(site)}</body></html>`;
+    const good = `<html>${homeHead("Weekly Wildcat, Ninety Six High School's Official Student Newspaper")}<body><h1 class="masthead-logo"><a href="/"><img alt="Weekly Wildcat"></a></h1>${ld(org)}${ld(site)}</body></html>`;
     expect(messages(good, "/")).toEqual([]);
-    const bare = good.replace("Weekly Wildcat | Ninety Six High School Student Newspaper", "Weekly Wildcat");
+    const bare = good.replace("Weekly Wildcat, Ninety Six High School's Official Student Newspaper", "Weekly Wildcat");
     expect(messages(bare, "/")).toEqual(expect.arrayContaining([expect.stringContaining("homepage title should describe")]));
     expect(messages(good.replace(/<h1[\s\S]*<\/h1>/, ""), "/")).toEqual(expect.arrayContaining([expect.stringContaining("exactly one h1")]));
     expect(messages(good.replace(ld(org), ""), "/")).toEqual(expect.arrayContaining([expect.stringContaining("NewsMediaOrganization")]));
