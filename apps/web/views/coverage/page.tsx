@@ -1,6 +1,7 @@
 import type { Metadata } from "@/lib/metadata";
 import { optionalBuildData } from "@/lib/build-data";
 import { formatDisplayDate } from "@/lib/format";
+import { getPresentationMediaUrl } from "@/lib/media";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import {
@@ -37,7 +38,7 @@ function CoverageCard({ coverage }: { coverage: WordPressCoverage }) {
       {coverage.artwork ? (
         <img
           className="coverage-artwork"
-          src={coverage.artwork.url}
+          src={getPresentationMediaUrl(coverage.artwork.url)}
           alt={coverage.artwork.alt}
           width={coverage.artwork.width ?? undefined}
           height={coverage.artwork.height ?? undefined}
