@@ -168,7 +168,10 @@ export function normalizePublicationConfig(value: unknown, fallback: BylinePubli
           ? [{
               name: item.name,
               slug: item.slug,
-              description: typeof item.description === "string" ? item.description : "",
+              // A section saved without a description keeps the publication's own default.
+              description: typeof item.description === "string" && item.description.trim()
+                ? item.description
+                : fallback.sections.find((section) => section.slug === item.slug)?.description ?? "",
               active: typeof item.active === "boolean" ? item.active : true
             }]
           : [];

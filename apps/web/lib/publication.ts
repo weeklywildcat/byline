@@ -38,11 +38,11 @@ export const WEEKLY_WILDCAT_PUBLICATION: BylinePublicationConfig = {
   },
   appearance: { theme: "weekly-wildcat", tokenOverrides: {} },
   sections: [
-    { name: "News", slug: "news", description: "", active: true },
-    { name: "Sports", slug: "sports", description: "", active: true },
-    { name: "Opinion", slug: "opinion", description: "", active: true },
-    { name: "Features", slug: "features", description: "", active: true },
-    { name: "Arts & Culture", slug: "culture", description: "", active: true }
+    { name: "News", slug: "news", description: "News from Ninety Six High School and the Ninety Six community, reported by Weekly Wildcat student journalists.", active: true },
+    { name: "Sports", slug: "sports", description: "Scores, results and reporting on Ninety Six High School Wildcats athletics from the Weekly Wildcat.", active: true },
+    { name: "Opinion", slug: "opinion", description: "Editorials, columns and student voices on life at Ninety Six High School and beyond.", active: true },
+    { name: "Features", slug: "features", description: "People, programs and stories from Ninety Six High School and the community around it.", active: true },
+    { name: "Arts & Culture", slug: "culture", description: "Theater, music, art and the creative life of Ninety Six High School and the Ninety Six community.", active: true }
   ],
   navigation: [
     { label: "News", url: "/category/news/", locations: ["header"] },
@@ -77,7 +77,7 @@ export const WEEKLY_WILDCAT_PUBLICATION: BylinePublicationConfig = {
   seo: {
     defaultTitle: "Weekly Wildcat",
     defaultDescription: "Student journalism from the Weekly Wildcat newsroom in Ninety Six, South Carolina.",
-    organizationType: "Organization"
+    organizationType: "NewsMediaOrganization"
   }
 };
 
