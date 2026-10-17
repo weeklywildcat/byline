@@ -1270,7 +1270,6 @@ html {
 
 .sticky-logo-bar {
   background: var(--paper);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, calc(var(--dock, 0) * 0.16));
   height: 65px;
   margin-bottom: -65px;
   pointer-events: none;
@@ -1279,6 +1278,58 @@ html {
   transform-origin: 50% 0;
   will-change: transform;
   z-index: 40;
+}
+
+/* The shadow is a fixed one that fades in. Re-painting a box-shadow on every
+   scroll frame is what made the dock stutter on phones. */
+.sticky-logo-bar::after {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16);
+  content: "";
+  inset: 0;
+  opacity: var(--dock, 0);
+  position: absolute;
+  will-change: opacity;
+}
+
+/* Where scroll-driven animations exist (Safari 26+, Chrome, Edge), the dock runs
+   on the compositor instead of a scroll listener, so it tracks the finger
+   frame for frame; Safari only fires scroll events in coarse steps during
+   momentum scrolling, which is what made the old version jump. The script adds
+   .dock-css and sets --dock-start / --dock-*-scale after measuring. */
+@supports (animation-timeline: scroll()) {
+  .dock-css .site-header--logo > .masthead-logo img,
+  .dock-css .sticky-logo-bar,
+  .dock-css .sticky-logo-bar::after {
+    animation-fill-mode: both;
+    animation-range: var(--dock-start, 0px) calc(var(--dock-start, 0px) + var(--dock-ramp, 150px));
+    animation-timeline: scroll(root block);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  }
+
+  .dock-css .site-header--logo > .masthead-logo img {
+    animation-name: dock-logo;
+  }
+
+  .dock-css .sticky-logo-bar {
+    animation-name: dock-bar;
+  }
+
+  .dock-css .sticky-logo-bar::after {
+    animation-name: dock-shadow;
+    opacity: 0;
+  }
+}
+
+@keyframes dock-logo {
+  to { transform: scale(var(--dock-logo-scale, 1)); }
+}
+
+@keyframes dock-bar {
+  to { transform: scaleY(var(--dock-bar-scale, 1)); }
+}
+
+@keyframes dock-shadow {
+  to { opacity: 1; }
 }
 
 @media (max-width: 640px) {

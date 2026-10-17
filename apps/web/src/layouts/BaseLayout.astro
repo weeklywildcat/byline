@@ -111,6 +111,12 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
         var start = 0;         // scroll position where the logo begins to pin
         var logoHeight = 0;
         var barHeight = 0;
+        var width = 0;
+
+        // Browsers with scroll-driven animations run the dock in CSS, off the
+        // main thread. Safari fires scroll events in coarse steps while a swipe
+        // is coasting, so driving this from a listener visibly jumps there.
+        var cssDriven = window.CSS && CSS.supports && CSS.supports("animation-timeline: scroll()");
 
         function measure() {
           var top = utility.getBoundingClientRect().bottom + window.scrollY;
@@ -121,10 +127,18 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
           // The strip covers the logo's resting box and overlaps it, so nothing shifts.
           bar.style.height = barHeight + "px";
           bar.style.marginBottom = -barHeight + "px";
+          if (cssDriven) {
+            var root = document.documentElement;
+            root.style.setProperty("--dock-start", Math.max(0, start) + "px");
+            root.style.setProperty("--dock-ramp", RAMP + "px");
+            root.style.setProperty("--dock-logo-scale", LOGO_HEIGHT / logoHeight);
+            root.style.setProperty("--dock-bar-scale", BAR_HEIGHT / barHeight);
+            root.classList.add("dock-css");
+          }
         }
 
         function update() {
-          if (!logoHeight) return;
+          if (cssDriven || !logoHeight) return;
           var p = Math.max(0, Math.min(1, (window.scrollY - start) / RAMP));
           var e = p * p * (3 - 2 * p);
           logo.style.transform = "scale(" + (1 + e * (LOGO_HEIGHT / logoHeight - 1)) + ")";
@@ -132,9 +146,11 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
           bar.style.setProperty("--dock", e);
         }
 
-        function refresh() { measure(); update(); }
-        window.addEventListener("scroll", update, { passive: true });
-        window.addEventListener("resize", refresh);
+        function refresh() { width = window.innerWidth; measure(); update(); }
+        if (!cssDriven) window.addEventListener("scroll", update, { passive: true });
+        // Mobile Safari fires resize as its toolbars collapse mid-scroll; only a
+        // width change moves the layout, so skip the forced re-measure otherwise.
+        window.addEventListener("resize", function () { if (window.innerWidth !== width) refresh(); });
         window.addEventListener("load", refresh);
         refresh();
       })();
@@ -168,8 +184,16 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
         toTop.addEventListener("click", function () {
           window.scrollTo({ top: 0, behavior: reduceMotion.matches ? "auto" : "smooth" });
         });
-        window.addEventListener("scroll", update, { passive: true });
-        window.addEventListener("resize", update);
+        // Once per frame at most, so these layout reads never pile up inside the
+        // scroll event itself.
+        var queued = false;
+        function schedule() {
+          if (queued) return;
+          queued = true;
+          requestAnimationFrame(function () { queued = false; update(); });
+        }
+        window.addEventListener("scroll", schedule, { passive: true });
+        window.addEventListener("resize", schedule);
         update();
 
         // "/" jumps to search, the way most news sites and web apps do.
