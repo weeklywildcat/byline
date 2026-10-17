@@ -3237,6 +3237,7 @@ function wwh_format_school_event(WP_Post $post): array
 require_once __DIR__ . '/includes/sports-rosters.php';
 require_once __DIR__ . '/includes/sports/archive.php';
 require_once __DIR__ . '/includes/content/newsroom-blocks.php';
+require_once __DIR__ . '/includes/content/gallery-media.php';
 require_once __DIR__ . '/includes/discord-integration.php';
 require_once __DIR__ . '/includes/integrations/discord.php';
 require_once __DIR__ . '/includes/core/upgrade.php';

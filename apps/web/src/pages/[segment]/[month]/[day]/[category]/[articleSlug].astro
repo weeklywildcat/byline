@@ -63,7 +63,7 @@ const slots = {
   ]))}></script>
   <ArticleView presentation={presentation} slots={slots} className={category?.slug === "opinion" ? "article-shell-opinion" : ""} />
   <script>
-    if (document.querySelector(".article-body .wp-block-gallery a[href] img")) {
+    if (document.querySelector(".article-body .wp-block-gallery img")) {
       import("@/src/scripts/gallery-lightbox").then(({ enhanceArticleGalleries }) => enhanceArticleGalleries());
     }
   </script>

@@ -90,7 +90,7 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
     {socialMetadataTags.map((tag) => tag.kind === "property"
       ? <meta property={tag.key} content={tag.content} />
       : <meta name={tag.key} content={tag.content} />)}
-    <script type="speculationrules" is:inline set:html={JSON.stringify({ prefetch: [{ where: { and: [{ href_matches: "/*" }, { not: { href_matches: ["/_wordpress-media/*", "/_byline/*", "/brand/*", "/*.xml", "/*.txt"] } }] }, eagerness: "moderate" }] })}></script>
+    <script type="speculationrules" is:inline set:html={JSON.stringify({ prefetch: [{ where: { and: [{ href_matches: "/*" }, { not: { href_matches: ["/_wordpress-media/*", "/_byline/*", "/brand/*", "/*.xml", "/*.txt", "/*.jpg", "/*.jpeg", "/*.png", "/*.webp", "/*.avif", "/*.gif", "/*.svg"] } }] }, eagerness: "moderate" }] })}></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>

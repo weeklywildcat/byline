@@ -239,6 +239,35 @@ export function sitemapLocations(xml: string) {
   return [...xml.matchAll(/<loc>([\s\S]*?)<\/loc>/g)].map((match) => decodeEntities(match[1].trim()));
 }
 
+/** Image sitemap locations: [page URL, its <image:loc> URLs]. */
+export function sitemapImageLocations(xml: string): Array<[string, string[]]> {
+  return [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)].flatMap((block): Array<[string, string[]]> => {
+    const images = [...block[1].matchAll(/<image:loc>([\s\S]*?)<\/image:loc>/g)].map((match) => decodeEntities(match[1].trim()));
+    return images.length ? [[decodeEntities(block[1].match(/<loc>([\s\S]*?)<\/loc>/)?.[1].trim() ?? ""), images]] : [];
+  });
+}
+
+/** Google reads at most 1,000 images per page entry. */
+export const MAX_SITEMAP_IMAGES = 1000;
+
+/** Image entries must be unique, absolute, on the site's own origin and declare their namespace. */
+export function auditSitemapImages(xml: string, origin: string): AuditIssue[] {
+  const issues: AuditIssue[] = [];
+  const images = sitemapImageLocations(xml);
+  if (images.length && !xml.includes('xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"')) {
+    issues.push({ route: "/sitemap.xml", message: "sitemap: image entries without the sitemap-image namespace" });
+  }
+  for (const [page, locations] of images) {
+    const fail = (message: string) => issues.push({ route: page, message: `sitemap: ${message}` });
+    if (locations.length > MAX_SITEMAP_IMAGES) fail(`lists ${locations.length} images (limit ${MAX_SITEMAP_IMAGES})`);
+    if (new Set(locations).size !== locations.length) fail("lists the same image more than once");
+    for (const location of locations) {
+      if (!location.startsWith(`${origin}/`)) fail(`image is not an absolute URL on ${origin}: ${location}`);
+    }
+  }
+  return issues;
+}
+
 /** Every sitemap URL must be a real, canonical, indexable page — not a redirect, 404, or noindex page. */
 export function auditSitemap(xml: string, pages: Map<string, SitemapPage>, origin: string): AuditIssue[] {
   const issues: AuditIssue[] = [];

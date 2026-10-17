@@ -1076,19 +1076,23 @@
   row-gap: 8px;
   align-self: stretch;
 }
-:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery .wp-block-image :is(a, img) {
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery .wp-block-image :is(a, img, .byline-gallery-opener) {
   display: block;
   max-width: 100%;
   min-width: 0;
   align-self: end;
 }
 :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery .wp-block-image img {
-  width: auto;
+  /* No `width: auto` and no `aspect-ratio: auto` here. WordPress marks lazy
+   * images `sizes="auto, ..."`, and browsers lay those out as a 300x150
+   * placeholder unless the image has a definite width. `width: auto` made the
+   * browser measure that placeholder as the slot and select the 300w
+   * candidate for a ~335px cell. The width/height attributes give the image a
+   * definite width (capped by max-width) and its intrinsic aspect ratio. */
   height: auto;
   max-height: 620px;
   object-fit: contain;
   margin-inline: auto;
-  aspect-ratio: auto;
 }
 :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery.is-cropped .wp-block-image img {
   width: 100%;
@@ -1309,9 +1313,16 @@
 }
 
 /* The lightbox is a small article-only enhancement; no animation or carousel. */
+/* Enlargeable photographs. Linked images keep their own <a>; unlinked Photo
+ * Gallery images are wrapped in a generated button at enhancement time. */
+.byline-article-view .article-body .wp-block-gallery :is(a[aria-haspopup="dialog"], .byline-gallery-opener) { cursor: zoom-in; }
+.byline-article-view .article-body .wp-block-gallery .byline-gallery-opener { appearance: none; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; }
+.byline-article-view .article-body .wp-block-gallery :is(a[aria-haspopup="dialog"], .byline-gallery-opener):focus-visible { outline: 3px solid var(--accent, #b11f24); outline-offset: 3px; }
 .byline-gallery-dialog { background: var(--page, #fff); color: var(--ink, #1f2328); border: 1px solid var(--rule, #d0d7de); width: min(1100px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 16px; }
 .byline-gallery-dialog::backdrop { background: rgb(0 0 0 / .8); }
 .byline-gallery-dialog img { display: block; max-width: 100%; max-height: 70dvh; width: auto; height: auto; object-fit: contain; margin-inline: auto; }
+.byline-gallery-dialog-stage { display: grid; place-items: center; min-height: min(40dvh, 320px); }
+.byline-gallery-dialog-stage[aria-busy="true"] img { opacity: .35; }
 .byline-gallery-dialog figcaption { font-family: var(--font-serif, Georgia, serif); line-height: 1.4; margin-top: 12px; }
 .byline-gallery-dialog-controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
 .byline-gallery-dialog button { font: inherit; color: inherit; background: transparent; border: 1px solid var(--rule-strong, #aab2bb); padding: 8px 12px; min-height: 44px; cursor: pointer; }
