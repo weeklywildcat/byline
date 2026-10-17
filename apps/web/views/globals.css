@@ -22,6 +22,11 @@
 
 /* Public editorial surfaces. These stay intentionally small so the same
    static-export layout works for publications with or without optional data. */
+.about-writer-contributors {
+  display: grid;
+  gap: 24px;
+}
+
 .article-correction-notices {
   display: grid;
   gap: 0;
@@ -1945,7 +1950,8 @@ h1.masthead-logo {
 
 .article-timing,
 .article-share-actions,
-.article-tags div {
+.article-tags div,
+.about-writer-links {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
@@ -1972,6 +1978,7 @@ h1.masthead-logo {
 }
 
 .article-share-actions button,
+.about-writer-links a,
 .article-tip-callout a {
   align-items: center;
   background: transparent;
@@ -1991,6 +1998,7 @@ h1.masthead-logo {
 
 .article-share-actions button:hover,
 .article-share-actions button:focus-visible,
+.about-writer-links a:hover,
 .article-tip-callout a:hover,
 .article-tip-callout a:focus-visible {
   background: var(--ink);
@@ -2373,6 +2381,51 @@ h1.masthead-logo {
 
 .article-after-section {
   padding-top: 0;
+}
+
+.about-writer-layout {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.about-writer-avatar {
+  height: 104px;
+  width: 104px;
+}
+
+.about-writer-body h3 {
+  font-family: var(--font-body);
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1.02;
+  margin: 0;
+}
+
+.about-writer-body > p {
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.48;
+  margin: 8px 0 0;
+  max-width: 720px;
+}
+
+.about-writer-coverage {
+  color: var(--soft-muted);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.about-writer-coverage a {
+  color: var(--accent);
+}
+
+.about-writer-links {
+  margin-top: 14px;
 }
 
 .article-story-grid {

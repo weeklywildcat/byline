@@ -61,6 +61,13 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .article-update-notice p { color: var(--muted); font-family: var(--font-body); font-size: .96rem; line-height: 1.45; margin: 0; }
 .byline-article-view .article-after { display: grid; gap: 28px; margin-top: 46px; }
 .byline-article-view .article-after-section { padding-top: 0; }
+.byline-article-view .about-writer-layout { align-items: start; display: grid; gap: 18px; grid-template-columns: auto minmax(0, 1fr); }
+.byline-article-view .about-writer-avatar { height: 104px; width: 104px; }
+.byline-article-view .about-writer-body h3 { font-family: var(--font-body); font-size: 1.65rem; font-weight: 800; line-height: 1.02; margin: 0; }
+.byline-article-view .about-writer-body > p { color: var(--muted); font-family: var(--font-body); font-size: 1rem; line-height: 1.48; margin: 8px 0 0; max-width: 720px; }
+.byline-article-view .about-writer-coverage { color: var(--soft-muted); font-family: var(--font-ui); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+.byline-article-view .about-writer-coverage a { color: var(--accent); }
+.byline-article-view .about-writer-links { margin-top: 14px; }
 .byline-article-view .article-story-grid { display: grid; gap: 0 22px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .byline-article-view .article-story-grid .story-teaser-compact { grid-template-columns: 1fr; }
 .byline-article-view .story-teaser { display: grid; }
