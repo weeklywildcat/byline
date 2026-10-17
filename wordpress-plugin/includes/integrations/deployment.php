@@ -118,6 +118,10 @@ function byline_deployment_job_status(): string
 /** The durably recorded revision the public site still owes, if any. */
 function byline_deployment_recorded_expected_revision(): int
 {
+    global $wpdb;
+    if (isset($wpdb) && isset($wpdb->options) && method_exists($wpdb, 'get_var')) {
+        return max(0, (int) $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", BYLINE_DEPLOYMENT_EXPECTED_REVISION_OPTION)));
+    }
     return max(0, absint(get_option(BYLINE_DEPLOYMENT_EXPECTED_REVISION_OPTION, 0)));
 }
 
@@ -128,6 +132,14 @@ function byline_deployment_recorded_expected_revision(): int
 function byline_deployment_record_expected_revision(int $revision): int
 {
     $revision = max(0, $revision);
+    global $wpdb;
+    if (isset($wpdb) && isset($wpdb->options) && method_exists($wpdb, 'query')) {
+        add_option(BYLINE_DEPLOYMENT_EXPECTED_REVISION_OPTION, 0, '', false);
+        $updated = $wpdb->query($wpdb->prepare("UPDATE {$wpdb->options} SET option_value = GREATEST(CAST(option_value AS UNSIGNED), %d) WHERE option_name = %s", $revision, BYLINE_DEPLOYMENT_EXPECTED_REVISION_OPTION));
+        if ($updated === false) throw new RuntimeException('Cannot record the expected public revision.');
+        wp_cache_delete(BYLINE_DEPLOYMENT_EXPECTED_REVISION_OPTION, 'options');
+        return byline_deployment_recorded_expected_revision();
+    }
     $recorded = byline_deployment_recorded_expected_revision();
     if ($revision > $recorded) {
         update_option(BYLINE_DEPLOYMENT_EXPECTED_REVISION_OPTION, $revision, false);
@@ -424,6 +436,18 @@ function byline_send_deployment_request(string $reason = 'scheduled', int $expec
         return new WP_Error('byline_deployment_not_configured', 'Deployment is not configured.', ['retryable' => false]);
     }
 
+    // All callers, including legacy/manual adapters, must prepare before HTTP.
+    // The job can coalesce toward a newer revision while it was waiting.
+    if (function_exists('byline_prepare_build_snapshot')) {
+        $prepared = byline_prepare_build_snapshot($expected_revision);
+        if (is_wp_error($prepared)) {
+            update_option(BYLINE_DEPLOYMENT_LAST_STATUS_OPTION, 'Snapshot preparation failed', false);
+            return $prepared;
+        }
+        $expected_revision = (int) $prepared['revision'];
+        byline_deployment_record_expected_revision($expected_revision);
+    }
+
     $headers = [
         'User-Agent' => 'Byline',
         'X-Byline-Reason' => sanitize_key($reason),
@@ -507,7 +531,7 @@ function byline_schedule_story_deployment_on_status($new_status, $old_status, $p
     byline_schedule_deployment('story-published');
 }
 
-add_action('transition_post_status', 'byline_schedule_story_deployment_on_status', 20, 3);
+// Canonical public revision hooks also cover unpublish and related datasets.
 
 function byline_process_deployment_event($job_id = 0): void
 {

@@ -541,7 +541,7 @@ function byline_update_publication_config(WP_REST_Request $request)
 
     $normalized = byline_normalize_publication_config($input);
     update_option(BYLINE_PUBLICATION_OPTION, $normalized, false);
-    $revision = max(0, (int) get_option(BYLINE_PUBLICATION_REVISION_OPTION, 0)) + 1;
+    $revision = function_exists('byline_bump_public_content_revision') ? byline_bump_public_content_revision() : max(0, (int) get_option(BYLINE_PUBLICATION_REVISION_OPTION, 0)) + 1;
     update_option(BYLINE_PUBLICATION_REVISION_OPTION, $revision, false);
     // The publication revision is already the value emitted by the static
     // manifest. Record that exact revision on the durable deployment request;

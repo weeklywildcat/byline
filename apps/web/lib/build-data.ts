@@ -41,6 +41,7 @@ export async function optionalBuildData<T>(endpoint: string, load: () => Promise
   try {
     return await load();
   } catch (cause) {
+    if (process.env.BYLINE_PREPARED_SNAPSHOT_FILE) throw new BylineBuildDataError(endpoint, cause);
     const detail = cause instanceof Error ? cause.message : String(cause);
     console.warn(`[byline] optional build data unavailable for ${endpoint}; continuing without it. ${detail}`);
     return fallback;

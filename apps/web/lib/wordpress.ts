@@ -1,3 +1,4 @@
+import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
 import { REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { mirrorWordPressMediaInValue } from "@/lib/media";
 import { getNamespaceApiUrl, getWordPressApiUrl } from "@/lib/byline-rest";
@@ -10,6 +11,8 @@ import galleryMedia from "../../../tests/fixtures/gallery-media.json";
 const DEFAULT_SITE_URL = "https://weeklywildcat.com";
 const WORDPRESS_FETCH_CACHE_KEY =
   process.env.WORDPRESS_FETCH_CACHE_KEY ||
+  process.env.WORKERS_CI_BUILD_UUID ||
+  process.env.WORKERS_CI_COMMIT_SHA ||
   process.env.VERCEL_GIT_COMMIT_SHA ||
   process.env.CF_PAGES_COMMIT_SHA ||
   process.env.NETLIFY_COMMIT_REF ||
@@ -673,6 +676,14 @@ async function fetchPublicNamespace<T>(namespace: string, path: string, query: R
 }
 
 async function publicWpFetch<T>(path: string, query: Record<string, QueryValue> = {}) {
+  assertPreparedBuildMode();
+  if (hasPreparedSnapshot()) {
+    const data = await getPreparedDatasets();
+    if (["/contributors/guests", "/contributors", "/guests"].includes(path)) return data.guests as T;
+    if (["/coverage", "/coverages"].includes(path)) return data.coverages as T;
+    if (path === "/corrections") return data.corrections as T;
+    throw new Error(`Snapshot has no public collection ${path}`);
+  }
   if (process.env.BYLINE_CONTENT_MODE?.endsWith("-fixture")) {
     return fixtureData<T>(path, query);
   }
@@ -724,6 +735,15 @@ async function publicCollection(paths: string[], query: Record<string, QueryValu
 }
 
 async function wpFetch<T>(path: string, query: Record<string, QueryValue> = {}) {
+  assertPreparedBuildMode();
+  if (hasPreparedSnapshot()) {
+    const data = await getPreparedDatasets();
+    const datasets: Record<string, unknown[]> = { "/posts": data.posts, "/pages": data.pages, "/categories": data.categories, "/tags": data.tags, "/users": data.authors };
+    let rows = datasets[path];
+    if (!rows) throw new Error(`Snapshot has no WordPress collection ${path}`);
+    if (query.slug) rows = rows.filter((row) => (row as { slug: string }).slug === query.slug);
+    return { data: rows as T, totalPages: 1 };
+  }
   if (process.env.BYLINE_CONTENT_MODE?.endsWith("-fixture")) {
     return { data: fixtureData<T>(path, query), totalPages: 1 };
   }
@@ -799,6 +819,11 @@ async function wpFetchCollection<T>(path: string, query: Record<string, QueryVal
 }
 
 async function headlessWpFetch<T>(path: string, query: Record<string, QueryValue> = {}) {
+  assertPreparedBuildMode();
+  if (hasPreparedSnapshot()) {
+    if (path === "/authors") return (await getPreparedDatasets()).authors as T;
+    throw new Error(`Snapshot has no headless collection ${path}`);
+  }
   if (process.env.BYLINE_CONTENT_MODE === "empty") {
     return [] as T;
   }
@@ -958,7 +983,8 @@ export async function getAllGuestContributors() {
       const contributor = normalizeGuestContributor(record);
       return contributor && contributorHasProfilePage(contributor) ? [contributor] : [];
     });
-  } catch {
+  } catch (error) {
+    if (hasPreparedSnapshot()) throw error;
     // Guest contributors are optional. A missing endpoint must not prevent the
     // normal WordPress author directory from building.
     return [];

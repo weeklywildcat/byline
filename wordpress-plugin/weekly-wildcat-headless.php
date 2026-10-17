@@ -102,6 +102,8 @@ const WWH_PRIMARY_GAME_META = 'weekly_wildcat_primary_game_id';
 require_once __DIR__ . '/includes/sports/teams.php';
 require_once __DIR__ . '/includes/sports/domain.php';
 require_once __DIR__ . '/includes/core/jobs.php';
+require_once __DIR__ . '/includes/publication/build-snapshot.php';
+require_once __DIR__ . '/includes/publication/public-revisions.php';
 require_once __DIR__ . '/includes/integrations/deployment.php';
 // Notifications use the durable job runner and only resolve private story
 // data at delivery time after rechecking the recipient's capabilities.
@@ -1423,7 +1425,7 @@ function wwh_maybe_schedule_cloudflare_deploy_for_transition(string $new_status,
         wwh_schedule_cloudflare_deploy();
     }
 }
-add_action('transition_post_status', 'wwh_maybe_schedule_cloudflare_deploy_for_transition', 10, 3);
+// Public mutation hooks are centralized in publication/public-revisions.php.
 
 function wwh_maybe_schedule_cloudflare_deploy_for_delete(int $post_id): void
 {
@@ -1435,7 +1437,7 @@ function wwh_maybe_schedule_cloudflare_deploy_for_delete(int $post_id): void
 
     wwh_schedule_cloudflare_deploy();
 }
-add_action('before_delete_post', 'wwh_maybe_schedule_cloudflare_deploy_for_delete');
+// Public deletion is tracked by the canonical revision hooks.
 
 function wwh_schedule_cloudflare_deploy(): void
 {

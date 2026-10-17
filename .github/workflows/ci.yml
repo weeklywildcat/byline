@@ -67,6 +67,13 @@ jobs:
           BYLINE_DISCORD_CLIENT_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
         run: npm run build:frontend
 
+      - name: Build through prepared snapshot discovery and forbid renderer CMS requests
+        env:
+          BYLINE_DEPLOYMENT_HOOK_URL: BYLINE_TEST_SECRET_DO_NOT_EXPORT
+          BYLINE_DISCORD_BRIDGE_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
+          BYLINE_DISCORD_CLIENT_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
+        run: npm run test:frontend:snapshot-build
+
       - name: Install Chromium for public Astro browser tests
         run: npx playwright install --with-deps chromium
 

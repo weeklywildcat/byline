@@ -1,3 +1,4 @@
+import { routeCacheDependency } from "./route-cache";
 import {
   archiveRouteDigest,
   articleRouteDigest,
@@ -170,7 +171,15 @@ export const getBuildSnapshot = memoizeBuildSnapshot(async () => {
   const snapshot = await loadSnapshot();
   const buildDirectory = path.join(process.cwd(), ".byline-build");
   await mkdir(buildDirectory, { recursive: true });
+  const cacheKeys = [
+    ...snapshot.posts.filter(isVisibleContentPost).map((post) => ({ path: getPostHref(post), ...routeCacheDependency(snapshot, "article", post.id) })),
+    ...snapshot.categories.filter((category) => !isHiddenCategory(category)).map((category) => ({ path: `/category/${category.slug}/`, ...routeCacheDependency(snapshot, "category", category.id) })),
+    ...snapshot.contributors.map((person) => ({ path: getContributorHref(person), ...routeCacheDependency(snapshot, "author", contributorIdentity(person)) })),
+    ...snapshot.pages.filter((page) => !CODE_ROUTED_PAGE_SLUGS.includes(page.slug)).map((page) => ({ path: `/${page.slug}/`, ...routeCacheDependency(snapshot, "page", page.slug) })),
+    ...snapshot.sports.coverages.map((coverage) => ({ path: `/coverage/${coverage.slug}/`, ...routeCacheDependency(snapshot, "coverage", coverage.slug) }))
+  ];
   await Promise.all([
+    writeFile(path.join(buildDirectory, "route-cache-keys.json"), `${JSON.stringify(cacheKeys, null, 2)}\n`),
     writeFile(path.join(buildDirectory, "expected-routes.json"), `${JSON.stringify(snapshot.routes, null, 2)}\n`),
     writeFile(path.join(buildDirectory, "snapshot-metrics.json"), `${JSON.stringify(snapshot.metrics, null, 2)}\n`)
   ]);

@@ -16,6 +16,11 @@ function positiveInteger(value, fallback = 0) {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+let snapshotBacked = false;
+try { snapshotBacked = JSON.parse(await readFile(path.join(projectRoot, ".byline-build/frontend-phases.json"), "utf8")).dataMode === "prepared-snapshot"; } catch {}
+if (snapshotBacked && process.env.BYLINE_PUBLICATION_REVISION !== undefined && positiveInteger(process.env.BYLINE_PUBLICATION_REVISION) !== builtPublication.revision) {
+  throw new Error("BYLINE_PUBLICATION_REVISION cannot override the verified snapshot revision.");
+}
 const manifest = {
   protocolVersion: 1,
   frontendVersion: String(packageJson.version || "0.0.0"),

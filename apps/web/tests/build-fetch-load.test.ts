@@ -77,7 +77,10 @@ describe("WordPress build load controls", () => {
 
     expect(source).toContain("WORDPRESS_FETCH_CACHE_KEY:");
     expect(source).toContain("process.env.CF_PAGES_COMMIT_SHA");
-    expect(source).toContain("`local-build-${Date.now()}`");
+    expect(source).toContain("process.env.WORKERS_CI_BUILD_UUID");
+    expect(source).toContain("process.env.WORKERS_CI_COMMIT_SHA");
+    expect(source).toContain("process.env.WORKERS_CI_BRANCH");
+    expect(source).not.toContain("Date.now()}`");
   });
 
   it("bounds concurrent requests while loading every sports page", async () => {

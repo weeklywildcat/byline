@@ -1,8 +1,13 @@
+import { getLocalBuildSnapshot } from "./prepared-snapshot";
+import { upcomingSnapshotEvents } from "./snapshot-events";
+import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
 import { mirrorWordPressMediaInValue } from "@/lib/media";
 import { getWordPressApiUrl } from "@/lib/wordpress";
 
 const HEADLESS_FETCH_CACHE_KEY =
   process.env.WORDPRESS_FETCH_CACHE_KEY ||
+  process.env.WORKERS_CI_BUILD_UUID ||
+  process.env.WORKERS_CI_COMMIT_SHA ||
   process.env.VERCEL_GIT_COMMIT_SHA ||
   process.env.CF_PAGES_COMMIT_SHA ||
   process.env.NETLIFY_COMMIT_REF ||
@@ -367,6 +372,14 @@ async function headlessFetch<T>(path: string, query: Record<string, QueryValue> 
 }
 
 async function headlessFetchPage<T>(path: string, query: Record<string, QueryValue> = {}) {
+  assertPreparedBuildMode();
+  if (hasPreparedSnapshot()) {
+    const data = await getPreparedDatasets();
+    if (path === "/school-events") return { data: upcomingSnapshotEvents(data.schoolEvents, getLocalBuildSnapshot()!.sourceTimezone, Number(query.per_page) || 20) as T, totalPages: 1 };
+    // Sports source records are frozen into native Pages. A future route must
+    // explicitly extend the schema instead of silently reading an empty module.
+    throw new Error(`Snapshot has no headless dataset ${path}`);
+  }
   if (process.env.BYLINE_CONTENT_MODE === "weekly-wildcat-fixture") {
     return { data: weeklyWildcatHeadlessFixture<T>(path), totalPages: 1 };
   }

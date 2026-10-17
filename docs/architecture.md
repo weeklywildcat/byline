@@ -9,8 +9,8 @@ static public presentation.
   WordPress owns stories, people, pages, sports, events, polls and poll votes,
   publication settings, capabilities, and protected
   integration credentials.
-- The Astro app is a static build client. It reads public `/byline/v1` and
-  legacy-compatible sports contracts through a single memoized build snapshot,
+- The Astro app is a static build client. It downloads one WordPress-prepared, revisioned public build snapshot through
+  `/byline/v1/build-snapshot`, verifies its SHA-256, then resolves all loaders locally,
   then emits static HTML, CSS, small React islands, media, and a safe
   `/_byline/manifest.json`. It has no database, auth, SSR, server actions, image
   optimizer, Cloudflare adapter, or required runtime application server.
@@ -58,7 +58,8 @@ unreachable.
 The Cloudflare Worker and `wrangler.jsonc` are unchanged by the renderer switch:
 static assets still come from `apps/web/out`, while `/api/*` continues through
 the poll proxy. See [migration/astro.md](migration/astro.md) for the build graph,
-verification reports, cache invalidation, and rollback procedure.
+verification reports and rollback procedure, and [build-snapshots.md](build-snapshots.md)
+for revision safety, incremental invalidation and Cloudflare cache operations.
 
 ## Sports archive
 
