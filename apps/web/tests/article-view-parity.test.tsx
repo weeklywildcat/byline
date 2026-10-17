@@ -39,7 +39,28 @@ describe("shared article presentation", () => {
     expect(markup).toContain("Public records guide");
     expect(markup).toContain("The public story.");
     expect(markup).toContain("Clarification");
-    expect(markup).toContain("About the Writers");
+    expect(markup).not.toContain("About the Writer");
     expect(markup).not.toContain("privateNote");
+  });
+});
+
+describe("per-contributor coverage", () => {
+  it("does not credit a contributor with the other writers' coverage areas", () => {
+    const post = publicEditorialPosts[0];
+    const contributors = getPostContributors(post);
+    const presentation = buildArticlePresentation({
+      post,
+      allPosts: publicEditorialPosts,
+      contributors: [
+        ...contributors,
+        { type: "guest", id: 999, name: "Photo Only", slug: "photo-only" } as (typeof contributors)[number]
+      ],
+      author: null
+    });
+    const photoOnly = presentation.contributors.find((contributor) => contributor.name === "Photo Only");
+    const writer = presentation.contributors.find((contributor) => contributor.name === "Alex Rivera");
+
+    expect(writer?.coverage?.length).toBeGreaterThan(0);
+    expect(photoOnly?.coverage ?? []).toEqual([]);
   });
 });

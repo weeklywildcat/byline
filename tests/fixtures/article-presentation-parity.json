@@ -20,7 +20,7 @@
           "path": "/uploads/alex.jpg",
           "alt": "Alex"
         },
-        "coverage": ["News", "Arts", "Sports"]
+        "coverage": ["News", "Arts"]
       },
       {
         "id": "guest-44-jordan-guest",
@@ -32,7 +32,7 @@
           "path": "/uploads/jordan.jpg",
           "alt": "Jordan"
         },
-        "coverage": ["News", "Arts", "Sports"]
+        "coverage": ["News", "Sports"]
       }
     ],
     "featuredImage": {
