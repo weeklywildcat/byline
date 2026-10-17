@@ -1467,8 +1467,8 @@
   background: transparent; cursor: ew-resize; touch-action: pan-y; -webkit-tap-highlight-color: transparent;
   -webkit-appearance: none; appearance: none;
 }
-.byline-comparison-range::-webkit-slider-runnable-track { background: transparent; border: 0; }
-.byline-comparison-range::-moz-range-track { background: transparent; border: 0; }
+.byline-comparison-range::-webkit-slider-runnable-track { height: var(--comparison-thumb); background: transparent; border: 0; }
+.byline-comparison-range::-moz-range-track { height: var(--comparison-thumb); background: transparent; border: 0; }
 .byline-comparison-range::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none; box-sizing: border-box; width: var(--comparison-thumb); height: var(--comparison-thumb);
   border: 2px solid #111; border-radius: 50%; background: #fff var(--comparison-handle) center / 28px no-repeat; box-shadow: 0 1px 6px rgb(0 0 0 / .45);

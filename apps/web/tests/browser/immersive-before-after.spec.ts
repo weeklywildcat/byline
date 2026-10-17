@@ -142,7 +142,7 @@ async function touchDevice(browser: Browser, width = 390, height = 844) {
   return { context, page, client: await context.newCDPSession(page) };
 }
 async function touch(client: Awaited<ReturnType<typeof touchDevice>>['client'], path: { x: number; y: number }[]) {
-  const send = (type: string, points: { x: number; y: number }[]) => client.send('Input.dispatchTouchEvent', { type, touchPoints: points.map((p) => ({ ...p, id: 1 })) });
+  const send = (type: 'touchStart' | 'touchMove' | 'touchEnd', points: { x: number; y: number }[]) => client.send('Input.dispatchTouchEvent', { type, touchPoints: points.map((p) => ({ ...p, id: 1 })) });
   await send('touchStart', [path[0]]);
   for (const step of path.slice(1)) await send('touchMove', [step]);
   await send('touchEnd', []);

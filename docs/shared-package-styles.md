@@ -45,9 +45,12 @@ at 1040px. Nested columns do not escape their own layout context. Wide/full
 blocks clear floated margin notes. Tables scroll inside their own figure.
 
 `@byline/ui/article-enhancements` exports `enhanceArticleStory(root, options)`.
-Astro imports it only when the article contains a gallery link, embedded
-visualization, annotated image, comparison or scrolly system. Static graphics,
-Core tables, chapters and prose need no enhancement JavaScript. The module is
+Astro imports it only when the article contains something that matches
+`articleEnhancementSelector` (`@byline/ui/article-enhancement-selector`, a
+dependency-free module): any `.wp-block-gallery img` (Photo Gallery images may be
+unlinked), an embedded visualization, annotated image, comparison or scrolly
+system. Static graphics, Core tables, chapters and prose need no enhancement
+JavaScript, and a text-only story downloads none. The module is
 framework-free and idempotent, returns cleanup for iframe/unmount hosts, and
 uses the root's owning document/window for preview breakpoint and event parity.
 
@@ -56,9 +59,10 @@ inside its real 1200/768/390px iframe. Local range/disclosure/annotation and
 scrolly interactions work; outgoing navigation and gallery actions remain
 blocked. Third-party graphics use their authored fallback in private preview.
 
-Gallery dialogs, source/origin-validated provider resize listeners, annotation
-synchronization, native comparison ranges and IntersectionObserver scrolly
-stages share this lifecycle. Flourish uses its documented `?auto=1` and JSON
+The Photo Gallery lightbox (`gallery.ts`, the behaviour introduced in #137),
+source/origin-validated provider resize listeners, annotation synchronization,
+the on-image comparison range (`before-after.ts`) and the reading-line scrolly
+stage (`scrolly.ts`) share this lifecycle. Flourish uses its documented `?auto=1` and JSON
 `Flourish` / `iframe.resize` messages; Datawrapper uses `datawrapper-height`.
 Both require the registered iframe's exact source and origin, matching chart
 identity where supplied, and a numeric height between 100 and 2400px. The
