@@ -63,6 +63,21 @@ describe("absolute social image URLs", () => {
   });
 });
 
+describe("profile social metadata", () => {
+  it("uses a compact Twitter card for square or portrait author photos", () => {
+    const metadata = buildPageMetadata({
+      title: "Gibson Bell",
+      description: "Editor-in-chief of the Weekly Wildcat.",
+      path: "/author/gibson/",
+      type: "profile",
+      image: { url: "/_wordpress-media/gibson.jpg", width: 800, height: 1000, alt: "Gibson Bell" }
+    });
+
+    expect(tagValues(metadata, "twitter:card")).toEqual(["summary"]);
+    expect(tagValues(metadata, "twitter:image")).toEqual([`${ORIGIN}/_wordpress-media/gibson.jpg`]);
+  });
+});
+
 describe("image alt text", () => {
   it("prefers explicit alt text", () => {
     expect(getMeaningfulImageAlt(media({ alt_text: "  The band marches downtown ", title: { rendered: "IMG_0042" } }))).toBe("The band marches downtown");
@@ -148,6 +163,7 @@ describe("article authors", () => {
 
     expect(getContributorPersonId(contributor)).toBe(`${ORIGIN}/author/gibson/#person`);
     expect(person["@id"]).toBe(`${ORIGIN}/author/gibson/#person`);
+    expect(person.description).toBe("Editor-in-chief of the Weekly Wildcat.");
     expect(person.image).toMatchObject({
       "@type": "ImageObject",
       "@id": `${ORIGIN}/author/gibson/#profile-image`,
