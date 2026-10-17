@@ -63,8 +63,10 @@ const slots = {
   ]))}></script>
   <ArticleView presentation={presentation} slots={slots} className={category?.slug === "opinion" ? "article-shell-opinion" : ""} />
   <script>
-    if (document.querySelector(".article-body .wp-block-gallery img")) {
-      import("@/src/scripts/gallery-lightbox").then(({ enhanceArticleGalleries }) => enhanceArticleGalleries());
+    import { articleEnhancementSelector } from "@byline/ui/article-enhancement-selector";
+    const body = document.querySelector<HTMLElement>(".article-body");
+    if (body?.querySelector(articleEnhancementSelector)) {
+      import("@byline/ui/article-enhancements").then(({ enhanceArticleStory }) => enhanceArticleStory(body));
     }
   </script>
   <div class="astro-island-relocation" data-target="article-share-island-slot"><ArticleShareActions title={title} url={articleUrl} client:idle /></div>

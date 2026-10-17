@@ -47,6 +47,30 @@ build_assets=(
   # Post editing canvas. The stylesheet references the bundled fonts below.
   build/story-block-variations.js
   build/story-block-variations.asset.php
+  build/blocks/table-of-contents/block.json
+  build/blocks/table-of-contents/index.js
+  build/blocks/table-of-contents/index.asset.php
+  build/blocks/table-of-contents/style-index.css
+  build/blocks/visualization/block.json
+  build/blocks/visualization/index.js
+  build/blocks/visualization/index.asset.php
+  build/blocks/visualization/style-index.css
+  build/blocks/annotated-image/block.json
+  build/blocks/annotated-image/index.js
+  build/blocks/annotated-image/index.asset.php
+  build/blocks/annotated-image/style-index.css
+  build/blocks/before-after/block.json
+  build/blocks/before-after/index.js
+  build/blocks/before-after/index.asset.php
+  build/blocks/before-after/style-index.css
+  build/blocks/scrolly/block.json
+  build/blocks/scrolly/index.js
+  build/blocks/scrolly/index.asset.php
+  build/blocks/scrolly/style-index.css
+  build/blocks/scrolly-step/block.json
+  build/blocks/scrolly-step/index.js
+  build/blocks/scrolly-step/index.asset.php
+  build/blocks/scrolly-step/style-index.css
   build/blocks/timeline/block.json
   build/blocks/timeline/index.js
   build/blocks/timeline/index.asset.php
@@ -217,7 +241,7 @@ for font_family in erode-normal-600 newsreader-normal-latin libre-franklin-norma
   fi
 done
 
-for newsroom_block in stories people sports-schedule events poll game-score correction-notice; do
+for newsroom_block in stories people sports-schedule events poll game-score correction-notice timeline table-of-contents visualization annotated-image before-after scrolly scrolly-step; do
   grep -qx "weekly-wildcat-headless/build/blocks/$newsroom_block/block.json" <<<"$archive_files"
   grep -qx "weekly-wildcat-headless/build/blocks/$newsroom_block/index.js" <<<"$archive_files"
   grep -qx "weekly-wildcat-headless/build/blocks/$newsroom_block/index.asset.php" <<<"$archive_files"

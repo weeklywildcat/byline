@@ -313,8 +313,8 @@ function newsroom_assert_no_nested_anchors(string $html, string $message): void
 }
 
 byline_newsroom_register_block_types();
-newsroom_assert(count($newsroom_test['blocks']) === 8, 'All eight newsroom blocks should be registered.');
-newsroom_assert(count(array_filter(array_keys($newsroom_test['blocks']), static fn(string $path): bool => strpos($path, '/blocks/') !== false)) === 8, 'Newsroom block registration should be metadata-driven.');
+newsroom_assert(count($newsroom_test['blocks']) === 14, 'All original and six new newsroom blocks should be registered.');
+newsroom_assert(count(array_filter(array_keys($newsroom_test['blocks']), static fn(string $path): bool => strpos($path, '/blocks/') !== false)) === 14, 'Newsroom block registration should be metadata-driven.');
 
 byline_newsroom_register_core_styles();
 $style_names = array_merge(...array_values($newsroom_test['styles']));
@@ -465,3 +465,43 @@ newsroom_assert(strpos($poll, 'Reader question') !== false && strpos($poll, 'byl
 newsroom_assert(strpos($poll, 'News') !== false && strpos($poll, 'Sports') !== false, 'Poll should render canonical options without a second datastore.');
 
 echo "Byline newsroom block regression passed.\n";
+
+// Immersive story additions retain the original registration contracts above.
+foreach (['table-of-contents', 'visualization', 'annotated-image', 'before-after', 'scrolly', 'scrolly-step'] as $slug) {
+    newsroom_assert(isset($newsroom_test['blocks'][dirname(__DIR__) . '/build/blocks/' . $slug]), 'Story block must register: ' . $slug);
+}
+foreach (['qa-interview', 'what-we-know', 'pros-cons', 'three-things', 'source-highlight', 'document-evidence'] as $slug) {
+    $pattern = $newsroom_test['patterns']['byline/' . $slug] ?? [];
+    newsroom_assert(($pattern['postTypes'] ?? []) === ['post'] && strpos($pattern['content'] ?? '', 'templateLock') === false, 'Unlocked story pattern: ' . $slug);
+}
+foreach (['core/cover' => ['byline-visual-chapter'], 'core/group' => ['byline-context', 'byline-why-it-matters', 'byline-whats-next', 'byline-how-we-know', 'byline-editors-note', 'byline-margin-note'], 'core/table' => ['byline-data-table', 'byline-comparison-table'], 'core/details' => ['byline-read-more', 'byline-methodology', 'byline-full-statement'], 'core/columns' => ['byline-comparison', 'byline-main-aside', 'byline-key-numbers']] as $block_name => $names) {
+    $registered = array_column($newsroom_test['styles'][$block_name] ?? [], 'name');
+    foreach ($names as $name) { newsroom_assert(in_array($name, $registered, true), 'Story style must register: ' . $name); }
+}
+function newsroom_test_heading($anchor, $text, $level = 2): array {
+    return ['blockName' => 'core/heading', 'attrs' => ['anchor' => $anchor, 'level' => $level], 'innerHTML' => '<h' . $level . ' id="' . esc_attr($anchor) . '">' . $text . '</h' . $level . '>'];
+}
+$heading_tree = [newsroom_test_heading('first', 'First <em>report</em>'), ['blockName' => 'core/group', 'innerBlocks' => [newsroom_test_heading('nested', 'Nested &amp; sourced', 3)]]];
+newsroom_assert(count(byline_story_heading_entries($heading_tree)) === 2, 'TOC traverses nested content.');
+newsroom_assert(count(byline_story_heading_entries($heading_tree, 2)) === 1, 'TOC can omit H3.');
+$invalid_tree = array_merge($heading_tree, [newsroom_test_heading('first', 'Duplicate'), newsroom_test_heading('bad anchor', 'Invalid'), newsroom_test_heading('empty', '  '), newsroom_test_heading('', 'No anchor')]);
+newsroom_assert(count(byline_story_heading_entries($invalid_tree)) === 1, 'TOC excludes duplicates, malformed and empty headings.');
+$mismatch = newsroom_test_heading('declared', 'Mismatched saved markup');
+$mismatch['innerHTML'] = '<h2 id="different">Mismatched saved markup</h2>';
+newsroom_assert(byline_story_heading_entries([$mismatch]) === [], 'TOC cannot link to a missing saved ID.');
+$newsroom_test['posts'][0]->post_content = '<!-- wp:heading {"anchor":"first"} --><h2 id="first">First report</h2><!-- /wp:heading --><!-- wp:heading {"anchor":"second"} --><h2 id="second">Second report</h2><!-- /wp:heading -->';
+$toc = byline_newsroom_render_table_of_contents(['ordered' => true], '', (object) ['context' => ['postId' => 101]]);
+newsroom_assert(strpos($toc, '<nav ') !== false && strpos($toc, '<ol>') !== false && strpos($toc, 'href="#second"') !== false, 'TOC renders semantic matching anchors from the saved post.');
+$newsroom_test['posts'][0]->post_content = '<!-- wp:heading {"anchor":"first"} --><h2 id="first">Only heading</h2><!-- /wp:heading -->';
+newsroom_assert(byline_newsroom_render_table_of_contents([], '', (object) ['context' => ['postId' => 101]]) === '', 'Fewer than two headings produces no public TOC.');
+echo "Byline immersive story regression passed.\n";
+
+$legacy_heading = newsroom_test_heading('legacy', 'Core 6.6 saved anchor');
+unset($legacy_heading['attrs']['anchor']);
+newsroom_assert(count(byline_story_heading_entries([$legacy_heading])) === 1, 'TOC must read Core 6.6 anchors from the actual saved heading ID.');
+$duplicate_target = ['blockName' => 'core/paragraph', 'innerHTML' => '<p id="legacy">An existing duplicate target</p>'];
+newsroom_assert(byline_story_heading_entries([$legacy_heading, $duplicate_target]) === [], 'TOC skips anchors duplicated by non-heading content.');
+
+$false_id = newsroom_test_heading('fake', 'Not a real heading target');
+$false_id['innerHTML'] = '<h2 data-id="fake">Not a real heading target</h2>';
+newsroom_assert(byline_story_heading_entries([$false_id]) === [], 'A data-id attribute is not a heading anchor.');

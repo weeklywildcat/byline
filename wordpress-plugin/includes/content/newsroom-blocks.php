@@ -20,6 +20,8 @@ if (!function_exists('byline_build_page_section_block_from_inner_blocks')) {
     require_once __DIR__ . '/pages.php';
 }
 
+require_once __DIR__ . '/story-blocks.php';
+
 const BYLINE_NEWSROOM_MAX_LIMIT = 12;
 const BYLINE_NEWSROOM_EDITOR_POLL_ROUTE = '/editor/polls';
 
@@ -713,6 +715,7 @@ function byline_newsroom_register_block_types(): void
     }
     $root = dirname(__DIR__, 2) . '/build/blocks';
     $dynamic = [
+        'table-of-contents' => 'byline_newsroom_render_table_of_contents',
         'stories' => 'byline_newsroom_render_stories',
         'people' => 'byline_newsroom_render_people',
         'sports-schedule' => 'byline_newsroom_render_sports_schedule',
@@ -725,6 +728,9 @@ function byline_newsroom_register_block_types(): void
     }
     register_block_type($root . '/correction-notice');
     register_block_type($root . '/timeline');
+    foreach (['visualization', 'annotated-image', 'before-after', 'scrolly', 'scrolly-step'] as $slug) {
+        register_block_type($root . '/' . $slug);
+    }
 }
 add_action('init', 'byline_newsroom_register_block_types', 30);
 
@@ -748,7 +754,16 @@ function byline_newsroom_register_core_styles(): void
         return;
     }
     $styles = [
+        'core/cover' => [['name' => 'byline-visual-chapter', 'label' => 'Visual Chapter']],
+        'core/columns' => [['name' => 'byline-comparison', 'label' => 'Comparison'], ['name' => 'byline-main-aside', 'label' => 'Main + Aside'], ['name' => 'byline-key-numbers', 'label' => 'Three Key Numbers']],
         'core/group' => [
+            ['name' => 'byline-context', 'label' => "Context"],
+            ['name' => 'byline-why-it-matters', 'label' => "Why It Matters"],
+            ['name' => 'byline-whats-next', 'label' => "What's Next"],
+            ['name' => 'byline-how-we-know', 'label' => "How We Know"],
+            ['name' => 'byline-editors-note', 'label' => "Editor's Note"],
+            ['name' => 'byline-margin-note', 'label' => "Margin Note"],
+            ['name' => 'byline-evidence', 'label' => "Source Highlight"],
             ['name' => 'byline-editorial-callout', 'label' => 'Editorial Callout'],
             ['name' => 'byline-soft-callout', 'label' => 'Soft Callout'],
             ['name' => 'byline-rule-top', 'label' => 'Rule Top'],
@@ -773,19 +788,23 @@ function byline_newsroom_register_core_styles(): void
             ['name' => 'byline-editorial-rule', 'label' => 'Editorial Rule'],
             ['name' => 'byline-heavy-rule', 'label' => 'Heavy Rule'],
         ],
-        'core/details' => [['name' => 'byline-faq', 'label' => 'FAQ']],
+        'core/details' => [['name' => 'byline-faq', 'label' => 'FAQ'], ['name' => 'byline-read-more', 'label' => 'Read More'], ['name' => 'byline-methodology', 'label' => 'Methodology'], ['name' => 'byline-full-statement', 'label' => 'Full Statement']],
         'core/table' => [
+            ['name' => 'byline-data-table', 'label' => 'Data Table'],
+            ['name' => 'byline-comparison-table', 'label' => 'Comparison Table'],
             ['name' => 'byline-editorial', 'label' => 'Editorial'],
             ['name' => 'byline-compact', 'label' => 'Compact'],
         ],
         'core/image' => [
+            ['name' => 'byline-wide-photo', 'label' => 'Wide Photo'],
+            ['name' => 'byline-full-photo', 'label' => 'Full-Bleed Photo'],
             ['name' => 'byline-editorial', 'label' => 'Editorial'],
             ['name' => 'byline-feature', 'label' => 'Feature'],
         ],
         'core/media-text' => [['name' => 'byline-portrait-text', 'label' => 'Portrait + Text']],
         'core/file' => [['name' => 'byline-document', 'label' => 'Document Viewer']],
         'core/audio' => [['name' => 'byline-story-audio', 'label' => 'Story Audio']],
-        'core/video' => [['name' => 'byline-story-video', 'label' => 'Story Video']],
+        'core/video' => [['name' => 'byline-story-video', 'label' => 'Story Video'], ['name' => 'byline-full-video', 'label' => 'Full-Bleed Video']],
         'core/gallery' => [
             ['name' => 'byline-photo-pair', 'label' => 'Photo Pair'],
             ['name' => 'byline-photo-gallery', 'label' => 'Photo Gallery'],
@@ -967,9 +986,10 @@ function byline_newsroom_buttons(string $content, array $attributes = []): strin
     return byline_newsroom_block_markup('core/buttons', $attributes, '<div class="' . esc_attr($classes) . '">' . $content . '</div>');
 }
 
-function byline_newsroom_columns(string $content): string
+function byline_newsroom_columns(string $content, array $attributes = []): string
 {
-    return byline_newsroom_block_markup('core/columns', [], '<div class="wp-block-columns">' . $content . '</div>');
+    $classes = trim('wp-block-columns ' . (!empty($attributes['align']) ? 'align' . sanitize_html_class($attributes['align']) . ' ' : '') . ($attributes['className'] ?? ''));
+    return byline_newsroom_block_markup('core/columns', $attributes, '<div class="' . esc_attr($classes) . '">' . $content . '</div>');
 }
 
 function byline_newsroom_column(string $content): string
@@ -1088,7 +1108,7 @@ function byline_newsroom_register_patterns(): void
         'byline/two-column-image-text' => byline_newsroom_page_pattern('Two-column Image + Text', 'A two-column page section for visual and written content.', byline_newsroom_page_section('Image and text', byline_newsroom_columns(byline_newsroom_column(byline_newsroom_image('Add an image')) . byline_newsroom_column(byline_newsroom_heading('Add a heading', 3) . byline_newsroom_paragraph('Add supporting copy.'))))),
         'byline/featured-cta' => byline_newsroom_page_pattern('Featured CTA', 'A high-emphasis call to action.', byline_newsroom_page_section('Featured invitation', byline_newsroom_paragraph('Tell readers what to do next and why it matters.') . byline_newsroom_buttons(byline_newsroom_button('Take action'), ['className' => 'is-style-byline-standard-cta']), true)),
         'byline/fact-box' => byline_newsroom_page_pattern('Fact Box', 'A compact, scannable block for key facts.', byline_newsroom_group(byline_newsroom_heading('At a glance', 3) . byline_newsroom_list(['Add a key fact', 'Add a second key fact', 'Add a source or date']), ['className' => 'is-style-byline-soft-callout'])),
-        'byline/key-numbers' => byline_newsroom_page_pattern('Key Numbers', 'A native columns layout for important figures.', byline_newsroom_columns(byline_newsroom_column(byline_newsroom_heading('00', 3) . byline_newsroom_paragraph('Label one')) . byline_newsroom_column(byline_newsroom_heading('00', 3) . byline_newsroom_paragraph('Label two')) . byline_newsroom_column(byline_newsroom_heading('00', 3) . byline_newsroom_paragraph('Label three')))),
+        'byline/key-numbers' => byline_newsroom_page_pattern('Key Numbers', 'A native columns layout for important figures.', byline_newsroom_columns(byline_newsroom_column(byline_newsroom_heading('00', 3) . byline_newsroom_paragraph('Label one')) . byline_newsroom_column(byline_newsroom_heading('00', 3) . byline_newsroom_paragraph('Label two')) . byline_newsroom_column(byline_newsroom_heading('00', 3) . byline_newsroom_paragraph('Label three')), ['align' => 'wide', 'className' => 'is-style-byline-key-numbers'])),
         'byline/quote-callout' => byline_newsroom_page_pattern('Quote Callout', 'A quote-led callout using the native Quote block.', byline_newsroom_block_markup('core/quote', ['className' => 'is-style-byline-editorial-quote'], '<blockquote class="wp-block-quote is-style-byline-editorial-quote">' . byline_newsroom_paragraph('Add a meaningful quote.') . '<cite>Source or attribution</cite></blockquote>')),
         'byline/related-resources' => byline_newsroom_page_pattern('Related Resources', 'A link list for related coverage and resources.', byline_newsroom_heading('Related resources') . byline_newsroom_list(['<a href="/">Add a related link</a>', '<a href="/">Add another link</a>'], ['className' => 'is-style-byline-link-list'])),
         'byline/corrections-feedback-cta' => byline_newsroom_page_pattern('Corrections & Feedback CTA', 'A transparent corrections and feedback call to action.', byline_newsroom_group(byline_newsroom_heading('See something we should fix?') . byline_newsroom_paragraph('Tell readers how to report a correction or share feedback.') . byline_newsroom_button('Contact the newsroom', '/'), ['className' => 'is-style-byline-soft-callout'])),
@@ -1097,6 +1117,9 @@ function byline_newsroom_register_patterns(): void
         'byline/quote-callout-post' => byline_newsroom_post_pattern('Quote Callout', 'A quote callout for a reported post.', byline_newsroom_block_markup('core/quote', ['className' => 'is-style-byline-source-quote'], '<blockquote class="wp-block-quote is-style-byline-source-quote">' . byline_newsroom_paragraph('Add a reported quote.') . '<cite>Source or attribution</cite></blockquote>')),
     ];
 
+    $patterns = array_merge($patterns, byline_story_patterns());
+    $patterns['byline/key-numbers']['postTypes'] = ['page', 'post'];
+    $patterns['byline/key-numbers']['title'] = 'Three Key Numbers';
     foreach ($patterns as $name => $pattern) {
         register_block_pattern($name, $pattern);
     }

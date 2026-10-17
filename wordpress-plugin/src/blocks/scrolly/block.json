@@ -1,0 +1,42 @@
+{
+  "apiVersion": 3,
+  "name": "byline/scrolly",
+  "version": "1.0.0",
+  "title": "Scrollytelling",
+  "description": "A linear visual story enhanced into a sticky image stage on large screens.",
+  "category": "byline",
+  "icon": "format-image",
+  "keywords": [
+    "feature",
+    "immersive",
+    "scroll"
+  ],
+  "textdomain": "weekly-wildcat-headless",
+  "attributes": {
+    "fit": {
+      "type": "string",
+      "default": "contain"
+    },
+    "align": {
+      "type": "string",
+      "default": "wide"
+    }
+  },
+  "supports": {
+    "html": false,
+    "anchor": true,
+    "align": [
+      "wide",
+      "full"
+    ]
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "postTypes": [
+    "post"
+  ],
+  "allowedBlocks": [
+    "byline/scrolly-step"
+  ]
+}

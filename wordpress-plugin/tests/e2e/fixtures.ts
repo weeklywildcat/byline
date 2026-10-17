@@ -18,28 +18,35 @@ export async function assertWordPressEnvironment(request: APIRequestContext): Pr
 }
 
 export async function loginAsAdmin(page: Page): Promise<void> {
-  await page.goto("/wp-login.php", { waitUntil: "domcontentloaded" });
+  // The login form is occasionally re-rendered by WordPress' own scripts right
+  // after load, which can leave the credentials in the wrong fields. Submit
+  // again from a clean load rather than waiting out a form that cannot succeed.
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await page.goto("/wp-login.php", { waitUntil: "load" });
 
-  const loginField = page.locator("#user_login");
-  if (await loginField.isVisible().catch(() => false)) {
-    await loginField.fill(adminUser);
-    await page.fill("#user_pass", adminPassword);
-    await page.click("#wp-submit");
+    const loginField = page.locator("#user_login");
+    if (await loginField.isVisible().catch(() => false)) {
+      await loginField.fill(adminUser);
+      await page.fill("#user_pass", adminPassword);
+      await page.click("#wp-submit");
+    }
+
+    // The admin bar is not guaranteed on every admin screen/theme. The stable
+    // login boundary is the authenticated admin document itself, which exposes
+    // the REST nonce used by the session fixture.
+    const signedIn = await expect.poll(
+      () => page.evaluate(() => {
+        const body = document.body;
+        const pathname = window.location.pathname;
+        return Boolean(body)
+          && !pathname.endsWith("/wp-login.php")
+          && body.classList.contains("wp-admin");
+      }),
+      { timeout: attempt < 3 ? 8_000 : 20_000, intervals: [100, 250, 500] }
+    ).toBe(true).then(() => true, () => false);
+    if (signedIn) return;
   }
-
-  // The admin bar is not guaranteed on every admin screen/theme. The stable
-  // login boundary is the authenticated admin document itself, which exposes
-  // the REST nonce used by the session fixture.
-  await expect.poll(
-    () => page.evaluate(() => {
-      const body = document.body;
-      const pathname = window.location.pathname;
-      return Boolean(body)
-        && !pathname.endsWith("/wp-login.php")
-        && body.classList.contains("wp-admin");
-    }),
-    { timeout: 20_000, intervals: [100, 250, 500] }
-  ).toBe(true);
+  throw new Error("WordPress admin sign-in did not complete after three attempts.");
 }
 
 export type AdminRestResult<T = unknown> = { ok: boolean; status: number; payload: T };

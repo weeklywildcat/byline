@@ -1,0 +1,54 @@
+{
+  "apiVersion": 3,
+  "name": "byline/before-after",
+  "version": "1.0.0",
+  "title": "Before / After",
+  "description": "Compare two photographs with a keyboard-operable slider.",
+  "category": "byline",
+  "icon": "format-image",
+  "keywords": [
+    "story",
+    "journalism"
+  ],
+  "textdomain": "weekly-wildcat-headless",
+  "attributes": {
+    "before": {
+      "type": "object",
+      "default": {}
+    },
+    "after": {
+      "type": "object",
+      "default": {}
+    },
+    "beforeLabel": {
+      "type": "string",
+      "default": "Before"
+    },
+    "afterLabel": {
+      "type": "string",
+      "default": "After"
+    },
+    "caption": {
+      "type": "string",
+      "default": ""
+    },
+    "align": {
+      "type": "string",
+      "default": "wide"
+    }
+  },
+  "supports": {
+    "html": false,
+    "anchor": true,
+    "align": [
+      "wide",
+      "full"
+    ]
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./style-index.css",
+  "postTypes": [
+    "post"
+  ]
+}

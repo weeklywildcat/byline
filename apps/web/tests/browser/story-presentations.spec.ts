@@ -29,13 +29,19 @@ test.describe("WordPress-rendered story presentations on Astro", () => {
         const columns = (selector: string) => getComputedStyle(q(selector)).gridTemplateColumns.split(" ").length;
         const pair = q('.is-style-byline-photo-pair');
         const media = q('.is-style-byline-portrait-text');
-        // The page sets `scrollbar-gutter: stable`, so Linux CI reserves a
-        // 15px gutter that clientWidth still counts when the headless scrollbar
-        // is hidden. The <html> box is the width content actually lays out in;
-        // macOS (no gutter) reports the same value as clientWidth.
+        // The page sets `scrollbar-gutter: stable`, so Linux CI reserves a 15px
+        // gutter that clientWidth still counts when the headless scrollbar is
+        // hidden: the <html> box is the width content lays out in. Centering is
+        // judged against the article canvas, the content box of the
+        // `byline-content` shell that `100cqw` resolves against.
         const viewportWidth = document.documentElement.getBoundingClientRect().width;
+        const shell = document.querySelector<HTMLElement>('main.article-shell')!;
+        const shellStyle = getComputedStyle(shell);
+        const shellRect = shell.getBoundingClientRect();
+        const canvasWidth = shellRect.width - parseFloat(shellStyle.paddingLeft) - parseFloat(shellStyle.paddingRight);
+        const canvasCenter = shellRect.left + parseFloat(shellStyle.paddingLeft) + canvasWidth / 2;
         return {
-          viewportWidth,
+          viewportWidth, canvasWidth, canvasCenter,
           overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
           pairColumns: columns('.is-style-byline-photo-pair'), galleryColumns: columns('.is-style-byline-photo-gallery'),
           legacyColumns: columns('.is-style-byline-news-grid'), mediaColumns: columns('.is-style-byline-portrait-text'),
@@ -60,8 +66,8 @@ test.describe("WordPress-rendered story presentations on Astro", () => {
       expect(data.mediaColumns).toBe(width <= 700 ? 1 : 2);
       expect(data.wide.x).toBeGreaterThanOrEqual(0);
       expect(data.wide.right).toBeLessThanOrEqual(data.viewportWidth);
-      expect(Math.abs((data.wide.x + data.wide.right) / 2 - data.viewportWidth / 2)).toBeLessThan(2);
-      if (width >= 1200) expect(data.wide.width).toBeCloseTo(1040, 0);
+      expect(Math.abs((data.wide.x + data.wide.right) / 2 - data.canvasCenter)).toBeLessThan(2);
+      expect(data.wide.width).toBeCloseTo(Math.min(1040, data.canvasWidth), 0);
       if (width <= 700) expect(data.portraitText.y).toBeGreaterThanOrEqual(data.portraitMedia.y + data.portraitMedia.height);
       expect(data.portrait.height / data.portrait.width).toBeCloseTo(1.5, 1);
       expect(data.portrait.height).toBeLessThanOrEqual(620);
@@ -83,7 +89,11 @@ test.describe("WordPress-rendered story presentations on Astro", () => {
       await expect(page.locator('.is-style-byline-document a:not([download])').first()).toBeVisible();
       await expect(page.locator('.is-style-byline-document a[download]').first()).toBeVisible();
       await expect(page.locator('video track[kind="captions"]')).toHaveCount(1);
-      await expect(page.locator('video[autoplay], audio[autoplay]')).toHaveCount(0);
+      // Story audio and video never start on their own. The only autoplay is Core's
+      // muted, looping, inline Cover background video, which carries no sound.
+      await expect(page.locator('video[autoplay]:not(.wp-block-cover__video-background), audio[autoplay]')).toHaveCount(0);
+      await expect(page.locator('video.wp-block-cover__video-background[autoplay]')).toHaveCount(1);
+      expect(await page.locator('video.wp-block-cover__video-background').evaluate((video) => (video as HTMLVideoElement).muted && (video as HTMLVideoElement).loop && video.hasAttribute('playsinline'))).toBe(true);
     });
   }
 

@@ -14,12 +14,12 @@ import { TimelineSave } from "../src/blocks/timeline/save";
 
 describe("semantic newsroom presets", () => {
   it("offers the ten Core/existing-block presets with stable style identities", () => {
-    expect(storyVariations.map(({ title, block }) => [title, block])).toEqual([
+    expect(storyVariations.slice(0, 10).map(({ title, block }) => [title, block])).toEqual([
       ["Portrait + Text", "core/media-text"], ["Photo Pair", "core/gallery"], ["Photo Gallery", "core/gallery"],
       ["Reported Quote", "core/quote"], ["Pull Quote", "core/pullquote"], ["Key Facts", "core/group"],
       ["Document Viewer", "core/file"], ["Related Coverage", "byline/stories"], ["Story Audio", "core/audio"], ["Story Video", "core/video"]
     ]);
-    expect(new Set(storyVariations.map((v) => v.name)).size).toBe(10);
+    expect(new Set(storyVariations.map((v) => v.name)).size).toBe(storyVariations.length);
     for (const variation of storyVariations) {
       expect(variation.keywords.length).toBeGreaterThan(1);
       expect(isStoryVariationActive(variation, variation.attributes)).toBe(true);

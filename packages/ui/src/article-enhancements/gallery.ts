@@ -19,13 +19,15 @@ type GalleryItem = {
   /** The element that opens the dialog and receives focus again on close. */
   opener: HTMLElement;
   link: HTMLAnchorElement | null;
+  /** Set when Byline generated the opener, so cleanup can restore the image. */
+  generated: boolean;
 };
 
 /** An http(s) URL that names an image file, resolved against the document. */
-function imageUrl(value: string | null | undefined): string | null {
+function imageUrl(value: string | null | undefined, base: string): string | null {
   if (!value) return null;
   try {
-    const url = new URL(value, document.baseURI);
+    const url = new URL(value, base);
     return /^https?:$/.test(url.protocol) && IMAGE_FILE.test(url.pathname) ? url.href : null;
   } catch {
     return null;
@@ -33,12 +35,12 @@ function imageUrl(value: string | null | undefined): string | null {
 }
 
 /** The widest candidate in an <img srcset>, by `w` (or `x`) descriptor. */
-function largestSrcsetCandidate(srcset: string | null): string | null {
+function largestSrcsetCandidate(srcset: string | null, base: string): string | null {
   let best: { url: string; weight: number } | null = null;
   for (const candidate of (srcset || "").split(/,\s+(?=\S)/)) {
     const [url, descriptor = "1x"] = candidate.trim().split(/\s+/);
     const weight = parseFloat(descriptor);
-    const resolved = imageUrl(url);
+    const resolved = imageUrl(url, base);
     if (resolved && Number.isFinite(weight) && (!best || weight > best.weight)) best = { url: resolved, weight };
   }
   return best?.url ?? null;
@@ -48,14 +50,14 @@ function largestSrcsetCandidate(srcset: string | null): string | null {
  * Sources to try for an item, best first: the attachment's full size, a full
  * media link, the widest srcset candidate, then what the page already shows.
  */
-function sourcesFor(item: GalleryItem): string[] {
+function sourcesFor(item: GalleryItem, base: string): string[] {
   const { image, link } = item;
   const candidates = [
-    imageUrl(image.getAttribute(FULL_SOURCE_ATTRIBUTE)),
-    imageUrl(link?.getAttribute("href")),
-    largestSrcsetCandidate(image.getAttribute("srcset")),
+    imageUrl(image.getAttribute(FULL_SOURCE_ATTRIBUTE), base),
+    imageUrl(link?.getAttribute("href"), base),
+    largestSrcsetCandidate(image.getAttribute("srcset"), base),
     image.currentSrc || null,
-    image.getAttribute("src") ? new URL(image.getAttribute("src")!, document.baseURI).href : null
+    image.getAttribute("src") ? new URL(image.getAttribute("src")!, base).href : null
   ];
   return [...new Set(candidates.filter((source): source is string => Boolean(source)))];
 }
@@ -64,8 +66,13 @@ function captionFor(image: HTMLImageElement) {
   return image.closest("figure")?.querySelector("figcaption")?.textContent?.trim() || "";
 }
 
-export function enhanceArticleGalleries(root: ParentNode = document) {
-  if (typeof HTMLDialogElement === "undefined" || !HTMLDialogElement.prototype.showModal) return;
+export function enhanceArticleGalleries(root: ParentNode = document): () => void {
+  const doc = root.nodeType === 9 ? (root as Document) : root.ownerDocument!;
+  const view = doc.defaultView;
+  if (!view || !view.HTMLDialogElement || !view.HTMLDialogElement.prototype.showModal) return () => {};
+  const base = doc.baseURI;
+  const abort = new view.AbortController();
+  const restore: (() => void)[] = [];
   let dialog: HTMLDialogElement | null = null;
   let stage: HTMLElement;
   let image: HTMLImageElement;
@@ -82,16 +89,16 @@ export function enhanceArticleGalleries(root: ParentNode = document) {
   /** Warm one neighbouring photograph. Only ever called after the dialog is open. */
   function warm(position: number) {
     if (items.length < 2) return;
-    const source = sourcesFor(items[(position + items.length) % items.length])[0];
+    const source = sourcesFor(items[(position + items.length) % items.length], base)[0];
     if (!source || warmed.has(source)) return;
     warmed.add(source);
-    new Image().src = source;
+    new view!.Image().src = source;
   }
 
   function show(selected: number) {
     index = (selected + items.length) % items.length;
     const item = items[index];
-    const sources = sourcesFor(item);
+    const sources = sourcesFor(item, base);
     const current = ++token;
     let attempt = 0;
 
@@ -130,7 +137,7 @@ export function enhanceArticleGalleries(root: ParentNode = document) {
   }
 
   function createDialog() {
-    dialog = document.createElement("dialog");
+    dialog = doc.createElement("dialog");
     dialog.className = "byline-gallery-dialog";
     dialog.setAttribute("aria-label", "Article photographs");
     // Static UI only. Authored captions and alt text are assigned as text.
@@ -156,7 +163,7 @@ export function enhanceArticleGalleries(root: ParentNode = document) {
       image.removeAttribute("src");
       opener?.focus();
     });
-    document.body.append(dialog);
+    doc.body.append(dialog);
   }
 
   function open(galleryItems: GalleryItem[], selected: GalleryItem) {
@@ -167,7 +174,7 @@ export function enhanceArticleGalleries(root: ParentNode = document) {
     dialog!.showModal();
   }
 
-  for (const gallery of root.querySelectorAll<HTMLElement>(".article-body .wp-block-gallery")) {
+  for (const gallery of root.querySelectorAll<HTMLElement>(".wp-block-gallery")) {
     if (gallery.dataset.bylineLightbox) continue;
     const photoGallery = gallery.classList.contains("is-style-byline-photo-gallery");
     const galleryItems: GalleryItem[] = [];
@@ -176,24 +183,29 @@ export function enhanceArticleGalleries(root: ParentNode = document) {
       const link = photograph.closest<HTMLAnchorElement>("a[href]");
       if (link) {
         // A link to anything but an image file is the writer's choice; leave it.
-        if (!gallery.contains(link) || link.hasAttribute("download") || !imageUrl(link.getAttribute("href"))) continue;
-        galleryItems.push({ image: photograph, opener: link, link });
+        if (!gallery.contains(link) || link.hasAttribute("download") || !imageUrl(link.getAttribute("href"), base)) continue;
+        galleryItems.push({ image: photograph, opener: link, link, generated: false });
       } else if (photoGallery) {
-        const button = document.createElement("button");
+        const button = doc.createElement("button");
         button.type = "button";
         button.className = "byline-gallery-opener";
         photograph.replaceWith(button);
         button.append(photograph);
-        galleryItems.push({ image: photograph, opener: button, link: null });
+        galleryItems.push({ image: photograph, opener: button, link: null, generated: true });
       }
     }
     if (!galleryItems.length) continue;
     gallery.dataset.bylineLightbox = "true";
+    restore.push(() => delete gallery.dataset.bylineLightbox);
 
     galleryItems.forEach((item, position) => {
       item.opener.setAttribute("aria-haspopup", "dialog");
-      if (!item.link) {
+      if (item.generated) {
         item.opener.setAttribute("aria-label", item.image.alt ? `Enlarge photograph: ${item.image.alt}` : `Enlarge photograph ${position + 1} of ${galleryItems.length}`);
+        // Unwrap the generated button so cleanup returns the saved markup.
+        restore.push(() => item.opener.replaceWith(item.image));
+      } else {
+        restore.push(() => item.opener.removeAttribute("aria-haspopup"));
       }
       item.opener.addEventListener("click", (event) => {
         if (event.defaultPrevented) return;
@@ -201,7 +213,15 @@ export function enhanceArticleGalleries(root: ParentNode = document) {
         if (item.link && (event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)) return;
         event.preventDefault();
         open(galleryItems, item);
-      });
+      }, { signal: abort.signal });
     });
   }
+
+  return () => {
+    abort.abort();
+    if (dialog?.open) dialog.close();
+    dialog?.remove();
+    dialog = null;
+    restore.splice(0).forEach((undo) => undo());
+  };
 }

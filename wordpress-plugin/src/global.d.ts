@@ -13,6 +13,8 @@ declare module "@wordpress/blocks" {
 }
 
 declare module "@wordpress/block-editor" {
+  export const MediaUpload: any;
+  export const MediaUploadCheck: any;
   export const BlockControls: any;
   export const InnerBlocks: any;
   export const InspectorControls: any;

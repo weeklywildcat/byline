@@ -156,8 +156,8 @@ edited to guess an original.
 Timeline starts with two entries, permits up to 25, and provides inline Add,
 Remove, Move up/down controls with focus following the changed entry. Its date
 labels are editorial text (such as “Fall 2026”), not fabricated machine dates.
-Only this content model requires a new custom block; saved output is an ordered
-list and requires no reader JavaScript.
+Timeline uses a custom content model; its saved output is an ordered list
+and requires no reader JavaScript.
 
 Related Coverage reuses the existing selector and PHP renderer. The selector
 requests published Posts; the server checks visibility again, excludes the
@@ -178,7 +178,8 @@ through the plugin's existing block assets, and imported by
 shell and typography, not a separate set of authored block layouts.
 
 Normal prose uses `--article-width` (760px). Direct `.alignwide` blocks can
-break out to 1040px, centered within the article shell's available width. The
+break out to `--article-wide-width` (1040px); `.alignfull` uses
+`--article-full-width` (1440px). Both center within the shell’s available canvas. The
 editor canvas establishes the equivalent width container, including in its
 iframe. Media shrink naturally; portrait photographs are contained rather
 than cropped unless the editor deliberately chooses Core's crop/image-fill
@@ -212,8 +213,10 @@ both supported WordPress environments.
 Gutenberg story. The browser spec can refresh its saved and REST-rendered HTML in `story-presentations.json`
 with `BYLINE_UPDATE_STORY_FIXTURE=1` when run against the primary environment.
 The public fixture build publishes that WordPress-rendered content through the
-actual Astro article route. Public geometry checks cover 1440, 1200, 768, 390,
-and 320px, plus keyboard lightbox behavior and no-JavaScript file links.
+actual Astro article route. Regenerate the fixture whenever block markup or the
+definitions change: `BYLINE_UPDATE_STORY_FIXTURE=1 npm run test:e2e:primary --workspace @byline/wordpress-plugin -- story-presentations.spec.ts -g "newsroom presets"`
+(never edit the rendered HTML by hand). Public geometry checks cover 1600, 1440,
+1200, 768, 390 and 320px, plus keyboard lightbox behavior and no-JavaScript file links.
 `apps/web/tests/browser/gallery-media.spec.ts` covers real JPEG galleries (srcset/sizes,
 Retina, lazy originals, navigation, sitemap); `wordpress-plugin/tests/e2e/gallery-media.spec.ts`
 covers WordPress rendering for new and existing galleries.
@@ -227,3 +230,160 @@ plain explanatory state, malformed dates are ignored, scores are shown only
 when the canonical record supplies them, and upcoming games never display
 invented scores or live status. Lists, headings, forms, labels, time values,
 focus states, and responsive layouts are part of the shared contract.
+
+## Immersive reporting tools
+
+The Story Presentation Library also supports investigations, explainers and
+visual features. Core presets remain ordinary editable Gutenberg blocks.
+Patterns are unlocked starters; they are not article formats or templates.
+
+| Editor-facing name | Underlying block | Model | Intended use | Reader interaction | Mobile | Without JavaScript |
+| --- | --- | --- | --- | --- | --- | --- |
+| Visual Chapter | `core/cover` | Core style/variation | Chapter divider with image/video, H2 and optional dek | None | 320–520px minimum height; text can grow | Complete chapter |
+| Wide Photo / Full-Bleed Photo | `core/image` | Core variations | 1040px / 1440px photography | Ordinary media links | Contained intrinsic image | Complete image and caption |
+| Full-Bleed Video | `core/video` | Core variation | Large native video, including portrait | Native controls/tracks | Intrinsic ratio | Native playback |
+| Context / Why It Matters / What's Next / How We Know / Editor's Note | `core/group` | Core variations/styles | Background and reporting context | Ordinary links | Inline aside | Complete reporting |
+| Margin Note | `core/group` | Core variation/style | Supporting context beside following prose | Ordinary links | Inline below 1100px canvas | Complete note |
+| Data Table / Comparison Table | `core/table` | Core variations/styles | Numbers, budgets, surveys, comparisons | Local horizontal scroll | Table scrolls within article | Complete semantic table |
+| Footnotes | `core/footnotes` and native Footnote format | Core | References, sources and backlinks | Local anchors | Long URLs wrap | Complete references/backlinks |
+| Read More / Methodology / Full Statement | `core/details` | Core variations/styles | Supporting reporting and statements | Native disclosure | One column | Native disclosure |
+| Comparison / Main + Aside / Three Key Numbers | `core/columns` | Core presets; existing Key Numbers pattern reused | Curated editable column arrangements | None | Stack at 700px | Complete DOM order |
+| Q&A / Interview | Group, Heading, Paragraph | Pattern | Interviews | Ordinary links | One column | Complete interview |
+| What We Know / What We Don't Know; Pros / Cons | Columns, Heading, Paragraph | Patterns | Reported comparisons | None | Stack at 700px | Complete reporting |
+| Three Things to Know | Heading, List | Pattern | Short explainer | Ordinary links | One column | Complete list |
+| Source Highlight / Document Evidence | Group, Quote, Paragraph; existing Document Viewer or Image | Patterns | Evidence with citation and context | Ordinary source/document links | Inline | Complete source and context |
+| Chart / Data Visualization; Map | `byline/visualization` | Custom block and Map variation | Supported provider embed or static exported graphic | Lazy iframe where validated | Full available width | Image, title/dek, source/notes and direct link |
+| In This Story | `byline/table-of-contents` | Dynamic custom block | H2/H3 contents navigation | Local anchors | One column | Complete nav |
+| Annotated Image | `byline/annotated-image` | Custom | Plans/photos with up to 12 stable annotation records | Marker/list synchronization, keyboard focus | List below image | Marker anchors and complete annotation list |
+| Before / After | `byline/before-after` | Custom | Two photographs showing change | Drag the divider on the photograph (mouse, touch) or use the arrow keys | Same control, 48px handle | Both complete labeled images and the caption |
+| Scrollytelling / Story Step | `byline/scrolly`, `byline/scrolly-step` | Custom parent/child system | Linear image-based visual narrative | Sticky decorative image switches as each step crosses a fixed reading line | Linear under 900px; reduced motion always linear | Every image, caption and text in sequence |
+
+### Authoring
+
+- **Footnotes:** Place the cursor after a claim, open the text toolbar's More
+  menu and choose Footnote. Type the source in Core's generated Footnotes area.
+  Core owns the reference IDs, post `footnotes` metadata and backlinks. Both
+  WordPress 7.1 and 6.6 render an ordered `.wp-block-footnotes` list with note
+  IDs and `#ID-link` backlinks. No extra heading is inserted by Byline.
+- **Visual Chapter:** Search Visual Chapter; select media with Core's library.
+  Use Core's focal point, overlay and content-position controls; Byline's
+  structural CSS never overrides them (the inline `object-position`, overlay
+  opacity, minimum height and the nine content positions all apply to images
+  and to video backgrounds). Keep text concise and check contrast against the
+  selected photograph. A chapter heading is normally H2. A video background is
+  Core's muted, looping, inline `<video autoplay>`; it has no sound but is not
+  paused for reduced-motion readers, so prefer a still image where motion would
+  distract.
+- **Visualization:** Search Chart / Data Visualization or Map. Choose embed or
+  static. For embeds paste an HTTPS Datawrapper/Flourish share or embed URL, a
+  Google Maps embed URL, or an OpenStreetMap export/embed URL. Select Compact,
+  Standard, Tall or Map height. Add title, description, fallback graphic with
+  separate alt text, source, notes and credit. Static graphics use the normal
+  media library and require no reader JavaScript. Private preview shows the
+  same fallback and width, without third-party loading.
+- **In This Story:** Add H2/H3 headings anywhere in Groups/Columns. The editor
+  assigns unique native anchors only to eligible headings lacking anchors.
+  Existing anchors remain stable after text edits. Two valid saved heading
+  anchors are required for a public nav; malformed/duplicate anchors are skipped.
+  Core 6.6 may store the anchor only in the saved heading HTML; Byline reads
+  those real IDs as well as newer Core comment attributes.
+- **Annotated Image:** Select the image in the media library. Add an annotation
+  by button or by clicking the canvas; new markers step across the image rather
+  than stacking. Everything can be done without a pointer: type the title and
+  explanation, set precise X/Y percentages (0-100, clamped) with the range or
+  number controls, or focus a marker and nudge it with the arrow keys (Shift for
+  10%). Move annotations up/down or remove them; focus follows the note you
+  acted on. IDs stay stable while numbering follows order. Duplicating, pasting
+  or inserting a copy of an annotation block gives the copy distinct IDs.
+- **Before / After:** Choose both photographs and write separate alt text and
+  labels. Similar framing works best. Different proportions produce a warning
+  and use contained images, preserving the complete evidence in the fallback.
+  Readers drag the divider on the photograph, or tab to it and use the arrow
+  keys (see the interaction contracts below).
+- **Scrollytelling:** Start with two Story Steps. Each has one image, optional
+  caption and ordinary text blocks. Add/reorder steps through normal block
+  controls or List View. Choose complete-image or explicit crop/fill for the
+  sticky stage. There are no scroll locks or interactive iframes in the stage.
+  Text fields in the new blocks keep what is typed locally, so fast typing never
+  loses characters while the editor catches up.
+
+Media retain attachment IDs plus stable image snapshots (URL, dimensions,
+responsive sources, alt and canonical photo credit). Credit comes from the
+existing Byline attachment metadata resolver, also used by Preview as Byline.
+Captions are never copied into alt text.
+
+Document Evidence intentionally starts with explanatory text rather than an
+unselected File block: insert the existing Document Viewer or Image into its
+unlocked Group and select the source. Social/oEmbed markup retains its direct
+links and explicit aspect-ratio classes; Byline does not execute arbitrary
+saved script tags to hydrate unsupported social providers.
+
+The public test harness intercepts provider URLs. CI never requires live
+Datawrapper, Flourish, Google Maps or OpenStreetMap responses. Production URL
+validation is unchanged by fixture configuration.
+
+### Interaction and layout contracts
+
+These are enforced by `apps/web/tests/browser/immersive-*.spec.ts`,
+`story-presentations.spec.ts`, the jsdom suites in `wordpress-plugin/tests-js/`
+and the WordPress E2E specs `story-presentations.spec.ts` and
+`annotated-image.spec.ts`.
+
+**One shared enhancer.** `@byline/ui/article-enhancements` is the only
+progressive-enhancement layer for the public article and the private preview.
+It is framework-free, scoped to the article root, idempotent and returns a
+cleanup that restores the saved markup. The Photo Gallery lightbox inside it is
+the #137 implementation and its contract is unchanged: `data-byline-full-url`;
+Photo Gallery images get a generated, labelled `<button>` when unlinked, linked
+images keep their link, and custom or non-image links are left alone; the full
+source is `data-byline-full-url`, then an image media link, the widest `srcset`
+candidate, `currentSrc`, `src`; originals load only after opening, and only the
+two neighbours are warmed after the opened photograph has loaded; native
+`<dialog>`, captions, alt text, arrow keys, Escape, focus return and modified
+link clicks are preserved. `wordpress-plugin/tests-js/gallery-enhancement.test.ts`
+pins each of these.
+
+**Before / After.** The control is one native `<input type="range">` (0-100,
+default 50, `aria-label="Compare Before and After"`, `aria-valuetext`) laid over
+the photograph, so the browser supplies mouse and touch dragging, pointer
+capture, arrow/Home/End keys and slider semantics. The enhancer only mirrors its
+value into `--comparison-position` (percent) and `--comparison-ratio` (0-1).
+The thumb is the 48px handle; its centre travels from half its width to half
+its width short of the far edge, and the divider line and the revealed edge use
+the same `--comparison-edge`, so all three always agree. `touch-action: pan-y`
+leaves vertical scrolling alone. Focus draws a 3px outline around the
+comparison and on the handle. Both complete images, the Before/After labels and
+the caption stay in the DOM and are visible without JavaScript.
+
+**Scrollytelling.** A step is active while it covers a fixed reading line
+`SCROLLY_ACTIVATION_LINE` (40) percent from the top of the viewport; the stage
+exposes it as `data-activation-line`. One `IntersectionObserver` watches a 1%
+band at that line (measured against the article document, so the private preview
+iframe behaves the same). The largest-visible-area rule is deliberately not
+used: a long previous step must not outvote a step that has reached the line.
+No scroll handlers, no scroll-jacking; the sticky, `aria-hidden` stage exists
+only at 900px and wider without reduced motion, and the linear story is never
+altered.
+
+**Width contract.** Prose is 760px, `alignwide` 1040px and `alignfull` 1440px,
+each capped by the article canvas: the content box of the `byline-content`
+shell, which is what `100cqw` resolves against. Blocks are centered in that
+canvas, post-article sections stay at or under 1040px, and nothing causes
+horizontal overflow. The window is not the authority: `html` uses
+`scrollbar-gutter: stable`, so a classic 15px scrollbar (or Linux CI's reserved
+but invisible gutter) makes the layout viewport narrower than
+`documentElement.clientWidth`. The geometry tests derive the canvas from the
+shell's rectangle and padding, and run every width (1600, 1440, 1200, 768, 390,
+320) with the platform default, with a reserved 15px gutter, and with a drawn
+classic scrollbar. Tolerances stay at 1-2px.
+
+**Preview as Byline.** The preview uses the same CSS and enhancer inside its
+iframe at 1200, 768 and 390px of real layout width. Disclosures, the comparison
+range, annotation selection and scrolly stepping work; outgoing navigation is
+blocked and third-party embeds show their fallback.
+
+**Intentional limitations.** Four allowlisted embed providers; the private
+preview never loads third-party frames; scrolly stages show images (reporting
+blocks stay in the linear story); Core Cover video backgrounds autoplay muted
+as Core defines them. Astro remains static, with no migration, new article
+format, homepage editor or frontend server.

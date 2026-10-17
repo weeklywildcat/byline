@@ -48,6 +48,20 @@ function previewDocument(stylesheetUrl: string, themeId: string, tokenOverrides:
   return `<!doctype html><html lang="en" data-byline-theme="${safeThemeId}" style="${safeVariables}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${stylesheetLinks}<style>html,body{background:var(--page);color:var(--ink);font-family:var(--font-body)}html,body,*{box-sizing:border-box}body{margin:0}</style></head><body><div id="byline-article-preview-frame-root"></div></body></html>`;
 }
 
+function EnhancedArticle({ model }: { model: ArticlePresentation }) {
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let disposed = false;
+    let cleanup: (() => void) | undefined;
+    const body = root.current?.querySelector<HTMLElement>(".article-body");
+    if (body) import("@byline/ui/article-enhancements").then(({ enhanceArticleStory }) => {
+      if (!disposed) cleanup = enhanceArticleStory(body, { preview: true });
+    });
+    return () => { disposed = true; cleanup?.(); };
+  }, [model]);
+  return <div ref={root}><ArticleView presentation={model} className="byline-preview-article" /></div>;
+}
+
 function PreviewFrame({
   model,
   stylesheetUrl,
@@ -94,14 +108,14 @@ function PreviewFrame({
             if (!frameDocument || !mount) return;
             rootRef.current?.unmount();
             rootRef.current = createRoot(mount);
-            rootRef.current.render(<ArticleView presentation={model} className="byline-preview-article" />);
+            rootRef.current.render(<EnhancedArticle model={model} />);
             const stopNavigation = (click: Event) => {
               // The target belongs to the iframe realm, so parent instanceof
               // Element checks would silently allow navigation.
               const target = (click.target as Element | null)?.closest?.("a,button,form");
               if (!target) return;
               click.preventDefault();
-              click.stopPropagation();
+              if (!target.matches(".byline-annotation-marker")) click.stopPropagation();
             };
             frameDocument.addEventListener("click", stopNavigation, true);
             frameDocument.addEventListener("submit", stopNavigation, true);
