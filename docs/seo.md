@@ -38,6 +38,12 @@ below is generated at build time and checked by `apps/web/scripts/verify-seo.mjs
   mirrored `/_wordpress-media/` source but are excluded in `robots.txt`, so
   card/avatar copies do not compete with the page that owns the image's canonical
   search context.
+- The presentation-only rule also applies to homepage package art, article photos
+  reused on About or the Media Kit, and coverage artwork on the coverage index.
+  The detail/article/profile page keeps the canonical media URL.
+- The default Open Graph image is a link-preview fallback only. An article with no
+  featured image omits `NewsArticle.image` rather than claiming the publication's
+  generic share card as story photography.
 - The publication is one `NewsMediaOrganization` (`/#organization`), described in full
   on the homepage and referenced by `@id` (with name and logo) as each article's
   publisher. The `WebSite` entity (`/#website`) is named "Weekly Wildcat".
