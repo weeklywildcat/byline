@@ -3,7 +3,7 @@ import { notFound } from "@/lib/static-not-found";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
-import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
+import { buildPageMetadata, getBreadcrumbSchema, getProfilePageSchema, serializeJsonLd } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getContributorBySlug,
@@ -63,20 +63,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
   const photo = getContributorPhoto(contributor);
   const socialLinks = getContributorSocialLinks(contributor);
   const bio = stripHtml(getContributorDescription(contributor));
-  const description = bio || `${publication.identity.shortName} contributor`;
-  const authorSchema = {
-    "@context": "https://schema.org",
-    "@type": "ProfilePage",
-    mainEntity: {
-      "@type": "Person",
-      name: contributor.name,
-      description,
-      jobTitle: getContributorRole(contributor) || undefined,
-      url: absoluteUrl(getContributorHref(contributor)),
-      image: photo?.url ? absoluteUrl(photo.url) : undefined,
-      sameAs: socialLinks.filter((link) => !link.href.startsWith("mailto:")).map((link) => link.href)
-    }
-  };
+  const authorSchema = getProfilePageSchema(contributor, posts);
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", path: "/" },
     { name: "Staff", path: "/staff/" },
@@ -100,7 +87,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
           <img
             className="author-avatar"
             src={photo.url}
-            alt={photo.alt || ""}
+            alt={photo.alt?.trim() || contributor.name}
             width={photo.width ?? 160}
             height={photo.height ?? 160}
           />
