@@ -2431,7 +2431,7 @@ h1.masthead-logo {
 
 .about-writer-role {
   color: var(--muted);
-  font-family: var(--font-ui);
+  font-family: "Libre Franklin", "Libre Franklin Fallback", Arial, sans-serif;
   font-size: 0.78rem;
   line-height: 1.35;
   margin: 3px 0 0;
