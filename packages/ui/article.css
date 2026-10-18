@@ -27,10 +27,10 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .article-share-actions { gap: 2px; margin: 0; position: relative; }
 .byline-article-view .article-share-actions button { align-items: center; background: transparent; border: 0; border-radius: 50%; color: var(--ink); cursor: pointer; display: inline-flex; height: 38px; justify-content: center; padding: 0; width: 38px; }
 .byline-article-view .article-share-status { height: 1px; overflow: hidden; position: absolute; width: 1px; clip-path: inset(50%); white-space: nowrap; }
-.byline-article-view .about-writer-links a, .byline-article-view .article-tip-callout a { align-items: center; background: transparent; border: 1px solid var(--rule-strong); color: var(--ink); cursor: pointer; display: inline-flex; font-family: var(--font-ui); font-size: .74rem; font-weight: 700; gap: 7px; line-height: 1; min-height: 34px; padding: 9px 11px; text-transform: uppercase; }
+.byline-article-view .article-tip-callout a { align-items: center; background: transparent; border: 1px solid var(--rule-strong); color: var(--ink); cursor: pointer; display: inline-flex; font-family: var(--font-ui); font-size: .74rem; font-weight: 700; gap: 7px; line-height: 1; min-height: 34px; padding: 9px 11px; text-transform: uppercase; }
 .byline-article-view .article-share-actions button:hover, .byline-article-view .article-share-actions button:focus-visible { background: var(--rule); outline: 0; }
 .byline-article-view .article-share-actions button:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
-.byline-article-view .about-writer-links a:hover, .byline-article-view .article-tip-callout a:hover, .byline-article-view .article-tip-callout a:focus-visible { background: var(--ink); color: var(--page); outline: 0; }
+.byline-article-view .article-tip-callout a:hover, .byline-article-view .article-tip-callout a:focus-visible { background: var(--ink); color: var(--page); outline: 0; }
 .byline-article-view .featured-image { margin: 0; }
 .byline-article-view .featured-image-frame { position: relative; }
 .byline-article-view .featured-image img { background: #ede8e2; border: 1px solid var(--rule); width: 100%; }
@@ -63,13 +63,19 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .article-update-notice p { color: var(--muted); font-family: var(--font-body); font-size: .96rem; line-height: 1.45; margin: 0; }
 .byline-article-view .article-after { width: 100%; max-width: var(--article-wide-width); margin-inline: auto; display: grid; gap: 28px; margin-top: 46px; }
 .byline-article-view .article-after-section { padding-top: 0; }
-.byline-article-view .about-writer-layout { align-items: start; display: grid; gap: 18px; grid-template-columns: auto minmax(0, 1fr); }
-.byline-article-view .about-writer-avatar { height: 104px; width: 104px; }
-.byline-article-view .about-writer-body h3 { font-family: var(--font-body); font-size: 1.65rem; font-weight: 800; line-height: 1.02; margin: 0; }
-.byline-article-view .about-writer-body > p { color: var(--muted); font-family: var(--font-body); font-size: 1rem; line-height: 1.48; margin: 8px 0 0; max-width: 720px; }
-.byline-article-view .about-writer-coverage { color: var(--soft-muted); font-family: var(--font-ui); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
-.byline-article-view .about-writer-coverage a { color: var(--accent); }
-.byline-article-view .about-writer-links { margin-top: 14px; }
+.byline-article-view .about-writer > .section-heading { border-bottom: 0; margin-bottom: 18px; padding-bottom: 0; }
+.byline-article-view .about-writer-layout { align-items: start; display: grid; gap: 16px; grid-template-columns: auto minmax(0, 1fr); }
+.byline-article-view .about-writer-contributors .about-writer-layout + .about-writer-layout { border-top: 1px solid var(--rule); padding-top: 20px; }
+.byline-article-view .about-writer-photo-link { border-radius: 50%; display: block; line-height: 0; }
+.byline-article-view .about-writer-avatar { height: 76px; width: 76px; }
+.byline-article-view .about-writer-body h3 { font-family: var(--font-body); font-size: 1.28rem; font-weight: 700; line-height: 1.1; margin: 0; }
+.byline-article-view .about-writer-body h3 a { color: var(--ink); text-decoration: none; }
+.byline-article-view .about-writer-body h3 a:hover, .byline-article-view .about-writer-body h3 a:focus-visible { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.byline-article-view .about-writer-role { color: var(--muted); font-family: var(--font-ui); font-size: .78rem; line-height: 1.35; margin: 3px 0 0; }
+.byline-article-view .about-writer-bio { color: var(--ink); font-family: var(--font-serif); font-size: .98rem; line-height: 1.5; margin: 8px 0 0; max-width: 66ch; }
+.byline-article-view .about-writer-links { gap: 0 14px; margin-top: 10px; }
+.byline-article-view .about-writer-links a { color: var(--muted); font-family: var(--font-ui); font-size: .78rem; font-weight: 600; line-height: 1.35; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.byline-article-view .about-writer-links a:hover, .byline-article-view .about-writer-links a:focus-visible { color: var(--accent); }
 .byline-article-view .article-story-grid { display: grid; gap: 0 22px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .byline-article-view .article-story-grid .story-teaser-compact { grid-template-columns: 1fr; }
 .byline-article-view .story-teaser { display: grid; }
@@ -115,6 +121,8 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .story-teaser h2, 
   .byline-article-view .article-byline-avatar + .article-byline-avatar { margin-left: -12px; }
   .byline-article-view .article-share-actions button { height: 34px; width: 34px; }
   .byline-article-view .article-body { font-size: 1.08rem; }
+  .byline-article-view .about-writer-layout { gap: 12px; }
+  .byline-article-view .about-writer-avatar { height: 64px; width: 64px; }
 }
 
 /* Photo credits are set in Libre Franklin under every image, as "Photo: Name"
