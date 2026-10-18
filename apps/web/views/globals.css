@@ -2540,6 +2540,15 @@ h1.masthead-logo {
   text-transform: uppercase;
 }
 
+.author-short-bio {
+  color: var(--muted);
+  font-family: var(--font-serif);
+  font-size: 1.04rem;
+  line-height: 1.5;
+  margin: 10px 0 0;
+  max-width: 58ch;
+}
+
 .author-about {
   border-top: 1px solid var(--rule);
   display: grid;
