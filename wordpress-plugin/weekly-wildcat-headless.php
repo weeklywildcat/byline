@@ -2040,6 +2040,13 @@ function wwh_render_author_profile_fields(WP_User $user): void
             <td><input type="text" class="regular-text" id="ww_author_role" name="ww_author_role" value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_role')); ?>"></td>
         </tr>
         <tr>
+            <th><label for="ww_author_short_bio">Short Bio</label></th>
+            <td>
+                <textarea class="large-text" rows="3" id="ww_author_short_bio" name="ww_author_short_bio"><?php echo esc_textarea(wwh_author_meta_value($user->ID, '_ww_author_short_bio')); ?></textarea>
+                <p class="description">Shown with your name at the end of stories and near the top of your author page. Keep this to one or two sentences; use WordPress Biographical Info for your full profile bio.</p>
+            </td>
+        </tr>
+        <tr>
             <th><label for="ww_author_pronouns">Pronouns</label></th>
             <td><input type="text" class="regular-text" id="ww_author_pronouns" name="ww_author_pronouns" value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_pronouns')); ?>"></td>
         </tr>
@@ -2092,6 +2099,7 @@ function wwh_save_author_profile_fields(int $user_id): void
     }
 
     wwh_update_user_meta($user_id, '_ww_author_role', wwh_request_value('ww_author_role'));
+    wwh_update_user_meta($user_id, '_ww_author_short_bio', wwh_request_textarea('ww_author_short_bio'));
     wwh_update_user_meta($user_id, '_ww_author_pronouns', wwh_request_value('ww_author_pronouns'));
     update_user_meta($user_id, '_ww_author_show_in_directory', isset($_POST['ww_author_show_in_directory']) ? '1' : '0');
 
@@ -2410,6 +2418,7 @@ function wwh_rest_author_profile(array $user): array
     return [
         'pronouns' => wwh_author_meta_value($user_id, '_ww_author_pronouns'),
         'role' => wwh_author_meta_value($user_id, '_ww_author_role'),
+        'shortBio' => wwh_author_meta_value($user_id, '_ww_author_short_bio'),
         'showInDirectory' => wwh_author_visible_in_directory($user_id),
         'profilePhoto' => wwh_author_profile_photo($photo_id),
         'socials' => $socials,
