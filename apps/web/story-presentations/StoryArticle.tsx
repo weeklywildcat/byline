@@ -1,24 +1,34 @@
 import type { ReactNode } from "react";
-import { ArticleView, type ArticleViewProps } from "@byline/ui";
+import { ArticleView, ImmersiveArticleView, type ArticleViewProps } from "@byline/ui";
 import { getStoryPresentation } from "./registry";
 
 /**
- * The public article body: the story's custom presentation when one is
- * registered for its WordPress post ID, otherwise the normal `ArticleView`.
- * Both article routes render through this, so they cannot disagree.
+ * The public article body. Which presentation a story gets, in order:
  *
- * Structured data stays the route's job. It is rendered here, outside the
- * custom component, so no presentation can omit it.
+ *  1. a repository override registered for its WordPress post ID (always wins);
+ *  2. the author's "Immersive" choice in WordPress, when the story has a
+ *     featured image to open on;
+ *  3. the normal `ArticleView`.
+ *
+ * Both article routes render through this, so they cannot disagree. Structured
+ * data stays the route's job: for a repository override it is rendered here,
+ * outside the custom component, so no override can omit it.
  */
 export function StoryArticle({ presentation, slots = {}, className }: ArticleViewProps): ReactNode {
   const Custom = getStoryPresentation(presentation.id);
-  if (!Custom) return <ArticleView presentation={presentation} slots={slots} className={className} />;
+  if (Custom) {
+    const { metadata, ...rest } = slots;
+    return (
+      <>
+        {metadata}
+        <Custom presentation={presentation} slots={rest} />
+      </>
+    );
+  }
 
-  const { metadata, ...rest } = slots;
-  return (
-    <>
-      {metadata}
-      <Custom presentation={presentation} slots={rest} />
-    </>
-  );
+  if (presentation.storyPresentation === "immersive" && presentation.image?.src) {
+    return <ImmersiveArticleView presentation={presentation} slots={slots} className={className} />;
+  }
+
+  return <ArticleView presentation={presentation} slots={slots} className={className} />;
 }

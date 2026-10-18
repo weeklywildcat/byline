@@ -2336,6 +2336,16 @@ function wwh_register_rest_routes(): void
                     'items' => ['type' => 'integer'],
                     'description' => 'Published game IDs rendered by structured Byline Game Score blocks in the post content.',
                 ],
+                'presentation' => [
+                    'type' => 'string',
+                    'enum' => BYLINE_STORY_PRESENTATIONS,
+                    'description' => 'Story presentation: the standard article or an immersive fullscreen opening.',
+                ],
+                'immersiveAlignment' => [
+                    'type' => 'string',
+                    'enum' => BYLINE_STORY_IMMERSIVE_ALIGNMENTS,
+                    'description' => 'Headline position for an immersive story.',
+                ],
             ],
         ],
     ]);
@@ -2348,6 +2358,8 @@ function wwh_register_rest_routes(): void
             'properties' => [
                 'primaryGameId' => ['type' => 'integer'],
                 'gameScoreGameIds' => ['type' => 'array', 'items' => ['type' => 'integer']],
+                'presentation' => ['type' => 'string', 'enum' => BYLINE_STORY_PRESENTATIONS],
+                'immersiveAlignment' => ['type' => 'string', 'enum' => BYLINE_STORY_IMMERSIVE_ALIGNMENTS],
             ],
         ],
     ]);
@@ -2361,7 +2373,7 @@ function wwh_rest_post_settings(array $post): array
     return [
         'primaryGameId' => absint(get_post_meta($post_id, WWH_PRIMARY_GAME_META, true)),
         'gameScoreGameIds' => function_exists('byline_newsroom_game_score_game_ids') ? byline_newsroom_game_score_game_ids($post_id) : [],
-    ];
+    ] + byline_story_presentation_settings($post_id);
 }
 
 function wwh_rest_image_credit(array $attachment): array
@@ -3241,6 +3253,7 @@ require_once __DIR__ . '/includes/sports/archive.php';
 require_once __DIR__ . '/includes/content/newsroom-blocks.php';
 require_once __DIR__ . '/includes/content/gallery-media.php';
 require_once __DIR__ . '/includes/content/photo-credits.php';
+require_once __DIR__ . '/includes/content/story-presentation.php';
 require_once __DIR__ . '/includes/discord-integration.php';
 require_once __DIR__ . '/includes/integrations/discord.php';
 require_once __DIR__ . '/includes/core/upgrade.php';

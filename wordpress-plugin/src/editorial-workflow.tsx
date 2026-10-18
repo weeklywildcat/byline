@@ -36,6 +36,8 @@ import { normalizeBylineError } from '@byline/admin-runtime';
 import { CorrectionsPanel } from './editorial/CorrectionsPanel';
 import { ContributorsPanel } from './editorial/ContributorsPanel';
 import { DistributionPanel } from './editorial/DistributionPanel';
+import { StoryPresentationPanel } from './editorial/StoryPresentationPanel';
+import { readStoryPresentation, storyPresentationMetaPatch } from './editorial/story-presentation-model';
 import { TasksPanel } from './editorial/TasksPanel';
 import {
   createEditorialRestClient,
@@ -96,7 +98,7 @@ declare global {
 // `PluginSidebar` registers its own entry in the editor's More menu, so no
 // separate `PluginSidebarMoreMenuItem` is rendered here: a second registration
 // would put two identical "Story" items in that menu.
-const { PluginPostStatusInfo, PluginSidebar } = editPostModule;
+const { PluginDocumentSettingPanel, PluginPostStatusInfo, PluginSidebar } = editPostModule;
 
 /**
  * These fills are available in the WordPress editor runtime, but older
@@ -1760,6 +1762,33 @@ function PostPublishLifecycle({
   );
 }
 
+/**
+ * Standard or Immersive, and where an immersive headline sits. Stored in post
+ * meta, so it saves with the post and needs no separate request.
+ */
+function StoryPresentationSettings() {
+  const { meta, featuredMedia } = useSelect((select: any) => {
+    const editor = select('core/editor');
+    return {
+      meta: editor?.getEditedPostAttribute?.('meta') as unknown,
+      featuredMedia: Number(editor?.getEditedPostAttribute?.('featured_media')) || 0
+    };
+  }, []);
+  const { editPost } = useDispatch('core/editor') as { editPost?: (edits: Record<string, unknown>) => void };
+  const { presentation, alignment } = readStoryPresentation(meta);
+
+  return (
+    <PluginDocumentSettingPanel name="byline-story-presentation" title={__('Story presentation', 'weekly-wildcat-headless')} className="byline-story-presentation-panel">
+      <StoryPresentationPanel
+        presentation={presentation}
+        alignment={alignment}
+        hasFeaturedImage={featuredMedia > 0}
+        onChange={(change) => editPost?.({ meta: storyPresentationMetaPatch(change) })}
+      />
+    </PluginDocumentSettingPanel>
+  );
+}
+
 function EditorialWorkflowPlugin() {
   const { postId, postType, isPublished, title, canonicalUrl, excerpt } = useSelect((select: any) => {
     const editor = select('core/editor');
@@ -1822,6 +1851,7 @@ function EditorialWorkflowPlugin() {
 
   return (
     <>
+      <StoryPresentationSettings />
       <PluginPostStatusInfo className="byline-workflow-summary-slot">
         <div className="byline-workflow-summary">
           <span>{__('Workflow', 'weekly-wildcat-headless')}</span>
