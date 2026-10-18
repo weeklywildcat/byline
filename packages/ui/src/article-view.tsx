@@ -131,6 +131,29 @@ function BylineAvatar({ contributor }: { contributor: ArticleContributorView }):
   );
 }
 
+function joinClassNames(...names: Array<string | undefined | false>) {
+  return names.filter(Boolean).join(" ");
+}
+
+/**
+ * The caption and photo credit for an image, without the surrounding `<figure>`.
+ * A custom layout that paints the lead image some other way (for example behind
+ * a headline) still prints the same caption and credit through this.
+ */
+export function ArticleImageCaption({ image }: { image: ArticleImageView }): ReactNode {
+  if (!(image.captionHtml || image.fallbackCaption || image.credit)) return null;
+  return (
+    <div className="featured-image-caption-row">
+      {image.captionHtml ? (
+        <div className="featured-image-caption" dangerouslySetInnerHTML={{ __html: image.captionHtml }} />
+      ) : image.fallbackCaption ? (
+        <div className="featured-image-caption">{image.fallbackCaption}</div>
+      ) : null}
+      {image.credit ? <p className="photo-credit">Photo: {image.credit}</p> : null}
+    </div>
+  );
+}
+
 function ArticleImage({ image, priority = false, showCaption = true }: { image: ArticleImageView; priority?: boolean; showCaption?: boolean }): ReactNode {
   const hasCaption = Boolean(image.captionHtml || image.fallbackCaption || image.credit);
   // A vertical lead photo would run several screens tall at article width, so
@@ -152,18 +175,7 @@ function ArticleImage({ image, priority = false, showCaption = true }: { image: 
           decoding="async"
         />
       </div>
-      {showCaption && hasCaption ? (
-        <figcaption>
-          <div className="featured-image-caption-row">
-            {image.captionHtml ? (
-              <div className="featured-image-caption" dangerouslySetInnerHTML={{ __html: image.captionHtml }} />
-            ) : image.fallbackCaption ? (
-              <div className="featured-image-caption">{image.fallbackCaption}</div>
-            ) : null}
-            {image.credit ? <p className="photo-credit">Photo: {image.credit}</p> : null}
-          </div>
-        </figcaption>
-      ) : null}
+      {showCaption && hasCaption ? <figcaption><ArticleImageCaption image={image} /></figcaption> : null}
     </figure>
   );
 }
@@ -184,7 +196,152 @@ function StoryCard({ story }: { story: ArticleStoryCardView }): ReactNode {
   );
 }
 
-function AboutWriters({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+/* --- Article primitives ------------------------------------------------------
+   `ArticleView` is only a composition of these. A repository-defined story
+   presentation composes the same pieces in a different order and wrapper, so
+   headline, byline, body, corrections and the standard ending stay one
+   implementation. Each reads the normalized `ArticlePresentation`; none holds
+   editorial copy. */
+
+type ArticlePieceProps = { presentation: ArticlePresentation; className?: string };
+
+/**
+ * The element that carries the theme scope (`byline-article-view`) and the
+ * `byline-content` container the wide and full-bleed blocks measure against.
+ * Everything that renders `ArticleBody` must sit inside one.
+ */
+export function ArticleShell({ as: Tag = "main", className, children }: { as?: "main" | "div"; className?: string; children?: ReactNode }): ReactNode {
+  return <Tag className={joinClassNames("article-shell", "byline-article-view", className)}>{children}</Tag>;
+}
+
+/** The section label ("News", "Sports") linking to the category archive. */
+export function ArticleCategory({ presentation, className }: ArticlePieceProps): ReactNode {
+  if (!presentation.category) return null;
+  return <a className={joinClassNames("article-section-label", className)} href={presentation.category.href}>{presentation.category.label}</a>;
+}
+
+/** The article's only `<h1>`. */
+export function ArticleHeadline({ presentation, className }: ArticlePieceProps): ReactNode {
+  return <h1 className={className} dangerouslySetInnerHTML={{ __html: presentation.titleHtml }} />;
+}
+
+/** The deck (excerpt), when the story has one. */
+export function ArticleExcerpt({ presentation, className }: ArticlePieceProps): ReactNode {
+  if (!presentation.excerptHtml) return null;
+  return <div className={joinClassNames("article-excerpt", className)} dangerouslySetInnerHTML={{ __html: presentation.excerptHtml }} />;
+}
+
+/** Athlete-spotlight labels; renders nothing for other stories. */
+export function ArticleAthleteMeta({ presentation, className }: ArticlePieceProps): ReactNode {
+  if (!presentation.athleteMeta?.length) return null;
+  return (
+    <div className={joinClassNames("article-athlete-meta", className)} aria-label="Athlete spotlight details">
+      {presentation.athleteMeta.map((value) => <span key={value}>{value}</span>)}
+    </div>
+  );
+}
+
+/** Avatars, byline, publication and update times, reading time and the share actions slot. */
+export function ArticleMeta({ presentation, shareActions, className }: ArticlePieceProps & { shareActions?: ReactNode }): ReactNode {
+  return (
+    <div className={joinClassNames("article-meta-block", className)}>
+      <div className="article-avatars" aria-hidden="true">
+        {presentation.contributors.length > 0
+          ? presentation.contributors.map((contributor) => <BylineAvatar key={contributor.id} contributor={contributor} />)
+          : <span className="article-byline-avatar author-avatar author-avatar-fallback">{initial(presentation.fallbackByline)}</span>}
+      </div>
+      <div className="article-byline-text">
+        <p className="article-author-line">
+          By {presentation.contributors.length > 0
+            ? presentation.contributors.map((contributor, index) => (
+                <span key={contributor.id}>{bylineSeparator(index, presentation.contributors.length)}{contributor.href ? <a href={contributor.href}>{contributor.name}</a> : contributor.name}</span>
+              ))
+            : <span>{presentation.fallbackByline}</span>}
+        </p>
+        <div className="article-timing">
+          <time dateTime={presentation.publishedAt}>Published {presentation.publishedLabel}</time>
+          {presentation.modifiedAt && presentation.modifiedLabel ? <time dateTime={presentation.modifiedAt}>Updated {presentation.modifiedLabel}</time> : null}
+          <span>{presentation.readingTime}</span>
+        </div>
+      </div>
+      {shareActions}
+    </div>
+  );
+}
+
+/** The lead image as a captioned figure. Use `ArticleImageCaption` when the image is painted another way. */
+export function ArticleFeaturedImage({ presentation, priority = true, showCaption = true }: { presentation: ArticlePresentation; priority?: boolean; showCaption?: boolean }): ReactNode {
+  return presentation.image?.src ? <ArticleImage image={presentation.image} priority={priority} showCaption={showCaption} /> : null;
+}
+
+/** The WordPress body (with the legacy primary-game card ahead of it), or the empty state. */
+export function ArticleBody({ presentation, primaryGame }: { presentation: ArticlePresentation; primaryGame?: ReactNode }): ReactNode {
+  return (
+    <>
+      {primaryGame}
+      {presentation.contentHtml ? (
+        <div className="article-body" dangerouslySetInnerHTML={{ __html: presentation.contentHtml }} />
+      ) : <p className="empty-state">No article body has been published yet.</p>}
+    </>
+  );
+}
+
+export function ArticleCorrections({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  if (presentation.corrections.length === 0) return null;
+  return (
+    <section className="article-correction-notices" aria-label="Story corrections and updates">
+      {presentation.corrections.map((correction) => (
+        <aside className="article-correction-notice" key={correction.id}>
+          <div className="article-correction-notice-heading">
+            <h2>{correction.label}</h2>
+            {correction.date ? <time dateTime={correction.date}>{correction.dateLabel ?? correction.date}</time> : null}
+          </div>
+          <p>{correction.text}</p>
+        </aside>
+      ))}
+    </section>
+  );
+}
+
+export function ArticleTopics({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  if (presentation.topics.length === 0) return null;
+  return (
+    <footer className="article-tags" aria-label="Story topics">
+      <h2>Topics</h2>
+      <div>{presentation.topics.map((topic) => <span key={topic.id}>{topic.name}</span>)}</div>
+    </footer>
+  );
+}
+
+export function ArticleUpdateNotice({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  if (!presentation.update) return null;
+  return (
+    <aside className="article-update-notice" aria-label="Story update notice">
+      <h2>Update</h2>
+      <p>{presentation.update.label}</p>
+    </aside>
+  );
+}
+
+/**
+ * Everything that follows the body inside `<article>`: corrections, the poll,
+ * topics, the update notice, reader feedback and the newsletter signup.
+ */
+export function ArticleStoryFooter({ presentation, slots = {} }: { presentation: ArticlePresentation; slots?: ArticleViewSlots }): ReactNode {
+  return (
+    <>
+      <ArticleCorrections presentation={presentation} />
+      {slots.poll}
+      <ArticleTopics presentation={presentation} />
+      <ArticleUpdateNotice presentation={presentation} />
+      {slots.feedback}
+      {slots.newsletter}
+    </>
+  );
+}
+
+/** "About the Writer(s)". Falls back to a staff card when the story has no profiled contributor. */
+export function ArticleAuthors({ presentation }: { presentation: ArticlePresentation }): ReactNode {
   const contributors = presentation.contributors.length > 0
     ? presentation.contributors
     : [{
@@ -246,102 +403,67 @@ function AboutWriters({ presentation }: { presentation: ArticlePresentation }): 
   );
 }
 
-export function ArticleView({ presentation, slots = {}, className = "" }: ArticleViewProps): ReactNode {
-  const shellClassName = ["article-shell", "byline-article-view", className].filter(Boolean).join(" ");
-
+export function ArticleRelatedStories({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  if (presentation.relatedStories.length === 0) return null;
   return (
-    <main className={shellClassName}>
+    <section className="article-after-section" aria-labelledby="related-stories-heading">
+      <div className="section-heading"><div><h2 id="related-stories-heading">Related Stories</h2><p>More from the same section or topic.</p></div></div>
+      <div className="article-story-grid">{presentation.relatedStories.map((story) => <StoryCard key={story.id} story={story} />)}</div>
+    </section>
+  );
+}
+
+export function ArticleMoreByAuthor({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  if (presentation.moreByAuthorStories.length === 0) return null;
+  return (
+    <section className="article-after-section" aria-labelledby="more-by-author-heading">
+      <div className="section-heading"><div><h2 id="more-by-author-heading">{presentation.contributors.length > 1 ? "More by the writers" : `More by ${presentation.contributors[0]?.name ?? "the newsroom"}`}</h2></div></div>
+      <div className="article-story-grid">{presentation.moreByAuthorStories.map((story) => <StoryCard key={story.id} story={story} />)}</div>
+    </section>
+  );
+}
+
+/** "Have something we should cover?" */
+export function ArticleTipCallout({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  return (
+    <aside className="article-tip-callout" aria-labelledby="article-tip-callout-heading">
+      <div><h2 id="article-tip-callout-heading">Have something we should cover?</h2><p>Send a tip, correction, photo opportunity, or story idea to the {presentation.publication.shortName} newsroom.</p></div>
+      <a href={presentation.publication.contactHref}>Contact the newsroom</a>
+    </aside>
+  );
+}
+
+/** Writers, related stories, more by the author and the newsroom tip. Render inside an `ArticleShell`. */
+export function ArticleStandardEnding({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  return (
+    <div className="article-after">
+      <ArticleAuthors presentation={presentation} />
+      <ArticleRelatedStories presentation={presentation} />
+      <ArticleMoreByAuthor presentation={presentation} />
+      <ArticleTipCallout presentation={presentation} />
+    </div>
+  );
+}
+
+export function ArticleView({ presentation, slots = {}, className = "" }: ArticleViewProps): ReactNode {
+  return (
+    <ArticleShell className={className}>
       {slots.metadata}
       <article className="article-story">
         <header className="article-header">
-          {presentation.category ? <a className="article-section-label" href={presentation.category.href}>{presentation.category.label}</a> : null}
-          <h1 dangerouslySetInnerHTML={{ __html: presentation.titleHtml }} />
-          {presentation.excerptHtml ? <div className="article-excerpt" dangerouslySetInnerHTML={{ __html: presentation.excerptHtml }} /> : null}
-          {presentation.athleteMeta?.length ? (
-            <div className="article-athlete-meta" aria-label="Athlete spotlight details">
-              {presentation.athleteMeta.map((value) => <span key={value}>{value}</span>)}
-            </div>
-          ) : null}
-          <div className="article-meta-block">
-            <div className="article-avatars" aria-hidden="true">
-              {presentation.contributors.length > 0
-                ? presentation.contributors.map((contributor) => <BylineAvatar key={contributor.id} contributor={contributor} />)
-                : <span className="article-byline-avatar author-avatar author-avatar-fallback">{initial(presentation.fallbackByline)}</span>}
-            </div>
-            <div className="article-byline-text">
-              <p className="article-author-line">
-                By {presentation.contributors.length > 0
-                  ? presentation.contributors.map((contributor, index) => (
-                      <span key={contributor.id}>{bylineSeparator(index, presentation.contributors.length)}{contributor.href ? <a href={contributor.href}>{contributor.name}</a> : contributor.name}</span>
-                    ))
-                  : <span>{presentation.fallbackByline}</span>}
-              </p>
-              <div className="article-timing">
-                <time dateTime={presentation.publishedAt}>Published {presentation.publishedLabel}</time>
-                {presentation.modifiedAt && presentation.modifiedLabel ? <time dateTime={presentation.modifiedAt}>Updated {presentation.modifiedLabel}</time> : null}
-                <span>{presentation.readingTime}</span>
-              </div>
-            </div>
-            {slots.shareActions}
-          </div>
-          {presentation.image?.src ? <ArticleImage image={presentation.image} priority /> : null}
+          <ArticleCategory presentation={presentation} />
+          <ArticleHeadline presentation={presentation} />
+          <ArticleExcerpt presentation={presentation} />
+          <ArticleAthleteMeta presentation={presentation} />
+          <ArticleMeta presentation={presentation} shareActions={slots.shareActions} />
+          <ArticleFeaturedImage presentation={presentation} />
         </header>
 
-        {slots.primaryGame}
-        {presentation.contentHtml ? (
-          <div className="article-body" dangerouslySetInnerHTML={{ __html: presentation.contentHtml }} />
-        ) : <p className="empty-state">No article body has been published yet.</p>}
-
-        {presentation.corrections.length > 0 ? (
-          <section className="article-correction-notices" aria-label="Story corrections and updates">
-            {presentation.corrections.map((correction) => (
-              <aside className="article-correction-notice" key={correction.id}>
-                <div className="article-correction-notice-heading">
-                  <h2>{correction.label}</h2>
-                  {correction.date ? <time dateTime={correction.date}>{correction.dateLabel ?? correction.date}</time> : null}
-                </div>
-                <p>{correction.text}</p>
-              </aside>
-            ))}
-          </section>
-        ) : null}
-
-        {slots.poll}
-        {presentation.topics.length > 0 ? (
-          <footer className="article-tags" aria-label="Story topics">
-            <h2>Topics</h2>
-            <div>{presentation.topics.map((topic) => <span key={topic.id}>{topic.name}</span>)}</div>
-          </footer>
-        ) : null}
-        {presentation.update ? (
-          <aside className="article-update-notice" aria-label="Story update notice">
-            <h2>Update</h2>
-            <p>{presentation.update.label}</p>
-          </aside>
-        ) : null}
-        {slots.feedback}
-        {slots.newsletter}
+        <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} />
+        <ArticleStoryFooter presentation={presentation} slots={slots} />
       </article>
 
-      <div className="article-after">
-        <AboutWriters presentation={presentation} />
-        {presentation.relatedStories.length > 0 ? (
-          <section className="article-after-section" aria-labelledby="related-stories-heading">
-            <div className="section-heading"><div><h2 id="related-stories-heading">Related Stories</h2><p>More from the same section or topic.</p></div></div>
-            <div className="article-story-grid">{presentation.relatedStories.map((story) => <StoryCard key={story.id} story={story} />)}</div>
-          </section>
-        ) : null}
-        {presentation.moreByAuthorStories.length > 0 ? (
-          <section className="article-after-section" aria-labelledby="more-by-author-heading">
-            <div className="section-heading"><div><h2 id="more-by-author-heading">{presentation.contributors.length > 1 ? "More by the writers" : `More by ${presentation.contributors[0]?.name ?? "the newsroom"}`}</h2></div></div>
-            <div className="article-story-grid">{presentation.moreByAuthorStories.map((story) => <StoryCard key={story.id} story={story} />)}</div>
-          </section>
-        ) : null}
-        <aside className="article-tip-callout" aria-labelledby="article-tip-callout-heading">
-          <div><h2 id="article-tip-callout-heading">Have something we should cover?</h2><p>Send a tip, correction, photo opportunity, or story idea to the {presentation.publication.shortName} newsroom.</p></div>
-          <a href={presentation.publication.contactHref}>Contact the newsroom</a>
-        </aside>
-      </div>
-    </main>
+      <ArticleStandardEnding presentation={presentation} />
+    </ArticleShell>
   );
 }

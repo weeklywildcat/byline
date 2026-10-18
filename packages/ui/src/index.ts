@@ -16,6 +16,7 @@ export * from "./ThisWeekCard";
 export * from "./PollCard";
 export * from "./Icon";
 export * from "./article-view";
+export * from "./HeroReveal";
 
 import type { BylineThemeTokens, CoreBylineBlockId } from "@byline/theme-contract";
 

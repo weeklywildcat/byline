@@ -6391,48 +6391,8 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
 
 /* Diversity & Inclusion page. Shares the About page's masthead, sections, prose,
    photo, band and card styles. */
-/* The hero stays pinned at the top while the page content scrolls up over it. */
-.di-hero {
-  background: #1f2328;
-  color: #fff;
-  height: calc(100vh - var(--di-header-h, 150px));
-  height: calc(100svh - var(--di-header-h, 150px));
-  min-height: 420px;
-  overflow: hidden;
-  position: sticky;
-  top: 0;
-  z-index: 0;
-}
-
-.di-hero-image {
-  height: 100%;
-  inset: 0;
-  object-fit: cover;
-  position: absolute;
-  width: 100%;
-  z-index: 0;
-}
-
-.di-hero::before {
-  background: rgba(14, 17, 22, 0.66);
-  content: "";
-  inset: 0;
-  position: absolute;
-  z-index: 1;
-}
-
-.di-hero-copy {
-  align-items: center;
-  display: flex;
-  flex-direction: column;
-  inset: 0;
-  justify-content: center;
-  padding: 0 24px;
-  position: absolute;
-  text-align: center;
-  z-index: 2;
-}
-
+/* The pinned hero and the content that rises over it are the shared
+   HeroReveal component (@byline/ui/hero-reveal.css); these are this page's words. */
 .di-hero-kicker {
   font-family: var(--font-ui);
   font-size: 0.82rem;
@@ -6453,46 +6413,6 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
   max-width: 26em;
   text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
   text-wrap: balance;
-}
-
-.di-hero-scroll {
-  align-items: center;
-  bottom: 24px;
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  font-family: var(--font-ui);
-  font-size: 0.7rem;
-  font-weight: 800;
-  gap: 4px;
-  left: 50%;
-  letter-spacing: 0.14em;
-  opacity: 0.85;
-  position: absolute;
-  text-transform: uppercase;
-  transform: translateX(-50%);
-  z-index: 2;
-}
-
-.di-hero-scroll svg {
-  animation: di-hero-bob 1.8s ease-in-out infinite;
-}
-
-.di-hero-scroll:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 4px;
-}
-
-@keyframes di-hero-bob {
-  50% {
-    transform: translateY(5px);
-  }
-}
-
-.di-content {
-  background: var(--paper);
-  position: relative;
-  z-index: 1;
 }
 
 .di-pull {
@@ -6608,10 +6528,6 @@ html[data-byline-theme="weekly-wildcat"] :is(.section-page-shell h1, .author-pro
 @media (prefers-reduced-motion: reduce) {
   .about-page .about-button {
     transition: none;
-  }
-
-  .di-hero-scroll svg {
-    animation: none;
   }
 }
 
