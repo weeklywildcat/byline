@@ -4,8 +4,21 @@ const primaryAuthor = {
   id: 7,
   name: "Alex Rivera",
   slug: "alex-rivera",
-  description: "News reporter.",
-  avatar_urls: {}
+  description: "Alex Rivera's long profile biography appears only on the author page.",
+  avatar_urls: {},
+  bylineProfile: {
+    pronouns: "",
+    role: "News reporter",
+    shortBio: "Alex Rivera reports on public records and local government.",
+    socials: {
+      website: "",
+      email: "",
+      instagram: "",
+      tiktok: "",
+      linkedin: "",
+      x: ""
+    }
+  }
 };
 
 export const publicEditorialPosts: WordPressPost[] = [
