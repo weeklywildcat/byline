@@ -66,6 +66,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
   const profile = !isGuestContributor(contributor) ? contributor.bylineProfile ?? contributor.weeklyWildcatProfile : null;
   const photo = getContributorPhoto(contributor);
   const socialLinks = getContributorSocialLinks(contributor);
+  const shortBio = !isGuestContributor(contributor) ? stripHtml(profile?.shortBio ?? "") : "";
   const bio = stripHtml(getContributorDescription(contributor));
   const authorSchema = getProfilePageSchema(contributor, posts);
   const breadcrumbSchema = getBreadcrumbSchema([
@@ -106,6 +107,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
           </div>
           <h1>{contributor.name}</h1>
           {profile?.pronouns ? <p className="author-pronouns">{profile.pronouns}</p> : null}
+          {shortBio ? <p className="author-short-bio">{shortBio}</p> : null}
           {socialLinks.length > 0 ? (
               <div className="author-social-links" aria-label={`${contributor.name} social links`}>
               {socialLinks.map((link) => (
