@@ -119,14 +119,14 @@ function byline_editorial_notification_visible_preference_labels(int $user_id): 
 
     $labels = [
         'storyAssignments' => 'Story assignments',
-        'readyForReview' => 'Stories ready for review',
-        'storyReturned' => 'Stories returned from review',
+        'readyForReview' => 'Ready for review',
+        'storyReturned' => 'Returned for revision',
         'mediaAssignments' => 'Media assignments',
-        'highPriorityTasks' => 'High-priority task assignments',
-        'dueDigest' => 'Daily due/overdue story and task reminder',
+        'highPriorityTasks' => 'High-priority tasks',
+        'dueDigest' => 'Due-work reminder',
     ];
     if (user_can($user_id, 'edit_others_posts') || user_can($user_id, 'manage_byline')) {
-        $labels['publishingFailures'] = 'Public-site publication failures';
+        $labels['publishingFailures'] = 'Publishing failures';
     }
 
     return $labels;
@@ -770,27 +770,49 @@ function byline_editorial_notification_profile_fields(WP_User $user): void
     if ($labels === []) {
         return;
     }
+
+    $descriptions = [
+        'storyAssignments' => 'When a story is assigned to you.',
+        'readyForReview' => 'When a story you edit is submitted for review.',
+        'storyReturned' => 'When an editor sends your story back for revision.',
+        'mediaAssignments' => 'When photo, video, or other media work is assigned to you.',
+        'highPriorityTasks' => 'When a high-priority or urgent task is assigned to you.',
+        'dueDigest' => 'One email with work that is due soon or overdue.',
+        'publishingFailures' => 'When the public site fails to publish and needs attention.',
+    ];
+
     if (function_exists('wp_nonce_field')) {
         wp_nonce_field('byline_editorial_notification_preferences', 'byline_editorial_notification_nonce');
     }
     ?>
-    <h2><?php echo esc_html('Byline notifications'); ?></h2>
-    <p><?php echo esc_html('Choose which private editorial notifications Byline may send to your WordPress email address.'); ?></p>
-    <table class="form-table" role="presentation">
-        <tbody>
+    <section class="byline-notification-settings" aria-labelledby="byline-notifications-heading">
+        <div class="byline-notification-heading">
+            <h2 id="byline-notifications-heading"><?php echo esc_html('Notifications'); ?></h2>
+            <p><?php echo esc_html('Choose the editorial updates Byline sends to your WordPress account email.'); ?></p>
+        </div>
+
+        <fieldset class="byline-notification-grid">
+            <legend class="screen-reader-text"><?php echo esc_html('Email notification preferences'); ?></legend>
             <?php foreach ($labels as $key => $label) : ?>
-                <tr>
-                    <th scope="row"><?php echo esc_html($label); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="byline_editorial_notification_preferences[<?php echo esc_attr($key); ?>]" value="1" <?php checked(!empty($preferences[$key])); ?> />
-                            <?php echo esc_html('Email me about this event'); ?>
-                        </label>
-                    </td>
-                </tr>
+                <label class="byline-notification-option">
+                    <span class="byline-notification-copy">
+                        <span class="byline-notification-title"><?php echo esc_html($label); ?></span>
+                        <span class="byline-notification-description"><?php echo esc_html($descriptions[$key] ?? 'Email me when this event happens.'); ?></span>
+                    </span>
+                    <input
+                        class="byline-notification-input"
+                        type="checkbox"
+                        name="byline_editorial_notification_preferences[<?php echo esc_attr($key); ?>]"
+                        value="1"
+                        <?php checked(!empty($preferences[$key])); ?>
+                    />
+                    <span class="byline-notification-switch" aria-hidden="true"></span>
+                </label>
             <?php endforeach; ?>
-        </tbody>
-    </table>
+        </fieldset>
+
+        <p class="byline-notification-footnote"><?php echo esc_html('These settings affect email only. They do not change assignments, deadlines, or access in Byline.'); ?></p>
+    </section>
     <?php
 }
 
