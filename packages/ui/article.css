@@ -71,7 +71,7 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .about-writer-body h3 { font-family: var(--font-body); font-size: 1.28rem; font-weight: 700; line-height: 1.1; margin: 0; }
 .byline-article-view .about-writer-body h3 a { color: var(--ink); text-decoration: none; }
 .byline-article-view .about-writer-body h3 a:hover, .byline-article-view .about-writer-body h3 a:focus-visible { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-.byline-article-view .about-writer-role { color: var(--muted); font-family: var(--font-ui); font-size: .78rem; line-height: 1.35; margin: 3px 0 0; }
+.byline-article-view .about-writer-role { color: var(--muted); font-family: "Libre Franklin", "Libre Franklin Fallback", Arial, sans-serif; font-size: .78rem; line-height: 1.35; margin: 3px 0 0; }
 .byline-article-view .about-writer-bio { color: var(--ink); font-family: var(--font-serif); font-size: .98rem; line-height: 1.5; margin: 8px 0 0; max-width: 66ch; }
 .byline-article-view .about-writer-links { gap: 0 14px; margin-top: 10px; }
 .byline-article-view .about-writer-links a { color: var(--muted); font-family: var(--font-ui); font-size: .78rem; font-weight: 600; line-height: 1.35; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
