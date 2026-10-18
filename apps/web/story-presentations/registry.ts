@@ -1,10 +1,11 @@
 import type { StoryPresentationComponent, StoryPresentationRegistry } from "./types";
-import RevealFixtureStory from "./stories/reveal-fixture";
+import OverrideFixtureStory from "./stories/override-fixture";
 
 /**
  * Stories with a custom presentation, keyed by WordPress post ID (never slug or
- * headline). A story that is not listed renders through the normal
- * `ArticleView`; delete a line to put a story back on it.
+ * headline). A listed story always uses its component, even if the author chose
+ * Immersive in WordPress. A story that is not listed falls through to that
+ * choice, then to the normal `ArticleView`; delete a line to put a story back.
  *
  *   384: NeedALift,
  *
@@ -16,11 +17,12 @@ export const storyPresentations: StoryPresentationRegistry = {
 
 /**
  * Test-only: the fixture build (`BYLINE_CONTENT_MODE=weekly-wildcat-fixture`)
- * exercises the framework on a fixture story. Production never sets that mode, so
+ * exercises the framework on a fixture story that WordPress also marks
+ * Immersive, to prove the override wins. Production never sets that mode, so
  * these IDs cannot match a real story.
  */
 export const fixtureStoryPresentations: StoryPresentationRegistry = {
-  8: RevealFixtureStory
+  6: OverrideFixtureStory
 };
 
 export function resolveStoryPresentation(registry: StoryPresentationRegistry, postId: number | string): StoryPresentationComponent | null {

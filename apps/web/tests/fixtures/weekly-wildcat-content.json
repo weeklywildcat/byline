@@ -242,13 +242,57 @@
         "rendered": "<p>A supporting browser fixture story.</p>"
       },
       "author": 1,
-      "featured_media": 0,
+      "featured_media": 800,
       "categories": [
         2
       ],
       "tags": [],
       "sticky": false,
+      "byline": { "presentation": "immersive", "immersiveAlignment": "bottom-left" },
       "_embedded": {
+        "wp:featuredmedia": [
+          {
+            "id": 800,
+            "date": "2026-08-16T09:00:00",
+            "slug": "newsroom-meeting",
+            "type": "attachment",
+            "link": "https://weeklywildcat.com/newsroom-meeting/",
+            "title": {
+              "rendered": "Newsroom meeting"
+            },
+            "author": 1,
+            "caption": {
+              "rendered": "<p>Staff plan the publishing schedule.</p>"
+            },
+            "alt_text": "Two staff members review a tablet at a conference table.",
+            "media_type": "image",
+            "mime_type": "image/jpeg",
+            "media_details": {
+              "width": 1600,
+              "height": 1067,
+              "sizes": {
+                "medium": {
+                  "file": "newsroom-meeting-640.jpg",
+                  "width": 640,
+                  "height": 427,
+                  "mime_type": "image/jpeg",
+                  "source_url": "https://weeklywildcat.com/newsroom/newsroom-meeting-640.jpg"
+                },
+                "large": {
+                  "file": "newsroom-meeting-1000.jpg",
+                  "width": 1000,
+                  "height": 667,
+                  "mime_type": "image/jpeg",
+                  "source_url": "https://weeklywildcat.com/newsroom/newsroom-meeting-1000.jpg"
+                }
+              }
+            },
+            "bylineImage": {
+              "creator": "Fixture Photographer"
+            },
+            "source_url": "https://weeklywildcat.com/newsroom/newsroom-meeting-1600.jpg"
+          }
+        ],
         "author": [
           {
             "id": 1,
@@ -295,13 +339,57 @@
         "rendered": "<p>Another supporting browser fixture story.</p>"
       },
       "author": 1,
-      "featured_media": 0,
+      "featured_media": 800,
       "categories": [
         2
       ],
       "tags": [],
       "sticky": false,
+      "byline": { "presentation": "immersive", "immersiveAlignment": "center" },
       "_embedded": {
+        "wp:featuredmedia": [
+          {
+            "id": 800,
+            "date": "2026-08-16T09:00:00",
+            "slug": "newsroom-meeting",
+            "type": "attachment",
+            "link": "https://weeklywildcat.com/newsroom-meeting/",
+            "title": {
+              "rendered": "Newsroom meeting"
+            },
+            "author": 1,
+            "caption": {
+              "rendered": "<p>Staff plan the publishing schedule.</p>"
+            },
+            "alt_text": "Two staff members review a tablet at a conference table.",
+            "media_type": "image",
+            "mime_type": "image/jpeg",
+            "media_details": {
+              "width": 1600,
+              "height": 1067,
+              "sizes": {
+                "medium": {
+                  "file": "newsroom-meeting-640.jpg",
+                  "width": 640,
+                  "height": 427,
+                  "mime_type": "image/jpeg",
+                  "source_url": "https://weeklywildcat.com/newsroom/newsroom-meeting-640.jpg"
+                },
+                "large": {
+                  "file": "newsroom-meeting-1000.jpg",
+                  "width": 1000,
+                  "height": 667,
+                  "mime_type": "image/jpeg",
+                  "source_url": "https://weeklywildcat.com/newsroom/newsroom-meeting-1000.jpg"
+                }
+              }
+            },
+            "bylineImage": {
+              "creator": "Fixture Photographer"
+            },
+            "source_url": "https://weeklywildcat.com/newsroom/newsroom-meeting-1600.jpg"
+          }
+        ],
         "author": [
           {
             "id": 1,
@@ -354,6 +442,7 @@
       ],
       "tags": [],
       "sticky": false,
+      "byline": { "presentation": "immersive", "immersiveAlignment": "bottom-left" },
       "_embedded": {
         "wp:featuredmedia": [
           {

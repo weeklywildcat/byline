@@ -6,6 +6,7 @@
     ".": "./src/index.ts",
     "./article.css": "./article.css",
     "./hero-reveal.css": "./hero-reveal.css",
+    "./immersive-article.css": "./immersive-article.css",
     "./page-blocks.css": "./src/page-blocks.css",
     "./newsroom-blocks.css": "./src/newsroom-blocks.css",
     "./article-enhancements": "./src/article-enhancements/index.ts",

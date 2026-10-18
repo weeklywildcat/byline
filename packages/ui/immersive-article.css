@@ -1,14 +1,19 @@
-/* Reveal fixture story. Every selector is under .story-reveal. */
-.story-reveal .story-reveal-hero {
+/* Immersive article (the WordPress "Immersive" story presentation). Every selector is under .immersive-article. */
+.immersive-article .immersive-article-hero {
   background: #14181d;
 }
 
-.story-reveal .story-reveal-hero::before {
+.immersive-article .immersive-article-hero::before {
   /* Heavier toward the bottom, where the words sit. */
   background: linear-gradient(to top, rgba(14, 17, 22, 0.82), rgba(14, 17, 22, 0.28) 62%, rgba(14, 17, 22, 0.12));
 }
 
-.story-reveal .hero-reveal-copy {
+/* Centered headline: an even scrim, since the words sit mid-photograph. */
+.immersive-article-center .immersive-article-hero::before {
+  background: rgba(14, 17, 22, 0.52);
+}
+
+.immersive-article .hero-reveal-copy {
   gap: 14px;
   margin: 0 auto;
   max-width: 1040px;
@@ -16,7 +21,11 @@
   padding-right: 20px;
 }
 
-.story-reveal .story-reveal-category {
+.immersive-article-center .hero-reveal-copy {
+  text-align: center;
+}
+
+.immersive-article .immersive-article-category {
   border-bottom: 2px solid #fff;
   color: #fff;
   font-family: var(--font-ui);
@@ -27,7 +36,7 @@
   text-transform: uppercase;
 }
 
-.story-reveal .story-reveal-headline {
+.immersive-article .immersive-article-headline {
   color: #fff;
   font-family: var(--font-headline);
   font-size: clamp(2rem, 5.2vw, 4rem);
@@ -40,7 +49,7 @@
   text-wrap: balance;
 }
 
-.story-reveal .story-reveal-excerpt {
+.immersive-article .immersive-article-excerpt {
   color: rgba(255, 255, 255, 0.92);
   font-family: var(--font-serif);
   font-size: clamp(1.05rem, 1.8vw, 1.35rem);
@@ -49,32 +58,36 @@
   text-shadow: 0 1px 16px rgba(0, 0, 0, 0.5);
 }
 
-.story-reveal .story-reveal-excerpt p {
+.immersive-article .immersive-article-excerpt p {
   margin: 0;
 }
 
+.immersive-article-center .immersive-article-excerpt {
+  text-align: center;
+}
+
 /* The surface always covers the pinned photograph completely. */
-.story-reveal .story-reveal-surface {
+.immersive-article .immersive-article-surface {
   min-height: 100svh;
 }
 
-.story-reveal .story-reveal-surface .byline-article-view.article-shell {
+.immersive-article .immersive-article-surface .byline-article-view.article-shell {
   padding-top: 28px;
 }
 
-.story-reveal .story-reveal-meta {
+.immersive-article .immersive-article-meta {
   border-bottom: 1px solid var(--rule);
   margin-bottom: 28px;
   padding-bottom: 18px;
 }
 
-.story-reveal .story-reveal-meta .article-meta-block {
+.immersive-article .immersive-article-meta .article-meta-block {
   border-top: 0;
   margin-top: 0;
   padding-top: 0;
 }
 
-.story-reveal .story-reveal-caption {
+.immersive-article .immersive-article-caption {
   color: var(--muted);
   font-family: var(--font-serif);
   font-size: 0.9rem;
@@ -82,12 +95,12 @@
   margin-top: 16px;
 }
 
-.story-reveal .story-reveal-caption p {
+.immersive-article .immersive-article-caption p {
   margin: 0;
 }
 
 @media (max-width: 640px) {
-  .story-reveal .hero-reveal-copy {
+  .immersive-article .hero-reveal-copy {
     padding-left: 16px;
     padding-right: 16px;
   }

@@ -146,17 +146,12 @@ export function registerInSource(source, { id, name }) {
 export function registryHasId(source, id) {
   const match = REGISTRY_BLOCK.exec(source);
   if (!match) return false;
-  const idText = String(id);
-  return match[2]
-    .split("\n")
-    .some((line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("//")) return false;
-      const colonIndex = trimmed.indexOf(":");
-      if (colonIndex === -1) return false;
-      const key = trimmed.slice(0, colonIndex).trim();
-      return key === idText;
-    });
+  // Compare parsed numbers; never build a pattern from the id.
+  const wanted = Number(id);
+  return match[2].split("\n").some((line) => {
+    const entry = /^\s*(\d+)\s*:/.exec(line);
+    return entry !== null && Number(entry[1]) === wanted;
+  });
 }
 
 export async function createStoryPresentation({ id, name, root = path.resolve(here, "..") }) {
