@@ -111,6 +111,7 @@ export type WordPressContributor = WordPressAuthor | WordPressGuestContributor;
 export type WordPressAuthorProfile = {
   pronouns: string;
   role: string;
+  shortBio?: string;
   showInDirectory?: boolean;
   profilePhoto?: {
     id: number;
