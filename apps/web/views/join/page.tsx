@@ -61,8 +61,9 @@ export default function JoinPage() {
           <p className="about-kicker">Newsroom</p>
           <h1>Join the {publication.identity.shortName}</h1>
           <p className="about-lede">
-            Any student at {publication.identity.organizationName} can join the staff, at any time of year, with or without
-            experience.
+            The Weekly Wildcat covers the people, events and issues that shape life at Ninety Six High School. We're always
+            looking for students who are curious about what's happening around them and want to be part of that work. No
+            experience is needed, and you can join at any time.
           </p>
           <p className="join-start">
             To start, talk to Mr. Mackin or email <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
