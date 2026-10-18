@@ -14,7 +14,8 @@ Guidance for future work in the canonical Byline monorepo.
   by WordPress post ID, and resolves the author's Standard/Immersive choice. Layouts
   arrange the normalized `ArticlePresentation`; WordPress still owns every word. The
   only author setting is that choice and the immersive headline position; do not add
-  design controls. See `docs/custom-story-presentations.md`.
+  design controls. See `docs/custom-story-presentations.md`. For bespoke story work,
+  read the scoped `apps/web/story-presentations/AGENTS.md` before editing.
 - `schemas/`, `docs/`, and `scripts/` are repository-wide.
 
 Do not recreate the former two-repository architecture or add divergent copies
