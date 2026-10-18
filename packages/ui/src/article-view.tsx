@@ -344,7 +344,7 @@ export function ArticleStoryFooter({ presentation, slots = {} }: { presentation:
   );
 }
 
-/** "About the Writer(s)". Falls back to a staff card when the story has no profiled contributor. */
+/** Compact author provenance for the end of an article. */
 export function ArticleAuthors({ presentation }: { presentation: ArticlePresentation }): ReactNode {
   const contributors = presentation.contributors.length > 0
     ? presentation.contributors
@@ -356,52 +356,53 @@ export function ArticleAuthors({ presentation }: { presentation: ArticlePresenta
         bio: `Stories reported by the ${presentation.publication.shortName} newsroom.`,
         coverage: []
       }];
-  const heading = contributors.length > 1 ? "About the Writers" : "About the Writer";
+  const heading = contributors.length > 1 ? "About the authors" : "About the author";
 
   return (
     <section className="article-after-section about-writer" aria-labelledby="about-writer-heading">
       <div className="section-heading"><div><h2 id="about-writer-heading">{heading}</h2></div></div>
       <div className={contributors.length > 1 ? "about-writer-contributors" : undefined}>
-        {contributors.map((contributor) => (
-          <div className="about-writer-layout" key={contributor.id}>
-            {contributor.photo?.src ? (
-              <img
-                className="author-avatar about-writer-avatar"
-                src={contributor.photo.src}
-                srcSet={contributor.photo.srcSet}
-                sizes={contributor.photo.sizes}
-                alt={contributor.photo.alt}
-                width={contributor.photo.width ?? 132}
-                height={contributor.photo.height ?? 132}
-                loading="lazy"
-              />
-            ) : (
-              <div className="author-avatar author-avatar-fallback about-writer-avatar" aria-hidden="true">{initial(contributor.name)}</div>
-            )}
-            <div className="about-writer-body">
-              <div className="author-profile-meta">
-                <p className="profile-kicker">{contributor.role}</p>
+        {contributors.map((contributor) => {
+          const avatar = contributor.photo?.src ? (
+            <img
+              className="author-avatar about-writer-avatar"
+              src={contributor.photo.src}
+              srcSet={contributor.photo.srcSet}
+              sizes={contributor.photo.sizes}
+              alt={contributor.photo.alt}
+              width={contributor.photo.width ?? 96}
+              height={contributor.photo.height ?? 96}
+              loading="lazy"
+            />
+          ) : (
+            <div className="author-avatar author-avatar-fallback about-writer-avatar" aria-hidden="true">{initial(contributor.name)}</div>
+          );
+
+          return (
+            <div className="about-writer-layout" key={contributor.id}>
+              {contributor.href ? (
+                <a className="about-writer-photo-link" href={contributor.href} aria-label={`View ${contributor.name}'s profile`}>
+                  {avatar}
+                </a>
+              ) : avatar}
+              <div className="about-writer-body">
+                <h3>{contributor.href ? <a href={contributor.href}>{contributor.name}</a> : contributor.name}</h3>
+                <p className="about-writer-role">{contributor.role}</p>
+                {contributor.bio ? <p className="about-writer-bio">{contributor.bio}</p> : null}
+                {contributor.href || contributor.contactHref ? (
+                  <div className="about-writer-links">
+                    {contributor.href ? (
+                      <a href={`${contributor.href}#author-stories-heading`}>
+                        More by {contributor.name === presentation.fallbackByline ? "the staff" : contributor.name}
+                      </a>
+                    ) : null}
+                    {contributor.contactHref ? <a href={contributor.contactHref}>Email</a> : null}
+                  </div>
+                ) : null}
               </div>
-              <h3>{contributor.name}</h3>
-              {contributor.coverage?.length ? (
-                <p className="about-writer-coverage">
-                  Covers {contributor.coverage.map((area, index) => (
-                    <span key={area.href}>
-                      <a href={area.href}>{area.label}</a>{index < contributor.coverage!.length - 1 ? ", " : ""}
-                    </span>
-                  ))}
-                </p>
-              ) : null}
-              {contributor.href || contributor.contactHref ? (
-                <div className="about-writer-links">
-                  {contributor.href ? <a href={contributor.href}>View full profile</a> : null}
-                  {contributor.href ? <a href={`${contributor.href}#author-stories-heading`}>More stories by {contributor.name === presentation.fallbackByline ? "the staff" : contributor.name}</a> : null}
-                  {contributor.contactHref ? <a href={contributor.contactHref}>Contact</a> : null}
-                </div>
-              ) : null}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
