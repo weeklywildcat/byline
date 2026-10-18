@@ -27,13 +27,13 @@ describe("diversity and inclusion page", () => {
 
   it("opens on a fullscreen hero with the statement, then the page content", async () => {
     const document = await render();
-    const hero = document.querySelector(".di-hero")!;
-    const content = document.querySelector(".di-content")!;
+    const hero = document.querySelector(".hero-reveal")!;
+    const content = document.querySelector(".hero-reveal-content")!;
 
     expect(hero.querySelector("h1")).not.toBeNull();
     expect(hero.querySelector(".di-hero-statement")!.textContent).toContain("represented accurately, fairly and fully");
-    expect(hero.querySelector("img.di-hero-image")!.getAttribute("alt")).toBe("");
-    expect(hero.querySelector('a[href="#di-content"]')).not.toBeNull();
+    expect(hero.querySelector("img.hero-reveal-image")!.getAttribute("alt")).toBe("");
+    expect(hero.querySelector('a.hero-reveal-scroll[href="#di-content"]')).not.toBeNull();
     expect(content.id).toBe("di-content");
     expect(hero.compareDocumentPosition(content) & 4).toBeTruthy();
     expect(content.querySelector("#di-reporting-heading")).not.toBeNull();

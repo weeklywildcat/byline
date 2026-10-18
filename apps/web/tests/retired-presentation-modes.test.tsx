@@ -87,7 +87,12 @@ describe("the custom article hero is gone", () => {
 
     // The route supplies data and slots; the shared renderer owns the one
     // canonical header and article structure used by production and preview.
-    expect(articleRoute).toContain("<ArticleView");
+    // A story gets a different arrangement only by a developer registering its
+    // WordPress post ID (story-presentations/registry.ts); otherwise the route
+    // renders the shared ArticleView.
+    expect(articleRoute).toContain("<StoryArticle");
+    expect(astroArticleRoute).toContain("<StoryArticle");
+    expect(readSource("../story-presentations/StoryArticle.tsx")).toContain("<ArticleView");
     expect(articleRenderer.match(/className="article-header"/g)).toHaveLength(1);
     expect(articleRenderer).toContain('<article className="article-story">');
   });
@@ -106,7 +111,7 @@ describe("the custom article hero is gone", () => {
       "article-tags",
       "article-update-notice",
       "NewsletterSignupForm",
-      "AboutWriters"
+      "ArticleAuthors"
     ]) {
       expect(`${articleRoute}\n${articleRenderer}`).toContain(marker);
     }

@@ -1,0 +1,94 @@
+/* Reveal fixture story. Every selector is under .story-reveal. */
+.story-reveal .story-reveal-hero {
+  background: #14181d;
+}
+
+.story-reveal .story-reveal-hero::before {
+  /* Heavier toward the bottom, where the words sit. */
+  background: linear-gradient(to top, rgba(14, 17, 22, 0.82), rgba(14, 17, 22, 0.28) 62%, rgba(14, 17, 22, 0.12));
+}
+
+.story-reveal .hero-reveal-copy {
+  gap: 14px;
+  margin: 0 auto;
+  max-width: 1040px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.story-reveal .story-reveal-category {
+  border-bottom: 2px solid #fff;
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.story-reveal .story-reveal-headline {
+  color: #fff;
+  font-family: var(--font-headline);
+  font-size: clamp(2rem, 5.2vw, 4rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.06;
+  margin: 0;
+  max-width: 18em;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
+  text-wrap: balance;
+}
+
+.story-reveal .story-reveal-excerpt {
+  color: rgba(255, 255, 255, 0.92);
+  font-family: var(--font-serif);
+  font-size: clamp(1.05rem, 1.8vw, 1.35rem);
+  line-height: 1.4;
+  max-width: 34em;
+  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.5);
+}
+
+.story-reveal .story-reveal-excerpt p {
+  margin: 0;
+}
+
+/* The surface always covers the pinned photograph completely. */
+.story-reveal .story-reveal-surface {
+  min-height: 100svh;
+}
+
+.story-reveal .story-reveal-surface .byline-article-view.article-shell {
+  padding-top: 28px;
+}
+
+.story-reveal .story-reveal-meta {
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 28px;
+  padding-bottom: 18px;
+}
+
+.story-reveal .story-reveal-meta .article-meta-block {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.story-reveal .story-reveal-caption {
+  color: var(--muted);
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin-top: 16px;
+}
+
+.story-reveal .story-reveal-caption p {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .story-reveal .hero-reveal-copy {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

@@ -5,7 +5,7 @@ import { ArticleShareActions } from "@/components/ArticleShareActions";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
 import { ReaderFeedbackForm } from "@/components/ReaderFeedbackForm";
-import { ArticleView } from "@byline/ui";
+import { StoryArticle } from "@/story-presentations/StoryArticle";
 import { getPrimaryVisibleCategory, getPublicTopicTags, isVisibleContentPost } from "@/lib/content";
 import { stripHtml, decodeHtml } from "@/lib/format";
 import { buildArticlePresentation } from "@/lib/article-presentation";
@@ -94,7 +94,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   );
 
   return (
-    <ArticleView
+    <StoryArticle
       presentation={presentation}
       slots={{
         metadata,

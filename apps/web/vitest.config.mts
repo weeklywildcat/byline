@@ -17,6 +17,9 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Story presentations import their stylesheet as a string (`?inline`); the
+    // default would hand tests an empty one.
+    css: { include: [/\.css\?inline/] },
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"]
   }
 });

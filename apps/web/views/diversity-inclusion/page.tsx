@@ -1,4 +1,5 @@
 import type { Metadata } from "@/lib/metadata";
+import { HeroReveal, HeroRevealContent } from "@byline/ui";
 import { ExploreCards } from "@/components/ExploreCards";
 import { getPublicationConfig } from "@/lib/publication";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
@@ -37,41 +38,25 @@ export default function DiversityInclusionPage() {
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
       />
 
-      <script
-        id="di-hero-fit"
-        dangerouslySetInnerHTML={{
-          __html:
-            "(function(){var h=document.querySelector('.site-header');if(!h)return;var r=document.documentElement;function f(){r.style.setProperty('--di-header-h',h.getBoundingClientRect().height+'px')}f();addEventListener('resize',f);if(window.ResizeObserver)new ResizeObserver(f).observe(h)})()"
+      <HeroReveal
+        target="di-content"
+        image={{
+          src: "/diversity-inclusion/hero-1600.jpg",
+          srcSet: "/diversity-inclusion/hero-960.jpg 960w, /diversity-inclusion/hero-1600.jpg 1600w, /diversity-inclusion/hero-2400.jpg 2400w",
+          alt: "",
+          width: 2400,
+          height: 2400
         }}
-      />
-      <header className="di-hero">
-        <img
-          className="di-hero-image"
-          src="/diversity-inclusion/hero-1600.jpg"
-          srcSet="/diversity-inclusion/hero-960.jpg 960w, /diversity-inclusion/hero-1600.jpg 1600w, /diversity-inclusion/hero-2400.jpg 2400w"
-          sizes="100vw"
-          width={2400}
-          height={2400}
-          alt=""
-          fetchPriority="high"
-        />
-        <div className="di-hero-copy">
-          <h1 className="di-hero-kicker">{title}</h1>
-          <p className="di-hero-statement">
-            {publication.identity.shortName} believes every student deserves to see their school and community represented
-            accurately, fairly and fully. We want our newsroom to include voices, experiences and stories that are often
-            overlooked.
-          </p>
-        </div>
-        <a className="di-hero-scroll" href="#di-content">
-          <span>Scroll</span>
-          <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </a>
-      </header>
+      >
+        <h1 className="di-hero-kicker">{title}</h1>
+        <p className="di-hero-statement">
+          {publication.identity.shortName} believes every student deserves to see their school and community represented
+          accurately, fairly and fully. We want our newsroom to include voices, experiences and stories that are often
+          overlooked.
+        </p>
+      </HeroReveal>
 
-      <div className="di-content" id="di-content">
+      <HeroRevealContent id="di-content">
       <div className="about-page">
       <section className="about-section" aria-labelledby="di-reporting-heading">
         <h2 id="di-reporting-heading">In our reporting</h2>
@@ -165,7 +150,7 @@ export default function DiversityInclusionPage() {
         <ExploreCards cards={RELATED} columns={4} />
       </section>
       </div>
-      </div>
+      </HeroRevealContent>
     </main>
   );
 }

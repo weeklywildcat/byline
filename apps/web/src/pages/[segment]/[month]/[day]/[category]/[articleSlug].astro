@@ -10,7 +10,7 @@ import { getPublicationConfig } from "@/lib/publication";
 import { absoluteUrl, getBreadcrumbSchema, getNewsArticleSchema, serializeJsonLd } from "@/lib/seo";
 import { getPostGameScoreGameIds, getPostHref, getPostRouteParts } from "@/lib/wordpress";
 import { stripHtml, decodeHtml } from "@/lib/format";
-import { ArticleView } from "@byline/ui";
+import { StoryArticle } from "@/story-presentations/StoryArticle";
 import { ArticleGameCard } from "@/components/ArticleGameCard";
 import { ArticleShareActions } from "@/components/ArticleShareActions";
 import { ReaderFeedbackForm } from "@/components/ReaderFeedbackForm";
@@ -48,7 +48,7 @@ const slots = {
     ...(category ? [{ name: decodeHtml(category.name), path: `/category/${category.slug}/` }] : []),
     { name: title, path: getPostHref(post) }
   ]))}></script>
-  <ArticleView presentation={presentation} slots={slots} className={category?.slug === "opinion" ? "article-shell-opinion" : ""} />
+  <StoryArticle presentation={presentation} slots={slots} className={category?.slug === "opinion" ? "article-shell-opinion" : ""} />
   <script>
     import { articleEnhancementSelector } from "@byline/ui/article-enhancement-selector";
     const body = document.querySelector<HTMLElement>(".article-body");

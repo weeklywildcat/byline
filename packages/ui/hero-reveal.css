@@ -1,0 +1,102 @@
+/* Fullscreen hero reveal (HeroReveal / HeroRevealContent). The hero is pinned at
+   the top while the content that follows it scrolls up over it. Hosts provide
+   --paper and the font variables. */
+/* Marks where the hero's normal-flow position starts; see HERO_REVEAL_FIT_SCRIPT. */
+.hero-reveal-anchor {
+  height: 0;
+}
+
+.hero-reveal {
+  background: #1f2328;
+  color: #fff;
+  height: calc(100vh - var(--hero-reveal-header-h, 150px));
+  height: calc(100svh - var(--hero-reveal-header-h, 150px));
+  min-height: 420px;
+  overflow: hidden;
+  position: sticky;
+  top: 0;
+  z-index: 0;
+}
+
+.hero-reveal-image {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
+  width: 100%;
+  z-index: 0;
+}
+
+.hero-reveal::before {
+  background: rgba(14, 17, 22, var(--hero-reveal-scrim, 0.66));
+  content: "";
+  inset: 0;
+  position: absolute;
+  z-index: 1;
+}
+
+.hero-reveal-copy {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  inset: 0;
+  justify-content: center;
+  padding: 0 24px;
+  position: absolute;
+  text-align: center;
+  z-index: 2;
+}
+
+/* Bottom-left, clear of the scroll cue. */
+.hero-reveal-copy-end {
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 0 24px 76px;
+  text-align: left;
+}
+
+.hero-reveal-scroll {
+  align-items: center;
+  bottom: 24px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 800;
+  gap: 4px;
+  left: 50%;
+  letter-spacing: 0.14em;
+  opacity: 0.85;
+  position: absolute;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+.hero-reveal-scroll svg {
+  animation: hero-reveal-bob 1.8s ease-in-out infinite;
+}
+
+.hero-reveal-scroll:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
+@keyframes hero-reveal-bob {
+  50% {
+    transform: translateY(5px);
+  }
+}
+
+.hero-reveal-content {
+  background: var(--paper);
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-reveal-scroll svg {
+    animation: none;
+  }
+}
