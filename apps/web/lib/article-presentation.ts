@@ -19,6 +19,7 @@ import {
   getPostCategories,
   getPostContributors,
   getPostHref,
+  getPostStoryPresentation,
   getPostTags,
   getPublicCorrectionsForPost,
   isGuestContributor,
@@ -179,6 +180,7 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
   const related = relatedPosts(post, relatedCandidates ?? visiblePosts);
   const relatedIds = new Set(related.map((relatedPost) => relatedPost.id));
   const moreByAuthor = authorPosts.filter((candidate) => candidate.id !== post.id && !relatedIds.has(candidate.id)).slice(0, 3);
+  const storyPresentation = getPostStoryPresentation(post);
   const athleteSpotlight = isAthleteSpotlightPost(post);
   const athleteMeta = athleteSpotlight
     ? [getAthleteSpotlightLabel(post), getAthleteSportLabel(post)].filter((value): value is string => Boolean(value))
@@ -193,6 +195,8 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
     contentHtml: post.content.rendered.trim(),
     category: category ? { label: decodeHtml(category.name), href: `/category/${category.slug}/` } : null,
     athleteMeta,
+    storyPresentation: storyPresentation.presentation,
+    immersiveAlignment: storyPresentation.immersiveAlignment,
     contributors: displayContributors.map((contributor) => contributorView(contributor, getCoverageAreas(visiblePosts.filter((candidate) => postHasContributor(candidate, contributor))))),
     fallbackByline: `${publication.identity.shortName} Staff`,
     publishedAt: post.date,

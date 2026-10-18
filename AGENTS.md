@@ -11,9 +11,10 @@ Guidance for future work in the canonical Byline monorepo.
 - `packages/` is the canonical source for shared contracts, the Weekly Wildcat theme, and UI
   presentation metadata.
 - `apps/web/story-presentations/` holds optional, developer-defined article layouts keyed
-  by WordPress post ID. They arrange the normalized `ArticlePresentation`; WordPress
-  still owns every word, and there is no WordPress setting for them. See
-  `docs/custom-story-presentations.md`.
+  by WordPress post ID, and resolves the author's Standard/Immersive choice. Layouts
+  arrange the normalized `ArticlePresentation`; WordPress still owns every word. The
+  only author setting is that choice and the immersive headline position; do not add
+  design controls. See `docs/custom-story-presentations.md`.
 - `schemas/`, `docs/`, and `scripts/` are repository-wide.
 
 Do not recreate the former two-repository architecture or add divergent copies

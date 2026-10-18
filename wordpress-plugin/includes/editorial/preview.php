@@ -773,6 +773,9 @@ function byline_editorial_preview_presentation(int $post_id): array
     $author_posts = array_slice($author_posts, 0, 3);
     $more_by_author = array_values(array_map('byline_editorial_preview_story_card', $author_posts));
     $short_name = byline_editorial_preview_plain_text((string) ($publication['identity']['shortName'] ?? 'Byline'));
+    $story_presentation = function_exists('byline_story_presentation_settings')
+        ? byline_story_presentation_settings($post_id)
+        : ['presentation' => 'standard', 'immersiveAlignment' => 'bottom-left'];
 
     return [
         'id' => $post_id,
@@ -783,6 +786,8 @@ function byline_editorial_preview_presentation(int $post_id): array
         'contentHtml' => $content,
         'category' => $category_view,
         'athleteMeta' => byline_editorial_preview_athlete_meta($post),
+        'storyPresentation' => $story_presentation['presentation'],
+        'immersiveAlignment' => $story_presentation['immersiveAlignment'],
         'contributors' => $contributor_views,
         'fallbackByline' => $short_name . ' Staff',
         'publishedAt' => $published_at,

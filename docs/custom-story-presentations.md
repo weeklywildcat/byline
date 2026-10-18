@@ -1,22 +1,58 @@
-# Custom story presentations
+# Story presentations
+
+How a story is laid out on the public site. There are three, chosen in this order:
+
+```
+WordPress post
+      ↓
+ArticlePresentation                   (apps/web/lib/article-presentation.ts)
+      ↓
+1. repo override registered for the post ID?  → custom TSX            (developers)
+      ↓ no
+2. author chose Immersive in WordPress?       → ImmersiveArticleView  (authors)
+      ↓ no
+3.                                            → ArticleView           (default)
+```
+
+A repository override always wins over the author's choice. `StoryArticle`
+(`apps/web/story-presentations/StoryArticle.tsx`) makes this decision for both
+article routes.
+
+## The author option: Immersive
+
+In the WordPress post editor's **Story presentation** panel (Document sidebar):
+
+- **Standard** (default) is the normal article.
+- **Immersive** opens the story on its featured image, full screen under the site
+  header, with the category, headline and excerpt over it. Scrolling slides the
+  article up over the pinned photograph. When chosen, **Headline position** is
+  **Bottom left** (default) or **Center**.
+
+There is nothing else to set: no colors, fonts, scrim or layout controls. The
+featured image is the hero, so an Immersive story without one is shown as a
+standard story (the panel says so). Everything else (byline, caption and credit,
+body, corrections, poll, newsletter, related stories, the ending) is the normal
+article's, just rearranged.
+
+Under the hood these are two post meta values, `byline_story_presentation`
+(`standard` | `immersive`) and `byline_story_immersive_alignment`
+(`bottom-left` | `center`), registered in
+`wordpress-plugin/includes/content/story-presentation.php` and sanitized to those
+values. They are published as `presentation` and `immersiveAlignment` in the
+existing post `byline` settings (and its `weeklyWildcat` alias), included in the
+build snapshot, and carried as `storyPresentation` and `immersiveAlignment` on
+`ArticlePresentation`. Stories from before the setting existed, and any missing or
+unrecognized value, are Standard / Bottom left. Changing the choice changes the
+post and so triggers the normal rebuild. `ImmersiveArticleView` lives in
+`packages/ui` with its styles in `packages/ui/immersive-article.css`.
+
+## The developer override
 
 A repository-defined presentation override for selected WordPress posts. It is an
 escape hatch for the occasional story that deserves a one-off layout, not the
 normal publishing path.
 
-```
-WordPress post
-      ↓
-ArticlePresentation          (apps/web/lib/article-presentation.ts)
-      ↓
-registered for this post ID?
-  ↙               ↘
-yes                no
- ↓                  ↓
-custom TSX       ArticleView
-```
-
-## What stays in WordPress
+### What stays in WordPress
 
 Everything editorial: headline, excerpt/deck, contributors and bylines, featured
 image with its caption and credit, the Gutenberg body (galleries, Visual
@@ -25,7 +61,7 @@ dates. Authors write, publish and correct exactly as they do now. There is no
 checkbox, template, shortcode, block, tag or setting for this feature, and
 WordPress does not know it exists.
 
-## What stays in the repository
+### What stays in the repository
 
 Layout, styling, animation and decorative assets: how the pieces above are
 arranged. Structured data, metadata, Open Graph, breadcrumbs and the canonical
@@ -45,15 +81,16 @@ export const storyPresentations: StoryPresentationRegistry = {
 };
 ```
 
-**Delete the line and the story is back on the normal article immediately.** A
-story that is not listed renders through `ArticleView` exactly as it always has.
+**Delete the line and the story is back on the author's choice (Immersive or
+Standard) immediately.** A story that is not listed and is Standard renders through
+`ArticleView` exactly as it always has.
 
 ## How the route resolves it
 
 Both article routes (`src/pages/.../[articleSlug].astro` and the legacy
 `views/.../page.tsx`) load the story, build `ArticlePresentation` and the slots as
-usual and render `<StoryArticle>`. It looks the post ID up in the registry and
-renders either the custom component or `ArticleView`. Structured-data scripts are
+usual and render `<StoryArticle>`. It looks the post ID up in the registry first.
+For an override, structured-data scripts are
 rendered by the route outside the custom component, so a presentation cannot omit
 them.
 
@@ -92,6 +129,7 @@ add `styles.css`, and add the import and the `id: Component` entry to the regist
 | `ArticleCorrections`, `ArticleTopics`, `ArticleUpdateNotice` | The individual pieces of the footer. |
 | `ArticleStandardEnding` | About the writers, related stories, more by the author and the newsroom tip. Or compose `ArticleAuthors`, `ArticleRelatedStories`, `ArticleMoreByAuthor`, `ArticleTipCallout`. |
 | `HeroReveal`, `HeroRevealContent` | The fullscreen reveal (see [fullscreen-hero-reveal.md](fullscreen-hero-reveal.md)). |
+| `ImmersiveArticleView` | The whole Immersive article. An override that only wants a different look can start from its source. |
 
 `ArticleView` is only a composition of these, so a change to a piece reaches every
 story, custom or not.
@@ -110,7 +148,7 @@ them yourself. The body, byline and ending are, and inherit the normal article
 styles. Wide and full-bleed blocks in the WordPress body work because the body
 sits in an `ArticleShell`.
 
-## Rules
+## Rules (for overrides)
 
 - **Never hard-code article reporting.** No headline, deck, byline, caption or
   paragraph in a presentation. Render `presentation` through the primitives; if
@@ -147,22 +185,29 @@ sits in an `ArticleShell`.
 Run `npm run story-presentation -- create 384 <name>`; the generated component is
 already that layout, so the work is the typography, spacing and any decoration.
 
-## Tests and the fixture
+## Tests and the fixtures
 
-`stories/reveal-fixture/` is the framework's example. It is registered for fixture
-post 8 only when `BYLINE_CONTENT_MODE=weekly-wildcat-fixture` (the CI fixture
-build), so it can never match a real story. Coverage:
+The fixture build (`BYLINE_CONTENT_MODE=weekly-wildcat-fixture`) marks fixture posts
+8 (bottom left), 7 (centered) and 6 as Immersive in WordPress. Post 6 also has the
+fixture-only override `stories/override-fixture/`, registered in
+`fixtureStoryPresentations`, so production can never match it. Coverage:
 
-- `apps/web/tests/story-presentations.test.tsx`: registry resolution, the default
-  article unchanged, and the example rendering live data with one `<h1>`, the body,
-  caption and credit, corrections, authors, slots and structured data.
+- `apps/web/tests/story-presentations.test.tsx`: registry resolution; the standard
+  article unchanged; the settings normalized and carried into the model; both
+  headline positions with the live WordPress content, one `<h1>`, caption and
+  credit, corrections, authors, slots and structured data; and the override
+  winning over Immersive.
 - `apps/web/tests/browser/hero-reveal.spec.ts`: the reveal geometry at desktop and
-  phone width, reduced motion, the scroll cue and no horizontal overflow, for the
-  example and the Diversity & Inclusion page.
+  phone width for both alignments, headline placement, reduced motion, the scroll
+  cue, no horizontal overflow, the override winning, and the Diversity & Inclusion
+  page using the same reveal.
+- `wordpress-plugin/tests/story-presentation-regression.php` (meta, defaults,
+  sanitizing, REST schema), `tests-js/story-presentation-settings.test.ts` (the
+  editor controls' model), and the build-snapshot integration test (the choice
+  reaches the snapshot).
 - `scripts/story-presentation.test.mjs`: the scaffold command.
 
-When you add a real presentation, add a test for anything specific to it (for
-example an interaction); the framework already covers the rest.
+When you add a real override, add a test for anything specific to it.
 
 ## Known limits
 
@@ -170,5 +215,7 @@ example an interaction); the framework already covers the rest.
   changed presentation or registry changes modules the shared article route
   imports, and Astro's incremental build hashes imported modules, so expect article
   pages to be re-rendered (not restored) after such a change.
+- The Story presentation panel is in the block editor only. The classic editor
+  keeps whatever was saved. "Preview as Byline" still renders the standard article.
 - Presentations are static HTML. Anything interactive needs its own island, as the
   existing slots do.
