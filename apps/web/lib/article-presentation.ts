@@ -7,7 +7,6 @@ import { getMediaCredit } from "@/lib/wordpress";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getAuthorProfile,
-  getContributorDescription,
   contributorHasProfilePage,
   getContributorHref,
   getContributorName,
@@ -113,7 +112,7 @@ function contributorView(contributor: WordPressContributor, coverage: ReturnType
     name: getContributorName(contributor),
     href: contributorHasProfilePage(contributor) ? getContributorHref(contributor) : "",
     role: getContributorRole(contributor),
-    bio: stripHtml(getContributorDescription(contributor)) || (contributorHasProfilePage(contributor) ? `Stories reported by the ${publication.identity.shortName} newsroom.` : ""),
+    bio: !isGuestContributor(contributor) ? stripHtml(profile?.shortBio ?? "") : "",
     photo: photo ? articleImage({
       id: typeof photo.id === "number" ? photo.id : 0,
       date: "",
