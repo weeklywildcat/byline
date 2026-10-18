@@ -15,10 +15,11 @@ $secret = 'BYLINE_PRIVATE_SENTINEL';
 $public = byline_snapshot_contributor([
     'id' => 4, 'name' => 'Public Writer', 'slug' => 'writer', 'user_email' => $secret, 'user_pass' => $secret, 'notes' => $secret, 'deployHookUrl' => $secret,
     'profilePhoto' => ['url' => 'https://cms.test/photo.jpg', 'alt' => 'Public', 'adminNonce' => $secret],
-    'bylineProfile' => ['pronouns' => 'they/them', 'private' => $secret, 'socials' => ['website' => 'https://writer.test', 'oauthToken' => $secret]],
+    'bylineProfile' => ['pronouns' => 'they/them', 'shortBio' => 'Reports on city hall and public records.', 'private' => $secret, 'socials' => ['website' => 'https://writer.test', 'oauthToken' => $secret]],
 ]);
 snapshot_assert(strpos(json_encode($public), $secret) === false, 'Only explicit public contributor fields may enter the artifact.');
 snapshot_assert($public['bylineProfile']['socials']['website'] === 'https://writer.test', 'Keep canonical public profile fields.');
+snapshot_assert($public['bylineProfile']['shortBio'] === 'Reports on city hall and public records.', 'Keep the public short author bio in build snapshots.');
 $post = new WP_Post();
 snapshot_assert(byline_snapshot_public_post($post), 'Published public content is allowed.');
 foreach (['draft', 'private', 'future', 'trash', 'pending'] as $status) { $post->post_status = $status; snapshot_assert(!byline_snapshot_public_post($post), 'Exclude non-public status ' . $status); }
