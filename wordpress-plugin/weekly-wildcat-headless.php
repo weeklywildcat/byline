@@ -2031,62 +2031,84 @@ function wwh_render_author_profile_fields(WP_User $user): void
 {
     $photo_id = absint(get_user_meta($user->ID, '_ww_author_photo_id', true));
     $photo = wwh_author_profile_photo($photo_id);
+    $social_fields = wwh_author_social_fields();
+    $has_social_links = false;
+
+    foreach (array_keys($social_fields) as $key) {
+        if (wwh_author_meta_value($user->ID, '_ww_author_social_' . $key) !== '') {
+            $has_social_links = true;
+            break;
+        }
+    }
 
     ?>
-    <h2><?php echo esc_html(byline_get_publication_config()['identity']['shortName']); ?> Profile</h2>
-    <table class="form-table wwh-author-profile" role="presentation">
-        <tr>
-            <th><label for="ww_author_role">Role</label></th>
-            <td><input type="text" class="regular-text" id="ww_author_role" name="ww_author_role" value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_role')); ?>"></td>
-        </tr>
-        <tr>
-            <th><label for="ww_author_short_bio">Short Bio</label></th>
-            <td>
-                <textarea class="large-text" rows="3" id="ww_author_short_bio" name="ww_author_short_bio"><?php echo esc_textarea(wwh_author_meta_value($user->ID, '_ww_author_short_bio')); ?></textarea>
-                <p class="description">Shown with your name at the end of stories and near the top of your author page. Keep this to one or two sentences; use WordPress Biographical Info for your full profile bio.</p>
-            </td>
-        </tr>
-        <tr>
-            <th><label for="ww_author_pronouns">Pronouns</label></th>
-            <td><input type="text" class="regular-text" id="ww_author_pronouns" name="ww_author_pronouns" value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_pronouns')); ?>"></td>
-        </tr>
-        <tr>
-            <th><label for="ww_author_photo_id">Profile Photo</label></th>
-            <td>
+    <section class="wwh-author-profile-editor" aria-labelledby="wwh-author-profile-heading">
+        <div class="wwh-author-profile-heading">
+            <div>
+                <h2 id="wwh-author-profile-heading"><?php echo esc_html(byline_get_publication_config()['identity']['shortName']); ?> profile</h2>
+                <p>Controls the public information shown on your author page and alongside your stories.</p>
+            </div>
+            <label class="wwh-author-visibility">
+                <input type="checkbox" name="ww_author_show_in_directory" value="1" <?php checked(wwh_author_visible_in_directory($user->ID)); ?>>
+                <span>Show in staff directory</span>
+            </label>
+        </div>
+
+        <div class="wwh-author-profile-card">
+            <div class="wwh-author-photo-field">
+                <span class="wwh-author-field-label">Profile photo</span>
                 <input type="hidden" id="ww_author_photo_id" name="ww_author_photo_id" value="<?php echo esc_attr((string) $photo_id); ?>">
                 <img class="wwh-author-photo-preview" src="<?php echo esc_url($photo['url']); ?>" alt="" <?php echo $photo['url'] === '' ? 'hidden' : ''; ?>>
-                <p>
-                    <button type="button" class="button wwh-author-photo-select">Select Profile Photo</button>
-                    <button type="button" class="button wwh-author-photo-remove" <?php echo $photo['url'] === '' ? 'hidden' : ''; ?>>Remove Photo</button>
-                </p>
-                <p class="description">Use a WordPress Media Library image instead of Gravatar.</p>
-            </td>
-        </tr>
-        <tr>
-            <th>Author Directory</th>
-            <td>
-                <label>
-                    <input type="checkbox" name="ww_author_show_in_directory" value="1" <?php checked(wwh_author_visible_in_directory($user->ID)); ?>>
-                    Show in author directory
-                </label>
-                <p class="description">Enabled by default so new contributors can appear before their first story is published.</p>
-            </td>
-        </tr>
-        <?php foreach (wwh_author_social_fields() as $key => $label) : ?>
-            <tr>
-                <th><label for="ww_author_social_<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></label></th>
-                <td>
-                    <input
-                        type="<?php echo $key === 'email' ? 'email' : 'url'; ?>"
-                        class="regular-text"
-                        id="ww_author_social_<?php echo esc_attr($key); ?>"
-                        name="ww_author_social_<?php echo esc_attr($key); ?>"
-                        value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_social_' . $key)); ?>"
-                    >
-                </td>
-            </tr>
-        <?php endforeach; ?>
-    </table>
+                <div class="wwh-author-photo-actions">
+                    <button type="button" class="button button-secondary wwh-author-photo-select"><?php echo $photo['url'] === '' ? 'Choose photo' : 'Change photo'; ?></button>
+                    <button type="button" class="button-link-delete wwh-author-photo-remove" <?php echo $photo['url'] === '' ? 'hidden' : ''; ?>>Remove</button>
+                </div>
+                <p class="description">Use a clear headshot. This replaces your WordPress avatar on the publication.</p>
+            </div>
+
+            <div class="wwh-author-profile-fields">
+                <div class="wwh-author-field">
+                    <label for="ww_author_role">Role</label>
+                    <input type="text" class="regular-text" id="ww_author_role" name="ww_author_role" value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_role')); ?>" placeholder="Editor-in-chief">
+                </div>
+
+                <div class="wwh-author-field">
+                    <label for="ww_author_pronouns">Pronouns <span class="wwh-author-optional">Optional</span></label>
+                    <input type="text" class="regular-text" id="ww_author_pronouns" name="ww_author_pronouns" value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_pronouns')); ?>" placeholder="they/them">
+                </div>
+
+                <div class="wwh-author-field wwh-author-field-wide">
+                    <label for="ww_author_short_bio">Short bio</label>
+                    <textarea class="large-text" rows="3" id="ww_author_short_bio" name="ww_author_short_bio" aria-describedby="ww-author-short-bio-help"><?php echo esc_textarea(wwh_author_meta_value($user->ID, '_ww_author_short_bio')); ?></textarea>
+                    <p class="description" id="ww-author-short-bio-help">One or two sentences shown at the end of stories and near the top of your author page.</p>
+                </div>
+            </div>
+        </div>
+
+        <p class="wwh-author-long-bio-note"><strong>Full bio:</strong> use the <a href="#description">Biographical Info</a> field above. It appears in the About section of your author page.</p>
+
+        <details class="wwh-author-socials" <?php echo $has_social_links ? 'open' : ''; ?>>
+            <summary>
+                <span>Contact &amp; social links</span>
+                <span class="wwh-author-optional">Optional</span>
+            </summary>
+            <div class="wwh-author-social-grid">
+                <?php foreach ($social_fields as $key => $label) : ?>
+                    <div class="wwh-author-field">
+                        <label for="ww_author_social_<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></label>
+                        <input
+                            type="<?php echo $key === 'email' ? 'email' : 'url'; ?>"
+                            class="regular-text"
+                            id="ww_author_social_<?php echo esc_attr($key); ?>"
+                            name="ww_author_social_<?php echo esc_attr($key); ?>"
+                            value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_social_' . $key)); ?>"
+                            placeholder="<?php echo esc_attr($key === 'email' ? 'name@example.com' : 'https://'); ?>"
+                        >
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </details>
+    </section>
     <?php
 }
 add_action('show_user_profile', 'wwh_render_author_profile_fields');
@@ -2143,7 +2165,7 @@ document.addEventListener('click', function (event) {
     var remove = event.target.closest('.wwh-author-photo-remove');
     if (select) {
         event.preventDefault();
-        var wrap = select.closest('td');
+        var wrap = select.closest('.wwh-author-photo-field');
         var frame = wp.media({ title: 'Select author profile photo', button: { text: 'Use this photo' }, multiple: false });
         frame.on('select', function () {
             var attachment = frame.state().get('selection').first().toJSON();
@@ -2157,7 +2179,7 @@ document.addEventListener('click', function (event) {
     }
     if (remove) {
         event.preventDefault();
-        var wrap = remove.closest('td');
+        var wrap = remove.closest('.wwh-author-photo-field');
         wrap.querySelector('#ww_author_photo_id').value = '';
         var preview = wrap.querySelector('.wwh-author-photo-preview');
         preview.removeAttribute('src');
@@ -2186,7 +2208,38 @@ function wwh_admin_styles(): void
         .wwh-field textarea, .wwh-checkbox { grid-column: 1 / -1; }
         .wwh-checkbox label, .wwh-checkbox span { display: inline; }
         @media (max-width: 782px) { .wwh-fields { grid-template-columns: 1fr; } }
-        .wwh-author-photo-preview { background: #f0f0f1; display: block; height: 96px; margin-bottom: 10px; object-fit: cover; width: 96px; }
+        .wwh-author-profile-editor { margin: 32px 0 24px; max-width: 920px; }
+        .wwh-author-profile-heading { align-items: end; display: flex; gap: 24px; justify-content: space-between; margin-bottom: 12px; }
+        .wwh-author-profile-heading h2 { margin: 0 0 4px; }
+        .wwh-author-profile-heading p { color: #646970; margin: 0; max-width: 620px; }
+        .wwh-author-visibility { align-items: center; display: inline-flex; flex: 0 0 auto; font-weight: 600; gap: 6px; padding-bottom: 2px; }
+        .wwh-author-profile-card { background: #fff; border: 1px solid #c3c4c7; display: grid; gap: 24px; grid-template-columns: 160px minmax(0, 1fr); padding: 20px; }
+        .wwh-author-photo-field { min-width: 0; }
+        .wwh-author-field-label, .wwh-author-field > label { display: block; font-weight: 600; margin-bottom: 6px; }
+        .wwh-author-photo-preview { background: #f0f0f1; border-radius: 50%; display: block; height: 112px; margin: 0 0 10px; object-fit: cover; width: 112px; }
+        .wwh-author-photo-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+        .wwh-author-photo-field .description { margin: 10px 0 0; }
+        .wwh-author-profile-fields, .wwh-author-social-grid { display: grid; gap: 16px 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .wwh-author-field { min-width: 0; }
+        .wwh-author-field-wide { grid-column: 1 / -1; }
+        .wwh-author-field input:not([type="checkbox"]), .wwh-author-field textarea { box-sizing: border-box; max-width: none; width: 100%; }
+        .wwh-author-field textarea { min-height: 88px; resize: vertical; }
+        .wwh-author-optional { color: #8c8f94; font-size: 12px; font-weight: 400; }
+        .wwh-author-long-bio-note { color: #646970; margin: 10px 0 0; }
+        .wwh-author-socials { background: #fff; border: 1px solid #c3c4c7; margin-top: 18px; }
+        .wwh-author-socials summary { align-items: center; cursor: pointer; display: flex; font-weight: 600; gap: 8px; justify-content: space-between; padding: 14px 16px; }
+        .wwh-author-socials[open] summary { border-bottom: 1px solid #dcdcde; }
+        .wwh-author-social-grid { padding: 18px 16px 20px; }
+        body.profile-php .user-profile-picture, body.user-edit-php .user-profile-picture { display: none; }
+        @media (max-width: 782px) {
+            .wwh-author-profile-heading { align-items: start; flex-direction: column; gap: 10px; }
+            .wwh-author-profile-card { grid-template-columns: 1fr; }
+            .wwh-author-photo-field { display: grid; grid-template-columns: 112px minmax(0, 1fr); column-gap: 14px; }
+            .wwh-author-photo-field .wwh-author-field-label { grid-column: 1 / -1; }
+            .wwh-author-photo-actions, .wwh-author-photo-field .description { align-self: start; }
+            .wwh-author-profile-fields, .wwh-author-social-grid { grid-template-columns: 1fr; }
+            .wwh-author-field-wide { grid-column: auto; }
+        }
     </style>';
 }
 add_action('admin_head', 'wwh_admin_styles');
