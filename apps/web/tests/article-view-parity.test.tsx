@@ -18,6 +18,7 @@ describe("shared article presentation", () => {
 
     expect(presentation.title).toBe("Public records guide");
     expect(presentation.contributors.map((contributor) => contributor.name)).toEqual(["Alex Rivera", "Jordan Guest"]);
+    expect(presentation.contributors[0]?.bio).toBe("Alex Rivera reports on public records and local government.");
     expect(presentation.corrections).toHaveLength(1);
     expect(presentation.corrections[0].label).toBe("Clarification");
     expect(JSON.stringify(presentation)).not.toContain("privateNote");
@@ -39,9 +40,14 @@ describe("shared article presentation", () => {
     expect(markup).toContain("Public records guide");
     expect(markup).toContain("The public story.");
     expect(markup).toContain("Clarification");
-    expect(markup).toContain("About the Writers");
+    expect(markup).toContain("About the authors");
     expect(markup).toContain("Alex Rivera");
     expect(markup).toContain("Jordan Guest");
+    expect(markup).toContain("Alex Rivera reports on public records and local government.");
+    expect(markup).toContain("More by Alex Rivera");
+    expect(markup).not.toContain("View full profile");
+    expect(markup).not.toContain("Covers ");
+    expect(markup).not.toContain("long profile biography");
     expect(markup).not.toContain("A public guest bio.");
     expect(markup).not.toContain("privateNote");
   });
