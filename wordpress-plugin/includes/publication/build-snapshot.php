@@ -36,7 +36,7 @@ function byline_snapshot_contributor(array $value): array
     if (isset($value['profilePhoto'])) $result['profilePhoto'] = byline_snapshot_photo($value['profilePhoto']);
     foreach (['bylineProfile', 'weeklyWildcatProfile'] as $field) {
         if (!isset($value[$field]) || !is_array($value[$field])) continue;
-        $profile = byline_snapshot_pick($value[$field], ['pronouns', 'role', 'showInDirectory']);
+        $profile = byline_snapshot_pick($value[$field], ['pronouns', 'role', 'shortBio', 'showInDirectory']);
         $profile['profilePhoto'] = byline_snapshot_photo($value[$field]['profilePhoto'] ?? null);
         // This explicitly public contact email is already rendered by author
         // pages. It is not the account's private user_email column.
