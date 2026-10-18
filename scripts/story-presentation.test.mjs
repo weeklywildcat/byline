@@ -82,3 +82,16 @@ test("prints the lines to add when the registry has an unexpected shape", async 
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("registryHasId reads entries without building a pattern from its input", () => {
+  const source = registry.replace("storyPresentations: StoryPresentationRegistry = {\n}", "storyPresentations: StoryPresentationRegistry = {\n  384: NeedALift,\n  // 500: Commented,\n}");
+  assert.equal(registryHasId(source, "384"), true);
+  assert.equal(registryHasId(source, 384), true);
+  assert.equal(registryHasId(source, "500"), false);
+  assert.equal(registryHasId(source, "38"), false);
+  assert.equal(registryHasId(source, "8"), false);
+  // Regex metacharacters are inert: they are not a number, so they never match.
+  assert.equal(registryHasId(source, "3.*"), false);
+  assert.equal(registryHasId(source, ".*"), false);
+  assert.equal(registryHasId("nothing", "1"), false);
+});

@@ -101,7 +101,7 @@ function byline_snapshot_post($post, array &$attachments): ?array
     if ($post->post_type === 'page') {
         $result['bylinePage'] = byline_snapshot_pick((array) ($data['bylinePage'] ?? []), ['eyebrow', 'indexing', 'sportsArchive']);
     } else {
-        $result['byline'] = $result['weeklyWildcat'] = byline_snapshot_pick(wwh_rest_post_settings(['id' => $post->ID]), ['primaryGameId', 'gameScoreGameIds']);
+        $result['byline'] = $result['weeklyWildcat'] = byline_snapshot_pick(wwh_rest_post_settings(['id' => $post->ID]), ['primaryGameId', 'gameScoreGameIds', 'presentation', 'immersiveAlignment']);
         $result['contributors'] = array_map('byline_snapshot_contributor', byline_get_public_story_contributors($post->ID));
         $result['corrections'] = array_map(static fn($item) => byline_snapshot_pick($item, ['id', 'type', 'text', 'date']), byline_get_public_corrections($post->ID));
         // Core's canonical embed serializer, restricted to its public embed

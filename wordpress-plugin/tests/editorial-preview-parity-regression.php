@@ -427,6 +427,7 @@ preview_parity_assert($preview_parity['creditCalls'] > 0, 'Preview never called 
 preview_parity_assert(array_column($presentation['relatedStories'], 'id') === $expected['relatedIds'], 'Preview related story IDs/order drifted from shared category/tag scoring.');
 preview_parity_assert(array_column($presentation['moreByAuthorStories'], 'id') === $expected['moreByAuthorIds'], 'Preview more-by-author did not use effective multi-contributor membership.');
 preview_parity_assert($presentation['athleteMeta'] === $expected['athleteMeta'], 'Preview athlete metadata drifted from the shared public contract.');
+preview_parity_assert(($presentation['storyPresentation'] ?? null) === 'standard' && ($presentation['immersiveAlignment'] ?? null) === 'bottom-left', 'Preview must carry the story presentation defaults the public adapter uses.');
 preview_parity_assert($presentation['publishedLabel'] === $expected['publishedDateLabel'], 'Preview publication date label drifted from the public locale rule.');
 preview_parity_assert($presentation['update'] === $expected['update'], 'Preview update state drifted from the public correction-aware rule.');
 preview_parity_assert($presentation['readingTime'] === $expected['readingTime'], 'Preview reading time drifted from the public word-count rule.');

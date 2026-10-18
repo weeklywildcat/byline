@@ -244,6 +244,8 @@ export type WordPressPost = {
 export type WordPressPostSettings = {
   primaryGameId?: number;
   gameScoreGameIds?: number[];
+  presentation?: unknown;
+  immersiveAlignment?: unknown;
   contributors?: unknown;
   authors?: unknown;
   corrections?: unknown;
@@ -1573,6 +1575,18 @@ export function getAuthorSocialLinks(author: WordPressAuthor) {
 export function getPostPrimaryGameId(post: WordPressPost) {
   const primaryGameId = (post.byline ?? post.weeklyWildcat)?.primaryGameId;
   return primaryGameId && primaryGameId > 0 ? primaryGameId : null;
+}
+
+/**
+ * How an author chose to present the story. Anything missing or unrecognized
+ * (including stories from before the setting existed) is Standard, bottom left.
+ */
+export function getPostStoryPresentation(post: WordPressPost): { presentation: "standard" | "immersive"; immersiveAlignment: "bottom-left" | "center" } {
+  const settings = post.byline ?? post.weeklyWildcat;
+  return {
+    presentation: settings?.presentation === "immersive" ? "immersive" : "standard",
+    immersiveAlignment: settings?.immersiveAlignment === "center" ? "center" : "bottom-left"
+  };
 }
 
 export function getPostGameScoreGameIds(post: WordPressPost) {

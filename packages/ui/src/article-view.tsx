@@ -69,6 +69,10 @@ export type ArticlePresentation = {
   contentHtml: string;
   category?: ArticleLinkView | null;
   athleteMeta?: string[];
+  /** The author's choice in WordPress. Absent means standard. */
+  storyPresentation?: "standard" | "immersive";
+  /** Headline position for an immersive story. Absent means bottom-left. */
+  immersiveAlignment?: "bottom-left" | "center";
   contributors: ArticleContributorView[];
   fallbackByline: string;
   publishedAt: string;

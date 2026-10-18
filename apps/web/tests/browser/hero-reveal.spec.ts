@@ -3,8 +3,16 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { openStory } from './story-fixtures';
 
-/** The registered fixture story (WordPress post 8) and a plain one beside it. */
-const customStory = '/2026/08/16/news/weekly-wildcat-browser-fixture-five/';
+/**
+ * Fixture stories the WordPress "Immersive" option is set on (build fixture
+ * `byline.presentation`): post 8 bottom left, post 7 centered. Post 6 is also
+ * Immersive but has a repository override, which must win. Post 9 is plain.
+ */
+const stories = [
+  { alignment: 'bottom-left', url: '/2026/08/16/news/weekly-wildcat-browser-fixture-five/' },
+  { alignment: 'center', url: '/2026/08/17/news/weekly-wildcat-browser-fixture-four/' }
+] as const;
+const overriddenStory = '/2026/08/18/news/weekly-wildcat-browser-fixture-three/';
 const plainStory = '/2026/08/15/news/weekly-wildcat-browser-fixture-six/';
 const diversityPage = '/diversity-inclusion/';
 
@@ -75,11 +83,29 @@ async function expectRevealGeometry(page: Page) {
   expect(overflow).toBe(false);
 }
 
-for (const viewport of viewports) {
-  test.describe(`custom story reveal at ${viewport.name} width`, () => {
+for (const story of stories) for (const viewport of viewports) {
+  test.describe(`immersive story (${story.alignment}) at ${viewport.name} width`, () => {
     test.beforeEach(async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await openReveal(page, customStory);
+      await openReveal(page, story.url);
+    });
+
+    test('places the headline where the author chose', async ({ page }) => {
+      const box = await page.evaluate(() => {
+        const hero = document.querySelector('.hero-reveal')!.getBoundingClientRect();
+        const h1 = document.querySelector('.hero-reveal h1')!.getBoundingClientRect();
+        return { heroTop: hero.top, heroHeight: hero.height, heroWidth: hero.width, left: h1.left, centerX: (h1.left + h1.right) / 2, centerY: (h1.top + h1.bottom) / 2 - hero.top, bottom: h1.bottom - hero.top };
+      });
+      expect(box.left).toBeGreaterThanOrEqual(0);
+      if (story.alignment === 'bottom-left') {
+        expect(box.left).toBeLessThan(box.heroWidth * 0.25);
+        expect(box.centerY).toBeGreaterThan(box.heroHeight * 0.55);
+      } else {
+        near(box.centerX, box.heroWidth / 2, 3);
+        expect(box.centerY).toBeGreaterThan(box.heroHeight * 0.3);
+        expect(box.centerY).toBeLessThan(box.heroHeight * 0.7);
+      }
+      expect(box.bottom).toBeLessThanOrEqual(box.heroHeight);
     });
 
     test('fills the screen beneath the header, and the article surface rises over the pinned photograph', async ({ page }) => {
@@ -92,7 +118,7 @@ for (const viewport of viewports) {
         const surface = document.querySelector('.hero-reveal-content')!;
         return {
           meta: top('.hero-reveal-content .article-meta-block'),
-          caption: top('.story-reveal-caption'),
+          caption: top('.immersive-article-caption'),
           body: top('.hero-reveal-content .article-body'),
           ending: top('.hero-reveal-content .article-after'),
           bodyInside: surface.contains(document.querySelector('.article-body')),
@@ -106,8 +132,8 @@ for (const viewport of viewports) {
       expect(order.bodyInside).toBe(true);
       expect(order.h1InHero).toBe(true);
       expect(order.h1Count).toBe(1);
-      await expect(page.locator('.story-reveal-caption')).toContainText('Staff plan the publishing schedule.');
-      await expect(page.locator('.story-reveal-caption')).toContainText('Photo: Fixture Photographer');
+      await expect(page.locator('.immersive-article-caption')).toContainText('Staff plan the publishing schedule.');
+      await expect(page.locator('.immersive-article-caption')).toContainText('Photo: Fixture Photographer');
       await expect(page.locator('.hero-reveal-content .article-after-section.about-writer')).toBeVisible();
     });
 
@@ -123,7 +149,7 @@ for (const viewport of viewports) {
           fit: getComputedStyle(image).objectFit,
           currentSrc: image.currentSrc,
           filled: Math.abs(imageBox.width - heroBox.width) < 1 && Math.abs(imageBox.height - heroBox.height) < 1,
-          scrim: scrim.backgroundImage,
+          scrim: scrim.backgroundImage !== 'none' ? scrim.backgroundImage : scrim.backgroundColor,
           headline: getComputedStyle(document.querySelector('.hero-reveal h1')!).color,
           headlineInside: (() => { const h = document.querySelector('.hero-reveal h1')!.getBoundingClientRect(); return h.top >= heroBox.top && h.bottom <= heroBox.bottom && h.left >= 0 && h.right <= window.innerWidth; })(),
           background: getComputedStyle(document.querySelector('.hero-reveal-content')!).backgroundColor,
@@ -134,7 +160,8 @@ for (const viewport of viewports) {
       expect(hero.srcset).toBe(3);
       expect(hero.fit).toBe('cover');
       expect(hero.filled).toBe(true);
-      expect(hero.scrim).toContain('linear-gradient');
+      // Bottom-left darkens toward the words with a gradient; centered uses an even scrim.
+      expect(hero.scrim).toMatch(story.alignment === 'bottom-left' ? /linear-gradient/ : /^rgba\(14, 17, 22, 0\.5\d*\)$/);
       expect(hero.headline).toBe('rgb(255, 255, 255)');
       expect(hero.headlineInside).toBe(true);
       expect(hero.background).not.toBe('rgba(0, 0, 0, 0)');
@@ -144,11 +171,11 @@ for (const viewport of viewports) {
 
     test('the scroll cue is a keyboard link to the article, and the page never traps scrolling', async ({ page }) => {
       const cue = page.locator('a.hero-reveal-scroll');
-      await expect(cue).toHaveAttribute('href', '#story-reveal-surface');
+      await expect(cue).toHaveAttribute('href', '#immersive-article-surface');
       await cue.focus();
       await expect(cue).toBeFocused();
       await page.keyboard.press('Enter');
-      await expect(page).toHaveURL(/#story-reveal-surface$/);
+      await expect(page).toHaveURL(/#immersive-article-surface$/);
       // The page reserves `scroll-padding-top` for the docked logo bar, so the surface lands just beneath it.
       const reserved = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0);
       await expect.poll(async () => Math.abs((await measure(page)).surface.top - reserved)).toBeLessThan(3);
@@ -158,7 +185,7 @@ for (const viewport of viewports) {
       await page.keyboard.press('Home');
       await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
       await page.goBack();
-      await expect(page).not.toHaveURL(/#story-reveal-surface$/);
+      await expect(page).not.toHaveURL(/#immersive-article-surface$/);
     });
   });
 }
@@ -166,7 +193,7 @@ for (const viewport of viewports) {
 test('respects reduced motion on the scroll cue', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await openReveal(page, customStory);
+  await openReveal(page, stories[0].url);
   const animation = () => page.locator('.hero-reveal-scroll svg').evaluate((svg) => getComputedStyle(svg).animationName);
   expect(await animation()).toBe('hero-reveal-bob');
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -185,13 +212,21 @@ for (const viewport of viewports) {
   });
 }
 
-test('a story with no registered override keeps the normal article and none of the custom assets', async ({ page }) => {
-  const requested: string[] = [];
-  page.on('request', (request) => requested.push(request.url()));
+test('a standard story keeps the normal article', async ({ page }) => {
   await page.goto(plainStory);
   await page.waitForLoadState('networkidle');
   await expect(page.locator('.article-header h1')).toHaveCount(1);
-  await expect(page.locator('.hero-reveal, .hero-reveal-content, style[data-story-presentation]')).toHaveCount(0);
-  expect(await page.evaluate(() => document.documentElement.outerHTML.includes('story-reveal'))).toBe(false);
-  expect(requested.filter((url) => /story-reveal|reveal-fixture/.test(url))).toEqual([]);
+  await expect(page.locator('.hero-reveal, .hero-reveal-content, .immersive-article')).toHaveCount(0);
+  await expect(page.locator('main.article-shell')).toHaveCount(1);
+});
+
+test('a repository override wins over WordPress Immersive', async ({ page }) => {
+  await serveFixturePhotos(page);
+  await page.goto(overriddenStory);
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('.story-override-fixture')).toHaveCount(1);
+  await expect(page.locator('.hero-reveal, .immersive-article')).toHaveCount(0);
+  await expect(page.locator('h1')).toHaveCount(1);
+  await expect(page.locator('script#newsarticle-json-ld')).toHaveCount(1);
+  await expect(page.locator('.article-body')).toBeVisible();
 });

@@ -190,6 +190,7 @@ describe("public article presentation parity fixture", () => {
     expect(presentation.corrections).toEqual(expected.corrections);
     expect(presentation.update).toBe(expected.update);
     expect(presentation.athleteMeta).toEqual(expected.athleteMeta);
+    expect([presentation.storyPresentation, presentation.immersiveAlignment]).toEqual(["standard", "bottom-left"]);
     expect(presentation.relatedStories.map((value) => value.id)).toEqual(expected.relatedIds);
     expect(presentation.moreByAuthorStories.map((value) => value.id)).toEqual(expected.moreByAuthorIds);
     expect(presentation.publishedLabel).toBe(expected.publishedDateLabel);
