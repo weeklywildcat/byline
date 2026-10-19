@@ -12,9 +12,7 @@ import {
   NEWSROOM_PHOTOS,
   PHOTOS,
   ROLES,
-  SECTIONS,
   SHOW_NEWSROOM_TODAY,
-  STANDARDS,
   STORY_SLUGS,
   TIMELINE
 } from "./content";
@@ -263,63 +261,6 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      <section className="about-section" id="coverage" aria-labelledby="coverage-heading">
-        <h2 id="coverage-heading">What we cover</h2>
-        <div className="about-section-body">
-          <div className="about-prose about-prose-wide">
-            <p>
-              Most stories are about the school: teams, classes, clubs, people and the decisions that shape a
-              student&rsquo;s day. We also report on the town and the wider area when a story reaches students and families.
-            </p>
-          </div>
-          <dl className="about-sections">
-            {SECTIONS.map((section) => (
-              <div key={section.slug}>
-                <dt>
-                  <a href={section.href}>{section.label}</a>
-                </dt>
-                <dd>{section.text}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </section>
-
-      <section className="about-section" id="standards" aria-labelledby="standards-heading">
-        <h2 id="standards-heading">Standards and corrections</h2>
-        <div className="about-section-body">
-          <div className="about-prose about-prose-wide">
-            <p>
-              This is the working code the staff holds itself to. It is our own statement, not an official policy of the
-              school or the district.
-            </p>
-          </div>
-          <dl className="about-standards">
-            {STANDARDS.map((standard) => (
-              <div key={standard.term}>
-                <dt>{standard.term}</dt>
-                <dd>{standard.text}</dd>
-              </div>
-            ))}
-          </dl>
-          <div className="about-corrections">
-            <h3>When we get something wrong</h3>
-            <div className="about-prose">
-              <p>
-                Corrections, clarifications, editor&rsquo;s notes and substantive updates are published in a{" "}
-                <a href="/corrections/">public log</a>, and the note appears on the story itself. To ask for one, use the
-                feedback form on the story or write to the newsroom through the <a href="/contact/">contact page</a>. You can
-                ask us to keep your name private. We review each request and correct the record when it is needed.
-              </p>
-              <p>
-                Original photographs are licensed under Creative Commons Attribution 4.0 unless a caption says otherwise. The{" "}
-                <a href="/image-license/">image license page</a> explains how to credit them.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section className="about-section" id="ai" aria-labelledby="ai-heading">
         <h2 id="ai-heading">Artificial intelligence</h2>
         <div className="about-section-body">
@@ -354,8 +295,8 @@ export default async function AboutPage() {
             </div>
             <div className="about-prose">
               <p>
-                Students decide what runs, no matter who is paying. Sponsors, advertisers and donors don&rsquo;t pick our
-                stories or see them before they publish, and a gift doesn&rsquo;t earn anyone coverage.
+                Our students decide what we publish. If sponsors, advertisers or donors come on board, we&rsquo;ll be
+                grateful for the support, and they still won&rsquo;t choose our stories or see them before they run.
               </p>
             </div>
           </div>
@@ -368,23 +309,23 @@ export default async function AboutPage() {
           <div className="about-split about-split-media">
             <div className="about-prose">
               <p>
-                The staff also builds and maintains the technology that publishes the paper. Editors write and schedule
-                stories in WordPress, which stays behind the scenes. Readers see a separate static website built from that
-                content, which loads quickly and stays up when the publishing system is down for maintenance. The software is
-                called Byline, and its code is public on{" "}
-                <a href="https://github.com/weeklywildcat/byline">GitHub</a>, so anyone can read it or suggest a fix.
+                Our students build and run the technology behind the paper, too. Editors write and schedule stories in
+                WordPress, which readers never see. What readers visit is a separate, static website built from that
+                content. It loads fast and stays online even when we take the publishing system down for maintenance. The
+                software is called Byline, and its code is public on{" "}
+                <a href="https://github.com/weeklywildcat/byline">GitHub</a> for anyone to read or suggest improvements.
               </p>
               {stats.archive ? (
                 <p>
-                  The same system holds a fixed archive of Wildcat sports results: {formatCount(stats.archive.games)} game
-                  records across {stats.archive.sports} sports
-                  {stats.archive.earliestSeason ? `, with seasons going back to ${stats.archive.earliestSeason}` : ""}. It is a
-                  historical record, not a live schedule. <a href={stats.archive.href}>Browse the archive</a>.
+                  Byline also holds our sports archive: {formatCount(stats.archive.games)} game records across{" "}
+                  {stats.archive.sports} sports
+                  {stats.archive.earliestSeason ? `, going back to the ${stats.archive.earliestSeason} season` : ""}.{" "}
+                  <a href={stats.archive.href}>Browse the archive</a>.
                 </p>
               ) : null}
               <p>
-                Our team also maintains Tilecast, an open source signage system that runs screens at the school. Both
-                projects are described on the <a href="/open-source/">Open Source page</a>.
+                We also maintain Tilecast, an open source signage system that runs the screens at the school. You can read
+                about both projects on the <a href="/open-source/">Open Source page</a>.
               </p>
             </div>
             <Photo photo={websitePhoto} />
