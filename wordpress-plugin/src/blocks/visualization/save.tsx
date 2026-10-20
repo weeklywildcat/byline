@@ -1,5 +1,5 @@
 import { useBlockProps } from '@wordpress/block-editor';
-import { StoryImageMarkup } from '../story/image';
+import { LegacyStoryImageMarkup as StoryImageMarkup } from '../story/image'; // 0.3.24 markup until this block's save moves to the slim one (with a deprecation)
 import { visualizationUrl } from '@byline/ui/visualization';
 export function VisualizationSave({ attributes: a }: any) {
   const validated = visualizationUrl(a.embedUrl || '');

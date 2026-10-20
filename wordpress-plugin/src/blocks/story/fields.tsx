@@ -1,3 +1,4 @@
+import { PlainText } from '@wordpress/block-editor';
 import { TextControl, TextareaControl } from '@wordpress/components';
 import { useEffect, useRef, useState } from '@wordpress/element';
 
@@ -29,4 +30,13 @@ export function StoryTextControl({ value, onChange, ...props }: Fieldprops) {
 export function StoryTextareaControl({ value, onChange, ...props }: Fieldprops) {
   const [local, change] = useBufferedText(value ?? '', onChange);
   return <TextareaControl __nextHasNoMarginBottom {...props} value={local} onChange={change} />;
+}
+
+/**
+ * A caption (or any short line of copy) edited where it appears, styled by the
+ * block's own figcaption rules. Plain text, so what is typed is what is saved.
+ */
+export function StoryCaption({ value, onChange, placeholder, className = 'byline-story-caption', label }: { value?: string; onChange: (value: string) => void; placeholder: string; className?: string; label: string }) {
+  const [local, change] = useBufferedText(value ?? '', onChange);
+  return <PlainText className={className} value={local} placeholder={placeholder} aria-label={label} onChange={change} />;
 }

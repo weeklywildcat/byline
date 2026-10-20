@@ -1,5 +1,5 @@
 import { useBlockProps } from '@wordpress/block-editor';
-import { StoryImageMarkup } from '../story/image';
+import { LegacyStoryImageMarkup as StoryImageMarkup } from '../story/image'; // 0.3.24 markup until this block's save moves to the slim one (with a deprecation)
 export function BeforeAfterSave({ attributes: a }: any) {
   return <figure {...useBlockProps.save({ className: 'byline-before-after' })}>
     {(!a.before?.url || !a.after?.url) && <p>Choose both photographs to complete this comparison.</p>}

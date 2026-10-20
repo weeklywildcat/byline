@@ -1,5 +1,5 @@
 import { useBlockProps } from '@wordpress/block-editor';
-import { StoryImageMarkup } from '../story/image';
+import { LegacyStoryImageMarkup as StoryImageMarkup } from '../story/image'; // 0.3.24 markup until this block's save moves to the slim one (with a deprecation)
 import { clampCoordinate, type Annotation } from '../story/models';
 export function AnnotatedImageSave({ attributes: a }: any) {
   if (!a.image?.url) return <figure {...useBlockProps.save({ className: 'byline-annotated-image' })}><p>Annotated image pending.</p></figure>;

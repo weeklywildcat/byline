@@ -66,7 +66,7 @@ function byline_story_register_media_field(): void
             return [
                 'srcSet' => is_string($srcset) ? $srcset : '',
                 'sizes' => is_string($sizes) ? $sizes : '',
-                'credit' => function_exists('byline_editorial_media_attachment_meta_value') ? byline_editorial_media_attachment_meta_value($id, 'creditText') : '',
+                'credit' => byline_story_credit($id),
             ];
         },
         'schema' => ['type' => 'object', 'readonly' => true, 'context' => ['view', 'edit']],
@@ -115,3 +115,177 @@ function byline_story_table_scroll_region(string $html): string
     return $tags->get_updated_html();
 }
 add_filter('render_block_core/table', 'byline_story_table_scroll_region');
+
+/*
+ * Story blocks at render time.
+ *
+ * Two jobs, both done here so the static export, REST `content.rendered` and
+ * Preview as Byline agree, and saved content is never rewritten:
+ *
+ *  1. Credits. Photograph credits come from the attachment's current metadata
+ *     through the same resolver Core images use, not from a snapshot taken when
+ *     the block was last saved. Credits baked in by Byline 0.3.24 and earlier
+ *     are replaced, so a corrected credit reaches old articles too.
+ *  2. Unfinished blocks. A block still waiting for a photograph, a graphic or
+ *     any text prints nothing to readers, instead of an editor instruction.
+ */
+
+/** Attachment IDs of the images in a rendered block, in document order. */
+function byline_story_image_ids(string $html): array
+{
+    preg_match_all('/<img\b[^>]*\bclass="[^"]*\bwp-image-(\d+)\b/i', $html, $matches);
+    return array_map('intval', $matches[1] ?? []);
+}
+
+/** Credit lines to replace: ones baked into saved markup before 0.3.25 (plain `<p>Photo: Name</p>`) and our own. */
+function byline_story_strip_legacy_credit_lines(string $html): string
+{
+    return (string) preg_replace('#<p(?:\sclass="photo-credit")?>(?:[^<:]{0,60}\s)?photo:\s[^<]*</p>#iu', '', $html);
+}
+
+/** Add credit lines to the figure's caption, creating the caption when the figure has none. */
+function byline_story_add_credit_lines(string $figure, array $credit_lines): string
+{
+    $lines = '';
+    foreach ($credit_lines as $line) {
+        if (trim($line) !== '') {
+            $lines .= '<p class="photo-credit">' . esc_html($line) . '</p>';
+        }
+    }
+    if ($lines === '') {
+        return $figure;
+    }
+    $end = strripos($figure, '</figcaption>');
+    if ($end !== false) {
+        return substr_replace($figure, $lines, $end, 0);
+    }
+    $close = strripos($figure, '</figure>');
+    return $close === false ? $figure : substr_replace($figure, '<figcaption class="wp-element-caption byline-photo-credit-only">' . $lines . '</figcaption>', $close, 0);
+}
+
+/** Remove a caption that has nothing left in it. */
+function byline_story_drop_empty_caption(string $html): string
+{
+    return (string) preg_replace('#<figcaption\b[^>]*>\s*</figcaption>#i', '', $html);
+}
+
+/** The credit for one attachment, or an empty string. */
+function byline_story_credit(int $attachment_id): string
+{
+    return function_exists('byline_photo_credit_for_attachment') ? byline_photo_credit_for_attachment($attachment_id) : '';
+}
+
+/**
+ * Responsive candidates for a story block's photographs, from the attachment as
+ * it is now. Saved markup used to carry a snapshot `srcset` and a generic
+ * `sizes` ("100vw, 1600px") that made every viewport fetch the largest file and
+ * went stale when sizes were regenerated. `$sizes` is the block's real layout
+ * (see BYLINE_STORY_IMAGE_SIZES); update it with the CSS.
+ */
+function byline_story_responsive_images(string $html, string $sizes): string
+{
+    if (!class_exists('WP_HTML_Tag_Processor') || !function_exists('wp_get_attachment_image_srcset') || stripos($html, '<img') === false) {
+        return $html;
+    }
+    $tags = new WP_HTML_Tag_Processor($html);
+    while ($tags->next_tag('IMG')) {
+        if (!preg_match('/\bwp-image-(\d+)\b/', (string) $tags->get_attribute('class'), $match)) {
+            continue;
+        }
+        $srcset = wp_get_attachment_image_srcset((int) $match[1], 'full');
+        if (is_string($srcset) && $srcset !== '') {
+            $tags->set_attribute('srcset', $srcset);
+            $tags->set_attribute('sizes', $sizes);
+        }
+    }
+    return $tags->get_updated_html();
+}
+
+/** Rendered widths per block, matching packages/ui/src/newsroom/*.css. */
+const BYLINE_STORY_IMAGE_SIZES = [
+    'annotated-image' => '(max-width: 700px) calc(100vw - 32px), (max-width: 1072px) calc((100vw - 32px) * 0.64), 660px',
+    'before-after' => '(max-width: 1072px) calc(100vw - 32px), 1040px',
+    'scrolly-step' => '(max-width: 899px) calc(100vw - 32px), 560px',
+    'visualization' => '(max-width: 1072px) calc(100vw - 32px), 1040px',
+];
+
+function byline_story_render_annotated_image(string $content, array $block = []): string
+{
+    if (stripos($content, '<img') === false) {
+        return '';
+    }
+    $ids = byline_story_image_ids($content);
+    $content = byline_story_responsive_images(byline_story_drop_empty_caption(byline_story_strip_legacy_credit_lines($content)), BYLINE_STORY_IMAGE_SIZES['annotated-image']);
+    $credit = $ids ? byline_story_credit($ids[0]) : '';
+    return byline_story_add_credit_lines($content, [$credit !== '' ? 'Photo: ' . $credit : '']);
+}
+
+function byline_story_render_before_after(string $content, array $block = []): string
+{
+    if (substr_count(strtolower($content), '<img') < 2) {
+        return '';
+    }
+    $ids = byline_story_image_ids($content);
+    preg_match_all('#<strong\b[^>]*data-(?:before|after)[^>]*>(.*?)</strong>#is', $content, $labels);
+    $credits = [];
+    foreach ($ids as $index => $id) {
+        $credit = byline_story_credit($id);
+        if ($credit !== '') {
+            $credits[] = [$credit, trim(wp_strip_all_tags((string) ($labels[1][$index] ?? '')))];
+        }
+    }
+    $line = '';
+    if ($credits) {
+        $unique = array_values(array_unique(array_column($credits, 0)));
+        $line = count($unique) === 1
+            ? 'Photo: ' . $unique[0]
+            : 'Photo: ' . implode(', ', array_map(static fn(array $pair): string => $pair[1] !== '' ? $pair[0] . ' (' . $pair[1] . ')' : $pair[0], $credits));
+    }
+    $content = byline_story_responsive_images(byline_story_drop_empty_caption(byline_story_strip_legacy_credit_lines($content)), BYLINE_STORY_IMAGE_SIZES['before-after']);
+    return byline_story_add_credit_lines($content, [$line]);
+}
+
+function byline_story_render_scrolly_step(string $content, array $block = []): string
+{
+    $ids = byline_story_image_ids($content);
+    if (!$ids) {
+        return $content;
+    }
+    $content = byline_story_responsive_images(byline_story_drop_empty_caption(byline_story_strip_legacy_credit_lines($content)), BYLINE_STORY_IMAGE_SIZES['scrolly-step']);
+    $credit = byline_story_credit($ids[0]);
+    return (string) preg_replace_callback('#<figure\b[^>]*\bbyline-scrolly-media\b[^>]*>.*?</figure>#is', static fn(array $match): string => byline_story_add_credit_lines($match[0], [$credit !== '' ? 'Photo: ' . $credit : '']), $content, 1);
+}
+
+function byline_story_render_timeline(string $content, array $block = []): string
+{
+    // An event needs a title or reporting; a date label alone is a stub.
+    $content = (string) preg_replace_callback('#<li\b[^>]*\bbyline-timeline-item\b[^>]*>(.*?)</li>#is', static function (array $match): string {
+        return preg_match('#byline-timeline-(?:title|body)#', $match[1]) && trim(wp_strip_all_tags((string) preg_replace('#<p class="byline-timeline-label">.*?</p>#is', '', $match[1]))) !== '' ? $match[0] : '';
+    }, $content);
+    return strpos($content, 'byline-timeline-item') === false ? '' : $content;
+}
+
+function byline_story_render_visualization(string $content, array $block = []): string
+{
+    $has_image = stripos($content, '<img') !== false;
+    $has_embed = strpos($content, 'data-src="') !== false;
+    if (!$has_image && !$has_embed) {
+        return '';
+    }
+    if (!$has_embed) {
+        // An unsupported or missing embed address publishes as its static graphic.
+        $content = str_replace('data-mode="embed"', 'data-mode="static"', $content);
+    }
+    return byline_story_responsive_images($content, BYLINE_STORY_IMAGE_SIZES['visualization']);
+}
+
+foreach ([
+    'annotated-image' => 'byline_story_render_annotated_image',
+    'before-after' => 'byline_story_render_before_after',
+    'scrolly-step' => 'byline_story_render_scrolly_step',
+    'timeline' => 'byline_story_render_timeline',
+    'visualization' => 'byline_story_render_visualization',
+] as $byline_story_slug => $byline_story_callback) {
+    add_filter('render_block_byline/' . $byline_story_slug, $byline_story_callback, 20, 2);
+}
+unset($byline_story_slug, $byline_story_callback);
