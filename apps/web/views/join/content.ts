@@ -75,7 +75,7 @@ export const FAQ = [
   {
     question: "Can I use my school Chromebook?",
     answer:
-      "No. You cannot access your account on your school Chromebook due to district restrictions. If you have one, we recommend bringing an iPad, MacBook or other personal laptop. If you do not have one, we will work with you."
+      "No. District restrictions do not let you add your @weeklywildcat.com Google Workspace account to a school Chromebook, so you will not be able to reach our WordPress, shared drive or any documents, and you cannot do newspaper work on one. We also typically ask that Chromebooks not be used for interviews, since recordings and notes have been lost on them, and we would suggest not relying on one to research your stories. An iPad, MacBook or other personal laptop works much better. If you do not have one, we will work with you."
   },
   {
     question: "Do I need my own camera?",
