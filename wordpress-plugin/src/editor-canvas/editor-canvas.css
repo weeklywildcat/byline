@@ -145,6 +145,18 @@
   max-width: none;
 }
 
+/* Wide and full-width blocks break out of the 760px column exactly as they do on the
+   published page (the width comes from newsroom/story-base.css). The constrained layout
+   WordPress puts on the root block list centres them with `margin: auto !important`,
+   which leaves a block wider than the column hanging off its right edge; only another
+   `!important` can win, so say it here and nowhere else. */
+.editor-styles-wrapper .is-root-container > .alignwide {
+  margin-inline: calc((100% - min(var(--article-wide-width), 100cqw)) / 2) !important;
+}
+.editor-styles-wrapper .is-root-container > .alignfull {
+  margin-inline: calc((100% - min(var(--article-full-width), 100cqw)) / 2) !important;
+}
+
 @media (max-width: 640px) {
   .editor-styles-wrapper .editor-post-title,
   .editor-styles-wrapper .editor-post-title__input,
