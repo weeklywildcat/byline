@@ -98,6 +98,21 @@ Publication, Work, Updated) and the existing sort; below about 820px of
 available width it becomes compact rows. TanStack Table is not used: nothing
 here needs column visibility, multi-sort, selection or pagination.
 
+The List is also the fastest editing surface. High-frequency scalar values use
+direct manipulation instead of forcing a Story Peek round-trip: click **Workflow**
+to open the native shadcn `Select`, click **Deadline** or an editable planned
+publication date to open the shared Popover/Calendar date picker. These edits use
+optimistic TanStack Query updates and roll back only the affected story on
+failure. WordPress scheduled/published timestamps stay read-only here because
+they are canonical publication state rather than planning targets.
+
+A row is wrapped in the native shadcn `ContextMenu`, so right-click exposes
+Quick view, Workspace, Gutenberg/preview links, and the same **Move to** status
+submenu as the visible three-dot menu. The context menu is strictly an
+accelerator: the title, inline controls, and three-dot menu remain the primary
+keyboard/touch routes. This avoids hiding required actions behind right-click
+while still giving mouse and trackpad users a spreadsheet-style workflow.
+
 ### Calendar: Schedule-X
 
 Schedule-X v4 (`@schedule-x/react`, `calendar`, `events-service`,
