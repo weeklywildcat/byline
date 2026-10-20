@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "@wordpress/element";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../admin-ui/ui/accordion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../admin-ui/ui/alert-dialog";
 import { CodeBlock, CodeBlockContent } from "../admin-ui/ui/code-block";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "../admin-ui/ui/breadcrumb";
 
 import type { NewsletterFetchers } from "./api";
 import {
@@ -262,7 +263,7 @@ export function NewsletterEditor({ fetchers, newsletterId, initialNewsletter, br
     <section className="byline-newsletter-screen byline-newsletter-editor" aria-labelledby="byline-newsletter-editor-title">
       <header className="byline-newsletter-screen-header">
         <div>
-          <div className="byline-newsletter-breadcrumbs">{onBack ? <Button variant="link" onClick={onBack}>{__("All newsletters", "weekly-wildcat-headless")}</Button> : null}</div>
+          {onBack ? <Breadcrumb className="mb-2"><BreadcrumbList><BreadcrumbItem><BreadcrumbLink render={<button type="button" onClick={onBack} />}>{__("Newsletters", "weekly-wildcat-headless")}</BreadcrumbLink></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{draft.title || __("New newsletter", "weekly-wildcat-headless")}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb> : null}
           <h1 id="byline-newsletter-editor-title">{draft.title || __("New newsletter", "weekly-wildcat-headless")}</h1>
           <div className="byline-newsletter-editor-state"><NewsletterStatusBadge status={draft.status} />{draft.updatedAt ? <span>{__("Updated", "weekly-wildcat-headless")} {formatNewsletterDate(draft.updatedAt)}</span> : null}</div>
         </div>
