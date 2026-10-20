@@ -18,7 +18,7 @@ function story(): PlanningStory {
     authors: [],
     writer: null,
     editor: null,
-    workflow: { id: "reporting", label: "Reporting" },
+    workflow: { id: "reporting", label: "Reporting", group: "main", selectable: true },
     wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
     deadline: "2026-10-21",
     plannedPublication: null,
