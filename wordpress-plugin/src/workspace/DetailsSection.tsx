@@ -13,10 +13,29 @@ import { SectionFailed } from "./parts";
 import { applyWorkflowPayload, patchStory, type StoryPatch } from "./workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { workspaceError } from "./workspace-errors";
+import { workspaceUndoToast } from "./workspace-toast";
 import { names, peopleOptions, sectionNames } from "./workspace-model";
 import type { WorkspaceStatus } from "./workspace-types";
 
 type Changes = { status?: string; editorId?: number | null; deadline?: string | null; plannedPublishAt?: string | null };
+
+function changeCopy(changes: Changes) {
+  if (changes.status !== undefined) return { saved: "Workflow updated.", restored: "Workflow restored." };
+  if (changes.editorId !== undefined) return { saved: "Editor updated.", restored: "Editor restored." };
+  if (changes.deadline !== undefined) return { saved: "Deadline updated.", restored: "Deadline restored." };
+  return { saved: "Publication target updated.", restored: "Publication target restored." };
+}
+
+function inverseChanges(changes: Changes, previous: StoryPatch): Changes {
+  const inverse: Changes = {};
+  if (changes.status !== undefined && previous.workflow) inverse.status = previous.workflow.id;
+  if (changes.editorId !== undefined) inverse.editorId = previous.editor?.id ?? null;
+  if (changes.deadline !== undefined) inverse.deadline = previous.deadline ?? null;
+  if (changes.plannedPublishAt !== undefined) inverse.plannedPublishAt = previous.plannedPublication ?? null;
+  return inverse;
+}
+
+const contributorIds = (people: ContributorEntry[]) => people.map((person) => Number(person.id)).join(",");
 
 /**
  * The story's facts as a compact definition list, not a settings form. A
@@ -48,7 +67,25 @@ export function DetailsSection() {
       cache.write((data) => patchStory(data, patch));
       return { previous, revision: current?.revision };
     },
-    onSuccess: (payload) => { cache.write((current) => applyWorkflowPayload(current, payload)); announce("Story details saved."); },
+    onSuccess: (payload, variables, context) => {
+      cache.write((current) => applyWorkflowPayload(current, payload));
+      const copy = changeCopy(variables.changes);
+      announce(copy.saved);
+      if (context) {
+        workspaceUndoToast(copy.saved, {
+          restored: copy.restored,
+          failed: "That story detail changed again, so it couldn't be undone.",
+          undo: async () => {
+            const current = cache.read();
+            if (!current) throw new Error("Workspace is unavailable.");
+            const undone = await editorial.updateWorkflow(storyId, { ...inverseChanges(variables.changes, context.previous), expectedRevision: current.revision });
+            cache.write((value) => applyWorkflowPayload(value, undone));
+            announce(copy.restored);
+            await cache.invalidate();
+          }
+        });
+      }
+    },
     onError: (error, _vars, context) => {
       if (context) cache.write((current) => { const reverted = patchStory(current, context.previous); return reverted && context.revision !== undefined ? { ...reverted, revision: context.revision } : reverted; });
       const failure = workspaceError(error, "The story couldn't be updated. Try again.");
@@ -61,7 +98,28 @@ export function DetailsSection() {
 
   const writers = useMutation({
     mutationFn: (value: ContributorEntry[]) => editorial.saveContributors(storyId, value),
-    onSuccess: (payload) => { cache.write((current) => current ? { ...current, contributors: { ...payload, contributors: payload.contributors.map((person) => ({ ...person, kind: person.kind ?? "user" })), available: (payload.available ?? current.contributors.available ?? []).map((person) => ({ ...person, kind: person.kind ?? "user" })) } } : current); announce("Writers saved."); },
+    onMutate: async () => {
+      await cache.cancel();
+      return { previous: cache.read()?.contributors.contributors ?? [] };
+    },
+    onSuccess: (payload, _value, context) => {
+      cache.write((current) => current ? { ...current, contributors: { ...payload, contributors: payload.contributors.map((person) => ({ ...person, kind: person.kind ?? "user" })), available: (payload.available ?? current.contributors.available ?? []).map((person) => ({ ...person, kind: person.kind ?? "user" })) } } : current);
+      announce("Writers saved.");
+      if (context) {
+        workspaceUndoToast("Writers saved.", {
+          restored: "Writers restored.",
+          failed: "The writers changed again, so that edit couldn't be undone.",
+          undo: async () => {
+            const current = cache.read();
+            if (!current || contributorIds(current.contributors.contributors) !== contributorIds(payload.contributors)) throw new Error("Writers changed again.");
+            const undone = await editorial.saveContributors(storyId, context.previous);
+            cache.write((value) => value ? { ...value, contributors: { ...undone, contributors: undone.contributors.map((person) => ({ ...person, kind: person.kind ?? "user" })), available: (undone.available ?? value.contributors.available ?? []).map((person) => ({ ...person, kind: person.kind ?? "user" })) } } : value);
+            announce("Writers restored.");
+            await cache.invalidate();
+          }
+        });
+      }
+    },
     onError: (error) => { const message = describeEditorialError(error, "Writers couldn't be saved. Try again."); toast.error(message); announce(message); },
     onSettled: () => { void cache.invalidate(); }
   });
