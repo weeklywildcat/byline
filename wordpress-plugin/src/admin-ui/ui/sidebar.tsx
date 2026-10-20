@@ -85,10 +85,10 @@ function SidebarMenuButton({
     defaultTagName: "button",
     props: mergeProps<"button">(
       {
-        "data-active": isActive || undefined,
         onClick: () => { if (mobile) setOpenMobile(false) },
         className: cn(
-          "flex min-h-8 w-full items-center rounded-lg px-2.5 py-1.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 data-active:bg-muted data-active:font-medium data-active:text-foreground",
+          "flex min-h-8 w-full items-center rounded-lg px-2.5 py-1.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50",
+          isActive && "bg-muted font-medium text-foreground",
           className
         ),
       },
