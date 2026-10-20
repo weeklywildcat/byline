@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { createBlock, getBlockType, parse, registerBlockType, serialize, validateBlock } from '@wordpress/blocks';
 import { addEvent, duplicateEvent, isStub, labelYear, moveEvent, periodStarts, removeEvent, setCurrentEvent, MAX_TIMELINE_ITEMS, type TimelineItem } from '../src/blocks/timeline/items';
 import { boardFocusIndex, indexAfterRemoval, movedIndex, stageStep, summarizeSteps } from '../src/blocks/scrolly/steps';
@@ -28,6 +28,9 @@ function register() {
 }
 const walk = (blocks: any[]): any[] => blocks.flatMap((block) => [block, ...walk(block.innerBlocks || [])]);
 const ours = (markup: string) => walk(parse(markup)).filter((block) => ['byline/scrolly', 'byline/scrolly-step', 'byline/timeline'].includes(block.name));
+
+// Loading the WordPress component graph is setup, outside each assertion's timeout.
+beforeAll(register, 30_000);
 
 describe('saved Scrollytelling and Timeline content from Byline 0.3.24 still validates', () => {
   it.each(corpus.map((markup, i) => [i, markup] as const))('corpus %i', async (_i, markup) => {

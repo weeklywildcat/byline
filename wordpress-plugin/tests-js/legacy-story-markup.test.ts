@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { getBlockType, parse, registerBlockType } from '@wordpress/blocks';
 import { createRequire } from 'node:module';
 // Same CJS instance @wordpress/blocks uses (see vitest.config.mts), so the filter reaches its validation.
@@ -39,6 +39,9 @@ async function registerStoryBlocks() {
 }
 
 const walk = (blocks: any[]): any[] => blocks.flatMap((block) => [block, ...walk(block.innerBlocks || [])]);
+
+// Loading the WordPress component graph is setup, outside each assertion's timeout.
+beforeAll(registerStoryBlocks, 30_000);
 
 describe('Byline 0.3.24 saved story markup still validates', () => {
   it.each(corpus)('%s', async (_name, markup) => {

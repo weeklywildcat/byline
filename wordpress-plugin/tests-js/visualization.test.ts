@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
 import { getBlockType, parse, serialize } from '@wordpress/blocks';
 const { addFilter } = createRequire(createRequire(import.meta.url).resolve('@wordpress/blocks'))('@wordpress/hooks');
@@ -87,6 +87,7 @@ describe('chart / map setup model', () => {
 });
 
 describe('saved Chart / Map markup', () => {
+  beforeAll(async () => { await import('../src/blocks/visualization/index'); }, 30_000);
   async function blocks(markup: string) {
     addFilter('blocks.getSaveContent.extraProps', 'byline-test/viz-wrapper', (props: any, blockType: any, attributes: any) => ({ ...props, className: Array.from(new Set([props.className, `wp-block-${blockType.name.replace('/', '-')}`, attributes.align && `align${attributes.align}`].filter(Boolean).join(' ').split(' '))).join(' ') }));
     if (!getBlockType('byline/visualization')) await import('../src/blocks/visualization/index');

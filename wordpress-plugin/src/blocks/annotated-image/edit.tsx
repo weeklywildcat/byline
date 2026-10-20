@@ -129,6 +129,7 @@ export function AnnotatedImageEdit({ attributes: a, setAttributes, clientId, isS
       setSelectedId(note.id);
       setFocus({ id: note.id, target: 'title' });
     } else if (event.key === 'Escape') {
+      claim();
       root.current?.focus();
     }
   }
