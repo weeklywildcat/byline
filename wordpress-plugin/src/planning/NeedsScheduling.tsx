@@ -9,6 +9,8 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, Con
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
 import type { NeedsSchedulingItem } from "./calendar-model";
+import { StoryTitleButton } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 
 const PREVIEW = 5;
 
@@ -33,7 +35,7 @@ export function NeedsScheduling({ items, loading, onOpenStory }: { items: NeedsS
             <ItemContent>
               <ItemTitle>{decodeEntities(item.title)}</ItemTitle>
               <ItemDescription className="line-clamp-none">
-                {item.storyId ? <button type="button" className="hover:underline" onClick={() => onOpenStory(item.storyId)}>{decodeEntities(item.storyTitle)}</button> : decodeEntities(item.storyTitle)}
+                {item.storyId ? <StoryHoverCard storyId={item.storyId} title={item.storyTitle}><StoryTitleButton story={{ id: item.storyId, title: item.storyTitle }} onOpen={onOpenStory} className="font-normal" /></StoryHoverCard> : decodeEntities(item.storyTitle)}
                 {" · "}<span className={item.hasTarget ? undefined : "text-muted-foreground"}>{item.target}</span>
                 {" · "}{item.assigneeNames.length ? item.assigneeNames.join(", ") : __("Unassigned", "weekly-wildcat-headless")}
               </ItemDescription>

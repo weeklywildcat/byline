@@ -19,6 +19,7 @@ import { dateLabel, homeAgenda, myActiveStories, myOpenTasks, reviewStories, wai
 import { HomeCommands, type HomeActionUrls } from "./HomeCommands";
 import { HomeCreate } from "./HomeCreate";
 import { StoryPeek } from "../story/StoryPeek";
+import { StoryHoverProvider } from "../story/StoryHoverCard";
 import type { StoryWorkspace } from "../workspace/workspace-types";
 import { AgendaItem, AttentionRow, MediaAssignmentRow, ReviewRow, StoryRow } from "./components/rows";
 import { ActivityRow, RowSkeletons, TaskRow } from "../story/rows";
@@ -159,7 +160,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
   const showActivity = home.isPending || Boolean(data?.activity.length || data?.errors.activity);
   const hasMoreWork = tasks.length > HOME_TASK_PREVIEW_LIMIT || Boolean(data && tasks.length > 0 && tasks.length >= data.limits.tasks);
 
-  return <main className="@container/home mx-auto mt-6 mb-8 flex max-w-[1320px] flex-col gap-5 pr-5 pl-1">
+  return <StoryHoverProvider fetchers={fetchers}><main className="@container/home mx-auto mt-6 mb-8 flex max-w-[1320px] flex-col gap-5 pr-5 pl-1">
     <header className="flex items-center justify-between gap-4">
       <div>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Today</h1>
@@ -186,7 +187,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
         </Surface>
 
         {showReview ? <Surface title="Ready for Review" action={<Badge variant="secondary">{review.length}</Badge>}>
-          <ItemGroup role="group" className="gap-0">{review.slice(0, 5).map((story) => <ReviewRow key={story.id} title={story.title} detail={`${story.authors.map((a) => a.name).join(", ") || story.writer?.name || "Unassigned writer"} · Ready for review`} onOpen={() => openStory(story.id)} />)}</ItemGroup>
+          <ItemGroup role="group" className="gap-0">{review.slice(0, 5).map((story) => <ReviewRow key={story.id} storyId={story.id} title={story.title} detail={`${story.authors.map((a) => a.name).join(", ") || story.writer?.name || "Unassigned writer"} · Ready for review`} onOpen={() => openStory(story.id)} />)}</ItemGroup>
         </Surface> : null}
       </div>
 
@@ -220,5 +221,5 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 pb-4">{tasks.length ? <ItemGroup role="group" className="gap-0">{tasks.map(renderTask)}</ItemGroup> : <Quiet>No open assignments.</Quiet>}{data && tasks.length >= data.limits.tasks ? <p className="px-3 pt-3 text-xs text-muted-foreground">Showing the first {data.limits.tasks} assignments.</p> : null}</div>
       </SheetContent>
     </Sheet>
-  </main>;
+  </main></StoryHoverProvider>;
 }

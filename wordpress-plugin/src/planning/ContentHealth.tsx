@@ -3,7 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Eye, RefreshCw, Wrench } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
-import { decodeEntities } from "../admin-ui/lib/text";
+import { StoryTitleButton } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Alert, AlertDescription } from "../admin-ui/ui/alert";
 import { Badge } from "../admin-ui/ui/badge";
@@ -59,7 +60,7 @@ export function ContentHealth({ fetchers, onOpenStory }: { fetchers: PlanningFet
               <ItemMedia><StatusBadge tone={issue.severity === "info" ? "neutral" : "attention"}>{issue.severity}</StatusBadge></ItemMedia>
               <ItemContent>
                 <ItemTitle className="line-clamp-none">{issue.problem.trim() || issue.type || __("Content issue", "weekly-wildcat-headless")}</ItemTitle>
-                <ItemDescription className="line-clamp-none">{issue.story ? <button type="button" className="hover:underline" onClick={() => onOpenStory(issue.story!.id)}>{decodeEntities(issue.story.title)}</button> : null}{issue.story && issue.lastCheckedAt ? " · " : ""}{issue.lastCheckedAt ? <time dateTime={issue.lastCheckedAt}>{new Date(issue.lastCheckedAt).toLocaleString()}</time> : null}</ItemDescription>
+                <ItemDescription className="line-clamp-none">{issue.story ? <StoryHoverCard storyId={issue.story.id} title={issue.story.title}><StoryTitleButton story={issue.story} onOpen={onOpenStory} className="font-normal" /></StoryHoverCard> : null}{issue.story && issue.lastCheckedAt ? " · " : ""}{issue.lastCheckedAt ? <time dateTime={issue.lastCheckedAt}>{new Date(issue.lastCheckedAt).toLocaleString()}</time> : null}</ItemDescription>
               </ItemContent>
               <ItemActions>
                 <Badge variant="outline">{issue.type}</Badge>

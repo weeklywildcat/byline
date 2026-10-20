@@ -4,6 +4,8 @@ import { Eye, Plus, Trash2 } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { decodeEntities } from "../admin-ui/lib/text";
+import { StoryTitleButton } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Button } from "../admin-ui/ui/button";
@@ -65,7 +67,7 @@ function CoverageCard({ item, stories, canManage, fetchers, onOpenStory }: Props
         {item.stories?.length
           ? <ItemGroup className="-mx-2 gap-0">{item.stories.map((story) => <ContextMenu key={story.id}>
             <ContextMenuTrigger render={<Item size="xs" />}>
-              <ItemContent><ItemTitle><button type="button" className="text-left hover:underline" onClick={() => onOpenStory(story.id)}>{decodeEntities(story.title)}</button></ItemTitle></ItemContent>
+              <ItemContent><ItemTitle><StoryHoverCard storyId={story.id} title={story.title}><StoryTitleButton story={story} onOpen={onOpenStory} className="font-medium" /></StoryHoverCard></ItemTitle></ItemContent>
               <ItemActions>
                 <StatusBadge tone={story.isPublished ? "done" : "neutral"}>{story.isPublished ? __("Published", "weekly-wildcat-headless") : __("Planned", "weekly-wildcat-headless")}</StatusBadge>
                 {canManage && fetchers.removeStoryFromCoverage ? <Button variant="ghost" size="icon-xs" aria-label={`${__("Remove", "weekly-wildcat-headless")} ${story.title}`} disabled={run.isPending} onClick={() => removeStory(story)}><Trash2 aria-hidden="true" /></Button> : null}

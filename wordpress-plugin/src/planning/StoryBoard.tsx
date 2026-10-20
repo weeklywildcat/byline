@@ -9,6 +9,7 @@ import { Badge } from "../admin-ui/ui/badge";
 import { Card, CardContent } from "../admin-ui/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { StoryDueLabel, StorySignals, StoryTitleButton, WorkflowBadge } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 import { StoryActionsMenu, StoryContextMenu } from "./StoryActionsMenu";
 import { boardWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
 
@@ -53,7 +54,7 @@ function BoardCard({ story, statuses, canMoveStories, moving, moved, timezone, n
     <Card ref={ref} size="sm" role="listitem" data-story-id={story.id} data-dragging={dragging} data-moved={moved} aria-busy={moving || undefined}
       className={cn("gap-1.5 py-2.5 transition-colors duration-700", movable && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
       <CardContent className="flex flex-col gap-1.5 px-3">
-        <StoryTitleButton story={story} onOpen={onOpenStory} className="text-sm leading-snug line-clamp-3" data-story-title={story.id} />
+        <StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="text-sm leading-snug line-clamp-3" data-story-title={story.id} /></StoryHoverCard>
         <div className="flex min-w-0 items-center gap-2 text-xs">
           {writers.length
             ? <><PeopleAvatars people={writers} /><span className="truncate text-muted-foreground" title={names}>{names}</span></>

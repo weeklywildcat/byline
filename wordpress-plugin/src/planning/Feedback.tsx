@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Eye, FilePlus2, MessageSquareText } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
-import { decodeEntities } from "../admin-ui/lib/text";
 import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Button } from "../admin-ui/ui/button";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
@@ -12,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Spinner } from "../admin-ui/ui/spinner";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { feedbackKey } from "../story/story-query";
+import { StoryTitleButton } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 import type { PlanningFetchers } from "./planning-api";
 import { exactPlanningDate, type FeedbackItem, type FeedbackResponse, type FeedbackStatus } from "./planning-model";
 import { NothingHere, PageHeader, ResourceGate } from "./PlanningPage";
@@ -72,7 +73,7 @@ function FeedbackRow({ item, fetchers, onOpenStory }: { item: FeedbackItem; fetc
       <p className="max-w-3xl text-sm leading-relaxed whitespace-pre-line [overflow-wrap:anywhere]">{item.message}</p>
       <ItemDescription className="line-clamp-none text-xs">
         {item.story
-          ? <>{__("Story", "weekly-wildcat-headless")}: <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline" onClick={() => onOpenStory(item.story!.id)}>{decodeEntities(item.story.title)}</button></>
+          ? <>{__("Story", "weekly-wildcat-headless")}: <StoryHoverCard storyId={item.story.id} title={item.story.title}><StoryTitleButton story={item.story} onOpen={onOpenStory} className="font-medium text-foreground underline-offset-2" /></StoryHoverCard></>
           : __("Not linked to a story", "weekly-wildcat-headless")}
       </ItemDescription>
     </ItemContent>

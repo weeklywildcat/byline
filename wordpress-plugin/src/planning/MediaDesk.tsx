@@ -10,7 +10,6 @@ import { StatusBadge } from "../admin-ui/components/status-badge";
 import { WorkStatusBadge, mediaIntensity, workBadgeColors } from "../admin-ui/components/work-status-badge";
 import { cn } from "../admin-ui/lib/utils";
 import { useElementWidth } from "../admin-ui/lib/hooks";
-import { decodeEntities } from "../admin-ui/lib/text";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "../admin-ui/ui/attachment";
 import { Badge } from "../admin-ui/ui/badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
@@ -24,6 +23,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../admin-ui/ui/table";
 import { mediaLibraryAvailable, pickFromMediaLibrary } from "../workspace/media-library";
 import { invalidateStoryData, mediaDeskKey } from "../story/story-query";
+import { StoryTitleButton } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 import type { PlanningFetchers } from "./planning-api";
 import { EMPTY_MEDIA_DESK_FILTERS, MEDIA_STATUS_OPTIONS, MEDIA_TYPE_OPTIONS, filterMediaRows, mediaDeskRows, mediaDueDay, mediaReadinessHint, mediaTypeLabel, sortMediaRows, type MediaDeskFilters, type MediaDeskRow } from "./media-desk-model";
 import { describeMediaDeskError } from "./media-desk-errors";
@@ -190,7 +191,7 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory }: MediaDe
     };
   };
 
-  const story = (row: MediaDeskRow) => <button type="button" className="text-left hover:underline" onClick={() => onOpenStory(row.story.id)}>{decodeEntities(row.story.title) || __("Untitled story", "weekly-wildcat-headless")}</button>;
+  const story = (row: MediaDeskRow) => <StoryHoverCard storyId={row.story.id} title={row.story.title}><StoryTitleButton story={row.story} onOpen={onOpenStory} className="font-normal" /></StoryHoverCard>;
   const table = width === 0 || width >= 860;
 
   return <div className="flex flex-col gap-3">
