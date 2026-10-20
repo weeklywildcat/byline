@@ -23,6 +23,7 @@ import { StoryHoverProvider } from "../story/StoryHoverCard";
 import type { StoryWorkspace } from "../workspace/workspace-types";
 import { AgendaItem, AttentionRow, MediaAssignmentRow, ReviewRow, StoryRow } from "./components/rows";
 import { ActivityRow, RowSkeletons, TaskRow } from "../story/rows";
+import { useUpdateTask } from "../story/use-update-task";
 
 export type HomeAppProps = { fetchers: HomeFetchers; currentUserId?: number | null; actionUrls?: HomeActionUrls };
 
@@ -97,6 +98,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
     const url = created.workspaceUrl || actionUrls?.workspace?.(created.story.id);
     if (url) window.location.assign(url); else openStory(created.story.id);
   }
+  const updateTask = useUpdateTask(fetchers);
   const complete = useMutation({
     mutationFn: (task: EditorialTask) => fetchers.editorial!.updateTask(task.id, { state: "completed" }),
     onMutate: async (task) => {
@@ -148,7 +150,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
   const visuals = data?.visualWork.filter((v) => v.status !== "done" && (data.capabilities.review || v.assignee?.id === data.currentUser.id)) || [];
   const newTask = (storyId: number | null = null) => { setTaskStoryId(storyId); setCreateKind("task"); };
   const storyTitle = (id?: number | null) => data?.stories.find((s) => s.id === id)?.title;
-  const renderTask = (task: EditorialTask) => <TaskRow key={task.id} task={task} storyTitle={storyTitle(task.storyId)} timezone={timezone} now={now} pending={complete.isPending} onOpen={task.storyId ? () => openStory(task.storyId!) : undefined} onComplete={() => complete.mutate(task)} />;
+  const renderTask = (task: EditorialTask) => <TaskRow key={task.id} task={task} storyTitle={storyTitle(task.storyId)} timezone={timezone} now={now} people={data?.people || []} canAssign={Boolean(data?.capabilities.review)} pending={complete.isPending || (updateTask.isPending && String(updateTask.variables?.task.id) === String(task.id))} onOpen={task.storyId ? () => openStory(task.storyId!) : undefined} onComplete={() => complete.mutate(task)} onUpdate={fetchers.editorial ? (patch, optimistic) => updateTask.mutate({ task, patch, optimistic }) : undefined} />;
   const section = (key: keyof HomeBootstrap["errors"], content: ReactNode, empty: string) => home.isPending ? <RowSkeletons /> : home.isError ? <Quiet>Work is temporarily unavailable.</Quiet> : data?.errors[key] ? <InlineAlert className="mx-1.5 w-auto" onAction={() => void home.refetch()}>{data.errors[key]}</InlineAlert> : content || <Quiet>{empty}</Quiet>;
   const failedDeploy = deployment.data?.lifecycle === "failed";
   const criticalHealth = health.data?.checks?.find((check) => check.status === "critical");
