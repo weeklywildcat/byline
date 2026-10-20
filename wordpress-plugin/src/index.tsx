@@ -460,27 +460,32 @@ function MediaAssetControl({
     frame.open();
   };
 
+  const ratio = asset.width && asset.height ? Math.min(3, Math.max(0.5, asset.width / asset.height)) : 16 / 9;
   return (
-    <fieldset>
-      <legend>{label}</legend>
+    <fieldset className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4">
+      <legend className="px-1 text-sm font-semibold">{label}</legend>
       {asset.url ? (
-        <div className="byline-media-asset-preview">
-          <img src={asset.url} alt="" />
-          <div>
-            <strong>{asset.url.split("/").pop() || label}</strong>
-            {asset.width && asset.height ? <span>{asset.width}×{asset.height}</span> : <span>Preview loaded from Media Library</span>}
+        <div className="grid gap-3 sm:grid-cols-[minmax(10rem,14rem)_1fr] sm:items-center">
+          <AspectRatio ratio={ratio} className="overflow-hidden rounded-lg border bg-muted">
+            <img src={asset.url} alt="" className="size-full object-contain" />
+          </AspectRatio>
+          <div className="min-w-0 text-sm">
+            <strong className="block truncate">{asset.url.split("/").pop() || label}</strong>
+            <span className="text-xs text-muted-foreground">{asset.width && asset.height ? `${asset.width}×${asset.height}` : "Preview loaded from Media Library"}</span>
           </div>
         </div>
-      ) : <p className="byline-empty-state">No {label.toLowerCase()} selected.</p>}
+      ) : <p className="text-sm text-muted-foreground">No {label.toLowerCase()} selected.</p>}
       <TextControl label="Alternative text" value={asset.alt} onChange={(alt) => onChange({ ...asset, alt })} />
       <div className="byline-settings-actions">
         <Button variant="secondary" onClick={chooseImage}>{asset.url ? "Replace" : "Choose from Media Library"}</Button>
         {asset.url ? <Button variant="link" isDestructive onClick={() => onChange({ url: "", alt: "", width: null, height: null })}>Remove</Button> : null}
       </div>
-      <details className="byline-advanced-details">
-        <summary>Advanced: manual image URL</summary>
-        <TextControl label="Image URL" value={asset.url} onChange={(url) => onChange({ ...asset, url })} />
-      </details>
+      <Accordion>
+        <AccordionItem value="manual-url">
+          <AccordionTrigger>Advanced: manual image URL</AccordionTrigger>
+          <AccordionContent><TextControl label="Image URL" value={asset.url} onChange={(url) => onChange({ ...asset, url })} /></AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </fieldset>
   );
 }
