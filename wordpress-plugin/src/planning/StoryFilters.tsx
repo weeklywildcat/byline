@@ -61,36 +61,35 @@ export type StoryFiltersProps = {
   statuses: PlanningWorkflowStatus[];
   writers: PlanningPerson[];
   editors: PlanningPerson[];
-  /** The saved views menu sits at the start of the first row. */
+  /** The saved views menu sits at the start of the toolbar. */
   savedViews?: ReactNode;
   /** The List hides finished published stories; this brings them back. Not a saved-view filter. */
   showPublished?: { value: boolean; onChange: (value: boolean) => void };
 };
 
 /**
- * One compact row of filters. Search, Workflow, Writer and Editor are always
- * there; everything else lives behind More filters and shows as a removable chip
- * once set, so no filter is ever applied invisibly.
+ * One responsive toolbar. Saved view, search, Workflow, Writer, Editor and More
+ * filters stay together on wide screens and wrap naturally when space runs out.
+ * Extra refinements still become removable chips, so no filter is invisible.
  */
 export function StoryFilters({ filters, onChange, statuses, writers, editors, savedViews, showPublished }: StoryFiltersProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const update = (patch: Partial<PlanningFilters>) => onChange(normalizePlanningFilters({ ...filters, ...patch }));
   const chips = [...moreFilterChips(filters), ...(showPublished?.value ? [{ key: "published", label: __("Showing published", "weekly-wildcat-headless"), clear: {} as Partial<PlanningFilters> }] : [])];
   const workflowOptions: Option[] = [{ value: ALL, label: __("All workflows", "weekly-wildcat-headless") }, ...statuses.filter((status) => status.group !== "derived").map((status) => ({ value: status.id, label: status.label }))];
+
   return <div className="flex flex-col gap-2" role="search" aria-label={__("Filter stories", "weekly-wildcat-headless")}>
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2 @4xl/planning:flex-nowrap">
       {savedViews}
-      <InputGroup className="min-w-52 flex-1 sm:max-w-md">
+      <InputGroup className="min-w-56 flex-[1_1_20rem] @4xl/planning:max-w-md">
         <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
         <InputGroupInput type="search" aria-label={__("Search stories", "weekly-wildcat-headless")} placeholder={__("Search stories…", "weekly-wildcat-headless")} value={filters.query} onChange={(event) => update({ query: event.target.value })} />
       </InputGroup>
-    </div>
-    <div className="flex flex-wrap items-center gap-2">
-      <OptionSelect label={__("Workflow", "weekly-wildcat-headless")} value={filters.workflow} options={workflowOptions} onChange={(workflow) => update({ workflow })} className="w-44" />
-      <OptionSelect label={__("Writer", "weekly-wildcat-headless")} value={filters.writerId === null ? "" : String(filters.writerId)} options={personOptions(writers, __("Any writer", "weekly-wildcat-headless"))} onChange={(value) => update({ writerId: value ? Number(value) : null })} className="w-40" />
-      <OptionSelect label={__("Editor", "weekly-wildcat-headless")} value={filters.editorId === null ? "" : String(filters.editorId)} options={personOptions(editors, __("Any editor", "weekly-wildcat-headless"))} onChange={(value) => update({ editorId: value ? Number(value) : null })} className="w-40" />
+      <OptionSelect label={__("Workflow", "weekly-wildcat-headless")} value={filters.workflow} options={workflowOptions} onChange={(workflow) => update({ workflow })} className="w-40 shrink-0" />
+      <OptionSelect label={__("Writer", "weekly-wildcat-headless")} value={filters.writerId === null ? "" : String(filters.writerId)} options={personOptions(writers, __("Any writer", "weekly-wildcat-headless"))} onChange={(value) => update({ writerId: value ? Number(value) : null })} className="w-36 shrink-0" />
+      <OptionSelect label={__("Editor", "weekly-wildcat-headless")} value={filters.editorId === null ? "" : String(filters.editorId)} options={personOptions(editors, __("Any editor", "weekly-wildcat-headless"))} onChange={(value) => update({ editorId: value ? Number(value) : null })} className="w-36 shrink-0" />
       <Popover open={moreOpen} onOpenChange={setMoreOpen}>
-        <PopoverTrigger render={<Button variant="outline" />}><SlidersHorizontal data-icon="inline-start" aria-hidden="true" />{__("More filters", "weekly-wildcat-headless")}{chips.length ? <Badge variant="secondary" className="ml-1">{chips.length}</Badge> : null}<ChevronDown data-icon="inline-end" aria-hidden="true" /></PopoverTrigger>
+        <PopoverTrigger render={<Button variant="outline" className="shrink-0" />}><SlidersHorizontal data-icon="inline-start" aria-hidden="true" />{__("More filters", "weekly-wildcat-headless")}{chips.length ? <Badge variant="secondary" className="ml-1">{chips.length}</Badge> : null}<ChevronDown data-icon="inline-end" aria-hidden="true" /></PopoverTrigger>
         <PopoverContent align="start" className="w-80 gap-4">
           <FieldGroup className="gap-3">
             <Field><FieldLabel htmlFor="story-filter-wordpress">{__("WordPress state", "weekly-wildcat-headless")}</FieldLabel><OptionSelect id="story-filter-wordpress" label={__("WordPress state", "weekly-wildcat-headless")} value={filters.wordpressState} options={WORDPRESS_STATES} onChange={(wordpressState) => update({ wordpressState })} className="w-full" /></Field>
@@ -106,7 +105,7 @@ export function StoryFilters({ filters, onChange, statuses, writers, editors, sa
           </FieldGroup>
         </PopoverContent>
       </Popover>
-      {hasActiveFilters(filters) ? <Button variant="ghost" onClick={() => onChange({ ...EMPTY_PLANNING_FILTERS })}>{__("Clear", "weekly-wildcat-headless")}</Button> : null}
+      {hasActiveFilters(filters) ? <Button variant="ghost" className="shrink-0" onClick={() => onChange({ ...EMPTY_PLANNING_FILTERS })}>{__("Clear", "weekly-wildcat-headless")}</Button> : null}
     </div>
     {chips.length ? <ul className="flex flex-wrap items-center gap-1.5" aria-label={__("Active filters", "weekly-wildcat-headless")}>
       {chips.map((chip) => <li key={chip.key}><Badge variant="secondary" className="gap-1 pr-0.5">{chip.label}<button type="button" className="rounded-full p-0.5 hover:bg-foreground/10" aria-label={`${__("Remove filter", "weekly-wildcat-headless")}: ${chip.label}`} onClick={() => (chip.key === "published" ? showPublished?.onChange(false) : update(chip.clear))}><X className="size-3" aria-hidden="true" /></button></Badge></li>)}
