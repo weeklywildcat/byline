@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { SelectField, TextAreaField, TextField } from "../admin-ui/components/form-fields";
 import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog-shell";
 import { PeoplePicker } from "./fields";
@@ -9,6 +8,7 @@ import { peopleOptions } from "./workspace-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyReporting } from "./workspace-cache";
 import { workspaceError } from "./workspace-errors";
+import { workspaceUndoToast, workspaceToast } from "./workspace-toast";
 import { SOURCE_STATUSES, type StorySource } from "./workspace-types";
 
 const statusOptions = SOURCE_STATUSES.map((value) => ({ value, label: SOURCE_STATUS_LABELS[value] }));
@@ -27,13 +27,45 @@ export function SourceDialog({ open, source, onClose, finalFocus }: SourceDialog
   const people = peopleOptions(data.people, source?.assignees);
   const patch = (changes: Partial<SourceForm>) => setForm((current) => ({ ...current, ...changes }));
 
-  const done = (message: string) => ({
-    onSuccess: (response: Parameters<typeof applyReporting>[1]) => { cache.write((current) => applyReporting(current, response)); toast.success(message); onClose(); },
+  const save = useMutation({
+    mutationFn: () => client.saveSource(storyId, sourceFormToInput(form, source ?? undefined), source?.id),
+    onSuccess: (response) => {
+      cache.write((current) => applyReporting(current, response));
+      if (source) {
+        const updated = response.sources.find((item) => item.id === source.id);
+        if (updated) {
+          workspaceUndoToast("Source saved.", {
+            restored: "Source restored.",
+            failed: "The source changed again, so that edit couldn't be undone.",
+            undo: async () => {
+              const undone = await client.saveSource(storyId, sourceFormToInput(sourceToForm(source), updated), source.id);
+              cache.write((current) => applyReporting(current, undone));
+              await cache.invalidate();
+            }
+          });
+        } else workspaceToast("Source saved.");
+      } else if (response.sourceId) {
+        workspaceUndoToast("Source added.", {
+          restored: "Source removed.",
+          failed: "The new source couldn't be removed.",
+          undo: async () => {
+            const undone = await client.deleteSource(storyId, response.sourceId!);
+            cache.write((current) => applyReporting(current, undone));
+            await cache.invalidate();
+          }
+        });
+      } else workspaceToast("Source added.");
+      onClose();
+    },
     onError: (failure: unknown) => setError(workspaceError(failure, "The source couldn't be saved. Try again.")),
     onSettled: () => { void cache.invalidate(); }
   });
-  const save = useMutation({ mutationFn: () => client.saveSource(storyId, sourceFormToInput(form, source ?? undefined), source?.id), ...done(source ? "Source saved." : "Source added.") });
-  const remove = useMutation({ mutationFn: () => client.deleteSource(storyId, source!.id), ...done("Source removed.") });
+  const remove = useMutation({
+    mutationFn: () => client.deleteSource(storyId, source!.id),
+    onSuccess: (response) => { cache.write((current) => applyReporting(current, response)); workspaceToast("Source removed."); onClose(); },
+    onError: (failure: unknown) => setError(workspaceError(failure, "The source couldn't be removed. Try again.")),
+    onSettled: () => { void cache.invalidate(); }
+  });
   const pending = save.isPending || remove.isPending;
   const dirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
