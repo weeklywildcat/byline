@@ -23,7 +23,9 @@ describe("fast editing interactions", () => {
   it("uses reversible removal for lightweight relationships", () => {
     expect(read("planning/Coverage.tsx")).toContain('label: __("Undo"');
     expect(read("workspace/ResourcesSection.tsx")).toContain('label: "Undo"');
+    expect(read("story/StoryPeek.tsx")).toContain('label: "Undo"');
     expect(read("planning/Coverage.tsx")).not.toContain("<ConfirmRemoveDialog");
+    expect(read("story/StoryPeek.tsx")).toContain("<ContextMenu");
   });
 
   it("removes extra submit clicks from coverage linking", () => {
