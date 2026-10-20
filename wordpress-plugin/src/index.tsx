@@ -1455,8 +1455,7 @@ function DiscordSettings() {
 }
 
 function OperationalInfo({ route, protocol }: { route: string; protocol: ProtocolManifest | null }) {
-  const legacyUrl = config?.nativeUrls.legacySettings;
-  const content: Record<string, { title: string; body: string; legacy?: boolean }> = {
+  const content: Record<string, { title: string; body: string }> = {
     "/advanced/access": {
       title: "Capability-based access",
       body: `Manage publication: ${config?.capabilities.manage ? "allowed" : "not allowed"}; manage integrations: ${config?.capabilities.manageIntegrations ? "allowed" : "not allowed"}.`
@@ -1469,8 +1468,7 @@ function OperationalInfo({ route, protocol }: { route: string; protocol: Protoco
     },
     "/advanced/compatibility": {
       title: "Legacy compatibility",
-      body: "The installed plugin path, update source, release ZIP, CPTs, metadata, and weekly-wildcat/v1 aliases remain intact while canonical Byline contracts are adopted.",
-      legacy: true
+      body: "The installed plugin path, update source, release ZIP, CPTs, metadata, and weekly-wildcat/v1 aliases remain intact while canonical Byline contracts are adopted. Old Byline settings URLs redirect into this unified Settings workspace."
     }
   };
   const item = content[route];
@@ -1480,7 +1478,6 @@ function OperationalInfo({ route, protocol }: { route: string; protocol: Protoco
       <CardBody>
         <h2>{item.title}</h2>
         <p>{item.body}</p>
-        {item.legacy && legacyUrl ? <Button variant="secondary" href={legacyUrl}>Open compatible native settings</Button> : null}
       </CardBody>
     </Card>
   );
