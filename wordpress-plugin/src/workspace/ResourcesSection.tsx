@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SelectField, TextField } from "../admin-ui/components/form-fields";
 import { ResourceIcon } from "../admin-ui/components/resource-icon";
@@ -61,7 +61,8 @@ function ResourceRow({ resource, canManage, onEdit, onRemove }: { resource: Stor
         : <Item size="sm" className="min-w-0 flex-1">{body}</Item>}
       {canManage ? <DropdownMenu>
         <DropdownMenuTrigger render={<Button ref={trigger} type="button" variant="ghost" size="icon-sm" aria-label={`Actions for ${resource.label}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-36">
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(resource.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</DropdownMenuItem>
           <DropdownMenuItem onClick={(event) => onEdit(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit link</DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</DropdownMenuItem>
         </DropdownMenuContent>
@@ -70,7 +71,8 @@ function ResourceRow({ resource, canManage, onEdit, onRemove }: { resource: Stor
     <ContextMenuContent className="w-48">
       <ContextMenuLabel className="max-w-44 truncate">{resource.label}</ContextMenuLabel>
       <ContextMenuSeparator />
-      {available ? <ContextMenuItem render={<a href={resource.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem> : null}
+      {available ? <ContextMenuItem render={<a href={resource.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
+      <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(resource.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem> : null}
       {canManage ? <>
         <ContextMenuItem onClick={(event) => onEdit(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
         <ContextMenuItem variant="destructive" onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
