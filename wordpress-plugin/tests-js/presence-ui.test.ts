@@ -6,13 +6,13 @@ const root = path.resolve(__dirname, "..");
 const read = (relative: string) => readFileSync(path.join(root, relative), "utf8");
 
 describe("presence toolbar presentation", () => {
-  it("uses shadcn AvatarBadge with an icon for each presence state", () => {
+  it("uses a plain active AvatarBadge and icons only for away/offline", () => {
     const source = read("src/presence/PresencePanel.tsx");
-    expect(source).toContain('import { Check, Clock3, Minus, Users } from "lucide-react"');
+    expect(source).toContain('import { Clock3, Minus, Users } from "lucide-react"');
     expect(source).toContain("<AvatarBadge");
     expect(source).toContain("{badgeIcon(person.status)}</AvatarBadge>");
     expect(source).toContain('status === "active"');
-    expect(source).toContain("<Check");
+    expect(source).not.toContain("<Check");
     expect(source).toContain("<Clock3");
     expect(source).toContain("<Minus");
   });
