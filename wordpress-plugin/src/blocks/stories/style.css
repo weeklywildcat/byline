@@ -1,1 +1,4 @@
+/* The shared newsroom stylesheet. It is built once, here, and enqueued once by
+   byline_newsroom_enqueue_shared_assets() for every story, page and editor
+   screen. Other blocks do not import it again. */
 @import "../../../../packages/ui/src/newsroom-blocks.css";

@@ -1,11 +1,13 @@
 import { Button, Notice } from "@wordpress/components";
 import { createRoot, useEffect, useMemo, useRef, useState } from "@wordpress/element";
 import { __ } from "@wordpress/i18n";
-import { ArticleView, type ArticlePresentation } from "@byline/ui";
+import { PresentedArticleView, usesImmersivePresentation, type ArticlePresentation } from "@byline/ui";
 import { getPublicationTheme, getPublicationThemeStylesheets, getPublicationThemeVariables } from "./publication-theme";
 
 import "@byline/ui/article.css";
 import "@byline/ui/newsroom-blocks.css";
+import "@byline/ui/hero-reveal.css";
+import "@byline/ui/immersive-article.css";
 import "./article-preview.css";
 
 type PreviewConfig = {
@@ -45,7 +47,14 @@ function previewDocument(stylesheetUrl: string, themeId: string, tokenOverrides:
   const safeThemeId = attribute(getPublicationTheme(themeId).id);
   const safeVariables = attribute(cssVariables);
 
-  return `<!doctype html><html lang="en" data-byline-theme="${safeThemeId}" style="${safeVariables}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${stylesheetLinks}<style>html,body{background:var(--page);color:var(--ink);font-family:var(--font-body)}html,body,*{box-sizing:border-box}body{margin:0}</style></head><body><div id="byline-article-preview-frame-root"></div></body></html>`;
+  return `<!doctype html><html lang="en" data-byline-theme="${safeThemeId}" style="${safeVariables}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${stylesheetLinks}<style>html{--hero-reveal-header-h:0px}html,body{background:var(--page);color:var(--ink);font-family:var(--font-body)}html,body,*{box-sizing:border-box}body{margin:0}</style></head><body><div id="byline-article-preview-frame-root"></div></body></html>`;
+}
+
+/** One line telling the editor which opening the public story will have, and why. */
+function presentationDescription(model: ArticlePresentation) {
+  if (usesImmersivePresentation(model)) return __("Presentation: Immersive. The featured image opens the story.", "weekly-wildcat-headless");
+  if (model.storyPresentation === "immersive") return __("Presentation: Standard. Immersive needs a featured image.", "weekly-wildcat-headless");
+  return __("Presentation: Standard.", "weekly-wildcat-headless");
 }
 
 function EnhancedArticle({ model }: { model: ArticlePresentation }) {
@@ -59,7 +68,7 @@ function EnhancedArticle({ model }: { model: ArticlePresentation }) {
     });
     return () => { disposed = true; cleanup?.(); };
   }, [model]);
-  return <div ref={root}><ArticleView presentation={model} className="byline-preview-article" /></div>;
+  return <div ref={root}><PresentedArticleView presentation={model} className="byline-preview-article" /></div>;
 }
 
 function PreviewFrame({
@@ -114,6 +123,12 @@ function PreviewFrame({
               // Element checks would silently allow navigation.
               const target = (click.target as Element | null)?.closest?.("a,button,form");
               if (!target) return;
+              // In-page anchors (footnotes, "In this story", the Immersive scroll cue) stay useful.
+              const href = target.tagName === "A" ? target.getAttribute("href") : null;
+              if (href && href.startsWith("#") && href.length > 1) {
+                const anchor = frameDocument.getElementById(decodeURIComponent(href.slice(1)));
+                if (anchor) { click.preventDefault(); anchor.scrollIntoView({ block: "start" }); return; }
+              }
               click.preventDefault();
               if (!target.matches(".byline-annotation-marker")) click.stopPropagation();
             };
@@ -129,6 +144,7 @@ function PreviewFrame({
 function PreviewApp({ config }: { config: PreviewConfig }) {
   const [viewport, setViewport] = useState<ViewportId>("desktop");
   const model = config.model;
+  const presentationNote = model ? presentationDescription(model) : "";
 
   if (!model) {
     return <Notice status="error" isDismissible={false}>{__("This story is not available for preview.", "weekly-wildcat-headless")}</Notice>;
@@ -140,6 +156,7 @@ function PreviewApp({ config }: { config: PreviewConfig }) {
         <div>
           <strong>{__("Private Byline preview", "weekly-wildcat-headless")}</strong>
           <span>{__("Saved WordPress content only · public actions are disabled", "weekly-wildcat-headless")}</span>
+          <span className="byline-preview-presentation" data-presentation={usesImmersivePresentation(model) ? "immersive" : "standard"}>{presentationNote}</span>
         </div>
         <div className="byline-preview-viewport-buttons">
           {(Object.keys(VIEWPORTS) as ViewportId[]).map((id) => (

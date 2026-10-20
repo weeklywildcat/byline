@@ -1,0 +1,17 @@
+/* Annotated Image: moved unchanged from newsroom-blocks.css. */
+.byline-annotation-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.byline-annotation-canvas { position: relative; min-width: 0; }
+.byline-annotation-canvas > img { display: block; width: 100%; height: auto; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .byline-annotation-marker {
+  position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center;
+  width: 32px; height: 32px; border: 2px solid #fff; border-radius: 50%; background: #111; color: #fff;
+  box-shadow: 0 0 0 1px #111; font: 700 14px/1 var(--font-ui); text-decoration: none;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .byline-annotation-marker.is-active { background: var(--accent); outline: 3px solid var(--ink); }
+.byline-annotations { min-width: 0; }
+.byline-annotations > li { padding: .5em; border-block-start: 1px solid var(--rule); scroll-margin-top: 100px; }
+.byline-annotations > li.is-active { border-inline-start: 3px solid var(--accent); }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .byline-annotations h3 { margin: 0 0 .4em; font-size: 1.12rem; }
+@media (max-width: 700px) {
+  .byline-annotation-layout { grid-template-columns: 1fr; }
+}

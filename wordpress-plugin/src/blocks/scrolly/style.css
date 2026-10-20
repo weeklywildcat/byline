@@ -1,1 +1,2 @@
-@import "../../../../packages/ui/src/newsroom-blocks.css";
+/* Editor-only chrome for this block. Its public presentation lives in
+   packages/ui/src/newsroom/scrolly.css and loads once through the shared newsroom stylesheet. */

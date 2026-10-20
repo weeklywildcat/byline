@@ -22,7 +22,7 @@ const BYLINE_PAGE_EDITOR_HANDLE = 'byline-page-editor';
 
 /**
  * Add one intentional Byline category without replacing WordPress's native
- * block categories. The second filter is retained for older editor builds.
+ * block categories.
  */
 function byline_add_page_block_category(array $categories, $post = null): array
 {
@@ -41,7 +41,6 @@ function byline_add_page_block_category(array $categories, $post = null): array
     return $categories;
 }
 add_filter('block_categories_all', 'byline_add_page_block_category', 10, 2);
-add_filter('block_categories', 'byline_add_page_block_category', 10, 1);
 
 function byline_register_page_section_block(): void
 {

@@ -1,0 +1,12 @@
+/* Chart / Map: moved unchanged from newsroom-blocks.css. */
+.byline-visualization { border-block-start: 1px solid var(--rule); padding-top: 18px; }
+.byline-visualization-media { min-width: 0; }
+.byline-visualization-frame { display: block; width: 100%; border: 0; }
+.byline-visualization-fallback-image img { width: auto; max-width: 100%; height: auto; margin-inline: auto; }
+.byline-visualization figcaption, .byline-visualization-link { overflow-wrap: anywhere; }
+.byline-visualization [hidden] { display: none; }
+/* Keep the initial public and private embed slot the same size. The no-JS
+   figure stays intrinsic; only the enhanced fallback is contained in a slot. */
+.byline-visualization-media.is-enhanced { position: relative; }
+.byline-visualization-media.is-enhanced .byline-visualization-fallback-image { position: absolute; inset: 0; background: var(--page, #fff); }
+.byline-visualization-media.is-enhanced .byline-visualization-fallback-image img { width: 100%; height: 100%; object-fit: contain; }

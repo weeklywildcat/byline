@@ -1,0 +1,653 @@
+/* Core block styles: the classes come from register_block_style(). */
+.wp-block-group.is-style-byline-editorial-callout,
+.wp-block-group.is-style-byline-soft-callout {
+  border-left: 4px solid var(--accent, #356875);
+  padding: 18px 20px;
+}
+
+.wp-block-group.is-style-byline-editorial-callout {
+  background: var(--ink, #1f2328);
+  color: var(--paper, #fff);
+}
+
+.wp-block-group.is-style-byline-editorial-callout :is(h2, h3, h4, p, li),
+.wp-block-group.is-style-byline-editorial-callout a {
+  color: inherit;
+}
+
+.wp-block-group.is-style-byline-soft-callout {
+  background: color-mix(in srgb, var(--accent, #356875) 8%, var(--paper, #fff));
+}
+
+.wp-block-group.is-style-byline-rule-top {
+  border-top: 3px solid var(--ink, #1f2328);
+  padding-top: 16px;
+}
+
+.wp-block-button.is-style-byline-primary .wp-block-button__link,
+.wp-block-button.is-style-byline-outline .wp-block-button__link,
+.wp-block-button.is-style-byline-text-link .wp-block-button__link {
+  border-radius: 0;
+  font-family: var(--font-ui, Arial, sans-serif);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.wp-block-button.is-style-byline-primary .wp-block-button__link {
+  background: var(--ink, #1f2328);
+  color: var(--paper, #fff);
+}
+
+.wp-block-button.is-style-byline-outline .wp-block-button__link {
+  background: transparent;
+  border: 1px solid currentColor;
+  color: var(--ink, #1f2328);
+}
+
+.wp-block-button.is-style-byline-text-link .wp-block-button__link {
+  background: transparent;
+  color: var(--link, #356875);
+  padding-left: 0;
+  padding-right: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.wp-block-buttons.is-style-byline-standard-cta {
+  gap: 12px;
+}
+
+.wp-block-buttons.is-style-byline-compact {
+  gap: 7px;
+}
+
+.wp-block-quote.is-style-byline-editorial-quote,
+.wp-block-quote.is-style-byline-source-quote,
+.wp-block-pullquote.is-style-byline-feature-quote {
+  border-left-color: var(--accent, #356875);
+  font-family: var(--font-serif, Georgia, serif);
+}
+
+.wp-block-quote.is-style-byline-source-quote {
+  border-left-style: double;
+}
+
+.wp-block-pullquote.is-style-byline-feature-quote {
+  border-bottom-color: var(--accent, #356875);
+  border-top-color: var(--accent, #356875);
+}
+
+.wp-block-separator.is-style-byline-editorial-rule {
+  border-bottom-color: var(--rule-strong, #aab2bb);
+}
+
+.wp-block-separator.is-style-byline-heavy-rule {
+  border-bottom: 3px solid var(--ink, #1f2328);
+}
+
+.wp-block-details.is-style-byline-faq {
+  border-bottom: 1px solid var(--rule, #d0d7de);
+  padding: 10px 0;
+}
+
+.wp-block-details.is-style-byline-faq summary {
+  color: var(--ink, #1f2328);
+  font-family: var(--font-ui, Arial, sans-serif);
+  font-weight: 800;
+}
+
+.wp-block-table.is-style-byline-editorial table,
+.wp-block-table.is-style-byline-compact table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.wp-block-table.is-style-byline-editorial :is(th, td),
+.wp-block-table.is-style-byline-compact :is(th, td) {
+  border-color: var(--rule, #d0d7de);
+  padding: 8px 10px;
+}
+
+.wp-block-table.is-style-byline-editorial th {
+  background: color-mix(in srgb, var(--accent, #356875) 8%, var(--paper, #fff));
+  text-align: left;
+}
+
+.wp-block-table.is-style-byline-compact :is(th, td) {
+  font-size: 0.88rem;
+  padding: 5px 7px;
+}
+
+.wp-block-image.is-style-byline-editorial img,
+.wp-block-image.is-style-byline-feature img {
+  height: auto;
+  max-width: 100%;
+}
+
+.wp-block-image.is-style-byline-editorial img {
+  border: 1px solid var(--rule, #d0d7de);
+}
+
+.wp-block-image.is-style-byline-feature img {
+  width: 100%;
+}
+
+.wp-block-gallery.is-style-byline-news-grid,
+.wp-block-gallery.is-style-byline-feature-grid {
+  gap: 12px;
+}
+
+.wp-block-gallery.is-style-byline-news-grid {
+  --wp--style--gallery-gap-default: 12px;
+}
+
+.wp-block-gallery.is-style-byline-feature-grid {
+  --wp--style--gallery-gap-default: 5px;
+}
+
+.wp-block-gallery.is-style-byline-feature-grid img {
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.wp-block-list.is-style-byline-resource-list,
+.wp-block-list.is-style-byline-link-list {
+  padding-left: 1.25em;
+}
+
+.wp-block-list.is-style-byline-resource-list li::marker {
+  color: var(--accent, #356875);
+}
+
+.wp-block-list.is-style-byline-link-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.wp-block-list.is-style-byline-link-list li {
+  border-bottom: 1px solid var(--rule, #d0d7de);
+  padding: 8px 0;
+}
+
+@media (max-width: 820px) {
+  .byline-newsroom-stories-grid,
+  .byline-people-layout-portrait-grid .byline-people-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .byline-newsroom-stories-featured-list {
+    grid-template-columns: 1fr;
+  }
+
+  .byline-newsroom-stories-featured-list > .story-teaser-lead {
+    grid-row: auto;
+  }
+
+  .byline-sports-schedule-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .byline-newsroom-stories-grid,
+  .byline-people-layout-portrait-grid .byline-people-grid,
+  .byline-people-layout-compact-list .byline-people-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .byline-newsroom-stories .story-teaser-list,
+  .byline-event {
+    grid-template-columns: 1fr;
+  }
+
+  .byline-game-score-team-name {
+    font-size: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .byline-newsroom-stories a,
+  .byline-people a,
+  .byline-game-score a {
+    scroll-behavior: auto;
+  }
+}
+
+/* Authored story contract. Astro publishes Core markup without a WordPress
+ * theme stylesheet. Own only the structure of the supported newsroom blocks.
+ * The same rules load in Gutenberg and the private article preview.
+ * The article shell/editor canvas establishes the byline-content container. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) {
+  display: flow-root;
+  overflow-wrap: break-word;
+}
+:is(.byline-article-view .article-story .article-body, .editor-styles-wrapper .is-root-container) > .alignwide {
+  clear: both;
+  box-sizing: border-box;
+  width: min(var(--article-wide-width), 100cqw);
+  max-width: none;
+  margin-inline: calc((100% - min(var(--article-wide-width), 100cqw)) / 2);
+}
+:is(.article-body, .editor-styles-wrapper, .byline-page-content) :is(img, video, audio, iframe, object) {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+:is(.article-body, .editor-styles-wrapper, .byline-page-content) .wp-block-image img {
+  display: block;
+  height: auto;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) figcaption {
+  color: var(--muted, #5f6872);
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: .9rem;
+  line-height: 1.4;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/* Core Media & Text: respect its inline column proportions and right-media
+ * switch. Core owns image-fill background positioning/focal-point editing. */
+.wp-block-media-text.is-style-byline-portrait-text {
+  display: grid;
+  grid-template-columns: 40% minmax(0, 1fr);
+  align-items: center;
+  column-gap: clamp(28px, 3vw, 36px);
+  margin-block: 2em;
+}
+.wp-block-media-text.is-style-byline-portrait-text.is-vertically-aligned-top { align-items: start; }
+.wp-block-media-text.is-style-byline-portrait-text.is-vertically-aligned-bottom { align-items: end; }
+.wp-block-media-text.is-style-byline-portrait-text.has-media-on-the-right {
+  grid-template-columns: minmax(0, 1fr) 40%;
+}
+.wp-block-media-text.is-style-byline-portrait-text > .wp-block-media-text__media {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 0;
+  min-width: 0;
+}
+.wp-block-media-text.is-style-byline-portrait-text.has-media-on-the-right > .wp-block-media-text__media {
+  grid-column: 2;
+}
+.wp-block-media-text.is-style-byline-portrait-text > .wp-block-media-text__content {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 0;
+  min-width: 0;
+}
+.wp-block-media-text.is-style-byline-portrait-text.has-media-on-the-right > .wp-block-media-text__content {
+  grid-column: 1;
+}
+.wp-block-media-text.is-style-byline-portrait-text:not(.is-image-fill) > .wp-block-media-text__media img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 620px;
+  margin-inline: auto;
+}
+.wp-block-media-text.is-style-byline-portrait-text.is-image-fill > .wp-block-media-text__media {
+  align-self: stretch;
+  background-size: cover;
+  min-height: 240px;
+}
+.wp-block-media-text.is-style-byline-portrait-text.is-image-fill > .wp-block-media-text__media img {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+
+/* Core Gallery has nested Image blocks (and older posts may have a list).
+ * Captions occupy a shared second row, never an overlay on the photograph. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery {
+  --byline-gallery-columns: 3;
+  --byline-gallery-gap: 18px;
+  display: grid;
+  grid-template-columns: repeat(var(--byline-gallery-columns), minmax(0, 1fr));
+  gap: var(--byline-gallery-gap);
+  align-items: start;
+}
+.wp-block-gallery.columns-1 { --byline-gallery-columns: 1 !important; }
+.wp-block-gallery.columns-2 { --byline-gallery-columns: 2 !important; }
+.wp-block-gallery.is-style-byline-photo-pair { --byline-gallery-columns: 2 !important; }
+.wp-block-gallery.is-style-byline-feature-grid { --byline-gallery-gap: 8px !important; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery > .wp-block-image {
+  /* Core's frontend gives nested figures ID-specific widths and flex growth. */
+  width: auto !important;
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  margin: 0 !important;
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  row-gap: 8px;
+  align-self: stretch;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery .wp-block-image :is(a, img, .byline-gallery-opener) {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  align-self: end;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery .wp-block-image img {
+  /* No `width: auto` and no `aspect-ratio: auto` here. WordPress marks lazy
+   * images `sizes="auto, ..."`, and browsers lay those out as a 300x150
+   * placeholder unless the image has a definite width. `width: auto` made the
+   * browser measure that placeholder as the slot and select the 300w
+   * candidate for a ~335px cell. The width/height attributes give the image a
+   * definite width (capped by max-width) and its intrinsic aspect ratio. */
+  height: auto;
+  max-height: 620px;
+  object-fit: contain;
+  margin-inline: auto;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery.is-cropped .wp-block-image img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery .wp-block-image figcaption {
+  position: static;
+  background: none;
+  color: var(--muted, #5f6872);
+  max-height: none;
+  padding: 0;
+  margin: 0;
+  width: auto;
+  overflow: visible;
+}
+.wp-block-gallery > .blocks-gallery-caption { grid-column: 1 / -1; }
+.wp-block-gallery > .blocks-gallery-grid { display: contents; }
+.wp-block-gallery .blocks-gallery-item { min-width: 0; list-style: none; }
+.wp-block-gallery .blocks-gallery-item figure { margin: 0; }
+.wp-block-gallery .blocks-gallery-item img { width: auto; height: auto; max-width: 100%; max-height: 620px; object-fit: contain; }
+
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-group.is-style-byline-photo-essay > * {
+  max-width: var(--article-width, 760px);
+  margin-inline: auto;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-group.is-style-byline-photo-essay > .wp-block-image {
+  max-width: 100%;
+  margin-block: 2.5em 1.5em;
+}
+.wp-block-group.is-style-byline-photo-essay > .wp-block-image img {
+  width: auto;
+  max-height: 780px;
+  object-fit: contain;
+  margin-inline: auto;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-quote.is-style-byline-source-quote {
+  color: var(--ink, #1f2328);
+  font-family: var(--font-serif, Georgia, serif);
+  border-left: 2px solid var(--accent, #b11f24);
+  margin-block: 1.7em;
+  padding-inline: 18px 0;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-pullquote.is-style-byline-feature-quote {
+  border-block: 2px solid var(--rule-strong, #aab2bb);
+  padding: 22px 0;
+  text-align: left;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-pullquote.is-style-byline-feature-quote blockquote {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: var(--ink, #1f2328);
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: clamp(1.4rem, 2.5vw, 1.85rem);
+  line-height: 1.3;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) :is(.is-style-byline-feature-quote, .is-style-byline-source-quote) cite {
+  display: block;
+  font-family: var(--font-ui, Arial, sans-serif);
+  font-size: .85rem;
+  font-style: normal;
+  color: var(--muted, #5f6872);
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-group.is-style-byline-key-facts {
+  border-block: 1px solid var(--rule-strong, #aab2bb);
+  border-left: 3px solid var(--accent, #b11f24);
+  padding: 16px 0 4px 18px;
+  margin-block: 1.8em;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .is-style-byline-key-facts h3 {
+  font-family: var(--font-ui, Arial, sans-serif);
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+.is-style-byline-key-facts li { line-height: 1.5; }
+
+
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-file.is-style-byline-document {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  border-block: 1px solid var(--rule-strong, #aab2bb);
+  padding-block: 18px;
+  margin-block: 1.8em;
+  font-family: var(--font-ui, Arial, sans-serif);
+  font-size: .95rem;
+  overflow-wrap: anywhere;
+}
+.wp-block-file.is-style-byline-document :is(object, iframe, .wp-block-file__embed) {
+  /* Core 7.1 adds hidden until its Interactivity runtime runs. Static Astro
+   * owns this visibility contract instead; narrow screens hide it below. */
+  display: block;
+  order: 1;
+  flex-basis: 100%;
+  width: 100%;
+  aspect-ratio: auto;
+  border: 1px solid var(--rule, #d0d7de);
+}
+.wp-block-file.is-style-byline-document > a { min-height: 44px; display: inline-flex; align-items: center; }
+.wp-block-file.is-style-byline-document .wp-block-file__button {
+  background: transparent;
+  color: var(--link, #356875);
+  border: 1px solid var(--rule-strong, #aab2bb);
+  border-radius: 0;
+  padding: 8px 14px;
+  font-size: .8rem;
+}
+.wp-block-file.is-style-byline-document > a:not([download])::after {
+  content: "Open document";
+  font-size: .75rem;
+  margin-left: 12px;
+  text-decoration: underline;
+}
+:is(.article-body, .editor-styles-wrapper, .byline-page-content) .wp-block-audio audio { width: 100%; }
+:is(.article-body, .editor-styles-wrapper, .byline-page-content) .wp-block-video video {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 780px;
+  margin-inline: auto;
+  aspect-ratio: auto;
+}
+.wp-block-audio.is-style-byline-story-audio { border-block: 1px solid var(--rule, #d0d7de); padding-block: 16px; }
+/* Only Core embeds declaring a ratio get a ratio. File previews and unrelated
+ * iframes retain their own dimensions. */
+.wp-block-embed.wp-embed-aspect-16-9 { --byline-embed-ratio: 16 / 9; }
+.wp-block-embed.wp-embed-aspect-4-3 { --byline-embed-ratio: 4 / 3; }
+.wp-block-embed.wp-embed-aspect-1-1 { --byline-embed-ratio: 1; }
+.wp-block-embed.wp-embed-aspect-9-16 { --byline-embed-ratio: 9 / 16; }
+.wp-block-embed.wp-embed-aspect-3-4 { --byline-embed-ratio: 3 / 4; }
+.wp-block-embed.wp-embed-aspect-18-9 { --byline-embed-ratio: 18 / 9; }
+.wp-block-embed.wp-embed-aspect-1-2 { --byline-embed-ratio: 1 / 2; }
+.wp-block-embed.wp-embed-aspect-21-9 { --byline-embed-ratio: 21 / 9; }
+:is(.article-body, .editor-styles-wrapper, .byline-page-content) .wp-block-embed.wp-has-aspect-ratio .wp-block-embed__wrapper {
+  aspect-ratio: var(--byline-embed-ratio, 16 / 9);
+  position: relative;
+  height: auto;
+}
+.wp-block-embed.wp-has-aspect-ratio .wp-block-embed__wrapper::before { content: none; }
+.wp-block-embed.wp-has-aspect-ratio .wp-block-embed__wrapper iframe { width: 100%; height: 100%; position: absolute; inset: 0; }
+
+.byline-newsroom-stories-layout-related { border-block: 1px solid var(--rule-strong, #aab2bb); padding-block: 16px; gap: 16px; }
+.byline-newsroom-stories-related { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.byline-newsroom-stories-related > .story-teaser { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; align-items: start; }
+.byline-newsroom-stories-related > .story-teaser-no-image { grid-template-columns: 1fr; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .byline-newsroom-stories-related :is(figure, h3) { margin: 0; }
+.byline-newsroom-stories-related .story-teaser h3 { font-size: 1.15rem; line-height: 1.2; }
+.byline-newsroom-stories-related .featured-image-frame { aspect-ratio: 4 / 3; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .byline-newsroom-stories.byline-newsroom-stories-layout-related > h2 {
+  font-family: var(--font-ui, Arial, sans-serif);
+  font-size: .82rem;
+  line-height: 1.2;
+  margin: 0;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .byline-newsroom-stories-related .story-teaser h3 {
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+.byline-newsroom-stories-related .story-teaser h3 a { color: inherit; text-decoration: none; }
+.byline-newsroom-stories-related .story-teaser h3 a:is(:hover, :focus-visible) { color: var(--link, #356875); text-decoration: underline; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) :is(.is-style-byline-feature-quote blockquote, .is-style-byline-source-quote) > p { margin-bottom: .65em; }
+
+@media (max-width: 900px) {
+  :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery:not(.columns-1):not(.is-style-byline-photo-pair) { --byline-gallery-columns: 2; }
+}
+@media (max-width: 700px) {
+  .wp-block-media-text.is-style-byline-portrait-text { grid-template-columns: minmax(0, 1fr) !important; row-gap: 22px; }
+  .wp-block-media-text.is-style-byline-portrait-text > .wp-block-media-text__media { grid-column: 1 !important; grid-row: 1; }
+  .wp-block-media-text.is-style-byline-portrait-text > .wp-block-media-text__content { grid-column: 1 !important; grid-row: 2; }
+  .wp-block-media-text.is-style-byline-portrait-text.is-image-fill > .wp-block-media-text__media { min-height: 0; background-image: none !important; }
+  .wp-block-media-text.is-style-byline-portrait-text.is-image-fill > .wp-block-media-text__media img { position: static; clip-path: none; width: auto; height: auto; max-height: 620px; margin-inline: auto; }
+}
+@media (max-width: 540px) {
+  :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .wp-block-gallery { --byline-gallery-columns: 1 !important; }
+  .wp-block-file.is-style-byline-document :is(object, iframe, .wp-block-file__embed) { display: none; }
+  .byline-newsroom-stories-related > .story-teaser { grid-template-columns: 72px minmax(0, 1fr); gap: 12px; }
+  .byline-newsroom-stories-related > .story-teaser-no-image { grid-template-columns: 1fr; }
+}
+
+/* The lightbox is a small article-only enhancement; no animation or carousel. */
+/* Enlargeable photographs. Linked images keep their own <a>; unlinked Photo
+ * Gallery images are wrapped in a generated button at enhancement time. */
+.byline-article-view .article-body .wp-block-gallery :is(a[aria-haspopup="dialog"], .byline-gallery-opener) { cursor: zoom-in; }
+.byline-article-view .article-body .wp-block-gallery .byline-gallery-opener { appearance: none; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; }
+.byline-article-view .article-body .wp-block-gallery :is(a[aria-haspopup="dialog"], .byline-gallery-opener):focus-visible { outline: 3px solid var(--accent, #b11f24); outline-offset: 3px; }
+.byline-gallery-dialog { background: var(--page, #fff); color: var(--ink, #1f2328); border: 1px solid var(--rule, #d0d7de); width: min(1100px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 16px; }
+.byline-gallery-dialog::backdrop { background: rgb(0 0 0 / .8); }
+.byline-gallery-dialog img { display: block; max-width: 100%; max-height: 70dvh; width: auto; height: auto; object-fit: contain; margin-inline: auto; }
+.byline-gallery-dialog-stage { display: grid; place-items: center; min-height: min(40dvh, 320px); }
+.byline-gallery-dialog-stage[aria-busy="true"] img { opacity: .35; }
+.byline-gallery-dialog figcaption { font-family: var(--font-serif, Georgia, serif); line-height: 1.4; margin-top: 12px; }
+.byline-gallery-dialog-controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.byline-gallery-dialog button { font: inherit; color: inherit; background: transparent; border: 1px solid var(--rule-strong, #aab2bb); padding: 8px 12px; min-height: 44px; cursor: pointer; }
+.byline-gallery-dialog button:focus-visible { outline: 2px solid var(--accent, #b11f24); outline-offset: 2px; }
+.byline-gallery-dialog figure { margin: 0; }
+
+/* The outer shell supplies the editorial canvas; nested layouts never escape
+   their own column. Shared across the editor, static article and private frame. */
+:is(.byline-article-view .article-story .article-body, .editor-styles-wrapper .is-root-container) > .alignfull {
+  clear: both;
+  box-sizing: border-box;
+  width: min(var(--article-full-width), 100cqw);
+  max-width: none;
+  margin-inline: calc((100% - min(var(--article-full-width), 100cqw)) / 2);
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is(.alignfull, .alignwide) { min-width: 0; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is(.alignfull, .alignwide) > figcaption {
+  max-width: var(--article-width); margin-inline: auto;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-image:is(.alignfull, .alignwide):not(.is-style-rounded) img:not([style*="object-fit:cover"]):not([style*="object-fit: cover"]) {
+  width: auto; height: auto; max-width: 100%; max-height: 85svh; margin-inline: auto;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-video video { display: block; width: auto; height: auto; max-height: 85svh; margin-inline: auto; }
+
+/* Core Cover structural compatibility. Core's inline focal/object position,
+   overlay colour/opacity and minimum-height controls remain authoritative. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  min-height: 430px; padding: clamp(24px, 5%, 64px); overflow: clip; isolation: isolate; color: #fff; box-sizing: border-box;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover :is(.wp-block-cover__image-background, .wp-block-cover__video-background, .wp-block-cover__background) {
+  position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; margin: 0; border: 0; object-fit: cover; z-index: -2;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .wp-block-cover__background { background: #000; opacity: .4; z-index: -1; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-0 { opacity: 0; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-10 { opacity: .1; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-20 { opacity: .2; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-30 { opacity: .3; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-40 { opacity: .4; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-50 { opacity: .5; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-60 { opacity: .6; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-70 { opacity: .7; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-80 { opacity: .8; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-90 { opacity: .9; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover .has-background-dim-100 { opacity: 1; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover__inner-container { width: 100%; min-width: 0; z-index: 1; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-style-byline-visual-chapter { min-height: clamp(420px, 68svh, 720px); }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-visual-chapter .wp-block-cover__inner-container { max-width: var(--article-width); }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-visual-chapter :is(h2,h3,p) { color: inherit; margin: 0 0 .5em; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-visual-chapter h2 { font-size: clamp(2rem, 4.5vw, 4rem); line-height: 1.08; text-wrap: balance; }
+/* Core's content-position control. Scoped like the structural rules above so the
+   chosen position wins over the centred default. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-top-left { align-items: flex-start; justify-content: flex-start; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-top-center { align-items: flex-start; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-top-right { align-items: flex-start; justify-content: flex-end; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-center-left { justify-content: flex-start; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-center-right { justify-content: flex-end; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-bottom-left { align-items: flex-end; justify-content: flex-start; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-bottom-center { align-items: flex-end; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-position-bottom-right { align-items: flex-end; justify-content: flex-end; }
+
+/* One restrained system for reported context. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-margin-note, .is-style-byline-evidence) {
+  border-block-start: 2px solid var(--accent, currentColor); padding: 18px 0; margin-block: 1.6em; display: flow-root;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-margin-note, .is-style-byline-evidence) > :is(h2,h3) {
+  font-family: var(--font-ui); font-size: .8rem; line-height: 1.4; letter-spacing: .04em; text-transform: uppercase; margin: 0 0 .7em;
+}
+@container byline-content (min-width: 1100px) {
+  :is(.article-body, .is-root-container) > .wp-block-group.is-style-byline-margin-note {
+    float: right; width: 280px; margin: .5em -210px 1.5em 30px; padding: 14px; background: var(--page, #fff); font-size: 1rem;
+  }
+}
+/* Clear floats before story-wide material, keeping all following prose legible. */
+:is(.article-body, .is-root-container) > :is(.alignwide, .alignfull) { clear: both; }
+
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-table { overflow-x: auto; max-width: 100%; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-table:is(.is-style-byline-data-table, .is-style-byline-comparison-table) table { border-collapse: collapse; width: 100%; font-size: 1rem; font-variant-numeric: tabular-nums; }
+:is(.is-style-byline-data-table, .is-style-byline-comparison-table) :is(th,td) { border: 0; border-bottom: 1px solid var(--rule); padding: .65em .85em; min-width: 9em; vertical-align: top; text-align: start; }
+:is(.is-style-byline-data-table, .is-style-byline-comparison-table) thead { border-block: 2px solid var(--ink); font-family: var(--font-ui); }
+.is-style-byline-comparison-table :is(td,th):first-child { font-weight: 700; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) sup.fn { font-size: .72em; line-height: 0; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is(.wp-block-footnotes, .byline-table-of-contents) { border-block-start: 1px solid var(--rule); padding-block: 20px; font-size: 1rem; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-footnotes { overflow-wrap: anywhere; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is([id], .fn) { scroll-margin-top: 100px; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is(a,summary,input,button,[tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) :is(.wp-block-footnotes li:target, .fn:target) { background: color-mix(in srgb, var(--accent) 10%, var(--page)); }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-details:is(.is-style-byline-read-more, .is-style-byline-methodology, .is-style-byline-full-statement) { border-block: 1px solid var(--rule); padding: 14px 0; margin-block: 1.6em; }
+:is(.is-style-byline-read-more, .is-style-byline-methodology, .is-style-byline-full-statement) summary { cursor: pointer; font-weight: 700; }
+:is(.is-style-byline-read-more, .is-style-byline-methodology, .is-style-byline-full-statement)[open] summary { margin-bottom: 1em; }
+
+/* Core inline flex-basis/width choices stay editable. Mobile DOM order stays intact. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-columns { display: flex; gap: var(--wp--style--block-gap, 28px); align-items: stretch; margin-block: 1.6em; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-column { flex-grow: 1; flex-basis: 0; min-width: 0; overflow-wrap: anywhere; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-column[style*="flex-basis"] { flex-grow: 0; }
+.wp-block-columns.are-vertically-aligned-top, .wp-block-column.is-vertically-aligned-top { align-items: flex-start; align-self: flex-start; }
+.wp-block-columns.are-vertically-aligned-center, .wp-block-column.is-vertically-aligned-center { align-items: center; align-self: center; }
+.wp-block-columns.are-vertically-aligned-bottom, .wp-block-column.is-vertically-aligned-bottom { align-items: flex-end; align-self: flex-end; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-key-numbers h3 { font-size: clamp(2rem, 4vw, 3.5rem); margin: 0; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .is-style-byline-qa h3 { border-top: 1px solid var(--rule); padding-top: 16px; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .byline-table-of-contents h2 { font-family: var(--font-ui); font-size: 1rem; }
+.byline-table-of-contents .byline-toc-level-3 { margin-inline-start: 1.3em; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-embed { min-width: 0; overflow-wrap: anywhere; }
+.wp-block-embed__wrapper > :is(blockquote,div) { max-width: 100%; margin-inline: auto; }
+@media (max-width: 700px) {
+  :is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-columns { flex-direction: column; }
+  :is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-column { flex-basis: auto !important; width: 100%; }
+  :is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-cover.is-style-byline-visual-chapter { min-height: clamp(320px, 60svh, 520px); }
+}
+
+
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .has-text-align-center { text-align: center; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .has-text-align-right { text-align: right; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper) .has-text-align-left { text-align: left; }

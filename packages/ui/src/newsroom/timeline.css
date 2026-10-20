@@ -1,0 +1,37 @@
+/* Timeline: moved unchanged from newsroom-blocks.css. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) ol.byline-timeline {
+  list-style: none;
+  padding: 0 0 0 22px;
+  margin-block: 1.8em;
+  border-left: 1px solid var(--rule-strong, #aab2bb);
+}
+.byline-timeline > .byline-timeline-item {
+  display: block;
+  position: relative;
+  padding: 0 0 24px;
+  min-width: 0;
+}
+.byline-timeline > .byline-timeline-item::before {
+  content: "";
+  position: absolute;
+  left: -27px;
+  top: .6em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, #b11f24);
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .byline-timeline-label {
+  font-family: var(--font-ui, Arial, sans-serif);
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--accent, #b11f24);
+  margin: 0 0 5px;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) .byline-timeline-title {
+  font-family: var(--font-headline, Georgia, serif);
+  font-size: 1.3rem;
+  margin: 0 0 8px;
+}
+.byline-timeline-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.byline-timeline-controls button { min-height: 44px; }

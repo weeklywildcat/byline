@@ -1,1 +1,2 @@
-@import "../../../../packages/ui/src/newsroom-blocks.css";
+/* Public styling for this block is in the shared newsroom stylesheet, loaded once by the plugin
+   (see stories/style.css and byline_newsroom_enqueue_shared_assets). */
