@@ -1,4 +1,5 @@
 import apiFetch from "@wordpress/api-fetch";
+import { toast } from "sonner";
 import {
   Button,
   Card,
@@ -604,6 +605,7 @@ function PublicationSettings({
       onSaved(saved);
       setValidationErrors({});
       setMessage("Publication settings saved.");
+      toast.success("Publication settings saved.");
     } catch (error) {
       setSaveError(safeRequestError(error, "Could not save publication settings. Check your access and try again."));
     } finally {
@@ -1038,6 +1040,7 @@ function DeploymentSettings() {
       setHookUrl("");
       setClearHook(false);
       setMessage("Deployment settings saved. The private hook URL was not returned to the browser.");
+      toast.success("Deployment settings saved.");
     } catch (requestError) {
       setError(safeRequestError(requestError, "Byline could not save the deploy hook. Enter a valid HTTPS URL and try again."));
     } finally {
@@ -1240,7 +1243,9 @@ function DiscordSettings() {
       const next = await request();
       if (applyDraft) applySavedPayload(next);
       else applyServerPayload(next);
-      setMessage(success(next));
+      const successMessage = success(next);
+      setMessage(successMessage);
+      if (nextOperation === "saving") toast.success("Discord settings saved.");
     } catch (requestError) {
       setError(safeRequestError(requestError, `Byline could not ${label}.`));
     } finally {
@@ -1597,6 +1602,7 @@ function AnalyticsSettings() {
       });
       applyPayload(next, providerId);
       setMessage("Analytics settings saved.");
+      toast.success("Analytics settings saved.");
     } catch (requestError) {
       setLoadError(safeRequestError(requestError, "Byline could not save analytics settings."));
     } finally {
@@ -1714,6 +1720,7 @@ function LoginSettings() {
       setKey("");
       setClearKey(false);
       setMessage("Login-screen settings saved.");
+      toast.success("Login-screen settings saved.");
     } catch (requestError) {
       setLoadError(safeRequestError(requestError, "Byline could not save login-screen settings."));
     } finally {
