@@ -27,7 +27,7 @@ import { useDispatch, useSelect } from '@wordpress/data';
 import { useCallback, useEffect, useMemo, useRef, useState } from '@wordpress/element';
 import * as editPostModule from '@wordpress/edit-post';
 import { __, sprintf } from '@wordpress/i18n';
-import { formatBold } from '@wordpress/icons';
+import { Icon, check, comment, formatBold, image, listView, megaphone, people, seen, time, update } from '@wordpress/icons';
 import { registerPlugin } from '@wordpress/plugins';
 import type { ComponentType, ReactNode } from 'react';
 
@@ -310,8 +310,7 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
   const normalized = normalizeWorkflowPayload(payload, payload, payload.story.postId, '');
   if (!normalized) return null;
 
-  const { story, statuses = [], capabilities, writer, editors = [], notes } = normalized;
-  const currentLabel = workflowStatusLabel(payload);
+  const { story, statuses = [], capabilities, editors = [], notes } = normalized;
   const published = story.isPublished || story.postStatus === 'publish';
   // A save in flight never disables a control. Edits queue behind the request
   // and are sent with the revision the previous response returned, so an editor
@@ -331,16 +330,6 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
 
   return (
     <div className="byline-workflow-panel">
-      <div className="byline-workflow-status-pair" aria-label={__('Story status', 'weekly-wildcat-headless')}>
-        <p className="byline-workflow-current">
-          <span className="byline-workflow-current-label">{__('Workflow', 'weekly-wildcat-headless')}</span>
-          <span className="byline-workflow-current-value">{currentLabel}</span>
-        </p>
-        <p className="byline-workflow-current">
-          <span className="byline-workflow-current-label">{__('WordPress publication', 'weekly-wildcat-headless')}</span>
-          <span className="byline-workflow-current-value">{publicationStatusLabel(story.postStatus)}</span>
-        </p>
-      </div>
       <p className="byline-workflow-note">
         {published
           ? __('Published follows WordPress. The earlier editorial stage is kept if the story is unpublished.', 'weekly-wildcat-headless')
@@ -364,13 +353,6 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
       ) : null}
 
       <div className="byline-workflow-fields">
-        {writer ? (
-          <dl className="byline-workflow-readonly">
-            <dt>{__('Writer', 'weekly-wildcat-headless')}</dt>
-            <dd>{writer.name}</dd>
-          </dl>
-        ) : null}
-
         {capabilities.assign ? (
           <>
             <div className="byline-workflow-field">
@@ -1005,7 +987,11 @@ function emptyEditorialPanelState(): Record<EditorialPanelKey, boolean> {
   return { tasks: false, contributors: false, corrections: false, distribution: false, activity: false };
 }
 
-function StorySummary({ payload, title }: { payload: WorkflowPayload | null; title: string }) {
+function StorySummary({ payload, title, onNavigate }: {
+  payload: WorkflowPayload | null;
+  title: string;
+  onNavigate: (panel: StorySidebarPanel) => void;
+}) {
   const normalized = payload ? normalizeWorkflowPayload(payload, payload, payload.story.postId, title) : null;
   const rawPayload = record(payload);
   const readiness = compactReadinessSummary(rawPayload.readiness);
@@ -1033,9 +1019,9 @@ function StorySummary({ payload, title }: { payload: WorkflowPayload | null; tit
       <div className="byline-story-summary-heading">
         <div>
           <span className="byline-editorial-eyebrow">{__('Story', 'weekly-wildcat-headless')}</span>
-          <h2 id="byline-story-summary-heading">{story.title || title || __('Untitled story', 'weekly-wildcat-headless')}</h2>
+          <h2 id="byline-story-summary-heading">{title || __('Untitled story', 'weekly-wildcat-headless')}</h2>
         </div>
-        <span className="byline-editorial-badge byline-story-summary-status">{workflowStatusLabel(payload)}</span>
+        <span className="byline-editorial-badge byline-story-summary-status">{sprintf(/* translators: %s: editorial workflow status. */ __('Workflow: %s', 'weekly-wildcat-headless'), workflowStatusLabel(payload))}</span>
       </div>
       <dl className="byline-story-summary-meta">
         <div>
@@ -1051,14 +1037,14 @@ function StorySummary({ payload, title }: { payload: WorkflowPayload | null; tit
           <dd>{due}</dd>
         </div>
         <div>
-          <dt>{__('WordPress', 'weekly-wildcat-headless')}</dt>
+          <dt>{__('WordPress publication', 'weekly-wildcat-headless')}</dt>
           <dd>{publicationStatusLabel(story.postStatus)}</dd>
         </div>
       </dl>
       <div className="byline-story-summary-counters" aria-live="polite">
-        {readiness && readiness.total > 0 ? <span>{sprintf(/* translators: 1: passed checks, 2: total checks. */ __('%1$d of %2$d checks ready', 'weekly-wildcat-headless'), readiness.passed, readiness.total)}</span> : null}
-        {typeof story.tasksOpen === 'number' ? <span>{sprintf(/* translators: %d: open task count. */ __('%d open tasks', 'weekly-wildcat-headless'), story.tasksOpen)}</span> : null}
-        {contributorCount > 0 ? <span>{sprintf(/* translators: %d: contributor count. */ __('%d contributors', 'weekly-wildcat-headless'), contributorCount)}</span> : null}
+        {readiness && readiness.total > 0 ? <span><Icon icon={check} size={16} aria-hidden="true" />{sprintf(/* translators: 1: passed checks, 2: total checks. */ __('%1$d of %2$d checks ready', 'weekly-wildcat-headless'), readiness.passed, readiness.total)}</span> : null}
+        {typeof story.tasksOpen === 'number' ? <Button variant="link" icon={check} onClick={() => onNavigate('tasks')} aria-label={sprintf(/* translators: %d: open task count. */ __('Open tasks: %d open', 'weekly-wildcat-headless'), story.tasksOpen)}>{sprintf(/* translators: %d: open task count. */ __('%d open tasks', 'weekly-wildcat-headless'), story.tasksOpen)}</Button> : null}
+        {contributorCount > 0 ? <Button variant="link" icon={people} onClick={() => onNavigate('contributors')} aria-label={sprintf(/* translators: %d: contributor count. */ __('Open contributors: %d', 'weekly-wildcat-headless'), contributorCount)}>{sprintf(/* translators: %d: contributor count. */ __('%d contributors', 'weekly-wildcat-headless'), contributorCount)}</Button> : null}
       </div>
     </section>
   );
@@ -1116,11 +1102,11 @@ function StoryPreviewLaunch({ postId }: { postId: number }) {
 
   return (
     <div className="byline-editorial-preview-launch">
-      <Button variant="secondary" isBusy={isSaving} disabled={isSaving || postId <= 0} onClick={() => void openPreview()}>
+      <Button variant="secondary" icon={seen} isBusy={isSaving} disabled={isSaving || postId <= 0} onClick={() => void openPreview()}>
         {isSaving ? __('Saving and opening preview…', 'weekly-wildcat-headless') : __('Preview as Byline', 'weekly-wildcat-headless')}
       </Button>
       <p className="byline-editorial-preview-help">
-        {__('Save the current story, then open a private responsive preview. Publishing and deployment actions are disabled there.', 'weekly-wildcat-headless')}
+        {__('Saves your changes and opens a private preview in a new tab.', 'weekly-wildcat-headless')}
       </p>
       {error ? <Notice status="error" isDismissible={false}>{error}</Notice> : null}
     </div>
@@ -1305,6 +1291,7 @@ function EditorialNewsroomPanels({
       <PanelBody
         className="byline-editorial-sidebar-panel"
         title={__('Visuals', 'weekly-wildcat-headless')}
+        icon={<Icon icon={image} aria-hidden="true" />}
         initialOpen={false}
         opened={openPanels.visuals}
         onToggle={(opened) => onPanelToggle('visuals', opened)}
@@ -1315,6 +1302,7 @@ function EditorialNewsroomPanels({
       <PanelBody
         className="byline-editorial-sidebar-panel"
         title={taskCount ? sprintf(/* translators: %d: open task count. */ __('Tasks · %d open', 'weekly-wildcat-headless'), taskCount) : __('Tasks', 'weekly-wildcat-headless')}
+        icon={<Icon icon={check} aria-hidden="true" />}
         initialOpen={false}
         opened={openPanels.tasks}
         onToggle={(opened) => onPanelToggle('tasks', opened)}
@@ -1337,6 +1325,7 @@ function EditorialNewsroomPanels({
       <PanelBody
         className="byline-editorial-sidebar-panel"
         title={contributorCount ? sprintf(/* translators: %d: contributor count. */ __('Contributors · %d', 'weekly-wildcat-headless'), contributorCount) : __('Contributors', 'weekly-wildcat-headless')}
+        icon={<Icon icon={people} aria-hidden="true" />}
         initialOpen={false}
         opened={openPanels.contributors}
         onToggle={(opened) => onPanelToggle('contributors', opened)}
@@ -1373,6 +1362,7 @@ function EditorialNewsroomPanels({
       <PanelBody
         className="byline-editorial-sidebar-panel"
         title={correctionCount ? sprintf(/* translators: %d: correction and update count. */ __('Corrections · %d', 'weekly-wildcat-headless'), correctionCount) : __('Corrections and updates', 'weekly-wildcat-headless')}
+        icon={<Icon icon={update} aria-hidden="true" />}
         initialOpen={false}
         onToggle={(opened) => { if (opened) loadCorrections(); }}
       >
@@ -1394,6 +1384,7 @@ function EditorialNewsroomPanels({
       <PanelBody
         className="byline-editorial-sidebar-panel"
         title={__('Activity', 'weekly-wildcat-headless')}
+        icon={<Icon icon={time} aria-hidden="true" />}
         initialOpen={false}
         onToggle={(opened) => { if (opened) loadActivity(); }}
       >
@@ -1406,6 +1397,7 @@ function EditorialNewsroomPanels({
         <PanelBody
           className="byline-editorial-sidebar-panel"
           title={__('Distribution', 'weekly-wildcat-headless')}
+          icon={<Icon icon={megaphone} aria-hidden="true" />}
           initialOpen={false}
           onToggle={(opened) => { if (opened) loadDistribution(); }}
         >
@@ -1432,6 +1424,7 @@ function EditorialNewsroomPanels({
         <PanelBody
           className="byline-editorial-sidebar-panel"
           title={__('Discussion', 'weekly-wildcat-headless')}
+          icon={<Icon icon={comment} aria-hidden="true" />}
           initialOpen={false}
         >
           {({ opened }) => opened ? (
@@ -1876,11 +1869,12 @@ function EditorialWorkflowPlugin() {
 
       <PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle} icon={formatBold} className="byline-editorial-sidebar">
         <Panel className="byline-story-panel">
-          <StorySummary payload={payload} title={title} />
+          <StorySummary payload={payload} title={title} onNavigate={openRequestedStoryPanel} />
           {postId > 0 ? <StoryPreviewLaunch postId={postId} /> : null}
           <PanelBody
             className="byline-editorial-sidebar-panel byline-editorial-workflow-panel"
             title={__('Workflow', 'weekly-wildcat-headless')}
+            icon={<Icon icon={listView} aria-hidden="true" />}
             initialOpen={true}
             opened={openPanels.workflow}
             onToggle={(opened) => onPanelToggle('workflow', opened)}

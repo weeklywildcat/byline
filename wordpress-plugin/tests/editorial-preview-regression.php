@@ -59,7 +59,7 @@ foreach ([
     "window.open('about:blank', '_blank')",
     'previewWindow.location.replace(previewUrl.toString())',
     'Preview as Byline',
-    'Publishing and deployment actions are disabled there.',
+    'Saves your changes and opens a private preview in a new tab.',
 ] as $needle) {
     $assert(strpos($entrypoint, $needle) !== false, "Editor preview launch contract missing: {$needle}");
 }

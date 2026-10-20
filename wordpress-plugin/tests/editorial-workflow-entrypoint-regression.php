@@ -51,7 +51,7 @@ foreach ([
 $assert(substr_count($entrypoint, '<WorkflowControls') === 1, 'The editor entrypoint renders more than one workflow controls surface.');
 $assert(strpos($entrypoint, '<WorkflowPanel') === false, 'The legacy duplicate WorkflowPanel is still mounted.');
 $assert(strpos($entrypoint, 'client.getWorkflow') === false, 'A secondary panel still issues a duplicate workflow request.');
-$assert(strpos($entrypoint, 'Workflow: %s') === false, 'The sidebar title still exposes a dynamic workflow label.');
+$assert(strpos($entrypoint, '<PluginSidebar name={SIDEBAR_NAME} title={sidebarTitle}') !== false, 'The sidebar must use its stable Story title.');
 
 // PluginSidebar registers its own More-menu entry. Rendering
 // PluginSidebarMoreMenuItem as well puts two identical "Story" items in that

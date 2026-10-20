@@ -166,7 +166,7 @@ test.describe("Gutenberg Story sidebar", () => {
     }
   });
 
-  test("secondary panels stay lazy until they are opened", async ({ adminPage: page, adminSession }) => {
+  test("the summary opens Tasks while secondary panels stay lazy", async ({ adminPage: page, adminSession }) => {
     await createEditorDraft(page, adminSession.registerTestPost, "lazy");
 
     const panelRequests: string[] = [];
@@ -175,10 +175,31 @@ test.describe("Gutenberg Story sidebar", () => {
     });
 
     await openStorySidebar(page);
+    const sidebar = page.locator('.byline-editorial-sidebar');
+    const widths = await sidebar.evaluate((element) => ({
+      content: element.getBoundingClientRect().width,
+      reserved: element.closest('.interface-interface-skeleton__sidebar')?.getBoundingClientRect().width,
+      overflow: element.scrollWidth > element.clientWidth,
+    }));
+    expect(widths.overflow).toBe(false);
+    if (widths.reserved) expect(Math.abs(widths.content - widths.reserved)).toBeLessThan(2);
     expect(panelRequests.some((url) => url.includes("/tasks"))).toBe(false);
 
-    await openStoryPanel(page, "tasks");
+    await page.getByRole("button", { name: /^Open tasks:/ }).click();
+    await expect(page.getByRole("button", { name: /^Tasks(?: ·|$)/ })).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("button", { name: "Workflow", exact: true })).toHaveAttribute("aria-expanded", "false");
     await expect.poll(() => panelRequests.some((url) => url.includes("/tasks"))).toBe(true);
+    expect(panelRequests.some((url) => /\/(contributors|corrections|activity)(?:\?|$)/.test(url))).toBe(false);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openStorySidebar(page);
+    const mobile = await sidebar.evaluate((element) => ({
+      width: element.getBoundingClientRect().width,
+      overflow: element.scrollWidth > element.clientWidth,
+    }));
+    expect(mobile.width).toBeGreaterThan(0);
+    expect(mobile.width).toBeLessThanOrEqual(390);
+    expect(mobile.overflow).toBe(false);
   });
 
   test("publishing reports queued, then Live only once the manifest proves the revision", async ({ adminPage: page, adminSession }) => {
