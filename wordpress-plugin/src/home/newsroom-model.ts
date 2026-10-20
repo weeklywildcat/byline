@@ -35,6 +35,16 @@ export type HomeBootstrap = {
 
 export const mediaTypeLabels: Record<MediaAssignmentType, string> = { photo: "Photo", gallery: "Gallery", graphic: "Graphic", video: "Video", audio: "Audio", other: "Visual" };
 export const mediaStatusLabels: Record<MediaAssignmentStatus, string> = { needed: "Needed", assigned: "Assigned", "in-progress": "In progress", uploaded: "Uploaded", selected: "Selected", done: "Done" };
+
+const GENERIC_MEDIA_TITLES = new Set(["visual request", "photo request", "media request"]);
+
+/** Keep custom assignment titles, but replace legacy generic request labels with useful newsroom copy. */
+export function mediaAssignmentTitle(media: Pick<HomeVisualWork, "title" | "type" | "status">): string {
+  const custom = media.title.trim();
+  if (custom && !GENERIC_MEDIA_TITLES.has(custom.toLowerCase())) return custom;
+  const kind = mediaTypeLabels[media.type] || "Visual";
+  return media.status === "needed" ? `${kind} needed` : `${kind} assignment`;
+}
 export const resourcePurposeLabels: Record<ResourcePurpose, string> = { draft: "Draft", "interview-notes": "Interview notes", transcript: "Transcript", research: "Research", data: "Data", folder: "Folder", other: "Other" };
 const appointmentKindLabels: Record<string, string> = { interview: "Interview", meeting: "Meeting", event: "Event", photo: "Photo shoot", "press-conference": "Press conference", game: "Game", performance: "Performance", reporting: "Reporting", other: "Appointment" };
 
@@ -170,20 +180,21 @@ export function homeAgenda(data: HomeBootstrap, now = new Date()): AgendaEvent[]
 
 export type AttentionItem = { id: string; storyId: number | null; title: string; detail: string; urgent?: boolean };
 export function waitingForMe(data: HomeBootstrap, now = new Date()): AttentionItem[] {
-  const overdue = myOpenTasks(data.tasks, data.currentUser.id, data.timezone, now).filter((t) => dayDistance(t.dueAt, data.timezone, now) < 0);
   const items: AttentionItem[] = [];
-  if (overdue.length) items.push({ id: "overdue-work", storyId: overdue[0].storyId || null, title: `${overdue.length} overdue ${overdue.length === 1 ? "task" : "tasks"}`, detail: "Review your deadlines in Up Next", urgent: true });
+  // Ordinary tasks already live in Up Next. Waiting for Me is reserved for work
+  // that needs a decision, assignment, or scheduling action instead of duplicating
+  // the same overdue task in two Home sections.
   data.stories.filter((s) => activeStory(s) && myStory(s, data.currentUser.id) && dayDistance(s.deadline, data.timezone, now) < 0).slice(0, 2).forEach((s) => items.push({ id: `late-story-${s.id}`, storyId: s.id, title: s.title, detail: "Story deadline has passed", urgent: true }));
   // A reporting appointment whose target window is about to open, is open, or only just lapsed.
   // An unscheduled idea or a far-off window never appears here.
   (data.appointments || []).flatMap((a) => { const need = schedulingNeed(a, data.timezone, now); return need ? [{ a, need }] : []; })
     .sort((x, y) => Number(y.need.urgent) - Number(x.need.urgent) || (x.a.windowStart || "").localeCompare(y.a.windowStart || "") || x.a.id.localeCompare(y.a.id)).slice(0, 2)
     .forEach(({ a, need }) => items.push({ id: `schedule-${a.id}`, storyId: a.storyId, title: a.title, detail: need.label, urgent: need.urgent }));
-  data.visualWork.filter((v) => v.assignee?.id === data.currentUser.id && v.status === "assigned").slice(0, 2).forEach((v) => items.push({ id: `assigned-media-${v.story.id}-${v.id}`, storyId: v.story.id, title: v.title || v.story.title, detail: `${v.story.title} · waiting to be started` }));
+  data.visualWork.filter((v) => v.assignee?.id === data.currentUser.id && v.status === "assigned").slice(0, 2).forEach((v) => items.push({ id: `assigned-media-${v.story.id}-${v.id}`, storyId: v.story.id, title: mediaAssignmentTitle(v), detail: `${v.story.title} · waiting to be started` }));
   if (data.capabilities.review) {
-    data.visualWork.filter((v) => !v.assignee && v.status === "needed" && dayDistance(v.dueAt, data.timezone, now) <= 1).slice(0, 2).forEach((v) => items.push({ id: `unassigned-${v.story.id}-${v.id}`, storyId: v.story.id, title: v.title || v.story.title, detail: `${v.story.title} · urgent visual work needs an assignee`, urgent: true }));
+    data.visualWork.filter((v) => !v.assignee && v.status === "needed" && dayDistance(v.dueAt, data.timezone, now) <= 1).slice(0, 2).forEach((v) => items.push({ id: `unassigned-${v.story.id}-${v.id}`, storyId: v.story.id, title: mediaAssignmentTitle(v), detail: `${v.story.title} · urgent visual work needs an assignee`, urgent: true }));
   }
-  // Urgent items first (stable), so a few scheduling nudges cannot push overdue or late work out of the bound.
+  // Urgent items first (stable), so a few scheduling nudges cannot push other decision work out of the bound.
   return [...items.filter((i) => i.urgent), ...items.filter((i) => !i.urgent)].slice(0, 5);
 }
 
