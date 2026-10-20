@@ -176,7 +176,7 @@ function normalizeMedia(value: unknown): QuickViewMedia {
   const type = text(source.type, "none");
   const status = text(source.status, "needed");
   return {
-    type: ["none", "photo", "gallery", "graphic", "video", "other"].includes(type) ? type as PlanningVisualType : "other",
+    type: ["none", "photo", "gallery", "graphic", "video", "audio", "other"].includes(type) ? type as PlanningVisualType : "other",
     status: ["needed", "assigned", "in-progress", "uploaded", "selected", "done"].includes(status) ? status as PlanningVisualStatus : "needed",
     label: text(source.label),
     notes: text(source.notes ?? source.legacyNotes),

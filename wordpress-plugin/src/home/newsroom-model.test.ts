@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { EditorialTask } from "../editorial/editorial-model";
 import type { PlanningStory } from "../planning/planning-model";
-import { activeStory, dayDistance, homeAgenda, myActiveStories, myOpenTasks, myStory, reviewStories, siteDay, waitingForMe, type HomeBootstrap } from "./newsroom-model";
+import type { HomeAppointment } from "../workspace/workspace-types";
+import { activeStory, dayDistance, homeAgenda, myActiveStories, myOpenTasks, myStory, reviewStories, siteDay, waitingForMe, workspaceUrlFor, type HomeBootstrap, type HomeVisualWork } from "./newsroom-model";
 import { replaceHomeTask } from "./home-query";
 
 const now = new Date("2026-10-20T12:00:00Z");
@@ -12,8 +13,15 @@ function story(patch: Partial<PlanningStory> = {}): PlanningStory {
 function task(id: number, dueAt: string | null, patch: Partial<EditorialTask> = {}): EditorialTask {
   return { id, title: `Task ${id}`, state: "open", assigneeId: 7, dueAt, priority: "normal", storyId: 1, order: id, ...patch };
 }
+function appointment(patch: Partial<HomeAppointment> = {}): HomeAppointment {
+  return { id: "a1", title: "Interview Mrs. Hamby", kind: "interview", status: "confirmed", scheduleMode: "exact", windowStart: null, windowEnd: null, startAt: "2026-10-27T14:15:00Z", endAt: null, sourceId: null, sourceLabel: null, location: "", storyId: 1, storyTitle: "Canteen could return", ...patch };
+}
+const windowAppointment = (patch: Partial<HomeAppointment> = {}) => appointment({ id: "w1", title: "Interview local reporter", status: "planned", scheduleMode: "window", windowStart: "2026-10-26", windowEnd: "2026-10-30", startAt: null, ...patch });
+function visual(patch: Partial<HomeVisualWork> = {}): HomeVisualWork {
+  return { id: "m1", story: { id: 1, title: "Canteen", editUrl: "" }, title: "Cafeteria photos", type: "photo", status: "assigned", assignee: { id: 7, name: "Caroline" }, dueAt: "2026-10-20T21:00:00Z", notes: "", attachmentIds: [], ...patch };
+}
 function bootstrap(patch: Partial<HomeBootstrap> = {}): HomeBootstrap {
-  return { currentUser: { id: 7, name: "Caroline" }, timezone, now: now.toISOString(), capabilities: { review: false, createStory: true, uploadMedia: true }, stories: [story()], tasks: [], visualWork: [], activity: [], errors: {}, limits: { stories: 320, tasks: 200, visualWork: 100, activity: 10 }, ...patch };
+  return { currentUser: { id: 7, name: "Caroline" }, timezone, now: now.toISOString(), capabilities: { review: false, createStory: true, uploadMedia: true }, stories: [story()], tasks: [], visualWork: [], appointments: [], activity: [], errors: {}, limits: { stories: 320, tasks: 200, visualWork: 100, appointments: 100, activity: 10 }, ...patch };
 }
 
 describe("personal newsroom work", () => {
@@ -56,8 +64,8 @@ describe("site dates and role-relevant attention", () => {
     expect(siteDay("2026-10-20T22:00:00Z", "+05:30")).toBe("2026-10-21");
   });
   it("combines commitments in chronological order and deduplicates identical publication instants", () => {
-    const data = bootstrap({ stories: [story({ deadline: "2026-10-20", plannedPublication: "2026-10-22T10:00:00-04:00", wordpressState: { id: "future", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-10-22T14:00:00Z" } })], tasks: [task(1, "2026-10-21T12:00:00Z")], visualWork: [{ id: 1, story: { id: 1, title: "Canteen", editUrl: "" }, assignee: { id: 7, name: "Caroline" }, dueAt: "2026-10-20T21:00:00Z", status: "assigned", type: "photo", notes: "", attachmentIds: [] }] });
-    expect(homeAgenda(data, now).map((e) => e.id)).toEqual(["deadline-1", "media-1", "task-1", "scheduled-1"]);
+    const data = bootstrap({ stories: [story({ deadline: "2026-10-20", plannedPublication: "2026-10-22T10:00:00-04:00", wordpressState: { id: "future", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-10-22T14:00:00Z" } })], tasks: [task(1, "2026-10-21T12:00:00Z")], visualWork: [visual()] });
+    expect(homeAgenda(data, now).map((e) => e.id)).toEqual(["deadline-1", "media-1-m1", "task-1", "scheduled-1"]);
     expect(homeAgenda(bootstrap({ stories: [story({ authors: [], writer: { id: 9, name: "Other" } })] }), now)).toEqual([]);
   });
   it("summarizes overdue tasks instead of duplicating the work list, and gates review", () => {
@@ -65,5 +73,62 @@ describe("site dates and role-relevant attention", () => {
     expect(waitingForMe(data, now)).toEqual([expect.objectContaining({ id: "overdue-work", title: "2 overdue tasks" })]);
     expect(reviewStories(data)).toEqual([]);
     expect(reviewStories({ ...data, capabilities: { ...data.capabilities, review: true } })).toHaveLength(1);
+  });
+});
+
+describe("production assignments in Coming Up", () => {
+  it("lists each assignment under its own title and label, and ids stay strings across stories", () => {
+    const data = bootstrap({
+      stories: [story({ deadline: null }), story({ id: 2, title: "Band", deadline: null })],
+      visualWork: [visual({ id: "legacy-v1" }), visual({ id: "legacy-v1", story: { id: 2, title: "Band", editUrl: "" }, title: "Band portraits", type: "audio", dueAt: "2026-10-22T14:00:00Z" }), visual({ id: "m3", title: "Done", status: "done" }), visual({ id: "m4", title: "Someone else's", assignee: { id: 9, name: "Other" } })]
+    });
+    const events = homeAgenda(data, now);
+    expect(events.map((e) => e.id)).toEqual(["media-1-legacy-v1", "media-2-legacy-v1"]);
+    expect(events[0]).toMatchObject({ title: "Cafeteria photos", detail: "Canteen", label: "Production due", storyId: 1 });
+    expect(events.every((e) => typeof e.id === "string")).toBe(true);
+    expect(homeAgenda({ ...data, capabilities: { ...data.capabilities, review: true } }, now).map((e) => e.id)).toContain("media-1-m4");
+  });
+});
+
+describe("appointments in Coming Up and Waiting for Me", () => {
+  it("shows a confirmed exact appointment with its real time, and never a target window", () => {
+    const data = bootstrap({ stories: [story({ deadline: null })], appointments: [appointment(), appointment({ id: "t1", status: "tentative", startAt: "2026-10-22T14:00:00Z" }), windowAppointment({ status: "confirmed" }), appointment({ id: "u1", scheduleMode: "unscheduled", startAt: null, status: "planned" })] });
+    const events = homeAgenda(data, now);
+    expect(events).toEqual([{ id: "appointment-a1", storyId: 1, title: "Interview Mrs. Hamby", detail: "Canteen could return", label: "Interview", date: "2026-10-27T14:15:00Z", day: "2026-10-27" }]);
+    expect(new Date(events[0].date).toISOString()).toBe("2026-10-27T14:15:00.000Z");
+  });
+  it("puts an appointment on its site day even when the UTC day is the next one", () => {
+    const late = appointment({ startAt: "2026-10-21T02:30:00Z" });
+    expect(homeAgenda(bootstrap({ stories: [], appointments: [late] }), now)[0]).toMatchObject({ day: "2026-10-20", date: "2026-10-21T02:30:00Z" });
+    expect(homeAgenda(bootstrap({ stories: [], appointments: [late], timezone: "Pacific/Auckland" }), now)[0].day).toBe("2026-10-21");
+  });
+  it("keeps appointments beyond two weeks and in the past out of Coming Up", () => {
+    expect(homeAgenda(bootstrap({ stories: [], appointments: [appointment({ startAt: "2026-11-20T15:00:00Z" }), appointment({ id: "p1", startAt: "2026-10-19T15:00:00Z" })] }), now)).toEqual([]);
+  });
+  it("lists an upcoming target window in Waiting for Me, but not a far-future window or an undated idea", () => {
+    const near = bootstrap({ stories: [], appointments: [windowAppointment()] });
+    expect(waitingForMe(near, now)).toEqual([{ id: "schedule-w1", storyId: 1, title: "Interview local reporter", detail: "Needs scheduling for next week", urgent: false }]);
+    const far = bootstrap({ stories: [], appointments: [windowAppointment({ windowStart: "2026-12-07", windowEnd: "2026-12-11" }), appointment({ id: "u1", scheduleMode: "unscheduled", startAt: null, status: "planned" }), appointment()] });
+    expect(waitingForMe(far, now)).toEqual([]);
+    expect(homeAgenda(near, now).length).toBe(0);
+  });
+  it("keeps overdue work first and bounded when scheduling items coexist", () => {
+    const stories = [1, 2, 3].map((id) => story({ id, title: `Late ${id}`, deadline: "2026-10-18" }));
+    const data = bootstrap({ stories, tasks: [task(1, "2026-10-19T12:00:00Z")], appointments: [windowAppointment({ id: "w1", windowStart: "2026-10-20", windowEnd: "2026-10-20" }), windowAppointment({ id: "w2", windowStart: "2026-10-26" }), windowAppointment({ id: "w3", windowStart: "2026-10-27" })], visualWork: [visual()] });
+    const items = waitingForMe(data, now);
+    expect(items).toHaveLength(5);
+    expect(items[0].id).toBe("overdue-work");
+    expect(items.map((i) => i.id)).toEqual(["overdue-work", "late-story-1", "late-story-2", "schedule-w1", "schedule-w2"]);
+    const calm = waitingForMe(bootstrap({ tasks: [task(1, "2026-10-19T12:00:00Z")], stories: [story()], appointments: [windowAppointment()] }), now);
+    expect(calm.map((i) => i.id)).toEqual(["overdue-work", "schedule-w1"]);
+  });
+});
+
+describe("Story Workspace navigation", () => {
+  it("derives the workspace URL from the Stories URL without string slicing", () => {
+    const url = new URL(workspaceUrlFor("http://site.test/wp-admin/admin.php?page=byline-planning&tab=stories", 42));
+    expect(url.pathname).toBe("/wp-admin/admin.php");
+    expect(Object.fromEntries(url.searchParams)).toEqual({ page: "byline-planning", story: "42" });
+    expect(new URL(workspaceUrlFor("/wp-admin/admin.php?tab=stories&page=byline-planning", 7, "http://site.test/wp-admin/admin.php")).search).toBe("?page=byline-planning&story=7");
   });
 });

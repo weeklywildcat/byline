@@ -1,7 +1,21 @@
 import type { EditorialTask, ContributorEntry } from "../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../editorial/activity-model";
-import type { ContributorPayload } from "../editorial/editorial-rest";
-import type { MediaRequest, PlanningPerson, PlanningStory } from "../planning/planning-model";
+import type { PlanningPerson, PlanningStory } from "../planning/planning-model";
+import { schedulingNeed, upcomingConfirmed } from "../workspace/schedule-model";
+import type { HomeAppointment, MediaAssignmentStatus, MediaAssignmentType, ResourcePurpose } from "../workspace/workspace-types";
+
+/** One production assignment, as Home receives it (one row per assignment, not per story). */
+export type HomeVisualWork = {
+  id: string;
+  story: { id: number; title: string; editUrl: string };
+  title: string;
+  type: MediaAssignmentType;
+  status: MediaAssignmentStatus;
+  assignee: PlanningPerson | null;
+  dueAt: string | null;
+  notes: string;
+  attachmentIds: number[];
+};
 
 export type HomeBootstrap = {
   currentUser: PlanningPerson;
@@ -11,29 +25,27 @@ export type HomeBootstrap = {
   capabilities: { review: boolean; createStory: boolean; uploadMedia: boolean };
   stories: PlanningStory[];
   tasks: EditorialTask[];
-  visualWork: MediaRequest[];
+  visualWork: HomeVisualWork[];
+  /** The signed-in user's open appointments. Windows carry no instant; Home never invents one. */
+  appointments: HomeAppointment[];
   activity: EditorialActivityRecord[];
-  errors: Partial<Record<"stories" | "tasks" | "visualWork" | "activity", string>>;
-  limits: { stories: number; tasks: number; visualWork: number; activity: number };
+  errors: Partial<Record<"stories" | "tasks" | "visualWork" | "appointments" | "activity", string>>;
+  limits: { stories: number; tasks: number; visualWork: number; appointments: number; activity: number };
 };
 
-export type StoryResource = { id: string; label: string; url: string; kind: string };
-export type HomeStoryContext = {
-  story: PlanningStory;
-  contributors: ContributorPayload;
-  resources: StoryResource[];
-  sections: string[];
-  previewUrl: string;
-};
-export type HomePeek = {
-  story: { revision?: number };
-  statuses: PlanningStory["workflow"][];
-  capabilities: { changeStatus: boolean; assign: boolean };
-  tasks: { tasks: EditorialTask[]; people: ContributorEntry[]; capabilities: { canAssign: boolean; canEditLinkedStory: boolean } };
-  media: { type: string; status: string; dueAt?: string; notes?: string; assigneeId?: number };
-  activity: { activity: EditorialActivityRecord[] };
-  homeContext: HomeStoryContext;
-};
+export const mediaTypeLabels: Record<MediaAssignmentType, string> = { photo: "Photo", gallery: "Gallery", graphic: "Graphic", video: "Video", audio: "Audio", other: "Visual" };
+export const mediaStatusLabels: Record<MediaAssignmentStatus, string> = { needed: "Needed", assigned: "Assigned", "in-progress": "In progress", uploaded: "Uploaded", selected: "Selected", done: "Done" };
+export const resourcePurposeLabels: Record<ResourcePurpose, string> = { draft: "Draft", "interview-notes": "Interview notes", transcript: "Transcript", research: "Research", data: "Data", folder: "Folder", other: "Other" };
+const appointmentKindLabels: Record<string, string> = { interview: "Interview", meeting: "Meeting", event: "Event", photo: "Photo shoot", "press-conference": "Press conference", game: "Game", performance: "Performance", reporting: "Reporting", other: "Appointment" };
+
+/** `…&tab=stories` becomes `…&story=<id>`: the full Story Workspace on the same Planning page. */
+export function workspaceUrlFor(storiesUrl: string, storyId: number, base = typeof window === "undefined" ? "http://localhost/wp-admin/" : window.location.href): string {
+  const url = new URL(storiesUrl, base);
+  url.searchParams.delete("tab");
+  url.searchParams.delete("mine");
+  url.searchParams.set("story", String(storyId));
+  return url.toString();
+}
 
 const DAY = 86_400_000;
 /** Date-only newsroom deadlines are calendar values, never browser-local instants. */
@@ -97,35 +109,39 @@ export function myActiveStories(stories: PlanningStory[], userId: number, timezo
     || (b.modifiedAt || "").localeCompare(a.modifiedAt || "") || a.id - b.id);
 }
 
-export type AgendaEvent = { id: string; storyId: number | null; title: string; detail: string; date: string; day: string };
+/** `label` is the kind of commitment ("Story deadline", "Interview"); `title`/`detail` identify the work. */
+export type AgendaEvent = { id: string; storyId: number | null; title: string; detail: string; label: string; date: string; day: string };
 export function homeAgenda(data: HomeBootstrap, now = new Date()): AgendaEvent[] {
   const { timezone, currentUser, capabilities } = data;
   const today = siteDay(now, timezone);
   const entries: AgendaEvent[] = [];
   const storyMap = new Map(data.stories.map((s) => [s.id, s]));
-  const add = (id: string, storyId: number | null, title: string, detail: string, date?: string | null) => {
+  const add = (id: string, storyId: number | null, title: string, detail: string, label: string, date?: string | null) => {
     if (!date) return;
     const day = siteDay(date, timezone);
     const delta = dayDistance(date, timezone, now);
-    if (day >= today && delta <= 14) entries.push({ id, storyId, title, detail, date, day });
+    if (day >= today && delta <= 14) entries.push({ id, storyId, title, detail, label, date, day });
   };
-  myOpenTasks(data.tasks, currentUser.id, timezone, now).forEach((task) => add(`task-${task.id}`, task.storyId ?? null, storyMap.get(task.storyId || 0)?.title || task.title, task.storyId ? task.title : "Task deadline", task.dueAt));
+  myOpenTasks(data.tasks, currentUser.id, timezone, now).forEach((task) => add(`task-${task.id}`, task.storyId ?? null, task.title, storyMap.get(task.storyId || 0)?.title || "", "Task deadline", task.dueAt));
   data.stories.filter(activeStory).forEach((story) => {
     if (!capabilities.review && !myStory(story, currentUser.id)) return;
-    add(`deadline-${story.id}`, story.id, story.title, "Story deadline", story.deadline);
+    add(`deadline-${story.id}`, story.id, story.title, "", "Story deadline", story.deadline);
     const scheduled = story.wordpressState.scheduledAt;
-    if (story.wordpressState.isScheduled) add(`scheduled-${story.id}`, story.id, story.title, "WordPress publication", scheduled);
+    if (story.wordpressState.isScheduled) add(`scheduled-${story.id}`, story.id, story.title, "", "WordPress publication", scheduled);
     // One day's publication commitment appears once. The distinct editorial
     // target and actual schedule remain visible in Story Peek.
     if (!scheduled || !story.plannedPublication || siteDay(scheduled, timezone) !== siteDay(story.plannedPublication, timezone)) {
-      add(`planned-${story.id}`, story.id, story.title, "Planned publication", story.plannedPublication);
+      add(`planned-${story.id}`, story.id, story.title, "", "Planned publication", story.plannedPublication);
     }
   });
   data.visualWork.forEach((media) => {
     if (media.status !== "done" && (capabilities.review || media.assignee?.id === currentUser.id)) {
-      add(`media-${media.id}`, media.story.id, media.story.title, `${media.type === "photo" ? "Photo" : "Visual"} assignment`, media.dueAt);
+      add(`media-${media.story.id}-${media.id}`, media.story.id, media.title || media.story.title, media.story.title, "Production due", media.dueAt);
     }
   });
+  // Only a confirmed, exact appointment has a day and a time. A target window or
+  // an unscheduled idea is never placed on the calendar; it is Waiting for Me's job.
+  upcomingConfirmed(data.appointments || [], timezone, now).forEach((appointment) => add(`appointment-${appointment.id}`, appointment.storyId, appointment.title, appointment.storyTitle, appointmentKindLabels[appointment.kind] || "Appointment", appointment.startAt));
   return entries.sort((a, b) => a.day.localeCompare(b.day) || a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
 
@@ -135,11 +151,17 @@ export function waitingForMe(data: HomeBootstrap, now = new Date()): AttentionIt
   const items: AttentionItem[] = [];
   if (overdue.length) items.push({ id: "overdue-work", storyId: overdue[0].storyId || null, title: `${overdue.length} overdue ${overdue.length === 1 ? "task" : "tasks"}`, detail: "Review your deadlines in Up Next", urgent: true });
   data.stories.filter((s) => activeStory(s) && myStory(s, data.currentUser.id) && dayDistance(s.deadline, data.timezone, now) < 0).slice(0, 2).forEach((s) => items.push({ id: `late-story-${s.id}`, storyId: s.id, title: s.title, detail: "Story deadline has passed", urgent: true }));
-  data.visualWork.filter((v) => v.assignee?.id === data.currentUser.id && v.status === "assigned").slice(0, 2).forEach((v) => items.push({ id: `assigned-media-${v.id}`, storyId: v.story.id, title: v.story.title, detail: "Visual assignment waiting to be started" }));
+  // A reporting appointment whose target window is about to open, is open, or only just lapsed.
+  // An unscheduled idea or a far-off window never appears here.
+  (data.appointments || []).flatMap((a) => { const need = schedulingNeed(a, data.timezone, now); return need ? [{ a, need }] : []; })
+    .sort((x, y) => Number(y.need.urgent) - Number(x.need.urgent) || (x.a.windowStart || "").localeCompare(y.a.windowStart || "") || x.a.id.localeCompare(y.a.id)).slice(0, 2)
+    .forEach(({ a, need }) => items.push({ id: `schedule-${a.id}`, storyId: a.storyId, title: a.title, detail: need.label, urgent: need.urgent }));
+  data.visualWork.filter((v) => v.assignee?.id === data.currentUser.id && v.status === "assigned").slice(0, 2).forEach((v) => items.push({ id: `assigned-media-${v.story.id}-${v.id}`, storyId: v.story.id, title: v.title || v.story.title, detail: `${v.story.title} · waiting to be started` }));
   if (data.capabilities.review) {
-    data.visualWork.filter((v) => !v.assignee && v.status === "needed" && dayDistance(v.dueAt, data.timezone, now) <= 1).slice(0, 2).forEach((v) => items.push({ id: `unassigned-${v.id}`, storyId: v.story.id, title: v.story.title, detail: "Urgent visual work needs an assignee", urgent: true }));
+    data.visualWork.filter((v) => !v.assignee && v.status === "needed" && dayDistance(v.dueAt, data.timezone, now) <= 1).slice(0, 2).forEach((v) => items.push({ id: `unassigned-${v.story.id}-${v.id}`, storyId: v.story.id, title: v.title || v.story.title, detail: `${v.story.title} · urgent visual work needs an assignee`, urgent: true }));
   }
-  return items.slice(0, 5);
+  // Urgent items first (stable), so a few scheduling nudges cannot push overdue or late work out of the bound.
+  return [...items.filter((i) => i.urgent), ...items.filter((i) => !i.urgent)].slice(0, 5);
 }
 
 export function reviewStories(data: HomeBootstrap): PlanningStory[] {

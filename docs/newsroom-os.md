@@ -12,8 +12,16 @@ public.
   visual work, and recent activity. Story Peek preserves list context; Gutenberg
   remains the writing environment. See [Byline Home](byline-home.md) for the
   protected read model, private links, Mira components and validation.
-- **Planning** is the daily queue: Stories Board/List, Calendar, Media Desk,
-  Coverage, Performance, Content Health, Feedback, and per-user saved views.
+- **Story Workspace** is the coordination page for one story: brief, writers and
+  editor, a reporting plan (sources and appointments, including appointments whose
+  exact time is not yet known), tasks, production assignments, resource links and
+  activity. It sits around the canonical WordPress story and the Google Doc the
+  team writes in; it replaces the shared tracking spreadsheet rather than the
+  editor. See [Story Workspace](story-workspace.md).
+- **Planning** is the daily queue: Stories Board/List, Calendar (story dates,
+  appointments, production deadlines and a Needs Scheduling area), Media Desk
+  (one row per production assignment), Coverage, Performance, Content Health,
+  Feedback, and per-user saved views.
 - **Editorial workflow** tracks pitch, assignment, reporting, writing, editing,
   ready for review, on hold, dropped, and derived published state. It is
   separate from WordPress `post_status`.
@@ -41,17 +49,20 @@ private records and must not mutate state.
 
 ## Publisher runbook
 
-1. Use Planning to filter the queue by workflow, editor, deadline, planned
+1. Open a story's workspace to see who still needs to be interviewed, what is
+   scheduled, what is due and where the draft lives. Record an appointment as soon
+   as someone is responsible, even if the date is only "next week".
+2. Use Planning to filter the queue by workflow, editor, deadline, planned
    publication, coverage, or readiness. Treat the Calendar as the publication
    plan, not as a replacement for WordPress post status.
-2. Review the fixed homepage after the static build. Story placement follows automatic selection rules, including the sticky lead.
-3. Before a public launch, run readiness and Content Health checks, confirm
+3. Review the fixed homepage after the static build. Story placement follows automatic selection rules, including the sticky lead.
+4. Before a public launch, run readiness and Content Health checks, confirm
    media requests are resolved, and review corrections/notes and contributor
    attribution.
-4. Use provider-specific test sends before sending a newsletter. A failed
+5. Use provider-specific test sends before sending a newsletter. A failed
    provider call must leave the issue retryable and must not expose API keys or
    subscriber data in logs or REST responses.
-5. After publication, use Performance and provider reports as signals, not as
+6. After publication, use Performance and provider reports as signals, not as
    replacements for editorial judgment. Investigate search gaps and broken
    links while preserving the public static export contract.
 

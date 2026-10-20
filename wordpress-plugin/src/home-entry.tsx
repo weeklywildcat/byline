@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { HomeApp } from "./home/HomeApp";
 import { createHomeFetchers } from "./home/home-api";
 import type { HomeNavigationCapabilities } from "./home/home-model";
+import { workspaceUrlFor } from "./home/newsroom-model";
 import "./home/style.css";
 
 type HomeConfig = {
@@ -38,6 +39,7 @@ if (root && config) {
     contentHealth: config.urls.planning.contentHealth,
     feedback: config.urls.planning.feedback,
     deployment: config.urls.integrations.deployment,
-    doctor: config.urls.settings.diagnostics
+    doctor: config.urls.settings.diagnostics,
+    workspace: (storyId) => workspaceUrlFor(config.urls.planning.stories, storyId)
   }} /></HomeBoundary>);
 }

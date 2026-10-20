@@ -16,18 +16,20 @@ test("Home creates real drafts, completes work with rollback, preserves peek con
   const title = `Canteen · Home ${Date.now()}`;
   await create.getByLabel("Story title").fill(title);
   await create.getByRole("button", { name: "Create story", exact: true }).click();
+  // Creating a story opens its full Story Workspace; Home's Peek is for existing rows.
+  await page.waitForURL(/page=byline-planning&story=\d+/);
+  const createdId = Number(new URL(page.url()).searchParams.get("story"));
+  await page.goto(homeUrl);
   const peek = page.getByRole("dialog", { name: title, exact: true });
-  await expect(peek).toBeVisible();
   const home = await session.rest<HomeBootstrap>("/byline/v1/editorial/home");
   expect(home.status).toBe(200);
   const story = home.payload.stories.find((s) => s.title === title)!;
   expect(story).toBeTruthy();
   session.registerTestPost(story.id);
+  expect(story.id).toBe(createdId);
   const post = await session.rest<{ status: string; content: { raw: string } }>(`/wp/v2/posts/${story.id}?context=edit`);
   expect(post.payload.status).toBe("draft");
   expect(post.payload.content.raw).toBe("");
-  await page.keyboard.press("Escape");
-  await expect(peek).not.toBeVisible();
   const taskResult = await session.rest<{ id: number }>("/byline/v1/editorial/tasks", "POST", { title: "Interview 3 students", storyId: story.id, assigneeId: home.payload.currentUser.id, dueAt: "2026-10-19T16:00:00Z", priority: "high" });
   expect(taskResult.ok).toBe(true);
   const taskId = taskResult.payload.id;
@@ -143,17 +145,15 @@ test("authenticated writers see their work, while private story and review data 
     await page.getByRole("button", { name: "New story", exact: true }).click();
     await page.getByLabel("Story title").fill(`Caroline's reporting ${Date.now()}`);
     await page.getByRole("button", { name: "Create story", exact: true }).click();
-    const peek = page.getByRole("dialog").filter({ hasText: "Newsroom context" });
-    await expect(peek).toBeVisible();
-    const editHref = await peek.getByRole("link", { name: "Edit article" }).getAttribute("href");
-    session.registerTestPost(Number(new URL(editHref!).searchParams.get("post")));
+    await page.waitForURL(/page=byline-planning&story=\d+/);
+    session.registerTestPost(Number(new URL(page.url()).searchParams.get("story")));
+    await page.goto(homeUrl);
     const denied = await page.evaluate(async (id) => {
       const response = await fetch(`/wp-json/byline/v1/editorial/stories/${id}/quick-view`, { headers: { "X-WP-Nonce": window.bylineHome!.nonce } });
       return { status: response.status, body: await response.text() };
     }, foreign.payload.story.id);
     expect(denied.status).toBe(403);
     expect(denied.body).not.toContain("Private editor planning");
-    await page.keyboard.press("Escape");
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({ path: "/tmp/byline-home-qa/writer-1440.png", fullPage: true, animations: "disabled" });
   } finally { await context.close(); }

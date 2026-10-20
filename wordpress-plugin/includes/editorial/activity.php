@@ -61,6 +61,16 @@ function byline_activity_action_definitions(): array
         'coverage_removed' => ['summary' => 'Coverage unlinked'],
         'coverage_changed' => ['summary' => 'Coverage updated'],
         'media_changed' => ['summary' => 'Media request changed'],
+        'source_added' => ['summary' => 'Source added'],
+        'source_status_changed' => ['summary' => 'Source status changed'],
+        'appointment_created' => ['summary' => 'Appointment added'],
+        'appointment_scheduled' => ['summary' => 'Appointment scheduled'],
+        'appointment_rescheduled' => ['summary' => 'Appointment rescheduled'],
+        'appointment_completed' => ['summary' => 'Appointment completed'],
+        'appointment_cancelled' => ['summary' => 'Appointment cancelled'],
+        'media_assignment_created' => ['summary' => 'Production assignment added'],
+        'media_assignment_assigned' => ['summary' => 'Production assignment assigned'],
+        'media_assignment_status_changed' => ['summary' => 'Production assignment updated'],
         'story_published' => ['summary' => 'Story published'],
         'build_started' => ['summary' => 'Website build started'],
         'build_failed' => ['summary' => 'Website build failed'],
@@ -250,6 +260,14 @@ function byline_activity_sanitize_context(array $context): array
         'attempt',
     ];
 
+    // Reporting and production records are identified by UUID, never by content.
+    foreach (['sourceUuid', 'appointmentUuid', 'assignmentUuid'] as $field) {
+        $uuid = isset($context[$field]) && function_exists('byline_story_valid_uuid') ? byline_story_valid_uuid($context[$field]) : '';
+        if ($uuid !== '') {
+            $result[$field] = $uuid;
+        }
+    }
+
     foreach ($id_fields as $field) {
         if (!array_key_exists($field, $context) || !is_scalar($context[$field])) {
             continue;
@@ -268,11 +286,14 @@ function byline_activity_sanitize_context(array $context): array
     $enum_fields = [
         'from' => ['pitch', 'assigned', 'reporting', 'writing', 'editing', 'ready', 'on-hold', 'dropped', 'published', 'none', 'unassigned'],
         'to' => ['pitch', 'assigned', 'reporting', 'writing', 'editing', 'ready', 'on-hold', 'dropped', 'published', 'none', 'unassigned'],
-        'status' => ['open', 'completed', 'needed', 'requested', 'selected', 'queued', 'building', 'failed', 'live', 'published', 'draft'],
+        'status' => ['open', 'completed', 'needed', 'requested', 'selected', 'queued', 'building', 'failed', 'live', 'published', 'draft',
+            'planned', 'contacted', 'waiting', 'needs-scheduling', 'scheduled', 'interviewed', 'declined', 'unavailable', 'tentative', 'confirmed', 'cancelled',
+            'assigned', 'in-progress', 'uploaded', 'done'],
         'state' => ['open', 'completed', 'reopened', 'deleted'],
-        'operation' => ['added', 'removed', 'updated', 'created', 'deleted', 'linked', 'unlinked', 'completed', 'reopened'],
-        'objectType' => ['story', 'task', 'coverage', 'correction', 'media', 'game', 'event', 'design', 'newsletter'],
-        'kind' => ['photo', 'video', 'audio', 'document', 'news', 'sports', 'opinion', 'breaking', 'design', 'newsletter'],
+        'operation' => ['added', 'removed', 'updated', 'created', 'deleted', 'linked', 'unlinked', 'completed', 'reopened', 'scheduled', 'rescheduled', 'assigned', 'cancelled'],
+        'objectType' => ['story', 'task', 'coverage', 'correction', 'media', 'game', 'event', 'design', 'newsletter', 'source', 'appointment', 'media-assignment'],
+        'kind' => ['photo', 'video', 'audio', 'document', 'news', 'sports', 'opinion', 'breaking', 'design', 'newsletter',
+            'gallery', 'graphic', 'other', 'interview', 'meeting', 'event', 'press-conference', 'game', 'performance', 'reporting'],
         'source' => ['wordpress', 'worker', 'deploy', 'manual', 'system'],
     ];
 
@@ -998,6 +1019,104 @@ function byline_editorial_activity_on_media_request_updated(int $post_id, $reque
     byline_record_activity($post_id, 'media_changed', $context, $user_id);
 }
 
+/** @param string $text A human, content-free phrase ("needs scheduling"). */
+function byline_activity_phrase(string $text): string
+{
+    return str_replace('-', ' ', $text);
+}
+
+function byline_activity_actor_name(?int $actor_id): string
+{
+    $user = function_exists('get_user_by') ? get_user_by('id', byline_activity_current_user_id($actor_id)) : null;
+    return is_object($user) ? byline_activity_safe_text($user->display_name ?? '', 60) : 'Someone';
+}
+
+/**
+ * Source activity records who and which source, never the notes.
+ *
+ * @param array<string,mixed>|null $source
+ * @param array<string,mixed>|null $previous
+ */
+function byline_editorial_activity_on_source_changed(int $story_id, $source, $previous, string $operation, ?int $actor_id = null): void
+{
+    if (!is_array($source)) {
+        return;
+    }
+    $actor = byline_activity_actor_name($actor_id);
+    $label = byline_activity_safe_text($source['label'] ?? '', 60);
+    $context = ['sourceUuid' => $source['id'] ?? '', 'objectType' => 'source', 'status' => $source['status'] ?? ''];
+    if ($operation === 'created') {
+        byline_record_activity($story_id, 'source_added', $context + ['operation' => 'created', 'summary' => "{$actor} added a source: {$label}"], $actor_id);
+    } elseif ($operation === 'updated' && is_array($previous) && ($previous['status'] ?? '') !== ($source['status'] ?? '')) {
+        byline_record_activity($story_id, 'source_status_changed', $context + ['operation' => 'updated', 'summary' => "{$actor} marked {$label} as " . byline_activity_phrase((string) $source['status'])], $actor_id);
+    }
+}
+
+/**
+ * Appointment activity names the event and when, never the notes or location.
+ *
+ * @param array<string,mixed>|null $appointment
+ * @param array<string,mixed>|null $previous
+ */
+function byline_editorial_activity_on_appointment_changed(int $story_id, $appointment, $previous, string $operation, ?int $actor_id = null): void
+{
+    if (!is_array($appointment) || $operation === 'deleted') {
+        return;
+    }
+    $actor = byline_activity_actor_name($actor_id);
+    $title = byline_activity_safe_text($appointment['title'] ?? '', 80);
+    $when = function_exists('byline_story_appointment_when') ? byline_story_appointment_when($appointment) : '';
+    $context = ['appointmentUuid' => $appointment['id'] ?? '', 'objectType' => 'appointment', 'kind' => $appointment['kind'] ?? '', 'status' => $appointment['status'] ?? ''];
+    $exact = ($appointment['scheduleMode'] ?? '') === 'exact';
+    $was_exact = is_array($previous) && ($previous['scheduleMode'] ?? '') === 'exact';
+    $previous_status = is_array($previous) ? ($previous['status'] ?? '') : '';
+    $status = (string) ($appointment['status'] ?? '');
+
+    if ($operation === 'created') {
+        $action = $exact ? 'appointment_scheduled' : 'appointment_created';
+        $summary = $exact ? "{$actor} scheduled {$title} for {$when}." : "{$actor} added an appointment: {$title}.";
+    } elseif ($status === 'cancelled' && $previous_status !== 'cancelled') {
+        $action = 'appointment_cancelled';
+        $summary = "{$actor} cancelled {$title}.";
+    } elseif ($status === 'completed' && $previous_status !== 'completed') {
+        $action = 'appointment_completed';
+        $summary = "{$actor} completed {$title}.";
+    } elseif ($exact && !$was_exact) {
+        $action = 'appointment_scheduled';
+        $summary = "{$actor} scheduled {$title} for {$when}.";
+    } elseif ($exact && $was_exact && (($previous['startAt'] ?? '') !== ($appointment['startAt'] ?? '') || ($previous['endAt'] ?? '') !== ($appointment['endAt'] ?? ''))) {
+        $action = 'appointment_rescheduled';
+        $summary = "{$actor} moved {$title} to {$when}.";
+    } else {
+        return;
+    }
+    byline_record_activity($story_id, $action, $context + ['operation' => $operation === 'created' ? 'created' : 'updated', 'summary' => $summary], $actor_id);
+}
+
+/**
+ * @param array<string,mixed>|null $assignment
+ * @param array<string,mixed>|null $previous
+ */
+function byline_editorial_activity_on_media_assignment_changed(int $story_id, $assignment, $previous, string $operation, ?int $actor_id = null): void
+{
+    if (!is_array($assignment) || $operation === 'deleted') {
+        return;
+    }
+    $actor = byline_activity_actor_name($actor_id);
+    $title = byline_activity_safe_text($assignment['title'] ?? '', 80);
+    $context = ['assignmentUuid' => $assignment['id'] ?? '', 'objectType' => 'media-assignment', 'kind' => $assignment['type'] ?? '', 'status' => $assignment['status'] ?? '', 'assigneeId' => $assignment['assigneeId'] ?? 0];
+    $assignee_id = absint($assignment['assigneeId'] ?? 0);
+    $assignee_changed = $assignee_id > 0 && (!is_array($previous) || absint($previous['assigneeId'] ?? 0) !== $assignee_id);
+    if ($assignee_changed) {
+        $name = byline_activity_actor_name($assignee_id);
+        byline_record_activity($story_id, 'media_assignment_assigned', $context + ['operation' => 'assigned', 'summary' => "{$name} was assigned {$title}."], $actor_id);
+    } elseif ($operation === 'created') {
+        byline_record_activity($story_id, 'media_assignment_created', $context + ['operation' => 'created', 'summary' => "{$actor} added {$title}."], $actor_id);
+    } elseif (is_array($previous) && ($previous['status'] ?? '') !== ($assignment['status'] ?? '')) {
+        byline_record_activity($story_id, 'media_assignment_status_changed', $context + ['operation' => 'updated', 'summary' => "{$actor} marked {$title} as " . byline_activity_phrase((string) $assignment['status']) . '.'], $actor_id);
+    }
+}
+
 function byline_editorial_activity_on_contributors_updated(int $post_id, array $contributors, ?int $user_id = null): void
 {
     byline_record_activity($post_id, 'contributor_changed', [
@@ -1153,6 +1272,9 @@ function byline_register_editorial_activity_hooks(): void
     add_action('transition_post_status', 'byline_editorial_activity_on_transition_post_status', 10, 3);
     add_action('byline_editorial_story_updated', 'byline_editorial_activity_on_story_updated', 10, 3);
     add_action('byline_editorial_media_request_updated', 'byline_editorial_activity_on_media_request_updated', 10, 3);
+    add_action('byline_story_source_changed', 'byline_editorial_activity_on_source_changed', 10, 5);
+    add_action('byline_story_appointment_changed', 'byline_editorial_activity_on_appointment_changed', 10, 5);
+    add_action('byline_editorial_media_assignment_changed', 'byline_editorial_activity_on_media_assignment_changed', 10, 5);
     add_action('byline_story_contributors_updated', 'byline_editorial_activity_on_contributors_updated', 10, 3);
     add_action('byline_editorial_task_changed', 'byline_editorial_activity_on_task_changed', 10, 3);
     add_action('byline_editorial_correction_changed', 'byline_editorial_activity_on_correction_changed', 10, 3);

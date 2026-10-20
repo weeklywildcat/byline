@@ -48,9 +48,9 @@ try {
     $assert($done->get_status() === 200 && $request('/editorial/home')->get_data()['tasks'] === [], 'Completion must persist through the canonical task endpoint.');
     $link = $request('/editorial/stories/' . $id . '/resources', 'POST', ['label' => 'Private notes', 'url' => 'https://docs.google.com/document/d/private-home-notes/edit']);
     $assert($link->get_status() === 200 && $link->get_data()['resources'][0]['kind'] === 'Google Doc', 'Authorized links must be sanitized/classified.');
-    $peek = $request('/editorial/stories/' . $id . '/quick-view')->get_data();
-    $assert(count($peek['homeContext']['resources']) === 1 && count($peek['tasks']['tasks']) === 2, 'Story Peek must project canonical links and tasks.');
-    $assert(!isset($peek['homeContext']['story']['content']), 'Story Peek must never return article bodies.');
+    $peek = $request('/editorial/stories/' . $id . '/workspace')->get_data();
+    $assert(count($peek['resources']) === 1 && count($peek['tasks']) === 2, 'Story Peek must project canonical links and tasks.');
+    $assert(!isset($peek['story']['content']), 'Story Peek must never return article bodies.');
     $assert($request('/editorial/stories/' . $id . '/resources', 'POST', ['label' => 'Bad', 'url' => 'javascript:alert(1)'])->get_status() === 400, 'Unsafe resource URLs must be rejected by real REST.');
     wp_set_current_user($user_ids['editor']);
     $editor_story = $request('/editorial/stories', 'POST', ['title' => 'Editor co-written story'])->get_data()['story']['id'];
@@ -62,7 +62,7 @@ try {
     $assert(byline_home_is_mine($row, $user_ids['editor']), 'Co-writer membership must use canonical contributors.');
     $assert(!byline_home_is_mine(['bylines' => [['type' => 'guest', 'id' => $user_ids['editor']]]], $user_ids['editor']), 'A guest ID must not impersonate user membership.');
     wp_set_current_user($user_ids['author']);
-    $assert($request('/editorial/stories/' . $editor_story . '/quick-view')->get_status() === 403, 'An author cannot inspect another writer\'s private story.');
+    $assert($request('/editorial/stories/' . $editor_story . '/workspace')->get_status() === 403, 'An author cannot inspect another writer\'s private story.');
     $assert($request('/editorial/stories/' . $editor_story . '/resources', 'POST', ['label' => 'Forbidden', 'url' => 'https://example.org'])->get_status() === 403, 'Resource writes must check edit_post.');
     $assert(!in_array($editor_story, array_column($request('/editorial/home')->get_data()['stories'], 'id'), true), 'Home must filter unauthorized stories.');
     wp_set_current_user($user_ids['subscriber']);

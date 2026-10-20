@@ -32,7 +32,6 @@ function byline_editorial_rest_story_quick_view(WP_REST_Request $request)
     $payload['activity'] = function_exists('byline_get_story_activity')
         ? ['storyId' => $story_id, 'activity' => byline_get_story_activity($story_id, ['limit' => 8])]
         : ['storyId' => $story_id, 'activity' => []];
-    $payload['homeContext'] = byline_home_peek($story_id);
 
     return rest_ensure_response($payload);
 }

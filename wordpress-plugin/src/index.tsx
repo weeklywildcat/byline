@@ -25,7 +25,7 @@ import {
   normalizeAdminTab
 } from "./admin-routing";
 import { createNavigationItem, moveItem, navigationConflictKey, sectionSlugForName } from "./settings-model";
-import { PlanningApp, createPlanningFetchers, type PlanningView } from "./planning";
+import { PlanningApp, createPlanningFetchers, createWorkspaceUrlBuilder, type PlanningView } from "./planning";
 import { NewsletterApp, createNewsletterFetchers } from "./newsletters";
 import type { NewsletterBranding } from "./newsletters/render";
 import { stripMarkupForText } from "./safe-text";
@@ -1520,6 +1520,7 @@ function Screen({
           initialFilters={{ mine: new URLSearchParams(window.location.search).get("mine") === "1" }}
           rememberStoriesView={activeTab === "stories" && !storiesViewFromRoute(config?.view)}
           currentUserId={config?.currentUserId}
+          workspaceUrl={createWorkspaceUrlBuilder(config?.urls.planning.stories)}
         />
       </AdminPageFrame>
     );

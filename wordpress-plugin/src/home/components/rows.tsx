@@ -7,8 +7,8 @@ import { Card } from "../ui/card";
 import { Skeleton } from "../ui/skeleton";
 import type { EditorialTask } from "../../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../../editorial/activity-model";
-import type { MediaRequest, PlanningStory } from "../../planning/planning-model";
-import { activityCopy, dateLabel, dayDistance, exactDate, type AgendaEvent, type AttentionItem } from "../newsroom-model";
+import type { PlanningStory } from "../../planning/planning-model";
+import { activityCopy, dateLabel, dayDistance, exactDate, mediaStatusLabels, mediaTypeLabels, type AgendaEvent, type AttentionItem, type HomeVisualWork } from "../newsroom-model";
 
 export function Surface({ title, children, className = "", action, subtitle }: { title: string; children: ReactNode; className?: string; action?: ReactNode; subtitle?: string }) {
   return <Card className={`home-surface ${className}`}><header className="home-surface-heading"><div><h2>{title}</h2>{subtitle ? <p>{subtitle}</p> : null}</div>{action}</header>{children}</Card>;
@@ -30,14 +30,15 @@ export function StoryRow({ story, timezone, onOpen, now }: { story: PlanningStor
   return <li><button type="button" className="home-story-row" onClick={onOpen}><span className="home-row-copy"><span className="home-row-title">{story.title || "Untitled story"}</span><span className="home-meta">{story.deadline ? `Due ${dateLabel(story.deadline, timezone, now).toLowerCase()}` : story.plannedPublication ? `Planned ${dateLabel(story.plannedPublication, timezone, now).toLowerCase()}` : "No deadline"}{story.openTaskCount ? ` · ${story.openTaskCount} open ${story.openTaskCount === 1 ? "task" : "tasks"}` : ""}</span></span><Badge variant="outline" className="home-workflow">{story.workflow.label}</Badge></button></li>;
 }
 export function AgendaItem({ event, timezone, onOpen }: { event: AgendaEvent; timezone: string; onOpen?: () => void }) {
-  return <li>{onOpen ? <button type="button" className="home-agenda-row" onClick={onOpen}><span className="home-row-title">{event.title}</span><span className="home-meta">{event.detail}<span>{event.date.includes("T") ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone: timezone }).format(new Date(event.date)) : ""}</span></span></button> : <div className="home-agenda-row"><span className="home-row-title">{event.title}</span><span className="home-meta">{event.detail}</span></div>}</li>;
+  const time = event.date.includes("T") ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone: timezone }).format(new Date(event.date)) : "";
+  const copy = <><span className="home-row-title">{event.title}</span><span className="home-meta"><span className="home-agenda-label">{event.label}{event.detail ? ` · ${event.detail}` : ""}</span><span>{time}</span></span></>;
+  return <li>{onOpen ? <button type="button" className="home-agenda-row" onClick={onOpen}>{copy}</button> : <div className="home-agenda-row">{copy}</div>}</li>;
 }
 export function AttentionRow({ item, onOpen }: { item: AttentionItem; onOpen: () => void }) {
   return <li><button type="button" className="home-attention-row" onClick={onOpen}>{item.urgent ? <CircleAlert size={15} className="home-attention-icon" aria-hidden="true" /> : <span className="home-attention-dot" />}<span className="home-row-copy"><span className="home-row-title">{item.title}</span><span className="home-meta">{item.detail}</span></span><ArrowUpRight size={14} className="home-row-arrow" aria-hidden="true" /></button></li>;
 }
-const mediaLabels = { needed: "Needed", assigned: "Assigned", "in-progress": "In progress", uploaded: "Uploaded", selected: "Selected", done: "Done" };
-export function MediaAssignmentRow({ media, timezone, now, onOpen }: { media: MediaRequest; timezone: string; now: Date; onOpen: () => void }) {
-  return <li><button type="button" className="home-story-row" onClick={onOpen}><span className="home-row-copy"><span className="home-row-title">{media.story.title}</span><span className="home-meta">{media.type === "photo" ? "Photo" : "Visual"} · {media.assignee?.name || "Unassigned"}{media.dueAt ? ` · ${dateLabel(media.dueAt, timezone, now)}` : ""}</span></span><Badge variant="outline" className="home-workflow">{mediaLabels[media.status]}</Badge></button></li>;
+export function MediaAssignmentRow({ media, timezone, now, onOpen }: { media: HomeVisualWork; timezone: string; now: Date; onOpen: () => void }) {
+  return <li><button type="button" className="home-story-row" onClick={onOpen}><span className="home-row-copy"><span className="home-row-title">{media.title || media.story.title}</span><span className="home-meta">{media.title ? `${media.story.title} · ` : ""}{mediaTypeLabels[media.type] || "Visual"} · {media.assignee?.name || "Unassigned"}{media.dueAt ? ` · ${dateLabel(media.dueAt, timezone, now)}` : ""}</span></span><Badge variant="outline" className="home-workflow">{mediaStatusLabels[media.status] || "Needed"}</Badge></button></li>;
 }
 export function ActivityRow({ item, timezone, onOpen }: { item: EditorialActivityRecord; timezone: string; onOpen?: () => void }) {
   const content = <><span className="home-activity-mark" aria-hidden="true" /><span className="home-row-copy"><span className="home-activity-copy">{activityCopy(item)}</span>{item.story?.title ? <span className="home-meta">{item.story.title}</span> : null}</span><time className="home-activity-time" dateTime={item.occurredAt} title={exactDate(item.occurredAt, timezone)}>{exactDate(item.occurredAt, timezone)}</time></>;

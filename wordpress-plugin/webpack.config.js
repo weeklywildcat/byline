@@ -3,6 +3,10 @@ const defaultConfig = require('@wordpress/scripts/config/webpack.config');
 const path = require('path');
 const DependencyExtractionWebpackPlugin = require('@wordpress/dependency-extraction-webpack-plugin');
 const homeCss = path.resolve(__dirname, 'src/home/style.css');
+// The Story Workspace shares Home's scoped Tailwind/PostCSS pipeline. The file is
+// named style.css so wp-scripts emits it as style-story-workspace.css.
+const workspaceCss = path.resolve(__dirname, 'src/workspace/style.css');
+const scopedCss = [homeCss, workspaceCss];
 const cssRule = defaultConfig.module.rules.find((rule) => rule.test?.test('style.css'));
 
 const adminConfig = {
@@ -19,7 +23,7 @@ const adminConfig = {
       },
       {
         ...cssRule,
-        include: homeCss,
+        include: scopedCss,
         use: cssRule.use.map((entry) => entry.loader?.includes('postcss-loader') ? {
           ...entry,
           options: {
@@ -29,7 +33,7 @@ const adminConfig = {
           },
         } : entry),
       },
-      ...defaultConfig.module.rules.map((rule) => rule === cssRule ? { ...rule, exclude: homeCss } : rule),
+      ...defaultConfig.module.rules.map((rule) => rule === cssRule ? { ...rule, exclude: scopedCss } : rule),
     ],
   },
   // The default configuration resolves paths from process.cwd(). Anchoring both
@@ -80,4 +84,20 @@ const homeConfig = {
     }),
   ]),
 };
-module.exports = [adminConfig, homeConfig];
+
+// The Story Workspace is a second private React 19 root with the same isolation
+// rules as Home: only wp-api-fetch is external and nothing else is shared.
+const workspaceConfig = {
+  ...homeConfig,
+  name: 'workspace',
+  dependencies: ['admin', 'home'],
+  entry: { 'story-workspace': path.resolve(__dirname, 'src/story-workspace-entry.tsx') },
+  plugins: homeConfig.plugins.filter((plugin) => plugin.constructor.name !== 'DependencyExtractionWebpackPlugin').concat([
+    new DependencyExtractionWebpackPlugin({
+      useDefaults: false,
+      requestToExternal: (request) => request === '@wordpress/api-fetch' ? ['wp', 'apiFetch'] : undefined,
+      requestToHandle: (request) => request === '@wordpress/api-fetch' ? 'wp-api-fetch' : undefined,
+    }),
+  ]),
+};
+module.exports = [adminConfig, homeConfig, workspaceConfig];

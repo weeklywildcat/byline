@@ -15,8 +15,10 @@ import type {
   HomePresetsPayload,
   HomeNavigationCapabilities
 } from "./home-model";
-import type { HomeBootstrap, HomePeek, HomeStoryContext, StoryResource } from "./newsroom-model";
+import type { HomeBootstrap } from "./newsroom-model";
 import { createEditorialRestClient, type EditorialRestClient } from "../editorial/editorial-rest";
+import { createWorkspaceClient, type WorkspaceClient } from "../workspace/workspace-api";
+import type { StoryWorkspace } from "../workspace/workspace-types";
 
 export type HomeRequest = <T>(options: PlanningRequestOptions) => Promise<T>;
 
@@ -33,11 +35,13 @@ export type HomePaths = {
 
 export type HomeFetchers = {
   getHome?: () => Promise<HomeBootstrap>;
-  getPeek?: (storyId: number) => Promise<HomePeek>;
+  /** The Story Workspace read model; Story Peek reads it instead of the old quick-view aggregate. */
+  getWorkspace?: (storyId: number) => Promise<StoryWorkspace>;
+  /** Typed workspace mutations (links, today). */
+  workspace?: WorkspaceClient;
   searchStories?: (query: string) => Promise<{ stories: Array<{ id: number; title: string }> }>;
-  createStory?: (title: string) => Promise<HomeStoryContext>;
-  addResource?: (storyId: number, link: { label: string; url: string }) => Promise<{ resources: StoryResource[] }>;
-  removeResource?: (storyId: number, resourceId: string) => Promise<{ resources: StoryResource[] }>;
+  /** Creates a draft, optionally from a template preset; resolves with the full workspace payload plus `workspaceUrl`/`template`. */
+  createStory?: (title: string, preset?: string) => Promise<StoryWorkspace>;
   editorial?: EditorialRestClient;
   getPlanning?: () => Promise<PlanningResponse>;
   getHealth?: () => Promise<HomeHealthPayload>;
@@ -79,11 +83,10 @@ export function createHomeFetchers(
   const fetchers: HomeFetchers = {};
   if (capabilities.editPosts !== false) {
     fetchers.getHome = () => request<HomeBootstrap>({ path: "/byline/v1/editorial/home" });
-    fetchers.getPeek = (id) => request<HomePeek>({ path: `/byline/v1/editorial/stories/${id}/quick-view` });
+    fetchers.workspace = createWorkspaceClient(request);
+    fetchers.getWorkspace = fetchers.workspace.getWorkspace;
     fetchers.searchStories = (query) => request({ path: `/byline/v1/editorial/home/search?query=${encodeURIComponent(query)}` });
-    fetchers.createStory = (title) => request({ path: "/byline/v1/editorial/stories", method: "POST", data: { title } });
-    fetchers.addResource = (id, link) => request({ path: `/byline/v1/editorial/stories/${id}/resources`, method: "POST", data: link });
-    fetchers.removeResource = (id, resourceId) => request({ path: `/byline/v1/editorial/stories/${id}/resources/${encodeURIComponent(resourceId)}`, method: "DELETE" });
+    fetchers.createStory = (title, preset) => request<StoryWorkspace>({ path: "/byline/v1/editorial/stories", method: "POST", data: preset ? { title, preset } : { title } });
     fetchers.editorial = createEditorialRestClient(request);
   }
 

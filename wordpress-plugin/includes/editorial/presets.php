@@ -22,6 +22,7 @@ const BYLINE_EDITORIAL_PRESETS_OPTION = 'byline_editorial_presets_v1';
 const BYLINE_EDITORIAL_PRESETS_REVISION_OPTION = 'byline_editorial_presets_revision';
 const BYLINE_EDITORIAL_PRESETS_SCHEMA_VERSION = 1;
 const BYLINE_EDITORIAL_PRESETS_MAX_TASKS = 8;
+const BYLINE_EDITORIAL_PRESETS_MAX_MEDIA_ASSIGNMENTS = 4;
 const BYLINE_PRESETS_OPTION = BYLINE_EDITORIAL_PRESETS_OPTION;
 
 /**
@@ -113,7 +114,12 @@ function byline_editorial_default_presets(): array
                 'requireCredit' => false,
                 'requireAltText' => false,
             ],
-            'tasks' => [],
+            'tasks' => [
+                ['key' => 'interview-sources', 'title' => 'Interview sources', 'when' => 'always', 'required' => false],
+                ['key' => 'verify-names-details', 'title' => 'Verify names and details', 'when' => 'always', 'required' => false],
+                ['key' => 'self-edit-draft', 'title' => 'Self-edit draft', 'when' => 'always', 'required' => false],
+            ],
+            'mediaAssignments' => [],
             'associations' => [
                 'coverageId' => 0,
                 'gameId' => 0,
@@ -140,7 +146,11 @@ function byline_editorial_default_presets(): array
                 'requireCredit' => true,
                 'requireAltText' => true,
             ],
-            'tasks' => [],
+            'tasks' => [
+                ['key' => 'confirm-score-stats', 'title' => 'Confirm score and stats', 'when' => 'always', 'required' => false],
+                ['key' => 'file-recap', 'title' => 'File recap', 'when' => 'always', 'required' => false],
+            ],
+            'mediaAssignments' => [],
             'associations' => [
                 'coverageId' => 0,
                 'gameId' => 0,
@@ -168,6 +178,7 @@ function byline_editorial_default_presets(): array
                 'requireAltText' => false,
             ],
             'tasks' => [],
+            'mediaAssignments' => [],
             'associations' => [
                 'coverageId' => 0,
                 'gameId' => 0,
@@ -195,6 +206,9 @@ function byline_editorial_default_presets(): array
                 'requireAltText' => true,
             ],
             'tasks' => [],
+            'mediaAssignments' => [
+                ['key' => 'photo-assignment', 'title' => 'Photo assignment', 'type' => 'photo', 'dueOffsetDays' => 2],
+            ],
             'associations' => [
                 'coverageId' => 0,
                 'gameId' => 0,
@@ -228,6 +242,7 @@ function byline_editorial_default_presets(): array
                     'required' => false,
                 ],
             ],
+            'mediaAssignments' => [],
             'associations' => [
                 'coverageId' => 0,
                 'gameId' => 0,
@@ -380,11 +395,47 @@ function byline_editorial_preset_sanitize_tasks(array $input): array
         if (!in_array($when, ['always', 'missing-noncritical', 'missing-required', 'on-publish'], true)) {
             $when = 'always';
         }
-        $result[] = [
+        $entry = [
             'key' => $key,
             'when' => $when,
             'required' => !empty($task['required']),
         ];
+        // An optional title makes a descriptor concrete: new stories receive it as a real task.
+        $title = byline_editorial_preset_text($task['title'] ?? '', 120);
+        if ($title !== '') {
+            $entry['title'] = $title;
+        }
+        $result[] = $entry;
+    }
+
+    return $result;
+}
+
+/**
+ * Production assignments a template starts a story with. Never sources, names
+ * or appointments: those belong to the reporter, per story.
+ *
+ * @param array<string, mixed> $input
+ * @return array<int, array<string, mixed>>
+ */
+function byline_editorial_preset_sanitize_media_assignments(array $input): array
+{
+    $result = [];
+    foreach (array_slice($input, 0, BYLINE_EDITORIAL_PRESETS_MAX_MEDIA_ASSIGNMENTS) as $assignment) {
+        if (!is_array($assignment)) {
+            continue;
+        }
+        $key = byline_editorial_preset_key($assignment['key'] ?? '');
+        $type = byline_editorial_preset_key($assignment['type'] ?? '');
+        $title = byline_editorial_preset_text($assignment['title'] ?? '', 120);
+        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $key) !== 1 || $title === '' || !in_array($type, ['photo', 'gallery', 'graphic', 'video', 'audio', 'other'], true)) {
+            continue;
+        }
+        $entry = ['key' => $key, 'title' => $title, 'type' => $type];
+        if (isset($assignment['dueOffsetDays']) && is_numeric($assignment['dueOffsetDays'])) {
+            $entry['dueOffsetDays'] = max(0, min(30, (int) $assignment['dueOffsetDays']));
+        }
+        $result[] = $entry;
     }
 
     return $result;
@@ -466,6 +517,9 @@ function byline_editorial_preset_sanitize_patch(string $type, array $input): arr
     }
     if (array_key_exists('tasks', $input) && is_array($input['tasks'])) {
         $result['tasks'] = byline_editorial_preset_sanitize_tasks($input['tasks']);
+    }
+    if (array_key_exists('mediaAssignments', $input) && is_array($input['mediaAssignments'])) {
+        $result['mediaAssignments'] = byline_editorial_preset_sanitize_media_assignments($input['mediaAssignments']);
     }
     if (isset($input['associations']) && is_array($input['associations'])) {
         $associations = byline_editorial_preset_sanitize_associations($input['associations']);
@@ -733,7 +787,7 @@ function byline_apply_editorial_preset(string $type, array $context = [], array 
     $context_override = isset($context['overrides']) && is_array($context['overrides'])
         ? $context['overrides']
         : [];
-    foreach (['label', 'section', 'workflow', 'readiness', 'media', 'tasks', 'associations'] as $field) {
+    foreach (['label', 'section', 'workflow', 'readiness', 'media', 'tasks', 'mediaAssignments', 'associations'] as $field) {
         if (array_key_exists($field, $context)) {
             $context_override[$field] = $context[$field];
         }
@@ -777,4 +831,65 @@ function byline_apply_editorial_preset(string $type, array $context = [], array 
 function byline_editorial_apply_preset(string $type, array $context = [], array $overrides = []): array
 {
     return byline_apply_editorial_preset($type, $context, $overrides);
+}
+
+
+/**
+ * Seed a freshly created story from a template: workflow stage, the deadline
+ * offset (editors only), a section, starter tasks and production assignments.
+ * Never creates sources, appointments or article text.
+ *
+ * Every step is independent and best-effort. The story already exists, so a step
+ * that cannot apply is reported and the reporter keeps their draft.
+ *
+ * @return array{tasks:int,mediaAssignments:int,errors:list<string>}
+ */
+function byline_story_apply_preset(int $story_id, string $type): array
+{
+    $result = ['tasks' => 0, 'mediaAssignments' => 0, 'errors' => []];
+    $preset = byline_get_editorial_preset(byline_editorial_normalize_preset_type($type));
+    if (!is_array($preset)) {
+        $result['errors'][] = 'That template is not available.';
+        return $result;
+    }
+    $user_id = get_current_user_id();
+    $workflow = is_array($preset['workflow'] ?? null) ? $preset['workflow'] : [];
+    $changes = [];
+    $status = sanitize_key((string) ($workflow['status'] ?? ''));
+    if ($status !== '' && in_array($status, byline_editorial_selectable_status_ids(), true)) {
+        $changes['status'] = $status;
+    }
+    if (byline_editorial_can_assign($story_id, $user_id) && isset($workflow['deadlineOffsetDays'])) {
+        $offset = in_array($workflow['deadlinePolicy'] ?? '', ['relative', 'same-day'], true) ? (int) ($workflow['deadlinePolicy'] === 'same-day' ? 0 : $workflow['deadlineOffsetDays']) : null;
+        if ($offset !== null) {
+            $changes['deadline'] = (new DateTimeImmutable(byline_story_site_today(), byline_editorial_planning_timezone()))->modify('+' . max(0, $offset) . ' days')->format('Y-m-d');
+        }
+    }
+    if ($changes !== []) {
+        $updated = byline_update_editorial_story_state($story_id, $changes, $user_id);
+        if (is_wp_error($updated)) {
+            $result['errors'][] = 'The template workflow could not be applied.';
+        }
+    }
+    $section = sanitize_title((string) ($preset['section'] ?? ''));
+    $category = $section !== '' ? get_category_by_slug($section) : false;
+    if ($category) {
+        wp_set_post_categories($story_id, [(int) $category->term_id]);
+    }
+    foreach ((array) ($preset['tasks'] ?? []) as $descriptor) {
+        if (($descriptor['when'] ?? '') !== 'always' || empty($descriptor['title'])) {
+            continue;
+        }
+        $task = byline_create_task(['title' => $descriptor['title'], 'storyId' => $story_id, 'assigneeId' => $user_id], $user_id);
+        is_wp_error($task) ? $result['errors'][] = 'A starter task could not be created.' : $result['tasks']++;
+    }
+    foreach ((array) ($preset['mediaAssignments'] ?? []) as $descriptor) {
+        $input = ['title' => $descriptor['title'], 'type' => $descriptor['type']];
+        if (isset($descriptor['dueOffsetDays'])) {
+            $input['dueAt'] = (new DateTimeImmutable(byline_story_site_today(), byline_editorial_planning_timezone()))->modify('+' . (int) $descriptor['dueOffsetDays'] . ' days')->format('Y-m-d') . 'T17:00';
+        }
+        $assignment = byline_media_assignment_save($story_id, $input, '', $user_id);
+        is_wp_error($assignment) ? $result['errors'][] = 'A starter production assignment could not be created.' : $result['mediaAssignments']++;
+    }
+    return $result;
 }

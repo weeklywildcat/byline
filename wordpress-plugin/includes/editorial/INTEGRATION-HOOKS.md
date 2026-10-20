@@ -7,14 +7,17 @@ domain modules with `require_once` before registering the grouped REST routes.
 For an integrator that prefers explicit includes, load these files after
 `workflow.php` and before `rest.php`:
 
-1. `planning.php`
-2. `media.php`
-3. `tasks.php`
-4. `coverage.php`
-5. `readiness.php`
-6. `corrections.php`
-7. `feedback.php`
-8. `contributors.php`
+1. `collections.php` (compare-and-swap helper shared by the private story collections)
+2. `story-context.php` (who may view a story's private context)
+3. `planning.php`
+4. `media.php`, then `media-assignments.php`
+5. `tasks.php`
+6. `coverage.php`
+7. `readiness.php`
+8. `corrections.php`
+9. `feedback.php`
+10. `contributors.php`
+11. `reporting.php`, `resources.php`, then `workspace.php`
 
 Each module registers its private post meta or hidden CPT on `init`. The REST
 transport registers on `rest_api_init` through
@@ -28,3 +31,18 @@ filter is attached there as well.
 remain the registration points for the workflow editor surfaces. The main
 bootstrap, admin app loader, central TypeScript entrypoints, integrations, and
 design folders are deliberately outside this slice.
+
+## Story Workspace actions
+
+The reporting and production domains announce changes the same way the workflow
+does; activity and notifications subscribe, and a subscriber failing never blocks
+the write. See `docs/story-workspace.md`.
+
+```php
+do_action('byline_story_source_changed', $story_id, $source, $previous, $operation, $actor_id);
+do_action('byline_story_appointment_changed', $story_id, $appointment, $previous, $operation, $actor_id);
+do_action('byline_editorial_media_assignment_changed', $story_id, $assignment, $previous, $operation, $actor_id);
+```
+
+`$operation` is `created`, `updated` or `deleted`; `$previous` is `null` on create
+and the removed record on delete. Records never include another user's email.

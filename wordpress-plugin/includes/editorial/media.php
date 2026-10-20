@@ -17,7 +17,7 @@ if (!defined('BYLINE_EDITORIAL_MEDIA_REQUEST_META')) {
 }
 
 if (!defined('BYLINE_EDITORIAL_MEDIA_TYPES')) {
-    define('BYLINE_EDITORIAL_MEDIA_TYPES', ['none', 'photo', 'gallery', 'graphic', 'video', 'other']);
+    define('BYLINE_EDITORIAL_MEDIA_TYPES', ['none', 'photo', 'gallery', 'graphic', 'video', 'audio', 'other']);
 }
 
 if (!defined('BYLINE_EDITORIAL_MEDIA_STATUSES')) {
@@ -180,12 +180,44 @@ function byline_editorial_media_request_legacy_notes(int $post_id): string
  */
 function byline_get_editorial_media_request(int $post_id, ?int $user_id = null): array
 {
+    // Once a story has multiple production assignments, the legacy single-request
+    // contract is the story's primary assignment. Older clients keep working; the
+    // installed v1 value is never read again or modified.
+    if (function_exists('byline_media_assignments_materialized') && byline_media_assignments_materialized($post_id)) {
+        $primary = byline_media_assignment_primary(byline_media_assignments_stored($post_id));
+        return byline_editorial_media_request_decorate(
+            $post_id,
+            $primary !== null ? byline_editorial_sanitize_media_request($primary) : byline_editorial_media_request_default(),
+            $primary,
+            $user_id,
+            byline_editorial_media_request_legacy_notes($post_id),
+            false
+        );
+    }
+
     $stored = get_post_meta($post_id, BYLINE_EDITORIAL_MEDIA_REQUEST_META, true);
     $structured = byline_editorial_media_request_is_structured($post_id);
-    $request = byline_editorial_sanitize_media_request($stored);
-    $legacy_notes = byline_editorial_media_request_legacy_notes($post_id);
+    return byline_editorial_media_request_decorate(
+        $post_id,
+        byline_editorial_sanitize_media_request($stored),
+        $stored,
+        $user_id,
+        byline_editorial_media_request_legacy_notes($post_id),
+        !$structured
+    );
+}
+
+/**
+ * Add attachment state, readiness and the legacy-note fallback to one sanitized
+ * request. Shared by the installed v1 record and a v2 assignment so both report
+ * alt text, credit, rights and featured-image awareness identically.
+ *
+ * @param mixed $raw The unsanitized stored value, used to report invalid attachments.
+ */
+function byline_editorial_media_request_decorate(int $post_id, array $request, $raw, ?int $user_id, string $legacy_notes, bool $is_legacy): array
+{
     $raw_attachment_ids = byline_editorial_media_attachment_input_ids(
-        byline_editorial_media_request_attachment_value($stored)
+        byline_editorial_media_request_attachment_value($raw)
     );
     $attachment_state = byline_editorial_media_request_attachment_state($post_id, $request['attachmentIds'], $user_id);
     $invalid_attachment_ids = array_values(array_unique(array_merge(
@@ -193,12 +225,12 @@ function byline_get_editorial_media_request(int $post_id, ?int $user_id = null):
         array_map('absint', (array) ($attachment_state['invalidAttachmentIds'] ?? []))
     )));
 
-    if (!$structured) {
+    if ($is_legacy) {
         $request['notes'] = $legacy_notes;
     }
 
     $request['legacyNotes'] = $legacy_notes;
-    $request['isLegacy'] = !$structured;
+    $request['isLegacy'] = $is_legacy;
     if ($user_id !== null) {
         $request['attachmentIds'] = $attachment_state['attachmentIds'];
     }
@@ -702,7 +734,14 @@ function byline_set_editorial_media_request(int $post_id, array $value, ?int $us
         return $reconciled;
     }
 
-    update_post_meta($post_id, BYLINE_EDITORIAL_MEDIA_REQUEST_META, $reconciled);
+    if (function_exists('byline_media_assignments_materialized') && byline_media_assignments_materialized($post_id)) {
+        $persisted = byline_media_assignment_persist_primary($post_id, $reconciled);
+        if (is_wp_error($persisted)) {
+            return $persisted;
+        }
+    } else {
+        update_post_meta($post_id, BYLINE_EDITORIAL_MEDIA_REQUEST_META, $reconciled);
+    }
 
     $result = byline_get_editorial_media_request($post_id, $user_id);
     // The fourth argument is private transition context for integrations that
@@ -830,6 +869,7 @@ function byline_list_editorial_media_requests(array $filters = [], ?int $user_id
             'relation' => 'OR',
             ['key' => BYLINE_EDITORIAL_MEDIA_REQUEST_META, 'compare' => 'EXISTS'],
             ['key' => '_wwh_story_visuals', 'value' => '', 'compare' => '!='],
+            ['key' => '_byline_story_media_assignments_v2', 'compare' => 'EXISTS'],
         ],
     ];
 

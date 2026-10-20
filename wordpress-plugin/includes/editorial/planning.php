@@ -493,10 +493,15 @@ function byline_editorial_planning_user_display(int $user_id): ?array
  * A deliberately compact private Planning row. No post content or private
  * metadata is included in this shape.
  */
-function byline_editorial_planning_story_summary(int $post_id, ?int $user_id = null, ?array $task_counts = null): array
+function byline_editorial_planning_story_summary(int $post_id, ?int $user_id = null, ?array $task_counts = null, bool $allow_context = false): array
 {
     $post = get_post($post_id);
-    if (!$post instanceof WP_Post || $post->post_type !== 'post' || !byline_editorial_can_view_planning_story($post_id, $user_id)) {
+    // Home and the Story Workspace also show stories a user participates in
+    // without being able to edit them; Planning collections stay edit_post-only.
+    $can_view = $allow_context && function_exists('byline_story_context_can_view')
+        ? byline_story_context_can_view($post_id, $user_id)
+        : byline_editorial_can_view_planning_story($post_id, $user_id);
+    if (!$post instanceof WP_Post || $post->post_type !== 'post' || !$can_view) {
         return [];
     }
 
@@ -576,6 +581,10 @@ function byline_editorial_planning_story_summary(int $post_id, ?int $user_id = n
             'legacyNotes' => (string) ($visual['legacyNotes'] ?? ''),
         ],
         'tasks' => ['openCount' => absint($task_count)],
+        // Note-free roll-ups. Sources, appointments and assignments themselves
+        // are loaded only by the protected story read.
+        'reporting' => function_exists('byline_story_reporting_summary') ? byline_story_reporting_summary($post_id) : null,
+        'media' => function_exists('byline_media_assignments_summary') ? byline_media_assignments_summary($post_id) : null,
         'coverage' => is_array($coverage) ? $coverage : [],
         'featuredImage' => ['present' => $has_thumbnail, 'attachmentId' => $thumbnail_id],
         'modifiedAt' => $modified !== '' ? byline_editorial_normalize_datetime(str_replace(' ', 'T', $modified) . 'Z') : '',

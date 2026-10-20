@@ -394,6 +394,15 @@ function byline_admin_query_key(string $key): string
     return sanitize_key((string) wp_unslash((string) $_GET[$key]));
 }
 
+/**
+ * The story whose full workspace is open (`page=byline-planning&story=ID`), or 0.
+ * It is a view of the Planning screen, not a second Stories menu entry.
+ */
+function byline_admin_workspace_story_id(): int
+{
+    return byline_admin_current_page() === BYLINE_ADMIN_PLANNING_PAGE ? max(0, (int) byline_admin_query_key('story')) : 0;
+}
+
 function byline_admin_user_landing_url(): string
 {
     if (current_user_can(BYLINE_MANAGE_CAPABILITY)) {
@@ -434,9 +443,21 @@ function byline_render_admin_app(): void
         wp_die(esc_html__('Sorry, you are not allowed to manage this Byline screen.', 'weekly-wildcat-headless'));
     }
 
-    $is_home = $page === BYLINE_ADMIN_PAGE || ($page === BYLINE_ADMIN_PLANNING_PAGE && in_array(byline_admin_query_key('tab'), ['', 'today'], true));
+    $workspace_story = byline_admin_workspace_story_id();
+    if ($workspace_story > 0) {
+        $context = byline_story_context($workspace_story);
+        if (!$context['exists']) {
+            wp_die(esc_html__('That story does not exist.', 'weekly-wildcat-headless'), '', ['response' => 404, 'back_link' => true]);
+        }
+        if (!$context['view']) {
+            wp_die(esc_html__('You are not part of this story.', 'weekly-wildcat-headless'), '', ['response' => 403, 'back_link' => true]);
+        }
+    }
+    $is_home = $workspace_story === 0 && ($page === BYLINE_ADMIN_PAGE || ($page === BYLINE_ADMIN_PLANNING_PAGE && in_array(byline_admin_query_key('tab'), ['', 'today'], true)));
     echo '<div class="wrap">';
-    if ($is_home) {
+    if ($workspace_story > 0) {
+        echo '<h1 class="screen-reader-text">' . esc_html__('Story workspace', 'weekly-wildcat-headless') . '</h1><hr class="wp-header-end" />';
+    } elseif ($is_home) {
         // Core moves admin notices after this marker. Keep that DOM surgery
         // outside React's compact Home header.
         echo '<h1 class="screen-reader-text">' . esc_html__('Byline Home', 'weekly-wildcat-headless') . '</h1><hr class="wp-header-end" />';
@@ -462,9 +483,13 @@ function byline_enqueue_admin_app(string $hook_suffix): void
 
     wp_enqueue_media();
 
-    $is_home = $page === BYLINE_ADMIN_PAGE || ($page === BYLINE_ADMIN_PLANNING_PAGE && in_array(byline_admin_query_key('tab'), ['', 'today'], true));
-    $bundle = $is_home ? 'home' : 'index';
-    $script_handle = $is_home ? 'byline-home' : 'byline-admin';
+    $workspace_story = byline_admin_workspace_story_id();
+    $is_workspace = $workspace_story > 0;
+    $is_home = !$is_workspace && ($page === BYLINE_ADMIN_PAGE || ($page === BYLINE_ADMIN_PLANNING_PAGE && in_array(byline_admin_query_key('tab'), ['', 'today'], true)));
+    // Home and the Story Workspace are separate React 19 runtimes; every other
+    // screen keeps the WordPress-provided React.
+    $bundle = $is_workspace ? 'story-workspace' : ($is_home ? 'home' : 'index');
+    $script_handle = $is_workspace ? 'byline-story-workspace' : ($is_home ? 'byline-home' : 'byline-admin');
     $asset_file = __DIR__ . '/../../build/' . $bundle . '.asset.php';
     $script_file = __DIR__ . '/../../build/' . $bundle . '.js';
     if (!is_readable($asset_file) || !is_readable($script_file)) {
@@ -486,10 +511,10 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         true
     );
 
-    $styles = $is_home ? ['byline-home' => 'home.css', 'byline-home-extra' => 'style-home.css'] : [
+    $styles = $is_workspace ? ['byline-story-workspace' => 'story-workspace.css', 'byline-story-workspace-extra' => 'style-story-workspace.css'] : ($is_home ? ['byline-home' => 'home.css', 'byline-home-extra' => 'style-home.css'] : [
         'byline-admin-vendor' => 'index.css',
         'byline-admin' => 'style-index.css',
-    ];
+    ]);
     foreach ($styles as $style_handle => $style_name) {
         $style_file = __DIR__ . '/../../build/' . $style_name;
         if (!is_readable($style_file)) {
@@ -499,14 +524,16 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         wp_enqueue_style(
             $style_handle,
             plugins_url('build/' . $style_name, dirname(__DIR__, 2) . '/weekly-wildcat-headless.php'),
-            $is_home ? [] : ['wp-components'],
+            $is_home || $is_workspace ? [] : ['wp-components'],
             $version
         );
     }
 
     $page_urls = byline_admin_page_urls();
     $publication = byline_get_publication_config();
-    wp_localize_script($script_handle, $is_home ? 'bylineHome' : 'bylineAdmin', [
+    wp_localize_script($script_handle, $is_workspace ? 'bylineWorkspace' : ($is_home ? 'bylineHome' : 'bylineAdmin'), [
+        'storyId' => $workspace_story,
+        'appointmentId' => byline_admin_query_key('appointment'),
         'page' => $page,
         'tab' => byline_admin_query_key('tab'),
         'view' => byline_admin_query_key('view'),
@@ -595,7 +622,8 @@ function byline_admin_submenu_file(?string $submenu_file): ?string
     $tab = byline_admin_query_key('tab');
 
     if ($page === BYLINE_ADMIN_PLANNING_PAGE) {
-        return byline_admin_planning_menu_slug($tab);
+        // An open story workspace belongs to Stories in the sidebar.
+        return byline_admin_planning_menu_slug(byline_admin_workspace_story_id() > 0 ? 'stories' : $tab);
     }
 
     // Diagnostics highlights Byline Doctor, its own entry, not Settings.

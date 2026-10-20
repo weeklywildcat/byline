@@ -7,7 +7,7 @@ import { activeStory } from "./newsroom-model";
 import { CommandDialog, Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator, CommandShortcut } from "./ui/command";
 import { describeEditorialError } from "../editorial/editorial-model";
 
-export type HomeActionUrls = { planning?: string; calendar?: string; upload?: string; dashboard?: string; contentHealth?: string; feedback?: string; deployment?: string; doctor?: string };
+export type HomeActionUrls = { planning?: string; calendar?: string; upload?: string; dashboard?: string; contentHealth?: string; feedback?: string; deployment?: string; doctor?: string; workspace?: (storyId: number) => string };
 
 export function HomeCommands({ open, onOpenChange, fetchers, data, recentIds, onStory, onNewStory, onNewTask, urls }: { open: boolean; onOpenChange: (open: boolean) => void; fetchers: HomeFetchers; data?: HomeBootstrap; recentIds: number[]; onStory: (id: number) => void; onNewStory: () => void; onNewTask: () => void; urls?: HomeActionUrls }) {
   const [query, setQuery] = useState("");

@@ -59,6 +59,16 @@ decision.
 | Editor | The newsroom editor assigned to the story. Distinct from the WordPress post author, who is the writer. |
 | Deadline | An internal `YYYY-MM-DD` date. It does not schedule publication and never touches `post_date`. |
 | Visual needs | Internal notes about the pictures the story still needs. Never shown to readers. |
+| Brief | A short private description of the angle, reporting direction and context (`_byline_story_brief`, up to 4,000 characters). Not article copy and not a WordPress Note. |
+
+## Not the same as reporting or production status
+
+Workflow answers "where is the **story** in the editorial process?". Other
+statuses answer different questions and are never folded into it: a **task** is
+open or completed; a **production assignment** (photo, graphic, video…) is
+needed, assigned, in progress, uploaded, selected or done; a reporting **source**
+is planned, contacted, … interviewed; an **appointment** is planned, tentative,
+confirmed, completed or cancelled. See [Story Workspace](story-workspace.md).
 
 ## Storage
 

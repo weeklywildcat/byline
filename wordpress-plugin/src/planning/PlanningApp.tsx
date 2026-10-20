@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "@wordpress/el
 import { __ } from "@wordpress/i18n";
 
 import { PlanningCalendar } from "./Calendar";
+import { createWorkspaceUrlBuilder, type WorkspaceUrl } from "./calendar-model";
 import { ContentHealth } from "./ContentHealth";
 import { Coverage } from "./Coverage";
 import { Feedback } from "./Feedback";
@@ -57,6 +58,12 @@ export type PlanningAppProps = {
   /** Pass the authenticated user's ID so saved-view ownership can be checked client-side. */
   currentUserId?: number | null;
   onOpenStory?: (story: PlanningStory) => void;
+  /**
+   * Builds the full Story Workspace URL (`admin.php?page=byline-planning&story=<id>`),
+   * optionally opening one appointment's scheduling dialog. Defaults to a URL
+   * relative to the current wp-admin page.
+   */
+  workspaceUrl?: WorkspaceUrl;
 };
 
 /**
@@ -204,7 +211,8 @@ export function PlanningApp({
   initialSort = DEFAULT_PLANNING_SORT,
   initialData,
   currentUserId,
-  onOpenStory
+  onOpenStory,
+  workspaceUrl: workspaceUrlProp
 }: PlanningAppProps) {
   const [view, setView] = useState<PlanningView>(() => {
     if (!rememberStoriesView || (initialView !== "board" && initialView !== "list" && initialView !== "calendar")) return initialView;
@@ -226,7 +234,9 @@ export function PlanningApp({
   const [savedViewName, setSavedViewName] = useState("");
   const [isSavingView, setIsSavingView] = useState(false);
   const [quickViewStoryId, setQuickViewStoryId] = useState<number | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
   const loadGeneration = useRef(0);
+  const workspaceUrl = useMemo(() => workspaceUrlProp || createWorkspaceUrlBuilder(), [workspaceUrlProp]);
 
   const media = useOptionalResource<MediaDeskResponse>(fetchers.getMediaDesk, "Media Desk");
   const coverage = useOptionalResource<CoverageResponse>(fetchers.getCoverage, "Coverage");
@@ -513,7 +523,7 @@ export function PlanningApp({
     if (loadError && !planning) return <PlanningEmpty label={__("Planning stories", "weekly-wildcat-headless")} instructions={loadError} />;
     if (view === "board") return <StoryBoard stories={visibleStories} statuses={statuses} canMoveStories={planning?.capabilities.canMoveStories ?? false} movingStoryId={movingStoryId} error={actionError} onMoveStory={(story, status) => { void handleMoveStory(story, status).catch(() => undefined); }} onOpenStory={openStory} />;
     if (view === "list") return <StoryList stories={visibleStories} statuses={statuses} sort={sort} canMoveStories={planning?.capabilities.canMoveStories ?? false} movingStoryId={movingStoryId} onSortChange={handleSortChange} onMoveStory={(story, status) => { void handleMoveStory(story, status).catch(() => undefined); }} onOpenStory={openStory} />;
-    return <PlanningCalendar stories={visibleStories} onOpenStory={openStory} />;
+    return <PlanningCalendar stories={visibleStories} onOpenStory={openStory} getSchedule={fetchers.getSchedule} currentUserId={resolvedUserId} workspaceUrl={workspaceUrl} reloadSignal={refreshTick} />;
   };
 
   const quickViewStory = quickViewStoryId === null ? null : stories.find((story) => story.id === quickViewStoryId) || null;
@@ -526,7 +536,7 @@ export function PlanningApp({
           <h1>{__("Planning", "weekly-wildcat-headless")}</h1>
           <p>{__("Move from assignment to publication with one protected view of newsroom work.", "weekly-wildcat-headless")}</p>
         </div>
-        <Button variant="secondary" onClick={() => void loadPlanning(filters)} disabled={isLoading}>{__("Refresh", "weekly-wildcat-headless")}</Button>
+        <Button variant="secondary" onClick={() => { setRefreshTick((tick) => tick + 1); void loadPlanning(filters); }} disabled={isLoading}>{__("Refresh", "weekly-wildcat-headless")}</Button>
       </header>
 
       {viewIsStories(view) ? (
@@ -570,7 +580,7 @@ export function PlanningApp({
 
       <main className="byline-planning-app-content">
         {viewIsStories(view) ? renderStories() : null}
-        {view === "media" ? (media.isLoading && !media.resource.data ? <PlanningLoading label={__("Loading Media Desk…", "weekly-wildcat-headless")} /> : <MediaDesk resource={media.resource} onRetry={media.load} updateRequest={fetchers.updateMediaRequest ? async (id, changes) => { await fetchers.updateMediaRequest!(id, changes); await media.load(); } : undefined} onOpenStory={openStoryById} />) : null}
+        {view === "media" ? (media.isLoading && !media.resource.data ? <PlanningLoading label={__("Loading Media Desk…", "weekly-wildcat-headless")} /> : <MediaDesk resource={media.resource} onRetry={media.load} updateRequest={fetchers.updateMediaRequest ? async (id, changes) => { await fetchers.updateMediaRequest!(id, changes); await media.load(); } : undefined} updateAssignment={fetchers.updateMediaAssignment ? async (storyId, assignmentId, changes) => { await fetchers.updateMediaAssignment!(storyId, assignmentId, changes); await media.load(); } : undefined} workspaceUrl={workspaceUrl} onOpenStory={openStoryById} />) : null}
         {view === "coverage" ? (coverage.isLoading && !coverage.resource.data ? <PlanningLoading label={__("Loading Coverage…", "weekly-wildcat-headless")} /> : <Coverage resource={coverage.resource} stories={stories} onRetry={coverage.load} onOpenStory={openStory} onCreateCoverage={fetchers.createCoverage ? async (input) => { const result = await fetchers.createCoverage!(input); await coverage.load(); return result; } : undefined} onAddStory={fetchers.addStoryToCoverage ? async (coverageId, storyId) => { const result = await fetchers.addStoryToCoverage!(coverageId, storyId); await coverage.load(); return result; } : undefined} onRemoveStory={fetchers.removeStoryFromCoverage ? async (coverageId, storyId) => { const result = await fetchers.removeStoryFromCoverage!(coverageId, storyId); await coverage.load(); return result; } : undefined} onCreateStory={fetchers.createCoverageStory ? async (coverageId, title) => { const result = await fetchers.createCoverageStory!(coverageId, title); await coverage.load(); return result; } : undefined} />) : null}
         {view === "feedback" ? (feedback.isLoading && !feedback.resource.data ? <PlanningLoading label={__("Loading Feedback…", "weekly-wildcat-headless")} /> : <Feedback resource={feedback.resource} onRetry={feedback.load} onUpdateStatus={fetchers.updateFeedback ? async (id, status) => { const result = await fetchers.updateFeedback!(id, status); await feedback.load(); return result; } : undefined} onCreateCorrection={fetchers.createCorrectionFromFeedback ? async (id, input) => { const result = await fetchers.createCorrectionFromFeedback!(id, input); await feedback.load(); return result; } : undefined} onOpenStory={openStoryById} />) : null}
         {view === "performance" ? (performance.isLoading && !performance.resource.data ? <PlanningLoading label={__("Loading Performance…", "weekly-wildcat-headless")} /> : <Performance resource={performance.resource} onRetry={performance.load} />) : null}
@@ -582,6 +592,7 @@ export function PlanningApp({
           story={quickViewStory}
           statuses={statuses}
           fetchers={fetchers}
+          workspaceUrl={workspaceUrl}
           onClose={() => setQuickViewStoryId(null)}
           onMoveStory={handleMoveStory}
           onUpdateStory={handleUpdateStory}

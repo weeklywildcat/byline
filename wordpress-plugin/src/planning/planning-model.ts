@@ -6,6 +6,9 @@
  * bodies to the planner or make private editorial fields look public.
  */
 
+import { siteDay } from "../home/newsroom-model";
+import type { MediaSummary, ReportingSummary } from "../workspace/workspace-types";
+
 export const PLANNING_VIEW_IDS = [
   "board",
   "list",
@@ -61,7 +64,7 @@ export type PlanningWordPressState = {
   publishedAt?: string | null;
 };
 
-export type PlanningVisualType = "none" | "photo" | "gallery" | "graphic" | "video" | "other";
+export type PlanningVisualType = "none" | "photo" | "gallery" | "graphic" | "video" | "audio" | "other";
 export type PlanningVisualStatus = "needed" | "assigned" | "in-progress" | "uploaded" | "selected" | "done";
 
 export type PlanningVisualSummary = {
@@ -105,6 +108,10 @@ export type PlanningStory = {
   coverage: PlanningCoverageReference[];
   featuredImage: PlanningFeaturedImage | null;
   needsReview?: boolean;
+  /** Note-free reporting roll-up (sources, interviews, appointments). Absent on older servers. */
+  reporting?: ReportingSummary | null;
+  /** Roll-up of production assignments. Absent on older servers. */
+  mediaSummary?: MediaSummary | null;
 };
 
 export type PlanningCapabilities = {
@@ -225,8 +232,35 @@ export type MediaRequest = {
   featuredAttachmentId?: number | null;
 };
 
+/**
+ * One production assignment (`GET /editorial/media` -> `assignments`). A story can
+ * have several. `id` is a UUID, or `"legacy-v1"` for a story that still only has
+ * its single original visual request.
+ */
+export type MediaAssignmentRow = {
+  id: string;
+  story: { id: number; title: string; editUrl: string };
+  title: string;
+  type: PlanningVisualType;
+  status: PlanningVisualStatus;
+  assignee: PlanningPerson | null;
+  dueAt: string | null;
+  notes: string;
+  attachmentIds: number[];
+  attachments?: MediaAttachment[];
+  invalidAttachmentIds?: number[];
+  mediaReadiness?: MediaReadiness | null;
+  featuredAttachmentId?: number | null;
+  order?: number;
+  isLegacy?: boolean;
+};
+
 export type MediaDeskResponse = {
   requests: MediaRequest[];
+  /** One row per production assignment. Missing on servers that predate assignments. */
+  assignments?: MediaAssignmentRow[];
+  /** Site timezone, when the server provides it; used to read due dates. */
+  timezone?: string;
   assignees?: PlanningPerson[];
   capabilities?: Pick<PlanningCapabilities, "canAssign" | "canManageMedia">;
 };
@@ -261,6 +295,25 @@ export function mergeMediaAttachmentIds(current: unknown, additions: unknown): n
 export function removeMediaAttachmentId(current: unknown, attachmentId: unknown): number[] {
   const id = mediaAttachmentId(attachmentId);
   return id === null ? normalizeMediaAttachmentIds(current) : normalizeMediaAttachmentIds(current).filter((item) => item !== id);
+}
+
+/**
+ * One note-free line for a story's reporting roll-up, e.g.
+ * "3 sources · 1 interviewed · 1 needs scheduling". Empty when nothing is
+ * being tracked. "Needs scheduling" counts the larger of sources waiting on a
+ * time and open appointments with no exact time, since those are usually the
+ * same people.
+ */
+export function reportingSummaryLine(reporting: ReportingSummary | null | undefined): string {
+  if (!reporting) return "";
+  const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+  const needs = Math.max(reporting.needsScheduling || 0, reporting.toSchedule || 0);
+  const parts = [
+    reporting.sources > 0 ? plural(reporting.sources, "source", "sources") : "",
+    reporting.interviewed > 0 ? `${reporting.interviewed} interviewed` : "",
+    needs > 0 ? `${needs} needs scheduling` : ""
+  ].filter(Boolean);
+  return parts.join(" · ");
 }
 
 export type CoverageStatus = "active" | "upcoming" | "past" | "draft" | "archived";
@@ -393,7 +446,7 @@ export function resolveContentHealthBlockPath(
   return block;
 }
 
-export type CalendarEventType = "deadline" | "planned" | "scheduled" | "published";
+export type CalendarEventType = "deadline" | "planned" | "scheduled" | "published" | "appointment" | "media" | "task";
 
 export type PlanningCalendarEvent = {
   id: string;
@@ -401,9 +454,23 @@ export type PlanningCalendarEvent = {
   storyTitle: string;
   storyUrl: string;
   type: CalendarEventType;
+  /** Site-local (or, for story dates before the schedule feed loads, browser-local) `YYYY-MM-DD`. */
   date: string;
   exactDate: string;
   label: string;
+  /** Visible text when it is not the story title (appointments, production and task deadlines). */
+  title?: string;
+  /** "10:15 AM" for an exact appointment, read in the site timezone. */
+  timeLabel?: string;
+  /** UTC instant used only to order timed events within a day. */
+  sortTime?: string;
+  /** Multi-line description for the native tooltip. */
+  tooltip?: string;
+  assigneeIds?: number[];
+  assigneeNames?: string[];
+  /** Story Workspace deep link. When present the event is a plain link, not a Quick View button. */
+  href?: string;
+  completed?: boolean;
 };
 
 export type OptionalResource<T> = {
@@ -692,7 +759,13 @@ export function deserializeSavedPlanningView(value: string, expectedOwnerId?: nu
   }
 }
 
-export function planningCalendarEvents(stories: PlanningStory[]): PlanningCalendarEvent[] {
+/**
+ * Story-derived events: deadline, planned publication, WordPress schedule and
+ * published date stay four separate events. With a site `timezone` the day is
+ * read in that zone (matching appointments and production deadlines); without
+ * one it falls back to the browser's, as before.
+ */
+export function planningCalendarEvents(stories: PlanningStory[], timezone?: string): PlanningCalendarEvent[] {
   const events: PlanningCalendarEvent[] = [];
   const add = (story: PlanningStory, type: CalendarEventType, value: string | null | undefined, label: string) => {
     if (!value || !parsePlanningDate(value)) return;
@@ -702,7 +775,7 @@ export function planningCalendarEvents(stories: PlanningStory[]): PlanningCalend
       storyTitle: story.title,
       storyUrl: story.editUrl,
       type,
-      date: planningDateKey(parsePlanningDate(value) as Date),
+      date: timezone ? siteDay(value, timezone) || planningDateKey(parsePlanningDate(value) as Date) : planningDateKey(parsePlanningDate(value) as Date),
       exactDate: exactPlanningDate(value),
       label
     });
