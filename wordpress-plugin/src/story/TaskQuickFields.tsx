@@ -1,7 +1,7 @@
 import type { ContributorEntry, EditorialTask, TaskPatch, TaskPriority } from "../editorial/editorial-model";
 import { dateLabel } from "../home/newsroom-model";
 import { AssigneePicker, DatePicker, valueSelectTriggerClass } from "../admin-ui/components/pickers";
-import { WorkStatusBadge } from "../admin-ui/components/work-status-badge";
+import { WorkStatusBadge, type WorkIntensity } from "../admin-ui/components/work-status-badge";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "../admin-ui/ui/select";
 
 export const TASK_PRIORITY_OPTIONS: Array<{ value: TaskPriority; label: string }> = [
@@ -11,7 +11,7 @@ export const TASK_PRIORITY_OPTIONS: Array<{ value: TaskPriority; label: string }
   { value: "urgent", label: "Urgent" }
 ];
 
-const priorityIntensity = (priority: TaskPriority) => priority === "urgent" ? "action" : priority === "high" ? "active" : "settled";
+const priorityIntensity = (priority: TaskPriority): WorkIntensity => priority === "urgent" ? "action" : priority === "high" ? "active" : "settled";
 
 export type TaskQuickUpdate = (patch: TaskPatch, optimistic?: Partial<EditorialTask>) => void;
 
