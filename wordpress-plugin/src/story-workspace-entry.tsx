@@ -42,7 +42,7 @@ if (root && config && config.storyId > 0) {
       storiesUrl={storiesUrl}
       client={createWorkspaceClient(request)}
       editorial={createEditorialRestClient(request)}
-      searchStories={(query) => request({ path: `/byline/v1/editorial/home/search?query=${encodeURIComponent(query)}` })}
+      searchStories={(query) => request<{ stories: Array<{ id: number; title: string }> }>({ path: `/byline/v1/editorial/home/search?query=${encodeURIComponent(query)}` })}
       commandUrls={{
         stories: config.urls?.planning?.stories,
         calendar: config.urls?.planning?.calendar,
