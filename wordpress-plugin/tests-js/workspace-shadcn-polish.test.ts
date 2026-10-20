@@ -25,9 +25,18 @@ describe("Story Workspace shadcn polish", () => {
     }
   });
 
-  it("uses the shared Spinner for pending dialog, peek-link and command-search states", () => {
-    expect(read("workspace/dialog-shell.tsx")).toContain('<Spinner data-icon="inline-start" />');
-    expect(read("story/StoryPeek.tsx")).toContain('<Spinner data-icon="inline-start" />Saving…');
+  it("uses the shared Spinner for pending actions instead of text-only loading labels", () => {
+    for (const file of [
+      "workspace/dialog-shell.tsx",
+      "workspace/BriefSection.tsx",
+      "story/StoryPeek.tsx",
+      "story/StoryCreateDialog.tsx",
+      "story/TaskCreateDialog.tsx",
+      "planning/SavedViews.tsx",
+      "planning/Coverage.tsx"
+    ]) {
+      expect(read(file), file).toContain("<Spinner");
+    }
     expect(read("home/HomeCommands.tsx")).toContain("<Spinner />Searching stories…");
   });
 });
