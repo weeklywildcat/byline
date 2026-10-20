@@ -71,8 +71,10 @@ function ResourceRow({ resource, canManage, onEdit, onRemove }: { resource: Stor
     <ContextMenuContent className="w-48">
       <ContextMenuLabel className="max-w-44 truncate">{resource.label}</ContextMenuLabel>
       <ContextMenuSeparator />
-      {available ? <ContextMenuItem render={<a href={resource.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
-      <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(resource.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem> : null}
+      {available ? <>
+        <ContextMenuItem render={<a href={resource.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
+        <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(resource.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem>
+      </> : null}
       {canManage ? <>
         <ContextMenuItem onClick={(event) => onEdit(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
         <ContextMenuItem variant="destructive" onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
