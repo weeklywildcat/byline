@@ -2,6 +2,7 @@
 import type { ContributorEntry, EditorialTask } from "../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../editorial/activity-model";
 import type { AvatarPerson } from "../admin-ui/components/people-avatars";
+import { decodeEntities } from "../admin-ui/lib/text";
 import { activityCopy, dayDistance, siteDay } from "../home/newsroom-model";
 import { appointmentTiming } from "./schedule-model";
 import type { Assignee, ReportingSummary, StoryWorkspace } from "./workspace-types";
@@ -38,8 +39,11 @@ export function names(people: Array<{ name: string }>): string {
 }
 
 /** "Reporting · News" */
+/** Section names arrive HTML-escaped from WordPress terms ("Arts &amp; Culture"). */
+export const sectionNames = (sections: string[]): string => sections.map((name) => decodeEntities(name)).join(", ");
+
 export function stateLine(data: Pick<StoryWorkspace, "story" | "sections">): string {
-  return [data.story.workflow.label, data.sections.join(", ")].filter(Boolean).join(" · ");
+  return [data.story.workflow.label, sectionNames(data.sections)].filter(Boolean).join(" · ");
 }
 
 export function writerNames(data: Pick<StoryWorkspace, "story" | "contributors">): string[] {

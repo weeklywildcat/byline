@@ -63,6 +63,8 @@ export type StoryFiltersProps = {
   editors: PlanningPerson[];
   /** The saved views menu sits at the start of the first row. */
   savedViews?: ReactNode;
+  /** The List hides finished published stories; this brings them back. Not a saved-view filter. */
+  showPublished?: { value: boolean; onChange: (value: boolean) => void };
 };
 
 /**
@@ -70,10 +72,10 @@ export type StoryFiltersProps = {
  * there; everything else lives behind More filters and shows as a removable chip
  * once set, so no filter is ever applied invisibly.
  */
-export function StoryFilters({ filters, onChange, statuses, writers, editors, savedViews }: StoryFiltersProps) {
+export function StoryFilters({ filters, onChange, statuses, writers, editors, savedViews, showPublished }: StoryFiltersProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const update = (patch: Partial<PlanningFilters>) => onChange(normalizePlanningFilters({ ...filters, ...patch }));
-  const chips = moreFilterChips(filters);
+  const chips = [...moreFilterChips(filters), ...(showPublished?.value ? [{ key: "published", label: __("Showing published", "weekly-wildcat-headless"), clear: {} as Partial<PlanningFilters> }] : [])];
   const workflowOptions: Option[] = [{ value: ALL, label: __("All workflows", "weekly-wildcat-headless") }, ...statuses.filter((status) => status.group !== "derived").map((status) => ({ value: status.id, label: status.label }))];
   return <div className="flex flex-col gap-2" role="search" aria-label={__("Filter stories", "weekly-wildcat-headless")}>
     <div className="flex flex-wrap items-center gap-2">
@@ -99,6 +101,7 @@ export function StoryFilters({ filters, onChange, statuses, writers, editors, sa
               <Field><FieldLabel htmlFor="story-filter-planned-from">{__("Planned from", "weekly-wildcat-headless")}</FieldLabel><Input id="story-filter-planned-from" type="date" value={filters.plannedFrom} onChange={(event) => update({ plannedFrom: event.target.value })} /></Field>
               <Field><FieldLabel htmlFor="story-filter-planned-to">{__("Planned to", "weekly-wildcat-headless")}</FieldLabel><Input id="story-filter-planned-to" type="date" value={filters.plannedTo} onChange={(event) => update({ plannedTo: event.target.value })} /></Field>
             </div>
+            {showPublished ? <Field orientation="horizontal"><Checkbox id="story-filter-published" checked={showPublished.value} onCheckedChange={(checked) => showPublished.onChange(Boolean(checked))} /><FieldLabel htmlFor="story-filter-published" className="font-normal">{__("Show finished published stories", "weekly-wildcat-headless")}</FieldLabel></Field> : null}
             {([["mine", __("Mine", "weekly-wildcat-headless")], ["unassigned", __("Unassigned", "weekly-wildcat-headless")], ["overdue", __("Overdue", "weekly-wildcat-headless")], ["needsReview", __("Needs review", "weekly-wildcat-headless")]] as const).map(([key, label]) => <Field key={key} orientation="horizontal"><Checkbox id={`story-filter-${key}`} checked={filters[key]} onCheckedChange={(checked) => update({ [key]: Boolean(checked) })} /><FieldLabel htmlFor={`story-filter-${key}`} className="font-normal">{label}</FieldLabel></Field>)}
           </FieldGroup>
         </PopoverContent>
@@ -106,7 +109,7 @@ export function StoryFilters({ filters, onChange, statuses, writers, editors, sa
       {hasActiveFilters(filters) ? <Button variant="ghost" onClick={() => onChange({ ...EMPTY_PLANNING_FILTERS })}>{__("Clear", "weekly-wildcat-headless")}</Button> : null}
     </div>
     {chips.length ? <ul className="flex flex-wrap items-center gap-1.5" aria-label={__("Active filters", "weekly-wildcat-headless")}>
-      {chips.map((chip) => <li key={chip.key}><Badge variant="secondary" className="gap-1 pr-0.5">{chip.label}<button type="button" className="rounded-full p-0.5 hover:bg-foreground/10" aria-label={`${__("Remove filter", "weekly-wildcat-headless")}: ${chip.label}`} onClick={() => update(chip.clear)}><X className="size-3" aria-hidden="true" /></button></Badge></li>)}
+      {chips.map((chip) => <li key={chip.key}><Badge variant="secondary" className="gap-1 pr-0.5">{chip.label}<button type="button" className="rounded-full p-0.5 hover:bg-foreground/10" aria-label={`${__("Remove filter", "weekly-wildcat-headless")}: ${chip.label}`} onClick={() => (chip.key === "published" ? showPublished?.onChange(false) : update(chip.clear))}><X className="size-3" aria-hidden="true" /></button></Badge></li>)}
     </ul> : null}
   </div>;
 }

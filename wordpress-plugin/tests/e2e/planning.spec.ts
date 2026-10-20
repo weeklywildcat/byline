@@ -96,6 +96,13 @@ test.describe("Stories board", () => {
     await expect(card(page, published)).toHaveCount(0);
     // ...and in the List its actions never offer a move.
     await page.getByRole("tab", { name: "List" }).click();
+    // Finished published stories are left out of the List until asked for.
+    await expect(page.getByRole("button", { name: `${unique} Open`, exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: `${unique} Published`, exact: true })).toHaveCount(0);
+    await expect(page.getByText(/1 published story with nothing left to do is hidden/)).toBeVisible();
+    await page.getByRole("button", { name: /More filters/ }).click();
+    await page.getByRole("checkbox", { name: "Show finished published stories" }).click();
+    await page.keyboard.press("Escape");
     await expect(page.getByRole("button", { name: `${unique} Published`, exact: true })).toBeVisible();
     await page.getByRole("button", { name: `Actions for ${unique} Published` }).click();
     await expect(page.getByRole("menuitem", { name: "Open workspace" })).toBeVisible();
@@ -159,6 +166,7 @@ test.describe("Story Peek everywhere", () => {
 
     await page.getByRole("tab", { name: "List" }).click();
     await expect(page).toHaveURL(/view=list/);
+    await expect(page.locator("[data-board-scroller]")).toHaveCount(0);
     await page.getByRole("button", { name: title, exact: true }).click();
     await expect(peek).toBeVisible();
     expect(await sections()).toBe(fromBoard);

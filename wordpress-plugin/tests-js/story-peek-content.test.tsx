@@ -5,7 +5,7 @@ import { FileAttachment } from "../src/workspace/MediaDialog";
 import type { StoryWorkspace } from "../src/workspace/workspace-types";
 
 const now = new Date("2026-10-20T12:00:00Z");
-const admin = { id: 1, kind: "user" as const, name: "admin" };
+const admin = { id: 1, kind: "user" as const, name: "admin", imageUrl: "https://example.test/admin.jpg" };
 const capabilities = { role: "manager", editArticle: true, changeStatus: false, assign: false, editContributors: false, editBrief: false, manageReporting: false, addSource: false, addAppointment: false, manageMedia: false, assignMedia: false, addTask: false, manageResources: false, review: false };
 
 /** The sparse Canteen story: one writer, two tasks, one assigned photo request, nothing else. */
@@ -71,7 +71,7 @@ describe("Story Peek, sparse", () => {
 });
 
 describe("Story Peek, dense", () => {
-  const people = ["Caroline Elrod", "Gibson Bell", "Maycie Photographer", "Dana Reyes"].map((name, index) => ({ id: index + 2, kind: "user" as const, name }));
+  const people = ["Caroline Elrod", "Gibson Bell", "Maycie Photographer", "Dana Reyes"].map((name, index) => ({ id: index + 2, kind: "user" as const, name, imageUrl: `https://example.test/${index}.jpg` }));
   const activity = Array.from({ length: 5 }, (_, index) => ({ id: `a${index}`, action: "task_created", occurredAt: "2026-10-20T10:00:00Z", summary: `Activity ${index}`, story: { id: 7, title: "Canteen" }, actor: { id: 1, name: "admin" } }));
   const html = render(canteen({
     contributors: { canEdit: true, contributors: people, available: people },

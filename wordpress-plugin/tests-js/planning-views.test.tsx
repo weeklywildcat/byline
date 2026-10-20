@@ -3,9 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { decodeEntities } from "../src/admin-ui/lib/text";
 import { StoryBoard } from "../src/planning/StoryBoard";
 import { StoryList } from "../src/planning/StoryList";
-import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, isPlannedDayOnly, type PlanningStory } from "../src/planning/planning-model";
+import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, hideFinishedPublished, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "../src/planning/planning-model";
 import { destinationForTab, initialStoriesView, storiesViewHref } from "../src/planning/planning-routing";
 import { productionSignal, storySignals } from "../src/story/story-parts";
+import { sectionNames } from "../src/workspace/workspace-model";
 
 const now = new Date("2026-10-20T12:00:00Z");
 const person = (id: number, name: string) => ({ id, name });
@@ -24,7 +25,7 @@ const props = (stories: PlanningStory[], canMove = true) => ({ stories, statuses
 describe("StoryBoard", () => {
   const stories = [
     story({ id: 1, title: "Canteen could return", workflow: stage("reporting"), authors: [person(1, "Caroline Elrod"), person(2, "Gibson Bell")], deadline: "2026-10-21", openTaskCount: 2, visual: { type: "photo", status: "assigned" } }),
-    story({ id: 2, title: "Homecoming", workflow: stage("reporting"), authors: ["Ava", "Mia", "Noah", "Pat", "Sam"].map((name, index) => person(10 + index, name)) }),
+    story({ id: 2, title: "Homecoming", workflow: stage("reporting"), authors: ["Ava", "Mia", "Noah", "Pat", "Sam"].map((name, index) => ({ ...person(10 + index, name), avatarUrl: `https://example.test/${name}.jpg` })) }),
     story({ id: 3, title: "Unassigned pitch", workflow: stage("pitch") }),
     story({ id: 4, title: "Robotics", workflow: stage("reporting"), deadline: "2026-10-19", visual: { type: "photo", status: "needed" } }),
     story({ id: 5, title: "Paused", workflow: stage("on-hold") })
@@ -58,6 +59,13 @@ describe("StoryBoard", () => {
   it("does not silently truncate people: five writers show three avatars and a +2", () => {
     expect(html).toContain("+2");
     expect(html).toContain("and 2 more: Pat, Sam");
+  });
+
+  it("draws no placeholder avatar for a writer without a photo; the name stands alone", () => {
+    const card = html.slice(html.indexOf('data-story-id="1"'), html.indexOf('data-story-id="2"'));
+    expect(card).toContain("Caroline Elrod, Gibson Bell");
+    expect(card).not.toContain('data-slot="avatar"');
+    expect(card).not.toContain(">CE<");
   });
 
   it("gives every card an actions menu named for its story", () => {
@@ -144,5 +152,39 @@ describe("text and dates from WordPress", () => {
     expect(isPlannedDayOnly("2026-10-24T16:00:00Z", "America/New_York")).toBe(true);
     expect(isPlannedDayOnly("2026-10-24T08:30:00")).toBe(false);
     expect(isPlannedDayOnly("2026-10-24T12:00:00Z", "America/New_York")).toBe(false);
+  });
+});
+
+describe("published stories in the List", () => {
+  const published = { id: "publish", label: "Published", isPublished: true, isScheduled: false };
+  const done = story({ id: 1, title: "Done", wordpressState: published });
+  const withTask = story({ id: 2, title: "Open task", wordpressState: published, openTaskCount: 1 });
+  const withPhoto = story({ id: 3, title: "Open photo", wordpressState: published, visual: { type: "photo", status: "assigned" } });
+  const photoDone = story({ id: 4, title: "Photo done", wordpressState: published, visual: { type: "photo", status: "done" } });
+  const toSchedule = story({ id: 5, title: "Needs a time", wordpressState: published, reporting: { sources: 0, interviewed: 0, needsScheduling: 1, toSchedule: 1, nextAppointment: null } });
+  const draft = story({ id: 6, title: "Draft" });
+
+  it("knows when something is not done", () => {
+    expect([done, withTask, withPhoto, photoDone, toSchedule].map(storyHasOpenWork)).toEqual([false, true, true, false, true]);
+  });
+
+  it("hides a published story with nothing open, and keeps drafts and anything with work left", () => {
+    expect(hideFinishedPublished([done, withTask, withPhoto, photoDone, toSchedule, draft]).map((item) => item.title)).toEqual(["Open task", "Open photo", "Needs a time", "Draft"]);
+  });
+
+  it("shows them when asked for, or when a WordPress state is chosen", () => {
+    expect(hideFinishedPublished([done, draft], { showPublished: true })).toHaveLength(2);
+    expect(hideFinishedPublished([done, draft], { wordpressState: "publish" })).toHaveLength(2);
+  });
+
+  it("says what it left out", () => {
+    const html = renderToStaticMarkup(<StoryList {...props([draft])} hiddenPublished={2} sort={DEFAULT_PLANNING_SORT} onSortChange={vi.fn()} />);
+    expect(html).toContain("2 published stories with nothing left to do are hidden.");
+  });
+});
+
+describe("section names", () => {
+  it("decode what WordPress escaped", () => {
+    expect(sectionNames(["Arts &amp; Culture", "News"])).toBe("Arts & Culture, News");
   });
 });
