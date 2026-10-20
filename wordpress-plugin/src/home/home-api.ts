@@ -1,7 +1,4 @@
-import {
-  normalizeContentHealthResponse,
-  type PlanningRequestOptions
-} from "../planning/planning-api";
+import { normalizeContentHealthResponse } from "../planning/planning-api";
 import type {
   ContentHealthResponse,
   FeedbackResponse,
@@ -16,11 +13,9 @@ import type {
   HomeNavigationCapabilities
 } from "./home-model";
 import type { HomeBootstrap } from "./newsroom-model";
-import { createEditorialRestClient, type EditorialRestClient } from "../editorial/editorial-rest";
-import { createWorkspaceClient, type WorkspaceClient } from "../workspace/workspace-api";
-import type { StoryWorkspace } from "../workspace/workspace-types";
+import { createStoryFetchers, type StoryFetchers, type StoryRequest } from "../story/story-fetchers";
 
-export type HomeRequest = <T>(options: PlanningRequestOptions) => Promise<T>;
+export type HomeRequest = StoryRequest;
 
 export type HomePaths = {
   planning?: string;
@@ -33,16 +28,9 @@ export type HomePaths = {
   presets?: string;
 };
 
-export type HomeFetchers = {
+export type HomeFetchers = StoryFetchers & {
   getHome?: () => Promise<HomeBootstrap>;
-  /** The Story Workspace read model; Story Peek reads it instead of the old quick-view aggregate. */
-  getWorkspace?: (storyId: number) => Promise<StoryWorkspace>;
-  /** Typed workspace mutations (links, today). */
-  workspace?: WorkspaceClient;
   searchStories?: (query: string) => Promise<{ stories: Array<{ id: number; title: string }> }>;
-  /** Creates a draft, optionally from a template preset; resolves with the full workspace payload plus `workspaceUrl`/`template`. */
-  createStory?: (title: string, preset?: string) => Promise<StoryWorkspace>;
-  editorial?: EditorialRestClient;
   getPlanning?: () => Promise<PlanningResponse>;
   getHealth?: () => Promise<HomeHealthPayload>;
   getContentHealth?: () => Promise<ContentHealthResponse>;
@@ -50,7 +38,6 @@ export type HomeFetchers = {
   getDeployment?: () => Promise<HomeDeploymentStatus>;
   retryDeployment?: () => Promise<HomeDeploymentStatus>;
   getActivity?: () => Promise<HomeActivityPayload>;
-  getPresets?: () => Promise<HomePresetsPayload>;
   updatePreset?: (type: string, changes: Record<string, unknown>) => Promise<HomePresetMutation>;
   resetPreset?: (type: string) => Promise<HomePresetMutation>;
 };
@@ -80,14 +67,10 @@ export function createHomeFetchers(
   if (paths.deployment && !paths.deploymentTrigger) {
     resolved.deploymentTrigger = `${resolved.deployment.replace(/\/+$/, "")}/trigger`;
   }
-  const fetchers: HomeFetchers = {};
+  const fetchers: HomeFetchers = createStoryFetchers(request, capabilities, { presets: resolved.presets });
   if (capabilities.editPosts !== false) {
     fetchers.getHome = () => request<HomeBootstrap>({ path: "/byline/v1/editorial/home" });
-    fetchers.workspace = createWorkspaceClient(request);
-    fetchers.getWorkspace = fetchers.workspace.getWorkspace;
     fetchers.searchStories = (query) => request({ path: `/byline/v1/editorial/home/search?query=${encodeURIComponent(query)}` });
-    fetchers.createStory = (title, preset) => request<StoryWorkspace>({ path: "/byline/v1/editorial/stories", method: "POST", data: preset ? { title, preset } : { title } });
-    fetchers.editorial = createEditorialRestClient(request);
   }
 
   // The planning route is intentionally edit_posts-scoped. A role that can
@@ -118,9 +101,6 @@ export function createHomeFetchers(
     fetchers.getActivity = () => request<HomeActivityPayload>({ path: resolved.activity });
   }
 
-  if (capabilities.editPosts !== false || capabilities.manage) {
-    fetchers.getPresets = () => request<HomePresetsPayload>({ path: resolved.presets });
-  }
   if (capabilities.manage) {
     fetchers.updatePreset = (type, changes) => request<HomePresetMutation>({
       path: `${resolved.presets}/${encodeURIComponent(type)}`,

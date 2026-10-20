@@ -483,9 +483,13 @@ function byline_render_admin_app(): void
         }
     }
     $is_home = $workspace_story === 0 && ($page === BYLINE_ADMIN_PAGE || ($page === BYLINE_ADMIN_PLANNING_PAGE && in_array(byline_admin_query_key('tab'), ['', 'today'], true)));
+    $is_planning = $workspace_story === 0 && !$is_home && $page === BYLINE_ADMIN_PLANNING_PAGE;
     echo '<div class="wrap">';
     if ($workspace_story > 0) {
         echo '<h1 class="screen-reader-text">' . esc_html__('Story workspace', 'weekly-wildcat-headless') . '</h1><hr class="wp-header-end" />';
+    } elseif ($is_planning) {
+        // Stories, Calendar, Media Desk and the other collection screens draw their own compact header.
+        echo '<h1 class="screen-reader-text">' . esc_html__('Byline Planning', 'weekly-wildcat-headless') . '</h1><hr class="wp-header-end" />';
     } elseif ($is_home) {
         // Core moves admin notices after this marker. Keep that DOM surgery
         // outside React's compact Home header.
@@ -513,10 +517,12 @@ function byline_enqueue_admin_app(string $hook_suffix): void
     $workspace_story = byline_admin_workspace_story_id();
     $is_workspace = $workspace_story > 0;
     $is_home = !$is_workspace && ($page === BYLINE_ADMIN_PAGE || ($page === BYLINE_ADMIN_PLANNING_PAGE && in_array(byline_admin_query_key('tab'), ['', 'today'], true)));
-    // Home and the Story Workspace are separate React 19 runtimes; every other
-    // screen keeps the WordPress-provided React.
-    $bundle = $is_workspace ? 'story-workspace' : ($is_home ? 'home' : 'index');
-    $script_handle = $is_workspace ? 'byline-story-workspace' : ($is_home ? 'byline-home' : 'byline-admin');
+    $is_planning = !$is_workspace && !$is_home && $page === BYLINE_ADMIN_PLANNING_PAGE;
+    // Home, Planning and the Story Workspace are separate private React 19
+    // runtimes; only Settings and Newsletters keep the WordPress-provided React.
+    $bundle = $is_workspace ? 'story-workspace' : ($is_home ? 'home' : ($is_planning ? 'planning' : 'index'));
+    $script_handle = $is_workspace ? 'byline-story-workspace' : ($is_home ? 'byline-home' : ($is_planning ? 'byline-planning' : 'byline-admin'));
+    $is_nova = $is_workspace || $is_home || $is_planning;
     $asset_file = __DIR__ . '/../../build/' . $bundle . '.asset.php';
     $script_file = __DIR__ . '/../../build/' . $bundle . '.js';
     if (!is_readable($asset_file) || !is_readable($script_file)) {
@@ -538,10 +544,10 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         true
     );
 
-    $styles = $is_workspace ? ['byline-story-workspace' => 'story-workspace.css', 'byline-story-workspace-extra' => 'style-story-workspace.css'] : ($is_home ? ['byline-home' => 'home.css', 'byline-home-extra' => 'style-home.css'] : [
+    $styles = $is_workspace ? ['byline-story-workspace' => 'story-workspace.css', 'byline-story-workspace-extra' => 'style-story-workspace.css'] : ($is_home ? ['byline-home' => 'home.css', 'byline-home-extra' => 'style-home.css'] : ($is_planning ? ['byline-planning' => 'planning.css', 'byline-planning-extra' => 'style-planning.css'] : [
         'byline-admin-vendor' => 'index.css',
         'byline-admin' => 'style-index.css',
-    ]);
+    ]));
     foreach ($styles as $style_handle => $style_name) {
         $style_file = __DIR__ . '/../../build/' . $style_name;
         if (!is_readable($style_file)) {
@@ -551,14 +557,18 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         wp_enqueue_style(
             $style_handle,
             plugins_url('build/' . $style_name, dirname(__DIR__, 2) . '/weekly-wildcat-headless.php'),
-            $is_home || $is_workspace ? [] : ['wp-components'],
+            $is_nova ? [] : ['wp-components'],
             $version
         );
     }
 
+    if ($is_planning && function_exists('wp_set_script_translations')) {
+        wp_set_script_translations($script_handle, 'weekly-wildcat-headless');
+    }
+
     $page_urls = byline_admin_page_urls();
     $publication = byline_get_publication_config();
-    wp_localize_script($script_handle, $is_workspace ? 'bylineWorkspace' : ($is_home ? 'bylineHome' : 'bylineAdmin'), [
+    wp_localize_script($script_handle, $is_workspace ? 'bylineWorkspace' : ($is_home ? 'bylineHome' : ($is_planning ? 'bylinePlanning' : 'bylineAdmin')), [
         'storyId' => $workspace_story,
         'appointmentId' => byline_admin_query_key('appointment'),
         'page' => $page,
@@ -597,10 +607,21 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         'nativeUrls' => byline_admin_native_urls(),
     ]);
 
-    add_filter('admin_body_class', static function (string $classes) use ($page): string {
+    add_filter('admin_body_class', static function (string $classes) use ($page, $is_nova): string {
         $classes .= ' byline-admin-page';
+        if ($is_nova) {
+            $classes .= ' byline-nova-page';
+        }
         return $classes;
     });
+
+    if ($is_nova) {
+        // Home, Planning and the Story Workspace are white. wp-admin's grey canvas is
+        // repainted only on these screens (the body class above gates it), never globally.
+        wp_register_style('byline-nova-page', false, [], $version);
+        wp_enqueue_style('byline-nova-page');
+        wp_add_inline_style('byline-nova-page', 'html:has(body.byline-nova-page), body.byline-nova-page, body.byline-nova-page #wpwrap, body.byline-nova-page #wpcontent, body.byline-nova-page #wpbody { background: #fff; }');
+    }
 }
 add_action('admin_enqueue_scripts', 'byline_enqueue_admin_app');
 

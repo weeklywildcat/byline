@@ -154,15 +154,17 @@ describe("filters and My schedule", () => {
   const all = [...planningCalendarEvents([story()], timezone), ...scheduleCalendarEvents(feed, workspaceUrl)];
   const types = (events: ReturnType<typeof filterCalendarEvents>) => events.map((event) => event.type);
 
-  it("defaults to appointments, deadlines, media and publication, with tasks off", () => {
-    expect(DEFAULT_CALENDAR_FILTERS).toEqual({ appointments: true, deadlines: true, media: true, publication: true, mine: false, tasks: false });
+  it("defaults to appointments, deadlines, media, publication and the WordPress schedule, with tasks off", () => {
+    expect(DEFAULT_CALENDAR_FILTERS).toEqual({ appointments: true, deadlines: true, media: true, publication: true, wordpress: true, mine: false, tasks: false });
     const visible = filterCalendarEvents(all, DEFAULT_CALENDAR_FILTERS, 7);
     expect(new Set(types(visible))).toEqual(new Set(["appointment", "deadline", "media", "planned", "scheduled"]));
   });
 
   it("toggles each category independently", () => {
     expect(new Set(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, appointments: false }, 7)))).not.toContain("appointment");
-    expect(new Set(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, publication: false }, 7)))).toEqual(new Set(["appointment", "deadline", "media"]));
+    expect(new Set(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, publication: false }, 7)))).toEqual(new Set(["appointment", "deadline", "media", "scheduled"]));
+    // The WordPress schedule is its own toggle, apart from the planned publication target.
+    expect(new Set(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, wordpress: false }, 7)))).toEqual(new Set(["appointment", "deadline", "media", "planned"]));
     expect(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, tasks: true }, 7))).toContain("task");
   });
 

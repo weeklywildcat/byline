@@ -46,8 +46,10 @@ primary command uses WordPress 7.1 and the legacy command uses WordPress 6.6.
 6. Preview as Byline saves the current draft first, renders saved content in
    the authenticated private preview, blocks public actions, and is not
    anonymously accessible.
-7. Planning Quick View moves one story optimistically, persists it, rolls back
-   a failed move without corrupting another story, and opens the full editor.
+7. Stories ([docs](stories-planning-ui.md)) drag a story between stages
+   optimistically, persist it, roll back a failed move without corrupting another
+   story, announce the result, offer the same move from a menu, and open the one
+   Story Peek, the workspace and the full editor.
 8. [Byline Home](byline-home.md) uses real writer/admin authentication, creates
    drafts, completes tasks with rollback, returns focus after Story Peek,
    searches by keyboard, manages private links, and opens Gutenberg without

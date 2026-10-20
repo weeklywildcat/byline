@@ -193,9 +193,9 @@ One bounded aggregate (no per-source/per-task requests), never the article body:
 | `GET /editorial/media` | adds `assignments` (one row per assignment); `requests` is kept |
 
 Each optional section of the workspace payload is read independently: a failure
-reports under `errors` and the rest renders. `GET …/quick-view` remains the
-legacy Planning modal's aggregate; Home and the workspace use the flat
-`/workspace` model.
+reports under `errors` and the rest renders. `GET …/quick-view` remains only as a
+protected compatibility route (nothing in the admin calls it); Home, Stories and
+the workspace all use the flat `/workspace` model.
 
 ## Files & links
 

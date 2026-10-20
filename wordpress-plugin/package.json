@@ -16,6 +16,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@atlaskit/pragmatic-drag-and-drop": "4.0.0",
+    "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "3.2.1",
+    "@atlaskit/pragmatic-drag-and-drop-live-region": "2.1.0",
     "@base-ui/react": "^1.9.0",
     "@byline/admin-runtime": "0.1.0",
     "@byline/content": "0.1.0",
@@ -25,6 +28,10 @@
     "@byline/theme-weekly-wildcat": "0.1.0",
     "@byline/ui": "0.1.0",
     "@iconify/react": "^6.0.2",
+    "@schedule-x/calendar": "4.9.1",
+    "@schedule-x/events-service": "4.9.1",
+    "@schedule-x/react": "4.1.0",
+    "@schedule-x/theme-shadcn": "4.9.1",
     "@tanstack/react-query": "^5.104.5",
     "@wordpress/api-fetch": "7.53.0",
     "@wordpress/blocks": "^15.26.0",
@@ -41,7 +48,8 @@
     "lucide-react": "^1.60.0",
     "react-day-picker": "^10.0.1",
     "sonner": "^2.0.8",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "temporal-polyfill": "0.3.2"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

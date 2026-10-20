@@ -1,22 +1,16 @@
-import { Button } from "@wordpress/components";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { __ } from "@wordpress/i18n";
-
-import {
-  type PlanningSort,
-  type PlanningSortKey,
-  type PlanningStory,
-  type PlanningWorkflowStatus,
-  storyDateSemantics
-} from "./planning-model";
-import {
-  PlanningDateValue,
-  PlanningEmpty,
-  PlanningStatusBadge,
-  StoryLink,
-  StoryMoveControl,
-  StorySignalLine,
-  WordPressState
-} from "./planning-ui";
+import { PeopleAvatars } from "../admin-ui/components/people-avatars";
+import { useElementWidth } from "../admin-ui/lib/hooks";
+import { cn } from "../admin-ui/lib/utils";
+import { Button } from "../admin-ui/ui/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../admin-ui/ui/table";
+import { exactDate, relativeTime } from "../home/newsroom-model";
+import { ProductionSummary, StoryDueLabel, plannedLabel, StoryTitleButton, WorkflowBadge, wordpressStateText } from "../story/story-parts";
+import { StoryActionsMenu } from "./StoryActionsMenu";
+import type { PlanningSort, PlanningSortKey, PlanningStory, PlanningWorkflowStatus } from "./planning-model";
 
 export type StoryListProps = {
   stories: PlanningStory[];
@@ -24,152 +18,87 @@ export type StoryListProps = {
   sort: PlanningSort;
   canMoveStories: boolean;
   movingStoryId?: number | null;
+  timezone: string;
+  now: Date;
+  workspaceUrl: (storyId: number) => string;
   onSortChange: (key: PlanningSortKey) => void;
-  onMoveStory: (story: PlanningStory, status: string) => void;
-  onOpenStory?: (story: PlanningStory) => void;
+  onMoveStory: (story: PlanningStory, status: string) => Promise<unknown> | void;
+  onOpenStory: (storyId: number) => void;
 };
 
-const columns: Array<{ key: PlanningSortKey; label: string }> = [
-  { key: "story", label: "Story" },
-  { key: "workflow", label: "Workflow" },
-  { key: "writer", label: "Writer" },
-  { key: "deadline", label: "Deadline" },
-  { key: "planned", label: "Planned" },
-  { key: "modified", label: "Modified" }
-];
+/** Below this width a seven-column table is unreadable, so the list becomes compact rows. */
+const TABLE_MIN_WIDTH = 820;
 
-function SortButton({
-  column,
-  sort,
-  onSortChange
-}: {
-  column: { key: PlanningSortKey; label: string };
-  sort: PlanningSort;
-  onSortChange: (key: PlanningSortKey) => void;
-}) {
-  const isCurrent = sort.key === column.key;
-  const marker = isCurrent ? (sort.direction === "asc" ? " ↑" : " ↓") : "";
-  return (
-    <Button
-      variant="tertiary"
-      className="byline-planning-sort-button"
-      onClick={() => onSortChange(column.key)}
-      aria-label={`${column.label}${isCurrent ? `, ${sort.direction === "asc" ? "ascending" : "descending"}` : ""}`}
-    >
-      {column.label}{marker}
-    </Button>
-  );
-}
-function WorkflowCell({
-  story,
-  statuses,
-  canMoveStories,
-  movingStoryId,
-  onMoveStory
-}: {
-  story: PlanningStory;
-  statuses: PlanningWorkflowStatus[];
-  canMoveStories: boolean;
-  movingStoryId?: number | null;
-  onMoveStory: (story: PlanningStory, status: string) => void;
-}) {
-  return (
-    <div className="byline-planning-list-workflow">
-      <PlanningStatusBadge label={story.workflow.label} tone={story.workflow.group === "sidelined" ? "warning" : "neutral"} />
-      <StoryMoveControl
-        story={story}
-        statuses={statuses}
-        disabled={!canMoveStories || movingStoryId === story.id}
-        onMove={(status) => onMoveStory(story, status)}
-      />
-    </div>
-  );
+function SortHead({ label, sortKey, sort, onSortChange, className }: { label: string; sortKey: PlanningSortKey; sort: PlanningSort; onSortChange: (key: PlanningSortKey) => void; className?: string }) {
+  const current = sort.key === sortKey;
+  const Icon = !current ? ArrowUpDown : sort.direction === "asc" ? ArrowUp : ArrowDown;
+  return <TableHead className={className} aria-sort={current ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+    <Button variant="ghost" size="sm" className="-ml-2.5 h-7 font-medium" onClick={() => onSortChange(sortKey)}>{label}<Icon data-icon="inline-end" aria-hidden="true" className={current ? undefined : "opacity-40"} /></Button>
+  </TableHead>;
 }
 
-export function StoryList({
-  stories,
-  statuses,
-  sort,
-  canMoveStories,
-  movingStoryId,
-  onSortChange,
-  onMoveStory,
-  onOpenStory
-}: StoryListProps) {
-  if (!stories.length) {
-    return <PlanningEmpty label={__("Planning list", "weekly-wildcat-headless")} instructions={__("No stories match these filters. Try clearing a filter or choosing a different saved view.", "weekly-wildcat-headless")} />;
-  }
+function People({ story }: { story: PlanningStory }) {
+  const writers = story.authors.length ? story.authors : story.writer ? [story.writer] : [];
+  return <div className="flex min-w-0 flex-col gap-0.5">
+    {writers.length
+      ? <span className="flex min-w-0 items-center gap-2"><PeopleAvatars people={writers} /><span className="truncate" title={writers.map((person) => person.name).join(", ")}>{writers.map((person) => person.name).join(", ")}</span></span>
+      : <span className="text-muted-foreground">{__("Unassigned", "weekly-wildcat-headless")}</span>}
+    {story.editor ? <span className="truncate text-xs text-muted-foreground">{__("Editor", "weekly-wildcat-headless")}: {story.editor.name}</span> : null}
+  </div>;
+}
 
-  return (
-    <div className="byline-planning-list-wrap">
-      <table className="byline-planning-list">
-        <caption className="byline-planning-sr-only">{__("Sortable newsroom story list", "weekly-wildcat-headless")}</caption>
-        <thead>
-          <tr>
-            <th scope="col" aria-sort={sort.key === "story" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-              <SortButton column={columns[0]} sort={sort} onSortChange={onSortChange} />
-            </th>
-            <th scope="col" aria-sort={sort.key === "workflow" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-              <SortButton column={columns[1]} sort={sort} onSortChange={onSortChange} />
-            </th>
-            <th scope="col" aria-sort={sort.key === "writer" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-              <SortButton column={columns[2]} sort={sort} onSortChange={onSortChange} />
-            </th>
-            <th scope="col" aria-sort={sort.key === "deadline" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-              <SortButton column={columns[3]} sort={sort} onSortChange={onSortChange} />
-            </th>
-            <th scope="col" aria-sort={sort.key === "planned" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-              <SortButton column={columns[4]} sort={sort} onSortChange={onSortChange} />
-            </th>
-            <th scope="col"><span>{__("WordPress", "weekly-wildcat-headless")}</span></th>
-            <th scope="col"><span>{__("Visuals", "weekly-wildcat-headless")}</span></th>
-            <th scope="col"><span>{__("Tasks", "weekly-wildcat-headless")}</span></th>
-            <th scope="col"><span>{__("Coverage", "weekly-wildcat-headless")}</span></th>
-            <th scope="col" aria-sort={sort.key === "modified" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-              <SortButton column={columns[5]} sort={sort} onSortChange={onSortChange} />
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {stories.map((story) => {
-            const dates = storyDateSemantics(story);
-            return (
-              <tr key={story.id}>
-                <th scope="row" className="byline-planning-list-story">
-                  <StoryLink story={story} onOpenStory={onOpenStory} className="byline-planning-story-title" />
-                  <span className="byline-planning-list-story-meta">{story.editor ? `${__("Editor", "weekly-wildcat-headless")}: ${story.editor.name}` : __("No editor assigned", "weekly-wildcat-headless")}</span>
-                </th>
-                <td>
-                  <WorkflowCell
-                    story={story}
-                    statuses={statuses}
-                    canMoveStories={canMoveStories}
-                    movingStoryId={movingStoryId}
-                    onMoveStory={onMoveStory}
-                  />
-                </td>
-                <td>{story.writer?.name || <span className="byline-planning-muted">{__("Unassigned", "weekly-wildcat-headless")}</span>}</td>
-                <td>
-                  <PlanningDateValue value={dates.deadline.value} relative empty={__("No deadline", "weekly-wildcat-headless")} />
-                </td>
-                <td>
-                  <PlanningDateValue value={dates.plannedPublication.value} empty={__("Not planned", "weekly-wildcat-headless")} />
-                  {dates.plannedPublication.value && dates.scheduled.value ? <span className="byline-planning-list-date-note">{__("Scheduled separately", "weekly-wildcat-headless")}</span> : null}
-                </td>
-                <td>
-                  <WordPressState story={story} />
-                  {dates.scheduled.value ? <span className="byline-planning-list-date-note" title={dates.scheduled.exact}>{__("At", "weekly-wildcat-headless")} {dates.scheduled.exact}</span> : null}
-                  {dates.published.value ? <span className="byline-planning-list-date-note" title={dates.published.exact}>{__("Published", "weekly-wildcat-headless")} {dates.published.exact}</span> : null}
-                </td>
-                <td><StorySignalLine story={story} /></td>
-                <td><span aria-label={`${story.openTaskCount} ${__("open tasks", "weekly-wildcat-headless")}`}>{story.openTaskCount}</span></td>
-                <td>{story.coverage.length ? story.coverage.map((item) => item.title).join(", ") : <span className="byline-planning-muted">{__("None", "weekly-wildcat-headless")}</span>}</td>
-                <td><PlanningDateValue value={story.modifiedAt} empty={__("Unknown", "weekly-wildcat-headless")} /></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
+function Publication({ story, timezone }: { story: PlanningStory; timezone: string }) {
+  return <div className="flex flex-col gap-0.5">
+    <span>{story.plannedPublication ? <time dateTime={story.plannedPublication}>{plannedLabel(story.plannedPublication, timezone)}</time> : <span className="text-muted-foreground">{__("Not planned", "weekly-wildcat-headless")}</span>}</span>
+    <span className="text-xs text-muted-foreground">{wordpressStateText(story, timezone)}</span>
+  </div>;
+}
+
+export function StoryList(props: StoryListProps) {
+  const { stories, statuses, sort, canMoveStories, movingStoryId, timezone, now, workspaceUrl, onSortChange, onMoveStory, onOpenStory } = props;
+  const [ref, width] = useElementWidth<HTMLDivElement>();
+  const menu = (story: PlanningStory) => <StoryActionsMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={movingStoryId === story.id} onMove={onMoveStory} workspaceUrl={workspaceUrl} />;
+
+  if (!stories.length) return <Empty className="border"><EmptyHeader><EmptyTitle>{__("No stories match", "weekly-wildcat-headless")}</EmptyTitle><EmptyDescription>{__("Try clearing a filter, or choose a different saved view.", "weekly-wildcat-headless")}</EmptyDescription></EmptyHeader></Empty>;
+
+  const table = width === 0 || width >= TABLE_MIN_WIDTH;
+  return <div ref={ref} className="rounded-xl border">
+    {table
+      ? <Table aria-label={__("Stories", "weekly-wildcat-headless")}>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <SortHead label={__("Story", "weekly-wildcat-headless")} sortKey="story" sort={sort} onSortChange={onSortChange} className="w-[28%]" />
+            <SortHead label={__("Workflow", "weekly-wildcat-headless")} sortKey="workflow" sort={sort} onSortChange={onSortChange} />
+            <SortHead label={__("People", "weekly-wildcat-headless")} sortKey="writer" sort={sort} onSortChange={onSortChange} />
+            <SortHead label={__("Deadline", "weekly-wildcat-headless")} sortKey="deadline" sort={sort} onSortChange={onSortChange} />
+            <SortHead label={__("Publication", "weekly-wildcat-headless")} sortKey="planned" sort={sort} onSortChange={onSortChange} />
+            <TableHead>{__("Work", "weekly-wildcat-headless")}</TableHead>
+            <SortHead label={__("Updated", "weekly-wildcat-headless")} sortKey="modified" sort={sort} onSortChange={onSortChange} />
+            <TableHead className="w-10"><span className="sr-only">{__("Actions", "weekly-wildcat-headless")}</span></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {stories.map((story) => <TableRow key={story.id} data-story-id={story.id} aria-busy={movingStoryId === story.id || undefined}>
+            <TableCell className="py-2.5 whitespace-normal"><StoryTitleButton story={story} onOpen={onOpenStory} /></TableCell>
+            <TableCell className="py-2.5"><WorkflowBadge workflow={story.workflow} /></TableCell>
+            <TableCell className="max-w-56 py-2.5 whitespace-normal"><People story={story} /></TableCell>
+            <TableCell className="py-2.5"><StoryDueLabel value={story.deadline} timezone={timezone} now={now} empty={__("No deadline", "weekly-wildcat-headless")} /></TableCell>
+            <TableCell className="py-2.5 whitespace-normal"><Publication story={story} timezone={timezone} /></TableCell>
+            <TableCell className="py-2.5"><ProductionSummary story={story} /></TableCell>
+            <TableCell className="py-2.5 text-muted-foreground">{story.modifiedAt ? <time dateTime={story.modifiedAt} title={exactDate(story.modifiedAt, timezone)}>{relativeTime(story.modifiedAt, timezone, now)}</time> : "—"}</TableCell>
+            <TableCell className="py-2.5 text-right">{menu(story)}</TableCell>
+          </TableRow>)}
+        </TableBody>
+      </Table>
+      : <ItemGroup className="gap-0" aria-label={__("Stories", "weekly-wildcat-headless")}>
+        {stories.map((story) => <Item key={story.id} size="sm" data-story-id={story.id} className={cn("border-b last:border-b-0 rounded-none")} aria-busy={movingStoryId === story.id || undefined}>
+          <ItemContent>
+            <ItemTitle className="line-clamp-2"><StoryTitleButton story={story} onOpen={onOpenStory} /></ItemTitle>
+            <div className="text-sm"><People story={story} /></div>
+            <div className="flex flex-wrap items-center gap-x-2 text-xs"><StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="Due " empty={__("No deadline", "weekly-wildcat-headless")} /><ProductionSummary story={story} className="flex-row gap-2" empty={null} /></div>
+          </ItemContent>
+          <ItemActions><WorkflowBadge workflow={story.workflow} />{menu(story)}</ItemActions>
+        </Item>)}
+      </ItemGroup>}
+  </div>;
 }

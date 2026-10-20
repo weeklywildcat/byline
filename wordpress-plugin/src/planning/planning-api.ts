@@ -153,8 +153,6 @@ export type PlanningFetchers = {
   getPlanning: (filters?: Partial<PlanningFilters>) => Promise<PlanningResponse>;
   /** Optional so read-only installs can still render the collection. */
   moveStory?: (storyId: number, status: string) => Promise<unknown>;
-  /** Lazy protected aggregate used by Story Quick View. */
-  getStoryQuickView?: (storyId: number) => Promise<unknown>;
   /** Ordinary planning edits use the same protected story domain endpoint. */
   updateStory?: (storyId: number, changes: Record<string, unknown>) => Promise<unknown>;
   createStoryTask?: (storyId: number, input: Record<string, unknown>) => Promise<unknown>;
@@ -238,10 +236,6 @@ export function createPlanningFetchers(request: PlanningRequest): PlanningFetche
       path: idPath(PLANNING_REST_ROUTES.story, storyId),
       method: "POST",
       data: { status }
-    }),
-
-    getStoryQuickView: (storyId) => request({
-      path: `${idPath(PLANNING_REST_ROUTES.story, storyId)}/quick-view`
     }),
 
     updateStory: (storyId, changes) => request({

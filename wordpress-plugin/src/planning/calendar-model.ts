@@ -29,8 +29,12 @@ import type { CalendarEventType, PlanningCalendarEvent } from "./planning-model"
 export type CalendarFilters = {
   appointments: boolean;
   deadlines: boolean;
+  /** Production due dates. */
   media: boolean;
+  /** Planned publication targets. */
   publication: boolean;
+  /** WordPress's own schedule and published dates. */
+  wordpress: boolean;
   /** Limit appointments, production deadlines and task deadlines to the signed-in user. */
   mine: boolean;
   tasks: boolean;
@@ -41,6 +45,7 @@ export const DEFAULT_CALENDAR_FILTERS: CalendarFilters = {
   deadlines: true,
   media: true,
   publication: true,
+  wordpress: true,
   mine: false,
   tasks: false
 };
@@ -49,8 +54,8 @@ export const DEFAULT_CALENDAR_FILTERS: CalendarFilters = {
 export const CALENDAR_EVENT_CATEGORY: Record<CalendarEventType, Exclude<keyof CalendarFilters, "mine">> = {
   deadline: "deadlines",
   planned: "publication",
-  scheduled: "publication",
-  published: "publication",
+  scheduled: "wordpress",
+  published: "wordpress",
   appointment: "appointments",
   media: "media",
   task: "tasks"
@@ -128,6 +133,7 @@ function appointmentEvent(appointment: ScheduleAppointment, timezone: string, wo
   const timeRange = formatTimeRange(appointment.startAt, appointment.endAt, timezone);
   return {
     id: `appointment-${appointment.id}`,
+    timing: { kind: "timed", start: appointment.startAt, end: appointment.endAt },
     storyId: appointment.storyId,
     storyTitle: appointment.storyTitle,
     storyUrl: workspaceUrl(appointment.storyId),
@@ -157,6 +163,8 @@ function mediaEvent(item: ScheduleMediaDeadline, timezone: string, workspaceUrl:
   if (!date) return null;
   return {
     id: `media-${item.storyId}-${item.id}`,
+    // Production due dates are picked as days; the stored time is a placeholder, so this stays a date.
+    timing: { kind: "date", date },
     storyId: item.storyId,
     storyTitle: item.storyTitle,
     storyUrl: workspaceUrl(item.storyId),
@@ -182,6 +190,7 @@ function taskEvent(item: ScheduleTaskDeadline, timezone: string, workspaceUrl: W
   if (!date) return null;
   return {
     id: `task-${item.id}`,
+    timing: { kind: "date", date },
     storyId: item.storyId ?? 0,
     storyTitle: item.storyTitle,
     storyUrl: item.storyId ? workspaceUrl(item.storyId) : "",

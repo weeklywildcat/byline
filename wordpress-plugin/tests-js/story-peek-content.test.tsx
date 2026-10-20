@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { StoryPeekContent, type StoryPeekContentProps } from "../src/home/StoryPeek";
+import { StoryPeekContent, type StoryPeekContentProps } from "../src/story/StoryPeek";
 import { FileAttachment } from "../src/workspace/MediaDialog";
 import type { StoryWorkspace } from "../src/workspace/workspace-types";
 

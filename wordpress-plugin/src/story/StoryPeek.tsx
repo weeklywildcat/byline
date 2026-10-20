@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { EditorialTask, ContributorEntry } from "../editorial/editorial-model";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
+import { decodeEntities } from "../admin-ui/lib/text";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { DatePicker, WritersPicker, fieldRow, valueSelectTriggerClass } from "../admin-ui/components/pickers";
 import { ResourceIcon } from "../admin-ui/components/resource-icon";
@@ -23,11 +24,11 @@ import { workingDraft } from "../workspace/resource-model";
 import { appointmentLine } from "../workspace/schedule-model";
 import { assigneeAvatars } from "../workspace/workspace-model";
 import { RESOURCE_PURPOSES, type ReportingSummary, type ResourcePurpose, type StoryResource, type StoryWorkspace } from "../workspace/workspace-types";
-import type { HomeFetchers } from "./home-api";
-import { homeKey, workspaceKey } from "./home-query";
+import { exactDate, mediaStatusLabels, mediaTypeLabels, resourcePurposeLabels, shortDateTime } from "../home/newsroom-model";
 import { mediaTypeIcons } from "./media-icons";
-import { exactDate, mediaStatusLabels, mediaTypeLabels, resourcePurposeLabels, shortDateTime } from "./newsroom-model";
-import { ActivityRow, RowSkeletons, TaskRow } from "./components/rows";
+import { ActivityRow, RowSkeletons, TaskRow } from "./rows";
+import type { StoryFetchers } from "./story-fetchers";
+import { invalidateStoryData, workspaceKey } from "./story-query";
 
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
 const PEEK_ACTIVITY = 3;
@@ -216,7 +217,7 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
   </>;
 }
 
-export type StoryPeekProps = { storyId: number | null; fetchers: HomeFetchers; timezone: string; onClose: () => void; origin: HTMLElement | null; onComplete: (task: EditorialTask) => void; completing?: boolean; onNewTask: (storyId: number) => void; now: Date; workspaceUrl?: (storyId: number) => string };
+export type StoryPeekProps = { storyId: number | null; fetchers: StoryFetchers; /** Used until the workspace names the site timezone. */ timezone?: string; onClose: () => void; origin: HTMLElement | null; onComplete: (task: EditorialTask) => void; completing?: boolean; onNewTask: (storyId: number) => void; now: Date; workspaceUrl?: (storyId: number) => string };
 
 export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComplete, completing, onNewTask, now, workspaceUrl }: StoryPeekProps) {
   const client = useQueryClient();
@@ -226,7 +227,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
   const [linkForm, setLinkForm] = useState<boolean | StoryResource>(false);
   const [linkError, setLinkError] = useState("");
   const [editError, setEditError] = useState("");
-  const refresh = () => Promise.all([client.invalidateQueries({ queryKey: homeKey }), client.invalidateQueries({ queryKey: workspaceKey(storyId!) })]);
+  const refresh = () => invalidateStoryData(client, storyId);
 
   const planning = useMutation({
     mutationFn: (patch: { deadline?: string | null; plannedPublishAt?: string | null; status?: string }) => fetchers.editorial!.updateWorkflow(storyId!, { ...patch, expectedRevision: data?.revision }),
@@ -260,7 +261,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
   return <Sheet open={Boolean(storyId)} onOpenChange={(open) => { if (!open && !resources.isPending && !writers.isPending && !planning.isPending) { setLinkForm(false); setEditError(""); setLinkError(""); onClose(); } }}>
     <SheetContent className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md" finalFocus={() => { if (origin?.isConnected) return origin; return document.querySelector<HTMLElement>("[data-home-search]"); }}>
       <SheetHeader className="gap-1 border-b pr-12">
-        <SheetTitle className="text-lg leading-snug [overflow-wrap:anywhere]">{story?.title || "Story details"}</SheetTitle>
+        <SheetTitle className="text-lg leading-snug [overflow-wrap:anywhere]">{decodeEntities(story?.title) || "Story details"}</SheetTitle>
         <SheetDescription>{story ? [story.workflow.label, data.sections.join(", ")].filter(Boolean).join(" · ") : "Newsroom context"}</SheetDescription>
         {story && (writerList.length || editor) ? <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-sm">
           {writerList.length ? <span className="flex items-center gap-2"><PeopleAvatars people={writerList} /><span>{writerList.map((p) => p.name).join(", ")}</span></span> : null}
@@ -268,7 +269,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
         </div> : null}
       </SheetHeader>
       {peek.isPending ? <div className="py-4"><RowSkeletons count={7} /></div> : peek.isError || !story || !data ? <div className="p-4"><InlineAlert title="The story couldn't be loaded." onAction={() => void peek.refetch()}>{describeEditorialError(peek.error, "The story couldn't be loaded.")}</InlineAlert></div>
-        : <StoryPeekContent data={data} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onNewTask={onNewTask} onComplete={onComplete} completing={completing}
+        : <StoryPeekContent data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl} onNewTask={onNewTask} onComplete={onComplete} completing={completing}
           onPlan={(patch) => planning.mutate(patch)} onWriters={(value) => writers.mutate(value)}
           onSaveLink={(input, existing) => resources.mutate(existing ? { ...input, id: existing.id } : input)} onRemoveLink={(id) => resources.mutate({ remove: id })}
           planning={planning.isPending} writing={writers.isPending} linking={resources.isPending} error={editError} linkError={linkError} linkFormOpen={linkForm} onLinkForm={(next) => { setLinkError(""); setLinkForm(next); }} />}
