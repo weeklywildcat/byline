@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, FileText, ImagePlus, Plus, ListTodo } from "lucide-react";
+import { CalendarDays, FileText, HeartPulse, ImagePlus, ListTodo, MessageSquareText, Plus } from "lucide-react";
 import type { HomeFetchers } from "./home-api";
 import type { HomeBootstrap } from "./newsroom-model";
 import { activeStory } from "./newsroom-model";
@@ -33,6 +33,9 @@ export function HomeCommands({ open, onOpenChange, fetchers, data, recentIds, on
       {data?.capabilities.uploadMedia && urls?.upload && (!query || "upload media".includes(query.toLowerCase())) ? <CommandItem value="upload-media" onSelect={() => { window.location.assign(urls.upload!); }}><ImagePlus />Upload media</CommandItem> : null}
       {urls?.planning && (!query || "open stories".includes(query.toLowerCase())) ? <CommandItem value="open-stories" onSelect={() => window.location.assign(urls.planning!)}><FileText />Open Stories</CommandItem> : null}
       {urls?.calendar && (!query || "open calendar".includes(query.toLowerCase())) ? <CommandItem value="open-calendar" onSelect={() => window.location.assign(urls.calendar!)}><CalendarDays />Open Calendar</CommandItem> : null}
+      {urls?.media && (!query || "open media desk".includes(query.toLowerCase())) ? <CommandItem value="open-media" onSelect={() => window.location.assign(urls.media!)}><ImagePlus />Open Media Desk</CommandItem> : null}
+      {urls?.feedback && (!query || "open feedback".includes(query.toLowerCase())) ? <CommandItem value="open-feedback" onSelect={() => window.location.assign(urls.feedback!)}><MessageSquareText />Open Feedback</CommandItem> : null}
+      {urls?.contentHealth && (!query || "open content health".includes(query.toLowerCase())) ? <CommandItem value="open-content-health" onSelect={() => window.location.assign(urls.contentHealth!)}><HeartPulse />Open Content Health</CommandItem> : null}
     </CommandGroup>
   </CommandList><footer className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground"><span className="flex items-center gap-1.5"><KbdGroup><Kbd>↑</Kbd><Kbd>↓</Kbd></KbdGroup>navigate<Kbd>↵</Kbd>open</span><span className="flex items-center gap-1.5"><Kbd>Esc</Kbd>close</span></footer></Command></CommandDialog>;
 }
