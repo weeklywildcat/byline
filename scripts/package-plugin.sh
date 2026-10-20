@@ -36,6 +36,11 @@ build_assets=(
   build/home.js
   build/home.asset.php
   build/style-home.css
+  # Toolbar presence is another private React 19 surface and must ship with its
+  # scoped Nova stylesheet or profile images can render at their natural size.
+  build/presence.js
+  build/presence.asset.php
+  build/style-presence.css
   # Stories, Calendar, Media Desk and the other Planning screens: the third private React 19 root.
   build/planning.js
   build/planning.asset.php
