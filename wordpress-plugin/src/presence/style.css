@@ -6,3 +6,15 @@
  */
 @import "../admin-ui/admin-ui.css";
 @source "./";
+
+/*
+ * Tailwind 4 only emits utilities from registered sources. Presence composes
+ * shared Nova primitives whose implementation classes live outside this
+ * directory, so register the exact shadcn primitives used here. Without these
+ * sources the toolbar gets the PresencePanel classes but not Avatar/Button/etc.
+ * sizing, which lets the natural profile image escape the 32px admin bar.
+ */
+@source "../admin-ui/ui/avatar.tsx";
+@source "../admin-ui/ui/button.tsx";
+@source "../admin-ui/ui/item.tsx";
+@source "../admin-ui/ui/popover.tsx";

@@ -11,6 +11,18 @@ test.describe("WordPress environment", () => {
     await adminPage.goto("/wp-admin/");
     const presence = adminPage.getByRole("button", { name: /Newsroom presence/ });
     await expect(presence).toBeVisible();
+
+    // This specifically guards the cross-directory Tailwind source boundary:
+    // the trigger can still be "visible" while an unstyled avatar renders at
+    // its natural image size and spills down over the WordPress admin screen.
+    await expect(presence).toHaveCSS("height", "32px");
+    const triggerAvatar = presence.locator('[data-slot="avatar"]').first();
+    await expect(triggerAvatar).toBeVisible();
+    await expect(triggerAvatar).toHaveCSS("width", "24px");
+    await expect(triggerAvatar).toHaveCSS("height", "24px");
+    await expect(triggerAvatar.locator('[data-slot="avatar-image"]')).toHaveCSS("width", "24px");
+    await expect(triggerAvatar.locator('[data-slot="avatar-image"]')).toHaveCSS("height", "24px");
+
     await presence.click();
     await expect(adminPage.getByText("Newsroom", { exact: true })).toBeVisible();
     await expect(adminPage.getByText("Active now", { exact: true })).toBeVisible();
