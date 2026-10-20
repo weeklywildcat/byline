@@ -8,7 +8,7 @@ import { cn } from "../admin-ui/lib/utils";
 import { Badge } from "../admin-ui/ui/badge";
 import { Card, CardContent } from "../admin-ui/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
-import { StoryDueLabel, StorySignals, StoryTitleButton } from "../story/story-parts";
+import { StoryDueLabel, StorySignals, StoryTitleButton, WorkflowBadge } from "../story/story-parts";
 import { StoryActionsMenu } from "./StoryActionsMenu";
 import { boardWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
 
@@ -89,7 +89,7 @@ function BoardColumn({ status, stories, canMoveStories, ...card }: Omit<StoryBoa
   return <section ref={ref} aria-labelledby={headingId} data-status={status.id} data-over={over}
     className="flex min-h-40 w-72 shrink-0 snap-start flex-col gap-2 rounded-xl border bg-background p-2 transition-colors data-[over=true]:bg-muted/60 data-[over=true]:ring-2 data-[over=true]:ring-ring/40 max-sm:w-[80vw] @5xl/planning:w-auto @5xl/planning:min-w-48 @5xl/planning:flex-1">
     <header className="flex items-center justify-between px-1.5 pt-0.5">
-      <h3 id={headingId} className="text-sm font-medium">{status.label}</h3>
+      <h3 id={headingId} className="text-sm font-medium"><WorkflowBadge workflow={status} className="max-w-none" /></h3>
       <Badge variant="secondary" aria-label={`${stories.length} ${stories.length === 1 ? __("story", "weekly-wildcat-headless") : __("stories", "weekly-wildcat-headless")}`}>{stories.length}</Badge>
     </header>
     <div role="list" aria-labelledby={headingId} className="flex flex-1 flex-col gap-2">
