@@ -100,5 +100,5 @@ if (mount && config) {
   const host = document.createElement("div");
   host.id = "byline-presence-app";
   document.body.appendChild(host);
-  createRoot(host).render(<AdminRoot><PresenceRuntime mount={mount} config={config} /></AdminRoot>);
+  createRoot(host).render(<AdminRoot toaster={false}><PresenceRuntime mount={mount} config={config} /></AdminRoot>);
 }
