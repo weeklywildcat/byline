@@ -1,7 +1,9 @@
 /** Rows shared by every surface that lists story work: Home, Story Peek and the Stories views. Anything visual comes from Item, Badge, Checkbox and Skeleton. */
 import type { ComponentProps, ReactNode } from "react";
+import { Pencil } from "lucide-react";
 import { ItemButton } from "../admin-ui/components/item-button";
 import { Checkbox } from "../admin-ui/ui/checkbox";
+import { Button } from "../admin-ui/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Skeleton } from "../admin-ui/ui/skeleton";
 import type { ContributorEntry, EditorialTask } from "../editorial/editorial-model";
@@ -21,7 +23,7 @@ export function Row({ onOpen, children, ...props }: { onOpen?: () => void; child
 }
 
 /** `compact` leaves the story name out of the description, for rows already listed under their story. */
-export function TaskRow({ task, storyTitle, compact, timezone, onOpen, onComplete, onUpdate, people = [], canAssign = false, pending, now }: { task: EditorialTask; storyTitle?: string; compact?: boolean; timezone: string; onOpen?: () => void; onComplete: () => void; onUpdate?: TaskQuickUpdate; people?: ContributorEntry[]; canAssign?: boolean; pending?: boolean; now: Date }) {
+export function TaskRow({ task, storyTitle, compact, timezone, onOpen, onEdit, onComplete, onUpdate, people = [], canAssign = false, pending, now }: { task: EditorialTask; storyTitle?: string; compact?: boolean; timezone: string; onOpen?: () => void; onEdit?: () => void; onComplete: () => void; onUpdate?: TaskQuickUpdate; people?: ContributorEntry[]; canAssign?: boolean; pending?: boolean; now: Date }) {
   const overdue = dayDistance(task.dueAt, timezone, now) < 0;
   const title = onOpen ? <button type="button" className="text-left hover:underline" onClick={onOpen}>{task.title}</button> : <span>{task.title}</span>;
   const hoverableTitle = !compact && task.storyId && storyTitle ? <StoryHoverCard storyId={task.storyId} title={storyTitle}>{title}</StoryHoverCard> : title;
@@ -32,7 +34,7 @@ export function TaskRow({ task, storyTitle, compact, timezone, onOpen, onComplet
       {!compact && storyTitle ? <ItemDescription>{decodeEntities(storyTitle)}</ItemDescription> : null}
       {onUpdate ? <TaskQuickFields task={task} timezone={timezone} now={now} people={people} canAssign={canAssign} disabled={pending} onUpdate={onUpdate} /> : task.priority === "urgent" ? <ItemDescription><span className="font-medium text-warning">Urgent</span></ItemDescription> : null}
     </ItemContent>
-    {!onUpdate ? <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined} title={exactDate(task.dueAt, timezone)}>{dateLabel(task.dueAt, timezone, now)}</time></ItemActions> : null}
+    {onEdit ? <ItemActions><Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit ${task.title}`} disabled={pending} onClick={onEdit}><Pencil aria-hidden="true" /></Button></ItemActions> : !onUpdate ? <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined} title={exactDate(task.dueAt, timezone)}>{dateLabel(task.dueAt, timezone, now)}</time></ItemActions> : null}
   </Item>;
 }
 
