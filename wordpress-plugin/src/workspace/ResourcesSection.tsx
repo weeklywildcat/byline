@@ -7,9 +7,10 @@ import { ResourceIcon } from "../admin-ui/components/resource-icon";
 import { Button } from "../admin-ui/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
-import { ConfirmRemoveDialog, WorkspaceDialog } from "./dialog-shell";
+import { WorkspaceDialog } from "./dialog-shell";
 import { AddButton, SectionFailed } from "./parts";
 import { useDialogTarget } from "./dialog-target";
 import { RESOURCE_PURPOSE_LABELS } from "./reporting-model";
@@ -46,7 +47,6 @@ function LinkDialog({ open, resource, onClose, finalFocus }: { open: boolean; re
 }
 
 function ResourceRow({ resource, canManage, onEdit, onRemove }: { resource: StoryResource; canManage: boolean; onEdit: (element: HTMLElement) => void; onRemove: () => void }) {
-  const [confirming, setConfirming] = useState(false);
   const trigger = useRef<HTMLButtonElement | null>(null);
   const available = isHttpUrl(resource.url);
   const body = <>
@@ -54,21 +54,29 @@ function ResourceRow({ resource, canManage, onEdit, onRemove }: { resource: Stor
     <ItemContent><ItemTitle>{resource.label}</ItemTitle><ItemDescription>{available ? resourceSubtitle(resource) : "Link unavailable"}</ItemDescription></ItemContent>
     {available ? <ItemActions><ExternalLink className="size-4 text-muted-foreground" aria-hidden="true" /><span className="sr-only">(opens in a new tab)</span></ItemActions> : null}
   </>;
-  return <div className="flex items-center gap-1 pr-1.5">
-    {available
-      ? <Item size="sm" className="min-w-0 flex-1" render={<a href={resource.url} target="_blank" rel="noopener noreferrer" />}>{body}</Item>
-      : <Item size="sm" className="min-w-0 flex-1">{body}</Item>}
-    {canManage ? <>
-      <DropdownMenu>
+  return <ContextMenu>
+    <ContextMenuTrigger render={<div className="flex items-center gap-1 pr-1.5" />}>
+      {available
+        ? <Item size="sm" className="min-w-0 flex-1" render={<a href={resource.url} target="_blank" rel="noopener noreferrer" />}>{body}</Item>
+        : <Item size="sm" className="min-w-0 flex-1">{body}</Item>}
+      {canManage ? <DropdownMenu>
         <DropdownMenuTrigger render={<Button ref={trigger} type="button" variant="ghost" size="icon-sm" aria-label={`Actions for ${resource.label}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-36">
           <DropdownMenuItem onClick={(event) => onEdit(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit link</DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={() => setConfirming(true)}><Trash2 aria-hidden="true" />Remove link</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</DropdownMenuItem>
         </DropdownMenuContent>
-      </DropdownMenu>
-      <ConfirmRemoveDialog open={confirming} onOpenChange={setConfirming} finalFocus={() => trigger.current} title="Remove this link?" description={`“${resource.label}” is removed from the story. The document itself isn't touched.`} confirmLabel="Remove" onConfirm={onRemove} />
-    </> : null}
-  </div>;
+      </DropdownMenu> : null}
+    </ContextMenuTrigger>
+    <ContextMenuContent className="w-48">
+      <ContextMenuLabel className="max-w-44 truncate">{resource.label}</ContextMenuLabel>
+      <ContextMenuSeparator />
+      {available ? <ContextMenuItem render={<a href={resource.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem> : null}
+      {canManage ? <>
+        <ContextMenuItem onClick={(event) => onEdit(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
+        <ContextMenuItem variant="destructive" onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
+      </> : null}
+    </ContextMenuContent>
+  </ContextMenu>;
 }
 
 export function ResourcesSection() {
@@ -79,15 +87,19 @@ export function ResourcesSection() {
   const canManage = caps.manageResources && !failed;
 
   const remove = useMutation({
-    mutationFn: (id: string) => client.removeResource(storyId, id),
-    onMutate: async (id) => {
+    mutationFn: (resource: StoryResource) => client.removeResource(storyId, resource.id),
+    onMutate: async (resource) => {
       await cache.cancel();
       const previous = cache.read()?.resources ?? [];
-      cache.write((current) => applyResources(current, (current?.resources ?? []).filter((resource) => resource.id !== id)));
+      cache.write((current) => applyResources(current, (current?.resources ?? []).filter((item) => item.id !== resource.id)));
       return { previous };
     },
-    onSuccess: (response) => { cache.write((current) => applyResources(current, response.resources)); announce("Link removed."); toast.success("Link removed."); },
-    onError: (failure, _id, context) => {
+    onSuccess: (response, resource) => {
+      cache.write((current) => applyResources(current, response.resources));
+      announce("Link removed.");
+      toast.success("Link removed.", { action: { label: "Undo", onClick: () => { void client.addResource(storyId, { label: resource.label, url: resource.url, purpose: resource.purpose }).then((restored) => { cache.write((current) => applyResources(current, restored.resources)); announce("Link restored."); void cache.invalidate(); }).catch((failure) => toast.error(workspaceError(failure, "The link couldn't be restored.").message)); } } });
+    },
+    onError: (failure, _resource, context) => {
       cache.write((current) => applyResources(current, context?.previous ?? []));
       toast.error(workspaceError(failure, "The link couldn't be removed. Try again.").message);
     },
@@ -102,7 +114,7 @@ export function ResourcesSection() {
     </CardHeader>
     <CardContent className="px-0">
       {failed ? <div className="px-3"><SectionFailed what="links" onRetry={() => void reload()} /></div> : data.resources.length
-        ? <ItemGroup role="group" aria-label="Links" className="gap-0">{data.resources.map((resource) => <ResourceRow key={resource.id} resource={resource} canManage={canManage} onEdit={(element) => dialog.openWith(resource, element)} onRemove={() => remove.mutate(resource.id)} />)}</ItemGroup>
+        ? <ItemGroup role="group" aria-label="Links" className="gap-0">{data.resources.map((resource) => <ResourceRow key={resource.id} resource={resource} canManage={canManage} onEdit={(element) => dialog.openWith(resource, element)} onRemove={() => remove.mutate(resource)} />)}</ItemGroup>
         : <div className="px-3"><Empty className="py-5"><EmptyHeader><EmptyTitle>No files or links yet.</EmptyTitle>{canManage ? <EmptyDescription>Link the working draft, notes and research.</EmptyDescription> : null}</EmptyHeader>{add ? <EmptyContent>{add}</EmptyContent> : null}</Empty></div>}
     </CardContent>
     <LinkDialog key={`link-${dialog.session}`} open={dialog.open} resource={dialog.target} onClose={dialog.close} finalFocus={dialog.finalFocus} />
