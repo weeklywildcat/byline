@@ -2,7 +2,8 @@
 import { ArrowUpRight, ChevronRight, CircleAlert, CircleDot } from "lucide-react";
 import { ItemButton } from "../../admin-ui/components/item-button";
 import { PeopleAvatars, anyPicture } from "../../admin-ui/components/people-avatars";
-import { StatusBadge } from "../../admin-ui/components/status-badge";
+import { WorkStatusBadge, mediaIntensity } from "../../admin-ui/components/work-status-badge";
+import { WorkflowBadge } from "../../story/story-parts";
 import { decodeEntities } from "../../admin-ui/lib/text";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "../../admin-ui/ui/item";
 import type { PlanningStory } from "../../planning/planning-model";
@@ -15,7 +16,7 @@ export function StoryRow({ story, timezone, onOpen, now }: { story: PlanningStor
   const timing = story.deadline ? `Due ${dateLabel(story.deadline, timezone, now).toLowerCase()}` : story.plannedPublication ? `Planned ${dateLabel(story.plannedPublication, timezone, now).toLowerCase()}` : "No deadline";
   return <ItemButton size="sm" onClick={onOpen}>
     <ItemContent><ItemTitle className="line-clamp-2">{decodeEntities(story.title) || "Untitled story"}</ItemTitle><ItemDescription>{timing}{story.openTaskCount ? ` · ${story.openTaskCount} open ${story.openTaskCount === 1 ? "task" : "tasks"}` : ""}</ItemDescription></ItemContent>
-    <ItemActions>{story.authors.length > 1 ? <PeopleAvatars people={story.authors} /> : null}<StatusBadge className="max-w-32 truncate">{story.workflow.label}</StatusBadge></ItemActions>
+    <ItemActions>{story.authors.length > 1 ? <PeopleAvatars people={story.authors} /> : null}<WorkflowBadge workflow={story.workflow} className="max-w-32" /></ItemActions>
   </ItemButton>;
 }
 
@@ -50,7 +51,7 @@ export function MediaAssignmentRow({ media, timezone, now, onOpen }: { media: Ho
       <ItemTitle className="line-clamp-2">{decodeEntities(title)}</ItemTitle>
       <ItemDescription>{decodeEntities(media.story.title)} · {mediaTypeLabels[media.type] || "Visual"} · {media.assignee?.name || "Unassigned"}{media.dueAt ? ` · ${dateLabel(media.dueAt, timezone, now)}` : ""}</ItemDescription>
     </ItemContent>
-    <ItemActions><StatusBadge tone={media.status === "needed" ? "attention" : "neutral"} className="max-w-32 truncate">{mediaStatusLabels[media.status] || "Needed"}</StatusBadge></ItemActions>
+    <ItemActions><WorkStatusBadge kind="production" intensity={mediaIntensity(media.status)} className="max-w-32">{mediaStatusLabels[media.status] || "Needed"}</WorkStatusBadge></ItemActions>
   </ItemButton>;
 }
 
