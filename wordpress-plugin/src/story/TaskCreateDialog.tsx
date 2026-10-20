@@ -8,6 +8,7 @@ import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../admin-ui/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
+import { Spinner } from "../admin-ui/ui/spinner";
 import type { StoryFetchers } from "./story-fetchers";
 import { invalidateStoryData } from "./story-query";
 
@@ -55,7 +56,7 @@ export function TaskCreateDialog({ open, onClose, fetchers, stories, storyId, pe
           <Field><FieldLabel htmlFor="task-create-due">Due</FieldLabel><DatePicker id="task-create-due" label="Task due date" value={dueAt} timezone={timezone} onChange={setDueAt} /></Field>
           {error ? <InlineAlert>{error}</InlineAlert> : null}
         </FieldGroup>
-        <DialogFooter className="mt-4"><Button variant="outline" type="button" onClick={onClose} disabled={create.isPending}>Cancel</Button><Button type="submit" disabled={create.isPending || !selectedStoryId}>{create.isPending ? "Creating…" : "Create task"}</Button></DialogFooter>
+        <DialogFooter className="mt-4"><Button variant="outline" type="button" onClick={onClose} disabled={create.isPending}>Cancel</Button><Button type="submit" disabled={create.isPending || !selectedStoryId}>{create.isPending ? <><Spinner data-icon="inline-start" />Creating…</> : "Create task"}</Button></DialogFooter>
       </form>
     </DialogContent>
   </Dialog>;
