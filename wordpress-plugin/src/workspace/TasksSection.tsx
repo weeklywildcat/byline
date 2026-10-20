@@ -15,9 +15,10 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, 
 import { WorkspaceDialog } from "./dialog-shell";
 import { AddButton, SectionFailed } from "./parts";
 import { useDialogTarget } from "./dialog-target";
-import { appendNewTasks, applyTask } from "./workspace-cache";
+import { appendNewTasks, applyTask, removeTask } from "./workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { completedTasks, dueText, isOverdue, openTasks, peopleOptions } from "./workspace-model";
+import { workspaceUndoToast, workspaceToast } from "./workspace-toast";
 
 const TASK_LIMIT = 10;
 
@@ -51,10 +52,23 @@ function TaskDialog({ open, onClose, finalFocus }: TaskDialogProps) {
 
   const create = useMutation({
     mutationFn: () => editorial.createTask({ title: title.trim(), storyId, assigneeId: Number(assignee?.id) || (caps.assign ? null : currentUserId || null), dueAt, priority: "normal" }),
-    onSuccess: (response) => {
+    onMutate: () => ({ before: new Set((cache.read()?.tasks ?? []).map((task) => String(task.id))) }),
+    onSuccess: (response, _vars, context) => {
       cache.write((current) => appendNewTasks(current, response.tasks));
       announce("Task added.");
-      toast.success("Task added.");
+      const created = response.tasks.find((task) => !context?.before.has(String(task.id)));
+      if (created) {
+        workspaceUndoToast("Task added.", {
+          restored: "Task removed.",
+          failed: "The new task couldn't be removed.",
+          undo: async () => {
+            await editorial.deleteTask(created.id);
+            cache.write((current) => removeTask(current, created.id));
+            announce("Task removed.");
+            await cache.invalidate();
+          }
+        });
+      } else workspaceToast("Task added.");
       onClose();
     },
     onError: (failure) => setError(describeEditorialError(failure, "The task couldn't be added. Try again.")),
@@ -90,9 +104,24 @@ export function TasksSection() {
       cache.write((current) => applyTask(current, setTaskCompletionState(previous, state)));
       return { previous };
     },
-    onSuccess: (updated, { task, state }) => {
+    onSuccess: (updated, { task, state }, context) => {
       cache.write((current) => applyTask(current, updated));
-      announce(state === "completed" ? `Completed ${task.title}.` : `Reopened ${task.title}.`);
+      const message = state === "completed" ? `Completed ${task.title}.` : `Reopened ${task.title}.`;
+      announce(message);
+      if (context) {
+        workspaceUndoToast(message, {
+          restored: state === "completed" ? `Reopened ${task.title}.` : `Marked ${task.title} complete again.`,
+          failed: "The task changed again, so that action couldn't be undone.",
+          undo: async () => {
+            const current = cache.read()?.tasks.find((item) => String(item.id) === String(task.id));
+            if (!current || current.state !== updated.state) throw new Error("Task changed again.");
+            const undone = await editorial.updateTask(task.id, { state: context.previous.state });
+            cache.write((value) => applyTask(value, undone));
+            announce(state === "completed" ? `Reopened ${task.title}.` : `Marked ${task.title} complete again.`);
+            await cache.invalidate();
+          }
+        });
+      }
     },
     onError: (error, { task, state }, context) => {
       cache.write((current) => applyTask(current, context?.previous ?? task));

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { FileImage, FileText, X } from "lucide-react";
-import { toast } from "sonner";
 import { SelectField, TextAreaField, TextField } from "../admin-ui/components/form-fields";
 import { AssigneePicker } from "../admin-ui/components/pickers";
 import { Button } from "../admin-ui/ui/button";
@@ -16,6 +15,7 @@ import { peopleOptions } from "./workspace-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyMedia } from "./workspace-cache";
 import { workspaceError } from "./workspace-errors";
+import { workspaceUndoToast, workspaceToast } from "./workspace-toast";
 import { MEDIA_ASSIGNMENT_STATUSES, MEDIA_ASSIGNMENT_TYPES, type MediaAssignmentsResponse, type StoryMediaAssignment } from "./workspace-types";
 
 const typeOptions = MEDIA_ASSIGNMENT_TYPES.map((value) => ({ value, label: MEDIA_TYPE_LABELS[value] }));
@@ -54,13 +54,46 @@ export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDial
   const patch = (changes: Partial<MediaForm>) => setForm((current) => ({ ...current, ...changes }));
   const invalid = new Set(assignment?.invalidAttachmentIds || []);
 
-  const handlers = (message: string) => ({
-    onSuccess: (response: MediaAssignmentsResponse) => { cache.write((current) => applyMedia(current, response)); toast.success(message); onClose(); },
+  const save = useMutation({
+    mutationFn: () => client.saveMediaAssignment(storyId, mediaFormToInput(form, assignment ?? undefined, { manage, assign: caps.assignMedia }, timezone), assignment?.id),
+    onSuccess: (response: MediaAssignmentsResponse) => {
+      cache.write((current) => applyMedia(current, response));
+      if (assignment) {
+        const updated = response.mediaAssignments.find((item) => item.id === assignment.id);
+        if (updated) {
+          workspaceUndoToast("Assignment saved.", {
+            restored: "Assignment restored.",
+            failed: "The assignment changed again, so that edit couldn't be undone.",
+            undo: async () => {
+              const original = mediaToForm(assignment, timezone);
+              const undone = await client.saveMediaAssignment(storyId, mediaFormToInput(original, updated, { manage, assign: caps.assignMedia }, timezone), assignment.id);
+              cache.write((current) => applyMedia(current, undone));
+              await cache.invalidate();
+            }
+          });
+        } else workspaceToast("Assignment saved.");
+      } else if (response.assignmentId) {
+        workspaceUndoToast("Assignment added.", {
+          restored: "Assignment removed.",
+          failed: "The new assignment couldn't be removed.",
+          undo: async () => {
+            const undone = await client.deleteMediaAssignment(storyId, response.assignmentId!);
+            cache.write((current) => applyMedia(current, undone));
+            await cache.invalidate();
+          }
+        });
+      } else workspaceToast("Assignment added.");
+      onClose();
+    },
     onError: (failure: unknown) => setError(workspaceError(failure, "The assignment couldn't be saved. Try again.")),
     onSettled: () => { void cache.invalidate(); }
   });
-  const save = useMutation({ mutationFn: () => client.saveMediaAssignment(storyId, mediaFormToInput(form, assignment ?? undefined, { manage, assign: caps.assignMedia }, timezone), assignment?.id), ...handlers(assignment ? "Assignment saved." : "Assignment added.") });
-  const remove = useMutation({ mutationFn: () => client.deleteMediaAssignment(storyId, assignment!.id), ...handlers("Assignment removed.") });
+  const remove = useMutation({
+    mutationFn: () => client.deleteMediaAssignment(storyId, assignment!.id),
+    onSuccess: (response: MediaAssignmentsResponse) => { cache.write((current) => applyMedia(current, response)); workspaceToast("Assignment removed."); onClose(); },
+    onError: (failure: unknown) => setError(workspaceError(failure, "The assignment couldn't be removed. Try again.")),
+    onSettled: () => { void cache.invalidate(); }
+  });
   const pending = save.isPending || remove.isPending;
   const dirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 

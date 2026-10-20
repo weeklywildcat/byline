@@ -29,6 +29,10 @@ export function applyTask(data: Data, task: EditorialTask): Data {
   return data ? { ...data, tasks: data.tasks.map((item) => (String(item.id) === String(task.id) ? task : item)) } : data;
 }
 
+export function removeTask(data: Data, taskId: number | string): Data {
+  return data ? { ...data, tasks: data.tasks.filter((item) => String(item.id) !== String(taskId)) } : data;
+}
+
 /** Tasks the server returned that the cache has not seen yet, appended in order. */
 export function appendNewTasks(data: Data, tasks: EditorialTask[]): Data {
   if (!data) return data;

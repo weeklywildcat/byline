@@ -58,6 +58,22 @@ Interaction and data principles were adopted; no UI was copied.
   checklists): Byline presets seed workflow, deadline offset, starter tasks and
   production assignments — never sources, article text or fake appointments.
 
+## Feedback and undo
+
+Workspace mutations use Sonner toasts for lightweight confirmation. When the
+server has an exact compensating mutation, the success toast stays for ten
+seconds and offers **Undo**. Undo always writes back to the server; it never
+pretends to restore something only in the React cache.
+
+Undo is offered for brief edits, workflow/detail edits, writer changes, task
+completion/reopen, task creation, link changes, and source/appointment/production
+adds or edits. Deleting a source, appointment, or production assignment keeps an
+explicit confirmation and has no Undo action because recreating the record would
+change its identity (and source removal can also clear appointment links).
+Removing a link is different: the linked document is untouched and no newsroom
+record points at the link ID, so removal is immediate and reversible from the
+toast.
+
 ## Date semantics
 
 These are different things and are never synchronized or labelled just "Due":
