@@ -116,11 +116,10 @@ Build plugin assets when editor/admin JavaScript or packaged assets changed:
 npm run build:plugin
 ```
 
-Use WordPress E2E only when the change depends on the real editor, REST/auth behavior, browser integration, or WordPress-version compatibility:
+Use WordPress E2E only when the change depends on the real editor, REST/auth behavior, browser integration, or WordPress-version behavior:
 
 ```sh
 npm run test:e2e:wp71
-npm run test:e2e:legacy
 ```
 
 Do not start a local WordPress environment for pure unit/model changes.

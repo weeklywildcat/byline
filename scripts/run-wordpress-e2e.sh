@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+# `primary` (WordPress 7.1) is the only environment; the WordPress 6.6 environment was retired.
 mode="${1:-primary}"
 shift || true
 
@@ -12,11 +13,8 @@ case "$mode" in
   primary)
     config=".wp-env.json"
     ;;
-  legacy)
-    config=".wp-env.legacy.json"
-    ;;
   *)
-    echo "Usage: npm run test:e2e:{primary,legacy} [-- Playwright options]" >&2
+    echo "Usage: npm run test:e2e:primary [-- Playwright options]" >&2
     exit 2
     ;;
 esac
