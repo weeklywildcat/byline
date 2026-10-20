@@ -23,7 +23,8 @@ export function workspaceUndoToast(message: string, options: UndoToastOptions) {
       onClick: () => {
         if (running) return;
         running = true;
-        void Promise.resolve(options.undo())
+        void Promise.resolve()
+          .then(() => options.undo())
           .then(() => { if (options.restored) toast.success(options.restored); })
           .catch(() => toast.error(options.failed || "That change couldn't be undone. Reload to see the latest version."))
           .finally(() => { running = false; });
