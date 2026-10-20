@@ -39,13 +39,13 @@ export function AgendaItem({ event, timezone, onOpen }: { event: AgendaEvent; ti
   return event.storyId ? <StoryHoverCard storyId={event.storyId} title={event.detail || event.title}>{row}</StoryHoverCard> : row;
 }
 
-export function AttentionRow({ item, onOpen }: { item: AttentionItem; onOpen: () => void }) {
+export function AttentionRow({ item, storyTitle, onOpen }: { item: AttentionItem; storyTitle?: string; onOpen: () => void }) {
   const row = <ItemButton size="sm" onClick={onOpen}>
     <ItemMedia variant="icon">{item.urgent ? <CircleAlert className="text-warning" aria-hidden="true" /> : <CircleDot className="text-muted-foreground" aria-hidden="true" />}</ItemMedia>
     <ItemContent><ItemTitle className="line-clamp-2">{decodeEntities(item.title)}</ItemTitle><ItemDescription>{decodeEntities(item.detail)}</ItemDescription></ItemContent>
     <ItemActions><ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" /></ItemActions>
   </ItemButton>;
-  return item.storyId ? <StoryHoverCard storyId={item.storyId} title={item.title}>{row}</StoryHoverCard> : row;
+  return item.storyId ? <StoryHoverCard storyId={item.storyId} title={storyTitle || item.title}>{row}</StoryHoverCard> : row;
 }
 
 export function MediaAssignmentRow({ media, timezone, now, onOpen }: { media: HomeVisualWork; timezone: string; now: Date; onOpen: () => void }) {
