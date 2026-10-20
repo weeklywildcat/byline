@@ -14,7 +14,7 @@ export type WorkIntensity = "action" | "active" | "settled";
 
 export const workBadgeColors: Record<WorkKind, Record<WorkIntensity, string>> = {
   reporting: {
-    action: "border-orange-800 bg-orange-700 text-white dark:border-orange-500 dark:bg-orange-600 dark:text-white",
+    action: "border-orange-800 bg-orange-700 text-white dark:border-orange-500 dark:bg-orange-700 dark:text-white",
     active: "border-orange-200 bg-orange-100 text-orange-900 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-200",
     settled: "border-orange-100 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300"
   },
@@ -29,12 +29,12 @@ export const workBadgeColors: Record<WorkKind, Record<WorkIntensity, string>> = 
     settled: "border-blue-100 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300"
   },
   task: {
-    action: "border-teal-800 bg-teal-700 text-white dark:border-teal-500 dark:bg-teal-600 dark:text-white",
+    action: "border-teal-800 bg-teal-700 text-white dark:border-teal-500 dark:bg-teal-700 dark:text-white",
     active: "border-teal-200 bg-teal-100 text-teal-900 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-200",
     settled: "border-teal-100 bg-teal-50 text-teal-700 dark:border-teal-900 dark:bg-teal-950/40 dark:text-teal-300"
   },
   publication: {
-    action: "border-green-800 bg-green-700 text-white dark:border-green-500 dark:bg-green-600 dark:text-white",
+    action: "border-green-800 bg-green-700 text-white dark:border-green-500 dark:bg-green-700 dark:text-white",
     active: "border-green-200 bg-green-100 text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-200",
     settled: "border-green-100 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300"
   },
