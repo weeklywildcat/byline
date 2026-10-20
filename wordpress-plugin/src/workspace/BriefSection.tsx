@@ -7,6 +7,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Field, FieldDescription, FieldLabel } from "../admin-ui/ui/field";
 import { Textarea } from "../admin-ui/ui/textarea";
+import { Spinner } from "../admin-ui/ui/spinner";
 import { SectionFailed } from "./parts";
 import { BRIEF_MAX } from "./reporting-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
@@ -67,7 +68,7 @@ export function BriefSection() {
           {error ? <InlineAlert onAction={error.conflict ? () => void reloadBrief() : undefined} actionLabel="Reload latest">{error.message}</InlineAlert> : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={cancel} disabled={save.isPending}>Cancel</Button>
-            <Button type="submit" disabled={save.isPending || draft === data.brief}>{save.isPending ? "Saving…" : "Save brief"}</Button>
+            <Button type="submit" disabled={save.isPending || draft === data.brief}>{save.isPending ? <><Spinner data-icon="inline-start" />Saving…</> : "Save brief"}</Button>
           </div>
         </form>
         : data.brief ? <p className="max-w-prose text-sm/relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{data.brief}</p>
