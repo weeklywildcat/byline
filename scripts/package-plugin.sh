@@ -36,6 +36,10 @@ build_assets=(
   build/home.js
   build/home.asset.php
   build/style-home.css
+  # Stories, Calendar, Media Desk and the other Planning screens: the third private React 19 root.
+  build/planning.js
+  build/planning.asset.php
+  build/style-planning.css
   # The block-editor workflow entry. A production install that ships without it
   # silently loses the editorial workflow sidebar.
   build/editorial-workflow.js
@@ -169,6 +173,20 @@ if grep -Eq '^(react|react-dom|react-jsx-runtime|wp-element)$' <<<"$home_depende
   exit 1
 fi
 
+# Planning keeps its private React 19 runtime too. WordPress supplies only apiFetch and the
+# translation runtime (wp.i18n has no React coupling), so the existing strings stay translatable.
+planning_dependencies="$(php -r '$asset = include $argv[1]; echo implode("\n", $asset["dependencies"] ?? []);' "$plugin_root/build/planning.asset.php")"
+for planning_dependency in wp-api-fetch wp-i18n; do
+  if ! grep -qx "$planning_dependency" <<<"$planning_dependencies"; then
+    echo "Planning must use WordPress $planning_dependency." >&2
+    exit 1
+  fi
+done
+if grep -Eq '^(react|react-dom|react-jsx-runtime|wp-element|wp-components)$' <<<"$planning_dependencies"; then
+  echo "Planning must bundle its isolated React 19 runtime and Nova components." >&2
+  exit 1
+fi
+
 # The workflow entry loads on every post editor, so it must rely entirely on the
 # WordPress-provided packages rather than bundling a second React or a second
 # copy of the editor packages.
@@ -235,6 +253,8 @@ grep -qx 'weekly-wildcat-headless/includes/design/post-type.php' <<<"$archive_fi
 grep -qx 'weekly-wildcat-headless/weekly-wildcat-headless.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/index.asset.php' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/planning.js' <<<"$archive_files"
+grep -qx 'weekly-wildcat-headless/build/style-planning.css' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/editorial-workflow.js' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/editorial-workflow.asset.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/article-preview.js' <<<"$archive_files"

@@ -5,7 +5,7 @@ import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
-import { mediaTypeIcons } from "../home/media-icons";
+import { mediaTypeIcons } from "../story/media-icons";
 import { MediaDialog } from "./MediaDialog";
 import { AddButton, Meta, SectionFailed } from "./parts";
 import { useDialogTarget } from "./dialog-target";

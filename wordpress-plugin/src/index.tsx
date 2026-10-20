@@ -25,12 +25,10 @@ import {
   normalizeAdminTab
 } from "./admin-routing";
 import { createNavigationItem, moveItem, navigationConflictKey, sectionSlugForName } from "./settings-model";
-import { PlanningApp, createPlanningFetchers, createWorkspaceUrlBuilder, type PlanningView } from "./planning";
 import { NewsletterApp, NewsletterSettings, createNewsletterFetchers } from "./newsletters";
 import type { NewsletterBranding } from "./newsletters/render";
 import { stripMarkupForText } from "./safe-text";
 import type { ReactNode } from "react";
-import { storiesViewFromRoute } from "./home/navigation-model";
 import { DoctorApp, type DoctorActionId, type DoctorActionResponse, type DoctorDiagnostics } from "./doctor";
 import "./style.css";
 
@@ -397,24 +395,6 @@ function settingsItem(tab: string): SettingsNavItem | undefined {
 
 function firstAvailableSettingsTab(): SettingsTab {
   return settingsNavigationGroups()[0]?.items[0]?.id || "identity";
-}
-
-function planningViewForTab(tab: string, requestedView = ""): PlanningView {
-  if (tab === "stories") {
-    const routeView = storiesViewFromRoute(requestedView);
-    if (routeView) return routeView;
-  }
-  switch (tab) {
-    case "today": return "board";
-    case "calendar": return "calendar";
-    case "media": return "media";
-    case "coverage": return "coverage";
-    case "performance": return "performance";
-    case "contentHealth":
-    case "content-health": return "content-health";
-    case "feedback": return "feedback";
-    default: return "board";
-  }
 }
 
 function newsletterTabs(): AdminTab[] {
@@ -1840,24 +1820,8 @@ function Screen({
   error: string;
   onPublicationSaved: (publication: PublicationConfig) => void;
 }) {
-  // Home has its own React/CSS entrypoint, enqueued only on its native route.
-  if (page === ADMIN_PAGE_SLUGS.dashboard) return null;
-  if (page === ADMIN_PAGE_SLUGS.planning) {
-    const activeTab = normalizeAdminTab(page, tab);
-    if (activeTab === "today") return null;
-    return (
-      <AdminPageFrame title="Planning" heading={false} error={error}>
-        <PlanningApp
-          fetchers={createPlanningFetchers(adminProtectedRequest)}
-          initialView={planningViewForTab(activeTab, config?.view)}
-          initialFilters={{ mine: new URLSearchParams(window.location.search).get("mine") === "1" }}
-          rememberStoriesView={activeTab === "stories" && !storiesViewFromRoute(config?.view)}
-          currentUserId={config?.currentUserId}
-          workspaceUrl={createWorkspaceUrlBuilder(config?.urls.planning.stories)}
-        />
-      </AdminPageFrame>
-    );
-  }
+  // Home, Planning and the Story Workspace have their own React 19 entrypoints, enqueued only on their native routes.
+  if (page === ADMIN_PAGE_SLUGS.dashboard || page === ADMIN_PAGE_SLUGS.planning) return null;
 
   if (page === ADMIN_PAGE_SLUGS.newsletters) {
     const activeTab = normalizeAdminTab(page, tab);

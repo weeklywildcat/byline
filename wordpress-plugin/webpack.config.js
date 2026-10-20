@@ -7,7 +7,10 @@ const homeCss = path.resolve(__dirname, 'src/home/style.css');
 // Tailwind/PostCSS pipeline. The file is named style.css so wp-scripts emits it
 // as style-story-workspace.css.
 const workspaceCss = path.resolve(__dirname, 'src/workspace/style.css');
-const scopedCss = [homeCss, workspaceCss];
+// Planning (Stories, Calendar, Media Desk, ...) is the third consumer; its
+// stylesheet adds only the Schedule-X theme, scoped to the same root.
+const planningCss = path.resolve(__dirname, 'src/planning/style.css');
+const scopedCss = [homeCss, workspaceCss, planningCss];
 const cssRule = defaultConfig.module.rules.find((rule) => rule.test?.test('style.css'));
 
 const adminConfig = {
@@ -102,4 +105,20 @@ const workspaceConfig = {
     }),
   ]),
 };
-module.exports = [adminConfig, homeConfig, workspaceConfig];
+// Planning is the third private React 19 root. It may also use WordPress'
+// translation runtime: @wordpress/i18n has no React coupling, so it stays an
+// external (wp.i18n) and the existing translatable strings keep working.
+const planningConfig = {
+  ...homeConfig,
+  name: 'planning',
+  dependencies: ['admin', 'home', 'workspace'],
+  entry: { planning: path.resolve(__dirname, 'src/planning-entry.tsx') },
+  plugins: homeConfig.plugins.filter((plugin) => plugin.constructor.name !== 'DependencyExtractionWebpackPlugin').concat([
+    new DependencyExtractionWebpackPlugin({
+      useDefaults: false,
+      requestToExternal: (request) => request === '@wordpress/api-fetch' ? ['wp', 'apiFetch'] : request === '@wordpress/i18n' ? ['wp', 'i18n'] : undefined,
+      requestToHandle: (request) => request === '@wordpress/api-fetch' ? 'wp-api-fetch' : request === '@wordpress/i18n' ? 'wp-i18n' : undefined,
+    }),
+  ]),
+};
+module.exports = [adminConfig, homeConfig, workspaceConfig, planningConfig];

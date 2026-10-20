@@ -95,6 +95,8 @@ export type PlanningStory = {
   id: number;
   title: string;
   editUrl: string;
+  /** Draft preview link; empty when the viewer cannot edit the story. */
+  previewUrl?: string;
   authors: PlanningPerson[];
   writer: PlanningPerson | null;
   editor: PlanningPerson | null;
@@ -176,6 +178,8 @@ export type SavedPlanningView = {
 
 export type PlanningResponse = {
   stories: PlanningStory[];
+  /** The site timezone every story date is read in. */
+  timezone?: string;
   workflowStatuses: PlanningWorkflowStatus[];
   savedViews?: SavedPlanningView[];
   capabilities: PlanningCapabilities;
@@ -448,8 +452,22 @@ export function resolveContentHealthBlockPath(
 
 export type CalendarEventType = "deadline" | "planned" | "scheduled" | "published" | "appointment" | "media" | "task";
 
+/**
+ * What kind of moment an event is. The Calendar renders a date as a date and a
+ * timestamp as a time; it never turns one into the other.
+ * - `date`: a site-local calendar day (deadlines, production and task due dates,
+ *   and a planned publication that is only a date).
+ * - `timed`: a real timestamp. A site-local `YYYY-MM-DDTHH:mm` string is read in
+ *   the site timezone; one with `Z` or an offset is an instant.
+ */
+export type CalendarEventTiming =
+  | { kind: "date"; date: string }
+  | { kind: "timed"; start: string; end: string | null };
+
 export type PlanningCalendarEvent = {
   id: string;
+  /** Canonical date semantics for this event. */
+  timing: CalendarEventTiming;
   storyId: number;
   storyTitle: string;
   storyUrl: string;
@@ -765,17 +783,45 @@ export function deserializeSavedPlanningView(value: string, expectedOwnerId?: nu
  * read in that zone (matching appointments and production deadlines); without
  * one it falls back to the browser's, as before.
  */
+/**
+ * Is a planned publication only a day? A bare date is. So is the noon the
+ * planned-publication picker writes when the editor chose only a day, whether it
+ * arrives as site-local `…T12:00` or as the instant for noon in the site
+ * timezone. Any other time is a real time and stays one.
+ */
+export function isPlannedDayOnly(value: string, timezone?: string): boolean {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return true;
+  if (/^\d{4}-\d{2}-\d{2}[T ]12:00(?::00)?$/.test(value)) return true;
+  if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value)) return false;
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) return false;
+  try {
+    return new Intl.DateTimeFormat("en-GB", { timeZone: timezone || "UTC", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(instant) === "12:00";
+  } catch {
+    return false;
+  }
+}
+
 export function planningCalendarEvents(stories: PlanningStory[], timezone?: string): PlanningCalendarEvent[] {
   const events: PlanningCalendarEvent[] = [];
   const add = (story: PlanningStory, type: CalendarEventType, value: string | null | undefined, label: string) => {
     if (!value || !parsePlanningDate(value)) return;
+    const date = timezone ? siteDay(value, timezone) || planningDateKey(parsePlanningDate(value) as Date) : planningDateKey(parsePlanningDate(value) as Date);
+    // A deadline is a day. A planned publication is a day until it carries a
+    // real time: the picker stores noon as a placeholder when only a day was
+    // chosen, so exactly 12:00 is still a day. WordPress's schedule and publish
+    // date are always timestamps.
+    const timing: CalendarEventTiming = type === "deadline" || (type === "planned" && isPlannedDayOnly(value, timezone))
+      ? { kind: "date", date }
+      : { kind: "timed", start: value, end: null };
     events.push({
       id: `${story.id}-${type}`,
+      timing,
       storyId: story.id,
       storyTitle: story.title,
       storyUrl: story.editUrl,
       type,
-      date: timezone ? siteDay(value, timezone) || planningDateKey(parsePlanningDate(value) as Date) : planningDateKey(parsePlanningDate(value) as Date),
+      date,
       exactDate: exactPlanningDate(value),
       label
     });

@@ -811,6 +811,15 @@ function byline_editorial_rest_wordpress_state(string $status, array $wordpress 
 }
 
 /** @return array<string,mixed> */
+function byline_editorial_rest_planning_preview_url(int $story_id): string
+{
+    if ($story_id <= 0 || !function_exists('get_preview_post_link') || !function_exists('current_user_can') || !current_user_can('edit_post', $story_id)) {
+        return '';
+    }
+
+    return esc_url_raw((string) get_preview_post_link($story_id));
+}
+
 function byline_editorial_rest_planning_story(array $row): array
 {
     $workflow_id = sanitize_key((string) ($row['workflow']['status'] ?? ''));
@@ -857,6 +866,8 @@ function byline_editorial_rest_planning_story(array $row): array
         'id' => absint($row['id'] ?? 0),
         'title' => sanitize_text_field((string) ($row['title'] ?? '')),
         'editUrl' => esc_url_raw((string) ($row['editUrl'] ?? '')),
+        // Only for people who may edit the story; the same link Story Peek shows.
+        'previewUrl' => byline_editorial_rest_planning_preview_url(absint($row['id'] ?? 0)),
         'authors' => $authors,
         'writer' => byline_editorial_rest_person($row['writer'] ?? null),
         'editor' => byline_editorial_rest_person($row['editor'] ?? null),

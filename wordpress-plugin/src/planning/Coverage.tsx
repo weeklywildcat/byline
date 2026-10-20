@@ -1,188 +1,127 @@
-import { Button, SelectControl, TextControl } from "@wordpress/components";
-import { useMemo, useState } from "@wordpress/element";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus, Trash2 } from "lucide-react";
 import { __ } from "@wordpress/i18n";
+import { toast } from "sonner";
+import { decodeEntities } from "../admin-ui/lib/text";
+import { PeopleAvatars } from "../admin-ui/components/people-avatars";
+import { StatusBadge } from "../admin-ui/components/status-badge";
+import { Button } from "../admin-ui/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../admin-ui/ui/card";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "../admin-ui/ui/combobox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../admin-ui/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "../admin-ui/ui/field";
+import { Input } from "../admin-ui/ui/input";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
+import { ToggleGroup, ToggleGroupItem } from "../admin-ui/ui/toggle-group";
+import { describeEditorialError } from "../editorial/editorial-model";
+import { ConfirmRemoveDialog } from "../workspace/dialog-shell";
+import { coverageKey, invalidateStoryData, planningKey } from "../story/story-query";
+import { planningFilterParams, type PlanningFetchers } from "./planning-api";
+import { EMPTY_PLANNING_FILTERS, exactPlanningDate, type CoverageItem, type CoverageResponse, type CoverageStatus } from "./planning-model";
+import { NothingHere, PageHeader, ResourceGate } from "./PlanningPage";
+import { useOptionalQuery } from "./planning-query";
 
-import {
-  exactPlanningDate,
-  type CoverageItem,
-  type CoverageResponse,
-  type OptionalResource,
-  type PlanningStory
-} from "./planning-model";
-import { PlanningDateValue, PlanningEmpty, PlanningNotice, PlanningStatusBadge, PlanningUnavailable, ViewHeader } from "./planning-ui";
+type CoverageFilter = "active" | "upcoming" | "past" | "all";
+const FILTERS: Array<{ value: CoverageFilter; label: string }> = [
+  { value: "active", label: __("Active", "weekly-wildcat-headless") },
+  { value: "upcoming", label: __("Upcoming", "weekly-wildcat-headless") },
+  { value: "past", label: __("Past", "weekly-wildcat-headless") },
+  { value: "all", label: __("All", "weekly-wildcat-headless") }
+];
+const visibleCoverage = (item: CoverageItem, filter: CoverageFilter) => filter === "all" || (filter === "past" ? item.status === "past" || item.status === "archived" : item.status === filter);
+const statusLabel = (status: CoverageStatus) => status.charAt(0).toUpperCase() + status.slice(1);
 
-export type CoverageProps = {
-  resource: OptionalResource<CoverageResponse>;
-  stories: PlanningStory[];
-  onRetry?: () => void;
-  onOpenStory?: (story: PlanningStory) => void;
-  onCreateCoverage?: (input: Record<string, unknown>) => Promise<unknown>;
-  onAddStory?: (coverageId: number, storyId: number) => Promise<unknown>;
-  onRemoveStory?: (coverageId: number, storyId: number) => Promise<unknown>;
-  onCreateStory?: (coverageId: number, title: string) => Promise<unknown>;
-};
+type StoryChoice = { id: number; title: string };
+type Props = { fetchers: PlanningFetchers; onOpenStory: (storyId: number) => void };
 
-type CoverageFilter = "all" | "active" | "upcoming" | "past";
-
-function statusTone(status: CoverageItem["status"]): "neutral" | "success" | "warning" | "info" {
-  if (status === "active") return "success";
-  if (status === "upcoming") return "info";
-  if (status === "past" || status === "archived") return "neutral";
-  return "warning";
-}
-function visibleCoverage(item: CoverageItem, filter: CoverageFilter): boolean {
-  if (filter === "all") return true;
-  if (filter === "active") return item.status === "active";
-  if (filter === "upcoming") return item.status === "upcoming";
-  return item.status === "past" || item.status === "archived";
-}
-
-function CoverageCard({
-  item,
-  stories,
-  canManage,
-  onOpenStory,
-  onAddStory,
-  onRemoveStory,
-  onCreateStory
-}: {
-  item: CoverageItem;
-  stories: PlanningStory[];
-  canManage: boolean;
-  onOpenStory?: (story: PlanningStory) => void;
-  onAddStory?: (coverageId: number, storyId: number) => Promise<unknown>;
-  onRemoveStory?: (coverageId: number, storyId: number) => Promise<unknown>;
-  onCreateStory?: (coverageId: number, title: string) => Promise<unknown>;
-}) {
-  const [selectedStory, setSelectedStory] = useState("");
+/** One coverage package: a public-safe identity that several stories belong to. A Card, because it is a thing of its own with stories inside it. */
+function CoverageCard({ item, stories, canManage, fetchers, onOpenStory }: Props & { item: CoverageItem; stories: StoryChoice[]; canManage: boolean }) {
+  const client = useQueryClient();
+  const [adding, setAdding] = useState<StoryChoice | null>(null);
   const [newTitle, setNewTitle] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const linkedIds = new Set((item.stories || []).map((story) => story.id));
-  const availableStories = stories.filter((story) => !linkedIds.has(story.id));
-
-  const run = async (operation: () => Promise<unknown>, success: string) => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      await operation();
-      setMessage(success);
-    } catch (reason) {
-      setMessage(reason && typeof reason === "object" && "message" in reason ? String((reason as { message: unknown }).message) : __("Coverage could not be updated.", "weekly-wildcat-headless"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <article className="byline-planning-coverage-card">
-      <div className="byline-planning-coverage-heading">
-        {item.artwork?.url ? <img src={item.artwork.url} alt={item.artwork.alt || ""} width={item.artwork.width || undefined} height={item.artwork.height || undefined} /> : null}
-        <div>
-          <h3>{item.title}</h3>
-          <p className="byline-planning-muted">/{item.slug}</p>
-          <PlanningStatusBadge label={item.status} tone={statusTone(item.status)} />
-        </div>
-      </div>
-      {item.shortDescription ? <p>{item.shortDescription}</p> : null}
-      <dl className="byline-planning-coverage-meta">
-        <div><dt>{__("Date range", "weekly-wildcat-headless")}</dt><dd><PlanningDateValue value={item.startAt} empty={__("No start", "weekly-wildcat-headless")} />{item.endAt ? <> – <PlanningDateValue value={item.endAt} empty={__("No end", "weekly-wildcat-headless")} /></> : null}</dd></div>
-        <div><dt>{__("Stories", "weekly-wildcat-headless")}</dt><dd>{item.storyCount}</dd></div>
-        <div><dt>{__("Planned stories", "weekly-wildcat-headless")}</dt><dd>{item.plannedStoryCount}</dd></div>
-        <div><dt>{__("Public landing page", "weekly-wildcat-headless")}</dt><dd>{item.publicLandingEnabled ? __("Enabled", "weekly-wildcat-headless") : __("Private", "weekly-wildcat-headless")}</dd></div>
-      </dl>
-      {item.staff.length ? <p className="byline-planning-coverage-staff">{__("Staff", "weekly-wildcat-headless")}: {item.staff.map((person) => person.name).join(", ")}</p> : null}
-
-      <div className="byline-planning-coverage-stories">
-        <h4>{__("Linked stories", "weekly-wildcat-headless")}</h4>
-        {item.stories?.length ? (
-          <ul>
-            {item.stories.map((story) => (
-              <li key={story.id}>
-                {onOpenStory ? <button type="button" className="byline-planning-link-button" onClick={() => {
-                  const full = stories.find((candidate) => candidate.id === story.id);
-                  if (full) onOpenStory(full);
-                }}>{story.title}</button> : <a href={story.editUrl}>{story.title}</a>}
-                {story.isPublished ? <PlanningStatusBadge label={__("Published", "weekly-wildcat-headless")} tone="success" /> : <PlanningStatusBadge label={__("Planned", "weekly-wildcat-headless")} tone="warning" />}
-                {canManage && onRemoveStory ? <Button variant="tertiary" isDestructive onClick={() => {
-                  if (window.confirm(__("Remove this story from the coverage?", "weekly-wildcat-headless"))) void run(() => onRemoveStory(item.id, story.id), __("Story removed from coverage.", "weekly-wildcat-headless"));
-                }}>{__("Remove", "weekly-wildcat-headless")}</Button> : null}
-              </li>
-            ))}
-          </ul>
-        ) : <p className="byline-planning-muted">{__("No stories linked yet.", "weekly-wildcat-headless")}</p>}
-      </div>
-
-      {canManage && (onAddStory || onCreateStory) ? (
-        <div className="byline-planning-coverage-actions">
-          {onAddStory ? (
-            <div className="byline-planning-inline-action">
-              <SelectControl __nextHasNoMarginBottom label={__("Add an existing story", "weekly-wildcat-headless")} value={selectedStory} options={[{ label: __("Choose a story…", "weekly-wildcat-headless"), value: "" }, ...availableStories.map((story) => ({ label: story.title, value: String(story.id) }))]} disabled={!availableStories.length || busy} onChange={setSelectedStory} />
-              <Button variant="secondary" disabled={!selectedStory || busy} onClick={() => void run(() => onAddStory(item.id, Number(selectedStory)), __("Story added to coverage.", "weekly-wildcat-headless"))}>{__("Add story", "weekly-wildcat-headless")}</Button>
-            </div>
-          ) : null}
-          {onCreateStory ? (
-            <div className="byline-planning-inline-action">
-              <TextControl __nextHasNoMarginBottom label={__("Quick-create a story", "weekly-wildcat-headless")} value={newTitle} disabled={busy} onChange={setNewTitle} />
-              <Button variant="secondary" disabled={!newTitle.trim() || busy} onClick={() => void run(() => onCreateStory(item.id, newTitle.trim()).then(() => setNewTitle("")), __("Story created for coverage.", "weekly-wildcat-headless"))}>{__("Create story", "weekly-wildcat-headless")}</Button>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-      {message ? <PlanningNotice status={message.includes("could not") ? "error" : "success"}>{message}</PlanningNotice> : null}
-    </article>
-  );
+  const [removing, setRemoving] = useState<{ id: number; title: string } | null>(null);
+  const linked = new Set((item.stories || []).map((story) => story.id));
+  const available = stories.filter((story) => !linked.has(story.id));
+  const refresh = () => Promise.all([client.invalidateQueries({ queryKey: coverageKey }), invalidateStoryData(client)]);
+  const run = useMutation({
+    mutationFn: (operation: () => Promise<unknown>) => operation(),
+    onSuccess: () => { void refresh(); },
+    onError: (error) => toast.error(describeEditorialError(error, __("Coverage could not be updated.", "weekly-wildcat-headless")))
+  });
+  return <Card size="sm" role="region" aria-label={item.title}>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">{item.title}<StatusBadge tone={item.status === "active" ? "done" : item.status === "draft" ? "attention" : "neutral"}>{statusLabel(item.status)}</StatusBadge></CardTitle>
+      <CardDescription>{[`/${item.slug}`, item.startAt ? `${exactPlanningDate(item.startAt)}${item.endAt ? ` – ${exactPlanningDate(item.endAt)}` : ""}` : "", item.publicLandingEnabled ? __("Public landing page", "weekly-wildcat-headless") : __("Private", "weekly-wildcat-headless")].filter(Boolean).join(" · ")}</CardDescription>
+      {item.staff.length ? <CardAction><PeopleAvatars people={item.staff} /></CardAction> : null}
+    </CardHeader>
+    <CardContent className="flex flex-col gap-3">
+      {item.shortDescription ? <p className="text-sm">{item.shortDescription}</p> : null}
+      <section aria-label={__("Linked stories", "weekly-wildcat-headless")} className="flex flex-col gap-1">
+        <h3 className="text-xs font-medium text-muted-foreground">{__("Stories", "weekly-wildcat-headless")} · {item.storyCount}{item.plannedStoryCount ? ` (${item.plannedStoryCount} ${__("planned", "weekly-wildcat-headless")})` : ""}</h3>
+        {item.stories?.length
+          ? <ItemGroup className="-mx-2 gap-0">{item.stories.map((story) => <Item key={story.id} size="xs">
+            <ItemContent><ItemTitle><button type="button" className="text-left hover:underline" onClick={() => onOpenStory(story.id)}>{decodeEntities(story.title)}</button></ItemTitle></ItemContent>
+            <ItemActions>
+              <StatusBadge tone={story.isPublished ? "done" : "neutral"}>{story.isPublished ? __("Published", "weekly-wildcat-headless") : __("Planned", "weekly-wildcat-headless")}</StatusBadge>
+              {canManage && fetchers.removeStoryFromCoverage ? <Button variant="ghost" size="icon-xs" aria-label={`${__("Remove", "weekly-wildcat-headless")} ${story.title}`} onClick={() => setRemoving(story)}><Trash2 aria-hidden="true" /></Button> : null}
+            </ItemActions>
+          </Item>)}</ItemGroup>
+          : <p className="text-sm text-muted-foreground">{__("No stories linked yet.", "weekly-wildcat-headless")}</p>}
+      </section>
+      {canManage && (fetchers.addStoryToCoverage || fetchers.createCoverageStory) ? <div className="flex flex-wrap items-end gap-3">
+        {fetchers.addStoryToCoverage ? <Field className="min-w-52 flex-1"><FieldLabel htmlFor={`coverage-add-${item.id}`}>{__("Add an existing story", "weekly-wildcat-headless")}</FieldLabel>
+          <div className="flex gap-2"><Combobox items={available} itemToStringLabel={(story: StoryChoice) => story.title} isItemEqualToValue={(a: StoryChoice, b: StoryChoice) => a.id === b.id} value={adding} onValueChange={setAdding}><ComboboxInput id={`coverage-add-${item.id}`} placeholder={__("Choose a story…", "weekly-wildcat-headless")} disabled={!available.length || run.isPending} /><ComboboxContent><ComboboxEmpty>{__("No stories to add.", "weekly-wildcat-headless")}</ComboboxEmpty><ComboboxList>{(story: StoryChoice) => <ComboboxItem key={story.id} value={story}>{story.title}</ComboboxItem>}</ComboboxList></ComboboxContent></Combobox>
+            <Button variant="outline" disabled={!adding || run.isPending} onClick={() => { const story = adding!; run.mutate(() => fetchers.addStoryToCoverage!(item.id, story.id).then(() => { setAdding(null); toast.success(__("Story added to coverage.", "weekly-wildcat-headless")); })); }}>{__("Add", "weekly-wildcat-headless")}</Button></div>
+        </Field> : null}
+        {fetchers.createCoverageStory ? <Field className="min-w-52 flex-1"><FieldLabel htmlFor={`coverage-create-${item.id}`}>{__("Quick-create a story", "weekly-wildcat-headless")}</FieldLabel>
+          <div className="flex gap-2"><Input id={`coverage-create-${item.id}`} value={newTitle} disabled={run.isPending} onChange={(event) => setNewTitle(event.target.value)} /><Button variant="outline" disabled={!newTitle.trim() || run.isPending} onClick={() => run.mutate(() => fetchers.createCoverageStory!(item.id, newTitle.trim()).then(() => { setNewTitle(""); toast.success(__("Story created for coverage.", "weekly-wildcat-headless")); }))}>{__("Create", "weekly-wildcat-headless")}</Button></div>
+        </Field> : null}
+      </div> : null}
+    </CardContent>
+    <ConfirmRemoveDialog open={removing !== null} onOpenChange={(open) => { if (!open) setRemoving(null); }} title={__("Remove this story from the coverage?", "weekly-wildcat-headless")} description={removing ? `“${removing.title}” ${__("stays in Byline; it just leaves this coverage.", "weekly-wildcat-headless")}` : ""} confirmLabel={__("Remove", "weekly-wildcat-headless")} onConfirm={() => { const story = removing; if (story) run.mutate(() => fetchers.removeStoryFromCoverage!(item.id, story.id).then(() => { toast.success(__("Story removed from coverage.", "weekly-wildcat-headless")); })); }} />
+  </Card>;
 }
 
-export function Coverage({
-  resource,
-  stories,
-  onRetry,
-  onOpenStory,
-  onCreateCoverage,
-  onAddStory,
-  onRemoveStory,
-  onCreateStory
-}: CoverageProps) {
+function NewCoverage({ fetchers, open, onClose }: { fetchers: PlanningFetchers; open: boolean; onClose: () => void }) {
+  const client = useQueryClient();
+  const create = useMutation({
+    mutationFn: (title: string) => fetchers.createCoverage!({ title }),
+    onSuccess: () => { void client.invalidateQueries({ queryKey: coverageKey }); onClose(); toast.success(__("Coverage created.", "weekly-wildcat-headless")); },
+    onError: (error) => toast.error(describeEditorialError(error, __("Coverage could not be created.", "weekly-wildcat-headless")))
+  });
+  return <Dialog open={open} onOpenChange={(next) => { if (!next && !create.isPending) onClose(); }}>
+    <DialogContent className="sm:max-w-md">
+      <DialogHeader><DialogTitle>{__("New coverage", "weekly-wildcat-headless")}</DialogTitle><DialogDescription>{__("A coverage package gives a group of stories one shared identity.", "weekly-wildcat-headless")}</DialogDescription></DialogHeader>
+      <form onSubmit={(event) => { event.preventDefault(); const title = String(new FormData(event.currentTarget).get("title") || "").trim(); if (title) create.mutate(title); }}>
+        <FieldGroup><Field><FieldLabel htmlFor="coverage-new-title">{__("Coverage title", "weekly-wildcat-headless")}</FieldLabel><Input id="coverage-new-title" name="title" required maxLength={160} autoFocus disabled={create.isPending} /></Field></FieldGroup>
+        <DialogFooter className="mt-4"><Button type="button" variant="outline" onClick={onClose} disabled={create.isPending}>{__("Cancel", "weekly-wildcat-headless")}</Button><Button type="submit" disabled={create.isPending}>{create.isPending ? __("Creating…", "weekly-wildcat-headless") : __("Create coverage", "weekly-wildcat-headless")}</Button></DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>;
+}
+
+export function Coverage({ fetchers, onOpenStory }: Props) {
   const [filter, setFilter] = useState<CoverageFilter>("active");
-  const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
-  const data = resource.data;
-  const canManage = data?.capabilities?.canManageCoverage !== false;
-  const visible = useMemo(() => (data?.coverage || []).filter((item) => visibleCoverage(item, filter)), [data?.coverage, filter]);
-
-  if (!data && !resource.available) return <PlanningUnavailable label={__("Coverage", "weekly-wildcat-headless")} message={resource.error || __("Coverage data is unavailable right now.", "weekly-wildcat-headless")} onRetry={onRetry} />;
-  if (!data) return <PlanningEmpty label={__("Coverage", "weekly-wildcat-headless")} instructions={__("No coverage data is available.", "weekly-wildcat-headless")} />;
-
-  const create = async () => {
-    if (!onCreateCoverage || !newTitle.trim()) return;
-    setCreating(true);
-    try {
-      await onCreateCoverage({ title: newTitle.trim() });
-      setNewTitle("");
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  return (
-    <section className="byline-planning-coverage" aria-labelledby="byline-planning-coverage-heading">
-      <ViewHeader title={__("Coverage", "weekly-wildcat-headless")} description={__("Organize stories around a public-safe coverage identity, without reducing coverage to a free-form tag.", "weekly-wildcat-headless")} />
-      {resource.error ? <PlanningNotice status="warning">{resource.error}</PlanningNotice> : null}
-      <div className="byline-planning-filter-grid">
-        <SelectControl __nextHasNoMarginBottom label={__("Coverage status", "weekly-wildcat-headless")} value={filter} options={[{ label: __("Active", "weekly-wildcat-headless"), value: "active" }, { label: __("Upcoming", "weekly-wildcat-headless"), value: "upcoming" }, { label: __("Past", "weekly-wildcat-headless"), value: "past" }, { label: __("All", "weekly-wildcat-headless"), value: "all" }]} onChange={(value: string) => setFilter((value as CoverageFilter) || "active")} />
-      </div>
-      {canManage && onCreateCoverage ? (
-        <div className="byline-planning-create-row">
-          <TextControl __nextHasNoMarginBottom label={__("New coverage title", "weekly-wildcat-headless")} value={newTitle} onChange={setNewTitle} />
-          <Button variant="primary" disabled={!newTitle.trim() || creating} onClick={() => void create()}>{creating ? __("Creating…", "weekly-wildcat-headless") : __("Create coverage", "weekly-wildcat-headless")}</Button>
-        </div>
-      ) : null}
-      {!visible.length ? <PlanningEmpty label={__("Coverage list", "weekly-wildcat-headless")} instructions={data.coverage.length ? __("No coverage matches this status filter.", "weekly-wildcat-headless") : __("Create a coverage package when a group of stories needs a shared identity.", "weekly-wildcat-headless")} /> : (
-        <div className="byline-planning-coverage-list">
-          {visible.map((item) => <CoverageCard key={item.id} item={item} stories={stories} canManage={canManage} onOpenStory={onOpenStory} onAddStory={onAddStory} onRemoveStory={onRemoveStory} onCreateStory={onCreateStory} />)}
-        </div>
-      )}
-    </section>
-  );
+  const query = useOptionalQuery<CoverageResponse>(coverageKey, fetchers.getCoverage ? () => fetchers.getCoverage!() : undefined, __("Coverage", "weekly-wildcat-headless"));
+  // The stories a coverage can adopt are the same collection Stories shows, so they share its cache entry.
+  const stories = useQuery({ queryKey: planningKey(planningFilterParams(EMPTY_PLANNING_FILTERS)), queryFn: () => fetchers.getPlanning(EMPTY_PLANNING_FILTERS), enabled: Boolean(query.data) });
+  const choices = useMemo(() => (stories.data?.stories || []).map((story) => ({ id: story.id, title: decodeEntities(story.title) })), [stories.data]);
+  const canManage = query.data?.capabilities?.canManageCoverage !== false;
+  return <>
+    <PageHeader title={__("Coverage", "weekly-wildcat-headless")} description={__("Organize stories around a public-safe identity, not a free-form tag.", "weekly-wildcat-headless")} actions={canManage && fetchers.createCoverage ? <Button onClick={() => setCreating(true)}><Plus data-icon="inline-start" aria-hidden="true" />{__("New coverage", "weekly-wildcat-headless")}</Button> : undefined} />
+    <ResourceGate query={query} label={__("Coverage", "weekly-wildcat-headless")}>{(data) => {
+      const visible = data.coverage.filter((item) => visibleCoverage(item, filter));
+      return <div className="flex flex-col gap-3">
+        <ToggleGroup variant="outline" value={[filter]} onValueChange={(value) => { if (value[0]) setFilter(value[0] as CoverageFilter); }} aria-label={__("Coverage status", "weekly-wildcat-headless")}>
+          {FILTERS.map((item) => <ToggleGroupItem key={item.value} value={item.value} aria-label={item.label}>{item.label}</ToggleGroupItem>)}
+        </ToggleGroup>
+        {visible.length
+          ? <div className="grid gap-3 @3xl/planning:grid-cols-2">{visible.map((item) => <CoverageCard key={item.id} item={item} stories={choices} canManage={canManage} fetchers={fetchers} onOpenStory={onOpenStory} />)}</div>
+          : <NothingHere title={data.coverage.length ? __("No coverage matches", "weekly-wildcat-headless") : __("No coverage yet", "weekly-wildcat-headless")} description={data.coverage.length ? __("Try another status.", "weekly-wildcat-headless") : __("Create a coverage package when a group of stories needs a shared identity.", "weekly-wildcat-headless")} />}
+      </div>;
+    }}</ResourceGate>
+    <NewCoverage fetchers={fetchers} open={creating} onClose={() => setCreating(false)} />
+  </>;
 }

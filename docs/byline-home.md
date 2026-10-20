@@ -82,7 +82,7 @@ synchronization. Ordinary WordPress database backups include the metadata.
 | `GET /editorial/home` | Bounded projection for the authenticated `edit_posts` user |
 | `GET /editorial/home/search?query=…` | Title-only search; `edit_posts` plus story object checks |
 | `POST /editorial/stories` | Create one WordPress draft; post type's `create_posts` capability |
-| `GET /editorial/stories/<id>/quick-view` | Existing protected aggregate, extended with `homeContext` |
+| `GET /editorial/stories/<id>/workspace` | The flat read model Story Peek and the workspace share (the old `…/quick-view` aggregate remains only as a protected compatibility route) |
 | `POST /editorial/stories/<id>/resources` | Add a sanitized private link; `edit_post` |
 | `DELETE /editorial/stories/<id>/resources/<resource>` | Remove one link; `edit_post` |
 
@@ -137,7 +137,7 @@ WordPress installations can still supply React 18 to their own screens. Home
 does not replace that runtime, pass React elements across runtimes or load on
 Gutenberg. Its only external dependency is WordPress `wp-api-fetch`.
 
-Only Home routes enqueue `home.js` and `style-home.css` (the Story Workspace enqueues `style-story-workspace.css` the same way). Tailwind 4 imports its
+Only Home routes enqueue `home.js` and `style-home.css` (the Story Workspace and [Planning](stories-planning-ui.md) enqueue their own bundles the same way). Story Peek lives in `src/story/` and is shared with Planning. Tailwind 4 imports its
 theme and utilities **without Preflight**. The Home-only PostCSS pass prefixes
 all selectors with `.byline-ui-root`, scopes generated theme selectors and
 renames animation keyframes. Utility rules leave their cascade layer so they

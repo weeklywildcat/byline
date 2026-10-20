@@ -13,15 +13,19 @@ import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-u
 import { Kbd, KbdGroup } from "../admin-ui/ui/kbd";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../admin-ui/ui/sheet";
 import type { HomeFetchers } from "./home-api";
-import { homeQueryClient, homeKey, workspaceKey, replaceHomeTask, replaceWorkspaceTask } from "./home-query";
+import { createAdminQueryClient } from "../story/story-query";
+import { homeKey, workspaceKey, replaceHomeTask, replaceWorkspaceTask } from "./home-query";
 import { dateLabel, homeAgenda, myActiveStories, myOpenTasks, reviewStories, waitingForMe, type HomeBootstrap } from "./newsroom-model";
 import { HomeCommands, type HomeActionUrls } from "./HomeCommands";
 import { HomeCreate } from "./HomeCreate";
-import { StoryPeek } from "./StoryPeek";
+import { StoryPeek } from "../story/StoryPeek";
 import type { StoryWorkspace } from "../workspace/workspace-types";
-import { ActivityRow, AgendaItem, AttentionRow, MediaAssignmentRow, ReviewRow, RowSkeletons, StoryRow, TaskRow } from "./components/rows";
+import { AgendaItem, AttentionRow, MediaAssignmentRow, ReviewRow, StoryRow } from "./components/rows";
+import { ActivityRow, RowSkeletons, TaskRow } from "../story/rows";
 
 export type HomeAppProps = { fetchers: HomeFetchers; currentUserId?: number | null; actionUrls?: HomeActionUrls };
+
+const homeQueryClient = createAdminQueryClient();
 
 export function HomeApp(props: HomeAppProps) {
   return <QueryClientProvider client={homeQueryClient}><AdminRoot><HomeWorkspace {...props} /></AdminRoot></QueryClientProvider>;

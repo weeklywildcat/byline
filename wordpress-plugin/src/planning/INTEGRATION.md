@@ -1,35 +1,18 @@
-# Planning admin UI integration
+# Planning admin UI
 
-This directory contains a reusable, controlled Planning workspace. It does not
-register an admin page or modify a central entrypoint. Mount it from the local
-Planning screen with the authenticated WordPress `apiFetch` instance:
+Planning is mounted by `src/planning-entry.tsx` (a private React 19 root; see
+`docs/stories-planning-ui.md`). It does not use WordPress's React or components.
 
 ```tsx
-import apiFetch from "@wordpress/api-fetch";
-import { PlanningApp, createPlanningFetchers } from "./planning";
-
-const fetchers = createPlanningFetchers((request) => apiFetch(request));
-
-<PlanningApp
-  fetchers={fetchers}
-  currentUserId={authenticatedUserId}
-  onOpenStory={(story) => openStoryQuickDetail(story)}
-/>
+const fetchers = { ...createPlanningFetchers(request), ...createStoryFetchers(request, capabilities) };
+<PlanningApp fetchers={fetchers} tab="stories" view="board" currentUserId={id} storiesUrl={storiesUrl} />
 ```
 
-The required collection is `GET /byline/v1/editorial/planning`; workflow moves
-use `POST /byline/v1/editorial/stories/<id>`. Optional views use the grouped
-protected routes in `PLANNING_REST_ROUTES` and render an unavailable state if a
-route is missing or fails. WordPress/API nonce middleware and capability checks
-remain owned by the host and server.
-
-The collection response should include normalized story summaries, workflow
-status definitions, capability booleans, the authenticated user, and (when
-available) personal saved views. Saved views are filtered by `ownerId` before
-display; the server remains the authorization boundary. Deadline, planned
-publication, WordPress scheduled, and published dates are separate fields and
-are never mutated by the UI as a side effect of another field.
-
-Importing `./planning` also loads the local `style.css`. Hosts that import
-individual components should import that stylesheet once at the same admin
-bundle boundary.
+`planning-api.ts`, `planning-model.ts`, `calendar-model.ts` and `media-desk-model.ts`
+are React-free transport and domain logic; keep UI out of them. Every story
+surface opens the shared Story Peek through `useStoryPeek().openStory(id)`.
+The collection comes from `GET /byline/v1/editorial/planning`; moves use
+`POST /byline/v1/editorial/stories/<id>`; optional destinations use the routes in
+`PLANNING_REST_ROUTES` and show an unavailable state if a route fails.
+Deadline, planned publication, WordPress schedule and published date are separate
+fields and are never changed as a side effect of one another.

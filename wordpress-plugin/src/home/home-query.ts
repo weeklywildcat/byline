@@ -1,8 +1,6 @@
-import { QueryClient } from "@tanstack/react-query";
 import type { HomeBootstrap } from "./newsroom-model";
 import type { EditorialTask } from "../editorial/editorial-model";
 
-export const homeQueryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: true } } });
 export const homeKey = ["byline", "home"] as const;
 export { workspaceKey, replaceWorkspaceTask } from "../workspace/workspace-query";
 
