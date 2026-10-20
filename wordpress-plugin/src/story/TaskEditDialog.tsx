@@ -40,7 +40,7 @@ export function TaskEditDialog({
     setAssignee(task.assignee ? people.find((person) => Number(person.id) === Number(task.assignee?.id)) || ({ ...task.assignee, kind: "user" } as ContributorEntry) : null);
     setDueAt(task.dueAt || null);
     setPriority(task.priority);
-  }, [open, task?.id, people]);
+  }, [open, task?.id]);
 
   if (!task) return null;
   const pending = update.isPending;
