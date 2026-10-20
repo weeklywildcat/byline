@@ -20,7 +20,7 @@ function story(patch: Partial<PlanningStory> & { id: number }): PlanningStory {
   };
 }
 const stage = (id: string) => DEFAULT_WORKFLOW_STATUSES.find((status) => status.id === id)!;
-const props = (stories: PlanningStory[], canMove = true) => ({ stories, statuses: DEFAULT_WORKFLOW_STATUSES, canMoveStories: canMove, timezone: "America/New_York", now, workspaceUrl: (id: number) => `/wp-admin/admin.php?page=byline-planning&story=${id}`, onMoveStory: vi.fn(), onOpenStory: vi.fn() });
+const props = (stories: PlanningStory[], canMove = true) => ({ stories, statuses: DEFAULT_WORKFLOW_STATUSES, canMoveStories: canMove, canAssignStories: true, canUpdateStories: true, movingStoryId: null, updatingStoryId: null, timezone: "America/New_York", now, workspaceUrl: (id: number) => `/wp-admin/admin.php?page=byline-planning&story=${id}`, onMoveStory: vi.fn(), onUpdateStory: vi.fn(), onOpenStory: vi.fn() });
 
 describe("Workflow status colors", () => {
   it("uses consistent work hues, with intensity reserved for action", () => {
@@ -137,6 +137,18 @@ describe("StoryList", () => {
     expect(html).toContain("Oct 26");
     expect(html).toContain(">Scheduled<");
     expect(html).not.toContain("Not planned");
+  });
+
+  it("makes high-frequency List fields direct-edit controls", () => {
+    expect(html).toContain('aria-label="Workflow: Reporting"');
+    expect(html).toContain('aria-label="Change deadline"');
+    expect(html).toContain('aria-label="Change planned publication"');
+    expect(html).toContain('data-slot="select-trigger"');
+  });
+
+  it("wraps rows in the native context-menu trigger while keeping the three-dot menu", () => {
+    expect((html.match(/data-slot="context-menu-trigger"/g) || []).length).toBe(stories.length);
+    expect(html).toContain('aria-label="Actions for Canteen could return"');
   });
 });
 
