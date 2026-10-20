@@ -108,6 +108,7 @@ test("Home visual QA and independent optional service failures", async ({ adminP
     await page.goto(homeUrl);
     await expect(page.getByRole("heading", { name: "Up Next", exact: true })).toBeVisible();
     await expect(page.getByRole("checkbox", { name: /Complete Interview 3 students/ })).toBeVisible();
+    await expect(page.locator("[data-home-column]")).toHaveCount(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: `/tmp/byline-home-qa/editor-${width}.png`, fullPage: true, animations: "disabled" });
     if (width === 1440 || width === 390) {
@@ -143,7 +144,7 @@ test("authenticated writers see their work, while private story and review data 
     await page.getByLabel("Password", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Log In", exact: true }).click();
     await page.goto(homeUrl);
-    await expect(page.getByRole("heading", { name: "Today / Caroline", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Ready for Review", exact: true })).not.toBeVisible();
     await expect(page.getByText("Private editor planning", { exact: false })).not.toBeVisible();
     await page.getByRole("button", { name: "New story", exact: true }).click();

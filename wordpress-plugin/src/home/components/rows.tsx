@@ -7,7 +7,7 @@ import { decodeEntities } from "../../admin-ui/lib/text";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "../../admin-ui/ui/item";
 import type { PlanningStory } from "../../planning/planning-model";
 import { Row } from "../../story/rows";
-import { dateLabel, mediaStatusLabels, mediaTypeLabels, type AgendaEvent, type AttentionItem, type HomeVisualWork } from "../newsroom-model";
+import { dateLabel, mediaAssignmentTitle, mediaStatusLabels, mediaTypeLabels, type AgendaEvent, type AttentionItem, type HomeVisualWork } from "../newsroom-model";
 
 const Chevron = () => <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />;
 
@@ -43,11 +43,12 @@ export function AttentionRow({ item, onOpen }: { item: AttentionItem; onOpen: ()
 }
 
 export function MediaAssignmentRow({ media, timezone, now, onOpen }: { media: HomeVisualWork; timezone: string; now: Date; onOpen: () => void }) {
+  const title = mediaAssignmentTitle(media);
   return <ItemButton size="sm" onClick={onOpen}>
     {media.assignee && anyPicture([media.assignee]) ? <ItemMedia><PeopleAvatars people={[media.assignee]} /></ItemMedia> : null}
     <ItemContent>
-      <ItemTitle className="line-clamp-2">{decodeEntities(media.title || media.story.title)}</ItemTitle>
-      <ItemDescription>{media.title ? `${decodeEntities(media.story.title)} · ` : ""}{mediaTypeLabels[media.type] || "Visual"} · {media.assignee?.name || "Unassigned"}{media.dueAt ? ` · ${dateLabel(media.dueAt, timezone, now)}` : ""}</ItemDescription>
+      <ItemTitle className="line-clamp-2">{decodeEntities(title)}</ItemTitle>
+      <ItemDescription>{decodeEntities(media.story.title)} · {mediaTypeLabels[media.type] || "Visual"} · {media.assignee?.name || "Unassigned"}{media.dueAt ? ` · ${dateLabel(media.dueAt, timezone, now)}` : ""}</ItemDescription>
     </ItemContent>
     <ItemActions><StatusBadge tone={media.status === "needed" ? "attention" : "neutral"} className="max-w-32 truncate">{mediaStatusLabels[media.status] || "Needed"}</StatusBadge></ItemActions>
   </ItemButton>;

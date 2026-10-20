@@ -18,16 +18,26 @@ Home is a custom React application, independent of the public site.
 - **My Stories** includes canonical co-writers, assigned editors and the legacy
   primary author. Published and dropped stories are excluded. Six stories are
   shown, ordered by overdue status, deadline, planned target and recent activity.
-- **Waiting for Me** summarizes overdue work and highlights a small number of
-  missed story deadlines and visual assignments. Editors also see urgent
-  unassigned visual work. Serious system failures are small links, shown only
-  to accounts that can inspect the corresponding service.
-- **Ready for Review** is shown only to accounts with `edit_others_posts`.
-  **Photo & Visual Work** uses structured media requests; it is shown for an
-  editor or when the current user has relevant work. No duplicate photo task or
-  manual needs-photo flag is created.
-- **Recent Activity** shows at most ten existing, authorized activity records.
-  It has its own failure state and does not block assigned work.
+- **Waiting for Me** is reserved for work that needs a decision or coordination
+  action: missed story deadlines, interviews that need scheduling, and urgent
+  unassigned visual work. Ordinary overdue tasks stay only in **Up Next**, and
+  assigned production stays only in **Photo & Visual Work**, so Home does not
+  repeat the same work in multiple sections. Serious system failures are small
+  links, shown only to accounts that can inspect the corresponding service.
+- **Ready for Review** is shown to accounts with `edit_others_posts` only when
+  the queue contains stories. **Photo & Visual Work** uses structured media
+  assignments and appears only when there is relevant work (or a media error).
+  Its header links to Media Desk. Legacy generic labels such as “Visual request”
+  are rendered as useful type/status labels such as “Photo needed.”
+- **Recent Activity** shows at most eight existing, authorized activity records
+  and disappears when there is nothing to show. It has its own failure state
+  and does not block assigned work.
+
+On wide screens Home uses two independent vertical stacks rather than locking
+cards into shared grid rows. A short **Coming Up** card therefore does not leave
+a large blank gap before **Waiting for Me** or visual work. Empty states use the
+compact Nova `Empty` treatment, and **View all work** is only shown when the
+task preview is actually truncated.
 
 All dates use the WordPress site timezone, including fixed UTC offsets. A
 date-only story deadline remains a calendar date, independent of the browser's
