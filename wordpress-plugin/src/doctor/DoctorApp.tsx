@@ -1,6 +1,12 @@
 import { Button, Card, CardBody, Notice, Spinner } from "../admin-ui/components/legacy-control-adapters";
 import { useCallback, useEffect, useMemo, useState } from "@wordpress/element";
+import { Check, TriangleAlert } from "lucide-react";
 import { __ } from "@wordpress/i18n";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../admin-ui/ui/accordion";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "../admin-ui/ui/alert";
+import { Badge } from "../admin-ui/ui/badge";
+import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockTitle } from "../admin-ui/ui/code-block";
+import { Progress, ProgressLabel } from "../admin-ui/ui/progress";
 
 import type {
   DoctorActionId,
@@ -68,7 +74,10 @@ function manifestAttentionMessage(manifest: DoctorDiagnostics["publicManifest"])
 
 function Mark({ status }: { status: string }) {
   const normalized = status === "critical" ? "critical" : status === "recommended" ? "recommended" : "good";
-  return <span className={`byline-doctor-mark byline-doctor-mark-${normalized}`} aria-label={normalized === "good" ? __("Good", "weekly-wildcat-headless") : normalized === "critical" ? __("Needs attention", "weekly-wildcat-headless") : __("Recommended", "weekly-wildcat-headless")}>{normalized === "good" ? "✓" : "!"}</span>;
+  const label = normalized === "good" ? __("Good", "weekly-wildcat-headless") : normalized === "critical" ? __("Needs attention", "weekly-wildcat-headless") : __("Recommended", "weekly-wildcat-headless");
+  return <Badge variant={normalized === "critical" ? "destructive" : normalized === "good" ? "secondary" : "outline"} className="shrink-0">
+    {normalized === "good" ? <Check data-icon="inline-start" aria-hidden="true" /> : <TriangleAlert data-icon="inline-start" aria-hidden="true" />}{label}
+  </Badge>;
 }
 
 function CheckRow({ check, onAction, busyAction }: { check: DoctorCheck; onAction: (action: DoctorActionId) => void; busyAction: DoctorActionId | null }) {
@@ -99,7 +108,6 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
   const [error, setError] = useState("");
   const [busyAction, setBusyAction] = useState<DoctorActionId | null>(null);
   const [actionMessage, setActionMessage] = useState("");
-  const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -151,22 +159,8 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
   const jobs = diagnostics?.jobs?.cronHealth;
   const jobsNeedAttention = Boolean(jobs && (jobs.status === "critical" || jobs.status === "recommended" || Number(diagnostics?.jobs?.overdueCount || 0) > 0));
   const supportReport = diagnostics?.supportReport || "";
-
-  const copyReport = async () => {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(supportReport);
-      } else {
-        const report = document.getElementById("byline-doctor-support-report") as HTMLTextAreaElement | null;
-        report?.focus();
-        report?.select();
-        document.execCommand("copy");
-      }
-      setCopied(true);
-    } catch {
-      setError(__("The report is ready below, but your browser could not copy it automatically.", "weekly-wildcat-headless"));
-    }
-  };
+  const passingChecks = allChecks.filter((check) => check.status === "good").length;
+  const checkProgress = allChecks.length ? Math.round((passingChecks / allChecks.length) * 100) : 0;
 
   return (
     <div className="byline-doctor-app">
