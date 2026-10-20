@@ -60,7 +60,7 @@ function byline_presence_sanitize_location($value): array
     }
 
     $href = is_scalar($value['href'] ?? null) ? esc_url_raw((string) $value['href']) : '';
-    $admin_base = untrailingslashit(admin_url());
+    $admin_base = rtrim(admin_url(), '/') . '/';
     if ($href !== '' && $admin_base !== '' && strpos($href, $admin_base) === 0) {
         $location['href'] = $href;
     }
@@ -402,16 +402,14 @@ function byline_enqueue_presence(): void
     $location = byline_presence_current_location();
     $now = time();
     byline_presence_touch(get_current_user_id(), 'active', $location, 'bootstrap', $now);
-    wp_localize_script('byline-presence', 'bylinePresence', [
-        'currentUserId' => get_current_user_id(),
+    $config = [
         'location' => $location,
-        'activeSeconds' => BYLINE_PRESENCE_ACTIVE_SECONDS,
-        'awaySeconds' => BYLINE_PRESENCE_AWAY_SECONDS,
         'recentSeconds' => BYLINE_PRESENCE_RECENT_SECONDS,
         'initial' => [
             'serverTime' => $now,
             'people' => byline_presence_people($now),
         ],
-    ]);
+    ];
+    wp_add_inline_script('byline-presence', 'window.bylinePresence = ' . wp_json_encode($config) . ';', 'before');
 }
 add_action('admin_enqueue_scripts', 'byline_enqueue_presence', 20);
