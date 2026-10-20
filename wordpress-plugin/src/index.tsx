@@ -1477,7 +1477,7 @@ function SettingsShell({ activeTab, children }: { activeTab: SettingsTab; childr
         <h1>Settings</h1>
         <p>Publication identity, connections, WordPress behavior, and advanced configuration in one place.</p>
       </header>
-      <SidebarProvider className="byline-settings-layout">
+      <SidebarProvider className="byline-settings-nova-layout">
         <Sidebar aria-label="Settings sections">
           <SidebarContent>
             {groups.map((group) => (
