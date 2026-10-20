@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ExternalLink, Pencil } from "lucide-react";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { AdminRoot } from "../admin-ui/components/admin-root";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
+import { NewsroomCommands } from "../story/NewsroomCommands";
+import { workspaceUrlFor } from "../home/newsroom-model";
 import { ActivitySection } from "./ActivitySection";
 import { BriefSection } from "./BriefSection";
 import { DetailsSection } from "./DetailsSection";
@@ -36,6 +39,7 @@ function WorkspaceScreen(env: WorkspaceEnv) {
   });
   const [now, setNow] = useState(() => new Date());
   const [message, setMessage] = useState("");
+  const [commandsOpen, setCommandsOpen] = useState(false);
   useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 60_000); return () => window.clearInterval(timer); }, []);
   const announce = useCallback((text: string) => setMessage((current) => (current === text ? `${text}​` : text)), []);
   const reload = useCallback(() => query.refetch(), [query]);
@@ -60,7 +64,7 @@ function WorkspaceScreen(env: WorkspaceEnv) {
 
   return <WorkspaceContext value={value}>
     <main className="@container/ws mx-auto mt-3 mb-8 flex max-w-[1320px] flex-col gap-6 pr-5">
-      <WorkspaceHeader />
+      <WorkspaceHeader onSearch={() => setCommandsOpen(true)} />
       {query.isError ? <InlineAlert onAction={() => void query.refetch()}>This page couldn't refresh, so it may be out of date.</InlineAlert> : null}
       {/* One column in the order a phone reads it; two columns once there is room. The wrappers dissolve on a phone so Files can precede Details. */}
       <div className="flex flex-col gap-4 @3xl/ws:grid @3xl/ws:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)] @3xl/ws:items-start @3xl/ws:gap-5">
@@ -79,6 +83,17 @@ function WorkspaceScreen(env: WorkspaceEnv) {
       </div>
       <p className="text-xs text-muted-foreground">Dates shown in {value.timezone.replace(/_/g, " ")}</p>
       <span role="status" aria-live="polite" className="sr-only">{message}</span>
+      <NewsroomCommands
+        open={commandsOpen}
+        onOpenChange={setCommandsOpen}
+        searchStories={env.searchStories}
+        onStory={(id) => window.location.assign(workspaceUrlFor(env.storiesUrl, id))}
+        urls={env.commandUrls}
+        actions={[
+          ...(value.caps.editArticle && value.data.story.editUrl ? [{ id: "edit-current-story", label: "Edit current article", keywords: "gutenberg edit article", icon: <Pencil />, href: value.data.story.editUrl }] : []),
+          ...(value.data.previewUrl ? [{ id: "preview-current-story", label: "Preview current article", keywords: "preview website article", icon: <ExternalLink />, href: value.data.previewUrl }] : [])
+        ]}
+      />
     </main>
   </WorkspaceContext>;
 }
