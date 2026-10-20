@@ -1,4 +1,4 @@
-import { Button, Notice, SelectControl, Spinner, TextControl } from "@wordpress/components";
+import { Button, Notice, SelectControl, Spinner, TextControl } from "../admin-ui/components/legacy-control-adapters";
 import { __ } from "@wordpress/i18n";
 import { useCallback, useEffect, useMemo, useState } from "@wordpress/element";
 
