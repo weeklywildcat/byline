@@ -410,6 +410,6 @@ function byline_enqueue_presence(): void
             'people' => byline_presence_people($now),
         ],
     ];
-    wp_add_inline_script('byline-presence', 'window.bylinePresence = ' . wp_json_encode($config) . ';', 'before');
+    wp_add_inline_script('byline-presence', 'window.bylinePresence = ' . wp_json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ';', 'before');
 }
 add_action('admin_enqueue_scripts', 'byline_enqueue_presence', 20);
