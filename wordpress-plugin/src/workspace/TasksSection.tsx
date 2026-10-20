@@ -23,7 +23,7 @@ import { completedTasks, dueText, isOverdue, openTasks, peopleOptions } from "./
 const TASK_LIMIT = 10;
 const PRIORITY_OPTIONS: Array<{ value: TaskPriority; label: string }> = [{ value: "normal", label: "Normal" }, { value: "urgent", label: "Urgent" }];
 
-function TaskItem({ task, timezone, now, busy, onToggle, onEdit }: { task: EditorialTask; timezone: string; now: Date; busy: boolean; onToggle: (task: EditorialTask, state: "open" | "completed") => void; onEdit: (task: EditorialTask, element: HTMLElement) => void }) {
+function TaskItem({ task, timezone, now, busy, editable, onToggle, onEdit }: { task: EditorialTask; timezone: string; now: Date; busy: boolean; editable: boolean; onToggle: (task: EditorialTask, state: "open" | "completed") => void; onEdit: (task: EditorialTask, element: HTMLElement) => void }) {
   const done = task.state === "completed";
   const due = done ? "" : dueText(task.dueAt, timezone, now);
   const overdue = !done && isOverdue(task.dueAt, timezone, now);
@@ -33,7 +33,7 @@ function TaskItem({ task, timezone, now, busy, onToggle, onEdit }: { task: Edito
     <ContextMenuTrigger render={<Item size="sm" data-task-id={task.id} />}>
       <ItemMedia><Checkbox id={id} aria-label={`${done ? "Reopen" : "Complete"} ${task.title}`} checked={done} aria-disabled={busy || undefined} onCheckedChange={(checked) => { if (!busy) onToggle(task, checked ? "completed" : "open"); }} /></ItemMedia>
       <ItemContent>
-        <ItemTitle><button type="button" className={done ? "text-left text-muted-foreground line-through hover:underline" : "text-left hover:underline"} onClick={(event) => onEdit(task, event.currentTarget)}>{task.title}</button></ItemTitle>
+        <ItemTitle>{editable ? <button type="button" className={done ? "text-left text-muted-foreground line-through hover:underline" : "text-left hover:underline"} onClick={(event) => onEdit(task, event.currentTarget)}>{task.title}</button> : <span className={done ? "text-muted-foreground line-through" : undefined}>{task.title}</span>}</ItemTitle>
         {meta ? <ItemDescription>{meta}</ItemDescription> : null}
       </ItemContent>
       {due ? <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined}>{due}</time></ItemActions> : null}
@@ -41,7 +41,7 @@ function TaskItem({ task, timezone, now, busy, onToggle, onEdit }: { task: Edito
     <ContextMenuContent className="w-48">
       <ContextMenuLabel className="max-w-44 truncate">{task.title}</ContextMenuLabel>
       <ContextMenuSeparator />
-      <ContextMenuItem disabled={busy} onClick={(event) => onEdit(task, event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit task</ContextMenuItem>
+      {editable ? <ContextMenuItem disabled={busy} onClick={(event) => onEdit(task, event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit task</ContextMenuItem> : null}
       <ContextMenuItem disabled={busy} onClick={() => onToggle(task, done ? "open" : "completed")}>{done ? "Reopen task" : "Mark complete"}</ContextMenuItem>
     </ContextMenuContent>
   </ContextMenu>;
@@ -124,7 +124,7 @@ export function TasksSection() {
     onSettled: (_result, _error, { task }) => { setBusyFor(String(task.id), false); void cache.invalidate(); }
   });
 
-  const rows = (tasks: EditorialTask[], label: string) => <ItemGroup role="group" aria-label={label} className="gap-0">{tasks.map((task) => <TaskItem key={task.id} task={task} timezone={timezone} now={now} busy={busy.has(String(task.id))} onToggle={(item, state) => toggle.mutate({ task: item, state })} onEdit={(item, element) => dialog.openWith(item, element)} />)}</ItemGroup>;
+  const rows = (tasks: EditorialTask[], label: string) => <ItemGroup role="group" aria-label={label} className="gap-0">{tasks.map((task) => <TaskItem key={task.id} task={task} timezone={timezone} now={now} busy={busy.has(String(task.id))} editable={caps.addTask} onToggle={(item, state) => toggle.mutate({ task: item, state })} onEdit={(item, element) => dialog.openWith(item, element)} />)}</ItemGroup>;
   const add = caps.addTask && !failed ? <AddButton data-ws-add="task" onClick={(event) => dialog.openWith(null, event.currentTarget)}>Add task</AddButton> : null;
 
   return <Card size="sm" role="region" aria-labelledby="ws-tasks-title" id="ws-tasks">
