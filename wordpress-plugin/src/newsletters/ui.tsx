@@ -1,4 +1,4 @@
-import { Button, Notice, Placeholder, Spinner } from "@wordpress/components";
+import { Button, Notice, Placeholder, Spinner } from "../admin-ui/components/legacy-control-adapters";
 import { __ } from "@wordpress/i18n";
 import type { ReactNode } from "react";
 
