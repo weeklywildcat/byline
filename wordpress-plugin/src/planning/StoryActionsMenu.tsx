@@ -4,7 +4,7 @@ import { Button } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { cn } from "../admin-ui/lib/utils";
-import { useRef, type ReactElement } from "react";
+import { useRef, type MouseEvent as ReactMouseEvent, type ReactElement } from "react";
 import { movableWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
 
 export type StoryActionsMenuProps = {
@@ -74,7 +74,7 @@ export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, w
   // click cannot open Story Peek or navigate a nested control.
   const secondaryPressUntil = useRef(0);
   const markSecondaryPress = () => { secondaryPressUntil.current = performance.now() + 750; };
-  const suppressSecondaryActivation = (event: React.MouseEvent<HTMLElement>) => {
+  const suppressSecondaryActivation = (event: ReactMouseEvent<HTMLElement>) => {
     if (event.ctrlKey || event.button !== 0 || performance.now() < secondaryPressUntil.current) {
       event.preventDefault();
       event.stopPropagation();
