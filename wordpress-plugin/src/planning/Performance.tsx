@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { decodeEntities } from "../admin-ui/lib/text";
-import { Alert, AlertDescription, AlertTitle } from "../admin-ui/ui/alert";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "../admin-ui/ui/alert";
 import { Button } from "../admin-ui/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
@@ -30,7 +30,7 @@ export function Performance({ fetchers, onOpenStory }: { fetchers: PlanningFetch
       const supported = data.metrics.filter((metric) => metric.supported);
       return <div className="flex flex-col gap-3">
         {!data.provider?.configured
-          ? <Alert><AlertTitle>{__("No analytics provider is configured", "weekly-wildcat-headless")}</AlertTitle><AlertDescription>{__("Configure one in Byline Settings → Analytics to see newsroom metrics. Editorial work is unaffected.", "weekly-wildcat-headless")}</AlertDescription></Alert>
+          ? <Alert><AlertTitle>{__("No analytics provider is configured", "weekly-wildcat-headless")}</AlertTitle><AlertDescription>{__("Connect an analytics provider to see newsroom metrics. Editorial work is unaffected.", "weekly-wildcat-headless")}</AlertDescription><AlertAction><Button variant="outline" size="sm" render={<a href="admin.php?page=byline-settings&tab=analytics" />}>{__("Open Analytics settings", "weekly-wildcat-headless")}</Button></AlertAction></Alert>
           : <p className="text-sm text-muted-foreground">{data.provider.label} — {__("only metrics the provider supplies are shown.", "weekly-wildcat-headless")}</p>}
         {supported.length
           ? <div className="grid grid-cols-2 gap-3 @3xl/planning:grid-cols-4" aria-label={__("Metrics", "weekly-wildcat-headless")}>{supported.map((metric) => <Card key={metric.id} size="sm"><CardHeader><CardDescription>{metric.label}</CardDescription><CardTitle className="text-2xl tabular-nums">{metricValue(metric)}</CardTitle>{metric.description ? <CardDescription>{metric.description}</CardDescription> : null}</CardHeader></Card>)}</div>
