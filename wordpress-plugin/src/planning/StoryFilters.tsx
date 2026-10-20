@@ -7,7 +7,7 @@ import { Checkbox } from "../admin-ui/ui/checkbox";
 import { Field, FieldGroup, FieldLabel } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../admin-ui/ui/input-group";
-import { Popover, PopoverContent, PopoverTrigger } from "../admin-ui/ui/popover";
+import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from "../admin-ui/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
 import { EMPTY_PLANNING_FILTERS, normalizePlanningFilters, type PlanningFilters, type PlanningPerson, type PlanningWorkflowStatus } from "./planning-model";
 
@@ -92,6 +92,7 @@ export function StoryFilters({ filters, onChange, statuses, writers, editors, sa
       <Popover open={moreOpen} onOpenChange={setMoreOpen}>
         <PopoverTrigger render={<Button variant="outline" />}><SlidersHorizontal data-icon="inline-start" aria-hidden="true" />{__("More filters", "weekly-wildcat-headless")}{chips.length ? <Badge variant="secondary" className="ml-1">{chips.length}</Badge> : null}<ChevronDown data-icon="inline-end" aria-hidden="true" /></PopoverTrigger>
         <PopoverContent align="start" className="w-80 gap-4">
+          <PopoverHeader><PopoverTitle>{__("More filters", "weekly-wildcat-headless")}</PopoverTitle><PopoverDescription>{__("Narrow the newsroom queue without hiding the filters you already set.", "weekly-wildcat-headless")}</PopoverDescription></PopoverHeader>
           <FieldGroup className="gap-3">
             <Field><FieldLabel htmlFor="story-filter-wordpress">{__("WordPress state", "weekly-wildcat-headless")}</FieldLabel><OptionSelect id="story-filter-wordpress" label={__("WordPress state", "weekly-wildcat-headless")} value={filters.wordpressState} options={WORDPRESS_STATES} onChange={(wordpressState) => update({ wordpressState })} className="w-full" /></Field>
             <Field><FieldLabel htmlFor="story-filter-visual">{__("Visual status", "weekly-wildcat-headless")}</FieldLabel><OptionSelect id="story-filter-visual" label={__("Visual status", "weekly-wildcat-headless")} value={filters.visualStatus} options={VISUAL_STATUSES} onChange={(visualStatus) => update({ visualStatus })} className="w-full" /></Field>
