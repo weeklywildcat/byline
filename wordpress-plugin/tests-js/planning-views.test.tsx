@@ -5,7 +5,7 @@ import { StoryBoard } from "../src/planning/StoryBoard";
 import { StoryList } from "../src/planning/StoryList";
 import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, hideFinishedPublished, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "../src/planning/planning-model";
 import { destinationForTab, initialStoriesView, storiesViewHref } from "../src/planning/planning-routing";
-import { productionSignal, storySignals } from "../src/story/story-parts";
+import { productionSignal, storySignals, workflowBadgeColors, WorkflowBadge } from "../src/story/story-parts";
 import { sectionNames } from "../src/workspace/workspace-model";
 
 const now = new Date("2026-10-20T12:00:00Z");
@@ -21,6 +21,25 @@ function story(patch: Partial<PlanningStory> & { id: number }): PlanningStory {
 }
 const stage = (id: string) => DEFAULT_WORKFLOW_STATUSES.find((status) => status.id === id)!;
 const props = (stories: PlanningStory[], canMove = true) => ({ stories, statuses: DEFAULT_WORKFLOW_STATUSES, canMoveStories: canMove, timezone: "America/New_York", now, workspaceUrl: (id: number) => `/wp-admin/admin.php?page=byline-planning&story=${id}`, onMoveStory: vi.fn(), onOpenStory: vi.fn() });
+
+describe("Workflow status colors", () => {
+  it("gives every known stage a distinct semantic palette and a readable label", () => {
+    expect(DEFAULT_WORKFLOW_STATUSES.every(({ id }) => Boolean(workflowBadgeColors[id]))).toBe(true);
+    for (const status of DEFAULT_WORKFLOW_STATUSES) {
+      const html = renderToStaticMarkup(<WorkflowBadge workflow={status} />);
+      expect(html).toContain(status.label);
+      expect(html).toContain("dark:");
+    }
+  });
+
+  it("uses the same colored labels in both planning views", () => {
+    const reporting = story({ id: 71, title: "Garden story", workflow: stage("reporting") });
+    const board = renderToStaticMarkup(<StoryBoard {...props([reporting])} />);
+    const list = renderToStaticMarkup(<StoryList {...props([reporting])} sort={DEFAULT_PLANNING_SORT} onSortChange={vi.fn()} />);
+    expect(board).toContain("bg-teal-50");
+    expect(list).toContain("bg-teal-50");
+  });
+});
 
 describe("StoryBoard", () => {
   const stories = [
