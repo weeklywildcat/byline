@@ -6,6 +6,7 @@
 import { CalendarClock, Camera, CheckCheck, Clock, Flag, ListTodo, Newspaper, type LucideIcon } from "lucide-react";
 import { cn } from "../admin-ui/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../admin-ui/ui/tooltip";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 import { CATEGORY_BY_EVENT_TYPE, CATEGORY_LABELS, type BylineScheduleXEvent, type ScheduleXCategory } from "./schedule-x-adapter";
 import type { CalendarEventType } from "./planning-model";
 
@@ -41,10 +42,10 @@ const timeOf = (event: BylineScheduleXEvent) => event.timed && event.start insta
 
 function Chip({ event, children, className }: { event: BylineScheduleXEvent; children: React.ReactNode; className?: string }) {
   const category = CATEGORY_BY_EVENT_TYPE[event.bylineType];
-  return <Tooltip>
-    <TooltipTrigger render={<div data-event-category={category} data-event-type={event.bylineType} aria-label={`${CATEGORY_LABELS[category]}: ${eventText(event).primary}${timeOf(event) ? `, ${timeOf(event)}` : ""}`} className={cn("flex h-full w-full min-w-0 items-center gap-1 rounded-sm border-l-2 px-1.5 py-0.5 text-xs leading-tight", CATEGORY_CLASSES[category], event.completed && "line-through opacity-70", className)} />}>{children}</TooltipTrigger>
-    <TooltipContent className="max-w-72 whitespace-pre-line">{event.tooltip}</TooltipContent>
-  </Tooltip>;
+  const chip = <div data-event-category={category} data-event-type={event.bylineType} aria-label={`${CATEGORY_LABELS[category]}: ${eventText(event).primary}${timeOf(event) ? `, ${timeOf(event)}` : ""}`} className={cn("flex h-full w-full min-w-0 items-center gap-1 rounded-sm border-l-2 px-1.5 py-0.5 text-xs leading-tight", CATEGORY_CLASSES[category], event.completed && "line-through opacity-70", className)}>{children}</div>;
+  return event.storyId > 0
+    ? <StoryHoverCard storyId={event.storyId} title={event.storyTitle} note={event.tooltip}>{chip}</StoryHoverCard>
+    : <Tooltip><TooltipTrigger render={chip} /><TooltipContent className="max-w-72 whitespace-pre-line">{event.tooltip}</TooltipContent></Tooltip>;
 }
 
 function Icon({ event }: { event: BylineScheduleXEvent }) {
