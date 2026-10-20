@@ -75,9 +75,9 @@ const adminConfig = {
   },
 };
 
-// Core still ships React 18 on supported installations. Home owns one private
-// React 19 root; its primitives never receive WordPress React elements. apiFetch
-// remains the WordPress-provided, nonce-authenticated transport.
+// Core still ships React 18 on supported installations. Home and toolbar
+// presence each own private React 19 roots; their primitives never receive
+// WordPress React elements. apiFetch remains the WordPress-provided transport.
 const homeConfig = {
   ...adminConfig,
   name: 'home',
