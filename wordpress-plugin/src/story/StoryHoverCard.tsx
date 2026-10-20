@@ -4,7 +4,6 @@ import { ArrowUpRight, CalendarClock, ListTodo } from "lucide-react";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { cn } from "../admin-ui/lib/utils";
 import { decodeEntities } from "../admin-ui/lib/text";
-import { Badge } from "../admin-ui/ui/badge";
 import { buttonVariants } from "../admin-ui/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../admin-ui/ui/hover-card";
 import { Separator } from "../admin-ui/ui/separator";
