@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "../admin-ui/ui
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../admin-ui/ui/table";
 import { exactDate, relativeTime, shortDateTime, siteDay } from "../home/newsroom-model";
 import { ProductionSummary, StoryDueLabel, plannedLabel, StoryTitleButton, WorkflowBadge } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 import { StoryActionsMenu, StoryContextMenu } from "./StoryActionsMenu";
 import { movableWorkflowStatuses, type PlanningSort, type PlanningSortKey, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
 
@@ -161,7 +162,7 @@ export function StoryList(props: StoryListProps) {
         </TableHeader>
         <TableBody>
           {stories.map((story) => context(story, <TableRow key={story.id} data-story-id={story.id} aria-busy={busy(story) || undefined} className="h-16">
-            <TableCell className="py-3 whitespace-normal"><StoryTitleButton story={story} onOpen={onOpenStory} className="text-[15px] font-semibold leading-5" /></TableCell>
+            <TableCell className="py-3 whitespace-normal"><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="text-[15px] font-semibold leading-5" /></StoryHoverCard></TableCell>
             <TableCell className="py-3"><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories} disabled={busy(story)} onMove={onMoveStory} /></TableCell>
             <TableCell className="max-w-60 py-3 whitespace-normal"><People story={story} /></TableCell>
             <TableCell className="py-3"><Deadline story={story} timezone={timezone} now={now} editable={canAssignStories && canUpdateStories} disabled={busy(story)} onChange={(deadline) => onUpdateStory(story, { deadline: deadline || "" }, { deadline }, __("Deadline", "weekly-wildcat-headless"))} /></TableCell>
@@ -175,7 +176,7 @@ export function StoryList(props: StoryListProps) {
       : <ItemGroup className="gap-0" aria-label={__("Stories", "weekly-wildcat-headless")}>
         {stories.map((story) => context(story, <Item key={story.id} size="sm" data-story-id={story.id} className={cn("border-b last:border-b-0 rounded-none")} aria-busy={busy(story) || undefined}>
           <ItemContent>
-            <ItemTitle className="line-clamp-2"><StoryTitleButton story={story} onOpen={onOpenStory} className="font-semibold" /></ItemTitle>
+            <ItemTitle className="line-clamp-2"><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="font-semibold" /></StoryHoverCard></ItemTitle>
             <div className="text-sm"><People story={story} /></div>
             <div className="flex flex-wrap items-center gap-x-2 text-xs">
               {canAssignStories && canUpdateStories
