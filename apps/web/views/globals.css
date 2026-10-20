@@ -3129,6 +3129,94 @@ h1.masthead-logo {
   color: #fff;
 }
 
+.static-page-header .intranet-actions {
+  margin: 28px 0 0;
+}
+
+.intranet-button {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  padding: 14px 22px;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.intranet-button:hover,
+.intranet-button:focus-visible {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.intranet-button-note {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.intranet-section {
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 14px;
+  padding: 34px 0;
+}
+
+.static-page-header + .intranet-section {
+  border-top: 0;
+}
+
+.intranet-section h2 {
+  font-family: var(--font-headline);
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.intranet-section p,
+.intranet-steps li {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.intranet-steps {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding-left: 1.5em;
+}
+
+.intranet-steps li::marker {
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+
+.intranet-steps li strong,
+.intranet-steps li span {
+  display: block;
+}
+
+.intranet-steps li strong {
+  font-weight: 700;
+}
+
 .search-page-shell {
   margin: 0 auto;
   max-width: 820px;
@@ -5222,6 +5310,19 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
 
   .open-source-project h2 {
     font-size: 1.9rem;
+  }
+
+  .intranet-section {
+    padding: 26px 0;
+  }
+
+  .intranet-section h2 {
+    font-size: 1.6rem;
+  }
+
+  .intranet-section p,
+  .intranet-steps li {
+    font-size: 1.08rem;
   }
 
   .open-source-project > p:not(.open-source-project-label),
