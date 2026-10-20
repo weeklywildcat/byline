@@ -1,4 +1,4 @@
-import { Check, Clock3, Minus, Users } from "lucide-react";
+import { Clock3, Minus, Users } from "lucide-react";
 import { Avatar, AvatarBadge, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage } from "../admin-ui/ui/avatar";
 import { Button } from "../admin-ui/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
@@ -11,11 +11,11 @@ const badgeClass = (status: PresencePerson["status"]) => status === "active"
     ? "bg-amber-400 text-amber-950"
     : "bg-muted-foreground/60 text-background";
 
-const badgeIcon = (status: PresencePerson["status"]) => status === "active"
-  ? <Check aria-hidden="true" />
-  : status === "away"
-    ? <Clock3 aria-hidden="true" />
-    : <Minus aria-hidden="true" />;
+const badgeIcon = (status: PresencePerson["status"]) => status === "away"
+  ? <Clock3 aria-hidden="true" />
+  : status === "offline"
+    ? <Minus aria-hidden="true" />
+    : null;
 
 function PresenceAvatar({ person, size = "default", badge = true, toolbar = false }: { person: PresencePerson; size?: "default" | "sm" | "lg"; badge?: boolean; toolbar?: boolean }) {
   return <Avatar size={size} className={toolbar ? "size-7" : undefined} role="img" aria-label={`${person.name}, ${person.status}`}>
