@@ -11,6 +11,26 @@ test.describe("WordPress environment", () => {
     await adminPage.goto("/wp-admin/");
     const presence = adminPage.getByRole("button", { name: /Newsroom presence/ });
     await expect(presence).toBeVisible();
+
+    // This specifically guards the cross-directory Tailwind source boundary:
+    // the trigger can still be "visible" while an unstyled avatar renders at
+    // its natural image size and spills down over the WordPress admin screen.
+    await expect(presence).toHaveCSS("height", "32px");
+    const triggerAvatar = presence.locator('[data-slot="avatar"]').first();
+    await expect(triggerAvatar).toBeVisible();
+    // Match the shared shadcn default avatar variant (32px), not the small
+    // toolbar-only variant. WordPress still serves a 96px source image.
+    await expect(triggerAvatar).toHaveAttribute("data-size", "default");
+    await expect(triggerAvatar).toHaveCSS("width", "32px");
+    await expect(triggerAvatar).toHaveCSS("height", "32px");
+    await expect(triggerAvatar).toHaveCSS("position", "relative");
+    await expect(triggerAvatar).toHaveCSS("border-radius", "9999px");
+    const triggerImage = triggerAvatar.locator('[data-slot="avatar-image"]');
+    await expect(triggerImage).toHaveCSS("width", "32px");
+    await expect(triggerImage).toHaveCSS("height", "32px");
+    await expect(triggerImage).toHaveCSS("object-fit", "cover");
+    await expect(triggerImage).toHaveCSS("border-radius", "9999px");
+
     await presence.click();
     await expect(adminPage.getByText("Newsroom", { exact: true })).toBeVisible();
     await expect(adminPage.getByText("Active now", { exact: true })).toBeVisible();

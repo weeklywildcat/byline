@@ -82,6 +82,37 @@ test.describe("Stories board", () => {
     await expect(page.getByRole("button", { name: `${unique} Menu move`, exact: true })).toBeFocused();
   });
 
+  test("right-click and macOS Control-click do not activate the story underneath the context menu", async ({ adminPage: page, adminSession: session }) => {
+    const unique = token();
+    const title = `${unique} Context menu`;
+    const id = await createPlanningStory(session, { title, status: "reporting" });
+    await openBoard(page, unique);
+
+    const storyTitle = page.getByRole("button", { name: title, exact: true });
+    const beforeUrl = page.url();
+    const beforePages = page.context().pages().length;
+
+    // A real secondary click opens Byline's menu and does not navigate or spawn a page.
+    await storyTitle.click({ button: "right" });
+    await expect(page.getByRole("menuitem", { name: "Quick view" })).toBeVisible();
+    expect(page.url()).toBe(beforeUrl);
+    expect(page.context().pages().length).toBe(beforePages);
+    await page.keyboard.press("Escape");
+
+    // On macOS, Control-click is also a secondary-click gesture. Chromium on
+    // Linux does not synthesize the contextmenu event for this, but it does
+    // reproduce the dangerous follow-up primary click that must be suppressed.
+    await storyTitle.click({ modifiers: ["Control"] });
+    await expect(page.getByRole("dialog", { name: title, exact: true })).toHaveCount(0);
+    expect(page.url()).toBe(beforeUrl);
+
+    // The explicit context-menu route itself must still load the real workspace.
+    await storyTitle.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Open workspace" }).click();
+    await page.waitForURL(new RegExp(`page=byline-planning&story=${id}`));
+    await expect(page.getByRole("heading", { name: title, exact: true }).first()).toBeVisible();
+  });
+
   test("an empty column accepts a drop, and a published story is not on the board or movable from the list", async ({ adminPage: page, adminSession: session }) => {
     const unique = token();
     const open = await createPlanningStory(session, { title: `${unique} Open`, status: "writing" });

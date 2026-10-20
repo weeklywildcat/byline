@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { describeEditorialError, setTaskCompletionState, type ContributorEntry, type EditorialTask } from "../editorial/editorial-model";
-import { TextField } from "../admin-ui/components/form-fields";
+import { describeEditorialError, setTaskCompletionState, type ContributorEntry, type EditorialTask, type TaskPriority } from "../editorial/editorial-model";
+import { SelectField, TextField } from "../admin-ui/components/form-fields";
 import { AssigneePicker, DatePicker } from "../admin-ui/components/pickers";
 import { Button } from "../admin-ui/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Checkbox } from "../admin-ui/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../admin-ui/ui/collapsible";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Field, FieldLabel } from "../admin-ui/ui/field";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
@@ -20,37 +21,47 @@ import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { completedTasks, dueText, isOverdue, openTasks, peopleOptions } from "./workspace-model";
 
 const TASK_LIMIT = 10;
+const PRIORITY_OPTIONS: Array<{ value: TaskPriority; label: string }> = [{ value: "normal", label: "Normal" }, { value: "urgent", label: "Urgent" }];
 
-function TaskItem({ task, timezone, now, busy, onToggle }: { task: EditorialTask; timezone: string; now: Date; busy: boolean; onToggle: (task: EditorialTask, state: "open" | "completed") => void }) {
+function TaskItem({ task, timezone, now, busy, editable, onToggle, onEdit }: { task: EditorialTask; timezone: string; now: Date; busy: boolean; editable: boolean; onToggle: (task: EditorialTask, state: "open" | "completed") => void; onEdit: (task: EditorialTask, element: HTMLElement) => void }) {
   const done = task.state === "completed";
   const due = done ? "" : dueText(task.dueAt, timezone, now);
   const overdue = !done && isOverdue(task.dueAt, timezone, now);
   const meta = [task.assignee?.name, task.priority === "urgent" ? "Urgent" : ""].filter(Boolean).join(" · ");
   const id = `ws-task-${task.id}`;
-  return <Item size="sm" data-task-id={task.id}>
-    <ItemMedia><Checkbox id={id} aria-label={task.title} checked={done} aria-disabled={busy || undefined} onCheckedChange={(checked) => { if (!busy) onToggle(task, checked ? "completed" : "open"); }} /></ItemMedia>
-    <ItemContent>
-      <ItemTitle><label htmlFor={id} className={done ? "cursor-pointer text-muted-foreground line-through" : "cursor-pointer"}>{task.title}</label></ItemTitle>
-      {meta ? <ItemDescription>{meta}</ItemDescription> : null}
-    </ItemContent>
-    {due ? <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined}>{due}</time></ItemActions> : null}
-  </Item>;
+  return <ContextMenu>
+    <ContextMenuTrigger render={<Item size="sm" data-task-id={task.id} />}>
+      <ItemMedia><Checkbox id={id} aria-label={`${done ? "Reopen" : "Complete"} ${task.title}`} checked={done} aria-disabled={busy || undefined} onCheckedChange={(checked) => { if (!busy) onToggle(task, checked ? "completed" : "open"); }} /></ItemMedia>
+      <ItemContent>
+        <ItemTitle>{editable ? <button type="button" className={done ? "text-left text-muted-foreground line-through hover:underline" : "text-left hover:underline"} onClick={(event) => onEdit(task, event.currentTarget)}>{task.title}</button> : <span className={done ? "text-muted-foreground line-through" : undefined}>{task.title}</span>}</ItemTitle>
+        {meta ? <ItemDescription>{meta}</ItemDescription> : null}
+      </ItemContent>
+      {due ? <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined}>{due}</time></ItemActions> : null}
+    </ContextMenuTrigger>
+    <ContextMenuContent className="w-48">
+      <ContextMenuLabel className="max-w-44 truncate">{task.title}</ContextMenuLabel>
+      <ContextMenuSeparator />
+      {editable ? <ContextMenuItem disabled={busy} onClick={(event) => onEdit(task, event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit task</ContextMenuItem> : null}
+      <ContextMenuItem disabled={busy} onClick={() => onToggle(task, done ? "open" : "completed")}>{done ? "Reopen task" : "Mark complete"}</ContextMenuItem>
+    </ContextMenuContent>
+  </ContextMenu>;
 }
 
-type TaskDialogProps = { open: boolean; onClose: () => void; finalFocus: () => HTMLElement | null };
+type TaskDialogProps = { open: boolean; task: EditorialTask | null; onClose: () => void; finalFocus: () => HTMLElement | null };
 
-function TaskDialog({ open, onClose, finalFocus }: TaskDialogProps) {
+function TaskDialog({ open, task, onClose, finalFocus }: TaskDialogProps) {
   const { storyId, editorial, data, timezone, caps, currentUserId, announce } = useWorkspace();
   const cache = useWorkspaceCache();
   const people = peopleOptions(data.people);
-  const [title, setTitle] = useState("");
-  const [assignee, setAssignee] = useState<ContributorEntry | null>(() => people.find((person) => Number(person.id) === currentUserId) ?? null);
-  const [dueAt, setDueAt] = useState<string | null>(null);
+  const [title, setTitle] = useState(task?.title || "");
+  const [assignee, setAssignee] = useState<ContributorEntry | null>(() => task?.assignee ? people.find((person) => Number(person.id) === Number(task.assignee?.id)) ?? task.assignee as ContributorEntry : people.find((person) => Number(person.id) === currentUserId) ?? null);
+  const [dueAt, setDueAt] = useState<string | null>(task?.dueAt ?? null);
+  const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? "normal");
   const [attempted, setAttempted] = useState(false);
   const [error, setError] = useState("");
 
   const create = useMutation({
-    mutationFn: () => editorial.createTask({ title: title.trim(), storyId, assigneeId: Number(assignee?.id) || (caps.assign ? null : currentUserId || null), dueAt, priority: "normal" }),
+    mutationFn: () => editorial.createTask({ title: title.trim(), storyId, assigneeId: Number(assignee?.id) || (caps.assign ? null : currentUserId || null), dueAt, priority }),
     onSuccess: (response) => {
       cache.write((current) => appendNewTasks(current, response.tasks));
       announce("Task added.");
@@ -60,20 +71,30 @@ function TaskDialog({ open, onClose, finalFocus }: TaskDialogProps) {
     onError: (failure) => setError(describeEditorialError(failure, "The task couldn't be added. Try again.")),
     onSettled: () => { void cache.invalidate(); }
   });
+  const edit = useMutation({
+    mutationFn: () => editorial.updateTask(task!.id, { title: title.trim(), dueAt, priority, ...(caps.assign ? { assigneeId: Number(assignee?.id) || null } : {}) }),
+    onSuccess: (updated) => { cache.write((current) => applyTask(current, updated)); announce("Task saved."); toast.success("Task saved."); onClose(); },
+    onError: (failure) => setError(describeEditorialError(failure, "The task couldn't be saved. Try again.")),
+    onSettled: () => { void cache.invalidate(); }
+  });
 
-  return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title="Add task" description="Work that has to happen before this story can run." submitLabel="Add task" pendingLabel="Adding…" pending={create.isPending} error={error} onSubmit={() => { setAttempted(true); setError(""); if (title.trim()) create.mutate(); }}>
+  const pending = create.isPending || edit.isPending;
+  const dirty = task ? title.trim() !== task.title || (task.dueAt || null) !== dueAt || task.priority !== priority || (caps.assign && Number(task.assigneeId || task.assignee?.id || 0) !== Number(assignee?.id || 0)) : Boolean(title.trim() || dueAt || priority !== "normal");
+
+  return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={task ? "Edit task" : "Add task"} description="Work that has to happen before this story can run." submitLabel={task ? "Save task" : "Add task"} pendingLabel={task ? "Saving…" : "Adding…"} pending={pending} dirty={dirty} error={error} onSubmit={() => { setAttempted(true); setError(""); if (title.trim()) task ? edit.mutate() : create.mutate(); }}>
     <TextField label="What needs doing?" value={title} onChange={setTitle} maxLength={240} autoFocus error={attempted && !title.trim() ? "Add a title." : undefined} />
     <div className="grid gap-4 sm:grid-cols-2">
-      {caps.assign ? <Field><FieldLabel htmlFor="ws-task-assignee">Assigned to</FieldLabel><AssigneePicker id="ws-task-assignee" people={people} value={assignee} onChange={setAssignee} /></Field> : null}
-      <Field><FieldLabel htmlFor="ws-task-due">Due</FieldLabel><DatePicker id="ws-task-due" label="Task due date" value={dueAt} timezone={timezone} onChange={setDueAt} /></Field>
+      {caps.assign ? <Field><FieldLabel htmlFor="ws-task-assignee">Assigned to</FieldLabel><AssigneePicker id="ws-task-assignee" people={people} value={assignee} onChange={setAssignee} disabled={pending} /></Field> : null}
+      <Field><FieldLabel htmlFor="ws-task-due">Due</FieldLabel><DatePicker id="ws-task-due" label="Task due date" value={dueAt} timezone={timezone} onChange={setDueAt} disabled={pending} /></Field>
     </div>
+    <SelectField label="Priority" value={priority} options={PRIORITY_OPTIONS} onChange={(value) => setPriority(value as TaskPriority)} />
   </WorkspaceDialog>;
 }
 
 export function TasksSection() {
   const { editorial, data, timezone, now, caps, announce, sectionError, reload } = useWorkspace();
   const cache = useWorkspaceCache();
-  const dialog = useDialogTarget<true>("[data-ws-add=task]");
+  const dialog = useDialogTarget<EditorialTask>("[data-ws-add=task]");
   const [showAll, setShowAll] = useState(false);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const failed = sectionError("tasks");
@@ -92,7 +113,20 @@ export function TasksSection() {
     },
     onSuccess: (updated, { task, state }) => {
       cache.write((current) => applyTask(current, updated));
-      announce(state === "completed" ? `Completed ${task.title}.` : `Reopened ${task.title}.`);
+      const message = state === "completed" ? `Completed ${task.title}.` : `Reopened ${task.title}.`;
+      announce(message);
+      toast.success(message, {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void editorial.updateTask(task.id, { state: task.state }).then((restored) => {
+              cache.write((current) => applyTask(current, restored));
+              announce(`Restored ${task.title}.`);
+              void cache.invalidate();
+            }).catch((failure) => toast.error(describeEditorialError(failure, "The task change couldn’t be undone.")));
+          }
+        }
+      });
     },
     onError: (error, { task, state }, context) => {
       cache.write((current) => applyTask(current, context?.previous ?? task));
@@ -103,8 +137,8 @@ export function TasksSection() {
     onSettled: (_result, _error, { task }) => { setBusyFor(String(task.id), false); void cache.invalidate(); }
   });
 
-  const rows = (tasks: EditorialTask[], label: string) => <ItemGroup role="group" aria-label={label} className="gap-0">{tasks.map((task) => <TaskItem key={task.id} task={task} timezone={timezone} now={now} busy={busy.has(String(task.id))} onToggle={(item, state) => toggle.mutate({ task: item, state })} />)}</ItemGroup>;
-  const add = caps.addTask && !failed ? <AddButton data-ws-add="task" onClick={(event) => dialog.openWith(true, event.currentTarget)}>Add task</AddButton> : null;
+  const rows = (tasks: EditorialTask[], label: string) => <ItemGroup role="group" aria-label={label} className="gap-0">{tasks.map((task) => <TaskItem key={task.id} task={task} timezone={timezone} now={now} busy={busy.has(String(task.id))} editable={caps.addTask} onToggle={(item, state) => toggle.mutate({ task: item, state })} onEdit={(item, element) => dialog.openWith(item, element)} />)}</ItemGroup>;
+  const add = caps.addTask && !failed ? <AddButton data-ws-add="task" onClick={(event) => dialog.openWith(null, event.currentTarget)}>Add task</AddButton> : null;
 
   return <Card size="sm" role="region" aria-labelledby="ws-tasks-title" id="ws-tasks">
     <CardHeader>
@@ -124,6 +158,6 @@ export function TasksSection() {
         </Collapsible> : null}
       </>}
     </CardContent>
-    <TaskDialog key={`task-${dialog.session}`} open={dialog.open} onClose={dialog.close} finalFocus={dialog.finalFocus} />
+    <TaskDialog key={`task-${dialog.session}`} open={dialog.open} task={dialog.target} onClose={dialog.close} finalFocus={dialog.finalFocus} />
   </Card>;
 }

@@ -91,6 +91,8 @@ Assigned to Reporting."). After a move focus stays on, or returns to, the story'
 title. A story that WordPress has published is not a board card and has no move
 action. On narrow screens columns stay card-width and scroll sideways with snap.
 
+Board cards also use the same native shadcn `ContextMenu` as List rows. Right-click is an accelerator for Quick view, Workspace/article links and **Move to**; dragging, the visible three-dot menu and keyboard/touch paths remain first-class.
+
 ### List
 
 A native shadcn `Table` with seven columns (Story, Workflow, People, Deadline,
@@ -153,13 +155,23 @@ its own header is hidden (`.sx__calendar-header`) because the toolbar is Byline'
 
 Media Desk is a table of assignments with inline status, assignee and due date,
 a Files popover built on `Attachment`, and a menu. Its search uses
-`InputGroup`, matching the Stories toolbar. Coverage keeps a `Card` per
-coverage package because each package is a standalone object with its own
-stories and controls. Feedback is an inbox-like `ItemGroup`, not a grid of
-cards: each note is one scannable item with its status action attached.
-Performance uses Cards for metrics and titled sections, while Content Health is
-an `ItemGroup` queue with severity and fix actions. Pending actions use the
-shared `Spinner` when the wait itself needs to be visible.
+`InputGroup`, matching the Stories toolbar. Its inline edits are optimistic,
+and every assignment row also has a right-click menu for Quick view, Workspace
+and status changes.
+
+Coverage keeps a `Card` per coverage package because each package is a
+standalone object with its own stories and controls. Choosing an existing story
+from the Combobox links it immediately; quick-create submits on Enter. Removing
+a story from a package is a lightweight relationship change, so it happens
+immediately with an **Undo** toast instead of a confirmation dialog.
+
+Feedback is an inbox-like `ItemGroup`, not a grid of cards: each note is one
+scannable item with its status action attached. Status changes are optimistic
+and reversible from the toast, and the row context menu exposes the same triage
+actions without hunting for controls. Content Health issues likewise expose
+Quick view, Fix and Recheck from their native context menu. Performance remains
+read-only Cards for metrics and titled sections. Pending actions use the shared
+`Spinner` when the wait itself needs to be visible.
 
 These choices follow the component semantics rather than using Cards as a
 generic container: `Item` is for content + description + actions, `Field`
