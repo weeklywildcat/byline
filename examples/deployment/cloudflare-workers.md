@@ -7,24 +7,50 @@ a custom uploader. Wrangler's static asset manifest deduplicates asset contents.
 
 ## Cloudflare settings to change after merge
 
-These are dashboard settings, not settings this PR can enforce in Wrangler:
+**The build variable and build-command changes must be made in the Cloudflare
+Workers dashboard.** The Git repository cannot enforce them through Wrangler.
+In **Workers & Pages → byline → Settings → Build**, set the following for the
+Git-connected Workers Builds project (including preview builds, if enabled):
 
 | Setting | Required value |
 | --- | --- |
 | Production branch | `main` |
-| Root directory | `apps/web` (framework detection/cache relative to the Astro project) |
-| Build command | `npm run build` |
-| Deploy command | `npm run deploy` |
-| Preview command | `npm run deploy:preview` |
+| Root directory | Prefer `apps/web` (framework detection/cache relative to the Astro project). An existing repository-root setting also works with the new command. |
+| Build command | `npm run build:cloudflare` |
+| Deploy command | `npm run deploy` (when root is `apps/web`; retain an existing working root-relative deploy command otherwise) |
+| Preview command | `npm run deploy:preview` (when root is `apps/web`; retain the existing root-relative preview command otherwise) |
+| Build variable | **`SKIP_DEPENDENCY_INSTALL=1`** (build-time variable, not a Worker runtime secret) |
 | Node version | `24` or a supported newer version |
-| Build cache | **Enabled**; confirm the log restores `node_modules/.astro` for this project |
-| Dependency installation | Leave automatic installation enabled; do **not** set `SKIP_DEPENDENCY_INSTALL=1` |
+| Build cache | **Enabled** |
 
-npm workspaces use the repository's root lockfile and link internal `@byline/*`
-packages even with the command run in `apps/web`. Use the pinned local Wrangler,
-not a separately auto-installed CLI. Keep the existing production hook targeting
-the same production branch. Install the snapshot-capable WordPress plugin and
-prepare its first artifact before letting the new frontend build run.
+The `build:cloudflare` script is available from **both** the repository root
+and `apps/web`. It installs only `@byline/web` and its workspace dependencies
+using the **existing root lockfile**:
+
+```sh
+npm ci --workspace=@byline/web --include-workspace-root=false --prefer-offline --no-audit --no-fund
+npm run build:frontend
+```
+
+Unlike a plain scoped `npm ci`, the wrapper **moves the restored
+`apps/web/node_modules/.astro` incremental cache out of `node_modules`
+before npm cleans the dependency tree, and moves it back before building**.
+The earlier scoped-install benchmark rejected this approach without the cache
+preservation step; do not replace the wrapper with a raw `npm ci` in the
+dashboard. A cold build remains correct if the cache is missing.
+
+To confirm this is active, the Cloudflare log should **not** contain
+`Installing project dependencies: npm clean-install` before the user build
+command. It should contain `[byline] npm ci ... --workspace=@byline/web` and
+then `[byline] npm run build:frontend`. Without both dashboard changes,
+Cloudflare will continue installing the full monorepo, and can even install
+twice if only the build command was changed.
+
+npm workspaces still link internal `@byline/*` packages. Wrangler is installed
+from the frontend workspace's pinned devDependencies. Keep the existing
+production hook targeting the same branch. Install the snapshot-capable
+WordPress plugin and prepare its first artifact before letting the new
+frontend build run.
 
 Keep the public CMS endpoint variable if needed:
 

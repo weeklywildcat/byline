@@ -1,5 +1,14 @@
 # October 2026 build-performance measurements
 
+> **October 20 follow-up:** The October 17 experiment below used a plain scoped
+> `npm ci`, which deleted the restored Astro cache. The new Cloudflare wrapper
+> preserves that cache around a scoped install. This resolves the identified
+> cache-loss blocker, but hosted before/after timings have **not yet been
+> measured**. The instruction below to keep automatic dependency installation
+> enabled is historical; for the new deployment configuration, follow
+> [Cloudflare Workers Builds](../../examples/deployment/cloudflare-workers.md).
+
+
 Measured October 17, 2026 against current `main`
 `e99a17b3af59f30a854e61ff7f4748661955b0c4` and this implementation. Node 26.7.0,
 npm 11.19.0, Astro 7.3.1, same macOS machine. These are local build measurements,

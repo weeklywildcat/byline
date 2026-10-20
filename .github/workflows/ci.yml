@@ -9,6 +9,39 @@ permissions:
   contents: read
 
 jobs:
+  cloudflare-scoped-build:
+    name: Cloudflare scoped install and Astro build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Simulate a restored Astro cache
+        run: |
+          mkdir -p apps/web/node_modules/.astro
+          echo retained > apps/web/node_modules/.astro/cloudflare-cache-sentinel
+
+      - name: Install public-site dependencies and build
+        env:
+          BYLINE_PUBLICATION_FILE: tests/fixtures/weekly-wildcat-publication.json
+          BYLINE_CONTENT_MODE: weekly-wildcat-fixture
+        run: npm run build:cloudflare
+
+      - name: Verify cache retention, workspace links and static export
+        run: |
+          test "$(cat apps/web/node_modules/.astro/cloudflare-cache-sentinel)" = retained
+          test -d node_modules/@byline/content
+          test ! -d node_modules/@wordpress/env
+          test -s apps/web/out/_byline/manifest.json
+
   php-compatibility:
     name: Plugin PHP ${{ matrix.php }} compatibility
     runs-on: ubuntu-latest
