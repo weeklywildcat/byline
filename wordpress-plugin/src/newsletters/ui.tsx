@@ -33,12 +33,10 @@ export function LoadingState({ label }: { label: string }) {
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <Notice status="error" isDismissible={false}>
-      <p>{message}</p>
-      {onRetry ? <Button variant="secondary" onClick={onRetry}>{__("Try again", "weekly-wildcat-headless")}</Button> : null}
-    </Notice>
-  );
+  return <Alert variant="destructive">
+    <AlertDescription>{message}</AlertDescription>
+    {onRetry ? <AlertAction><Button variant="secondary" onClick={onRetry}>{__("Try again", "weekly-wildcat-headless")}</Button></AlertAction> : null}
+  </Alert>;
 }
 
 export function OptionalUnavailable({ children, action }: { children: ReactNode; action?: ReactNode }) {
