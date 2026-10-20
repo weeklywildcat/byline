@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCheck, Image as ImageIcon, ImagePlus, LayoutDashboard, MoreHorizontal, Paperclip, Search, Star, X } from "lucide-react";
+import { CheckCheck, Eye, Image as ImageIcon, ImagePlus, LayoutDashboard, MoreHorizontal, Paperclip, Search, Star, X } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
@@ -15,6 +15,7 @@ import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, Att
 import { Badge } from "../admin-ui/ui/badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Input } from "../admin-ui/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../admin-ui/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
@@ -80,6 +81,33 @@ function RowMenu({ row, editable, saving, workspaceUrl, update }: { row: MediaDe
       {row.status !== "done" ? <DropdownMenuItem disabled={!editable || saving} onClick={() => update(row, { status: "done" })}><CheckCheck aria-hidden="true" />{__("Mark complete", "weekly-wildcat-headless")}</DropdownMenuItem> : null}
     </DropdownMenuContent>
   </DropdownMenu>;
+}
+
+function MediaRowContext({ row, editable, saving, workspaceUrl, onOpenStory, update, children }: { row: MediaDeskRow; editable: boolean; saving: boolean; workspaceUrl: MediaDeskProps["workspaceUrl"]; onOpenStory: MediaDeskProps["onOpenStory"]; update: Update; children: ReactElement }) {
+  const title = row.title || mediaTypeLabel(row.type);
+  return <ContextMenu>
+    <ContextMenuTrigger render={children} />
+    <ContextMenuContent className="w-56">
+      <ContextMenuLabel className="max-w-52 truncate">{title}</ContextMenuLabel>
+      <ContextMenuSeparator />
+      <ContextMenuGroup>
+        <ContextMenuItem onClick={() => onOpenStory(row.story.id)}><Eye aria-hidden="true" />{__("Quick view story", "weekly-wildcat-headless")}</ContextMenuItem>
+        <ContextMenuItem render={<a href={workspaceUrl(row.story.id)} />}><LayoutDashboard aria-hidden="true" />{__("Open story workspace", "weekly-wildcat-headless")}</ContextMenuItem>
+      </ContextMenuGroup>
+      {editable ? <>
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger disabled={saving}>{__("Status", "weekly-wildcat-headless")}</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-44">
+            <ContextMenuRadioGroup value={row.status} onValueChange={(value) => { if (value && value !== row.status) update(row, { status: String(value) }); }}>
+              {MEDIA_STATUS_OPTIONS.map((item) => <ContextMenuRadioItem key={item.value} value={item.value}>{item.label}</ContextMenuRadioItem>)}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        {row.status !== "done" ? <ContextMenuItem disabled={saving} onClick={() => update(row, { status: "done" })}><CheckCheck aria-hidden="true" />{__("Mark complete", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+      </> : null}
+    </ContextMenuContent>
+  </ContextMenu>;
 }
 
 function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory }: MediaDeskProps & { data: MediaDeskResponse }) {
