@@ -143,7 +143,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
   const showActivity = home.isPending || Boolean(data?.activity.length || data?.errors.activity);
   const hasMoreWork = tasks.length > HOME_TASK_PREVIEW_LIMIT || Boolean(data && tasks.length > 0 && tasks.length >= data.limits.tasks);
 
-  return <StoryHoverProvider fetchers={fetchers} onOpenStory={openStory} workspaceUrl={actionUrls?.workspace}><main className="@container/home mx-auto mt-6 mb-8 flex max-w-[1320px] flex-col gap-5 pr-5 pl-1">
+  return <StoryHoverProvider fetchers={fetchers}><main className="@container/home mx-auto mt-6 mb-8 flex max-w-[1320px] flex-col gap-5 pr-5 pl-1">
     <header className="flex items-center justify-between gap-4">
       <div>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Today</h1>
