@@ -7,7 +7,7 @@ import { describeEditorialError } from "../editorial/editorial-model";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { decodeEntities } from "../admin-ui/lib/text";
 import { PeopleAvatars, anyPicture } from "../admin-ui/components/people-avatars";
-import { DatePicker, WritersPicker, fieldRow, valueSelectTriggerClass } from "../admin-ui/components/pickers";
+import { DatePicker, WritersPicker, valueSelectTriggerClass } from "../admin-ui/components/pickers";
 import { ResourceIcon } from "../admin-ui/components/resource-icon";
 import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
@@ -17,6 +17,7 @@ import { Field, FieldContent, FieldGroup, FieldLabel, FieldLegend, FieldSet, Fie
 import { Input } from "../admin-ui/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemHeader, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
+import { ScrollArea } from "../admin-ui/ui/scroll-area";
 import { Spinner } from "../admin-ui/ui/spinner";
 import { Separator } from "../admin-ui/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "../admin-ui/ui/sheet";
@@ -43,6 +44,13 @@ function PeekSection({ title, action, children }: { title: string; action?: Reac
 }
 
 const compactEmpty = "items-start gap-2 border-0 p-0 text-left";
+
+function PeekProperty({ label, children }: { label: string; children: ReactNode }) {
+  return <Field orientation="responsive" aria-label={label} className="min-h-7 @md/field-group:items-center!">
+    <FieldTitle className="font-normal text-muted-foreground @md/field-group:w-32 @md/field-group:flex-none!">{label}</FieldTitle>
+    <FieldContent className="min-w-0 text-sm [overflow-wrap:anywhere]">{children}</FieldContent>
+  </Field>;
+}
 
 /** A compact, note-free roll-up. A target window is shown as a window; it never acquires a clock time. */
 function ReportingPeek({ reporting, error, timezone, canAddSource, canAddAppointment, reportingUrl }: { reporting: ReportingSummary | null; error?: string; timezone: string; canAddSource: boolean; canAddAppointment: boolean; reportingUrl?: string }) {
@@ -150,15 +158,15 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
   const visibleActivity = data.activity.slice(0, PEEK_ACTIVITY);
   const statusItems = data.statuses.map((status) => ({ value: status.id, label: status.label }));
   return <>
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
+    <ScrollArea className="min-h-0 flex-1"><div className="px-4">
       <FieldSet className="gap-2 pt-4 pb-3">
         <FieldLegend variant="label" className="mb-0">Story details</FieldLegend>
         <FieldGroup className="gap-1">
-          <Field orientation="horizontal" aria-label="Workflow" className={fieldRow.field}><FieldTitle className={fieldRow.label}>Workflow</FieldTitle><FieldContent className={fieldRow.value}>{caps.changeStatus ? <Select items={statusItems} value={story.workflow.id} disabled={planning} onValueChange={(id) => { if (id && id !== story.workflow.id) onPlan({ status: id }); }}><SelectTrigger aria-label="Workflow" className={valueSelectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{data.statuses.filter((status) => status.selectable).map((status) => <SelectItem key={status.id} value={status.id}>{status.label}</SelectItem>)}</SelectContent></Select> : story.workflow.label}</FieldContent></Field>
-          {cp.canEdit ? <Field orientation="horizontal" aria-label="Writers" className={fieldRow.field}><FieldTitle className={fieldRow.label}>Writers</FieldTitle><FieldContent className={fieldRow.value}><WritersPicker people={cp.available || []} value={contributors} onChange={onWriters} disabled={writing} /></FieldContent></Field> : null}
-          <Field orientation="horizontal" aria-label="Deadline" className={fieldRow.field}><FieldTitle className={fieldRow.label}>Deadline</FieldTitle><FieldContent className={fieldRow.value}>{caps.assign ? <DatePicker appearance="value" label="Deadline" dateOnly value={story.deadline} timezone={timezone} disabled={planning} onChange={(deadline) => onPlan({ deadline })} /> : exactDate(story.deadline, timezone)}</FieldContent></Field>
-          <Field orientation="horizontal" aria-label="Planned publication" className={fieldRow.field}><FieldTitle className={fieldRow.label}>Planned publication</FieldTitle><FieldContent className={fieldRow.value}>{caps.assign ? <DatePicker appearance="value" label="Planned publication" value={story.plannedPublication} timezone={timezone} disabled={planning} onChange={(plannedPublishAt) => onPlan({ plannedPublishAt })} /> : exactDate(story.plannedPublication, timezone)}</FieldContent></Field>
-          <Field orientation="horizontal" aria-label="WordPress" className={fieldRow.field}><FieldTitle className={fieldRow.label}>WordPress</FieldTitle><FieldContent className={fieldRow.value}>{story.wordpressState.label}{story.wordpressState.isScheduled ? ` · ${exactDate(story.wordpressState.scheduledAt, timezone)}` : ""}</FieldContent></Field>
+          <PeekProperty label="Workflow">{caps.changeStatus ? <Select items={statusItems} value={story.workflow.id} disabled={planning} onValueChange={(id) => { if (id && id !== story.workflow.id) onPlan({ status: id }); }}><SelectTrigger aria-label="Workflow" className={valueSelectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{data.statuses.filter((status) => status.selectable).map((status) => <SelectItem key={status.id} value={status.id}>{status.label}</SelectItem>)}</SelectContent></Select> : story.workflow.label}</PeekProperty>
+          {cp.canEdit ? <PeekProperty label="Writers"><WritersPicker people={cp.available || []} value={contributors} onChange={onWriters} disabled={writing} /></PeekProperty> : null}
+          <PeekProperty label="Deadline">{caps.assign ? <DatePicker appearance="value" label="Deadline" dateOnly value={story.deadline} timezone={timezone} disabled={planning} onChange={(deadline) => onPlan({ deadline })} /> : exactDate(story.deadline, timezone)}</PeekProperty>
+          <PeekProperty label="Planned publication">{caps.assign ? <DatePicker appearance="value" label="Planned publication" value={story.plannedPublication} timezone={timezone} disabled={planning} onChange={(plannedPublishAt) => onPlan({ plannedPublishAt })} /> : exactDate(story.plannedPublication, timezone)}</PeekProperty>
+          <PeekProperty label="WordPress">{story.wordpressState.label}{story.wordpressState.isScheduled ? ` · ${exactDate(story.wordpressState.scheduledAt, timezone)}` : ""}</PeekProperty>
         </FieldGroup>
         {error ? <InlineAlert>{error}</InlineAlert> : null}
       </FieldSet>
@@ -207,7 +215,7 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
           <ItemGroup role="group" aria-label="Recent activity" className="-mx-2.5 w-auto gap-0">{visibleActivity.map((item) => <ActivityRow key={item.id} item={item} compact timezone={timezone} now={now} />)}</ItemGroup>
         </PeekSection>
       </> : null}
-    </div>
+    </div></ScrollArea>
     <SheetFooter className="flex-row flex-wrap items-center gap-2 border-t sm:justify-between">
       {workspaceHref ? <a className={buttonVariants({ variant: "outline" })} href={workspaceHref}><LayoutDashboard data-icon="inline-start" aria-hidden="true" />Open workspace</a> : <span />}
       <div className="flex flex-wrap items-center gap-2">
