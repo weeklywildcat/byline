@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { describeEditorialError, type ContributorEntry } from "../editorial/editorial-model";
+import { describeEditorialError, type ContributorEntry, type TaskPriority } from "../editorial/editorial-model";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { AssigneePicker, DatePicker } from "../admin-ui/components/pickers";
 import { Button } from "../admin-ui/ui/button";
@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldGroup, FieldLabel } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
 import { Spinner } from "../admin-ui/ui/spinner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
+import { TASK_PRIORITY_OPTIONS } from "./TaskQuickFields";
 import type { StoryFetchers } from "./story-fetchers";
 import { invalidateStoryData } from "./story-query";
 
@@ -36,11 +38,12 @@ export function TaskCreateDialog({ open, onClose, fetchers, stories, storyId, pe
   const [selectedStoryId, setSelectedStoryId] = useState<number | null>(storyId || null);
   const [dueAt, setDueAt] = useState<string | null>(null);
   const [assignee, setAssignee] = useState<ContributorEntry | null>(null);
-  useEffect(() => { setError(""); setSelectedStoryId(storyId || null); setDueAt(null); setAssignee(currentUser ? { ...currentUser, kind: "user" } : null); }, [open, storyId, currentUser?.id]);
+  const [priority, setPriority] = useState<TaskPriority>("normal");
+  useEffect(() => { setError(""); setSelectedStoryId(storyId || null); setDueAt(null); setAssignee(currentUser ? { ...currentUser, kind: "user" } : null); setPriority("normal"); }, [open, storyId, currentUser?.id]);
   const create = useMutation({
     mutationFn: async (title: string) => {
       if (!selectedStoryId) throw new Error("Choose a story for this task.");
-      await fetchers.editorial!.createTask({ title, storyId: selectedStoryId, assigneeId: Number(assignee?.id) || null, dueAt, priority: "normal" });
+      await fetchers.editorial!.createTask({ title, storyId: selectedStoryId, assigneeId: Number(assignee?.id) || null, dueAt, priority });
     },
     onSuccess: () => { void invalidateStoryData(client, selectedStoryId); onClose(); },
     onError: (failure) => setError(describeEditorialError(failure, "The task couldn't be created. Try again."))
@@ -54,6 +57,7 @@ export function TaskCreateDialog({ open, onClose, fetchers, stories, storyId, pe
           <Field><FieldLabel htmlFor="task-create-story">Story</FieldLabel><Combobox items={stories} itemToStringLabel={(s) => s.title} isItemEqualToValue={(a, b) => a.id === b.id} value={stories.find((s) => s.id === selectedStoryId) || null} onValueChange={(s) => setSelectedStoryId(s?.id || null)}><ComboboxInput id="task-create-story" required placeholder="Choose a story…" /><ComboboxContent><ComboboxEmpty>No active stories. Create a story first.</ComboboxEmpty><ComboboxList>{(story: TaskStoryChoice) => <ComboboxItem key={story.id} value={story}>{story.title}</ComboboxItem>}</ComboboxList></ComboboxContent></Combobox></Field>
           {canAssign ? <Field><FieldLabel htmlFor="task-create-assignee">Assignee</FieldLabel><AssigneePicker id="task-create-assignee" people={people} value={assignee} onChange={setAssignee} /></Field> : null}
           <Field><FieldLabel htmlFor="task-create-due">Due</FieldLabel><DatePicker id="task-create-due" label="Task due date" value={dueAt} timezone={timezone} onChange={setDueAt} /></Field>
+          <Field><FieldLabel htmlFor="task-create-priority">Priority</FieldLabel><Select items={TASK_PRIORITY_OPTIONS} value={priority} onValueChange={(value) => { if (value) setPriority(value as TaskPriority); }}><SelectTrigger id="task-create-priority" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{TASK_PRIORITY_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></Field>
           {error ? <InlineAlert>{error}</InlineAlert> : null}
         </FieldGroup>
         <DialogFooter className="mt-4"><Button variant="outline" type="button" onClick={onClose} disabled={create.isPending}>Cancel</Button><Button type="submit" disabled={create.isPending || !selectedStoryId}>{create.isPending ? <><Spinner data-icon="inline-start" />Creating…</> : "Create task"}</Button></DialogFooter>
