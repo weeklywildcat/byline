@@ -67,7 +67,7 @@ function StoryHoverBody({ summary, loading, failed, timezone, note }: {
   </div>;
 }
 
-export function StoryHoverCard({ storyId, title, story, note, children }: {
+export function StoryHoverCard(props: {
   storyId: number;
   title: string;
   story?: StoryHoverSummary;
@@ -75,15 +75,25 @@ export function StoryHoverCard({ storyId, title, story, note, children }: {
   children: ReactElement;
 }) {
   const context = useContext(StoryHoverContext);
+  if (!context?.fetchers.getWorkspace || props.storyId <= 0) return props.children;
+  return <StoryHoverCardQuery {...props} context={context} />;
+}
+
+function StoryHoverCardQuery({ storyId, title, story, note, children, context }: {
+  storyId: number;
+  title: string;
+  story?: StoryHoverSummary;
+  note?: string;
+  children: ReactElement;
+  context: StoryHoverContextValue;
+}) {
   const [open, setOpen] = useState(false);
   const preview = useQuery({
     queryKey: workspaceKey(storyId),
-    queryFn: () => context!.fetchers.getWorkspace!(storyId),
-    enabled: open && storyId > 0 && Boolean(context?.fetchers.getWorkspace),
+    queryFn: () => context.fetchers.getWorkspace!(storyId),
+    enabled: open,
     staleTime: 30_000
   });
-
-  if (!context || storyId <= 0) return children;
 
   const workspace = preview.data;
   const resolved: StoryHoverSummary = workspace?.story || story || { id: storyId, title };

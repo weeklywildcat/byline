@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { AdminRoot } from "../admin-ui/components/admin-root";
 import { StoryCreateDialog } from "../story/StoryCreateDialog";
 import { StoryPeekHost } from "../story/StoryPeekHost";
+import { StoryHoverProvider } from "../story/StoryHoverCard";
 import type { StoryFetchers } from "../story/story-fetchers";
 import { createAdminQueryClient } from "../story/story-query";
 import type { StoryWorkspace } from "../workspace/workspace-types";
@@ -40,9 +41,11 @@ export function PlanningApp(props: PlanningAppProps) {
 
 function PlanningShell(props: PlanningAppProps) {
   const workspaceUrl = useMemo(() => createWorkspaceUrlBuilder(props.storiesUrl), [props.storiesUrl]);
-  return <StoryPeekHost fetchers={props.fetchers} workspaceUrl={(storyId) => workspaceUrl(storyId)}>
-    <PlanningBody {...props} workspaceUrl={workspaceUrl} />
-  </StoryPeekHost>;
+  return <StoryHoverProvider fetchers={props.fetchers}>
+    <StoryPeekHost fetchers={props.fetchers} workspaceUrl={(storyId) => workspaceUrl(storyId)}>
+      <PlanningBody {...props} workspaceUrl={workspaceUrl} />
+    </StoryPeekHost>
+  </StoryHoverProvider>;
 }
 
 function PlanningBody({ fetchers, tab, view, currentUserId, mine, workspaceUrl }: PlanningAppProps & { workspaceUrl: ReturnType<typeof createWorkspaceUrlBuilder> }) {
