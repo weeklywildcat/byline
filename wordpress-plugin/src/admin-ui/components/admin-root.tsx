@@ -9,13 +9,13 @@ import { TooltipProvider } from "../ui/tooltip";
  * scoped theme root, the portal container for every overlay, tooltips and
  * toasts. Children mount once the root exists so portals always have a target.
  */
-export function AdminRoot({ className, children }: { className?: string; children: ReactNode }) {
+export function AdminRoot({ className, toaster = true, children }: { className?: string; toaster?: boolean; children: ReactNode }) {
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
   return <div className={cn("byline-ui-root", className)} ref={setRoot}>
     <AdminPortalContext value={root}>
       <TooltipProvider>
         {root ? children : null}
-        <Toaster position="bottom-right" closeButton toastOptions={{ className: "font-sans text-sm" }} />
+        {toaster ? <Toaster position="bottom-right" closeButton toastOptions={{ className: "font-sans text-sm" }} /> : null}
       </TooltipProvider>
     </AdminPortalContext>
   </div>;
