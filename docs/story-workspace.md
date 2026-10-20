@@ -176,6 +176,33 @@ planning dates keep their existing capability checks.
 A participant's read model contains only the records assigned to them and no
 activity trail.
 
+## Fast editing interaction model
+
+The workspace treats common status and list edits as direct manipulation rather
+than forcing a full dialog round-trip.
+
+- Task completion stays a one-click Checkbox. Users who may manage tasks can
+  click a task title to edit its title, assignee, due date and priority; the
+  same Edit / Complete / Reopen actions are available from the row's native
+  shadcn `ContextMenu`.
+- Source and appointment rows keep their primary click-to-edit behavior, while
+  right-click exposes a status radio submenu. Status writes are optimistic and
+  use `expectedUpdatedAt`, so a concurrent edit still produces the normal 409
+  rather than being silently overwritten.
+- Production rows use the same pattern: click to open the full assignment,
+  right-click to change status immediately. Assigned participants keep the
+  server's existing field-level permission checks.
+- Files & Links keep the ordinary external-link click and visible three-dot
+  menu, while right-click adds Edit / Remove. Removing a link is reversible, so
+  it uses an **Undo** toast instead of a blocking confirmation. Undo recreates
+  the link; it never touches the remote document.
+
+Context menus are always accelerators. Any action required to use the product
+also remains available through a visible control, direct row click, Checkbox or
+dialog. Low-risk reversible relationship changes prefer immediate action +
+Undo; destructive actions that cannot be reconstructed still require explicit
+confirmation.
+
 ## Read model and routes
 
 One bounded aggregate (no per-source/per-task requests), never the article body:
