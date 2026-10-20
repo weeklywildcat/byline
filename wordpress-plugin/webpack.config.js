@@ -1,8 +1,16 @@
 // Admin, article preview, and Gutenberg entries share the local WordPress build.
 const defaultConfig = require('@wordpress/scripts/config/webpack.config');
 const path = require('path');
+const DependencyExtractionWebpackPlugin = require('@wordpress/dependency-extraction-webpack-plugin');
+const homeCss = path.resolve(__dirname, 'src/home/style.css');
+// The Story Workspace shares Home's scoped Tailwind/PostCSS pipeline. The file is
+// named style.css so wp-scripts emits it as style-story-workspace.css.
+const workspaceCss = path.resolve(__dirname, 'src/workspace/style.css');
+const scopedCss = [homeCss, workspaceCss];
+const cssRule = defaultConfig.module.rules.find((rule) => rule.test?.test('style.css'));
 
-module.exports = {
+const adminConfig = {
+  name: 'admin',
   ...defaultConfig,
   module: {
     ...defaultConfig.module,
@@ -13,7 +21,19 @@ module.exports = {
         enforce: 'pre',
         loader: path.resolve(__dirname, 'loaders/site-font-urls.js'),
       },
-      ...defaultConfig.module.rules,
+      {
+        ...cssRule,
+        include: scopedCss,
+        use: cssRule.use.map((entry) => entry.loader?.includes('postcss-loader') ? {
+          ...entry,
+          options: {
+            postcssOptions: {
+              plugins: [require('@tailwindcss/postcss')(), require('postcss-nesting')(), require('./loaders/home-postcss')],
+            },
+          },
+        } : entry),
+      },
+      ...defaultConfig.module.rules.map((rule) => rule === cssRule ? { ...rule, exclude: scopedCss } : rule),
     ],
   },
   // The default configuration resolves paths from process.cwd(). Anchoring both
@@ -47,3 +67,38 @@ module.exports = {
     'blocks/correction-notice/index': path.resolve(__dirname, 'src/blocks/correction-notice/index.tsx'),
   },
 };
+
+// Core still ships React 18 on supported installations. Home owns one private
+// React 19 root; its primitives never receive WordPress React elements. apiFetch
+// remains the WordPress-provided, nonce-authenticated transport.
+const homeConfig = {
+  ...adminConfig,
+  name: 'home',
+  dependencies: ['admin'],
+  entry: { home: path.resolve(__dirname, 'src/home-entry.tsx') },
+  output: { ...adminConfig.output, clean: false },
+  plugins: adminConfig.plugins.filter((plugin) => !['DependencyExtractionWebpackPlugin', 'CopyPlugin', 'PhpFilePathsPlugin'].includes(plugin.constructor.name)).concat([
+    new DependencyExtractionWebpackPlugin({
+      useDefaults: false,
+      requestToExternal: (request) => request === '@wordpress/api-fetch' ? ['wp', 'apiFetch'] : undefined,
+      requestToHandle: (request) => request === '@wordpress/api-fetch' ? 'wp-api-fetch' : undefined,
+    }),
+  ]),
+};
+
+// The Story Workspace is a second private React 19 root with the same isolation
+// rules as Home: only wp-api-fetch is external and nothing else is shared.
+const workspaceConfig = {
+  ...homeConfig,
+  name: 'workspace',
+  dependencies: ['admin', 'home'],
+  entry: { 'story-workspace': path.resolve(__dirname, 'src/story-workspace-entry.tsx') },
+  plugins: homeConfig.plugins.filter((plugin) => plugin.constructor.name !== 'DependencyExtractionWebpackPlugin').concat([
+    new DependencyExtractionWebpackPlugin({
+      useDefaults: false,
+      requestToExternal: (request) => request === '@wordpress/api-fetch' ? ['wp', 'apiFetch'] : undefined,
+      requestToHandle: (request) => request === '@wordpress/api-fetch' ? 'wp-api-fetch' : undefined,
+    }),
+  ]),
+};
+module.exports = [adminConfig, homeConfig, workspaceConfig];

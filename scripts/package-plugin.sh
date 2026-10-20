@@ -32,6 +32,10 @@ build_assets=(
   build/index.asset.php
   build/index.css
   build/style-index.css
+  # Home owns React 19 and the scoped Mira/Tailwind stylesheet.
+  build/home.js
+  build/home.asset.php
+  build/style-home.css
   # The block-editor workflow entry. A production install that ships without it
   # silently loses the editorial workflow sidebar.
   build/editorial-workflow.js
@@ -153,6 +157,17 @@ for external_dependency in react-jsx-runtime wp-element; do
     exit 1
   fi
 done
+
+# Home must keep its private React 19 runtime while using WordPress apiFetch.
+home_dependencies="$(php -r '$asset = include $argv[1]; echo implode("\n", $asset["dependencies"] ?? []);' "$plugin_root/build/home.asset.php")"
+if ! grep -qx 'wp-api-fetch' <<<"$home_dependencies"; then
+  echo "Home must use WordPress apiFetch." >&2
+  exit 1
+fi
+if grep -Eq '^(react|react-dom|react-jsx-runtime|wp-element)$' <<<"$home_dependencies"; then
+  echo "Home must bundle its isolated React 19 runtime." >&2
+  exit 1
+fi
 
 # The workflow entry loads on every post editor, so it must rely entirely on the
 # WordPress-provided packages rather than bundling a second React or a second

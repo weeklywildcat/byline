@@ -187,3 +187,17 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+.byline-story-quick-view-workspace {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 12px;
+}
+
+.byline-story-quick-view-reporting {
+  color: #50575e;
+  font-size: 12px;
+  margin: 0;
+}

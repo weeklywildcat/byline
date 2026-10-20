@@ -15,6 +15,10 @@ import type {
   HomePresetsPayload,
   HomeNavigationCapabilities
 } from "./home-model";
+import type { HomeBootstrap } from "./newsroom-model";
+import { createEditorialRestClient, type EditorialRestClient } from "../editorial/editorial-rest";
+import { createWorkspaceClient, type WorkspaceClient } from "../workspace/workspace-api";
+import type { StoryWorkspace } from "../workspace/workspace-types";
 
 export type HomeRequest = <T>(options: PlanningRequestOptions) => Promise<T>;
 
@@ -30,6 +34,15 @@ export type HomePaths = {
 };
 
 export type HomeFetchers = {
+  getHome?: () => Promise<HomeBootstrap>;
+  /** The Story Workspace read model; Story Peek reads it instead of the old quick-view aggregate. */
+  getWorkspace?: (storyId: number) => Promise<StoryWorkspace>;
+  /** Typed workspace mutations (links, today). */
+  workspace?: WorkspaceClient;
+  searchStories?: (query: string) => Promise<{ stories: Array<{ id: number; title: string }> }>;
+  /** Creates a draft, optionally from a template preset; resolves with the full workspace payload plus `workspaceUrl`/`template`. */
+  createStory?: (title: string, preset?: string) => Promise<StoryWorkspace>;
+  editorial?: EditorialRestClient;
   getPlanning?: () => Promise<PlanningResponse>;
   getHealth?: () => Promise<HomeHealthPayload>;
   getContentHealth?: () => Promise<ContentHealthResponse>;
@@ -68,6 +81,14 @@ export function createHomeFetchers(
     resolved.deploymentTrigger = `${resolved.deployment.replace(/\/+$/, "")}/trigger`;
   }
   const fetchers: HomeFetchers = {};
+  if (capabilities.editPosts !== false) {
+    fetchers.getHome = () => request<HomeBootstrap>({ path: "/byline/v1/editorial/home" });
+    fetchers.workspace = createWorkspaceClient(request);
+    fetchers.getWorkspace = fetchers.workspace.getWorkspace;
+    fetchers.searchStories = (query) => request({ path: `/byline/v1/editorial/home/search?query=${encodeURIComponent(query)}` });
+    fetchers.createStory = (title, preset) => request<StoryWorkspace>({ path: "/byline/v1/editorial/stories", method: "POST", data: preset ? { title, preset } : { title } });
+    fetchers.editorial = createEditorialRestClient(request);
+  }
 
   // The planning route is intentionally edit_posts-scoped. A role that can
   // manage Byline configuration but cannot edit stories should still get the

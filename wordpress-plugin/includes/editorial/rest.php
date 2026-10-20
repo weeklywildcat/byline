@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 // Loading the editorial domain modules from this already-registered transport
 // keeps the new slice available to both the plugin and focused standalone tests
 // without creating a second bootstrap path.
-foreach (['planning', 'media', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors', 'activity', 'presets'] as $byline_editorial_module) {
+foreach (['collections', 'story-context', 'planning', 'media', 'media-assignments', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors', 'activity', 'presets', 'reporting', 'resources', 'workspace', 'home'] as $byline_editorial_module) {
     $byline_editorial_module_file = __DIR__ . '/' . $byline_editorial_module . '.php';
     if (is_readable($byline_editorial_module_file)) {
         require_once $byline_editorial_module_file;
@@ -530,12 +530,20 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
             ? (bool) metadata_exists('post', $post_id, $media_meta_key)
             : false;
         $media_previous = $media_meta_key !== '' ? get_post_meta($post_id, $media_meta_key, true) : '';
+        // A story with several production assignments keeps the single-request
+        // write on its primary assignment, so that row must roll back too.
+        $v2_key = defined('BYLINE_MEDIA_ASSIGNMENTS_META') ? BYLINE_MEDIA_ASSIGNMENTS_META : '';
+        $v2_existed = $v2_key !== '' && byline_story_meta_exists($post_id, $v2_key);
+        $v2_previous = $v2_existed ? get_post_meta($post_id, $v2_key, true) : '';
         $media_result = byline_set_editorial_media_request($post_id, $media);
         if (is_wp_error($media_result)) {
             return $fail($media_result);
         }
         if ($media_meta_key !== '') {
-            $rollbacks[] = static function () use ($post_id, $media_meta_key, $media_existed, $media_previous): void {
+            $rollbacks[] = static function () use ($post_id, $media_meta_key, $media_existed, $media_previous, $v2_key, $v2_existed, $v2_previous): void {
+                if ($v2_existed) {
+                    update_post_meta($post_id, $v2_key, wp_slash($v2_previous));
+                }
                 if ($media_existed) {
                     update_post_meta($post_id, $media_meta_key, $media_previous);
                     return;
@@ -814,6 +822,7 @@ function byline_editorial_rest_planning_story(array $row): array
     foreach ((array) ($row['bylines'] ?? []) as $person) {
         $normalized = byline_editorial_rest_person($person);
         if ($normalized !== null) {
+            $normalized['kind'] = ($person['type'] ?? $person['kind'] ?? 'user') === 'guest' ? 'guest' : 'user';
             $authors[] = $normalized;
         }
     }
@@ -870,6 +879,8 @@ function byline_editorial_rest_planning_story(array $row): array
             'attachmentIds' => array_values(array_map('absint', (array) ($visual['attachmentIds'] ?? []))),
         ],
         'openTaskCount' => absint($row['tasks']['openCount'] ?? 0),
+        'reporting' => is_array($row['reporting'] ?? null) ? $row['reporting'] : null,
+        'mediaSummary' => is_array($row['media'] ?? null) ? $row['media'] : null,
         'coverage' => $coverage,
         'featuredImage' => $featured_id > 0 ? ['id' => $featured_id, 'isSelectedVisual' => !empty($featured['isLinked'])] : null,
         'needsReview' => $workflow_id === 'ready',
@@ -946,6 +957,7 @@ function byline_editorial_rest_planning(WP_REST_Request $request)
 
     return rest_ensure_response([
         'stories' => $stories,
+        'timezone' => byline_editorial_planning_timezone()->getName(),
         'workflowStatuses' => byline_editorial_rest_statuses(),
         'savedViews' => $saved_views,
         'capabilities' => [
@@ -1059,6 +1071,7 @@ function byline_editorial_rest_media(WP_REST_Request $request)
     $can_assign = current_user_can('edit_others_posts');
 
     return rest_ensure_response([
+        'timezone' => byline_editorial_planning_timezone()->getName(),
         'requests' => array_map('byline_editorial_rest_media_item', $items),
         'assignees' => $can_assign && function_exists('byline_editorial_assignable_editors')
             ? byline_editorial_assignable_editors()
@@ -1069,7 +1082,25 @@ function byline_editorial_rest_media(WP_REST_Request $request)
         ],
         // Preserve the original collection key for early admin consumers.
         'items' => $items,
+        // One row per production assignment; `requests` stays per story.
+        'assignments' => array_map('byline_editorial_rest_media_assignment_row', byline_list_editorial_media_assignments(byline_editorial_rest_request_params($request), $user_id)),
     ]);
+}
+
+/** @return array<string,mixed> */
+function byline_editorial_rest_media_assignment_row(array $row): array
+{
+    $assignment = $row['assignment'];
+    return [
+        'id' => $assignment['id'],
+        'story' => ['id' => absint($row['storyId']), 'title' => sanitize_text_field((string) $row['title']), 'editUrl' => esc_url_raw((string) $row['editUrl'])],
+        'title' => $assignment['title'], 'type' => $assignment['type'], 'status' => $assignment['status'],
+        'assignee' => byline_editorial_rest_user_person($assignment['assigneeId']),
+        'dueAt' => $assignment['dueAt'] !== '' ? $assignment['dueAt'] : null,
+        'notes' => $assignment['notes'], 'attachmentIds' => $assignment['attachmentIds'], 'attachments' => $assignment['attachments'],
+        'invalidAttachmentIds' => $assignment['invalidAttachmentIds'], 'mediaReadiness' => $assignment['mediaReadiness'],
+        'featuredAttachmentId' => $assignment['featuredAttachmentId'], 'order' => $assignment['order'], 'isLegacy' => $assignment['isLegacy'],
+    ];
 }
 
 function byline_editorial_rest_update_media(WP_REST_Request $request)

@@ -1,7 +1,21 @@
 import { Button, SelectControl, TextControl } from "@wordpress/components";
-import { useMemo, useState } from "@wordpress/element";
+import { useEffect, useMemo, useState } from "@wordpress/element";
 import { __ } from "@wordpress/i18n";
 
+import { createWorkspaceUrlBuilder, type WorkspaceUrl } from "./calendar-model";
+import {
+  EMPTY_MEDIA_DESK_FILTERS,
+  MEDIA_STATUS_OPTIONS,
+  MEDIA_TYPE_OPTIONS,
+  filterMediaRows,
+  mediaDeskRows,
+  mediaDueDay,
+  mediaReadinessHint,
+  mediaTypeLabel,
+  sortMediaRows,
+  type MediaDeskFilters,
+  type MediaDeskRow
+} from "./media-desk-model";
 import {
   exactPlanningDate,
   mergeMediaAttachmentIds,
@@ -9,42 +23,27 @@ import {
   relativePlanningDate,
   type MediaAttachment,
   type MediaDeskResponse,
-  type MediaRequest,
   type OptionalResource,
   type PlanningPerson,
-  type PlanningVisualStatus,
-  type PlanningVisualType
+  type PlanningVisualStatus
 } from "./planning-model";
 import { describeMediaDeskError } from "./media-desk-errors";
-import { PlanningDateValue, PlanningEmpty, PlanningNotice, PlanningStatusBadge, PlanningUnavailable, StoryLink, ViewHeader } from "./planning-ui";
+import { PlanningEmpty, PlanningNotice, PlanningStatusBadge, PlanningUnavailable, ViewHeader } from "./planning-ui";
 
 export type MediaDeskProps = {
   resource: OptionalResource<MediaDeskResponse>;
   onRetry?: () => void;
+  /** Legacy per-story update. Used for older servers and for the story-level featured image. */
   updateRequest?: (requestId: number, changes: Record<string, unknown>) => Promise<unknown>;
+  /** Per-assignment update (`POST /editorial/stories/<id>/media-assignments/<assignmentId>`). */
+  updateAssignment?: (storyId: number, assignmentId: string, changes: Record<string, unknown>) => Promise<unknown>;
+  /** Story Workspace URL builder; each row links to its story's workspace. */
+  workspaceUrl?: WorkspaceUrl;
   onOpenStory?: (storyId: number) => void;
 };
 
-const STATUS_OPTIONS: Array<{ value: PlanningVisualStatus; label: string }> = [
-  { value: "needed", label: "Needed" },
-  { value: "assigned", label: "Assigned" },
-  { value: "in-progress", label: "In progress" },
-  { value: "uploaded", label: "Uploaded" },
-  { value: "selected", label: "Selected" },
-  { value: "done", label: "Done" }
-];
-
-const TYPE_LABELS: Record<PlanningVisualType, string> = {
-  none: "None",
-  photo: "Photo",
-  gallery: "Gallery",
-  graphic: "Graphic",
-  video: "Video",
-  other: "Other"
-};
-
 function statusLabel(status: PlanningVisualStatus): string {
-  return STATUS_OPTIONS.find((item) => item.value === status)?.label || status;
+  return MEDIA_STATUS_OPTIONS.find((item) => item.value === status)?.label || status;
 }
 
 function statusTone(status: PlanningVisualStatus): "neutral" | "success" | "warning" | "info" {
@@ -54,42 +53,67 @@ function statusTone(status: PlanningVisualStatus): "neutral" | "success" | "warn
   return "neutral";
 }
 
-function RequestCard({
-  request,
+function DueDateField({ row, timezone, disabled, onCommit }: { row: MediaDeskRow; timezone?: string; disabled: boolean; onCommit: (value: string | null) => void }) {
+  const current = mediaDueDay(row.dueAt, timezone);
+  const [value, setValue] = useState(current);
+  useEffect(() => setValue(current), [current]);
+  return (
+    <TextControl
+      __nextHasNoMarginBottom
+      type="date"
+      label={__("Due date", "weekly-wildcat-headless")}
+      value={value}
+      disabled={disabled}
+      onChange={setValue}
+      onBlur={() => {
+        if (value !== current) onCommit(value || null);
+      }}
+    />
+  );
+}
+
+function AssignmentCard({
+  row,
   assignees,
+  timezone,
   canManage,
   canAssign,
   isSaving,
-  updateRequest,
+  update,
+  canUpdate,
+  workspaceUrl,
   onOpenStory
 }: {
-  request: MediaRequest;
+  row: MediaDeskRow;
   assignees: PlanningPerson[];
+  timezone?: string;
   canManage: boolean;
   canAssign: boolean;
   isSaving: boolean;
-  updateRequest?: (requestId: number, changes: Record<string, unknown>) => Promise<unknown>;
+  update: (row: MediaDeskRow, changes: Record<string, unknown>, options?: { featured?: boolean }) => Promise<void>;
+  canUpdate: boolean;
+  workspaceUrl: WorkspaceUrl;
   onOpenStory?: (storyId: number) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const editable = canManage && canUpdate;
 
-  const update = async (changes: Record<string, unknown>) => {
-    if (!updateRequest) return;
+  const run = async (changes: Record<string, unknown>, options?: { featured?: boolean }) => {
     setError(null);
     try {
-      await updateRequest(request.id, changes);
+      await update(row, changes, options);
     } catch (reason) {
       setError(describeMediaDeskError(reason));
     }
   };
 
-  const attachments: MediaAttachment[] = request.attachments?.length
-    ? request.attachments
-    : request.attachmentIds.map((id) => ({ id }));
-  const featuredId = request.featuredAttachmentId || request.mediaReadiness?.featuredAttachmentId || 0;
+  const attachments: MediaAttachment[] = row.attachments?.length ? row.attachments : row.attachmentIds.map((id) => ({ id }));
+  const featuredId = row.featuredAttachmentId || row.mediaReadiness?.featuredAttachmentId || 0;
+  const hint = mediaReadinessHint(row);
+  const heading = row.title || mediaTypeLabel(row.type);
 
   const chooseMedia = () => {
-    if (!canManage || !updateRequest || !window.wp?.media) return;
+    if (!editable || !window.wp?.media) return;
 
     const frame = window.wp.media({
       title: __("Link WordPress media", "weekly-wildcat-headless"),
@@ -104,33 +128,54 @@ function RequestCard({
       const selected = typeof selection.toJSON === "function"
         ? selection.toJSON()
         : (selection.models || []).map((model) => typeof model.toJSON === "function" ? model.toJSON() : model.get?.("id"));
-      void update({ attachmentIds: mergeMediaAttachmentIds(request.attachmentIds, selected) });
+      void run({ attachmentIds: mergeMediaAttachmentIds(row.attachmentIds, selected) });
     });
     frame.open();
   };
 
   const unlinkMedia = (attachmentId: number) => {
-    void update({ attachmentIds: removeMediaAttachmentId(request.attachmentIds, attachmentId) });
+    void run({ attachmentIds: removeMediaAttachmentId(row.attachmentIds, attachmentId) });
   };
-
-  const story = { id: request.story.id, title: request.story.title, editUrl: request.story.editUrl, authors: [], writer: null, editor: null, workflow: { id: "", label: "", group: "main" as const, selectable: false }, wordpressState: { id: "", label: "", isPublished: false, isScheduled: false }, deadline: null, plannedPublication: null, modifiedAt: null, visual: { type: request.type, status: request.status }, openTaskCount: 0, coverage: [], featuredImage: null };
 
   return (
     <article className="byline-planning-media-card" aria-busy={isSaving}>
       <div className="byline-planning-media-card-heading">
-        <StoryLink
-          story={story}
-          onOpenStory={onOpenStory ? (selectedStory) => onOpenStory(selectedStory.id) : undefined}
-          className="byline-planning-story-title"
-        />
-        <PlanningStatusBadge label={statusLabel(request.status)} tone={statusTone(request.status)} />
+        <div>
+          <h4 className="byline-planning-media-assignment-title">{heading}</h4>
+          <p className="byline-planning-media-story">
+            {onOpenStory ? (
+              <a className="byline-planning-story-title" href={row.story.editUrl} onClick={(event) => { event.preventDefault(); onOpenStory(row.story.id); }}>
+                {row.story.title || __("Untitled story", "weekly-wildcat-headless")}
+              </a>
+            ) : (
+              <a className="byline-planning-story-title" href={workspaceUrl(row.story.id)}>{row.story.title || __("Untitled story", "weekly-wildcat-headless")}</a>
+            )}
+          </p>
+        </div>
+        <PlanningStatusBadge label={statusLabel(row.status)} tone={statusTone(row.status)} />
       </div>
-      <p className="byline-planning-media-type">{TYPE_LABELS[request.type] || request.type}</p>
-      {request.notes || request.legacyNotes ? <p className="byline-planning-media-notes">{request.notes || request.legacyNotes}</p> : <p className="byline-planning-muted">{__("No notes supplied.", "weekly-wildcat-headless")}</p>}
+      <div className="byline-planning-media-chips">
+        <span className="byline-planning-media-type">{mediaTypeLabel(row.type)}</span>
+        <PlanningStatusBadge label={hint.label} tone={hint.tone} />
+        <a className="byline-planning-media-workspace-link" href={workspaceUrl(row.story.id)}>{__("Open story workspace", "weekly-wildcat-headless")}</a>
+      </div>
+      {row.notes ? <p className="byline-planning-media-notes">{row.notes}</p> : null}
       <dl className="byline-planning-media-meta">
-        <div><dt>{__("Due", "weekly-wildcat-headless")}</dt><dd><PlanningDateValue value={request.dueAt} relative empty={__("No due date", "weekly-wildcat-headless")} /></dd></div>
-        <div><dt>{__("Attachments", "weekly-wildcat-headless")}</dt><dd>{request.attachmentIds.length ? request.attachmentIds.length : __("None selected", "weekly-wildcat-headless")}</dd></div>
-        <div><dt>{__("Featured", "weekly-wildcat-headless")}</dt><dd>{featuredId ? __("Linked visual", "weekly-wildcat-headless") : __("Not linked", "weekly-wildcat-headless")}</dd></div>
+        <div><dt>{__("Assignee", "weekly-wildcat-headless")}</dt><dd>{row.assignee?.name || __("Unassigned", "weekly-wildcat-headless")}</dd></div>
+        <div>
+          <dt>{__("Due", "weekly-wildcat-headless")}</dt>
+          <dd>
+            {row.dueAt ? (
+              <time dateTime={mediaDueDay(row.dueAt, timezone)} title={exactPlanningDate(row.dueAt)}>
+                {mediaDueDay(row.dueAt, timezone) ? new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${mediaDueDay(row.dueAt, timezone)}T12:00:00Z`)) : exactPlanningDate(row.dueAt)}
+                {" "}
+                <span className="byline-planning-list-date-note">{timezone ? "" : relativePlanningDate(row.dueAt)}</span>
+              </time>
+            ) : <span className="byline-planning-muted">{__("No due date", "weekly-wildcat-headless")}</span>}
+          </dd>
+        </div>
+        <div><dt>{__("Attachments", "weekly-wildcat-headless")}</dt><dd>{row.attachmentIds.length ? row.attachmentIds.length : __("None selected", "weekly-wildcat-headless")}</dd></div>
+        {row.isPrimary ? <div><dt>{__("Featured", "weekly-wildcat-headless")}</dt><dd>{featuredId ? __("Linked visual", "weekly-wildcat-headless") : __("Not linked", "weekly-wildcat-headless")}</dd></div> : null}
       </dl>
       <div className="byline-planning-media-attachments">
         {attachments.length ? attachments.map((attachment) => {
@@ -154,8 +199,9 @@ function RequestCard({
               {attachment.isImage ? (
                 <Button
                   variant={isFeatured ? "primary" : "secondary"}
-                  disabled={!canManage || !updateRequest || isSaving}
-                  onClick={() => void update({ featuredAttachmentId: attachment.id })}
+                  disabled={!editable || isSaving || !row.isPrimary}
+                  title={row.isPrimary ? undefined : __("The featured image is set from the story's primary visual assignment.", "weekly-wildcat-headless")}
+                  onClick={() => void run({ featuredAttachmentId: attachment.id }, { featured: true })}
                 >
                   {isFeatured ? __("Featured", "weekly-wildcat-headless") : __("Set featured", "weekly-wildcat-headless")}
                 </Button>
@@ -163,7 +209,7 @@ function RequestCard({
               <Button
                 variant="tertiary"
                 isDestructive
-                disabled={!canManage || !updateRequest || isSaving}
+                disabled={!editable || isSaving}
                 onClick={() => unlinkMedia(attachment.id)}
               >
                 {__("Unlink", "weekly-wildcat-headless")}
@@ -171,8 +217,8 @@ function RequestCard({
             </div>
           );
         }) : null}
-        {request.invalidAttachmentIds?.length ? <PlanningNotice status="warning">{__("Some linked media is no longer available. Relink the request.", "weekly-wildcat-headless")}</PlanningNotice> : null}
-        <Button variant="secondary" disabled={!canManage || !updateRequest || isSaving || !window.wp?.media} onClick={chooseMedia}>
+        {row.invalidAttachmentIds?.length ? <PlanningNotice status="warning">{__("Some linked media is no longer available. Relink the assignment.", "weekly-wildcat-headless")}</PlanningNotice> : null}
+        <Button variant="secondary" disabled={!editable || isSaving || !window.wp?.media} onClick={chooseMedia}>
           {__("Link from Media Library", "weekly-wildcat-headless")}
         </Button>
       </div>
@@ -180,78 +226,95 @@ function RequestCard({
         <SelectControl
           __nextHasNoMarginBottom
           label={__("Status", "weekly-wildcat-headless")}
-          value={request.status}
-          options={STATUS_OPTIONS}
-          disabled={!canManage || !updateRequest || isSaving}
-          onChange={(value: string) => void update({ status: value })}
+          value={row.status}
+          options={MEDIA_STATUS_OPTIONS}
+          disabled={!editable || isSaving}
+          onChange={(value: string) => void run({ status: value })}
         />
         <SelectControl
           __nextHasNoMarginBottom
           label={__("Assignee", "weekly-wildcat-headless")}
-          value={request.assignee?.id ? String(request.assignee.id) : ""}
+          value={row.assignee?.id ? String(row.assignee.id) : ""}
           options={[{ label: __("Unassigned", "weekly-wildcat-headless"), value: "" }, ...assignees.map((person) => ({ label: person.name, value: String(person.id) }))]}
-          disabled={!canManage || !canAssign || !updateRequest || isSaving}
-          onChange={(value: string) => void update({ assigneeId: value ? Number(value) : 0 })}
+          disabled={!editable || !canAssign || isSaving}
+          onChange={(value: string) => void run({ assigneeId: value ? Number(value) : 0 })}
         />
+        <DueDateField row={row} timezone={timezone} disabled={!editable || isSaving} onCommit={(value) => void run({ dueAt: value })} />
       </div>
-      {request.status !== "done" ? <Button variant="primary" disabled={!canManage || !updateRequest || isSaving} onClick={() => void update({ status: "done" })}>{__("Mark complete", "weekly-wildcat-headless")}</Button> : null}
-      {request.dueAt ? <p className="byline-planning-list-date-note" title={exactPlanningDate(request.dueAt)}>{relativePlanningDate(request.dueAt)}</p> : null}
+      {row.status !== "done" ? <Button variant="primary" disabled={!editable || isSaving} onClick={() => void run({ status: "done" })}>{__("Mark complete", "weekly-wildcat-headless")}</Button> : null}
       {error ? <PlanningNotice>{error}</PlanningNotice> : null}
-      {!updateRequest ? <p className="byline-planning-help">{__("The protected media update API is not available in this install.", "weekly-wildcat-headless")}</p> : null}
+      {!canUpdate ? <p className="byline-planning-help">{__("The protected media update API is not available in this install.", "weekly-wildcat-headless")}</p> : null}
     </article>
   );
 }
 
-export function MediaDesk({ resource, onRetry, updateRequest, onOpenStory }: MediaDeskProps) {
-  const [statusFilter, setStatusFilter] = useState<"" | PlanningVisualStatus>("");
-  const [assigneeFilter, setAssigneeFilter] = useState("");
-  const [storyFilter, setStoryFilter] = useState("");
-  const [savingId, setSavingId] = useState<number | null>(null);
+export function MediaDesk({ resource, onRetry, updateRequest, updateAssignment, workspaceUrl: workspaceUrlProp, onOpenStory }: MediaDeskProps) {
+  const [filters, setFilters] = useState<MediaDeskFilters>(EMPTY_MEDIA_DESK_FILTERS);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
   const data = resource.data;
-  const requests = data?.requests || [];
+  const workspaceUrl = useMemo(() => workspaceUrlProp || createWorkspaceUrlBuilder(), [workspaceUrlProp]);
+  const rows = useMemo(() => mediaDeskRows(data), [data]);
   const assignees = data?.assignees || [];
+  const timezone = data?.timezone;
   const canManage = data?.capabilities?.canManageMedia !== false;
   const canAssign = data?.capabilities?.canAssign !== false;
+  const setFilter = <K extends keyof MediaDeskFilters>(key: K, value: MediaDeskFilters[K]) => setFilters((current) => ({ ...current, [key]: value }));
 
-  const filtered = useMemo(() => requests.filter((request) => {
-    if (statusFilter && request.status !== statusFilter) return false;
-    if (assigneeFilter && String(request.assignee?.id || "") !== assigneeFilter) return false;
-    if (storyFilter && !request.story.title.toLocaleLowerCase().includes(storyFilter.toLocaleLowerCase())) return false;
-    return true;
-  }), [requests, statusFilter, assigneeFilter, storyFilter]);
+  const filtered = useMemo(() => sortMediaRows(filterMediaRows(rows, filters, timezone), timezone), [rows, filters, timezone]);
+  const grouped = MEDIA_STATUS_OPTIONS.map((status) => ({ ...status, rows: filtered.filter((row) => row.status === status.value) })).filter((group) => group.rows.length);
+  const filtersActive = JSON.stringify(filters) !== JSON.stringify(EMPTY_MEDIA_DESK_FILTERS);
 
-  const grouped = STATUS_OPTIONS.map((status) => ({ ...status, requests: filtered.filter((request) => request.status === status.value) })).filter((group) => group.requests.length);
+  const rowKey = (row: MediaDeskRow) => `${row.story.id}:${row.id}`;
+  const canUpdate = (row: MediaDeskRow) => (row.source === "assignment" ? Boolean(updateAssignment) : Boolean(updateRequest));
+
+  // Assignment rows write to their own assignment. The story-level featured
+  // image (and the legacy collection) still goes through the per-story route.
+  const update = async (row: MediaDeskRow, changes: Record<string, unknown>, options?: { featured?: boolean }) => {
+    const key = rowKey(row);
+    setSavingKey(key);
+    try {
+      if (options?.featured && updateRequest) await updateRequest(row.story.id, changes);
+      else if (row.source === "assignment" && updateAssignment) await updateAssignment(row.story.id, row.id, changes);
+      else if (updateRequest) await updateRequest(row.story.id, changes);
+    } finally {
+      setSavingKey(null);
+    }
+  };
 
   if (!data && !resource.available) return <PlanningUnavailable label={__("Media Desk", "weekly-wildcat-headless")} message={resource.error || __("Media planning is unavailable right now.", "weekly-wildcat-headless")} onRetry={onRetry} />;
   if (!data) return <PlanningEmpty label={__("Media Desk", "weekly-wildcat-headless")} instructions={__("No media request data is available.", "weekly-wildcat-headless")} />;
 
   return (
     <section className="byline-planning-media" aria-labelledby="byline-planning-media-heading">
-      <ViewHeader title={__("Media Desk", "weekly-wildcat-headless")} description={__("Track visual requests without creating a parallel media library. Attachments remain owned by WordPress Media.", "weekly-wildcat-headless")} />
+      <ViewHeader title={__("Media Desk", "weekly-wildcat-headless")} description={__("Track each photo, video, graphic and audio assignment without creating a parallel media library. Attachments remain owned by WordPress Media.", "weekly-wildcat-headless")} />
       {resource.error ? <PlanningNotice status="warning">{resource.error}</PlanningNotice> : null}
       <div className="byline-planning-filter-grid">
-        <SelectControl __nextHasNoMarginBottom label={__("Filter by status", "weekly-wildcat-headless")} value={statusFilter} options={[{ label: __("All statuses", "weekly-wildcat-headless"), value: "" }, ...STATUS_OPTIONS]} onChange={setStatusFilter} />
-        <SelectControl __nextHasNoMarginBottom label={__("Filter by assignee", "weekly-wildcat-headless")} value={assigneeFilter} options={[{ label: __("Everyone", "weekly-wildcat-headless"), value: "" }, ...assignees.map((person) => ({ label: person.name, value: String(person.id) }))]} onChange={setAssigneeFilter} />
-        <TextControl __nextHasNoMarginBottom label={__("Find a story", "weekly-wildcat-headless")} value={storyFilter} onChange={setStoryFilter} />
+        <SelectControl __nextHasNoMarginBottom label={__("Filter by type", "weekly-wildcat-headless")} value={filters.type} options={[{ label: __("All types", "weekly-wildcat-headless"), value: "" }, ...MEDIA_TYPE_OPTIONS.map((option) => ({ label: option.label, value: option.value }))]} onChange={(value: string) => setFilter("type", value as MediaDeskFilters["type"])} />
+        <SelectControl __nextHasNoMarginBottom label={__("Filter by status", "weekly-wildcat-headless")} value={filters.status} options={[{ label: __("All statuses", "weekly-wildcat-headless"), value: "" }, ...MEDIA_STATUS_OPTIONS]} onChange={(value: string) => setFilter("status", value as MediaDeskFilters["status"])} />
+        <SelectControl __nextHasNoMarginBottom label={__("Filter by assignee", "weekly-wildcat-headless")} value={filters.assigneeId} options={[{ label: __("Everyone", "weekly-wildcat-headless"), value: "" }, ...assignees.map((person) => ({ label: person.name, value: String(person.id) }))]} onChange={(value: string) => setFilter("assigneeId", value)} />
+        <TextControl __nextHasNoMarginBottom label={__("Find a story or assignment", "weekly-wildcat-headless")} value={filters.story} onChange={(value: string) => setFilter("story", value)} />
+        <TextControl __nextHasNoMarginBottom type="date" label={__("Due from", "weekly-wildcat-headless")} value={filters.dueFrom} onChange={(value: string) => setFilter("dueFrom", value)} />
+        <TextControl __nextHasNoMarginBottom type="date" label={__("Due to", "weekly-wildcat-headless")} value={filters.dueTo} onChange={(value: string) => setFilter("dueTo", value)} />
       </div>
-      {!filtered.length ? <PlanningEmpty label={__("Media requests", "weekly-wildcat-headless")} instructions={requests.length ? __("No media requests match these filters.", "weekly-wildcat-headless") : __("No visual requests have been recorded yet.", "weekly-wildcat-headless")} /> : (
+      {filtersActive ? <Button variant="tertiary" onClick={() => setFilters(EMPTY_MEDIA_DESK_FILTERS)}>{__("Clear filters", "weekly-wildcat-headless")}</Button> : null}
+      {!filtered.length ? <PlanningEmpty label={__("Media assignments", "weekly-wildcat-headless")} instructions={rows.length ? __("No media assignments match these filters.", "weekly-wildcat-headless") : __("No visual assignments have been recorded yet.", "weekly-wildcat-headless")} /> : (
         <div className="byline-planning-media-groups">
           {grouped.map((group) => (
             <section className="byline-planning-media-group" key={group.value} aria-labelledby={`byline-planning-media-group-${group.value}`}>
-              <h3 id={`byline-planning-media-group-${group.value}`}>{group.label} <span className="byline-planning-count">{group.requests.length}</span></h3>
+              <h3 id={`byline-planning-media-group-${group.value}`}>{group.label} <span className="byline-planning-count">{group.rows.length}</span></h3>
               <div className="byline-planning-media-list">
-                {group.requests.map((request) => (
-                  <RequestCard
-                    key={request.id}
-                    request={request}
+                {group.rows.map((row) => (
+                  <AssignmentCard
+                    key={rowKey(row)}
+                    row={row}
                     assignees={assignees}
+                    timezone={timezone}
                     canManage={canManage}
                     canAssign={canAssign}
-                    isSaving={savingId === request.id}
-                    updateRequest={updateRequest ? async (id, changes) => {
-                      setSavingId(id);
-                      try { await updateRequest(id, changes); } finally { setSavingId(null); }
-                    } : undefined}
+                    isSaving={savingKey === rowKey(row)}
+                    update={update}
+                    canUpdate={canUpdate(row)}
+                    workspaceUrl={workspaceUrl}
                     onOpenStory={onOpenStory}
                   />
                 ))}

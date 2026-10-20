@@ -27,6 +27,7 @@ function byline_editorial_notification_preference_defaults(): array
         'publishingFailures' => true,
         'storyReturned' => true,
         'dueDigest' => true,
+        'appointments' => true,
     ];
 }
 
@@ -57,6 +58,7 @@ function byline_editorial_notification_preference_for_event(string $event): stri
         'publishing-failure' => 'publishingFailures',
         'story-returned' => 'storyReturned',
         'due-digest' => 'dueDigest',
+        'appointment-update' => 'appointments',
     ];
 
     return $map[$event] ?? '';
@@ -123,6 +125,7 @@ function byline_editorial_notification_visible_preference_labels(int $user_id): 
         'storyReturned' => 'Returned for revision',
         'mediaAssignments' => 'Media assignments',
         'highPriorityTasks' => 'High-priority tasks',
+        'appointments' => 'Interviews and appointments',
         'dueDigest' => 'Due-work reminder',
     ];
     if (user_can($user_id, 'edit_others_posts') || user_can($user_id, 'manage_byline')) {
@@ -144,7 +147,8 @@ function byline_editorial_notification_enqueue(
     int $story_id = 0,
     int $task_id = 0,
     string $dedupe_token = '',
-    int $actor_id = 0
+    int $actor_id = 0,
+    array $extra = []
 )
 {
     $recipient_id = absint($recipient_id);
@@ -172,8 +176,18 @@ function byline_editorial_notification_enqueue(
     if ($dedupe_token !== '') {
         $payload['dedupeToken'] = byline_editorial_notification_dedupe_token($dedupe_token);
     }
+    // Opaque references only; titles, times and places are read at delivery.
+    if (function_exists('byline_story_valid_uuid') && byline_story_valid_uuid($extra['appointmentId'] ?? '') !== '') {
+        $payload['appointmentId'] = byline_story_valid_uuid($extra['appointmentId']);
+    }
+    if (in_array($extra['change'] ?? '', ['assigned', 'changed', 'cancelled'], true)) {
+        $payload['change'] = $extra['change'];
+    }
 
     $target = $task_id > 0 ? 'task-' . $task_id : ($story_id > 0 ? 'story-' . $story_id : 'global');
+    if (isset($payload['appointmentId'])) {
+        $target .= '-appointment-' . $payload['appointmentId'];
+    }
     $idempotency = implode(':', [
         BYLINE_EDITORIAL_NOTIFICATION_JOB_TYPE,
         $event,
@@ -199,7 +213,8 @@ function byline_editorial_notification_story_can_be_viewed(int $user_id, int $st
     $story = function_exists('get_post') ? get_post($story_id) : null;
     return $story instanceof WP_Post
         && (string) ($story->post_type ?? '') === 'post'
-        && user_can($user_id, 'edit_post', $story_id);
+        && (user_can($user_id, 'edit_post', $story_id)
+            || (function_exists('byline_story_context_can_view') && byline_story_context_can_view($story_id, $user_id)));
 }
 
 function byline_editorial_notification_task_can_be_viewed(int $user_id, int $task_id, int $story_id): bool
@@ -487,10 +502,45 @@ function byline_editorial_notification_due_stories(int $user_id): array
     return $due;
 }
 
+/**
+ * Confirmed appointments starting within the next day. Fuzzy target windows are
+ * deliberately excluded: there is no moment to remind anyone about.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function byline_editorial_notification_due_appointments(int $user_id): array
+{
+    if (!function_exists('get_posts') || !function_exists('byline_story_appointments')) {
+        return [];
+    }
+    $now = function_exists('current_time') ? (int) current_time('timestamp', true) : time();
+    $due = [];
+    $posts = get_posts([
+        'post_type' => 'post', 'post_status' => ['draft', 'pending', 'future', 'private', 'publish'], 'posts_per_page' => 200,
+        'orderby' => 'modified', 'order' => 'DESC', 'no_found_rows' => true,
+        'meta_query' => [['key' => BYLINE_STORY_APPOINTMENTS_META, 'compare' => 'EXISTS']],
+    ]);
+    foreach (is_array($posts) ? $posts : [] as $post) {
+        $story_id = absint($post->ID ?? 0);
+        if ($story_id <= 0 || !byline_editorial_notification_story_can_be_viewed($user_id, $story_id)) {
+            continue;
+        }
+        foreach (byline_story_appointments($story_id) as $appointment) {
+            $start = $appointment['scheduleMode'] === 'exact' ? strtotime((string) $appointment['startAt']) : false;
+            if ($appointment['status'] !== 'confirmed' || !in_array($user_id, $appointment['assigneeIds'], true)
+                || $start === false || $start < $now || $start > $now + 86400) {
+                continue;
+            }
+            $due[] = ['kind' => 'appointment', 'id' => 0, 'storyId' => $story_id, 'appointment' => $appointment, '_dueTimestamp' => (int) $start];
+        }
+    }
+    return $due;
+}
+
 /** @return array<int,array<string,mixed>> */
 function byline_editorial_notification_due_items(int $user_id): array
 {
-    $items = [];
+    $items = byline_editorial_notification_due_appointments($user_id);
     foreach (byline_editorial_notification_due_tasks($user_id) as $task) {
         $items[] = [
             'kind' => 'task',
@@ -541,6 +591,12 @@ function byline_editorial_notification_message(array $payload, WP_User $recipien
         $lines = [];
         foreach (array_slice($items, 0, 20) as $item) {
             $story_title = byline_editorial_notification_story_title(absint($item['storyId'] ?? 0));
+            if (($item['kind'] ?? '') === 'appointment') {
+                $appointment = (array) $item['appointment'];
+                $lines[] = '- Appointment: ' . byline_editorial_notification_safe_text($appointment['title'] ?? 'Appointment', 180)
+                    . ($story_title !== '' ? ' — ' . $story_title : '') . ' (' . byline_story_appointment_when($appointment) . ')';
+                continue;
+            }
             if (($item['kind'] ?? '') === 'story') {
                 $when = (string) ($item['_dueLabel'] ?? 'due soon');
                 $lines[] = '- Story deadline: ' . ($story_title !== '' ? $story_title : 'Untitled story') . ' (' . $when . ')';
@@ -577,6 +633,34 @@ function byline_editorial_notification_message(array $payload, WP_User $recipien
             $subject = 'Byline: media work assigned';
             $body .= 'Media work has been assigned to you' . ($story_title !== '' ? ' for ' . $story_title : '.') . "\n";
             break;
+        case 'appointment-update':
+            $appointment = null;
+            foreach (function_exists('byline_story_appointments') ? byline_story_appointments($story_id) : [] as $candidate) {
+                if ($candidate['id'] === ($payload['appointmentId'] ?? '')) {
+                    $appointment = $candidate;
+                }
+            }
+            if ($appointment === null || ($payload['change'] ?? '') !== 'cancelled' && !in_array((int) $recipient->ID, $appointment['assigneeIds'], true)) {
+                return new WP_Error('byline_notification_empty_digest', 'The appointment is no longer relevant.', ['status' => 200, 'skip' => true]);
+            }
+            $title = byline_editorial_notification_safe_text($appointment['title'], 180);
+            $change = (string) ($payload['change'] ?? 'changed');
+            $subject = ['assigned' => 'Byline: appointment assigned to you', 'cancelled' => 'Byline: appointment cancelled'][$change] ?? 'Byline: appointment changed';
+            $body .= ['assigned' => 'An appointment has been assigned to you: ', 'cancelled' => 'An appointment was cancelled: '][$change] ?? 'An appointment changed: ';
+            $body .= $title . "\n";
+            if ($change !== 'cancelled') {
+                $body .= 'When: ' . byline_story_appointment_when($appointment) . "\n";
+                if ($appointment['location'] !== '') {
+                    $body .= 'Where: ' . byline_editorial_notification_safe_text($appointment['location'], 160) . "\n";
+                }
+            }
+            if ($story_title !== '') {
+                $body .= 'Story: ' . $story_title . "\n";
+            }
+            if (function_exists('byline_story_workspace_url')) {
+                $body .= "\nOpen the story workspace: " . byline_editorial_notification_safe_text(byline_story_workspace_url($story_id), 500) . "\n";
+            }
+            return ['subject' => $subject, 'body' => $body];
         case 'high-priority-task':
             $subject = 'Byline: high-priority task assigned';
             $body .= 'A high-priority task has been assigned to you' . ($task_title !== '' ? ': ' . $task_title : '.') . "\n";
@@ -718,6 +802,60 @@ function byline_editorial_notification_on_media_updated(int $post_id, $result, i
     byline_editorial_notification_enqueue('media-assignment', $recipient_id, $post_id, 0, $token, absint($actor_id));
 }
 
+/**
+ * Tell the right person about an appointment, quietly: a new assignment, a
+ * cancellation, or a change to the exact time or place of something already
+ * scheduled. Notes, status chatter and target-window edits send nothing.
+ *
+ * @param array<string,mixed>|null $appointment
+ * @param array<string,mixed>|null $previous
+ */
+function byline_editorial_notification_on_appointment_changed(int $story_id, $appointment, $previous, string $operation, ?int $actor_id = null): void
+{
+    if (!is_array($appointment) || $operation === 'deleted') {
+        return;
+    }
+    $actor_id = absint($actor_id);
+    $previous = is_array($previous) ? $previous : null;
+    $previous_assignees = $previous ? (array) $previous['assigneeIds'] : [];
+    $open = in_array($appointment['status'], ['planned', 'tentative', 'confirmed'], true);
+    $cancelled = $appointment['status'] === 'cancelled' && (!$previous || $previous['status'] !== 'cancelled');
+    $moved = $previous !== null && $appointment['scheduleMode'] === 'exact' && (
+        $previous['scheduleMode'] !== 'exact' || $previous['startAt'] !== $appointment['startAt'] || $previous['endAt'] !== $appointment['endAt'] || $previous['location'] !== $appointment['location']
+    );
+    foreach ((array) $appointment['assigneeIds'] as $recipient_id) {
+        $recipient_id = absint($recipient_id);
+        if ($recipient_id <= 0 || $recipient_id === $actor_id) {
+            continue;
+        }
+        $change = '';
+        if ($cancelled && in_array($recipient_id, $previous_assignees, true)) {
+            $change = 'cancelled';
+        } elseif ($open && !in_array($recipient_id, $previous_assignees, true)) {
+            $change = 'assigned';
+        } elseif ($open && $moved) {
+            $change = 'changed';
+        }
+        if ($change !== '') {
+            byline_editorial_notification_enqueue('appointment-update', $recipient_id, $story_id, 0, $change . '-' . $appointment['updatedAt'], $actor_id, ['appointmentId' => $appointment['id'], 'change' => $change]);
+        }
+    }
+}
+
+/** @param array<string,mixed>|null $assignment @param array<string,mixed>|null $previous */
+function byline_editorial_notification_on_media_assignment_changed(int $story_id, $assignment, $previous, string $operation, ?int $actor_id = null): void
+{
+    if (!is_array($assignment) || $operation === 'deleted') {
+        return;
+    }
+    $recipient_id = absint($assignment['assigneeId'] ?? 0);
+    $previous_recipient_id = is_array($previous) ? absint($previous['assigneeId'] ?? 0) : 0;
+    if ($recipient_id <= 0 || $recipient_id === $previous_recipient_id || $recipient_id === absint($actor_id)) {
+        return;
+    }
+    byline_editorial_notification_enqueue('media-assignment', $recipient_id, $story_id, 0, 'assignment-' . $assignment['id'] . '-' . $recipient_id, absint($actor_id));
+}
+
 function byline_editorial_notification_on_task_changed(int $task_id, $task, string $operation, array $changes = []): void
 {
     if (!is_array($task) || !in_array($operation, ['created', 'changed'], true)) {
@@ -777,6 +915,7 @@ function byline_editorial_notification_profile_fields(WP_User $user): void
         'storyReturned' => 'When an editor sends your story back for revision.',
         'mediaAssignments' => 'When photo, video, or other media work is assigned to you.',
         'highPriorityTasks' => 'When a high-priority or urgent task is assigned to you.',
+        'appointments' => 'When an interview or appointment is assigned to you, rescheduled, or cancelled.',
         'dueDigest' => 'One email with work that is due soon or overdue.',
         'publishingFailures' => 'When the public site fails to publish and needs attention.',
     ];
@@ -853,6 +992,8 @@ if (function_exists('add_action')) {
     add_action('byline_editorial_story_updated', 'byline_editorial_notification_on_story_updated', 10, 4);
     add_action('byline_editorial_media_request_updated', 'byline_editorial_notification_on_media_updated', 10, 4);
     add_action('byline_editorial_task_changed', 'byline_editorial_notification_on_task_changed', 10, 4);
+    add_action('byline_story_appointment_changed', 'byline_editorial_notification_on_appointment_changed', 10, 5);
+    add_action('byline_editorial_media_assignment_changed', 'byline_editorial_notification_on_media_assignment_changed', 10, 5);
     add_action('byline_editorial_build_failed', 'byline_editorial_notification_on_build_failed', 10, 2);
     add_action('show_user_profile', 'byline_editorial_notification_profile_fields');
     add_action('edit_user_profile', 'byline_editorial_notification_profile_fields');

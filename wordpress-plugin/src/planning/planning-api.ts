@@ -12,6 +12,7 @@ import {
   type SavedPlanningView
 } from "./planning-model";
 import { normalizeStorySidebarPanel } from "../editorial/story-sidebar-navigation";
+import type { ScheduleResponse } from "../workspace/workspace-types";
 
 /**
  * The caller supplies WordPress' authenticated apiFetch (or a compatible
@@ -32,6 +33,7 @@ export const PLANNING_REST_ROUTES = {
   story: "/byline/v1/editorial/stories",
   savedViews: "/byline/v1/editorial/planning/views",
   media: "/byline/v1/admin/media",
+  schedule: "/byline/v1/editorial/schedule",
   coverage: "/byline/v1/admin/coverage",
   feedback: "/byline/v1/admin/feedback",
   corrections: "/byline/v1/admin/editorial/corrections",
@@ -161,7 +163,12 @@ export type PlanningFetchers = {
   saveSavedView?: (view: SavedPlanningViewInput) => Promise<SavedPlanningView>;
   deleteSavedView?: (viewId: string) => Promise<void>;
   getMediaDesk?: (filters?: Record<string, string | number | boolean | undefined>) => Promise<MediaDeskResponse>;
+  /** Legacy per-story update (`POST /admin/media/<storyId>`). Also owns the story-level featured image. */
   updateMediaRequest?: (requestId: number, changes: Record<string, unknown>) => Promise<unknown>;
+  /** Update one production assignment (`MediaAssignmentInput`: status, assigneeId, dueAt, attachmentIds, notes, title, type). */
+  updateMediaAssignment?: (storyId: number, assignmentId: string, changes: Record<string, unknown>) => Promise<unknown>;
+  /** The Calendar's schedule feed. Site-local day range, at most about four months. */
+  getSchedule?: (from: string, to: string, includeTasks?: boolean) => Promise<ScheduleResponse>;
   getCoverage?: () => Promise<CoverageResponse>;
   createCoverage?: (input: Record<string, unknown>) => Promise<unknown>;
   addStoryToCoverage?: (coverageId: number, storyId: number) => Promise<unknown>;
@@ -209,6 +216,11 @@ export function planningFilterParams(filters?: Partial<PlanningFilters>): Record
 
 function idPath(path: string, id: string | number): string {
   return `${path}/${encodeURIComponent(String(id))}`;
+}
+
+/** `POST /editorial/stories/<storyId>/media-assignments/<assignmentId>` (a UUID, or `legacy-v1`). */
+export function mediaAssignmentPath(storyId: number, assignmentId: string): string {
+  return `${idPath(PLANNING_REST_ROUTES.story, storyId)}/media-assignments/${encodeURIComponent(assignmentId)}`;
 }
 
 /**
@@ -271,6 +283,16 @@ export function createPlanningFetchers(request: PlanningRequest): PlanningFetche
       path: idPath(PLANNING_REST_ROUTES.media, requestId),
       method: "POST",
       data: changes
+    }),
+
+    updateMediaAssignment: (storyId, assignmentId, changes) => request({
+      path: mediaAssignmentPath(storyId, assignmentId),
+      method: "POST",
+      data: changes
+    }),
+
+    getSchedule: (from, to, includeTasks = false) => request<ScheduleResponse>({
+      path: queryPath(PLANNING_REST_ROUTES.schedule, { from, to, includeTasks: includeTasks ? 1 : undefined })
     }),
 
     getCoverage: () => request<CoverageResponse>({ path: PLANNING_REST_ROUTES.coverage }),

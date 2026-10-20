@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@base-ui/react": "^1.9.0",
     "@byline/admin-runtime": "0.1.0",
     "@byline/content": "0.1.0",
     "@byline/core": "0.1.0",
@@ -24,6 +25,7 @@
     "@byline/theme-weekly-wildcat": "0.1.0",
     "@byline/ui": "0.1.0",
     "@iconify/react": "^6.0.2",
+    "@tanstack/react-query": "^5.104.5",
     "@wordpress/api-fetch": "7.53.0",
     "@wordpress/blocks": "^15.26.0",
     "@wordpress/components": "39.0.0",
@@ -31,16 +33,27 @@
     "@wordpress/element": "8.5.0",
     "@wordpress/i18n": "6.26.0",
     "@wordpress/icons": "15.4.0",
-    "@wordpress/plugins": "7.53.0"
+    "@wordpress/plugins": "7.53.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.60.0",
+    "react-day-picker": "^10.0.1",
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "@wordpress/env": "11.14.0",
     "@wordpress/scripts": "34.2.0",
+    "postcss-nesting": "^14.0.3",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "tailwindcss": "^4.3.3",
     "typescript": "6.0.3",
     "vitest": "4.1.11"
   }

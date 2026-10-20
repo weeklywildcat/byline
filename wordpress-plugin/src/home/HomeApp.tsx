@@ -1,350 +1,130 @@
-import { Button, Card, CardBody, Notice, Spinner } from "@wordpress/components";
-import { useCallback, useEffect, useMemo, useState } from "@wordpress/element";
-import { __ } from "@wordpress/i18n";
-
-import { normalizeBylineError } from "@byline/admin-runtime";
-
-import {
-  exactPlanningDate,
-  relativePlanningDate,
-  type PlanningStory
-} from "../planning/planning-model";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, Plus, Search } from "lucide-react";
+import { Toaster, toast } from "sonner";
+import { describeEditorialError, setTaskCompletionState, type EditorialTask } from "../editorial/editorial-model";
 import type { HomeFetchers } from "./home-api";
-import { PresetsPanel } from "./PresetsPanel";
-import {
-  doctorHealthStatus,
-  homeAttentionItems,
-  homeComingUp,
-  homeFailureMessage,
-  homeRecentlyPublished,
-  homeYourStories,
-  type HomeActivityRecord,
-  type HomeData,
-  type HomeAttentionSeverity,
-  type HomeHealthStatus,
-  type HomeResourceState
-} from "./home-model";
+import { homeQueryClient, homeKey, workspaceKey, replaceHomeTask, replaceWorkspaceTask } from "./home-query";
+import { HomePortalContext } from "./lib/portal";
+import { dateLabel, homeAgenda, myActiveStories, myOpenTasks, reviewStories, waitingForMe, type HomeBootstrap } from "./newsroom-model";
+import { HomeCommands, type HomeActionUrls } from "./HomeCommands";
+import { HomeCreate } from "./HomeCreate";
+import { StoryPeek } from "./StoryPeek";
+import { Button } from "./ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "./ui/sheet";
+import { TooltipProvider } from "./ui/tooltip";
+import type { StoryWorkspace } from "../workspace/workspace-types";
+import { ActivityRow, AgendaItem, AttentionRow, Empty, MediaAssignmentRow, RowSkeletons, StoryRow, Surface, TaskRow } from "./components/rows";
 
-export type HomeAppProps = {
-  fetchers: HomeFetchers;
-  currentUserId?: number | null;
-  actionUrls?: {
-    dashboard?: string;
-    planning?: string;
-    contentHealth?: string;
-    feedback?: string;
-    deployment?: string;
-    doctor?: string;
-  };
-};
+export type HomeAppProps = { fetchers: HomeFetchers; currentUserId?: number | null; actionUrls?: HomeActionUrls };
 
-function emptyResource<T>(available = false): HomeResourceState<T> {
-  return { data: null, error: null, available };
+export function HomeApp(props: HomeAppProps) {
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  return <QueryClientProvider client={homeQueryClient}><div className="byline-home-root" ref={setRoot}><HomePortalContext value={root}><TooltipProvider>{root ? <HomeWorkspace {...props} /> : null}<Toaster position="bottom-right" closeButton toastOptions={{ className: "home-toast" }} /></TooltipProvider></HomePortalContext></div></QueryClientProvider>;
 }
 
-function emptyData(fetchers: HomeFetchers): HomeData {
-  return {
-    planning: emptyResource(Boolean(fetchers.getPlanning)),
-    health: emptyResource(Boolean(fetchers.getHealth)),
-    contentHealth: emptyResource(Boolean(fetchers.getContentHealth)),
-    feedback: emptyResource(Boolean(fetchers.getFeedback)),
-    deployment: emptyResource(Boolean(fetchers.getDeployment)),
-    activity: emptyResource(Boolean(fetchers.getActivity))
-  };
-}
-
-/** One safe error boundary, shared with every other Byline admin surface. */
-function requestError(error: unknown, fallback: string): string {
-  return normalizeBylineError(error, { message: fallback }).message;
-}
-
-async function loadResource<T>(fetcher: (() => Promise<T>) | undefined, label: string): Promise<HomeResourceState<T>> {
-  if (!fetcher) return emptyResource(false);
-  try {
-    return { data: await fetcher(), error: null, available: true };
-  } catch (error) {
-    return { data: null, error: requestError(error, `${label} could not be loaded.`), available: true };
-  }
-}
-
-function StatusMark({ status }: { status: HomeHealthStatus | HomeAttentionSeverity | "info" }) {
-  const label = status === "critical" ? "Needs attention" : status === "recommended" || status === "warning" ? "Recommended" : status === "good" ? "Good" : "Info";
-  return <span className={`byline-home-status-mark byline-home-status-${status}`} aria-label={label}>{status === "critical" || status === "recommended" || status === "warning" ? "!" : status === "good" ? "✓" : "•"}</span>;
-}
-
-function StoryLink({ story, showDate = false }: { story: PlanningStory; showDate?: boolean }) {
-  const date = story.deadline ? relativePlanningDate(story.deadline) : "";
-  return (
-    <li className="byline-home-story-item">
-      <a href={story.editUrl || undefined}>{story.title || __("Untitled story", "weekly-wildcat-headless")}</a>
-      <span className="byline-home-story-meta">
-        {story.workflow.label}
-        {showDate && date ? ` · ${date}` : ""}
-        {showDate && story.deadline ? <span className="byline-home-sr-only">{` (${exactPlanningDate(story.deadline)})`}</span> : null}
-      </span>
-    </li>
-  );
-}
-
-function EmptyList({ children }: { children: string }) {
-  return <p className="byline-home-muted">{children}</p>;
-}
-
-function activityTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || __("Unknown time", "weekly-wildcat-headless");
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
-}
-
-function ActivityList({ records }: { records: HomeActivityRecord[] }) {
-  if (!records.length) return <EmptyList>{__("No newsroom activity has been recorded yet.", "weekly-wildcat-headless")}</EmptyList>;
-  return (
-    <ul className="byline-home-activity-list">
-      {records.slice(0, 12).map((item) => (
-        <li key={String(item.id)}>
-          <span className="byline-home-activity-mark" aria-hidden="true">•</span>
-          <div>
-            <strong>{item.summary}</strong>
-            <small>
-              {item.story?.title ? `${item.story.title} · ` : ""}
-              {item.actor?.name ? `${item.actor.name} · ` : ""}
-              <time dateTime={item.occurredAt}>{activityTime(item.occurredAt)}</time>
-            </small>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function FailureList({ data, actionUrls }: { data: HomeData; actionUrls: HomeAppProps["actionUrls"] }) {
-  const failures = [
-    { resource: data.contentHealth, label: __("Content Health", "weekly-wildcat-headless"), href: actionUrls?.contentHealth },
-    { resource: data.feedback, label: __("Reader feedback", "weekly-wildcat-headless"), href: actionUrls?.feedback },
-    { resource: data.deployment, label: __("Website publishing", "weekly-wildcat-headless"), href: actionUrls?.deployment },
-    { resource: data.health, label: __("Byline checks", "weekly-wildcat-headless"), href: actionUrls?.doctor },
-    { resource: data.activity, label: __("Newsroom activity", "weekly-wildcat-headless"), href: actionUrls?.dashboard }
-  ].filter((item) => item.resource.error);
-
-  if (!failures.length) return null;
-  return (
-    <section className="byline-home-failures" aria-labelledby="byline-home-failures-heading">
-      <h2 id="byline-home-failures-heading">{__("Some services need attention", "weekly-wildcat-headless")}</h2>
-      {failures.map((failure) => (
-        <Notice key={failure.label} status="warning" isDismissible={false}>
-          <strong>{failure.label}</strong>{" "}{homeFailureMessage(failure.resource, failure.label)}
-          {failure.href ? <>{" "}<a href={failure.href}>{__("Open", "weekly-wildcat-headless")}</a></> : null}
-        </Notice>
-      ))}
-    </section>
-  );
-}
-
-function AttentionList({ data, actionUrls, onRetryDeployment, retrying }: { data: HomeData; actionUrls: HomeAppProps["actionUrls"]; onRetryDeployment?: () => void; retrying?: boolean }) {
-  const items = useMemo(() => homeAttentionItems(data), [data]);
-  if (!items.length) {
-    return (
-      <div className="byline-home-all-clear" role="status">
-        <StatusMark status="good" />
-        <div>
-          <strong>{__("Everything is on track", "weekly-wildcat-headless")}</strong>
-          <p>{__("No overdue stories, review requests, or integration failures were found in your view.", "weekly-wildcat-headless")}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const hrefFor = (item: (typeof items)[number]) => item.href || (item.source === "deployment" ? actionUrls?.deployment : item.source === "content-health" ? actionUrls?.contentHealth : item.source === "feedback" ? actionUrls?.feedback : item.source === "health" ? actionUrls?.doctor : undefined);
-  return (
-    <ul className="byline-home-attention-list">
-      {items.map((item) => {
-        const href = hrefFor(item);
-        return (
-          <li key={item.id}>
-            <StatusMark status={item.severity} />
-            <span className="byline-home-attention-copy">
-              <strong>{item.title}</strong>
-              <small>{item.detail}</small>
-            </span>
-            {item.id === "deployment-failed" && onRetryDeployment ? (
-              <Button variant="link" isBusy={retrying} disabled={retrying} onClick={onRetryDeployment}>{retrying ? __("Retrying…", "weekly-wildcat-headless") : __("Retry", "weekly-wildcat-headless")}</Button>
-            ) : href ? <a href={href}>{__("Open", "weekly-wildcat-headless")}</a> : null}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function Metric({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="byline-home-metric">
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function HomeStatus({ status, doctorUrl }: { status: ReturnType<typeof doctorHealthStatus>; doctorUrl?: string }) {
-  const text = status === "good"
-    ? __("Everything looks good", "weekly-wildcat-headless")
-    : status === "critical"
-      ? __("Byline needs attention", "weekly-wildcat-headless")
-      : status === "recommended"
-        ? __("A few setup checks need review", "weekly-wildcat-headless")
-        : __("Byline checks are unavailable", "weekly-wildcat-headless");
-  return (
-    <div className="byline-home-health-summary">
-      <StatusMark status={status === "unknown" ? "info" : status} />
-      <div>
-        <strong>{text}</strong>
-        {doctorUrl ? <a href={doctorUrl}>{__("Open Byline Doctor", "weekly-wildcat-headless")}</a> : null}
-      </div>
-    </div>
-  );
-}
-
-export function HomeApp({ fetchers, currentUserId, actionUrls }: HomeAppProps) {
-  const [data, setData] = useState<HomeData>(() => emptyData(fetchers));
-  const [loading, setLoading] = useState(true);
-  const [retryingDeployment, setRetryingDeployment] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    const [planning, health, contentHealth, feedback, deployment, activity] = await Promise.all([
-      loadResource(fetchers.getPlanning, "Stories"),
-      loadResource(fetchers.getHealth, "Byline checks"),
-      loadResource(fetchers.getContentHealth, "Content Health"),
-      loadResource(fetchers.getFeedback, "Reader feedback"),
-      loadResource(fetchers.getDeployment, "Website publishing"),
-      loadResource(fetchers.getActivity, "Newsroom activity")
-    ]);
-    setData({ planning, health, contentHealth, feedback, deployment, activity });
-    if (planning.error) setLoadError(planning.error);
-    setLoading(false);
-  }, [fetchers]);
+function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
+  const client = useQueryClient();
+  const home = useQuery({ queryKey: homeKey, queryFn: () => fetchers.getHome!(), enabled: Boolean(fetchers.getHome) });
+  const health = useQuery({ queryKey: ["byline", "home-health"], queryFn: () => fetchers.getHealth!(), enabled: Boolean(fetchers.getHealth) });
+  const deployment = useQuery({ queryKey: ["byline", "home-deployment"], queryFn: () => fetchers.getDeployment!(), enabled: Boolean(fetchers.getDeployment) });
+  const data = home.data;
+  const timezone = data?.timezone || "UTC";
+  const [now, setNow] = useState(new Date());
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [peekId, setPeekId] = useState<number | null>(null);
+  const [origin, setOrigin] = useState<HTMLElement | null>(null);
+  const [recentIds, setRecentIds] = useState<number[]>([]);
+  const [createKind, setCreateKind] = useState<"story" | "task" | null>(null);
+  const [taskStoryId, setTaskStoryId] = useState<number | null>(null);
+  const [allWorkOpen, setAllWorkOpen] = useState(false);
+  const workRef = useRef<HTMLElement | null>(null);
+  const [completionError, setCompletionError] = useState("");
+  const [completedLabel, setCompletedLabel] = useState("");
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    const shortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!createKind) setCommandOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", shortcut, true);
+    return () => { clearInterval(timer); window.removeEventListener("keydown", shortcut, true); };
+  }, [createKind]);
 
-  const retryDeployment = useCallback(async () => {
-    if (!fetchers.retryDeployment || retryingDeployment) return;
-    setRetryingDeployment(true);
-    try {
-      const deployment = await fetchers.retryDeployment();
-      setData((current) => ({ ...current, deployment: { data: deployment, error: null, available: true } }));
-      setLoadError(null);
-    } catch (error) {
-      const message = requestError(error, "Website publishing could not be retried.");
-      setData((current) => ({ ...current, deployment: { data: null, error: message, available: true } }));
-      setLoadError(message);
-    } finally {
-      setRetryingDeployment(false);
-    }
-  }, [fetchers.retryDeployment, retryingDeployment]);
+  function openStory(id: number) {
+    if (!peekId) setOrigin(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    setPeekId(id);
+    setRecentIds((ids) => [id, ...ids.filter((item) => item !== id)].slice(0, 8));
+  }
+  // A new story opens its full Story Workspace; Peek stays the fast way to inspect existing rows.
+  function openCreatedStory(created: StoryWorkspace) {
+    const url = created.workspaceUrl || actionUrls?.workspace?.(created.story.id);
+    if (url) window.location.assign(url); else openStory(created.story.id);
+  }
+  const complete = useMutation({
+    mutationFn: (task: EditorialTask) => fetchers.editorial!.updateTask(task.id, { state: "completed" }),
+    onMutate: async (task) => {
+      setCompletionError("");
+      await client.cancelQueries({ queryKey: homeKey });
+      if (task.storyId) await client.cancelQueries({ queryKey: workspaceKey(task.storyId) });
+      const focused = document.activeElement as HTMLElement | null;
+      const container = focused?.closest(".home-surface, .home-peek-section, .home-all-work");
+      const rows = container ? Array.from(container.querySelectorAll<HTMLElement>("[data-slot=checkbox]")) : [];
+      const index = focused ? rows.indexOf(focused) : -1;
+      const next = rows[index + 1] || rows[index - 1];
+      const updated = setTaskCompletionState(task, "completed");
+      client.setQueryData<HomeBootstrap>(homeKey, (old) => replaceHomeTask(old, updated));
+      if (task.storyId) client.setQueryData<StoryWorkspace>(workspaceKey(task.storyId), (old) => replaceWorkspaceTask(old, updated));
+      if (index >= 0) requestAnimationFrame(() => { if (next?.isConnected) next.focus(); else (container?.querySelector<HTMLElement>(".home-work-footer button, .home-peek-section header button") || workRef.current)?.focus(); });
+    },
+    onSuccess: (_updated, task) => setCompletedLabel(`Completed ${task.title}.`),
+    onError: (error, task) => {
+      client.setQueryData<HomeBootstrap>(homeKey, (old) => replaceHomeTask(old, task));
+      if (task.storyId) client.setQueryData<StoryWorkspace>(workspaceKey(task.storyId), (old) => replaceWorkspaceTask(old, task));
+      const message = describeEditorialError(error, "Task couldn't be completed. Try again.");
+      setCompletionError(message);
+      toast.error(message);
+    },
+    onSettled: (_data, _error, task) => { void client.invalidateQueries({ queryKey: homeKey }); if (task.storyId) void client.invalidateQueries({ queryKey: workspaceKey(task.storyId) }); }
+  });
+  const tasks = data ? myOpenTasks(data.tasks, data.currentUser.id, timezone, now) : [];
+  const stories = data ? myActiveStories(data.stories, data.currentUser.id, timezone, now) : [];
+  const agenda = data ? homeAgenda(data, now).slice(0, 6) : [];
+  const attention = data ? waitingForMe(data, now) : [];
+  const review = data ? reviewStories(data) : [];
+  const visuals = data?.visualWork.filter((v) => v.status !== "done" && (data.capabilities.review || v.assignee?.id === data.currentUser.id)) || [];
+  const newTask = (storyId: number | null = null) => { setTaskStoryId(storyId); setCreateKind("task"); };
+  const storyTitle = (id?: number | null) => data?.stories.find((s) => s.id === id)?.title;
+  const renderTask = (task: EditorialTask) => <TaskRow key={task.id} task={task} storyTitle={storyTitle(task.storyId)} timezone={timezone} now={now} pending={complete.isPending} onOpen={task.storyId ? () => openStory(task.storyId!) : undefined} onComplete={() => complete.mutate(task)} />;
+  const section = (key: keyof HomeBootstrap["errors"], content: ReactNode, empty: string) => home.isPending ? <RowSkeletons /> : home.isError ? <Empty>Work is temporarily unavailable.</Empty> : data?.errors[key] ? <p className="home-inline-error" role="alert">{data.errors[key]} <Button variant="link" onClick={() => void home.refetch()}>Try again</Button></p> : content || <Empty>{empty}</Empty>;
+  const failedDeploy = deployment.data?.lifecycle === "failed";
+  const criticalHealth = health.data?.checks?.find((check) => check.status === "critical");
 
-  const stories = data.planning.data?.stories || [];
-  const resolvedUserId = currentUserId ?? data.planning.data?.currentUser?.id ?? null;
-  const comingUp = useMemo(() => homeComingUp(stories), [stories]);
-  const yourStories = useMemo(() => homeYourStories(stories, resolvedUserId), [resolvedUserId, stories]);
-  const recentlyPublished = useMemo(() => homeRecentlyPublished(stories), [stories]);
-  const healthStatus = doctorHealthStatus(data.health.data);
-
-  return (
-    <div className="byline-home-app">
-      <header className="byline-home-header">
-        <div>
-          <p className="byline-home-eyebrow">{__("Newsroom workspace", "weekly-wildcat-headless")}</p>
-          <h1>{__("Today", "weekly-wildcat-headless")}</h1>
-          <p>{__("The next useful thing to do, at a glance.", "weekly-wildcat-headless")}</p>
-        </div>
-        <Button variant="secondary" onClick={() => void load()} disabled={loading}>{loading ? __("Refreshing…", "weekly-wildcat-headless") : __("Refresh", "weekly-wildcat-headless")}</Button>
-      </header>
-
-      {loadError && !data.planning.data ? <Notice status="warning" isDismissible={false}>{__("Stories are temporarily unavailable. Other Byline checks are still shown below.", "weekly-wildcat-headless")}{" "}<Button variant="link" onClick={() => void load()}>{__("Try again", "weekly-wildcat-headless")}</Button></Notice> : null}
-
-      {!data.planning.available ? <Notice status="info" isDismissible={false}>{__("Story work is not available for this role. Byline checks and integrations you can access are shown below.", "weekly-wildcat-headless")}</Notice> : null}
-
-      <section className="byline-home-primary-grid">
-        <Card className="byline-home-attention-card">
-          <CardBody>
-            <div className="byline-home-section-heading">
-              <div>
-                <p className="byline-home-eyebrow">{__("Prioritized for you", "weekly-wildcat-headless")}</p>
-                <h2>{__("Needs your attention", "weekly-wildcat-headless")}</h2>
-              </div>
-              {loading ? <Spinner /> : null}
-            </div>
-            <AttentionList data={data} actionUrls={actionUrls} onRetryDeployment={fetchers.retryDeployment ? () => void retryDeployment() : undefined} retrying={retryingDeployment} />
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <p className="byline-home-eyebrow">{__("System", "weekly-wildcat-headless")}</p>
-            <h2>{__("Byline status", "weekly-wildcat-headless")}</h2>
-            <HomeStatus status={healthStatus} doctorUrl={actionUrls?.doctor} />
-            {data.deployment.data?.pending ? <p className="byline-home-muted">{__("Website update is queued.", "weekly-wildcat-headless")}</p> : null}
-          </CardBody>
-        </Card>
-      </section>
-
-      <section className="byline-home-section" aria-labelledby="byline-home-coming-up-heading">
-        <div className="byline-home-section-heading">
-          <div>
-            <p className="byline-home-eyebrow">{__("Plan ahead", "weekly-wildcat-headless")}</p>
-            <h2 id="byline-home-coming-up-heading">{__("Coming up", "weekly-wildcat-headless")}</h2>
-          </div>
-          {actionUrls?.planning ? <a href={actionUrls.planning}>{__("Open Stories", "weekly-wildcat-headless")}</a> : null}
-        </div>
-        {data.planning.available ? (
-          <div className="byline-home-metrics">
-            <Metric value={comingUp.dueToday} label={__("stories due today", "weekly-wildcat-headless")} />
-            <Metric value={comingUp.scheduledToday} label={__("posts scheduled today", "weekly-wildcat-headless")} />
-            <Metric value={comingUp.plannedSoon} label={__("planned this week", "weekly-wildcat-headless")} />
-          </div>
-        ) : <p className="byline-home-muted">{__("Story planning is unavailable for this role.", "weekly-wildcat-headless")}</p>}
-      </section>
-
-      <section className="byline-home-lists-grid">
-        <Card>
-          <CardBody>
-            <div className="byline-home-section-heading"><h2>{__("Your work", "weekly-wildcat-headless")}</h2>{actionUrls?.planning ? <a href={actionUrls.planning}>{__("View all", "weekly-wildcat-headless")}</a> : null}</div>
-            {data.planning.available ? (yourStories.length ? <ul className="byline-home-story-list">{yourStories.map((story) => <StoryLink key={story.id} story={story} showDate />)}</ul> : <EmptyList>{resolvedUserId ? __("No assigned stories are visible yet.", "weekly-wildcat-headless") : __("Your assigned stories will appear here.", "weekly-wildcat-headless")}</EmptyList>) : <EmptyList>{__("Story work is not available for this role.", "weekly-wildcat-headless")}</EmptyList>}
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="byline-home-section-heading"><h2>{__("Recently published", "weekly-wildcat-headless")}</h2>{actionUrls?.planning ? <a href={actionUrls.planning}>{__("Open Stories", "weekly-wildcat-headless")}</a> : null}</div>
-            {data.planning.available ? (recentlyPublished.length ? <ul className="byline-home-story-list">{recentlyPublished.map((story) => <StoryLink key={story.id} story={story} />)}</ul> : <EmptyList>{__("No recently published stories are visible yet.", "weekly-wildcat-headless")}</EmptyList>) : <EmptyList>{__("Story work is not available for this role.", "weekly-wildcat-headless")}</EmptyList>}
-          </CardBody>
-        </Card>
-      </section>
-
-      {data.activity.available ? (
-        <section className="byline-home-section" aria-labelledby="byline-home-activity-heading">
-          <Card>
-            <CardBody>
-              <div className="byline-home-section-heading">
-                <div>
-                  <p className="byline-home-eyebrow">{__("What happened", "weekly-wildcat-headless")}</p>
-                  <h2 id="byline-home-activity-heading">{__("Recent newsroom activity", "weekly-wildcat-headless")}</h2>
-                </div>
-              </div>
-              {data.activity.error ? <Notice status="warning" isDismissible={false}>{data.activity.error}{" "}<Button variant="link" onClick={() => void load()}>{__("Try again", "weekly-wildcat-headless")}</Button></Notice> : <ActivityList records={data.activity.data?.activity || data.activity.data?.items || []} />}
-            </CardBody>
-          </Card>
-        </section>
-      ) : null}
-
-      {fetchers.getPresets ? <PresetsPanel fetchers={fetchers} canEdit={Boolean(actionUrls?.dashboard)} /> : null}
-
-      <FailureList data={data} actionUrls={actionUrls} />
-      <p className="byline-home-status-line" role="status" aria-live="polite">
-        {loading ? __("Refreshing newsroom data…", "weekly-wildcat-headless") : data.planning.error ? __("Home is showing available checks while Stories reconnects.", "weekly-wildcat-headless") : __("Home is up to date.", "weekly-wildcat-headless")}
-      </p>
+  return <main className="home-workspace">
+    <header className="home-page-heading"><div><h1>Today<span className="home-greeting">{data?.currentUser.name ? ` / ${data.currentUser.name.split(" ")[0]}` : ""}</span></h1><p>{new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: timezone }).format(now)}</p></div><div className="home-header-actions"><Button variant="outline" className="home-search-trigger" onClick={() => setCommandOpen(true)}><Search size={15} /><span>Search</span><kbd>⌘K / Ctrl K</kbd></Button>{data?.capabilities.createStory ? <Button onClick={() => setCreateKind("story")}><Plus size={15} />New story</Button> : null}</div></header>
+    {!fetchers.getHome ? <p className="home-inline-error">Story work is not available for this role.</p> : home.isError ? <div role="alert" className="home-inline-error home-load-error">{describeEditorialError(home.error, "Home couldn't be loaded. Try again.")} <Button variant="outline" onClick={() => void home.refetch()}>Try again</Button></div> : null}
+    <div className="home-grid">
+      <Surface title="Up Next" subtitle="Your assigned work, in order of urgency" className="home-up-next" action={fetchers.editorial ? <Button variant="ghost" size="sm" onClick={() => newTask()}><Plus size={13} />Task</Button> : undefined}>
+        <section ref={workRef} tabIndex={-1} aria-label="Assigned tasks">{section("tasks", tasks.length ? <ul className="home-rows">{tasks.slice(0, 7).map(renderTask)}</ul> : null, "No open assignments.")}<footer className="home-work-footer"><Button variant="link" onClick={() => setAllWorkOpen(true)}>View all work<ArrowRight size={13} /></Button><span>{tasks.length ? `${tasks.length} open` : ""}</span></footer></section>
+        {completionError ? <p role="alert" className="home-inline-error">{completionError}</p> : null}
+      </Surface>
+      <Surface title="Waiting for Me" className="home-waiting">{home.isPending ? <RowSkeletons count={2} /> : attention.length || failedDeploy || criticalHealth ? <ul className="home-rows">{attention.map((item) => <AttentionRow key={item.id} item={item} onOpen={() => item.storyId ? openStory(item.storyId) : workRef.current?.focus()} />)}{failedDeploy && actionUrls?.deployment ? <li><a className="home-service-attention" href={actionUrls.deployment}>Website publication failed<ArrowRight size={13} /></a></li> : null}{criticalHealth && actionUrls?.doctor ? <li><a className="home-service-attention" href={actionUrls.doctor}>{criticalHealth.label}<ArrowRight size={13} /></a></li> : null}</ul> : <Empty>{home.isError || data?.errors.tasks || data?.errors.stories || data?.errors.visualWork || data?.errors.appointments ? "Attention items couldn't be checked." : "You're caught up."}</Empty>}</Surface>
+      <Surface title="Coming Up" className="home-coming-up" action={actionUrls?.calendar ? <a className="home-surface-link" href={actionUrls.calendar}>Calendar<ArrowRight size={12} /></a> : undefined}>{section("stories", agenda.length ? <div className="home-agenda">{Array.from(new Set(agenda.map((e) => e.day))).map((day) => <section key={day}><h3>{dateLabel(day, timezone, now)}</h3><ul className="home-rows">{agenda.filter((e) => e.day === day).map((event) => <AgendaItem key={event.id} event={event} timezone={timezone} onOpen={event.storyId ? () => openStory(event.storyId!) : undefined} />)}</ul></section>)}</div> : null, "Nothing scheduled in the next two weeks.")}{data?.errors.tasks || data?.errors.visualWork || data?.errors.appointments ? <p className="home-partial-note">Some assignments could not be checked.</p> : null}</Surface>
+      <Surface title="My Stories" className="home-my-stories" action={actionUrls?.planning ? <a className="home-surface-link" href={`${actionUrls.planning}&mine=1`}>All my stories<ArrowRight size={12} /></a> : undefined}>{section("stories", stories.length ? <ul className="home-rows">{stories.slice(0, 6).map((story) => <StoryRow key={story.id} story={story} timezone={timezone} now={now} onOpen={() => openStory(story.id)} />)}</ul> : null, "No active stories assigned to you.")}</Surface>
+      {data?.capabilities.review ? <Surface title="Ready for Review" className="home-review" action={<span className="home-section-count">{review.length}</span>}>{review.length ? <ul className="home-rows">{review.slice(0, 5).map((story) => <li key={story.id}><button type="button" className="home-story-row" onClick={() => openStory(story.id)}><span className="home-row-copy"><span className="home-row-title">{story.title}</span><span className="home-meta">{story.authors.map((a) => a.name).join(", ") || story.writer?.name || "Unassigned writer"} · Ready for review</span></span><ArrowRight size={14} className="home-row-arrow" /></button></li>)}</ul> : <Empty>{data.errors.stories ? "The review queue couldn't be checked." : "No stories waiting for review."}</Empty>}</Surface> : null}
+      {data?.capabilities.review || visuals.length || data?.errors.visualWork ? <Surface title="Photo & Visual Work" className={`home-visuals ${!data?.capabilities.review ? "home-visuals-wide" : ""}`}>{section("visualWork", visuals.length ? <ul className="home-rows">{visuals.slice(0, 5).map((media) => <MediaAssignmentRow key={`${media.story.id}-${media.id}`} media={media} timezone={timezone} now={now} onOpen={() => openStory(media.story.id)} />)}</ul> : null, "No photo assignments.")}</Surface> : null}
+      <Surface title="Recent Activity" className="home-activity">{section("activity", data?.activity.length ? <ul className="home-rows">{data.activity.slice(0, 10).map((item) => <ActivityRow key={item.id} item={item} timezone={timezone} onOpen={item.storyId ? () => openStory(item.storyId!) : undefined} />)}</ul> : null, "No recent newsroom activity.")}</Surface>
     </div>
-  );
+    <footer className="home-page-footer"><span>{data ? `Dates shown in ${timezone.replace(/_/g, " ")}` : ""}</span><Button variant="link" disabled={home.isFetching} onClick={() => void home.refetch()}>{home.isFetching ? "Refreshing…" : "Refresh"}</Button></footer>
+    {health.isError || deployment.isError ? <p className="home-partial-note">Some system checks are unavailable. Your work is shown above.</p> : null}
+    <span role="status" className="sr-only" aria-live="polite">{completedLabel}</span>
+    <StoryPeek storyId={peekId} fetchers={fetchers} timezone={timezone} onClose={() => setPeekId(null)} origin={origin} onComplete={(task) => complete.mutate(task)} completing={complete.isPending} onNewTask={newTask} now={now} workspaceUrl={actionUrls?.workspace} />
+    <HomeCommands open={commandOpen} onOpenChange={setCommandOpen} fetchers={fetchers} data={data} recentIds={recentIds} onStory={openStory} onNewStory={() => setCreateKind("story")} onNewTask={newTask} urls={actionUrls} />
+    <HomeCreate kind={createKind} onClose={() => setCreateKind(null)} onStoryCreated={openCreatedStory} fetchers={fetchers} data={data} storyId={taskStoryId} />
+    <Sheet open={allWorkOpen} onOpenChange={setAllWorkOpen}><SheetContent className="home-story-peek home-all-work"><SheetHeader><SheetTitle>All my work</SheetTitle><SheetDescription>Your visible open assignments</SheetDescription></SheetHeader><div className="home-peek-scroll">{tasks.length ? <ul className="home-rows">{tasks.map(renderTask)}</ul> : <Empty>No open assignments.</Empty>}{data && tasks.length >= data.limits.tasks ? <p className="home-partial-note">Showing the first {data.limits.tasks} assignments.</p> : null}</div></SheetContent></Sheet>
+  </main>;
 }

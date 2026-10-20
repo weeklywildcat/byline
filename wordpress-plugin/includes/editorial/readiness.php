@@ -236,6 +236,10 @@ function byline_story_readiness_checks(int $post_id, array $context = []): array
     $media_request = function_exists('byline_get_editorial_media_request')
         ? byline_get_editorial_media_request($post_id)
         : null;
+    // With several production assignments, readiness looks at all of them.
+    if (function_exists('byline_media_assignments_readiness_view') && ($all_assignments = byline_media_assignments_readiness_view($post_id)) !== null) {
+        $media_request = $all_assignments;
+    }
     $visual_records = [];
     foreach (['byline_get_story_visual_requests', 'byline_get_story_media_requests', 'byline_get_editorial_media_requests', 'byline_get_editorial_media_request'] as $provider) {
         if (function_exists($provider)) {

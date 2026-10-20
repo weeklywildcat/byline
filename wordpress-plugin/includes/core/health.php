@@ -113,6 +113,9 @@ function byline_expected_admin_asset_presence(): array
         'assetManifest' => $plugin_root . '/build/index.asset.php',
         'vendorStyles' => $plugin_root . '/build/index.css',
         'adminStyles' => $plugin_root . '/build/style-index.css',
+        'homeScript' => $plugin_root . '/build/home.js',
+        'homeManifest' => $plugin_root . '/build/home.asset.php',
+        'homeStyles' => $plugin_root . '/build/style-home.css',
         // The block-editor workflow entry. Without it a production install opens
         // the post editor with no editorial workflow control at all.
         'editorialWorkflowScript' => $plugin_root . '/build/editorial-workflow.js',

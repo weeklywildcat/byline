@@ -48,6 +48,10 @@ primary command uses WordPress 7.1 and the legacy command uses WordPress 6.6.
    anonymously accessible.
 7. Planning Quick View moves one story optimistically, persists it, rolls back
    a failed move without corrupting another story, and opens the full editor.
+8. [Byline Home](byline-home.md) uses real writer/admin authentication, creates
+   drafts, completes tasks with rollback, returns focus after Story Peek,
+   searches by keyboard, manages private links, and opens Gutenberg without
+   Home CSS. Home screenshots cover 1440, 1280, 1024, 768 and 390 pixels.
 
 ## Manual QA that still needs a person
 

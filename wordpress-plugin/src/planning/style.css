@@ -403,7 +403,123 @@
 .byline-planning-calendar-event-planned { border-color: #646970; }
 .byline-planning-calendar-event-scheduled { border-color: #2271b1; }
 .byline-planning-calendar-event-published { border-color: #00a32a; }
+.byline-planning-calendar-event-appointment { border-color: #6a3fb5; background: #f4f0fb; }
+.byline-planning-calendar-event-media { border-color: #007c89; background: #eef7f8; }
+.byline-planning-calendar-event-task { border-color: #50575e; border-left-style: dashed; }
+.byline-planning-calendar-event-completed { opacity: 0.65; }
+.byline-planning-calendar-event-completed .byline-planning-calendar-event-title { text-decoration: line-through; }
 .byline-planning-calendar-event-title { margin-left: 4px; }
+.byline-planning-calendar-event-time { font-weight: 600; }
+.byline-planning-calendar-event-time + .byline-planning-calendar-event-title { margin-left: 4px; }
+
+/* Rows are grouped into weeks for the grid semantics, but lay out as one 7-column grid. */
+.byline-planning-calendar-week { display: contents; }
+.byline-planning-calendar-grid-cell { min-width: 0; }
+
+.byline-planning-calendar-more {
+  border: 0;
+  padding: 2px 5px;
+  background: transparent;
+  color: #2271b1;
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.byline-planning-calendar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.byline-planning-calendar-filter-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 6px;
+  background: #c3c4c7;
+}
+
+.byline-planning-calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #50575e;
+  font-size: 12px;
+}
+
+.byline-planning-calendar-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.byline-planning-calendar-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 12px;
+  border-left: 3px solid #646970;
+  background: #f6f7f7;
+}
+
+.byline-planning-needs-scheduling {
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #dcdcde;
+  border-left: 3px solid #6a3fb5;
+  background: #fff;
+}
+
+.byline-planning-needs-scheduling h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.byline-planning-needs-scheduling-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.byline-planning-needs-scheduling-item {
+  display: grid;
+  gap: 2px;
+  height: 100%;
+  padding: 8px 10px;
+  border: 1px solid #dcdcde;
+  background: #f6f7f7;
+  color: #1d2327;
+  text-decoration: none;
+}
+
+.byline-planning-needs-scheduling-item:hover { border-color: #6a3fb5; }
+.byline-planning-needs-scheduling-item:focus-visible { outline: 2px solid #2271b1; outline-offset: 2px; }
+.byline-planning-needs-scheduling-title { font-weight: 600; }
+.byline-planning-needs-scheduling-meta { color: #50575e; font-size: 12px; }
+.byline-planning-needs-scheduling-target { color: #6a3fb5; font-size: 12px; font-weight: 600; }
+.byline-planning-needs-scheduling-target.byline-planning-muted { color: #646970; font-weight: 400; }
+
+.byline-planning-media-assignment-title { margin: 0; font-size: 14px; }
+.byline-planning-media-story { margin: 2px 0 0; font-size: 12px; }
+.byline-planning-media-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 6px 0;
+  font-size: 12px;
+}
+.byline-planning-media-workspace-link { margin-left: auto; }
 
 .byline-planning-media-groups,
 .byline-planning-coverage-list,

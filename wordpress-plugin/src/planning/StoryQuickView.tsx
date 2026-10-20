@@ -7,10 +7,12 @@ import type { PlanningFetchers } from "./planning-api";
 import {
   mergeMediaAttachmentIds,
   relativePlanningDate,
+  reportingSummaryLine,
   type PlanningPerson,
   type PlanningStory,
   type PlanningWorkflowStatus
 } from "./planning-model";
+import { createWorkspaceUrlBuilder, type WorkspaceUrl } from "./calendar-model";
 import { normalizeStoryQuickView, type QuickViewTask, type StoryQuickViewData } from "./quick-view-model";
 import { PlanningDateValue, PlanningStatusBadge } from "./planning-ui";
 import "./story-quick-view.css";
@@ -19,6 +21,8 @@ export type StoryQuickViewProps = {
   story: PlanningStory;
   statuses: PlanningWorkflowStatus[];
   fetchers: PlanningFetchers;
+  /** Story Workspace URL builder. Defaults to a URL relative to the current wp-admin page. */
+  workspaceUrl?: WorkspaceUrl;
   onClose: () => void;
   onMoveStory?: (story: PlanningStory, status: string) => Promise<void> | void;
   onUpdateStory?: (storyId: number, changes: Record<string, unknown>) => Promise<void> | void;
@@ -199,7 +203,7 @@ function QuickViewVisual({ data, story, fetchers, reload }: { data: StoryQuickVi
   );
 }
 
-export function StoryQuickView({ story, statuses, fetchers, onClose, onMoveStory, onUpdateStory }: StoryQuickViewProps) {
+export function StoryQuickView({ story, statuses, fetchers, workspaceUrl: workspaceUrlProp, onClose, onMoveStory, onUpdateStory }: StoryQuickViewProps) {
   const [data, setData] = useState<StoryQuickViewData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -252,6 +256,8 @@ export function StoryQuickView({ story, statuses, fetchers, onClose, onMoveStory
   };
 
   const taskData = data || normalizeStoryQuickView({}, story);
+  const workspaceHref = (workspaceUrlProp || createWorkspaceUrlBuilder())(story.id);
+  const reportingLine = reportingSummaryLine(story.reporting);
 
   return (
     <Modal title={story.title || __("Story Quick View", "weekly-wildcat-headless")} onRequestClose={onClose} className="byline-story-quick-view-modal">
@@ -261,6 +267,10 @@ export function StoryQuickView({ story, statuses, fetchers, onClose, onMoveStory
           <div className="byline-story-quick-view-header-row">
             <PlanningStatusBadge label={story.workflow.label} tone={story.workflow.id === "ready" ? "info" : "neutral"} />
             <span className="byline-story-quick-view-state">{wordPressStateLabel(story)}</span>
+          </div>
+          <div className="byline-story-quick-view-workspace">
+            <Button variant="primary" href={workspaceHref} className="byline-story-quick-view-workspace-link">{__("Open full story workspace", "weekly-wildcat-headless")}</Button>
+            {reportingLine ? <p className="byline-story-quick-view-reporting">{reportingLine}</p> : null}
           </div>
           <dl className="byline-story-quick-view-meta">
             <div><dt>{__("Writer", "weekly-wildcat-headless")}</dt><dd>{story.writer?.name || __("Unassigned", "weekly-wildcat-headless")}</dd></div>
@@ -280,7 +290,7 @@ export function StoryQuickView({ story, statuses, fetchers, onClose, onMoveStory
 
         <StoryQuickViewSection title={__("Actions", "weekly-wildcat-headless")}>
           <div className="byline-story-quick-view-actions">
-            <Button variant="primary" href={story.editUrl}>{__("Open article", "weekly-wildcat-headless")}</Button>
+            <Button variant="secondary" href={story.editUrl}>{__("Open article", "weekly-wildcat-headless")}</Button>
             <Button variant="secondary" href={storyPreviewUrl(story)} target="_blank" rel="noreferrer">{__("Preview as Byline", "weekly-wildcat-headless")}</Button>
           </div>
           <SelectControl

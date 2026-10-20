@@ -74,6 +74,9 @@ no database binding. See [docs/polls.md](docs/polls.md).
 The plugin owns durable editorial settings, legacy sports/events storage,
 publication configuration, protected deployment/Discord integrations, and
 newsroom workflows. Admin tools work without the public site being reachable.
+Start from **Planning → Today** for personal tasks, upcoming commitments and
+story context. [Byline Home](docs/byline-home.md) documents Story Peek, search,
+quick draft creation and its isolated shadcn Mira/React 19 implementation.
 The fixed homepage follows automatic selection rules, including the sticky lead.
 Sports management is retired; the plugin converts published game and roster records to fixed archive Pages grouped by sport and season. See [sports archive](docs/sports-archive.md).
 There is no layout editor, manual homepage pinning, or design scheduling.
