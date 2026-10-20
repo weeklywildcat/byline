@@ -6,6 +6,7 @@ import { AssigneePicker } from "../admin-ui/components/pickers";
 import { Button } from "../admin-ui/ui/button";
 import { Field, FieldDescription, FieldLabel } from "../admin-ui/ui/field";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "../admin-ui/ui/attachment";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../admin-ui/ui/tooltip";
 import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog-shell";
 import { DayField } from "./fields";
 import { emptyMediaForm, fileCountLabel, mediaFormToInput, mediaToForm, validateMediaForm, type MediaForm } from "./media-form";
@@ -30,7 +31,7 @@ export function FileAttachment({ preview, unavailable, onRemove, disabled }: { p
     <AttachmentMedia variant={image ? "image" : "icon"}>{image ? <img src={preview.previewUrl!} alt="" loading="lazy" /> : preview.mimeType?.startsWith("image/") ? <FileImage aria-hidden="true" /> : <FileText aria-hidden="true" />}</AttachmentMedia>
     <AttachmentContent><AttachmentTitle>{title}</AttachmentTitle><AttachmentDescription>#{preview.id}{unavailable ? " · can't be read" : href ? " · open preview" : ""}</AttachmentDescription></AttachmentContent>
     {href ? <AttachmentTrigger render={<a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title} in a new tab`} />} /> : null}
-    <AttachmentActions><AttachmentAction type="button" aria-label={`Remove ${unavailable ? `file ${preview.id}` : preview.title}`} disabled={disabled} onClick={onRemove}><X aria-hidden="true" /></AttachmentAction></AttachmentActions>
+    <AttachmentActions><Tooltip><TooltipTrigger render={<AttachmentAction type="button" aria-label={`Remove ${unavailable ? `file ${preview.id}` : preview.title}`} disabled={disabled} onClick={onRemove} />}><X aria-hidden="true" /></TooltipTrigger><TooltipContent>Remove file</TooltipContent></Tooltip></AttachmentActions>
   </Attachment>;
 }
 
