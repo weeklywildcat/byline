@@ -5,6 +5,7 @@ import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { decodeEntities } from "../admin-ui/lib/text";
 import { StoryTitleButton } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Button } from "../admin-ui/ui/button";
@@ -63,7 +64,7 @@ function CoverageCard({ item, stories, canManage, fetchers, onOpenStory }: Props
         <h3 className="text-xs font-medium text-muted-foreground">{__("Stories", "weekly-wildcat-headless")} · {item.storyCount}{item.plannedStoryCount ? ` (${item.plannedStoryCount} ${__("planned", "weekly-wildcat-headless")})` : ""}</h3>
         {item.stories?.length
           ? <ItemGroup className="-mx-2 gap-0">{item.stories.map((story) => <Item key={story.id} size="xs">
-            <ItemContent><ItemTitle><StoryTitleButton story={story} onOpen={onOpenStory} className="font-medium" /></ItemTitle></ItemContent>
+            <ItemContent><ItemTitle><StoryHoverCard storyId={story.id} title={story.title}><StoryTitleButton story={story} onOpen={onOpenStory} className="font-medium" /></StoryHoverCard></ItemTitle></ItemContent>
             <ItemActions>
               <StatusBadge tone={story.isPublished ? "done" : "neutral"}>{story.isPublished ? __("Published", "weekly-wildcat-headless") : __("Planned", "weekly-wildcat-headless")}</StatusBadge>
               {canManage && fetchers.removeStoryFromCoverage ? <Button variant="ghost" size="icon-xs" aria-label={`${__("Remove", "weekly-wildcat-headless")} ${story.title}`} onClick={() => setRemoving(story)}><Trash2 aria-hidden="true" /></Button> : null}
