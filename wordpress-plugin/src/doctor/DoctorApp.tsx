@@ -197,11 +197,8 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
         <Alert>
           <TriangleAlert aria-hidden="true" />
           <AlertTitle>{__("Website publishing needs attention", "weekly-wildcat-headless")}</AlertTitle>
-          <AlertDescription>{__("The last deployment request failed. WordPress content is safe; test the deploy hook or open deployment settings.", "weekly-wildcat-headless")}</AlertDescription>
-          <AlertAction className="flex gap-1">
-            {canManageIntegrations ? <Button variant="secondary" isBusy={busyAction === "test-deploy-hook"} disabled={Boolean(busyAction)} onClick={() => void runAction("test-deploy-hook")}>{__("Test deploy hook", "weekly-wildcat-headless")}</Button> : null}
-            {urls?.deployment ? <Button variant="link" href={urls.deployment}>{__("Settings", "weekly-wildcat-headless")}</Button> : null}
-          </AlertAction>
+          <AlertDescription>{__("The last deployment request failed. WordPress content is safe.", "weekly-wildcat-headless")}{urls?.deployment ? <> <a href={urls.deployment}>{__("Open deployment settings", "weekly-wildcat-headless")}</a>.</> : null}</AlertDescription>
+          {canManageIntegrations ? <AlertAction><Button variant="secondary" isBusy={busyAction === "test-deploy-hook"} disabled={Boolean(busyAction)} onClick={() => void runAction("test-deploy-hook")}>{__("Test deploy hook", "weekly-wildcat-headless")}</Button></AlertAction> : null}
         </Alert>
       ) : null}
 
