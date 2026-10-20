@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { Eye, Plus, Trash2 } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { decodeEntities } from "../admin-ui/lib/text";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Button } from "../admin-ui/ui/button";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "../admin-ui/ui/combobox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../admin-ui/ui/dialog";
@@ -16,7 +17,6 @@ import { Spinner } from "../admin-ui/ui/spinner";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
 import { ToggleGroup, ToggleGroupItem } from "../admin-ui/ui/toggle-group";
 import { describeEditorialError } from "../editorial/editorial-model";
-import { ConfirmRemoveDialog } from "../workspace/dialog-shell";
 import { coverageKey, invalidateStoryData, planningKey } from "../story/story-query";
 import { planningFilterParams, type PlanningFetchers } from "./planning-api";
 import { EMPTY_PLANNING_FILTERS, exactPlanningDate, type CoverageItem, type CoverageResponse, type CoverageStatus } from "./planning-model";
@@ -41,7 +41,6 @@ function CoverageCard({ item, stories, canManage, fetchers, onOpenStory }: Props
   const client = useQueryClient();
   const [adding, setAdding] = useState<StoryChoice | null>(null);
   const [newTitle, setNewTitle] = useState("");
-  const [removing, setRemoving] = useState<{ id: number; title: string } | null>(null);
   const linked = new Set((item.stories || []).map((story) => story.id));
   const available = stories.filter((story) => !linked.has(story.id));
   const refresh = () => Promise.all([client.invalidateQueries({ queryKey: coverageKey }), invalidateStoryData(client)]);
@@ -50,6 +49,9 @@ function CoverageCard({ item, stories, canManage, fetchers, onOpenStory }: Props
     onSuccess: () => { void refresh(); },
     onError: (error) => toast.error(describeEditorialError(error, __("Coverage could not be updated.", "weekly-wildcat-headless")))
   });
+  const removeStory = (story: { id: number; title: string }) => run.mutate(() => fetchers.removeStoryFromCoverage!(item.id, story.id).then(() => {
+    toast.success(__("Story removed from coverage.", "weekly-wildcat-headless"), { action: { label: __("Undo", "weekly-wildcat-headless"), onClick: () => run.mutate(() => fetchers.addStoryToCoverage!(item.id, story.id)) } });
+  }));
   return <Card size="sm" role="region" aria-label={item.title}>
     <CardHeader>
       <CardTitle className="flex items-center gap-2">{item.title}<StatusBadge tone={item.status === "active" ? "done" : item.status === "draft" ? "attention" : "neutral"}>{statusLabel(item.status)}</StatusBadge></CardTitle>
