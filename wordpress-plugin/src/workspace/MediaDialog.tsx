@@ -7,7 +7,7 @@ import { AssigneePicker } from "../admin-ui/components/pickers";
 import { Button } from "../admin-ui/ui/button";
 import { Field, FieldDescription, FieldLabel } from "../admin-ui/ui/field";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "../admin-ui/ui/attachment";
-import { RemoveControl, WorkspaceDialog } from "./dialog-shell";
+import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog-shell";
 import { DayField } from "./fields";
 import { emptyMediaForm, fileCountLabel, mediaFormToInput, mediaToForm, validateMediaForm, type MediaForm } from "./media-form";
 import { mediaLibraryAvailable, pickFromMediaLibrary, type PickedAttachment } from "./media-library";
@@ -42,7 +42,8 @@ export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDial
   const { storyId, client, data, timezone, caps, currentUserId, reload } = useWorkspace();
   const cache = useWorkspaceCache();
   const manage = caps.manageMedia;
-  const [form, setForm] = useState<MediaForm>(() => (assignment ? mediaToForm(assignment, timezone) : emptyMediaForm(caps.assignMedia ? 0 : currentUserId)));
+  const initialForm = assignment ? mediaToForm(assignment, timezone) : emptyMediaForm(caps.assignMedia ? 0 : currentUserId);
+  const [form, setForm] = useState<MediaForm>(() => initialForm);
   const [previews, setPreviews] = useState<Map<number, PickedAttachment>>(() => new Map((assignment?.attachments || []).map((file) => [file.id, { id: file.id, title: file.title || `File ${file.id}`, previewUrl: file.previewUrl ?? file.url ?? null, mimeType: file.mimeType ?? null }])));
   const [attempted, setAttempted] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -61,11 +62,14 @@ export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDial
   const save = useMutation({ mutationFn: () => client.saveMediaAssignment(storyId, mediaFormToInput(form, assignment ?? undefined, { manage, assign: caps.assignMedia }, timezone), assignment?.id), ...handlers(assignment ? "Assignment saved." : "Assignment added.") });
   const remove = useMutation({ mutationFn: () => client.deleteMediaAssignment(storyId, assignment!.id), ...handlers("Assignment removed.") });
   const pending = save.isPending || remove.isPending;
+  const dirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
   const submit = () => {
     setAttempted(true);
     setError(null);
-    if (Object.keys(validateMediaForm(form)).length === 0) save.mutate();
+    const nextErrors = validateMediaForm(form);
+    if (Object.keys(nextErrors).length === 0) save.mutate();
+    else focusFirstInvalidField();
   };
   const addFromLibrary = async () => {
     setPicking(true);
@@ -82,7 +86,7 @@ export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDial
   const reloadAndClose = async () => { await reload(); onClose(); };
   const assigneeName = assignee?.name || assignment?.assignee?.name || "Unassigned";
 
-  return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} modal={!picking} title={assignment ? "Edit assignment" : "Add assignment"} description={manage ? "Photo, graphics, video and audio work for this story." : "You can update the status, notes and files of your assignment."} submitLabel={assignment ? "Save assignment" : "Add assignment"} pending={pending} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
+  return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} modal={!picking} title={assignment ? "Edit assignment" : "Add assignment"} description={manage ? "Photo, graphics, video and audio work for this story." : "You can update the status, notes and files of your assignment."} submitLabel={assignment ? "Save assignment" : "Add assignment"} pending={pending} dirty={dirty} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
     secondary={assignment && manage ? <RemoveControl label="Remove assignment" title="Remove this assignment?" description="Files stay in the Media Library." confirmLabel="Remove" pending={pending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
     {manage ? <>
       <TextField label="Title" value={form.title} onChange={(title) => patch({ title })} error={errors.title} maxLength={160} optional autoFocus placeholder={`${MEDIA_TYPE_LABELS[form.type]} for this story`} />
