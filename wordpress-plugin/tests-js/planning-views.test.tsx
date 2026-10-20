@@ -106,9 +106,13 @@ describe("StoryList", () => {
     expect(html).not.toMatch(/>[^<]*12:00\s?PM/);
   });
 
-  it("keeps WordPress state quiet and in words under Publication", () => {
-    expect(html).toContain("Scheduled Oct 26");
-    expect(html).toContain("Not planned");
+  it("makes newsroom dates and ownership scan before secondary status", () => {
+    expect(html).toContain("Oct 21");
+    expect(html).toContain("Tomorrow");
+    expect(html).toContain("Edited by Gibson Bell");
+    expect(html).toContain("Oct 26");
+    expect(html).toContain(">Scheduled<");
+    expect(html).not.toContain("Not planned");
   });
 });
 
