@@ -39,7 +39,7 @@ function expectDecoded(html: string) {
 describe("Home WordPress title entities", () => {
   it("decodes titles in My Stories and review rows", () => {
     expectDecoded(renderToStaticMarkup(<StoryRow story={story()} timezone={timezone} now={now} onOpen={vi.fn()} />));
-    expectDecoded(renderToStaticMarkup(<ReviewRow title={encoded} detail="Ready for review" onOpen={vi.fn()} />));
+    expectDecoded(renderToStaticMarkup(<ReviewRow storyId={17} title={encoded} detail="Ready for review" onOpen={vi.fn()} />));
   });
 
   it("decodes story titles carried through agenda, attention, and production rows", () => {
