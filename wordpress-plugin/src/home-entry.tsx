@@ -13,7 +13,7 @@ type HomeConfig = {
   currentUserId: number;
   capabilities: HomeNavigationCapabilities;
   urls: {
-    planning: { stories: string; calendar: string; contentHealth: string; feedback: string };
+    planning: { stories: string; calendar: string; media: string; contentHealth: string; feedback: string };
     integrations: { deployment: string };
     settings: { diagnostics: string };
   };
@@ -36,6 +36,7 @@ if (root && config) {
   createRoot(root).render(<HomeBoundary><HomeApp fetchers={fetchers} currentUserId={config.currentUserId} actionUrls={{
     planning: config.urls.planning.stories,
     calendar: config.urls.planning.calendar,
+    media: config.urls.planning.media,
     upload: config.capabilities.editPosts ? "media-new.php" : undefined,
     contentHealth: config.urls.planning.contentHealth,
     feedback: config.urls.planning.feedback,
