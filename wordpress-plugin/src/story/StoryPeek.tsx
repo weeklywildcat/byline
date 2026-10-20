@@ -9,7 +9,7 @@ import { decodeEntities } from "../admin-ui/lib/text";
 import { PeopleAvatars, anyPicture } from "../admin-ui/components/people-avatars";
 import { DatePicker, WritersPicker, fieldRow, valueSelectTriggerClass } from "../admin-ui/components/pickers";
 import { ResourceIcon } from "../admin-ui/components/resource-icon";
-import { StatusBadge } from "../admin-ui/components/status-badge";
+import { WorkStatusBadge, mediaIntensity } from "../admin-ui/components/work-status-badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
@@ -186,7 +186,7 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
                 <ItemDescription>{mediaTypeLabels[item.type] || "Visual"} · {assignee?.name || "Unassigned"}</ItemDescription>
                 {due ? <ItemDescription>Due {due}</ItemDescription> : null}
               </ItemContent>
-              <ItemActions><StatusBadge tone={item.status === "needed" ? "attention" : "neutral"}>{mediaStatusLabels[item.status] || "Needed"}</StatusBadge></ItemActions>
+              <ItemActions><WorkStatusBadge kind="production" intensity={mediaIntensity(item.status)}>{mediaStatusLabels[item.status] || "Needed"}</WorkStatusBadge></ItemActions>
             </Item>;
           })}</ItemGroup>}
         </PeekSection>
