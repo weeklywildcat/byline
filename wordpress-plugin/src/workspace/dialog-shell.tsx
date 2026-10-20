@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../admin-ui/ui/alert-dialog";
 import { Button } from "../admin-ui/ui/button";
@@ -15,6 +15,8 @@ export type WorkspaceDialogProps = {
   submitLabel: string;
   pendingLabel?: string;
   pending?: boolean;
+  /** True once the user has changed something that would be lost on close. */
+  dirty?: boolean;
   /** A server rejection shown above the actions, with an optional reload for a stale edit. */
   error?: string;
   onReload?: () => void;
@@ -31,27 +33,58 @@ export type WorkspaceDialogProps = {
  * The one dialog for source, appointment, production, task and link editing: a
  * Nova Dialog whose form scrolls between its header and footer.
  */
-export function WorkspaceDialog({ open, onClose, finalFocus, title, description, submitLabel, pendingLabel = "Saving…", pending, error, onReload, onSubmit, secondary, modal = true, readOnly, children }: WorkspaceDialogProps) {
+export function WorkspaceDialog({ open, onClose, finalFocus, title, description, submitLabel, pendingLabel = "Saving…", pending, dirty = false, error, onReload, onSubmit, secondary, modal = true, readOnly, children }: WorkspaceDialogProps) {
+  const [discardOpen, setDiscardOpen] = useState(false);
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!pending && !readOnly) onSubmit();
   };
-  return <Dialog open={open} modal={modal} onOpenChange={(next) => { if (!next && !pending && modal) onClose(); }}>
-    <DialogContent finalFocus={finalFocus} className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] sm:max-w-lg">
-      <DialogHeader><DialogTitle>{title}</DialogTitle>{description ? <DialogDescription>{description}</DialogDescription> : null}</DialogHeader>
-      <form onSubmit={submit} noValidate className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-4">
-        <FieldGroup className="no-scrollbar -mx-4 min-h-0 w-auto gap-4 overflow-y-auto px-4 pb-1">
-          {children}
-          {error ? <InlineAlert onAction={onReload} actionLabel="Reload">{error}</InlineAlert> : null}
-        </FieldGroup>
-        <DialogFooter className="items-center">
-          {secondary ? <div className="sm:mr-auto">{secondary}</div> : null}
-          <Button type="button" variant="outline" onClick={onClose} disabled={pending}>{readOnly ? "Close" : "Cancel"}</Button>
-          {readOnly ? null : <Button type="submit" disabled={pending}>{pending ? <><Spinner data-icon="inline-start" />{pendingLabel}</> : submitLabel}</Button>}
-        </DialogFooter>
-      </form>
-    </DialogContent>
-  </Dialog>;
+  const requestClose = () => {
+    if (pending || !modal) return;
+    if (dirty && !readOnly) setDiscardOpen(true);
+    else onClose();
+  };
+
+  useEffect(() => {
+    if (!open || !dirty || readOnly) return undefined;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [open, dirty, readOnly]);
+
+  return <>
+    <Dialog open={open} modal={modal} onOpenChange={(next) => { if (!next) requestClose(); }}>
+      <DialogContent finalFocus={finalFocus} className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] sm:max-w-lg">
+        <DialogHeader><DialogTitle>{title}</DialogTitle>{description ? <DialogDescription>{description}</DialogDescription> : null}</DialogHeader>
+        <form onSubmit={submit} noValidate className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-4">
+          <FieldGroup className="no-scrollbar -mx-4 min-h-0 w-auto gap-4 overflow-y-auto px-4 pb-1">
+            {error ? <InlineAlert onAction={onReload} actionLabel="Reload">{error}</InlineAlert> : null}
+            {children}
+          </FieldGroup>
+          <DialogFooter className="items-center">
+            {secondary || dirty ? <div className="flex items-center gap-3 sm:mr-auto">{secondary}{dirty && !readOnly ? <span className="text-xs text-muted-foreground">Unsaved changes</span> : null}</div> : null}
+            <Button type="button" variant="outline" onClick={requestClose} disabled={pending}>{readOnly ? "Close" : "Cancel"}</Button>
+            {readOnly ? null : <Button type="submit" disabled={pending}>{pending ? <><Spinner data-icon="inline-start" />{pendingLabel}</> : submitLabel}</Button>}
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+    <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+      <AlertDialogContent size="sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+          <AlertDialogDescription>Your edits in this form haven't been saved.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep editing</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={() => { setDiscardOpen(false); onClose(); }}>Discard changes</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>;
 }
 
 export type ConfirmRemoveProps = { title: string; description: string; confirmLabel: string; onConfirm: () => void };
@@ -76,4 +109,15 @@ export function RemoveControl({ label, pending, onStart, onConfirm, ...confirm }
   return <ConfirmRemoveDialog open={open} onOpenChange={setOpen} {...confirm} onConfirm={() => { onStart?.(); onConfirm(); }}>
     <AlertDialogTrigger render={<Button type="button" variant="destructive" disabled={pending} />}>{label}</AlertDialogTrigger>
   </ConfirmRemoveDialog>;
+}
+
+
+/** Move keyboard focus to the first invalid control in the topmost Nova dialog. */
+export function focusFirstInvalidField() {
+  requestAnimationFrame(() => {
+    const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[data-slot="dialog-content"]'));
+    const root = dialogs.at(-1);
+    const control = root?.querySelector<HTMLElement>('[aria-invalid="true"], [data-invalid="true"] input, [data-invalid="true"] textarea, [data-invalid="true"] button, [data-invalid="true"] [role="combobox"]');
+    control?.focus();
+  });
 }
