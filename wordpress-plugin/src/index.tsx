@@ -11,6 +11,11 @@ import {
   ToggleControl
 } from "./admin-ui/components/legacy-control-adapters";
 import { AdminRoot } from "./admin-ui/components/admin-root";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./admin-ui/ui/accordion";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "./admin-ui/ui/alert";
+import { AspectRatio } from "./admin-ui/ui/aspect-ratio";
+import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockTitle } from "./admin-ui/ui/code-block";
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "./admin-ui/ui/sidebar";
 import { Component, createRoot, useEffect, useState } from "@wordpress/element";
 // Scoped publication styles used by shared admin presentation components.
 import "@byline/theme-weekly-wildcat/styles.css";
@@ -1472,30 +1477,33 @@ function SettingsShell({ activeTab, children }: { activeTab: SettingsTab; childr
         <h1>Settings</h1>
         <p>Publication identity, connections, WordPress behavior, and advanced configuration in one place.</p>
       </header>
-      <div className="byline-settings-layout">
-        <aside className="byline-settings-rail" aria-label="Settings sections">
-          {groups.map((group) => (
-            <section key={group.label} className="byline-settings-rail-group">
-              <h2>{group.label}</h2>
-              <nav>
-                {group.items.map((item) => (
-                  <a
-                    key={item.id}
-                    href={adminUrl(config?.urls.settings[item.id])}
-                    className={activeTab === item.id ? "is-active" : undefined}
-                    aria-current={activeTab === item.id ? "page" : undefined}
-                  >
-                    {item.label}
-                  </a>
-                ))}
-              </nav>
-            </section>
-          ))}
-        </aside>
-        <section className="byline-settings-content">
+      <SidebarProvider className="byline-settings-layout">
+        <Sidebar aria-label="Settings sections">
+          <SidebarContent>
+            {groups.map((group) => (
+              <SidebarGroup key={group.label}>
+                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                <SidebarMenu>
+                  {group.items.map((item) => (
+                    <SidebarMenuItem key={item.id}>
+                      <SidebarMenuButton
+                        isActive={activeTab === item.id}
+                        render={<a href={adminUrl(config?.urls.settings[item.id])} aria-current={activeTab === item.id ? "page" : undefined} />}
+                      >
+                        {item.label}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroup>
+            ))}
+          </SidebarContent>
+        </Sidebar>
+        <SidebarInset className="byline-settings-content">
+          <div className="mb-4 md:hidden"><SidebarTrigger /></div>
           {children}
-        </section>
-      </div>
+        </SidebarInset>
+      </SidebarProvider>
     </div>
   );
 }
