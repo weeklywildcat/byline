@@ -3,6 +3,7 @@ import { __ } from "@wordpress/i18n";
 import { Button } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
 import { cn } from "../admin-ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../admin-ui/ui/tooltip";
 import { movableWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
 
 export type StoryActionsMenuProps = {
@@ -28,7 +29,7 @@ export function StoryActionsMenu({ story, statuses, canMove, disabled, onMove, w
   const movable = canMove && !story.wordpressState.isPublished;
   const stages = movableWorkflowStatuses(statuses);
   return <DropdownMenu>
-    <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className={cn("shrink-0", className)} disabled={disabled} aria-label={`${__("Actions for", "weekly-wildcat-headless")} ${title}`} data-story-actions={story.id} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
+    <Tooltip><TooltipTrigger render={<DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className={cn("shrink-0", className)} disabled={disabled} aria-label={`${__("Actions for", "weekly-wildcat-headless")} ${title}`} data-story-actions={story.id} />} />}><MoreHorizontal aria-hidden="true" /></TooltipTrigger><TooltipContent>{__("Story actions", "weekly-wildcat-headless")}</TooltipContent></Tooltip>
     <DropdownMenuContent align="end" className="w-52">
       <DropdownMenuGroup>
         <DropdownMenuItem render={<a href={workspaceUrl(story.id)} />}><LayoutDashboard aria-hidden="true" />{__("Open workspace", "weekly-wildcat-headless")}</DropdownMenuItem>

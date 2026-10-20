@@ -1,6 +1,12 @@
-import { Button, Card, CardBody, Notice, Spinner } from "@wordpress/components";
+import { Button, Card, CardBody, Notice, Spinner } from "../admin-ui/components/legacy-control-adapters";
 import { useCallback, useEffect, useMemo, useState } from "@wordpress/element";
+import { Check, TriangleAlert } from "lucide-react";
 import { __ } from "@wordpress/i18n";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../admin-ui/ui/accordion";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "../admin-ui/ui/alert";
+import { Badge } from "../admin-ui/ui/badge";
+import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockTitle } from "../admin-ui/ui/code-block";
+import { Progress, ProgressLabel } from "../admin-ui/ui/progress";
 
 import type {
   DoctorActionId,
@@ -68,7 +74,10 @@ function manifestAttentionMessage(manifest: DoctorDiagnostics["publicManifest"])
 
 function Mark({ status }: { status: string }) {
   const normalized = status === "critical" ? "critical" : status === "recommended" ? "recommended" : "good";
-  return <span className={`byline-doctor-mark byline-doctor-mark-${normalized}`} aria-label={normalized === "good" ? __("Good", "weekly-wildcat-headless") : normalized === "critical" ? __("Needs attention", "weekly-wildcat-headless") : __("Recommended", "weekly-wildcat-headless")}>{normalized === "good" ? "✓" : "!"}</span>;
+  const label = normalized === "good" ? __("Good", "weekly-wildcat-headless") : normalized === "critical" ? __("Needs attention", "weekly-wildcat-headless") : __("Recommended", "weekly-wildcat-headless");
+  return <Badge variant={normalized === "critical" ? "destructive" : normalized === "good" ? "secondary" : "outline"} className="shrink-0">
+    {normalized === "good" ? <Check data-icon="inline-start" aria-hidden="true" /> : <TriangleAlert data-icon="inline-start" aria-hidden="true" />}{label}
+  </Badge>;
 }
 
 function CheckRow({ check, onAction, busyAction }: { check: DoctorCheck; onAction: (action: DoctorActionId) => void; busyAction: DoctorActionId | null }) {
@@ -90,7 +99,7 @@ function CheckRow({ check, onAction, busyAction }: { check: DoctorCheck; onActio
 }
 
 function ActionFailure({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return <Notice status="error" isDismissible={false}>{message}{" "}<Button variant="link" onClick={onRetry}>{__("Try again", "weekly-wildcat-headless")}</Button></Notice>;
+  return <Alert variant="destructive"><AlertTitle>{__("Check failed", "weekly-wildcat-headless")}</AlertTitle><AlertDescription>{message}</AlertDescription><AlertAction><Button variant="secondary" onClick={onRetry}>{__("Try again", "weekly-wildcat-headless")}</Button></AlertAction></Alert>;
 }
 
 export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: DoctorAppProps) {
@@ -99,7 +108,6 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
   const [error, setError] = useState("");
   const [busyAction, setBusyAction] = useState<DoctorActionId | null>(null);
   const [actionMessage, setActionMessage] = useState("");
-  const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -151,22 +159,8 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
   const jobs = diagnostics?.jobs?.cronHealth;
   const jobsNeedAttention = Boolean(jobs && (jobs.status === "critical" || jobs.status === "recommended" || Number(diagnostics?.jobs?.overdueCount || 0) > 0));
   const supportReport = diagnostics?.supportReport || "";
-
-  const copyReport = async () => {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(supportReport);
-      } else {
-        const report = document.getElementById("byline-doctor-support-report") as HTMLTextAreaElement | null;
-        report?.focus();
-        report?.select();
-        document.execCommand("copy");
-      }
-      setCopied(true);
-    } catch {
-      setError(__("The report is ready below, but your browser could not copy it automatically.", "weekly-wildcat-headless"));
-    }
-  };
+  const passingChecks = allChecks.filter((check) => check.status === "good").length;
+  const checkProgress = allChecks.length ? Math.round((passingChecks / allChecks.length) * 100) : 0;
 
   return (
     <div className="byline-doctor-app">
@@ -192,30 +186,29 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
             {loading ? <Spinner /> : null}
           </div>
           <p>{status === "good" ? __("Byline is ready for newsroom work.", "weekly-wildcat-headless") : status === "unknown" ? __("Run the checks to see what needs attention.", "weekly-wildcat-headless") : __("The issues below are prioritized. Safe repair actions never reset your publication or content.", "weekly-wildcat-headless")}</p>
+          {allChecks.length ? <Progress value={checkProgress} className="mt-4">
+            <ProgressLabel>{__("Health checks", "weekly-wildcat-headless")}</ProgressLabel>
+            <span className="ml-auto text-xs tabular-nums text-muted-foreground">{passingChecks} / {allChecks.length} {__("passing", "weekly-wildcat-headless")}</span>
+          </Progress> : null}
         </CardBody>
       </Card>
 
       {deploymentAttention ? (
-        <Card className="byline-doctor-problem-card">
-          <CardBody>
-            <h2>{__("Website publishing needs attention", "weekly-wildcat-headless")}</h2>
-            <p>{__("The last deployment request failed. WordPress content is safe; test the deploy hook or open deployment settings.", "weekly-wildcat-headless")}</p>
-            <div className="byline-doctor-action-row">
-              {canManageIntegrations ? <Button variant="secondary" isBusy={busyAction === "test-deploy-hook"} disabled={Boolean(busyAction)} onClick={() => void runAction("test-deploy-hook")}>{__("Test deploy hook", "weekly-wildcat-headless")}</Button> : null}
-              {urls?.deployment ? <Button variant="link" href={urls.deployment}>{__("Open deployment settings", "weekly-wildcat-headless")}</Button> : null}
-            </div>
-          </CardBody>
-        </Card>
+        <Alert>
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle>{__("Website publishing needs attention", "weekly-wildcat-headless")}</AlertTitle>
+          <AlertDescription>{__("The last deployment request failed. WordPress content is safe.", "weekly-wildcat-headless")}{urls?.deployment ? <> <a href={urls.deployment}>{__("Open deployment settings", "weekly-wildcat-headless")}</a>.</> : null}</AlertDescription>
+          {canManageIntegrations ? <AlertAction><Button variant="secondary" isBusy={busyAction === "test-deploy-hook"} disabled={Boolean(busyAction)} onClick={() => void runAction("test-deploy-hook")}>{__("Test deploy hook", "weekly-wildcat-headless")}</Button></AlertAction> : null}
+        </Alert>
       ) : null}
 
       {manifestAttention ? (
-        <Card className="byline-doctor-problem-card">
-          <CardBody>
-            <h2>{__("Public site needs attention", "weekly-wildcat-headless")}</h2>
-            <p>{manifestAttentionMessage(diagnostics?.publicManifest)}</p>
-            <Button variant="secondary" isBusy={busyAction === "test-public-manifest"} disabled={Boolean(busyAction)} onClick={() => void runAction("test-public-manifest")}>{__("Test public site", "weekly-wildcat-headless")}</Button>
-          </CardBody>
-        </Card>
+        <Alert>
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle>{__("Public site needs attention", "weekly-wildcat-headless")}</AlertTitle>
+          <AlertDescription>{manifestAttentionMessage(diagnostics?.publicManifest)}</AlertDescription>
+          <AlertAction><Button variant="secondary" isBusy={busyAction === "test-public-manifest"} disabled={Boolean(busyAction)} onClick={() => void runAction("test-public-manifest")}>{__("Test public site", "weekly-wildcat-headless")}</Button></AlertAction>
+        </Alert>
       ) : null}
 
       {jobs ? (
@@ -275,12 +268,16 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
       ) : null}
 
       {allChecks.length ? (
-        <details className="byline-doctor-all-checks">
-          <summary>{__("Show all checks", "weekly-wildcat-headless")}</summary>
-          <ul className="byline-doctor-check-list">
-            {allChecks.map((check) => <CheckRow key={check.id} check={{ ...check, action: undefined }} onAction={(action) => void runAction(action)} busyAction={busyAction} />)}
-          </ul>
-        </details>
+        <Accordion className="rounded-xl border bg-card px-3">
+          <AccordionItem value="all-checks">
+            <AccordionTrigger>{__("All checks", "weekly-wildcat-headless")} <Badge variant="secondary" className="ml-auto mr-2">{allChecks.length}</Badge></AccordionTrigger>
+            <AccordionContent>
+              <ul className="byline-doctor-check-list">
+                {allChecks.map((check) => <CheckRow key={check.id} check={{ ...check, action: undefined }} onAction={(action) => void runAction(action)} busyAction={busyAction} />)}
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       ) : null}
 
       {supportReport ? (
@@ -288,12 +285,10 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
           <CardBody>
             <div className="byline-doctor-section-heading"><div><p className="byline-doctor-eyebrow">{__("Support", "weekly-wildcat-headless")}</p><h2>{__("Safe support report", "weekly-wildcat-headless")}</h2></div></div>
             <p>{__("This report excludes credentials, tokens, hook URLs, and private integration settings.", "weekly-wildcat-headless")}</p>
-            <label htmlFor="byline-doctor-support-report" className="byline-doctor-report-label">{__("Copy this report for support", "weekly-wildcat-headless")}</label>
-            <textarea id="byline-doctor-support-report" className="byline-doctor-report" readOnly value={supportReport} rows={12} />
-            <div className="byline-doctor-action-row">
-              <Button variant="secondary" onClick={() => void copyReport()}>{__("Copy support report", "weekly-wildcat-headless")}</Button>
-              {copied ? <span role="status">{__("Copied.", "weekly-wildcat-headless")}</span> : null}
-            </div>
+            <CodeBlock className="mt-3">
+              <CodeBlockHeader><CodeBlockTitle>{__("Support report", "weekly-wildcat-headless")}</CodeBlockTitle><CodeBlockActions><CodeBlockCopyButton value={supportReport} /></CodeBlockActions></CodeBlockHeader>
+              <CodeBlockContent wrap>{supportReport}</CodeBlockContent>
+            </CodeBlock>
           </CardBody>
         </Card>
       ) : null}

@@ -589,8 +589,9 @@ if (strpos($index_source, 'byline-admin-sidebar') !== false
     || strpos($style_source, 'byline-admin-nav') !== false) {
     fail('The duplicate global Byline sidebar/hash shell regressed.');
 }
-if (strpos($index_source, 'byline-settings-rail') === false) {
-    fail('The unified Settings screen must own a local settings rail.');
+if (strpos($index_source, '<SidebarProvider') === false
+    || strpos($index_source, '<SidebarMenu') === false) {
+    fail('The unified Settings screen must own grouped local settings navigation.');
 }
 if (strpos($game_source, "add_options_page(\n        'Byline Legacy Integration Settings'") !== false
     || strpos($game_source, "'Byline Legacy Settings'") !== false) {

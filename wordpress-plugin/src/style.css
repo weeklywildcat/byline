@@ -234,7 +234,7 @@
   gap: 16px;
 }
 
-.byline-repeat-list fieldset {
+.byline-repeat-list fieldset:not([class]) {
   border: 1px solid var(--byline-admin-border);
   border-radius: 4px;
   margin: 0;
@@ -338,7 +338,7 @@
   gap: 12px;
 }
 
-.byline-navigation-add .components-base-control {
+.byline-navigation-add [data-slot="field"] {
   flex: 1;
   margin-bottom: 0;
 }

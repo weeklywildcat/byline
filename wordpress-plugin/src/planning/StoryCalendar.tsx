@@ -11,6 +11,7 @@ import { ButtonGroup } from "../admin-ui/ui/button-group";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
 import { Skeleton } from "../admin-ui/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../admin-ui/ui/tooltip";
 import { scheduleKey } from "../story/story-query";
 import { CALENDAR_COMPONENTS, CATEGORY_DOT_CLASSES } from "./calendar-events";
 import { calendarHeading, createCalendarController } from "./calendar-controller";
@@ -112,8 +113,8 @@ export function StoryCalendar({ stories, timezone, getSchedule, currentUserId, w
       <h2 className="mr-2 min-w-40 text-lg font-medium tracking-tight" aria-live="polite">{heading || <Skeleton className="h-6 w-40" />}</h2>
       <ButtonGroup aria-label={__("Calendar navigation", "weekly-wildcat-headless")}>
         <Button variant="outline" onClick={controller.today}>{__("Today", "weekly-wildcat-headless")}</Button>
-        <Button variant="outline" size="icon" aria-label={__("Previous", "weekly-wildcat-headless")} onClick={() => controller.step(-1)}><ChevronLeft aria-hidden="true" /></Button>
-        <Button variant="outline" size="icon" aria-label={__("Next", "weekly-wildcat-headless")} onClick={() => controller.step(1)}><ChevronRight aria-hidden="true" /></Button>
+        <Tooltip><TooltipTrigger render={<Button variant="outline" size="icon" aria-label={__("Previous", "weekly-wildcat-headless")} onClick={() => controller.step(-1)} />}><ChevronLeft aria-hidden="true" /></TooltipTrigger><TooltipContent>{__("Previous", "weekly-wildcat-headless")}</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger render={<Button variant="outline" size="icon" aria-label={__("Next", "weekly-wildcat-headless")} onClick={() => controller.step(1)} />}><ChevronRight aria-hidden="true" /></TooltipTrigger><TooltipContent>{__("Next", "weekly-wildcat-headless")}</TooltipContent></Tooltip>
       </ButtonGroup>
       <div className="ml-auto flex items-center gap-2">
         {viewItems.length ? <Select items={viewItems} value={snapshot.view} onValueChange={(next) => { if (next) controller.setView(String(next)); }}>

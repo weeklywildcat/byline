@@ -5,7 +5,8 @@ import { SelectField, TextAreaField, TextField } from "../admin-ui/components/fo
 import { AssigneePicker } from "../admin-ui/components/pickers";
 import { Button } from "../admin-ui/ui/button";
 import { Field, FieldDescription, FieldLabel } from "../admin-ui/ui/field";
-import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "../admin-ui/ui/attachment";
+import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "../admin-ui/ui/attachment";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../admin-ui/ui/tooltip";
 import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog-shell";
 import { DayField } from "./fields";
 import { emptyMediaForm, fileCountLabel, mediaFormToInput, mediaToForm, validateMediaForm, type MediaForm } from "./media-form";
@@ -24,10 +25,13 @@ const statusOptions = MEDIA_ASSIGNMENT_STATUSES.map((value) => ({ value, label: 
 /** One Media Library file linked to the assignment: a native Attachment with its remove action. */
 export function FileAttachment({ preview, unavailable, onRemove, disabled }: { preview: PickedAttachment; unavailable: boolean; onRemove: () => void; disabled?: boolean }) {
   const title = unavailable ? "Unavailable file" : preview.title;
-  return <Attachment size="sm" state={unavailable ? "error" : "done"} className="w-full">
-    <AttachmentMedia variant={preview.previewUrl ? "image" : "icon"}>{preview.previewUrl ? <img src={preview.previewUrl} alt="" loading="lazy" /> : preview.mimeType?.startsWith("image/") ? <FileImage aria-hidden="true" /> : <FileText aria-hidden="true" />}</AttachmentMedia>
-    <AttachmentContent><AttachmentTitle>{title}</AttachmentTitle><AttachmentDescription>#{preview.id}{unavailable ? " · can't be read" : ""}</AttachmentDescription></AttachmentContent>
-    <AttachmentActions><AttachmentAction type="button" aria-label={`Remove ${unavailable ? `file ${preview.id}` : preview.title}`} disabled={disabled} onClick={onRemove}><X aria-hidden="true" /></AttachmentAction></AttachmentActions>
+  const href = unavailable ? null : preview.url || preview.previewUrl;
+  const image = Boolean(preview.previewUrl && preview.mimeType?.startsWith("image/"));
+  return <Attachment size="sm" orientation={image ? "vertical" : "horizontal"} state={unavailable ? "error" : "done"} className={image ? "w-32" : "w-60"}>
+    <AttachmentMedia variant={image ? "image" : "icon"}>{image ? <img src={preview.previewUrl!} alt="" loading="lazy" /> : preview.mimeType?.startsWith("image/") ? <FileImage aria-hidden="true" /> : <FileText aria-hidden="true" />}</AttachmentMedia>
+    <AttachmentContent><AttachmentTitle>{title}</AttachmentTitle><AttachmentDescription>#{preview.id}{unavailable ? " · can't be read" : href ? " · open preview" : ""}</AttachmentDescription></AttachmentContent>
+    {href ? <AttachmentTrigger render={<a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title} in a new tab`} />} /> : null}
+    <AttachmentActions><Tooltip><TooltipTrigger render={<AttachmentAction type="button" aria-label={`Remove ${unavailable ? `file ${preview.id}` : preview.title}`} disabled={disabled} onClick={onRemove} />}><X aria-hidden="true" /></TooltipTrigger><TooltipContent>Remove file</TooltipContent></Tooltip></AttachmentActions>
   </Attachment>;
 }
 
@@ -44,7 +48,7 @@ export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDial
   const manage = caps.manageMedia;
   const initialForm = assignment ? mediaToForm(assignment, timezone) : emptyMediaForm(caps.assignMedia ? 0 : currentUserId);
   const [form, setForm] = useState<MediaForm>(() => initialForm);
-  const [previews, setPreviews] = useState<Map<number, PickedAttachment>>(() => new Map((assignment?.attachments || []).map((file) => [file.id, { id: file.id, title: file.title || `File ${file.id}`, previewUrl: file.previewUrl ?? file.url ?? null, mimeType: file.mimeType ?? null }])));
+  const [previews, setPreviews] = useState<Map<number, PickedAttachment>>(() => new Map((assignment?.attachments || []).map((file) => [file.id, { id: file.id, title: file.title || `File ${file.id}`, url: file.url ?? null, previewUrl: file.previewUrl ?? file.url ?? null, mimeType: file.mimeType ?? null }])));
   const [attempted, setAttempted] = useState(false);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<ReturnType<typeof workspaceError> | null>(null);
@@ -145,7 +149,7 @@ export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDial
 
     <Field>
       <FieldLabel id="ws-media-files-label">Files <span className="font-normal text-muted-foreground">{fileCountLabel(form.attachmentIds.length)}</span></FieldLabel>
-      {form.attachmentIds.length ? <AttachmentGroup role="group" aria-labelledby="ws-media-files-label" className="flex-col gap-2 overflow-visible py-0">{form.attachmentIds.map((id) => <FileAttachment key={id} preview={previews.get(id) ?? { id, title: `File ${id}`, previewUrl: null, mimeType: null }} unavailable={invalid.has(id)} disabled={pending} onRemove={() => patch({ attachmentIds: form.attachmentIds.filter((item) => item !== id) })} />)}</AttachmentGroup> : <FieldDescription>No files linked yet.</FieldDescription>}
+      {form.attachmentIds.length ? <AttachmentGroup role="group" aria-labelledby="ws-media-files-label" className="-mx-1 w-[calc(100%+0.5rem)] px-1">{form.attachmentIds.map((id) => <FileAttachment key={id} preview={previews.get(id) ?? { id, title: `File ${id}`, url: null, previewUrl: null, mimeType: null }} unavailable={invalid.has(id)} disabled={pending} onRemove={() => patch({ attachmentIds: form.attachmentIds.filter((item) => item !== id) })} />)}</AttachmentGroup> : <FieldDescription>No files linked yet.</FieldDescription>}
       {mediaLibraryAvailable() ? <div><Button type="button" variant="outline" size="sm" disabled={pending || picking} onClick={() => void addFromLibrary()}>Add from Media Library</Button></div> : <FieldDescription>Upload files in the Media Library, then link them here.</FieldDescription>}
     </Field>
   </WorkspaceDialog>;

@@ -1,6 +1,11 @@
-import { Button, Notice, SelectControl, Spinner, TextControl } from "@wordpress/components";
+import { Button, Notice, SelectControl, Spinner, TextControl } from "../admin-ui/components/legacy-control-adapters";
 import { __ } from "@wordpress/i18n";
+import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useState } from "@wordpress/element";
+import { Badge } from "../admin-ui/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../admin-ui/ui/card";
+import { FieldGroup } from "../admin-ui/ui/field";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
 
 import type { NewsletterFetchers } from "./api";
 import {
@@ -83,7 +88,9 @@ export function NewsletterSettings({ fetchers, initialProviderId, title }: Newsl
     try {
       const result = await fetchers.saveProviderSettings(providerId, settings);
       setProviders((current) => current.map((provider) => provider.id === result.provider.id ? result.provider : provider));
-      setNotice(result.message || __("Provider settings saved.", "weekly-wildcat-headless"));
+      const message = result.message || __("Provider settings saved.", "weekly-wildcat-headless");
+      setNotice(message);
+      toast.success(message);
     } catch (saveError: unknown) {
       setError(describeNewsletterError(saveError, __("Provider settings could not be saved.", "weekly-wildcat-headless")));
     } finally {
@@ -101,7 +108,9 @@ export function NewsletterSettings({ fetchers, initialProviderId, title }: Newsl
       // The result updates safe connection status only.  Local `settings` are
       // intentionally untouched so a test cannot erase unsaved credentials.
       setProviders((current) => current.map((provider) => provider.id === result.provider.id ? result.provider : provider));
-      setNotice(result.message || __("Connection test completed.", "weekly-wildcat-headless"));
+      const message = result.message || __("Connection test completed.", "weekly-wildcat-headless");
+      setNotice(message);
+      toast.success(message);
     } catch (testError: unknown) {
       setError(describeNewsletterError(testError, __("The provider connection test failed.", "weekly-wildcat-headless")));
     } finally {
@@ -130,34 +139,42 @@ export function NewsletterSettings({ fetchers, initialProviderId, title }: Newsl
       {!providers.length ? (
         <OptionalUnavailable>{__("No newsletter provider is available. The public site can continue without a newsletter integration; connect one when you are ready.", "weekly-wildcat-headless")}</OptionalUnavailable>
       ) : (
-        <div className="byline-newsletter-settings-grid">
-          <div className="byline-newsletter-card">
-            <h2>{__("Provider", "weekly-wildcat-headless")}</h2>
-            <SelectControl __nextHasNoMarginBottom label={__("Newsletter provider", "weekly-wildcat-headless")} value={providerId} options={providers.map((provider) => ({ label: provider.label, value: provider.id }))} onChange={selectProvider} />
-            {selectedProvider ? (
-              <>
-                <p className="byline-newsletter-provider-line"><ProviderStatus status={selectedProvider.connectionStatus} configured={selectedProvider.configured} />{selectedProvider.maskedIdentifier ? <span>{selectedProvider.maskedIdentifier}</span> : null}</p>
-                {selectedProvider.setupMessage ? <OptionalUnavailable>{selectedProvider.setupMessage}</OptionalUnavailable> : null}
-                <h3>{__("Supported actions", "weekly-wildcat-headless")}</h3>
-                <ul className="byline-newsletter-capabilities">
-                  {NEWSLETTER_CAPABILITIES.map((capability) => <li key={capability} className={selectedProvider.capabilities[capability] ? "is-supported" : "is-unavailable"}><span aria-hidden="true">{selectedProvider.capabilities[capability] ? "✓" : "—"}</span>{providerCapabilityLabel(capability)}<span className="screen-reader-text">{selectedProvider.capabilities[capability] ? __("supported", "weekly-wildcat-headless") : __("unavailable", "weekly-wildcat-headless")}</span></li>)}
-                </ul>
-                <p className="byline-newsletter-help">{__("Delivery screens only show actions marked as supported by this provider.", "weekly-wildcat-headless")}</p>
-              </>
-            ) : null}
-          </div>
+        <div className="grid gap-4 lg:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.2fr)]">
+          <Card size="sm">
+            <CardHeader><CardTitle>{__("Provider", "weekly-wildcat-headless")}</CardTitle><CardDescription>{__("Choose the delivery service and review exactly which actions it supports.", "weekly-wildcat-headless")}</CardDescription></CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <SelectControl label={__("Newsletter provider", "weekly-wildcat-headless")} value={providerId} options={providers.map((provider) => ({ label: provider.label, value: provider.id }))} onChange={selectProvider} />
+              {selectedProvider ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2"><ProviderStatus status={selectedProvider.connectionStatus} configured={selectedProvider.configured} />{selectedProvider.maskedIdentifier ? <span className="text-xs text-muted-foreground">{selectedProvider.maskedIdentifier}</span> : null}</div>
+                  {selectedProvider.setupMessage ? <OptionalUnavailable>{selectedProvider.setupMessage}</OptionalUnavailable> : null}
+                  <div>
+                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">{__("Supported actions", "weekly-wildcat-headless")}</p>
+                    <ItemGroup className="gap-0 overflow-hidden rounded-lg border">
+                      {NEWSLETTER_CAPABILITIES.map((capability) => <Item key={capability} size="xs" className="rounded-none border-0 border-b last:border-b-0">
+                        <ItemContent><ItemTitle>{providerCapabilityLabel(capability)}</ItemTitle></ItemContent>
+                        <ItemActions><Badge variant={selectedProvider.capabilities[capability] ? "secondary" : "outline"}>{selectedProvider.capabilities[capability] ? __("Supported", "weekly-wildcat-headless") : __("Unavailable", "weekly-wildcat-headless")}</Badge></ItemActions>
+                      </Item>)}
+                    </ItemGroup>
+                  </div>
+                </>
+              ) : null}
+            </CardContent>
+          </Card>
 
-          <div className="byline-newsletter-card">
-            <h2>{__("Connection details", "weekly-wildcat-headless")}</h2>
-            {selectedProvider?.fields?.length ? selectedProvider.fields.map((field) => (
-              <TextControl key={field.id} label={field.label} type={fieldInputType(field)} value={settings[field.id] || ""} onChange={(value: string) => updateSetting(field.id, value)} placeholder={field.placeholder} help={field.description || (field.secret ? __("Stored securely; the existing value is not shown.", "weekly-wildcat-headless") : undefined)} autoComplete={field.secret ? "new-password" : undefined} />
-            )) : <p className="byline-newsletter-help">{__("This provider has no editable connection fields. Check its setup instructions or use its public signup link mode.", "weekly-wildcat-headless")}</p>}
-            <div className="byline-newsletter-settings-actions">
-              <Button variant="primary" onClick={() => void saveSettings()} isBusy={isSaving} disabled={isSaving || isTesting || !providerId}>{__("Save settings", "weekly-wildcat-headless")}</Button>
-              {selectedProvider?.capabilities.connectionTest ? <Button variant="secondary" onClick={() => void testConnection()} isBusy={isTesting} disabled={isSaving || isTesting}>{__("Test connection", "weekly-wildcat-headless")}</Button> : null}
-              {selectedProvider ? <span className="byline-newsletter-muted">{providerStatusLabel(selectedProvider.connectionStatus)}</span> : null}
-            </div>
-          </div>
+          <Card size="sm">
+            <CardHeader><CardTitle>{__("Connection details", "weekly-wildcat-headless")}</CardTitle><CardDescription>{__("Secret values are write-only and never displayed after saving.", "weekly-wildcat-headless")}</CardDescription></CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {selectedProvider?.fields?.length ? <FieldGroup className="gap-4">{selectedProvider.fields.map((field) => (
+                <TextControl key={field.id} label={field.label} type={fieldInputType(field)} value={settings[field.id] || ""} onChange={(value: string) => updateSetting(field.id, value)} placeholder={field.placeholder} help={field.description || (field.secret ? __("Stored securely; the existing value is not shown.", "weekly-wildcat-headless") : undefined)} autoComplete={field.secret ? "new-password" : undefined} />
+              ))}</FieldGroup> : <p className="text-sm text-muted-foreground">{__("This provider has no editable connection fields. Check its setup instructions or use its public signup link mode.", "weekly-wildcat-headless")}</p>}
+              <div className="flex flex-wrap items-center gap-2 border-t pt-4">
+                <Button variant="primary" onClick={() => void saveSettings()} isBusy={isSaving} disabled={isSaving || isTesting || !providerId}>{__("Save settings", "weekly-wildcat-headless")}</Button>
+                {selectedProvider?.capabilities.connectionTest ? <Button variant="secondary" onClick={() => void testConnection()} isBusy={isTesting} disabled={isSaving || isTesting}>{__("Test connection", "weekly-wildcat-headless")}</Button> : null}
+                {selectedProvider ? <span className="ml-auto text-xs text-muted-foreground">{providerStatusLabel(selectedProvider.connectionStatus)}</span> : null}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </section>

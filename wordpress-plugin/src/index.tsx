@@ -1,4 +1,5 @@
 import apiFetch from "@wordpress/api-fetch";
+import { toast } from "sonner";
 import {
   Button,
   Card,
@@ -9,7 +10,13 @@ import {
   TextareaControl,
   TextControl,
   ToggleControl
-} from "@wordpress/components";
+} from "./admin-ui/components/legacy-control-adapters";
+import { AdminRoot } from "./admin-ui/components/admin-root";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./admin-ui/ui/accordion";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "./admin-ui/ui/alert";
+import { AspectRatio } from "./admin-ui/ui/aspect-ratio";
+import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockTitle } from "./admin-ui/ui/code-block";
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "./admin-ui/ui/sidebar";
 import { Component, createRoot, useEffect, useState } from "@wordpress/element";
 // Scoped publication styles used by shared admin presentation components.
 import "@byline/theme-weekly-wildcat/styles.css";
@@ -31,6 +38,7 @@ import { stripMarkupForText } from "./safe-text";
 import type { ReactNode } from "react";
 import { DoctorApp, type DoctorActionId, type DoctorActionResponse, type DoctorDiagnostics } from "./doctor";
 import "./style.css";
+import "./admin-ui/admin-ui.css";
 
 type BylineAdminConfig = {
   page: string;
@@ -453,27 +461,32 @@ function MediaAssetControl({
     frame.open();
   };
 
+  const ratio = asset.width && asset.height ? Math.min(3, Math.max(0.5, asset.width / asset.height)) : 16 / 9;
   return (
-    <fieldset>
-      <legend>{label}</legend>
+    <fieldset className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4">
+      <legend className="px-1 text-sm font-semibold">{label}</legend>
       {asset.url ? (
-        <div className="byline-media-asset-preview">
-          <img src={asset.url} alt="" />
-          <div>
-            <strong>{asset.url.split("/").pop() || label}</strong>
-            {asset.width && asset.height ? <span>{asset.width}×{asset.height}</span> : <span>Preview loaded from Media Library</span>}
+        <div className="grid gap-3 sm:grid-cols-[minmax(10rem,14rem)_1fr] sm:items-center">
+          <AspectRatio ratio={ratio} className="overflow-hidden rounded-lg border bg-muted">
+            <img src={asset.url} alt="" className="size-full object-contain" />
+          </AspectRatio>
+          <div className="min-w-0 text-sm">
+            <strong className="block truncate">{asset.url.split("/").pop() || label}</strong>
+            <span className="text-xs text-muted-foreground">{asset.width && asset.height ? `${asset.width}×${asset.height}` : "Preview loaded from Media Library"}</span>
           </div>
         </div>
-      ) : <p className="byline-empty-state">No {label.toLowerCase()} selected.</p>}
+      ) : <p className="text-sm text-muted-foreground">No {label.toLowerCase()} selected.</p>}
       <TextControl label="Alternative text" value={asset.alt} onChange={(alt) => onChange({ ...asset, alt })} />
       <div className="byline-settings-actions">
         <Button variant="secondary" onClick={chooseImage}>{asset.url ? "Replace" : "Choose from Media Library"}</Button>
         {asset.url ? <Button variant="link" isDestructive onClick={() => onChange({ url: "", alt: "", width: null, height: null })}>Remove</Button> : null}
       </div>
-      <details className="byline-advanced-details">
-        <summary>Advanced: manual image URL</summary>
-        <TextControl label="Image URL" value={asset.url} onChange={(url) => onChange({ ...asset, url })} />
-      </details>
+      <Accordion>
+        <AccordionItem value="manual-url">
+          <AccordionTrigger>Advanced: manual image URL</AccordionTrigger>
+          <AccordionContent><TextControl label="Image URL" value={asset.url} onChange={(url) => onChange({ ...asset, url })} /></AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </fieldset>
   );
 }
@@ -592,6 +605,7 @@ function PublicationSettings({
       onSaved(saved);
       setValidationErrors({});
       setMessage("Publication settings saved.");
+      toast.success("Publication settings saved.");
     } catch (error) {
       setSaveError(safeRequestError(error, "Could not save publication settings. Check your access and try again."));
     } finally {
@@ -1026,6 +1040,7 @@ function DeploymentSettings() {
       setHookUrl("");
       setClearHook(false);
       setMessage("Deployment settings saved. The private hook URL was not returned to the browser.");
+      toast.success("Deployment settings saved.");
     } catch (requestError) {
       setError(safeRequestError(requestError, "Byline could not save the deploy hook. Enter a valid HTTPS URL and try again."));
     } finally {
@@ -1228,7 +1243,9 @@ function DiscordSettings() {
       const next = await request();
       if (applyDraft) applySavedPayload(next);
       else applyServerPayload(next);
-      setMessage(success(next));
+      const successMessage = success(next);
+      setMessage(successMessage);
+      if (nextOperation === "saving") toast.success("Discord settings saved.");
     } catch (requestError) {
       setError(safeRequestError(requestError, `Byline could not ${label}.`));
     } finally {
@@ -1423,20 +1440,22 @@ function DiscordSettings() {
 }
 
 function OperationalInfo({ route, protocol }: { route: string; protocol: ProtocolManifest | null }) {
-  const content: Record<string, { title: string; body: string }> = {
+  const content: Record<string, { title: string; body: string; technical?: boolean }> = {
     "/advanced/access": {
       title: "Capability-based access",
       body: `Manage publication: ${config?.capabilities.manage ? "allowed" : "not allowed"}; manage integrations: ${config?.capabilities.manageIntegrations ? "allowed" : "not allowed"}.`
     },
     "/advanced/api": {
       title: "Versioned API",
+      technical: true,
       body: protocol
-        ? `REST namespace byline/v1 · protocol ${protocol.protocolVersion} · publication schema ${protocol.publicationSchemaVersion} · design schema ${protocol.designSchemaVersion} · theme API ${protocol.themeApiVersion}.`
-        : "Byline exposes versioned public and capability-protected REST contracts under byline/v1."
+        ? `REST namespace: byline/v1\nProtocol: ${protocol.protocolVersion}\nPublication schema: ${protocol.publicationSchemaVersion}\nDesign schema: ${protocol.designSchemaVersion}\nTheme API: ${protocol.themeApiVersion}`
+        : "REST namespace: byline/v1\nProtected and public contracts are versioned."
     },
     "/advanced/compatibility": {
       title: "Legacy compatibility",
-      body: "The installed plugin path, update source, release ZIP, CPTs, metadata, and weekly-wildcat/v1 aliases remain intact while canonical Byline contracts are adopted. Old Byline settings URLs redirect into this unified Settings workspace."
+      technical: true,
+      body: "Installed plugin path: preserved\nUpdate source: preserved\nRelease ZIP: preserved\nCPTs and metadata: preserved\nREST alias: weekly-wildcat/v1\nLegacy settings URLs: redirect to unified Settings"
     }
   };
   const item = content[route];
@@ -1445,7 +1464,10 @@ function OperationalInfo({ route, protocol }: { route: string; protocol: Protoco
     <Card>
       <CardBody>
         <h2>{item.title}</h2>
-        <p>{item.body}</p>
+        {item.technical ? <CodeBlock className="mt-3">
+          <CodeBlockHeader><CodeBlockTitle>{item.title}</CodeBlockTitle><CodeBlockActions><CodeBlockCopyButton value={item.body} /></CodeBlockActions></CodeBlockHeader>
+          <CodeBlockContent wrap>{item.body}</CodeBlockContent>
+        </CodeBlock> : <p>{item.body}</p>}
       </CardBody>
     </Card>
   );
@@ -1470,30 +1492,33 @@ function SettingsShell({ activeTab, children }: { activeTab: SettingsTab; childr
         <h1>Settings</h1>
         <p>Publication identity, connections, WordPress behavior, and advanced configuration in one place.</p>
       </header>
-      <div className="byline-settings-layout">
-        <aside className="byline-settings-rail" aria-label="Settings sections">
-          {groups.map((group) => (
-            <section key={group.label} className="byline-settings-rail-group">
-              <h2>{group.label}</h2>
-              <nav>
-                {group.items.map((item) => (
-                  <a
-                    key={item.id}
-                    href={adminUrl(config?.urls.settings[item.id])}
-                    className={activeTab === item.id ? "is-active" : undefined}
-                    aria-current={activeTab === item.id ? "page" : undefined}
-                  >
-                    {item.label}
-                  </a>
-                ))}
-              </nav>
-            </section>
-          ))}
-        </aside>
-        <section className="byline-settings-content">
+      <SidebarProvider className="byline-settings-nova-layout">
+        <Sidebar aria-label="Settings sections">
+          <SidebarContent>
+            {groups.map((group) => (
+              <SidebarGroup key={group.label}>
+                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                <SidebarMenu>
+                  {group.items.map((item) => (
+                    <SidebarMenuItem key={item.id}>
+                      <SidebarMenuButton
+                        isActive={activeTab === item.id}
+                        render={<a href={adminUrl(config?.urls.settings[item.id])} aria-current={activeTab === item.id ? "page" : undefined} />}
+                      >
+                        {item.label}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroup>
+            ))}
+          </SidebarContent>
+        </Sidebar>
+        <SidebarInset className="byline-settings-content">
+          <div className="mb-4 md:hidden"><SidebarTrigger /></div>
           {children}
-        </section>
-      </div>
+        </SidebarInset>
+      </SidebarProvider>
     </div>
   );
 }
@@ -1577,6 +1602,7 @@ function AnalyticsSettings() {
       });
       applyPayload(next, providerId);
       setMessage("Analytics settings saved.");
+      toast.success("Analytics settings saved.");
     } catch (requestError) {
       setLoadError(safeRequestError(requestError, "Byline could not save analytics settings."));
     } finally {
@@ -1694,6 +1720,7 @@ function LoginSettings() {
       setKey("");
       setClearKey(false);
       setMessage("Login-screen settings saved.");
+      toast.success("Login-screen settings saved.");
     } catch (requestError) {
       setLoadError(safeRequestError(requestError, "Byline could not save login-screen settings."));
     } finally {
@@ -2036,8 +2063,10 @@ const rootElement = document.getElementById("byline-admin-root");
 
 if (rootElement) {
   createRoot(rootElement).render(
-    <AdminErrorBoundary>
-      <BylineAdminApp />
-    </AdminErrorBoundary>
+    <AdminRoot>
+      <AdminErrorBoundary>
+        <BylineAdminApp />
+      </AdminErrorBoundary>
+    </AdminRoot>
   );
 }

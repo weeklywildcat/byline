@@ -12,6 +12,7 @@ import { Empty, EmptyDescription } from "../admin-ui/ui/empty";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
 import { Kbd, KbdGroup } from "../admin-ui/ui/kbd";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../admin-ui/ui/sheet";
+import { ScrollArea } from "../admin-ui/ui/scroll-area";
 import type { HomeFetchers } from "./home-api";
 import { createAdminQueryClient } from "../story/story-query";
 import { homeKey, workspaceKey, replaceHomeTask, replaceWorkspaceTask } from "./home-query";
@@ -178,7 +179,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
     <Sheet open={allWorkOpen} onOpenChange={setAllWorkOpen}>
       <SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-xl">
         <SheetHeader><SheetTitle>All my work</SheetTitle><SheetDescription>Your visible open assignments</SheetDescription></SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 pb-4">{tasks.length ? <ItemGroup role="group" className="gap-0">{tasks.map(renderTask)}</ItemGroup> : <Quiet>No open assignments.</Quiet>}{data && tasks.length >= data.limits.tasks ? <p className="px-3 pt-3 text-xs text-muted-foreground">Showing the first {data.limits.tasks} assignments.</p> : null}</div>
+        <ScrollArea className="min-h-0 flex-1"><div className="px-2.5 pb-4">{tasks.length ? <ItemGroup role="group" className="gap-0">{tasks.map(renderTask)}</ItemGroup> : <Quiet>No open assignments.</Quiet>}{data && tasks.length >= data.limits.tasks ? <p className="px-3 pt-3 text-xs text-muted-foreground">Showing the first {data.limits.tasks} assignments.</p> : null}</div></ScrollArea>
       </SheetContent>
     </Sheet>
   </main>;

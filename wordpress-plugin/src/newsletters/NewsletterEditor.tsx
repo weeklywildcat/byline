@@ -6,9 +6,14 @@ import {
   Spinner,
   TextControl,
   TextareaControl
-} from "@wordpress/components";
+} from "../admin-ui/components/legacy-control-adapters";
 import { __ } from "@wordpress/i18n";
+import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useState } from "@wordpress/element";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../admin-ui/ui/accordion";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../admin-ui/ui/alert-dialog";
+import { CodeBlock, CodeBlockContent } from "../admin-ui/ui/code-block";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "../admin-ui/ui/breadcrumb";
 
 import type { NewsletterFetchers } from "./api";
 import {
@@ -59,6 +64,7 @@ export function NewsletterEditor({ fetchers, newsletterId, initialNewsletter, br
   const [isActing, setIsActing] = useState<NewsletterAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"send" | "schedule" | null>(null);
   const [providerUnavailable, setProviderUnavailable] = useState(false);
   const [storyQuery, setStoryQuery] = useState("");
   const [storyPlacement, setStoryPlacement] = useState<NewsletterStoryPlacement>("additional");
@@ -130,7 +136,9 @@ export function NewsletterEditor({ fetchers, newsletterId, initialNewsletter, br
     try {
       const next = await fetchers.save(normalizeNewsletterDraft(draft));
       setDraft({ ...next });
-      setNotice(__("Newsletter saved.", "weekly-wildcat-headless"));
+      const message = __("Newsletter saved.", "weekly-wildcat-headless");
+      setNotice(message);
+      toast.success(message);
       onSaved?.(next);
       return next;
     } catch (saveError: unknown) {
@@ -198,7 +206,6 @@ export function NewsletterEditor({ fetchers, newsletterId, initialNewsletter, br
     const record = await ensureSaved();
     if (!record) return;
 
-    if ((action === "send" || action === "schedule") && typeof window !== "undefined" && !window.confirm(action === "send" ? __("Send this newsletter now?", "weekly-wildcat-headless") : __("Schedule this newsletter for the selected time?", "weekly-wildcat-headless"))) return;
     if (action === "schedule" && !draft.scheduledAt) {
       setError(__("Choose a scheduled date and time before scheduling.", "weekly-wildcat-headless"));
       return;
@@ -212,19 +219,27 @@ export function NewsletterEditor({ fetchers, newsletterId, initialNewsletter, br
         const response = await fetchers.sendTest(record.id, testRecipient.trim() || undefined);
         // A test send must never transition a draft to sent.
         setDraft((current) => ({ ...response.newsletter, status: current.status }));
-        setNotice(response.message || __("Test email sent. The issue remains unsent.", "weekly-wildcat-headless"));
+        const message = response.message || __("Test email sent. The issue remains unsent.", "weekly-wildcat-headless");
+        setNotice(message);
+        toast.success(message);
       } else if (action === "send") {
         const response = await fetchers.send(record.id);
         setDraft({ ...response.newsletter });
-        setNotice(response.message || __("Newsletter send requested.", "weekly-wildcat-headless"));
+        const message = response.message || __("Newsletter send requested.", "weekly-wildcat-headless");
+        setNotice(message);
+        toast.success(message);
       } else if (action === "schedule") {
         const response = await fetchers.schedule(record.id, draft.scheduledAt as string);
         setDraft({ ...response.newsletter });
-        setNotice(response.message || __("Newsletter scheduled.", "weekly-wildcat-headless"));
+        const message = response.message || __("Newsletter scheduled.", "weekly-wildcat-headless");
+        setNotice(message);
+        toast.success(message);
       } else if (action === "cancel") {
         const response = await fetchers.cancel(record.id);
         setDraft({ ...response.newsletter });
-        setNotice(response.message || __("Newsletter schedule cancelled.", "weekly-wildcat-headless"));
+        const message = response.message || __("Newsletter schedule cancelled.", "weekly-wildcat-headless");
+        setNotice(message);
+        toast.success(message);
       }
     } catch (actionError: unknown) {
       setError(describeNewsletterError(actionError, __("The newsletter action could not be completed.", "weekly-wildcat-headless")));
@@ -248,7 +263,7 @@ export function NewsletterEditor({ fetchers, newsletterId, initialNewsletter, br
     <section className="byline-newsletter-screen byline-newsletter-editor" aria-labelledby="byline-newsletter-editor-title">
       <header className="byline-newsletter-screen-header">
         <div>
-          <div className="byline-newsletter-breadcrumbs">{onBack ? <Button variant="link" onClick={onBack}>{__("All newsletters", "weekly-wildcat-headless")}</Button> : null}</div>
+          {onBack ? <Breadcrumb className="mb-2"><BreadcrumbList><BreadcrumbItem><BreadcrumbLink render={<button type="button" onClick={onBack} />}>{__("Newsletters", "weekly-wildcat-headless")}</BreadcrumbLink></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{draft.title || __("New newsletter", "weekly-wildcat-headless")}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb> : null}
           <h1 id="byline-newsletter-editor-title">{draft.title || __("New newsletter", "weekly-wildcat-headless")}</h1>
           <div className="byline-newsletter-editor-state"><NewsletterStatusBadge status={draft.status} />{draft.updatedAt ? <span>{__("Updated", "weekly-wildcat-headless")} {formatNewsletterDate(draft.updatedAt)}</span> : null}</div>
         </div>
@@ -318,10 +333,12 @@ export function NewsletterEditor({ fetchers, newsletterId, initialNewsletter, br
             <h2>{__("Preview", "weekly-wildcat-headless")}</h2>
             <p className="byline-newsletter-help">{__("This preview uses the same deterministic renderer used for the send snapshot. Editor-entered HTML is sanitized.", "weekly-wildcat-headless")}</p>
             <iframe className="byline-newsletter-preview-frame" title={__("Newsletter HTML preview", "weekly-wildcat-headless")} srcDoc={renderNewsletterHtml(toRenderableNewsletter(draft), selectedStories, branding)} sandbox="" />
-            <details className="byline-newsletter-plaintext-preview">
-              <summary>{__("Plaintext alternative", "weekly-wildcat-headless")}</summary>
-              <pre>{preview.plaintext}</pre>
-            </details>
+            <Accordion className="mt-3 rounded-xl border px-3">
+              <AccordionItem value="plaintext">
+                <AccordionTrigger>{__("Plaintext alternative", "weekly-wildcat-headless")}</AccordionTrigger>
+                <AccordionContent><CodeBlock><CodeBlockContent wrap>{preview.plaintext}</CodeBlockContent></CodeBlock></AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
         </div>
 
@@ -337,8 +354,11 @@ export function NewsletterEditor({ fetchers, newsletterId, initialNewsletter, br
 
             <div className="byline-newsletter-delivery-actions" aria-label={__("Newsletter delivery actions", "weekly-wildcat-headless")}>
               {actions.includes("sendTest") ? <Button variant="secondary" onClick={() => void performAction("sendTest")} isBusy={isActing === "sendTest"} disabled={Boolean(isActing) || isSaving}>{__("Send test", "weekly-wildcat-headless")}</Button> : null}
-              {actions.includes("schedule") ? <Button variant="secondary" onClick={() => void performAction("schedule")} isBusy={isActing === "schedule"} disabled={Boolean(isActing) || isSaving}>{__("Schedule", "weekly-wildcat-headless")}</Button> : null}
-              {actions.includes("send") ? <Button variant="primary" onClick={() => void performAction("send")} isBusy={isActing === "send"} disabled={Boolean(isActing) || isSaving}>{__("Send now", "weekly-wildcat-headless")}</Button> : null}
+              {actions.includes("schedule") ? <Button variant="secondary" onClick={() => {
+                if (!draft.scheduledAt) { setError(__("Choose a scheduled date and time before scheduling.", "weekly-wildcat-headless")); return; }
+                setConfirmAction("schedule");
+              }} isBusy={isActing === "schedule"} disabled={Boolean(isActing) || isSaving}>{__("Schedule", "weekly-wildcat-headless")}</Button> : null}
+              {actions.includes("send") ? <Button variant="primary" onClick={() => setConfirmAction("send")} isBusy={isActing === "send"} disabled={Boolean(isActing) || isSaving}>{__("Send now", "weekly-wildcat-headless")}</Button> : null}
               {actions.includes("cancel") ? <Button variant="tertiary" onClick={() => void performAction("cancel")} isBusy={isActing === "cancel"} disabled={Boolean(isActing) || isSaving}>{__("Cancel schedule", "weekly-wildcat-headless")}</Button> : null}
               {draft.status === "sent" && selectedProvider?.capabilities.stats ? <Button variant="secondary" disabled>{__("Stats available in Performance", "weekly-wildcat-headless")}</Button> : null}
             </div>
@@ -353,6 +373,24 @@ export function NewsletterEditor({ fetchers, newsletterId, initialNewsletter, br
           </div>
         </aside>
       </div>
+      <AlertDialog open={confirmAction !== null} onOpenChange={(open) => { if (!open) setConfirmAction(null); }}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmAction === "send" ? __("Send this newsletter now?", "weekly-wildcat-headless") : __("Schedule this newsletter?", "weekly-wildcat-headless")}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmAction === "send"
+              ? __("This hands the issue to the provider for immediate delivery. Review the subject, audience and stories first.", "weekly-wildcat-headless")
+              : __("This hands the selected send time to the provider. You can cancel the schedule later if the provider supports it.", "weekly-wildcat-headless")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{__("Keep editing", "weekly-wildcat-headless")}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              const action = confirmAction;
+              setConfirmAction(null);
+              if (action) void performAction(action);
+            }}>{confirmAction === "send" ? __("Send now", "weekly-wildcat-headless") : __("Schedule", "weekly-wildcat-headless")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
