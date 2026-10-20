@@ -17,7 +17,7 @@ import { StoryFilters } from "./StoryFilters";
 import { StoryList } from "./StoryList";
 import type { PlanningFetchers } from "./planning-api";
 import { storiesViewHref } from "./planning-routing";
-import { useMoveStory, usePlanningStories } from "./planning-query";
+import { useMoveStory, usePlanningStories, useUpdatePlanningStory } from "./planning-query";
 import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, filterPlanningStories, hideFinishedPublished, normalizePlanningFilters, sortPlanningStories, type PlanningFilters, type PlanningPerson, type PlanningSort, type PlanningSortKey, type PlanningStory } from "./planning-model";
 import { describePlanningError } from "./planning-model";
 
@@ -60,7 +60,9 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
   const userId = currentUserId ?? data?.currentUser?.id ?? null;
   const timezone = data?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const canMove = data?.capabilities.canMoveStories ?? false;
+  const canAssign = data?.capabilities.canAssign ?? false;
   const { move, movingStoryId } = useMoveStory(fetchers, statuses);
+  const { update, updatingStoryId, available: canUpdateStories } = useUpdatePlanningStory(fetchers);
   const stories = useMemo(() => sortPlanningStories(filterPlanningStories(data?.stories || [], filters, userId ?? undefined), sort), [data, filters, sort, userId]);
 
   // The List is for work in progress: finished published stories stay out of it until asked for.
@@ -106,7 +108,7 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
         ? <div role="status" aria-label={__("Loading stories", "weekly-wildcat-headless")} className="grid gap-3 @3xl/planning:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <div key={i} className="flex flex-col gap-2 rounded-xl border p-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>)}</div>
         : <>
           <TabsContent value="board"><StoryBoard stories={stories} statuses={statuses} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onMoveStory={move} onOpenStory={open} /></TabsContent>
-          <TabsContent value="list"><StoryList stories={listStories} hiddenPublished={stories.length - listStories.length} statuses={statuses} sort={sort} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onOpenStory={open} /></TabsContent>
+          <TabsContent value="list"><StoryList stories={listStories} hiddenPublished={stories.length - listStories.length} statuses={statuses} sort={sort} canMoveStories={canMove} canAssignStories={canAssign} canUpdateStories={canUpdateStories} movingStoryId={movingStoryId} updatingStoryId={updatingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onUpdateStory={update} onOpenStory={open} /></TabsContent>
           <TabsContent value="calendar"><StoryCalendar stories={stories} timezone={timezone} getSchedule={fetchers.getSchedule} currentUserId={userId} workspaceUrl={workspaceUrl} onOpenStory={open} /></TabsContent>
         </>}
     </Tabs>
