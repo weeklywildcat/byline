@@ -14,7 +14,7 @@
         "id": "user-7-alex-rivera",
         "name": "Alex Rivera",
         "role": "Editor",
-        "bio": "",
+        "bio": "Reporter bio",
         "contactHref": "mailto:alex@example.test",
         "photo": {
           "path": "/uploads/alex.jpg",
@@ -26,7 +26,7 @@
         "id": "guest-44-jordan-guest",
         "name": "Jordan Guest",
         "role": "Community contributor",
-        "bio": "",
+        "bio": "Guest bio",
         "contactHref": "",
         "photo": {
           "path": "/uploads/jordan.jpg",

@@ -135,7 +135,10 @@ test("a realistic visual story survives build, save, reload, edit and preview", 
   expect(rendered).not.toContain("byline-before-after"); // removed in the editor above
   expect(rendered).not.toContain("Choose both photographs");
   expect(rendered).not.toContain("Annotated image pending");
-  expect(rendered).not.toMatch(/sizes="\(max-width: 1600px\) 100vw, 1600px"/);
+  // Story blocks get responsive candidates sized for their own layout, not WordPress's generic "100vw, 1600px".
+  const annotated = rendered.match(/<figure class="wp-block-byline-annotated-image[\s\S]*?<\/figure>/)![0];
+  expect(annotated).toMatch(/<img [^>]*srcset="[^"]+"/);
+  expect(annotated).not.toMatch(/sizes="(?:auto, )?\(max-width: 1600px\) 100vw, 1600px"/);
 
   // Preview as Byline: the Immersive opening and every tool, at three widths, without third-party frames.
   await page.goto(`/wp-admin/admin.php?page=byline-article-preview&post=${story.id}`, { waitUntil: "domcontentloaded" });

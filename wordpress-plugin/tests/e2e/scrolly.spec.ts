@@ -1,16 +1,36 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { saveEditorDraft, waitForEditorReady } from "./editor-helpers";
 import { createEditorDraft } from "./story-helpers";
 
-const upload = (name: string, width: number, height: number, alt: string, id: number) => ({ id, url: `http://localhost:8888/wp-content/uploads/2026/10/${name}.jpg`, alt, width, height });
-const PHOTOS = [
-  upload("newsroom-meeting", 1600, 1067, "Two students review a draft.", 10),
-  upload("newsroom-laughing", 1600, 2000, "A student laughs at a desk.", 7),
-  upload("newsroom-tablet", 1600, 2000, "A student at a laptop.", 13)
+/** Real, credited attachments, uploaded fresh for each test (the credit comes from the media library). */
+type Photo = { id: number; url: string; alt: string; width: number; height: number };
+let PHOTOS: Photo[] = [];
+const SOURCES = [
+  { name: "meeting", alt: "Two students review a draft.", creator: "Jamal Whitfield" },
+  { name: "laughing", alt: "A student laughs at a desk.", creator: "Maya Okafor" },
+  { name: "tablet", alt: "A student at a laptop.", creator: "Maya Okafor" }
 ];
+test.beforeEach(async ({ adminPage: page, adminSession }) => {
+  await page.goto("/wp-admin/", { waitUntil: "domcontentloaded" });
+  const nonce = await page.evaluate(() => (window as any).wpApiSettings.nonce as string);
+  PHOTOS = [];
+  for (const source of SOURCES) {
+    const response = await page.request.post("/wp-json/wp/v2/media", {
+      headers: { "X-WP-Nonce": nonce, "Content-Type": "image/jpeg", "Content-Disposition": `attachment; filename="scrolly-${Date.now()}-${source.name}.jpg"` },
+      data: await readFile(path.resolve(__dirname, `../../../tests/fixtures/story-media/newsroom-${source.name}.jpg`))
+    });
+    expect(response.ok()).toBe(true);
+    const media = await response.json() as { id: number; source_url: string; media_details: { width: number; height: number } };
+    adminSession.addCleanup(async () => { await adminSession.rest(`/wp/v2/media/${media.id}?force=true`, "DELETE"); });
+    expect((await adminSession.rest(`/wp/v2/media/${media.id}`, "POST", { meta: { _ww_image_creator: source.creator } })).ok).toBe(true);
+    PHOTOS.push({ id: media.id, url: media.source_url, alt: source.alt, width: media.media_details.width, height: media.media_details.height });
+  }
+});
 type Step = { image?: (typeof PHOTOS)[number]; caption?: string; heading: string; text: string };
-const STEPS: Step[] = [
+const stepList = (): Step[] => [
   { image: PHOTOS[0], caption: "A table of juniors.", heading: "First step", text: "First reporting." },
   { image: PHOTOS[1], caption: "A laugh.", heading: "Second step", text: "Second reporting." },
   { heading: "Third step", text: "Text only." }
@@ -24,7 +44,7 @@ const steps = (page: Page): Promise<Summary[]> => page.evaluate(() => {
 });
 const selectedName = (page: Page) => page.evaluate(() => (window as any).wp.data.select("core/block-editor").getSelectedBlock()?.name);
 
-async function openStory(page: Page, adminSession: any, label: string, list: Step[] = STEPS, fit = "contain") {
+async function openStory(page: Page, adminSession: any, label: string, list: Step[] = stepList(), fit = "contain") {
   const story = await createEditorDraft(page, adminSession.registerTestPost, label);
   await page.evaluate(({ list, fit }) => {
     const wp = (window as any).wp;
@@ -44,12 +64,12 @@ test("the story board shows every step in order and drives selection, the canvas
   // One numbered card per step: thumbnail, heading, and a plain "Text only" for the step without a photograph.
   await expect(cards(block).locator(".byline-scrolly-card-title")).toHaveText(["First step", "Second step", "Third step"]);
   await expect(cards(block).locator(".byline-scrolly-card-number")).toHaveText(["1", "2", "3"]);
-  await expect(cards(block).nth(0).locator("img")).toHaveAttribute("src", /newsroom-meeting\.jpg/);
+  await expect(cards(block).nth(0).locator("img")).toHaveAttribute("src", /meeting\.jpg/);
   await expect(cards(block).nth(2)).toContainText("Text only");
   // The preview shows the real stage for the first step.
   const preview = block.getByRole("region", { name: "As the reader sees it" });
   await expect(preview.locator(".byline-scrolly-progress")).toContainText("Step 1 of 3");
-  await expect(preview.locator(".byline-scrolly-frame img")).toHaveAttribute("src", /newsroom-meeting\.jpg/);
+  await expect(preview.locator(".byline-scrolly-frame img")).toHaveAttribute("src", /meeting\.jpg/);
   await expect(preview.locator("figcaption")).toContainText("A table of juniors.");
   await expect(preview.locator(".byline-scrolly-preview-heading")).toHaveText("First step");
 
@@ -57,12 +77,12 @@ test("the story board shows every step in order and drives selection, the canvas
   await cards(block).nth(1).click();
   await expect(cards(block).nth(1)).toHaveAttribute("aria-current", "step");
   await expect(preview.locator(".byline-scrolly-progress")).toContainText("Step 2 of 3");
-  await expect(preview.locator(".byline-scrolly-frame img")).toHaveAttribute("src", /newsroom-laughing\.jpg/);
+  await expect(preview.locator(".byline-scrolly-frame img")).toHaveAttribute("src", /laughing\.jpg/);
   await expect(block.locator(".byline-scrolly-step-editor").nth(1).locator("h2").first()).toBeFocused();
   // A text-only step keeps the previous photograph on the stage, and says so.
   await page.evaluate((id) => (window as any).wp.data.dispatch("core/block-editor").selectBlock(id), (await steps(page))[2].clientId);
   await expect(preview.locator(".byline-scrolly-progress")).toContainText("Step 3 of 3");
-  await expect(preview.locator(".byline-scrolly-frame img")).toHaveAttribute("src", /newsroom-laughing\.jpg/);
+  await expect(preview.locator(".byline-scrolly-frame img")).toHaveAttribute("src", /laughing\.jpg/);
   await expect(preview.getByText("Text-only step: the stage keeps the photograph from step 2.")).toBeVisible();
   // The stepper moves through the story without leaving the board.
   await preview.getByRole("button", { name: "Previous step", exact: true }).click();
