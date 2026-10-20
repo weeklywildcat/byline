@@ -1,4 +1,4 @@
-import { Button } from "@wordpress/components";
+import { Button } from "../admin-ui/components/legacy-control-adapters";
 import { __ } from "@wordpress/i18n";
 import { useState } from "@wordpress/element";
 
