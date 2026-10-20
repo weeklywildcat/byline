@@ -428,6 +428,15 @@ function byline_list_tasks(array $filters = [], ?int $user_id = null): array
     if (!empty($filters['storyId'])) {
         $args['post_parent'] = absint($filters['storyId']);
     }
+    // Apply assignment/state before the limit. Otherwise other people's work
+    // can crowd an assigned task out of Home's bounded collection.
+    foreach (['assigneeId' => BYLINE_TASK_ASSIGNEE_META, 'state' => BYLINE_TASK_STATE_META] as $filter => $key) {
+        if (!empty($filters[$filter])) {
+            $args['meta_query'][] = $filter === 'state' && $filters[$filter] === 'open'
+                ? ['relation' => 'OR', ['key' => $key, 'value' => 'completed', 'compare' => '!='], ['key' => $key, 'compare' => 'NOT EXISTS']]
+                : ['key' => $key, 'value' => $filters[$filter], 'compare' => '='];
+        }
+    }
     $posts = function_exists('get_posts') ? get_posts($args) : [];
     $result = [];
     foreach (is_array($posts) ? $posts : [] as $post) {
@@ -463,6 +472,32 @@ function byline_task_count_for_story(int $story_id, ?int $user_id = null): int
     }
 
     return $count;
+}
+
+/** Exact counts in one query; Home has already selected a bounded story set. */
+function byline_task_counts_for_stories(array $story_ids, int $user_id): array
+{
+    global $wpdb;
+    $ids = array_values(array_filter(array_unique(array_map('absint', $story_ids)), static function ($id) use ($user_id): bool {
+        return $id > 0 && byline_task_user_can($user_id, 'edit_post', $id);
+    }));
+    if ($ids === []) {
+        return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+    $sql = "SELECT CASE WHEN p.post_parent > 0 THEN p.post_parent ELSE CAST(legacy.meta_value AS UNSIGNED) END AS story_id, COUNT(DISTINCT p.ID) AS open_count
+        FROM {$wpdb->posts} p
+        LEFT JOIN {$wpdb->postmeta} state ON state.post_id = p.ID AND state.meta_key = %s
+        LEFT JOIN {$wpdb->postmeta} legacy ON legacy.post_id = p.ID AND legacy.meta_key = '_byline_task_story_id'
+        WHERE p.post_type = %s AND p.post_status = 'private'
+        AND (state.meta_value IS NULL OR state.meta_value <> 'completed')
+        AND (p.post_parent IN ($placeholders) OR (p.post_parent = 0 AND CAST(legacy.meta_value AS UNSIGNED) IN ($placeholders)))
+        GROUP BY story_id";
+    $counts = [];
+    foreach ($wpdb->get_results($wpdb->prepare($sql, array_merge([BYLINE_TASK_STATE_META, BYLINE_TASK_POST_TYPE], $ids, $ids))) as $row) {
+        $counts[(int) $row->story_id] = (int) $row->open_count;
+    }
+    return $counts;
 }
 
 function byline_get_story_tasks(int $story_id, ?int $user_id = null): array

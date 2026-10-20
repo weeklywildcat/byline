@@ -1,5 +1,3 @@
-import "./style.css";
-
 export { HomeApp } from "./HomeApp";
 export type { HomeAppProps } from "./HomeApp";
 export { createHomeFetchers } from "./home-api";

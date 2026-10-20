@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 // Loading the editorial domain modules from this already-registered transport
 // keeps the new slice available to both the plugin and focused standalone tests
 // without creating a second bootstrap path.
-foreach (['planning', 'media', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors', 'activity', 'presets'] as $byline_editorial_module) {
+foreach (['planning', 'media', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors', 'activity', 'presets', 'resources', 'home'] as $byline_editorial_module) {
     $byline_editorial_module_file = __DIR__ . '/' . $byline_editorial_module . '.php';
     if (is_readable($byline_editorial_module_file)) {
         require_once $byline_editorial_module_file;
@@ -814,6 +814,7 @@ function byline_editorial_rest_planning_story(array $row): array
     foreach ((array) ($row['bylines'] ?? []) as $person) {
         $normalized = byline_editorial_rest_person($person);
         if ($normalized !== null) {
+            $normalized['kind'] = ($person['type'] ?? $person['kind'] ?? 'user') === 'guest' ? 'guest' : 'user';
             $authors[] = $normalized;
         }
     }

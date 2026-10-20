@@ -7,6 +7,11 @@ public.
 
 ## Operating model
 
+- **Home / Today** is the personal starting page: assigned tasks, upcoming
+  commitments, active stories, selective attention, role-relevant review and
+  visual work, and recent activity. Story Peek preserves list context; Gutenberg
+  remains the writing environment. See [Byline Home](byline-home.md) for the
+  protected read model, private links, Mira components and validation.
 - **Planning** is the daily queue: Stories Board/List, Calendar, Media Desk,
   Coverage, Performance, Content Health, Feedback, and per-user saved views.
 - **Editorial workflow** tracks pitch, assignment, reporting, writing, editing,

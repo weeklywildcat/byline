@@ -15,6 +15,8 @@ import type {
   HomePresetsPayload,
   HomeNavigationCapabilities
 } from "./home-model";
+import type { HomeBootstrap, HomePeek, HomeStoryContext, StoryResource } from "./newsroom-model";
+import { createEditorialRestClient, type EditorialRestClient } from "../editorial/editorial-rest";
 
 export type HomeRequest = <T>(options: PlanningRequestOptions) => Promise<T>;
 
@@ -30,6 +32,13 @@ export type HomePaths = {
 };
 
 export type HomeFetchers = {
+  getHome?: () => Promise<HomeBootstrap>;
+  getPeek?: (storyId: number) => Promise<HomePeek>;
+  searchStories?: (query: string) => Promise<{ stories: Array<{ id: number; title: string }> }>;
+  createStory?: (title: string) => Promise<HomeStoryContext>;
+  addResource?: (storyId: number, link: { label: string; url: string }) => Promise<{ resources: StoryResource[] }>;
+  removeResource?: (storyId: number, resourceId: string) => Promise<{ resources: StoryResource[] }>;
+  editorial?: EditorialRestClient;
   getPlanning?: () => Promise<PlanningResponse>;
   getHealth?: () => Promise<HomeHealthPayload>;
   getContentHealth?: () => Promise<ContentHealthResponse>;
@@ -68,6 +77,15 @@ export function createHomeFetchers(
     resolved.deploymentTrigger = `${resolved.deployment.replace(/\/+$/, "")}/trigger`;
   }
   const fetchers: HomeFetchers = {};
+  if (capabilities.editPosts !== false) {
+    fetchers.getHome = () => request<HomeBootstrap>({ path: "/byline/v1/editorial/home" });
+    fetchers.getPeek = (id) => request<HomePeek>({ path: `/byline/v1/editorial/stories/${id}/quick-view` });
+    fetchers.searchStories = (query) => request({ path: `/byline/v1/editorial/home/search?query=${encodeURIComponent(query)}` });
+    fetchers.createStory = (title) => request({ path: "/byline/v1/editorial/stories", method: "POST", data: { title } });
+    fetchers.addResource = (id, link) => request({ path: `/byline/v1/editorial/stories/${id}/resources`, method: "POST", data: link });
+    fetchers.removeResource = (id, resourceId) => request({ path: `/byline/v1/editorial/stories/${id}/resources/${encodeURIComponent(resourceId)}`, method: "DELETE" });
+    fetchers.editorial = createEditorialRestClient(request);
+  }
 
   // The planning route is intentionally edit_posts-scoped. A role that can
   // manage Byline configuration but cannot edit stories should still get the

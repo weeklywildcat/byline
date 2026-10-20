@@ -30,7 +30,7 @@ import { NewsletterApp, createNewsletterFetchers } from "./newsletters";
 import type { NewsletterBranding } from "./newsletters/render";
 import { stripMarkupForText } from "./safe-text";
 import type { ReactNode } from "react";
-import { HomeApp, createHomeFetchers, storiesViewFromRoute } from "./home";
+import { storiesViewFromRoute } from "./home/navigation-model";
 import { DoctorApp, type DoctorActionId, type DoctorActionResponse, type DoctorDiagnostics } from "./doctor";
 import "./style.css";
 
@@ -383,18 +383,6 @@ function adminProtectedRequest<T>({ path, method, data }: { path: string; method
   return apiFetch({ path, method, data }) as Promise<T>;
 }
 
-function homeActionUrls() {
-  const canManage = Boolean(config?.capabilities.manage);
-  const canEditPosts = Boolean(config && config.capabilities.editPosts !== false);
-  return {
-    dashboard: canManage ? adminUrl(config?.urls.dashboard) : undefined,
-    planning: canEditPosts ? adminUrl(config?.urls.planning?.stories) : undefined,
-    contentHealth: canEditPosts || canManage ? adminUrl(config?.urls.planning?.contentHealth) : undefined,
-    feedback: config?.capabilities.editOthersPosts || canManage ? adminUrl(config?.urls.planning?.feedback) : undefined,
-    deployment: config?.capabilities.manageIntegrations ? adminUrl(config?.urls.integrations?.deployment) : undefined,
-    doctor: canManage ? adminUrl(config?.urls.settings?.diagnostics) : undefined
-  };
-}
 
 function newsletterBranding(publication: PublicationConfig | null): NewsletterBranding {
   const accentColor = publication?.appearance.tokenOverrides.accent || publication?.appearance.tokenOverrides.link;
@@ -1519,46 +1507,17 @@ function Screen({
   error: string;
   onPublicationSaved: (publication: PublicationConfig) => void;
 }) {
-  if (page === ADMIN_PAGE_SLUGS.dashboard) {
-    return (
-      <AdminPageFrame title="Home" error={error}>
-        <HomeApp
-          fetchers={createHomeFetchers(adminProtectedRequest, {
-            health: config?.healthPath,
-            contentHealth: config?.contentHealthPath,
-            feedback: config?.feedbackPath,
-            deployment: config?.deploymentPath
-          }, config?.capabilities)}
-          currentUserId={config?.currentUserId}
-          actionUrls={homeActionUrls()}
-        />
-      </AdminPageFrame>
-    );
-  }
-
+  // Home has its own React/CSS entrypoint, enqueued only on its native route.
+  if (page === ADMIN_PAGE_SLUGS.dashboard) return null;
   if (page === ADMIN_PAGE_SLUGS.planning) {
     const activeTab = normalizeAdminTab(page, tab);
-    if (activeTab === "today") {
-      return (
-        <AdminPageFrame title="Today" heading={false} error={error}>
-          <HomeApp
-            fetchers={createHomeFetchers(adminProtectedRequest, {
-              health: config?.healthPath,
-              contentHealth: config?.contentHealthPath,
-              feedback: config?.feedbackPath,
-              deployment: config?.deploymentPath
-            }, config?.capabilities)}
-            currentUserId={config?.currentUserId}
-            actionUrls={homeActionUrls()}
-          />
-        </AdminPageFrame>
-      );
-    }
+    if (activeTab === "today") return null;
     return (
       <AdminPageFrame title="Planning" heading={false} error={error}>
         <PlanningApp
           fetchers={createPlanningFetchers(adminProtectedRequest)}
           initialView={planningViewForTab(activeTab, config?.view)}
+          initialFilters={{ mine: new URLSearchParams(window.location.search).get("mine") === "1" }}
           rememberStoriesView={activeTab === "stories" && !storiesViewFromRoute(config?.view)}
           currentUserId={config?.currentUserId}
         />

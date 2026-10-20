@@ -1,0 +1,34 @@
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { CalendarDays, FileText, ImagePlus, Plus, ListTodo } from "lucide-react";
+import type { HomeFetchers } from "./home-api";
+import type { HomeBootstrap } from "./newsroom-model";
+import { activeStory } from "./newsroom-model";
+import { CommandDialog, Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator, CommandShortcut } from "./ui/command";
+import { describeEditorialError } from "../editorial/editorial-model";
+
+export type HomeActionUrls = { planning?: string; calendar?: string; upload?: string; dashboard?: string; contentHealth?: string; feedback?: string; deployment?: string; doctor?: string };
+
+export function HomeCommands({ open, onOpenChange, fetchers, data, recentIds, onStory, onNewStory, onNewTask, urls }: { open: boolean; onOpenChange: (open: boolean) => void; fetchers: HomeFetchers; data?: HomeBootstrap; recentIds: number[]; onStory: (id: number) => void; onNewStory: () => void; onNewTask: () => void; urls?: HomeActionUrls }) {
+  const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
+  useEffect(() => { const timer = window.setTimeout(() => setDebounced(query.trim()), 200); return () => window.clearTimeout(timer); }, [query]);
+  useEffect(() => { if (!open) { setQuery(""); setDebounced(""); } }, [open]);
+  const search = useQuery({ queryKey: ["byline", "home-search", debounced], queryFn: () => fetchers.searchStories!(debounced), enabled: open && debounced.length >= 2 && Boolean(fetchers.searchStories) });
+  const recent = [...(data?.stories || [])].filter(activeStory).sort((a, b) => {
+    const ai = recentIds.indexOf(a.id), bi = recentIds.indexOf(b.id);
+    return (ai < 0 ? 100 : ai) - (bi < 0 ? 100 : bi) || (b.modifiedAt || "").localeCompare(a.modifiedAt || "");
+  }).slice(0, 5);
+  const choose = (action: () => void) => { onOpenChange(false); requestAnimationFrame(action); };
+  const searching = query.trim().length >= 2;
+  return <CommandDialog open={open} onOpenChange={onOpenChange} title="Search Byline" description="Find a story or run a newsroom action."><Command shouldFilter={false}><CommandInput aria-label="Search stories and actions" placeholder="Find a story or action…" value={query} onValueChange={setQuery} /><CommandList>
+    {searching ? <CommandGroup heading="Stories">{search.isFetching || debounced !== query.trim() ? <p className="home-command-hint" role="status">Searching stories…</p> : search.isError ? <p role="alert" className="home-inline-error">{describeEditorialError(search.error, "Story search couldn't be loaded. Try again.")}</p> : search.data?.stories.length ? search.data.stories.map((story) => <CommandItem key={story.id} value={`story-${story.id}`} onSelect={() => choose(() => onStory(story.id))}><FileText />{story.title}</CommandItem>) : <CommandEmpty>No matching stories.</CommandEmpty>}</CommandGroup> : <CommandGroup heading="Recent stories">{recent.map((story) => <CommandItem key={story.id} value={`recent-${story.id}`} onSelect={() => choose(() => onStory(story.id))}><FileText />{story.title}</CommandItem>)}{!recent.length ? <p className="home-command-hint">Type at least two characters to find a story.</p> : null}</CommandGroup>}
+    <CommandSeparator /><CommandGroup heading="Actions">
+      {data?.capabilities.createStory && (!query || "new story".includes(query.toLowerCase())) ? <CommandItem value="new-story" onSelect={() => choose(onNewStory)}><Plus />New story</CommandItem> : null}
+      {fetchers.editorial && (!query || "new task".includes(query.toLowerCase())) ? <CommandItem value="new-task" onSelect={() => choose(onNewTask)}><ListTodo />New task</CommandItem> : null}
+      {data?.capabilities.uploadMedia && urls?.upload && (!query || "upload media".includes(query.toLowerCase())) ? <CommandItem value="upload-media" onSelect={() => { window.location.assign(urls.upload!); }}><ImagePlus />Upload media</CommandItem> : null}
+      {urls?.planning && (!query || "open stories".includes(query.toLowerCase())) ? <CommandItem value="open-stories" onSelect={() => window.location.assign(urls.planning!)}><FileText />Open Stories</CommandItem> : null}
+      {urls?.calendar && (!query || "open calendar".includes(query.toLowerCase())) ? <CommandItem value="open-calendar" onSelect={() => window.location.assign(urls.calendar!)}><CalendarDays />Open Calendar</CommandItem> : null}
+    </CommandGroup>
+  </CommandList><footer className="home-command-footer"><span>↑ ↓ to navigate · Enter to open</span><CommandShortcut>Esc to close</CommandShortcut></footer></Command></CommandDialog>;
+}

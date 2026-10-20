@@ -434,7 +434,14 @@ function byline_render_admin_app(): void
         wp_die(esc_html__('Sorry, you are not allowed to manage this Byline screen.', 'weekly-wildcat-headless'));
     }
 
-    echo '<div class="wrap"><div id="byline-admin-root"></div></div>';
+    $is_home = $page === BYLINE_ADMIN_PAGE || ($page === BYLINE_ADMIN_PLANNING_PAGE && in_array(byline_admin_query_key('tab'), ['', 'today'], true));
+    echo '<div class="wrap">';
+    if ($is_home) {
+        // Core moves admin notices after this marker. Keep that DOM surgery
+        // outside React's compact Home header.
+        echo '<h1 class="screen-reader-text">' . esc_html__('Byline Home', 'weekly-wildcat-headless') . '</h1><hr class="wp-header-end" />';
+    }
+    echo '<div id="byline-admin-root"></div></div>';
 }
 
 function byline_enqueue_admin_app(string $hook_suffix): void
@@ -455,8 +462,11 @@ function byline_enqueue_admin_app(string $hook_suffix): void
 
     wp_enqueue_media();
 
-    $asset_file = __DIR__ . '/../../build/index.asset.php';
-    $script_file = __DIR__ . '/../../build/index.js';
+    $is_home = $page === BYLINE_ADMIN_PAGE || ($page === BYLINE_ADMIN_PLANNING_PAGE && in_array(byline_admin_query_key('tab'), ['', 'today'], true));
+    $bundle = $is_home ? 'home' : 'index';
+    $script_handle = $is_home ? 'byline-home' : 'byline-admin';
+    $asset_file = __DIR__ . '/../../build/' . $bundle . '.asset.php';
+    $script_file = __DIR__ . '/../../build/' . $bundle . '.js';
     if (!is_readable($asset_file) || !is_readable($script_file)) {
         add_action('admin_notices', static function (): void {
             echo '<div class="notice notice-error"><p>' . esc_html__('Byline admin assets are missing. Install a release build or run the admin asset build.', 'weekly-wildcat-headless') . '</p></div>';
@@ -469,17 +479,18 @@ function byline_enqueue_admin_app(string $hook_suffix): void
     $version = is_string($asset['version'] ?? null) ? $asset['version'] : BYLINE_PLUGIN_VERSION;
 
     wp_enqueue_script(
-        'byline-admin',
-        plugins_url('build/index.js', dirname(__DIR__, 2) . '/weekly-wildcat-headless.php'),
+        $script_handle,
+        plugins_url('build/' . $bundle . '.js', dirname(__DIR__, 2) . '/weekly-wildcat-headless.php'),
         $dependencies,
         $version,
         true
     );
 
-    foreach ([
+    $styles = $is_home ? ['byline-home' => 'home.css', 'byline-home-extra' => 'style-home.css'] : [
         'byline-admin-vendor' => 'index.css',
         'byline-admin' => 'style-index.css',
-    ] as $style_handle => $style_name) {
+    ];
+    foreach ($styles as $style_handle => $style_name) {
         $style_file = __DIR__ . '/../../build/' . $style_name;
         if (!is_readable($style_file)) {
             continue;
@@ -488,14 +499,14 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         wp_enqueue_style(
             $style_handle,
             plugins_url('build/' . $style_name, dirname(__DIR__, 2) . '/weekly-wildcat-headless.php'),
-            ['wp-components'],
+            $is_home ? [] : ['wp-components'],
             $version
         );
     }
 
     $page_urls = byline_admin_page_urls();
     $publication = byline_get_publication_config();
-    wp_localize_script('byline-admin', 'bylineAdmin', [
+    wp_localize_script($script_handle, $is_home ? 'bylineHome' : 'bylineAdmin', [
         'page' => $page,
         'tab' => byline_admin_query_key('tab'),
         'view' => byline_admin_query_key('view'),

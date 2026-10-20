@@ -48,6 +48,7 @@ export const DEFAULT_WORKFLOW_STATUSES: PlanningWorkflowStatus[] = [
 export type PlanningPerson = {
   id: number;
   name: string;
+  kind?: "user" | "guest";
   avatarUrl?: string | null;
 };
 

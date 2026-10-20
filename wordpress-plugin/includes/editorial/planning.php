@@ -493,7 +493,7 @@ function byline_editorial_planning_user_display(int $user_id): ?array
  * A deliberately compact private Planning row. No post content or private
  * metadata is included in this shape.
  */
-function byline_editorial_planning_story_summary(int $post_id, ?int $user_id = null): array
+function byline_editorial_planning_story_summary(int $post_id, ?int $user_id = null, ?array $task_counts = null): array
 {
     $post = get_post($post_id);
     if (!$post instanceof WP_Post || $post->post_type !== 'post' || !byline_editorial_can_view_planning_story($post_id, $user_id)) {
@@ -520,7 +520,9 @@ function byline_editorial_planning_story_summary(int $post_id, ?int $user_id = n
 
     $thumbnail_id = function_exists('get_post_thumbnail_id') ? absint(get_post_thumbnail_id($post_id)) : 0;
     $has_thumbnail = function_exists('has_post_thumbnail') ? (bool) has_post_thumbnail($post_id) : $thumbnail_id > 0;
-    if (function_exists('byline_editorial_task_count_for_story')) {
+    if ($task_counts !== null) {
+        $task_count = $task_counts[$post_id] ?? 0;
+    } elseif (function_exists('byline_editorial_task_count_for_story')) {
         $task_count = byline_editorial_task_count_for_story($post_id, $user_id);
     } elseif (function_exists('byline_task_count_for_story')) {
         // The shorter legacy-style helper is used by installations that load
@@ -657,7 +659,7 @@ function byline_editorial_collect_planning_stories(array $filters = [], ?int $us
         }
 
         if (!empty($sanitized_filters['mine']) && $user_id > 0) {
-            $is_mine = (int) $post->post_author === $user_id || (int) ($summary['editor']['id'] ?? 0) === $user_id;
+            $is_mine = byline_editorial_story_involves_user($summary, $user_id);
             if (!$is_mine) {
                 continue;
             }
@@ -680,6 +682,23 @@ function byline_editorial_get_planning_collection(array $filters = [], ?int $use
         'hasMore' => count($items) >= (int) ($filters['limit'] ?? 50),
         'filters' => $filters,
     ];
+}
+
+/** User membership uses canonical co-writers with the legacy author fallback. */
+function byline_editorial_story_involves_user(array $story, int $user_id): bool
+{
+    if ($user_id <= 0) {
+        return false;
+    }
+    if ((int) ($story['editor']['id'] ?? 0) === $user_id || (int) ($story['writer']['id'] ?? 0) === $user_id) {
+        return true;
+    }
+    foreach ((array) ($story['bylines'] ?? []) as $person) {
+        if (($person['type'] ?? $person['kind'] ?? 'user') === 'user' && (int) ($person['id'] ?? 0) === $user_id) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function byline_editorial_saved_view_user_id(?int $user_id = null)
