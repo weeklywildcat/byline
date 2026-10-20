@@ -8,7 +8,7 @@ Editing "About Us" in WordPress no longer changes the public page.
 | File | What it holds |
 | --- | --- |
 | `apps/web/views/about/page.tsx` | Layout and the long-form prose |
-| `apps/web/views/about/content.ts` | Timeline, standards, coverage sections, links, and the stories and photographs the page names by slug |
+| `apps/web/views/about/content.ts` | Timeline, links, and the stories and photographs the page names by slug |
 | `apps/web/views/about/data.ts` | Build-time data: story counts, the editors, sports archive figures, photographs |
 | `apps/web/public/newsroom/` | Staff photographs for "Who we are" (three widths each, metadata stripped; credits follow the files' own metadata) |
 | `apps/web/views/about/icons.ts` | Phosphor icons bundled for the cards. The site's `SiteIcon` loads icons after hydration, which leaves them blank in static HTML |
@@ -50,10 +50,6 @@ Leadership is not duplicated here. Only people whose directory role contains "Ed
 These are written as the newsroom's working standards or as statements about its current structure. No policy
 document in the repository or the CMS establishes them. Confirm or reword before treating them as policy.
 
-- **Verification** and **Responsible reporting** in "Standards and corrections" (rumors, unconfirmed claims, extra
-  care with health, safety and discipline).
-- **Independence**, and "Support does not buy coverage" under "Money and independence."
-- The statement that editors check names, titles, scores and dates before a story runs.
 - The September 2025 date and the "approved" milestone, which come from the newsroom, not a published source.
 - Dan Mackin as the current adviser, and the adviser's role. The page says only that an adviser "works with the
   staff."

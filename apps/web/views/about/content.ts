@@ -10,8 +10,6 @@ export const SHOW_NEWSROOM_TODAY = false;
 export const CONTENTS = [
   { id: "who-we-are", label: "Who we are" },
   { id: "history", label: "Our history" },
-  { id: "coverage", label: "What we cover" },
-  { id: "standards", label: "Standards and corrections" },
   { id: "ai", label: "Artificial intelligence" },
   { id: "funding", label: "Money and independence" },
   { id: "technology", label: "Behind the website" },
@@ -61,66 +59,6 @@ export const TIMELINE = [
     when: "January 2026",
     text: "The new staff publishes its first stories and introduces its leadership team.",
     storySlug: "a-new-era-for-student-journalism-nshs"
-  }
-] as const;
-
-export const SECTIONS = [
-  {
-    slug: "news",
-    label: "News",
-    href: "/category/news/",
-    text: "What is happening at school and in town, including the explanation behind an announcement, a schedule change or a new rule."
-  },
-  {
-    slug: "sports",
-    label: "Sports",
-    href: "/category/sports/",
-    text: "Game stories and results for Wildcat teams. Older results are kept in a separate archive."
-  },
-  {
-    slug: "features",
-    label: "Features",
-    href: "/category/features/",
-    text: "Longer pieces about people, programs and policies: how a rule works, who a program serves, what a drive is for."
-  },
-  {
-    slug: "culture",
-    label: "Arts & Culture",
-    href: "/category/culture/",
-    text: "Theatre, clubs and the traditions that make up school life."
-  },
-  {
-    slug: "opinion",
-    label: "Opinion",
-    href: "/category/opinion/",
-    text: "Columns and commentary, labeled as opinion so readers can tell them apart from reporting."
-  }
-] as const;
-
-export const STANDARDS = [
-  {
-    term: "Accuracy",
-    text: "Names, titles, scores and dates are checked before a story runs. Editors read drafts for details and context as well as for writing."
-  },
-  {
-    term: "Fairness",
-    text: "People we write about get a chance to respond. We try to quote more than the people who are easiest to reach."
-  },
-  {
-    term: "Verification",
-    text: "We report what we saw, what someone in a position to know told us, or what a document shows. A rumor does not go in as fact. If we cannot confirm something, we say so or leave it out."
-  },
-  {
-    term: "Independence",
-    text: "Sources, advertisers and supporters do not decide what we cover or how we describe it."
-  },
-  {
-    term: "Transparency",
-    text: "Stories carry bylines and photographs carry credits. Opinion is labeled as opinion. When a story changes after it is published, a note says what changed."
-  },
-  {
-    term: "Responsible reporting",
-    text: "Many of the people in our stories are classmates and teachers we will see the next morning. We weigh what a detail adds against what it could cost the person involved, and we take extra care with stories about students' health, safety or discipline."
   }
 ] as const;
 
