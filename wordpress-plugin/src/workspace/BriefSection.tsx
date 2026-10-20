@@ -15,6 +15,7 @@ import { BRIEF_MAX } from "./reporting-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyBrief } from "./workspace-cache";
 import { workspaceError, type WorkspaceError } from "./workspace-errors";
+import { workspaceUndoToast } from "./workspace-toast";
 
 /** The internal one-paragraph brief. Never article copy; the article editor owns the story's words. */
 export function BriefSection() {
@@ -37,10 +38,22 @@ export function BriefSection() {
       cache.write((current) => applyBrief(current, text));
       return { previous };
     },
-    onSuccess: (response) => {
+    onSuccess: (response, _vars, context) => {
       cache.write((current) => applyBrief(current, response.brief));
       setEditing(false);
       announce("Brief saved.");
+      if (context) {
+        workspaceUndoToast("Brief saved.", {
+          restored: "Brief restored.",
+          failed: "The brief changed again, so it couldn't be undone.",
+          undo: async () => {
+            const undone = await client.saveBrief(storyId, context.previous, response.brief);
+            cache.write((current) => applyBrief(current, undone.brief));
+            announce("Brief restored.");
+            await cache.invalidate();
+          }
+        });
+      }
       requestAnimationFrame(() => edit.current?.focus());
     },
     onError: (failure, _text, context) => {
