@@ -23,6 +23,9 @@ const sourceTone = (status: StorySource["status"]): StatusTone => (status === "n
 
 type Open = (element: HTMLElement) => void;
 const Chevron = () => <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />;
+const People = ({ people }: { people: AvatarPerson[] }) => anyPicture(people)
+  ? <PeopleHoverCard people={people} />
+  : people.length ? <span className="max-w-36 truncate text-xs text-muted-foreground" title={people.map((person) => person.name).join(", ")}>{people.map((person) => person.name).join(", ")}</span> : null;
 
 function SourceRow({ source, people, timing, onOpen }: { source: StorySource; people: AvatarPerson[]; timing: string; onOpen: Open }) {
   const detail = [source.role, source.organization].filter(Boolean).join(" · ");
@@ -30,7 +33,7 @@ function SourceRow({ source, people, timing, onOpen }: { source: StorySource; pe
     {anyPicture(people) ? <ItemMedia><PeopleHoverCard people={people} /></ItemMedia> : null}
     <ItemContent>
       <ItemTitle>{source.label}</ItemTitle>
-      <ItemDescription>{detail}{people.length ? null : <>{detail ? " · " : ""}Unassigned</>}</ItemDescription>
+      <ItemDescription>{detail}{people.length ? (!anyPicture(people) ? <>{detail ? " · " : ""}{people.map((person) => person.name).join(", ")}</> : null) : <>{detail ? " · " : ""}Unassigned</>}</ItemDescription>
       {timing ? <ItemDescription>{timing}</ItemDescription> : null}
     </ItemContent>
     <ItemActions><StatusBadge tone={sourceTone(source.status)}>{SOURCE_STATUS_LABELS[source.status]}</StatusBadge><Chevron /></ItemActions>
@@ -48,7 +51,7 @@ function ExactRow({ appointment, people, timezone, onOpen }: { appointment: Stor
   return <ItemButton size="sm" onClick={(event) => onOpen(event.currentTarget)}>
     <ItemMedia className="w-[4.5rem] justify-start text-sm font-medium whitespace-nowrap tabular-nums"><span aria-hidden="true">{formatTime(appointment.startAt!, timezone)}</span><span className="sr-only">{range}</span></ItemMedia>
     <ItemContent><ItemTitle>{appointment.title}</ItemTitle><ItemDescription>{appointmentSub(appointment, false) || labelFor(APPOINTMENT_KIND_LABELS, appointment.kind)}</ItemDescription></ItemContent>
-    <ItemActions><PeopleHoverCard people={people} /><Chevron /></ItemActions>
+    <ItemActions><People people={people} /><Chevron /></ItemActions>
   </ItemButton>;
 }
 
@@ -65,7 +68,7 @@ function PastRow({ appointment, people, timezone, onOpen }: { appointment: Story
   const timing = appointment.scheduleMode === "unscheduled" ? "" : appointmentTiming(appointment, timezone).primary;
   return <ItemButton size="sm" onClick={(event) => onOpen(event.currentTarget)}>
     <ItemContent><ItemTitle className="text-muted-foreground">{appointment.title}</ItemTitle><ItemDescription>{[labelFor(APPOINTMENT_STATUS_LABELS, appointment.status), timing].filter(Boolean).join(" · ")}</ItemDescription></ItemContent>
-    <ItemActions><PeopleHoverCard people={people} /><Chevron /></ItemActions>
+    <ItemActions><People people={people} /><Chevron /></ItemActions>
   </ItemButton>;
 }
 
