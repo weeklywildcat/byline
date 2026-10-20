@@ -44,7 +44,8 @@ export function NewsletterList({ fetchers, initialFilters = {}, onOpen, onCreate
   const [providerUnavailable, setProviderUnavailable] = useState(false);
   const [tableRef, width] = useElementWidth<HTMLDivElement>();
   const debouncedSearch = useDebouncedValue(filters.search || "", 250);
-  const requestFilters = useMemo(() => ({ ...filters, search: debouncedSearch }), [debouncedSearch, filters]);
+  const { status, audience, page: filterPage, perPage: filterPerPage } = filters;
+  const requestFilters = useMemo(() => ({ status, audience, page: filterPage, perPage: filterPerPage, search: debouncedSearch }), [audience, debouncedSearch, filterPage, filterPerPage, status]);
 
   const load = useCallback(async () => {
     setIsLoading(true);
