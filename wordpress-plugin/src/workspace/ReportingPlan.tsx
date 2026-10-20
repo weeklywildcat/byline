@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { ChevronRight } from "lucide-react";
 import { ItemButton } from "../admin-ui/components/item-button";
-import { PeopleAvatars, type AvatarPerson } from "../admin-ui/components/people-avatars";
+import { PeopleAvatars, anyPicture, type AvatarPerson } from "../admin-ui/components/people-avatars";
 import { StatusBadge, type StatusTone } from "../admin-ui/components/status-badge";
 import { Button } from "../admin-ui/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
@@ -27,7 +27,7 @@ const Chevron = () => <ChevronRight className="size-4 text-muted-foreground" ari
 function SourceRow({ source, people, timing, onOpen }: { source: StorySource; people: AvatarPerson[]; timing: string; onOpen: Open }) {
   const detail = [source.role, source.organization].filter(Boolean).join(" · ");
   return <ItemButton size="sm" onClick={(event) => onOpen(event.currentTarget)}>
-    {people.length ? <ItemMedia><PeopleAvatars people={people} /></ItemMedia> : null}
+    {anyPicture(people) ? <ItemMedia><PeopleAvatars people={people} /></ItemMedia> : null}
     <ItemContent>
       <ItemTitle>{source.label}</ItemTitle>
       <ItemDescription>{detail}{people.length ? null : <>{detail ? " · " : ""}Unassigned</>}</ItemDescription>

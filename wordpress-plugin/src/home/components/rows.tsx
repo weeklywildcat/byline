@@ -1,7 +1,7 @@
 /** Home-only rows. Rows Home shares with Story Peek (tasks, activity, loading) live in story/rows. */
 import { ArrowUpRight, ChevronRight, CircleAlert, CircleDot } from "lucide-react";
 import { ItemButton } from "../../admin-ui/components/item-button";
-import { PeopleAvatars } from "../../admin-ui/components/people-avatars";
+import { PeopleAvatars, anyPicture } from "../../admin-ui/components/people-avatars";
 import { StatusBadge } from "../../admin-ui/components/status-badge";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "../../admin-ui/ui/item";
 import type { PlanningStory } from "../../planning/planning-model";
@@ -43,7 +43,7 @@ export function AttentionRow({ item, onOpen }: { item: AttentionItem; onOpen: ()
 
 export function MediaAssignmentRow({ media, timezone, now, onOpen }: { media: HomeVisualWork; timezone: string; now: Date; onOpen: () => void }) {
   return <ItemButton size="sm" onClick={onOpen}>
-    {media.assignee ? <ItemMedia><PeopleAvatars people={[media.assignee]} /></ItemMedia> : null}
+    {media.assignee && anyPicture([media.assignee]) ? <ItemMedia><PeopleAvatars people={[media.assignee]} /></ItemMedia> : null}
     <ItemContent>
       <ItemTitle className="line-clamp-2">{media.title || media.story.title}</ItemTitle>
       <ItemDescription>{media.title ? `${media.story.title} · ` : ""}{mediaTypeLabels[media.type] || "Visual"} · {media.assignee?.name || "Unassigned"}{media.dueAt ? ` · ${dateLabel(media.dueAt, timezone, now)}` : ""}</ItemDescription>

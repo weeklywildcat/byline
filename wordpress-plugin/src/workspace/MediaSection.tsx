@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { ItemButton } from "../admin-ui/components/item-button";
-import { PeopleAvatars } from "../admin-ui/components/people-avatars";
+import { PeopleAvatars, anyPicture } from "../admin-ui/components/people-avatars";
 import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
@@ -24,7 +24,7 @@ function MediaRow({ assignment, people, timezone, now, onOpen }: { assignment: S
   const hints = mediaReadinessHints(assignment);
   const detail = [files ? fileCountLabel(files) : "", ...hints];
   return <ItemButton size="sm" onClick={(event) => onOpen(event.currentTarget)}>
-    {assignment.assignee ? <ItemMedia><PeopleAvatars people={assigneeAvatars([assignment.assignee], people)} /></ItemMedia> : <ItemMedia variant="icon" className="size-6 rounded-full bg-muted text-muted-foreground"><Icon aria-hidden="true" /></ItemMedia>}
+    {assignment.assignee && anyPicture(assigneeAvatars([assignment.assignee], people)) ? <ItemMedia><PeopleAvatars people={assigneeAvatars([assignment.assignee], people)} /></ItemMedia> : <ItemMedia variant="icon" className="size-6 rounded-full bg-muted text-muted-foreground"><Icon aria-hidden="true" /></ItemMedia>}
     <ItemContent>
       <ItemTitle>{assignment.title}</ItemTitle>
       <ItemDescription>

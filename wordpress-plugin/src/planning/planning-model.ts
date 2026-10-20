@@ -672,6 +672,27 @@ function storySortValue(story: PlanningStory, key: PlanningSortKey): string | nu
   }
 }
 
+/**
+ * Does a story still have something not done? Open tasks, production that is
+ * not finished, appointments waiting for a time, or a review request.
+ */
+export function storyHasOpenWork(story: PlanningStory): boolean {
+  if (story.openTaskCount > 0 || story.needsReview) return true;
+  if ((story.mediaSummary?.open ?? 0) > 0) return true;
+  if (story.visual && story.visual.type !== "none" && story.visual.status !== "done" && story.visual.status !== "selected") return true;
+  return (story.reporting?.needsScheduling ?? 0) > 0;
+}
+
+/**
+ * A published story is finished news, so the List hides it unless something on
+ * it is still open. Choosing a WordPress state yourself, or asking for published
+ * stories, shows them.
+ */
+export function hideFinishedPublished(stories: PlanningStory[], options: { showPublished?: boolean; wordpressState?: string } = {}): PlanningStory[] {
+  if (options.showPublished || options.wordpressState) return stories;
+  return stories.filter((story) => !story.wordpressState.isPublished || storyHasOpenWork(story));
+}
+
 export function sortPlanningStories(stories: PlanningStory[], sort: PlanningSort = DEFAULT_PLANNING_SORT): PlanningStory[] {
   const direction = sort.direction === "desc" ? -1 : 1;
   return [...stories].sort((left, right) => {

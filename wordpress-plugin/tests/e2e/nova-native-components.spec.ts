@@ -94,7 +94,9 @@ test("Story Peek, sparse: calm header, native sections, no dead space, clear foo
     await expect(peek.getByText("Today", { exact: true })).toBeVisible();
     // Production shows who has it.
     const production = peek.getByRole("region", { name: "Production" });
-    await expect(production.getByRole("img", { name: canteen.user.name })).toBeVisible();
+    // The assignee is named in words. Without a real photo there is no placeholder avatar, only the kind of work.
+    await expect(production.getByText(new RegExp(`Photo · ${canteen.user.name}`))).toBeVisible();
+    await expect(production.locator('[data-slot="avatar"]')).toHaveCount(0);
     await expect(production.getByText(/Due Oct 21/)).toBeVisible();
     // Empty links are compact.
     await expect(peek.getByRole("region", { name: "Files & links" }).getByRole("button", { name: "Add link" })).toBeVisible();

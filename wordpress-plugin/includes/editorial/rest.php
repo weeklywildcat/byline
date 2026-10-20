@@ -763,10 +763,14 @@ function byline_editorial_rest_person($person): ?array
     }
 
     $result = ['id' => $id, 'name' => $name];
-    if (isset($person['avatarUrl']) && is_scalar($person['avatarUrl'])) {
-        $avatar = esc_url_raw((string) $person['avatarUrl']);
-        if ($avatar !== '') {
-            $result['avatarUrl'] = $avatar;
+    // A real photo only (a guest or author picture); never a generated placeholder.
+    foreach (['avatarUrl', 'imageUrl'] as $photo_key) {
+        if (isset($person[$photo_key]) && is_scalar($person[$photo_key])) {
+            $avatar = esc_url_raw((string) $person[$photo_key]);
+            if ($avatar !== '') {
+                $result['avatarUrl'] = $avatar;
+                break;
+            }
         }
     }
 

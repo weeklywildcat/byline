@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-import { __ } from "@wordpress/i18n";
+import { __, _n, sprintf } from "@wordpress/i18n";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { useElementWidth } from "../admin-ui/lib/hooks";
 import { cn } from "../admin-ui/lib/utils";
@@ -24,6 +24,8 @@ export type StoryListProps = {
   onSortChange: (key: PlanningSortKey) => void;
   onMoveStory: (story: PlanningStory, status: string) => Promise<unknown> | void;
   onOpenStory: (storyId: number) => void;
+  /** Finished published stories the List left out, so it can say so. */
+  hiddenPublished?: number;
 };
 
 /** Below this width a seven-column table is unreadable, so the list becomes compact rows. */
@@ -55,14 +57,15 @@ function Publication({ story, timezone }: { story: PlanningStory; timezone: stri
 }
 
 export function StoryList(props: StoryListProps) {
-  const { stories, statuses, sort, canMoveStories, movingStoryId, timezone, now, workspaceUrl, onSortChange, onMoveStory, onOpenStory } = props;
+  const { stories, statuses, sort, canMoveStories, movingStoryId, timezone, now, workspaceUrl, onSortChange, onMoveStory, onOpenStory, hiddenPublished = 0 } = props;
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const menu = (story: PlanningStory) => <StoryActionsMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={movingStoryId === story.id} onMove={onMoveStory} workspaceUrl={workspaceUrl} />;
 
-  if (!stories.length) return <Empty className="border"><EmptyHeader><EmptyTitle>{__("No stories match", "weekly-wildcat-headless")}</EmptyTitle><EmptyDescription>{__("Try clearing a filter, or choose a different saved view.", "weekly-wildcat-headless")}</EmptyDescription></EmptyHeader></Empty>;
+  const hidden = hiddenPublished > 0 ? <p className="px-1 text-xs text-muted-foreground">{sprintf(/* translators: %d: number of stories. */ _n("%d published story with nothing left to do is hidden.", "%d published stories with nothing left to do are hidden.", hiddenPublished, "weekly-wildcat-headless"), hiddenPublished)} {__("Use More filters to show them.", "weekly-wildcat-headless")}</p> : null;
+  if (!stories.length) return <><Empty className="border"><EmptyHeader><EmptyTitle>{__("No stories match", "weekly-wildcat-headless")}</EmptyTitle><EmptyDescription>{__("Try clearing a filter, or choose a different saved view.", "weekly-wildcat-headless")}</EmptyDescription></EmptyHeader></Empty>{hidden}</>;
 
   const table = width === 0 || width >= TABLE_MIN_WIDTH;
-  return <div ref={ref} className="rounded-xl border">
+  return <div className="flex flex-col gap-2"><div ref={ref} className="rounded-xl border">
     {table
       ? <Table aria-label={__("Stories", "weekly-wildcat-headless")}>
         <TableHeader>
@@ -100,5 +103,5 @@ export function StoryList(props: StoryListProps) {
           <ItemActions><WorkflowBadge workflow={story.workflow} />{menu(story)}</ItemActions>
         </Item>)}
       </ItemGroup>}
-  </div>;
+  </div>{hidden}</div>;
 }

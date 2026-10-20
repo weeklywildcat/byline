@@ -6,7 +6,7 @@ import type { EditorialTask, ContributorEntry } from "../editorial/editorial-mod
 import { describeEditorialError } from "../editorial/editorial-model";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { decodeEntities } from "../admin-ui/lib/text";
-import { PeopleAvatars } from "../admin-ui/components/people-avatars";
+import { PeopleAvatars, anyPicture } from "../admin-ui/components/people-avatars";
 import { DatePicker, WritersPicker, fieldRow, valueSelectTriggerClass } from "../admin-ui/components/pickers";
 import { ResourceIcon } from "../admin-ui/components/resource-icon";
 import { StatusBadge } from "../admin-ui/components/status-badge";
@@ -22,7 +22,7 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 import { ConfirmRemoveDialog } from "../workspace/dialog-shell";
 import { workingDraft } from "../workspace/resource-model";
 import { appointmentLine } from "../workspace/schedule-model";
-import { assigneeAvatars } from "../workspace/workspace-model";
+import { assigneeAvatars, sectionNames } from "../workspace/workspace-model";
 import { RESOURCE_PURPOSES, type ReportingSummary, type ResourcePurpose, type StoryResource, type StoryWorkspace } from "../workspace/workspace-types";
 import { exactDate, mediaStatusLabels, mediaTypeLabels, resourcePurposeLabels, shortDateTime } from "../home/newsroom-model";
 import { mediaTypeIcons } from "./media-icons";
@@ -179,7 +179,7 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
             const Icon = mediaTypeIcons[item.type] || mediaTypeIcons.other;
             const due = shortDateTime(item.dueAt, timezone);
             return <Item key={item.id} size="sm">
-              {assignee ? <ItemMedia><PeopleAvatars people={[assignee]} /></ItemMedia> : <ItemMedia variant="icon" className="size-6 rounded-full bg-muted text-muted-foreground"><Icon aria-hidden="true" /></ItemMedia>}
+              {assignee && anyPicture([assignee]) ? <ItemMedia><PeopleAvatars people={[assignee]} /></ItemMedia> : <ItemMedia variant="icon" className="size-6 rounded-full bg-muted text-muted-foreground"><Icon aria-hidden="true" /></ItemMedia>}
               <ItemContent>
                 <ItemTitle>{item.title || mediaTypeLabels[item.type]}</ItemTitle>
                 <ItemDescription>{mediaTypeLabels[item.type] || "Visual"} · {assignee?.name || "Unassigned"}</ItemDescription>
@@ -262,7 +262,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
     <SheetContent className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md" finalFocus={() => { if (origin?.isConnected) return origin; return document.querySelector<HTMLElement>("[data-home-search]"); }}>
       <SheetHeader className="gap-1 border-b pr-12">
         <SheetTitle className="text-lg leading-snug [overflow-wrap:anywhere]">{decodeEntities(story?.title) || "Story details"}</SheetTitle>
-        <SheetDescription>{story ? [story.workflow.label, data.sections.join(", ")].filter(Boolean).join(" · ") : "Newsroom context"}</SheetDescription>
+        <SheetDescription>{story ? [story.workflow.label, sectionNames(data.sections)].filter(Boolean).join(" · ") : "Newsroom context"}</SheetDescription>
         {story && (writerList.length || editor) ? <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-sm">
           {writerList.length ? <span className="flex items-center gap-2"><PeopleAvatars people={writerList} /><span>{writerList.map((p) => p.name).join(", ")}</span></span> : null}
           {editor ? <span className="flex items-center gap-2 text-muted-foreground"><PeopleAvatars people={[editor]} />Editor: {editor.name}</span> : null}
