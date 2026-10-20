@@ -211,7 +211,7 @@ describe("an immersive story", () => {
     expect(document.querySelectorAll(".article-correction-notice")).toHaveLength(1);
     expect(text(document.querySelector(".article-tags"))).toContain("Campus");
     expect(text(document.querySelector(".article-update-notice"))).toContain("Updated after publication.");
-    expect(document.querySelector(".about-writer h2")!.textContent).toBe("About the Writers");
+    expect(document.querySelector(".about-writer h2")!.textContent).toBe("About the authors");
     expect(document.querySelector(".article-tip-callout")).not.toBeNull();
     expect(document.querySelector('.article-meta-block [data-slot="share"]')).not.toBeNull();
     expect(document.querySelectorAll("#newsarticle-json-ld")).toHaveLength(1);

@@ -89,3 +89,15 @@ add_action('rest_api_init', static function (): void {
         ],
     ]);
 });
+
+/**
+ * Test-only: lets a spec credit an uploaded photograph through the REST API. The
+ * plugin registers the attachment's Image Creator without REST access (in
+ * production it is set in the media library), so open it up for the tests.
+ */
+add_filter('register_meta_args', static function (array $args, array $defaults, string $object_type, string $meta_key): array {
+    if ($object_type === 'post' && $meta_key === '_ww_image_creator') {
+        $args['show_in_rest'] = true;
+    }
+    return $args;
+}, 10, 4);

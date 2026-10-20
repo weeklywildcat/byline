@@ -32,6 +32,13 @@
   max-width: var(--article-width);
 }
 
+/* The root block list is the Post Content block of the active theme's template. Some
+   themes make it full width (`alignfull`, an inline `max-width: none`), which turned the
+   article into a 1300px column in the editor. The article measure is ours, not the theme's. */
+.editor-styles-wrapper .is-root-container.is-root-container {
+  max-width: var(--article-width);
+}
+
 .editor-styles-wrapper .editor-post-title,
 .editor-styles-wrapper .editor-post-title__input,
 .editor-styles-wrapper .wp-block-post-title {
@@ -121,7 +128,7 @@
 /* Images and captions. */
 .editor-styles-wrapper .is-root-container .wp-block-image img,
 .editor-styles-wrapper .is-root-container figure img {
-  border: 1px solid var(--rule);
+  border: 0;
 }
 
 .editor-styles-wrapper .is-root-container figcaption {
@@ -136,6 +143,18 @@
    above already sets the article measure. */
 .editor-styles-wrapper .is-root-container > .wp-block {
   max-width: none;
+}
+
+/* Wide and full-width blocks break out of the 760px column exactly as they do on the
+   published page (the width comes from newsroom/story-base.css). The constrained layout
+   WordPress puts on the root block list centres them with `margin: auto !important`,
+   which leaves a block wider than the column hanging off its right edge; only another
+   `!important` can win, so say it here and nowhere else. */
+.editor-styles-wrapper .is-root-container > .alignwide {
+  margin-inline: calc((100% - min(var(--article-wide-width), 100cqw)) / 2) !important;
+}
+.editor-styles-wrapper .is-root-container > .alignfull {
+  margin-inline: calc((100% - min(var(--article-full-width), 100cqw)) / 2) !important;
 }
 
 @media (max-width: 640px) {

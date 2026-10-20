@@ -53,7 +53,7 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .article-body blockquote, .byline-article-view .article-body .wp-block-quote { border-left: 4px solid var(--accent); color: #33302c; font-size: 1.28rem; line-height: 1.45; padding-left: 18px; }
 .byline-article-view .article-body .wp-block-pullquote { border-bottom: 1px solid var(--rule); border-top: 1px solid var(--rule); font-size: 1.45rem; line-height: 1.35; margin: 2em 0; padding: 20px 0; text-align: left; }
 .byline-article-view .article-body .wp-block-pullquote blockquote { border-left: 0; margin-bottom: 0; padding-left: 0; }
-.byline-article-view .article-body .wp-block-image img, .byline-article-view .article-body figure img { border: 1px solid var(--rule); }
+.byline-article-view .article-body .wp-block-image img, .byline-article-view .article-body figure img { border: 0; }
 .byline-article-view .article-body .wp-block-embed__wrapper { width: 100%; }
 .byline-article-view .article-body iframe, .byline-article-view .article-body video { max-width: 100%; }
 .byline-article-view .article-tags { border-top: 1px solid var(--rule); margin-top: 36px; padding-top: 16px; }

@@ -1,0 +1,122 @@
+/*
+ * Timeline: a chronology on a hairline axis. Supporting context, so it keeps the
+ * family rule on top and no box. In a wide column each event's date label sits
+ * left of the axis, its headline and reporting right of it; in a narrow column
+ * the label stacks above the headline beside the axis. The accent marks one
+ * event at most: the latest.
+ *
+ * The same rules load in the article, the Gutenberg canvas and Preview as Byline.
+ */
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) {
+  & ol.byline-timeline {
+    --timeline-label: 7.5rem;
+    --timeline-gap: 2.25rem;
+    --timeline-dot: 9px;
+    --timeline-axis: calc(var(--timeline-label) + var(--timeline-gap) / 2);
+    /* Where the marker sits: the middle of the first line of the headline. */
+    --timeline-mark: .78rem;
+    border-block-start: var(--story-rule-strong);
+    font-size: 1rem;
+    line-height: 1.55;
+    list-style: none;
+    margin-block: var(--story-space);
+    padding: 22px 0 0;
+  }
+  & ol.byline-timeline > .byline-timeline-item {
+    align-items: baseline;
+    display: grid;
+    grid-template-columns: var(--timeline-label) minmax(0, 1fr);
+    column-gap: var(--timeline-gap);
+    margin: 0;
+    min-width: 0;
+    padding: 0 0 2em;
+    position: relative;
+  }
+  /* The axis is one hairline: each event carries its stretch of it, from its marker down to the next. */
+  & ol.byline-timeline > .byline-timeline-item::before {
+    background: var(--rule-strong, #aab2bb);
+    bottom: 0;
+    content: "";
+    left: var(--timeline-axis);
+    position: absolute;
+    top: 0;
+    width: 1px;
+  }
+  & ol.byline-timeline > .byline-timeline-item:first-child::before { top: var(--timeline-mark); }
+  & ol.byline-timeline > .byline-timeline-item:last-child { padding-bottom: 0; }
+  & ol.byline-timeline > .byline-timeline-item:last-child::before { bottom: auto; height: var(--timeline-mark); }
+  & ol.byline-timeline > .byline-timeline-item::after {
+    background: var(--page, #fff);
+    border: 1.5px solid var(--ink, #121212);
+    border-radius: 50%;
+    box-sizing: border-box;
+    content: "";
+    height: var(--timeline-dot);
+    left: calc(var(--timeline-axis) - var(--timeline-dot) / 2);
+    position: absolute;
+    top: calc(var(--timeline-mark) - var(--timeline-dot) / 2);
+    width: var(--timeline-dot);
+  }
+  /* A new year or period: a hairline across the whole row. */
+  & ol.byline-timeline > .byline-timeline-item.is-new-period {
+    border-block-start: var(--story-rule);
+    margin-top: -.25em;
+    padding-top: 1.6em;
+  }
+  & ol.byline-timeline > .byline-timeline-item.is-new-period:last-child::before { height: calc(1.6em + var(--timeline-mark)); }
+  & ol.byline-timeline > .byline-timeline-item.is-new-period::after { top: calc(1.6em + var(--timeline-mark) - var(--timeline-dot) / 2); }
+
+  /* Typography: the label voice in figure.css. */
+  & .byline-timeline-label {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+  & .byline-timeline-title {
+    color: var(--ink, #121212);
+    font-family: var(--story-headline);
+    font-size: 1.3rem;
+    font-weight: 600;
+    grid-column: 2;
+    grid-row: 1;
+    letter-spacing: -.01em;
+    line-height: 1.2;
+    margin: 0;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+  & .byline-timeline-body {
+    grid-column: 2;
+    grid-row: 2;
+    margin: .45em 0 0;
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+  }
+  /* The latest event is the one the reader should find first. */
+  & ol.byline-timeline > .byline-timeline-item.is-current::after {
+    background: var(--story-accent);
+    border-color: var(--story-accent);
+  }
+  & .byline-timeline-item.is-current .byline-timeline-label { color: var(--story-accent); }
+}
+
+/* A narrow column: the axis moves to the left edge and each label stacks above its headline. */
+@container byline-content (max-width: 599px) {
+  :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) {
+    & ol.byline-timeline { --timeline-axis: calc(var(--timeline-dot) / 2); }
+    & ol.byline-timeline > .byline-timeline-item { display: block; padding-left: 1.6rem; }
+    & ol.byline-timeline > .byline-timeline-item:has(.byline-timeline-label) { --timeline-mark: .43rem; }
+    & .byline-timeline-label { margin-bottom: .25em; }
+    & .byline-timeline-body { margin-top: .4em; }
+  }
+}
+
+@media (forced-colors: active) {
+  :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) {
+    & ol.byline-timeline > .byline-timeline-item::before { background: CanvasText; forced-color-adjust: none; }
+    & ol.byline-timeline > .byline-timeline-item::after { background: Canvas; border-color: CanvasText; forced-color-adjust: none; }
+    & ol.byline-timeline > .byline-timeline-item.is-current::after { background: Highlight; border-color: Highlight; }
+  }
+}

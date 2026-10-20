@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArticleView, ImmersiveArticleView, type ArticleViewProps } from "@byline/ui";
+import { PresentedArticleView, type ArticleViewProps } from "@byline/ui";
 import { getStoryPresentation } from "./registry";
 
 /**
@@ -26,9 +26,5 @@ export function StoryArticle({ presentation, slots = {}, className }: ArticleVie
     );
   }
 
-  if (presentation.storyPresentation === "immersive" && presentation.image?.src) {
-    return <ImmersiveArticleView presentation={presentation} slots={slots} className={className} />;
-  }
-
-  return <ArticleView presentation={presentation} slots={slots} className={className} />;
+  return <PresentedArticleView presentation={presentation} slots={slots} className={className} />;
 }

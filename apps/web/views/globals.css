@@ -2244,7 +2244,7 @@ h1.masthead-logo {
 
 .article-body .wp-block-image img,
 .article-body figure img {
-  border: 1px solid var(--rule);
+  border: 0;
 }
 
 .article-body .wp-block-embed__wrapper {

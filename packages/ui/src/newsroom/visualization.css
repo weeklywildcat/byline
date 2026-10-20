@@ -1,0 +1,119 @@
+/*
+ * Chart / Map: a major visual moment (docs/editorial-design-system.md). A
+ * hairline rule, a headline and dek, the graphic or interactive embed at wide
+ * width, then source, notes and credit in the figure language (figure.css).
+ *
+ * An interactive embed owns a slot sized from `data-height` (the same four
+ * presets as `visualizationHeights`), so the fallback graphic, the provider
+ * iframe and the editor's preview all occupy the same box and nothing moves when
+ * the frame loads. A static graphic is not given a slot: it fills the width,
+ * up to its own size, at its own proportions.
+ */
+.byline-visualization { --viz-height: 480px; }
+.byline-visualization[data-height="compact"] { --viz-height: 320px; }
+.byline-visualization[data-height="tall"] { --viz-height: 680px; }
+.byline-visualization[data-height="map"] { --viz-height: 560px; }
+
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-visualization {
+  border-block-start: var(--story-rule);
+  margin-block: var(--story-moment-space);
+  padding-block-start: 18px;
+}
+/* Headline and dek. The headline is a figure title, not a story section, so it
+   is an h3 (an h2 would list every chart beside the story's own sections);
+   content saved before 0.3.25 has an h2 and an unclassed paragraph. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-visualization-title,
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-visualization > h2 {
+  color: var(--ink, #121212);
+  font-family: var(--story-headline);
+  font-size: clamp(1.4rem, 1.15rem + 1vw, 1.8rem);
+  font-weight: 600;
+  letter-spacing: -.012em;
+  line-height: 1.14;
+  margin: 0 0 .3em;
+  text-wrap: balance;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-visualization-dek,
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-visualization > p:not([class]) {
+  color: var(--story-muted);
+  font-family: var(--story-serif);
+  font-size: 1.05rem;
+  line-height: 1.45;
+  margin: 0 0 1.1rem;
+  max-width: var(--article-width, 760px);
+  text-wrap: pretty;
+}
+
+.byline-visualization-media { min-width: 0; }
+.byline-visualization-fallback-image img { display: block; height: auto; width: 100%; }
+.byline-visualization [hidden] { display: none; }
+
+/* Interactive embed: one slot, with the fallback graphic filling it until the
+   frame loads. Without scripting nothing will replace the graphic, so it keeps
+   its own proportions instead of floating in an empty frame. */
+@media (scripting: enabled) {
+  .byline-visualization[data-mode="embed"] .byline-visualization-media { min-height: var(--viz-height); position: relative; }
+  .byline-visualization[data-mode="embed"] .byline-visualization-media.is-loaded { min-height: 0; }
+  .byline-visualization[data-mode="embed"] .byline-visualization-fallback-image { background: var(--page, #fff); inset: 0; position: absolute; }
+  :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-visualization[data-mode="embed"] .byline-visualization-fallback-image img {
+    border: 0;
+    height: 100%;
+    object-fit: contain;
+  }
+}
+.byline-visualization-frame { background: var(--page, #fff); border: 0; display: block; position: relative; width: 100%; }
+
+/* "Preview: ..." and the stand-in when there is no graphic: editor canvas and Preview as Byline only. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-visualization-badge {
+  background: var(--ink, #121212);
+  bottom: 10px;
+  box-sizing: border-box;
+  color: var(--page, #fff);
+  font-family: var(--story-sans);
+  font-size: .74rem;
+  line-height: 1.35;
+  left: 10px;
+  margin: 0;
+  max-width: calc(100% - 20px);
+  padding: 5px 9px;
+  position: absolute;
+  text-wrap: pretty;
+  z-index: 1;
+}
+.byline-visualization-badge strong { font-weight: 700; }
+.byline-visualization-placeholder {
+  align-items: center;
+  border: 1px dashed var(--rule-strong, #aab2bb);
+  box-sizing: border-box;
+  color: var(--story-muted);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--story-sans);
+  font-size: .85rem;
+  gap: 10px;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+}
+
+/* Direct link: an unobtrusive text link under the graphic. */
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-visualization-link {
+  font-family: var(--story-sans);
+  font-size: .82rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.byline-visualization-link a { align-items: center; display: inline-flex; min-height: 44px; }
+.byline-visualization-link a:focus-visible { outline: 2px solid var(--story-accent); outline-offset: 3px; }
+.byline-visualization-link + figcaption { margin-top: 0; }
+
+/* What the graphic shows, in words, then who and what is behind it. */
+.byline-visualization figcaption { overflow-wrap: anywhere; }
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-visualization-summary {
+  color: var(--ink, #121212);
+  margin-block-end: 6px;
+}
+
+@media (forced-colors: active) {
+  .byline-visualization-badge { border: 1px solid CanvasText; }
+}

@@ -92,7 +92,8 @@ describe("the custom article hero is gone", () => {
     // renders the shared ArticleView.
     expect(articleRoute).toContain("<StoryArticle");
     expect(astroArticleRoute).toContain("<StoryArticle");
-    expect(readSource("../story-presentations/StoryArticle.tsx")).toContain("<ArticleView");
+    // The shared PresentedArticleView renders the normal ArticleView unless the author chose Immersive.
+    expect(readSource("../story-presentations/StoryArticle.tsx")).toContain("<PresentedArticleView");
     expect(articleRenderer.match(/className="article-header"/g)).toHaveLength(1);
     expect(articleRenderer).toContain('<article className="article-story">');
   });

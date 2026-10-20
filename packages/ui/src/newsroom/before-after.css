@@ -1,0 +1,113 @@
+/*
+ * Before / After: one photograph with a draggable divider. Before is on the
+ * left of the divider and After on the right, whatever the value, so the
+ * labels read in the order a reader expects. Without script the two complete
+ * photographs sit side by side (stacked on a narrow canvas), each under its
+ * label. The same rules draw the comparison in the Gutenberg canvas.
+ *
+ * Shape: the frame's proportions come from `--comparison-aspect`, written into
+ * the saved markup (see before-after/model.ts), so a tall pair is capped to
+ * the screen instead of running past it. `data-fit="cover"` (the default) crops
+ * the After photograph to the Before frame; `data-fit="contain"` shows both
+ * complete, with margins where their shapes differ. Older markup has neither,
+ * and the photographs size the frame themselves.
+ */
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) {
+  & .byline-before-after {
+    --comparison-thumb: 48px;
+    --comparison-ratio: .5;
+    /* The thumb's centre travels from half its width to the other half, so the divider and the
+       revealed edge share one position. The enhancer writes --comparison-ratio (0-1). */
+    --comparison-edge: calc(var(--comparison-thumb) / 2 + (100% - var(--comparison-thumb)) * var(--comparison-ratio));
+    --comparison-handle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M9 8 3 14l6 6M19 8l6 6-6 6' fill='none' stroke='%23111' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    margin-block: var(--story-moment-space);
+  }
+  & .byline-comparison-images { display: grid; gap: 1.25rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  & .byline-comparison-image { margin: 0; min-width: 0; }
+  & .byline-comparison-image img { border: 0; display: block; height: auto; width: 100%; }
+  & .byline-comparison-image > strong { display: block; margin-bottom: .5rem; }
+
+  /* Enhanced: the photographs share one frame and the native range sits on it. */
+  & .byline-before-after.is-enhanced .byline-comparison-images {
+    aspect-ratio: var(--comparison-aspect, auto);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    isolation: isolate;
+    margin-inline: auto;
+    position: relative;
+    width: min(100%, calc(85svh * var(--comparison-aspect)));
+  }
+  & .byline-before-after.is-enhanced .byline-comparison-image { background: var(--page, #fff); display: grid; grid-area: 1 / 1; min-height: 0; }
+  & .byline-before-after.is-enhanced .byline-comparison-image img { grid-area: 1 / 1; height: 100%; min-height: 0; object-fit: cover; }
+  & .byline-before-after[data-fit="contain"].is-enhanced .byline-comparison-image img { object-fit: contain; }
+  & .byline-before-after.is-enhanced .byline-comparison-image:nth-child(2) { clip-path: inset(0 0 0 var(--comparison-edge)); }
+  /* The enhancer draws its own labels over the photograph; these stay for assistive technology without taking a row. */
+  & .byline-before-after.is-enhanced .byline-comparison-image > strong { clip-path: inset(50%); height: 1px; margin: 0; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+
+  & .byline-comparison-labels { display: flex; inset: 12px 12px auto; justify-content: space-between; pointer-events: none; position: absolute; z-index: 2; }
+  & .byline-comparison-labels span { background: rgb(255 255 255 / .92); color: var(--ink, #121212); max-width: 48%; overflow: hidden; padding: 5px 9px; text-overflow: ellipsis; transition: opacity var(--story-motion); white-space: nowrap; }
+  & .byline-comparison-labels span.is-covered { opacity: 0; }
+  & .byline-comparison-divider {
+    border-left: 2px solid #fff;
+    bottom: 0;
+    box-shadow: 1px 0 rgb(0 0 0 / .4), -1px 0 rgb(0 0 0 / .4);
+    left: var(--comparison-edge);
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    width: 0;
+    z-index: 2;
+  }
+  /* The native range is the control; its thumb is the handle (48px, past the 44px target). */
+  & .byline-comparison-range {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    box-sizing: border-box;
+    cursor: ew-resize;
+    height: 100%;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+    position: absolute;
+    touch-action: pan-y;
+    -webkit-tap-highlight-color: transparent;
+    width: 100%;
+    z-index: 3;
+  }
+  & .byline-comparison-range::-webkit-slider-runnable-track { background: transparent; border: 0; height: var(--comparison-thumb); }
+  & .byline-comparison-range::-moz-range-track { background: transparent; border: 0; height: var(--comparison-thumb); }
+  & .byline-comparison-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    background: #fff var(--comparison-handle) center / 28px no-repeat;
+    border: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / .3), 0 2px 10px rgb(0 0 0 / .4);
+    box-sizing: border-box;
+    height: var(--comparison-thumb);
+    width: var(--comparison-thumb);
+  }
+  & .byline-comparison-range::-moz-range-thumb {
+    background: #fff var(--comparison-handle) center / 28px no-repeat;
+    border: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / .3), 0 2px 10px rgb(0 0 0 / .4);
+    box-sizing: border-box;
+    height: var(--comparison-thumb);
+    width: var(--comparison-thumb);
+  }
+  & .byline-comparison-range:focus { outline: none; }
+  & .byline-comparison-range:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--story-accent); outline-offset: 3px; }
+  & .byline-comparison-range:focus-visible::-moz-range-thumb { outline: 2px solid var(--story-accent); outline-offset: 3px; }
+  & .byline-comparison-images:has(.byline-comparison-range:focus-visible) { outline: 2px solid var(--story-accent); outline-offset: 3px; }
+}
+
+/* Side by side is for a canvas wide enough to compare; narrower, the two stack. */
+@container byline-content (max-width: 640px) {
+  :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-before-after:not(.is-enhanced) .byline-comparison-images { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (forced-colors: active) {
+  :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-comparison-range::-webkit-slider-thumb { forced-color-adjust: none; }
+}

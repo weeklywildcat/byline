@@ -40,11 +40,9 @@ describe('new semantic Core presets', () => {
   it('keeps media/Core defaults, aside semantics, editable columns and filtered optional attributes', () => {
     const byTitle = (title: string) => storyVariations.find((item) => item.title === title)!;
     expect(byTitle('Visual Chapter')).toMatchObject({ block: 'core/cover', attributes: { align: 'full', dimRatio: 40, contentPosition: 'center center' } });
-    for (const [title, core, align] of [['Wide Photo','core/image','wide'],['Full-Bleed Photo','core/image','full'],['Full-Bleed Video','core/video','full']]) expect(byTitle(title)).toMatchObject({ block: core, attributes: { align } });
-    expect(byTitle('Full-Bleed Video').attributes).toMatchObject({ controls: true, autoplay: false });
-    expect(byTitle('Why It Matters').attributes).toMatchObject({ tagName: 'aside', className: 'is-style-byline-why-it-matters' });
+    expect(byTitle('Context Box')).toMatchObject({ block: 'core/group', attributes: { tagName: 'aside', className: 'is-style-byline-context' } });
+    expect(byTitle('Expandable Section')).toMatchObject({ block: 'core/details', attributes: { summary: 'Methodology', showContent: false } });
     expect(byTitle('Comparison')).toMatchObject({ block: 'core/columns', attributes: { align: 'wide' } });
-    expect(byTitle('Main + Aside').innerBlocks!.map((column) => column[1]?.width)).toEqual(['65%', '35%']);
     expect(byTitle('Three Key Numbers').innerBlocks).toHaveLength(3);
     expect(byTitle('Map')).toMatchObject({ block: 'byline/visualization', attributes: { type: 'map', heightPreset: 'map' } });
     expect(supportedAttributes(byTitle('Visual Chapter').attributes, { className: {}, align: {} })).toEqual({ className: 'is-style-byline-visual-chapter', align: 'full' });
@@ -93,6 +91,9 @@ describe('semantic saved story content', () => {
     expect(root.querySelectorAll('script,iframe')).toHaveLength(0);
     expect(root.querySelector('a')!.href).toBe('https://datawrapper.dwcdn.net/AbCdE/1/');
     expect(root.querySelector('img')!.alt).toBe('A plan');
+    expect(root.querySelector('h3.byline-visualization-title')!.textContent).toBe('Budget');
+    expect(root.querySelector('.byline-visualization-link a')!.textContent).toBe('Open the interactive version');
+    expect(root.querySelector('figcaption .byline-visualization-source')!.textContent).toBe('Source: District records');
     const invalid = roundtrip('byline/visualization', { embedUrl: 'javascript:alert(1)' });
     expect(invalid.querySelector('[data-src],a')).toBeNull();
   });
@@ -108,7 +109,8 @@ describe('semantic saved story content', () => {
     expect(root.querySelector('input')).toBeNull();
     const incomplete = roundtrip('byline/before-after', { before: image });
     expect(incomplete.querySelectorAll('img')).toHaveLength(1);
-    expect(incomplete.textContent).toContain('Choose both photographs');
+    // The editor's instruction never reaches readers: the figure holds only what was chosen.
+    expect(incomplete.textContent).not.toContain('Choose both photographs');
   });
   it('keeps every step image and text in order with a constrained parent/child model', () => {
     setup();
