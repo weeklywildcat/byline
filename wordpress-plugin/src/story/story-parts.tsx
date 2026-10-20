@@ -9,12 +9,10 @@ import { cn } from "../admin-ui/lib/utils";
 import { decodeEntities } from "../admin-ui/lib/text";
 import { dateLabel, dayDistance, exactDate, mediaStatusLabels, mediaTypeLabels, siteDay } from "../home/newsroom-model";
 import { isPlannedDayOnly, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
-import { StoryHoverCard } from "./StoryHoverCard";
 
 /** The headline, as a button that opens Story Peek. Never a link into the editor: inspect first. */
 export function StoryTitleButton({ story, onOpen, className, ...props }: { story: Pick<PlanningStory, "id" | "title">; onOpen: (storyId: number) => void } & Omit<ComponentProps<"button">, "onClick" | "children">) {
-  const trigger = <button type="button" className={cn("min-w-0 text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline focus-visible:outline-none", className)} onClick={() => onOpen(story.id)} {...props}>{decodeEntities(story.title) || "Untitled story"}</button>;
-  return <StoryHoverCard storyId={story.id} title={story.title} story={story}>{trigger}</StoryHoverCard>;
+  return <button type="button" className={cn("min-w-0 text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline focus-visible:outline-none", className)} onClick={() => onOpen(story.id)} {...props}>{decodeEntities(story.title) || "Untitled story"}</button>;
 }
 
 /** "Due tomorrow", "2d overdue", or a quiet fallback. Overdue is the one warning. */
