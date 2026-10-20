@@ -1,9 +1,12 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
+import { useMediaQuery } from "../admin-ui/lib/hooks";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../admin-ui/ui/alert-dialog";
 import { Button } from "../admin-ui/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../admin-ui/ui/dialog";
+import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "../admin-ui/ui/drawer";
 import { Spinner } from "../admin-ui/ui/spinner";
+import { ScrollArea } from "../admin-ui/ui/scroll-area";
 import { FieldGroup } from "../admin-ui/ui/field";
 
 export type WorkspaceDialogProps = {
@@ -35,6 +38,7 @@ export type WorkspaceDialogProps = {
  */
 export function WorkspaceDialog({ open, onClose, finalFocus, title, description, submitLabel, pendingLabel = "Saving…", pending, dirty = false, error, onReload, onSubmit, secondary, modal = true, readOnly, children }: WorkspaceDialogProps) {
   const [discardOpen, setDiscardOpen] = useState(false);
+  const mobile = useMediaQuery("(max-width: 639px)");
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!pending && !readOnly) onSubmit();
@@ -55,23 +59,41 @@ export function WorkspaceDialog({ open, onClose, finalFocus, title, description,
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [open, dirty, readOnly]);
 
+  const fields = <ScrollArea className="min-h-0 flex-1">
+    <FieldGroup className="gap-4 px-4 pb-2">
+      {error ? <InlineAlert onAction={onReload} actionLabel="Reload">{error}</InlineAlert> : null}
+      {children}
+    </FieldGroup>
+  </ScrollArea>;
+
+  const footerContents = <>
+    {secondary || dirty ? <div className="flex items-center gap-3 sm:mr-auto">{secondary}{dirty && !readOnly ? <span className="text-xs text-muted-foreground">Unsaved changes</span> : null}</div> : null}
+    <Button type="button" variant="outline" onClick={requestClose} disabled={pending}>{readOnly ? "Close" : "Cancel"}</Button>
+    {readOnly ? null : <Button type="submit" disabled={pending}>{pending ? <><Spinner data-icon="inline-start" />{pendingLabel}</> : submitLabel}</Button>}
+  </>;
+
+  const responsiveOverlay = mobile && modal
+    ? <Drawer open={open} onOpenChange={(next) => { if (!next) requestClose(); }} showSwipeHandle>
+        <DrawerContent>
+          <DrawerHeader><DrawerTitle>{title}</DrawerTitle>{description ? <DrawerDescription>{description}</DrawerDescription> : null}</DrawerHeader>
+          <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col">
+            {fields}
+            <DrawerFooter className="items-stretch sm:items-center">{footerContents}</DrawerFooter>
+          </form>
+        </DrawerContent>
+      </Drawer>
+    : <Dialog open={open} modal={modal} onOpenChange={(next) => { if (!next) requestClose(); }}>
+        <DialogContent finalFocus={finalFocus} className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] sm:max-w-lg">
+          <DialogHeader><DialogTitle>{title}</DialogTitle>{description ? <DialogDescription>{description}</DialogDescription> : null}</DialogHeader>
+          <form onSubmit={submit} noValidate className="-mx-4 grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-4">
+            {fields}
+            <DialogFooter className="mx-4 items-center">{footerContents}</DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>;
+
   return <>
-    <Dialog open={open} modal={modal} onOpenChange={(next) => { if (!next) requestClose(); }}>
-      <DialogContent finalFocus={finalFocus} className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] sm:max-w-lg">
-        <DialogHeader><DialogTitle>{title}</DialogTitle>{description ? <DialogDescription>{description}</DialogDescription> : null}</DialogHeader>
-        <form onSubmit={submit} noValidate className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-4">
-          <FieldGroup className="no-scrollbar -mx-4 min-h-0 w-auto gap-4 overflow-y-auto px-4 pb-1">
-            {error ? <InlineAlert onAction={onReload} actionLabel="Reload">{error}</InlineAlert> : null}
-            {children}
-          </FieldGroup>
-          <DialogFooter className="items-center">
-            {secondary || dirty ? <div className="flex items-center gap-3 sm:mr-auto">{secondary}{dirty && !readOnly ? <span className="text-xs text-muted-foreground">Unsaved changes</span> : null}</div> : null}
-            <Button type="button" variant="outline" onClick={requestClose} disabled={pending}>{readOnly ? "Close" : "Cancel"}</Button>
-            {readOnly ? null : <Button type="submit" disabled={pending}>{pending ? <><Spinner data-icon="inline-start" />{pendingLabel}</> : submitLabel}</Button>}
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    {responsiveOverlay}
     <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
