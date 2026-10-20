@@ -3,7 +3,7 @@ import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { Badge } from "../admin-ui/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "../admin-ui/ui/breadcrumb";
 import { buttonVariants } from "../admin-ui/ui/button";
-import { writerNames } from "./workspace-model";
+import { sectionNames, writerNames } from "./workspace-model";
 import { workingDraft } from "./resource-model";
 import { useWorkspace } from "./workspace-context";
 
@@ -27,7 +27,7 @@ export function WorkspaceHeader() {
         <h1 className="font-heading text-2xl leading-tight font-semibold tracking-tight text-balance [overflow-wrap:anywhere]">{title}</h1>
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
           <Badge variant="secondary">{story.workflow.label}</Badge>
-          {data.sections.length ? <span>{data.sections.join(", ")}</span> : null}
+          {data.sections.length ? <span>{sectionNames(data.sections)}</span> : null}
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
           {writers.length ? <span className="flex items-center gap-2">

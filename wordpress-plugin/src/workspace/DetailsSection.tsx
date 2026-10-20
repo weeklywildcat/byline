@@ -13,7 +13,7 @@ import { SectionFailed } from "./parts";
 import { applyWorkflowPayload, patchStory, type StoryPatch } from "./workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { workspaceError } from "./workspace-errors";
-import { names, peopleOptions } from "./workspace-model";
+import { names, peopleOptions, sectionNames } from "./workspace-model";
 import type { WorkspaceStatus } from "./workspace-types";
 
 type Changes = { status?: string; editorId?: number | null; deadline?: string | null; plannedPublishAt?: string | null };
@@ -94,7 +94,7 @@ export function DetailsSection() {
           {caps.assign ? <DatePicker appearance="value" label="Publication target" value={story.plannedPublication} timezone={timezone} disabled={busy} onChange={(plannedPublishAt) => save({ plannedPublishAt })} /> : <>{exactDate(story.plannedPublication, timezone)}</>}
         </Property>
         <Property label="WordPress state">{wpState.label}{scheduled}</Property>
-        <Property label="Section">{data.sections.join(", ") || "None"}</Property>
+        <Property label="Section">{sectionNames(data.sections) || "None"}</Property>
       </FieldGroup>
       {update.isError && update.error && workspaceError(update.error).conflict ? <InlineAlert className="mt-3" onAction={() => void reload()} actionLabel="Reload">{workspaceError(update.error).message}</InlineAlert> : null}
     </CardContent>
