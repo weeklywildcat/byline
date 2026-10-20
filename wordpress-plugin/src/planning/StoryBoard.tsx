@@ -9,6 +9,7 @@ import { Badge } from "../admin-ui/ui/badge";
 import { Card, CardContent } from "../admin-ui/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { StoryDueLabel, StorySignals, StoryTitleButton, WorkflowBadge } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 import { StoryActionsMenu } from "./StoryActionsMenu";
 import { boardWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
 
