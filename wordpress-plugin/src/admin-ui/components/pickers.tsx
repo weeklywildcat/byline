@@ -64,11 +64,11 @@ export function WritersPicker({ people, value, onChange, disabled, appearance = 
 }
 
 /** A date (or date and time) stored as an offset-free site-local value. */
-export function DatePicker({ id, label, value, timezone, onChange, disabled, dateOnly = false, appearance = "field", placeholder = "Set date" }: { id?: string; label: string; value?: string | null; timezone: string; onChange: (date: string | null) => void; disabled?: boolean; dateOnly?: boolean; appearance?: PickerAppearance; placeholder?: string }) {
+export function DatePicker({ id, label, value, timezone, onChange, disabled, dateOnly = false, appearance = "field", placeholder = "Set date", displayValue }: { id?: string; label: string; value?: string | null; timezone: string; onChange: (date: string | null) => void; disabled?: boolean; dateOnly?: boolean; appearance?: PickerAppearance; placeholder?: string; displayValue?: string }) {
   const [open, setOpen] = useState(false);
   const day = value ? siteDay(value, timezone) : "";
   const selected = day ? new Date(`${day}T12:00:00`) : undefined;
-  const text = value ? exactDate(value, timezone) : "";
+  const text = value ? (displayValue ?? exactDate(value, timezone)) : "";
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger render={<Button id={id} {...triggerProps(appearance, appearance === "field" ? "justify-start" : undefined)} disabled={disabled} aria-label={`Change ${label.toLowerCase()}`} />}>
       <CalendarDays aria-hidden="true" className={appearance === "value" ? "hidden" : "text-muted-foreground"} />
