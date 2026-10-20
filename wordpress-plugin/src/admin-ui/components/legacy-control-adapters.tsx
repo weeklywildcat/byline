@@ -5,6 +5,9 @@ import { Card as NovaCard, CardContent } from "../ui/card";
 import { Field, FieldDescription, FieldLabel } from "../ui/field";
 import { Input } from "../ui/input";
 import { NativeSelect, NativeSelectOption } from "../ui/native-select";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
+import { Search } from "lucide-react";
 import { Spinner } from "../ui/spinner";
 import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
@@ -108,3 +111,27 @@ export function ToggleControl({ label, checked, onChange, help, disabled }: {
 }
 
 export { Spinner };
+
+
+export function SearchControl({ label, value, onChange, placeholder, className }: {
+  label: string;
+  value?: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  return <Field className={className}>
+    <FieldLabel className="sr-only">{label}</FieldLabel>
+    <InputGroup>
+      <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
+      <InputGroupInput type="search" aria-label={label} value={value ?? ""} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+    </InputGroup>
+  </Field>;
+}
+
+export function Placeholder({ label, instructions, children }: { label: string; instructions?: string; children?: ReactNode }) {
+  return <Empty className="py-8">
+    <EmptyHeader><EmptyTitle>{label}</EmptyTitle>{instructions ? <EmptyDescription>{instructions}</EmptyDescription> : null}</EmptyHeader>
+    {children ? <EmptyContent>{children}</EmptyContent> : null}
+  </Empty>;
+}
