@@ -1,4 +1,4 @@
-import { Button, Card, CardBody, Notice, Spinner } from "@wordpress/components";
+import { Button, Card, CardBody, Notice, Spinner } from "../admin-ui/components/legacy-control-adapters";
 import { useCallback, useEffect, useMemo, useState } from "@wordpress/element";
 import { __ } from "@wordpress/i18n";
 
