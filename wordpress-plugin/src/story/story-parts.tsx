@@ -23,8 +23,28 @@ export function StoryDueLabel({ value, timezone, now, prefix = "", empty = "No d
   return <time dateTime={value} title={exactDate(value, timezone)} className={cn(overdue ? "text-warning" : "text-muted-foreground", className)}>{prefix}{prefix ? label.charAt(0).toLowerCase() + label.slice(1) : label}</time>;
 }
 
+/**
+ * Workflow colors distinguish production stages without treating routine work
+ * as an alert. Darker amber is reserved for a review handoff, and on-hold
+ * gets muted rust. Text always names the stage; color is supplementary.
+ *
+ * Both light and dark themes use a paired surface/foreground/border palette.
+ * The generic status badge remains responsible for actual attention signals.
+ */
+export const workflowBadgeColors: Record<string, string> = {
+  pitch: "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200",
+  assigned: "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200",
+  reporting: "border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-200",
+  writing: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-200",
+  editing: "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-200",
+  ready: "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200",
+  "on-hold": "border-orange-300 bg-orange-100 text-orange-900 dark:border-orange-700 dark:bg-orange-950 dark:text-orange-200",
+  dropped: "border-zinc-300 bg-zinc-200 text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200",
+  published: "border-green-200 bg-green-100 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200"
+};
+
 export function WorkflowBadge({ workflow, className }: { workflow: Pick<PlanningWorkflowStatus, "id" | "label" | "group">; className?: string }) {
-  return <StatusBadge tone={workflow.id === "ready" || workflow.id === "published" ? "done" : "neutral"} className={cn("max-w-36 truncate", className)}>{workflow.label}</StatusBadge>;
+  return <StatusBadge tone="neutral" className={cn("max-w-36 truncate font-medium", workflowBadgeColors[workflow.id] ?? "border-border bg-muted text-foreground", className)}>{workflow.label}</StatusBadge>;
 }
 
 /** A planned publication as a day when only a day was planned ("Oct 24"), and with its time when a real time was. */
