@@ -20,7 +20,7 @@ export function ActivitySection() {
           <ItemContent><ItemTitle className="line-clamp-none font-normal">{workspaceActivityCopy(item)}</ItemTitle></ItemContent>
           <ItemActions><time className="text-xs whitespace-nowrap text-muted-foreground" dateTime={item.occurredAt} title={exactDate(item.occurredAt, timezone)}>{relativeTime(item.occurredAt, timezone, now)}</time></ItemActions>
         </Item>)}</ItemGroup>
-        : <div className="px-3"><Empty className="border"><EmptyHeader><EmptyTitle>No recent activity.</EmptyTitle></EmptyHeader></Empty></div>}
+        : <div className="px-3"><Empty className="py-5"><EmptyHeader><EmptyTitle>No recent activity.</EmptyTitle></EmptyHeader></Empty></div>}
     </CardContent>
   </Card>;
 }
