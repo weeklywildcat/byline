@@ -29,9 +29,9 @@ defaults (`http://localhost:8888`, `admin`, `password`).
 
 `.wp-env.json` mounts this repository's plugin directory directly, so run
 `npm run build:plugin` first: the editor loads `build/editorial-workflow.js`,
-not `src/`. Use `npm run test:e2e:legacy` for the smaller WordPress 6.6
-compatibility environment. The same suite runs in both environments; the
-primary command uses WordPress 7.1 and the legacy command uses WordPress 6.6.
+not `src/`. The suite runs against WordPress 7.1 (`npm run test:e2e:primary`).
+The separate WordPress 6.6 environment has been retired; the plugin's own
+compatibility code for older Core is covered by the PHP regressions.
 
 ## What the specs cover
 
