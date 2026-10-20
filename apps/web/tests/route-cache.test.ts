@@ -48,7 +48,7 @@ describe("incremental keys follow actual render dependencies", () => {
     expect(key(before, "article", before.posts[0].id)).toBe(key(await snapshot(bodyEdit), "article", before.posts[0].id));
   });
   it("invalidates articles and profiles displaying changed contributor information", async () => {
-    const before = await snapshot(); const people = structuredClone(fixture.authors); people[0].description += " Updated bio";
+    const before = await snapshot(); const people = structuredClone(fixture.authors); people[0].name += " Updated"; // the article author block shows the name, role and photo (the bio is not shown there)
     const after = await snapshot(before.posts, people);
     for (const p of before.posts.filter((p) => getPostContributors(p).some((c) => !isGuestContributor(c) && c.id === 1))) expect(key(before, "article", p.id)).not.toBe(key(after, "article", p.id));
     expect(key(before, "author", "user:1")).not.toBe(key(after, "author", "user:1"));

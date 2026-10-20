@@ -39,11 +39,20 @@ export function setCurrentEvent(items: TimelineItem[], index: number, current: b
   return items.map(({ current: _previous, ...item }, i) => (current && i === index ? { ...item, current: true } : item));
 }
 
-const plain = (html: string) => html.replace(/<[^>]*>/g, '').trim();
+/** Whether markup holds any visible text, read character by character (no tag-stripping regex to get wrong). */
+function hasText(html: string): boolean {
+  let inTag = false;
+  for (const character of html) {
+    if (character === '<') inTag = true;
+    else if (character === '>') inTag = false;
+    else if (!inTag && character.trim() !== '') return true;
+  }
+  return false;
+}
 
 /** An event needs a headline or reporting; a date label alone is a stub that is not published. */
 export function isStub(item: TimelineItem): boolean {
-  return !item.title.trim() && !plain(item.body);
+  return !item.title.trim() && !hasText(item.body);
 }
 
 /** The first four-digit year in a label ("Fall 2027", "Oct. 17, 2026"), as includes/content/story-blocks.php reads it. */
