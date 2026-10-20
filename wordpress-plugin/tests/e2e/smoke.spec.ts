@@ -23,8 +23,13 @@ test.describe("WordPress environment", () => {
     await expect(triggerAvatar).toHaveAttribute("data-size", "default");
     await expect(triggerAvatar).toHaveCSS("width", "32px");
     await expect(triggerAvatar).toHaveCSS("height", "32px");
-    await expect(triggerAvatar.locator('[data-slot="avatar-image"]')).toHaveCSS("width", "32px");
-    await expect(triggerAvatar.locator('[data-slot="avatar-image"]')).toHaveCSS("height", "32px");
+    await expect(triggerAvatar).toHaveCSS("position", "relative");
+    await expect(triggerAvatar).toHaveCSS("border-radius", "9999px");
+    const triggerImage = triggerAvatar.locator('[data-slot="avatar-image"]');
+    await expect(triggerImage).toHaveCSS("width", "32px");
+    await expect(triggerImage).toHaveCSS("height", "32px");
+    await expect(triggerImage).toHaveCSS("object-fit", "cover");
+    await expect(triggerImage).toHaveCSS("border-radius", "9999px");
 
     await presence.click();
     await expect(adminPage.getByText("Newsroom", { exact: true })).toBeVisible();
