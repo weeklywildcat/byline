@@ -105,7 +105,7 @@ export function ReportingPlan() {
     </CardHeader>
     <CardContent className="flex flex-col gap-4 px-0">
       {failed ? <div className="px-3"><SectionFailed what="the reporting plan" onRetry={() => void reload()} /></div> : nothing
-        ? <div className="px-3"><Empty className="border">
+        ? <div className="px-3"><Empty className="py-5">
           <EmptyHeader><EmptyTitle>No sources or interviews yet.</EmptyTitle><EmptyDescription>{caps.addSource || caps.addAppointment ? "Add the people you plan to talk to, even as a role, and when you'll meet them." : "No reporting is assigned to you."}</EmptyDescription></EmptyHeader>
           {addSource || addAppointment ? <EmptyContent className="flex-row justify-center">{addSource}{addAppointment}</EmptyContent> : null}
         </Empty></div>
