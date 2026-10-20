@@ -1,8 +1,10 @@
-import { ArrowRightLeft, ArrowUpRight, FilePen, LayoutDashboard, MoreHorizontal } from "lucide-react";
+import { ArrowRightLeft, ArrowUpRight, FilePen, LayoutDashboard, MoreHorizontal, PanelRightOpen } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { Button } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { cn } from "../admin-ui/lib/utils";
+import type { ReactElement } from "react";
 import { movableWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
 
 export type StoryActionsMenuProps = {
@@ -48,4 +50,46 @@ export function StoryActionsMenu({ story, statuses, canMove, disabled, onMove, w
       </> : null}
     </DropdownMenuContent>
   </DropdownMenu>;
+}
+
+
+export type StoryContextMenuProps = StoryActionsMenuProps & {
+  onOpenStory: (storyId: number) => void;
+  children: ReactElement;
+};
+
+/**
+ * Pointer accelerator for Story List rows. It mirrors the visible three-dot
+ * menu instead of replacing it, so touch and keyboard users keep the ordinary
+ * action button while mouse/trackpad users can right-click anywhere on a row.
+ */
+export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, workspaceUrl, onOpenStory, children }: StoryContextMenuProps) {
+  const title = story.title || __("Untitled story", "weekly-wildcat-headless");
+  const movable = canMove && !story.wordpressState.isPublished;
+  const stages = movableWorkflowStatuses(statuses);
+
+  return <ContextMenu>
+    <ContextMenuTrigger render={children} />
+    <ContextMenuContent className="w-56">
+      <ContextMenuLabel className="max-w-52 truncate">{title}</ContextMenuLabel>
+      <ContextMenuSeparator />
+      <ContextMenuGroup>
+        <ContextMenuItem disabled={disabled} onClick={() => onOpenStory(story.id)}><PanelRightOpen aria-hidden="true" />{__("Quick view", "weekly-wildcat-headless")}</ContextMenuItem>
+        <ContextMenuItem render={<a href={workspaceUrl(story.id)} />}><LayoutDashboard aria-hidden="true" />{__("Open workspace", "weekly-wildcat-headless")}</ContextMenuItem>
+        {story.editUrl ? <ContextMenuItem render={<a href={story.editUrl} />}><FilePen aria-hidden="true" />{__("Edit article", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+        {story.previewUrl ? <ContextMenuItem render={<a href={story.previewUrl} target="_blank" rel="noopener noreferrer" />}><ArrowUpRight aria-hidden="true" />{__("Preview", "weekly-wildcat-headless")}<span className="sr-only"> {__("(opens in a new tab)", "weekly-wildcat-headless")}</span></ContextMenuItem> : null}
+      </ContextMenuGroup>
+      {movable && stages.length ? <>
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger disabled={disabled}><ArrowRightLeft aria-hidden="true" />{__("Move to", "weekly-wildcat-headless")}</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-44">
+            <ContextMenuRadioGroup value={story.workflow.id} onValueChange={(value) => { if (value && value !== story.workflow.id) onMove(story, String(value)); }}>
+              {stages.map((stage) => <ContextMenuRadioItem key={stage.id} value={stage.id}>{stage.label}</ContextMenuRadioItem>)}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      </> : null}
+    </ContextMenuContent>
+  </ContextMenu>;
 }
