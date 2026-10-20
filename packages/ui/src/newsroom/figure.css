@@ -64,7 +64,8 @@
 }
 
 /* Label (kicker): the small capitals that name a thing: a date, a number, "Context". */
-.byline-kicker {
+.byline-kicker,
+.byline-timeline-label {
   color: var(--story-muted);
   font-family: var(--story-sans);
   font-size: .72rem;

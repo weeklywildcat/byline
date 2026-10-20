@@ -740,11 +740,11 @@ function byline_newsroom_enqueue_shared_assets(): void
         return;
     }
     $root = dirname(__DIR__, 2);
-    $file = $root . '/build/blocks/stories/style-index.css';
+    $file = $root . '/build/newsroom-blocks.css';
     if (!file_exists($file)) {
         return;
     }
-    wp_enqueue_style('byline-newsroom-blocks', plugins_url('build/blocks/stories/style-index.css', $root . '/weekly-wildcat-headless.php'), [], (string) filemtime($file));
+    wp_enqueue_style('byline-newsroom-blocks', plugins_url('build/newsroom-blocks.css', $root . '/weekly-wildcat-headless.php'), [], (string) filemtime($file));
 }
 add_action('enqueue_block_assets', 'byline_newsroom_enqueue_shared_assets', 30);
 

@@ -32,6 +32,13 @@
   max-width: var(--article-width);
 }
 
+/* The root block list is the Post Content block of the active theme's template. Some
+   themes make it full width (`alignfull`, an inline `max-width: none`), which turned the
+   article into a 1300px column in the editor. The article measure is ours, not the theme's. */
+.editor-styles-wrapper .is-root-container.is-root-container {
+  max-width: var(--article-width);
+}
+
 .editor-styles-wrapper .editor-post-title,
 .editor-styles-wrapper .editor-post-title__input,
 .editor-styles-wrapper .wp-block-post-title {
