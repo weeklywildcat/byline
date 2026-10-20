@@ -60,7 +60,7 @@ describe("Home dashboard attention", () => {
     expect(items).toEqual([]);
   });
 
-  it("still surfaces decision work such as an assigned production item", () => {
+  it("keeps assigned production work in its own section instead of duplicating it in Waiting for Me", () => {
     const visual: HomeVisualWork = {
       id: "m1",
       story: { id: 10, title: "Canteen", editUrl: "/wp-admin/post.php?post=10&action=edit" },
@@ -72,10 +72,25 @@ describe("Home dashboard attention", () => {
       notes: "",
       attachmentIds: []
     };
-    const items = waitingForMe(home({ visualWork: [visual] }), new Date("2026-10-20T12:00:00Z"));
+    expect(waitingForMe(home({ visualWork: [visual] }), new Date("2026-10-20T12:00:00Z"))).toEqual([]);
+  });
+
+  it("still surfaces editor action such as urgent unassigned production", () => {
+    const visual: HomeVisualWork = {
+      id: "m2",
+      story: { id: 10, title: "Canteen", editUrl: "/wp-admin/post.php?post=10&action=edit" },
+      title: "Visual request",
+      type: "photo",
+      status: "needed",
+      assignee: null,
+      dueAt: "2026-10-20T18:00:00Z",
+      notes: "",
+      attachmentIds: []
+    };
+    const items = waitingForMe(home({ capabilities: { review: true, createStory: true, uploadMedia: true }, visualWork: [visual] }), new Date("2026-10-20T12:00:00Z"));
 
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ title: "Photo assignment", detail: "Canteen · waiting to be started" });
+    expect(items[0]).toMatchObject({ title: "Photo needed", detail: "Canteen · urgent visual work needs an assignee" });
   });
 });
 
