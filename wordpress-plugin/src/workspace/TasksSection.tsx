@@ -113,7 +113,20 @@ export function TasksSection() {
     },
     onSuccess: (updated, { task, state }) => {
       cache.write((current) => applyTask(current, updated));
-      announce(state === "completed" ? `Completed ${task.title}.` : `Reopened ${task.title}.`);
+      const message = state === "completed" ? `Completed ${task.title}.` : `Reopened ${task.title}.`;
+      announce(message);
+      toast.success(message, {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void editorial.updateTask(task.id, { state: task.state }).then((restored) => {
+              cache.write((current) => applyTask(current, restored));
+              announce(`Restored ${task.title}.`);
+              void cache.invalidate();
+            }).catch((failure) => toast.error(describeEditorialError(failure, "The task change couldn’t be undone.")));
+          }
+        }
+      });
     },
     onError: (error, { task, state }, context) => {
       cache.write((current) => applyTask(current, context?.previous ?? task));
