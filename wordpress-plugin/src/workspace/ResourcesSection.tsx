@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-u
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
-import { ConfirmRemoveDialog, WorkspaceDialog } from "./dialog-shell";
+import { WorkspaceDialog } from "./dialog-shell";
 import { AddButton, SectionFailed } from "./parts";
 import { useDialogTarget } from "./dialog-target";
 import { RESOURCE_PURPOSE_LABELS } from "./reporting-model";
@@ -17,6 +17,7 @@ import { isHttpUrl, normalizePurpose, resourceSubtitle, validateLink } from "./r
 import { applyResources } from "./workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { workspaceError } from "./workspace-errors";
+import { workspaceUndoToast, workspaceToast } from "./workspace-toast";
 import { RESOURCE_PURPOSES, type ResourcePurpose, type StoryResource } from "./workspace-types";
 
 const purposeOptions = RESOURCE_PURPOSES.map((value) => ({ value, label: RESOURCE_PURPOSE_LABELS[value] }));
@@ -33,7 +34,43 @@ function LinkDialog({ open, resource, onClose, finalFocus }: { open: boolean; re
   const patch = (changes: Partial<LinkDraft>) => setDraft((current) => ({ ...current, ...changes }));
   const save = useMutation({
     mutationFn: (input: LinkDraft) => resource ? client.updateResource(storyId, resource.id, input) : client.addResource(storyId, input),
-    onSuccess: (response: { resources: StoryResource[] }) => { cache.write((current) => applyResources(current, response.resources)); announce(resource ? "Link saved." : "Link added."); toast.success(resource ? "Link saved." : "Link added."); onClose(); },
+    onMutate: () => ({ previous: cache.read()?.resources ?? [] }),
+    onSuccess: (response: { resources: StoryResource[] }, _input, context) => {
+      cache.write((current) => applyResources(current, response.resources));
+      const message = resource ? "Link saved." : "Link added.";
+      announce(message);
+      if (resource && context) {
+        const saved = response.resources.find((item) => item.id === resource.id);
+        workspaceUndoToast(message, {
+          restored: "Link restored.",
+          failed: "The link changed again, so that edit couldn't be undone.",
+          undo: async () => {
+            const current = cache.read()?.resources.find((item) => item.id === resource.id);
+            if (!current || !saved || current.label !== saved.label || current.url !== saved.url || current.purpose !== saved.purpose) throw new Error("Link changed again.");
+            const undone = await client.updateResource(storyId, resource.id, { label: resource.label, url: resource.url, purpose: resource.purpose });
+            cache.write((value) => applyResources(value, undone.resources));
+            announce("Link restored.");
+            await cache.invalidate();
+          }
+        });
+      } else if (context) {
+        const before = new Set(context.previous.map((item) => item.id));
+        const added = response.resources.find((item) => !before.has(item.id));
+        if (added) {
+          workspaceUndoToast(message, {
+            restored: "Link removed.",
+            failed: "The new link couldn't be removed.",
+            undo: async () => {
+              const undone = await client.removeResource(storyId, added.id);
+              cache.write((value) => applyResources(value, undone.resources));
+              announce("Link removed.");
+              await cache.invalidate();
+            }
+          });
+        } else workspaceToast(message);
+      } else workspaceToast(message);
+      onClose();
+    },
     onError: (failure: unknown) => setError(workspaceError(failure, "The link couldn't be saved. Try again.").message),
     onSettled: () => { void cache.invalidate(); }
   });
@@ -46,8 +83,6 @@ function LinkDialog({ open, resource, onClose, finalFocus }: { open: boolean; re
 }
 
 function ResourceRow({ resource, canManage, onEdit, onRemove }: { resource: StoryResource; canManage: boolean; onEdit: (element: HTMLElement) => void; onRemove: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-  const trigger = useRef<HTMLButtonElement | null>(null);
   const available = isHttpUrl(resource.url);
   const body = <>
     <ItemMedia variant="icon" className="text-muted-foreground"><ResourceIcon resource={resource} /></ItemMedia>
@@ -60,13 +95,12 @@ function ResourceRow({ resource, canManage, onEdit, onRemove }: { resource: Stor
       : <Item size="sm" className="min-w-0 flex-1">{body}</Item>}
     {canManage ? <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button ref={trigger} type="button" variant="ghost" size="icon-sm" aria-label={`Actions for ${resource.label}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
+        <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={`Actions for ${resource.label}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-36">
           <DropdownMenuItem onClick={(event) => onEdit(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit link</DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={() => setConfirming(true)}><Trash2 aria-hidden="true" />Remove link</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <ConfirmRemoveDialog open={confirming} onOpenChange={setConfirming} finalFocus={() => trigger.current} title="Remove this link?" description={`“${resource.label}” is removed from the story. The document itself isn't touched.`} confirmLabel="Remove" onConfirm={onRemove} />
     </> : null}
   </div>;
 }
@@ -86,7 +120,23 @@ export function ResourcesSection() {
       cache.write((current) => applyResources(current, (current?.resources ?? []).filter((resource) => resource.id !== id)));
       return { previous };
     },
-    onSuccess: (response) => { cache.write((current) => applyResources(current, response.resources)); announce("Link removed."); toast.success("Link removed."); },
+    onSuccess: (response, id, context) => {
+      cache.write((current) => applyResources(current, response.resources));
+      announce("Link removed.");
+      const removed = context?.previous.find((resource) => resource.id === id);
+      if (removed) {
+        workspaceUndoToast("Link removed.", {
+          restored: "Link restored.",
+          failed: "The link couldn't be restored.",
+          undo: async () => {
+            const undone = await client.addResource(storyId, { label: removed.label, url: removed.url, purpose: removed.purpose });
+            cache.write((value) => applyResources(value, undone.resources));
+            announce("Link restored.");
+            await cache.invalidate();
+          }
+        });
+      } else workspaceToast("Link removed.");
+    },
     onError: (failure, _id, context) => {
       cache.write((current) => applyResources(current, context?.previous ?? []));
       toast.error(workspaceError(failure, "The link couldn't be removed. Try again.").message);
