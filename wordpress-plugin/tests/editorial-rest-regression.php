@@ -36,6 +36,30 @@ class WP_REST_Server
 
 $editorial_rest_test_routes = [];
 $editorial_rest_test_fields = [];
+$editorial_rest_test_user_meta = [
+    7 => ['_ww_author_photo_id' => 101],
+];
+
+function absint($value): int { return abs((int) $value); }
+function sanitize_text_field($value): string { return trim(strip_tags((string) $value)); }
+function esc_url_raw($value, $protocols = null): string
+{
+    $url = (string) $value;
+    return preg_match('#^https?://#', $url) ? $url : '';
+}
+function get_user_meta(int $user_id, string $key, bool $single = false)
+{
+    global $editorial_rest_test_user_meta;
+    return $editorial_rest_test_user_meta[$user_id][$key] ?? '';
+}
+function wp_get_attachment_image_url(int $attachment_id, string $size = 'thumbnail')
+{
+    $urls = [
+        101 => 'https://images.example.test/author.jpg',
+        102 => 'https://images.example.test/contributor.jpg',
+    ];
+    return $urls[$attachment_id] ?? false;
+}
 
 function add_action(...$args): void {}
 function add_filter(...$args): void {}
@@ -137,5 +161,29 @@ foreach ($editorial_rest_test_routes as $route => $definition) {
 
 editorial_rest_test_assert(isset($editorial_rest_test_fields['post:contributors']), 'Public contributor REST projection was not registered.');
 editorial_rest_test_assert(isset($editorial_rest_test_fields['post:corrections']), 'Public correction REST projection was not registered.');
+
+// Planning people must preserve real Byline profile photos so the shadcn
+// AvatarGroup used by Board/List has an image to render.
+$legacy_author = byline_editorial_rest_person(['id' => 7, 'name' => 'Primary Writer']);
+editorial_rest_test_assert(($legacy_author['avatarUrl'] ?? '') === 'https://images.example.test/author.jpg', 'A writer/editor row did not resolve its stored Byline profile photo.');
+
+$user_contributor = byline_editorial_rest_person([
+    'id' => 8,
+    'name' => 'Second Writer',
+    'type' => 'user',
+    'imageId' => 102,
+]);
+editorial_rest_test_assert(($user_contributor['avatarUrl'] ?? '') === 'https://images.example.test/contributor.jpg', 'A user contributor imageId did not become a Planning avatar URL.');
+
+$guest_contributor = byline_editorial_rest_person([
+    'id' => 9,
+    'name' => 'Guest Photographer',
+    'type' => 'guest',
+    'profilePhoto' => ['url' => 'https://images.example.test/guest.jpg'],
+]);
+editorial_rest_test_assert(($guest_contributor['avatarUrl'] ?? '') === 'https://images.example.test/guest.jpg', 'A guest contributor profile photo did not become a Planning avatar URL.');
+
+$no_photo = byline_editorial_rest_person(['id' => 10, 'name' => 'No Photo']);
+editorial_rest_test_assert(!array_key_exists('avatarUrl', $no_photo), 'Planning must not invent a placeholder avatar when no real profile photo exists.');
 
 echo "Grouped editorial REST regression passed (" . count($editorial_rest_test_routes) . " routes).\n";
