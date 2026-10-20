@@ -186,30 +186,32 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
             {loading ? <Spinner /> : null}
           </div>
           <p>{status === "good" ? __("Byline is ready for newsroom work.", "weekly-wildcat-headless") : status === "unknown" ? __("Run the checks to see what needs attention.", "weekly-wildcat-headless") : __("The issues below are prioritized. Safe repair actions never reset your publication or content.", "weekly-wildcat-headless")}</p>
+          {allChecks.length ? <Progress value={checkProgress} className="mt-4">
+            <ProgressLabel>{__("Health checks", "weekly-wildcat-headless")}</ProgressLabel>
+            <span className="ml-auto text-xs tabular-nums text-muted-foreground">{passingChecks} / {allChecks.length} {__("passing", "weekly-wildcat-headless")}</span>
+          </Progress> : null}
         </CardBody>
       </Card>
 
       {deploymentAttention ? (
-        <Card className="byline-doctor-problem-card">
-          <CardBody>
-            <h2>{__("Website publishing needs attention", "weekly-wildcat-headless")}</h2>
-            <p>{__("The last deployment request failed. WordPress content is safe; test the deploy hook or open deployment settings.", "weekly-wildcat-headless")}</p>
-            <div className="byline-doctor-action-row">
-              {canManageIntegrations ? <Button variant="secondary" isBusy={busyAction === "test-deploy-hook"} disabled={Boolean(busyAction)} onClick={() => void runAction("test-deploy-hook")}>{__("Test deploy hook", "weekly-wildcat-headless")}</Button> : null}
-              {urls?.deployment ? <Button variant="link" href={urls.deployment}>{__("Open deployment settings", "weekly-wildcat-headless")}</Button> : null}
-            </div>
-          </CardBody>
-        </Card>
+        <Alert>
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle>{__("Website publishing needs attention", "weekly-wildcat-headless")}</AlertTitle>
+          <AlertDescription>{__("The last deployment request failed. WordPress content is safe; test the deploy hook or open deployment settings.", "weekly-wildcat-headless")}</AlertDescription>
+          <AlertAction className="flex gap-1">
+            {canManageIntegrations ? <Button variant="secondary" isBusy={busyAction === "test-deploy-hook"} disabled={Boolean(busyAction)} onClick={() => void runAction("test-deploy-hook")}>{__("Test deploy hook", "weekly-wildcat-headless")}</Button> : null}
+            {urls?.deployment ? <Button variant="link" href={urls.deployment}>{__("Settings", "weekly-wildcat-headless")}</Button> : null}
+          </AlertAction>
+        </Alert>
       ) : null}
 
       {manifestAttention ? (
-        <Card className="byline-doctor-problem-card">
-          <CardBody>
-            <h2>{__("Public site needs attention", "weekly-wildcat-headless")}</h2>
-            <p>{manifestAttentionMessage(diagnostics?.publicManifest)}</p>
-            <Button variant="secondary" isBusy={busyAction === "test-public-manifest"} disabled={Boolean(busyAction)} onClick={() => void runAction("test-public-manifest")}>{__("Test public site", "weekly-wildcat-headless")}</Button>
-          </CardBody>
-        </Card>
+        <Alert>
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle>{__("Public site needs attention", "weekly-wildcat-headless")}</AlertTitle>
+          <AlertDescription>{manifestAttentionMessage(diagnostics?.publicManifest)}</AlertDescription>
+          <AlertAction><Button variant="secondary" isBusy={busyAction === "test-public-manifest"} disabled={Boolean(busyAction)} onClick={() => void runAction("test-public-manifest")}>{__("Test public site", "weekly-wildcat-headless")}</Button></AlertAction>
+        </Alert>
       ) : null}
 
       {jobs ? (
@@ -269,12 +271,16 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
       ) : null}
 
       {allChecks.length ? (
-        <details className="byline-doctor-all-checks">
-          <summary>{__("Show all checks", "weekly-wildcat-headless")}</summary>
-          <ul className="byline-doctor-check-list">
-            {allChecks.map((check) => <CheckRow key={check.id} check={{ ...check, action: undefined }} onAction={(action) => void runAction(action)} busyAction={busyAction} />)}
-          </ul>
-        </details>
+        <Accordion className="rounded-xl border bg-card px-3">
+          <AccordionItem value="all-checks">
+            <AccordionTrigger>{__("All checks", "weekly-wildcat-headless")} <Badge variant="secondary" className="ml-auto mr-2">{allChecks.length}</Badge></AccordionTrigger>
+            <AccordionContent>
+              <ul className="byline-doctor-check-list">
+                {allChecks.map((check) => <CheckRow key={check.id} check={{ ...check, action: undefined }} onAction={(action) => void runAction(action)} busyAction={busyAction} />)}
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       ) : null}
 
       {supportReport ? (
@@ -282,12 +288,10 @@ export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: Doc
           <CardBody>
             <div className="byline-doctor-section-heading"><div><p className="byline-doctor-eyebrow">{__("Support", "weekly-wildcat-headless")}</p><h2>{__("Safe support report", "weekly-wildcat-headless")}</h2></div></div>
             <p>{__("This report excludes credentials, tokens, hook URLs, and private integration settings.", "weekly-wildcat-headless")}</p>
-            <label htmlFor="byline-doctor-support-report" className="byline-doctor-report-label">{__("Copy this report for support", "weekly-wildcat-headless")}</label>
-            <textarea id="byline-doctor-support-report" className="byline-doctor-report" readOnly value={supportReport} rows={12} />
-            <div className="byline-doctor-action-row">
-              <Button variant="secondary" onClick={() => void copyReport()}>{__("Copy support report", "weekly-wildcat-headless")}</Button>
-              {copied ? <span role="status">{__("Copied.", "weekly-wildcat-headless")}</span> : null}
-            </div>
+            <CodeBlock className="mt-3">
+              <CodeBlockHeader><CodeBlockTitle>{__("Support report", "weekly-wildcat-headless")}</CodeBlockTitle><CodeBlockActions><CodeBlockCopyButton value={supportReport} /></CodeBlockActions></CodeBlockHeader>
+              <CodeBlockContent wrap>{supportReport}</CodeBlockContent>
+            </CodeBlock>
           </CardBody>
         </Card>
       ) : null}
