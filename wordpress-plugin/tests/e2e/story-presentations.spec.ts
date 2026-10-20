@@ -142,7 +142,8 @@ test("newsroom presets save valid Core content and match the private preview at 
   expect(rendered).toContain('District budget records, reviewed by the newsroom.');
   expect(rendered).toContain('<ol class="wp-block-byline-timeline byline-timeline">');
   if (process.env.BYLINE_UPDATE_STORY_FIXTURE === "1") {
-    const clean = rendered.split(media.source_url).join("/newsroom/newsroom-meeting-640.jpg").replace(/http:\/\/localhost:8888/g, "");
+    // The static fixture only ships the one photograph; drop the other WordPress-generated srcset candidates.
+    const clean = rendered.split(media.source_url).join("/newsroom/newsroom-meeting-640.jpg").replace(/http:\/\/localhost:8888/g, "").replace(/,\s*[^,"\s]*\/wp-content\/uploads\/[^,"]*?\s\d+w/g, "");
     await writeFile(path.join(repoRoot, "tests/fixtures/story-presentations.json"), JSON.stringify({ saved, rendered: clean }, null, 2) + "\n");
   }
   const sidebar = await openStorySidebar(page);
