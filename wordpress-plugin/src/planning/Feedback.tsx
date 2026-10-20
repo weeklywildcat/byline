@@ -8,6 +8,7 @@ import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Button } from "../admin-ui/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
+import { Spinner } from "../admin-ui/ui/spinner";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { feedbackKey } from "../story/story-query";
 import type { PlanningFetchers } from "./planning-api";
@@ -65,7 +66,7 @@ function FeedbackRow({ item, fetchers, onOpenStory }: { item: FeedbackItem; fetc
       </Select>
     </ItemActions>
     {item.type === "correction" && item.story && fetchers.createCorrectionFromFeedback
-      ? <ItemFooter className="justify-end pt-1"><Button variant="outline" size="sm" disabled={busy} onClick={() => correction.mutate()}>{__("Create draft correction", "weekly-wildcat-headless")}</Button></ItemFooter>
+      ? <ItemFooter className="justify-end pt-1"><Button variant="outline" size="sm" disabled={busy} onClick={() => correction.mutate()}>{correction.isPending ? <Spinner data-icon="inline-start" /> : null}{correction.isPending ? __("Creating…", "weekly-wildcat-headless") : __("Create draft correction", "weekly-wildcat-headless")}</Button></ItemFooter>
       : null}
   </Item>;
 }
