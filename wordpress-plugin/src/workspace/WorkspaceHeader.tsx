@@ -1,4 +1,5 @@
 import { ArrowUpRight, FileText } from "lucide-react";
+import { NewsroomSearchButton } from "../story/NewsroomCommands";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { Badge } from "../admin-ui/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "../admin-ui/ui/breadcrumb";
@@ -7,7 +8,7 @@ import { sectionNames, writerNames } from "./workspace-model";
 import { workingDraft } from "./resource-model";
 import { useWorkspace } from "./workspace-context";
 
-export function WorkspaceHeader() {
+export function WorkspaceHeader({ onSearch }: { onSearch?: () => void }) {
   const { data, storiesUrl, caps } = useWorkspace();
   const { story } = data;
   const writers = writerNames(data);
@@ -37,7 +38,7 @@ export function WorkspaceHeader() {
           {story.editor ? <span className="flex items-center gap-2"><PeopleAvatars people={[{ name: story.editor.name, imageUrl: data.people.find((person) => Number(person.id) === story.editor!.id)?.imageUrl }]} tooltips={false} />Editor: {story.editor.name}</span> : null}
         </div>
       </div>
-      <div className="flex flex-wrap gap-2 @2xl/ws:shrink-0">
+      <div className="flex flex-wrap gap-2 @2xl/ws:shrink-0">{onSearch ? <NewsroomSearchButton compact onClick={onSearch} /> : null}
         {draft ? <a className={buttonVariants({ variant: "ghost" })} href={draft.url} target="_blank" rel="noopener noreferrer"><FileText data-icon="inline-start" aria-hidden="true" />Working draft<ArrowUpRight data-icon="inline-end" aria-hidden="true" /><span className="sr-only"> (opens in a new tab)</span></a> : null}
         {preview ? <a className={buttonVariants({ variant: "outline" })} href={preview} target="_blank" rel="noopener noreferrer">Preview<ArrowUpRight data-icon="inline-end" aria-hidden="true" /><span className="sr-only"> (opens in a new tab)</span></a> : null}
         {caps.editArticle && story.editUrl ? <a className={buttonVariants()} href={story.editUrl}>Edit article</a> : null}

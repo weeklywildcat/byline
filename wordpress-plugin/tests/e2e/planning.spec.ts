@@ -177,6 +177,26 @@ test.describe("Stories board", () => {
   });
 });
 
+test.describe("Universal newsroom search", () => {
+  test("Control+K opens from Planning and a story result opens the existing Story Peek", async ({ adminPage: page, adminSession: session }) => {
+    const unique = token();
+    const title = `${unique} Command search`;
+    await createPlanningStory(session, { title, status: "reporting" });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto(storiesUrl + "&view=board");
+
+    await expect(page.getByRole("button", { name: "Search" })).toBeVisible();
+    await page.keyboard.press("Control+K");
+    const palette = page.getByRole("dialog", { name: "Search Byline" });
+    await expect(palette).toBeVisible();
+    await palette.getByRole("combobox", { name: "Search stories and actions" }).fill(unique);
+    await palette.getByRole("option", { name: title, exact: true }).click();
+
+    await expect(palette).toBeHidden();
+    await expect(page.getByRole("dialog", { name: title, exact: true })).toBeVisible();
+  });
+});
+
 test.describe("Story Peek everywhere", () => {
   test("Board, List and Calendar open the one Story Peek, and Peek opens the workspace and the editor", async ({ adminPage: page, adminSession: session }) => {
     const unique = token();

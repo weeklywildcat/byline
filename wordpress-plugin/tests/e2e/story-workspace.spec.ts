@@ -1,12 +1,33 @@
 import fs from "node:fs/promises";
 import { expect, test } from "./fixtures";
 import { seedCanteenStory } from "./story-workspace-fixture";
+import { createPlanningStory, token } from "./planning-fixture";
 
 /**
  * The Story Workspace is built from shadcn Nova (Item, Field, Select,
  * RadioGroup, Empty, Collapsible, Dialog, AlertDialog). These tests drive it the way a
  * reporter would and pin the behaviours the component migration must not lose.
  */
+test("Control+K searches the newsroom from a Story Workspace and jumps straight to another workspace", async ({ adminPage: page, adminSession: session }) => {
+  const fixture = await seedCanteenStory(session);
+  const unique = token();
+  const otherTitle = `${unique} Other story`;
+  const otherId = await createPlanningStory(session, { title: otherTitle, status: "writing" });
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(fixture.workspaceUrl);
+  await expect(page.getByRole("button", { name: "Search" })).toBeVisible();
+
+  await page.keyboard.press("Control+K");
+  const palette = page.getByRole("dialog", { name: "Search Byline" });
+  await expect(palette).toBeVisible();
+  await palette.getByRole("combobox", { name: "Search stories and actions" }).fill(unique);
+  await palette.getByRole("option", { name: otherTitle, exact: true }).click();
+
+  await page.waitForURL(new RegExp(`page=byline-planning&story=${otherId}`));
+  await expect(page.getByRole("heading", { level: 1, name: otherTitle })).toBeVisible();
+});
+
 test("the workspace reads as Nova: sources, appointments, tasks, files and a scheduling dialog that works", async ({ adminPage: page, adminSession: session }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
