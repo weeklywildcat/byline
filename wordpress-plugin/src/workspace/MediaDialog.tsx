@@ -6,7 +6,7 @@ import { SelectField, TextAreaField, TextField } from "../admin-ui/components/fo
 import { AssigneePicker } from "../admin-ui/components/pickers";
 import { Button } from "../admin-ui/ui/button";
 import { Field, FieldDescription, FieldLabel } from "../admin-ui/ui/field";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
+import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "../admin-ui/ui/attachment";
 import { RemoveControl, WorkspaceDialog } from "./dialog-shell";
 import { DayField } from "./fields";
 import { emptyMediaForm, fileCountLabel, mediaFormToInput, mediaToForm, validateMediaForm, type MediaForm } from "./media-form";
@@ -21,12 +21,14 @@ import { MEDIA_ASSIGNMENT_STATUSES, MEDIA_ASSIGNMENT_TYPES, type MediaAssignment
 const typeOptions = MEDIA_ASSIGNMENT_TYPES.map((value) => ({ value, label: MEDIA_TYPE_LABELS[value] }));
 const statusOptions = MEDIA_ASSIGNMENT_STATUSES.map((value) => ({ value, label: MEDIA_STATUS_LABELS[value] }));
 
-function FileRow({ preview, unavailable, onRemove, disabled }: { preview: PickedAttachment; unavailable: boolean; onRemove: () => void; disabled?: boolean }) {
-  return <Item variant="outline" size="sm">
-    <ItemMedia variant="image" className="bg-muted text-muted-foreground" aria-hidden="true">{preview.previewUrl ? <img src={preview.previewUrl} alt="" loading="lazy" /> : preview.mimeType?.startsWith("image/") ? <FileImage /> : <FileText />}</ItemMedia>
-    <ItemContent><ItemTitle>{unavailable ? "Unavailable file" : preview.title}</ItemTitle><ItemDescription>#{preview.id}{unavailable ? " · can't be read" : ""}</ItemDescription></ItemContent>
-    <ItemActions><Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${unavailable ? `file ${preview.id}` : preview.title}`} disabled={disabled} onClick={onRemove}><X aria-hidden="true" /></Button></ItemActions>
-  </Item>;
+/** One Media Library file linked to the assignment: a native Attachment with its remove action. */
+export function FileAttachment({ preview, unavailable, onRemove, disabled }: { preview: PickedAttachment; unavailable: boolean; onRemove: () => void; disabled?: boolean }) {
+  const title = unavailable ? "Unavailable file" : preview.title;
+  return <Attachment size="sm" state={unavailable ? "error" : "done"} className="w-full">
+    <AttachmentMedia variant={preview.previewUrl ? "image" : "icon"}>{preview.previewUrl ? <img src={preview.previewUrl} alt="" loading="lazy" /> : preview.mimeType?.startsWith("image/") ? <FileImage aria-hidden="true" /> : <FileText aria-hidden="true" />}</AttachmentMedia>
+    <AttachmentContent><AttachmentTitle>{title}</AttachmentTitle><AttachmentDescription>#{preview.id}{unavailable ? " · can't be read" : ""}</AttachmentDescription></AttachmentContent>
+    <AttachmentActions><AttachmentAction type="button" aria-label={`Remove ${unavailable ? `file ${preview.id}` : preview.title}`} disabled={disabled} onClick={onRemove}><X aria-hidden="true" /></AttachmentAction></AttachmentActions>
+  </Attachment>;
 }
 
 export type MediaDialogProps = { open: boolean; assignment: StoryMediaAssignment | null; onClose: () => void; finalFocus: () => HTMLElement | null };
@@ -81,7 +83,7 @@ export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDial
   const assigneeName = assignee?.name || assignment?.assignee?.name || "Unassigned";
 
   return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} modal={!picking} title={assignment ? "Edit assignment" : "Add assignment"} description={manage ? "Photo, graphics, video and audio work for this story." : "You can update the status, notes and files of your assignment."} submitLabel={assignment ? "Save assignment" : "Add assignment"} pending={pending} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
-    secondary={assignment && manage ? <RemoveControl label="Remove assignment" prompt="Remove this assignment? Files stay in the Media Library." confirmLabel="Remove" pendingLabel="Removing…" pending={pending} removing={remove.isPending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
+    secondary={assignment && manage ? <RemoveControl label="Remove assignment" title="Remove this assignment?" description="Files stay in the Media Library." confirmLabel="Remove" pending={pending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
     {manage ? <>
       <TextField label="Title" value={form.title} onChange={(title) => patch({ title })} error={errors.title} maxLength={160} optional autoFocus placeholder={`${MEDIA_TYPE_LABELS[form.type]} for this story`} />
       <div className="grid gap-4 sm:grid-cols-2">
@@ -106,7 +108,7 @@ export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDial
 
     <Field>
       <FieldLabel id="ws-media-files-label">Files <span className="font-normal text-muted-foreground">{fileCountLabel(form.attachmentIds.length)}</span></FieldLabel>
-      {form.attachmentIds.length ? <ItemGroup role="group" aria-labelledby="ws-media-files-label">{form.attachmentIds.map((id) => <FileRow key={id} preview={previews.get(id) ?? { id, title: `File ${id}`, previewUrl: null, mimeType: null }} unavailable={invalid.has(id)} disabled={pending} onRemove={() => patch({ attachmentIds: form.attachmentIds.filter((item) => item !== id) })} />)}</ItemGroup> : <FieldDescription>No files linked yet.</FieldDescription>}
+      {form.attachmentIds.length ? <AttachmentGroup role="group" aria-labelledby="ws-media-files-label" className="flex-col gap-2 overflow-visible py-0">{form.attachmentIds.map((id) => <FileAttachment key={id} preview={previews.get(id) ?? { id, title: `File ${id}`, previewUrl: null, mimeType: null }} unavailable={invalid.has(id)} disabled={pending} onRemove={() => patch({ attachmentIds: form.attachmentIds.filter((item) => item !== id) })} />)}</AttachmentGroup> : <FieldDescription>No files linked yet.</FieldDescription>}
       {mediaLibraryAvailable() ? <div><Button type="button" variant="outline" size="sm" disabled={pending || picking} onClick={() => void addFromLibrary()}>Add from Media Library</Button></div> : <FieldDescription>Upload files in the Media Library, then link them here.</FieldDescription>}
     </Field>
   </WorkspaceDialog>;

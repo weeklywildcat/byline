@@ -1,7 +1,8 @@
 /** Home's rows: shadcn Item compositions. Anything visual comes from Item, Badge, Checkbox and Skeleton. */
 import { ArrowUpRight, ChevronRight, CircleAlert, CircleDot } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
-import { ItemButton } from "../../admin-ui/components/item-list";
+import { ItemButton } from "../../admin-ui/components/item-button";
+import { PeopleAvatars } from "../../admin-ui/components/people-avatars";
 import { StatusBadge } from "../../admin-ui/components/status-badge";
 import { Checkbox } from "../../admin-ui/ui/checkbox";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "../../admin-ui/ui/item";
@@ -22,13 +23,14 @@ function Row({ onOpen, children, ...props }: { onOpen?: () => void; children: Re
   return onOpen ? <ItemButton onClick={onOpen} {...props}>{children}</ItemButton> : <Item {...props}>{children}</Item>;
 }
 
-export function TaskRow({ task, storyTitle, timezone, onOpen, onComplete, pending, now }: { task: EditorialTask; storyTitle?: string; timezone: string; onOpen?: () => void; onComplete: () => void; pending?: boolean; now: Date }) {
+/** `compact` leaves the story name out of the description, for rows already listed under their story. */
+export function TaskRow({ task, storyTitle, compact, timezone, onOpen, onComplete, pending, now }: { task: EditorialTask; storyTitle?: string; compact?: boolean; timezone: string; onOpen?: () => void; onComplete: () => void; pending?: boolean; now: Date }) {
   const overdue = dayDistance(task.dueAt, timezone, now) < 0;
   return <Item size="sm" data-task-id={task.id}>
-    <Checkbox aria-label={`Complete ${task.title}${storyTitle ? ` — ${storyTitle}` : ""}`} checked={task.state === "completed"} aria-disabled={pending || undefined} onCheckedChange={(checked) => { if (checked && !pending) onComplete(); }} />
+    <ItemMedia><Checkbox aria-label={`Complete ${task.title}${storyTitle ? ` — ${storyTitle}` : ""}`} checked={task.state === "completed"} aria-disabled={pending || undefined} onCheckedChange={(checked) => { if (checked && !pending) onComplete(); }} /></ItemMedia>
     <ItemContent>
       <ItemTitle className="line-clamp-2">{onOpen ? <button type="button" className="text-left hover:underline" onClick={onOpen}>{task.title}</button> : task.title}</ItemTitle>
-      <ItemDescription>{storyTitle || "Newsroom task"}{task.priority === "urgent" ? <span className="font-medium text-warning"> · Urgent</span> : null}</ItemDescription>
+      {compact && task.priority !== "urgent" ? null : <ItemDescription>{compact ? null : storyTitle || "Newsroom task"}{task.priority === "urgent" ? <span className="font-medium text-warning">{compact ? "" : " · "}Urgent</span> : null}</ItemDescription>}
     </ItemContent>
     <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined} title={exactDate(task.dueAt, timezone)}>{dateLabel(task.dueAt, timezone, now)}</time></ItemActions>
   </Item>;
@@ -38,7 +40,7 @@ export function StoryRow({ story, timezone, onOpen, now }: { story: PlanningStor
   const timing = story.deadline ? `Due ${dateLabel(story.deadline, timezone, now).toLowerCase()}` : story.plannedPublication ? `Planned ${dateLabel(story.plannedPublication, timezone, now).toLowerCase()}` : "No deadline";
   return <ItemButton size="sm" onClick={onOpen}>
     <ItemContent><ItemTitle className="line-clamp-2">{story.title || "Untitled story"}</ItemTitle><ItemDescription>{timing}{story.openTaskCount ? ` · ${story.openTaskCount} open ${story.openTaskCount === 1 ? "task" : "tasks"}` : ""}</ItemDescription></ItemContent>
-    <ItemActions><StatusBadge className="max-w-32 truncate">{story.workflow.label}</StatusBadge></ItemActions>
+    <ItemActions>{story.authors.length > 1 ? <PeopleAvatars people={story.authors} /> : null}<StatusBadge className="max-w-32 truncate">{story.workflow.label}</StatusBadge></ItemActions>
   </ItemButton>;
 }
 
@@ -67,6 +69,7 @@ export function AttentionRow({ item, onOpen }: { item: AttentionItem; onOpen: ()
 
 export function MediaAssignmentRow({ media, timezone, now, onOpen }: { media: HomeVisualWork; timezone: string; now: Date; onOpen: () => void }) {
   return <ItemButton size="sm" onClick={onOpen}>
+    {media.assignee ? <ItemMedia><PeopleAvatars people={[media.assignee]} /></ItemMedia> : null}
     <ItemContent>
       <ItemTitle className="line-clamp-2">{media.title || media.story.title}</ItemTitle>
       <ItemDescription>{media.title ? `${media.story.title} · ` : ""}{mediaTypeLabels[media.type] || "Visual"} · {media.assignee?.name || "Unassigned"}{media.dueAt ? ` · ${dateLabel(media.dueAt, timezone, now)}` : ""}</ItemDescription>
@@ -75,9 +78,9 @@ export function MediaAssignmentRow({ media, timezone, now, onOpen }: { media: Ho
   </ItemButton>;
 }
 
-export function ActivityRow({ item, timezone, now, onOpen }: { item: EditorialActivityRecord; timezone: string; now: Date; onOpen?: () => void }) {
+export function ActivityRow({ item, compact, timezone, now, onOpen }: { item: EditorialActivityRecord; compact?: boolean; timezone: string; now: Date; onOpen?: () => void }) {
   return <Row size="xs" onOpen={onOpen}>
-    <ItemContent><ItemTitle className="line-clamp-none font-normal">{activityCopy(item)}</ItemTitle>{item.story?.title ? <ItemDescription>{item.story.title}</ItemDescription> : null}</ItemContent>
+    <ItemContent><ItemTitle className="line-clamp-none font-normal">{activityCopy(item)}</ItemTitle>{item.story?.title && !compact ? <ItemDescription>{item.story.title}</ItemDescription> : null}</ItemContent>
     <ItemActions><time className="text-xs whitespace-nowrap text-muted-foreground" dateTime={item.occurredAt} title={exactDate(item.occurredAt, timezone)}>{relativeTime(item.occurredAt, timezone, now)}</time></ItemActions>
   </Row>;
 }

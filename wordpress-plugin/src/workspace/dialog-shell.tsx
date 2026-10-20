@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../admin-ui/ui/alert-dialog";
 import { Button } from "../admin-ui/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../admin-ui/ui/dialog";
 import { FieldGroup } from "../admin-ui/ui/field";
@@ -52,14 +53,26 @@ export function WorkspaceDialog({ open, onClose, finalFocus, title, description,
   </Dialog>;
 }
 
-/** Remove/Delete with a plain confirmation in the footer. Marking something cancelled is the gentler route, so the prompt says so. */
-export function RemoveControl({ label, prompt, confirmLabel, pendingLabel, pending, removing, onConfirm, onStart }: { label: string; prompt: string; confirmLabel: string; pendingLabel: string; pending: boolean; removing: boolean; onConfirm: () => void; onStart?: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-  return confirming
-    ? <div role="group" aria-label={`Confirm: ${label.toLowerCase()}`} className="flex flex-wrap items-center gap-2 text-sm">
-      <span>{prompt}</span>
-      <Button type="button" variant="destructive" disabled={pending} onClick={() => { onStart?.(); onConfirm(); }}>{removing ? pendingLabel : confirmLabel}</Button>
-      <Button type="button" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>Keep</Button>
-    </div>
-    : <Button type="button" variant="destructive" disabled={pending} onClick={() => setConfirming(true)}>{label}</Button>;
+export type ConfirmRemoveProps = { title: string; description: string; confirmLabel: string; onConfirm: () => void };
+
+/** The one destructive confirmation: a small AlertDialog. Cancel closes it and does nothing; the action closes it, then runs `onConfirm`. */
+export function ConfirmRemoveDialog({ open, onOpenChange, finalFocus, title, description, confirmLabel, onConfirm, children }: ConfirmRemoveProps & { open?: boolean; onOpenChange?: (open: boolean) => void; finalFocus?: () => HTMLElement | null; children?: ReactNode }) {
+  return <AlertDialog open={open} onOpenChange={onOpenChange}>
+    {children}
+    <AlertDialogContent size="sm" finalFocus={finalFocus}>
+      <AlertDialogHeader><AlertDialogTitle>{title}</AlertDialogTitle><AlertDialogDescription>{description}</AlertDialogDescription></AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction variant="destructive" onClick={() => { onOpenChange?.(false); onConfirm(); }}>{confirmLabel}</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>;
+}
+
+/** A Remove/Delete button inside a form dialog that asks before it acts. Marking something cancelled is the gentler route, so the description says so. */
+export function RemoveControl({ label, pending, onStart, onConfirm, ...confirm }: { label: string; pending: boolean; onStart?: () => void } & ConfirmRemoveProps) {
+  const [open, setOpen] = useState(false);
+  return <ConfirmRemoveDialog open={open} onOpenChange={setOpen} {...confirm} onConfirm={() => { onStart?.(); onConfirm(); }}>
+    <AlertDialogTrigger render={<Button type="button" variant="destructive" disabled={pending} />}>{label}</AlertDialogTrigger>
+  </ConfirmRemoveDialog>;
 }

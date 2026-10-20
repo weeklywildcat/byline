@@ -93,6 +93,18 @@ export function exactDate(value: string | null | undefined, timezone: string): s
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", ...(!dateOnly ? { timeStyle: "short" } as const : {}), timeZone: dateOnly || siteWallTime ? "UTC" : timezone }).format(date);
 }
 
+/** "Oct 21 · 2:00 PM", or just "Oct 21" for a date-only value. Site timezone, no year. */
+export function shortDateTime(value: string | null | undefined, timezone: string): string {
+  if (!value) return "";
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const siteWallTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value);
+  const date = new Date(dateOnly ? `${value}T12:00:00Z` : siteWallTime ? `${value}Z` : value);
+  if (Number.isNaN(date.getTime())) return "";
+  const zone = dateOnly || siteWallTime ? "UTC" : timezone;
+  const day = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: zone }).format(date);
+  return dateOnly ? day : `${day} · ${new Intl.DateTimeFormat(undefined, { timeStyle: "short", timeZone: zone }).format(date)}`;
+}
+
 const priorities = { urgent: 0, high: 1, normal: 2, low: 3 };
 export function taskUrgency(task: EditorialTask, timezone: string, now = new Date()): number {
   const d = dayDistance(task.dueAt, timezone, now);

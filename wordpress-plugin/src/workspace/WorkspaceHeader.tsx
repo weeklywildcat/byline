@@ -1,6 +1,5 @@
 import { ArrowUpRight, FileText } from "lucide-react";
-import { PersonAvatar } from "../admin-ui/components/person-avatar";
-import { AvatarGroup } from "../admin-ui/ui/avatar";
+import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { Badge } from "../admin-ui/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "../admin-ui/ui/breadcrumb";
 import { buttonVariants } from "../admin-ui/ui/button";
@@ -32,10 +31,10 @@ export function WorkspaceHeader() {
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
           {writers.length ? <span className="flex items-center gap-2">
-            <AvatarGroup>{data.contributors.contributors.slice(0, 3).map((person) => <PersonAvatar key={`${person.kind}:${person.id}`} name={person.name} url={person.imageUrl} />)}</AvatarGroup>
+            <PeopleAvatars people={data.contributors.contributors.length ? data.contributors.contributors : story.authors} tooltips={false} />
             {writers.join(", ")}
           </span> : <span>No writers yet</span>}
-          {story.editor ? <span>Editor: {story.editor.name}</span> : null}
+          {story.editor ? <span className="flex items-center gap-2"><PeopleAvatars people={[{ name: story.editor.name, imageUrl: data.people.find((person) => Number(person.id) === story.editor!.id)?.imageUrl }]} tooltips={false} />Editor: {story.editor.name}</span> : null}
         </div>
       </div>
       <div className="flex flex-wrap gap-2 @2xl/ws:shrink-0">

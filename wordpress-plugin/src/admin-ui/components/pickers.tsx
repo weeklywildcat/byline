@@ -9,11 +9,11 @@ import { CalendarDays } from "lucide-react";
 import { contributorKey, type ContributorEntry } from "../../editorial/editorial-model";
 import { exactDate, siteDay } from "../../home/newsroom-model";
 import { cn } from "../lib/utils";
-import { AvatarGroup } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { Calendar } from "../ui/calendar";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger } from "../ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { PeopleAvatars } from "./people-avatars";
 import { PersonAvatar } from "./person-avatar";
 
 export type PickerAppearance = "field" | "value";
@@ -22,6 +22,12 @@ export type PickerAppearance = "field" | "value";
 export const valueTriggerClass = "-ml-2 h-auto min-h-7 max-w-full justify-start px-2 py-1 text-left font-normal whitespace-normal [&_svg]:opacity-0 hover:[&_svg]:opacity-100 focus-visible:[&_svg]:opacity-100 aria-expanded:[&_svg]:opacity-100";
 /** The same look for a Select trigger in a property list. */
 export const valueSelectTriggerClass = "-ml-2 h-7 w-fit max-w-full border-transparent bg-transparent px-2 hover:bg-muted data-popup-open:bg-muted dark:bg-transparent [&_svg]:opacity-0 hover:[&_svg]:opacity-100 focus-visible:[&_svg]:opacity-100 data-popup-open:[&_svg]:opacity-100";
+/** Class names that turn native horizontal Fields into a label column plus a value, for story facts. */
+export const fieldRow = {
+  field: "min-h-7 items-center!",
+  label: "w-36 flex-none! font-normal text-muted-foreground",
+  value: "min-w-0 text-sm [overflow-wrap:anywhere]"
+} as const;
 const fieldTriggerClass = "w-full justify-between font-normal";
 
 function triggerProps(appearance: PickerAppearance, className?: string) {
@@ -47,7 +53,7 @@ export function WritersPicker({ people, value, onChange, disabled, appearance = 
   const names = value.map((person) => person.name).join(", ");
   return <Combobox multiple items={people} value={value} onValueChange={onChange} itemToStringLabel={(person: ContributorEntry) => person.name} isItemEqualToValue={(a: ContributorEntry, b: ContributorEntry) => contributorKey(a) === contributorKey(b)} disabled={disabled}>
     <ComboboxTrigger render={<Button {...triggerProps(appearance)} aria-label={`Writers: ${names || "none"}`} disabled={disabled} />}>
-      {value.length ? <span className="flex min-w-0 items-center gap-2"><AvatarGroup>{value.slice(0, 3).map((person) => <PersonAvatar key={contributorKey(person)} name={person.name} url={person.imageUrl} />)}</AvatarGroup><span className="truncate">{names}</span></span> : muted("Add writers")}
+      {value.length ? <span className="flex min-w-0 items-center gap-2"><PeopleAvatars people={value} tooltips={false} /><span className="truncate">{names}</span></span> : muted("Add writers")}
     </ComboboxTrigger>
     <ComboboxContent>
       <ComboboxInput showTrigger={false} aria-label="Search writers" placeholder="Search writers…" />

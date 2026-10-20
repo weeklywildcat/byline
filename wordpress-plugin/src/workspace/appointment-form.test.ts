@@ -7,6 +7,7 @@ import {
   emptyAppointmentForm,
   isValid,
   localDateFromDay,
+  rangeToWindow,
   setExactDate,
   setScheduleMode,
   siteWallParts,
@@ -165,5 +166,27 @@ describe("calendar day conversion", () => {
     expect(dayFromLocalDate(new Date(2026, 0, 1, 0, 5))).toBe("2026-01-01");
     expect(dayFromLocalDate(new Date(2026, 11, 31, 23, 55))).toBe("2026-12-31");
     expect(localDateFromDay("nope")).toBeUndefined();
+  });
+});
+
+describe("target window from one range calendar", () => {
+  const day = (iso: string) => localDateFromDay(iso)!;
+
+  it("writes the same windowStart / windowEnd two separate pickers did", () => {
+    expect(rangeToWindow({ from: day("2026-10-26"), to: day("2026-10-30") })).toEqual({ windowStart: "2026-10-26", windowEnd: "2026-10-30" });
+  });
+
+  it("leaves the end empty for a single day or a range that has only started", () => {
+    expect(rangeToWindow({ from: day("2026-10-26"), to: day("2026-10-26") })).toEqual({ windowStart: "2026-10-26", windowEnd: "" });
+    expect(rangeToWindow({ from: day("2026-10-26") })).toEqual({ windowStart: "2026-10-26", windowEnd: "" });
+    expect(rangeToWindow(undefined)).toBeNull();
+  });
+
+  it("never turns a window into a timestamp, and switching modes still clears the others", () => {
+    const windowForm = { ...emptyAppointmentForm(), mode: "window" as const, ...rangeToWindow({ from: day("2026-10-26"), to: day("2026-10-30") })! };
+    const input = appointmentFormToInput(windowForm);
+    expect(input).toMatchObject({ scheduleMode: "window", windowStart: "2026-10-26", windowEnd: "2026-10-30", startAt: null, endAt: null });
+    const exact = setScheduleMode(windowForm, "exact");
+    expect(exact).toMatchObject({ mode: "exact", windowStart: "", windowEnd: "", date: "", startTime: "" });
   });
 });

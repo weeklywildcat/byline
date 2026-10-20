@@ -1,10 +1,10 @@
 import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
-import { EmptyState } from "../admin-ui/components/empty-state";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
-import { Panel } from "../admin-ui/components/panel";
 import { Button } from "../admin-ui/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../admin-ui/ui/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Field, FieldDescription, FieldLabel } from "../admin-ui/ui/field";
 import { Textarea } from "../admin-ui/ui/textarea";
 import { SectionFailed } from "./parts";
@@ -50,22 +50,28 @@ export function BriefSection() {
   const cancel = () => { setEditing(false); setError(null); requestAnimationFrame(() => edit.current?.focus()); };
   const reloadBrief = async () => { await reload(); setEditing(false); setError(null); };
 
-  return <Panel id="ws-brief" title="Brief" description="Internal, not article copy."
-    action={canEdit && !editing ? <Button ref={edit} type="button" variant="outline" size="sm" onClick={start}><Pencil data-icon="inline-start" aria-hidden="true" />{data.brief ? "Edit" : "Add brief"}</Button> : null}>
-    {failed ? <SectionFailed what="the brief" onRetry={() => void reload()} /> : editing
-      ? <form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); if (!save.isPending) save.mutate({ text: draft, expected: data.brief }); }}>
-        <Field>
-          <FieldLabel htmlFor="ws-brief-input" className="sr-only">Brief</FieldLabel>
-          <Textarea id="ws-brief-input" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={BRIEF_MAX} rows={5} autoFocus disabled={save.isPending} />
-          <FieldDescription aria-live="polite" className="tabular-nums">{draft.length}/{BRIEF_MAX}</FieldDescription>
-        </Field>
-        {error ? <InlineAlert onAction={error.conflict ? () => void reloadBrief() : undefined} actionLabel="Reload latest">{error.message}</InlineAlert> : null}
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={cancel} disabled={save.isPending}>Cancel</Button>
-          <Button type="submit" disabled={save.isPending || draft === data.brief}>{save.isPending ? "Saving…" : "Save brief"}</Button>
-        </div>
-      </form>
-      : data.brief ? <p className="max-w-prose text-sm/relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{data.brief}</p>
-        : <EmptyState title="No brief yet." description={canEdit ? "Say what this story is, in a few lines." : undefined} />}
-  </Panel>;
+  return <Card size="sm" role="region" aria-labelledby="ws-brief-title" id="ws-brief">
+    <CardHeader>
+      <CardTitle id="ws-brief-title" role="heading" aria-level={2}>Brief</CardTitle>
+      <CardDescription>Internal, not article copy.</CardDescription>
+      {canEdit && !editing ? <CardAction><Button ref={edit} type="button" variant="outline" size="sm" onClick={start}><Pencil data-icon="inline-start" aria-hidden="true" />{data.brief ? "Edit" : "Add brief"}</Button></CardAction> : null}
+    </CardHeader>
+    <CardContent>
+      {failed ? <SectionFailed what="the brief" onRetry={() => void reload()} /> : editing
+        ? <form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); if (!save.isPending) save.mutate({ text: draft, expected: data.brief }); }}>
+          <Field>
+            <FieldLabel htmlFor="ws-brief-input" className="sr-only">Brief</FieldLabel>
+            <Textarea id="ws-brief-input" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={BRIEF_MAX} rows={5} autoFocus disabled={save.isPending} />
+            <FieldDescription aria-live="polite" className="tabular-nums">{draft.length}/{BRIEF_MAX}</FieldDescription>
+          </Field>
+          {error ? <InlineAlert onAction={error.conflict ? () => void reloadBrief() : undefined} actionLabel="Reload latest">{error.message}</InlineAlert> : null}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={cancel} disabled={save.isPending}>Cancel</Button>
+            <Button type="submit" disabled={save.isPending || draft === data.brief}>{save.isPending ? "Saving…" : "Save brief"}</Button>
+          </div>
+        </form>
+        : data.brief ? <p className="max-w-prose text-sm/relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{data.brief}</p>
+          : <Empty className="border"><EmptyHeader><EmptyTitle>No brief yet.</EmptyTitle>{canEdit ? <EmptyDescription>Say what this story is, in a few lines.</EmptyDescription> : null}</EmptyHeader></Empty>}
+    </CardContent>
+  </Card>;
 }

@@ -4,7 +4,7 @@ import { seedCanteenStory } from "./story-workspace-fixture";
 
 /**
  * The Story Workspace is built from shadcn Nova (Item, Field, Select,
- * ToggleGroup, Empty, Collapsible, Dialog). These tests drive it the way a
+ * RadioGroup, Empty, Collapsible, Dialog, AlertDialog). These tests drive it the way a
  * reporter would and pin the behaviours the component migration must not lose.
  */
 test("the workspace reads as Nova: sources, appointments, tasks, files and a scheduling dialog that works", async ({ adminPage: page, adminSession: session }) => {
@@ -38,22 +38,21 @@ test("the workspace reads as Nova: sources, appointments, tasks, files and a sch
   await expect(sourceDialog).toBeHidden();
   await expect(reporting.getByRole("button", { name: /Athletic director/ })).toBeVisible();
 
-  // An appointment: Not scheduled / Date range / Exact time are one ToggleGroup.
+  // An appointment: Not scheduled / Target date range / Exact date & time are native RadioGroup choice cards.
   await reporting.getByRole("button", { name: "Add appointment", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add appointment" });
   await dialog.getByLabel("Title").fill("Call the athletic director");
-  const when = dialog.getByRole("group", { name: "When is this happening?" });
-  await expect(when.getByRole("button", { name: "Not scheduled" })).toHaveAttribute("aria-pressed", "true");
-  await when.getByRole("button", { name: "Date range" }).click();
+  await expect(dialog.getByRole("radio", { name: /Not scheduled/ })).toBeChecked();
+  await dialog.getByRole("radio", { name: /Target date range/ }).click();
   await expect(dialog.getByRole("button", { name: "This week" })).toBeVisible();
   await dialog.getByRole("button", { name: "Next week" }).click();
-  await expect(dialog.getByRole("button", { name: /^First day/ })).not.toContainText("Choose a date");
-  await when.getByRole("button", { name: "Exact time" }).click();
-  await expect(dialog.getByLabel("Starts")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Target dates" })).not.toContainText("Choose target dates");
+  await dialog.getByRole("radio", { name: /Exact date & time/ }).click();
+  await expect(dialog.getByLabel("Start time")).toBeVisible();
   await expect(dialog.getByRole("button", { name: "This week" })).toHaveCount(0);
   // Leaving a mode clears its fields: pick the range again before saving.
-  await when.getByRole("button", { name: "Date range" }).click();
-  await expect(dialog.getByRole("button", { name: /^First day/ })).toContainText("Choose a date");
+  await dialog.getByRole("radio", { name: /Target date range/ }).click();
+  await expect(dialog.getByRole("button", { name: "Target dates" })).toContainText("Choose target dates");
   await dialog.getByRole("button", { name: "This week" }).click();
   await dialog.getByRole("button", { name: "Add appointment", exact: true }).click();
   await expect(dialog).toBeHidden();
@@ -112,8 +111,8 @@ test("the workspace keeps its layout from 1440 down to a phone", async ({ adminP
     }
   }
   // On a phone the page reads in the order a reporter works: brief, reporting, tasks, media, files, details, activity.
-  const order = await page.evaluate(() => Array.from(document.querySelectorAll("main section[aria-labelledby]"))
-    .map((section) => ({ title: section.querySelector("[role=heading]")?.textContent, top: section.getBoundingClientRect().top }))
+  const order = await page.evaluate(() => Array.from(document.querySelectorAll("main [role=region][aria-labelledby]"))
+    .map((section) => ({ title: section.querySelector("[role=heading][aria-level='2']")?.textContent, top: section.getBoundingClientRect().top }))
     .filter((section) => section.title).sort((a, b) => a.top - b.top).map((section) => section.title));
   expect(order).toEqual(["Brief", "Reporting", "Tasks", "Media & Production", "Files & Links", "Details", "Recent Activity"]);
 });

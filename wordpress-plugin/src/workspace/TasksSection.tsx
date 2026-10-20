@@ -3,15 +3,15 @@ import { useMutation } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { describeEditorialError, setTaskCompletionState, type ContributorEntry, type EditorialTask } from "../editorial/editorial-model";
-import { EmptyState } from "../admin-ui/components/empty-state";
 import { TextField } from "../admin-ui/components/form-fields";
-import { ItemList } from "../admin-ui/components/item-list";
-import { Panel } from "../admin-ui/components/panel";
 import { AssigneePicker, DatePicker } from "../admin-ui/components/pickers";
 import { Button } from "../admin-ui/ui/button";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Checkbox } from "../admin-ui/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../admin-ui/ui/collapsible";
-import { Field, FieldContent, FieldDescription, FieldLabel } from "../admin-ui/ui/field";
+import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
+import { Field, FieldLabel } from "../admin-ui/ui/field";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { WorkspaceDialog } from "./dialog-shell";
 import { AddButton, SectionFailed } from "./parts";
 import { useDialogTarget } from "./dialog-target";
@@ -27,14 +27,14 @@ function TaskItem({ task, timezone, now, busy, onToggle }: { task: EditorialTask
   const overdue = !done && isOverdue(task.dueAt, timezone, now);
   const meta = [task.assignee?.name, task.priority === "urgent" ? "Urgent" : ""].filter(Boolean).join(" · ");
   const id = `ws-task-${task.id}`;
-  return <Field orientation="horizontal" role="none" data-task-id={task.id} className="px-3 py-2.5 hover:bg-muted">
-    <Checkbox id={id} aria-label={task.title} checked={done} aria-disabled={busy || undefined} onCheckedChange={(checked) => { if (!busy) onToggle(task, checked ? "completed" : "open"); }} />
-    <FieldContent>
-      <FieldLabel htmlFor={id} className={done ? "font-medium text-muted-foreground line-through" : "font-medium"}>{task.title}</FieldLabel>
-      {meta ? <FieldDescription>{meta}</FieldDescription> : null}
-    </FieldContent>
-    {due ? <time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined}>{due}</time> : null}
-  </Field>;
+  return <Item size="sm" data-task-id={task.id}>
+    <ItemMedia><Checkbox id={id} aria-label={task.title} checked={done} aria-disabled={busy || undefined} onCheckedChange={(checked) => { if (!busy) onToggle(task, checked ? "completed" : "open"); }} /></ItemMedia>
+    <ItemContent>
+      <ItemTitle><label htmlFor={id} className={done ? "cursor-pointer text-muted-foreground line-through" : "cursor-pointer"}>{task.title}</label></ItemTitle>
+      {meta ? <ItemDescription>{meta}</ItemDescription> : null}
+    </ItemContent>
+    {due ? <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined}>{due}</time></ItemActions> : null}
+  </Item>;
 }
 
 type TaskDialogProps = { open: boolean; onClose: () => void; finalFocus: () => HTMLElement | null };
@@ -103,21 +103,27 @@ export function TasksSection() {
     onSettled: (_result, _error, { task }) => { setBusyFor(String(task.id), false); void cache.invalidate(); }
   });
 
-  const rows = (tasks: EditorialTask[]) => <ItemList>{tasks.map((task) => <TaskItem key={task.id} task={task} timezone={timezone} now={now} busy={busy.has(String(task.id))} onToggle={(item, state) => toggle.mutate({ task: item, state })} />)}</ItemList>;
+  const rows = (tasks: EditorialTask[], label: string) => <ItemGroup role="group" aria-label={label} className="gap-0">{tasks.map((task) => <TaskItem key={task.id} task={task} timezone={timezone} now={now} busy={busy.has(String(task.id))} onToggle={(item, state) => toggle.mutate({ task: item, state })} />)}</ItemGroup>;
   const add = caps.addTask && !failed ? <AddButton data-ws-add="task" onClick={(event) => dialog.openWith(true, event.currentTarget)}>Add task</AddButton> : null;
 
-  return <Panel id="ws-tasks" title="Tasks" action={open.length || done.length ? add : null} contentClassName="px-0">
-    {failed ? <SectionFailed what="tasks" onRetry={() => void reload()} /> : <>
-      {open.length ? rows(showAll ? open : open.slice(0, TASK_LIMIT))
-        : <div className="px-3"><EmptyState title={done.length ? "Nothing left to do." : caps.addTask ? "No tasks yet." : "No tasks are assigned to you."}>{done.length ? null : add}</EmptyState></div>}
-      {open.length > TASK_LIMIT ? <Button type="button" variant="ghost" size="sm" className="mx-1.5 mt-1 text-muted-foreground" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>{showAll ? "Show fewer" : `Show ${open.length - TASK_LIMIT} more`}</Button> : null}
-      {done.length ? <Collapsible className="mt-1 px-1.5">
-        <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="text-muted-foreground" />}>
-          <ChevronRight data-icon="inline-start" aria-hidden="true" className="transition-transform in-data-panel-open:rotate-90" />Completed <span className="font-normal">{done.length}</span>
-        </CollapsibleTrigger>
-        <CollapsibleContent>{rows(done)}</CollapsibleContent>
-      </Collapsible> : null}
-    </>}
+  return <Card size="sm" role="region" aria-labelledby="ws-tasks-title" id="ws-tasks">
+    <CardHeader>
+      <CardTitle id="ws-tasks-title" role="heading" aria-level={2}>Tasks</CardTitle>
+      {add && (open.length || done.length) ? <CardAction>{add}</CardAction> : null}
+    </CardHeader>
+    <CardContent className="px-0">
+      {failed ? <div className="px-3"><SectionFailed what="tasks" onRetry={() => void reload()} /></div> : <>
+        {open.length ? rows(showAll ? open : open.slice(0, TASK_LIMIT), "Open tasks")
+          : <div className="px-3"><Empty className="border"><EmptyHeader><EmptyTitle>{done.length ? "Nothing left to do." : caps.addTask ? "No tasks yet." : "No tasks are assigned to you."}</EmptyTitle></EmptyHeader>{done.length || !add ? null : <EmptyContent>{add}</EmptyContent>}</Empty></div>}
+        {open.length > TASK_LIMIT ? <Button type="button" variant="ghost" size="sm" className="mx-1.5 mt-1 text-muted-foreground" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>{showAll ? "Show fewer" : `Show ${open.length - TASK_LIMIT} more`}</Button> : null}
+        {done.length ? <Collapsible className="mt-1 px-1.5">
+          <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="text-muted-foreground" />}>
+            <ChevronRight data-icon="inline-start" aria-hidden="true" className="transition-transform in-data-panel-open:rotate-90" />Completed <span className="font-normal">{done.length}</span>
+          </CollapsibleTrigger>
+          <CollapsibleContent>{rows(done, "Completed tasks")}</CollapsibleContent>
+        </Collapsible> : null}
+      </>}
+    </CardContent>
     <TaskDialog key={`task-${dialog.session}`} open={dialog.open} onClose={dialog.close} finalFocus={dialog.finalFocus} />
-  </Panel>;
+  </Card>;
 }

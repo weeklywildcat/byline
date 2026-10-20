@@ -1,16 +1,15 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { describeEditorialError, setTaskCompletionState, type EditorialTask } from "../editorial/editorial-model";
 import { AdminRoot } from "../admin-ui/components/admin-root";
-import { EmptyState } from "../admin-ui/components/empty-state";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
-import { ItemList } from "../admin-ui/components/item-list";
-import { Panel } from "../admin-ui/components/panel";
 import { Badge } from "../admin-ui/ui/badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
-import { Item, ItemActions, ItemContent, ItemTitle } from "../admin-ui/ui/item";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../admin-ui/ui/card";
+import { Empty, EmptyDescription } from "../admin-ui/ui/empty";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
 import { Kbd, KbdGroup } from "../admin-ui/ui/kbd";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../admin-ui/ui/sheet";
 import type { HomeFetchers } from "./home-api";
@@ -32,13 +31,21 @@ const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(naviga
 
 /** A titled Card whose rows are flush with its edges. */
 function Surface({ title, subtitle, action, className, children }: { title: string; subtitle?: string; action?: ReactNode; className?: string; children: ReactNode }) {
-  return <Panel title={title} description={subtitle} action={action} className={className} contentClassName="px-0">{children}</Panel>;
+  const id = useId();
+  return <Card size="sm" role="region" aria-labelledby={id} className={className}>
+    <CardHeader>
+      <CardTitle id={id} role="heading" aria-level={2}>{title}</CardTitle>
+      {subtitle ? <CardDescription>{subtitle}</CardDescription> : null}
+      {action ? <CardAction>{action}</CardAction> : null}
+    </CardHeader>
+    <CardContent className="px-0">{children}</CardContent>
+  </Card>;
 }
 
 const surfaceLink = (href: string, label: string) => <a className={buttonVariants({ variant: "ghost", size: "sm" })} href={href}>{label}<ArrowRight data-icon="inline-end" aria-hidden="true" /></a>;
 
 function Quiet({ children }: { children: ReactNode }) {
-  return <EmptyState title={children} className="border-0 py-4" />;
+  return <Empty className="items-start p-3 text-left"><EmptyDescription>{children}</EmptyDescription></Empty>;
 }
 
 function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
@@ -139,24 +146,24 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
     <div className="flex flex-col gap-5 @3xl/home:grid @3xl/home:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] @3xl/home:items-start">
       <Surface title="Up Next" subtitle="Your assigned work, in order of urgency" className="@3xl/home:col-start-1 @3xl/home:row-start-1" action={fetchers.editorial ? <Button variant="ghost" size="sm" onClick={() => newTask()}><Plus data-icon="inline-start" aria-hidden="true" />Task</Button> : undefined}>
         <section ref={workRef} tabIndex={-1} aria-label="Assigned tasks" className="outline-none">
-          {section("tasks", tasks.length ? <ItemList>{tasks.slice(0, 7).map(renderTask)}</ItemList> : null, "No open assignments.")}
+          {section("tasks", tasks.length ? <ItemGroup role="group" className="gap-0">{tasks.slice(0, 7).map(renderTask)}</ItemGroup> : null, "No open assignments.")}
           <div data-home-work-footer className="mt-1 flex items-center justify-between border-t px-1.5 pt-2"><Button variant="link" size="sm" onClick={() => setAllWorkOpen(true)}>View all work<ArrowRight data-icon="inline-end" aria-hidden="true" /></Button><span className="text-xs text-muted-foreground">{tasks.length ? `${tasks.length} open` : ""}</span></div>
         </section>
         {completionError ? <InlineAlert className="mx-1.5 mt-2 w-auto">{completionError}</InlineAlert> : null}
       </Surface>
-      <Surface title="Waiting for Me" className="@3xl/home:col-start-2 @3xl/home:row-start-2">{home.isPending ? <RowSkeletons count={2} /> : attention.length || failedDeploy || criticalHealth ? <ItemList>{[
+      <Surface title="Waiting for Me" className="@3xl/home:col-start-2 @3xl/home:row-start-2">{home.isPending ? <RowSkeletons count={2} /> : attention.length || failedDeploy || criticalHealth ? <ItemGroup role="group" className="gap-0">{[
         ...attention.map((item) => <AttentionRow key={item.id} item={item} onOpen={() => item.storyId ? openStory(item.storyId) : workRef.current?.focus()} />),
         ...(failedDeploy && actionUrls?.deployment ? [attentionLink(actionUrls.deployment, "Website publication failed")] : []),
         ...(criticalHealth && actionUrls?.doctor ? [attentionLink(actionUrls.doctor, criticalHealth.label)] : [])
-      ]}</ItemList> : <Quiet>{home.isError || data?.errors.tasks || data?.errors.stories || data?.errors.visualWork || data?.errors.appointments ? "Attention items couldn't be checked." : "You're caught up."}</Quiet>}</Surface>
+      ]}</ItemGroup> : <Quiet>{home.isError || data?.errors.tasks || data?.errors.stories || data?.errors.visualWork || data?.errors.appointments ? "Attention items couldn't be checked." : "You're caught up."}</Quiet>}</Surface>
       <Surface title="Coming Up" className="@3xl/home:col-start-2 @3xl/home:row-start-1" action={actionUrls?.calendar ? surfaceLink(actionUrls.calendar, "Calendar") : undefined}>
-        {section("stories", agenda.length ? <div className="flex flex-col gap-2">{Array.from(new Set(agenda.map((e) => e.day))).map((day) => <div key={day}><h3 className="px-3 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">{dateLabel(day, timezone, now)}</h3><ItemList>{agenda.filter((e) => e.day === day).map((event) => <AgendaItem key={event.id} event={event} timezone={timezone} onOpen={event.storyId ? () => openStory(event.storyId!) : undefined} />)}</ItemList></div>)}</div> : null, "Nothing scheduled in the next two weeks.")}
+        {section("stories", agenda.length ? <div className="flex flex-col gap-2">{Array.from(new Set(agenda.map((e) => e.day))).map((day) => <div key={day}><h3 className="px-3 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">{dateLabel(day, timezone, now)}</h3><ItemGroup role="group" className="gap-0">{agenda.filter((e) => e.day === day).map((event) => <AgendaItem key={event.id} event={event} timezone={timezone} onOpen={event.storyId ? () => openStory(event.storyId!) : undefined} />)}</ItemGroup></div>)}</div> : null, "Nothing scheduled in the next two weeks.")}
         {partial ? <p className="px-3 pt-2 text-xs text-muted-foreground">Some assignments could not be checked.</p> : null}
       </Surface>
-      <Surface title="My Stories" className="@3xl/home:col-start-1 @3xl/home:row-start-2" action={actionUrls?.planning ? surfaceLink(`${actionUrls.planning}&mine=1`, "All my stories") : undefined}>{section("stories", stories.length ? <ItemList>{stories.slice(0, 6).map((story) => <StoryRow key={story.id} story={story} timezone={timezone} now={now} onOpen={() => openStory(story.id)} />)}</ItemList> : null, "No active stories assigned to you.")}</Surface>
-      {data?.capabilities.review ? <Surface title="Ready for Review" className="@3xl/home:col-start-1" action={<Badge variant="secondary">{review.length}</Badge>}>{review.length ? <ItemList>{review.slice(0, 5).map((story) => <ReviewRow key={story.id} title={story.title} detail={`${story.authors.map((a) => a.name).join(", ") || story.writer?.name || "Unassigned writer"} · Ready for review`} onOpen={() => openStory(story.id)} />)}</ItemList> : <Quiet>{data.errors.stories ? "The review queue couldn't be checked." : "No stories waiting for review."}</Quiet>}</Surface> : null}
-      {data?.capabilities.review || visuals.length || data?.errors.visualWork ? <Surface title="Photo & Visual Work" className={data?.capabilities.review ? "@3xl/home:col-start-2" : "@3xl/home:col-span-2"}>{section("visualWork", visuals.length ? <ItemList>{visuals.slice(0, 5).map((media) => <MediaAssignmentRow key={`${media.story.id}-${media.id}`} media={media} timezone={timezone} now={now} onOpen={() => openStory(media.story.id)} />)}</ItemList> : null, "No photo assignments.")}</Surface> : null}
-      <Surface title="Recent Activity" className="@3xl/home:col-span-2">{section("activity", data?.activity.length ? <ItemList>{data.activity.slice(0, 10).map((item) => <ActivityRow key={item.id} item={item} timezone={timezone} now={now} onOpen={item.storyId ? () => openStory(item.storyId!) : undefined} />)}</ItemList> : null, "No recent newsroom activity.")}</Surface>
+      <Surface title="My Stories" className="@3xl/home:col-start-1 @3xl/home:row-start-2" action={actionUrls?.planning ? surfaceLink(`${actionUrls.planning}&mine=1`, "All my stories") : undefined}>{section("stories", stories.length ? <ItemGroup role="group" className="gap-0">{stories.slice(0, 6).map((story) => <StoryRow key={story.id} story={story} timezone={timezone} now={now} onOpen={() => openStory(story.id)} />)}</ItemGroup> : null, "No active stories assigned to you.")}</Surface>
+      {data?.capabilities.review ? <Surface title="Ready for Review" className="@3xl/home:col-start-1" action={<Badge variant="secondary">{review.length}</Badge>}>{review.length ? <ItemGroup role="group" className="gap-0">{review.slice(0, 5).map((story) => <ReviewRow key={story.id} title={story.title} detail={`${story.authors.map((a) => a.name).join(", ") || story.writer?.name || "Unassigned writer"} · Ready for review`} onOpen={() => openStory(story.id)} />)}</ItemGroup> : <Quiet>{data.errors.stories ? "The review queue couldn't be checked." : "No stories waiting for review."}</Quiet>}</Surface> : null}
+      {data?.capabilities.review || visuals.length || data?.errors.visualWork ? <Surface title="Photo & Visual Work" className={data?.capabilities.review ? "@3xl/home:col-start-2" : "@3xl/home:col-span-2"}>{section("visualWork", visuals.length ? <ItemGroup role="group" className="gap-0">{visuals.slice(0, 5).map((media) => <MediaAssignmentRow key={`${media.story.id}-${media.id}`} media={media} timezone={timezone} now={now} onOpen={() => openStory(media.story.id)} />)}</ItemGroup> : null, "No photo assignments.")}</Surface> : null}
+      <Surface title="Recent Activity" className="@3xl/home:col-span-2">{section("activity", data?.activity.length ? <ItemGroup role="group" className="gap-0">{data.activity.slice(0, 10).map((item) => <ActivityRow key={item.id} item={item} timezone={timezone} now={now} onOpen={item.storyId ? () => openStory(item.storyId!) : undefined} />)}</ItemGroup> : null, "No recent newsroom activity.")}</Surface>
     </div>
     <footer className="flex items-center justify-between text-xs text-muted-foreground"><span>{data ? `Dates shown in ${timezone.replace(/_/g, " ")}` : ""}</span><Button variant="link" size="xs" disabled={home.isFetching} onClick={() => void home.refetch()}>{home.isFetching ? "Refreshing…" : "Refresh"}</Button></footer>
     {health.isError || deployment.isError ? <p className="text-xs text-muted-foreground">Some system checks are unavailable. Your work is shown above.</p> : null}
@@ -167,7 +174,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
     <Sheet open={allWorkOpen} onOpenChange={setAllWorkOpen}>
       <SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-xl">
         <SheetHeader><SheetTitle>All my work</SheetTitle><SheetDescription>Your visible open assignments</SheetDescription></SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 pb-4">{tasks.length ? <ItemList>{tasks.map(renderTask)}</ItemList> : <Quiet>No open assignments.</Quiet>}{data && tasks.length >= data.limits.tasks ? <p className="px-3 pt-3 text-xs text-muted-foreground">Showing the first {data.limits.tasks} assignments.</p> : null}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 pb-4">{tasks.length ? <ItemGroup role="group" className="gap-0">{tasks.map(renderTask)}</ItemGroup> : <Quiet>No open assignments.</Quiet>}{data && tasks.length >= data.limits.tasks ? <p className="px-3 pt-3 text-xs text-muted-foreground">Showing the first {data.limits.tasks} assignments.</p> : null}</div>
       </SheetContent>
     </Sheet>
   </main>;

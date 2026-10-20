@@ -43,7 +43,7 @@ export function SourceDialog({ open, source, onClose, finalFocus }: SourceDialog
   };
 
   return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={source ? "Edit source" : "Add source"} description="Who you plan to talk to for this story. No contact details are kept here." submitLabel={source ? "Save source" : "Add source"} pending={pending} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
-    secondary={source ? <RemoveControl label="Remove source" prompt="Remove this source? Linked appointments stay." confirmLabel="Remove" pendingLabel="Removing…" pending={pending} removing={remove.isPending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
+    secondary={source ? <RemoveControl label="Remove source" title="Remove this source?" description="Linked appointments stay." confirmLabel="Remove" pending={pending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
     <TextField label="Label" value={form.label} onChange={(label) => patch({ label })} error={errors.label} maxLength={120} autoFocus placeholder="Mrs. Hamby, or a role like “Athletic director”" />
     <div className="grid gap-4 sm:grid-cols-2">
       <TextField label="Role" value={form.role} onChange={(role) => patch({ role })} maxLength={120} optional />

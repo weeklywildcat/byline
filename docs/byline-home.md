@@ -114,11 +114,20 @@ produce a misleading all-clear message.
 Tailwind 4, Base UI). `src/admin-ui/ui/` holds the generated Nova components
 (MIT), shared by Home and the Story Workspace; the only local change is that
 overlays portal into the `.byline-ui-root` container (`admin-ui/lib/portal.ts`).
-`src/admin-ui/components/` holds the few Byline compositions over them (Panel,
-ItemList, EmptyState, form fields, pickers). To update a primitive, regenerate it
-with the shadcn CLI and re-apply the portal change; do not restyle it by hand.
-Rows are `Item`, forms are `Field`, options are `Select`, empty states are
-`Empty`. `src/admin-ui/admin-ui.css` is the one stylesheet: Nova's neutral tokens
+`src/admin-ui/components/` holds only Byline *domain* compositions over them:
+`PeopleAvatars` (nobody, one `Avatar`, an `AvatarGroup`, or three plus an
+`AvatarGroupCount` "+N"), `PersonAvatar`, the writer, assignee and date pickers,
+the resource icon resolver, form-field wiring and the status badge. There are no
+visual-system wrappers: sections are `Card`, rows are `Item` (a Media Library file
+is an `Attachment`; an external link is an `Item` anchor), story facts are
+horizontal `Field`s, a schedule mode is a `RadioGroup` choice card, a target
+window is one range `Calendar` in a `Popover`, empty states are `Empty`,
+overflow actions are `DropdownMenu`, and destructive confirmations are
+`AlertDialog`. To update a primitive, regenerate it with the shadcn CLI
+(it needs `@/*` aliases in `tsconfig.json` and `components.json` while it runs;
+revert them and rewrite the generated `@/` and `"cn"` imports to relative ones)
+and re-apply the portal change; do not restyle it by hand.
+`src/admin-ui/admin-ui.css` is the one stylesheet: Nova's neutral tokens
 (black primary, plus one `warning` token),
 WordPress resets and overlay stacking. Layout is Tailwind utilities on the
 components, so `home/style.css` and `workspace/style.css` only import it.

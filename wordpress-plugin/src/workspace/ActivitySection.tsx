@@ -1,8 +1,7 @@
 import { exactDate, relativeTime } from "../home/newsroom-model";
-import { EmptyState } from "../admin-ui/components/empty-state";
-import { ItemList } from "../admin-ui/components/item-list";
-import { Panel } from "../admin-ui/components/panel";
-import { Item, ItemActions, ItemContent, ItemTitle } from "../admin-ui/ui/item";
+import { Card, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
+import { Empty, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
 import { SectionFailed } from "./parts";
 import { workspaceActivityCopy } from "./workspace-model";
 import { useWorkspace } from "./workspace-context";
@@ -13,12 +12,15 @@ export function ActivitySection() {
   if (caps.role === "participant") return null;
   const failed = sectionError("activity");
   const items = data.activity.slice(0, 8);
-  return <Panel id="ws-activity" title="Recent Activity" className="order-3 @3xl/ws:order-none" contentClassName="px-0">
-    {failed ? <SectionFailed what="recent activity" onRetry={() => void reload()} /> : items.length
-      ? <ItemList>{items.map((item) => <Item key={item.id} size="xs">
-        <ItemContent><ItemTitle className="line-clamp-none font-normal">{workspaceActivityCopy(item)}</ItemTitle></ItemContent>
-        <ItemActions><time className="text-xs whitespace-nowrap text-muted-foreground" dateTime={item.occurredAt} title={exactDate(item.occurredAt, timezone)}>{relativeTime(item.occurredAt, timezone, now)}</time></ItemActions>
-      </Item>)}</ItemList>
-      : <div className="px-3"><EmptyState title="No recent activity." /></div>}
-  </Panel>;
+  return <Card size="sm" role="region" aria-labelledby="ws-activity-title" id="ws-activity" className="order-3 @3xl/ws:order-none">
+    <CardHeader><CardTitle id="ws-activity-title" role="heading" aria-level={2}>Recent Activity</CardTitle></CardHeader>
+    <CardContent className="px-0">
+      {failed ? <div className="px-3"><SectionFailed what="recent activity" onRetry={() => void reload()} /></div> : items.length
+        ? <ItemGroup role="group" aria-label="Recent activity" className="gap-0">{items.map((item) => <Item key={item.id} size="xs">
+          <ItemContent><ItemTitle className="line-clamp-none font-normal">{workspaceActivityCopy(item)}</ItemTitle></ItemContent>
+          <ItemActions><time className="text-xs whitespace-nowrap text-muted-foreground" dateTime={item.occurredAt} title={exactDate(item.occurredAt, timezone)}>{relativeTime(item.occurredAt, timezone, now)}</time></ItemActions>
+        </Item>)}</ItemGroup>
+        : <div className="px-3"><Empty className="border"><EmptyHeader><EmptyTitle>No recent activity.</EmptyTitle></EmptyHeader></Empty></div>}
+    </CardContent>
+  </Card>;
 }

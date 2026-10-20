@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ArrowUpRight, FileText, Folder, Link2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { EmptyState } from "../admin-ui/components/empty-state";
 import { SelectField, TextField } from "../admin-ui/components/form-fields";
-import { ItemList } from "../admin-ui/components/item-list";
-import { Panel } from "../admin-ui/components/panel";
+import { ResourceIcon } from "../admin-ui/components/resource-icon";
 import { Button } from "../admin-ui/ui/button";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
-import { WorkspaceDialog } from "./dialog-shell";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
+import { ConfirmRemoveDialog, WorkspaceDialog } from "./dialog-shell";
 import { AddButton, SectionFailed } from "./parts";
 import { useDialogTarget } from "./dialog-target";
 import { RESOURCE_PURPOSE_LABELS } from "./reporting-model";
@@ -22,11 +22,6 @@ import { RESOURCE_PURPOSES, type ResourcePurpose, type StoryResource } from "./w
 const purposeOptions = RESOURCE_PURPOSES.map((value) => ({ value, label: RESOURCE_PURPOSE_LABELS[value] }));
 
 type LinkDraft = { label: string; url: string; purpose: ResourcePurpose };
-
-function resourceIcon(resource: StoryResource) {
-  if (resource.purpose === "folder" || /folder/i.test(resource.kind)) return Folder;
-  return /doc|sheet|slides|pdf/i.test(resource.kind) || resource.purpose === "draft" ? FileText : Link2;
-}
 
 function LinkDialog({ open, resource, onClose, finalFocus }: { open: boolean; resource: StoryResource | null; onClose: () => void; finalFocus: () => HTMLElement | null }) {
   const { storyId, client, announce } = useWorkspace();
@@ -51,24 +46,28 @@ function LinkDialog({ open, resource, onClose, finalFocus }: { open: boolean; re
 }
 
 function ResourceRow({ resource, canManage, onEdit, onRemove }: { resource: StoryResource; canManage: boolean; onEdit: (element: HTMLElement) => void; onRemove: () => void }) {
-  const Icon = resourceIcon(resource);
+  const [confirming, setConfirming] = useState(false);
+  const trigger = useRef<HTMLButtonElement | null>(null);
   const available = isHttpUrl(resource.url);
   const body = <>
-    <ItemMedia variant="icon" className="text-muted-foreground"><Icon aria-hidden="true" /></ItemMedia>
+    <ItemMedia variant="icon" className="text-muted-foreground"><ResourceIcon resource={resource} /></ItemMedia>
     <ItemContent><ItemTitle>{resource.label}</ItemTitle><ItemDescription>{available ? resourceSubtitle(resource) : "Link unavailable"}</ItemDescription></ItemContent>
-    {available ? <ItemActions><ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" /><span className="sr-only">(opens in a new tab)</span></ItemActions> : null}
+    {available ? <ItemActions><ExternalLink className="size-4 text-muted-foreground" aria-hidden="true" /><span className="sr-only">(opens in a new tab)</span></ItemActions> : null}
   </>;
   return <div className="flex items-center gap-1 pr-1.5">
     {available
       ? <Item size="sm" className="min-w-0 flex-1" render={<a href={resource.url} target="_blank" rel="noopener noreferrer" />}>{body}</Item>
       : <Item size="sm" className="min-w-0 flex-1">{body}</Item>}
-    {canManage ? <DropdownMenu>
-      <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={`Actions for ${resource.label}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-36">
-        <DropdownMenuItem onClick={(event) => onEdit(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit link</DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu> : null}
+    {canManage ? <>
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button ref={trigger} type="button" variant="ghost" size="icon-sm" aria-label={`Actions for ${resource.label}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-36">
+          <DropdownMenuItem onClick={(event) => onEdit(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit link</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={() => setConfirming(true)}><Trash2 aria-hidden="true" />Remove link</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConfirmRemoveDialog open={confirming} onOpenChange={setConfirming} finalFocus={() => trigger.current} title="Remove this link?" description={`“${resource.label}” is removed from the story. The document itself isn't touched.`} confirmLabel="Remove" onConfirm={onRemove} />
+    </> : null}
   </div>;
 }
 
@@ -96,10 +95,16 @@ export function ResourcesSection() {
   });
 
   const add = canManage ? <AddButton data-ws-add="link" onClick={(event) => dialog.openWith(null, event.currentTarget)}>Add link</AddButton> : null;
-  return <Panel id="ws-files" title="Files & Links" className="order-1 @3xl/ws:order-none" action={data.resources.length ? add : null} contentClassName="px-0">
-    {failed ? <SectionFailed what="links" onRetry={() => void reload()} /> : data.resources.length
-      ? <ItemList>{data.resources.map((resource) => <ResourceRow key={resource.id} resource={resource} canManage={canManage} onEdit={(element) => dialog.openWith(resource, element)} onRemove={() => remove.mutate(resource.id)} />)}</ItemList>
-      : <div className="px-3"><EmptyState title="No files or links yet." description={canManage ? "Link the working draft, notes and research." : undefined}>{add}</EmptyState></div>}
+  return <Card size="sm" role="region" aria-labelledby="ws-files-title" id="ws-files" className="order-1 @3xl/ws:order-none">
+    <CardHeader>
+      <CardTitle id="ws-files-title" role="heading" aria-level={2}>Files &amp; Links</CardTitle>
+      {data.resources.length && add ? <CardAction>{add}</CardAction> : null}
+    </CardHeader>
+    <CardContent className="px-0">
+      {failed ? <div className="px-3"><SectionFailed what="links" onRetry={() => void reload()} /></div> : data.resources.length
+        ? <ItemGroup role="group" aria-label="Links" className="gap-0">{data.resources.map((resource) => <ResourceRow key={resource.id} resource={resource} canManage={canManage} onEdit={(element) => dialog.openWith(resource, element)} onRemove={() => remove.mutate(resource.id)} />)}</ItemGroup>
+        : <div className="px-3"><Empty className="border"><EmptyHeader><EmptyTitle>No files or links yet.</EmptyTitle>{canManage ? <EmptyDescription>Link the working draft, notes and research.</EmptyDescription> : null}</EmptyHeader>{add ? <EmptyContent>{add}</EmptyContent> : null}</Empty></div>}
+    </CardContent>
     <LinkDialog key={`link-${dialog.session}`} open={dialog.open} resource={dialog.target} onClose={dialog.close} finalFocus={dialog.finalFocus} />
-  </Panel>;
+  </Card>;
 }

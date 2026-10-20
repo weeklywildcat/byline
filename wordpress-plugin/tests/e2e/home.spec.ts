@@ -27,6 +27,8 @@ test("Home creates real drafts, completes work with rollback, preserves peek con
   expect(story).toBeTruthy();
   session.registerTestPost(story.id);
   expect(story.id).toBe(createdId);
+  // Give it a near deadline so it ranks into "My Stories" however many fixture stories earlier runs left behind.
+  expect((await session.rest(`/byline/v1/editorial/stories/${story.id}`, "POST", { deadline: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) })).ok).toBe(true);
   const post = await session.rest<{ status: string; content: { raw: string } }>(`/wp/v2/posts/${story.id}?context=edit`);
   expect(post.payload.status).toBe("draft");
   expect(post.payload.content.raw).toBe("");
@@ -71,7 +73,9 @@ test("Home creates real drafts, completes work with rollback, preserves peek con
   await expect(command.getByRole("option", { name: title })).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(peek).toBeVisible();
-  await peek.getByRole("button", { name: "Remove Interview notes" }).click();
+  await peek.getByRole("button", { name: "Actions for Interview notes" }).click();
+  await page.getByRole("menuitem", { name: "Remove link" }).click();
+  await page.getByRole("alertdialog", { name: "Remove this link?" }).getByRole("button", { name: "Remove" }).click();
   await expect(peek.getByRole("link", { name: /Interview notes/ })).not.toBeVisible();
   expect(pageErrors).toEqual([]);
   await peek.getByRole("link", { name: "Edit article" }).click();

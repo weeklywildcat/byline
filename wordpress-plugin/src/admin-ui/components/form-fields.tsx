@@ -46,10 +46,3 @@ export function SelectField<T extends string>({ label, value, options, onChange,
     </Select>
   </FormField>;
 }
-
-export function TimeField({ label, value, onChange, error, disabled, optional }: FieldChrome & { value: string; onChange: (value: string) => void; disabled?: boolean }) {
-  const id = useId();
-  return <FormField id={id} label={label} error={error} optional={optional}>
-    <Input id={id} type="time" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} aria-invalid={error ? true : undefined} aria-describedby={describedBy(id, error)} />
-  </FormField>;
-}
