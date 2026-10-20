@@ -2063,7 +2063,7 @@ const rootElement = document.getElementById("byline-admin-root");
 
 if (rootElement) {
   createRoot(rootElement).render(
-    <AdminRoot className="byline-admin-app">
+    <AdminRoot>
       <AdminErrorBoundary>
         <BylineAdminApp />
       </AdminErrorBoundary>
