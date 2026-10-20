@@ -1,0 +1,8 @@
+/*
+ * The toolbar presence app uses the same shadcn Nova system as Home, Planning,
+ * and Story Workspace. The trigger is portalled into a `.byline-ui-root`
+ * mount inside the WordPress toolbar; the popover is portalled back into the
+ * private AdminRoot so WordPress toolbar styles never own the overlay.
+ */
+@import "../admin-ui/admin-ui.css";
+@source "./";
