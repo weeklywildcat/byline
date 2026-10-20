@@ -373,9 +373,9 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 18px;
-  border-block: 1px solid var(--rule-strong, #aab2bb);
-  padding-block: 18px;
-  margin-block: 1.8em;
+  border-block-start: var(--story-rule-strong, 2px solid var(--ink, #121212));
+  padding-block: 14px 0;
+  margin-block: var(--story-space, 1.8em);
   font-family: var(--font-ui, Arial, sans-serif);
   font-size: .95rem;
   overflow-wrap: anywhere;
@@ -415,7 +415,7 @@
   margin-inline: auto;
   aspect-ratio: auto;
 }
-.wp-block-audio.is-style-byline-story-audio { border-block: 1px solid var(--rule, #d0d7de); padding-block: 16px; }
+.wp-block-audio.is-style-byline-story-audio { margin-block: var(--story-space); }
 /* Only Core embeds declaring a ratio get a ratio. File previews and unrelated
  * iframes retain their own dimensions. */
 .wp-block-embed.wp-embed-aspect-16-9 { --byline-embed-ratio: 16 / 9; }
