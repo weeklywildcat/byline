@@ -92,7 +92,7 @@ function Deadline({ story, timezone, now, editable, disabled, onChange }: { stor
   }
 
   return <div className="flex flex-col gap-0.5">
-    <DatePicker appearance="value" label={__("Deadline", "weekly-wildcat-headless")} dateOnly value={story.deadline} timezone={timezone} disabled={disabled} placeholder={__("No deadline", "weekly-wildcat-headless")} onChange={onChange} />
+    <DatePicker appearance="value" label={__("Deadline", "weekly-wildcat-headless")} dateOnly value={story.deadline} timezone={timezone} disabled={disabled} placeholder={__("No deadline", "weekly-wildcat-headless")} displayValue={story.deadline ? shortDay(story.deadline, timezone) : undefined} onChange={onChange} />
     {story.deadline ? <StoryDueLabel value={story.deadline} timezone={timezone} now={now} empty="" className="text-xs" /> : null}
   </div>;
 }
@@ -115,7 +115,7 @@ function Publication({ story, timezone, editable, disabled, onChange }: { story:
 
   if (editable) {
     return <div className="flex flex-col gap-0.5">
-      <DatePicker appearance="value" label={__("Planned publication", "weekly-wildcat-headless")} dateOnly value={story.plannedPublication} timezone={timezone} disabled={disabled} placeholder={__("Not scheduled", "weekly-wildcat-headless")} onChange={onChange} />
+      <DatePicker appearance="value" label={__("Planned publication", "weekly-wildcat-headless")} dateOnly value={story.plannedPublication} timezone={timezone} disabled={disabled} placeholder={__("Not scheduled", "weekly-wildcat-headless")} displayValue={story.plannedPublication ? plannedLabel(story.plannedPublication, timezone) : undefined} onChange={onChange} />
       <span className="text-xs text-muted-foreground">{story.plannedPublication ? __("Planned publication", "weekly-wildcat-headless") : (state.label || __("Draft", "weekly-wildcat-headless"))}</span>
     </div>;
   }
@@ -179,7 +179,7 @@ export function StoryList(props: StoryListProps) {
             <div className="text-sm"><People story={story} /></div>
             <div className="flex flex-wrap items-center gap-x-2 text-xs">
               {canAssignStories && canUpdateStories
-                ? <DatePicker appearance="value" label={__("Deadline", "weekly-wildcat-headless")} dateOnly value={story.deadline} timezone={timezone} disabled={busy(story)} placeholder={__("No deadline", "weekly-wildcat-headless")} onChange={(deadline) => onUpdateStory(story, { deadline: deadline || "" }, { deadline }, __("Deadline", "weekly-wildcat-headless"))} />
+                ? <DatePicker appearance="value" label={__("Deadline", "weekly-wildcat-headless")} dateOnly value={story.deadline} timezone={timezone} disabled={busy(story)} placeholder={__("No deadline", "weekly-wildcat-headless")} displayValue={story.deadline ? shortDay(story.deadline, timezone) : undefined} onChange={(deadline) => onUpdateStory(story, { deadline: deadline || "" }, { deadline }, __("Deadline", "weekly-wildcat-headless"))} />
                 : <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="Due " empty={__("No deadline", "weekly-wildcat-headless")} />}
               <ProductionSummary story={story} className="flex-row gap-2" empty={null} />
             </div>
