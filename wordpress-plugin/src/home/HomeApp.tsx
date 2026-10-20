@@ -140,7 +140,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
   const showReview = Boolean(data?.capabilities.review && review.length);
   const showVisuals = Boolean(visuals.length || data?.errors.visualWork);
   const showActivity = home.isPending || Boolean(data?.activity.length || data?.errors.activity);
-  const hasMoreWork = tasks.length > HOME_TASK_PREVIEW_LIMIT || Boolean(data && tasks.length >= data.limits.tasks);
+  const hasMoreWork = tasks.length > HOME_TASK_PREVIEW_LIMIT || Boolean(data && tasks.length > 0 && tasks.length >= data.limits.tasks);
 
   return <main className="@container/home mx-auto mt-6 mb-8 flex max-w-[1320px] flex-col gap-5 pr-5 pl-1">
     <header className="flex items-center justify-between gap-4">
