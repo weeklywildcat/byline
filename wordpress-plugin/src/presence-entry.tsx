@@ -7,10 +7,7 @@ import type { PresenceLocation, PresencePayload } from "./presence/presence-mode
 import "./presence/style.css";
 
 type PresenceConfig = {
-  currentUserId: number;
   location: PresenceLocation;
-  activeSeconds: number;
-  awaySeconds: number;
   recentSeconds: number;
   initial: PresencePayload;
 };
@@ -22,13 +19,13 @@ type JQueryDocument = {
 };
 type JQueryLike = (target: Document) => JQueryDocument;
 
-declare global {
-  interface Window {
-    bylinePresence?: PresenceConfig;
-    jQuery?: JQueryLike;
-    wp?: { heartbeat?: { connectNow?: () => void } };
-  }
-}
+type PresenceWindow = Window & {
+  bylinePresence?: PresenceConfig;
+  jQuery?: JQueryLike;
+};
+
+const presenceWindow = window as PresenceWindow;
+const heartbeat = () => (window as unknown as { wp?: { heartbeat?: { connectNow?: () => void } } }).wp?.heartbeat;
 
 function isPresencePayload(value: unknown): value is PresencePayload {
   if (!value || typeof value !== "object") return false;
@@ -48,7 +45,7 @@ function PresenceRuntime({ mount, config }: { mount: HTMLElement; config: Presen
   const lastInteraction = useRef(Date.now());
 
   useEffect(() => {
-    const jquery = window.jQuery;
+    const jquery = presenceWindow.jQuery;
     if (!jquery) return undefined;
     const documentEvents = jquery(document);
     const activity = () => { lastInteraction.current = Date.now(); };
@@ -64,11 +61,11 @@ function PresenceRuntime({ mount, config }: { mount: HTMLElement; config: Presen
     };
     const wake = () => {
       activity();
-      window.wp?.heartbeat?.connectNow?.();
+      heartbeat()?.connectNow?.();
     };
     const visibility = () => {
       if (document.visibilityState === "visible") activity();
-      window.wp?.heartbeat?.connectNow?.();
+      heartbeat()?.connectNow?.();
     };
 
     documentEvents.on("heartbeat-send.bylinePresence", send);
@@ -77,7 +74,7 @@ function PresenceRuntime({ mount, config }: { mount: HTMLElement; config: Presen
     window.addEventListener("keydown", activity, true);
     window.addEventListener("focus", wake);
     document.addEventListener("visibilitychange", visibility);
-    window.wp?.heartbeat?.connectNow?.();
+    heartbeat()?.connectNow?.();
 
     return () => {
       documentEvents.off("heartbeat-send.bylinePresence", send);
@@ -98,7 +95,7 @@ function PresenceRuntime({ mount, config }: { mount: HTMLElement; config: Presen
 }
 
 const mount = document.getElementById("byline-presence-root");
-const config = window.bylinePresence;
+const config = presenceWindow.bylinePresence;
 if (mount && config) {
   const host = document.createElement("div");
   host.id = "byline-presence-app";
