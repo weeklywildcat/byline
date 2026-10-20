@@ -45,7 +45,7 @@ export function StoryPeekHost({ fetchers, workspaceUrl, children }: { fetchers: 
   const people: ContributorEntry[] = workspace?.people || [];
 
   return <StoryPeekContext value={api}>
-    <StoryHoverProvider fetchers={fetchers} onOpenStory={openStory} workspaceUrl={workspaceUrl}>{children}</StoryHoverProvider>
+    <StoryHoverProvider fetchers={fetchers}>{children}</StoryHoverProvider>
     <StoryPeek storyId={peekId} fetchers={fetchers} onClose={() => setPeekId(null)} origin={origin} onComplete={(task) => complete.mutate(task)} completing={complete.isPending} onNewTask={setTaskStoryId} now={now} workspaceUrl={workspaceUrl} />
     <TaskCreateDialog open={taskStoryId !== null} onClose={() => setTaskStoryId(null)} fetchers={fetchers} stories={workspace ? [{ id: workspace.story.id, title: workspace.story.title }] : []} storyId={taskStoryId} people={people} currentUser={workspace?.currentUser} canAssign={Boolean(workspace?.capabilities.review)} timezone={workspace?.timezone || "UTC"} />
   </StoryPeekContext>;
