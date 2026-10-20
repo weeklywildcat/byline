@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Eye, RefreshCw, Wrench } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { decodeEntities } from "../admin-ui/lib/text";
@@ -7,6 +8,7 @@ import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Alert, AlertDescription } from "../admin-ui/ui/alert";
 import { Badge } from "../admin-ui/ui/badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
 import { Spinner } from "../admin-ui/ui/spinner";
@@ -52,18 +54,27 @@ export function ContentHealth({ fetchers, onOpenStory }: { fetchers: PlanningFet
       {issues.length
         ? <ItemGroup className="gap-0 overflow-hidden rounded-xl border bg-card shadow-xs" aria-label={__("Content health issues", "weekly-wildcat-headless")}>{issues.map((issue) => {
           const fix = contentHealthFixHref(issue);
-          return <Item key={issue.id} size="sm" className="rounded-none border-0 border-b px-3 py-3 last:border-b-0">
-            <ItemMedia><StatusBadge tone={issue.severity === "info" ? "neutral" : "attention"}>{issue.severity}</StatusBadge></ItemMedia>
-            <ItemContent>
-              <ItemTitle className="line-clamp-none">{issue.problem.trim() || issue.type || __("Content issue", "weekly-wildcat-headless")}</ItemTitle>
-              <ItemDescription className="line-clamp-none">{issue.story ? <button type="button" className="hover:underline" onClick={() => onOpenStory(issue.story!.id)}>{decodeEntities(issue.story.title)}</button> : null}{issue.story && issue.lastCheckedAt ? " · " : ""}{issue.lastCheckedAt ? <time dateTime={issue.lastCheckedAt}>{new Date(issue.lastCheckedAt).toLocaleString()}</time> : null}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Badge variant="outline">{issue.type}</Badge>
-              {fix ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={fix}>{__("Fix", "weekly-wildcat-headless")}</a> : null}
-              {fetchers.recheckContentHealth ? <Button variant="ghost" size="sm" disabled={busyId !== null} onClick={() => recheck.mutate(issue.id)}>{busyId === issue.id ? <><Spinner data-icon="inline-start" />{__("Checking…", "weekly-wildcat-headless")}</> : __("Recheck", "weekly-wildcat-headless")}</Button> : null}
-            </ItemActions>
-          </Item>;
+          return <ContextMenu key={issue.id}>
+            <ContextMenuTrigger render={<Item size="sm" className="rounded-none border-0 border-b px-3 py-3 last:border-b-0" />}>
+              <ItemMedia><StatusBadge tone={issue.severity === "info" ? "neutral" : "attention"}>{issue.severity}</StatusBadge></ItemMedia>
+              <ItemContent>
+                <ItemTitle className="line-clamp-none">{issue.problem.trim() || issue.type || __("Content issue", "weekly-wildcat-headless")}</ItemTitle>
+                <ItemDescription className="line-clamp-none">{issue.story ? <button type="button" className="hover:underline" onClick={() => onOpenStory(issue.story!.id)}>{decodeEntities(issue.story.title)}</button> : null}{issue.story && issue.lastCheckedAt ? " · " : ""}{issue.lastCheckedAt ? <time dateTime={issue.lastCheckedAt}>{new Date(issue.lastCheckedAt).toLocaleString()}</time> : null}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Badge variant="outline">{issue.type}</Badge>
+                {fix ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={fix}>{__("Fix", "weekly-wildcat-headless")}</a> : null}
+                {fetchers.recheckContentHealth ? <Button variant="ghost" size="sm" disabled={busyId !== null} onClick={() => recheck.mutate(issue.id)}>{busyId === issue.id ? <><Spinner data-icon="inline-start" />{__("Checking…", "weekly-wildcat-headless")}</> : __("Recheck", "weekly-wildcat-headless")}</Button> : null}
+              </ItemActions>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-52">
+              <ContextMenuLabel className="max-w-48 truncate">{issue.type}</ContextMenuLabel>
+              <ContextMenuSeparator />
+              {issue.story ? <ContextMenuItem onClick={() => onOpenStory(issue.story!.id)}><Eye aria-hidden="true" />{__("Quick view story", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+              {fix ? <ContextMenuItem render={<a href={fix} />}><Wrench aria-hidden="true" />{__("Fix issue", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+              {fetchers.recheckContentHealth ? <ContextMenuItem disabled={busyId !== null} onClick={() => recheck.mutate(issue.id)}><RefreshCw aria-hidden="true" />{__("Recheck", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+            </ContextMenuContent>
+          </ContextMenu>;
         })}</ItemGroup>
         : <NothingHere title={data.issues.length ? __("No issues match", "weekly-wildcat-headless") : __("Nothing to fix", "weekly-wildcat-headless")} description={data.issues.length ? __("Try another filter.", "weekly-wildcat-headless") : __("No cached content health issues were returned.", "weekly-wildcat-headless")} />}
     </div>}</ResourceGate>

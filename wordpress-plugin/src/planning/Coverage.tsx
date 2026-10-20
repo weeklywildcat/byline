@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { Eye, Plus, Trash2 } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { decodeEntities } from "../admin-ui/lib/text";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Button } from "../admin-ui/ui/button";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "../admin-ui/ui/combobox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../admin-ui/ui/dialog";
@@ -16,7 +17,6 @@ import { Spinner } from "../admin-ui/ui/spinner";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
 import { ToggleGroup, ToggleGroupItem } from "../admin-ui/ui/toggle-group";
 import { describeEditorialError } from "../editorial/editorial-model";
-import { ConfirmRemoveDialog } from "../workspace/dialog-shell";
 import { coverageKey, invalidateStoryData, planningKey } from "../story/story-query";
 import { planningFilterParams, type PlanningFetchers } from "./planning-api";
 import { EMPTY_PLANNING_FILTERS, exactPlanningDate, type CoverageItem, type CoverageResponse, type CoverageStatus } from "./planning-model";
@@ -41,7 +41,6 @@ function CoverageCard({ item, stories, canManage, fetchers, onOpenStory }: Props
   const client = useQueryClient();
   const [adding, setAdding] = useState<StoryChoice | null>(null);
   const [newTitle, setNewTitle] = useState("");
-  const [removing, setRemoving] = useState<{ id: number; title: string } | null>(null);
   const linked = new Set((item.stories || []).map((story) => story.id));
   const available = stories.filter((story) => !linked.has(story.id));
   const refresh = () => Promise.all([client.invalidateQueries({ queryKey: coverageKey }), invalidateStoryData(client)]);
@@ -50,6 +49,9 @@ function CoverageCard({ item, stories, canManage, fetchers, onOpenStory }: Props
     onSuccess: () => { void refresh(); },
     onError: (error) => toast.error(describeEditorialError(error, __("Coverage could not be updated.", "weekly-wildcat-headless")))
   });
+  const removeStory = (story: { id: number; title: string }) => run.mutate(() => fetchers.removeStoryFromCoverage!(item.id, story.id).then(() => {
+    toast.success(__("Story removed from coverage.", "weekly-wildcat-headless"), { action: { label: __("Undo", "weekly-wildcat-headless"), onClick: () => run.mutate(() => fetchers.addStoryToCoverage!(item.id, story.id)) } });
+  }));
   return <Card size="sm" role="region" aria-label={item.title}>
     <CardHeader>
       <CardTitle className="flex items-center gap-2">{item.title}<StatusBadge tone={item.status === "active" ? "done" : item.status === "draft" ? "attention" : "neutral"}>{statusLabel(item.status)}</StatusBadge></CardTitle>
@@ -61,26 +63,37 @@ function CoverageCard({ item, stories, canManage, fetchers, onOpenStory }: Props
       <section aria-label={__("Linked stories", "weekly-wildcat-headless")} className="flex flex-col gap-1">
         <h3 className="text-xs font-medium text-muted-foreground">{__("Stories", "weekly-wildcat-headless")} · {item.storyCount}{item.plannedStoryCount ? ` (${item.plannedStoryCount} ${__("planned", "weekly-wildcat-headless")})` : ""}</h3>
         {item.stories?.length
-          ? <ItemGroup className="-mx-2 gap-0">{item.stories.map((story) => <Item key={story.id} size="xs">
-            <ItemContent><ItemTitle><button type="button" className="text-left hover:underline" onClick={() => onOpenStory(story.id)}>{decodeEntities(story.title)}</button></ItemTitle></ItemContent>
-            <ItemActions>
-              <StatusBadge tone={story.isPublished ? "done" : "neutral"}>{story.isPublished ? __("Published", "weekly-wildcat-headless") : __("Planned", "weekly-wildcat-headless")}</StatusBadge>
-              {canManage && fetchers.removeStoryFromCoverage ? <Button variant="ghost" size="icon-xs" aria-label={`${__("Remove", "weekly-wildcat-headless")} ${story.title}`} onClick={() => setRemoving(story)}><Trash2 aria-hidden="true" /></Button> : null}
-            </ItemActions>
-          </Item>)}</ItemGroup>
+          ? <ItemGroup className="-mx-2 gap-0">{item.stories.map((story) => <ContextMenu key={story.id}>
+            <ContextMenuTrigger render={<Item size="xs" />}>
+              <ItemContent><ItemTitle><button type="button" className="text-left hover:underline" onClick={() => onOpenStory(story.id)}>{decodeEntities(story.title)}</button></ItemTitle></ItemContent>
+              <ItemActions>
+                <StatusBadge tone={story.isPublished ? "done" : "neutral"}>{story.isPublished ? __("Published", "weekly-wildcat-headless") : __("Planned", "weekly-wildcat-headless")}</StatusBadge>
+                {canManage && fetchers.removeStoryFromCoverage ? <Button variant="ghost" size="icon-xs" aria-label={`${__("Remove", "weekly-wildcat-headless")} ${story.title}`} disabled={run.isPending} onClick={() => removeStory(story)}><Trash2 aria-hidden="true" /></Button> : null}
+              </ItemActions>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-52">
+              <ContextMenuLabel className="max-w-48 truncate">{decodeEntities(story.title)}</ContextMenuLabel>
+              <ContextMenuSeparator />
+              <ContextMenuItem onClick={() => onOpenStory(story.id)}><Eye aria-hidden="true" />{__("Quick view", "weekly-wildcat-headless")}</ContextMenuItem>
+              {canManage && fetchers.removeStoryFromCoverage ? <ContextMenuItem variant="destructive" disabled={run.isPending} onClick={() => removeStory(story)}><Trash2 aria-hidden="true" />{__("Remove from coverage", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+            </ContextMenuContent>
+          </ContextMenu>)}</ItemGroup>
           : <p className="text-sm text-muted-foreground">{__("No stories linked yet.", "weekly-wildcat-headless")}</p>}
       </section>
       {canManage && (fetchers.addStoryToCoverage || fetchers.createCoverageStory) ? <div className="flex flex-wrap items-end gap-3">
         {fetchers.addStoryToCoverage ? <Field className="min-w-52 flex-1"><FieldLabel htmlFor={`coverage-add-${item.id}`}>{__("Add an existing story", "weekly-wildcat-headless")}</FieldLabel>
-          <div className="flex gap-2"><Combobox items={available} itemToStringLabel={(story: StoryChoice) => story.title} isItemEqualToValue={(a: StoryChoice, b: StoryChoice) => a.id === b.id} value={adding} onValueChange={setAdding}><ComboboxInput id={`coverage-add-${item.id}`} placeholder={__("Choose a story…", "weekly-wildcat-headless")} disabled={!available.length || run.isPending} /><ComboboxContent><ComboboxEmpty>{__("No stories to add.", "weekly-wildcat-headless")}</ComboboxEmpty><ComboboxList>{(story: StoryChoice) => <ComboboxItem key={story.id} value={story}>{story.title}</ComboboxItem>}</ComboboxList></ComboboxContent></Combobox>
-            <Button variant="outline" disabled={!adding || run.isPending} onClick={() => { const story = adding!; run.mutate(() => fetchers.addStoryToCoverage!(item.id, story.id).then(() => { setAdding(null); toast.success(__("Story added to coverage.", "weekly-wildcat-headless")); })); }}>{__("Add", "weekly-wildcat-headless")}</Button></div>
+          <Combobox items={available} itemToStringLabel={(story: StoryChoice) => story.title} isItemEqualToValue={(a: StoryChoice, b: StoryChoice) => a.id === b.id} value={adding} onValueChange={(story) => {
+            setAdding(story);
+            if (!story) return;
+            run.mutate(() => fetchers.addStoryToCoverage!(item.id, story.id).then(() => { setAdding(null); toast.success(__("Story added to coverage.", "weekly-wildcat-headless")); }));
+          }}><ComboboxInput id={`coverage-add-${item.id}`} placeholder={run.isPending ? __("Adding…", "weekly-wildcat-headless") : __("Choose a story…", "weekly-wildcat-headless")} disabled={!available.length || run.isPending} /><ComboboxContent><ComboboxEmpty>{__("No stories to add.", "weekly-wildcat-headless")}</ComboboxEmpty><ComboboxList>{(story: StoryChoice) => <ComboboxItem key={story.id} value={story}>{story.title}</ComboboxItem>}</ComboboxList></ComboboxContent></Combobox>
         </Field> : null}
         {fetchers.createCoverageStory ? <Field className="min-w-52 flex-1"><FieldLabel htmlFor={`coverage-create-${item.id}`}>{__("Quick-create a story", "weekly-wildcat-headless")}</FieldLabel>
-          <div className="flex gap-2"><Input id={`coverage-create-${item.id}`} value={newTitle} disabled={run.isPending} onChange={(event) => setNewTitle(event.target.value)} /><Button variant="outline" disabled={!newTitle.trim() || run.isPending} onClick={() => run.mutate(() => fetchers.createCoverageStory!(item.id, newTitle.trim()).then(() => { setNewTitle(""); toast.success(__("Story created for coverage.", "weekly-wildcat-headless")); }))}>{__("Create", "weekly-wildcat-headless")}</Button></div>
+          <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); const title = newTitle.trim(); if (title && !run.isPending) run.mutate(() => fetchers.createCoverageStory!(item.id, title).then(() => { setNewTitle(""); toast.success(__("Story created for coverage.", "weekly-wildcat-headless")); })); }}><Input id={`coverage-create-${item.id}`} value={newTitle} disabled={run.isPending} onChange={(event) => setNewTitle(event.target.value)} placeholder={__("Story headline", "weekly-wildcat-headless")} /><Button type="submit" variant="outline" disabled={!newTitle.trim() || run.isPending}>{__("Create", "weekly-wildcat-headless")}</Button></form>
         </Field> : null}
       </div> : null}
     </CardContent>
-    <ConfirmRemoveDialog open={removing !== null} onOpenChange={(open) => { if (!open) setRemoving(null); }} title={__("Remove this story from the coverage?", "weekly-wildcat-headless")} description={removing ? `“${removing.title}” ${__("stays in Byline; it just leaves this coverage.", "weekly-wildcat-headless")}` : ""} confirmLabel={__("Remove", "weekly-wildcat-headless")} onConfirm={() => { const story = removing; if (story) run.mutate(() => fetchers.removeStoryFromCoverage!(item.id, story.id).then(() => { toast.success(__("Story removed from coverage.", "weekly-wildcat-headless")); })); }} />
+
   </Card>;
 }
 

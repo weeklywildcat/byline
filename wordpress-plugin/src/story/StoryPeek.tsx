@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, ExternalLink, LayoutDashboard, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, Copy, ExternalLink, LayoutDashboard, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { EditorialTask, ContributorEntry } from "../editorial/editorial-model";
 import { describeEditorialError } from "../editorial/editorial-model";
@@ -12,6 +12,7 @@ import { ResourceIcon } from "../admin-ui/components/resource-icon";
 import { WorkStatusBadge, mediaIntensity } from "../admin-ui/components/work-status-badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Field, FieldContent, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
@@ -20,7 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Spinner } from "../admin-ui/ui/spinner";
 import { Separator } from "../admin-ui/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "../admin-ui/ui/sheet";
-import { ConfirmRemoveDialog } from "../workspace/dialog-shell";
 import { workingDraft } from "../workspace/resource-model";
 import { appointmentLine } from "../workspace/schedule-model";
 import { assigneeAvatars, sectionNames } from "../workspace/workspace-model";
@@ -90,25 +90,34 @@ function LinkForm({ resource, pending, onSubmit, onCancel }: { resource: StoryRe
 
 /** One external link: an Item that is an anchor, with Edit and Remove in a menu for people who may manage links. */
 function LinkRow({ link, canManage, disabled, onEdit, onRemove }: { link: StoryResource; canManage: boolean; disabled: boolean; onEdit: () => void; onRemove: () => void }) {
-  const [confirming, setConfirming] = useState(false);
   let trigger: HTMLElement | null = null;
-  return <div className="flex items-center gap-1">
-    <Item size="sm" className="min-w-0 flex-1" render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}>
-      <ItemMedia variant="icon" className="text-muted-foreground"><ResourceIcon resource={link} /></ItemMedia>
-      <ItemContent><ItemTitle>{link.label}</ItemTitle><ItemDescription>{link.kind}{link.purpose && link.purpose !== "other" ? ` · ${resourcePurposeLabels[link.purpose] || ""}` : ""}</ItemDescription></ItemContent>
-      <ItemActions><ExternalLink className="size-4 text-muted-foreground" aria-hidden="true" /></ItemActions>
-    </Item>
-    {canManage ? <>
-      <DropdownMenu>
+  return <ContextMenu>
+    <ContextMenuTrigger render={<div className="flex items-center gap-1" />}>
+      <Item size="sm" className="min-w-0 flex-1" render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}>
+        <ItemMedia variant="icon" className="text-muted-foreground"><ResourceIcon resource={link} /></ItemMedia>
+        <ItemContent><ItemTitle>{link.label}</ItemTitle><ItemDescription>{link.kind}{link.purpose && link.purpose !== "other" ? ` · ${resourcePurposeLabels[link.purpose] || ""}` : ""}</ItemDescription></ItemContent>
+        <ItemActions><ExternalLink className="size-4 text-muted-foreground" aria-hidden="true" /></ItemActions>
+      </Item>
+      {canManage ? <DropdownMenu>
         <DropdownMenuTrigger render={<Button ref={(element: HTMLButtonElement | null) => { trigger = element; }} variant="ghost" size="icon-sm" aria-label={`Actions for ${link.label}`} disabled={disabled} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-36">
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</DropdownMenuItem>
           <DropdownMenuItem onClick={onEdit}><Pencil aria-hidden="true" />Edit link</DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={() => setConfirming(true)}><Trash2 aria-hidden="true" />Remove link</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</DropdownMenuItem>
         </DropdownMenuContent>
-      </DropdownMenu>
-      <ConfirmRemoveDialog open={confirming} onOpenChange={setConfirming} finalFocus={() => trigger} title="Remove this link?" description={`“${link.label}” is removed from the story. The document itself isn't touched.`} confirmLabel="Remove" onConfirm={onRemove} />
-    </> : null}
-  </div>;
+      </DropdownMenu> : null}
+    </ContextMenuTrigger>
+    <ContextMenuContent className="w-48">
+      <ContextMenuLabel className="max-w-44 truncate">{link.label}</ContextMenuLabel>
+      <ContextMenuSeparator />
+      <ContextMenuItem render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
+      <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem>
+      {canManage ? <>
+        <ContextMenuItem disabled={disabled} onClick={onEdit}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
+        <ContextMenuItem variant="destructive" disabled={disabled} onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
+      </> : null}
+    </ContextMenuContent>
+  </ContextMenu>;
 }
 
 export type StoryPeekContentProps = {
@@ -252,7 +261,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
       client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (old) => old ? { ...old, resources: "remove" in input ? old.resources.filter((r) => r.id !== input.remove) : input.id ? old.resources : [...old.resources, { id: "pending-link", label: input.label, url: input.url, purpose: input.purpose || "other", kind: "Saving…" }] } : old);
       return previous;
     },
-    onSuccess: (result) => { client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (old) => old ? { ...old, resources: result.resources } : old); setLinkForm(false); },
+    onSuccess: (result, input, previous) => { client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (old) => old ? { ...old, resources: result.resources } : old); setLinkForm(false); if ("remove" in input) { const removed = previous?.find((resource) => resource.id === input.remove); if (removed) toast.success("Link removed.", { action: { label: "Undo", onClick: () => { void fetchers.workspace!.addResource(storyId!, { label: removed.label, url: removed.url, purpose: removed.purpose }).then((restored) => client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (old) => old ? { ...old, resources: restored.resources } : old)).then(() => refresh()).catch(() => toast.error("The link couldn’t be restored.")); } } }); } },
     onError: (error, _input, previous) => { client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (old) => old ? { ...old, resources: previous || [] } : old); setLinkError(describeEditorialError(error, "The link couldn't be saved. Try again.")); toast.error("Link couldn't be saved."); },
     onSettled: () => { void refresh(); }
   });

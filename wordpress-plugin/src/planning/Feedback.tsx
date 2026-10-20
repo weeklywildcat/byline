@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { MessageSquareText } from "lucide-react";
+import { Eye, FilePlus2, MessageSquareText } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { decodeEntities } from "../admin-ui/lib/text";
 import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Button } from "../admin-ui/ui/button";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
 import { Spinner } from "../admin-ui/ui/spinner";
@@ -29,8 +30,22 @@ function FeedbackRow({ item, fetchers, onOpenStory }: { item: FeedbackItem; fetc
   const refresh = () => client.invalidateQueries({ queryKey: feedbackKey });
   const status = useMutation({
     mutationFn: (next: FeedbackStatus) => fetchers.updateFeedback!(item.id, next),
-    onSuccess: () => { toast.success(__("Feedback status updated.", "weekly-wildcat-headless")); },
-    onError: (error) => toast.error(describeEditorialError(error, __("Feedback status could not be updated.", "weekly-wildcat-headless"))),
+    onMutate: async (next) => {
+      await client.cancelQueries({ queryKey: feedbackKey });
+      const previous = client.getQueryData<FeedbackResponse>(feedbackKey);
+      client.setQueryData<FeedbackResponse>(feedbackKey, (current) => current ? { ...current, feedback: current.feedback.map((entry) => entry.id === item.id ? { ...entry, status: next } : entry) } : current);
+      return { previous, previousStatus: item.status };
+    },
+    onSuccess: (_result, next, context) => {
+      const label = STATUSES.find((candidate) => candidate.value === next)?.label || next;
+      toast.success(`${__("Feedback marked", "weekly-wildcat-headless")} ${label}.`, {
+        action: context?.previousStatus && context.previousStatus !== next && fetchers.updateFeedback ? { label: __("Undo", "weekly-wildcat-headless"), onClick: () => { void fetchers.updateFeedback!(item.id, context.previousStatus).then(() => refresh()); } } : undefined
+      });
+    },
+    onError: (error, _next, context) => {
+      if (context?.previous) client.setQueryData(feedbackKey, context.previous);
+      toast.error(describeEditorialError(error, __("Feedback status could not be updated.", "weekly-wildcat-headless")));
+    },
     onSettled: refresh
   });
   const correction = useMutation({
@@ -45,7 +60,9 @@ function FeedbackRow({ item, fetchers, onOpenStory }: { item: FeedbackItem; fetc
     ? <>{item.name || __("Reader", "weekly-wildcat-headless")}{item.email ? <> · <a className="underline-offset-2 hover:underline" href={`mailto:${item.email}`}>{item.email}</a></> : null}</>
     : __("Anonymous reader", "weekly-wildcat-headless");
 
-  return <Item size="sm" className="rounded-none border-0 border-b px-3 py-3.5 last:border-b-0" aria-busy={busy || undefined}>
+  return <ContextMenu>
+    <ContextMenuTrigger render={<Item size="sm" className="rounded-none border-0 border-b px-3 py-3.5 last:border-b-0" aria-busy={busy || undefined} />}>
+
     <ItemMedia variant="icon" className="text-muted-foreground"><MessageSquareText aria-hidden="true" /></ItemMedia>
     <ItemContent className="min-w-0 gap-1.5">
       <ItemTitle className="line-clamp-none capitalize">{item.type}<StatusBadge tone={item.status === "new" ? "attention" : item.status === "closed" ? "done" : "neutral"}>{statusLabel}</StatusBadge></ItemTitle>
@@ -68,7 +85,26 @@ function FeedbackRow({ item, fetchers, onOpenStory }: { item: FeedbackItem; fetc
     {item.type === "correction" && item.story && fetchers.createCorrectionFromFeedback
       ? <ItemFooter className="justify-end pt-1"><Button variant="outline" size="sm" disabled={busy} onClick={() => correction.mutate()}>{correction.isPending ? <Spinner data-icon="inline-start" /> : null}{correction.isPending ? __("Creating…", "weekly-wildcat-headless") : __("Create draft correction", "weekly-wildcat-headless")}</Button></ItemFooter>
       : null}
-  </Item>;
+
+    </ContextMenuTrigger>
+    <ContextMenuContent className="w-56">
+      <ContextMenuLabel className="capitalize">{item.type}</ContextMenuLabel>
+      <ContextMenuSeparator />
+      {item.story ? <ContextMenuItem onClick={() => onOpenStory(item.story!.id)}><Eye aria-hidden="true" />{__("Quick view story", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+      {fetchers.updateFeedback ? <ContextMenuSub>
+        <ContextMenuSubTrigger disabled={busy}>{__("Status", "weekly-wildcat-headless")}</ContextMenuSubTrigger>
+        <ContextMenuSubContent className="min-w-40">
+          <ContextMenuRadioGroup value={item.status} onValueChange={(next) => { if (next && next !== item.status) status.mutate(next as FeedbackStatus); }}>
+            {STATUSES.map((candidate) => <ContextMenuRadioItem key={candidate.value} value={candidate.value}>{candidate.label}</ContextMenuRadioItem>)}
+          </ContextMenuRadioGroup>
+        </ContextMenuSubContent>
+      </ContextMenuSub> : null}
+      {item.type === "correction" && item.story && fetchers.createCorrectionFromFeedback ? <>
+        <ContextMenuSeparator />
+        <ContextMenuItem disabled={busy} onClick={() => correction.mutate()}><FilePlus2 aria-hidden="true" />{__("Create draft correction", "weekly-wildcat-headless")}</ContextMenuItem>
+      </> : null}
+    </ContextMenuContent>
+  </ContextMenu>;
 }
 
 export function Feedback({ fetchers, onOpenStory }: { fetchers: PlanningFetchers; onOpenStory: (storyId: number) => void }) {

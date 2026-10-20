@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCheck, Image as ImageIcon, ImagePlus, LayoutDashboard, MoreHorizontal, Paperclip, Search, Star, X } from "lucide-react";
+import { CheckCheck, Eye, Image as ImageIcon, ImagePlus, LayoutDashboard, MoreHorizontal, Paperclip, Search, Star, X } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
@@ -15,6 +15,7 @@ import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, Att
 import { Badge } from "../admin-ui/ui/badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Input } from "../admin-ui/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../admin-ui/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
@@ -82,6 +83,33 @@ function RowMenu({ row, editable, saving, workspaceUrl, update }: { row: MediaDe
   </DropdownMenu>;
 }
 
+function MediaRowContext({ row, editable, saving, workspaceUrl, onOpenStory, update, children }: { row: MediaDeskRow; editable: boolean; saving: boolean; workspaceUrl: MediaDeskProps["workspaceUrl"]; onOpenStory: MediaDeskProps["onOpenStory"]; update: Update; children: ReactElement }) {
+  const title = row.title || mediaTypeLabel(row.type);
+  return <ContextMenu>
+    <ContextMenuTrigger render={children} />
+    <ContextMenuContent className="w-56">
+      <ContextMenuLabel className="max-w-52 truncate">{title}</ContextMenuLabel>
+      <ContextMenuSeparator />
+      <ContextMenuGroup>
+        <ContextMenuItem onClick={() => onOpenStory(row.story.id)}><Eye aria-hidden="true" />{__("Quick view story", "weekly-wildcat-headless")}</ContextMenuItem>
+        <ContextMenuItem render={<a href={workspaceUrl(row.story.id)} />}><LayoutDashboard aria-hidden="true" />{__("Open story workspace", "weekly-wildcat-headless")}</ContextMenuItem>
+      </ContextMenuGroup>
+      {editable ? <>
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger disabled={saving}>{__("Status", "weekly-wildcat-headless")}</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-44">
+            <ContextMenuRadioGroup value={row.status} onValueChange={(value) => { if (value && value !== row.status) update(row, { status: String(value) }); }}>
+              {MEDIA_STATUS_OPTIONS.map((item) => <ContextMenuRadioItem key={item.value} value={item.value}>{item.label}</ContextMenuRadioItem>)}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        {row.status !== "done" ? <ContextMenuItem disabled={saving} onClick={() => update(row, { status: "done" })}><CheckCheck aria-hidden="true" />{__("Mark complete", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+      </> : null}
+    </ContextMenuContent>
+  </ContextMenu>;
+}
+
 function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory }: MediaDeskProps & { data: MediaDeskResponse }) {
   const client = useQueryClient();
   const [filters, setFilters] = useState<MediaDeskFilters>(EMPTY_MEDIA_DESK_FILTERS);
@@ -105,7 +133,36 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory }: MediaDe
       if (fetchers.updateMediaRequest) return fetchers.updateMediaRequest(row.story.id, changes);
       throw new Error(__("The protected media update API is not available in this install.", "weekly-wildcat-headless"));
     },
-    onError: (error) => toast.error(describeMediaDeskError(error)),
+    onMutate: async ({ row, changes }) => {
+      await client.cancelQueries({ queryKey: mediaDeskKey });
+      const previous = client.getQueryData<MediaDeskResponse>(mediaDeskKey);
+      const patch = <T extends { status: string; assignee: MediaDeskRow["assignee"]; dueAt: string | null; attachmentIds: number[]; featuredAttachmentId?: number | null }>(item: T): T => {
+        const assignee = Object.prototype.hasOwnProperty.call(changes, "assigneeId")
+          ? assignees.find((person) => person.id === Number(changes.assigneeId)) || null
+          : item.assignee;
+        return {
+          ...item,
+          ...(Object.prototype.hasOwnProperty.call(changes, "status") ? { status: String(changes.status) } : {}),
+          ...(Object.prototype.hasOwnProperty.call(changes, "dueAt") ? { dueAt: changes.dueAt ? String(changes.dueAt) : null } : {}),
+          ...(Object.prototype.hasOwnProperty.call(changes, "attachmentIds") ? { attachmentIds: Array.isArray(changes.attachmentIds) ? changes.attachmentIds.map(Number) : item.attachmentIds } : {}),
+          ...(Object.prototype.hasOwnProperty.call(changes, "featuredAttachmentId") ? { featuredAttachmentId: Number(changes.featuredAttachmentId) || null } : {}),
+          assignee
+        } as T;
+      };
+      client.setQueryData<MediaDeskResponse>(mediaDeskKey, (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          requests: current.requests.map((item) => row.source === "request" && item.story.id === row.story.id ? patch(item) : item),
+          assignments: current.assignments?.map((item) => row.source === "assignment" && item.story.id === row.story.id && item.id === row.id ? patch(item) : item)
+        };
+      });
+      return { previous };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previous) client.setQueryData(mediaDeskKey, context.previous);
+      toast.error(describeMediaDeskError(error));
+    },
     onSettled: (_data, _error, variables) => { void client.invalidateQueries({ queryKey: mediaDeskKey }); void invalidateStoryData(client, variables?.row.story.id); }
   });
   const savingKey = mutation.isPending && mutation.variables ? rowKey(mutation.variables.row) : null;
@@ -163,29 +220,33 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory }: MediaDe
             <TableHeader className="bg-muted/20"><TableRow className="hover:bg-transparent"><TableHead>{__("Assignment", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Story", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Assignee", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Due", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Status", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Files", "weekly-wildcat-headless")}</TableHead><TableHead className="w-10"><span className="sr-only">{__("Actions", "weekly-wildcat-headless")}</span></TableHead></TableRow></TableHeader>
             <TableBody>{visible.map((row) => {
               const c = cells(row);
-              return <TableRow key={rowKey(row)} aria-busy={c.saving || undefined} className="h-16">
-                <TableCell className="py-3 whitespace-normal"><span className="font-semibold">{row.title || mediaTypeLabel(row.type)}</span><span className="block text-xs text-muted-foreground">{mediaTypeLabel(row.type)}</span></TableCell>
-                <TableCell className="py-3 whitespace-normal">{story(row)}</TableCell>
-                <TableCell className="py-3">{c.assignee}</TableCell>
-                <TableCell className="py-3">{c.due}</TableCell>
-                <TableCell className="py-3">{c.status}</TableCell>
-                <TableCell className="py-3"><MediaFiles row={row} editable={c.editable} saving={c.saving} update={update} /></TableCell>
-                <TableCell className="py-3 text-right"><RowMenu row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} update={update} /></TableCell>
-              </TableRow>;
+              return <MediaRowContext key={rowKey(row)} row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory} update={update}>
+                <TableRow aria-busy={c.saving || undefined} className="h-16">
+                  <TableCell className="py-3 whitespace-normal"><span className="font-semibold">{row.title || mediaTypeLabel(row.type)}</span><span className="block text-xs text-muted-foreground">{mediaTypeLabel(row.type)}</span></TableCell>
+                  <TableCell className="py-3 whitespace-normal">{story(row)}</TableCell>
+                  <TableCell className="py-3">{c.assignee}</TableCell>
+                  <TableCell className="py-3">{c.due}</TableCell>
+                  <TableCell className="py-3">{c.status}</TableCell>
+                  <TableCell className="py-3"><MediaFiles row={row} editable={c.editable} saving={c.saving} update={update} /></TableCell>
+                  <TableCell className="py-3 text-right"><RowMenu row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} update={update} /></TableCell>
+                </TableRow>
+              </MediaRowContext>;
             })}</TableBody>
           </Table>
           : <ItemGroup className="gap-0" aria-label={__("Production assignments", "weekly-wildcat-headless")}>{visible.map((row) => {
             const c = cells(row);
-            return <Item key={rowKey(row)} size="sm" className="rounded-none border-b last:border-b-0" aria-busy={c.saving || undefined}>
-              <ItemMedia variant="icon" aria-hidden="true"><ImageIcon /></ItemMedia>
-              <ItemContent>
-                <ItemTitle>{row.title || mediaTypeLabel(row.type)}</ItemTitle>
-                <div className="text-sm text-muted-foreground">{story(row)} · {mediaTypeLabel(row.type)}</div>
-                <div className="flex flex-wrap items-center gap-x-3 text-sm">{c.assignee}{c.due}</div>
-                <MediaFiles row={row} editable={c.editable} saving={c.saving} update={update} />
-              </ItemContent>
-              <ItemActions>{c.status}<RowMenu row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} update={update} /></ItemActions>
-            </Item>;
+            return <MediaRowContext key={rowKey(row)} row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory} update={update}>
+              <Item size="sm" className="rounded-none border-b last:border-b-0" aria-busy={c.saving || undefined}>
+                <ItemMedia variant="icon" aria-hidden="true"><ImageIcon /></ItemMedia>
+                <ItemContent>
+                  <ItemTitle>{row.title || mediaTypeLabel(row.type)}</ItemTitle>
+                  <div className="text-sm text-muted-foreground">{story(row)} · {mediaTypeLabel(row.type)}</div>
+                  <div className="flex flex-wrap items-center gap-x-3 text-sm">{c.assignee}{c.due}</div>
+                  <MediaFiles row={row} editable={c.editable} saving={c.saving} update={update} />
+                </ItemContent>
+                <ItemActions>{c.status}<RowMenu row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} update={update} /></ItemActions>
+              </Item>
+            </MediaRowContext>;
           })}</ItemGroup>}
       </div>}
   </div>;
