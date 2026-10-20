@@ -14,6 +14,7 @@ if (!defined('ABSPATH')) {
 
 require_once __DIR__ . '/includes/core/compatibility.php';
 require_once __DIR__ . '/includes/core/protocol.php';
+require_once __DIR__ . '/includes/author/social-links.php';
 require_once __DIR__ . '/includes/core/capabilities.php';
 require_once __DIR__ . '/includes/publication/config.php';
 require_once __DIR__ . '/includes/design/post-type.php';
@@ -2096,6 +2097,22 @@ function wwh_render_author_profile_fields(WP_User $user): void
     $photo_id = absint(get_user_meta($user->ID, '_ww_author_photo_id', true));
     $photo = wwh_author_profile_photo($photo_id);
     $social_fields = wwh_author_social_fields();
+    $social_placeholders = [
+        'website' => 'https://example.com',
+        'email' => 'name@example.com',
+        'instagram' => '@username',
+        'tiktok' => '@username',
+        'linkedin' => 'https://www.linkedin.com/in/username',
+        'x' => '@username',
+    ];
+    $social_help = [
+        'website' => 'Paste your website URL.',
+        'email' => 'Public contact email, shown on your author page.',
+        'instagram' => 'Enter @username or paste a profile URL.',
+        'tiktok' => 'Enter @username or paste a profile URL.',
+        'linkedin' => 'Paste your LinkedIn profile URL.',
+        'x' => 'Enter @username or paste a profile URL.',
+    ];
     $has_social_links = false;
 
     foreach (array_keys($social_fields) as $key) {
@@ -2161,13 +2178,15 @@ function wwh_render_author_profile_fields(WP_User $user): void
                     <div class="wwh-author-field">
                         <label for="ww_author_social_<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></label>
                         <input
-                            type="<?php echo $key === 'email' ? 'email' : 'url'; ?>"
+                            type="<?php echo $key === 'email' ? 'email' : 'text'; ?>"
                             class="regular-text"
                             id="ww_author_social_<?php echo esc_attr($key); ?>"
                             name="ww_author_social_<?php echo esc_attr($key); ?>"
                             value="<?php echo esc_attr(wwh_author_meta_value($user->ID, '_ww_author_social_' . $key)); ?>"
-                            placeholder="<?php echo esc_attr($key === 'email' ? 'name@example.com' : 'https://'); ?>"
+                            placeholder="<?php echo esc_attr($social_placeholders[$key]); ?>"
+                            aria-describedby="ww_author_social_help_<?php echo esc_attr($key); ?>"
                         >
+                        <p class="description wwh-author-social-help" id="ww_author_social_help_<?php echo esc_attr($key); ?>"><?php echo esc_html($social_help[$key]); ?></p>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -2194,7 +2213,9 @@ function wwh_save_author_profile_fields(int $user_id): void
 
     foreach (wwh_author_social_fields() as $key => $_label) {
         $field = 'ww_author_social_' . $key;
-        $value = $key === 'email' ? sanitize_email(wwh_request_value($field)) : esc_url_raw(wwh_request_value($field));
+        $value = $key === 'email'
+            ? sanitize_email(wwh_request_value($field))
+            : wwh_normalize_author_social_link($key, wwh_request_value($field));
         wwh_update_user_meta($user_id, '_ww_author_social_' . $key, $value);
     }
 }
@@ -2294,6 +2315,7 @@ function wwh_admin_styles(): void
         .wwh-author-socials summary { align-items: center; cursor: pointer; display: flex; font-weight: 600; gap: 8px; justify-content: space-between; padding: 14px 16px; }
         .wwh-author-socials[open] summary { border-bottom: 1px solid #dcdcde; }
         .wwh-author-social-grid { padding: 18px 16px 20px; }
+        .wwh-author-social-help { color: #646970; font-size: 12px; line-height: 1.4; margin: 6px 0 0; }
         .byline-notification-settings { margin: 32px 0 24px; max-width: 920px; }
         .byline-notification-heading { margin-bottom: 12px; }
         .byline-notification-heading h2 { margin: 0 0 4px; }
@@ -2546,7 +2568,8 @@ function wwh_rest_author_profile(array $user): array
     $socials = [];
 
     foreach (wwh_author_social_fields() as $key => $_label) {
-        $socials[$key] = wwh_author_meta_value($user_id, '_ww_author_social_' . $key);
+        $value = wwh_author_meta_value($user_id, '_ww_author_social_' . $key);
+        $socials[$key] = $key === 'email' ? sanitize_email($value) : wwh_normalize_author_social_link($key, $value);
     }
 
     return [
