@@ -43,7 +43,7 @@ test.describe("Planning destinations are one design system", () => {
     await expect(page.getByRole("dialog", { name: title, exact: true }).getByRole("link", { name: "Open workspace" })).toBeVisible();
   });
 
-  test("Coverage creates a package, adds a story to it and removes it after confirming", async ({ adminPage: page, adminSession: session }) => {
+  test("Coverage creates a package, links a story in one step and removes it with Undo available", async ({ adminPage: page, adminSession: session }) => {
     const unique = token();
     const me = await currentUserId(session);
     const title = `${unique} Coverage story`;
@@ -65,10 +65,10 @@ test.describe("Planning destinations are one design system", () => {
     });
     await card.getByRole("combobox", { name: "Add an existing story" }).fill(unique);
     await page.getByRole("option", { name: title }).click();
-    await card.getByRole("button", { name: "Add", exact: true }).click();
     await expect(card.getByRole("button", { name: title, exact: true })).toBeVisible();
     await card.getByRole("button", { name: `Remove ${title}` }).click();
-    await page.getByRole("alertdialog").getByRole("button", { name: "Remove" }).click();
     await expect(card.getByRole("button", { name: title, exact: true })).toHaveCount(0);
+    await expect(page.getByText("Story removed from coverage.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
   });
 });
