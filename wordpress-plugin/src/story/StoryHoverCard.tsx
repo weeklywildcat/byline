@@ -1,10 +1,8 @@
 import { createContext, useContext, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, CalendarClock, ListTodo } from "lucide-react";
+import { CalendarClock, ListTodo } from "lucide-react";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
-import { cn } from "../admin-ui/lib/utils";
 import { decodeEntities } from "../admin-ui/lib/text";
-import { buttonVariants } from "../admin-ui/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../admin-ui/ui/hover-card";
 import { Separator } from "../admin-ui/ui/separator";
 import { Skeleton } from "../admin-ui/ui/skeleton";
@@ -17,26 +15,20 @@ import { openTasks } from "../workspace/workspace-model";
 
 type StoryHoverSummary = Pick<PlanningStory, "id" | "title"> & Partial<Omit<PlanningStory, "id" | "title">>;
 
-type StoryHoverContextValue = {
-  fetchers: StoryFetchers;
-  onOpenStory?: (storyId: number) => void;
-  workspaceUrl?: (storyId: number) => string;
-};
+type StoryHoverContextValue = { fetchers: StoryFetchers };
 
 const StoryHoverContext = createContext<StoryHoverContextValue | null>(null);
 
-export function StoryHoverProvider({ fetchers, onOpenStory, workspaceUrl, children }: StoryHoverContextValue & { children: ReactNode }) {
-  const value = useMemo(() => ({ fetchers, onOpenStory, workspaceUrl }), [fetchers, onOpenStory, workspaceUrl]);
+export function StoryHoverProvider({ fetchers, children }: StoryHoverContextValue & { children: ReactNode }) {
+  const value = useMemo(() => ({ fetchers }), [fetchers]);
   return <StoryHoverContext value={value}>{children}</StoryHoverContext>;
 }
 
-function StoryHoverBody({ summary, loading, failed, timezone, workspaceHref, onOpenStory, note }: {
+function StoryHoverBody({ summary, loading, failed, timezone, note }: {
   summary: StoryHoverSummary;
   loading: boolean;
   failed: boolean;
   timezone: string;
-  workspaceHref?: string;
-  onOpenStory?: () => void;
   note?: string;
 }) {
   const title = decodeEntities(summary.title) || "Untitled story";
@@ -70,13 +62,8 @@ function StoryHoverBody({ summary, loading, failed, timezone, workspaceHref, onO
     {reportingLine ? <div className="flex items-start gap-1.5 text-xs text-muted-foreground"><ListTodo className="mt-0.5 size-3 shrink-0" aria-hidden="true" /><span>{reportingLine}</span></div> : null}
     {summary.visual ? <ProductionSummary story={summary as PlanningStory} className="flex-row gap-2 text-xs" empty={null} /> : null}
 
-    {failed ? <p className="text-xs text-muted-foreground">The full preview is unavailable. You can still open the story.</p> : null}
+    {failed ? <p className="text-xs text-muted-foreground">The full preview is unavailable. Open the story for details.</p> : null}
     {note ? <><Separator /><p className="whitespace-pre-line text-xs leading-relaxed text-muted-foreground">{note}</p></> : null}
-
-    {(onOpenStory || workspaceHref) ? <div className="flex items-center gap-1 border-t pt-2">
-      {onOpenStory ? <button type="button" className={cn(buttonVariants({ variant: "ghost", size: "xs" }), "-ml-2")} onClick={onOpenStory}>Open details</button> : null}
-      {workspaceHref ? <a className={buttonVariants({ variant: "ghost", size: "xs" })} href={workspaceHref}>Workspace<ArrowUpRight data-icon="inline-end" aria-hidden="true" /></a> : null}
-    </div> : null}
   </div>;
 }
 
@@ -104,16 +91,10 @@ export function StoryHoverCard({ storyId, title, story, note, children }: {
     ? { ...resolved, openTaskCount: openTasks(workspace.tasks).length, reporting: workspace.reporting || resolved.reporting, mediaSummary: workspace.story.mediaSummary || resolved.mediaSummary }
     : resolved;
   const timezone = workspace?.timezone || "UTC";
-  const workspaceHref = workspace?.workspaceUrl || context.workspaceUrl?.(storyId);
-  const openDetails = context.onOpenStory ? () => {
-    setOpen(false);
-    context.onOpenStory!(storyId);
-  } : undefined;
-
   return <HoverCard open={open} onOpenChange={setOpen}>
     <HoverCardTrigger delay={260} closeDelay={140} render={children} />
     <HoverCardContent className="w-[22rem] max-w-[calc(100vw-1rem)]">
-      <StoryHoverBody summary={enriched} loading={preview.isPending && !workspace} failed={preview.isError} timezone={timezone} workspaceHref={workspaceHref} onOpenStory={openDetails} note={note} />
+      <StoryHoverBody summary={enriched} loading={preview.isPending && !workspace} failed={preview.isError} timezone={timezone} note={note} />
     </HoverCardContent>
   </HoverCard>;
 }
