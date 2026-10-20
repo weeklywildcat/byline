@@ -1,18 +1,26 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { __ } from "@wordpress/i18n";
 import { Button } from "../admin-ui/ui/button";
+import { NewsroomSearchButton } from "../story/NewsroomCommands";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { RowSkeletons } from "../story/rows";
 import type { OptionalQuery } from "./planning-query";
 
+const PlanningSearchContext = createContext<(() => void) | null>(null);
+
+export function PlanningSearchProvider({ onSearch, children }: { onSearch: () => void; children: ReactNode }) {
+  return <PlanningSearchContext value={onSearch}>{children}</PlanningSearchContext>;
+}
+
 /** The compact header every Planning destination shares with Home and the Story Workspace. */
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
+  const onSearch = useContext(PlanningSearchContext);
   return <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
     <div>
       <h1 className="font-heading text-2xl font-semibold tracking-tight">{title}</h1>
       {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
     </div>
-    {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+    {actions || onSearch ? <div className="flex flex-wrap items-center gap-2">{onSearch ? <NewsroomSearchButton compact onClick={onSearch} /> : null}{actions}</div> : null}
   </header>;
 }
 
