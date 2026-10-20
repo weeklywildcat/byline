@@ -1,1 +1,75 @@
-@import "../../../../packages/ui/src/newsroom-blocks.css";
+/* Editor-only chrome for this block. Its public presentation lives in
+   packages/ui/src/newsroom/visualization.css and loads once through the shared newsroom stylesheet;
+   the canvas uses those same classes, so the figure here is the figure readers get. */
+
+/* Fields typed where they print (title, dek, attribution lines). */
+.byline-viz-field {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: inherit;
+  display: block;
+  font: inherit;
+  letter-spacing: inherit;
+  margin: 0;
+  padding: 0;
+  resize: none;
+  width: 100%;
+}
+.byline-viz-field:focus { box-shadow: none; outline: 1px dashed var(--story-soft, #737373); outline-offset: 3px; }
+.byline-visualization figcaption .byline-viz-line { align-items: baseline; display: flex; gap: .3em; }
+.byline-viz-line > span { flex: none; }
+
+/* Empty state: two plain choices. */
+.byline-viz-choice .components-placeholder__fieldset { align-items: stretch; flex-direction: row; flex-wrap: wrap; gap: 12px; }
+.byline-viz-choice .components-button {
+  align-items: flex-start;
+  flex: 1 1 240px;
+  flex-direction: column;
+  gap: 6px;
+  height: auto;
+  justify-content: flex-start;
+  padding: 16px;
+  text-align: left;
+  white-space: normal;
+}
+.byline-viz-choice .components-button span { font-weight: 400; line-height: 1.4; }
+
+/* Setup: what the block needs, below the figure it configures. */
+.byline-viz-setup {
+  border-block-start: 1px solid var(--rule, #e2e2e2);
+  display: grid;
+  font-family: var(--story-sans, system-ui, sans-serif);
+  font-size: 13px;
+  gap: 24px;
+  margin-block-start: 28px;
+  padding-block-start: 20px;
+}
+.byline-viz-setup .byline-kicker { margin: 0 0 4px; }
+.byline-viz-help { color: var(--story-muted, #545454); line-height: 1.45; margin: 6px 0 0; }
+.byline-viz-recognised { align-items: center; display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 8px 0 0; }
+.byline-viz-provider { align-items: center; display: inline-flex; font-weight: 700; gap: 6px; }
+.byline-viz-provider > span { background: var(--ink, #121212); color: var(--page, #fff); display: grid; font-size: 11px; height: 18px; place-items: center; width: 18px; }
+.byline-viz-address .components-notice { margin: 8px 0 0; }
+.byline-viz-accepted { margin-top: 10px; }
+.byline-viz-accepted summary { cursor: pointer; min-height: 32px; }
+.byline-viz-accepted ul { display: grid; gap: 12px; list-style: none; margin: 8px 0 0; padding: 0; }
+.byline-viz-accepted code { background: transparent; display: block; font-size: 12px; overflow-wrap: anywhere; padding: 2px 0 0; }
+.byline-viz-fallback .components-placeholder { margin-top: 10px; min-height: 0; }
+.byline-viz-fallback .components-notice { margin: 8px 0 0; }
+
+/* Height: four frames drawn to scale. */
+.byline-viz-heights { border: 0; margin: 0; padding: 0; }
+.byline-viz-heights legend { color: var(--story-muted, #545454); font-size: .72rem; font-weight: 700; letter-spacing: .08em; padding: 0; text-transform: uppercase; }
+.byline-viz-heights > div { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-top: 8px; }
+.byline-viz-heights label { align-content: end; border: 1px solid var(--rule, #e2e2e2); cursor: pointer; display: grid; gap: 2px; padding: 12px; position: relative; }
+.byline-viz-heights label.is-checked { border-color: var(--ink, #121212); box-shadow: inset 0 0 0 1px var(--ink, #121212); }
+.byline-viz-heights label:has(input:focus-visible) { outline: 2px solid var(--story-accent, #73192a); outline-offset: 3px; }
+.byline-viz-heights input { appearance: none; inset: 0; margin: 0; position: absolute; }
+.byline-viz-height-glyph { background: var(--rule, #e2e2e2); border: 1px solid var(--story-soft, #737373); box-sizing: border-box; margin-bottom: 8px; width: 100%; }
+.byline-viz-heights label.is-checked .byline-viz-height-glyph { border-color: var(--ink, #121212); }
+.byline-viz-height-name { font-weight: 700; }
+.byline-viz-height-note { color: var(--story-muted, #545454); line-height: 1.35; }
+
+/* Drawn stand-in inside the frame when there is no graphic yet. */
+.byline-viz-schematic { opacity: .55; }

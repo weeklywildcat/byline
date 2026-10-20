@@ -3,13 +3,17 @@
   "name": "byline/scrolly",
   "version": "1.0.0",
   "title": "Scrollytelling",
-  "description": "A linear visual story enhanced into a sticky image stage on large screens.",
+  "description": "Photographs that stay in view while the reporting scrolls past. Build it step by step: a photograph and the words that go with it.",
   "category": "byline",
   "icon": "format-image",
   "keywords": [
     "feature",
     "immersive",
-    "scroll"
+    "scroll",
+    "scrollytelling",
+    "photo essay",
+    "sticky",
+    "visual story"
   ],
   "textdomain": "weekly-wildcat-headless",
   "attributes": {

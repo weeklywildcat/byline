@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  ArticleView,
   ArticleAthleteMeta,
   ArticleBody,
   ArticleCategory,
@@ -67,4 +68,19 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
       </HeroRevealContent>
     </main>
   );
+}
+
+/**
+ * Whether an article is shown with the Immersive opening. The author's choice
+ * only applies when the story has a featured image to open on; otherwise it is
+ * a standard story. The public routes and the private Preview as Byline both
+ * ask this, so they cannot disagree.
+ */
+export function usesImmersivePresentation(presentation: Pick<ArticleViewProps["presentation"], "storyPresentation" | "image">): boolean {
+  return presentation.storyPresentation === "immersive" && Boolean(presentation.image?.src);
+}
+
+/** The article the author chose in WordPress: Immersive, or the normal `ArticleView`. */
+export function PresentedArticleView(props: ArticleViewProps): ReactNode {
+  return usesImmersivePresentation(props.presentation) ? <ImmersiveArticleView {...props} /> : <ArticleView {...props} />;
 }

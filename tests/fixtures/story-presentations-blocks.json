@@ -265,7 +265,12 @@
   },
   {
     "name": "byline/timeline",
-    "attributes": {}
+    "attributes": {
+      "items": [
+        { "label": "Earlier", "title": "How it began", "body": "The campus plan is first proposed." },
+        { "label": "Now", "title": "What happened next", "body": "Construction begins on the new library." }
+      ]
+    }
   },
   {
     "name": "core/file",

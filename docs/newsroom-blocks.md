@@ -65,31 +65,44 @@ corrections. Post patterns cover sports recap/preview, correction, fact box,
 and quote callout. WordPress's Blank option remains available, and there is no
 newsletter block or newsletter pattern in this library.
 
-## Story presentation library
+## Story tools
 
-**Byline gives editors semantic newsroom presentation choices; it does not
-expose arbitrary CSS/layout engineering to writers.** Press `+`, search for the
-editor-facing name, and add content. Core retains its media library, alt text,
-captions, crop/focal point, file controls, and video text tracks. These are
-ordinary Gutenberg blocks; there is no second article format or layout builder.
+**Byline gives editors semantic newsroom tools; it does not expose arbitrary
+CSS/layout engineering to writers.** Press `+`, search for the tool by what you
+want to do ("timeline", "compare", "context", "map") and add content. Core keeps
+its media library, alt text, captions, crop/focal point, file controls and video
+text tracks. Tools are ordinary Gutenberg blocks, block styles or variations;
+there is no second article format or layout builder. The visual language every
+tool shares is in [`editorial-design-system.md`](editorial-design-system.md); how
+the tools were chosen is in [`visual-storytelling-audit.md`](visual-storytelling-audit.md).
+
+The tools are organised around what a reporter is trying to do:
+
+| Task | Tools |
+| --- | --- |
+| Present photographs and video | Photo Gallery, Portrait + Text, Visual Chapter, and Core's Image (Wide / Full width in the alignment toolbar), Video and Audio |
+| Explain the reporting and the evidence | Reported Quote, Pull Quote, Key Facts, Context Box, Margin Note, Editor's Note, Expandable Section, Document Viewer, Footnotes |
+| Show data, maps and comparisons | Chart / Map, Data Table, Comparison, Three Key Numbers, Before / After, Annotated Image |
+| Build visual narratives and chronological stories | Timeline, Scrollytelling, Visual Chapter, Photo Essay (pattern) |
+| Provide supporting context and related coverage | Related Coverage, In This Story, Context Box, Margin Note |
 
 | Editor-facing name | Underlying block | Intended use | Mobile behavior |
 | --- | --- | --- | --- |
 | Portrait + Text | `core/media-text` variation/style | A contained portrait beside reporting; wide, 40% media by default | Media first, then text below 700px |
-| Photo Pair | `core/gallery` variation/style | Two photographs with individual captions; original proportions | Two columns until 540px, then one |
-| Photo Gallery | `core/gallery` variation/style | A photo feature with readable credits and larger-image links | Three columns, two below 900px, one below 540px |
+| Photo Gallery | `core/gallery` variation/style | A photo feature with readable credits and larger-image links; set 2 columns for a pair | Three columns, two below 900px, one below 540px |
 | Photo Essay (Patterns) | Wide `core/group` with Image and Paragraph blocks | An editable visual narrative; duplicate, reorder, or delete any block | Single-column narrative with prose measure preserved |
-| Reported Quote | `core/quote`, existing `byline-source-quote` style | A source quotation with smaller attribution | Compact inset |
-| Pull Quote | `core/pullquote`, existing `byline-feature-quote` style | Prominent left-aligned editorial quote between rules | Type scales down |
-| Key Facts | `core/group` with Heading and List | Verified facts, links, and sources at normal prose width | Readable single column |
-| Timeline | `byline/timeline` | Ordered chronology with display labels and inline reporting | Always vertical |
+| Reported Quote | `core/quote`, `byline-source-quote` style | A source quotation with smaller attribution | Compact inset |
+| Pull Quote | `core/pullquote`, `byline-feature-quote` style | A line lifted from the story between rules, in the headline face | Type scales down |
+| Key Facts | `core/group` with Heading and List | Verified facts, one per ruled row | Readable single column |
 | Document Viewer | `core/file` variation/style | PDF preview, direct file link, and optional download | Inline preview hidden below 540px; file link and download remain |
 | Related Coverage | Existing `byline/stories`, `related` layout | Up to three selected published stories, compact thumbnails/titles | Compact stacked list |
-| Story Audio | `core/audio` variation/style | Native controls and caption; metadata preload, no autoplay/loop | Full-width controls |
-| Story Video | `core/video` variation/style | Self-hosted video with native controls/text tracks; no autoplay | Intrinsic proportions, including portrait |
 
-Photo Pair is intended for two images; Core still permits adding/removing them.
-Photo Gallery defaults to media links.
+Wide and full-bleed photographs and video use Core's own alignment control, and
+audio and video use Core's defaults (native controls, no autoplay or loop); the
+`Story Audio`, `Story Video`, `Wide Photo`, `Full-Bleed Photo` and `Full-Bleed
+Video` presets are no longer offered in the inserter because they only set those
+defaults, and their classes still render for published stories. Photo Pair was
+folded into Photo Gallery (set Columns to 2).
 
 ### Photo Gallery media delivery
 
@@ -167,6 +180,43 @@ end-of-story Related Stories remains separate and unchanged.
 Existing News Grid, Feature Grid, source/feature quote styles, and Fact Box
 patterns retain their names and remain valid. No content migration is needed.
 
+## Staff guide to the visual tools
+
+All of these edit on the canvas: type captions, titles and explanations where they
+appear; the block toolbar holds the actions; the sidebar holds alt text and options.
+Credits are filled in from the media library, never typed into a block. A block that
+is not finished (no photograph, no text) is not published.
+
+- **Annotated Image.** Choose a photograph, then click it (or use *Add marker*) to
+  place numbered markers. Drag a marker, or focus it and use the arrow keys (Shift
+  moves 10%); `[` and `]` reorder, Delete removes, Enter jumps to its text. Select a
+  marker to type its title and explanation in the list; exact X/Y and alt text are in
+  the sidebar. Up to 12 markers. Readers get the photo with the notes beside it (below
+  on narrow screens); markers are links, so it works without script.
+- **Before / After.** Drop a photograph into each zone, then drag the divider on the
+  canvas to judge the framing. Type the left and right labels on the photo; Replace
+  Before, Replace After and Swap are in the toolbar. If the photographs are different
+  shapes, choose between cropping the right-hand one and showing both complete. Before
+  is always on the left, After on the right.
+- **Scrollytelling.** A photograph pins beside the reporting while readers scroll
+  (linear on phones and for readers who prefer less motion). The *story board* at the
+  top shows every step; Add, Duplicate, Earlier, Later and Remove arrange them (arrow
+  keys browse, Alt+arrow moves). *As the reader sees it* previews the selected step. A
+  step without a photograph keeps the previous one on the stage.
+- **Timeline.** Click into any event and type a date label, a headline and an
+  explanation; Enter moves on and, after the last explanation, adds the next event.
+  The toolbar adds, duplicates, moves and removes the event you are in; *Latest* marks
+  the most recent event. Up to 25 events; events with only a date are not published.
+- **Chart / Map.** Choose *Interactive chart or map* (paste only the address: Datawrapper,
+  Flourish, Google Maps embed or OpenStreetMap embed) or *Static graphic* (upload an
+  image). Add a fallback graphic with alt text: readers see it if the interactive version
+  cannot load, without JavaScript, and in search. The canvas shows the fallback with a
+  "Preview" badge; the editor and Preview as Byline never load the provider. Pick
+  Compact (320px), Standard (480), Tall (680) or Map (560). Write the title as the
+  takeaway and the dek as the precise measure, then source, notes and credit.
+- **Preview as Byline** shows the Standard or Immersive opening you chose. A one-off
+  layout a developer built for a single story is not previewed.
+
 ## Shared rendering and widths
 
 Astro owns a minimal compatibility layer for the Core Gutenberg markup it
@@ -242,12 +292,12 @@ Patterns are unlocked starters; they are not article formats or templates.
 | Visual Chapter | `core/cover` | Core style/variation | Chapter divider with image/video, H2 and optional dek | None | 320–520px minimum height; text can grow | Complete chapter |
 | Wide Photo / Full-Bleed Photo | `core/image` | Core variations | 1040px / 1440px photography | Ordinary media links | Contained intrinsic image | Complete image and caption |
 | Full-Bleed Video | `core/video` | Core variation | Large native video, including portrait | Native controls/tracks | Intrinsic ratio | Native playback |
-| Context / Why It Matters / What's Next / How We Know / Editor's Note | `core/group` | Core variations/styles | Background and reporting context | Ordinary links | Inline aside | Complete reporting |
+| Context Box / Editor's Note / Source Highlight | `core/group` | Core variations/styles | Background, transparency and evidence: a rule and a label, no box. Rename a Context Box's heading to Context, Why it matters, What's next or How we know | Ordinary links | Inline aside | Complete reporting |
 | Margin Note | `core/group` | Core variation/style | Supporting context beside following prose | Ordinary links | Inline below 1100px canvas | Complete note |
-| Data Table / Comparison Table | `core/table` | Core variations/styles | Numbers, budgets, surveys, comparisons | Local horizontal scroll | Table scrolls within article | Complete semantic table |
+| Data Table | `core/table` | Core variation/style (a Comparison Table style remains for published stories) | Numbers, budgets, surveys, comparisons | Local horizontal scroll | Table scrolls within article | Complete semantic table |
 | Footnotes | `core/footnotes` and native Footnote format | Core | References, sources and backlinks | Local anchors | Long URLs wrap | Complete references/backlinks |
-| Read More / Methodology / Full Statement | `core/details` | Core variations/styles | Supporting reporting and statements | Native disclosure | One column | Native disclosure |
-| Comparison / Main + Aside / Three Key Numbers | `core/columns` | Core presets; existing Key Numbers pattern reused | Curated editable column arrangements | None | Stack at 700px | Complete DOM order |
+| Expandable Section | `core/details` | Core variation/style | Methodology, a full statement or extra reporting; rename the summary | Native disclosure | One column | Native disclosure |
+| Comparison / Three Key Numbers | `core/columns` | Core presets; existing Key Numbers pattern reused | Curated editable column arrangements (Main + Aside was retired: use a Margin Note) | None | Stack at 700px | Complete DOM order |
 | Q&A / Interview | Group, Heading, Paragraph | Pattern | Interviews | Ordinary links | One column | Complete interview |
 | What We Know / What We Don't Know; Pros / Cons | Columns, Heading, Paragraph | Patterns | Reported comparisons | None | Stack at 700px | Complete reporting |
 | Three Things to Know | Heading, List | Pattern | Short explainer | Ordinary links | One column | Complete list |

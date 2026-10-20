@@ -32,7 +32,7 @@ const BYLINE_GALLERY_MEDIA_FULL_ATTRIBUTE = 'data-byline-full-url';
 const BYLINE_GALLERY_MEDIA_PHOTO_GALLERY_CLASS = 'is-style-byline-photo-gallery';
 const BYLINE_GALLERY_MEDIA_PHOTO_PAIR_CLASS = 'is-style-byline-photo-pair';
 
-// Layout constants mirrored from packages/ui/src/newsroom-blocks.css: the wide
+// Layout constants mirrored from packages/ui/src/newsroom/story-base.css: the wide
 // measure (--article-wide-width), the gallery gap, the page gutter and the
 // column breakpoints. `sizes` is only a hint, so approximate gutters are fine.
 const BYLINE_GALLERY_MEDIA_WIDE_PX = 1040;

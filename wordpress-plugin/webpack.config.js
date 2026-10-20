@@ -56,6 +56,7 @@ const adminConfig = {
     'blocks/scrolly-step/index': path.resolve(__dirname, 'src/blocks/scrolly-step/index.tsx'),
     'blocks/timeline/index': path.resolve(__dirname, 'src/blocks/timeline/index.tsx'),
     'editor-canvas': path.resolve(__dirname, 'src/editor-canvas/index.ts'),
+    'newsroom-blocks': path.resolve(__dirname, 'src/newsroom-blocks.ts'),
     'blocks/page-section/index': path.resolve(__dirname, 'src/blocks/page-section/index.tsx'),
     'blocks/stories/index': path.resolve(__dirname, 'src/blocks/stories/index.tsx'),
     'blocks/people/index': path.resolve(__dirname, 'src/blocks/people/index.tsx'),

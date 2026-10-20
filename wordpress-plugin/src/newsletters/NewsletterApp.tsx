@@ -15,6 +15,8 @@ export type NewsletterAppProps = {
   branding: NewsletterBranding;
   initialView?: NewsletterAppView;
   initialNewsletterId?: number;
+  /** When supplied, provider configuration lives in the host's unified settings screen. */
+  settingsUrl?: string;
 };
 
 /**
@@ -22,7 +24,7 @@ export type NewsletterAppProps = {
  * assumptions, so an existing admin entrypoint can choose whether to render
  * this shell or mount the individual views in its own navigation.
  */
-export function NewsletterApp({ fetchers, branding, initialView = "list", initialNewsletterId }: NewsletterAppProps) {
+export function NewsletterApp({ fetchers, branding, initialView = "list", initialNewsletterId, settingsUrl }: NewsletterAppProps) {
   const [view, setView] = useState<NewsletterAppView>(initialView);
   const [newsletterId, setNewsletterId] = useState<number | undefined>(initialNewsletterId);
 
@@ -36,12 +38,14 @@ export function NewsletterApp({ fetchers, branding, initialView = "list", initia
     <div className="byline-newsletter-app">
       <nav className="byline-newsletter-nav" aria-label={__("Newsletter navigation", "weekly-wildcat-headless")}>
         <Button variant={view === "list" ? "primary" : "secondary"} aria-current={view === "list" ? "page" : undefined} onClick={openList}>{__("Issues", "weekly-wildcat-headless")}</Button>
-        <Button variant={view === "settings" ? "primary" : "secondary"} aria-current={view === "settings" ? "page" : undefined} onClick={() => setView("settings")}>{__("Settings", "weekly-wildcat-headless")}</Button>
+        {settingsUrl
+          ? <Button variant="secondary" href={settingsUrl}>{__("Settings", "weekly-wildcat-headless")}</Button>
+          : <Button variant={view === "settings" ? "primary" : "secondary"} aria-current={view === "settings" ? "page" : undefined} onClick={() => setView("settings")}>{__("Settings", "weekly-wildcat-headless")}</Button>}
         {view === "editor" ? <span className="byline-newsletter-nav-current" aria-current="page">{__("Editor", "weekly-wildcat-headless")}</span> : null}
       </nav>
 
       {view === "list" ? <NewsletterList fetchers={fetchers} onOpen={openEditor} onCreate={() => openEditor()} /> : null}
-      {view === "settings" ? <NewsletterSettings fetchers={fetchers} /> : null}
+      {!settingsUrl && view === "settings" ? <NewsletterSettings fetchers={fetchers} /> : null}
       {view === "editor" ? <NewsletterEditor fetchers={fetchers} newsletterId={newsletterId} branding={branding} onBack={openList} onSaved={(newsletter) => setNewsletterId(newsletter.id)} /> : null}
     </div>
   );

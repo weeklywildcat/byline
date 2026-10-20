@@ -26,7 +26,7 @@ import {
 } from "./admin-routing";
 import { createNavigationItem, moveItem, navigationConflictKey, sectionSlugForName } from "./settings-model";
 import { PlanningApp, createPlanningFetchers, createWorkspaceUrlBuilder, type PlanningView } from "./planning";
-import { NewsletterApp, createNewsletterFetchers } from "./newsletters";
+import { NewsletterApp, NewsletterSettings, createNewsletterFetchers } from "./newsletters";
 import type { NewsletterBranding } from "./newsletters/render";
 import { stripMarkupForText } from "./safe-text";
 import type { ReactNode } from "react";
@@ -55,6 +55,7 @@ type BylineAdminConfig = {
   distributionPath?: string;
   newsletterPath?: string;
   analyticsPath?: string;
+  mediaSettingsPath?: string;
   contentHealthPath?: string;
   currentUserId?: number;
   capabilities: {
@@ -330,22 +331,72 @@ function integrationTabs(): AdminTab[] {
   return tabs;
 }
 
-/**
- * Diagnostics is deliberately absent: it is the Byline Doctor destination in
- * the WordPress sidebar, not a view of Settings. Its URL is unchanged.
- */
-function settingsTabs(): AdminTab[] {
-  const labels: Record<(typeof SETTINGS_TABS)[number], string> = {
-    access: "Access",
-    api: "API",
-    compatibility: "Compatibility",
-    diagnostics: "Diagnostics"
-  };
-  return SETTINGS_TABS.filter((id) => id !== "diagnostics").map((id) => ({
-    id,
-    label: labels[id],
-    href: adminUrl(config?.urls.settings[id])
-  }));
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+type SettingsNavItem = {
+  id: SettingsTab;
+  label: string;
+  description: string;
+  capability: "manage" | "manageIntegrations";
+  feature?: string;
+};
+type SettingsNavGroup = { label: string; items: SettingsNavItem[] };
+
+const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
+  {
+    label: "Publication",
+    items: [
+      { id: "identity", label: "Publication", description: "Name, location, URLs, licensing, and search defaults.", capability: "manage" },
+      { id: "branding", label: "Branding", description: "Masthead, logos, social image, and app icons.", capability: "manage" },
+      { id: "navigation", label: "Navigation", description: "Sections and the links readers see around the site.", capability: "manage" },
+      { id: "social", label: "Social", description: "Publication social profiles and reader-facing links.", capability: "manage" },
+      { id: "features", label: "Features", description: "Turn optional newsroom and public modules on or off.", capability: "manage" }
+    ]
+  },
+  {
+    label: "Connections",
+    items: [
+      { id: "newsletter", label: "Newsletter", description: "Connect the provider used for newsletter signup and delivery.", capability: "manageIntegrations", feature: "newsletter" },
+      { id: "analytics", label: "Analytics", description: "Connect Plausible or Cloudflare for newsroom performance data.", capability: "manageIntegrations" },
+      { id: "discord", label: "Discord", description: "Connect the newsroom bot, server, channels, and workflow sync.", capability: "manageIntegrations", feature: "discord" },
+      { id: "deployment", label: "Deployment", description: "Configure the private build hook used after content changes.", capability: "manageIntegrations" }
+    ]
+  },
+  {
+    label: "WordPress",
+    items: [
+      { id: "login", label: "Login screen", description: "Configure the Unsplash-powered WordPress login background.", capability: "manage" }
+    ]
+  },
+  {
+    label: "Advanced",
+    items: [
+      { id: "access", label: "Access", description: "See the capabilities that control Byline administration.", capability: "manage" },
+      { id: "api", label: "API", description: "Inspect Byline's versioned REST and schema contracts.", capability: "manage" },
+      { id: "compatibility", label: "Compatibility", description: "Review the legacy contracts retained for installed sites.", capability: "manage" },
+      { id: "diagnostics", label: "Diagnostics", description: "Run Byline Doctor and collect a support report.", capability: "manage" }
+    ]
+  }
+];
+
+function settingsItemAvailable(item: SettingsNavItem): boolean {
+  if (item.capability === "manage" && !config?.capabilities.manage) return false;
+  if (item.capability === "manageIntegrations" && !config?.capabilities.manageIntegrations) return false;
+  if (item.feature && !config?.features[item.feature]) return false;
+  return true;
+}
+
+function settingsNavigationGroups(): SettingsNavGroup[] {
+  return SETTINGS_NAV_GROUPS
+    .map((group) => ({ ...group, items: group.items.filter(settingsItemAvailable) }))
+    .filter((group) => group.items.length > 0);
+}
+
+function settingsItem(tab: string): SettingsNavItem | undefined {
+  return SETTINGS_NAV_GROUPS.flatMap((group) => group.items).find((item) => item.id === tab);
+}
+
+function firstAvailableSettingsTab(): SettingsTab {
+  return settingsNavigationGroups()[0]?.items[0]?.id || "identity";
 }
 
 function planningViewForTab(tab: string, requestedView = ""): PlanningView {
@@ -1392,8 +1443,7 @@ function DiscordSettings() {
 }
 
 function OperationalInfo({ route, protocol }: { route: string; protocol: ProtocolManifest | null }) {
-  const legacyUrl = config?.nativeUrls.legacySettings;
-  const content: Record<string, { title: string; body: string; legacy?: boolean }> = {
+  const content: Record<string, { title: string; body: string }> = {
     "/advanced/access": {
       title: "Capability-based access",
       body: `Manage publication: ${config?.capabilities.manage ? "allowed" : "not allowed"}; manage integrations: ${config?.capabilities.manageIntegrations ? "allowed" : "not allowed"}.`
@@ -1406,8 +1456,7 @@ function OperationalInfo({ route, protocol }: { route: string; protocol: Protoco
     },
     "/advanced/compatibility": {
       title: "Legacy compatibility",
-      body: "The installed plugin path, update source, release ZIP, CPTs, metadata, and weekly-wildcat/v1 aliases remain intact while canonical Byline contracts are adopted.",
-      legacy: true
+      body: "The installed plugin path, update source, release ZIP, CPTs, metadata, and weekly-wildcat/v1 aliases remain intact while canonical Byline contracts are adopted. Old Byline settings URLs redirect into this unified Settings workspace."
     }
   };
   const item = content[route];
@@ -1417,9 +1466,293 @@ function OperationalInfo({ route, protocol }: { route: string; protocol: Protoco
       <CardBody>
         <h2>{item.title}</h2>
         <p>{item.body}</p>
-        {item.legacy && legacyUrl ? <Button variant="secondary" href={legacyUrl}>Open compatible native settings</Button> : null}
       </CardBody>
     </Card>
+  );
+}
+
+function SettingsSectionHeader({ item }: { item?: SettingsNavItem }) {
+  if (!item) return null;
+  return (
+    <header className="byline-settings-section-header">
+      <h2>{item.label}</h2>
+      <p>{item.description}</p>
+    </header>
+  );
+}
+
+function SettingsShell({ activeTab, children }: { activeTab: SettingsTab; children: ReactNode }) {
+  const groups = settingsNavigationGroups();
+  return (
+    <div className="byline-settings-page">
+      <header className="byline-settings-page-header">
+        <p className="byline-eyebrow">Byline</p>
+        <h1>Settings</h1>
+        <p>Publication identity, connections, WordPress behavior, and advanced configuration in one place.</p>
+      </header>
+      <div className="byline-settings-layout">
+        <aside className="byline-settings-rail" aria-label="Settings sections">
+          {groups.map((group) => (
+            <section key={group.label} className="byline-settings-rail-group">
+              <h2>{group.label}</h2>
+              <nav>
+                {group.items.map((item) => (
+                  <a
+                    key={item.id}
+                    href={adminUrl(config?.urls.settings[item.id])}
+                    className={activeTab === item.id ? "is-active" : undefined}
+                    aria-current={activeTab === item.id ? "page" : undefined}
+                  >
+                    {item.label}
+                  </a>
+                ))}
+              </nav>
+            </section>
+          ))}
+        </aside>
+        <section className="byline-settings-content">
+          {children}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+type AnalyticsProviderField = {
+  id: string;
+  label: string;
+  type: string;
+  secret?: boolean;
+  configured?: boolean;
+  value?: string;
+};
+type AnalyticsProvider = {
+  id: string;
+  label: string;
+  description: string;
+  configured: boolean;
+  maskedIdentifier: string;
+  connectionStatus: string;
+  fields: AnalyticsProviderField[];
+};
+type AnalyticsSettingsPayload = {
+  provider: string;
+  configured: boolean;
+  providers: AnalyticsProvider[];
+};
+
+function analyticsValues(provider: AnalyticsProvider | undefined): Record<string, string> {
+  return Object.fromEntries((provider?.fields || []).map((field) => [field.id, field.value || ""]));
+}
+
+function AnalyticsSettings() {
+  const path = config?.analyticsPath || "/byline/v1/admin/analytics";
+  const [payload, setPayload] = useState<AnalyticsSettingsPayload | null>(null);
+  const [providerId, setProviderId] = useState("");
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [operation, setOperation] = useState<"idle" | "saving" | "testing">("idle");
+  const [message, setMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
+
+  const applyPayload = (next: AnalyticsSettingsPayload, preferredProvider?: string) => {
+    const selectedId = preferredProvider || next.provider || next.providers[0]?.id || "";
+    const selected = next.providers.find((provider) => provider.id === selectedId) || next.providers[0];
+    setPayload(next);
+    setProviderId(selected?.id || "");
+    setValues(analyticsValues(selected));
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<AnalyticsSettingsPayload>({ path })
+      .then((next) => {
+        if (!cancelled) applyPayload(next);
+      })
+      .catch((requestError) => {
+        if (!cancelled) setLoadError(safeRequestError(requestError, "Byline could not load analytics settings."));
+      });
+    return () => { cancelled = true; };
+  }, [path]);
+
+  if (!payload && !loadError) return <LoadingState label="Loading analytics settings…" />;
+
+  const selected = payload?.providers.find((provider) => provider.id === providerId);
+  const changeProvider = (nextId: string) => {
+    setProviderId(nextId);
+    setValues(analyticsValues(payload?.providers.find((provider) => provider.id === nextId)));
+    setMessage("");
+    setLoadError("");
+  };
+
+  const save = async () => {
+    if (!providerId) return;
+    setOperation("saving");
+    setMessage("");
+    setLoadError("");
+    try {
+      const next = await apiFetch<AnalyticsSettingsPayload>({
+        path,
+        method: "POST",
+        data: { provider: providerId, settings: { [providerId]: values } }
+      });
+      applyPayload(next, providerId);
+      setMessage("Analytics settings saved.");
+    } catch (requestError) {
+      setLoadError(safeRequestError(requestError, "Byline could not save analytics settings."));
+    } finally {
+      setOperation("idle");
+    }
+  };
+
+  const test = async () => {
+    if (!providerId || providerId === "none") return;
+    setOperation("testing");
+    setMessage("");
+    setLoadError("");
+    try {
+      const result = await apiFetch<{ ok: boolean; error?: string }>({
+        path: `${path}/test`,
+        method: "POST",
+        data: { provider: providerId }
+      });
+      setMessage(result.ok ? "Analytics provider connected." : (result.error || "The analytics provider could not be reached."));
+      const refreshed = await apiFetch<AnalyticsSettingsPayload>({ path });
+      applyPayload(refreshed, providerId);
+    } catch (requestError) {
+      setLoadError(safeRequestError(requestError, "The analytics connection test failed."));
+    } finally {
+      setOperation("idle");
+    }
+  };
+
+  return (
+    <>
+      <SettingsSectionHeader item={settingsItem("analytics")} />
+      {loadError ? <Notice status="error" isDismissible={false}>{loadError}</Notice> : null}
+      {message ? <Notice status={message.includes("connected") || message.includes("saved") ? "success" : "warning"} isDismissible={false}>{message}</Notice> : null}
+      <Card>
+        <CardBody className="byline-settings-card">
+          <SelectControl
+            label="Analytics provider"
+            value={providerId}
+            options={(payload?.providers || []).map((provider) => ({ label: provider.label, value: provider.id }))}
+            onChange={changeProvider}
+          />
+          {selected ? (
+            <>
+              <p className="byline-field-note">{selected.description}</p>
+              <dl className="byline-diagnostics-list">
+                <div><dt>Status</dt><dd>{selected.connectionStatus === "connected" ? "Connected" : selected.configured ? "Configured" : "Not configured"}</dd></div>
+                {selected.maskedIdentifier ? <div><dt>Account</dt><dd>{selected.maskedIdentifier}</dd></div> : null}
+              </dl>
+              {selected.fields.length ? (
+                <div className="byline-settings-grid">
+                  {selected.fields.map((field) => (
+                    <TextControl
+                      key={field.id}
+                      label={field.secret && field.configured ? `Replace ${field.label.toLowerCase()}` : field.label}
+                      type={field.secret ? "password" : "text"}
+                      value={values[field.id] || ""}
+                      autoComplete={field.secret ? "new-password" : undefined}
+                      help={field.secret && field.configured ? "Stored securely. Leave blank to keep the current value." : undefined}
+                      onChange={(value) => {
+                        setValues((current) => ({ ...current, [field.id]: value }));
+                        setMessage("");
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              <div className="byline-settings-actions">
+                <Button variant="primary" isBusy={operation === "saving"} disabled={operation !== "idle"} onClick={() => void save()}>Save analytics</Button>
+                {providerId !== "none" ? <Button variant="secondary" isBusy={operation === "testing"} disabled={operation !== "idle" || !selected.configured} onClick={() => void test()}>Test saved connection</Button> : null}
+              </div>
+            </>
+          ) : null}
+        </CardBody>
+      </Card>
+    </>
+  );
+}
+
+type MediaSettingsPayload = {
+  provider: "unsplash";
+  configured: boolean;
+  savedKeyConfigured: boolean;
+  managedExternally: boolean;
+  source: "environment" | "wordpress" | "none";
+};
+
+function LoginSettings() {
+  const path = config?.mediaSettingsPath || "/byline/v1/admin/media-settings";
+  const [payload, setPayload] = useState<MediaSettingsPayload | null>(null);
+  const [key, setKey] = useState("");
+  const [clearKey, setClearKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<MediaSettingsPayload>({ path })
+      .then((next) => { if (!cancelled) setPayload(next); })
+      .catch((requestError) => { if (!cancelled) setLoadError(safeRequestError(requestError, "Byline could not load login-screen settings.")); });
+    return () => { cancelled = true; };
+  }, [path]);
+
+  const save = async () => {
+    setSaving(true);
+    setMessage("");
+    setLoadError("");
+    try {
+      const next = await apiFetch<MediaSettingsPayload>({
+        path,
+        method: "POST",
+        data: { unsplashKey: key, clearUnsplashKey: clearKey }
+      });
+      setPayload(next);
+      setKey("");
+      setClearKey(false);
+      setMessage("Login-screen settings saved.");
+    } catch (requestError) {
+      setLoadError(safeRequestError(requestError, "Byline could not save login-screen settings."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!payload && !loadError) return <LoadingState label="Loading login-screen settings…" />;
+
+  return (
+    <>
+      <SettingsSectionHeader item={settingsItem("login")} />
+      {loadError ? <Notice status="error" isDismissible={false}>{loadError}</Notice> : null}
+      {message ? <Notice status="success" isDismissible={false}>{message}</Notice> : null}
+      <Card>
+        <CardBody className="byline-settings-card">
+          <h3>Unsplash login background</h3>
+          <p>WordPress uses this key only to load rotating landscape photos for the sign-in screen.</p>
+          {payload?.managedExternally ? (
+            <Notice status="info" isDismissible={false}>An environment variable or constant supplies the active key. Change it in the server environment.</Notice>
+          ) : (
+            <>
+              <TextControl
+                label={payload?.savedKeyConfigured ? "Replace Unsplash access key" : "Unsplash access key"}
+                type="password"
+                value={key}
+                autoComplete="new-password"
+                help={payload?.savedKeyConfigured ? "A key is saved. Leave this blank to keep it unchanged." : "Create an Unsplash access key and paste it here."}
+                onChange={(value) => { setKey(value); setMessage(""); }}
+              />
+              {payload?.savedKeyConfigured ? <ToggleControl label="Remove the saved Unsplash key" checked={clearKey} onChange={setClearKey} /> : null}
+              <div className="byline-settings-actions">
+                <Button variant="primary" isBusy={saving} disabled={saving || (!key && !clearKey)} onClick={() => void save()}>Save login settings</Button>
+              </div>
+            </>
+          )}
+        </CardBody>
+      </Card>
+    </>
   );
 }
 
@@ -1532,8 +1865,9 @@ function Screen({
       <AdminPageFrame title="Newsletters" tabs={newsletterTabs()} activeTab={activeTab} error={error}>
         <NewsletterApp
           fetchers={createNewsletterFetchers(adminProtectedRequest)}
-          initialView={activeTab === "settings" ? "settings" : "list"}
+          initialView="list"
           branding={newsletterBranding(publication)}
+          settingsUrl={adminUrl(config?.urls.settings.newsletter)}
         />
       </AdminPageFrame>
     );
@@ -1564,36 +1898,79 @@ function Screen({
   }
 
   if (page === ADMIN_PAGE_SLUGS.settings) {
-    const activeTab = normalizeAdminTab(page, tab);
+    const requestedTab = normalizeAdminTab(page, tab) as SettingsTab;
+    const activeTab = settingsItemAvailable(settingsItem(requestedTab) || SETTINGS_NAV_GROUPS[0].items[0])
+      ? requestedTab
+      : firstAvailableSettingsTab();
     const route = adminScreenRoute(page, activeTab);
-    const isDoctor = route === "/advanced/diagnostics";
+    const activeItem = settingsItem(activeTab);
+    let settingsContent: ReactNode;
+
+    if (route.startsWith("/publication/")) {
+      settingsContent = (
+        <>
+          <SettingsSectionHeader item={activeItem} />
+          <PublicationSettings route={route} publication={publication} onSaved={onPublicationSaved} />
+        </>
+      );
+    } else if (route === "/integrations/newsletter") {
+      settingsContent = (
+        <NewsletterSettings
+          fetchers={createNewsletterFetchers(adminProtectedRequest)}
+          title="Newsletter"
+        />
+      );
+    } else if (route === "/integrations/analytics") {
+      settingsContent = <AnalyticsSettings />;
+    } else if (route === "/integrations/deployment") {
+      settingsContent = (
+        <>
+          <SettingsSectionHeader item={activeItem} />
+          <DeploymentSettings />
+        </>
+      );
+    } else if (route === "/integrations/discord") {
+      settingsContent = (
+        <>
+          <SettingsSectionHeader item={activeItem} />
+          <DiscordSettings />
+        </>
+      );
+    } else if (route === "/integrations/login") {
+      settingsContent = <LoginSettings />;
+    } else if (route === "/advanced/diagnostics") {
+      settingsContent = (
+        <DoctorApp
+          fetchers={{
+            getDiagnostics: () => apiFetch<DoctorDiagnostics>({ path: config?.diagnosticsPath || "/byline/v1/admin/diagnostics" }),
+            runAction: (action: DoctorActionId) => apiFetch<DoctorActionResponse>({
+              path: config?.diagnosticsPath || "/byline/v1/admin/diagnostics",
+              method: "POST",
+              data: { action }
+            })
+          }}
+          urls={{
+            deployment: adminUrl(config?.urls.settings.deployment),
+            publication: adminUrl(config?.urls.settings.identity),
+            branding: adminUrl(config?.urls.settings.branding),
+            theme: adminUrl(config?.urls.settings.branding),
+            doctor: adminUrl(config?.urls.settings.diagnostics)
+          }}
+          canManageIntegrations={Boolean(config?.capabilities.manageIntegrations)}
+        />
+      );
+    } else {
+      settingsContent = (
+        <>
+          <SettingsSectionHeader item={activeItem} />
+          <OperationalInfo route={route} protocol={protocol} />
+        </>
+      );
+    }
+
     return (
-      <AdminPageFrame
-        title={isDoctor ? "Byline Doctor" : "Settings"}
-        tabs={isDoctor ? undefined : settingsTabs()}
-        activeTab={isDoctor ? undefined : activeTab}
-        error={error}
-      >
-        {isDoctor ? (
-          <DoctorApp
-            fetchers={{
-              getDiagnostics: () => apiFetch<DoctorDiagnostics>({ path: config?.diagnosticsPath || "/byline/v1/admin/diagnostics" }),
-              runAction: (action: DoctorActionId) => apiFetch<DoctorActionResponse>({
-                path: config?.diagnosticsPath || "/byline/v1/admin/diagnostics",
-                method: "POST",
-                data: { action }
-              })
-            }}
-            urls={{
-              deployment: adminUrl(config?.urls.integrations?.deployment),
-              publication: adminUrl(config?.urls.publication?.identity),
-              branding: adminUrl(config?.urls.publication?.branding),
-              theme: adminUrl(config?.urls.publication?.branding),
-              doctor: adminUrl(config?.urls.settings?.diagnostics)
-            }}
-            canManageIntegrations={Boolean(config?.capabilities.manageIntegrations)}
-          />
-        ) : <OperationalInfo route={route} protocol={protocol} />}
+      <AdminPageFrame title="Settings" heading={false} error={error}>
+        <SettingsShell activeTab={activeTab}>{settingsContent}</SettingsShell>
       </AdminPageFrame>
     );
   }

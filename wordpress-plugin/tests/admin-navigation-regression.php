@@ -197,17 +197,16 @@ foreach ($planning_children as $slug => $submenu) {
     }
 }
 
-// Byline configuration children.
+// Byline has one configuration destination. Home stays independent so the
+// dashboard can evolve without becoming part of the settings information architecture.
 $byline_children = $by_parent['byline'] ?? [];
 $expected_children = [
     'byline' => ['Home', BYLINE_MANAGE_CAPABILITY],
-    'byline-publication' => ['Publication', BYLINE_MANAGE_CAPABILITY],
-    'byline-integrations' => ['Integrations', BYLINE_MANAGE_INTEGRATIONS_CAPABILITY],
     'byline-settings' => ['Settings', BYLINE_MANAGE_CAPABILITY],
 ];
 foreach ($expected_children as $slug => [$title, $capability]) {
     if (!isset($byline_children[$slug])) {
-        fail("Byline should still own the {$slug} configuration screen.");
+        fail("Byline should own the {$slug} screen.");
     }
     if ($byline_children[$slug][2] !== $title) {
         fail("Byline child {$slug} should be titled {$title}, got {$byline_children[$slug][2]}.");
@@ -217,26 +216,16 @@ foreach ($expected_children as $slug => [$title, $capability]) {
     }
 }
 
-// The Byline configuration landing child is now Home.
 if ($byline_children['byline'][2] === 'Dashboard') {
     fail('The Byline Dashboard child should have been renamed to Home.');
 }
 
-// Byline Doctor keeps its name and its own entry, pointing at the unchanged
-// diagnostics URL rather than a new page slug.
-$doctor_slug = 'admin.php?page=byline-settings&tab=diagnostics';
-if (!isset($byline_children[$doctor_slug])) {
-    fail('Byline Doctor must be reachable from the Byline menu.');
-}
-if ($byline_children[$doctor_slug][2] !== 'Byline Doctor') {
-    fail('Byline Doctor must keep its name in the sidebar.');
-}
-if ($byline_children[$doctor_slug][3] !== BYLINE_MANAGE_CAPABILITY
-    || byline_admin_doctor_menu_slug() !== $doctor_slug) {
-    fail('Byline Doctor must carry the Settings capability and the canonical diagnostics URL.');
-}
-if (($byline_children[$doctor_slug][5] ?? '') !== '') {
-    fail('Byline Doctor is a deep link into Settings and must not register a second callback.');
+// Publication, Integrations, and Doctor are sections of Settings rather than
+// permanent WordPress sidebar entries.
+foreach (['byline-publication', 'byline-integrations', byline_admin_doctor_menu_slug()] as $fragmented) {
+    if (isset($byline_children[$fragmented])) {
+        fail("Byline should not expose the fragmented {$fragmented} settings destination.");
+    }
 }
 
 // Byline must no longer own workflow screens.
@@ -245,7 +234,7 @@ foreach (['byline-studio', 'byline-polls', 'byline-teams'] as $moved) {
         fail("Byline should no longer contain {$moved} after the IA refactor.");
     }
 }
-if (count($byline_children) !== count($expected_children) + 1) {
+if (count($byline_children) !== count($expected_children)) {
     fail('Byline gained an unexpected configuration child.');
 }
 
@@ -319,6 +308,10 @@ $test_capabilities = [BYLINE_MANAGE_INTEGRATIONS_CAPABILITY => true];
 if (byline_admin_menu_capability() !== BYLINE_MANAGE_INTEGRATIONS_CAPABILITY) {
     fail('An integrations manager should still reach the Byline menu.');
 }
+if (strpos(byline_admin_user_landing_url(), 'page=byline-settings') === false
+    || strpos(byline_admin_user_landing_url(), 'tab=deployment') === false) {
+    fail('An integrations manager should land inside the unified Settings screen.');
+}
 $test_capabilities = [
     BYLINE_MANAGE_CAPABILITY => true,
     BYLINE_EDIT_DESIGN_CAPABILITY => true,
@@ -335,13 +328,17 @@ $test_capabilities = [
 $urls = byline_admin_page_urls();
 if (strpos($urls['planning']['today'], 'page=byline-planning') === false
     || strpos($urls['planning']['today'], 'tab=today') === false
-    || strpos($urls['publication']['branding'], 'page=byline-publication') === false
+    || strpos($urls['publication']['branding'], 'page=byline-settings') === false
     || strpos($urls['publication']['branding'], 'tab=branding') === false
-    || strpos($urls['integrations']['deployment'], 'page=byline-integrations') === false
+    || strpos($urls['integrations']['analytics'], 'page=byline-settings') === false
+    || strpos($urls['integrations']['analytics'], 'tab=analytics') === false
+    || strpos($urls['integrations']['deployment'], 'page=byline-settings') === false
     || strpos($urls['integrations']['deployment'], 'tab=deployment') === false
+    || strpos($urls['newsletters']['settings'], 'page=byline-settings') === false
+    || strpos($urls['newsletters']['settings'], 'tab=newsletter') === false
     || strpos($urls['settings']['diagnostics'], 'page=byline-settings') === false
     || strpos($urls['settings']['diagnostics'], 'tab=diagnostics') === false) {
-    fail('Native Byline page URLs did not preserve deep-linkable tabs/views.');
+    fail('Byline configuration URLs must resolve to deep-linkable unified Settings sections.');
 }
 
 $native = byline_admin_native_urls();
@@ -355,6 +352,8 @@ $legacy_urls = byline_admin_legacy_hash_urls($urls);
 if (($legacy_urls['/home'] ?? '') !== $urls['planning']['today']
     || ($legacy_urls['/planning/today'] ?? '') !== $urls['planning']['today']
     || $legacy_urls['/publication/branding'] !== $urls['publication']['branding']
+    || $legacy_urls['/integrations/analytics'] !== $urls['integrations']['analytics']
+    || $legacy_urls['/newsletters/settings'] !== $urls['newsletters']['settings']
     || $legacy_urls['/content/polls'] !== $urls['polls']
     || $legacy_urls['/content/teams'] !== $urls['teams']
     || $legacy_urls['/advanced/diagnostics'] !== $urls['settings']['diagnostics']) {
@@ -373,11 +372,45 @@ if (!is_string($redirected_to) || strpos($redirected_to, 'post_type=page') === f
     fail('The retired byline-teams URL must redirect to native archive Pages.');
 }
 
-$_GET = ['page' => 'byline-publication'];
+$_GET = ['page' => 'byline-publication', 'tab' => 'branding'];
 $redirected_to = null;
-byline_admin_redirect_legacy_pages();
-if ($redirected_to !== null) {
-    fail('The legacy redirect must not fire on current Byline screens.');
+try {
+    byline_admin_redirect_legacy_pages();
+} catch (RuntimeException $exception) {
+    // wp_safe_redirect throws in this harness.
+}
+if (!is_string($redirected_to) || strpos($redirected_to, 'page=byline-settings') === false || strpos($redirected_to, 'tab=branding') === false) {
+    fail('The former Publication screen must redirect into unified Settings.');
+}
+
+$_GET = ['page' => 'byline-integrations', 'tab' => 'deployment'];
+$redirected_to = null;
+try {
+    byline_admin_redirect_legacy_pages();
+} catch (RuntimeException $exception) {
+}
+if (!is_string($redirected_to) || strpos($redirected_to, 'page=byline-settings') === false || strpos($redirected_to, 'tab=deployment') === false) {
+    fail('The former Integrations screen must redirect into unified Settings.');
+}
+
+$_GET = ['page' => 'byline-newsletters', 'tab' => 'settings'];
+$redirected_to = null;
+try {
+    byline_admin_redirect_legacy_pages();
+} catch (RuntimeException $exception) {
+}
+if (!is_string($redirected_to) || strpos($redirected_to, 'tab=newsletter') === false) {
+    fail('Newsletter provider settings must redirect into unified Settings.');
+}
+
+$_GET = ['page' => 'wwh-settings'];
+$redirected_to = null;
+try {
+    byline_admin_redirect_legacy_pages();
+} catch (RuntimeException $exception) {
+}
+if (!is_string($redirected_to) || strpos($redirected_to, 'tab=login') === false) {
+    fail('The retired native Byline settings page must redirect to Login screen settings.');
 }
 
 // ---------------------------------------------------------------------------
@@ -414,8 +447,9 @@ foreach ([
     }
 }
 
-// Byline configuration screens highlight Byline plus their own child.
-foreach (['byline', 'byline-publication', 'byline-integrations', 'byline-settings'] as $config_page) {
+// Home and every settings section keep the Byline menu open. Settings has a
+// single WordPress submenu entry; its local rail owns section navigation.
+foreach (['byline', 'byline-settings'] as $config_page) {
     $_GET = ['page' => $config_page];
     $test_screen = (object) ['id' => 'byline_page_' . $config_page, 'post_type' => null];
     if (byline_admin_parent_file('') !== 'byline' || byline_admin_submenu_file('') !== $config_page) {
@@ -423,20 +457,10 @@ foreach (['byline', 'byline-publication', 'byline-integrations', 'byline-setting
     }
 }
 
-$_GET = ['page' => 'byline-integrations', 'tab' => 'discord'];
-if (byline_admin_parent_file('') !== 'byline' || byline_admin_submenu_file('') !== 'byline-integrations') {
-    fail('Byline > Integrations > Discord must highlight the Integrations child.');
-}
-
-// Diagnostics is Byline Doctor's own entry, not a view of Settings.
-$_GET = ['page' => 'byline-settings', 'tab' => 'diagnostics'];
-if (byline_admin_parent_file('') !== 'byline' || byline_admin_submenu_file('') !== $doctor_slug) {
-    fail('The diagnostics URL must highlight Byline Doctor.');
-}
-foreach (['access', 'api', 'compatibility', ''] as $settings_tab) {
+foreach (['identity', 'branding', 'newsletter', 'analytics', 'discord', 'deployment', 'login', 'access', 'api', 'compatibility', 'diagnostics', ''] as $settings_tab) {
     $_GET = $settings_tab === '' ? ['page' => 'byline-settings'] : ['page' => 'byline-settings', 'tab' => $settings_tab];
-    if (byline_admin_submenu_file('') !== 'byline-settings') {
-        fail('Settings tabs other than diagnostics must keep highlighting Settings.');
+    if (byline_admin_parent_file('') !== 'byline' || byline_admin_submenu_file('') !== 'byline-settings') {
+        fail("Unified Settings tab {$settings_tab} must highlight the single Settings child.");
     }
 }
 
@@ -534,7 +558,7 @@ if (!$polls_rejected) {
 }
 $test_features = ['polls' => true, 'sports' => true, 'events' => true, 'discord' => true];
 
-$_GET = ['page' => 'byline-publication'];
+$_GET = ['page' => 'byline-settings', 'tab' => 'branding'];
 $test_capabilities = [BYLINE_MANAGE_CAPABILITY => true];
 ob_start();
 byline_render_admin_app();
@@ -563,7 +587,14 @@ if (strpos($index_source, 'byline-admin-sidebar') !== false
     || strpos($index_source, 'hashchange') !== false
     || strpos($style_source, 'byline-admin-sidebar') !== false
     || strpos($style_source, 'byline-admin-nav') !== false) {
-    fail('The duplicate Byline sidebar/hash shell regressed.');
+    fail('The duplicate global Byline sidebar/hash shell regressed.');
+}
+if (strpos($index_source, 'byline-settings-rail') === false) {
+    fail('The unified Settings screen must own a local settings rail.');
+}
+if (strpos($game_source, "add_options_page(\n        'Byline Legacy Integration Settings'") !== false
+    || strpos($game_source, "'Byline Legacy Settings'") !== false) {
+    fail('The legacy WordPress Settings menu entry must stay retired.');
 }
 
 // The custom global header that repeated the sidebar as HOME/WORK/DESK/

@@ -82,6 +82,7 @@ build_assets=(
   build/editor-canvas.js
   build/editor-canvas.asset.php
   build/editor-canvas.css
+  build/newsroom-blocks.css
   # Metadata, editor script, and shared block CSS are all runtime assets.
   build/blocks/page-section/block.json
   build/blocks/page-section/index.js
@@ -246,6 +247,8 @@ grep -qx 'weekly-wildcat-headless/build/blocks/page-section/index.js' <<<"$archi
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/index.asset.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/render.php' <<<"$archive_files"
 grep -qx 'weekly-wildcat-headless/build/blocks/page-section/style-index.css' <<<"$archive_files"
+# The one shared newsroom stylesheet every story, page and editor screen loads.
+grep -qx 'weekly-wildcat-headless/build/newsroom-blocks.css' <<<"$archive_files"
 
 # The editor canvas stylesheet loads Weekly Wildcat fonts from build/fonts. If the
 # build stops emitting them the editor silently falls back to system fonts.

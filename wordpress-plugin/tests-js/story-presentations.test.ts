@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createElement } from "@wordpress/element";
 import { createBlock, getBlockType, parse, registerBlockType, serialize, validateBlock } from "@wordpress/blocks";
 import { storyVariations, supportedAttributes, isStoryVariationActive } from "../src/story-block-variations/definitions";
-import { changeTimeline, MAX_TIMELINE_ITEMS } from "../src/blocks/timeline/items";
+import { addEvent, MAX_TIMELINE_ITEMS, moveEvent, removeEvent } from "../src/blocks/timeline/items";
 import timelineMetadata from "../src/blocks/timeline/block.json";
 
 vi.mock("@wordpress/block-editor", () => ({
@@ -13,15 +13,26 @@ vi.mock("@wordpress/block-editor", () => ({
 import { TimelineSave } from "../src/blocks/timeline/save";
 
 describe("semantic newsroom presets", () => {
-  it("offers the ten Core/existing-block presets with stable style identities", () => {
-    expect(storyVariations.slice(0, 10).map(({ title, block }) => [title, block])).toEqual([
-      ["Portrait + Text", "core/media-text"], ["Photo Pair", "core/gallery"], ["Photo Gallery", "core/gallery"],
-      ["Reported Quote", "core/quote"], ["Pull Quote", "core/pullquote"], ["Key Facts", "core/group"],
-      ["Document Viewer", "core/file"], ["Related Coverage", "byline/stories"], ["Story Audio", "core/audio"], ["Story Video", "core/video"]
+  it("offers one preset per editorial need, in task order, with stable style identities", () => {
+    expect(storyVariations.map(({ title, block }) => [title, block])).toEqual([
+      // Photographs and video
+      ["Photo Gallery", "core/gallery"], ["Portrait + Text", "core/media-text"], ["Visual Chapter", "core/cover"],
+      // Reporting and evidence
+      ["Reported Quote", "core/quote"], ["Pull Quote", "core/pullquote"], ["Key Facts", "core/group"], ["Context Box", "core/group"],
+      ["Margin Note", "core/group"], ["Editor's Note", "core/group"], ["Expandable Section", "core/details"], ["Document Viewer", "core/file"],
+      // Data, maps and comparisons
+      ["Data Table", "core/table"], ["Comparison", "core/columns"], ["Three Key Numbers", "core/columns"], ["Map", "byline/visualization"],
+      // Supporting context and related coverage
+      ["Related Coverage", "byline/stories"]
     ]);
+    // Presets that only repeated a Core default or another preset are not offered (their classes still render).
+    for (const retired of ["Photo Pair", "Wide Photo", "Full-Bleed Photo", "Full-Bleed Video", "Story Audio", "Story Video", "Why It Matters", "What's Next", "How We Know", "Methodology", "Full Statement", "Comparison Table", "Main + Aside", "Read More"]) {
+      expect(storyVariations.find((v) => v.title === retired), retired).toBeUndefined();
+    }
     expect(new Set(storyVariations.map((v) => v.name)).size).toBe(storyVariations.length);
     for (const variation of storyVariations) {
       expect(variation.keywords.length).toBeGreaterThan(1);
+      expect(variation.description.length, `${variation.title} needs a sentence of guidance`).toBeGreaterThan(30);
       expect(isStoryVariationActive(variation, variation.attributes)).toBe(true);
       expect(isStoryVariationActive(variation, {})).toBe(false);
     }
@@ -29,12 +40,9 @@ describe("semantic newsroom presets", () => {
   it("uses safe media and compact related-story defaults", () => {
     const attrs = (name: string) => storyVariations.find((v) => v.name === name)!.attributes;
     expect(attrs("byline-portrait-text")).toMatchObject({ align: "wide", mediaWidth: 40, imageFill: false, isStackedOnMobile: true });
-    expect(attrs("byline-photo-pair")).toMatchObject({ columns: 2, imageCrop: false, align: "wide" });
     expect(attrs("byline-photo-gallery")).toMatchObject({ linkTo: "media", randomOrder: false, imageCrop: false });
     expect(attrs("byline-related-coverage")).toMatchObject({ layout: "related", source: "manual", limit: 3, showByline: false, showDate: false, showExcerpt: false });
     expect(attrs("byline-document")).toMatchObject({ displayPreview: true, previewHeight: 640, showDownloadButton: true });
-    for (const name of ["byline-story-audio", "byline-story-video"]) expect(attrs(name)).toMatchObject({ autoplay: false, preload: "metadata" });
-    expect(attrs("byline-story-video")).toMatchObject({ controls: true, playsInline: true });
     const facts = storyVariations.find((v) => v.title === "Key Facts")!;
     expect(facts.innerBlocks![0]).toEqual(["core/heading", { level: 3, content: "Key facts" }]);
     expect(facts.innerBlocks![1][2]).toHaveLength(3);
@@ -45,16 +53,16 @@ describe("semantic newsroom presets", () => {
 });
 
 describe("Timeline", () => {
-  const items = timelineMetadata.attributes.items.default;
+  const items = [{ label: "Earlier", title: "How it began", body: "" }, { label: "Now", title: "What happened next", body: "" }];
   it("adds, removes, reorders and returns the intended focus position without mutating input", () => {
-    expect(changeTimeline(items, "up", 1)).toEqual({ items: [items[1], items[0]], focusIndex: 0 });
-    expect(changeTimeline(items, "down", 0)).toEqual({ items: [items[1], items[0]], focusIndex: 1 });
-    expect(changeTimeline(items, "remove", 1)).toEqual({ items: [items[0]], focusIndex: 0 });
-    expect(changeTimeline(items, "add").focusIndex).toBe(2);
+    expect(moveEvent(items, 1, -1)).toEqual({ items: [items[1], items[0]], focusIndex: 0 });
+    expect(moveEvent(items, 0, 1)).toEqual({ items: [items[1], items[0]], focusIndex: 1 });
+    expect(removeEvent(items, 1)).toEqual({ items: [items[0]], focusIndex: 0 });
+    expect(addEvent(items).focusIndex).toBe(2);
     expect(items).toHaveLength(2);
-    expect(changeTimeline([items[0]], "remove", 0).items).toHaveLength(1);
-    expect(changeTimeline(items, "up", 0).items).toBe(items);
-    expect(changeTimeline(Array.from({ length: MAX_TIMELINE_ITEMS }, () => items[0]), "add").items).toHaveLength(25);
+    expect(removeEvent([items[0]], 0).items).toEqual([{ label: "", title: "", body: "" }]);
+    expect(moveEvent(items, 0, -1).items).toBe(items);
+    expect(addEvent(Array.from({ length: MAX_TIMELINE_ITEMS }, () => items[0])).items).toHaveLength(25);
   });
   it("round-trips attributes, plain titles, inline body links and semantic saved markup", () => {
     if (!getBlockType("byline/timeline")) registerBlockType(timelineMetadata as any, { save: TimelineSave as any });

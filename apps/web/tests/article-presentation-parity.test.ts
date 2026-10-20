@@ -178,7 +178,8 @@ describe("public article presentation parity fixture", () => {
       photo: value.photo ? { path: new URL(value.photo.src, "https://example.test").pathname, alt: value.photo.alt } : null,
       coverage: value.coverage?.map((area) => area.label) ?? []
     }));
-    expect(normalizedContributors).toEqual(expected.contributors);
+    // The public author block deliberately shows no bio (#130), though the WordPress preview model still carries it.
+    expect(normalizedContributors).toEqual(expected.contributors.map((contributor: { bio: string }) => ({ ...contributor, bio: "" })));
     expect(presentation.image).toMatchObject({
       src: expected.featuredImage.path,
       alt: expected.featuredImage.alt,

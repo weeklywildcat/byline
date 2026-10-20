@@ -850,7 +850,7 @@ function byline_editorial_render_preview_page(): void
 
     echo '<div class="wrap byline-article-preview-page">';
     echo '<h1>' . esc_html__('Preview as Byline', 'weekly-wildcat-headless') . '</h1>';
-    echo '<p>' . esc_html__('This private preview uses the latest saved WordPress content. Interactive public actions are disabled.', 'weekly-wildcat-headless') . '</p>';
+    echo '<p>' . esc_html__('This private preview uses the latest saved WordPress content, with the Standard or Immersive presentation chosen for the story. Interactive public actions are disabled. A one-off layout built by the site\'s developers for a single story is not previewed here.', 'weekly-wildcat-headless') . '</p>';
     echo '<div id="byline-article-preview-root"></div>';
     echo '</div>';
 }

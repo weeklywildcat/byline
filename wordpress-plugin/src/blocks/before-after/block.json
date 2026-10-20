@@ -3,7 +3,7 @@
   "name": "byline/before-after",
   "version": "1.0.0",
   "title": "Before / After",
-  "description": "Compare two photographs with a keyboard-operable slider.",
+  "description": "Compare two photographs with a draggable divider.",
   "category": "byline",
   "icon": "format-image",
   "keywords": [
@@ -27,6 +27,14 @@
     "afterLabel": {
       "type": "string",
       "default": "After"
+    },
+    "fit": {
+      "type": "string",
+      "enum": [
+        "cover",
+        "contain"
+      ],
+      "default": "cover"
     },
     "caption": {
       "type": "string",

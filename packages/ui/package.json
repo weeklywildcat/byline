@@ -10,6 +10,7 @@
     "./page-blocks.css": "./src/page-blocks.css",
     "./newsroom-blocks.css": "./src/newsroom-blocks.css",
     "./article-enhancements": "./src/article-enhancements/index.ts",
+    "./before-after": "./src/article-enhancements/before-after.ts",
     "./visualization": "./src/visualization.ts",
     "./article-enhancement-selector": "./src/article-enhancements/selector.ts"
   },

@@ -2,6 +2,23 @@
 export const visualizationHeights = { compact: 320, standard: 480, tall: 680, map: 560 } as const;
 export type VisualizationPreset = keyof typeof visualizationHeights;
 export type VisualizationProvider = 'datawrapper' | 'flourish' | 'google-maps' | 'openstreetmap';
+/** How each allowlisted provider is named to writers and readers, and the addresses its share menu produces. */
+export const visualizationProviders: Record<VisualizationProvider, { label: string; examples: string[]; where: string }> = {
+  datawrapper: { label: 'Datawrapper', where: 'Publish your chart, then copy "Link to visualization".', examples: ['https://datawrapper.dwcdn.net/AbCdE/', 'https://www.datawrapper.de/_/AbCdE/'] },
+  flourish: { label: 'Flourish', where: 'Share, then copy the "Link" to your public visualization or story.', examples: ['https://public.flourish.studio/visualisation/1234567/', 'https://flo.uri.sh/visualisation/1234567/embed'] },
+  'google-maps': { label: 'Google Maps', where: 'Share, Embed a map, then copy only the address after src= (never the whole iframe).', examples: ['https://www.google.com/maps/embed?pb=!1m18!1m12…'] },
+  openstreetmap: { label: 'OpenStreetMap', where: 'Share, HTML, then copy only the address after src= from the embed code.', examples: ['https://www.openstreetmap.org/export/embed.html?bbox=-0.1%2C51.5%2C-0.08%2C51.51'] }
+};
+const MAP_PROVIDERS: string[] = ['google-maps', 'openstreetmap'];
+/** "Datawrapper chart", "OpenStreetMap map": how the interactive piece is named where it is only previewed. */
+export function visualizationPieceName(provider: string): string {
+  if (!(provider in visualizationProviders)) return 'interactive chart or map';
+  return `${visualizationProviders[provider as VisualizationProvider].label} ${MAP_PROVIDERS.includes(provider) ? 'map' : 'chart'}`;
+}
+/** The sentence after "Preview:" on a fallback preview, in the editor and in Preview as Byline. */
+export function visualizationPreviewNote(provider: string): string {
+  return provider in visualizationProviders ? `interactive ${visualizationPieceName(provider)} loads here on the published story` : 'the interactive chart or map loads here on the published story';
+}
 export function visualizationHeight(preset: string): number {
   return visualizationHeights[preset as VisualizationPreset] || visualizationHeights.standard;
 }

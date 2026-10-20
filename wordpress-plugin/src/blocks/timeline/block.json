@@ -4,12 +4,14 @@
   "version": "1.0.0",
   "title": "Timeline",
   "category": "byline",
-  "description": "A vertical chronology with editorial date labels and reporting.",
+  "description": "Events in order, each with a date label, a headline and a short explanation, drawn as a chronology on a hairline axis.",
   "keywords": [
     "chronology",
     "dates",
     "history",
-    "events"
+    "events",
+    "timeline",
+    "what happened when"
   ],
   "icon": "list-view",
   "textdomain": "weekly-wildcat-headless",
@@ -18,14 +20,14 @@
       "type": "array",
       "default": [
         {
-          "label": "Earlier",
-          "title": "How it began",
-          "body": "Add the context behind this event."
+          "label": "",
+          "title": "",
+          "body": ""
         },
         {
-          "label": "Now",
-          "title": "What happened next",
-          "body": "Explain the next development."
+          "label": "",
+          "title": "",
+          "body": ""
         }
       ],
       "items": {

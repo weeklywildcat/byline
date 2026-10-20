@@ -3,12 +3,14 @@
   "name": "byline/scrolly-step",
   "version": "1.0.0",
   "title": "Story Step",
-  "description": "An image and its reporting. Reorder steps with normal block controls.",
+  "description": "One step of a Scrollytelling story: a photograph (optional) and the reporting beside it.",
   "category": "byline",
   "icon": "format-image",
   "keywords": [
     "story",
-    "journalism"
+    "journalism",
+    "step",
+    "scrollytelling"
   ],
   "textdomain": "weekly-wildcat-headless",
   "attributes": {

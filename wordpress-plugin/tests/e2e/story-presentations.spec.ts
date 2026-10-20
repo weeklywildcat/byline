@@ -43,9 +43,13 @@ test("newsroom presets save valid Core content and match the private preview at 
     }, pattern!.content);
     expect(valid, name).toBe(true);
   }
-  await page.evaluate(({ definitions, relatedIds, essayPattern }) => {
+  // Photograph credits come from the attachment, not from the block. The fixture's photographs
+  // are static test assets, so tie them to the one real attachment and credit it ("Staff").
+  const credited = await adminSession.rest(`/wp/v2/media/${media.id}`, "POST", { meta: { _ww_image_creator: "Staff" } });
+  expect(credited.ok).toBe(true);
+  await page.evaluate(({ definitions, relatedIds, essayPattern, creditedId }) => {
     const wp = (window as any).wp;
-    const titles = ["Portrait + Text", "Photo Pair", "Photo Gallery", "Reported Quote", "Pull Quote", "Key Facts", "Document Viewer", "Related Coverage", "Story Audio", "Story Video", "Visual Chapter", "Wide Photo", "Full-Bleed Photo", "Full-Bleed Video", "Context", "Why It Matters", "What's Next", "How We Know", "Editor's Note", "Margin Note", "Data Table", "Comparison Table", "Read More", "Methodology", "Full Statement", "Comparison", "Main + Aside", "Three Key Numbers", "Map"];
+    const titles = ["Photo Gallery", "Portrait + Text", "Visual Chapter", "Reported Quote", "Pull Quote", "Key Facts", "Context Box", "Margin Note", "Editor's Note", "Expandable Section", "Document Viewer", "Data Table", "Comparison", "Three Key Numbers", "Map", "Related Coverage"];
     const names = ["core/media-text", "core/gallery", "core/quote", "core/pullquote", "core/group", "core/file", "byline/stories", "core/audio", "core/video", "core/cover", "core/image", "core/table", "core/details", "core/columns", "byline/visualization"];
     const variations = names.flatMap((name) => wp.blocks.getBlockVariations(name) || []);
     for (const title of titles) {
@@ -54,6 +58,9 @@ test("newsroom presets save valid Core content and match the private preview at 
     function make(definition: any): any {
       const attributes = { ...definition.attributes };
       if (definition.name === "byline/stories") attributes.postIds = relatedIds;
+      for (const key of ["image", "before", "after"]) {
+        if (attributes[key]?.url?.startsWith("/test-assets/")) attributes[key] = { ...attributes[key], id: creditedId };
+      }
       // Core HTML stores raw inner content in 7.1; parse its saved format so
       // this deterministic embed fixture works with both supported schemas.
       if (definition.name === "core/html") return wp.blocks.parse(`<!-- wp:html -->${attributes.content}<!-- /wp:html -->`)[0];
@@ -73,7 +80,7 @@ test("newsroom presets save valid Core content and match the private preview at 
     if (invalid.length) throw new Error(`Invalid saved blocks: ${invalid.join(", ")}`);
     wp.data.dispatch("core/block-editor").resetBlocks(reopened);
     return serialized;
-  }, { definitions: blocks, relatedIds, essayPattern });
+  }, { definitions: blocks, relatedIds, essayPattern, creditedId: media.id });
   // Wait for the real TOC editor effect to assign native stable heading anchors.
   await expect.poll(() => page.evaluate(() => {
     const wp = (window as any).wp;
@@ -108,15 +115,23 @@ test("newsroom presets save valid Core content and match the private preview at 
   expect(canvasGeometry.columns).toBe(2);
   expect(canvasGeometry.width).toBeGreaterThanOrEqual(canvasGeometry.proseWidth);
 
-  // The one custom block can add/reorder/remove inline with focus following it.
+  // The one custom block edits its events in place: Enter adds the next event, the toolbar acts on the event the caret is in.
   const timeline = editor.canvas.locator('.byline-timeline-editor');
-  await timeline.getByRole("button", { name: "Add item", exact: true }).click();
+  await timeline.getByLabel("Event explanation").last().click();
+  await page.keyboard.press("Enter");
   await expect(timeline.getByLabel("Date or label").last()).toBeFocused();
-  await timeline.getByLabel("Date or label").last().fill("Fall 2026");
-  await timeline.getByLabel("Event title").last().fill("The next chapter");
-  await timeline.getByRole("button", { name: "Move up", exact: true }).last().click();
-  await expect(timeline.getByLabel("Date or label").nth(1)).toBeFocused();
-  await timeline.getByRole("button", { name: "Remove item", exact: true }).nth(1).click();
+  await page.keyboard.type("Fall 2026");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("The next chapter");
+  await expect(timeline.locator(".byline-timeline-item")).toHaveCount(3);
+  // Typing hides Gutenberg's block toolbar until the pointer moves again.
+  const reveal = async () => { await page.mouse.move(700, 120); await page.mouse.move(740, 140); };
+  await reveal();
+  await page.getByRole("button", { name: "Move event earlier", exact: true }).click();
+  await expect(timeline.getByLabel("Event title").nth(1)).toBeFocused();
+  await expect(timeline.getByLabel("Event title").nth(1)).toHaveValue("The next chapter");
+  await reveal();
+  await page.getByRole("button", { name: "Remove event", exact: true }).click();
   await expect(timeline.locator(".byline-timeline-item")).toHaveCount(2);
 
   const response = await adminSession.rest<{ content: { rendered: string } }>(`/wp/v2/posts/${story.id}`);
@@ -127,7 +142,8 @@ test("newsroom presets save valid Core content and match the private preview at 
   expect(rendered).toContain('District budget records, reviewed by the newsroom.');
   expect(rendered).toContain('<ol class="wp-block-byline-timeline byline-timeline">');
   if (process.env.BYLINE_UPDATE_STORY_FIXTURE === "1") {
-    const clean = rendered.split(media.source_url).join("/newsroom/newsroom-meeting-640.jpg").replace(/http:\/\/localhost:8888/g, "");
+    // The static fixture only ships the one photograph; drop the other WordPress-generated srcset candidates.
+    const clean = rendered.split(media.source_url).join("/newsroom/newsroom-meeting-640.jpg").replace(/http:\/\/localhost:8888/g, "").replace(/,\s*[^,"\s]*\/wp-content\/uploads\/[^,"]*?\s\d+w/g, "");
     await writeFile(path.join(repoRoot, "tests/fixtures/story-presentations.json"), JSON.stringify({ saved, rendered: clean }, null, 2) + "\n");
   }
   const sidebar = await openStorySidebar(page);
@@ -150,7 +166,8 @@ test("newsroom presets save valid Core content and match the private preview at 
       if (width >= 900) await expect(frame.locator('.byline-scrolly')).toHaveClass(/is-enhanced/);
       else await expect(frame.locator('.byline-scrolly')).not.toHaveClass(/is-enhanced/);
       await expect(frame.locator('.byline-visualization iframe')).toHaveCount(0);
-      await expect(frame.locator('.byline-visualization-placeholder').first()).toHaveCSS('height', '480px');
+      await expect(frame.locator('.byline-visualization-badge').first()).toContainText('Preview: interactive');
+      await expect(frame.locator('.byline-visualization[data-mode="embed"] .byline-visualization-media').first()).toHaveCSS('height', '480px');
       await expect(frame.locator('.article-body iframe').first()).toHaveAttribute('sandbox', '');
       await expect(frame.locator('.article-body iframe[srcdoc], .article-body script')).toHaveCount(0);
       await expect(frame.locator('.article-body .byline-newsroom-stories-related article')).toHaveCount(3);
@@ -168,7 +185,8 @@ test("newsroom presets save valid Core content and match the private preview at 
       if (width >= 900) await expect(frame.locator('.byline-scrolly')).toHaveClass(/is-enhanced/);
       else await expect(frame.locator('.byline-scrolly')).not.toHaveClass(/is-enhanced/);
       await expect(frame.locator('.byline-visualization iframe')).toHaveCount(0);
-      await expect(frame.locator('.byline-visualization-placeholder').first()).toHaveCSS('height', '480px');
+      await expect(frame.locator('.byline-visualization-badge').first()).toContainText('Preview: interactive');
+      await expect(frame.locator('.byline-visualization[data-mode="embed"] .byline-visualization-media').first()).toHaveCSS('height', '480px');
       expect(await frame.locator('body').evaluate((body) => body.ownerDocument.location.href)).toBe('about:srcdoc');
     }
     // The private preview runs the same enhancer in its own document: the local controls work
@@ -209,7 +227,7 @@ test("newsroom presets save valid Core content and match the private preview at 
       view.scrollTo({ top: step.getBoundingClientRect().top + view.scrollY - (view.innerHeight * line) / 100 + 20, behavior: 'instant' });
     });
     await expect(stage).toHaveAttribute('data-step', '2');
-    await expect(stage.locator('img')).toHaveAttribute('src', /panorama\.svg/);
+    await expect(stage.locator('.byline-scrolly-frame:last-child img')).toHaveAttribute('src', /panorama\.svg/);
   } finally { await preview.close(); }
 });
 
@@ -231,12 +249,16 @@ test('story authoring preserves native anchors, precise annotations and normal s
   }, selected);
   const editor = await waitForEditorReady(page);
   const annotation = editor.canvas.locator('.byline-annotated-image');
-  await annotation.getByRole('button', { name: 'Replace annotation image', exact: true }).click();
+  await page.evaluate(() => { const store = (window as any).wp.data; store.dispatch('core/block-editor').selectBlock(store.select('core/block-editor').getBlocks().find((block: any) => block.name === 'byline/annotated-image').clientId); });
+  await page.getByRole('button', { name: 'Replace photograph', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Open Media Library', exact: true }).click();
   await page.locator('.media-modal').getByRole('tab', { name: 'Media Library', exact: true }).click();
   await page.locator(`.media-modal [data-id="${media.id}"]`).click();
   await page.locator('.media-modal').getByRole('button', { name: 'Select', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).wp.data.select('core/block-editor').getBlocks().find((block: any) => block.name === 'byline/annotated-image').attributes.image.id)).toBe(media.id);
-  await annotation.locator('.components-range-control input[type="number"]').first().fill('33');
+  await annotation.locator('.byline-annotation-marker').first().click();
+  await page.evaluate(() => (window as any).wp.data.dispatch('core/edit-post').openGeneralSidebar('edit-post/block'));
+  await page.getByRole('spinbutton', { name: 'Left to right (%)' }).fill('33');
   await page.keyboard.press('Tab');
   await expect.poll(() => page.evaluate(() => (window as any).wp.data.select('core/block-editor').getBlocks().find((block: any) => block.name === 'byline/annotated-image').attributes.annotations[0].x)).toBe(33);
   await expect.poll(() => page.evaluate(() => (window as any).wp.data.select('core/block-editor').getBlocks().find((block: any) => block.name === 'byline/scrolly').innerBlocks[0].innerBlocks[0].attributes.anchor)).not.toBe('');

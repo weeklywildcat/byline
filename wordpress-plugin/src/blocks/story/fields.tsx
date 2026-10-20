@@ -1,3 +1,4 @@
+import { PlainText } from '@wordpress/block-editor';
 import { TextControl, TextareaControl } from '@wordpress/components';
 import { useEffect, useRef, useState } from '@wordpress/element';
 
@@ -29,4 +30,16 @@ export function StoryTextControl({ value, onChange, ...props }: Fieldprops) {
 export function StoryTextareaControl({ value, onChange, ...props }: Fieldprops) {
   const [local, change] = useBufferedText(value ?? '', onChange);
   return <TextareaControl __nextHasNoMarginBottom {...props} value={local} onChange={change} />;
+}
+
+/**
+ * A caption (or any short line of copy) edited where it appears, styled by the
+ * block's own figcaption rules. Plain text, so what is typed is what is saved.
+ * `singleLine` is for headlines and attribution lines: Enter does nothing and a
+ * pasted line break becomes a space.
+ */
+export function StoryCaption({ value, onChange, placeholder, className = 'byline-story-caption', label, singleLine }: { value?: string; onChange: (value: string) => void; placeholder: string; className?: string; label: string; singleLine?: boolean }) {
+  const [local, change] = useBufferedText(value ?? '', onChange);
+  const lineProps = singleLine ? { onKeyDown: (event: { key: string; preventDefault: () => void }) => { if (event.key === 'Enter') event.preventDefault(); } } : {};
+  return <PlainText className={className} value={local} placeholder={placeholder} aria-label={label} onChange={(next: string) => change(singleLine ? next.replace(/\s*\n\s*/g, ' ') : next)} {...lineProps} />;
 }

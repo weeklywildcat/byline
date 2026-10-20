@@ -156,6 +156,32 @@ test('annotation markers remain reachable at 200% browser zoom', async ({ browse
   await context.close();
 });
 
+test('an annotation link marks its marker and note, markers have a 44px target, and the notes are a numbered list', async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.goto(`${article}#annotation-campus-library`);
+  const markers = page.locator('.byline-annotation-marker');
+  const notes = page.locator('.byline-annotations > li');
+  await expect(notes.nth(1)).toHaveClass(/is-active/); await expect(markers.nth(1)).toHaveClass(/is-active/);
+  await expect(markers.nth(1)).toHaveAttribute('aria-current', 'true'); await expect(markers.nth(0)).not.toHaveClass(/is-active/);
+  // The 32px disc has a 44px target: a point 21px from its centre still lands on it.
+  await markers.first().scrollIntoViewIfNeeded();
+  const reach = await markers.first().evaluate((marker) => {
+    const box = marker.getBoundingClientRect();
+    const hit = (dx: number, dy: number) => marker.ownerDocument.elementFromPoint(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy);
+    return { size: box.width, right: hit(21, 0) === marker, below: hit(0, 21) === marker, far: hit(30, 0) === marker };
+  });
+  expect(reach).toEqual({ size: 32, right: true, below: true, far: false });
+  // A list with real numbers: the ordered list keeps its role, and each note repeats its marker's number.
+  await expect(page.locator('ol.byline-annotations')).toHaveAttribute('role', 'list');
+  const numbers = await notes.evaluateAll((items) => items.map((item) => getComputedStyle(item, '::before').content));
+  expect(numbers).toEqual(['counter(annotation)', 'counter(annotation)']);
+  await expect(page.locator('ol.byline-annotations')).toHaveCSS('list-style-type', 'none');
+  expect(await markers.allTextContents()).toEqual(['1', '2']);
+  // Hierarchy: bold title, then the explanation in the reading face.
+  const type = await notes.first().evaluate((item) => ({ title: getComputedStyle(item.querySelector('h3')!).fontWeight, body: getComputedStyle(item.querySelector('p')!).fontFamily }));
+  expect(type.title).toBe('700'); expect(type.body).toMatch(/newsreader|serif/i);
+});
+
 /* --------------------------- Providers and embeds --------------------------- */
 
 test('provider resize messages require matching source, origin, ID and bounded height', async ({ page }) => {
@@ -204,7 +230,7 @@ test('Google Maps embeds use the allowlisted form, the chosen height and a direc
   await expect(frame).toHaveCSS('height', '320px');
   const link = figure.locator('.byline-visualization-link a');
   await expect(link).toHaveAttribute('href', (await figure.getAttribute('data-src'))!);
-  await expect(link).toContainText('Open map: District map');
+  await expect(link).toContainText('Open the interactive version');
   await expect(link).toBeVisible();
   await expect.poll(() => requestedProviders.filter((url) => url.startsWith('https://www.google.com/maps/embed?pb='))).toHaveLength(1);
   // Google Maps never resizes from a message: another provider's wire format is ignored.

@@ -1,3 +1,4 @@
+/* Page editing only: every editor selector below carries .post-type-page so these rules never reach the Post editor canvas. */
 /*
  * Canonical styles for authored WordPress pages.
  *
@@ -9,13 +10,13 @@
  */
 
 .byline-page-content,
-.editor-styles-wrapper {
+.editor-styles-wrapper.post-type-page {
   color: var(--ink, #1f2328);
   font-family: var(--font-body, Arial, Helvetica, sans-serif);
 }
 
 .byline-page-content .wp-block-byline-page-section,
-.editor-styles-wrapper .wp-block-byline-page-section {
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section {
   display: grid;
   gap: 14px;
   grid-template-columns: minmax(0, 1fr);
@@ -23,7 +24,7 @@
 }
 
 .byline-page-content .wp-block-byline-page-section > .wp-block-heading,
-.editor-styles-wrapper .wp-block-byline-page-section > .wp-block-heading,
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section > .wp-block-heading,
 .byline-page-content .byline-page-section > :is(h2, h3, h4) {
   color: var(--ink, #1f2328);
   font-family: var(--font-headline, Georgia, serif);
@@ -37,7 +38,7 @@
 }
 
 .byline-page-content .wp-block-byline-page-section__body,
-.editor-styles-wrapper .wp-block-byline-page-section__body,
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section__body,
 .byline-page-content .byline-page-section-body {
   display: grid;
   gap: 18px;
@@ -48,26 +49,26 @@
  * Direct and nested editorial blocks therefore do not add a second prose
  * margin on top of that gap. */
 .byline-page-content .wp-block-byline-page-section__body :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table, .wp-block-columns, .wp-block-buttons),
-.editor-styles-wrapper .wp-block-byline-page-section__body :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table, .wp-block-columns, .wp-block-buttons),
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section__body :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table, .wp-block-columns, .wp-block-buttons),
 .byline-page-content .byline-page-section-body :is(p, ul, ol, blockquote, figure, .byline-page-section-actions) {
   margin-bottom: 0;
 }
 
 .byline-page-content :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table),
-.editor-styles-wrapper :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table) {
+.editor-styles-wrapper.post-type-page :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table) {
   margin-top: 0;
   margin-bottom: 1.35em;
 }
 
 .byline-page-content .wp-block-byline-page-section__body :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table),
-.editor-styles-wrapper .wp-block-byline-page-section__body :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table),
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section__body :is(p, ul, ol, blockquote, figure, .wp-block-image, .wp-block-gallery, .wp-block-embed, .wp-block-table),
 .byline-page-content .byline-page-section-body :is(p, ul, ol, blockquote, figure) {
   margin-top: 0;
   margin-bottom: 0;
 }
 
 .byline-page-content :is(p, li),
-.editor-styles-wrapper :is(p, li) {
+.editor-styles-wrapper.post-type-page :is(p, li) {
   color: var(--ink, #1f2328);
   font-family: var(--font-serif, Georgia, serif);
   font-size: 1.15rem;
@@ -75,17 +76,17 @@
 }
 
 .byline-page-content li + li,
-.editor-styles-wrapper li + li {
+.editor-styles-wrapper.post-type-page li + li {
   margin-top: 0.35em;
 }
 
 .byline-page-content li::marker,
-.editor-styles-wrapper li::marker {
+.editor-styles-wrapper.post-type-page li::marker {
   color: var(--accent, #b11f24);
 }
 
 .byline-page-content :is(p, li) a:not(.wp-block-button__link),
-.editor-styles-wrapper :is(p, li) a:not(.wp-block-button__link) {
+.editor-styles-wrapper.post-type-page :is(p, li) a:not(.wp-block-button__link) {
   color: var(--accent, #b11f24);
   text-decoration: underline;
   text-decoration-thickness: 1px;
@@ -93,17 +94,17 @@
 }
 
 .byline-page-content :is(ul, ol),
-.editor-styles-wrapper :is(ul, ol) {
+.editor-styles-wrapper.post-type-page :is(ul, ol) {
   padding-left: 1.3em;
 }
 
 .byline-page-content .wp-block-byline-page-section__body :is(ul, ol),
-.editor-styles-wrapper .wp-block-byline-page-section__body :is(ul, ol) {
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section__body :is(ul, ol) {
   padding-left: 1.3em;
 }
 
 .byline-page-content :is(h2, h3, h4),
-.editor-styles-wrapper :is(h2, h3, h4) {
+.editor-styles-wrapper.post-type-page :is(h2, h3, h4) {
   color: var(--ink, #1f2328);
   font-family: var(--font-headline, Georgia, serif);
   font-weight: 600;
@@ -119,13 +120,13 @@
 }
 
 .byline-page-content .wp-block-byline-page-section__body :is(h3, h4),
-.editor-styles-wrapper .wp-block-byline-page-section__body :is(h3, h4) {
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section__body :is(h3, h4) {
   font-size: 1.25rem;
   margin: 0.4em 0 0;
 }
 
 .byline-page-content :is(blockquote, .wp-block-quote),
-.editor-styles-wrapper :is(blockquote, .wp-block-quote) {
+.editor-styles-wrapper.post-type-page :is(blockquote, .wp-block-quote) {
   border-left: 4px solid var(--accent, #b11f24);
   color: var(--ink, #1f2328);
   font-family: var(--font-serif, Georgia, serif);
@@ -135,37 +136,37 @@
 }
 
 .byline-page-content .wp-block-pullquote,
-.editor-styles-wrapper .wp-block-pullquote {
+.editor-styles-wrapper.post-type-page .wp-block-pullquote {
   border-bottom: 4px solid var(--accent, #b11f24);
   border-top: 4px solid var(--accent, #b11f24);
   padding: 1.2em 0;
 }
 
 .byline-page-content :is(.wp-block-image, .wp-block-gallery) img,
-.editor-styles-wrapper :is(.wp-block-image, .wp-block-gallery) img {
+.editor-styles-wrapper.post-type-page :is(.wp-block-image, .wp-block-gallery) img {
   border: 1px solid var(--rule, #d0d7de);
   height: auto;
   max-width: 100%;
 }
 
 .byline-page-content .wp-block-gallery,
-.editor-styles-wrapper .wp-block-gallery {
+.editor-styles-wrapper.post-type-page .wp-block-gallery {
   align-items: start;
 }
 
 .byline-page-content .wp-block-table,
-.editor-styles-wrapper .wp-block-table {
+.editor-styles-wrapper.post-type-page .wp-block-table {
   overflow-x: auto;
 }
 
 .byline-page-content .wp-block-table table,
-.editor-styles-wrapper .wp-block-table table {
+.editor-styles-wrapper.post-type-page .wp-block-table table {
   border-collapse: collapse;
   min-width: 100%;
 }
 
 .byline-page-content .wp-block-table :is(td, th),
-.editor-styles-wrapper .wp-block-table :is(td, th) {
+.editor-styles-wrapper.post-type-page .wp-block-table :is(td, th) {
   border: 1px solid var(--rule, #d0d7de);
   padding: 8px 10px;
   text-align: left;
@@ -173,14 +174,14 @@
 
 .byline-page-content .wp-block-embed__wrapper,
 .byline-page-content .wp-block-embed iframe,
-.editor-styles-wrapper .wp-block-embed__wrapper,
-.editor-styles-wrapper .wp-block-embed iframe {
+.editor-styles-wrapper.post-type-page .wp-block-embed__wrapper,
+.editor-styles-wrapper.post-type-page .wp-block-embed iframe {
   max-width: 100%;
   width: 100%;
 }
 
 .byline-page-content .wp-block-buttons,
-.editor-styles-wrapper .wp-block-buttons,
+.editor-styles-wrapper.post-type-page .wp-block-buttons,
 .byline-page-content .byline-page-section-actions {
   display: flex;
   flex-wrap: wrap;
@@ -189,12 +190,12 @@
 }
 
 .byline-page-content .wp-block-button,
-.editor-styles-wrapper .wp-block-button {
+.editor-styles-wrapper.post-type-page .wp-block-button {
   margin: 0;
 }
 
 .byline-page-content .wp-block-button__link,
-.editor-styles-wrapper .wp-block-button__link {
+.editor-styles-wrapper.post-type-page .wp-block-button__link {
   background: var(--accent, #b11f24);
   border: 1px solid var(--accent, #b11f24);
   border-radius: 0;
@@ -213,8 +214,8 @@
 
 .byline-page-content .wp-block-button__link:hover,
 .byline-page-content .wp-block-button__link:focus-visible,
-.editor-styles-wrapper .wp-block-button__link:hover,
-.editor-styles-wrapper .wp-block-button__link:focus-visible {
+.editor-styles-wrapper.post-type-page .wp-block-button__link:hover,
+.editor-styles-wrapper.post-type-page .wp-block-button__link:focus-visible {
   background: var(--ink, #1f2328);
   border-color: var(--ink, #1f2328);
   color: #fff;
@@ -223,7 +224,7 @@
 /* Page-level actions are still editable Core Buttons, but retain the outlined
  * treatment used by the pre-Gutenberg page templates. */
 .byline-page-content .wp-block-buttons.is-style-page-actions .wp-block-button__link,
-.editor-styles-wrapper .wp-block-buttons.is-style-page-actions .wp-block-button__link {
+.editor-styles-wrapper.post-type-page .wp-block-buttons.is-style-page-actions .wp-block-button__link {
   background: transparent;
   border: 1px solid var(--rule-strong, #1f2328);
   color: var(--ink, #1f2328);
@@ -231,7 +232,7 @@
 }
 
 .byline-page-content .wp-block-buttons.is-style-page-actions,
-.editor-styles-wrapper .wp-block-buttons.is-style-page-actions {
+.editor-styles-wrapper.post-type-page .wp-block-buttons.is-style-page-actions {
   border-top: 1px solid var(--rule, #d0d7de);
   margin-top: 22px;
   padding-top: 20px;
@@ -239,15 +240,15 @@
 
 .byline-page-content .wp-block-buttons.is-style-page-actions .wp-block-button__link:hover,
 .byline-page-content .wp-block-buttons.is-style-page-actions .wp-block-button__link:focus-visible,
-.editor-styles-wrapper .wp-block-buttons.is-style-page-actions .wp-block-button__link:hover,
-.editor-styles-wrapper .wp-block-buttons.is-style-page-actions .wp-block-button__link:focus-visible {
+.editor-styles-wrapper.post-type-page .wp-block-buttons.is-style-page-actions .wp-block-button__link:hover,
+.editor-styles-wrapper.post-type-page .wp-block-buttons.is-style-page-actions .wp-block-button__link:focus-visible {
   background: var(--ink, #1f2328);
   border-color: var(--ink, #1f2328);
   color: var(--page, #f7f7f7);
 }
 
 .byline-page-content .wp-block-byline-page-section.is-style-featured,
-.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured {
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section.is-style-featured {
   background: #171a21;
   color: #fff;
   gap: 14px;
@@ -256,38 +257,38 @@
 }
 
 .byline-page-content .wp-block-byline-page-section.is-style-featured > .wp-block-heading,
-.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured > .wp-block-heading,
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section.is-style-featured > .wp-block-heading,
 .byline-page-content .wp-block-byline-page-section.is-style-featured :is(p, li, blockquote, h2, h3, h4),
-.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured :is(p, li, blockquote, h2, h3, h4) {
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section.is-style-featured :is(p, li, blockquote, h2, h3, h4) {
   color: #fff;
 }
 
 .byline-page-content .wp-block-byline-page-section.is-style-featured :is(p, li),
-.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured :is(p, li) {
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section.is-style-featured :is(p, li) {
   color: #eee8e1;
 }
 
 .byline-page-content .wp-block-byline-page-section.is-style-featured :is(blockquote, .wp-block-quote),
-.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured :is(blockquote, .wp-block-quote) {
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section.is-style-featured :is(blockquote, .wp-block-quote) {
   border-left-color: #fff;
 }
 
 .byline-page-content .wp-block-byline-page-section.is-style-featured .wp-block-button__link:hover,
 .byline-page-content .wp-block-byline-page-section.is-style-featured .wp-block-button__link:focus-visible,
-.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured .wp-block-button__link:hover,
-.editor-styles-wrapper .wp-block-byline-page-section.is-style-featured .wp-block-button__link:focus-visible {
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section.is-style-featured .wp-block-button__link:hover,
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section.is-style-featured .wp-block-button__link:focus-visible {
   background: #fff;
   border-color: #fff;
   color: #171a21;
 }
 
 .byline-page-content > .wp-block-buttons:not(.is-style-page-actions),
-.editor-styles-wrapper .is-root-container > .wp-block-buttons:not(.is-style-page-actions) {
+.editor-styles-wrapper.post-type-page .is-root-container > .wp-block-buttons:not(.is-style-page-actions) {
   padding-top: 18px;
 }
 
 .byline-page-content .wp-block-byline-page-section__body > .wp-block-buttons:not(.is-style-page-actions),
-.editor-styles-wrapper .wp-block-byline-page-section__body > .wp-block-buttons:not(.is-style-page-actions) {
+.editor-styles-wrapper.post-type-page .wp-block-byline-page-section__body > .wp-block-buttons:not(.is-style-page-actions) {
   padding-top: 4px;
 }
 
@@ -334,7 +335,7 @@
 }
 
 .byline-page-content .alignwide,
-.editor-styles-wrapper .alignwide {
+.editor-styles-wrapper.post-type-page .alignwide {
   margin-left: -40px;
   margin-right: -40px;
   max-width: none;
@@ -343,7 +344,7 @@
 
 @media (max-width: 900px) {
   .byline-page-content .alignwide,
-  .editor-styles-wrapper .alignwide {
+  .editor-styles-wrapper.post-type-page .alignwide {
     margin-left: 0;
     margin-right: 0;
     width: 100%;
@@ -352,7 +353,7 @@
 
 @media (max-width: 640px) {
   .byline-page-content .wp-block-byline-page-section,
-  .editor-styles-wrapper .wp-block-byline-page-section,
+  .editor-styles-wrapper.post-type-page .wp-block-byline-page-section,
   .byline-page-content .byline-page-section {
     gap: 10px;
     padding: 16px 0;
@@ -360,17 +361,17 @@
 
   .byline-page-content .byline-page-section > :is(h2, h3, h4),
   .byline-page-content .wp-block-byline-page-section > .wp-block-heading,
-  .editor-styles-wrapper .wp-block-byline-page-section > .wp-block-heading {
+  .editor-styles-wrapper.post-type-page .wp-block-byline-page-section > .wp-block-heading {
     font-size: 1.4rem;
   }
 
   .byline-page-content :is(p, li),
-  .editor-styles-wrapper :is(p, li) {
+  .editor-styles-wrapper.post-type-page :is(p, li) {
     font-size: 1.08rem;
   }
 
   .byline-page-content .wp-block-byline-page-section.is-style-featured,
-  .editor-styles-wrapper .wp-block-byline-page-section.is-style-featured,
+  .editor-styles-wrapper.post-type-page .wp-block-byline-page-section.is-style-featured,
   .byline-page-content .byline-page-section.is-style-featured {
     gap: 10px;
     margin: 16px 0;

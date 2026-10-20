@@ -9,6 +9,8 @@ import { openStory, routeStoryFixtures } from './story-fixtures';
  */
 const story = (page: Page) => page.locator('.byline-scrolly');
 const stage = (page: Page) => story(page).locator('.byline-scrolly-stage');
+/** The photograph on show: the newest frame (an outgoing one can still be fading out beneath it). */
+const frame = (page: Page) => stage(page).locator('.byline-scrolly-frame:last-child');
 
 /** Scroll (instantly) so step `index`'s top edge sits `offset` px below the reading line. */
 async function placeStep(page: Page, index: number, offset: number) {
@@ -40,8 +42,10 @@ test('the reading line is a fixed viewport position, not a visible-area contest'
 test('steps change when they cross the reading line, downward and upward', async ({ page }) => {
   await open(page);
   await expect(stage(page)).toHaveAttribute('data-step', '0');
-  await expect(stage(page).locator('img')).toHaveAttribute('src', /landscape\.svg/);
-  await expect(stage(page).locator('.byline-scrolly-stage-caption')).toHaveText('The first scene. Photo: Staff');
+  await expect(frame(page).locator('img')).toHaveAttribute('src', /landscape\.svg/);
+  await expect(frame(page).locator('figcaption')).toContainText('The first scene.');
+  await expect(frame(page).locator('figcaption')).toContainText('Photo: Staff');
+  await expect(stage(page).locator('.byline-scrolly-progress')).toHaveText('Step 1 of 3');
 
   // Step 1 is still below the line: the long first step keeps the stage.
   await placeStep(page, 1, 40);
@@ -49,22 +53,24 @@ test('steps change when they cross the reading line, downward and upward', async
   // Crossing the line changes the stage at once.
   await placeStep(page, 1, -20);
   await expect(stage(page)).toHaveAttribute('data-step', '1');
-  await expect(stage(page).locator('img')).toHaveAttribute('src', /landscape-after\.svg/);
-  await expect(stage(page).locator('.byline-scrolly-stage-caption')).toHaveText('The second scene. Photo: Staff');
+  await expect(frame(page).locator('img')).toHaveAttribute('src', /landscape-after\.svg/);
+  await expect(frame(page).locator('figcaption')).toContainText('The second scene.');
+  await expect(stage(page).locator('.byline-scrolly-progress')).toHaveText('Step 2 of 3');
 
   await placeStep(page, 2, 40);
   await expect(stage(page)).toHaveAttribute('data-step', '1');
   await placeStep(page, 2, -20);
   await expect(stage(page)).toHaveAttribute('data-step', '2');
-  await expect(stage(page).locator('img')).toHaveAttribute('src', /panorama\.svg/);
-  await expect(stage(page).locator('.byline-scrolly-stage-caption')).toHaveText('The third scene. Photo: Staff');
+  await expect(frame(page).locator('img')).toHaveAttribute('src', /panorama\.svg/);
+  await expect(frame(page).locator('figcaption')).toContainText('The third scene.');
 
   // Upward: step 2 sinks below the line, step 1 covers it again, then step 0.
   await placeStep(page, 2, 40);
   await expect(stage(page)).toHaveAttribute('data-step', '1');
   await placeStep(page, 1, 40);
   await expect(stage(page)).toHaveAttribute('data-step', '0');
-  await expect(stage(page).locator('.byline-scrolly-stage-caption')).toHaveText('The first scene. Photo: Staff');
+  await expect(frame(page).locator('figcaption')).toContainText('The first scene.');
+  await expect(stage(page).locator('.byline-scrolly-progress')).toHaveText('Step 1 of 3');
 });
 
 test('large jumps select the step under the line', async ({ page }) => {
@@ -89,7 +95,14 @@ test('loading partway down the story selects the step under the line', async ({ 
   await placeStep(page, 1, -30);
   await page.reload();
   await expect(story(page)).toHaveClass(/is-enhanced/);
-  await expect.poll(async () => { await page.waitForTimeout(100); return stage(page).getAttribute('data-step'); }).toBe('1');
+  // The browser restores the scroll position before the stage changes the layout, so the step under the line after
+  // loading is whichever one the final layout puts there. The stage must show exactly that step.
+  const underLine = () => page.evaluate(() => {
+    const line = (window.innerHeight * Number(document.querySelector<HTMLElement>('.byline-scrolly-stage')!.dataset.activationLine)) / 100;
+    const covering = Array.from(document.querySelectorAll('.byline-scrolly > .byline-scrolly-step')).findIndex((step) => { const box = step.getBoundingClientRect(); return box.top <= line && box.bottom > line; });
+    return { covering, shown: Number(document.querySelector<HTMLElement>('.byline-scrolly-stage')!.dataset.step), scrolled: window.scrollY > 0 };
+  });
+  await expect.poll(async () => { await page.waitForTimeout(100); const state = await underLine(); return state.covering >= 0 && state.covering === state.shown && state.scrolled; }).toBe(true);
 });
 
 test('the stage is sticky, decorative and duplicates, never replaces, the source story', async ({ page }) => {
@@ -97,10 +110,11 @@ test('the stage is sticky, decorative and duplicates, never replaces, the source
   await placeStep(page, 1, -20);
   await expect(stage(page)).toHaveCSS('position', 'sticky');
   await expect(stage(page)).toHaveAttribute('aria-hidden', 'true');
-  await expect(stage(page).locator('img')).toHaveAttribute('alt', '');
-  // It stays pinned while the story scrolls.
-  const top = await stage(page).evaluate((node) => node.getBoundingClientRect().top);
-  expect(top).toBeGreaterThanOrEqual(99); expect(top).toBeLessThanOrEqual(101);
+  await expect(frame(page).locator('img')).toHaveAttribute('alt', '');
+  // It stays pinned, just under the site header, while the story scrolls.
+  const stuck = await stage(page).evaluate((node) => ({ top: node.getBoundingClientRect().top, offset: parseFloat(getComputedStyle(node).top) }));
+  expect(stuck.offset).toBeGreaterThan(40); expect(stuck.offset).toBeLessThan(110);
+  expect(Math.abs(stuck.top - stuck.offset)).toBeLessThanOrEqual(1);
   // The linear story is untouched: every step, heading, text and source image remains in order.
   const steps = story(page).locator(':scope > .byline-scrolly-step');
   await expect(steps).toHaveCount(3);
@@ -110,7 +124,7 @@ test('the stage is sticky, decorative and duplicates, never replaces, the source
   expect(sources.map((source) => source.src?.split('/').pop())).toEqual(['landscape.svg', 'landscape-after.svg', 'panorama.svg']);
   expect(sources.every((source) => source.complete && source.width && source.height)).toBe(true);
   // The stage image carries the active step's source attributes.
-  const active = await stage(page).locator('img').evaluate((image) => ({ src: image.getAttribute('src'), width: image.getAttribute('width'), height: image.getAttribute('height') }));
+  const active = await frame(page).locator('img').evaluate((image) => ({ src: image.getAttribute('src'), width: image.getAttribute('width'), height: image.getAttribute('height') }));
   expect(active).toEqual({ src: sources[1].src, width: sources[1].width, height: sources[1].height });
   // Source images and captions stay in the accessibility tree (clipped, not hidden).
   await expect(steps.nth(1).locator('.byline-scrolly-media')).not.toHaveAttribute('aria-hidden', /.*/);
@@ -159,4 +173,37 @@ test('exactly one stage exists and cleanup-safe reinitialisation keeps the story
   for (const [width, height] of [[1000, 900], [800, 900], [1300, 900], [850, 900], [1100, 900]] as const) await page.setViewportSize({ width, height });
   await expect(stage(page)).toHaveCount(1);
   await expect(story(page).locator(':scope > .byline-scrolly-step')).toHaveCount(3);
+});
+
+test('the stage holds one photograph with its caption and credit on separate lines, inside the viewport', async ({ page }) => {
+  await open(page);
+  await placeStep(page, 1, -20);
+  await expect(stage(page).locator('.byline-scrolly-frame')).toHaveCount(1);
+  const caption = frame(page).locator('figcaption');
+  // Same figure language as every other photograph: the caption, then the credit on its own line.
+  const lines = await caption.evaluate((node) => Array.from(node.children, (child) => ({ text: child.textContent, display: getComputedStyle(child).display })));
+  expect(lines).toEqual([{ text: 'Photo: Staff', display: 'block' }]);
+  const box = await frame(page).evaluate((node) => { const figure = node.getBoundingClientRect(); const credit = node.querySelector('figcaption')!.getBoundingClientRect(); return { top: figure.top, bottom: credit.bottom, viewport: window.innerHeight }; });
+  expect(box.top).toBeGreaterThanOrEqual(0); expect(box.bottom).toBeLessThanOrEqual(box.viewport);
+  // The photograph keeps its proportions: contained, never cropped, unless the author chose to fill the stage.
+  await expect(frame(page).locator('img')).toHaveCSS('object-fit', 'contain');
+  const gap = await frame(page).evaluate((node) => { const image = node.querySelector('img')!.getBoundingClientRect(); const text = node.querySelector('figcaption')!.getBoundingClientRect(); return text.top - image.bottom; });
+  expect(gap).toBeGreaterThan(4); expect(gap).toBeLessThan(24);
+});
+
+test('a change of step crossfades briefly and leaves a single photograph behind', async ({ page }) => {
+  await open(page);
+  await placeStep(page, 1, -20);
+  await expect(stage(page)).toHaveAttribute('data-step', '1');
+  await expect(frame(page).locator('img')).toHaveAttribute('src', /landscape-after\.svg/);
+  await expect(stage(page).locator('.byline-scrolly-frame')).toHaveCount(1);
+  const transition = await frame(page).evaluate((node) => getComputedStyle(node).transitionProperty + ' ' + getComputedStyle(node).transitionDuration);
+  expect(transition).toBe('opacity 0.16s');
+});
+
+test('every step carries its number and the reading position as a quiet progress cue', async ({ page }) => {
+  await open(page);
+  await placeStep(page, 2, -20);
+  await expect(stage(page).locator('.byline-scrolly-progress')).toHaveText('Step 3 of 3');
+  await expect(stage(page).locator('.byline-scrolly-ticks i')).toHaveClass(['is-past', 'is-past', 'is-active']);
 });

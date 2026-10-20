@@ -51,7 +51,7 @@ export function Performance({ resource, onRetry }: PerformanceProps) {
 
       {!data.provider?.configured ? (
         <Notice status="info" isDismissible={false}>
-          {__("No analytics provider is configured. Configure one in Byline Integrations to see supported newsroom metrics; editorial work remains available.", "weekly-wildcat-headless")}
+          {__("No analytics provider is configured. Configure one in Byline Settings → Analytics to see supported newsroom metrics; editorial work remains available.", "weekly-wildcat-headless")}
         </Notice>
       ) : (
         <p className="byline-planning-provider-line">

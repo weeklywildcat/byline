@@ -2,9 +2,11 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { article, articleCanvas, openStory, routeStoryFixtures } from './story-fixtures';
 
 /**
- * Before / After is one native range laid over the photograph. These tests
- * drive that control the way readers do (keyboard, mouse, touch) and read the
- * resulting geometry, never a second slider.
+ * Before / After is one native range laid over the photograph. The value is
+ * where the divider stands from the left: Before shows to its left and After
+ * (clipped from the left) to its right. These tests drive that control the way
+ * readers do (keyboard, mouse, touch) and read the resulting geometry, never a
+ * second slider.
  */
 async function open(page: Page) {
   await routeStoryFixtures(page);
@@ -24,11 +26,11 @@ function read(page: Page): Promise<Reading> {
     const range = figure.querySelector<HTMLInputElement>('input[type=range]')!;
     const box = range.getBoundingClientRect();
     const after = figure.querySelectorAll<HTMLElement>('.byline-comparison-image')[1];
-    // clip-path: inset(0 <right> 0 0); the right inset is `N%`, `Npx` or calc(N% + Mpx).
-    const right = getComputedStyle(after).clipPath.match(/^inset\(\S+ (calc\([^)]*\)|\S+) \S+ \S+\)$/)![1];
+    // clip-path: inset(0 0 0 <left>); the left inset is `N%`, `Npx` or calc(N% + Mpx) and is the revealed edge.
+    const left = getComputedStyle(after).clipPath.match(/^inset\(\S+ \S+ \S+ (calc\([^)]*\)|\S+)\)$/)![1];
     // Sum the terms, e.g. `calc(51% - 0.48px)` or `calc(49% + 0.48px)`.
     let inset = 0;
-    for (const [, sign, amount, unit] of right.matchAll(/(?:^|[\s(])([+-]?)\s*([\d.]+)(%|px)/g)) inset += (sign === '-' ? -1 : 1) * parseFloat(amount) * (unit === '%' ? frame.width / 100 : 1);
+    for (const [, sign, amount, unit] of left.matchAll(/(?:^|[\s(])([+-]?)\s*([\d.]+)(%|px)/g)) inset += (sign === '-' ? -1 : 1) * parseFloat(amount) * (unit === '%' ? frame.width / 100 : 1);
     return {
       value: Number(range.value),
       position: (figure as HTMLElement).style.getPropertyValue('--comparison-position'),
@@ -36,7 +38,7 @@ function read(page: Page): Promise<Reading> {
       thumb: parseFloat(getComputedStyle(figure).getPropertyValue('--comparison-thumb')),
       frame: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
       dividerX: figure.querySelector('.byline-comparison-divider')!.getBoundingClientRect().x,
-      revealedEdge: frame.width - inset,
+      revealedEdge: inset,
       rangeBox: { x: box.x, y: box.y, width: box.width, height: box.height }
     };
   });
@@ -68,7 +70,7 @@ test('is one native range on the photograph, with no separate slider below', asy
   near(r.rangeBox.x, r.frame.x); near(r.rangeBox.y, r.frame.y); near(r.rangeBox.width, r.frame.width); near(r.rangeBox.height, r.frame.height);
   await expect(range).toHaveAttribute('min', '0'); await expect(range).toHaveAttribute('max', '100'); await expect(range).toHaveValue('50');
   await expect(range).toHaveAttribute('aria-label', 'Compare Before and After');
-  await expect(range).toHaveAttribute('aria-valuetext', '50% after image revealed');
+  await expect(range).toHaveAttribute('aria-valuetext', '50% Before, 50% After');
   await expect(page.getByRole('slider', { name: 'Compare Before and After' })).toHaveCount(1);
   // Labels stay on the photograph and both complete images are in the DOM.
   await expect(figure.locator('.byline-comparison-labels span')).toHaveText(['Before', 'After']);
@@ -88,7 +90,7 @@ test('keyboard arrows move the divider and focus is visible on the photograph', 
   await page.keyboard.press('ArrowRight');
   await expect(range).toHaveValue('51');
   await expectFollowsValue(page, 51);
-  await expect(range).toHaveAttribute('aria-valuetext', '51% after image revealed');
+  await expect(range).toHaveAttribute('aria-valuetext', '51% Before, 49% After');
   await page.keyboard.press('ArrowLeft'); await page.keyboard.press('ArrowLeft');
   await expectFollowsValue(page, 49);
   await page.keyboard.press('End'); await expectFollowsValue(page, 100);
@@ -98,7 +100,7 @@ test('keyboard arrows move the divider and focus is visible on the photograph', 
   near(r.dividerX - r.frame.x, r.thumb / 2);
   // Visible focus, on and around the comparison itself.
   await expect(frame).toHaveCSS('outline-style', 'solid');
-  await expect(frame).toHaveCSS('outline-width', '3px');
+  await expect(frame).toHaveCSS('outline-width', '2px');
   await page.keyboard.press('Tab');
   await expect(frame).not.toHaveCSS('outline-style', 'solid');
 });
@@ -176,7 +178,7 @@ test('resizing keeps the divider where the value says', async ({ page }) => {
   await range.fill('70');
   await expectFollowsValue(page, 70);
   const wide = await read(page);
-  for (const [width, height] of [[768, 900], [390, 844], [320, 700], [1200, 900]] as const) {
+  for (const [width, height] of [[768, 900], [390, 844], [320, 700], [1280, 720]] as const) {
     await page.setViewportSize({ width, height });
     await page.locator('.byline-before-after').scrollIntoViewIfNeeded();
     const resized = await expectFollowsValue(page, 70);
@@ -229,4 +231,54 @@ test('without JavaScript both complete photographs, the labels and the caption r
   await expect(figure.locator('figcaption')).toContainText('The campus renovation.');
   await expect(figure.locator('input')).toHaveCount(0);
   await context.close();
+});
+
+test('Before reads on the left and After on the right, and a label fades once the divider covers it', async ({ page }) => {
+  const { figure, range } = await open(page);
+  const chips = figure.locator('.byline-comparison-labels span');
+  const [beforeX, afterX] = await chips.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().x));
+  expect(beforeX).toBeLessThan(afterX);
+  await expect(chips).toHaveText(['Before', 'After']);
+  // The divider is the join: at the start only After shows, at the end only Before.
+  await range.focus();
+  await page.keyboard.press('Home');
+  const start = await expectFollowsValue(page, 0);
+  near(start.revealedEdge, start.thumb / 2);
+  await expect(chips.nth(0)).toHaveClass(/is-covered/); await expect(chips.nth(1)).not.toHaveClass(/is-covered/);
+  await page.keyboard.press('End');
+  const end = await expectFollowsValue(page, 100);
+  near(end.revealedEdge, end.frame.width - end.thumb / 2);
+  await expect(chips.nth(1)).toHaveClass(/is-covered/); await expect(chips.nth(0)).not.toHaveClass(/is-covered/);
+  await range.fill('50');
+  await expect(chips.nth(0)).not.toHaveClass(/is-covered/); await expect(chips.nth(1)).not.toHaveClass(/is-covered/);
+  // The labels are still named for assistive technology without taking a row of their own.
+  await expect(figure.locator('.byline-comparison-image > strong').first()).toHaveText('Before');
+});
+
+test('a tall comparison is capped to the screen and centred, whatever its shape', async ({ page }) => {
+  const { figure, frame } = await open(page);
+  await frame.evaluate((node) => node.style.setProperty('--comparison-aspect', '0.8'));
+  const box = (await frame.boundingBox())!, outer = (await figure.boundingBox())!;
+  const height = page.viewportSize()!.height;
+  expect(box.height).toBeLessThanOrEqual(height * 0.85 + 1);
+  near(box.width / box.height, 0.8, 0.01);
+  near(box.x - outer.x, (outer.width - box.width) / 2, 1.5);
+  // Every photograph fills the capped frame; nothing spills out of it.
+  const images = await figure.locator('img').evaluateAll((nodes) => nodes.map((node) => { const b = node.getBoundingClientRect(); return [b.width, b.height]; }));
+  for (const [width, imageHeight] of images) { near(width, box.width, 1); near(imageHeight, box.height, 1); }
+});
+
+test('without JavaScript the photographs sit side by side on a wide canvas and stack on a narrow one', async ({ browser }) => {
+  for (const [width, stacked] of [[1200, false], [390, true]] as const) {
+    const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width, height: 900 } });
+    const page = await context.newPage(); await routeStoryFixtures(page);
+    await page.goto(`http://127.0.0.1:${process.env.BYLINE_BROWSER_PORT || 4173}${article}`);
+    const [first, second] = await page.locator('.byline-before-after .byline-comparison-image').evaluateAll((nodes) => nodes.map((node) => { const b = node.getBoundingClientRect(); return { x: b.x, right: b.right, y: b.y, bottom: b.bottom }; }));
+    if (stacked) expect(second.y).toBeGreaterThanOrEqual(first.bottom - 1); else expect(second.x).toBeGreaterThanOrEqual(first.right - 1);
+    // The story itself never runs past the window (a table scrolls inside its own figure). The page's
+    // newsletter signup is checked by the geometry suite; without JavaScript it is a separate matter.
+    const outside = await page.evaluate(() => Array.from(document.querySelectorAll('.article-body *')).filter((node) => !node.closest('.wp-block-table') && node.getBoundingClientRect().right > document.documentElement.clientWidth + 1).length);
+    expect(outside).toBe(0);
+    await context.close();
+  }
 });

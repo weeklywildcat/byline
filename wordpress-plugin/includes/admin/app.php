@@ -45,7 +45,7 @@ function byline_admin_page_capability(string $page): string
         BYLINE_ADMIN_PLANNING_PAGE => 'edit_posts',
         BYLINE_ADMIN_PUBLICATION_PAGE => BYLINE_MANAGE_CAPABILITY,
         BYLINE_ADMIN_INTEGRATIONS_PAGE => BYLINE_MANAGE_INTEGRATIONS_CAPABILITY,
-        BYLINE_ADMIN_SETTINGS_PAGE => BYLINE_MANAGE_CAPABILITY,
+        BYLINE_ADMIN_SETTINGS_PAGE => byline_admin_menu_capability(),
         BYLINE_ADMIN_NEWSLETTERS_PAGE => 'edit_posts',
         // Retained for the redirect below; polls themselves use their own
         // mapped capability family, not a generic post capability.
@@ -71,28 +71,18 @@ function byline_admin_page_definitions(): array
     $pages = [
         BYLINE_ADMIN_PAGE => [
             'page_title' => 'Byline Home',
-            // WordPress already owns a top-level "Dashboard"; this is the
-            // actionable newsroom landing surface for Byline.
+            // Keep Home independent from the settings redesign. It remains the
+            // actionable newsroom landing surface for publication managers.
             'menu_title' => 'Home',
             'capability' => BYLINE_MANAGE_CAPABILITY,
             'callback' => 'byline_render_admin_app',
         ],
-        BYLINE_ADMIN_PUBLICATION_PAGE => [
-            'page_title' => 'Publication',
-            'menu_title' => 'Publication',
-            'capability' => BYLINE_MANAGE_CAPABILITY,
-            'callback' => 'byline_render_admin_app',
-        ],
-        BYLINE_ADMIN_INTEGRATIONS_PAGE => [
-            'page_title' => 'Integrations',
-            'menu_title' => 'Integrations',
-            'capability' => BYLINE_MANAGE_INTEGRATIONS_CAPABILITY,
-            'callback' => 'byline_render_admin_app',
-        ],
         BYLINE_ADMIN_SETTINGS_PAGE => [
-            'page_title' => 'Settings',
+            'page_title' => 'Byline Settings',
             'menu_title' => 'Settings',
-            'capability' => BYLINE_MANAGE_CAPABILITY,
+            // Settings contains both publication and integration sections. The
+            // React app hides sections the current user cannot administer.
+            'capability' => byline_admin_menu_capability(),
             'callback' => 'byline_render_admin_app',
         ],
     ];
@@ -157,9 +147,9 @@ function byline_admin_planning_menu_slug(string $tab): string
 }
 
 /**
- * Byline Doctor is the diagnostics surface of the Settings screen. It keeps its
- * own sidebar entry, and its own name, because it is a destination people are
- * sent to by support instructions rather than a view of Settings.
+ * Diagnostics remains deep-linkable for support instructions, but it now lives
+ * inside the unified Settings information architecture instead of owning a
+ * second WordPress sidebar entry.
  */
 function byline_admin_doctor_menu_slug(): string
 {
@@ -261,16 +251,6 @@ function byline_register_admin_app(): void
         );
     }
 
-    // Byline Doctor is a deep link into the Settings screen rather than a page
-    // of its own, so it carries the Settings capability and no callback.
-    add_submenu_page(
-        BYLINE_ADMIN_PAGE,
-        'Byline Doctor',
-        'Byline Doctor',
-        byline_admin_page_capability(BYLINE_ADMIN_SETTINGS_PAGE),
-        byline_admin_doctor_menu_slug(),
-        ''
-    );
 }
 add_action('admin_menu', 'byline_register_admin_app');
 
@@ -280,12 +260,44 @@ add_action('admin_menu', 'byline_register_admin_app');
  */
 function byline_admin_redirect_legacy_pages(): void
 {
-    if (wp_doing_ajax() || byline_admin_current_page() !== BYLINE_ADMIN_LEGACY_TEAMS_PAGE) {
+    if (wp_doing_ajax()) {
         return;
     }
 
-    wp_safe_redirect(byline_sports_team_settings_url());
-    exit;
+    $page = byline_admin_current_page();
+    $tab = byline_admin_query_key('tab');
+
+    if ($page === BYLINE_ADMIN_LEGACY_TEAMS_PAGE) {
+        wp_safe_redirect(byline_sports_team_settings_url());
+        exit;
+    }
+
+    if ($page === BYLINE_ADMIN_PUBLICATION_PAGE) {
+        $allowed = ['identity', 'branding', 'navigation', 'features', 'social'];
+        $target = in_array($tab, $allowed, true) ? $tab : 'identity';
+        wp_safe_redirect(byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => $target]));
+        exit;
+    }
+
+    if ($page === BYLINE_ADMIN_INTEGRATIONS_PAGE) {
+        $allowed = ['discord', 'deployment'];
+        $target = in_array($tab, $allowed, true) ? $tab : 'deployment';
+        if ($target === 'discord' && !byline_admin_feature_enabled('discord')) {
+            $target = 'deployment';
+        }
+        wp_safe_redirect(byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => $target]));
+        exit;
+    }
+
+    if ($page === BYLINE_ADMIN_NEWSLETTERS_PAGE && $tab === 'settings') {
+        wp_safe_redirect(byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'newsletter']));
+        exit;
+    }
+
+    if ($page === 'wwh-settings') {
+        wp_safe_redirect(byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'login']));
+        exit;
+    }
 }
 add_action('admin_init', 'byline_admin_redirect_legacy_pages');
 
@@ -308,18 +320,33 @@ function byline_admin_page_urls(): array
             'contentHealth' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'content-health']),
             'feedback' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'feedback']),
         ],
+        // Keep the old URL groups as API-shape compatibility aliases. Every
+        // configuration destination now resolves to the single Settings page.
         'publication' => [
-            'identity' => byline_admin_page_url(BYLINE_ADMIN_PUBLICATION_PAGE, ['tab' => 'identity']),
-            'branding' => byline_admin_page_url(BYLINE_ADMIN_PUBLICATION_PAGE, ['tab' => 'branding']),
-            'navigation' => byline_admin_page_url(BYLINE_ADMIN_PUBLICATION_PAGE, ['tab' => 'navigation']),
-            'features' => byline_admin_page_url(BYLINE_ADMIN_PUBLICATION_PAGE, ['tab' => 'features']),
-            'social' => byline_admin_page_url(BYLINE_ADMIN_PUBLICATION_PAGE, ['tab' => 'social']),
+            'identity' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'identity']),
+            'branding' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'branding']),
+            'navigation' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'navigation']),
+            'features' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'features']),
+            'social' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'social']),
         ],
         'integrations' => [
-            'discord' => byline_admin_page_url(BYLINE_ADMIN_INTEGRATIONS_PAGE, ['tab' => 'discord']),
-            'deployment' => byline_admin_page_url(BYLINE_ADMIN_INTEGRATIONS_PAGE, ['tab' => 'deployment']),
+            'newsletter' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'newsletter']),
+            'analytics' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'analytics']),
+            'discord' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'discord']),
+            'deployment' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'deployment']),
+            'login' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'login']),
         ],
         'settings' => [
+            'identity' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'identity']),
+            'branding' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'branding']),
+            'navigation' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'navigation']),
+            'social' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'social']),
+            'features' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'features']),
+            'newsletter' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'newsletter']),
+            'analytics' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'analytics']),
+            'discord' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'discord']),
+            'deployment' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'deployment']),
+            'login' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'login']),
             'access' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'access']),
             'api' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'api']),
             'compatibility' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'compatibility']),
@@ -327,7 +354,7 @@ function byline_admin_page_urls(): array
         ],
         'newsletters' => [
             'issues' => byline_admin_page_url(BYLINE_ADMIN_NEWSLETTERS_PAGE, ['tab' => 'issues']),
-            'settings' => byline_admin_page_url(BYLINE_ADMIN_NEWSLETTERS_PAGE, ['tab' => 'settings']),
+            'settings' => byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'newsletter']),
         ],
         'polls' => byline_admin_polls_url(),
         'teams' => byline_sports_team_settings_url(),
@@ -371,6 +398,8 @@ function byline_admin_legacy_hash_urls(array $page_urls): array
         '/content/polls' => $page_urls['polls'],
         '/content/teams' => $page_urls['teams'],
         '/sports/teams' => $page_urls['teams'],
+        '/integrations/newsletter' => $page_urls['integrations']['newsletter'],
+        '/integrations/analytics' => $page_urls['integrations']['analytics'],
         '/integrations/discord' => $page_urls['integrations']['discord'],
         '/integrations/deployment' => $page_urls['integrations']['deployment'],
         '/advanced/access' => $page_urls['settings']['access'],
@@ -410,7 +439,7 @@ function byline_admin_user_landing_url(): string
     }
 
     if (current_user_can(BYLINE_MANAGE_INTEGRATIONS_CAPABILITY)) {
-        return byline_admin_page_url(BYLINE_ADMIN_INTEGRATIONS_PAGE);
+        return byline_admin_page_url(BYLINE_ADMIN_SETTINGS_PAGE, ['tab' => 'deployment']);
     }
 
     if (current_user_can('edit_posts')) {
@@ -471,8 +500,6 @@ function byline_enqueue_admin_app(string $hook_suffix): void
     $app_pages = [
         BYLINE_ADMIN_PAGE,
         BYLINE_ADMIN_PLANNING_PAGE,
-        BYLINE_ADMIN_PUBLICATION_PAGE,
-        BYLINE_ADMIN_INTEGRATIONS_PAGE,
         BYLINE_ADMIN_SETTINGS_PAGE,
         BYLINE_ADMIN_NEWSLETTERS_PAGE,
     ];
@@ -552,6 +579,7 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         'distributionPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/distribution',
         'newsletterPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/newsletters',
         'analyticsPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/analytics',
+        'mediaSettingsPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/media-settings',
         'contentHealthPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/content-health',
         'currentUserId' => get_current_user_id(),
         'nonce' => wp_create_nonce('wp_rest'),
@@ -583,8 +611,6 @@ function byline_admin_config_pages(): array
 {
     return [
         BYLINE_ADMIN_PAGE,
-        BYLINE_ADMIN_PUBLICATION_PAGE,
-        BYLINE_ADMIN_INTEGRATIONS_PAGE,
         BYLINE_ADMIN_SETTINGS_PAGE,
     ];
 }
@@ -624,11 +650,6 @@ function byline_admin_submenu_file(?string $submenu_file): ?string
     if ($page === BYLINE_ADMIN_PLANNING_PAGE) {
         // An open story workspace belongs to Stories in the sidebar.
         return byline_admin_planning_menu_slug(byline_admin_workspace_story_id() > 0 ? 'stories' : $tab);
-    }
-
-    // Diagnostics highlights Byline Doctor, its own entry, not Settings.
-    if ($page === BYLINE_ADMIN_SETTINGS_PAGE && $tab === 'diagnostics') {
-        return byline_admin_doctor_menu_slug();
     }
 
     if (in_array($page, byline_admin_config_pages(), true)) {

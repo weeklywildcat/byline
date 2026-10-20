@@ -13,7 +13,7 @@ function registerAvailableVariations() {
     if (!type || registered.has(variation.name)) continue;
     registered.add(variation.name);
     registerBlockVariation(variation.block, {
-      name: variation.name, title: variation.title, description: variation.title,
+      name: variation.name, title: variation.title, description: variation.description,
       icon: variation.icon as any, keywords: variation.keywords, scope: ["inserter"],
       attributes: supportedAttributes(variation.attributes, type.attributes || {}),
       ...(variation.innerBlocks ? { innerBlocks: filterInnerBlocks(variation.innerBlocks) as any } : {}),

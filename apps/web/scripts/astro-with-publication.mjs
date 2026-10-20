@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,6 +39,42 @@ async function loadPublication() {
   } catch (error) {
     console.warn(`Byline publication endpoint unavailable (${error instanceof Error ? error.message : error}); using compatibility defaults.`);
     return null;
+  }
+}
+
+/**
+ * Astro's incremental build restores a page when its own module graph is
+ * unchanged, but it does not follow stylesheets (a change inside an @import-ed
+ * partial leaves restored pages pointing at a CSS file that no longer exists,
+ * and the asset check then fails the build). Fingerprint everything that can
+ * change a page's markup or styles and drop the incremental cache when it moves.
+ */
+async function sourceFingerprint() {
+  const hash = createHash("sha256");
+  const roots = ["../../packages", "src", "components", "lib", "views", "story-presentations", "public/fonts"];
+  async function visit(directory) {
+    let entries;
+    try { entries = await readdir(directory, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+      const file = path.join(directory, entry.name);
+      if (entry.isDirectory()) await visit(file);
+      else if (/\.(css|astro|tsx?|mjs|json)$/.test(entry.name)) hash.update(file).update(await readFile(file));
+    }
+  }
+  for (const root of roots) await visit(path.join(projectRoot, root));
+  return hash.digest("hex");
+}
+
+async function invalidateIncrementalBuildWhenSourcesChange() {
+  const cacheDirectory = path.join(projectRoot, "node_modules/.astro");
+  const marker = path.join(cacheDirectory, "byline-source-fingerprint");
+  const current = await sourceFingerprint();
+  const previous = await readFile(marker, "utf8").catch(() => "");
+  if (previous !== current) {
+    await rm(path.join(cacheDirectory, "incremental-build.json"), { force: true });
+    await mkdir(cacheDirectory, { recursive: true });
+    await writeFile(marker, current);
   }
 }
 
@@ -85,6 +121,7 @@ const publication = snapshot?.publication ?? await loadPublication();
 if (publication) publication.appearance = { theme: "weekly-wildcat", tokenOverrides: {} };
 const acquisitionMs = performance.now() - acquisitionStarted;
 if (astroArguments[0] === "build") {
+  await invalidateIncrementalBuildWhenSourcesChange();
   const buildDirectory = path.join(projectRoot, ".byline-build");
   await rm(buildDirectory, { recursive: true, force: true });
   await mkdir(buildDirectory, { recursive: true });

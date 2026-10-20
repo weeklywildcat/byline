@@ -474,9 +474,14 @@ foreach (['qa-interview', 'what-we-know', 'pros-cons', 'three-things', 'source-h
     $pattern = $newsroom_test['patterns']['byline/' . $slug] ?? [];
     newsroom_assert(($pattern['postTypes'] ?? []) === ['post'] && strpos($pattern['content'] ?? '', 'templateLock') === false, 'Unlocked story pattern: ' . $slug);
 }
-foreach (['core/cover' => ['byline-visual-chapter'], 'core/group' => ['byline-context', 'byline-why-it-matters', 'byline-whats-next', 'byline-how-we-know', 'byline-editors-note', 'byline-margin-note'], 'core/table' => ['byline-data-table', 'byline-comparison-table'], 'core/details' => ['byline-read-more', 'byline-methodology', 'byline-full-statement'], 'core/columns' => ['byline-comparison', 'byline-main-aside', 'byline-key-numbers']] as $block_name => $names) {
+foreach (['core/cover' => ['byline-visual-chapter'], 'core/group' => ['byline-context', 'byline-editors-note', 'byline-margin-note'], 'core/table' => ['byline-data-table', 'byline-comparison-table'], 'core/details' => ['byline-read-more'], 'core/columns' => ['byline-comparison', 'byline-key-numbers']] as $block_name => $names) {
     $registered = array_column($newsroom_test['styles'][$block_name] ?? [], 'name');
     foreach ($names as $name) { newsroom_assert(in_array($name, $registered, true), 'Story style must register: ' . $name); }
+}
+// Retired duplicates are no longer offered for new content; published stories keep their classes (still styled).
+foreach (['core/group' => ['byline-why-it-matters', 'byline-whats-next', 'byline-how-we-know'], 'core/details' => ['byline-methodology', 'byline-full-statement'], 'core/columns' => ['byline-main-aside']] as $block_name => $names) {
+    $registered = array_column($newsroom_test['styles'][$block_name] ?? [], 'name');
+    foreach ($names as $name) { newsroom_assert(!in_array($name, $registered, true), 'Retired style must not be offered: ' . $name); }
 }
 function newsroom_test_heading($anchor, $text, $level = 2): array {
     return ['blockName' => 'core/heading', 'attrs' => ['anchor' => $anchor, 'level' => $level], 'innerHTML' => '<h' . $level . ' id="' . esc_attr($anchor) . '">' . $text . '</h' . $level . '>'];

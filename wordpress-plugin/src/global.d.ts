@@ -3,7 +3,9 @@ declare module "*.css";
 declare module "@wordpress/blocks" {
   export function registerBlockVariation(blockName: string, variation: { name: string; title: string; description?: string; icon?: any; keywords?: string[]; scope?: string[]; attributes?: Record<string, unknown>; innerBlocks?: any; isActive?: (attributes: Record<string, unknown>) => boolean }): void;
   export function __unstableGetInnerBlocksProps(...args: any[]): any;
+  export function __unstableGetBlockProps(...args: any[]): any;
   export function createBlock(...args: any[]): any;
+  export function cloneBlock(...args: any[]): any;
   export function getBlockType(...args: any[]): any;
   export function parse(...args: any[]): any;
   export function registerBlockType(metadata: unknown, settings: unknown): unknown;
@@ -15,11 +17,15 @@ declare module "@wordpress/blocks" {
 declare module "@wordpress/block-editor" {
   export const MediaUpload: any;
   export const MediaUploadCheck: any;
+  export const MediaPlaceholder: any;
+  export const MediaReplaceFlow: any;
+  export const PlainText: any;
   export const BlockControls: any;
   export const InnerBlocks: any;
   export const InspectorControls: any;
   export const RichText: any;
   export const useBlockProps: any;
+  export const useInnerBlocksProps: any;
 }
 
 declare module "@wordpress/edit-post" {

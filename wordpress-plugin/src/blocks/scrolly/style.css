@@ -1,1 +1,54 @@
-@import "../../../../packages/ui/src/newsroom-blocks.css";
+/* Editor-only chrome for this block: the story board, the reader preview and the fit choice.
+   The public presentation (including the stage the preview reuses) lives in
+   packages/ui/src/newsroom/scrolly.css and loads once through the shared newsroom stylesheet. */
+.byline-visually-hidden { border: 0; clip-path: inset(50%); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; width: 1px; }
+
+/* The block is a workspace, not a column of prose: keep its contents off the selection outline. */
+.byline-scrolly-editor { padding-inline: 1rem; }
+
+/* Story board: one card per step, in reading order. */
+.byline-scrolly-board { border-block-start: var(--story-rule-strong); font-family: var(--story-sans); padding-top: .75rem; }
+.byline-scrolly-board-head { align-items: center; display: flex; flex-wrap: wrap; gap: .5rem .75rem; margin-bottom: .75rem; }
+.byline-scrolly-board-count { color: var(--story-muted); font-size: .8rem; }
+.byline-scrolly-board-actions { display: flex; flex-wrap: wrap; gap: .25rem; margin-inline-start: auto; }
+.byline-scrolly-board-actions .components-button { min-height: 36px; }
+.byline-scrolly-cards { display: flex; gap: .75rem; list-style: none; margin: 0; overflow-x: auto; padding: 4px 4px .75rem; scroll-padding-inline: 4px; }
+.byline-scrolly-cards > li { flex: 0 0 9.5rem; margin: 0; }
+.byline-scrolly-card {
+  background: transparent; border: 0; color: var(--ink); cursor: pointer; display: grid; font: inherit; gap: .4rem; grid-template-columns: 1fr; padding: 0; position: relative; text-align: left; width: 100%;
+}
+.byline-scrolly-card-thumb { align-items: center; aspect-ratio: 4 / 3; background: color-mix(in srgb, var(--ink, #121212) 6%, transparent); color: var(--story-muted); display: flex; font-size: .75rem; justify-content: center; overflow: hidden; }
+.byline-scrolly-card-thumb img { height: 100%; object-fit: cover; width: 100%; }
+.byline-scrolly-card-number { background: var(--ink, #121212); border-radius: 50%; color: var(--page, #fff); font-size: .72rem; font-weight: 700; height: 1.5rem; left: .4rem; line-height: 1.5rem; position: absolute; text-align: center; top: .4rem; width: 1.5rem; }
+.byline-scrolly-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-family: var(--story-headline); font-size: .95rem; font-weight: 600; line-height: 1.25; min-height: 2.5em; overflow: hidden; }
+.byline-scrolly-card-flag { color: var(--story-accent); font-size: .72rem; font-weight: 700; }
+.byline-scrolly-card[aria-current="step"] .byline-scrolly-card-thumb { outline: 2px solid var(--story-accent); outline-offset: 2px; }
+.byline-scrolly-card[aria-current="step"] .byline-scrolly-card-number { background: var(--story-accent); }
+.byline-scrolly-card:focus-visible { outline: 2px solid var(--story-accent); outline-offset: 3px; }
+.byline-scrolly-board-empty { color: var(--story-muted); margin: 0 0 .75rem; }
+.byline-scrolly-board-hint { color: var(--story-soft); font-size: .78rem; margin: 0 0 1rem; }
+
+/* Reader preview: the real stage beside the active step. */
+.byline-scrolly-preview { --scrolly-stage-max: 13rem; border-block-start: var(--story-rule); container: scrolly-preview / inline-size; font-family: var(--story-sans); margin-bottom: 1.5rem; padding-top: .75rem; }
+.byline-scrolly-preview-head { align-items: center; display: flex; gap: 1rem; justify-content: space-between; margin-bottom: 1rem; }
+.byline-scrolly-stepper { align-items: center; display: flex; font-size: .85rem; gap: .25rem; }
+.byline-scrolly-preview-body { display: grid; gap: 1.25rem 2.25rem; grid-template-columns: 1fr; }
+@container scrolly-preview (min-width: 560px) { .byline-scrolly-preview-body { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
+.byline-scrolly-preview-heading { font-family: var(--story-headline); font-size: 1.3rem; font-weight: 600; line-height: 1.2; margin: 0 0 .5rem; text-wrap: balance; }
+.byline-scrolly-preview-excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; font-family: var(--story-serif); font-size: 1rem; line-height: 1.55; margin: 0; overflow: hidden; }
+.byline-scrolly-preview-note { color: var(--story-soft); font-size: .78rem; line-height: 1.4; margin: .75rem 0 0; }
+.byline-scrolly-preview-empty { color: var(--story-muted); font-size: .9rem; margin: 0; }
+
+.byline-scrolly-steps { display: flow-root; }
+.byline-scrolly-add { margin-top: 1rem; }
+
+/* Photograph fit, in the sidebar: two radio cards that draw what they do. */
+.byline-fit-choice { border: 0; display: grid; gap: .5rem; margin: 0; padding: 0; }
+.byline-fit-choice legend { font-weight: 600; margin-bottom: .5rem; padding: 0; }
+.byline-fit-option { cursor: pointer; display: block; }
+.byline-fit-option input { height: 1px; opacity: 0; position: absolute; width: 1px; }
+.byline-fit-card { border: 1px solid #949494; border-radius: 2px; display: grid; gap: .25rem; padding: .75rem; }
+.byline-fit-card small { color: #757575; font-size: .75rem; line-height: 1.4; }
+.byline-fit-option input:checked + .byline-fit-card { border-color: var(--wp-admin-theme-color, #3858e9); box-shadow: inset 0 0 0 1px var(--wp-admin-theme-color, #3858e9); }
+.byline-fit-option input:focus-visible + .byline-fit-card { outline: 2px solid var(--wp-admin-theme-color, #3858e9); outline-offset: 2px; }
+.byline-fit-diagram { color: #1e1e1e; }
