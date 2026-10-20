@@ -18,10 +18,11 @@ test.describe("WordPress environment", () => {
     await expect(presence).toHaveCSS("height", "32px");
     const triggerAvatar = presence.locator('[data-slot="avatar"]').first();
     await expect(triggerAvatar).toBeVisible();
-    await expect(triggerAvatar).toHaveCSS("width", "24px");
-    await expect(triggerAvatar).toHaveCSS("height", "24px");
-    await expect(triggerAvatar.locator('[data-slot="avatar-image"]')).toHaveCSS("width", "24px");
-    await expect(triggerAvatar.locator('[data-slot="avatar-image"]')).toHaveCSS("height", "24px");
+    await expect(triggerAvatar).toHaveAttribute("data-size", "default");
+    await expect(triggerAvatar).toHaveCSS("width", "32px");
+    await expect(triggerAvatar).toHaveCSS("height", "32px");
+    await expect(triggerAvatar.locator('[data-slot="avatar-image"]')).toHaveCSS("width", "32px");
+    await expect(triggerAvatar.locator('[data-slot="avatar-image"]')).toHaveCSS("height", "32px");
 
     await presence.click();
     await expect(adminPage.getByText("Newsroom", { exact: true })).toBeVisible();
