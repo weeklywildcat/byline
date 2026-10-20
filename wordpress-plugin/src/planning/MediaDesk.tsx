@@ -7,6 +7,8 @@ import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { DatePicker, valueSelectTriggerClass } from "../admin-ui/components/pickers";
 import { StatusBadge } from "../admin-ui/components/status-badge";
+import { WorkStatusBadge, mediaIntensity, workBadgeColors } from "../admin-ui/components/work-status-badge";
+import { cn } from "../admin-ui/lib/utils";
 import { useElementWidth } from "../admin-ui/lib/hooks";
 import { decodeEntities } from "../admin-ui/lib/text";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "../admin-ui/ui/attachment";
@@ -24,14 +26,13 @@ import { invalidateStoryData, mediaDeskKey } from "../story/story-query";
 import type { PlanningFetchers } from "./planning-api";
 import { EMPTY_MEDIA_DESK_FILTERS, MEDIA_STATUS_OPTIONS, MEDIA_TYPE_OPTIONS, filterMediaRows, mediaDeskRows, mediaDueDay, mediaReadinessHint, mediaTypeLabel, sortMediaRows, type MediaDeskFilters, type MediaDeskRow } from "./media-desk-model";
 import { describeMediaDeskError } from "./media-desk-errors";
-import { mergeMediaAttachmentIds, removeMediaAttachmentId, type MediaAttachment, type MediaDeskResponse, type PlanningVisualStatus } from "./planning-model";
+import { mergeMediaAttachmentIds, removeMediaAttachmentId, type MediaAttachment, type MediaDeskResponse } from "./planning-model";
 import { NothingHere, PageHeader, ResourceGate } from "./PlanningPage";
 import { useOptionalQuery } from "./planning-query";
 
 export type MediaDeskProps = { fetchers: PlanningFetchers; workspaceUrl: (storyId: number, appointmentId?: string) => string; onOpenStory: (storyId: number) => void };
 
 const ANY = "__any";
-const statusTone = (status: PlanningVisualStatus) => status === "needed" ? "attention" as const : status === "done" || status === "selected" ? "done" as const : "neutral" as const;
 const rowKey = (row: MediaDeskRow) => `${row.story.id}:${row.id}`;
 
 type Update = (row: MediaDeskRow, changes: Record<string, unknown>, options?: { featured?: boolean }) => void;
@@ -121,8 +122,8 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory }: MediaDe
     return {
       editable, saving,
       status: editable
-        ? <Select items={MEDIA_STATUS_OPTIONS} value={row.status} disabled={saving} onValueChange={(value) => { if (value && value !== row.status) update(row, { status: String(value) }); }}><SelectTrigger aria-label={`${__("Status", "weekly-wildcat-headless")}: ${row.title || mediaTypeLabel(row.type)}`} className={valueSelectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{MEDIA_STATUS_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-        : <StatusBadge tone={statusTone(row.status)}>{MEDIA_STATUS_OPTIONS.find((item) => item.value === row.status)?.label || row.status}</StatusBadge>,
+        ? <Select items={MEDIA_STATUS_OPTIONS} value={row.status} disabled={saving} onValueChange={(value) => { if (value && value !== row.status) update(row, { status: String(value) }); }}><SelectTrigger aria-label={`${__("Status", "weekly-wildcat-headless")}: ${row.title || mediaTypeLabel(row.type)}`} className={cn(valueSelectTriggerClass, workBadgeColors.production[mediaIntensity(row.status)])}><SelectValue /></SelectTrigger><SelectContent>{MEDIA_STATUS_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+        : <WorkStatusBadge kind="production" intensity={mediaIntensity(row.status)}>{MEDIA_STATUS_OPTIONS.find((item) => item.value === row.status)?.label || row.status}</WorkStatusBadge>,
       assignee: editable && canAssign
         ? <Select items={assigneeItems} value={String(row.assignee?.id || 0)} disabled={saving} onValueChange={(value) => { if (value !== undefined && String(value) !== String(row.assignee?.id || 0)) update(row, { assigneeId: Number(value) }); }}><SelectTrigger aria-label={`${__("Assignee", "weekly-wildcat-headless")}: ${row.title || mediaTypeLabel(row.type)}`} className={valueSelectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{assigneeItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
         : <span className="flex items-center gap-2">{row.assignee ? <><PeopleAvatars people={[row.assignee]} />{row.assignee.name}</> : <span className="text-muted-foreground">{__("Unassigned", "weekly-wildcat-headless")}</span>}</span>,

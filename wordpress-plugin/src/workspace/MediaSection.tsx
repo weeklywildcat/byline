@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import { ItemButton } from "../admin-ui/components/item-button";
 import { PeopleAvatars, anyPicture } from "../admin-ui/components/people-avatars";
-import { StatusBadge } from "../admin-ui/components/status-badge";
+import { WorkStatusBadge, mediaIntensity } from "../admin-ui/components/work-status-badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
@@ -33,7 +33,7 @@ function MediaRow({ assignment, people, timezone, now, onOpen }: { assignment: S
       {detail.some(Boolean) ? <ItemDescription><Meta parts={detail} flag={(index) => (files ? index > 0 : true)} /></ItemDescription> : null}
     </ItemContent>
     <ItemActions>
-      <StatusBadge tone={done ? "done" : assignment.status === "needed" ? "attention" : "neutral"}>{labelFor(MEDIA_STATUS_LABELS, assignment.status)}</StatusBadge>
+      <WorkStatusBadge kind="production" intensity={mediaIntensity(assignment.status)}>{labelFor(MEDIA_STATUS_LABELS, assignment.status)}</WorkStatusBadge>
       <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
     </ItemActions>
   </ItemButton>;

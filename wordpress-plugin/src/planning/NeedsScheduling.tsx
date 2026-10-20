@@ -2,6 +2,7 @@ import { useState } from "react";
 import { __, sprintf } from "@wordpress/i18n";
 import { decodeEntities } from "../admin-ui/lib/text";
 import { Badge } from "../admin-ui/ui/badge";
+import { WorkStatusBadge } from "../admin-ui/components/work-status-badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
@@ -34,7 +35,7 @@ export function NeedsScheduling({ items, loading, onOpenStory }: { items: NeedsS
               {" · "}{item.assigneeNames.length ? item.assigneeNames.join(", ") : __("Unassigned", "weekly-wildcat-headless")}
             </ItemDescription>
           </ItemContent>
-          <ItemActions><a className={buttonVariants({ variant: "outline", size: "sm" })} href={item.href}>{__("Schedule", "weekly-wildcat-headless")}<span className="sr-only"> {item.title}</span></a></ItemActions>
+          <ItemActions><WorkStatusBadge kind="reporting" intensity="action">{__("Needs scheduling", "weekly-wildcat-headless")}</WorkStatusBadge><a className={buttonVariants({ variant: "outline", size: "sm" })} href={item.href}>{__("Schedule", "weekly-wildcat-headless")}<span className="sr-only"> {item.title}</span></a></ItemActions>
         </Item>)}</ItemGroup>
         : <p className="px-3 pb-2 text-sm text-muted-foreground">{__("Checking for appointments that need a time…", "weekly-wildcat-headless")}</p>}
       {items.length > PREVIEW ? <div className="px-1.5 pt-1"><Button variant="link" size="sm" aria-expanded={showAll} onClick={() => setShowAll((current) => !current)}>{showAll ? __("Show fewer", "weekly-wildcat-headless") : sprintf(/* translators: %d: item count. */ __("Show all %d", "weekly-wildcat-headless"), items.length)}</Button></div> : null}

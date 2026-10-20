@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { ChevronRight } from "lucide-react";
 import { ItemButton } from "../admin-ui/components/item-button";
 import { PeopleAvatars, anyPicture, type AvatarPerson } from "../admin-ui/components/people-avatars";
-import { StatusBadge, type StatusTone } from "../admin-ui/components/status-badge";
+import { WorkStatusBadge, sourceIntensity, appointmentIntensity, appointmentStatusLabel, appointmentKind } from "../admin-ui/components/work-status-badge";
 import { Button } from "../admin-ui/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../admin-ui/ui/collapsible";
@@ -19,8 +19,6 @@ import { assigneeAvatars } from "./workspace-model";
 import { useWorkspace } from "./workspace-context";
 import type { StoryAppointment, StorySource } from "./workspace-types";
 
-const sourceTone = (status: StorySource["status"]): StatusTone => (status === "needs-scheduling" ? "attention" : status === "interviewed" ? "done" : "neutral");
-
 type Open = (element: HTMLElement) => void;
 const Chevron = () => <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />;
 
@@ -33,8 +31,15 @@ function SourceRow({ source, people, timing, onOpen }: { source: StorySource; pe
       <ItemDescription>{detail}{people.length ? null : <>{detail ? " · " : ""}Unassigned</>}</ItemDescription>
       {timing ? <ItemDescription>{timing}</ItemDescription> : null}
     </ItemContent>
-    <ItemActions><StatusBadge tone={sourceTone(source.status)}>{SOURCE_STATUS_LABELS[source.status]}</StatusBadge><Chevron /></ItemActions>
+    <ItemActions><WorkStatusBadge kind="reporting" intensity={sourceIntensity(source.status)}>{SOURCE_STATUS_LABELS[source.status]}</WorkStatusBadge><Chevron /></ItemActions>
   </ItemButton>;
+}
+
+function AppointmentBadge({ appointment }: { appointment: StoryAppointment }) {
+  const kind = labelFor(APPOINTMENT_KIND_LABELS, appointment.kind);
+  return <WorkStatusBadge kind={appointmentKind(appointment)} intensity={appointmentIntensity(appointment)}>
+    {kind} {appointmentStatusLabel(appointment).toLowerCase()}
+  </WorkStatusBadge>;
 }
 
 function appointmentSub(appointment: StoryAppointment, withStatus: boolean) {
@@ -48,7 +53,7 @@ function ExactRow({ appointment, people, timezone, onOpen }: { appointment: Stor
   return <ItemButton size="sm" onClick={(event) => onOpen(event.currentTarget)}>
     <ItemMedia className="w-[4.5rem] justify-start text-sm font-medium whitespace-nowrap tabular-nums"><span aria-hidden="true">{formatTime(appointment.startAt!, timezone)}</span><span className="sr-only">{range}</span></ItemMedia>
     <ItemContent><ItemTitle>{appointment.title}</ItemTitle><ItemDescription>{appointmentSub(appointment, false) || labelFor(APPOINTMENT_KIND_LABELS, appointment.kind)}</ItemDescription></ItemContent>
-    <ItemActions><PeopleAvatars people={people} /><Chevron /></ItemActions>
+    <ItemActions><AppointmentBadge appointment={appointment} /><PeopleAvatars people={people} /><Chevron /></ItemActions>
   </ItemButton>;
 }
 
@@ -57,7 +62,7 @@ function ToScheduleRow({ appointment, people, timezone, onOpen }: { appointment:
   const { primary } = appointmentTiming(appointment, timezone);
   return <ItemButton size="sm" onClick={(event) => onOpen(event.currentTarget)}>
     <ItemContent><ItemTitle>{appointment.title}</ItemTitle><ItemDescription>{appointmentSub(appointment, false) || labelFor(APPOINTMENT_KIND_LABELS, appointment.kind)}</ItemDescription></ItemContent>
-    <ItemActions><span className="text-xs text-muted-foreground">{primary}</span><PeopleAvatars people={people} /><Chevron /></ItemActions>
+    <ItemActions><span className="text-xs text-muted-foreground">{primary}</span><AppointmentBadge appointment={appointment} /><PeopleAvatars people={people} /><Chevron /></ItemActions>
   </ItemButton>;
 }
 
