@@ -68,9 +68,9 @@ describe("site dates and role-relevant attention", () => {
     expect(homeAgenda(data, now).map((e) => e.id)).toEqual(["deadline-1", "media-1-m1", "task-1", "scheduled-1"]);
     expect(homeAgenda(bootstrap({ stories: [story({ authors: [], writer: { id: 9, name: "Other" } })] }), now)).toEqual([]);
   });
-  it("summarizes overdue tasks instead of duplicating the work list, and gates review", () => {
+  it("leaves overdue tasks to Up Next instead of duplicating them, and gates review", () => {
     const data = bootstrap({ tasks: [task(1, "2026-10-19T12:00:00Z"), task(2, "2026-10-18T12:00:00Z")], stories: [story({ workflow: { id: "ready", label: "Ready for Review", group: "main", selectable: true } })] });
-    expect(waitingForMe(data, now)).toEqual([expect.objectContaining({ id: "overdue-work", title: "2 overdue tasks" })]);
+    expect(waitingForMe(data, now)).toEqual([]);
     expect(reviewStories(data)).toEqual([]);
     expect(reviewStories({ ...data, capabilities: { ...data.capabilities, review: true } })).toHaveLength(1);
   });
@@ -112,15 +112,14 @@ describe("appointments in Coming Up and Waiting for Me", () => {
     expect(waitingForMe(far, now)).toEqual([]);
     expect(homeAgenda(near, now).length).toBe(0);
   });
-  it("keeps overdue work first and bounded when scheduling items coexist", () => {
+  it("keeps late stories first and bounded when scheduling items coexist", () => {
     const stories = [1, 2, 3].map((id) => story({ id, title: `Late ${id}`, deadline: "2026-10-18" }));
     const data = bootstrap({ stories, tasks: [task(1, "2026-10-19T12:00:00Z")], appointments: [windowAppointment({ id: "w1", windowStart: "2026-10-20", windowEnd: "2026-10-20" }), windowAppointment({ id: "w2", windowStart: "2026-10-26" }), windowAppointment({ id: "w3", windowStart: "2026-10-27" })], visualWork: [visual()] });
     const items = waitingForMe(data, now);
-    expect(items).toHaveLength(5);
-    expect(items[0].id).toBe("overdue-work");
-    expect(items.map((i) => i.id)).toEqual(["overdue-work", "late-story-1", "late-story-2", "schedule-w1", "schedule-w2"]);
+    expect(items).toHaveLength(4);
+    expect(items.map((i) => i.id)).toEqual(["late-story-1", "late-story-2", "schedule-w1", "schedule-w2"]);
     const calm = waitingForMe(bootstrap({ tasks: [task(1, "2026-10-19T12:00:00Z")], stories: [story()], appointments: [windowAppointment()] }), now);
-    expect(calm.map((i) => i.id)).toEqual(["overdue-work", "schedule-w1"]);
+    expect(calm.map((i) => i.id)).toEqual(["schedule-w1"]);
   });
 });
 
