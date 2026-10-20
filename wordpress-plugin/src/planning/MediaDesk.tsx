@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../admin-ui/ui/table";
 import { mediaLibraryAvailable, pickFromMediaLibrary } from "../workspace/media-library";
 import { invalidateStoryData, mediaDeskKey } from "../story/story-query";
+import { StoryTitleButton } from "../story/story-parts";
 import type { PlanningFetchers } from "./planning-api";
 import { EMPTY_MEDIA_DESK_FILTERS, MEDIA_STATUS_OPTIONS, MEDIA_TYPE_OPTIONS, filterMediaRows, mediaDeskRows, mediaDueDay, mediaReadinessHint, mediaTypeLabel, sortMediaRows, type MediaDeskFilters, type MediaDeskRow } from "./media-desk-model";
 import { describeMediaDeskError } from "./media-desk-errors";
@@ -133,7 +134,7 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory }: MediaDe
     };
   };
 
-  const story = (row: MediaDeskRow) => <button type="button" className="text-left hover:underline" onClick={() => onOpenStory(row.story.id)}>{decodeEntities(row.story.title) || __("Untitled story", "weekly-wildcat-headless")}</button>;
+  const story = (row: MediaDeskRow) => <StoryTitleButton story={row.story} onOpen={onOpenStory} className="font-normal" />;
   const table = width === 0 || width >= 860;
 
   return <div className="flex flex-col gap-3">
