@@ -2,7 +2,10 @@
 /** Link validation and private-field registration, without a WordPress DB. */
 define('ABSPATH', __DIR__ . '/../');
 class WP_Error {
-    public function __construct(public string $code, public string $message, public array $data = []) {}
+    public $code;
+    public $message;
+    public $data;
+    public function __construct($code, $message, $data = []) { $this->code = $code; $this->message = $message; $this->data = $data; }
 }
 $home_hooks = [];
 $home_meta = [];

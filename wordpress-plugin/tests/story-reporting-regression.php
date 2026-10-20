@@ -7,12 +7,15 @@
 define('ABSPATH', __DIR__ . '/../');
 
 class WP_Error {
-    public function __construct(public string $code = '', public string $message = '', public array $data = []) {}
+    public $code;
+    public $message;
+    public $data;
+    public function __construct($code = '', $message = '', $data = []) { $this->code = $code; $this->message = $message; $this->data = $data; }
     public function get_error_code(): string { return $this->code; }
     public function get_error_data() { return $this->data; }
 }
-class WP_Post { public function __construct(public int $ID, public string $post_type = 'post', public string $post_status = 'draft', public int $post_author = 0) {} }
-class WP_User { public function __construct(public int $ID, public string $display_name) {} }
+class WP_Post { public $ID; public $post_type; public $post_status; public $post_author; public function __construct($ID, $post_type = 'post', $post_status = 'draft', $post_author = 0) { $this->ID = $ID; $this->post_type = $post_type; $this->post_status = $post_status; $this->post_author = $post_author; } }
+class WP_User { public $ID; public $display_name; public function __construct($ID, $display_name) { $this->ID = $ID; $this->display_name = $display_name; } }
 class WP_REST_Request {}
 
 $GLOBALS['meta'] = [];
@@ -47,7 +50,7 @@ function user_can($user, $cap, ...$args): bool {
     return in_array($cap, $GLOBALS['caps'][$user] ?? [], true);
 }
 function get_posts($args) { return in_array((int) ($args['meta_query'][0]['value'] ?? 0), $GLOBALS['task_assignees'][$args['post_parent'] ?? 0] ?? [], true) ? [1] : []; }
-function byline_get_story_contributor_entries($story_id, $fallback = true): array { return array_map(static fn($id) => ['type' => 'user', 'id' => $id], $GLOBALS['contributors'][$story_id] ?? []); }
+function byline_get_story_contributor_entries($story_id, $fallback = true): array { return array_map(function ($id) { return ['type' => 'user', 'id' => $id]; }, $GLOBALS['contributors'][$story_id] ?? []); }
 function byline_get_editorial_editor_id($story_id): int { return 0; }
 const BYLINE_TASK_POST_TYPE = 'byline_task';
 const BYLINE_TASK_ASSIGNEE_META = '_byline_task_assignee_id';
@@ -191,7 +194,7 @@ $keep = byline_story_source_save(10, ['label' => 'Keep me'])['source'];
 $linked = byline_story_appointment_save(10, ['title' => 'Call', 'sourceId' => $keep['id']])['appointment'];
 byline_story_appointment_delete(10, $linked['id']);
 check(in_array($keep['id'], array_column(byline_story_sources(10), 'id'), true) && !in_array($linked['id'], array_column(byline_story_appointments(10), 'id'), true), 'Deleting an appointment does not touch its source.');
-check(count(array_filter($GLOBALS['fired'], static fn($f) => $f[0] === 'byline_story_appointment_changed')) > 0, 'Domain changes announce themselves for activity and notifications.');
+check(count(array_filter($GLOBALS['fired'], function ($f) { return $f[0] === 'byline_story_appointment_changed'; })) > 0, 'Domain changes announce themselves for activity and notifications.');
 
 /* ----------------------------------------------------------- summary data */
 $summary = byline_story_reporting_summary(10);
@@ -204,7 +207,7 @@ $again = byline_story_appointment_save(10, ['title' => 'Edited twice', 'expected
 check(code($again) === 'byline_stale_record', 'A stale appointment edit is a conflict.');
 
 /* ------------------------------------------------------------ story access */
-$ctx = static fn(int $user, int $story = 10) => byline_story_context($story, $user);
+$ctx = function (int $user, int $story = 10) { return byline_story_context($story, $user); };
 check($ctx(1)['view'] && $ctx(1)['manage'] && !$ctx(1)['assignedOnly'], 'A story editor can view and manage reporting.');
 check($ctx(2)['view'] && $ctx(2)['manage'] && !$ctx(2)['edit'], 'A real contributor without edit_post can view and manage reporting for their story.');
 check($ctx(3)['view'] && !$ctx(3)['manage'] && $ctx(3)['assignedOnly'] && $ctx(3)['taskAssignee'], 'A photographer with only a task sees context and cannot manage the story.');
