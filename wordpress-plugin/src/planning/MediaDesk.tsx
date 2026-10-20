@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCheck, Image as ImageIcon, ImagePlus, LayoutDashboard, MoreHorizontal, Paperclip, Star, X } from "lucide-react";
+import { CheckCheck, Image as ImageIcon, ImagePlus, LayoutDashboard, MoreHorizontal, Paperclip, Search, Star, X } from "lucide-react";
 import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
@@ -14,6 +14,7 @@ import { Badge } from "../admin-ui/ui/badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
 import { Input } from "../admin-ui/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "../admin-ui/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Popover, PopoverContent, PopoverTrigger } from "../admin-ui/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
@@ -136,7 +137,10 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory }: MediaDe
 
   return <div className="flex flex-col gap-3">
     <div className="flex flex-wrap items-center gap-2" role="search" aria-label={__("Filter assignments", "weekly-wildcat-headless")}>
-      <Input type="search" className="w-60" aria-label={__("Find a story or assignment", "weekly-wildcat-headless")} placeholder={__("Find a story or assignment…", "weekly-wildcat-headless")} value={filters.story} onChange={(event) => set("story", event.target.value)} />
+      <InputGroup className="min-w-60 flex-1 sm:max-w-sm">
+        <InputGroupInput type="search" aria-label={__("Find a story or assignment", "weekly-wildcat-headless")} placeholder={__("Find a story or assignment…", "weekly-wildcat-headless")} value={filters.story} onChange={(event) => set("story", event.target.value)} />
+        <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
+      </InputGroup>
       <Select items={typeItems} value={filters.type || ANY} onValueChange={(value) => set("type", !value || value === ANY ? "" : value as MediaDeskFilters["type"])}><SelectTrigger aria-label={__("Type", "weekly-wildcat-headless")} className="w-32"><SelectValue /></SelectTrigger><SelectContent>{typeItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
       <Select items={statusItems} value={filters.status || ANY} onValueChange={(value) => set("status", !value || value === ANY ? "" : value as MediaDeskFilters["status"])}><SelectTrigger aria-label={__("Status", "weekly-wildcat-headless")} className="w-36"><SelectValue /></SelectTrigger><SelectContent>{statusItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
       <Select items={assigneeFilterItems} value={filters.assigneeId || ANY} onValueChange={(value) => set("assigneeId", !value || value === ANY ? "" : String(value))}><SelectTrigger aria-label={__("Assignee", "weekly-wildcat-headless")} className="w-40"><SelectValue /></SelectTrigger><SelectContent>{assigneeFilterItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
@@ -152,20 +156,20 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory }: MediaDe
 
     {!visible.length
       ? <NothingHere title={rows.length ? __("No assignments match", "weekly-wildcat-headless") : __("No production assignments yet", "weekly-wildcat-headless")} description={rows.length ? __("Try clearing a filter.", "weekly-wildcat-headless") : __("Photo, video, graphic and audio work appears here once it is assigned from a story.", "weekly-wildcat-headless")} />
-      : <div ref={ref} className="rounded-xl border">
+      : <div ref={ref} className="overflow-hidden rounded-xl border bg-card shadow-xs">
         {table
           ? <Table aria-label={__("Production assignments", "weekly-wildcat-headless")}>
-            <TableHeader><TableRow className="hover:bg-transparent"><TableHead>{__("Assignment", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Story", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Assignee", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Due", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Status", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Files", "weekly-wildcat-headless")}</TableHead><TableHead className="w-10"><span className="sr-only">{__("Actions", "weekly-wildcat-headless")}</span></TableHead></TableRow></TableHeader>
+            <TableHeader className="bg-muted/20"><TableRow className="hover:bg-transparent"><TableHead>{__("Assignment", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Story", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Assignee", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Due", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Status", "weekly-wildcat-headless")}</TableHead><TableHead>{__("Files", "weekly-wildcat-headless")}</TableHead><TableHead className="w-10"><span className="sr-only">{__("Actions", "weekly-wildcat-headless")}</span></TableHead></TableRow></TableHeader>
             <TableBody>{visible.map((row) => {
               const c = cells(row);
-              return <TableRow key={rowKey(row)} aria-busy={c.saving || undefined}>
-                <TableCell className="py-2.5 whitespace-normal"><span className="font-medium">{row.title || mediaTypeLabel(row.type)}</span><span className="block text-xs text-muted-foreground">{mediaTypeLabel(row.type)}</span></TableCell>
-                <TableCell className="py-2.5 whitespace-normal">{story(row)}</TableCell>
-                <TableCell className="py-2.5">{c.assignee}</TableCell>
-                <TableCell className="py-2.5">{c.due}</TableCell>
-                <TableCell className="py-2.5">{c.status}</TableCell>
-                <TableCell className="py-2.5"><MediaFiles row={row} editable={c.editable} saving={c.saving} update={update} /></TableCell>
-                <TableCell className="py-2.5 text-right"><RowMenu row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} update={update} /></TableCell>
+              return <TableRow key={rowKey(row)} aria-busy={c.saving || undefined} className="h-16">
+                <TableCell className="py-3 whitespace-normal"><span className="font-semibold">{row.title || mediaTypeLabel(row.type)}</span><span className="block text-xs text-muted-foreground">{mediaTypeLabel(row.type)}</span></TableCell>
+                <TableCell className="py-3 whitespace-normal">{story(row)}</TableCell>
+                <TableCell className="py-3">{c.assignee}</TableCell>
+                <TableCell className="py-3">{c.due}</TableCell>
+                <TableCell className="py-3">{c.status}</TableCell>
+                <TableCell className="py-3"><MediaFiles row={row} editable={c.editable} saving={c.saving} update={update} /></TableCell>
+                <TableCell className="py-3 text-right"><RowMenu row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} update={update} /></TableCell>
               </TableRow>;
             })}</TableBody>
           </Table>
