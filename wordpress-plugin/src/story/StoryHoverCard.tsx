@@ -43,11 +43,7 @@ function StoryHoverBody({ summary, loading, failed, timezone, workspaceHref, onO
   const writers = summary.authors?.length ? summary.authors : summary.writer ? [summary.writer] : [];
   const deadline = summary.deadline ? exactDate(summary.deadline, timezone) : "";
   const planned = summary.plannedPublication ? plannedLabel(summary.plannedPublication, timezone) : "";
-  const workParts = [
-    typeof summary.openTaskCount === "number" && summary.openTaskCount > 0 ? `${summary.openTaskCount} open ${summary.openTaskCount === 1 ? "task" : "tasks"}` : "",
-    summary.reporting ? reportingSummaryLine(summary.reporting) : "",
-    summary.mediaSummary?.open ? `${summary.mediaSummary.open} production ${summary.mediaSummary.open === 1 ? "item" : "items"} open` : ""
-  ].filter(Boolean);
+  const reportingLine = summary.reporting ? reportingSummaryLine(summary.reporting) : "";
 
   return <div data-slot="story-hover-preview" aria-label={`Story preview: ${title}`} className="flex flex-col gap-3">
     {summary.featuredImage?.url ? <img src={summary.featuredImage.url} alt="" className="aspect-[16/7] w-full rounded-md object-cover" /> : null}
@@ -71,7 +67,7 @@ function StoryHoverBody({ summary, loading, failed, timezone, workspaceHref, onO
       {planned ? <span>Planned {planned}</span> : null}
     </div> : null}
 
-    {workParts.length ? <div className="flex items-start gap-1.5 text-xs text-muted-foreground"><ListTodo className="mt-0.5 size-3 shrink-0" aria-hidden="true" /><span>{workParts.join(" · ")}</span></div> : null}
+    {reportingLine ? <div className="flex items-start gap-1.5 text-xs text-muted-foreground"><ListTodo className="mt-0.5 size-3 shrink-0" aria-hidden="true" /><span>{reportingLine}</span></div> : null}
     {summary.visual ? <ProductionSummary story={summary as PlanningStory} className="flex-row gap-2 text-xs" empty={null} /> : null}
 
     {failed ? <p className="text-xs text-muted-foreground">The full preview is unavailable. You can still open the story.</p> : null}
