@@ -1435,20 +1435,22 @@ function DiscordSettings() {
 }
 
 function OperationalInfo({ route, protocol }: { route: string; protocol: ProtocolManifest | null }) {
-  const content: Record<string, { title: string; body: string }> = {
+  const content: Record<string, { title: string; body: string; technical?: boolean }> = {
     "/advanced/access": {
       title: "Capability-based access",
       body: `Manage publication: ${config?.capabilities.manage ? "allowed" : "not allowed"}; manage integrations: ${config?.capabilities.manageIntegrations ? "allowed" : "not allowed"}.`
     },
     "/advanced/api": {
       title: "Versioned API",
+      technical: true,
       body: protocol
-        ? `REST namespace byline/v1 · protocol ${protocol.protocolVersion} · publication schema ${protocol.publicationSchemaVersion} · design schema ${protocol.designSchemaVersion} · theme API ${protocol.themeApiVersion}.`
-        : "Byline exposes versioned public and capability-protected REST contracts under byline/v1."
+        ? `REST namespace: byline/v1\nProtocol: ${protocol.protocolVersion}\nPublication schema: ${protocol.publicationSchemaVersion}\nDesign schema: ${protocol.designSchemaVersion}\nTheme API: ${protocol.themeApiVersion}`
+        : "REST namespace: byline/v1\nProtected and public contracts are versioned."
     },
     "/advanced/compatibility": {
       title: "Legacy compatibility",
-      body: "The installed plugin path, update source, release ZIP, CPTs, metadata, and weekly-wildcat/v1 aliases remain intact while canonical Byline contracts are adopted. Old Byline settings URLs redirect into this unified Settings workspace."
+      technical: true,
+      body: "Installed plugin path: preserved\nUpdate source: preserved\nRelease ZIP: preserved\nCPTs and metadata: preserved\nREST alias: weekly-wildcat/v1\nLegacy settings URLs: redirect to unified Settings"
     }
   };
   const item = content[route];
@@ -1457,7 +1459,10 @@ function OperationalInfo({ route, protocol }: { route: string; protocol: Protoco
     <Card>
       <CardBody>
         <h2>{item.title}</h2>
-        <p>{item.body}</p>
+        {item.technical ? <CodeBlock className="mt-3">
+          <CodeBlockHeader><CodeBlockTitle>{item.title}</CodeBlockTitle><CodeBlockActions><CodeBlockCopyButton value={item.body} /></CodeBlockActions></CodeBlockHeader>
+          <CodeBlockContent wrap>{item.body}</CodeBlockContent>
+        </CodeBlock> : <p>{item.body}</p>}
       </CardBody>
     </Card>
   );
