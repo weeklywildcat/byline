@@ -139,7 +139,7 @@ export function NewsletterSettings({ fetchers, initialProviderId, title }: Newsl
       {!providers.length ? (
         <OptionalUnavailable>{__("No newsletter provider is available. The public site can continue without a newsletter integration; connect one when you are ready.", "weekly-wildcat-headless")}</OptionalUnavailable>
       ) : (
-        <div className="grid gap-4 @4xl/settings:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.2fr)]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.2fr)]">
           <Card size="sm">
             <CardHeader><CardTitle>{__("Provider", "weekly-wildcat-headless")}</CardTitle><CardDescription>{__("Choose the delivery service and review exactly which actions it supports.", "weekly-wildcat-headless")}</CardDescription></CardHeader>
             <CardContent className="flex flex-col gap-4">
