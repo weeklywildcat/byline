@@ -908,6 +908,83 @@ function wwh_sanitize_unsplash_access_key($value): string
     return $value;
 }
 
+function byline_media_settings_payload(): array
+{
+    $saved_key = trim((string) get_option(WWH_UNSPLASH_ACCESS_KEY_OPTION, ''));
+    $external_key = '';
+
+    if (defined('WWH_UNSPLASH_ACCESS_KEY') && is_string(constant('WWH_UNSPLASH_ACCESS_KEY'))) {
+        $external_key = trim((string) constant('WWH_UNSPLASH_ACCESS_KEY'));
+    }
+    if ($external_key === '') {
+        $environment_key = getenv('WWH_UNSPLASH_ACCESS_KEY');
+        $external_key = is_string($environment_key) ? trim($environment_key) : '';
+    }
+
+    return [
+        'provider' => 'unsplash',
+        'configured' => $external_key !== '' || $saved_key !== '',
+        'savedKeyConfigured' => $saved_key !== '',
+        'managedExternally' => $external_key !== '',
+        'source' => $external_key !== '' ? 'environment' : ($saved_key !== '' ? 'wordpress' : 'none'),
+    ];
+}
+
+function byline_media_settings_rest($request = null)
+{
+    $method = is_object($request) && method_exists($request, 'get_method')
+        ? strtoupper((string) $request->get_method())
+        : 'GET';
+
+    if ($method !== 'GET') {
+        $params = is_object($request) && method_exists($request, 'get_json_params')
+            ? $request->get_json_params()
+            : [];
+        $params = is_array($params) ? $params : [];
+        $clear = !empty($params['clearUnsplashKey']);
+        $value = is_scalar($params['unsplashKey'] ?? null) ? trim((string) $params['unsplashKey']) : '';
+
+        if ($clear) {
+            update_option(WWH_UNSPLASH_ACCESS_KEY_OPTION, '', false);
+        } elseif ($value !== '') {
+            if (strlen($value) < 20 || strlen($value) > 100 || preg_match('/^[A-Za-z0-9_-]+$/', $value) !== 1) {
+                return new WP_Error(
+                    'byline_invalid_unsplash_access_key',
+                    'Enter a valid Unsplash access key.',
+                    ['status' => 400]
+                );
+            }
+            update_option(WWH_UNSPLASH_ACCESS_KEY_OPTION, $value, false);
+        }
+
+        delete_transient('wwh_unsplash_login_photos');
+        delete_transient(wwh_unsplash_photo_cache_key('ZeGQ22v9Zhk'));
+    }
+
+    return rest_ensure_response(byline_media_settings_payload());
+}
+
+function byline_register_media_settings_route(): void
+{
+    register_rest_route(BYLINE_REST_NAMESPACE, '/admin/media-settings', [
+        [
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => 'byline_media_settings_rest',
+            'permission_callback' => static function (): bool {
+                return current_user_can(BYLINE_MANAGE_CAPABILITY);
+            },
+        ],
+        [
+            'methods' => WP_REST_Server::EDITABLE,
+            'callback' => 'byline_media_settings_rest',
+            'permission_callback' => static function (): bool {
+                return current_user_can(BYLINE_MANAGE_CAPABILITY);
+            },
+        ],
+    ]);
+}
+add_action('rest_api_init', 'byline_register_media_settings_route');
+
 function wwh_render_unsplash_access_key_field(): void
 {
     $saved_key = (string) get_option(WWH_UNSPLASH_ACCESS_KEY_OPTION, '');
@@ -1362,19 +1439,6 @@ function wwh_register_game_embed_block(): void
     ]);
 }
 add_action('init', 'wwh_register_game_embed_block');
-
-add_action('admin_menu', 'wwh_register_legacy_settings_page');
-
-function wwh_register_legacy_settings_page(): void
-{
-    add_options_page(
-        'Byline Legacy Integration Settings',
-        'Byline Legacy Settings',
-        'manage_options',
-        'wwh-settings',
-        'wwh_render_settings_page'
-    );
-}
 
 function wwh_cloudflare_deploy_post_types(): array
 {
