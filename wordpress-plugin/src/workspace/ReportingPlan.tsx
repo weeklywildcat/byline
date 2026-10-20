@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { ChevronRight } from "lucide-react";
 import { ItemButton } from "../admin-ui/components/item-button";
-import { PeopleAvatars, anyPicture, type AvatarPerson } from "../admin-ui/components/people-avatars";
+import { PeopleHoverCard, anyPicture, type AvatarPerson } from "../admin-ui/components/people-avatars";
 import { StatusBadge, type StatusTone } from "../admin-ui/components/status-badge";
 import { Button } from "../admin-ui/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
@@ -27,7 +27,7 @@ const Chevron = () => <ChevronRight className="size-4 text-muted-foreground" ari
 function SourceRow({ source, people, timing, onOpen }: { source: StorySource; people: AvatarPerson[]; timing: string; onOpen: Open }) {
   const detail = [source.role, source.organization].filter(Boolean).join(" · ");
   return <ItemButton size="sm" onClick={(event) => onOpen(event.currentTarget)}>
-    {anyPicture(people) ? <ItemMedia><PeopleAvatars people={people} /></ItemMedia> : null}
+    {anyPicture(people) ? <ItemMedia><PeopleHoverCard people={people} /></ItemMedia> : null}
     <ItemContent>
       <ItemTitle>{source.label}</ItemTitle>
       <ItemDescription>{detail}{people.length ? null : <>{detail ? " · " : ""}Unassigned</>}</ItemDescription>
@@ -48,7 +48,7 @@ function ExactRow({ appointment, people, timezone, onOpen }: { appointment: Stor
   return <ItemButton size="sm" onClick={(event) => onOpen(event.currentTarget)}>
     <ItemMedia className="w-[4.5rem] justify-start text-sm font-medium whitespace-nowrap tabular-nums"><span aria-hidden="true">{formatTime(appointment.startAt!, timezone)}</span><span className="sr-only">{range}</span></ItemMedia>
     <ItemContent><ItemTitle>{appointment.title}</ItemTitle><ItemDescription>{appointmentSub(appointment, false) || labelFor(APPOINTMENT_KIND_LABELS, appointment.kind)}</ItemDescription></ItemContent>
-    <ItemActions><PeopleAvatars people={people} /><Chevron /></ItemActions>
+    <ItemActions><PeopleHoverCard people={people} /><Chevron /></ItemActions>
   </ItemButton>;
 }
 
@@ -57,7 +57,7 @@ function ToScheduleRow({ appointment, people, timezone, onOpen }: { appointment:
   const { primary } = appointmentTiming(appointment, timezone);
   return <ItemButton size="sm" onClick={(event) => onOpen(event.currentTarget)}>
     <ItemContent><ItemTitle>{appointment.title}</ItemTitle><ItemDescription>{appointmentSub(appointment, false) || labelFor(APPOINTMENT_KIND_LABELS, appointment.kind)}</ItemDescription></ItemContent>
-    <ItemActions><span className="text-xs text-muted-foreground">{primary}</span><PeopleAvatars people={people} /><Chevron /></ItemActions>
+    <ItemActions><span className="text-xs text-muted-foreground">{primary}</span><PeopleHoverCard people={people} /><Chevron /></ItemActions>
   </ItemButton>;
 }
 
@@ -65,7 +65,7 @@ function PastRow({ appointment, people, timezone, onOpen }: { appointment: Story
   const timing = appointment.scheduleMode === "unscheduled" ? "" : appointmentTiming(appointment, timezone).primary;
   return <ItemButton size="sm" onClick={(event) => onOpen(event.currentTarget)}>
     <ItemContent><ItemTitle className="text-muted-foreground">{appointment.title}</ItemTitle><ItemDescription>{[labelFor(APPOINTMENT_STATUS_LABELS, appointment.status), timing].filter(Boolean).join(" · ")}</ItemDescription></ItemContent>
-    <ItemActions><PeopleAvatars people={people} /><Chevron /></ItemActions>
+    <ItemActions><PeopleHoverCard people={people} /><Chevron /></ItemActions>
   </ItemButton>;
 }
 
