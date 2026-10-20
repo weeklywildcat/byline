@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Byline
  * Description: Publishing tools and integrations for the Weekly Wildcat newsroom.
- * Version: 0.3.36
+ * Version: 0.3.37
  * Requires PHP: 7.4
  * Author: Byline Contributors
  * License: GPL-2.0-or-later
