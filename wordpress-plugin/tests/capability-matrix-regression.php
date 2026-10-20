@@ -224,7 +224,7 @@ foreach ($profiles as $role => $capabilities) {
 
 // Direct screen access follows the same capability model as menu visibility.
 byline_matrix_set_role('administrator', $profiles['administrator']);
-foreach (['byline', 'byline-planning', 'byline-publication', 'byline-integrations', 'byline-settings'] as $page) {
+foreach (['byline', 'byline-planning', 'byline-settings'] as $page) {
     byline_matrix_expect_mount($page);
 }
 
@@ -239,8 +239,8 @@ byline_matrix_expect_denied('byline');
 byline_matrix_expect_denied('byline-publication');
 
 byline_matrix_set_role('integration-manager', $profiles['integration-manager']);
-byline_matrix_expect_mount('byline-integrations');
-byline_matrix_expect_redirect('byline', 'page=byline-integrations');
+byline_matrix_expect_mount('byline-settings');
+byline_matrix_expect_redirect('byline', 'page=byline-settings');
 byline_matrix_expect_denied('byline-publication');
 
 byline_matrix_set_role('sports-content-editor', $profiles['sports-content-editor']);
