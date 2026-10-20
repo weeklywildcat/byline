@@ -35,8 +35,11 @@ export function StoryTextareaControl({ value, onChange, ...props }: Fieldprops) 
 /**
  * A caption (or any short line of copy) edited where it appears, styled by the
  * block's own figcaption rules. Plain text, so what is typed is what is saved.
+ * `singleLine` is for headlines and attribution lines: Enter does nothing and a
+ * pasted line break becomes a space.
  */
-export function StoryCaption({ value, onChange, placeholder, className = 'byline-story-caption', label }: { value?: string; onChange: (value: string) => void; placeholder: string; className?: string; label: string }) {
+export function StoryCaption({ value, onChange, placeholder, className = 'byline-story-caption', label, singleLine }: { value?: string; onChange: (value: string) => void; placeholder: string; className?: string; label: string; singleLine?: boolean }) {
   const [local, change] = useBufferedText(value ?? '', onChange);
-  return <PlainText className={className} value={local} placeholder={placeholder} aria-label={label} onChange={change} />;
+  const lineProps = singleLine ? { onKeyDown: (event: { key: string; preventDefault: () => void }) => { if (event.key === 'Enter') event.preventDefault(); } } : {};
+  return <PlainText className={className} value={local} placeholder={placeholder} aria-label={label} onChange={(next: string) => change(singleLine ? next.replace(/\s*\n\s*/g, ' ') : next)} {...lineProps} />;
 }

@@ -77,3 +77,9 @@
 /* The caption field in the editor is a figcaption that can be typed into. */
 .byline-story-caption { background: transparent; border: 0; display: block; padding: 0; resize: none; width: 100%; }
 .byline-story-caption:focus { box-shadow: none; outline: 1px dashed var(--story-soft); outline-offset: 3px; }
+
+/* Major visual moments breathe: anything that breaks out of the reading column gets
+   the same generous, controlled space above and below, whatever block it is. */
+:where(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) > :is(.alignwide, .alignfull) {
+  margin-block: var(--story-moment-space);
+}

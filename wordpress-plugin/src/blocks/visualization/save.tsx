@@ -1,14 +1,26 @@
 import { useBlockProps } from '@wordpress/block-editor';
-import { LegacyStoryImageMarkup as StoryImageMarkup } from '../story/image'; // 0.3.24 markup until this block's save moves to the slim one (with a deprecation)
+import { StoryImageMarkup } from '../story/image';
 import { visualizationUrl } from '@byline/ui/visualization';
+
+/**
+ * The saved figure is a complete, readable section without JavaScript: title,
+ * dek, the graphic (the fallback when there is an embed), a direct link, and
+ * the attribution lines. The credit of a photograph or exported graphic is
+ * added when the article renders (includes/content/story-blocks.php).
+ */
 export function VisualizationSave({ attributes: a }: any) {
   const validated = visualizationUrl(a.embedUrl || '');
-  return <figure {...useBlockProps.save({ className: 'byline-visualization' })} data-mode={a.mode} data-provider={validated?.provider} data-src={a.mode === 'embed' ? validated?.src : undefined} data-height={a.heightPreset}>
-    {a.title && <h2>{a.title}</h2>}{a.description && <p>{a.description}</p>}
+  const embed = a.mode === 'embed';
+  return <figure {...useBlockProps.save({ className: 'byline-visualization' })} data-mode={a.mode} data-provider={validated?.provider} data-src={embed ? validated?.src : undefined} data-height={a.heightPreset}>
+    {a.title && <h3 className="byline-visualization-title">{a.title}</h3>}
+    {a.description && <p className="byline-visualization-dek">{a.description}</p>}
     <div className="byline-visualization-media"><div className="byline-visualization-fallback-image"><StoryImageMarkup image={a.image} /></div></div>
-    {a.mode === 'embed' && validated && <p className="byline-visualization-link"><a href={validated.src} rel="noopener noreferrer">Open {a.type === 'map' ? 'map' : 'visualization'}: {a.title || validated.provider}</a></p>}
-    {(a.source || a.notes || a.credit || a.image?.credit) && <figcaption>
-      {a.source && <p>Source: {a.source}</p>}{a.notes && <p>{a.notes}</p>}{(a.credit || a.image?.credit) && <p>Credit: {a.credit || a.image.credit}</p>}
+    {embed && validated && <p className="byline-visualization-link"><a href={validated.src} rel="noopener noreferrer">Open the interactive version</a></p>}
+    {(a.summary || a.source || a.notes || a.credit) && <figcaption>
+      {a.summary && <p className="byline-visualization-summary">{a.summary}</p>}
+      {a.source && <p className="byline-visualization-source">Source: {a.source}</p>}
+      {a.notes && <p className="byline-visualization-notes">{a.notes}</p>}
+      {a.credit && <p className="photo-credit">Credit: {a.credit}</p>}
     </figcaption>}
   </figure>;
 }

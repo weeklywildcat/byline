@@ -65,7 +65,7 @@ linearly. Nothing hijacks scrolling.
 
 ## CSS rules for contributors
 
-1. Scope Core-markup selectors with `:where(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content)`. Zero specificity means a later rule never needs `!important` or a longer selector to win. Byline's own classes (`.byline-timeline`) need no scope.
+1. Generic rules (tokens, captions, credits, labels) are scoped with `:where(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content)`: zero specificity, so a block can refine them without an override. A *style variant* of a Core block (Pull Quote, Key Facts, Context Box) uses the same scope as a plain `:is()` selector so that it beats the generic Core element rule in `article.css`. Never win with `!important` or by lengthening a selector. Byline's own classes (`.byline-timeline`) need no scope.
 2. One owner per feature: `packages/ui/src/newsroom/<feature>.css`. Do not restate caption, credit or label typography; extend `figure.css`.
 3. Layout is container-based (`100cqw`, `@container byline-content`), not viewport-based, so the editor canvas, the preview iframe and the public page agree.
 4. Every interactive element has a visible `:focus-visible` outline (`2px solid var(--story-accent)`, 3px offset) and a 44px minimum target.

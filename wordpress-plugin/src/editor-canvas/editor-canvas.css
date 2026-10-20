@@ -121,7 +121,7 @@
 /* Images and captions. */
 .editor-styles-wrapper .is-root-container .wp-block-image img,
 .editor-styles-wrapper .is-root-container figure img {
-  border: 1px solid var(--rule);
+  border: 0;
 }
 
 .editor-styles-wrapper .is-root-container figcaption {

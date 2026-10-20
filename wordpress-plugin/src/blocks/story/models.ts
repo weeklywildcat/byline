@@ -23,6 +23,41 @@ export function changeAnnotations(items: Annotation[], action: 'add' | 'remove' 
   [next[index], next[destination]] = [next[destination], next[index]];
   return next;
 }
+/** New markers step across the photograph instead of stacking on the centre. */
+export function nextMarkerPoint(count: number): { x: number; y: number } {
+  return { x: 50 + (count % 5) * 8, y: 50 + (count % 4) * 6 };
+}
+export function updateAnnotation(items: Annotation[], id: string, values: Partial<Omit<Annotation, 'id'>>): Annotation[] {
+  return items.map((item) => item.id !== id ? item : {
+    ...item, ...values,
+    x: clampCoordinate(values.x ?? item.x), y: clampCoordinate(values.y ?? item.y)
+  });
+}
+/** Arrow keys nudge a marker by 1% of the photograph, Shift by 10%. */
+export function nudgeAnnotation(items: Annotation[], id: string, key: string, shift = false): Annotation[] {
+  const step = shift ? 10 : 1;
+  const delta = ({ ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] } as Record<string, number[]>)[key];
+  const current = items.find((item) => item.id === id);
+  return delta && current ? updateAnnotation(items, id, { x: current.x + delta[0], y: current.y + delta[1] }) : items;
+}
+/** A marker with no text points at nothing, so readers are not shown it. */
+export function isAnnotationEmpty(note: Annotation): boolean { return !note.title.trim() && !note.body.trim(); }
+export function publishedAnnotations(items: Annotation[]): Annotation[] { return items.filter((note) => !isAnnotationEmpty(note)); }
+/**
+ * Duplicated and pasted blocks arrive carrying the original's IDs, and a note's
+ * ID is its public anchor. Give a block's colliding notes fresh IDs and leave
+ * the rest alone; the same array comes back when nothing collides.
+ */
+export function withFreshIds(items: Annotation[], taken: ReadonlySet<string>, makeId: () => string = newAnnotationId): Annotation[] {
+  const seen = new Set(taken);
+  let changed = false;
+  const next = items.map((note) => {
+    if (seen.has(note.id)) { changed = true; const id = makeId(); seen.add(id); return { ...note, id }; }
+    seen.add(note.id);
+    return note;
+  });
+  return changed ? next : items;
+}
 export function mismatchedRatios(before?: StoryImage, after?: StoryImage): boolean {
   if (!before?.width || !before.height || !after?.width || !after.height) return false;
   return Math.abs((before.width / before.height) / (after.width / after.height) - 1) > .12;

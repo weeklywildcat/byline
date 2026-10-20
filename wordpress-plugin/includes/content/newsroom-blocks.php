@@ -755,12 +755,11 @@ function byline_newsroom_register_core_styles(): void
     }
     $styles = [
         'core/cover' => [['name' => 'byline-visual-chapter', 'label' => 'Visual Chapter']],
-        'core/columns' => [['name' => 'byline-comparison', 'label' => 'Comparison'], ['name' => 'byline-main-aside', 'label' => 'Main + Aside'], ['name' => 'byline-key-numbers', 'label' => 'Three Key Numbers']],
+        'core/columns' => [['name' => 'byline-comparison', 'label' => 'Comparison'], ['name' => 'byline-key-numbers', 'label' => 'Three Key Numbers']],
         'core/group' => [
-            ['name' => 'byline-context', 'label' => "Context"],
-            ['name' => 'byline-why-it-matters', 'label' => "Why It Matters"],
-            ['name' => 'byline-whats-next', 'label' => "What's Next"],
-            ['name' => 'byline-how-we-know', 'label' => "How We Know"],
+            // Why It Matters, What's Next and How We Know are the same box under another heading; their
+            // classes stay styled for published stories but are no longer offered as separate styles.
+            ['name' => 'byline-context', 'label' => "Context Box"],
             ['name' => 'byline-editors-note', 'label' => "Editor's Note"],
             ['name' => 'byline-margin-note', 'label' => "Margin Note"],
             ['name' => 'byline-evidence', 'label' => "Source Highlight"],
@@ -788,7 +787,7 @@ function byline_newsroom_register_core_styles(): void
             ['name' => 'byline-editorial-rule', 'label' => 'Editorial Rule'],
             ['name' => 'byline-heavy-rule', 'label' => 'Heavy Rule'],
         ],
-        'core/details' => [['name' => 'byline-faq', 'label' => 'FAQ'], ['name' => 'byline-read-more', 'label' => 'Read More'], ['name' => 'byline-methodology', 'label' => 'Methodology'], ['name' => 'byline-full-statement', 'label' => 'Full Statement']],
+        'core/details' => [['name' => 'byline-faq', 'label' => 'FAQ'], ['name' => 'byline-read-more', 'label' => 'Expandable Section']],
         'core/table' => [
             ['name' => 'byline-data-table', 'label' => 'Data Table'],
             ['name' => 'byline-comparison-table', 'label' => 'Comparison Table'],

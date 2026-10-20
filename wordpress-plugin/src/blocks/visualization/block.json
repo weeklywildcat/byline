@@ -2,15 +2,19 @@
   "apiVersion": 3,
   "name": "byline/visualization",
   "version": "1.0.0",
-  "title": "Chart / Data Visualization",
-  "description": "Embed a supported chart or map, or select a static graphic.",
+  "title": "Chart / Map",
+  "description": "Show an interactive chart or map from a link, with a fallback graphic, or a static graphic.",
   "category": "byline",
-  "icon": "format-image",
+  "icon": "chart-bar",
   "keywords": [
     "chart",
     "data",
     "map",
-    "interactive"
+    "interactive",
+    "graph",
+    "datawrapper",
+    "flourish",
+    "embed"
   ],
   "textdomain": "weekly-wildcat-headless",
   "attributes": {
@@ -19,6 +23,10 @@
       "default": ""
     },
     "description": {
+      "type": "string",
+      "default": ""
+    },
+    "summary": {
       "type": "string",
       "default": ""
     },
