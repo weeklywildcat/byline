@@ -114,7 +114,7 @@ export function TasksSection() {
     <CardContent className="px-0">
       {failed ? <div className="px-3"><SectionFailed what="tasks" onRetry={() => void reload()} /></div> : <>
         {open.length ? rows(showAll ? open : open.slice(0, TASK_LIMIT), "Open tasks")
-          : <div className="px-3"><Empty className="border"><EmptyHeader><EmptyTitle>{done.length ? "Nothing left to do." : caps.addTask ? "No tasks yet." : "No tasks are assigned to you."}</EmptyTitle></EmptyHeader>{done.length || !add ? null : <EmptyContent>{add}</EmptyContent>}</Empty></div>}
+          : <div className="px-3"><Empty className="py-5"><EmptyHeader><EmptyTitle>{done.length ? "Nothing left to do." : caps.addTask ? "No tasks yet." : "No tasks are assigned to you."}</EmptyTitle></EmptyHeader>{done.length || !add ? null : <EmptyContent>{add}</EmptyContent>}</Empty></div>}
         {open.length > TASK_LIMIT ? <Button type="button" variant="ghost" size="sm" className="mx-1.5 mt-1 text-muted-foreground" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>{showAll ? "Show fewer" : `Show ${open.length - TASK_LIMIT} more`}</Button> : null}
         {done.length ? <Collapsible className="mt-1 px-1.5">
           <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="text-muted-foreground" />}>
