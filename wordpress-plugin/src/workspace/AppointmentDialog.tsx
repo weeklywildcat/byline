@@ -1,6 +1,5 @@
 import { useId, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { FormField, SelectField, TextAreaField, TextField, describedBy } from "../admin-ui/components/form-fields";
 import { Button } from "../admin-ui/ui/button";
 import { ButtonGroup } from "../admin-ui/ui/button-group";
@@ -16,6 +15,7 @@ import { formatLongDay, peopleOptions } from "./workspace-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyReporting } from "./workspace-cache";
 import { workspaceError } from "./workspace-errors";
+import { workspaceUndoToast, workspaceToast } from "./workspace-toast";
 import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES, type ReportingResponse, type ScheduleMode, type StoryAppointment, type StorySource } from "./workspace-types";
 
 const kindOptions = APPOINTMENT_KINDS.map((value) => ({ value, label: APPOINTMENT_KIND_LABELS[value] }));
@@ -76,13 +76,46 @@ export function AppointmentDialog({ open, appointment, initial, onClose, finalFo
   const people = peopleOptions(data.people, appointment?.assignees);
   const patch = (changes: Partial<AppointmentForm>) => setForm((current) => ({ ...current, ...changes }));
 
-  const handlers = (message: string) => ({
-    onSuccess: (response: ReportingResponse) => { cache.write((current) => applyReporting(current, response)); toast.success(message); onClose(); },
+  const save = useMutation({
+    mutationFn: () => client.saveAppointment(storyId, appointmentFormToInput(form, appointment ?? undefined, timezone), appointment?.id),
+    onSuccess: (response: ReportingResponse) => {
+      cache.write((current) => applyReporting(current, response));
+      if (appointment) {
+        const updated = response.appointments.find((item) => item.id === appointment.id);
+        if (updated) {
+          workspaceUndoToast("Appointment saved.", {
+            restored: "Appointment restored.",
+            failed: "The appointment changed again, so that edit couldn't be undone.",
+            undo: async () => {
+              const original = appointmentToForm(appointment, timezone);
+              const undone = await client.saveAppointment(storyId, appointmentFormToInput(original, updated, timezone), appointment.id);
+              cache.write((current) => applyReporting(current, undone));
+              await cache.invalidate();
+            }
+          });
+        } else workspaceToast("Appointment saved.");
+      } else if (response.appointmentId) {
+        workspaceUndoToast("Appointment added.", {
+          restored: "Appointment removed.",
+          failed: "The new appointment couldn't be removed.",
+          undo: async () => {
+            const undone = await client.deleteAppointment(storyId, response.appointmentId!);
+            cache.write((current) => applyReporting(current, undone));
+            await cache.invalidate();
+          }
+        });
+      } else workspaceToast("Appointment added.");
+      onClose();
+    },
     onError: (failure: unknown) => setError(workspaceError(failure, "The appointment couldn't be saved. Try again.")),
     onSettled: () => { void cache.invalidate(); }
   });
-  const save = useMutation({ mutationFn: () => client.saveAppointment(storyId, appointmentFormToInput(form, appointment ?? undefined, timezone), appointment?.id), ...handlers(appointment ? "Appointment saved." : "Appointment added.") });
-  const remove = useMutation({ mutationFn: () => client.deleteAppointment(storyId, appointment!.id), ...handlers("Appointment deleted.") });
+  const remove = useMutation({
+    mutationFn: () => client.deleteAppointment(storyId, appointment!.id),
+    onSuccess: (response: ReportingResponse) => { cache.write((current) => applyReporting(current, response)); workspaceToast("Appointment deleted."); onClose(); },
+    onError: (failure: unknown) => setError(workspaceError(failure, "The appointment couldn't be deleted. Try again.")),
+    onSettled: () => { void cache.invalidate(); }
+  });
   const pending = save.isPending || remove.isPending;
   const dirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
