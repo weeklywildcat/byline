@@ -1,4 +1,6 @@
 import { Button, Notice, Placeholder, Spinner } from "../admin-ui/components/legacy-control-adapters";
+import { Badge } from "../admin-ui/ui/badge";
+import { Alert, AlertAction, AlertDescription } from "../admin-ui/ui/alert";
 import { __ } from "@wordpress/i18n";
 import type { ReactNode } from "react";
 
@@ -13,17 +15,13 @@ import {
 import "./style.css";
 
 export function NewsletterStatusBadge({ status }: { status: NewsletterStatus }) {
-  return (
-    <span className={`byline-newsletter-status byline-newsletter-status-${status}`} title={newsletterStatusDescription(status)}>
-      <span aria-hidden="true" className="byline-newsletter-status-dot" />
-      {newsletterStatusLabel(status)}
-    </span>
-  );
+  const variant = status === "failed" ? "destructive" : status === "sent" ? "secondary" : "outline";
+  return <Badge variant={variant} title={newsletterStatusDescription(status)}>{newsletterStatusLabel(status)}</Badge>;
 }
 
 export function ProviderStatus({ status, configured }: { status: NewsletterConnectionStatus; configured: boolean }) {
   const label = configured ? providerStatusLabel(status) : __("Not configured", "weekly-wildcat-headless");
-  return <span className={`byline-newsletter-provider-status byline-newsletter-provider-status-${status}`}>{label}</span>;
+  return <Badge variant={status === "connected" ? "secondary" : "outline"}>{label}</Badge>;
 }
 
 export function LoadingState({ label }: { label: string }) {
@@ -44,12 +42,10 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 }
 
 export function OptionalUnavailable({ children, action }: { children: ReactNode; action?: ReactNode }) {
-  return (
-    <div className="byline-newsletter-optional" role="status">
-      <p>{children}</p>
-      {action ? <div>{action}</div> : null}
-    </div>
-  );
+  return <Alert role="status">
+    <AlertDescription>{children}</AlertDescription>
+    {action ? <AlertAction>{action}</AlertAction> : null}
+  </Alert>;
 }
 
 export function formatNewsletterDate(value: string | null | undefined): string {
