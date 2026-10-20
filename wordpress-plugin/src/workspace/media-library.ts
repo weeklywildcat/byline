@@ -5,7 +5,7 @@
  */
 import type { MediaAssignmentType } from "./workspace-types";
 
-export type PickedAttachment = { id: number; title: string; url: string | null; previewUrl: string | null; mimeType: string | null };
+export type PickedAttachment = { id: number; title: string; url?: string | null; previewUrl: string | null; mimeType: string | null };
 
 type MediaFrame = { on: (event: string, handler: () => void) => void; open: () => void; close: () => void; state: () => { get: (name: string) => { toJSON: () => unknown[] } } };
 type MediaFactory = (options: Record<string, unknown>) => MediaFrame;
