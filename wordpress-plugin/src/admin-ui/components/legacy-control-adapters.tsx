@@ -18,7 +18,7 @@ export function Button({ variant = "secondary", isBusy, isDestructive, href, chi
   isDestructive?: boolean;
   href?: string;
   children?: ReactNode;
-  [key: string]: unknown;
+  [key: string]: any;
 }) {
   const novaVariant = isDestructive ? "destructive" : variant === "primary" ? "default" : variant === "secondary" ? "outline" : variant === "tertiary" ? "ghost" : "link";
   const content = <>{isBusy ? <Spinner data-icon="inline-start" /> : null}{children}</>;
@@ -48,7 +48,7 @@ export function TextControl({ label, value, onChange, help, type = "text", ...pr
   onChange: (value: string) => void;
   help?: ReactNode;
   type?: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }) {
   return <Field>
     <FieldLabel>{label}</FieldLabel>
@@ -63,7 +63,7 @@ export function TextareaControl({ label, value, onChange, help, rows = 4, ...pro
   onChange: (value: string) => void;
   help?: ReactNode;
   rows?: number;
-  [key: string]: unknown;
+  [key: string]: any;
 }) {
   return <Field>
     <FieldLabel>{label}</FieldLabel>
