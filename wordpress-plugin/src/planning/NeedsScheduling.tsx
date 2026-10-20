@@ -8,6 +8,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-u
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
 import type { NeedsSchedulingItem } from "./calendar-model";
 import { StoryTitleButton } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 
 const PREVIEW = 5;
 
@@ -31,7 +32,7 @@ export function NeedsScheduling({ items, loading, onOpenStory }: { items: NeedsS
           <ItemContent>
             <ItemTitle>{decodeEntities(item.title)}</ItemTitle>
             <ItemDescription className="line-clamp-none">
-              {item.storyId ? <StoryTitleButton story={{ id: item.storyId, title: item.storyTitle }} onOpen={onOpenStory} className="font-normal" /> : decodeEntities(item.storyTitle)}
+              {item.storyId ? <StoryHoverCard storyId={item.storyId} title={item.storyTitle}><StoryTitleButton story={{ id: item.storyId, title: item.storyTitle }} onOpen={onOpenStory} className="font-normal" /></StoryHoverCard> : decodeEntities(item.storyTitle)}
               {" · "}<span className={item.hasTarget ? undefined : "text-muted-foreground"}>{item.target}</span>
               {" · "}{item.assigneeNames.length ? item.assigneeNames.join(", ") : __("Unassigned", "weekly-wildcat-headless")}
             </ItemDescription>
