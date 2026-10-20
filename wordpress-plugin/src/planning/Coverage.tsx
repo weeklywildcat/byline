@@ -12,6 +12,7 @@ import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../admin-ui/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
+import { Spinner } from "../admin-ui/ui/spinner";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
 import { ToggleGroup, ToggleGroupItem } from "../admin-ui/ui/toggle-group";
 import { describeEditorialError } from "../editorial/editorial-model";
@@ -95,7 +96,7 @@ function NewCoverage({ fetchers, open, onClose }: { fetchers: PlanningFetchers; 
       <DialogHeader><DialogTitle>{__("New coverage", "weekly-wildcat-headless")}</DialogTitle><DialogDescription>{__("A coverage package gives a group of stories one shared identity.", "weekly-wildcat-headless")}</DialogDescription></DialogHeader>
       <form onSubmit={(event) => { event.preventDefault(); const title = String(new FormData(event.currentTarget).get("title") || "").trim(); if (title) create.mutate(title); }}>
         <FieldGroup><Field><FieldLabel htmlFor="coverage-new-title">{__("Coverage title", "weekly-wildcat-headless")}</FieldLabel><Input id="coverage-new-title" name="title" required maxLength={160} autoFocus disabled={create.isPending} /></Field></FieldGroup>
-        <DialogFooter className="mt-4"><Button type="button" variant="outline" onClick={onClose} disabled={create.isPending}>{__("Cancel", "weekly-wildcat-headless")}</Button><Button type="submit" disabled={create.isPending}>{create.isPending ? __("Creating…", "weekly-wildcat-headless") : __("Create coverage", "weekly-wildcat-headless")}</Button></DialogFooter>
+        <DialogFooter className="mt-4"><Button type="button" variant="outline" onClick={onClose} disabled={create.isPending}>{__("Cancel", "weekly-wildcat-headless")}</Button><Button type="submit" disabled={create.isPending}>{create.isPending ? <><Spinner data-icon="inline-start" />{__("Creating…", "weekly-wildcat-headless")}</> : __("Create coverage", "weekly-wildcat-headless")}</Button></DialogFooter>
       </form>
     </DialogContent>
   </Dialog>;

@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldGroup, FieldLabel } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
+import { Spinner } from "../admin-ui/ui/spinner";
 import type { StoryWorkspace } from "../workspace/workspace-types";
 import type { StoryFetchers } from "./story-fetchers";
 import { invalidateStoryData } from "./story-query";
@@ -53,7 +54,7 @@ export function StoryCreateDialog({ open, onClose, onCreated, fetchers }: StoryC
           </Field> : null}
           {error ? <InlineAlert>{error}</InlineAlert> : null}
         </FieldGroup>
-        <DialogFooter className="mt-4"><Button variant="outline" type="button" onClick={onClose} disabled={create.isPending}>Cancel</Button><Button type="submit" disabled={create.isPending}>{create.isPending ? "Creating…" : "Create story"}</Button></DialogFooter>
+        <DialogFooter className="mt-4"><Button variant="outline" type="button" onClick={onClose} disabled={create.isPending}>Cancel</Button><Button type="submit" disabled={create.isPending}>{create.isPending ? <><Spinner data-icon="inline-start" />Creating…</> : "Create story"}</Button></DialogFooter>
       </form>
     </DialogContent>
   </Dialog>;

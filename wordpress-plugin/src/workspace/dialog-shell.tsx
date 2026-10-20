@@ -3,6 +3,7 @@ import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../admin-ui/ui/alert-dialog";
 import { Button } from "../admin-ui/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../admin-ui/ui/dialog";
+import { Spinner } from "../admin-ui/ui/spinner";
 import { FieldGroup } from "../admin-ui/ui/field";
 
 export type WorkspaceDialogProps = {
@@ -46,7 +47,7 @@ export function WorkspaceDialog({ open, onClose, finalFocus, title, description,
         <DialogFooter className="items-center">
           {secondary ? <div className="sm:mr-auto">{secondary}</div> : null}
           <Button type="button" variant="outline" onClick={onClose} disabled={pending}>{readOnly ? "Close" : "Cancel"}</Button>
-          {readOnly ? null : <Button type="submit" disabled={pending}>{pending ? pendingLabel : submitLabel}</Button>}
+          {readOnly ? null : <Button type="submit" disabled={pending}>{pending ? <><Spinner data-icon="inline-start" />{pendingLabel}</> : submitLabel}</Button>}
         </DialogFooter>
       </form>
     </DialogContent>

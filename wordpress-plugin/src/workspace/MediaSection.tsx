@@ -55,7 +55,7 @@ export function MediaSection() {
     <CardContent className="px-0">
       {failed ? <div className="px-3"><SectionFailed what="production assignments" onRetry={() => void reload()} /></div> : data.mediaAssignments.length
         ? <ItemGroup role="group" aria-label="Production assignments" className="gap-0">{data.mediaAssignments.map((assignment) => <MediaRow key={assignment.id} assignment={assignment} people={data.people} timezone={timezone} now={now} onOpen={(element) => dialog.openWith(assignment, element)} />)}</ItemGroup>
-        : <div className="px-3"><Empty className="border"><EmptyHeader><EmptyTitle>No photo, graphic, video or audio work yet.</EmptyTitle></EmptyHeader>{add ? <EmptyContent>{add}</EmptyContent> : null}</Empty></div>}
+        : <div className="px-3"><Empty className="py-5"><EmptyHeader><EmptyTitle>No photo, graphic, video or audio work yet.</EmptyTitle></EmptyHeader>{add ? <EmptyContent>{add}</EmptyContent> : null}</Empty></div>}
     </CardContent>
     <MediaDialog key={`media-${dialog.session}`} open={dialog.open} assignment={dialog.target} onClose={dialog.close} finalFocus={dialog.finalFocus} />
   </Card>;

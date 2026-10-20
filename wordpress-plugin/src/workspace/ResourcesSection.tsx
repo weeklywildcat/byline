@@ -103,7 +103,7 @@ export function ResourcesSection() {
     <CardContent className="px-0">
       {failed ? <div className="px-3"><SectionFailed what="links" onRetry={() => void reload()} /></div> : data.resources.length
         ? <ItemGroup role="group" aria-label="Links" className="gap-0">{data.resources.map((resource) => <ResourceRow key={resource.id} resource={resource} canManage={canManage} onEdit={(element) => dialog.openWith(resource, element)} onRemove={() => remove.mutate(resource.id)} />)}</ItemGroup>
-        : <div className="px-3"><Empty className="border"><EmptyHeader><EmptyTitle>No files or links yet.</EmptyTitle>{canManage ? <EmptyDescription>Link the working draft, notes and research.</EmptyDescription> : null}</EmptyHeader>{add ? <EmptyContent>{add}</EmptyContent> : null}</Empty></div>}
+        : <div className="px-3"><Empty className="py-5"><EmptyHeader><EmptyTitle>No files or links yet.</EmptyTitle>{canManage ? <EmptyDescription>Link the working draft, notes and research.</EmptyDescription> : null}</EmptyHeader>{add ? <EmptyContent>{add}</EmptyContent> : null}</Empty></div>}
     </CardContent>
     <LinkDialog key={`link-${dialog.session}`} open={dialog.open} resource={dialog.target} onClose={dialog.close} finalFocus={dialog.finalFocus} />
   </Card>;

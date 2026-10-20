@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
 import { Field, FieldGroup, FieldLabel } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
+import { Spinner } from "../admin-ui/ui/spinner";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { savedViewsKey } from "../story/story-query";
@@ -108,7 +109,7 @@ export function SavedViews({ fetchers, currentUserId, filters, sort, selectedId,
             <Field><FieldLabel htmlFor="saved-view-name">{__("View name", "weekly-wildcat-headless")}</FieldLabel><Input id="saved-view-name" name="name" required maxLength={80} autoFocus defaultValue={dialog?.kind === "rename" ? dialog.view.name : ""} placeholder={__("e.g. Publishing this week", "weekly-wildcat-headless")} disabled={save.isPending} /></Field>
             {error ? <InlineAlert>{error}</InlineAlert> : null}
           </FieldGroup>
-          <DialogFooter className="mt-4"><Button type="button" variant="outline" onClick={close} disabled={save.isPending}>{__("Cancel", "weekly-wildcat-headless")}</Button><Button type="submit" disabled={save.isPending}>{save.isPending ? __("Saving…", "weekly-wildcat-headless") : dialog?.kind === "rename" ? __("Rename", "weekly-wildcat-headless") : __("Save view", "weekly-wildcat-headless")}</Button></DialogFooter>
+          <DialogFooter className="mt-4"><Button type="button" variant="outline" onClick={close} disabled={save.isPending}>{__("Cancel", "weekly-wildcat-headless")}</Button><Button type="submit" disabled={save.isPending}>{save.isPending ? <><Spinner data-icon="inline-start" />{__("Saving…", "weekly-wildcat-headless")}</> : dialog?.kind === "rename" ? __("Rename", "weekly-wildcat-headless") : __("Save view", "weekly-wildcat-headless")}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

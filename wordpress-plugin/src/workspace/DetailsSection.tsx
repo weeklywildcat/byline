@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { describeEditorialError, type ContributorEntry } from "../editorial/editorial-model";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
-import { AssigneePicker, DatePicker, WritersPicker, fieldRow, valueSelectTriggerClass } from "../admin-ui/components/pickers";
+import { AssigneePicker, DatePicker, WritersPicker, valueSelectTriggerClass } from "../admin-ui/components/pickers";
 import { Card, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Field, FieldContent, FieldGroup, FieldTitle } from "../admin-ui/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
@@ -73,7 +73,7 @@ export function DetailsSection() {
   return <Card size="sm" role="region" aria-labelledby="ws-details-title" id="ws-details" className="order-2 @3xl/ws:order-none">
     <CardHeader><CardTitle id="ws-details-title" role="heading" aria-level={2}>Details</CardTitle></CardHeader>
     <CardContent>
-      <FieldGroup className="gap-1">
+      <FieldGroup className="gap-2">
         <Property label="Workflow">
           {caps.changeStatus ? <Select items={data.statuses.map((status) => ({ value: status.id, label: status.label }))} value={story.workflow.id} disabled={busy} onValueChange={(id) => { if (id && id !== story.workflow.id) save({ status: id }); }}>
             <SelectTrigger aria-label="Workflow" className={valueSelectTriggerClass}><SelectValue /></SelectTrigger>
@@ -103,5 +103,8 @@ export function DetailsSection() {
 
 /** A story fact as a native horizontal Field: a muted label column, then the value or its control. */
 function Property({ label, children }: { label: string; children: React.ReactNode }) {
-  return <Field orientation="horizontal" aria-label={label} className={fieldRow.field}><FieldTitle className={fieldRow.label}>{label}</FieldTitle><FieldContent className={fieldRow.value}>{children}</FieldContent></Field>;
+  return <Field orientation="responsive" aria-label={label} className="min-h-7 @md/field-group:items-center!">
+    <FieldTitle className="font-normal text-muted-foreground @md/field-group:w-36 @md/field-group:flex-none!">{label}</FieldTitle>
+    <FieldContent className="min-w-0 text-sm [overflow-wrap:anywhere]">{children}</FieldContent>
+  </Field>;
 }
