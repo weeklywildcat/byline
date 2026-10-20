@@ -41,6 +41,8 @@ describe("fast editing interactions", () => {
     expect(source).toContain("editorial.updateTask(task!.id");
     expect(source).toContain("<ContextMenu");
     expect(source).toContain('label="Priority"');
+    expect(source).toContain('label: "Undo"');
+    expect(read("home/HomeApp.tsx")).toContain('label: "Undo"');
   });
 
   it("adds status accelerators to reporting and production rows", () => {
