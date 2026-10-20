@@ -71,7 +71,7 @@ export function BriefSection() {
           </div>
         </form>
         : data.brief ? <p className="max-w-prose text-sm/relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{data.brief}</p>
-          : <Empty className="border"><EmptyHeader><EmptyTitle>No brief yet.</EmptyTitle>{canEdit ? <EmptyDescription>Say what this story is, in a few lines.</EmptyDescription> : null}</EmptyHeader></Empty>}
+          : <Empty className="py-5"><EmptyHeader><EmptyTitle>No brief yet.</EmptyTitle>{canEdit ? <EmptyDescription>Say what this story is, in a few lines.</EmptyDescription> : null}</EmptyHeader></Empty>}
     </CardContent>
   </Card>;
 }
