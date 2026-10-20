@@ -371,9 +371,14 @@ foreach (['byline-planning', 'byline'] as $slug) {
         byline_smoke_fail("Smoke harness did not register {$slug}.");
     }
 }
-foreach (['byline', 'byline-publication', 'byline-integrations', 'byline-settings'] as $slug) {
+foreach (['byline', 'byline-settings'] as $slug) {
     if (!isset($byline_smoke_submenus[$slug])) {
         byline_smoke_fail("Smoke harness did not register {$slug}.");
+    }
+}
+foreach (['byline-publication', 'byline-integrations'] as $retired_slug) {
+    if (isset($byline_smoke_submenus[$retired_slug])) {
+        byline_smoke_fail("Smoke harness should not register retired {$retired_slug} settings navigation.");
     }
 }
 
@@ -407,7 +412,6 @@ $screens = [
     ['page' => '', 'screen' => ['id' => 'edit-' . BYLINE_POLL_POST_TYPE, 'post_type' => BYLINE_POLL_POST_TYPE]],
     ['page' => '', 'screen' => ['id' => 'edit-' . WWH_SCHOOL_EVENT_POST_TYPE, 'post_type' => WWH_SCHOOL_EVENT_POST_TYPE]],
     ['page' => 'byline', 'screen' => ['id' => 'byline_page_byline', 'post_type' => null]],
-    ['page' => 'byline-publication', 'screen' => ['id' => 'byline_page_byline-publication', 'post_type' => null]],
     ['page' => 'byline-settings', 'screen' => ['id' => 'byline_page_byline-settings', 'post_type' => null]],
 ];
 
@@ -424,11 +428,11 @@ foreach ($screens as $screen_case) {
 
 // Direct callbacks still enforce their capabilities independently of menu
 // visibility, and an authorized configuration screen gets a React mount.
-$_GET = ['page' => 'byline-publication'];
+$_GET = ['page' => 'byline-settings', 'tab' => 'identity'];
 $byline_smoke_capabilities = [];
 try {
     byline_render_admin_app();
-    byline_smoke_fail('Unauthorized Publication screen was rendered.');
+    byline_smoke_fail('Unauthorized Settings screen was rendered.');
 } catch (RuntimeException $exception) {
 }
 
@@ -437,7 +441,7 @@ ob_start();
 byline_render_admin_app();
 $rendered = (string) ob_get_clean();
 if (strpos($rendered, 'id="byline-admin-root"') === false) {
-    byline_smoke_fail('Authorized Publication screen did not render its application mount.');
+    byline_smoke_fail('Authorized Settings screen did not render its application mount.');
 }
 
 // --- editorial workflow -----------------------------------------------------
