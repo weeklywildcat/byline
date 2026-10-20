@@ -10,7 +10,10 @@ const workspaceCss = path.resolve(__dirname, 'src/workspace/style.css');
 // Planning (Stories, Calendar, Media Desk, ...) is the third consumer; its
 // stylesheet adds only the Schedule-X theme, scoped to the same root.
 const planningCss = path.resolve(__dirname, 'src/planning/style.css');
-const scopedCss = [homeCss, workspaceCss, planningCss];
+// Presence is a fourth private React 19 surface. Its trigger is portalled into
+// the WordPress toolbar while its overlays stay in the isolated Nova root.
+const presenceCss = path.resolve(__dirname, 'src/presence/style.css');
+const scopedCss = [homeCss, workspaceCss, planningCss, presenceCss];
 const cssRule = defaultConfig.module.rules.find((rule) => rule.test?.test('style.css'));
 
 const adminConfig = {
@@ -79,7 +82,10 @@ const homeConfig = {
   ...adminConfig,
   name: 'home',
   dependencies: ['admin'],
-  entry: { home: path.resolve(__dirname, 'src/home-entry.tsx') },
+  entry: {
+    home: path.resolve(__dirname, 'src/home-entry.tsx'),
+    presence: path.resolve(__dirname, 'src/presence-entry.tsx'),
+  },
   output: { ...adminConfig.output, clean: false },
   plugins: adminConfig.plugins.filter((plugin) => !['DependencyExtractionWebpackPlugin', 'CopyPlugin', 'PhpFilePathsPlugin'].includes(plugin.constructor.name)).concat([
     new DependencyExtractionWebpackPlugin({
