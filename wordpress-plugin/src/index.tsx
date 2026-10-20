@@ -9,7 +9,8 @@ import {
   TextareaControl,
   TextControl,
   ToggleControl
-} from "@wordpress/components";
+} from "./admin-ui/components/legacy-control-adapters";
+import { AdminRoot } from "./admin-ui/components/admin-root";
 import { Component, createRoot, useEffect, useState } from "@wordpress/element";
 // Scoped publication styles used by shared admin presentation components.
 import "@byline/theme-weekly-wildcat/styles.css";
@@ -31,6 +32,7 @@ import { stripMarkupForText } from "./safe-text";
 import type { ReactNode } from "react";
 import { DoctorApp, type DoctorActionId, type DoctorActionResponse, type DoctorDiagnostics } from "./doctor";
 import "./style.css";
+import "./admin-ui/admin-ui.css";
 
 type BylineAdminConfig = {
   page: string;
@@ -2036,8 +2038,10 @@ const rootElement = document.getElementById("byline-admin-root");
 
 if (rootElement) {
   createRoot(rootElement).render(
-    <AdminErrorBoundary>
-      <BylineAdminApp />
-    </AdminErrorBoundary>
+    <AdminRoot className="byline-admin-app">
+      <AdminErrorBoundary>
+        <BylineAdminApp />
+      </AdminErrorBoundary>
+    </AdminRoot>
   );
 }
