@@ -11,6 +11,7 @@ describe("fast editing interactions", () => {
     expect(read("planning/MediaDesk.tsx")).toContain("<MediaRowContext");
     expect(read("planning/ContentHealth.tsx")).toContain("<ContextMenu");
     expect(read("planning/Feedback.tsx")).toContain("<ContextMenu");
+    expect(read("planning/NeedsScheduling.tsx")).toContain("<ContextMenu");
   });
 
   it("makes low-risk queue edits optimistic instead of waiting for a refetch", () => {
@@ -24,6 +25,8 @@ describe("fast editing interactions", () => {
     expect(read("planning/Coverage.tsx")).toContain('label: __("Undo"');
     expect(read("workspace/ResourcesSection.tsx")).toContain('label: "Undo"');
     expect(read("story/StoryPeek.tsx")).toContain('label: "Undo"');
+    expect(read("workspace/ResourcesSection.tsx")).toContain("Copy link");
+    expect(read("story/StoryPeek.tsx")).toContain("Copy link");
     expect(read("planning/Coverage.tsx")).not.toContain("<ConfirmRemoveDialog");
     expect(read("story/StoryPeek.tsx")).toContain("<ContextMenu");
   });
