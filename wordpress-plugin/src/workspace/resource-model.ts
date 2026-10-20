@@ -32,3 +32,20 @@ export function validateLink(link: { label: string; url: string }): Partial<Reco
   else if (link.url.trim().length > 2048 || !isHttpUrl(link.url)) errors.url = "Use a full link that starts with http:// or https://.";
   return errors;
 }
+
+export type ResourceKind = "doc" | "sheet" | "slides" | "folder" | "pdf" | "link";
+
+/**
+ * What a link is, decided from what the server already knows (its kind label
+ * and purpose) and from Google's own URL shapes. Anything unrecognised is a
+ * plain link: the icon never guesses.
+ */
+export function resourceKind(resource: Pick<StoryResource, "kind" | "purpose" | "url">): ResourceKind {
+  const url = resource.url.toLowerCase();
+  if (resource.purpose === "folder" || /folder/i.test(resource.kind) || url.includes("drive.google.com/drive/folders")) return "folder";
+  if (/sheet/i.test(resource.kind) || url.includes("docs.google.com/spreadsheets")) return "sheet";
+  if (/slide/i.test(resource.kind) || url.includes("docs.google.com/presentation")) return "slides";
+  if (/pdf/i.test(resource.kind) || /\.pdf($|\?)/.test(url)) return "pdf";
+  if (/doc/i.test(resource.kind) || resource.purpose === "draft" || url.includes("docs.google.com/document")) return "doc";
+  return "link";
+}

@@ -73,6 +73,17 @@ export function dateLabel(value: string | null | undefined, timezone: string, no
   return new Intl.DateTimeFormat(undefined, { weekday: "short", ...(distance > 6 ? { month: "short", day: "numeric" } as const : {}), timeZone: "UTC" }).format(new Date(`${siteDay(value!, timezone)}T12:00:00Z`));
 }
 
+/** "5m ago", "3h ago", then a site-timezone date. The exact time belongs in a title, not here. */
+export function relativeTime(value: string, timezone: string, now = new Date()): string {
+  const elapsed = now.getTime() - new Date(value).getTime();
+  if (!Number.isFinite(elapsed)) return "";
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: timezone }).format(new Date(value));
+}
+
 export function exactDate(value: string | null | undefined, timezone: string): string {
   if (!value) return "Not set";
   const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -80,6 +91,18 @@ export function exactDate(value: string | null | undefined, timezone: string): s
   const date = new Date(dateOnly ? `${value}T12:00:00Z` : siteWallTime ? `${value}Z` : value);
   if (Number.isNaN(date.getTime())) return "Not set";
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", ...(!dateOnly ? { timeStyle: "short" } as const : {}), timeZone: dateOnly || siteWallTime ? "UTC" : timezone }).format(date);
+}
+
+/** "Oct 21 · 2:00 PM", or just "Oct 21" for a date-only value. Site timezone, no year. */
+export function shortDateTime(value: string | null | undefined, timezone: string): string {
+  if (!value) return "";
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const siteWallTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value);
+  const date = new Date(dateOnly ? `${value}T12:00:00Z` : siteWallTime ? `${value}Z` : value);
+  if (Number.isNaN(date.getTime())) return "";
+  const zone = dateOnly || siteWallTime ? "UTC" : timezone;
+  const day = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: zone }).format(date);
+  return dateOnly ? day : `${day} · ${new Intl.DateTimeFormat(undefined, { timeStyle: "short", timeZone: zone }).format(date)}`;
 }
 
 const priorities = { urgent: 0, high: 1, normal: 2, low: 3 };

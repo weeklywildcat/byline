@@ -27,6 +27,8 @@ test("Home creates real drafts, completes work with rollback, preserves peek con
   expect(story).toBeTruthy();
   session.registerTestPost(story.id);
   expect(story.id).toBe(createdId);
+  // Give it a near deadline so it ranks into "My Stories" however many fixture stories earlier runs left behind.
+  expect((await session.rest(`/byline/v1/editorial/stories/${story.id}`, "POST", { deadline: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) })).ok).toBe(true);
   const post = await session.rest<{ status: string; content: { raw: string } }>(`/wp/v2/posts/${story.id}?context=edit`);
   expect(post.payload.status).toBe("draft");
   expect(post.payload.content.raw).toBe("");
@@ -50,12 +52,12 @@ test("Home creates real drafts, completes work with rollback, preserves peek con
   await expect(checkbox).not.toBeVisible();
   failRelease();
   await expect(checkbox).toBeVisible();
-  await expect(page.locator(".home-up-next").getByRole("alert")).toContainText("couldn't be completed");
+  await expect(page.getByRole("region", { name: "Up Next" }).getByRole("alert")).toContainText("couldn't be completed");
   await page.unroute(taskRoute);
   await checkbox.click();
   await expect(checkbox).not.toBeVisible();
   await expect.poll(async () => (await session.rest<{ state: string }>(`/byline/v1/editorial/tasks/${taskId}`)).payload.state).toBe("completed");
-  const row = page.locator(".home-my-stories").getByRole("button", { name: new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) });
+  const row = page.getByRole("region", { name: "My Stories" }).getByRole("button", { name: new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) });
   await row.click();
   await expect(peek).toBeVisible();
   await peek.getByRole("button", { name: "Add link", exact: true }).click();
@@ -71,7 +73,9 @@ test("Home creates real drafts, completes work with rollback, preserves peek con
   await expect(command.getByRole("option", { name: title })).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(peek).toBeVisible();
-  await peek.getByRole("button", { name: "Remove Interview notes" }).click();
+  await peek.getByRole("button", { name: "Actions for Interview notes" }).click();
+  await page.getByRole("menuitem", { name: "Remove link" }).click();
+  await page.getByRole("alertdialog", { name: "Remove this link?" }).getByRole("button", { name: "Remove" }).click();
   await expect(peek.getByRole("link", { name: /Interview notes/ })).not.toBeVisible();
   expect(pageErrors).toEqual([]);
   await peek.getByRole("link", { name: "Edit article" }).click();
@@ -107,7 +111,7 @@ test("Home visual QA and independent optional service failures", async ({ adminP
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: `/tmp/byline-home-qa/editor-${width}.png`, fullPage: true, animations: "disabled" });
     if (width === 1440 || width === 390) {
-      await page.locator(".home-my-stories").getByRole("button", { name: /^Canteen/ }).click();
+      await page.getByRole("region", { name: "My Stories" }).getByRole("button", { name: /^Canteen Due/ }).click();
       const peek = page.getByRole("dialog", { name: "Canteen", exact: true });
       await expect(peek).toBeVisible();
       await expect(peek).toHaveCSS("opacity", "1");
@@ -119,7 +123,7 @@ test("Home visual QA and independent optional service failures", async ({ adminP
   await page.route("**/byline/v1/editorial/home*", (route) => route.fulfill({ json: { ...body, activity: [], errors: { activity: "Activity is temporarily unavailable." } } }));
   await page.reload();
   await expect(page.getByRole("checkbox", { name: /Complete Interview 3 students/ })).toBeVisible();
-  await expect(page.locator(".home-activity").getByRole("alert")).toContainText("Activity is temporarily unavailable.");
+  await expect(page.getByRole("region", { name: "Recent Activity" }).getByRole("alert")).toContainText("Activity is temporarily unavailable.");
 });
 
 test("authenticated writers see their work, while private story and review data stay protected", async ({ browser, adminSession: session }) => {

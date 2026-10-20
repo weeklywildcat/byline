@@ -3,8 +3,9 @@ const defaultConfig = require('@wordpress/scripts/config/webpack.config');
 const path = require('path');
 const DependencyExtractionWebpackPlugin = require('@wordpress/dependency-extraction-webpack-plugin');
 const homeCss = path.resolve(__dirname, 'src/home/style.css');
-// The Story Workspace shares Home's scoped Tailwind/PostCSS pipeline. The file is
-// named style.css so wp-scripts emits it as style-story-workspace.css.
+// The Story Workspace shares Home's admin UI (src/admin-ui) and its scoped
+// Tailwind/PostCSS pipeline. The file is named style.css so wp-scripts emits it
+// as style-story-workspace.css.
 const workspaceCss = path.resolve(__dirname, 'src/workspace/style.css');
 const scopedCss = [homeCss, workspaceCss];
 const cssRule = defaultConfig.module.rules.find((rule) => rule.test?.test('style.css'));
@@ -28,7 +29,7 @@ const adminConfig = {
           ...entry,
           options: {
             postcssOptions: {
-              plugins: [require('@tailwindcss/postcss')(), require('postcss-nesting')(), require('./loaders/home-postcss')],
+              plugins: [require('@tailwindcss/postcss')(), require('postcss-nesting')(), require('./loaders/ui-scope-postcss')],
             },
           },
         } : entry),

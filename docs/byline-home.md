@@ -108,23 +108,38 @@ visuals and activity have separate safe error fields. System checks use
 independent queries. A failed optional service cannot suppress assigned work or
 produce a misleading all-clear message.
 
-## Mira, React and WordPress isolation
+## Nova, React and WordPress isolation
 
-`wordpress-plugin/components.json` selects **shadcn base-mira** and Lucide.
-`src/home/ui/` contains the upstream Mira component implementations (MIT), with
-local imports, Lucide icons and portal-container support. Product rows are
-custom Byline components composed from those primitives. Mira's compact
-controls retain their upstream classes; CSS customization is for the page
-layout, responsive structure and necessary WordPress compatibility.
+`wordpress-plugin/components.json` selects **shadcn base-nova** (neutral, Lucide,
+Tailwind 4, Base UI). `src/admin-ui/ui/` holds the generated Nova components
+(MIT), shared by Home and the Story Workspace; the only local change is that
+overlays portal into the `.byline-ui-root` container (`admin-ui/lib/portal.ts`).
+`src/admin-ui/components/` holds only Byline *domain* compositions over them:
+`PeopleAvatars` (nobody, one `Avatar`, an `AvatarGroup`, or three plus an
+`AvatarGroupCount` "+N"), `PersonAvatar`, the writer, assignee and date pickers,
+the resource icon resolver, form-field wiring and the status badge. There are no
+visual-system wrappers: sections are `Card`, rows are `Item` (a Media Library file
+is an `Attachment`; an external link is an `Item` anchor), story facts are
+horizontal `Field`s, a schedule mode is a `RadioGroup` choice card, a target
+window is one range `Calendar` in a `Popover`, empty states are `Empty`,
+overflow actions are `DropdownMenu`, and destructive confirmations are
+`AlertDialog`. To update a primitive, regenerate it with the shadcn CLI
+(it needs `@/*` aliases in `tsconfig.json` and `components.json` while it runs;
+revert them and rewrite the generated `@/` and `"cn"` imports to relative ones)
+and re-apply the portal change; do not restyle it by hand.
+`src/admin-ui/admin-ui.css` is the one stylesheet: Nova's neutral tokens
+(black primary, plus one `warning` token),
+WordPress resets and overlay stacking. Layout is Tailwind utilities on the
+components, so `home/style.css` and `workspace/style.css` only import it.
 
 Home has a separate webpack entry and a private React 19 runtime. Supported
 WordPress installations can still supply React 18 to their own screens. Home
 does not replace that runtime, pass React elements across runtimes or load on
 Gutenberg. Its only external dependency is WordPress `wp-api-fetch`.
 
-Only Home routes enqueue `home.js` and `style-home.css`. Tailwind 4 imports its
+Only Home routes enqueue `home.js` and `style-home.css` (the Story Workspace enqueues `style-story-workspace.css` the same way). Tailwind 4 imports its
 theme and utilities **without Preflight**. The Home-only PostCSS pass prefixes
-all selectors with `.byline-home-root`, scopes generated theme selectors and
+all selectors with `.byline-ui-root`, scopes generated theme selectors and
 renames animation keyframes. Utility rules leave their cascade layer so they
 can outrank wp-admin's unlayered form rules within that root. All dialog,
 popover, combobox and tooltip portals remain inside the same root. Theme

@@ -3,11 +3,18 @@ import { useMutation } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { describeEditorialError, setTaskCompletionState, type ContributorEntry, type EditorialTask } from "../editorial/editorial-model";
-import { AssigneePicker, DatePicker } from "../home/components/pickers";
-import { Button } from "../home/ui/button";
-import { Checkbox } from "../home/ui/checkbox";
-import { Input } from "../home/ui/input";
-import { AddButton, InlineError, Note, SectionFailed, SectionHeading } from "./fields";
+import { TextField } from "../admin-ui/components/form-fields";
+import { AssigneePicker, DatePicker } from "../admin-ui/components/pickers";
+import { Button } from "../admin-ui/ui/button";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
+import { Checkbox } from "../admin-ui/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../admin-ui/ui/collapsible";
+import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
+import { Field, FieldLabel } from "../admin-ui/ui/field";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
+import { WorkspaceDialog } from "./dialog-shell";
+import { AddButton, SectionFailed } from "./parts";
+import { useDialogTarget } from "./dialog-target";
 import { appendNewTasks, applyTask } from "./workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { completedTasks, dueText, isOverdue, openTasks, peopleOptions } from "./workspace-model";
@@ -19,25 +26,56 @@ function TaskItem({ task, timezone, now, busy, onToggle }: { task: EditorialTask
   const due = done ? "" : dueText(task.dueAt, timezone, now);
   const overdue = !done && isOverdue(task.dueAt, timezone, now);
   const meta = [task.assignee?.name, task.priority === "urgent" ? "Urgent" : ""].filter(Boolean).join(" · ");
-  return <li className={`ws-task${done ? " ws-task-done" : ""}`} data-task-id={task.id}>
-    <Checkbox aria-label={task.title} checked={done} aria-disabled={busy || undefined} onCheckedChange={(checked) => { if (!busy) onToggle(task, checked ? "completed" : "open"); }} />
-    <span className="ws-row-main"><span className="ws-row-title">{task.title}</span>{meta ? <span className="ws-row-sub">{meta}</span> : null}</span>
-    {due ? <time className={`ws-due${overdue ? " ws-overdue" : ""}`} dateTime={task.dueAt || undefined}>{due}</time> : null}
-  </li>;
+  const id = `ws-task-${task.id}`;
+  return <Item size="sm" data-task-id={task.id}>
+    <ItemMedia><Checkbox id={id} aria-label={task.title} checked={done} aria-disabled={busy || undefined} onCheckedChange={(checked) => { if (!busy) onToggle(task, checked ? "completed" : "open"); }} /></ItemMedia>
+    <ItemContent>
+      <ItemTitle><label htmlFor={id} className={done ? "cursor-pointer text-muted-foreground line-through" : "cursor-pointer"}>{task.title}</label></ItemTitle>
+      {meta ? <ItemDescription>{meta}</ItemDescription> : null}
+    </ItemContent>
+    {due ? <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined}>{due}</time></ItemActions> : null}
+  </Item>;
+}
+
+type TaskDialogProps = { open: boolean; onClose: () => void; finalFocus: () => HTMLElement | null };
+
+function TaskDialog({ open, onClose, finalFocus }: TaskDialogProps) {
+  const { storyId, editorial, data, timezone, caps, currentUserId, announce } = useWorkspace();
+  const cache = useWorkspaceCache();
+  const people = peopleOptions(data.people);
+  const [title, setTitle] = useState("");
+  const [assignee, setAssignee] = useState<ContributorEntry | null>(() => people.find((person) => Number(person.id) === currentUserId) ?? null);
+  const [dueAt, setDueAt] = useState<string | null>(null);
+  const [attempted, setAttempted] = useState(false);
+  const [error, setError] = useState("");
+
+  const create = useMutation({
+    mutationFn: () => editorial.createTask({ title: title.trim(), storyId, assigneeId: Number(assignee?.id) || (caps.assign ? null : currentUserId || null), dueAt, priority: "normal" }),
+    onSuccess: (response) => {
+      cache.write((current) => appendNewTasks(current, response.tasks));
+      announce("Task added.");
+      toast.success("Task added.");
+      onClose();
+    },
+    onError: (failure) => setError(describeEditorialError(failure, "The task couldn't be added. Try again.")),
+    onSettled: () => { void cache.invalidate(); }
+  });
+
+  return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title="Add task" description="Work that has to happen before this story can run." submitLabel="Add task" pendingLabel="Adding…" pending={create.isPending} error={error} onSubmit={() => { setAttempted(true); setError(""); if (title.trim()) create.mutate(); }}>
+    <TextField label="What needs doing?" value={title} onChange={setTitle} maxLength={240} autoFocus error={attempted && !title.trim() ? "Add a title." : undefined} />
+    <div className="grid gap-4 sm:grid-cols-2">
+      {caps.assign ? <Field><FieldLabel htmlFor="ws-task-assignee">Assigned to</FieldLabel><AssigneePicker id="ws-task-assignee" people={people} value={assignee} onChange={setAssignee} /></Field> : null}
+      <Field><FieldLabel htmlFor="ws-task-due">Due</FieldLabel><DatePicker id="ws-task-due" label="Task due date" value={dueAt} timezone={timezone} onChange={setDueAt} /></Field>
+    </div>
+  </WorkspaceDialog>;
 }
 
 export function TasksSection() {
-  const { storyId, editorial, data, timezone, now, caps, currentUserId, announce, sectionError, reload } = useWorkspace();
+  const { editorial, data, timezone, now, caps, announce, sectionError, reload } = useWorkspace();
   const cache = useWorkspaceCache();
-  const [adding, setAdding] = useState(false);
-  const [showDone, setShowDone] = useState(false);
+  const dialog = useDialogTarget<true>("[data-ws-add=task]");
   const [showAll, setShowAll] = useState(false);
-  const [title, setTitle] = useState("");
-  const [assignee, setAssignee] = useState<ContributorEntry | null>(null);
-  const [dueAt, setDueAt] = useState<string | null>(null);
-  const [createError, setCreateError] = useState("");
   const [busy, setBusy] = useState<Set<string>>(new Set());
-  const people = peopleOptions(data.people);
   const failed = sectionError("tasks");
   const open = openTasks(data.tasks);
   const done = completedTasks(data.tasks);
@@ -65,42 +103,27 @@ export function TasksSection() {
     onSettled: (_result, _error, { task }) => { setBusyFor(String(task.id), false); void cache.invalidate(); }
   });
 
-  const create = useMutation({
-    mutationFn: () => editorial.createTask({ title: title.trim(), storyId, assigneeId: Number(assignee?.id) || (caps.assign ? null : currentUserId || null), dueAt, priority: "normal" }),
-    onSuccess: (response) => {
-      cache.write((current) => appendNewTasks(current, response.tasks));
-      announce("Task added.");
-      setAdding(false); setTitle(""); setAssignee(null); setDueAt(null); setCreateError("");
-      requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-ws-add=task]")?.focus());
-    },
-    onError: (error) => setCreateError(describeEditorialError(error, "The task couldn't be added. Try again.")),
-    onSettled: () => { void cache.invalidate(); }
-  });
+  const rows = (tasks: EditorialTask[], label: string) => <ItemGroup role="group" aria-label={label} className="gap-0">{tasks.map((task) => <TaskItem key={task.id} task={task} timezone={timezone} now={now} busy={busy.has(String(task.id))} onToggle={(item, state) => toggle.mutate({ task: item, state })} />)}</ItemGroup>;
+  const add = caps.addTask && !failed ? <AddButton data-ws-add="task" onClick={(event) => dialog.openWith(true, event.currentTarget)}>Add task</AddButton> : null;
 
-  const startAdding = () => {
-    setAssignee(peopleOptions(data.people).find((person) => Number(person.id) === currentUserId) ?? null);
-    setCreateError("");
-    setAdding(true);
-  };
-
-  return <section aria-labelledby="ws-tasks" className="ws-section ws-tasks">
-    <SectionHeading id="ws-tasks" title="Tasks">{caps.addTask && !failed && !adding ? <AddButton data-ws-add="task" onClick={startAdding}>Add task</AddButton> : null}</SectionHeading>
-    {failed ? <SectionFailed what="tasks" onRetry={() => void reload()} /> : <>
-      {adding ? <form className="ws-inline-form" onSubmit={(event) => { event.preventDefault(); if (title.trim() && !create.isPending) create.mutate(); }}>
-        <Input aria-label="Task title" placeholder="What needs doing?" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={240} autoFocus required className="ws-input" />
-        <div className="ws-inline-fields">
-          {caps.assign ? <AssigneePicker people={people} value={assignee} onChange={setAssignee} /> : null}
-          <DatePicker label="Task due date" value={dueAt} timezone={timezone} onChange={setDueAt} />
-        </div>
-        {createError ? <InlineError>{createError}</InlineError> : null}
-        <div className="ws-inline-actions"><Button type="button" variant="ghost" onClick={() => setAdding(false)} disabled={create.isPending}>Cancel</Button><Button type="submit" disabled={create.isPending || !title.trim()}>{create.isPending ? "Adding…" : "Add task"}</Button></div>
-      </form> : null}
-      {open.length ? <ul className="ws-rows ws-task-list">{(showAll ? open : open.slice(0, TASK_LIMIT)).map((task) => <TaskItem key={task.id} task={task} timezone={timezone} now={now} busy={busy.has(String(task.id))} onToggle={(item, state) => toggle.mutate({ task: item, state })} />)}</ul> : !adding ? <Note>{done.length ? "Nothing left to do." : caps.addTask ? "No tasks yet." : "No tasks are assigned to you."}</Note> : null}
-      {open.length > TASK_LIMIT ? <Button type="button" variant="ghost" className="ws-more" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>{showAll ? "Show fewer" : `Show ${open.length - TASK_LIMIT} more`}</Button> : null}
-      {done.length ? <div className="ws-group">
-        <button type="button" className="ws-disclosure" aria-expanded={showDone} aria-controls="ws-done-tasks" onClick={() => setShowDone((value) => !value)}><ChevronRight aria-hidden="true" />Completed <span>{done.length}</span></button>
-        {showDone ? <ul className="ws-rows ws-task-list" id="ws-done-tasks">{done.map((task) => <TaskItem key={task.id} task={task} timezone={timezone} now={now} busy={busy.has(String(task.id))} onToggle={(item, state) => toggle.mutate({ task: item, state })} />)}</ul> : null}
-      </div> : null}
-    </>}
-  </section>;
+  return <Card size="sm" role="region" aria-labelledby="ws-tasks-title" id="ws-tasks">
+    <CardHeader>
+      <CardTitle id="ws-tasks-title" role="heading" aria-level={2}>Tasks</CardTitle>
+      {add && (open.length || done.length) ? <CardAction>{add}</CardAction> : null}
+    </CardHeader>
+    <CardContent className="px-0">
+      {failed ? <div className="px-3"><SectionFailed what="tasks" onRetry={() => void reload()} /></div> : <>
+        {open.length ? rows(showAll ? open : open.slice(0, TASK_LIMIT), "Open tasks")
+          : <div className="px-3"><Empty className="border"><EmptyHeader><EmptyTitle>{done.length ? "Nothing left to do." : caps.addTask ? "No tasks yet." : "No tasks are assigned to you."}</EmptyTitle></EmptyHeader>{done.length || !add ? null : <EmptyContent>{add}</EmptyContent>}</Empty></div>}
+        {open.length > TASK_LIMIT ? <Button type="button" variant="ghost" size="sm" className="mx-1.5 mt-1 text-muted-foreground" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>{showAll ? "Show fewer" : `Show ${open.length - TASK_LIMIT} more`}</Button> : null}
+        {done.length ? <Collapsible className="mt-1 px-1.5">
+          <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="text-muted-foreground" />}>
+            <ChevronRight data-icon="inline-start" aria-hidden="true" className="transition-transform in-data-panel-open:rotate-90" />Completed <span className="font-normal">{done.length}</span>
+          </CollapsibleTrigger>
+          <CollapsibleContent>{rows(done, "Completed tasks")}</CollapsibleContent>
+        </Collapsible> : null}
+      </>}
+    </CardContent>
+    <TaskDialog key={`task-${dialog.session}`} open={dialog.open} onClose={dialog.close} finalFocus={dialog.finalFocus} />
+  </Card>;
 }

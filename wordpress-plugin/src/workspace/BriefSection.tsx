@@ -1,10 +1,13 @@
 import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "../home/ui/button";
-import { Textarea } from "../home/ui/textarea";
-import { InlineError, SectionFailed, SectionHeading } from "./fields";
+import { InlineAlert } from "../admin-ui/components/inline-alert";
+import { Button } from "../admin-ui/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../admin-ui/ui/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
+import { Field, FieldDescription, FieldLabel } from "../admin-ui/ui/field";
+import { Textarea } from "../admin-ui/ui/textarea";
+import { SectionFailed } from "./parts";
 import { BRIEF_MAX } from "./reporting-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyBrief } from "./workspace-cache";
@@ -47,19 +50,28 @@ export function BriefSection() {
   const cancel = () => { setEditing(false); setError(null); requestAnimationFrame(() => edit.current?.focus()); };
   const reloadBrief = async () => { await reload(); setEditing(false); setError(null); };
 
-  return <section aria-labelledby="ws-brief" className="ws-section ws-brief">
-    <SectionHeading id="ws-brief" title="Brief">
-      <span className="ws-caption">Internal — not article copy</span>
-      {canEdit && !editing ? <Button ref={edit} type="button" variant="ghost" size="sm" className="ws-add" onClick={start}><Pencil aria-hidden="true" />{data.brief ? "Edit" : "Add brief"}</Button> : null}
-    </SectionHeading>
-    {failed ? <SectionFailed what="the brief" onRetry={() => void reload()} /> : editing ? <form className="ws-brief-form" onSubmit={(event) => { event.preventDefault(); if (!save.isPending) save.mutate({ text: draft, expected: data.brief }); }}>
-      <Textarea aria-label="Brief" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={BRIEF_MAX} rows={5} autoFocus className="ws-textarea ws-brief-input" disabled={save.isPending} />
-      <div className="ws-brief-actions">
-        <span className="ws-count" aria-live="polite">{draft.length}/{BRIEF_MAX}</span>
-        <Button type="button" variant="ghost" onClick={cancel} disabled={save.isPending}>Cancel</Button>
-        <Button type="submit" disabled={save.isPending || draft === data.brief}>{save.isPending ? "Saving…" : "Save brief"}</Button>
-      </div>
-      {error ? <InlineError>{error.message}{error.conflict ? <> <Button type="button" variant="link" onClick={() => void reloadBrief()}>Reload latest</Button></> : null}</InlineError> : null}
-    </form> : data.brief ? <p className="ws-brief-text">{data.brief}</p> : <p className="ws-empty">{canEdit ? "No brief yet. Say what this story is, in a few lines." : "No brief."}</p>}
-  </section>;
+  return <Card size="sm" role="region" aria-labelledby="ws-brief-title" id="ws-brief">
+    <CardHeader>
+      <CardTitle id="ws-brief-title" role="heading" aria-level={2}>Brief</CardTitle>
+      <CardDescription>Internal, not article copy.</CardDescription>
+      {canEdit && !editing ? <CardAction><Button ref={edit} type="button" variant="outline" size="sm" onClick={start}><Pencil data-icon="inline-start" aria-hidden="true" />{data.brief ? "Edit" : "Add brief"}</Button></CardAction> : null}
+    </CardHeader>
+    <CardContent>
+      {failed ? <SectionFailed what="the brief" onRetry={() => void reload()} /> : editing
+        ? <form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); if (!save.isPending) save.mutate({ text: draft, expected: data.brief }); }}>
+          <Field>
+            <FieldLabel htmlFor="ws-brief-input" className="sr-only">Brief</FieldLabel>
+            <Textarea id="ws-brief-input" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={BRIEF_MAX} rows={5} autoFocus disabled={save.isPending} />
+            <FieldDescription aria-live="polite" className="tabular-nums">{draft.length}/{BRIEF_MAX}</FieldDescription>
+          </Field>
+          {error ? <InlineAlert onAction={error.conflict ? () => void reloadBrief() : undefined} actionLabel="Reload latest">{error.message}</InlineAlert> : null}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={cancel} disabled={save.isPending}>Cancel</Button>
+            <Button type="submit" disabled={save.isPending || draft === data.brief}>{save.isPending ? "Saving…" : "Save brief"}</Button>
+          </div>
+        </form>
+        : data.brief ? <p className="max-w-prose text-sm/relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{data.brief}</p>
+          : <Empty className="border"><EmptyHeader><EmptyTitle>No brief yet.</EmptyTitle>{canEdit ? <EmptyDescription>Say what this story is, in a few lines.</EmptyDescription> : null}</EmptyHeader></Empty>}
+    </CardContent>
+  </Card>;
 }

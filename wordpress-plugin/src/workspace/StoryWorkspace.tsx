@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { Toaster } from "sonner";
-import { HomePortalContext } from "../home/lib/portal";
-import { TooltipProvider } from "../home/ui/tooltip";
+import { AdminRoot } from "../admin-ui/components/admin-root";
+import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { ActivitySection } from "./ActivitySection";
 import { BriefSection } from "./BriefSection";
 import { DetailsSection } from "./DetailsSection";
@@ -13,7 +12,6 @@ import { ResourcesSection } from "./ResourcesSection";
 import { TasksSection } from "./TasksSection";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 import { WorkspaceLoadError, WorkspaceSkeleton } from "./WorkspaceStates";
-import { InlineError } from "./fields";
 import { WorkspaceContext, type WorkspaceContextValue, type WorkspaceEnv } from "./workspace-context";
 import { workspaceError } from "./workspace-errors";
 import { workspaceKey, workspaceQueryClient } from "./workspace-query";
@@ -21,15 +19,10 @@ import type { StoryWorkspace as StoryWorkspaceData, WorkspaceSection } from "./w
 
 export type StoryWorkspaceAppProps = WorkspaceEnv;
 
-/** The Story Workspace root: its own query client, portal boundary, toasts and tooltips. */
+/** The Story Workspace root: its own query client and the shared admin UI boundary. */
 export function StoryWorkspaceApp(props: StoryWorkspaceAppProps) {
-  const [root, setRoot] = useState<HTMLDivElement | null>(null);
   return <QueryClientProvider client={workspaceQueryClient}>
-    <div className="byline-home-root story-workspace-root" ref={setRoot}>
-      <HomePortalContext value={root}>
-        <TooltipProvider>{root ? <WorkspaceScreen {...props} /> : null}<Toaster position="bottom-right" closeButton toastOptions={{ className: "home-toast" }} /></TooltipProvider>
-      </HomePortalContext>
-    </div>
+    <AdminRoot><WorkspaceScreen {...props} /></AdminRoot>
   </QueryClientProvider>;
 }
 
@@ -66,24 +59,25 @@ function WorkspaceScreen(env: WorkspaceEnv) {
   if (!data || !value) return <WorkspaceLoadError error={workspaceError(query.error, "The story workspace couldn't be loaded.")} storiesUrl={env.storiesUrl} onRetry={() => void query.refetch()} retrying={query.isFetching} />;
 
   return <WorkspaceContext value={value}>
-    <main className="ws-page">
+    <main className="@container/ws mx-auto mt-3 mb-8 flex max-w-[1320px] flex-col gap-6 pr-5">
       <WorkspaceHeader />
-      {query.isError ? <InlineError onRetry={() => void query.refetch()}>This page couldn't refresh, so it may be out of date.</InlineError> : null}
-      <div className="ws-body">
-        <div className="ws-main">
+      {query.isError ? <InlineAlert onAction={() => void query.refetch()}>This page couldn't refresh, so it may be out of date.</InlineAlert> : null}
+      {/* One column in the order a phone reads it; two columns once there is room. The wrappers dissolve on a phone so Files can precede Details. */}
+      <div className="flex flex-col gap-4 @3xl/ws:grid @3xl/ws:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)] @3xl/ws:items-start @3xl/ws:gap-5">
+        <div className="contents @3xl/ws:flex @3xl/ws:flex-col @3xl/ws:gap-4">
           <BriefSection />
           <ReportingSummaryStrip />
           <ReportingPlan />
           <TasksSection />
           <MediaSection />
         </div>
-        <aside className="ws-rail" aria-label="Story context">
+        <aside aria-label="Story context" className="contents @3xl/ws:flex @3xl/ws:flex-col @3xl/ws:gap-4">
           <DetailsSection />
           <ResourcesSection />
           <ActivitySection />
         </aside>
       </div>
-      <p className="ws-footnote">Dates shown in {value.timezone.replace(/_/g, " ")}</p>
+      <p className="text-xs text-muted-foreground">Dates shown in {value.timezone.replace(/_/g, " ")}</p>
       <span role="status" aria-live="polite" className="sr-only">{message}</span>
     </main>
   </WorkspaceContext>;

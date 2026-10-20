@@ -1,6 +1,7 @@
 /** Small presentation-free helpers shared by the Story Workspace sections. */
 import type { ContributorEntry, EditorialTask } from "../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../editorial/activity-model";
+import type { AvatarPerson } from "../admin-ui/components/people-avatars";
 import { activityCopy, dayDistance, siteDay } from "../home/newsroom-model";
 import { appointmentTiming } from "./schedule-model";
 import type { Assignee, ReportingSummary, StoryWorkspace } from "./workspace-types";
@@ -25,6 +26,11 @@ export function peopleOptions(people: ContributorEntry[], extra: Assignee[] = []
 
 export function peopleForIds(ids: number[], options: ContributorEntry[]): ContributorEntry[] {
   return ids.map((id) => options.find((person) => Number(person.id) === id)).filter((person): person is ContributorEntry => Boolean(person));
+}
+
+/** Assignees (id and name only) with their pictures looked up from the people the workspace already loaded. */
+export function assigneeAvatars(assignees: Assignee[], people: ContributorEntry[]): AvatarPerson[] {
+  return assignees.map((assignee) => ({ name: assignee.name, imageUrl: people.find((person) => Number(person.id) === assignee.id)?.imageUrl }));
 }
 
 export function names(people: Array<{ name: string }>): string {

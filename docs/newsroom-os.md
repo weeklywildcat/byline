@@ -11,7 +11,7 @@ public.
   commitments, active stories, selective attention, role-relevant review and
   visual work, and recent activity. Story Peek preserves list context; Gutenberg
   remains the writing environment. See [Byline Home](byline-home.md) for the
-  protected read model, private links, Mira components and validation.
+  protected read model, private links, Nova components and validation.
 - **Story Workspace** is the coordination page for one story: brief, writers and
   editor, a reporting plan (sources and appointments, including appointments whose
   exact time is not yet known), tasks, production assignments, resource links and

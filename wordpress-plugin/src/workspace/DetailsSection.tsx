@@ -1,11 +1,15 @@
-import { useId, type ReactNode } from "react";
+
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { describeEditorialError, type ContributorEntry } from "../editorial/editorial-model";
-import { AssigneePicker, DatePicker, WritersPicker } from "../home/components/pickers";
-import { Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList } from "../home/ui/combobox";
+import { InlineAlert } from "../admin-ui/components/inline-alert";
+import { PeopleAvatars } from "../admin-ui/components/people-avatars";
+import { AssigneePicker, DatePicker, WritersPicker, fieldRow, valueSelectTriggerClass } from "../admin-ui/components/pickers";
+import { Card, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
+import { Field, FieldContent, FieldGroup, FieldTitle } from "../admin-ui/ui/field";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
 import { dateLabel, exactDate } from "../home/newsroom-model";
-import { InlineError, SectionFailed, SectionHeading } from "./fields";
+import { SectionFailed } from "./parts";
 import { applyWorkflowPayload, patchStory, type StoryPatch } from "./workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { workspaceError } from "./workspace-errors";
@@ -14,18 +18,13 @@ import type { WorkspaceStatus } from "./workspace-types";
 
 type Changes = { status?: string; editorId?: number | null; deadline?: string | null; plannedPublishAt?: string | null };
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  const id = useId();
-  return <div className="ws-detail" role="group" aria-labelledby={id}><dt id={id}>{label}</dt><dd>{children}</dd></div>;
-}
-
 /**
  * The story's facts as a compact definition list, not a settings form. A
  * deadline, a planned publication date and a WordPress schedule are three
  * different things, and are labelled so.
  */
 export function DetailsSection() {
-  const { storyId, editorial, data, timezone, now, caps, currentUserId, reload, announce, sectionError } = useWorkspace();
+  const { storyId, editorial, data, timezone, now, caps, reload, announce, sectionError } = useWorkspace();
   const cache = useWorkspaceCache();
   const { story } = data;
   const contributorsFailed = sectionError("contributors");
@@ -70,31 +69,39 @@ export function DetailsSection() {
   const editor = story.editor ? people.find((person) => Number(person.id) === story.editor!.id) ?? { id: story.editor.id, kind: "user" as const, name: story.editor.name } : null;
   const busy = update.isPending;
 
-  return <section aria-labelledby="ws-details" className="ws-section ws-details-section">
-    <SectionHeading id="ws-details" title="Details" />
-    <dl className="ws-details">
-      <Row label="Workflow">
-        {caps.changeStatus ? <Combobox items={statuses} value={data.statuses.find((status) => status.id === story.workflow.id) || null} itemToStringLabel={(status: WorkspaceStatus) => status.label} isItemEqualToValue={(a: WorkspaceStatus, b: WorkspaceStatus) => a.id === b.id} onValueChange={(status: WorkspaceStatus | null) => { if (status && status.id !== story.workflow.id) save({ status: status.id }); }} disabled={busy}>
-          <ComboboxInput aria-label="Workflow" />
-          <ComboboxContent><ComboboxList>{(status: WorkspaceStatus) => <ComboboxItem key={status.id} value={status}>{status.label}</ComboboxItem>}</ComboboxList></ComboboxContent>
-        </Combobox> : story.workflow.label}
-      </Row>
-      <Row label="Writers">
-        {contributorsFailed ? <SectionFailed what="writers" onRetry={() => void reload()} /> : data.contributors.canEdit ? <WritersPicker people={data.contributors.available || []} value={data.contributors.contributors} onChange={(value) => writers.mutate(value)} disabled={writers.isPending} /> : names(data.contributors.contributors) || names(story.authors) || "None"}
-      </Row>
-      <Row label="Editor">
-        {caps.assign ? <AssigneePicker people={people} value={editor} onChange={(person) => save({ editorId: person ? Number(person.id) : null })} disabled={busy} /> : story.editor?.name || "None"}
-      </Row>
-      <Row label="Story deadline">
-        {caps.assign ? <DatePicker label="Story deadline" dateOnly value={story.deadline} timezone={timezone} disabled={busy} onChange={(deadline) => save({ deadline })} /> : <>{exactDate(story.deadline, timezone)}</>}
-        {overdue ? <span className="ws-overdue ws-detail-note">Overdue</span> : null}
-      </Row>
-      <Row label="Publication target">
-        {caps.assign ? <DatePicker label="Publication target" value={story.plannedPublication} timezone={timezone} disabled={busy} onChange={(plannedPublishAt) => save({ plannedPublishAt })} /> : <>{exactDate(story.plannedPublication, timezone)}</>}
-      </Row>
-      <Row label="WordPress state">{wpState.label}{scheduled}</Row>
-      <Row label="Section">{data.sections.join(", ") || "None"}</Row>
-    </dl>
-    {update.isError && update.error && workspaceError(update.error).conflict ? <InlineError onRetry={() => void reload()} retryLabel="Reload">{workspaceError(update.error).message}</InlineError> : null}
-  </section>;
+  const shownWriters = data.contributors.contributors.length ? data.contributors.contributors : story.authors;
+  return <Card size="sm" role="region" aria-labelledby="ws-details-title" id="ws-details" className="order-2 @3xl/ws:order-none">
+    <CardHeader><CardTitle id="ws-details-title" role="heading" aria-level={2}>Details</CardTitle></CardHeader>
+    <CardContent>
+      <FieldGroup className="gap-1">
+        <Property label="Workflow">
+          {caps.changeStatus ? <Select items={data.statuses.map((status) => ({ value: status.id, label: status.label }))} value={story.workflow.id} disabled={busy} onValueChange={(id) => { if (id && id !== story.workflow.id) save({ status: id }); }}>
+            <SelectTrigger aria-label="Workflow" className={valueSelectTriggerClass}><SelectValue /></SelectTrigger>
+            <SelectContent>{statuses.map((status) => <SelectItem key={status.id} value={status.id}>{status.label}</SelectItem>)}</SelectContent>
+          </Select> : story.workflow.label}
+        </Property>
+        <Property label="Writers">
+          {contributorsFailed ? <SectionFailed what="writers" onRetry={() => void reload()} /> : data.contributors.canEdit ? <WritersPicker people={data.contributors.available || []} value={data.contributors.contributors} onChange={(value) => writers.mutate(value)} disabled={writers.isPending} /> : shownWriters.length ? <span className="flex items-center gap-2"><PeopleAvatars people={shownWriters} tooltips={false} />{names(shownWriters)}</span> : "None"}
+        </Property>
+        <Property label="Editor">
+          {caps.assign ? <AssigneePicker appearance="value" label="Editor" placeholder="No editor" people={people} value={editor} onChange={(person) => save({ editorId: person ? Number(person.id) : null })} disabled={busy} /> : story.editor?.name || "None"}
+        </Property>
+        <Property label="Story deadline">
+          {caps.assign ? <DatePicker appearance="value" label="Story deadline" dateOnly value={story.deadline} timezone={timezone} disabled={busy} onChange={(deadline) => save({ deadline })} /> : <>{exactDate(story.deadline, timezone)}</>}
+          {overdue ? <span className="ml-2 text-xs text-warning">Overdue</span> : null}
+        </Property>
+        <Property label="Publication target">
+          {caps.assign ? <DatePicker appearance="value" label="Publication target" value={story.plannedPublication} timezone={timezone} disabled={busy} onChange={(plannedPublishAt) => save({ plannedPublishAt })} /> : <>{exactDate(story.plannedPublication, timezone)}</>}
+        </Property>
+        <Property label="WordPress state">{wpState.label}{scheduled}</Property>
+        <Property label="Section">{data.sections.join(", ") || "None"}</Property>
+      </FieldGroup>
+      {update.isError && update.error && workspaceError(update.error).conflict ? <InlineAlert className="mt-3" onAction={() => void reload()} actionLabel="Reload">{workspaceError(update.error).message}</InlineAlert> : null}
+    </CardContent>
+  </Card>;
+}
+
+/** A story fact as a native horizontal Field: a muted label column, then the value or its control. */
+function Property({ label, children }: { label: string; children: React.ReactNode }) {
+  return <Field orientation="horizontal" aria-label={label} className={fieldRow.field}><FieldTitle className={fieldRow.label}>{label}</FieldTitle><FieldContent className={fieldRow.value}>{children}</FieldContent></Field>;
 }

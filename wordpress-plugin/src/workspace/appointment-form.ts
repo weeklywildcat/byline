@@ -103,6 +103,18 @@ export function setScheduleMode(form: AppointmentForm, mode: ScheduleMode): Appo
   return { ...form, mode, windowStart: "", windowEnd: "", date: "", startTime: "", endDate: "", endTime: "" };
 }
 
+/**
+ * A calendar range as the stored target window. A single day, or a range that
+ * has only started, leaves the end empty: exactly what the separate "first day"
+ * and "last day" pickers used to write. No time of day is ever involved.
+ */
+export function rangeToWindow(range: { from?: Date; to?: Date } | undefined): { windowStart: string; windowEnd: string } | null {
+  if (!range?.from) return null;
+  const windowStart = dayFromLocalDate(range.from);
+  const last = range.to ? dayFromLocalDate(range.to) : "";
+  return { windowStart, windowEnd: last === windowStart ? "" : last };
+}
+
 /** Moving the day moves an end that was on the same day with it. */
 export function setExactDate(form: AppointmentForm, date: string): AppointmentForm {
   return { ...form, date, endDate: !form.endDate || form.endDate === form.date ? date : form.endDate };

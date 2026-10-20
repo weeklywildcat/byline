@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Button } from "../home/ui/button";
-import { WorkspaceDialog } from "./dialog-shell";
-import { PeoplePicker, SelectField, TextAreaField, TextField } from "./fields";
+import { SelectField, TextAreaField, TextField } from "../admin-ui/components/form-fields";
+import { RemoveControl, WorkspaceDialog } from "./dialog-shell";
+import { PeoplePicker } from "./fields";
 import { SOURCE_NOTES_MAX, SOURCE_STATUS_LABELS, emptySourceForm, sourceFormToInput, sourceToForm, validateSourceForm, type SourceForm } from "./reporting-model";
 import { peopleOptions } from "./workspace-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
@@ -21,7 +21,6 @@ export function SourceDialog({ open, source, onClose, finalFocus }: SourceDialog
   const cache = useWorkspaceCache();
   const [form, setForm] = useState<SourceForm>(() => (source ? sourceToForm(source) : emptySourceForm()));
   const [attempted, setAttempted] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<ReturnType<typeof workspaceError> | null>(null);
   const errors = attempted ? validateSourceForm(form) : {};
   const people = peopleOptions(data.people, source?.assignees);
@@ -44,11 +43,9 @@ export function SourceDialog({ open, source, onClose, finalFocus }: SourceDialog
   };
 
   return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={source ? "Edit source" : "Add source"} description="Who you plan to talk to for this story. No contact details are kept here." submitLabel={source ? "Save source" : "Add source"} pending={pending} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
-    secondary={source ? (confirmDelete
-      ? <div className="ws-confirm" role="group" aria-label="Confirm removing this source"><span>Remove this source? Linked appointments stay.</span><Button type="button" variant="destructive" disabled={pending} onClick={() => { setError(null); remove.mutate(); }}>{remove.isPending ? "Removing…" : "Remove"}</Button><Button type="button" variant="ghost" disabled={pending} onClick={() => setConfirmDelete(false)}>Keep</Button></div>
-      : <Button type="button" variant="ghost" className="ws-delete" disabled={pending} onClick={() => setConfirmDelete(true)}>Remove source</Button>) : null}>
+    secondary={source ? <RemoveControl label="Remove source" title="Remove this source?" description="Linked appointments stay." confirmLabel="Remove" pending={pending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
     <TextField label="Label" value={form.label} onChange={(label) => patch({ label })} error={errors.label} maxLength={120} autoFocus placeholder="Mrs. Hamby, or a role like “Athletic director”" />
-    <div className="ws-form-row">
+    <div className="grid gap-4 sm:grid-cols-2">
       <TextField label="Role" value={form.role} onChange={(role) => patch({ role })} maxLength={120} optional />
       <TextField label="Organization" value={form.organization} onChange={(organization) => patch({ organization })} maxLength={120} optional />
     </div>

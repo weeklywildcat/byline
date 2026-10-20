@@ -7,8 +7,8 @@ export function ReportingSummaryStrip() {
   if (sectionError("reporting")) return null;
   const headline = reportingHeadline(data.reporting, timezone);
   if (!headline) return null;
-  return <section aria-label="Reporting at a glance" className="ws-glance">
-    {headline.next ? <p><span className="ws-glance-label">Next</span>{headline.next}</p> : null}
-    {headline.counts ? <p className="ws-glance-counts">{headline.counts}</p> : null}
+  return <section aria-label="Reporting at a glance" className="flex flex-col gap-1 px-1 text-sm @3xl/ws:hidden">
+    {headline.next ? <p><span className="mr-2 font-medium">Next</span>{headline.next}</p> : null}
+    {headline.counts ? <p className="text-muted-foreground">{headline.counts}</p> : null}
   </section>;
 }

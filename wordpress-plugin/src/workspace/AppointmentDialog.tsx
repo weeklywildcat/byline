@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Button } from "../home/ui/button";
-import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "../home/ui/combobox";
-import { WorkspaceDialog } from "./dialog-shell";
-import { DayField, FieldFrame, PeoplePicker, Segmented, SelectField, TextAreaField, TextField, TimeField } from "./fields";
+import { FormField, SelectField, TextAreaField, TextField, describedBy } from "../admin-ui/components/form-fields";
+import { Button } from "../admin-ui/ui/button";
+import { ButtonGroup } from "../admin-ui/ui/button-group";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "../admin-ui/ui/combobox";
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "../admin-ui/ui/field";
+import { Input } from "../admin-ui/ui/input";
+import { RadioGroup, RadioGroupItem } from "../admin-ui/ui/radio-group";
+import { RemoveControl, WorkspaceDialog } from "./dialog-shell";
+import { DayField, DayRangeField, PeoplePicker } from "./fields";
 import { appointmentFormToInput, appointmentToForm, applyQuickWindow, emptyAppointmentForm, isValid, setExactDate, setScheduleMode, validateAppointmentForm, type AppointmentForm } from "./appointment-form";
 import { APPOINTMENT_KIND_LABELS, APPOINTMENT_NOTES_MAX, APPOINTMENT_STATUS_LABELS } from "./reporting-model";
 import { formatLongDay, peopleOptions } from "./workspace-model";
@@ -15,20 +20,35 @@ import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES, type ReportingResponse, type S
 
 const kindOptions = APPOINTMENT_KINDS.map((value) => ({ value, label: APPOINTMENT_KIND_LABELS[value] }));
 const statusOptions = APPOINTMENT_STATUSES.map((value) => ({ value, label: APPOINTMENT_STATUS_LABELS[value] }));
-const modeOptions: Array<{ value: ScheduleMode; label: string }> = [
-  { value: "unscheduled", label: "Not scheduled" },
-  { value: "window", label: "Date range" },
-  { value: "exact", label: "Exact time" }
+const modeOptions: Array<{ value: ScheduleMode; label: string; description: string }> = [
+  { value: "unscheduled", label: "Not scheduled", description: "We haven't arranged a date yet." },
+  { value: "window", label: "Target date range", description: "We know roughly when it should happen." },
+  { value: "exact", label: "Exact date & time", description: "The appointment has been scheduled." }
 ];
+
+/** Start and end as two time inputs under one label: "10:15 AM — 10:35 AM". */
+function TimeRange({ start, end, onStart, onEnd, startError, endError }: { start: string; end: string; onStart: (value: string) => void; onEnd: (value: string) => void; startError?: string; endError?: string }) {
+  const id = useId();
+  const error = startError || endError;
+  return <FormField id={`${id}-start`} label="Time" error={error}>
+    <div className="flex items-center gap-2">
+      <Input id={`${id}-start`} type="time" aria-label="Start time" value={start} onChange={(event) => onStart(event.target.value)} aria-invalid={startError ? true : undefined} aria-describedby={describedBy(`${id}-start`, error)} />
+      <span aria-hidden="true" className="text-muted-foreground">—</span>
+      <Input type="time" aria-label="End time (optional)" value={end} onChange={(event) => onEnd(event.target.value)} aria-invalid={endError ? true : undefined} aria-describedby={describedBy(`${id}-start`, error)} />
+    </div>
+  </FormField>;
+}
 
 function SourcePicker({ sources, value, onChange }: { sources: StorySource[]; value: string; onChange: (id: string) => void }) {
   const selected = sources.find((source) => source.id === value) || null;
-  return <FieldFrame id="ws-appointment-source" label="Linked source" optional hint={sources.length ? undefined : "Add a source to link it here."}>
+  return <Field>
+    <FieldLabel htmlFor="ws-appointment-source">Linked source <span className="font-normal text-muted-foreground">Optional</span></FieldLabel>
     <Combobox items={sources} value={selected} onValueChange={(source: StorySource | null) => onChange(source?.id || "")} itemToStringLabel={(source: StorySource) => source.label} isItemEqualToValue={(a: StorySource, b: StorySource) => a.id === b.id}>
       <ComboboxInput id="ws-appointment-source" placeholder="No linked source" showClear disabled={!sources.length} />
       <ComboboxContent><ComboboxEmpty>No sources found.</ComboboxEmpty><ComboboxList>{(source: StorySource) => <ComboboxItem key={source.id} value={source}>{source.label}</ComboboxItem>}</ComboboxList></ComboboxContent>
     </Combobox>
-  </FieldFrame>;
+    {sources.length ? null : <FieldDescription>Add a source to link it here.</FieldDescription>}
+  </Field>;
 }
 
 export type AppointmentDialogProps = {
@@ -41,8 +61,8 @@ export type AppointmentDialogProps = {
 };
 
 /**
- * Scheduling for one appointment. "Not scheduled", "Date range" and "Exact
- * time" are mutually exclusive: choosing one clears the others' fields, and
+ * Scheduling for one appointment. "Not scheduled", "Target date range" and
+ * "Exact date & time" are mutually exclusive: choosing one clears the others' fields, and
  * only the chosen mode's fields are ever sent.
  */
 export function AppointmentDialog({ open, appointment, initial, onClose, finalFocus }: AppointmentDialogProps) {
@@ -50,7 +70,6 @@ export function AppointmentDialog({ open, appointment, initial, onClose, finalFo
   const cache = useWorkspaceCache();
   const [form, setForm] = useState<AppointmentForm>(() => (appointment ? appointmentToForm(appointment, timezone) : emptyAppointmentForm({ assigneeIds: currentUserId ? [currentUserId] : [], ...initial })));
   const [attempted, setAttempted] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<ReturnType<typeof workspaceError> | null>(null);
   const errors = attempted ? validateAppointmentForm(form) : {};
   const people = peopleOptions(data.people, appointment?.assignees);
@@ -74,39 +93,37 @@ export function AppointmentDialog({ open, appointment, initial, onClose, finalFo
   const differentEndDay = form.mode === "exact" && form.endTime && form.endDate && form.endDate !== form.date;
 
   return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={appointment ? "Edit appointment" : "Add appointment"} description="Where and when someone has to be. Leave the schedule open until you know." submitLabel={appointment ? "Save appointment" : "Add appointment"} pending={pending} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
-    secondary={appointment ? (confirmDelete
-      ? <div className="ws-confirm" role="group" aria-label="Confirm deleting this appointment"><span>Delete this appointment? Marking it cancelled keeps a record.</span><Button type="button" variant="destructive" disabled={pending} onClick={() => { setError(null); remove.mutate(); }}>{remove.isPending ? "Deleting…" : "Delete"}</Button><Button type="button" variant="ghost" disabled={pending} onClick={() => setConfirmDelete(false)}>Keep</Button></div>
-      : <Button type="button" variant="ghost" className="ws-delete" disabled={pending} onClick={() => setConfirmDelete(true)}>Delete appointment</Button>) : null}>
+    secondary={appointment ? <RemoveControl label="Delete appointment" title="Delete this appointment?" description="Marking it cancelled instead keeps a record." confirmLabel="Delete" pending={pending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
     <TextField label="Title" value={form.title} onChange={(title) => patch({ title })} error={errors.title} maxLength={160} autoFocus placeholder="Interview Mrs. Hamby" />
-    <div className="ws-form-row">
+    <div className="grid gap-4 sm:grid-cols-2">
       <SelectField label="Type" value={form.kind} options={kindOptions} onChange={(kind) => patch({ kind })} />
       <SelectField label="Status" value={form.status} options={statusOptions} onChange={(status) => patch({ status })} />
     </div>
 
-    <fieldset className="ws-schedule">
-      <Segmented label="When" value={form.mode} options={modeOptions} onChange={(mode) => setForm((current) => setScheduleMode(current, mode))} />
-      {form.mode === "unscheduled" ? <p className="ws-hint">No date yet. It will be listed under “To schedule”.</p> : null}
-      {form.mode === "window" ? <div className="ws-schedule-panel">
-        <div className="ws-quick" role="group" aria-label="Quick target dates">
-          <Button type="button" variant="outline" onClick={() => setForm((current) => applyQuickWindow(current, "this-week", timezone))}>This week</Button>
-          <Button type="button" variant="outline" onClick={() => setForm((current) => applyQuickWindow(current, "next-week", timezone))}>Next week</Button>
-        </div>
-        <div className="ws-form-row">
-          <DayField label="First day" value={form.windowStart} onChange={(windowStart) => patch({ windowStart })} error={errors.windowStart} clearable={false} />
-          <DayField label="Last day (optional)" value={form.windowEnd} onChange={(windowEnd) => patch({ windowEnd })} error={errors.windowEnd} />
-        </div>
-        <p className="ws-hint">A target range has no time of day. Switch to “Exact time” when it's set.</p>
-      </div> : null}
-      {form.mode === "exact" ? <div className="ws-schedule-panel">
+    <FieldSet>
+      <FieldLegend variant="label">When is this happening?</FieldLegend>
+      <RadioGroup value={form.mode} onValueChange={(mode) => setForm((current) => setScheduleMode(current, mode as ScheduleMode))}>
+        {modeOptions.map((option) => <FieldLabel key={option.value} htmlFor={`ws-schedule-${option.value}`}>
+          <Field orientation="horizontal">
+            <FieldContent><FieldTitle>{option.label}</FieldTitle><FieldDescription>{option.description}</FieldDescription></FieldContent>
+            <RadioGroupItem id={`ws-schedule-${option.value}`} value={option.value} />
+          </Field>
+        </FieldLabel>)}
+      </RadioGroup>
+      {form.mode === "window" ? <FieldGroup className="gap-4">
+        <ButtonGroup aria-label="Quick target dates">
+          <Button type="button" variant="outline" size="sm" onClick={() => setForm((current) => applyQuickWindow(current, "this-week", timezone))}>This week</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setForm((current) => applyQuickWindow(current, "next-week", timezone))}>Next week</Button>
+        </ButtonGroup>
+        <DayRangeField label="Target dates" start={form.windowStart} end={form.windowEnd} onChange={(windowStart, windowEnd) => patch({ windowStart, windowEnd })} error={errors.windowStart || errors.windowEnd} hint="A target range has no time of day. Choose “Exact date & time” when it's set." />
+      </FieldGroup> : null}
+      {form.mode === "exact" ? <FieldGroup className="gap-4">
         <DayField label="Date" value={form.date} onChange={(date) => setForm((current) => setExactDate(current, date))} error={errors.date} clearable={false} />
-        <div className="ws-form-row">
-          <TimeField label="Starts" value={form.startTime} onChange={(startTime) => patch({ startTime })} error={errors.startTime} />
-          <TimeField label="Ends" value={form.endTime} onChange={(endTime) => patch({ endTime })} error={errors.endTime} optional />
-        </div>
-        {differentEndDay ? <p className="ws-hint">Ends {formatLongDay(form.endDate)}. <Button type="button" variant="link" onClick={() => patch({ endDate: form.date })}>Same day</Button></p> : null}
-        <p className="ws-hint">Times are in the site's timezone ({timezone.replace(/_/g, " ")}).</p>
-      </div> : null}
-    </fieldset>
+        <TimeRange start={form.startTime} end={form.endTime} onStart={(startTime) => patch({ startTime })} onEnd={(endTime) => patch({ endTime })} startError={errors.startTime} endError={errors.endTime} />
+        {differentEndDay ? <FieldDescription>Ends {formatLongDay(form.endDate)}. <Button type="button" variant="link" size="xs" className="h-auto p-0" onClick={() => patch({ endDate: form.date })}>Same day</Button></FieldDescription> : null}
+        <FieldDescription>Times are in the site's timezone ({timezone.replace(/_/g, " ")}).</FieldDescription>
+      </FieldGroup> : null}
+    </FieldSet>
 
     <SourcePicker sources={data.sources} value={form.sourceId} onChange={(sourceId) => patch({ sourceId })} />
     <PeoplePicker label="Assigned to" options={people} value={form.assigneeIds} onChange={(assigneeIds) => patch({ assigneeIds })} error={errors.assignees} />
