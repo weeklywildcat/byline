@@ -5,7 +5,7 @@ import { StoryBoard } from "../src/planning/StoryBoard";
 import { StoryList } from "../src/planning/StoryList";
 import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, hideFinishedPublished, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "../src/planning/planning-model";
 import { destinationForTab, initialStoriesView, storiesViewHref } from "../src/planning/planning-routing";
-import { productionSignal, storySignals, workflowBadgeColors, WorkflowBadge } from "../src/story/story-parts";
+import { productionSignal, storySignals, workflowBadgeSpec, WorkflowBadge } from "../src/story/story-parts";
 import { sectionNames } from "../src/workspace/workspace-model";
 
 const now = new Date("2026-10-20T12:00:00Z");
@@ -23,8 +23,11 @@ const stage = (id: string) => DEFAULT_WORKFLOW_STATUSES.find((status) => status.
 const props = (stories: PlanningStory[], canMove = true) => ({ stories, statuses: DEFAULT_WORKFLOW_STATUSES, canMoveStories: canMove, timezone: "America/New_York", now, workspaceUrl: (id: number) => `/wp-admin/admin.php?page=byline-planning&story=${id}`, onMoveStory: vi.fn(), onOpenStory: vi.fn() });
 
 describe("Workflow status colors", () => {
-  it("gives every known stage a distinct semantic palette and a readable label", () => {
-    expect(DEFAULT_WORKFLOW_STATUSES.every(({ id }) => Boolean(workflowBadgeColors[id]))).toBe(true);
+  it("uses consistent work hues, with intensity reserved for action", () => {
+    expect(DEFAULT_WORKFLOW_STATUSES.every(({ id }) => Boolean(workflowBadgeSpec[id]))).toBe(true);
+    expect(workflowBadgeSpec.reporting).toEqual({ kind: "reporting", intensity: "active" });
+    expect(workflowBadgeSpec.writing).toEqual(workflowBadgeSpec.editing);
+    expect(workflowBadgeSpec.ready).toEqual({ kind: "editorial", intensity: "action" });
     for (const status of DEFAULT_WORKFLOW_STATUSES) {
       const html = renderToStaticMarkup(<WorkflowBadge workflow={status} />);
       expect(html).toContain(status.label);
@@ -32,12 +35,14 @@ describe("Workflow status colors", () => {
     }
   });
 
-  it("uses the same colored labels in both planning views", () => {
+  it("uses the same reporting hue in Board and List", () => {
     const reporting = story({ id: 71, title: "Garden story", workflow: stage("reporting") });
     const board = renderToStaticMarkup(<StoryBoard {...props([reporting])} />);
     const list = renderToStaticMarkup(<StoryList {...props([reporting])} sort={DEFAULT_PLANNING_SORT} onSortChange={vi.fn()} />);
-    expect(board).toContain("bg-teal-50");
-    expect(list).toContain("bg-teal-50");
+    expect(board).toContain('data-work-kind="reporting"');
+    expect(list).toContain('data-work-kind="reporting"');
+    expect(board).toContain("bg-orange-100");
+    expect(list).toContain("bg-orange-100");
   });
 });
 
