@@ -9,7 +9,7 @@ import { Badge } from "../admin-ui/ui/badge";
 import { Card, CardContent } from "../admin-ui/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { StoryDueLabel, StorySignals, StoryTitleButton, WorkflowBadge } from "../story/story-parts";
-import { StoryActionsMenu } from "./StoryActionsMenu";
+import { StoryActionsMenu, StoryContextMenu } from "./StoryActionsMenu";
 import { boardWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
 
 export type StoryBoardProps = {
@@ -49,22 +49,24 @@ function BoardCard({ story, statuses, canMoveStories, moving, moved, timezone, n
 
   const writers = story.authors.length ? story.authors : story.writer ? [story.writer] : [];
   const names = writers.map((person) => person.name).join(", ");
-  return <Card ref={ref} size="sm" role="listitem" data-story-id={story.id} data-dragging={dragging} data-moved={moved} aria-busy={moving || undefined}
-    className={cn("gap-1.5 py-2.5 transition-colors duration-700", movable && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
-    <CardContent className="flex flex-col gap-1.5 px-3">
-      <StoryTitleButton story={story} onOpen={onOpenStory} className="text-sm leading-snug line-clamp-3" data-story-title={story.id} />
-      <div className="flex min-w-0 items-center gap-2 text-xs">
-        {writers.length
-          ? <><PeopleAvatars people={writers} /><span className="truncate text-muted-foreground" title={names}>{names}</span></>
-          : <span className="text-muted-foreground">{__("Unassigned", "weekly-wildcat-headless")}</span>}
-      </div>
-      <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="Due " empty={__("No deadline", "weekly-wildcat-headless")} className="text-xs" />
-      <div className="-mb-1 flex items-center justify-between gap-1">
-        <StorySignals story={story} className="min-w-0" />
-        <StoryActionsMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={moving} onMove={onMoveStory} workspaceUrl={workspaceUrl} className="ml-auto -mr-1.5" />
-      </div>
-    </CardContent>
-  </Card>;
+  return <StoryContextMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={moving} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>
+    <Card ref={ref} size="sm" role="listitem" data-story-id={story.id} data-dragging={dragging} data-moved={moved} aria-busy={moving || undefined}
+      className={cn("gap-1.5 py-2.5 transition-colors duration-700", movable && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
+      <CardContent className="flex flex-col gap-1.5 px-3">
+        <StoryTitleButton story={story} onOpen={onOpenStory} className="text-sm leading-snug line-clamp-3" data-story-title={story.id} />
+        <div className="flex min-w-0 items-center gap-2 text-xs">
+          {writers.length
+            ? <><PeopleAvatars people={writers} /><span className="truncate text-muted-foreground" title={names}>{names}</span></>
+            : <span className="text-muted-foreground">{__("Unassigned", "weekly-wildcat-headless")}</span>}
+        </div>
+        <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="Due " empty={__("No deadline", "weekly-wildcat-headless")} className="text-xs" />
+        <div className="-mb-1 flex items-center justify-between gap-1">
+          <StorySignals story={story} className="min-w-0" />
+          <StoryActionsMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={moving} onMove={onMoveStory} workspaceUrl={workspaceUrl} className="ml-auto -mr-1.5" />
+        </div>
+      </CardContent>
+    </Card>
+  </StoryContextMenu>;
 }
 
 function BoardColumn({ status, stories, canMoveStories, ...card }: Omit<StoryBoardProps, "stories"> & { status: PlanningWorkflowStatus; stories: PlanningStory[]; movedId: number | null }) {
