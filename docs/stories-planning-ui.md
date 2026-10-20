@@ -136,12 +136,21 @@ its own header is hidden (`.sx__calendar-header`) because the toolbar is Byline'
 
 ## Other destinations
 
-Media Desk (table of assignments with inline status, assignee and due date, a
-Files popover built on `Attachment`, and a menu), Coverage (a Card per coverage
-package with its stories), Feedback (a Card per note), Performance (Cards and
-Items; there is no time series, so there is no chart) and Content Health (Items
-with severity) all share `PageHeader` and `ResourceGate`: a skeleton, then
-either the content or a plain message with *Try again*.
+Media Desk is a table of assignments with inline status, assignee and due date,
+a Files popover built on `Attachment`, and a menu. Its search uses
+`InputGroup`, matching the Stories toolbar. Coverage keeps a `Card` per
+coverage package because each package is a standalone object with its own
+stories and controls. Feedback is an inbox-like `ItemGroup`, not a grid of
+cards: each note is one scannable item with its status action attached.
+Performance uses Cards for metrics and titled sections, while Content Health is
+an `ItemGroup` queue with severity and fix actions. Pending actions use the
+shared `Spinner` when the wait itself needs to be visible.
+
+These choices follow the component semantics rather than using Cards as a
+generic container: `Item` is for content + description + actions, `Field`
+is for form controls, and `Card` is reserved for a distinct grouped object or
+section. All secondary destinations share `PageHeader` and `ResourceGate`:
+a skeleton, then either the content or a plain message with *Try again*.
 
 ## Verifying
 
