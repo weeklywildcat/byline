@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Spinner } from "../admin-ui/ui/spinner";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { feedbackKey } from "../story/story-query";
+import { StoryTitleButton } from "../story/story-parts";
 import type { PlanningFetchers } from "./planning-api";
 import { exactPlanningDate, type FeedbackItem, type FeedbackResponse, type FeedbackStatus } from "./planning-model";
 import { NothingHere, PageHeader, ResourceGate } from "./PlanningPage";
@@ -55,7 +56,7 @@ function FeedbackRow({ item, fetchers, onOpenStory }: { item: FeedbackItem; fetc
       <p className="max-w-3xl text-sm leading-relaxed whitespace-pre-line [overflow-wrap:anywhere]">{item.message}</p>
       <ItemDescription className="line-clamp-none text-xs">
         {item.story
-          ? <>{__("Story", "weekly-wildcat-headless")}: <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline" onClick={() => onOpenStory(item.story!.id)}>{decodeEntities(item.story.title)}</button></>
+          ? <>{__("Story", "weekly-wildcat-headless")}: <StoryTitleButton story={item.story} onOpen={onOpenStory} className="font-medium text-foreground underline-offset-2" /></>
           : __("Not linked to a story", "weekly-wildcat-headless")}
       </ItemDescription>
     </ItemContent>
