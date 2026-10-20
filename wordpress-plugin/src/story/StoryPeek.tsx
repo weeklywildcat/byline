@@ -17,6 +17,7 @@ import { Field, FieldContent, FieldGroup, FieldLabel, FieldLegend, FieldSet, Fie
 import { Input } from "../admin-ui/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemHeader, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
+import { Spinner } from "../admin-ui/ui/spinner";
 import { Separator } from "../admin-ui/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "../admin-ui/ui/sheet";
 import { ConfirmRemoveDialog } from "../workspace/dialog-shell";
@@ -82,7 +83,7 @@ function LinkForm({ resource, pending, onSubmit, onCancel }: { resource: StoryRe
       <Field><FieldLabel htmlFor="home-link-purpose">Purpose <span className="font-normal text-muted-foreground">Optional</span></FieldLabel>
         <Select items={purposeItems} value={purpose} onValueChange={(next) => setPurpose((next as ResourcePurpose | "none") || "none")}><SelectTrigger id="home-link-purpose" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{purposeItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
       </Field>
-      <div className="flex justify-end gap-2"><Button variant="outline" type="button" onClick={onCancel}>Cancel</Button><Button type="submit" disabled={pending}>{pending ? "Saving…" : resource ? "Save link" : "Add link"}</Button></div>
+      <div className="flex justify-end gap-2"><Button variant="outline" type="button" onClick={onCancel} disabled={pending}>Cancel</Button><Button type="submit" disabled={pending}>{pending ? <><Spinner data-icon="inline-start" />Saving…</> : resource ? "Save link" : "Add link"}</Button></div>
     </FieldGroup>
   </form>;
 }
@@ -265,7 +266,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
         <SheetDescription>{story ? [story.workflow.label, sectionNames(data.sections)].filter(Boolean).join(" · ") : "Newsroom context"}</SheetDescription>
         {story && (writerList.length || editor) ? <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-sm">
           {writerList.length ? <span className="flex items-center gap-2"><PeopleAvatars people={writerList} /><span>{writerList.map((p) => p.name).join(", ")}</span></span> : null}
-          {editor ? <span className="flex items-center gap-2 text-muted-foreground"><PeopleAvatars people={[editor]} />Editor: {editor.name}</span> : null}
+          {editor ? <span className="flex items-center gap-2 text-muted-foreground"><PeopleAvatars people={[editor]} />Edited by {editor.name}</span> : null}
         </div> : null}
       </SheetHeader>
       {peek.isPending ? <div className="py-4"><RowSkeletons count={7} /></div> : peek.isError || !story || !data ? <div className="p-4"><InlineAlert title="The story couldn't be loaded." onAction={() => void peek.refetch()}>{describeEditorialError(peek.error, "The story couldn't be loaded.")}</InlineAlert></div>
