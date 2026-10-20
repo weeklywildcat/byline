@@ -73,6 +73,17 @@ export function dateLabel(value: string | null | undefined, timezone: string, no
   return new Intl.DateTimeFormat(undefined, { weekday: "short", ...(distance > 6 ? { month: "short", day: "numeric" } as const : {}), timeZone: "UTC" }).format(new Date(`${siteDay(value!, timezone)}T12:00:00Z`));
 }
 
+/** "5m ago", "3h ago", then a site-timezone date. The exact time belongs in a title, not here. */
+export function relativeTime(value: string, timezone: string, now = new Date()): string {
+  const elapsed = now.getTime() - new Date(value).getTime();
+  if (!Number.isFinite(elapsed)) return "";
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: timezone }).format(new Date(value));
+}
+
 export function exactDate(value: string | null | undefined, timezone: string): string {
   if (!value) return "Not set";
   const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);

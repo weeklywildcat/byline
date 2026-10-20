@@ -1,6 +1,8 @@
 import apiFetch from "@wordpress/api-fetch";
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
+import { InlineAlert } from "./admin-ui/components/inline-alert";
+import { buttonVariants } from "./admin-ui/ui/button";
 import { createEditorialRestClient } from "./editorial/editorial-rest";
 import { StoryWorkspaceApp } from "./workspace/StoryWorkspace";
 import { createWorkspaceClient } from "./workspace/workspace-api";
@@ -21,7 +23,7 @@ class WorkspaceBoundary extends Component<{ children: ReactNode; storiesUrl: str
   static getDerivedStateFromError() { return { failed: true }; }
   render() {
     return this.state.failed
-      ? <div className="byline-home-root story-workspace-root"><p className="ws-inline-error" role="alert">The story workspace couldn't be displayed. <button type="button" onClick={() => window.location.reload()}>Reload</button> <a href={this.props.storiesUrl}>Back to Stories</a></p></div>
+      ? <div className="byline-ui-root mr-5 mt-6"><InlineAlert onAction={() => window.location.reload()} actionLabel="Reload"><span>The story workspace couldn't be displayed. <a className={buttonVariants({ variant: "link", size: "xs" })} href={this.props.storiesUrl}>Back to Stories</a></span></InlineAlert></div>
       : this.props.children;
   }
 }

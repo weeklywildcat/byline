@@ -1,38 +1,50 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, LayoutDashboard, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, FileText, LayoutDashboard, Link2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { EditorialTask, ContributorEntry } from "../editorial/editorial-model";
 import { describeEditorialError } from "../editorial/editorial-model";
+import { EmptyState } from "../admin-ui/components/empty-state";
+import { InlineAlert } from "../admin-ui/components/inline-alert";
+import { ItemList } from "../admin-ui/components/item-list";
+import { DatePicker, WritersPicker, valueSelectTriggerClass } from "../admin-ui/components/pickers";
+import { Property, PropertyList } from "../admin-ui/components/properties";
+import { StatusBadge } from "../admin-ui/components/status-badge";
+import { SubHeading } from "../admin-ui/components/sub-heading";
+import { Badge } from "../admin-ui/ui/badge";
+import { Button, buttonVariants } from "../admin-ui/ui/button";
+import { Field, FieldGroup, FieldLabel } from "../admin-ui/ui/field";
+import { Input } from "../admin-ui/ui/input";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
+import { Separator } from "../admin-ui/ui/separator";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "../admin-ui/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../admin-ui/ui/tooltip";
 import type { HomeFetchers } from "./home-api";
 import { exactDate, mediaStatusLabels, mediaTypeLabels, resourcePurposeLabels } from "./newsroom-model";
 import { homeKey, workspaceKey } from "./home-query";
 import { appointmentLine } from "../workspace/schedule-model";
 import { RESOURCE_PURPOSES, type ReportingSummary, type ResourcePurpose, type StoryResource, type StoryWorkspace } from "../workspace/workspace-types";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "./ui/sheet";
-import { Badge } from "./ui/badge";
-import { AvatarGroup } from "./ui/avatar";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Field, FieldLabel } from "./ui/field";
-import { Separator } from "./ui/separator";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { Combobox, ComboboxInput, ComboboxContent, ComboboxItem, ComboboxList } from "./ui/combobox";
-import { ActivityRow, Empty, PersonAvatar, RowSkeletons, TaskRow } from "./components/rows";
-import { DatePicker, WritersPicker } from "./components/pickers";
+import { ActivityRow, RowSkeletons, TaskRow } from "./components/rows";
 
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+
+function PeekSection({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return <section aria-label={title} className="flex flex-col gap-1 py-4"><SubHeading title={title}>{action}</SubHeading>{children}</section>;
+}
+
+const Quiet = ({ children }: { children: React.ReactNode }) => <EmptyState title={children} className="border-0 p-2" />;
 
 /** A compact, note-free roll-up. A target window is shown as a window; it never acquires a clock time. */
 function ReportingPeek({ reporting, error, timezone }: { reporting: ReportingSummary | null; error?: string; timezone: string }) {
   const next = reporting?.nextAppointment;
   const stats = reporting ? [reporting.sources ? plural(reporting.sources, "source") : "", reporting.interviewed ? `${reporting.interviewed} interviewed` : "", reporting.needsScheduling ? `${reporting.needsScheduling} needs scheduling` : ""].filter(Boolean) : [];
-  return <section className="home-peek-section" aria-label="Reporting"><header><h3>Reporting</h3></header>
-    {error ? <p className="home-inline-error" role="alert">Reporting couldn't be loaded.</p> : stats.length || next ? <>
-      {stats.length ? <ul className="home-reporting-stats">{stats.map((stat) => <li key={stat}>{stat}</li>)}</ul> : null}
-      {next ? <div className="home-reporting-next"><span className="home-meta">Next:</span><span className="home-row-title">{next.title}</span><span className="home-meta">{appointmentLine({ ...next, status: "confirmed", endAt: null }, timezone)}</span></div> : null}
-    </> : <Empty>No sources or appointments yet.</Empty>}
-  </section>;
+  return <PeekSection title="Reporting">
+    {error ? <InlineAlert>Reporting couldn't be loaded.</InlineAlert> : stats.length || next ? <div className="flex flex-col gap-1.5 text-sm">
+      {stats.length ? <ul className="flex flex-col gap-0.5">{stats.map((stat) => <li key={stat}>{stat}</li>)}</ul> : null}
+      {next ? <div className="flex flex-col"><span className="text-muted-foreground">Next:</span><span className="font-medium">{next.title}</span><span className="text-muted-foreground">{appointmentLine({ ...next, status: "confirmed", endAt: null }, timezone)}</span></div> : null}
+    </div> : <Quiet>No sources or appointments yet.</Quiet>}
+  </PeekSection>;
 }
 
 export type StoryPeekProps = { storyId: number | null; fetchers: HomeFetchers; timezone: string; onClose: () => void; origin: HTMLElement | null; onComplete: (task: EditorialTask) => void; completing?: boolean; onNewTask: (storyId: number) => void; now: Date; workspaceUrl?: (storyId: number) => string };
@@ -45,6 +57,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
   const [addingLink, setAddingLink] = useState(false);
   const [linkError, setLinkError] = useState("");
   const [editError, setEditError] = useState("");
+  const [purpose, setPurpose] = useState<ResourcePurpose | "none">("none");
   const refresh = () => Promise.all([client.invalidateQueries({ queryKey: homeKey }), client.invalidateQueries({ queryKey: workspaceKey(storyId!) })]);
 
   const planning = useMutation({
@@ -78,39 +91,61 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
   const drafts = data?.resources.filter((link) => link.purpose === "draft") || [];
   const assignments = data?.mediaAssignments || [];
   const peopleLabel = (id: number) => data?.people.find((p) => Number(p.id) === id)?.name;
+  const purposeItems = [{ value: "none", label: "No purpose" }, ...RESOURCE_PURPOSES.map((value) => ({ value, label: resourcePurposeLabels[value] }))];
   return <Sheet open={Boolean(storyId)} onOpenChange={(open) => { if (!open && !resources.isPending && !writers.isPending && !planning.isPending) { setAddingLink(false); setEditError(""); setLinkError(""); onClose(); } }}>
-    <SheetContent className="home-story-peek" finalFocus={() => { if (origin?.isConnected) return origin; return document.querySelector<HTMLElement>(".home-search-trigger"); }}>
-      <SheetHeader><SheetTitle>{story?.title || "Story details"}</SheetTitle><SheetDescription>Newsroom context</SheetDescription></SheetHeader>
-      <div className="home-peek-scroll">
-        {peek.isPending ? <RowSkeletons count={7} /> : peek.isError || !story ? <div className="home-inline-error" role="alert"><p>{describeEditorialError(peek.error, "The story couldn't be loaded.")}</p><Button variant="outline" onClick={() => void peek.refetch()}>Try again</Button></div> : <>
-          <div className="home-peek-state"><Badge variant="outline">{story.workflow.label}</Badge><span className="home-meta">{data.sections.join(" · ") || "No section"}</span></div>
-          <dl className="home-properties">
-            <dt>Workflow</dt><dd>{data.capabilities.changeStatus ? <Combobox items={data.statuses.filter((s) => s.selectable)} value={data.statuses.find((s) => s.id === story.workflow.id) || null} itemToStringLabel={(s) => s.label} isItemEqualToValue={(a, b) => a.id === b.id} onValueChange={(s) => { if (s) planning.mutate({ status: s.id }); }} disabled={planning.isPending}><ComboboxInput aria-label="Workflow" /><ComboboxContent><ComboboxList>{(status: StoryWorkspace["statuses"][number]) => <ComboboxItem key={status.id} value={status}>{status.label}</ComboboxItem>}</ComboboxList></ComboboxContent></Combobox> : story.workflow.label}</dd>
-            <dt>Writers</dt><dd>{cp?.canEdit ? <WritersPicker people={cp.available || []} value={contributors} onChange={(value) => writers.mutate(value)} disabled={writers.isPending} /> : <div className="home-people"><AvatarGroup>{contributors.map((person) => <PersonAvatar key={`${person.kind}:${person.id}`} name={person.name} url={person.imageUrl} />)}</AvatarGroup>{contributors.map((p) => p.name).join(", ")}</div>}</dd>
-            <dt>Deadline</dt><dd>{data.capabilities.assign ? <DatePicker label="Deadline" dateOnly value={story.deadline} timezone={timezone} disabled={planning.isPending} onChange={(deadline) => planning.mutate({ deadline })} /> : exactDate(story.deadline, timezone)}</dd>
-            <dt>Planned publication</dt><dd>{data.capabilities.assign ? <DatePicker label="Planned publication" value={story.plannedPublication} timezone={timezone} disabled={planning.isPending} onChange={(plannedPublishAt) => planning.mutate({ plannedPublishAt })} /> : exactDate(story.plannedPublication, timezone)}</dd>
-            <dt>WordPress</dt><dd>{story.wordpressState.label}{story.wordpressState.isScheduled ? ` · ${exactDate(story.wordpressState.scheduledAt, timezone)}` : ""}</dd>
-          </dl>
-          {editError ? <p className="home-inline-error" role="alert">{editError}</p> : null}
-          <Separator />
+    <SheetContent className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-xl" finalFocus={() => { if (origin?.isConnected) return origin; return document.querySelector<HTMLElement>("[data-home-search]"); }}>
+      <SheetHeader className="border-b pr-12"><SheetTitle className="text-lg leading-snug [overflow-wrap:anywhere]">{story?.title || "Story details"}</SheetTitle><SheetDescription>Newsroom context</SheetDescription></SheetHeader>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
+        {peek.isPending ? <div className="py-4"><RowSkeletons count={7} /></div> : peek.isError || !story ? <div className="py-4"><InlineAlert title="The story couldn't be loaded." onAction={() => void peek.refetch()}>{describeEditorialError(peek.error, "The story couldn't be loaded.")}</InlineAlert></div> : <>
+          <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground"><Badge variant="secondary">{story.workflow.label}</Badge>{data.sections.join(" · ") || "No section"}</div>
+          <PropertyList>
+            <Property label="Workflow">{data.capabilities.changeStatus ? <Select items={data.statuses.map((s) => ({ value: s.id, label: s.label }))} value={story.workflow.id} disabled={planning.isPending} onValueChange={(id) => { if (id && id !== story.workflow.id) planning.mutate({ status: id }); }}><SelectTrigger aria-label="Workflow" className={valueSelectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{data.statuses.filter((s) => s.selectable).map((status) => <SelectItem key={status.id} value={status.id}>{status.label}</SelectItem>)}</SelectContent></Select> : story.workflow.label}</Property>
+            <Property label="Writers">{cp?.canEdit ? <WritersPicker people={cp.available || []} value={contributors} onChange={(value) => writers.mutate(value)} disabled={writers.isPending} /> : contributors.map((p) => p.name).join(", ") || "None"}</Property>
+            <Property label="Deadline">{data.capabilities.assign ? <DatePicker appearance="value" label="Deadline" dateOnly value={story.deadline} timezone={timezone} disabled={planning.isPending} onChange={(deadline) => planning.mutate({ deadline })} /> : exactDate(story.deadline, timezone)}</Property>
+            <Property label="Planned publication">{data.capabilities.assign ? <DatePicker appearance="value" label="Planned publication" value={story.plannedPublication} timezone={timezone} disabled={planning.isPending} onChange={(plannedPublishAt) => planning.mutate({ plannedPublishAt })} /> : exactDate(story.plannedPublication, timezone)}</Property>
+            <Property label="WordPress">{story.wordpressState.label}{story.wordpressState.isScheduled ? ` · ${exactDate(story.wordpressState.scheduledAt, timezone)}` : ""}</Property>
+          </PropertyList>
+          {editError ? <div className="pt-3"><InlineAlert>{editError}</InlineAlert></div> : null}
+          <Separator className="mt-4" />
           <ReportingPeek reporting={data.reporting} error={data.errors.reporting} timezone={timezone} />
           <Separator />
-          <section className="home-peek-section"><header><h3>Tasks</h3>{data.capabilities.addTask ? <Button variant="ghost" onClick={() => onNewTask(story.id)}><Plus size={14} /> Add task</Button> : null}</header>{taskList.length ? <ul className="home-rows">{taskList.map((task) => <TaskRow key={task.id} task={task} storyTitle={story.title} timezone={timezone} now={now} onComplete={() => onComplete(task)} pending={completing} />)}</ul> : <Empty>No open tasks.</Empty>}</section>
+          <PeekSection title="Tasks" action={data.capabilities.addTask ? <Button variant="outline" size="sm" data-peek-add-task="" onClick={() => onNewTask(story.id)}><Plus data-icon="inline-start" aria-hidden="true" />Add task</Button> : null}>
+            {taskList.length ? <ItemList className="-mx-3 w-auto">{taskList.map((task) => <TaskRow key={task.id} task={task} storyTitle={story.title} timezone={timezone} now={now} onComplete={() => onComplete(task)} pending={completing} />)}</ItemList> : <Quiet>No open tasks.</Quiet>}
+          </PeekSection>
           <Separator />
-          <section className="home-peek-section"><header><h3>Production</h3></header>{data.errors.media ? <p className="home-inline-error" role="alert">Production assignments couldn't be loaded.</p> : assignments.length ? <ul className="home-production">{assignments.map((item) => <li key={item.id}><span className="home-row-title">{item.title || mediaTypeLabels[item.type]}</span><span className="home-meta">{mediaTypeLabels[item.type] || "Visual"} · {item.assignee?.name || peopleLabel(item.assigneeId) || "Unassigned"}{item.dueAt ? ` · ${exactDate(item.dueAt, timezone)}` : ""}</span><Badge variant="outline">{mediaStatusLabels[item.status] || "Needed"}</Badge></li>)}</ul> : <Empty>No production assignments.</Empty>}</section>
+          <PeekSection title="Production">{data.errors.media ? <InlineAlert>Production assignments couldn't be loaded.</InlineAlert> : assignments.length ? <ItemList className="-mx-3 w-auto">{assignments.map((item) => <Item key={item.id} size="sm"><ItemContent><ItemTitle>{item.title || mediaTypeLabels[item.type]}</ItemTitle><ItemDescription>{mediaTypeLabels[item.type] || "Visual"} · {item.assignee?.name || peopleLabel(item.assigneeId) || "Unassigned"}{item.dueAt ? ` · ${exactDate(item.dueAt, timezone)}` : ""}</ItemDescription></ItemContent><ItemActions><StatusBadge tone={item.status === "needed" ? "attention" : "neutral"}>{mediaStatusLabels[item.status] || "Needed"}</StatusBadge></ItemActions></Item>)}</ItemList> : <Quiet>No production assignments.</Quiet>}</PeekSection>
           <Separator />
-          <section className="home-peek-section"><header><h3>Links</h3>{data.capabilities.manageResources ? <Button variant="ghost" disabled={resources.isPending} onClick={() => setAddingLink(!addingLink)}><Plus size={14} /> Add link</Button> : null}</header>
-            {drafts.length === 1 ? <a className="home-working-draft" href={drafts[0].url} target="_blank" rel="noopener noreferrer">Open working draft<ArrowUpRight size={12} /></a> : null}
-            <ul className="home-resources">{data.resources.map((link: StoryResource) => <li key={link.id}><a href={link.url} target="_blank" rel="noopener noreferrer"><span>{link.label}</span><small>{link.kind}{link.purpose && link.purpose !== "other" ? ` · ${resourcePurposeLabels[link.purpose] || ""}` : ""} <ArrowUpRight size={12} /></small></a><Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Remove ${link.label}`} disabled={resources.isPending} onClick={() => resources.mutate({ remove: link.id })} />}><Trash2 size={13} /></TooltipTrigger><TooltipContent>Remove link</TooltipContent></Tooltip></li>)}</ul>
-            {!data.resources.length && !addingLink ? <Empty>No resource links.</Empty> : null}
-            {addingLink ? <form className="home-link-form" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const purpose = String(form.get("purpose") || ""); resources.mutate({ label: String(form.get("label")), url: String(form.get("url")), ...(RESOURCE_PURPOSES.includes(purpose as ResourcePurpose) ? { purpose: purpose as ResourcePurpose } : {}) }); }}><Field><FieldLabel htmlFor="home-link-label">Label</FieldLabel><Input id="home-link-label" name="label" required maxLength={120} placeholder="Interview notes" autoFocus /></Field><Field><FieldLabel htmlFor="home-link-url">URL</FieldLabel><Input id="home-link-url" name="url" type="url" required maxLength={2048} placeholder="https://…" /></Field><Field><FieldLabel htmlFor="home-link-purpose">Purpose (optional)</FieldLabel><select id="home-link-purpose" name="purpose" className="home-native-select" defaultValue=""><option value="">No purpose</option>{RESOURCE_PURPOSES.map((purpose) => <option key={purpose} value={purpose}>{resourcePurposeLabels[purpose]}</option>)}</select></Field><div><Button type="submit" disabled={resources.isPending}>{resources.isPending ? "Saving…" : "Add link"}</Button><Button variant="ghost" type="button" onClick={() => setAddingLink(false)}>Cancel</Button></div></form> : null}
-            {linkError ? <p role="alert" className="home-inline-error">{linkError}</p> : null}
-          </section>
+          <PeekSection title="Links" action={data.capabilities.manageResources ? <Button variant="outline" size="sm" disabled={resources.isPending} onClick={() => setAddingLink(!addingLink)}><Plus data-icon="inline-start" aria-hidden="true" />Add link</Button> : null}>
+            {drafts.length === 1 ? <a className={buttonVariants({ variant: "ghost", size: "sm" }) + " self-start"} href={drafts[0].url} target="_blank" rel="noopener noreferrer"><FileText data-icon="inline-start" aria-hidden="true" />Open working draft<ArrowUpRight data-icon="inline-end" aria-hidden="true" /></a> : null}
+            {data.resources.length ? <ItemList className="-mx-3 w-auto">{data.resources.map((link: StoryResource) => <div key={link.id} className="flex items-center gap-1">
+              <Item size="sm" className="min-w-0 flex-1" render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}>
+                <ItemMedia variant="icon" className="text-muted-foreground"><Link2 aria-hidden="true" /></ItemMedia>
+                <ItemContent><ItemTitle>{link.label}</ItemTitle><ItemDescription>{link.kind}{link.purpose && link.purpose !== "other" ? ` · ${resourcePurposeLabels[link.purpose] || ""}` : ""}</ItemDescription></ItemContent>
+                <ItemActions><ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" /></ItemActions>
+              </Item>
+              <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Remove ${link.label}`} disabled={resources.isPending} onClick={() => resources.mutate({ remove: link.id })} />}><Trash2 aria-hidden="true" /></TooltipTrigger><TooltipContent>Remove link</TooltipContent></Tooltip>
+            </div>)}</ItemList> : addingLink ? null : <Quiet>No resource links.</Quiet>}
+            {addingLink ? <form className="pt-2" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); resources.mutate({ label: String(form.get("label")), url: String(form.get("url")), ...(purpose !== "none" ? { purpose } : {}) }); }}>
+              <FieldGroup className="gap-4">
+                <Field><FieldLabel htmlFor="home-link-label">Label</FieldLabel><Input id="home-link-label" name="label" required maxLength={120} placeholder="Interview notes" autoFocus /></Field>
+                <Field><FieldLabel htmlFor="home-link-url">URL</FieldLabel><Input id="home-link-url" name="url" type="url" required maxLength={2048} placeholder="https://…" /></Field>
+                <Field><FieldLabel htmlFor="home-link-purpose">Purpose <span className="font-normal text-muted-foreground">Optional</span></FieldLabel>
+                  <Select items={purposeItems} value={purpose} onValueChange={(next) => setPurpose((next as ResourcePurpose | "none") || "none")}><SelectTrigger id="home-link-purpose" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{purposeItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+                </Field>
+                <div className="flex justify-end gap-2"><Button variant="outline" type="button" onClick={() => setAddingLink(false)}>Cancel</Button><Button type="submit" disabled={resources.isPending}>{resources.isPending ? "Saving…" : "Add link"}</Button></div>
+              </FieldGroup>
+            </form> : null}
+            {linkError ? <InlineAlert className="mt-2">{linkError}</InlineAlert> : null}
+          </PeekSection>
           <Separator />
-          <section className="home-peek-section"><header><h3>Recent activity</h3></header>{data.activity.length ? <ul className="home-rows home-peek-activity">{data.activity.slice(0, 6).map((item) => <ActivityRow key={item.id} item={item} timezone={timezone} />)}</ul> : <Empty>No recent activity.</Empty>}</section>
+          <PeekSection title="Recent activity">{data.activity.length ? <ItemList className="-mx-3 w-auto">{data.activity.slice(0, 6).map((item) => <ActivityRow key={item.id} item={item} timezone={timezone} now={now} />)}</ItemList> : <Quiet>No recent activity.</Quiet>}</PeekSection>
         </>}
       </div>
-      {story ? <SheetFooter>{story.editUrl ? <Button render={<a href={story.editUrl} />}>{story.workflow.id === "ready" && data.capabilities.assign ? "Review article" : "Edit article"}<ArrowUpRight size={14} /></Button> : null}{workspaceUrl ? <Button variant="outline" render={<a href={workspaceUrl(story.id)} />}><LayoutDashboard size={14} />Open full story workspace</Button> : null}{data.previewUrl ? <Button variant="outline" render={<a href={data.previewUrl} target="_blank" rel="noopener noreferrer" />}>Preview<ArrowUpRight size={14} /></Button> : null}</SheetFooter> : null}
+      {story ? <SheetFooter className="flex-row flex-wrap border-t">
+        {story.editUrl ? <a className={buttonVariants()} href={story.editUrl}>{story.workflow.id === "ready" && data.capabilities.assign ? "Review article" : "Edit article"}<ArrowUpRight data-icon="inline-end" aria-hidden="true" /></a> : null}
+        {workspaceUrl ? <a className={buttonVariants({ variant: "outline" })} href={workspaceUrl(story.id)}><LayoutDashboard data-icon="inline-start" aria-hidden="true" />Open full story workspace</a> : null}
+        {data.previewUrl ? <a className={buttonVariants({ variant: "outline" })} href={data.previewUrl} target="_blank" rel="noopener noreferrer">Preview<ArrowUpRight data-icon="inline-end" aria-hidden="true" /></a> : null}
+      </SheetFooter> : null}
     </SheetContent>
   </Sheet>;
 }

@@ -1,6 +1,7 @@
 import apiFetch from "@wordpress/api-fetch";
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
+import { InlineAlert } from "./admin-ui/components/inline-alert";
 import { HomeApp } from "./home/HomeApp";
 import { createHomeFetchers } from "./home/home-api";
 import type { HomeNavigationCapabilities } from "./home/home-model";
@@ -23,7 +24,7 @@ class HomeBoundary extends Component<{ children: ReactNode }, { failed: boolean 
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
   render() {
-    return this.state.failed ? <div className="byline-home-root"><p className="home-inline-error" role="alert">Home couldn't be displayed. <button type="button" onClick={() => window.location.reload()}>Reload Home</button></p></div> : this.props.children;
+    return this.state.failed ? <div className="byline-ui-root mr-5 mt-6"><InlineAlert onAction={() => window.location.reload()} actionLabel="Reload Home">Home couldn't be displayed.</InlineAlert></div> : this.props.children;
   }
 }
 
