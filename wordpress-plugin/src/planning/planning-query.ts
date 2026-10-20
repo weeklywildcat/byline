@@ -3,7 +3,7 @@
  * components keep only what is ephemeral (selected view, open menus, drag state).
  */
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import { __ } from "@wordpress/i18n";
+import { __, sprintf } from "@wordpress/i18n";
 import { announce } from "@atlaskit/pragmatic-drag-and-drop-live-region";
 import { toast } from "sonner";
 import { decodeEntities } from "../admin-ui/lib/text";
@@ -46,6 +46,58 @@ export function useOptionalQuery<T>(key: QueryKey, fetcher: (() => Promise<T>) |
     isLoading: Boolean(fetcher) && query.isPending,
     available: Boolean(fetcher) && !query.isError,
     refetch: () => void query.refetch()
+  };
+}
+
+type InlineUpdateVariables = {
+  story: PlanningStory;
+  changes: Record<string, unknown>;
+  optimistic: PlanningStory;
+  label: string;
+};
+
+/**
+ * Fast List edits use the same story endpoint as the full editor, but stay
+ * quiet when they succeed. The visible cell updates immediately; failures
+ * restore only the optimistic copy that this edit wrote.
+ */
+export function useUpdatePlanningStory(fetchers: PlanningFetchers) {
+  const client = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ story, changes }: InlineUpdateVariables) => {
+      if (!fetchers.updateStory) throw new Error(__("Quick edits are not available in this install.", "weekly-wildcat-headless"));
+      return fetchers.updateStory(story.id, changes);
+    },
+    onMutate: async ({ story, optimistic }) => {
+      await client.cancelQueries({ queryKey: planningRootKey });
+      client.setQueriesData<PlanningResponse>({ queryKey: planningRootKey }, (old) => old?.stories
+        ? { ...old, stories: replacePlanningStory(old.stories, story.id, optimistic) }
+        : old);
+      return { optimistic };
+    },
+    onError: (error, { story, label }, context) => {
+      if (context) {
+        client.setQueriesData<PlanningResponse>({ queryKey: planningRootKey }, (old) => old?.stories
+          ? { ...old, stories: replacePlanningStory(old.stories, story.id, story, context.optimistic) }
+          : old);
+      }
+      const message = describeEditorialError(error, sprintf(__("%s could not be saved. The previous value was restored.", "weekly-wildcat-headless"), label));
+      toast.error(message);
+      announce(`${story.title || __("Story", "weekly-wildcat-headless")}: ${message}`);
+    },
+    onSuccess: (_result, { story, label }) => {
+      announce(`${story.title || __("Untitled story", "weekly-wildcat-headless")}: ${label} updated.`);
+    },
+    onSettled: (_data, _error, variables) => { void invalidateStoryData(client, variables.story.id); }
+  });
+
+  return {
+    update: (story: PlanningStory, changes: Record<string, unknown>, patch: Partial<PlanningStory>, label: string) => {
+      const optimistic = { ...story, ...patch };
+      return mutation.mutateAsync({ story, changes, optimistic, label }).catch(() => undefined);
+    },
+    updatingStoryId: mutation.isPending ? mutation.variables?.story.id ?? null : null,
+    available: Boolean(fetchers.updateStory)
   };
 }
 
