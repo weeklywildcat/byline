@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, ExternalLink, LayoutDashboard, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, Copy, ExternalLink, LayoutDashboard, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { EditorialTask, ContributorEntry } from "../editorial/editorial-model";
 import { describeEditorialError } from "../editorial/editorial-model";
@@ -100,7 +100,8 @@ function LinkRow({ link, canManage, disabled, onEdit, onRemove }: { link: StoryR
       </Item>
       {canManage ? <DropdownMenu>
         <DropdownMenuTrigger render={<Button ref={(element: HTMLButtonElement | null) => { trigger = element; }} variant="ghost" size="icon-sm" aria-label={`Actions for ${link.label}`} disabled={disabled} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-36">
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</DropdownMenuItem>
           <DropdownMenuItem onClick={onEdit}><Pencil aria-hidden="true" />Edit link</DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</DropdownMenuItem>
         </DropdownMenuContent>
@@ -110,6 +111,7 @@ function LinkRow({ link, canManage, disabled, onEdit, onRemove }: { link: StoryR
       <ContextMenuLabel className="max-w-44 truncate">{link.label}</ContextMenuLabel>
       <ContextMenuSeparator />
       <ContextMenuItem render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
+      <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem>
       {canManage ? <>
         <ContextMenuItem disabled={disabled} onClick={onEdit}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
         <ContextMenuItem variant="destructive" disabled={disabled} onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
