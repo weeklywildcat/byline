@@ -2,12 +2,14 @@ import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
+import { AlertDialogTrigger } from "../admin-ui/ui/alert-dialog";
 import { Button } from "../admin-ui/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Field, FieldDescription, FieldLabel } from "../admin-ui/ui/field";
 import { Textarea } from "../admin-ui/ui/textarea";
 import { Spinner } from "../admin-ui/ui/spinner";
+import { ConfirmRemoveDialog } from "./dialog-shell";
 import { SectionFailed } from "./parts";
 import { BRIEF_MAX } from "./reporting-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
@@ -24,6 +26,7 @@ export function BriefSection() {
   const edit = useRef<HTMLButtonElement | null>(null);
   const failed = sectionError("brief");
   const canEdit = caps.editBrief && !failed;
+  const dirty = editing && draft !== data.brief;
 
   const save = useMutation({
     mutationFn: ({ text, expected }: { text: string; expected: string }) => client.saveBrief(storyId, text, expected),
@@ -66,9 +69,11 @@ export function BriefSection() {
             <FieldDescription aria-live="polite" className="tabular-nums">{draft.length}/{BRIEF_MAX}</FieldDescription>
           </Field>
           {error ? <InlineAlert onAction={error.conflict ? () => void reloadBrief() : undefined} actionLabel="Reload latest">{error.message}</InlineAlert> : null}
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={cancel} disabled={save.isPending}>Cancel</Button>
-            <Button type="submit" disabled={save.isPending || draft === data.brief}>{save.isPending ? <><Spinner data-icon="inline-start" />Saving…</> : "Save brief"}</Button>
+          <div className="flex items-center justify-end gap-2">
+            {dirty ? <ConfirmRemoveDialog title="Discard unsaved brief changes?" description="Your edits to the brief haven't been saved." confirmLabel="Discard changes" onConfirm={cancel}>
+              <AlertDialogTrigger render={<Button type="button" variant="outline" disabled={save.isPending} />}>Cancel</AlertDialogTrigger>
+            </ConfirmRemoveDialog> : <Button type="button" variant="outline" onClick={cancel} disabled={save.isPending}>Cancel</Button>}
+            <Button type="submit" disabled={save.isPending || !dirty}>{save.isPending ? <><Spinner data-icon="inline-start" />Saving…</> : "Save brief"}</Button>
           </div>
         </form>
         : data.brief ? <p className="max-w-prose text-sm/relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{data.brief}</p>
