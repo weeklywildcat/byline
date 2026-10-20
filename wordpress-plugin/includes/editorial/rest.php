@@ -750,6 +750,47 @@ function byline_editorial_rest_current_user_id(): int
  * Guest contributor records use the same shape, so no user email or private
  * profile metadata can leak through an editorial collection response.
  */
+/**
+ * Resolve the real profile photo carried by the contributor domain into the
+ * compact Planning person shape. The source records are intentionally mixed:
+ * editor-facing people may already have a URL, public guest contributors carry
+ * profilePhoto, public user contributors carry imageId, and the legacy
+ * writer/editor rows only carry a WordPress user id.
+ */
+function byline_editorial_rest_person_photo_url(array $person, int $id): string
+{
+    foreach (['avatarUrl', 'imageUrl'] as $photo_key) {
+        if (isset($person[$photo_key]) && is_scalar($person[$photo_key])) {
+            $url = esc_url_raw((string) $person[$photo_key]);
+            if ($url !== '') {
+                return $url;
+            }
+        }
+    }
+
+    if (is_array($person['profilePhoto'] ?? null)) {
+        $url = esc_url_raw((string) ($person['profilePhoto']['url'] ?? ''));
+        if ($url !== '') {
+            return $url;
+        }
+    }
+
+    $image_id = absint($person['imageId'] ?? 0);
+    $kind = (string) ($person['type'] ?? $person['kind'] ?? 'user');
+    if ($image_id <= 0 && $kind !== 'guest' && function_exists('get_user_meta')) {
+        $image_id = absint(get_user_meta($id, '_ww_author_photo_id', true));
+    }
+
+    if ($image_id > 0 && function_exists('wp_get_attachment_image_url')) {
+        $image_url = wp_get_attachment_image_url($image_id, 'thumbnail');
+        if (is_string($image_url)) {
+            return esc_url_raw($image_url);
+        }
+    }
+
+    return '';
+}
+
 function byline_editorial_rest_person($person): ?array
 {
     if (!is_array($person)) {
@@ -763,15 +804,9 @@ function byline_editorial_rest_person($person): ?array
     }
 
     $result = ['id' => $id, 'name' => $name];
-    // A real photo only (a guest or author picture); never a generated placeholder.
-    foreach (['avatarUrl', 'imageUrl'] as $photo_key) {
-        if (isset($person[$photo_key]) && is_scalar($person[$photo_key])) {
-            $avatar = esc_url_raw((string) $person[$photo_key]);
-            if ($avatar !== '') {
-                $result['avatarUrl'] = $avatar;
-                break;
-            }
-        }
+    $avatar = byline_editorial_rest_person_photo_url($person, $id);
+    if ($avatar !== '') {
+        $result['avatarUrl'] = $avatar;
     }
 
     return $result;
