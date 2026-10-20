@@ -84,6 +84,7 @@ function routeEntries(input: {
     ...CODE_ROUTED_PAGE_SLUGS.map((slug): RouteManifestEntry => ({ path: `/${slug}/`, kind: "page" })),
     { path: "/media-kit/", kind: "page" },
     { path: "/open-source/", kind: "page" },
+    { path: "/intranet/", kind: "page" },
     { path: "/search/", kind: "search" },
     { path: "/sports/", kind: "redirect", redirectTo: archiveHref, delivery: "edge" },
     { path: "/sports/schedule/", kind: "redirect", redirectTo: archiveHref, delivery: "edge" },
