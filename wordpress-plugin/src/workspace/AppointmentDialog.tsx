@@ -8,7 +8,7 @@ import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, 
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
 import { RadioGroup, RadioGroupItem } from "../admin-ui/ui/radio-group";
-import { RemoveControl, WorkspaceDialog } from "./dialog-shell";
+import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog-shell";
 import { DayField, DayRangeField, PeoplePicker } from "./fields";
 import { appointmentFormToInput, appointmentToForm, applyQuickWindow, emptyAppointmentForm, isValid, setExactDate, setScheduleMode, validateAppointmentForm, type AppointmentForm } from "./appointment-form";
 import { APPOINTMENT_KIND_LABELS, APPOINTMENT_NOTES_MAX, APPOINTMENT_STATUS_LABELS } from "./reporting-model";
@@ -68,7 +68,8 @@ export type AppointmentDialogProps = {
 export function AppointmentDialog({ open, appointment, initial, onClose, finalFocus }: AppointmentDialogProps) {
   const { storyId, client, data, timezone, currentUserId, reload } = useWorkspace();
   const cache = useWorkspaceCache();
-  const [form, setForm] = useState<AppointmentForm>(() => (appointment ? appointmentToForm(appointment, timezone) : emptyAppointmentForm({ assigneeIds: currentUserId ? [currentUserId] : [], ...initial })));
+  const initialForm = appointment ? appointmentToForm(appointment, timezone) : emptyAppointmentForm({ assigneeIds: currentUserId ? [currentUserId] : [], ...initial });
+  const [form, setForm] = useState<AppointmentForm>(() => initialForm);
   const [attempted, setAttempted] = useState(false);
   const [error, setError] = useState<ReturnType<typeof workspaceError> | null>(null);
   const errors = attempted ? validateAppointmentForm(form) : {};
@@ -83,16 +84,19 @@ export function AppointmentDialog({ open, appointment, initial, onClose, finalFo
   const save = useMutation({ mutationFn: () => client.saveAppointment(storyId, appointmentFormToInput(form, appointment ?? undefined, timezone), appointment?.id), ...handlers(appointment ? "Appointment saved." : "Appointment added.") });
   const remove = useMutation({ mutationFn: () => client.deleteAppointment(storyId, appointment!.id), ...handlers("Appointment deleted.") });
   const pending = save.isPending || remove.isPending;
+  const dirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
   const submit = () => {
     setAttempted(true);
     setError(null);
-    if (isValid(validateAppointmentForm(form))) save.mutate();
+    const nextErrors = validateAppointmentForm(form);
+    if (isValid(nextErrors)) save.mutate();
+    else focusFirstInvalidField();
   };
   const reloadAndClose = async () => { await reload(); onClose(); };
   const differentEndDay = form.mode === "exact" && form.endTime && form.endDate && form.endDate !== form.date;
 
-  return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={appointment ? "Edit appointment" : "Add appointment"} description="Where and when someone has to be. Leave the schedule open until you know." submitLabel={appointment ? "Save appointment" : "Add appointment"} pending={pending} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
+  return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={appointment ? "Edit appointment" : "Add appointment"} description="Where and when someone has to be. Leave the schedule open until you know." submitLabel={appointment ? "Save appointment" : "Add appointment"} pending={pending} dirty={dirty} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
     secondary={appointment ? <RemoveControl label="Delete appointment" title="Delete this appointment?" description="Marking it cancelled instead keeps a record." confirmLabel="Delete" pending={pending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
     <TextField label="Title" value={form.title} onChange={(title) => patch({ title })} error={errors.title} maxLength={160} autoFocus placeholder="Interview Mrs. Hamby" />
     <div className="grid gap-4 sm:grid-cols-2">

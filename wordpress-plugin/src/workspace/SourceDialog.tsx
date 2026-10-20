@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { SelectField, TextAreaField, TextField } from "../admin-ui/components/form-fields";
-import { RemoveControl, WorkspaceDialog } from "./dialog-shell";
+import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog-shell";
 import { PeoplePicker } from "./fields";
 import { SOURCE_NOTES_MAX, SOURCE_STATUS_LABELS, emptySourceForm, sourceFormToInput, sourceToForm, validateSourceForm, type SourceForm } from "./reporting-model";
 import { peopleOptions } from "./workspace-model";
@@ -19,7 +19,8 @@ export type SourceDialogProps = { open: boolean; source: StorySource | null; onC
 export function SourceDialog({ open, source, onClose, finalFocus }: SourceDialogProps) {
   const { storyId, client, data, reload } = useWorkspace();
   const cache = useWorkspaceCache();
-  const [form, setForm] = useState<SourceForm>(() => (source ? sourceToForm(source) : emptySourceForm()));
+  const initialForm = source ? sourceToForm(source) : emptySourceForm();
+  const [form, setForm] = useState<SourceForm>(() => initialForm);
   const [attempted, setAttempted] = useState(false);
   const [error, setError] = useState<ReturnType<typeof workspaceError> | null>(null);
   const errors = attempted ? validateSourceForm(form) : {};
@@ -34,15 +35,18 @@ export function SourceDialog({ open, source, onClose, finalFocus }: SourceDialog
   const save = useMutation({ mutationFn: () => client.saveSource(storyId, sourceFormToInput(form, source ?? undefined), source?.id), ...done(source ? "Source saved." : "Source added.") });
   const remove = useMutation({ mutationFn: () => client.deleteSource(storyId, source!.id), ...done("Source removed.") });
   const pending = save.isPending || remove.isPending;
+  const dirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
   const reloadAndClose = async () => { await reload(); onClose(); };
   const submit = () => {
     setAttempted(true);
     setError(null);
-    if (Object.keys(validateSourceForm(form)).length === 0) save.mutate();
+    const nextErrors = validateSourceForm(form);
+    if (Object.keys(nextErrors).length === 0) save.mutate();
+    else focusFirstInvalidField();
   };
 
-  return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={source ? "Edit source" : "Add source"} description="Who you plan to talk to for this story. No contact details are kept here." submitLabel={source ? "Save source" : "Add source"} pending={pending} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
+  return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={source ? "Edit source" : "Add source"} description="Who you plan to talk to for this story. No contact details are kept here." submitLabel={source ? "Save source" : "Add source"} pending={pending} dirty={dirty} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
     secondary={source ? <RemoveControl label="Remove source" title="Remove this source?" description="Linked appointments stay." confirmLabel="Remove" pending={pending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
     <TextField label="Label" value={form.label} onChange={(label) => patch({ label })} error={errors.label} maxLength={120} autoFocus placeholder="Mrs. Hamby, or a role like “Athletic director”" />
     <div className="grid gap-4 sm:grid-cols-2">
