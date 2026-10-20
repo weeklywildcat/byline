@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button as NovaButton } from "../ui/button";
 import { Card as NovaCard, CardContent } from "../ui/card";
@@ -53,9 +53,11 @@ export function TextControl({ label, value, onChange, help, type = "text", ...pr
   type?: string;
   [key: string]: any;
 }) {
+  const generatedId = useId();
+  const id = props.id || generatedId;
   return <Field>
-    <FieldLabel>{label}</FieldLabel>
-    <Input type={type} value={value ?? ""} onChange={(event) => onChange(event.target.value)} {...props} />
+    <FieldLabel htmlFor={id}>{label}</FieldLabel>
+    <Input id={id} type={type} value={value ?? ""} onChange={(event) => onChange(event.target.value)} {...props} />
     {help ? <FieldDescription>{help}</FieldDescription> : null}
   </Field>;
 }
@@ -68,9 +70,11 @@ export function TextareaControl({ label, value, onChange, help, rows = 4, ...pro
   rows?: number;
   [key: string]: any;
 }) {
+  const generatedId = useId();
+  const id = props.id || generatedId;
   return <Field>
-    <FieldLabel>{label}</FieldLabel>
-    <Textarea value={value ?? ""} rows={rows} onChange={(event) => onChange(event.target.value)} {...props} />
+    <FieldLabel htmlFor={id}>{label}</FieldLabel>
+    <Textarea id={id} value={value ?? ""} rows={rows} onChange={(event) => onChange(event.target.value)} {...props} />
     {help ? <FieldDescription>{help}</FieldDescription> : null}
   </Field>;
 }
@@ -85,9 +89,10 @@ export function SelectControl({ label, value, options, onChange, help, disabled,
   className?: string;
   __nextHasNoMarginBottom?: boolean;
 }) {
+  const id = useId();
   return <Field className={className}>
-    <FieldLabel>{label}</FieldLabel>
-    <NativeSelect className="w-full" value={value ?? ""} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+    <FieldLabel htmlFor={id}>{label}</FieldLabel>
+    <NativeSelect className="w-full" id={id} value={value ?? ""} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
       {options.map((option) => <NativeSelectOption key={option.value} value={option.value}>{option.label}</NativeSelectOption>)}
     </NativeSelect>
     {help ? <FieldDescription>{help}</FieldDescription> : null}
@@ -101,12 +106,13 @@ export function ToggleControl({ label, checked, onChange, help, disabled }: {
   help?: ReactNode;
   disabled?: boolean;
 }) {
+  const id = useId();
   return <Field orientation="horizontal" className="items-start justify-between gap-4 rounded-lg border p-3">
     <div className="min-w-0">
-      <FieldLabel className="font-medium">{label}</FieldLabel>
+      <FieldLabel htmlFor={id} className="font-medium">{label}</FieldLabel>
       {help ? <FieldDescription>{help}</FieldDescription> : null}
     </div>
-    <Switch checked={checked} disabled={disabled} onCheckedChange={(next) => onChange(Boolean(next))} />
+    <Switch id={id} checked={checked} disabled={disabled} onCheckedChange={(next) => onChange(Boolean(next))} />
   </Field>;
 }
 
