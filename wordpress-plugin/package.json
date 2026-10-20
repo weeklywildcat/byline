@@ -54,7 +54,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "@wordpress/env": "11.14.0",
-    "@wordpress/scripts": "34.2.0",
+    "@wordpress/scripts": "37.0.0",
     "postcss-nesting": "^14.0.3",
     "react": "19.2.7",
     "react-dom": "19.2.7",
