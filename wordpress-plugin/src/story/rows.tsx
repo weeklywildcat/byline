@@ -7,6 +7,7 @@ import { Skeleton } from "../admin-ui/ui/skeleton";
 import type { EditorialTask } from "../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../editorial/activity-model";
 import { activityCopy, dateLabel, dayDistance, exactDate, relativeTime } from "../home/newsroom-model";
+import { decodeEntities } from "../admin-ui/lib/text";
 
 export function RowSkeletons({ count = 4 }: { count?: number }) {
   return <div aria-label="Loading newsroom work" aria-busy="true" className="flex flex-col gap-4 px-3 pb-2">{Array.from({ length: count }, (_, i) => <div key={i} className="flex flex-col gap-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/3" /></div>)}</div>;
@@ -21,10 +22,10 @@ export function Row({ onOpen, children, ...props }: { onOpen?: () => void; child
 export function TaskRow({ task, storyTitle, compact, timezone, onOpen, onComplete, pending, now }: { task: EditorialTask; storyTitle?: string; compact?: boolean; timezone: string; onOpen?: () => void; onComplete: () => void; pending?: boolean; now: Date }) {
   const overdue = dayDistance(task.dueAt, timezone, now) < 0;
   return <Item size="sm" data-task-id={task.id}>
-    <ItemMedia><Checkbox aria-label={`Complete ${task.title}${storyTitle ? ` — ${storyTitle}` : ""}`} checked={task.state === "completed"} aria-disabled={pending || undefined} onCheckedChange={(checked) => { if (checked && !pending) onComplete(); }} /></ItemMedia>
+    <ItemMedia><Checkbox aria-label={`Complete ${task.title}${storyTitle ? ` — ${decodeEntities(storyTitle)}` : ""}`} checked={task.state === "completed"} aria-disabled={pending || undefined} onCheckedChange={(checked) => { if (checked && !pending) onComplete(); }} /></ItemMedia>
     <ItemContent>
       <ItemTitle className="line-clamp-2">{onOpen ? <button type="button" className="text-left hover:underline" onClick={onOpen}>{task.title}</button> : task.title}</ItemTitle>
-      {compact && task.priority !== "urgent" ? null : <ItemDescription>{compact ? null : storyTitle || "Newsroom task"}{task.priority === "urgent" ? <span className="font-medium text-warning">{compact ? "" : " · "}Urgent</span> : null}</ItemDescription>}
+      {compact && task.priority !== "urgent" ? null : <ItemDescription>{compact ? null : decodeEntities(storyTitle) || "Newsroom task"}{task.priority === "urgent" ? <span className="font-medium text-warning">{compact ? "" : " · "}Urgent</span> : null}</ItemDescription>}
     </ItemContent>
     <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined} title={exactDate(task.dueAt, timezone)}>{dateLabel(task.dueAt, timezone, now)}</time></ItemActions>
   </Item>;
@@ -32,7 +33,7 @@ export function TaskRow({ task, storyTitle, compact, timezone, onOpen, onComplet
 
 export function ActivityRow({ item, compact, timezone, now, onOpen }: { item: EditorialActivityRecord; compact?: boolean; timezone: string; now: Date; onOpen?: () => void }) {
   return <Row size="xs" onOpen={onOpen}>
-    <ItemContent><ItemTitle className="line-clamp-none font-normal">{activityCopy(item)}</ItemTitle>{item.story?.title && !compact ? <ItemDescription>{item.story.title}</ItemDescription> : null}</ItemContent>
+    <ItemContent><ItemTitle className="line-clamp-none font-normal">{activityCopy(item)}</ItemTitle>{item.story?.title && !compact ? <ItemDescription>{decodeEntities(item.story.title)}</ItemDescription> : null}</ItemContent>
     <ItemActions><time className="text-xs whitespace-nowrap text-muted-foreground" dateTime={item.occurredAt} title={exactDate(item.occurredAt, timezone)}>{relativeTime(item.occurredAt, timezone, now)}</time></ItemActions>
   </Row>;
 }
