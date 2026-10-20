@@ -589,7 +589,10 @@ function byline_project_user_contributor(int $user_id): ?array
         // These are publication-facing profile links. The legacy email field
         // is intentionally omitted from this allow-list.
         foreach (['website', 'instagram', 'tiktok', 'linkedin', 'x'] as $key) {
-            $url = byline_guest_public_url(get_user_meta($user_id, '_ww_author_social_' . $key, true));
+            $raw_url = (string) get_user_meta($user_id, '_ww_author_social_' . $key, true);
+            $url = function_exists('wwh_normalize_author_social_link')
+                ? wwh_normalize_author_social_link($key, $raw_url)
+                : byline_guest_public_url($raw_url);
             if ($url !== '') {
                 $links[$key] = $url;
             }
