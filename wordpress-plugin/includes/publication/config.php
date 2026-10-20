@@ -140,7 +140,7 @@ function byline_weekly_wildcat_publication_config(): array
             ['label' => 'Open Source', 'url' => '/open-source/', 'locations' => ['footer'], 'group' => 'About'],
             ['label' => 'Advertise with Us', 'url' => '/advertise/', 'locations' => ['footer'], 'group' => 'About'],
             ['label' => 'Join our team', 'url' => '/join/', 'locations' => ['footer'], 'group' => 'About'],
-            ['label' => 'Leadership', 'url' => '/leadership/', 'locations' => ['footer'], 'group' => 'About'],
+            ['label' => 'Staff', 'url' => '/staff/', 'locations' => ['footer'], 'group' => 'About'],
             ['label' => 'Diversity & Inclusion', 'url' => '/diversity-inclusion/', 'locations' => ['footer'], 'group' => 'About'],
     ];
     $config['social'] = [
