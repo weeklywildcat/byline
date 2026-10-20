@@ -6,7 +6,7 @@ import {
   Spinner,
   TextControl,
   TextareaControl
-} from "@wordpress/components";
+} from "../admin-ui/components/legacy-control-adapters";
 import { __ } from "@wordpress/i18n";
 import { useCallback, useEffect, useMemo, useState } from "@wordpress/element";
 
