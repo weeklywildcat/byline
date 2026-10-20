@@ -21,7 +21,7 @@ function CodeBlockActions({ className, ...props }: React.ComponentProps<"div">) 
   return <div data-slot="code-block-actions" className={cn("ml-auto flex shrink-0 items-center", className)} {...props} />
 }
 
-function CodeBlockCopyButton({ value, className, ...props }: React.ComponentProps<typeof Button> & { value: string }) {
+function CodeBlockCopyButton({ value, className, onClick, ...props }: React.ComponentProps<typeof Button> & { value: string }) {
   const [copied, setCopied] = React.useState(false)
   React.useEffect(() => {
     if (!copied) return
@@ -36,11 +36,11 @@ function CodeBlockCopyButton({ value, className, ...props }: React.ComponentProp
         size="icon-xs"
         aria-label={copied ? "Copied" : "Copy"}
         className={className}
+        {...props}
         onClick={(event) => {
-          props.onClick?.(event)
+          onClick?.(event)
           void navigator.clipboard.writeText(value).then(() => setCopied(true)).catch(() => undefined)
         }}
-        {...props}
       >
         {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
       </Button>
