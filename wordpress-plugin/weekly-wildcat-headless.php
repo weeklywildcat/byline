@@ -23,6 +23,7 @@ require_once __DIR__ . '/includes/content/pages.php';
 require_once __DIR__ . '/includes/content/page-blocks.php';
 require_once __DIR__ . '/includes/content/editor-canvas.php';
 require_once __DIR__ . '/includes/admin/app.php';
+require_once __DIR__ . '/includes/admin/presence.php';
 
 // Editorial workflow is a first-class Byline domain. Integrations consume it;
 // none of them owns it.
