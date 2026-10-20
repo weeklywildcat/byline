@@ -116,7 +116,7 @@ export function RemoveControl({ label, pending, onStart, onConfirm, ...confirm }
 export function focusFirstInvalidField() {
   requestAnimationFrame(() => {
     const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[data-slot="dialog-content"]'));
-    const root = dialogs.at(-1);
+    const root = dialogs[dialogs.length - 1];
     const control = root?.querySelector<HTMLElement>('[aria-invalid="true"], [data-invalid="true"] input, [data-invalid="true"] textarea, [data-invalid="true"] button, [data-invalid="true"] [role="combobox"]');
     control?.focus();
   });
