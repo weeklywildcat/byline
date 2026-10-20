@@ -1,6 +1,7 @@
 export const ADMIN_PAGE_SLUGS = {
   dashboard: "byline",
   planning: "byline-planning",
+  // Retained only for redirects from bookmarks created before settings were consolidated.
   publication: "byline-publication",
   integrations: "byline-integrations",
   settings: "byline-settings",
@@ -12,7 +13,22 @@ export type AdminPageSlug = (typeof ADMIN_PAGE_SLUGS)[keyof typeof ADMIN_PAGE_SL
 
 export const PUBLICATION_TABS = ["identity", "branding", "navigation", "features", "social"] as const;
 export const INTEGRATION_TABS = ["discord", "deployment"] as const;
-export const SETTINGS_TABS = ["access", "api", "compatibility", "diagnostics"] as const;
+export const SETTINGS_TABS = [
+  "identity",
+  "branding",
+  "navigation",
+  "social",
+  "features",
+  "newsletter",
+  "analytics",
+  "discord",
+  "deployment",
+  "login",
+  "access",
+  "api",
+  "compatibility",
+  "diagnostics"
+] as const;
 export const PLANNING_TABS = ["today", "stories", "calendar", "media", "coverage", "performance", "content-health", "feedback"] as const;
 export const NEWSLETTER_TABS = ["issues", "settings"] as const;
 
@@ -39,13 +55,30 @@ export function normalizeAdminTab(page: string, tab: string | undefined) {
   return tabs[0] || "";
 }
 
+const settingsRoutes: Record<(typeof SETTINGS_TABS)[number], string> = {
+  identity: "/publication/identity",
+  branding: "/publication/branding",
+  navigation: "/publication/navigation",
+  social: "/publication/social",
+  features: "/publication/features",
+  newsletter: "/integrations/newsletter",
+  analytics: "/integrations/analytics",
+  discord: "/integrations/discord",
+  deployment: "/integrations/deployment",
+  login: "/integrations/login",
+  access: "/advanced/access",
+  api: "/advanced/api",
+  compatibility: "/advanced/compatibility",
+  diagnostics: "/advanced/diagnostics"
+};
+
 export function adminScreenRoute(page: string, tab: string | undefined) {
   const normalizedPage = normalizeAdminPage(page);
   const normalizedTab = normalizeAdminTab(normalizedPage, tab);
 
   if (normalizedPage === ADMIN_PAGE_SLUGS.publication) return `/publication/${normalizedTab}`;
   if (normalizedPage === ADMIN_PAGE_SLUGS.integrations) return `/integrations/${normalizedTab}`;
-  if (normalizedPage === ADMIN_PAGE_SLUGS.settings) return `/advanced/${normalizedTab}`;
+  if (normalizedPage === ADMIN_PAGE_SLUGS.settings) return settingsRoutes[normalizedTab as (typeof SETTINGS_TABS)[number]] || settingsRoutes.identity;
   if (normalizedPage === ADMIN_PAGE_SLUGS.planning) return normalizedTab === "today" ? "/home" : `/planning/${normalizedTab}`;
   if (normalizedPage === ADMIN_PAGE_SLUGS.newsletters) return `/newsletters/${normalizedTab}`;
   if (normalizedPage === ADMIN_PAGE_SLUGS.polls) return "/content/polls";
@@ -78,15 +111,17 @@ const legacyDestinations: Record<string, LegacyAdminDestination> = {
   "/planning/content-health": { page: ADMIN_PAGE_SLUGS.planning, tab: "content-health" },
   "/planning/feedback": { page: ADMIN_PAGE_SLUGS.planning, tab: "feedback" },
   "/newsletters/issues": { page: ADMIN_PAGE_SLUGS.newsletters, tab: "issues" },
-  "/newsletters/settings": { page: ADMIN_PAGE_SLUGS.newsletters, tab: "settings" },
-  "/publication/identity": { page: ADMIN_PAGE_SLUGS.publication, tab: "identity" },
-  "/publication/branding": { page: ADMIN_PAGE_SLUGS.publication, tab: "branding" },
-  "/publication/navigation": { page: ADMIN_PAGE_SLUGS.publication, tab: "navigation" },
-  "/publication/features": { page: ADMIN_PAGE_SLUGS.publication, tab: "features" },
-  "/publication/social": { page: ADMIN_PAGE_SLUGS.publication, tab: "social" },
+  "/newsletters/settings": { page: ADMIN_PAGE_SLUGS.settings, tab: "newsletter" },
+  "/publication/identity": { page: ADMIN_PAGE_SLUGS.settings, tab: "identity" },
+  "/publication/branding": { page: ADMIN_PAGE_SLUGS.settings, tab: "branding" },
+  "/publication/navigation": { page: ADMIN_PAGE_SLUGS.settings, tab: "navigation" },
+  "/publication/features": { page: ADMIN_PAGE_SLUGS.settings, tab: "features" },
+  "/publication/social": { page: ADMIN_PAGE_SLUGS.settings, tab: "social" },
   "/content/polls": { page: ADMIN_PAGE_SLUGS.polls },
-  "/integrations/discord": { page: ADMIN_PAGE_SLUGS.integrations, tab: "discord" },
-  "/integrations/deployment": { page: ADMIN_PAGE_SLUGS.integrations, tab: "deployment" },
+  "/integrations/newsletter": { page: ADMIN_PAGE_SLUGS.settings, tab: "newsletter" },
+  "/integrations/analytics": { page: ADMIN_PAGE_SLUGS.settings, tab: "analytics" },
+  "/integrations/discord": { page: ADMIN_PAGE_SLUGS.settings, tab: "discord" },
+  "/integrations/deployment": { page: ADMIN_PAGE_SLUGS.settings, tab: "deployment" },
   "/advanced/access": { page: ADMIN_PAGE_SLUGS.settings, tab: "access" },
   "/advanced/api": { page: ADMIN_PAGE_SLUGS.settings, tab: "api" },
   "/advanced/compatibility": { page: ADMIN_PAGE_SLUGS.settings, tab: "compatibility" },
