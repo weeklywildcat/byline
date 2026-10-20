@@ -99,7 +99,7 @@ function CheckRow({ check, onAction, busyAction }: { check: DoctorCheck; onActio
 }
 
 function ActionFailure({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return <Notice status="error" isDismissible={false}>{message}{" "}<Button variant="link" onClick={onRetry}>{__("Try again", "weekly-wildcat-headless")}</Button></Notice>;
+  return <Alert variant="destructive"><AlertTitle>{__("Check failed", "weekly-wildcat-headless")}</AlertTitle><AlertDescription>{message}</AlertDescription><AlertAction><Button variant="secondary" onClick={onRetry}>{__("Try again", "weekly-wildcat-headless")}</Button></AlertAction></Alert>;
 }
 
 export function DoctorApp({ fetchers, urls, canManageIntegrations = false }: DoctorAppProps) {
