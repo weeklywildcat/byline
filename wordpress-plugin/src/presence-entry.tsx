@@ -35,7 +35,13 @@ function isPresencePayload(value: unknown): value is PresencePayload {
 
 function tabSessionId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  return `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const randomPart = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    return `tab-${Date.now().toString(36)}-${randomPart}`;
+  }
+  return `tab-${Date.now().toString(36)}`;
 }
 
 function PresenceRuntime({ mount, config }: { mount: HTMLElement; config: PresenceConfig }) {
