@@ -155,7 +155,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
     </header>
     {!fetchers.getHome ? <InlineAlert>Story work is not available for this role.</InlineAlert> : home.isError ? <InlineAlert onAction={() => void home.refetch()}>{describeEditorialError(home.error, "Home couldn't be loaded. Try again.")}</InlineAlert> : null}
     <div className="grid grid-cols-1 gap-5 @3xl/home:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] @3xl/home:items-start">
-      <div className="flex min-w-0 flex-col gap-5">
+      <div className="flex min-w-0 flex-col gap-5" data-home-column="primary">
         <Surface title="Up Next" subtitle="Your assigned work, in order of urgency" action={fetchers.editorial ? <Button variant="ghost" size="sm" onClick={() => newTask()}><Plus data-icon="inline-start" aria-hidden="true" />Task</Button> : undefined}>
           <section ref={workRef} tabIndex={-1} aria-label="Assigned tasks" className="outline-none">
             {section("tasks", tasks.length ? <ItemGroup role="group" className="gap-0">{tasks.slice(0, HOME_TASK_PREVIEW_LIMIT).map(renderTask)}</ItemGroup> : null, "No open assignments.")}
@@ -173,7 +173,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
         </Surface> : null}
       </div>
 
-      <div className="flex min-w-0 flex-col gap-5">
+      <div className="flex min-w-0 flex-col gap-5" data-home-column="secondary">
         <Surface title="Coming Up" action={actionUrls?.calendar ? surfaceLink(actionUrls.calendar, "Calendar") : undefined}>
           {section("stories", agenda.length ? <div className="flex flex-col gap-2">{Array.from(new Set(agenda.map((e) => e.day))).map((day) => <div key={day}><h3 className="px-3 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">{dateLabel(day, timezone, now)}</h3><ItemGroup role="group" className="gap-0">{agenda.filter((e) => e.day === day).map((event) => <AgendaItem key={event.id} event={event} timezone={timezone} onOpen={event.storyId ? () => openStory(event.storyId!) : undefined} />)}</ItemGroup></div>)}</div> : null, "Nothing scheduled in the next two weeks.")}
           {partial ? <p className="px-3 pt-2 text-xs text-muted-foreground">Some assignments could not be checked.</p> : null}
