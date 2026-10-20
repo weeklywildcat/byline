@@ -237,14 +237,7 @@
   display: block;
   height: auto;
 }
-:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) figcaption {
-  color: var(--muted, #5f6872);
-  font-family: var(--font-serif, Georgia, serif);
-  font-size: .9rem;
-  line-height: 1.4;
-  text-align: left;
-  overflow-wrap: anywhere;
-}
+/* Captions and credits: see figure.css. */
 
 /* Core Media & Text: respect its inline column proportions and right-media
  * switch. Core owns image-fill background positioning/focal-point editing. */
@@ -553,9 +546,6 @@
   margin-inline: calc((100% - min(var(--article-full-width), 100cqw)) / 2);
 }
 :is(.byline-article-view .article-body, .editor-styles-wrapper) :is(.alignfull, .alignwide) { min-width: 0; }
-:is(.byline-article-view .article-body, .editor-styles-wrapper) :is(.alignfull, .alignwide) > figcaption {
-  max-width: var(--article-width); margin-inline: auto;
-}
 :is(.byline-article-view .article-body, .editor-styles-wrapper) .wp-block-image:is(.alignfull, .alignwide):not(.is-style-rounded) img:not([style*="object-fit:cover"]):not([style*="object-fit: cover"]) {
   width: auto; height: auto; max-width: 100%; max-height: 85svh; margin-inline: auto;
 }

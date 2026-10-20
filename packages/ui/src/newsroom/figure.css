@@ -1,0 +1,79 @@
+/*
+ * The editorial figure language. Every Byline story block that shows a
+ * photograph, graphic or embed (Core Image, Gallery, Annotated Image, Before /
+ * After, Scrollytelling, Chart / Map) draws its caption, credit and label from
+ * here, so a dramatic photograph and a quiet note differ in weight, never in
+ * dialect. docs/editorial-design-system.md explains the rules.
+ *
+ * Scoping: `:where()` keeps specificity at zero, so block CSS can refine these
+ * without piles of overrides. The same scope covers the public article, the
+ * Gutenberg canvas and Preview as Byline.
+ */
+:where(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) {
+  /* Type */
+  --story-sans: var(--font-ui, system-ui, sans-serif);
+  --story-serif: var(--font-serif, Georgia, serif);
+  --story-headline: var(--font-headline, Georgia, serif);
+  /* Rules and colour: ink and hairlines; the accent marks one thing at a time. */
+  --story-rule: 1px solid var(--rule, #e2e2e2);
+  --story-rule-strong: 2px solid var(--ink, #121212);
+  --story-muted: var(--muted, #545454);
+  --story-soft: var(--soft-muted, #737373);
+  --story-accent: var(--accent, #73192a);
+  /* Space: inline material sits in the prose rhythm, visual moments get air. */
+  --story-space: 1.6em;
+  --story-moment-space: clamp(2.25rem, 5vw, 3.5rem);
+  --story-media-gap: 10px;
+  /* Motion: short, never decorative; zeroed below. */
+  --story-motion: 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) { --story-motion: 0s; }
+}
+
+/* Caption: what is shown. Credit: who made it. Never merged into one line. */
+:where(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) figcaption,
+.byline-story-caption {
+  color: var(--story-muted);
+  font-family: var(--story-serif);
+  font-size: .9rem;
+  line-height: 1.4;
+  margin-top: var(--story-media-gap);
+  overflow-wrap: anywhere;
+  text-align: left;
+  text-wrap: pretty;
+}
+:where(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) figcaption > p { margin: 0; }
+:where(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) figcaption .photo-credit,
+.byline-story-image-credit {
+  color: var(--story-soft);
+  display: block;
+  font-family: var(--story-sans);
+  font-size: .78rem;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.4;
+  margin: 3px 0 0;
+}
+/* A caption sits under the edge of what it describes; under a full-bleed
+   figure it joins the reading column instead of hugging the window. */
+:where(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) :is(.alignfull) > figcaption {
+  box-sizing: border-box;
+  margin-inline: auto;
+  max-width: var(--article-width, 760px);
+}
+
+/* Label (kicker): the small capitals that name a thing: a date, a number, "Context". */
+.byline-kicker {
+  color: var(--story-muted);
+  font-family: var(--story-sans);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+/* The caption field in the editor is a figcaption that can be typed into. */
+.byline-story-caption { background: transparent; border: 0; display: block; padding: 0; resize: none; width: 100%; }
+.byline-story-caption:focus { box-shadow: none; outline: 1px dashed var(--story-soft); outline-offset: 3px; }

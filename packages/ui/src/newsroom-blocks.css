@@ -4,6 +4,7 @@
  * file in ./newsroom owns one feature, in cascade order.
  */
 @import "./newsroom/page-blocks.css";
+@import "./newsroom/figure.css";
 @import "./newsroom/story-base.css";
 @import "./newsroom/timeline.css";
 @import "./newsroom/annotated-image.css";
