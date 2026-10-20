@@ -1,4 +1,4 @@
-import { useInstanceId } from '@wordpress/compose';
+import { useId } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
 const TEXT = 'weekly-wildcat-headless';
@@ -27,7 +27,7 @@ function FitDiagram({ fit }: { fit: string }) {
  * keys and screen readers work as for any radio group.
  */
 export function FitChoice({ value, onChange }: { value: string; onChange: (fit: string) => void }) {
-  const name = `byline-scrolly-fit-${useInstanceId(FitChoice)}`;
+  const name = `byline-scrolly-fit-${useId()}`;
   return <fieldset className="byline-fit-choice">
     <legend>{__('Photograph fit', TEXT)}</legend>
     {FIT_OPTIONS.map((option) => <label key={option.value} className="byline-fit-option">

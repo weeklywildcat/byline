@@ -203,9 +203,9 @@ function byline_story_responsive_images(string $html, string $sizes): string
 
 /** Rendered widths per block, matching packages/ui/src/newsroom/*.css. */
 const BYLINE_STORY_IMAGE_SIZES = [
-    'annotated-image' => '(max-width: 700px) calc(100vw - 32px), (max-width: 1072px) calc((100vw - 32px) * 0.64), 660px',
+    'annotated-image' => '(max-width: 911px) calc(100vw - 32px), (max-width: 1072px) calc((100vw - 32px) * 0.62), 655px',
     'before-after' => '(max-width: 1072px) calc(100vw - 32px), 1040px',
-    'scrolly-step' => '(max-width: 899px) calc(100vw - 32px), 560px',
+    'scrolly-step' => '(max-width: 899px) calc(100vw - 32px), (max-width: 1072px) calc((100vw - 32px) * 0.6), 624px',
     'visualization' => '(max-width: 1072px) calc(100vw - 32px), 1040px',
 ];
 
@@ -215,9 +215,20 @@ function byline_story_render_annotated_image(string $content, array $block = [])
         return '';
     }
     $ids = byline_story_image_ids($content);
+    // The notes are numbered by CSS, which Safari reads as "not a list" unless the role is explicit (0.3.24 markup had none).
+    $content = str_replace('<ol class="byline-annotations">', '<ol class="byline-annotations" role="list">', $content);
     $content = byline_story_responsive_images(byline_story_drop_empty_caption(byline_story_strip_legacy_credit_lines($content)), BYLINE_STORY_IMAGE_SIZES['annotated-image']);
     $credit = $ids ? byline_story_credit($ids[0]) : '';
     return byline_story_add_credit_lines($content, [$credit !== '' ? 'Photo: ' . $credit : '']);
+}
+
+/** Width over height of an attachment, or 0 when WordPress has no dimensions for it. */
+function byline_story_attachment_shape(int $attachment_id): float
+{
+    $meta = function_exists('wp_get_attachment_metadata') ? wp_get_attachment_metadata($attachment_id) : false;
+    $width = is_array($meta) ? (int) ($meta['width'] ?? 0) : 0;
+    $height = is_array($meta) ? (int) ($meta['height'] ?? 0) : 0;
+    return $width > 0 && $height > 0 ? $width / $height : 0.0;
 }
 
 function byline_story_render_before_after(string $content, array $block = []): string
@@ -226,6 +237,14 @@ function byline_story_render_before_after(string $content, array $block = []): s
         return '';
     }
     $ids = byline_story_image_ids($content);
+    // Comparisons saved before the fit choice existed always showed both photographs complete.
+    // Keep doing that when their shapes differ, instead of cropping what was published whole.
+    if (strpos($content, 'data-fit=') === false && count($ids) >= 2) {
+        [$before_shape, $after_shape] = [byline_story_attachment_shape($ids[0]), byline_story_attachment_shape($ids[1])];
+        if ($before_shape > 0 && $after_shape > 0 && abs($before_shape / $after_shape - 1) > 0.12) {
+            $content = (string) preg_replace('/<figure\b/i', '<figure data-fit="contain"', $content, 1);
+        }
+    }
     preg_match_all('#<strong\b[^>]*data-(?:before|after)[^>]*>(.*?)</strong>#is', $content, $labels);
     $credits = [];
     foreach ($ids as $index => $id) {
@@ -258,11 +277,41 @@ function byline_story_render_scrolly_step(string $content, array $block = []): s
 
 function byline_story_render_timeline(string $content, array $block = []): string
 {
-    // An event needs a title or reporting; a date label alone is a stub.
-    $content = (string) preg_replace_callback('#<li\b[^>]*\bbyline-timeline-item\b[^>]*>(.*?)</li>#is', static function (array $match): string {
-        return preg_match('#byline-timeline-(?:title|body)#', $match[1]) && trim(wp_strip_all_tags((string) preg_replace('#<p class="byline-timeline-label">.*?</p>#is', '', $match[1]))) !== '' ? $match[0] : '';
+    $previous_year = null;
+    $content = (string) preg_replace_callback('#<li\b([^>]*\bbyline-timeline-item\b[^>]*)>(.*?)</li>#is', static function (array $match) use (&$previous_year): string {
+        $inner = $match[2];
+        // An event needs a title or reporting; a date label alone is a stub.
+        if (!preg_match('#byline-timeline-(?:title|body)#', $inner) || trim(wp_strip_all_tags((string) preg_replace('#<p class="byline-timeline-label">.*?</p>#is', '', $inner))) === '') {
+            return '';
+        }
+        // The first event naming a new year starts a new period; the page draws a hairline above it.
+        $label = preg_match('#<p class="byline-timeline-label">(.*?)</p>#is', $inner, $label_match) ? html_entity_decode(wp_strip_all_tags($label_match[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8') : '';
+        $year = preg_match('/\b(1[5-9]\d{2}|20\d{2})\b/', $label, $year_match) ? $year_match[1] : null;
+        $starts = $previous_year !== null && $year !== null && $year !== $previous_year && strpos($match[1], 'is-new-period') === false;
+        $previous_year = $year ?? $previous_year;
+        return $starts ? '<li' . (string) preg_replace('#class="([^"]*)"#', 'class="$1 is-new-period"', $match[1], 1) . '>' . $inner . '</li>' : $match[0];
     }, $content);
     return strpos($content, 'byline-timeline-item') === false ? '' : $content;
+}
+
+/**
+ * A static graphic fills the story column up to its own width and keeps its
+ * proportions: the width and height attributes carry the ratio, and the width
+ * caps how far a small export is stretched.
+ */
+function byline_story_cap_static_graphic(string $html): string
+{
+    if (!class_exists('WP_HTML_Tag_Processor') || strpos($html, 'data-mode="static"') === false) {
+        return $html;
+    }
+    $tags = new WP_HTML_Tag_Processor($html);
+    while ($tags->next_tag('IMG')) {
+        $width = (int) $tags->get_attribute('width');
+        if ($width > 0) {
+            $tags->set_attribute('style', 'max-width:' . $width . 'px');
+        }
+    }
+    return $tags->get_updated_html();
 }
 
 function byline_story_render_visualization(string $content, array $block = []): string
@@ -276,7 +325,11 @@ function byline_story_render_visualization(string $content, array $block = []): 
         // An unsupported or missing embed address publishes as its static graphic.
         $content = str_replace('data-mode="embed"', 'data-mode="static"', $content);
     }
-    return byline_story_responsive_images($content, BYLINE_STORY_IMAGE_SIZES['visualization']);
+    $ids = byline_story_image_ids($content);
+    $content = byline_story_cap_static_graphic(byline_story_responsive_images($content, BYLINE_STORY_IMAGE_SIZES['visualization']));
+    // A credit typed in the block wins; otherwise the attachment's own credit is printed.
+    $credit = $ids ? byline_story_credit($ids[0]) : '';
+    return $credit !== '' && stripos($content, 'Credit:') === false ? byline_story_add_credit_lines($content, ['Credit: ' . $credit]) : $content;
 }
 
 foreach ([

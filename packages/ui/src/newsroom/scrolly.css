@@ -1,13 +1,79 @@
-/* Scrollytelling: moved unchanged from newsroom-blocks.css. */
-.byline-scrolly { display: flow-root; }
-.byline-scrolly-step { margin-block: 2em; }
-.byline-scrolly-media img { display: block; max-height: 75svh; height: auto; width: auto; max-width: 100%; margin-inline: auto; }
-.byline-scrolly.is-enhanced { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 0 4%; position: relative; }
-.byline-scrolly-stage { grid-column: 1; grid-row: 1 / span 1000; position: sticky; top: 100px; height: 72svh; align-self: start; display: grid; align-items: center; }
-.byline-scrolly-stage img { max-width: 100%; width: 100%; height: 100%; max-height: 72svh; object-fit: contain; }
-.byline-scrolly[data-fit="cover"] .byline-scrolly-stage img { object-fit: cover; }
-.byline-scrolly.is-enhanced > .byline-scrolly-step { grid-column: 2; min-width: 0; min-height: 65svh; padding-block: 12svh; margin: 0; }
-/* Visually hide duplicated originals only. They remain in accessible DOM order. */
-.byline-scrolly.is-enhanced .byline-scrolly-media { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.byline-scrolly-stage { grid-template-rows: minmax(0,1fr) auto; }
-.byline-scrolly-stage-caption { font-size: .9rem; line-height: 1.4; margin: 8px 0; }
+/*
+ * Scrollytelling: a linear story, each step a photograph above its reporting.
+ * On a wide screen with motion allowed, article-enhancements/scrolly.ts adds a
+ * sticky stage that shows the photograph for the step being read; everything
+ * else here is the same story laid out beside it. Phones, reduced motion and
+ * readers without JavaScript keep the linear layout.
+ *
+ * The stage is drawn from the figure language (caption, credit, label) and the
+ * only thing that moves is its crossfade between photographs.
+ */
+.byline-scrolly {
+  /* Where the stage sticks (clears the site header), and the tallest photograph it can hold. */
+  --scrolly-top: 76px;
+  --scrolly-stage-max: calc(100svh - var(--scrolly-top) - 8rem);
+  display: flow-root;
+}
+
+/* Linear story */
+.byline-scrolly-step { margin-block: var(--story-moment-space); }
+.byline-scrolly-step .byline-scrolly-media { margin: 0 0 1.25em; }
+/* The photograph spans the column and is never cropped; a tall one stops at the height cap and sits at the left, under its caption. */
+.byline-scrolly-step .byline-scrolly-media img {
+  display: block;
+  height: auto;
+  margin: 0;
+  max-height: min(75svh, 42rem);
+  object-fit: contain;
+  object-position: left top;
+  width: 100%;
+}
+.byline-scrolly-text > :first-child { margin-top: 0; }
+.byline-scrolly-text > :last-child { margin-bottom: 0; }
+
+/* Stage: progress cue, then the active photograph with its caption and credit. */
+.byline-scrolly-stage { display: flex; flex-direction: column; min-width: 0; }
+.byline-scrolly-stage .byline-scrolly-progress { align-items: center; display: flex; gap: .9rem; margin: 0 0 1rem; }
+.byline-scrolly-ticks { display: flex; gap: 3px; max-width: 14rem; flex: 1; }
+.byline-scrolly-ticks i { background: var(--rule, #e2e2e2); flex: 1 1 0; height: 2px; max-width: 1.5rem; min-width: 4px; }
+.byline-scrolly-ticks i.is-past { background: var(--story-soft); }
+.byline-scrolly-ticks i.is-active { background: var(--story-accent); }
+.byline-scrolly-frames { display: grid; }
+.byline-scrolly-stage .byline-scrolly-frame { grid-area: 1 / 1; margin: 0; min-width: 0; transition: opacity var(--story-motion); }
+.byline-scrolly-stage .byline-scrolly-frame:is(.is-entering, .is-leaving) { opacity: 0; }
+.byline-scrolly-stage .byline-scrolly-frame img {
+  display: block;
+  height: auto;
+  max-height: var(--scrolly-stage-max);
+  object-fit: contain;
+  object-position: left top;
+  width: 100%;
+}
+/* The author chose to fill the stage: the one case where a photograph is cropped. */
+.byline-scrolly-stage[data-fit="cover"] .byline-scrolly-frame img { height: var(--scrolly-stage-max); object-fit: cover; object-position: center; }
+
+/* Enhanced layout: stage left, steps right. A portrait story gives the stage half the width. */
+.byline-scrolly.is-enhanced {
+  column-gap: clamp(2rem, 5%, 4rem);
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  position: relative;
+}
+.byline-scrolly.is-enhanced.is-portrait { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.byline-scrolly.is-enhanced > .byline-scrolly-stage { align-self: start; grid-column: 1; position: sticky; top: var(--scrolly-top); }
+.byline-scrolly.is-enhanced > .byline-scrolly-step {
+  box-sizing: border-box;
+  grid-column: 2;
+  margin: 0;
+  max-width: 34rem;
+  min-height: 52svh;
+  min-width: 0;
+  padding-block: 10svh 6svh;
+}
+/* The originals stay in the accessibility tree and the reading order; only their picture is hidden. */
+.byline-scrolly.is-enhanced .byline-scrolly-step .byline-scrolly-media { clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; width: 1px; }
+
+@media (forced-colors: active) {
+  .byline-scrolly-ticks i { background: GrayText; }
+  .byline-scrolly-ticks i.is-active { background: Highlight; }
+}

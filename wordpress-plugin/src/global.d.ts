@@ -5,6 +5,7 @@ declare module "@wordpress/blocks" {
   export function __unstableGetInnerBlocksProps(...args: any[]): any;
   export function __unstableGetBlockProps(...args: any[]): any;
   export function createBlock(...args: any[]): any;
+  export function cloneBlock(...args: any[]): any;
   export function getBlockType(...args: any[]): any;
   export function parse(...args: any[]): any;
   export function registerBlockType(metadata: unknown, settings: unknown): unknown;

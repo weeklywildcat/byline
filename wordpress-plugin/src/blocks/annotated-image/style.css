@@ -1,2 +1,34 @@
 /* Editor-only chrome for this block. Its public presentation lives in
-   packages/ui/src/newsroom/annotated-image.css and loads once through the shared newsroom stylesheet. */
+   packages/ui/src/newsroom/annotated-image.css and loads once through the shared newsroom stylesheet;
+   the canvas uses those same rules, so what is typed here is set exactly as readers will see it. */
+.byline-annotated-image .byline-annotation-canvas > img { cursor: crosshair; }
+.byline-annotated-image .byline-annotation-marker { cursor: grab; }
+.byline-annotated-image .byline-annotation-marker:active { cursor: grabbing; }
+/* A marker with no text is not published; it reads as unfinished. */
+.byline-annotated-image .byline-annotation-marker.is-unfinished:not(.is-active) { background: rgb(18 18 18 / .55); }
+.byline-annotation-hint {
+  background: rgb(18 18 18 / .78); bottom: 12px; color: #fff; font: 600 .78rem/1.2 var(--story-sans, system-ui);
+  left: 12px; margin: 0; padding: 6px 10px; pointer-events: none; position: absolute;
+}
+.byline-annotation-missing { align-items: center; aspect-ratio: 3 / 2; border: 1px dashed var(--story-soft, #737373); color: var(--story-muted, #545454); display: flex; font: 500 .9rem/1.4 var(--story-sans, system-ui); justify-content: center; margin: 0; padding: 1rem; text-align: center; }
+
+.byline-annotation-notes { min-width: 0; }
+.byline-annotation-notes .byline-annotations > li:not(.is-editing) { cursor: pointer; }
+.byline-annotation-notes .byline-annotations > li:not(.is-editing):hover::before { background: var(--story-accent, #73192a); }
+/* The selected note is typed in place: the fields wear the note's own type. */
+.byline-annotation-title-field, .byline-annotation-body-field {
+  background: transparent; border: 0; border-radius: 0; box-shadow: none; box-sizing: border-box; color: var(--ink, #121212);
+  display: block; margin: 0; overflow-wrap: anywhere; padding: 0; resize: none; width: 100%;
+}
+.byline-annotation-title-field { font: 700 1rem/1.3 var(--story-sans, system-ui); margin-top: .25rem; }
+.byline-annotation-body-field { font: inherit; line-height: 1.5; margin-top: .3rem; }
+.byline-annotation-title-field::placeholder, .byline-annotation-body-field::placeholder { color: var(--story-soft, #737373); }
+.byline-annotation-title-field:focus, .byline-annotation-body-field:focus { box-shadow: none; outline: 1px dashed var(--story-soft, #737373); outline-offset: 3px; }
+.byline-annotation-actions { display: flex; gap: 2px; margin: .6rem 0 0 -8px; }
+.byline-annotation-unfinished, .byline-annotation-empty { color: var(--story-muted, #545454); font-size: .9rem; line-height: 1.45; margin: 0; }
+.byline-annotation-empty { margin-top: 1rem; }
+.byline-annotation-add { align-items: center; border-block-start: 1px solid var(--rule, #e2e2e2); display: flex; gap: .75rem; padding-top: .5rem; }
+.byline-annotation-add:first-child { border-block-start: 0; padding-top: 0; }
+.byline-annotation-add span { color: var(--story-soft, #737373); font: 500 .78rem/1 var(--story-sans, system-ui); }
+.byline-story-editor-note { color: var(--story-muted, #545454); font: 500 .8rem/1.4 var(--story-sans, system-ui); margin: .5rem 0 0; }
+.byline-annotation-add .components-button { font-family: var(--story-sans, system-ui); font-weight: 600; }

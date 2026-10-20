@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SCROLLY_ACTIVATION_LINE, enhanceArticleStory } from '../../packages/ui/src/article-enhancements';
 beforeEach(() => {
   document.body.innerHTML = '';
@@ -22,7 +22,7 @@ describe('shared article enhancement lifecycle', () => {
     expect(root.querySelector('.byline-comparison-control')).toBeNull();
     expect([range.min, range.max, range.value]).toEqual(['0', '100', '50']);
     expect(range.getAttribute('aria-label')).toBe('Compare Before and After');
-    expect(range.getAttribute('aria-valuetext')).toBe('50% after image revealed');
+    expect(range.getAttribute('aria-valuetext')).toBe('50% Before, 50% After');
     expect(root.querySelector('.byline-comparison-divider')!.getAttribute('aria-hidden')).toBe('true');
     expect(root.querySelector('.byline-comparison-labels')!.textContent).toBe('BeforeAfter');
     const figure = root.querySelector<HTMLElement>('figure')!;
@@ -30,7 +30,7 @@ describe('shared article enhancement lifecycle', () => {
     range.value = '72'; range.dispatchEvent(new Event('input'));
     expect(figure.style.getPropertyValue('--comparison-position')).toBe('72%');
     expect(figure.style.getPropertyValue('--comparison-ratio')).toBe('0.72');
-    expect(range.getAttribute('aria-valuetext')).toBe('72% after image revealed');
+    expect(range.getAttribute('aria-valuetext')).toBe('72% Before, 28% After');
     cleanup();
     expect(root.querySelector('input')).toBeNull();
     expect(figure.getAttribute('style')).toBeNull();
@@ -55,6 +55,31 @@ describe('shared article enhancement lifecycle', () => {
     enhanceArticleStory(root, { preview: true })(); expect(root.querySelector('iframe')).toBeNull();
     const cleanup = enhanceArticleStory(root); const frame = root.querySelector('iframe')!;
     expect(frame.title).toBe('District budget'); expect(frame.loading).toBe('lazy'); expect(frame.getAttribute('sandbox')).toContain('allow-scripts'); cleanup();
+  });
+  it('labels the fallback as a preview, never loads a provider, and removes its labels on cleanup', () => {
+    const root = document.createElement('div'); document.body.append(root);
+    const figure = (image: string) => `<figure class="byline-visualization" data-mode="embed" data-provider="openstreetmap" data-src="https://www.openstreetmap.org/export/embed.html?bbox=1,2,3,4"><h3 class="byline-visualization-title">Map</h3><div class="byline-visualization-media"><div class="byline-visualization-fallback-image">${image}</div></div></figure>`;
+    root.innerHTML = figure('<img src="/fallback.png" alt="">');
+    const cleanup = enhanceArticleStory(root, { preview: true });
+    expect(root.querySelector('iframe')).toBeNull();
+    expect(root.querySelector('.byline-visualization-badge')!.textContent).toBe('Preview: interactive OpenStreetMap map loads here on the published story');
+    expect(root.querySelector('.byline-visualization-placeholder')).toBeNull();
+    cleanup();
+    expect(root.querySelector('.byline-visualization-badge')).toBeNull();
+    root.innerHTML = figure('');
+    enhanceArticleStory(root, { preview: true });
+    expect(root.querySelector('.byline-visualization-placeholder')!.textContent).toBe('OpenStreetMap map');
+  });
+  it('keeps the fallback until the frame loads, then reserves nothing more', () => {
+    const root = document.createElement('div'); document.body.append(root);
+    root.innerHTML = '<figure class="byline-visualization" data-mode="embed" data-provider="datawrapper" data-src="https://datawrapper.dwcdn.net/AbCdE/1/"><div class="byline-visualization-media"><div class="byline-visualization-fallback-image"><img src="/f.png" alt=""></div></div></figure>';
+    enhanceArticleStory(root);
+    const fallback = root.querySelector<HTMLElement>('.byline-visualization-fallback-image')!;
+    const media = root.querySelector<HTMLElement>('.byline-visualization-media')!;
+    expect(fallback.hidden).toBe(false);
+    root.querySelector('iframe')!.dispatchEvent(new Event('load'));
+    expect(fallback.hidden).toBe(true);
+    expect(media.classList.contains('is-loaded')).toBe(true);
   });
   it('uses the preview iframe realm and keeps incomplete comparisons linear', () => {
     const frame = document.createElement('iframe'); document.body.append(frame);
@@ -89,6 +114,7 @@ describe('scrollytelling activation', () => {
   const observers: { callback: Callback; options: IntersectionObserverInit; observed: Element[]; disconnected: boolean }[] = [];
   beforeEach(() => {
     observers.length = 0;
+    vi.useFakeTimers();
     Object.defineProperty(window, 'matchMedia', { configurable: true, value: vi.fn(() => ({ matches: true, addEventListener: vi.fn() })) });
     Object.defineProperty(window, 'IntersectionObserver', { configurable: true, value: class {
       record: (typeof observers)[number];
@@ -97,7 +123,11 @@ describe('scrollytelling activation', () => {
       disconnect() { this.record.disconnected = true; }
     } });
   });
-  const story = '<section class="byline-scrolly">' + [1, 2, 3].map((i) => `<section class="byline-scrolly-step"><figure class="byline-scrolly-media"><img src="/step-${i}.jpg" alt=""><figcaption>Scene ${i}<p>Photo: Staff</p></figcaption></figure><div class="byline-scrolly-text"><h2>Step ${i}</h2></div></section>`).join('') + '</section>';
+  afterEach(() => vi.useRealTimers());
+  const step = (i: number, photo = true, size = '') => `<section class="byline-scrolly-step">${photo ? `<figure class="byline-scrolly-media"><img src="/step-${i}.jpg" alt=""${size}><figcaption>Scene ${i}<p class="photo-credit">Photo: Staff</p></figcaption></figure>` : ''}<div class="byline-scrolly-text"><h2>Step ${i}</h2></div></section>`;
+  const story = '<section class="byline-scrolly" data-fit="contain">' + [1, 2, 3].map((i) => step(i)).join('') + '</section>';
+  /** The photograph the stage shows now: the newest frame (an outgoing one may still be fading). */
+  const shown = (root: Element) => root.querySelector<HTMLElement>('.byline-scrolly-frame:last-child')!;
 
   it('observes a thin band at the reading line and follows the step covering it', () => {
     const root = document.createElement('div'); document.body.append(root); root.innerHTML = story;
@@ -105,7 +135,11 @@ describe('scrollytelling activation', () => {
     const stage = root.querySelector<HTMLElement>('.byline-scrolly-stage')!;
     expect(stage.dataset.step).toBe('0');
     expect(stage.getAttribute('aria-hidden')).toBe('true');
-    expect(stage.querySelector('p')!.textContent).toBe('Scene 1 Photo: Staff');
+    expect(stage.dataset.fit).toBe('contain');
+    expect(stage.querySelector('.byline-scrolly-progress')!.textContent).toBe('Step 1 of 3');
+    // Caption and credit stay on separate lines, as in the figure language.
+    expect(shown(stage).querySelector('figcaption')!.firstChild!.textContent).toBe('Scene 1');
+    expect(shown(stage).querySelector('figcaption .photo-credit')!.textContent).toBe('Photo: Staff');
     const [observer] = observers;
     expect(observer.observed).toHaveLength(3);
     // A fixed band 40% down the viewport, 1% tall, measured against this document.
@@ -114,7 +148,9 @@ describe('scrollytelling activation', () => {
     const steps = Array.from(root.querySelectorAll('.byline-scrolly-step'));
     // Entering the band selects the step whatever its visible area; leaving it changes nothing.
     observer.callback([{ target: steps[1], isIntersecting: true, intersectionRatio: 0.01 }]);
-    expect([stage.dataset.step, stage.querySelector('img')!.getAttribute('src')]).toEqual(['1', '/step-2.jpg']);
+    expect([stage.dataset.step, shown(stage).querySelector('img')!.getAttribute('src')]).toEqual(['1', '/step-2.jpg']);
+    expect(stage.querySelector('.byline-scrolly-progress')!.textContent).toBe('Step 2 of 3');
+    expect(Array.from(stage.querySelectorAll('.byline-scrolly-ticks i')).map((tick) => tick.className)).toEqual(['is-past', 'is-active', '']);
     observer.callback([{ target: steps[1], isIntersecting: false }]);
     expect(stage.dataset.step).toBe('1');
     // A long jump may report several entering steps; the furthest wins, and upward travel reverses.
@@ -129,14 +165,66 @@ describe('scrollytelling activation', () => {
     expect(root.querySelector('.byline-scrolly-stage')).toBeNull();
     expect(root.querySelector('.byline-scrolly')!.classList.contains('is-enhanced')).toBe(false);
   });
-  it('stays linear when the media query does not match or a step has no image', () => {
+
+  it('crossfades: the outgoing photograph leaves while the new one arrives, then only the new one remains', () => {
+    const root = document.createElement('div'); document.body.append(root); root.innerHTML = story;
+    enhanceArticleStory(root);
+    const stage = root.querySelector<HTMLElement>('.byline-scrolly-stage')!;
+    // The first photograph is simply there.
+    expect(stage.querySelectorAll('.byline-scrolly-frame')).toHaveLength(1);
+    expect(stage.querySelector('.byline-scrolly-frame')!.classList.contains('is-entering')).toBe(false);
+    observers[0].callback([{ target: root.querySelectorAll('.byline-scrolly-step')[1], isIntersecting: true }]);
+    const frames = stage.querySelectorAll('.byline-scrolly-frame');
+    expect(Array.from(frames, (frame) => frame.className)).toEqual(['byline-scrolly-frame is-leaving', 'byline-scrolly-frame is-entering']);
+    vi.advanceTimersByTime(30);
+    expect(frames[1].classList.contains('is-entering')).toBe(false);
+    vi.advanceTimersByTime(500);
+    expect(stage.querySelectorAll('.byline-scrolly-frame')).toHaveLength(1);
+    expect(shown(stage).querySelector('img')!.getAttribute('src')).toBe('/step-2.jpg');
+  });
+
+  it('holds the previous photograph through a text-only step and starts on the first photograph', () => {
+    const root = document.createElement('div'); document.body.append(root);
+    root.innerHTML = '<section class="byline-scrolly">' + [step(1), step(2, false), step(3)].join('') + '</section>';
+    enhanceArticleStory(root);
+    const stage = root.querySelector<HTMLElement>('.byline-scrolly-stage')!;
+    const steps = Array.from(root.querySelectorAll('.byline-scrolly-step'));
+    observers[0].callback([{ target: steps[1], isIntersecting: true }]);
+    expect(stage.dataset.step).toBe('1');
+    expect(stage.querySelectorAll('.byline-scrolly-frame')).toHaveLength(1);
+    expect(shown(stage).querySelector('img')!.getAttribute('src')).toBe('/step-1.jpg');
+    expect(stage.querySelector('.byline-scrolly-progress')!.textContent).toBe('Step 2 of 3');
+    observers[0].callback([{ target: steps[2], isIntersecting: true }]);
+    expect(shown(stage).querySelector('img')!.getAttribute('src')).toBe('/step-3.jpg');
+    // A story that opens with a text-only step starts on the first photograph.
+    const opening = document.createElement('div'); document.body.append(opening);
+    opening.innerHTML = '<section class="byline-scrolly">' + [step(1, false), step(2)].join('') + '</section>';
+    enhanceArticleStory(opening);
+    expect(shown(opening.querySelector('.byline-scrolly-stage')!).querySelector('img')!.getAttribute('src')).toBe('/step-2.jpg');
+  });
+
+  it('gives a story of mostly portrait photographs a narrower-text layout class, and removes it on cleanup', () => {
+    const root = document.createElement('div'); document.body.append(root);
+    root.innerHTML = '<section class="byline-scrolly">' + [1, 2, 3].map((i) => step(i, true, i < 3 ? ' width="1600" height="2000"' : ' width="1600" height="1067"')).join('') + '</section>';
+    const cleanup = enhanceArticleStory(root);
+    const element = root.querySelector('.byline-scrolly')!;
+    expect(element.classList.contains('is-portrait')).toBe(true);
+    cleanup();
+    expect(element.classList.contains('is-portrait')).toBe(false);
+    const landscape = document.createElement('div'); document.body.append(landscape);
+    landscape.innerHTML = '<section class="byline-scrolly">' + [1, 2].map((i) => step(i, true, ' width="1600" height="1067"')).join('') + '</section>';
+    enhanceArticleStory(landscape);
+    expect(landscape.querySelector('.byline-scrolly')!.classList.contains('is-portrait')).toBe(false);
+  });
+
+  it('stays linear when the media query does not match or no step has a photograph', () => {
     Object.defineProperty(window, 'matchMedia', { configurable: true, value: vi.fn(() => ({ matches: false, addEventListener: vi.fn() })) });
     const root = document.createElement('div'); document.body.append(root); root.innerHTML = story;
     enhanceArticleStory(root)();
     expect(observers).toHaveLength(0);
     expect(root.querySelector('.byline-scrolly-stage')).toBeNull();
     Object.defineProperty(window, 'matchMedia', { configurable: true, value: vi.fn(() => ({ matches: true, addEventListener: vi.fn() })) });
-    root.innerHTML = story.replace('<img src="/step-2.jpg" alt="">', '');
+    root.innerHTML = '<section class="byline-scrolly">' + [1, 2].map((i) => step(i, false)).join('') + '</section>';
     enhanceArticleStory(root)();
     expect(root.querySelector('.byline-scrolly-stage')).toBeNull();
   });

@@ -180,6 +180,43 @@ end-of-story Related Stories remains separate and unchanged.
 Existing News Grid, Feature Grid, source/feature quote styles, and Fact Box
 patterns retain their names and remain valid. No content migration is needed.
 
+## Staff guide to the visual tools
+
+All of these edit on the canvas: type captions, titles and explanations where they
+appear; the block toolbar holds the actions; the sidebar holds alt text and options.
+Credits are filled in from the media library, never typed into a block. A block that
+is not finished (no photograph, no text) is not published.
+
+- **Annotated Image.** Choose a photograph, then click it (or use *Add marker*) to
+  place numbered markers. Drag a marker, or focus it and use the arrow keys (Shift
+  moves 10%); `[` and `]` reorder, Delete removes, Enter jumps to its text. Select a
+  marker to type its title and explanation in the list; exact X/Y and alt text are in
+  the sidebar. Up to 12 markers. Readers get the photo with the notes beside it (below
+  on narrow screens); markers are links, so it works without script.
+- **Before / After.** Drop a photograph into each zone, then drag the divider on the
+  canvas to judge the framing. Type the left and right labels on the photo; Replace
+  Before, Replace After and Swap are in the toolbar. If the photographs are different
+  shapes, choose between cropping the right-hand one and showing both complete. Before
+  is always on the left, After on the right.
+- **Scrollytelling.** A photograph pins beside the reporting while readers scroll
+  (linear on phones and for readers who prefer less motion). The *story board* at the
+  top shows every step; Add, Duplicate, Earlier, Later and Remove arrange them (arrow
+  keys browse, Alt+arrow moves). *As the reader sees it* previews the selected step. A
+  step without a photograph keeps the previous one on the stage.
+- **Timeline.** Click into any event and type a date label, a headline and an
+  explanation; Enter moves on and, after the last explanation, adds the next event.
+  The toolbar adds, duplicates, moves and removes the event you are in; *Latest* marks
+  the most recent event. Up to 25 events; events with only a date are not published.
+- **Chart / Map.** Choose *Interactive chart or map* (paste only the address: Datawrapper,
+  Flourish, Google Maps embed or OpenStreetMap embed) or *Static graphic* (upload an
+  image). Add a fallback graphic with alt text: readers see it if the interactive version
+  cannot load, without JavaScript, and in search. The canvas shows the fallback with a
+  "Preview" badge; the editor and Preview as Byline never load the provider. Pick
+  Compact (320px), Standard (480), Tall (680) or Map (560). Write the title as the
+  takeaway and the dek as the precise measure, then source, notes and credit.
+- **Preview as Byline** shows the Standard or Immersive opening you chose. A one-off
+  layout a developer built for a single story is not previewed.
+
 ## Shared rendering and widths
 
 Astro owns a minimal compatibility layer for the Core Gutenberg markup it

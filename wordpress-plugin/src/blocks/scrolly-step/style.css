@@ -1,2 +1,12 @@
-/* Editor-only chrome for this block. Its public presentation lives in
-   packages/ui/src/newsroom/scrolly.css and loads once through the shared newsroom stylesheet. */
+/* Editor-only chrome for this block: a step is drawn as the photograph beside its reporting, as readers meet it
+   on a wide screen. The stage it feeds lives in packages/ui/src/newsroom/scrolly.css. */
+.byline-scrolly-step-editor { border-block-start: var(--story-rule); margin-block: 1.5rem; padding-top: 1rem; }
+.byline-scrolly-step-number { margin: 0 0 .75rem; }
+.byline-scrolly-step-layout { display: grid; gap: 1.25rem 2rem; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+@container byline-content (max-width: 720px) { .byline-scrolly-step-layout { grid-template-columns: 1fr; } }
+.byline-scrolly-step-editor .byline-scrolly-media { margin: 0; min-width: 0; }
+.byline-scrolly-step-editor .byline-scrolly-media img { max-height: 26rem; }
+.byline-scrolly-step-editor .byline-scrolly-media figcaption .byline-story-caption { margin: 0 0 4px; min-height: 0; }
+.byline-scrolly-step-editor .byline-scrolly-text { min-width: 0; }
+.byline-scrolly-warning { color: #cc1818; font-family: var(--story-sans); font-size: .85rem; margin: .5rem 0 0; }
+.byline-scrolly-step-hint { color: var(--story-muted); font-family: var(--story-sans); font-size: .8rem; line-height: 1.4; margin-top: .5rem; }

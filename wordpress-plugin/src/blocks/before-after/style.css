@@ -1,2 +1,19 @@
 /* Editor-only chrome for this block. Its public presentation lives in
-   packages/ui/src/newsroom/before-after.css and loads once through the shared newsroom stylesheet. */
+   packages/ui/src/newsroom/before-after.css and loads once through the shared newsroom stylesheet;
+   the canvas draws the comparison with those same rules. */
+.byline-before-after .byline-comparison-slot { min-width: 0; }
+.byline-before-after .byline-comparison-slot .components-placeholder { min-height: 220px; }
+.byline-before-after .byline-comparison-missing {
+  align-items: center; aspect-ratio: 3 / 2; border: 1px dashed var(--story-soft, #737373); box-sizing: border-box; color: var(--story-muted, #545454);
+  display: flex; font: 500 .9rem/1.4 var(--story-sans, system-ui); justify-content: center; margin: 0; padding: 1rem; text-align: center;
+}
+/* The label chips are typed in place; the range stays in charge of the rest of the photograph. */
+.byline-before-after .byline-comparison-labels { z-index: 4; }
+.byline-before-after .byline-comparison-labels > span { pointer-events: auto; }
+.byline-comparison-label-field {
+  background: transparent; border: 0; border-radius: 0; box-shadow: none; box-sizing: content-box; color: inherit; display: block; field-sizing: content;
+  font: inherit; letter-spacing: inherit; line-height: inherit; margin: 0; min-width: 3ch; overflow: hidden; padding: 0; resize: none; text-transform: inherit; white-space: nowrap;
+}
+.byline-comparison-label-field:focus { box-shadow: none; outline: 1px dashed currentColor; outline-offset: 3px; }
+.byline-before-after > .components-notice { margin: 0 0 1rem; }
+.byline-story-editor-note { color: var(--story-muted, #545454); font: 500 .8rem/1.4 var(--story-sans, system-ui); margin: .5rem 0 0; }

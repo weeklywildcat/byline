@@ -1,6 +1,7 @@
 import { useBlockProps } from '@wordpress/block-editor';
 import { visualizationUrl } from '@byline/ui/visualization';
 import { LegacyStoryImageMarkup } from '../story/image';
+import metadata from './block.json';
 
 /** Byline 0.3.24 and earlier: an h2 and unclassed paragraphs, credit and responsive candidates baked in. */
 function LegacyVisualizationSave({ attributes: a }: any) {
@@ -21,4 +22,6 @@ function migrate(attributes: any) {
   return { ...attributes, image, credit: attributes.credit || (image.id ? '' : attachmentCredit || '') };
 }
 
-export default [{ save: LegacyVisualizationSave, migrate }];
+// Deprecations do not inherit the block's attributes or supports; this one differs only by not having `summary`.
+const { summary: _summary, ...attributes } = metadata.attributes;
+export default [{ attributes, supports: metadata.supports, save: LegacyVisualizationSave, migrate }];

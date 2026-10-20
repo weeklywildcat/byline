@@ -1,17 +1,101 @@
-/* Annotated Image: moved unchanged from newsroom-blocks.css. */
-.byline-annotation-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 28px; align-items: start; }
-.byline-annotation-canvas { position: relative; min-width: 0; }
-.byline-annotation-canvas > img { display: block; width: 100%; height: auto; }
-:is(.byline-article-view .article-body, .editor-styles-wrapper) .byline-annotation-marker {
-  position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center;
-  width: 32px; height: 32px; border: 2px solid #fff; border-radius: 50%; background: #111; color: #fff;
-  box-shadow: 0 0 0 1px #111; font: 700 14px/1 var(--font-ui); text-decoration: none;
+/*
+ * Annotated Image: a photograph with numbered markers and the notes they point
+ * to. The notes sit beside the photograph when the article canvas is wide and
+ * below it otherwise. Markers are links, so without script a reader still
+ * jumps to the matching note; the enhancer only pairs the active marker with
+ * its note. The same rules style the Gutenberg canvas, where markers are
+ * buttons and the selected note is typed in place.
+ */
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) {
+  & .byline-annotated-image { margin-block: var(--story-moment-space); }
+  & .byline-annotation-layout { display: grid; gap: 1.5rem; }
+  & .byline-annotation-canvas { min-width: 0; position: relative; }
+  & .byline-annotation-canvas > img { border: 0; display: block; height: auto; width: 100%; }
+
+  /* A numbered disc: white ring and a dark edge keep it legible on any photograph. The ::after pad is the 44px target. */
+  & .byline-annotation-marker {
+    background: var(--ink, #121212);
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / .5), 0 2px 8px rgb(0 0 0 / .3);
+    box-sizing: border-box;
+    color: #fff;
+    cursor: pointer;
+    display: grid;
+    font: 700 .8rem/1 var(--story-sans);
+    font-variant-numeric: tabular-nums;
+    height: 32px;
+    margin: 0;
+    padding: 0;
+    place-items: center;
+    position: absolute;
+    text-decoration: none;
+    transform: translate(-50%, -50%);
+    transition: background-color var(--story-motion), transform var(--story-motion);
+    width: 32px;
+  }
+  & .byline-annotation-marker::after { border-radius: 50%; content: ""; inset: -8px; position: absolute; }
+  & .byline-annotation-marker:hover { transform: translate(-50%, -50%) scale(1.08); }
+  /* The accent marks the one thing to find first: the marker (and its note) you are on. */
+  & .byline-annotation-marker.is-active { background: var(--story-accent); transform: translate(-50%, -50%) scale(1.1); }
+  & .byline-annotation-marker:focus-visible { box-shadow: 0 0 0 5px #fff; outline: 2px solid var(--story-accent); outline-offset: 3px; }
+
+  & .byline-annotations { counter-reset: annotation; display: grid; list-style: none; margin: 0; max-width: 40rem; min-width: 0; padding: 0; }
+  & .byline-annotations > li {
+    border-block-start: var(--story-rule);
+    column-gap: .9rem;
+    counter-increment: annotation;
+    display: grid;
+    font-size: 1rem;
+    grid-template-columns: 1.75rem minmax(0, 1fr);
+    line-height: 1.5;
+    margin: 0;
+    padding: 1rem 0 1.15rem;
+    scroll-margin-block: 5rem;
+  }
+  /* The number repeats the marker so a note is found by the same sign. */
+  & .byline-annotations > li::before {
+    align-self: start;
+    background: var(--ink, #121212);
+    border-radius: 50%;
+    color: #fff;
+    content: counter(annotation);
+    display: grid;
+    font: 700 .78rem/1 var(--story-sans);
+    font-variant-numeric: tabular-nums;
+    grid-row: 1 / span 3;
+    height: 1.75rem;
+    place-items: center;
+    transition: background-color var(--story-motion);
+    width: 1.75rem;
+  }
+  & .byline-annotations > li > * { grid-column: 2; }
+  /* The theme sets headings and paragraphs with a scoped selector of its own; naming the layout keeps these ahead of it. */
+  & .byline-annotation-layout .byline-annotations h3 {
+    color: var(--ink, #121212);
+    font: 700 1rem/1.3 var(--story-sans);
+    margin: .25rem 0 0;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+  & .byline-annotation-layout .byline-annotations p { color: var(--ink, #121212); margin: .3rem 0 0; overflow-wrap: anywhere; text-wrap: pretty; }
+  & .byline-annotation-layout .byline-annotations > li > p:first-child { margin-top: .2rem; }
+  & .byline-annotations > li:is(.is-active, :target) { border-block-start-color: var(--ink, #121212); }
+  & .byline-annotations > li:is(.is-active, :target)::before { background: var(--story-accent); }
+  & .byline-annotations > li:focus-visible { outline: 2px solid var(--story-accent); outline-offset: 3px; }
 }
-:is(.byline-article-view .article-body, .editor-styles-wrapper) .byline-annotation-marker.is-active { background: var(--accent); outline: 3px solid var(--ink); }
-.byline-annotations { min-width: 0; }
-.byline-annotations > li { padding: .5em; border-block-start: 1px solid var(--rule); scroll-margin-top: 100px; }
-.byline-annotations > li.is-active { border-inline-start: 3px solid var(--accent); }
-:is(.byline-article-view .article-body, .editor-styles-wrapper) .byline-annotations h3 { margin: 0 0 .4em; font-size: 1.12rem; }
-@media (max-width: 700px) {
-  .byline-annotation-layout { grid-template-columns: 1fr; }
+
+/* Wide enough for the photograph to keep most of the width: the notes sit beside it and the photograph stays in view while a long list is read. */
+@container byline-content (min-width: 880px) {
+  :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) {
+    /* (.byline-annotation-notes is the editor's column for the list and its Add marker button.) */
+    & .byline-annotation-layout:has(> .byline-annotations, > .byline-annotation-notes) { align-items: start; gap: clamp(1.75rem, 3vw, 2.5rem); grid-template-columns: minmax(0, 1.9fr) minmax(15rem, 1fr); }
+    & .byline-annotation-layout:has(> .byline-annotations, > .byline-annotation-notes) > .byline-annotation-canvas { position: sticky; top: 1.5rem; }
+  }
+}
+
+@media (forced-colors: active) {
+  :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) {
+    & .byline-annotation-marker.is-active, & .byline-annotations > li:is(.is-active, :target)::before { background: Highlight; color: HighlightText; forced-color-adjust: none; }
+  }
 }

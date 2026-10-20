@@ -22,10 +22,10 @@ export function useStepOperations(rootClientId: string | undefined, announce: (m
   const registry = useSelect((select) => select(STORE) as any, []);
 
   const stepIds = useCallback((): string[] => (rootClientId ? registry.getBlockOrder(rootClientId) : []), [registry, rootClientId]);
-  /** Put the caret in a step's heading, which also scrolls the canvas to it. */
+  /** Put the caret at the end of a step's heading, which also scrolls the canvas to it. */
   const edit = useCallback((clientId: string) => {
     const heading = registry.getBlocks(clientId).find((block: any) => block.name === 'core/heading');
-    selectBlock(heading ? heading.clientId : clientId);
+    selectBlock(heading ? heading.clientId : clientId, -1);
   }, [registry, selectBlock]);
   /** Select a step without moving focus out of the control that asked. */
   const choose = useCallback((clientId: string) => selectBlock(clientId, null), [selectBlock]);

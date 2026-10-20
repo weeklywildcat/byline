@@ -89,3 +89,16 @@ add_action('rest_api_init', static function (): void {
         ],
     ]);
 });
+
+/**
+ * Test-only: lets a spec credit an uploaded photograph through the REST API. In
+ * production the credit is set in the media library.
+ */
+add_action('init', static function (): void {
+    register_post_meta('attachment', '_ww_image_creator', [
+        'single' => true,
+        'type' => 'string',
+        'show_in_rest' => true,
+        'auth_callback' => static fn(): bool => current_user_can('upload_files'),
+    ]);
+});

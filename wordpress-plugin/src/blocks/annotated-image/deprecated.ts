@@ -2,6 +2,7 @@ import { createElement } from '@wordpress/element';
 import { useBlockProps } from '@wordpress/block-editor';
 import { LegacyStoryImageMarkup } from '../story/image';
 import { clampCoordinate, type Annotation } from '../story/models';
+import metadata from './block.json';
 
 /** Byline 0.3.24 and earlier: baked-in responsive candidates and credit, an editor instruction when empty, every marker kept. */
 function LegacyAnnotatedImageSave({ attributes: a }: any) {
@@ -22,4 +23,4 @@ function migrate(attributes: any) {
   return { ...attributes, image };
 }
 
-export default [{ save: LegacyAnnotatedImageSave, migrate }];
+export default [{ attributes: metadata.attributes, supports: metadata.supports, save: LegacyAnnotatedImageSave, migrate }];

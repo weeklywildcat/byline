@@ -48,14 +48,18 @@
 .byline-visualization-fallback-image img { display: block; height: auto; width: 100%; }
 .byline-visualization [hidden] { display: none; }
 
-/* Interactive embed: one slot, with the fallback graphic filling it until the frame loads. */
-.byline-visualization[data-mode="embed"] .byline-visualization-media { min-height: var(--viz-height); position: relative; }
-.byline-visualization[data-mode="embed"] .byline-visualization-media.is-loaded { min-height: 0; }
-.byline-visualization[data-mode="embed"] .byline-visualization-fallback-image { background: var(--page, #fff); inset: 0; position: absolute; }
-:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-visualization[data-mode="embed"] .byline-visualization-fallback-image img {
-  border: 0;
-  height: 100%;
-  object-fit: contain;
+/* Interactive embed: one slot, with the fallback graphic filling it until the
+   frame loads. Without scripting nothing will replace the graphic, so it keeps
+   its own proportions instead of floating in an empty frame. */
+@media (scripting: enabled) {
+  .byline-visualization[data-mode="embed"] .byline-visualization-media { min-height: var(--viz-height); position: relative; }
+  .byline-visualization[data-mode="embed"] .byline-visualization-media.is-loaded { min-height: 0; }
+  .byline-visualization[data-mode="embed"] .byline-visualization-fallback-image { background: var(--page, #fff); inset: 0; position: absolute; }
+  :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-visualization[data-mode="embed"] .byline-visualization-fallback-image img {
+    border: 0;
+    height: 100%;
+    object-fit: contain;
+  }
 }
 .byline-visualization-frame { background: var(--page, #fff); border: 0; display: block; position: relative; width: 100%; }
 
@@ -83,8 +87,10 @@
   box-sizing: border-box;
   color: var(--story-muted);
   display: flex;
+  flex-direction: column;
   font-family: var(--story-sans);
   font-size: .85rem;
+  gap: 10px;
   inset: 0;
   justify-content: center;
   position: absolute;

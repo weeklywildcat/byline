@@ -1,7 +1,8 @@
 /**
  * Annotated Image: keeps the numbered markers and the list of notes in step
- * (focus or click either one and both show it as active). The saved figure is a
- * complete, linked, ordered list without this.
+ * (focus or click either one and both show it as active, as does arriving on a
+ * `#annotation-...` link). The saved figure is a complete, linked, ordered list
+ * without this.
  */
 export function enhanceAnnotatedImage(figure: HTMLElement, signal: AbortSignal): void {
   const markers = Array.from(figure.querySelectorAll<HTMLAnchorElement>('.byline-annotation-marker'));
@@ -22,4 +23,6 @@ export function enhanceAnnotatedImage(figure: HTMLElement, signal: AbortSignal):
     note.addEventListener('focusin', () => select(note.id), { signal });
     note.addEventListener('click', () => select(note.id), { signal });
   });
+  const arrived = notes.find((note) => note.id === figure.ownerDocument.defaultView?.location.hash.slice(1));
+  if (arrived) select(arrived.id);
 }

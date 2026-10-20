@@ -51,7 +51,13 @@ export function defineGeometry(variant: Variant) {
         const rect = (selector: string) => { const r = body.querySelector(selector)!.getBoundingClientRect(); return { x: r.x, right: r.right, y: r.y, bottom: r.bottom, width: r.width, height: r.height }; };
         const table = body.querySelector('.is-style-byline-data-table')!;
         return {
-          portrait: rect('.wp-block-image.alignfull img[alt="Campus portrait"]'),
+          portrait: (() => {
+            // The photograph fills its slot and is contained, whole, inside it: measure what is drawn, not the box.
+            const img = body.querySelector<HTMLImageElement>('.wp-block-image.alignfull img[alt="Campus portrait"]')!;
+            const box = img.getBoundingClientRect();
+            const scale = getComputedStyle(img).objectFit === 'contain' ? Math.min(box.width / img.naturalWidth, box.height / img.naturalHeight) : 1;
+            return { width: img.naturalWidth * scale, height: img.naturalHeight * scale, contained: getComputedStyle(img).objectFit === 'contain' };
+          })(),
           note: rect('.is-style-byline-margin-note'), afterNote: rect('.is-style-byline-margin-note + p + .alignwide'),
           noteFloat: getComputedStyle(body.querySelector('.is-style-byline-margin-note')!).float,
           tableScroll: table.scrollWidth > table.clientWidth,
@@ -63,6 +69,7 @@ export function defineGeometry(variant: Variant) {
           })
         };
       });
+      expect(geometry.portrait.contained).toBe(true);
       expect(geometry.portrait.height).toBeLessThanOrEqual(900 * .85 + 1);
       expect(geometry.portrait.height / geometry.portrait.width).toBeCloseTo(1.5, 1);
       // The margin note floats when the article container (not the window) is wide enough.

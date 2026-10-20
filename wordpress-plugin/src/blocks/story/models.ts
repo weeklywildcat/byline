@@ -12,6 +12,8 @@ export function newAnnotationId(): string {
   return globalThis.crypto?.randomUUID?.() || `note-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 export function clampCoordinate(value: number): number { return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 50; }
+/** A tenth of a percent is finer than anyone can place a marker, and keeps the saved markup short. */
+export function roundCoordinate(value: number): number { return Math.round(clampCoordinate(value) * 10) / 10; }
 export function changeAnnotations(items: Annotation[], action: 'add' | 'remove' | 'up' | 'down', id: string, point = { x: 50, y: 50 }): Annotation[] {
   if (action === 'add') return items.length < MAX_ANNOTATIONS && !items.some((item) => item.id === id)
     ? [...items, { id, x: clampCoordinate(point.x), y: clampCoordinate(point.y), title: '', body: '' }] : items;
@@ -30,7 +32,7 @@ export function nextMarkerPoint(count: number): { x: number; y: number } {
 export function updateAnnotation(items: Annotation[], id: string, values: Partial<Omit<Annotation, 'id'>>): Annotation[] {
   return items.map((item) => item.id !== id ? item : {
     ...item, ...values,
-    x: clampCoordinate(values.x ?? item.x), y: clampCoordinate(values.y ?? item.y)
+    x: roundCoordinate(values.x ?? item.x), y: roundCoordinate(values.y ?? item.y)
   });
 }
 /** Arrow keys nudge a marker by 1% of the photograph, Shift by 10%. */
