@@ -162,10 +162,10 @@ export function NewsletterList({ fetchers, initialFilters = {}, onOpen, onCreate
           </div>
 
           {total && total > perPage ? <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>{\`\${(page - 1) * perPage + 1}–\${Math.min(page * perPage, total)} of \${total}\`}</span>
+            <span>{`${(page - 1) * perPage + 1}–${Math.min(page * perPage, total)} of ${total}`}</span>
             <Pagination className="mx-0 w-auto"><PaginationContent>
               <PaginationItem><PaginationPrevious disabled={page <= 1 || isLoading} onClick={() => setPage(page - 1)} /></PaginationItem>
-              <PaginationItem><span className="px-2 tabular-nums">{\`Page \${page} of \${pages}\`}</span></PaginationItem>
+              <PaginationItem><span className="px-2 tabular-nums">{`Page ${page} of ${pages}`}</span></PaginationItem>
               <PaginationItem><PaginationNext disabled={page >= pages || isLoading} onClick={() => setPage(page + 1)} /></PaginationItem>
             </PaginationContent></Pagination>
           </div> : null}
