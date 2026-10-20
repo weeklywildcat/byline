@@ -61,11 +61,14 @@
   box-sizing: border-box;
   margin-inline: auto;
   max-width: var(--article-width, 760px);
+  width: 100%;
 }
 
 /* Label (kicker): the small capitals that name a thing: a date, a number, "Context". */
 .byline-kicker,
-.byline-timeline-label {
+.byline-timeline-label,
+.byline-comparison-image > strong,
+.byline-comparison-labels > span {
   color: var(--story-muted);
   font-family: var(--story-sans);
   font-size: .72rem;
