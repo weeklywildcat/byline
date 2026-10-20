@@ -43,7 +43,7 @@ function Sidebar({ className, children, ...props }: React.ComponentProps<"aside"
       </SheetContent>
     </Sheet>
   }
-  return <aside data-slot="sidebar" className={cn("sticky top-12 hidden w-52 shrink-0 flex-col border-r pr-4 md:flex", className)} {...props}>{children}</aside>
+  return <aside data-slot="sidebar" className={cn("sticky top-12 hidden w-52 shrink-0 border-r pr-3 md:block", className)} {...props}><ScrollArea className="max-h-[calc(100dvh-4rem)]"><div className="pr-1">{children}</div></ScrollArea></aside>
 }
 
 function SidebarTrigger({ className, ...props }: React.ComponentProps<typeof Button>) {
