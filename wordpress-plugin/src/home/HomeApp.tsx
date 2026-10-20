@@ -113,7 +113,24 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
       if (task.storyId) client.setQueryData<StoryWorkspace>(workspaceKey(task.storyId), (old) => replaceWorkspaceTask(old, updated));
       if (index >= 0) requestAnimationFrame(() => { if (next?.isConnected) next.focus(); else (container?.querySelector<HTMLElement>("[data-home-work-footer] button, [data-peek-add-task]") || workRef.current)?.focus(); });
     },
-    onSuccess: (_updated, task) => setCompletedLabel(`Completed ${task.title}.`),
+    onSuccess: (_updated, task) => {
+      const message = `Completed ${task.title}.`;
+      setCompletedLabel(message);
+      toast.success(message, {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void fetchers.editorial!.updateTask(task.id, { state: task.state }).then((restored) => {
+              client.setQueryData<HomeBootstrap>(homeKey, (old) => replaceHomeTask(old, restored));
+              if (task.storyId) client.setQueryData<StoryWorkspace>(workspaceKey(task.storyId), (old) => replaceWorkspaceTask(old, restored));
+              setCompletedLabel(`Restored ${task.title}.`);
+              void client.invalidateQueries({ queryKey: homeKey });
+              if (task.storyId) void client.invalidateQueries({ queryKey: workspaceKey(task.storyId) });
+            }).catch((error) => toast.error(describeEditorialError(error, "The task change couldn’t be undone.")));
+          }
+        }
+      });
+    },
     onError: (error, task) => {
       client.setQueryData<HomeBootstrap>(homeKey, (old) => replaceHomeTask(old, task));
       if (task.storyId) client.setQueryData<StoryWorkspace>(workspaceKey(task.storyId), (old) => replaceWorkspaceTask(old, task));
