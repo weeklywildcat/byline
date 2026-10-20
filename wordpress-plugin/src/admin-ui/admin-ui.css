@@ -58,7 +58,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Nova's neutral palette. Only primary and ring carry the Weekly Wildcat green. */
+/* Nova's neutral palette, unmodified apart from one warning token. */
 .byline-ui-root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -66,7 +66,7 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.448 0.068 155.2);
+  --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -79,7 +79,7 @@
   --warning: oklch(0.52 0.12 55);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.448 0.068 155.2);
+  --ring: oklch(0.708 0 0);
   --radius: 0.625rem;
   color: var(--foreground);
   font-family: var(--font-sans);

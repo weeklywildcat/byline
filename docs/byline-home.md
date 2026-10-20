@@ -119,7 +119,7 @@ ItemList, EmptyState, form fields, pickers). To update a primitive, regenerate i
 with the shadcn CLI and re-apply the portal change; do not restyle it by hand.
 Rows are `Item`, forms are `Field`, options are `Select`, empty states are
 `Empty`. `src/admin-ui/admin-ui.css` is the one stylesheet: Nova's neutral tokens
-(only `primary`/`ring` carry the Weekly Wildcat green, plus one `warning` token),
+(black primary, plus one `warning` token),
 WordPress resets and overlay stacking. Layout is Tailwind utilities on the
 components, so `home/style.css` and `workspace/style.css` only import it.
 
