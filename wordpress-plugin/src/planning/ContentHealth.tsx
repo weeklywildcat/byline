@@ -9,6 +9,7 @@ import { Badge } from "../admin-ui/ui/badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
+import { Spinner } from "../admin-ui/ui/spinner";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { contentHealthKey } from "../story/story-query";
 import { contentHealthFixHref } from "./content-health-navigation";
@@ -40,7 +41,7 @@ export function ContentHealth({ fetchers, onOpenStory }: { fetchers: PlanningFet
   const typeItems = [{ value: ALL, label: __("All issue types", "weekly-wildcat-headless") }, ...types.map((item) => ({ value: item, label: item }))];
   const issues = useMemo(() => (query.data?.issues || []).filter((issue) => (severity === ALL || issue.severity === severity) && (type === ALL || issue.type === type)), [query.data, severity, type]);
   return <>
-    <PageHeader title={__("Content Health", "weekly-wildcat-headless")} description={__("Cached checks on published and draft content. Nothing is crawled while this page loads.", "weekly-wildcat-headless")} actions={<Button variant="outline" disabled={!fetchers.recheckContentHealth || busyId !== null} onClick={() => recheck.mutate(undefined)}>{busyId === ALL ? __("Checking…", "weekly-wildcat-headless") : __("Run checks", "weekly-wildcat-headless")}</Button>} />
+    <PageHeader title={__("Content Health", "weekly-wildcat-headless")} description={__("Cached checks on published and draft content. Nothing is crawled while this page loads.", "weekly-wildcat-headless")} actions={<Button variant="outline" disabled={!fetchers.recheckContentHealth || busyId !== null} onClick={() => recheck.mutate(undefined)}>{busyId === ALL ? <><Spinner data-icon="inline-start" />{__("Checking…", "weekly-wildcat-headless")}</> : __("Run checks", "weekly-wildcat-headless")}</Button>} />
     <ResourceGate query={query} label={__("Content Health", "weekly-wildcat-headless")}>{(data) => <div className="flex flex-col gap-3">
       {data.scannerAvailable === false ? <Alert><AlertDescription>{__("The background scanner is not available, so results may be out of date. Publishing does not depend on Content Health.", "weekly-wildcat-headless")}</AlertDescription></Alert> : null}
       <div className="flex flex-wrap items-center gap-2">
@@ -49,9 +50,9 @@ export function ContentHealth({ fetchers, onOpenStory }: { fetchers: PlanningFet
         {data.lastRunAt ? <span className="ml-auto text-xs text-muted-foreground">{__("Last checked", "weekly-wildcat-headless")} <time dateTime={data.lastRunAt}>{new Date(data.lastRunAt).toLocaleString()}</time></span> : null}
       </div>
       {issues.length
-        ? <ItemGroup className="rounded-xl border" aria-label={__("Content health issues", "weekly-wildcat-headless")}>{issues.map((issue) => {
+        ? <ItemGroup className="gap-0 overflow-hidden rounded-xl border bg-card shadow-xs" aria-label={__("Content health issues", "weekly-wildcat-headless")}>{issues.map((issue) => {
           const fix = contentHealthFixHref(issue);
-          return <Item key={issue.id} size="sm" className="rounded-none border-0 border-b last:border-b-0">
+          return <Item key={issue.id} size="sm" className="rounded-none border-0 border-b px-3 py-3 last:border-b-0">
             <ItemMedia><StatusBadge tone={issue.severity === "info" ? "neutral" : "attention"}>{issue.severity}</StatusBadge></ItemMedia>
             <ItemContent>
               <ItemTitle className="line-clamp-none">{issue.problem.trim() || issue.type || __("Content issue", "weekly-wildcat-headless")}</ItemTitle>
@@ -60,7 +61,7 @@ export function ContentHealth({ fetchers, onOpenStory }: { fetchers: PlanningFet
             <ItemActions>
               <Badge variant="outline">{issue.type}</Badge>
               {fix ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={fix}>{__("Fix", "weekly-wildcat-headless")}</a> : null}
-              {fetchers.recheckContentHealth ? <Button variant="ghost" size="sm" disabled={busyId !== null} onClick={() => recheck.mutate(issue.id)}>{busyId === issue.id ? __("Checking…", "weekly-wildcat-headless") : __("Recheck", "weekly-wildcat-headless")}</Button> : null}
+              {fetchers.recheckContentHealth ? <Button variant="ghost" size="sm" disabled={busyId !== null} onClick={() => recheck.mutate(issue.id)}>{busyId === issue.id ? <><Spinner data-icon="inline-start" />{__("Checking…", "weekly-wildcat-headless")}</> : __("Recheck", "weekly-wildcat-headless")}</Button> : null}
             </ItemActions>
           </Item>;
         })}</ItemGroup>
