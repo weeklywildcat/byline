@@ -1,5 +1,6 @@
 import { Button, Notice, SelectControl, Spinner, TextControl } from "../admin-ui/components/legacy-control-adapters";
 import { __ } from "@wordpress/i18n";
+import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useState } from "@wordpress/element";
 
 import type { NewsletterFetchers } from "./api";
@@ -83,7 +84,9 @@ export function NewsletterSettings({ fetchers, initialProviderId, title }: Newsl
     try {
       const result = await fetchers.saveProviderSettings(providerId, settings);
       setProviders((current) => current.map((provider) => provider.id === result.provider.id ? result.provider : provider));
-      setNotice(result.message || __("Provider settings saved.", "weekly-wildcat-headless"));
+      const message = result.message || __("Provider settings saved.", "weekly-wildcat-headless");
+      setNotice(message);
+      toast.success(message);
     } catch (saveError: unknown) {
       setError(describeNewsletterError(saveError, __("Provider settings could not be saved.", "weekly-wildcat-headless")));
     } finally {
@@ -101,7 +104,9 @@ export function NewsletterSettings({ fetchers, initialProviderId, title }: Newsl
       // The result updates safe connection status only.  Local `settings` are
       // intentionally untouched so a test cannot erase unsaved credentials.
       setProviders((current) => current.map((provider) => provider.id === result.provider.id ? result.provider : provider));
-      setNotice(result.message || __("Connection test completed.", "weekly-wildcat-headless"));
+      const message = result.message || __("Connection test completed.", "weekly-wildcat-headless");
+      setNotice(message);
+      toast.success(message);
     } catch (testError: unknown) {
       setError(describeNewsletterError(testError, __("The provider connection test failed.", "weekly-wildcat-headless")));
     } finally {
