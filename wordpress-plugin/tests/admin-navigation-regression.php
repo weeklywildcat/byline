@@ -26,6 +26,9 @@ $test_capabilities = [
     'edit_others_posts' => true,
 ];
 $redirected_to = null;
+$test_roles = ['administrator'];
+$test_network_admin = false;
+$test_user_admin = false;
 
 function fail(string $message): void
 {
@@ -91,6 +94,18 @@ function current_user_can(string $capability): bool
 {
     global $test_capabilities;
     return !empty($test_capabilities[$capability]);
+}
+
+function wp_get_current_user()
+{
+    global $test_roles;
+    return (object) ['roles' => $test_roles];
+}
+function is_network_admin(): bool { return $GLOBALS['test_network_admin']; }
+function is_user_admin(): bool { return $GLOBALS['test_user_admin']; }
+function remove_menu_page(string $slug): void
+{
+    unset($GLOBALS['registered_menus'][$slug]);
 }
 
 function byline_get_publication_config(): array
@@ -665,6 +680,47 @@ foreach (['wwh_render_sports_import_page', 'wwh_save_sports_game', 'wwh_create_s
 if (preg_match("/\\\$GLOBALS\\[['\"]menu['\"]\\]/", $app_source)
     || preg_match("/global\\s+\\\$submenu\\s*;/", $app_source)) {
     fail('Byline must not manipulate WordPress menu globals to build sections.');
+}
+
+// Contributors land in Today, while other roles and administrative contexts
+// keep Dashboard. Exercise both the sidebar action and direct Dashboard visits.
+if (!in_array('byline_admin_hide_contributor_dashboard', $registered_actions['admin_menu'] ?? [], true)
+    || !in_array('byline_admin_redirect_contributor_dashboard', $registered_actions['load-index.php'] ?? [], true)
+    || in_array('byline_admin_redirect_contributor_dashboard', $registered_actions['admin_init'] ?? [], true)) {
+    fail('Contributor Dashboard routing must be registered only on the Dashboard load hook.');
+}
+foreach ([
+    'contributor' => [['contributor'], ['edit_posts'], false, false, true],
+    'author' => [['author'], ['edit_posts', 'publish_posts'], false, false, false],
+    'subscriber' => [['subscriber'], ['read'], false, false, false],
+    'editor' => [['editor'], ['edit_posts', 'edit_others_posts'], false, false, false],
+    'contributor-editor' => [['contributor', 'editor'], ['edit_posts', 'edit_others_posts'], false, false, false],
+    'contributor-admin' => [['contributor', 'administrator'], ['edit_posts', 'manage_options'], false, false, false],
+    'contributor-manager' => [['contributor'], ['edit_posts', BYLINE_MANAGE_CAPABILITY], false, false, false],
+    'contributor-integrations' => [['contributor'], ['edit_posts', BYLINE_MANAGE_INTEGRATIONS_CAPABILITY], false, false, false],
+    'contributor-without-stories' => [['contributor'], ['read'], false, false, false],
+    'network-admin' => [['contributor'], ['edit_posts'], true, false, false],
+    'user-admin' => [['contributor'], ['edit_posts'], false, true, false],
+] as $profile => [$test_roles, $capabilities, $test_network_admin, $test_user_admin, $hidden]) {
+    $test_capabilities = array_fill_keys($capabilities, true);
+    $registered_menus = ['index.php' => [], 'edit.php' => [], 'profile.php' => []];
+    byline_admin_hide_contributor_dashboard();
+    if (isset($registered_menus['index.php']) === $hidden
+        || !isset($registered_menus['edit.php'], $registered_menus['profile.php'])) {
+        fail("Dashboard menu visibility is wrong for {$profile}, or another menu was removed.");
+    }
+    $redirected_to = null;
+    try {
+        byline_admin_redirect_contributor_dashboard();
+    } catch (RuntimeException $exception) {
+        if (strpos($exception->getMessage(), 'redirect:') !== 0) {
+            throw $exception;
+        }
+    }
+    $expected_redirect = $hidden ? byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'today']) : null;
+    if ($redirected_to !== $expected_redirect) {
+        fail("Dashboard redirect is wrong for {$profile}.");
+    }
 }
 
 echo "Byline admin navigation regression passed.\n";

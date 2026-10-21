@@ -238,17 +238,24 @@ $publisher_capabilities = ['edit_posts', 'publish_posts'];
 $contributor_capabilities = ['edit_posts'];
 $integration_manager_capabilities = [BYLINE_MANAGE_INTEGRATIONS_CAPABILITY];
 newsletter_set_capabilities($contributor_capabilities);
-newsletter_assert(byline_newsletter_can_edit_issues(), 'Contributors should be able to prepare newsletter drafts.');
+newsletter_assert(!byline_newsletter_can_edit_issues(), 'Contributors must not access newsletter issues.');
 newsletter_assert(!byline_newsletter_can_publish_issues(), 'Contributors must not have newsletter delivery capability.');
 newsletter_assert(!byline_newsletter_can_manage(), 'Contributors must not have newsletter integration-management capability.');
 
-$contributor_issue = byline_newsletter_issue_create_or_update([
+$denied_draft = byline_newsletter_issue_create_or_update([
     'title' => 'Contributor draft',
     'subject' => 'Contributor draft',
     'providerId' => 'mailchimp',
     'leadStoryId' => 7,
 ]);
-newsletter_assert(is_array($contributor_issue) && ($contributor_issue['id'] ?? 0) > 0, 'Contributors should be able to create newsletter drafts.');
+newsletter_assert(is_wp_error($denied_draft) && $denied_draft->get_error_code() === 'byline_newsletter_forbidden', 'Contributors must not create newsletter drafts.');
+// A draft created before a contributor lost newsletter access must stay stored
+// while its former owner loses read and mutation access.
+newsletter_set_capabilities($publisher_capabilities);
+$contributor_issue = byline_newsletter_issue_create_or_update([
+    'title' => 'Existing draft', 'subject' => 'Existing draft', 'providerId' => 'mailchimp', 'leadStoryId' => 7,
+]);
+newsletter_assert(is_array($contributor_issue) && ($contributor_issue['id'] ?? 0) > 0, 'A publisher must be able to prepare a newsletter draft.');
 $contributor_issue_id = (int) $contributor_issue['id'];
 $private_story_attempt = byline_newsletter_issue_create_or_update([
     'title' => 'Private story attempt',
@@ -256,9 +263,24 @@ $private_story_attempt = byline_newsletter_issue_create_or_update([
     'providerId' => 'mailchimp',
     'leadStoryId' => 9,
 ]);
-newsletter_assert(is_wp_error($private_story_attempt) && $private_story_attempt->get_error_code() === 'byline_newsletter_story_missing', 'Contributors must not attach another writer\'s private draft to a newsletter.');
+newsletter_assert(is_wp_error($private_story_attempt) && $private_story_attempt->get_error_code() === 'byline_newsletter_story_missing', 'Publishers must not attach another writer\'s private draft to a newsletter.');
 $private_story_add_attempt = byline_newsletter_issue_add_story($contributor_issue_id, 9, 'additional');
-newsletter_assert(is_wp_error($private_story_add_attempt) && $private_story_add_attempt->get_error_code() === 'byline_newsletter_story_missing', 'Contributors must not add another writer\'s private draft to an existing issue.');
+newsletter_assert(is_wp_error($private_story_add_attempt) && $private_story_add_attempt->get_error_code() === 'byline_newsletter_story_missing', 'Publishers must not add another writer\'s private draft to an existing issue.');
+newsletter_set_capabilities($contributor_capabilities);
+$existing_record = byline_newsletter_issue_record($contributor_issue_id);
+newsletter_assert(!byline_newsletter_issue_can_access($contributor_issue_id), 'Contributors must not retain access to previously owned newsletter drafts.');
+foreach ([
+    byline_newsletter_issue_create_or_update(['title' => 'Changed'], $contributor_issue_id),
+    byline_newsletter_issue_add_story($contributor_issue_id, 8, 'additional'),
+    byline_newsletter_rest_get(new NewsletterRegressionRequest(['id' => $contributor_issue_id])),
+    byline_newsletter_rest_list(),
+    byline_newsletter_rest_delete(new NewsletterRegressionRequest(['id' => $contributor_issue_id])),
+] as $denied_issue_access) {
+    newsletter_assert(is_wp_error($denied_issue_access) && $denied_issue_access->get_error_code() === 'byline_newsletter_forbidden', 'Contributors must not read, update, delete, or attach stories to newsletter issues.');
+}
+newsletter_assert(byline_newsletter_issue_record($contributor_issue_id) === $existing_record, 'Denied contributor access changed a stored issue.');
+$denied_list = byline_newsletter_issue_list();
+newsletter_assert(($denied_list['items'] ?? null) === [] && ($denied_list['providers'] ?? null) === [], 'Contributors must not enumerate issues or provider metadata.');
 foreach (['send-test', 'send', 'schedule', 'cancel'] as $delivery_action) {
     $denied = byline_newsletter_issue_action($contributor_issue_id, $delivery_action, $delivery_action === 'schedule' ? ['scheduledAt' => gmdate('c', time() + 3600)] : []);
     newsletter_assert(is_wp_error($denied) && $denied->get_error_code() === 'byline_newsletter_forbidden', 'Contributors must be denied direct newsletter action: ' . $delivery_action . '.');
@@ -278,11 +300,12 @@ newsletter_assert(($denied_connection['status'] ?? 0) === 403 && empty($denied_c
 $denied_audiences = byline_newsletter_list_audiences('mailchimp');
 newsletter_assert(($denied_audiences['status'] ?? 0) === 403 && empty($denied_audiences['ok']), 'Contributors must not discover newsletter audiences.');
 
+newsletter_set_capabilities($publisher_capabilities);
 $current_user = 8;
 $unshared_issue = byline_newsletter_rest_get(new NewsletterRegressionRequest(['id' => $contributor_issue_id]));
-newsletter_assert(is_wp_error($unshared_issue) && $unshared_issue->get_error_code() === 'byline_newsletter_not_found', 'Contributors must not retrieve another writer\'s private newsletter issue.');
+newsletter_assert(is_wp_error($unshared_issue) && $unshared_issue->get_error_code() === 'byline_newsletter_not_found', 'Publishers must not retrieve another writer\'s private newsletter issue.');
 $unshared_list = byline_newsletter_issue_list();
-newsletter_assert(($unshared_list['total'] ?? 0) === 0, 'Contributors must not enumerate another writer\'s private newsletter issues.');
+newsletter_assert(($unshared_list['total'] ?? 0) === 0, 'Publishers must not enumerate another writer\'s private newsletter issues.');
 $current_user = 7;
 
 $editor_capabilities = ['edit_posts', 'edit_others_posts'];
@@ -416,7 +439,11 @@ foreach ([
     newsletter_assert(($routes[$integration_route]['permission_callback'] ?? null) === 'byline_newsletter_can_manage', 'Newsletter integration route was not protected: ' . $integration_route . '.');
 }
 newsletter_set_capabilities($contributor_capabilities);
-newsletter_assert(call_user_func($routes['byline/v1/admin/newsletters']['0']['permission_callback']) === true, 'Contributors should retain draft issue route access.');
+newsletter_assert(call_user_func($routes['byline/v1/admin/newsletters']['0']['permission_callback']) === false, 'Contributors must be denied newsletter collection access.');
+foreach ($routes['byline/v1/admin/newsletters/(?P<id>\\d+)'] as $method) {
+    newsletter_assert(call_user_func($method['permission_callback'], new NewsletterRegressionRequest(['id' => $contributor_issue_id])) === false, 'Contributors must be denied every issue read/write/delete route.');
+}
+newsletter_assert(call_user_func($routes['byline/v1/admin/newsletters']['1']['permission_callback']) === false, 'Contributors must be denied the issue creation route.');
 foreach (['send-test', 'send', 'schedule', 'cancel'] as $delivery_action) {
     $route = 'byline/v1/admin/newsletters/(?P<id>\\d+)/' . $delivery_action;
     newsletter_assert(call_user_func($routes[$route]['permission_callback']) === false, 'Contributors must be denied the newsletter delivery route: ' . $delivery_action . '.');

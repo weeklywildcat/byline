@@ -14,6 +14,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+require_once __DIR__ . '/newsletter-permissions.php';
+
 if (!function_exists('byline_integration_remote_json')) {
     require_once __DIR__ . '/http.php';
 }
@@ -768,11 +770,11 @@ function byline_newsletter_issue_record($issue_id): ?array
 
 /**
  * Newsletter issues are private post-backed records. Keep collection access
- * broad enough for the newsroom screen, but make every existing issue
+ * limited to publishers and editors, and make every existing issue
  * object-scoped so one editor cannot read another editor's private issue.
  * The author fallback is intentional: a private custom post can require
  * edit_private_posts in Core even when the author has the existing newsroom
- * edit_posts capability and should still be able to edit their own issue.
+ * publishing authority and should still be able to edit their own issue.
  */
 function byline_newsletter_issue_can_access(int $issue_id, ?int $user_id = null): bool
 {
@@ -782,12 +784,15 @@ function byline_newsletter_issue_can_access(int $issue_id, ?int $user_id = null)
     }
     $management_capability = defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline';
     if ($user_id !== null && function_exists('user_can')) {
+        if (!user_can($user_id, byline_newsletter_issue_capability($user_id))) {
+            return false;
+        }
         if (user_can($user_id, $management_capability) || user_can($user_id, 'edit_post', $issue_id)) {
             return true;
         }
         return (int) ($post->post_author ?? 0) === $user_id && user_can($user_id, 'edit_posts');
     }
-    if (!function_exists('current_user_can')) {
+    if (!byline_newsletter_can_edit_issues()) {
         return false;
     }
     if (current_user_can($management_capability) || current_user_can('edit_post', $issue_id)) {
@@ -1213,6 +1218,9 @@ function byline_newsletter_issue_create_or_update(array $input, ?int $issue_id =
 
 function byline_newsletter_issue_list(array $params = []): array
 {
+    if (!byline_newsletter_can_edit_issues()) {
+        return ['items' => [], 'newsletters' => [], 'total' => 0, 'providers' => []];
+    }
     $status = byline_newsletter_issue_scalar($params['status'] ?? '', 32);
     $search = byline_newsletter_issue_scalar($params['search'] ?? '', 200);
     $page = max(1, (int) ($params['page'] ?? 1));
@@ -1385,11 +1393,17 @@ function byline_newsletter_rest_issue_request($request): array
 
 function byline_newsletter_rest_list($request = null)
 {
+    if (!byline_newsletter_can_edit_issues()) {
+        return byline_newsletter_issue_error('byline_newsletter_forbidden', 'You are not allowed to access newsletter issues.', 403);
+    }
     return rest_ensure_response(byline_newsletter_issue_list(is_object($request) && method_exists($request, 'get_params') ? (array) $request->get_params() : []));
 }
 
 function byline_newsletter_rest_get($request = null)
 {
+    if (!byline_newsletter_can_edit_issues()) {
+        return byline_newsletter_issue_error('byline_newsletter_forbidden', 'You are not allowed to access newsletter issues.', 403);
+    }
     $params = byline_newsletter_rest_issue_request($request);
     $id = byline_newsletter_issue_id($params['id'] ?? 0);
     $record = byline_newsletter_issue_record($id);
@@ -1445,25 +1459,12 @@ function byline_newsletter_can_manage(): bool
 }
 
 /**
- * Issue editing is newsroom work; provider credentials and audience discovery
- * remain integration administration. Keeping these permissions separate lets
- * an editor prepare and review an issue without granting access to secrets.
- */
-function byline_newsletter_can_edit_issues(): bool
-{
-    return function_exists('current_user_can') && current_user_can('edit_posts');
-}
-
-/**
- * Delivery is a publication mutation, not draft preparation. Core publisher
- * capabilities keep this aligned with the site's existing newsroom roles.
+ * Issue access and delivery share the same publishing/editorial threshold.
+ * Provider settings remain restricted to integration managers.
  */
 function byline_newsletter_can_publish_issues(): bool
 {
-    if (!function_exists('current_user_can')) {
-        return false;
-    }
-    return current_user_can('publish_posts') || current_user_can('edit_others_posts');
+    return byline_newsletter_can_edit_issues();
 }
 
 function byline_newsletter_rest_issue_permission($request = null): bool

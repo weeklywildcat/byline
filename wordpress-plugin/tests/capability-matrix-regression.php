@@ -20,7 +20,7 @@ const WWH_SCHOOL_EVENT_POST_TYPE = 'ww_school_event';
 
 $byline_matrix_role = '';
 $byline_matrix_capabilities = [];
-$byline_matrix_features = ['sports' => true, 'events' => true, 'polls' => true, 'discord' => true];
+$byline_matrix_features = ['sports' => true, 'events' => true, 'polls' => true, 'discord' => true, 'newsletter' => true];
 $byline_matrix_menus = [];
 $byline_matrix_submenus = [];
 $byline_matrix_routes = [];
@@ -200,10 +200,11 @@ $profiles = [
         BYLINE_EDIT_DESIGN_CAPABILITY,
         BYLINE_PUBLISH_DESIGN_CAPABILITY,
         BYLINE_MANAGE_INTEGRATIONS_CAPABILITY,
-        'edit_posts', 'edit_byline_polls', 'publish_byline_polls',
+        'edit_posts', 'publish_posts', 'edit_others_posts', 'edit_byline_polls', 'publish_byline_polls',
     ],
-    'editor' => ['edit_posts', 'edit_byline_polls', 'publish_byline_polls'],
-    'author' => ['edit_posts', 'edit_byline_polls', 'publish_byline_polls'],
+    'editor' => ['edit_posts', 'edit_others_posts', 'edit_byline_polls', 'publish_byline_polls'],
+    'author' => ['edit_posts', 'publish_posts', 'edit_byline_polls', 'publish_byline_polls'],
+    'contributor' => ['edit_posts'],
     'design-only' => [BYLINE_EDIT_DESIGN_CAPABILITY, BYLINE_PUBLISH_DESIGN_CAPABILITY],
     'sports-content-editor' => ['edit_posts'],
     'poll-editor' => ['edit_byline_polls', 'publish_byline_polls'],
@@ -211,9 +212,10 @@ $profiles = [
 ];
 
 $expected_menus = [
-    'administrator' => ['byline'],
-    'editor' => ['byline'],
-    'author' => ['byline'],
+    'administrator' => ['byline', 'byline-newsletters'],
+    'editor' => ['byline', 'byline-newsletters'],
+    'author' => ['byline', 'byline-newsletters'],
+    'contributor' => ['byline'],
     'design-only' => [],
     'sports-content-editor' => ['byline'],
     'poll-editor' => [],
@@ -223,12 +225,20 @@ $expected_menus = [
 foreach ($profiles as $role => $capabilities) {
     byline_matrix_set_role($role, $capabilities);
     byline_register_admin_app();
-    foreach (['byline-studio', 'byline-planning', 'byline'] as $menu_slug) {
+    foreach (['byline-studio', 'byline-planning', 'byline', 'byline-newsletters'] as $menu_slug) {
         $menu = $byline_matrix_menus[$menu_slug] ?? null;
         $visible = is_array($menu) && current_user_can((string) $menu[2]);
         byline_matrix_assert($visible === in_array($menu_slug, $expected_menus[$role], true), "Menu visibility for {$role} and {$menu_slug} does not match capabilities.");
     }
 }
+
+// Newsletter bookmarks enforce the same threshold as the native menu.
+foreach (['administrator', 'editor', 'author'] as $role) {
+    byline_matrix_set_role($role, $profiles[$role]);
+    byline_matrix_expect_mount('byline-newsletters');
+}
+byline_matrix_set_role('contributor', $profiles['contributor']);
+byline_matrix_expect_denied('byline-newsletters');
 
 // Direct screen access follows the same capability model as menu visibility.
 byline_matrix_set_role('administrator', $profiles['administrator']);
