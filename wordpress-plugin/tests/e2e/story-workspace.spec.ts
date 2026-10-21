@@ -58,13 +58,29 @@ test("the workspace reads as Nova: sources, appointments, tasks, files and a sch
   await expect(dialog).toBeHidden();
   await expect(reporting.getByRole("button", { name: /Call the athletic director/ })).toBeVisible();
 
-  // Tasks: a checkbox field; completed work lives in a Collapsible.
+  // Tasks: high-frequency fields edit directly; the title still has a full edit dialog.
   const tasks = page.getByRole("region", { name: "Tasks", exact: true });
-  const task = tasks.getByRole("checkbox", { name: "Interview three students" });
+  await tasks.getByRole("button", { name: "Task priority: normal" }).first().click();
+  await page.getByRole("option", { name: "High", exact: true }).click();
+  await expect(tasks.getByRole("button", { name: "Task priority: high" }).first()).toBeVisible();
+
+  await tasks.getByRole("button", { name: "Change task due date" }).first().click();
+  await page.getByRole("button", { name: "Clear date" }).click();
+  await expect(tasks.getByRole("button", { name: "Change task due date" }).first()).toContainText("No due date");
+
+  await tasks.getByRole("button", { name: "Interview three students", exact: true }).click();
+  const taskDialog = page.getByRole("dialog", { name: "Edit task" });
+  await taskDialog.getByLabel("What needs doing?").fill("Interview four students");
+  await taskDialog.getByRole("button", { name: "Save task" }).click();
+  await expect(taskDialog).toBeHidden();
+  await expect(tasks.getByRole("button", { name: "Interview four students", exact: true })).toBeVisible();
+
+  // Completion still moves the task into the completed Collapsible.
+  const task = tasks.getByRole("checkbox", { name: "Interview four students" });
   await task.click();
   await expect(task).toHaveCount(0);
   await tasks.getByRole("button", { name: /^Completed/ }).click();
-  await expect(tasks.getByRole("checkbox", { name: "Interview three students" })).toBeChecked();
+  await expect(tasks.getByRole("checkbox", { name: "Interview four students" })).toBeChecked();
 
   // Files & Links: each row is a link that opens a new tab; management lives in a menu.
   const files = page.getByRole("region", { name: "Files & Links", exact: true });

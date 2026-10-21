@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, Copy, ExternalLink, LayoutDashboard, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { EditorialTask, ContributorEntry } from "../editorial/editorial-model";
+import type { EditorialTask, ContributorEntry, TaskPatch } from "../editorial/editorial-model";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { decodeEntities } from "../admin-ui/lib/text";
@@ -30,6 +30,8 @@ import { mediaTypeIcons } from "./media-icons";
 import { ActivityRow, RowSkeletons, TaskRow } from "./rows";
 import type { StoryFetchers } from "./story-fetchers";
 import { invalidateStoryData, workspaceKey } from "./story-query";
+import { useUpdateTask } from "./use-update-task";
+import { TaskEditDialog } from "./TaskEditDialog";
 
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
 const PEEK_ACTIVITY = 3;
@@ -127,6 +129,9 @@ export type StoryPeekContentProps = {
   workspaceUrl?: (storyId: number) => string;
   onNewTask: (storyId: number) => void;
   onComplete: (task: EditorialTask) => void;
+  onUpdateTask: (task: EditorialTask, patch: TaskPatch, optimistic?: Partial<EditorialTask>) => void;
+  onEditTask: (task: EditorialTask) => void;
+  updatingTaskId?: string | null;
   completing?: boolean;
   /** Mutations. Each rejects through `error`; none is called when the user lacks the capability. */
   onPlan: (patch: { deadline?: string | null; plannedPublishAt?: string | null; status?: string }) => void;
@@ -145,7 +150,7 @@ export type StoryPeekContentProps = {
 
 /** What the peek says about one story: identity in the header, then only the sections that have something to show or do. */
 export function StoryPeekContent(props: StoryPeekContentProps) {
-  const { data, timezone, now, workspaceUrl, onNewTask, onComplete, completing, onPlan, onWriters, onSaveLink, onRemoveLink, planning, writing, linking, error, linkError, linkFormOpen, onLinkForm } = props;
+  const { data, timezone, now, workspaceUrl, onNewTask, onComplete, onUpdateTask, onEditTask, updatingTaskId, completing, onPlan, onWriters, onSaveLink, onRemoveLink, planning, writing, linking, error, linkError, linkFormOpen, onLinkForm } = props;
   const { story } = data;
   const cp = data.contributors;
   const contributors = cp.contributors;
@@ -177,7 +182,7 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
       {tasks.length || caps.addTask ? <>
         <Separator />
         <PeekSection title="Tasks" action={caps.addTask ? <Button variant="outline" size="sm" data-peek-add-task="" onClick={() => onNewTask(story.id)}><Plus data-icon="inline-start" aria-hidden="true" />Add task</Button> : null}>
-          {tasks.length ? <ItemGroup role="group" aria-label="Open tasks" className="-mx-3 w-auto gap-0">{tasks.map((task) => <TaskRow key={task.id} task={task} storyTitle={story.title} compact timezone={timezone} now={now} onComplete={() => onComplete(task)} pending={completing} />)}</ItemGroup> : <p className="text-sm text-muted-foreground">No open tasks.</p>}
+          {tasks.length ? <ItemGroup role="group" aria-label="Open tasks" className="-mx-3 w-auto gap-0">{tasks.map((task) => <TaskRow key={task.id} task={task} storyTitle={story.title} compact timezone={timezone} now={now} people={data.people} canAssign={caps.assign} onComplete={() => onComplete(task)} onEdit={caps.addTask ? () => onEditTask(task) : undefined} onUpdate={caps.addTask ? (patch, optimistic) => onUpdateTask(task, patch, optimistic) : undefined} pending={Boolean(completing || (updatingTaskId && updatingTaskId === String(task.id)))} />)}</ItemGroup> : <p className="text-sm text-muted-foreground">No open tasks.</p>}
         </PeekSection>
       </> : null}
 
@@ -231,12 +236,14 @@ export type StoryPeekProps = { storyId: number | null; fetchers: StoryFetchers; 
 
 export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComplete, completing, onNewTask, now, workspaceUrl }: StoryPeekProps) {
   const client = useQueryClient();
+  const updateTask = useUpdateTask(fetchers);
   const peek = useQuery({ queryKey: workspaceKey(storyId || 0), queryFn: () => fetchers.getWorkspace!(storyId!), enabled: Boolean(storyId && fetchers.getWorkspace) });
   const data = peek.data;
   const story = data?.story;
   const [linkForm, setLinkForm] = useState<boolean | StoryResource>(false);
   const [linkError, setLinkError] = useState("");
   const [editError, setEditError] = useState("");
+  const [editingTask, setEditingTask] = useState<EditorialTask | null>(null);
   const refresh = () => invalidateStoryData(client, storyId);
 
   const planning = useMutation({
@@ -268,7 +275,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
 
   const writerList = data?.contributors.contributors.length ? data.contributors.contributors : story?.authors || [];
   const editor = story?.editor ? { name: story.editor.name, imageUrl: data?.people.find((candidate) => Number(candidate.id) === story.editor!.id)?.imageUrl } : null;
-  return <Sheet open={Boolean(storyId)} onOpenChange={(open) => { if (!open && !resources.isPending && !writers.isPending && !planning.isPending) { setLinkForm(false); setEditError(""); setLinkError(""); onClose(); } }}>
+  return <><Sheet open={Boolean(storyId)} onOpenChange={(open) => { if (!open && !resources.isPending && !writers.isPending && !planning.isPending) { setLinkForm(false); setEditError(""); setLinkError(""); setEditingTask(null); onClose(); } }}>
     <SheetContent className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md" finalFocus={() => { if (origin?.isConnected) return origin; return document.querySelector<HTMLElement>("[data-home-search]"); }}>
       <SheetHeader className="gap-1 border-b pr-12">
         <SheetTitle className="text-lg leading-snug [overflow-wrap:anywhere]">{decodeEntities(story?.title) || "Story details"}</SheetTitle>
@@ -279,10 +286,12 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
         </div> : null}
       </SheetHeader>
       {peek.isPending ? <div className="py-4"><RowSkeletons count={7} /></div> : peek.isError || !story || !data ? <div className="p-4"><InlineAlert title="The story couldn't be loaded." onAction={() => void peek.refetch()}>{describeEditorialError(peek.error, "The story couldn't be loaded.")}</InlineAlert></div>
-        : <StoryPeekContent data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl} onNewTask={onNewTask} onComplete={onComplete} completing={completing}
+        : <StoryPeekContent data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl} onNewTask={onNewTask} onComplete={onComplete} onUpdateTask={(task, patch, optimistic) => updateTask.mutate({ task, patch, optimistic })} onEditTask={setEditingTask} updatingTaskId={updateTask.isPending ? String(updateTask.variables?.task.id || "") : null} completing={completing}
           onPlan={(patch) => planning.mutate(patch)} onWriters={(value) => writers.mutate(value)}
           onSaveLink={(input, existing) => resources.mutate(existing ? { ...input, id: existing.id } : input)} onRemoveLink={(id) => resources.mutate({ remove: id })}
           planning={planning.isPending} writing={writers.isPending} linking={resources.isPending} error={editError} linkError={linkError} linkFormOpen={linkForm} onLinkForm={(next) => { setLinkError(""); setLinkForm(next); }} />}
     </SheetContent>
-  </Sheet>;
+  </Sheet>
+  <TaskEditDialog open={editingTask !== null} onClose={() => setEditingTask(null)} fetchers={fetchers} task={editingTask} people={data?.people || []} canAssign={Boolean(data?.capabilities.assign)} timezone={data?.timezone || timezone || "UTC"} />
+  </>;
 }

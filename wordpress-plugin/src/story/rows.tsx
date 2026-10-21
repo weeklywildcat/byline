@@ -1,14 +1,17 @@
 /** Rows shared by every surface that lists story work: Home, Story Peek and the Stories views. Anything visual comes from Item, Badge, Checkbox and Skeleton. */
 import type { ComponentProps, ReactNode } from "react";
+import { Pencil } from "lucide-react";
 import { ItemButton } from "../admin-ui/components/item-button";
 import { Checkbox } from "../admin-ui/ui/checkbox";
+import { Button } from "../admin-ui/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Skeleton } from "../admin-ui/ui/skeleton";
-import type { EditorialTask } from "../editorial/editorial-model";
+import type { ContributorEntry, EditorialTask } from "../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../editorial/activity-model";
 import { activityCopy, dateLabel, dayDistance, exactDate, relativeTime } from "../home/newsroom-model";
 import { decodeEntities } from "../admin-ui/lib/text";
 import { StoryHoverCard } from "./StoryHoverCard";
+import { TaskQuickFields, type TaskQuickUpdate } from "./TaskQuickFields";
 
 export function RowSkeletons({ count = 4 }: { count?: number }) {
   return <div aria-label="Loading newsroom work" aria-busy="true" className="flex flex-col gap-4 px-3 pb-2">{Array.from({ length: count }, (_, i) => <div key={i} className="flex flex-col gap-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/3" /></div>)}</div>;
@@ -20,17 +23,18 @@ export function Row({ onOpen, children, ...props }: { onOpen?: () => void; child
 }
 
 /** `compact` leaves the story name out of the description, for rows already listed under their story. */
-export function TaskRow({ task, storyTitle, compact, timezone, onOpen, onComplete, pending, now }: { task: EditorialTask; storyTitle?: string; compact?: boolean; timezone: string; onOpen?: () => void; onComplete: () => void; pending?: boolean; now: Date }) {
+export function TaskRow({ task, storyTitle, compact, timezone, onOpen, onEdit, onComplete, onUpdate, people = [], canAssign = false, pending, now }: { task: EditorialTask; storyTitle?: string; compact?: boolean; timezone: string; onOpen?: () => void; onEdit?: () => void; onComplete: () => void; onUpdate?: TaskQuickUpdate; people?: ContributorEntry[]; canAssign?: boolean; pending?: boolean; now: Date }) {
   const overdue = dayDistance(task.dueAt, timezone, now) < 0;
   const title = onOpen ? <button type="button" className="text-left hover:underline" onClick={onOpen}>{task.title}</button> : <span>{task.title}</span>;
   const hoverableTitle = !compact && task.storyId && storyTitle ? <StoryHoverCard storyId={task.storyId} title={storyTitle}>{title}</StoryHoverCard> : title;
   return <Item size="sm" data-task-id={task.id}>
     <ItemMedia><Checkbox aria-label={`Complete ${task.title}${storyTitle ? ` — ${decodeEntities(storyTitle)}` : ""}`} checked={task.state === "completed"} aria-disabled={pending || undefined} onCheckedChange={(checked) => { if (checked && !pending) onComplete(); }} /></ItemMedia>
-    <ItemContent>
+    <ItemContent className="gap-1">
       <ItemTitle className="line-clamp-2">{hoverableTitle}</ItemTitle>
-      {compact && task.priority !== "urgent" ? null : <ItemDescription>{compact ? null : decodeEntities(storyTitle) || "Newsroom task"}{task.priority === "urgent" ? <span className="font-medium text-warning">{compact ? "" : " · "}Urgent</span> : null}</ItemDescription>}
+      {!compact && storyTitle ? <ItemDescription>{decodeEntities(storyTitle)}</ItemDescription> : null}
+      {onUpdate ? <TaskQuickFields task={task} timezone={timezone} now={now} people={people} canAssign={canAssign} disabled={pending} onUpdate={onUpdate} /> : task.priority === "urgent" ? <ItemDescription><span className="font-medium text-warning">Urgent</span></ItemDescription> : null}
     </ItemContent>
-    <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined} title={exactDate(task.dueAt, timezone)}>{dateLabel(task.dueAt, timezone, now)}</time></ItemActions>
+    {onEdit ? <ItemActions><Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit ${task.title}`} disabled={pending} onClick={onEdit}><Pencil aria-hidden="true" /></Button></ItemActions> : !onUpdate ? <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined} title={exactDate(task.dueAt, timezone)}>{dateLabel(task.dueAt, timezone, now)}</time></ItemActions> : null}
   </Item>;
 }
 

@@ -26,7 +26,7 @@ function canteen(patch: Record<string, unknown> = {}): StoryWorkspace {
 
 const props = (data: StoryWorkspace): StoryPeekContentProps => ({
   data, timezone: "America/New_York", now, workspaceUrl: (id) => `/wp-admin/admin.php?page=byline-planning&story=${id}`,
-  onNewTask: vi.fn(), onComplete: vi.fn(), onPlan: vi.fn(), onWriters: vi.fn(), onSaveLink: vi.fn(), onRemoveLink: vi.fn(),
+  onNewTask: vi.fn(), onComplete: vi.fn(), onUpdateTask: vi.fn(), onEditTask: vi.fn(), onPlan: vi.fn(), onWriters: vi.fn(), onSaveLink: vi.fn(), onRemoveLink: vi.fn(),
   planning: false, writing: false, linking: false, error: "", linkError: "", linkFormOpen: false, onLinkForm: vi.fn()
 });
 const render = (data: StoryWorkspace) => renderToStaticMarkup(<StoryPeekContent {...props(data)} />);
