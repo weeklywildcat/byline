@@ -8,7 +8,7 @@ import { WorkStatusBadge, sourceIntensity, appointmentIntensity, appointmentStat
 import { Button } from "../admin-ui/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../admin-ui/ui/collapsible";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemHeader, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { AppointmentDialog } from "./AppointmentDialog";
@@ -30,17 +30,19 @@ function QuickStatusContext({ title, current, options, disabled, onOpen, onStatu
   return <ContextMenu>
     <ContextMenuTrigger render={<div className="contents" />}>{children}</ContextMenuTrigger>
     <ContextMenuContent className="w-52">
-      <ContextMenuLabel className="max-w-48 truncate">{title}</ContextMenuLabel>
-      <ContextMenuSeparator />
-      <ContextMenuItem onClick={(event) => onOpen(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit</ContextMenuItem>
-      {onStatus ? <ContextMenuSub>
-        <ContextMenuSubTrigger disabled={disabled}>Status</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="min-w-44">
-          <ContextMenuRadioGroup value={current} onValueChange={(value) => { if (value && value !== current) onStatus(String(value)); }}>
-            {options.map((option) => <ContextMenuRadioItem key={option.value} value={option.value}>{option.label}</ContextMenuRadioItem>)}
-          </ContextMenuRadioGroup>
-        </ContextMenuSubContent>
-      </ContextMenuSub> : null}
+      <ContextMenuGroup>
+        <ContextMenuLabel className="max-w-48 truncate">{title}</ContextMenuLabel>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={(event) => onOpen(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit</ContextMenuItem>
+        {onStatus ? <ContextMenuSub>
+          <ContextMenuSubTrigger disabled={disabled}>Status</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-44">
+            <ContextMenuRadioGroup value={current} onValueChange={(value) => { if (value && value !== current) onStatus(String(value)); }}>
+              {options.map((option) => <ContextMenuRadioItem key={option.value} value={option.value}>{option.label}</ContextMenuRadioItem>)}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub> : null}
+      </ContextMenuGroup>
     </ContextMenuContent>
   </ContextMenu>;
 }

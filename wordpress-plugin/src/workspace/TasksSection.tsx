@@ -9,7 +9,7 @@ import { Button } from "../admin-ui/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Checkbox } from "../admin-ui/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../admin-ui/ui/collapsible";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Field, FieldLabel } from "../admin-ui/ui/field";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
@@ -38,10 +38,12 @@ function TaskItem({ task, timezone, now, busy, editable, people, canAssign, onTo
       {!editable && due ? <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined}>{due}</time></ItemActions> : null}
     </ContextMenuTrigger>
     <ContextMenuContent className="w-48">
-      <ContextMenuLabel className="max-w-44 truncate">{task.title}</ContextMenuLabel>
-      <ContextMenuSeparator />
-      {editable ? <ContextMenuItem disabled={busy} onClick={(event) => onEdit(task, event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit task</ContextMenuItem> : null}
-      <ContextMenuItem disabled={busy} onClick={() => onToggle(task, done ? "open" : "completed")}>{done ? "Reopen task" : "Mark complete"}</ContextMenuItem>
+      <ContextMenuGroup>
+        <ContextMenuLabel className="max-w-44 truncate">{task.title}</ContextMenuLabel>
+        <ContextMenuSeparator />
+        {editable ? <ContextMenuItem disabled={busy} onClick={(event) => onEdit(task, event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit task</ContextMenuItem> : null}
+        <ContextMenuItem disabled={busy} onClick={() => onToggle(task, done ? "open" : "completed")}>{done ? "Reopen task" : "Mark complete"}</ContextMenuItem>
+      </ContextMenuGroup>
     </ContextMenuContent>
   </ContextMenu>;
 }

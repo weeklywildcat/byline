@@ -43,6 +43,36 @@ test.describe("Planning destinations are one design system", () => {
     await expect(page.getByRole("dialog", { name: title, exact: true }).getByRole("link", { name: "Open workspace" })).toBeVisible();
   });
 
+  for (const width of [1440, 700]) {
+    test(`Media Desk right-click opens actions and Story Peek at ${width}px`, async ({ adminPage: page, adminSession: session }) => {
+      const unique = token();
+      const title = `${unique} Context story`;
+      const id = await createPlanningStory(session, { title, status: "reporting" });
+      const assignmentTitle = `${unique} Photos`;
+      const created = await session.rest(`/byline/v1/editorial/stories/${id}/media-assignments`, "POST", { title: assignmentTitle, type: "photo" });
+      expect(created.ok).toBe(true);
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      const url = planning("media");
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(url);
+      await page.getByRole("searchbox", { name: "Find a story or assignment" }).fill(unique);
+      await page.getByRole("button", { name: title, exact: true }).click({ button: "right" });
+      const menu = page.locator('[data-slot="context-menu-content"]');
+      await expect(menu).toBeVisible();
+      await expect(menu.getByRole("group", { name: assignmentTitle, exact: true })).toBeVisible();
+      await expect(menu.getByRole("menuitem", { name: "Open story workspace" })).toHaveAttribute("href", new RegExp(`story=${id}(?:&|$)`));
+      await menu.getByRole("menuitem", { name: "Status", exact: true }).hover();
+      await expect(page.getByRole("menuitemradio", { name: "Needed", exact: true })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await menu.getByRole("menuitem", { name: "Quick view story" }).click();
+      await expect(page.getByRole("dialog", { name: title, exact: true })).toBeVisible();
+      await expect(page.getByText("Planning couldn't be displayed.", { exact: true })).toHaveCount(0);
+      expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(url);
+      expect(errors).toEqual([]);
+    });
+  }
+
   test("Coverage creates a package, links a story in one step and removes it with Undo available", async ({ adminPage: page, adminSession: session }) => {
     const unique = token();
     const me = await currentUserId(session);
