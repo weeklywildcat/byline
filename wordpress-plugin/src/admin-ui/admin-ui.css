@@ -1,7 +1,8 @@
 /*
  * The Byline admin design system: shadcn base-nova (neutral) on Tailwind 4,
- * shared by Home and the Story Workspace. Both entry stylesheets import this
- * file, so the theme, resets and overlay rules exist exactly once.
+ * shared by Home, Planning, the Story Workspace, Presence, and isolated admin
+ * islands such as Settings navigation. Consumer stylesheets import this file;
+ * the scope root keeps the theme, resets and overlays out of WordPress chrome.
  *
  * There is no Preflight. Every compiled selector is prefixed with
  * `.byline-ui-root` by loaders/ui-scope-postcss.js, so nothing here can touch
