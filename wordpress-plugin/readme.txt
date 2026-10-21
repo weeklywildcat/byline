@@ -415,6 +415,78 @@ makes Studio a real homepage editor.**
   unaffected and continues to render normally.
 * Homepage designs saved while these settings existed continue to load.
 
+= 0.2.8 =
+
+**Makes WordPress the authoritative home for polls and votes.**
+
+* Adds native WordPress poll editing, ordered answers, voting windows, results,
+  CSV exports, and controls to open, close, reopen, duplicate, or reset a poll.
+* Stores votes in WordPress with duplicate-vote protection and prevents removing
+  answers that already have votes. Poll permissions follow newsroom roles.
+* Replaces the public site's Cloudflare D1 poll implementation with a thin
+  same-origin proxy to WordPress. Existing poll URLs, voter cookies, signatures,
+  and voter-key derivation stay compatible.
+* Adds D1 export and WordPress import tooling that preserves poll and answer
+  identifiers and vote records. Existing installations must migrate their data
+  and retain the same signing secret before switching the public proxy.
+
+= 0.2.7 =
+
+**Organizes WordPress navigation around newsroom work.**
+
+* Promotes Studio, Sports, Polls, and Events to top-level WordPress menus. Sports
+  opens directly on Games, with its roster and import/export tools beneath it.
+* Moves Byline below Settings and limits it to publication configuration:
+  Overview, Publication, Theme, Integrations, and Settings.
+* Uses each screen's own capability for menu visibility, hides disabled modules,
+  and fixes active-menu highlighting for sports utilities.
+* Preserves existing screen URLs and redirects the retired Team Settings page to
+  the Sports team screen.
+
+= 0.2.6 =
+
+**Fixes the WordPress admin crash and adds Discord connection settings.**
+
+* Fixes the fatal error introduced in 0.2.5 when WordPress passes a null value to
+  the admin menu filters, including on the Plugins screen.
+* Adds a Discord settings screen for the bot connection, server, storyboard
+  Forum, announcements channel, staff role, and synchronization behavior.
+* Loads server, channel, and role choices from Discord, with manual ID fields
+  when those choices cannot be loaded, and reports connection health.
+* Keeps saved secrets write-only. The bot loads settings through the signed
+  WordPress bridge and retains environment configuration as a fallback.
+* Adds a signed reconciliation endpoint for Sync now.
+
+= 0.2.5 =
+
+**Moves Byline navigation into native WordPress screens.**
+
+* Replaces the admin app's primary hash navigation with native WordPress menu
+  pages and stable URLs for Dashboard, Studio, Publication, Theme, Integrations,
+  Settings, and enabled newsroom modules.
+* Keeps related settings in local WordPress-style tabs and translates old hash
+  bookmarks to their new screen URLs.
+* Checks capabilities on each screen and directs users with limited access to
+  an allowed landing page.
+* Fixes Studio publication style parity with the public site.
+
+= 0.2.4 =
+
+**Publishes the first canonical Byline monorepo release.**
+
+* Ships the WordPress plugin alongside the static public site, optional Discord
+  bot, and shared content, design, and presentation packages in one repository.
+* Adds design schema v2 and shared lead and sports package renderers to Studio
+  and the public homepage. Existing designs retain legacy content that cannot
+  be converted faithfully.
+* Fails static builds on content-fetch errors while allowing genuinely empty
+  publications, and fixes PHP 7.4 compatibility and Discord user metadata
+  registration.
+* Exposes plugin metadata at the repository root so existing installations can
+  update from the standalone repository's 0.2.3 bridge to canonical releases.
+  The installed plugin folder, main file, updater slug, and ZIP name stay the
+  same.
+
 == Upgrade Notice ==
 
 = 0.3.47 =
