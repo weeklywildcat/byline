@@ -19,6 +19,8 @@ The combined Byline menu is visible to users who can edit posts, manage Byline, 
 
 Byline's top-level entry resolves to a capability the current user actually holds. An integration manager lands in Settings; a writer lands in Today. Retired design capabilities alone grant no admin destination.
 
+Contributors use Today instead of the native WordPress Dashboard: its sidebar entry is hidden and Dashboard visits, including the default post-login landing, redirect to Today. Other admin screens remain available under their existing permissions. Users who also hold editorial, WordPress administration, or Byline management privileges keep Dashboard; network and user administration are unaffected.
+
 Archived sports post types remain registered privately with `show_ui` and `show_in_rest` disabled and editing/deletion capabilities set to `do_not_allow`. Normal archive Pages use the ordinary Page editor for corrections. Public sports REST read aliases remain available for existing article embeds and data consumers.
 
 ## URLs and compatibility

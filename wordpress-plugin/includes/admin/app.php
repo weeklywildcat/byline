@@ -251,6 +251,43 @@ function byline_register_admin_app(): void
 add_action('admin_menu', 'byline_register_admin_app');
 
 /**
+ * Contributors use Today as their newsroom landing screen. Preserve Dashboard
+ * for users who also hold editorial or administrative privileges.
+ */
+function byline_admin_contributor_dashboard_hidden(): bool
+{
+    if (is_network_admin() || is_user_admin()
+        || !current_user_can('edit_posts')
+        || current_user_can('edit_others_posts')
+        || current_user_can('manage_options')
+        || current_user_can(BYLINE_MANAGE_CAPABILITY)
+        || current_user_can(BYLINE_MANAGE_INTEGRATIONS_CAPABILITY)) {
+        return false;
+    }
+
+    return in_array('contributor', (array) wp_get_current_user()->roles, true);
+}
+
+function byline_admin_hide_contributor_dashboard(): void
+{
+    if (byline_admin_contributor_dashboard_hidden()) {
+        remove_menu_page('index.php');
+    }
+}
+add_action('admin_menu', 'byline_admin_hide_contributor_dashboard', 999);
+
+function byline_admin_redirect_contributor_dashboard(): void
+{
+    if (byline_admin_contributor_dashboard_hidden()) {
+        wp_safe_redirect(byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'today']));
+        exit;
+    }
+}
+// Scope the redirect to the native Dashboard; editors, profile pages, REST,
+// AJAX, and other admin requests retain their normal behavior.
+add_action('load-index.php', 'byline_admin_redirect_contributor_dashboard');
+
+/**
  * The Sports team screen was previously duplicated as a Byline-owned page.
  * Translate its retired URL to native archive Pages.
  */
