@@ -60,13 +60,14 @@ test("the workspace reads as Nova: sources, appointments, tasks, files and a sch
 
   // Tasks: high-frequency fields edit directly; the title still has a full edit dialog.
   const tasks = page.getByRole("region", { name: "Tasks", exact: true });
-  await tasks.getByRole("button", { name: "Task priority: normal" }).first().click();
+  await tasks.getByRole("combobox", { name: "Task priority: normal" }).first().click();
   await page.getByRole("option", { name: "High", exact: true }).click();
-  await expect(tasks.getByRole("button", { name: "Task priority: high" }).first()).toBeVisible();
+  await expect(tasks.getByRole("combobox", { name: "Task priority: high" }).first()).toBeVisible();
 
   await tasks.getByRole("button", { name: "Change task due date" }).first().click();
   await page.getByRole("button", { name: "Clear date" }).click();
-  await expect(tasks.getByRole("button", { name: "Change task due date" }).first()).toContainText("No due date");
+  // A task without a date sorts after dated ones, so look for it rather than assume it stays first.
+  await expect(tasks.getByRole("button", { name: "Change task due date" }).filter({ hasText: "No due date" })).toHaveCount(1);
 
   await tasks.getByRole("button", { name: "Interview three students", exact: true }).click();
   const taskDialog = page.getByRole("dialog", { name: "Edit task" });
@@ -134,9 +135,9 @@ test("the workspace keeps its layout from 1440 down to a phone", async ({ adminP
       await expect(dialog).toBeHidden();
     }
   }
-  // On a phone the page reads in the order a reporter works: brief, reporting, tasks, media, files, details, activity.
+  // On a phone the page reads in the order a reporter works: brief, reporting, tasks, media, files, details, article notes, activity.
   const order = await page.evaluate(() => Array.from(document.querySelectorAll("main [role=region][aria-labelledby]"))
     .map((section) => ({ title: section.querySelector("[role=heading][aria-level='2']")?.textContent, top: section.getBoundingClientRect().top }))
     .filter((section) => section.title).sort((a, b) => a.top - b.top).map((section) => section.title));
-  expect(order).toEqual(["Brief", "Reporting", "Tasks", "Media & Production", "Files & Links", "Details", "Recent Activity"]);
+  expect(order).toEqual(["Brief", "Reporting", "Tasks", "Media & Production", "Files & Links", "Details", "Article Notes", "Recent Activity"]);
 });

@@ -15,26 +15,27 @@ test.describe("WordPress environment", () => {
     // This specifically guards the cross-directory Tailwind source boundary:
     // the trigger can still be "visible" while an unstyled avatar renders at
     // its natural image size and spills down over the WordPress admin screen.
-    await expect(presence).toHaveCSS("height", "32px");
+    await expect(presence).toHaveCSS("height", "28px");
     const triggerAvatar = presence.locator('[data-slot="avatar"]').first();
     await expect(triggerAvatar).toBeVisible();
-    // Match the shared shadcn default avatar variant (32px), not the small
-    // toolbar-only variant. WordPress still serves a 96px source image.
+    // The compact toolbar variant: the shared shadcn default avatar, sized
+    // to 28px (size-7) so it sits inside the 32px bar. WordPress still serves
+    // a 96px source image.
     await expect(triggerAvatar).toHaveAttribute("data-size", "default");
-    await expect(triggerAvatar).toHaveCSS("width", "32px");
-    await expect(triggerAvatar).toHaveCSS("height", "32px");
+    await expect(triggerAvatar).toHaveCSS("width", "28px");
+    await expect(triggerAvatar).toHaveCSS("height", "28px");
     await expect(triggerAvatar).toHaveCSS("position", "relative");
     await expect(triggerAvatar).toHaveCSS("border-radius", "9999px");
     const triggerImage = triggerAvatar.locator('[data-slot="avatar-image"]');
-    await expect(triggerImage).toHaveCSS("width", "32px");
-    await expect(triggerImage).toHaveCSS("height", "32px");
+    await expect(triggerImage).toHaveCSS("width", "28px");
+    await expect(triggerImage).toHaveCSS("height", "28px");
     await expect(triggerImage).toHaveCSS("object-fit", "cover");
     await expect(triggerImage).toHaveCSS("border-radius", "9999px");
 
     await presence.click();
     await expect(adminPage.getByText("Newsroom", { exact: true })).toBeVisible();
     await expect(adminPage.getByRole("heading", { name: "Active now", exact: true })).toBeVisible();
-    await expect(adminPage.getByText(/people? active/)).toBeVisible();
+    await expect(adminPage.getByText(/\d+ (person|people) active/)).toBeVisible();
   });
 
   test("Byline REST namespace is registered", async ({ adminPage }) => {

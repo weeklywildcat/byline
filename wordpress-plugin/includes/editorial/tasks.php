@@ -252,8 +252,11 @@ function byline_create_task(array $input, ?int $user_id = null)
         return new WP_Error('byline_task_assignment_forbidden', 'Only an editor can assign work to another user.', ['status' => 403]);
     }
 
-    $due_at = byline_task_datetime($input['dueAt'] ?? $input['dueDate'] ?? '');
-    if (($input['dueAt'] ?? $input['dueDate'] ?? '') !== '' && $due_at === '') {
+    // An absent, empty or null date means "no due date".
+    $raw_due_at = $input['dueAt'] ?? $input['dueDate'] ?? '';
+    $raw_due_at = $raw_due_at === null ? '' : $raw_due_at;
+    $due_at = byline_task_datetime($raw_due_at);
+    if ($raw_due_at !== '' && $due_at === '') {
         return new WP_Error('byline_task_invalid_due_at', 'Use a valid task due date/time.', ['status' => 400]);
     }
 
@@ -338,7 +341,9 @@ function byline_update_task(int $task_id, array $input, ?int $user_id = null)
     }
 
     if (array_key_exists('dueAt', $input) || array_key_exists('dueDate', $input)) {
-        $raw_due_at = $input['dueAt'] ?? $input['dueDate'];
+        // The UI clears a due date by sending null; that is the same as an empty string.
+        $raw_due_at = array_key_exists('dueAt', $input) ? $input['dueAt'] : $input['dueDate'];
+        $raw_due_at = $raw_due_at === null ? '' : $raw_due_at;
         $due_at = byline_task_datetime($raw_due_at);
         if ($raw_due_at !== '' && $due_at === '') {
             return new WP_Error('byline_task_invalid_due_at', 'Use a valid task due date/time.', ['status' => 400]);
