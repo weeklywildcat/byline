@@ -13,7 +13,10 @@ const planningCss = path.resolve(__dirname, 'src/planning/style.css');
 // Presence is a fourth private React 19 surface. Its trigger is portalled into
 // the WordPress toolbar while its overlays stay in the isolated Nova root.
 const presenceCss = path.resolve(__dirname, 'src/presence/style.css');
-const scopedCss = [homeCss, workspaceCss, planningCss, presenceCss];
+// Settings remains in the WordPress React entrypoint, but its navigation island
+// uses the same scoped Nova/shadcn pipeline as the private React 19 surfaces.
+const settingsCss = path.resolve(__dirname, 'src/settings/style.css');
+const scopedCss = [homeCss, workspaceCss, planningCss, presenceCss, settingsCss];
 const cssRule = defaultConfig.module.rules.find((rule) => rule.test?.test('style.css'));
 
 const adminConfig = {
