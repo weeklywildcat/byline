@@ -69,7 +69,7 @@ export function PresencePanel({ people, now, currentLocation, recentSeconds }: {
   const activeLabel = groups.active.length === 1 ? "1 person active" : `${groups.active.length} people active`;
 
   return <Popover>
-    <PopoverTrigger render={<Button variant="ghost" size="sm" className="h-8 min-w-8 gap-1 rounded-md px-1.5 text-white hover:bg-white/10 hover:text-white focus-visible:ring-white/50" aria-label={`Newsroom presence, ${activeLabel}`} />}>
+    <PopoverTrigger render={<Button variant="ghost" size="icon-sm" className="rounded-full bg-transparent p-0 text-white hover:bg-transparent hover:text-white aria-expanded:bg-transparent aria-expanded:text-white focus-visible:bg-transparent focus-visible:ring-white/50" aria-label={`Newsroom presence, ${activeLabel}`} />}>
       {shown.length ? <AvatarGroup className="-space-x-1.5">
         {shown.map((person) => <PresenceAvatar key={person.id} person={person} toolbar />)}
         {overflow ? <AvatarGroupCount className="size-7 bg-neutral-700 text-[10px] text-white ring-neutral-900">+{overflow}</AvatarGroupCount> : null}
