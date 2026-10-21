@@ -8,7 +8,7 @@ WordPress owns the sidebar. Byline does not add a second global navigation shell
 - Byline is the first sidebar menu, above Dashboard. It contains Home, Today, Stories, Calendar, Media Desk, Coverage, Performance, Content Health, Feedback, and Settings, in that order. The Planning destinations retain their existing `admin.php?page=byline-planning&tab=...` URLs; Planning no longer has a separate top-level menu.
 - Polls is a native post type with its own capability family and menu.
 - School Events retains its native post type, editor, and menu when enabled.
-- Newsletters provides Issues and Settings when the module is enabled.
+- Newsletters provides Issues when the module is enabled and the user has publishing or editorial permissions. Provider settings live in Byline Settings.
 - Settings contains publication, integration, access, API, compatibility, and diagnostics sections. Former Publication, Integrations, and Byline Doctor links resolve to the corresponding Settings section.
 
 The Studio, Theme, and custom Sports menus have been removed. Historical games and rosters are converted to normal Pages, grouped by sport and season. There are no Games, Teams, Rosters, schedule imports/exports, or bulk reset screens. See [sports archive](sports-archive.md).
@@ -20,6 +20,8 @@ The combined Byline menu is visible to users who can edit posts, manage Byline, 
 Byline's top-level entry resolves to a capability the current user actually holds. An integration manager lands in Settings; a writer lands in Today. Retired design capabilities alone grant no admin destination.
 
 Contributors use Today instead of the native WordPress Dashboard: its sidebar entry is hidden and Dashboard visits, including the default post-login landing, redirect to Today. Other admin screens remain available under their existing permissions. Users who also hold editorial, WordPress administration, or Byline management privileges keep Dashboard; network and user administration are unaffected.
+
+Newsletter issues require `publish_posts` or `edit_others_posts` across the sidebar, direct screen URLs, command palette, and REST API. Contributors cannot list, read, create, update, delete, or deliver newsletter issues, including drafts they previously owned. Authors with publishing access and editors retain issue access; provider settings still require `manage_byline_integrations`.
 
 Archived sports post types remain registered privately with `show_ui` and `show_in_rest` disabled and editing/deletion capabilities set to `do_not_allow`. Normal archive Pages use the ordinary Page editor for corrections. Public sports REST read aliases remain available for existing article embeds and data consumers.
 
