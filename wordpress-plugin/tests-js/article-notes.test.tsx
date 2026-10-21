@@ -222,7 +222,7 @@ describe("Article Notes in Story Peek", () => {
     expect(html).toContain("3 open notes");
     expect(html).toContain("Review in editor");
     const link = html.match(/<a[^>]*data-peek-notes[^>]*>/)![0];
-    expect(link).toContain(`href="${editUrl.replace("&", "&amp;")}"`);
+    expect(link).toContain(`href="${editUrl.replace(/&/g, "&amp;")}"`);
     expect(link).toContain('target="_blank"');
     expect(html).not.toContain("7 resolved");
   });
