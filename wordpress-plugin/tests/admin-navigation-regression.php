@@ -47,7 +47,13 @@ function add_filter(string $tag, $callback, int $priority = 10, int $accepted_ar
     ];
     return true;
 }
-function remove_submenu_page(...$args): void {}
+function remove_submenu_page(string $parent, string $slug): void
+{
+    global $registered_submenus;
+    $registered_submenus = array_values(array_filter($registered_submenus, static function (array $submenu) use ($parent, $slug): bool {
+        return $submenu[0] !== $parent || $submenu[4] !== $slug;
+    }));
+}
 function apply_filters(string $tag, $value, ...$args)
 {
     global $registered_filters;
@@ -72,7 +78,12 @@ function add_menu_page(...$args): string
 function add_submenu_page(...$args): string
 {
     global $registered_submenus;
-    $registered_submenus[] = $args;
+    $position = $args[6] ?? null;
+    if (is_int($position)) {
+        array_splice($registered_submenus, $position, 0, [$args]);
+    } else {
+        $registered_submenus[] = $args;
+    }
     return 'byline_page_' . $args[4];
 }
 
@@ -131,14 +142,13 @@ function submenus_by_parent(): array
 }
 
 // ---------------------------------------------------------------------------
-// Menu architecture: newsroom workflows are top-level, Byline is configuration.
+// Menu architecture: one Byline menu above Dashboard, with protected Settings.
 // ---------------------------------------------------------------------------
 
 byline_register_admin_app();
 
 $expected_top_level = [
-    'byline-planning' => ['title' => 'Planning', 'capability' => 'edit_posts', 'position' => 26],
-    'byline' => ['title' => 'Byline', 'capability' => BYLINE_MANAGE_CAPABILITY, 'position' => 100],
+    'byline' => ['title' => 'Byline', 'capability' => BYLINE_MANAGE_CAPABILITY, 'position' => 1],
 ];
 foreach ($expected_top_level as $slug => $expected) {
     if (!isset($registered_menus[$slug])) {
@@ -156,10 +166,14 @@ foreach ($expected_top_level as $slug => $expected) {
     }
 }
 
-// Planning owns its destinations as native submenu entries, so the sidebar is
-// the only persistent navigation a user has to learn.
+// Planning destinations are native Byline children, with no separate parent.
+if (isset($registered_menus['byline-planning'])) {
+    fail('Planning must be a child of Byline rather than a separate top-level menu.');
+}
 $by_parent = submenus_by_parent();
-$planning_children = $by_parent['byline-planning'] ?? [];
+$planning_children = array_filter($by_parent['byline'] ?? [], static function (array $submenu): bool {
+    return $submenu[4] !== 'byline' && $submenu[4] !== 'byline-settings';
+});
 $expected_planning = [
     'byline-planning' => ['Today', 'edit_posts'],
     'admin.php?page=byline-planning&tab=stories' => ['Stories', 'edit_posts'],
@@ -184,24 +198,20 @@ foreach ($expected_planning as $slug => [$title, $capability]) {
 if (count($planning_children) !== count($expected_planning)) {
     fail('Planning gained or lost a destination.');
 }
-// The landing child reuses the parent slug, which is how WordPress is told not
-// to add a duplicate "Planning > Planning" entry above it.
-if (array_key_first($planning_children) !== 'byline-planning') {
-    fail('The Planning landing entry must reuse the parent slug so WordPress does not duplicate it.');
-}
-// Planning destinations are deep links into the already registered page, so
-// they must not register a second render callback.
+// Today must register the Planning page now that it is no longer top-level.
+// Other destinations are deep links to that same registered callback.
 foreach ($planning_children as $slug => $submenu) {
-    if (($submenu[5] ?? '') !== '') {
-        fail("Planning child {$slug} must not register its own callback.");
+    $expected_callback = $slug === 'byline-planning' ? 'byline_render_admin_app' : '';
+    if (($submenu[5] ?? '') !== $expected_callback) {
+        fail("Planning child {$slug} has the wrong callback registration.");
     }
 }
 
-// Byline has one configuration destination. Home stays independent so the
-// dashboard can evolve without becoming part of the settings information architecture.
+// Byline keeps Home first, the Planning destinations next, and Settings last.
 $byline_children = $by_parent['byline'] ?? [];
 $expected_children = [
     'byline' => ['Home', BYLINE_MANAGE_CAPABILITY],
+] + $expected_planning + [
     'byline-settings' => ['Settings', BYLINE_MANAGE_CAPABILITY],
 ];
 foreach ($expected_children as $slug => [$title, $capability]) {
@@ -211,7 +221,7 @@ foreach ($expected_children as $slug => [$title, $capability]) {
     if ($byline_children[$slug][2] !== $title) {
         fail("Byline child {$slug} should be titled {$title}, got {$byline_children[$slug][2]}.");
     }
-    if ($byline_children[$slug][3] !== $capability || byline_admin_page_capability($slug) !== $capability) {
+    if ($byline_children[$slug][3] !== $capability || (strpos($slug, 'admin.php?') !== 0 && byline_admin_page_capability($slug) !== $capability)) {
         fail("Capability mapping changed for {$slug}.");
     }
 }
@@ -234,8 +244,8 @@ foreach (['byline-studio', 'byline-polls', 'byline-teams'] as $moved) {
         fail("Byline should no longer contain {$moved} after the IA refactor.");
     }
 }
-if (count($byline_children) !== count($expected_children)) {
-    fail('Byline gained an unexpected configuration child.');
+if (array_keys($byline_children) !== array_keys($expected_children)) {
+    fail('Byline must list Home, Planning destinations, and Settings in that order.');
 }
 
 // ---------------------------------------------------------------------------
@@ -274,8 +284,11 @@ $test_features = ['polls' => true, 'sports' => true, 'events' => true, 'discord'
 // ---------------------------------------------------------------------------
 
 $test_capabilities = ['edit_posts' => true];
-if (byline_admin_menu_capability() === 'edit_posts') {
-    fail('A reporter who can only edit posts must not surface the Byline configuration menu.');
+if (byline_admin_menu_capability() !== 'edit_posts') {
+    fail('A reporter must see the combined Byline menu.');
+}
+if (byline_admin_page_capability('byline-settings') === 'edit_posts') {
+    fail('Seeing the Byline menu must not grant a reporter access to Settings.');
 }
 if (strpos(byline_admin_user_landing_url(), 'page=byline-planning') === false || strpos(byline_admin_user_landing_url(), 'tab=today') === false) {
     fail('An editor landing on Byline must be sent to the Today surface.');
@@ -288,9 +301,12 @@ if (byline_admin_feedback_capability() !== BYLINE_MANAGE_CAPABILITY) {
 }
 reset_menu_state();
 byline_register_admin_app();
-$reporter_planning = submenus_by_parent()['byline-planning'] ?? [];
+$reporter_planning = submenus_by_parent()['byline'] ?? [];
 if (($reporter_planning['admin.php?page=byline-planning&tab=feedback'][3] ?? '') !== BYLINE_MANAGE_CAPABILITY) {
     fail('Feedback must not become visible to a reporter who can only edit their own posts.');
+}
+if (isset($reporter_planning['byline'])) {
+    fail('A reporter must not see a duplicate Byline parent entry above Today.');
 }
 if (!isset($reporter_planning['admin.php?page=byline-planning&tab=stories'])) {
     fail('A reporter must still reach Stories from the Planning menu.');
@@ -466,8 +482,8 @@ foreach (['identity', 'branding', 'newsletter', 'analytics', 'discord', 'deploym
 
 // Every Planning destination highlights itself, on a direct link or a refresh.
 $_GET = ['page' => 'byline-planning'];
-$test_screen = (object) ['id' => 'toplevel_page_byline-planning', 'post_type' => null];
-if (byline_admin_parent_file('byline-planning') !== 'byline-planning' || byline_admin_submenu_file('') !== 'byline-planning') {
+$test_screen = (object) ['id' => 'byline_page_byline-planning', 'post_type' => null];
+if (byline_admin_parent_file('byline-planning') !== 'byline' || byline_admin_submenu_file('') !== 'byline-planning') {
     fail('Planning without a tab must highlight its landing entry.');
 }
 foreach ([
@@ -481,8 +497,8 @@ foreach ([
     'feedback' => 'admin.php?page=byline-planning&tab=feedback',
 ] as $planning_tab => $expected_submenu) {
     $_GET = ['page' => 'byline-planning', 'tab' => $planning_tab];
-    if (byline_admin_parent_file('byline-planning') !== 'byline-planning') {
-        fail("Planning tab {$planning_tab} must keep the Planning menu open.");
+    if (byline_admin_parent_file('byline-planning') !== 'byline') {
+        fail("Planning tab {$planning_tab} must keep the Byline menu open.");
     }
     if (byline_admin_submenu_file('') !== $expected_submenu) {
         fail("Planning tab {$planning_tab} must highlight its own sidebar entry.");
@@ -498,6 +514,12 @@ if (byline_admin_submenu_file('') !== 'byline-planning') {
 $_GET = ['page' => 'byline-planning', 'tab' => 'stories', 'view' => 'list'];
 if (byline_admin_submenu_file('') !== 'admin.php?page=byline-planning&tab=stories') {
     fail('A Stories view deep link must still highlight Stories.');
+}
+
+$_GET = ['page' => 'byline-planning', 'story' => '42'];
+if (byline_admin_parent_file('') !== 'byline'
+    || byline_admin_submenu_file('') !== 'admin.php?page=byline-planning&tab=stories') {
+    fail('An open story workspace must highlight Stories under Byline.');
 }
 
 // Polls and retired Studio URLs must not activate the Byline configuration menu.

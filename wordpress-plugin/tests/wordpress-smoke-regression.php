@@ -366,12 +366,13 @@ function wp_safe_redirect(string $location): void
 require __DIR__ . '/../includes/admin/app.php';
 
 byline_register_admin_app();
-foreach (['byline-planning', 'byline'] as $slug) {
-    if (!isset($byline_smoke_menus[$slug])) {
-        byline_smoke_fail("Smoke harness did not register {$slug}.");
-    }
+if (!isset($byline_smoke_menus['byline'])) {
+    byline_smoke_fail('Smoke harness did not register Byline.');
 }
-foreach (['byline', 'byline-settings'] as $slug) {
+if (isset($byline_smoke_menus['byline-planning'])) {
+    byline_smoke_fail('Planning must not retain a separate top-level menu.');
+}
+foreach (['byline', 'byline-planning', 'byline-settings'] as $slug) {
     if (!isset($byline_smoke_submenus[$slug])) {
         byline_smoke_fail("Smoke harness did not register {$slug}.");
     }
