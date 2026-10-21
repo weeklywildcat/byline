@@ -46,13 +46,23 @@ function byline_dashboard_story_posts(array $args = [], bool $mine = false): arr
     }));
 }
 
+function byline_dashboard_story_workspace_url(int $post_id): string
+{
+    if (function_exists('byline_admin_page_url') && defined('BYLINE_ADMIN_PLANNING_PAGE')) {
+        return byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, [
+            'tab' => 'stories',
+            'story' => $post_id,
+        ]);
+    }
+
+    return admin_url('admin.php?page=byline-planning&tab=stories&story=' . absint($post_id));
+}
+
 function byline_dashboard_story_link(WP_Post $post): string
 {
     $title = get_the_title($post) ?: __('Untitled story', 'weekly-wildcat-headless');
-    $url = get_edit_post_link($post->ID);
-    return $url
-        ? '<a href="' . esc_url($url) . '">' . esc_html($title) . '</a>'
-        : esc_html($title);
+    $url = byline_dashboard_story_workspace_url($post->ID);
+    return '<a href="' . esc_url($url) . '">' . esc_html($title) . '</a>';
 }
 
 function byline_dashboard_render_story_list(array $posts, string $empty): void
