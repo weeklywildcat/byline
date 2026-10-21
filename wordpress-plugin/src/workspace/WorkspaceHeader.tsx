@@ -22,7 +22,7 @@ export function WorkspaceHeader() {
         <BreadcrumbItem className="min-w-0"><BreadcrumbPage className="truncate">{title}</BreadcrumbPage></BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
-    <div className="flex flex-col gap-4 @2xl/ws:flex-row @2xl/ws:items-start @2xl/ws:justify-between">
+    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
       <div className="flex min-w-0 flex-col gap-2">
         <h1 className="font-heading text-2xl leading-tight font-semibold tracking-tight text-balance [overflow-wrap:anywhere]">{title}</h1>
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
@@ -37,7 +37,7 @@ export function WorkspaceHeader() {
           {story.editor ? <span className="flex items-center gap-2"><PeopleAvatars people={[{ name: story.editor.name, imageUrl: data.people.find((person) => Number(person.id) === story.editor!.id)?.imageUrl }]} tooltips={false} />Editor: {story.editor.name}</span> : null}
         </div>
       </div>
-      <div className="flex flex-wrap gap-2 @2xl/ws:shrink-0">
+      <div className="flex flex-wrap gap-2 md:shrink-0">
         {draft ? <a className={buttonVariants({ variant: "ghost" })} href={draft.url} target="_blank" rel="noopener noreferrer"><FileText data-icon="inline-start" aria-hidden="true" />Working draft<ArrowUpRight data-icon="inline-end" aria-hidden="true" /><span className="sr-only"> (opens in a new tab)</span></a> : null}
         {preview ? <a className={buttonVariants({ variant: "outline" })} href={preview} target="_blank" rel="noopener noreferrer">Preview<ArrowUpRight data-icon="inline-end" aria-hidden="true" /><span className="sr-only"> (opens in a new tab)</span></a> : null}
         {caps.editArticle && story.editUrl ? <a className={buttonVariants()} href={story.editUrl}>Edit article</a> : null}
