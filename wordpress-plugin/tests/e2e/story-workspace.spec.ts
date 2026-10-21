@@ -115,6 +115,14 @@ test("the workspace keeps its layout from 1440 down to a phone", async ({ adminP
     await expect(page.getByRole("heading", { level: 1, name: fixture.title })).toBeVisible();
     await expect(page.getByRole("region", { name: "Reporting", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    if (width === 1440) {
+      const briefBox = await page.getByRole("region", { name: "Brief", exact: true }).boundingBox();
+      const detailsBox = await page.getByRole("region", { name: "Details", exact: true }).boundingBox();
+      expect(briefBox).not.toBeNull();
+      expect(detailsBox).not.toBeNull();
+      expect(detailsBox!.x).toBeGreaterThan(briefBox!.x + briefBox!.width);
+      expect(Math.abs(detailsBox!.y - briefBox!.y)).toBeLessThan(24);
+    }
     await page.screenshot({ path: `/tmp/byline-workspace-qa/workspace-${width}.png`, fullPage: true, animations: "disabled" });
     if (width === 1440 || width === 390) {
       await page.getByRole("region", { name: "Reporting", exact: true }).getByRole("button", { name: /Interview local reporter/ }).click();
