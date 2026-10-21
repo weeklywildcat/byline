@@ -33,7 +33,7 @@ test.describe("WordPress environment", () => {
 
     await presence.click();
     await expect(adminPage.getByText("Newsroom", { exact: true })).toBeVisible();
-    await expect(adminPage.getByText("Active now", { exact: true })).toBeVisible();
+    await expect(adminPage.getByRole("heading", { name: "Active now", exact: true })).toBeVisible();
     await expect(adminPage.getByText(/people? active/)).toBeVisible();
   });
 

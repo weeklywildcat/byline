@@ -75,8 +75,8 @@ test("Home creates real drafts, completes work with rollback, preserves peek con
   await expect(peek).toBeVisible();
   await peek.getByRole("button", { name: "Actions for Interview notes" }).click();
   await page.getByRole("menuitem", { name: "Remove link" }).click();
-  await page.getByRole("alertdialog", { name: "Remove this link?" }).getByRole("button", { name: "Remove" }).click();
   await expect(peek.getByRole("link", { name: /Interview notes/ })).not.toBeVisible();
+  await expect(page.getByText("Link removed.", { exact: true })).toBeVisible();
   expect(pageErrors).toEqual([]);
   await peek.getByRole("link", { name: "Edit article" }).click();
   await expect(page).toHaveURL(new RegExp(`post.php\\?post=${story.id}&action=edit`));

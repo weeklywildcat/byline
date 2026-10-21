@@ -158,7 +158,7 @@ test("Story Peek, dense: four writers collapse to a +N count, links live in a me
   }
 });
 
-test("Story Peek: removing a link asks first; cancelling keeps it, confirming removes it, and focus returns", async ({ adminPage: page, adminSession: session }) => {
+test("Story Peek: removing a link is immediate and Undo restores it", async ({ adminPage: page, adminSession: session }) => {
   const fixture = await seedCanteenStory(session);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(homeUrl);
@@ -166,15 +166,13 @@ test("Story Peek: removing a link asks first; cancelling keeps it, confirming re
   const actions = peek.getByRole("button", { name: "Actions for Research folder" });
   await actions.click();
   await page.getByRole("menuitem", { name: "Remove link" }).click();
-  const confirm = page.getByRole("alertdialog", { name: "Remove this link?" });
-  await expect(confirm).toBeVisible();
-  await confirm.getByRole("button", { name: "Cancel" }).click();
-  await expect(confirm).toBeHidden();
+  await expect(peek.getByRole("link", { name: /Research folder/ })).toHaveCount(0);
+  await expect(page.getByText("Link removed.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(peek.getByRole("link", { name: /Research folder/ })).toBeVisible();
-  await expect(actions).toBeFocused();
-  await actions.click();
+  await expect.poll(async () => (await session.rest<StoryWorkspace>(`/byline/v1/editorial/stories/${fixture.storyId}/workspace`)).payload.resources.some((resource) => resource.label === "Research folder")).toBe(true);
+  await peek.getByRole("button", { name: "Actions for Research folder" }).click();
   await page.getByRole("menuitem", { name: "Remove link" }).click();
-  await page.getByRole("alertdialog", { name: "Remove this link?" }).getByRole("button", { name: "Remove" }).click();
   await expect(peek.getByRole("link", { name: /Research folder/ })).toHaveCount(0);
   await expect.poll(async () => (await session.rest<StoryWorkspace>(`/byline/v1/editorial/stories/${fixture.storyId}/workspace`)).payload.resources.some((resource) => resource.label === "Research folder")).toBe(false);
 });

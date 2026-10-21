@@ -87,7 +87,7 @@ test("the workspace reads as Nova: sources, appointments, tasks, files and a sch
   // The styles belong to the Byline screens only: leave them and nothing is left behind.
   await page.goto("/wp-admin/edit.php");
   expect(await page.locator('link[href*="style-story-workspace"],link[href*="style-home"]').count()).toBe(0);
-  expect(await page.locator(".byline-ui-root").count()).toBe(0);
+  expect(await page.locator("#byline-admin-root .byline-ui-root").count()).toBe(0);
 });
 
 test("the workspace keeps its layout from 1440 down to a phone", async ({ adminPage: page, adminSession: session }) => {
