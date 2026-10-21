@@ -22,6 +22,8 @@ describe("presence toolbar presentation", () => {
     expect(source).toContain("online.slice(0, 3)");
     expect(source).toContain('toolbar ? "size-7"');
     expect(source).toContain('className="size-7 bg-neutral-700');
+    expect(source).toContain('aria-expanded:bg-transparent');
+    expect(source).toContain('hover:bg-transparent');
     expect(source).not.toContain("online.slice(0, 4)");
   });
 
@@ -30,8 +32,10 @@ describe("presence toolbar presentation", () => {
     expect(php).toContain("height:28px;");
     expect(php).toContain("flex:0 0 28px;");
     expect(php).toContain("overflow:visible;");
-    expect(php).toContain("width:11px;");
+    expect(php).toContain("background:transparent !important;");
+    expect(php).toContain('button[aria-expanded="true"]');
+    expect(php).toContain("width:10px;");
     expect(php).toContain('[data-slot="avatar-badge"] > svg');
-    expect(php).toContain("width:7px;");
+    expect(php).toContain("width:6px;");
   });
 });
