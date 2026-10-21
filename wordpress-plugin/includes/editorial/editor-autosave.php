@@ -37,4 +37,6 @@ function byline_editor_settings_autosave(array $settings, $context): array
 
     return $settings;
 }
-add_filter('block_editor_settings_all', 'byline_editor_settings_autosave', 10, 2);
+if (function_exists('add_filter')) {
+    add_filter('block_editor_settings_all', 'byline_editor_settings_autosave', 10, 2);
+}
