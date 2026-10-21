@@ -510,4 +510,8 @@ function byline_enqueue_presence(): void
     ];
     wp_add_inline_script('byline-presence', 'window.bylinePresence = ' . wp_json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ';', 'before');
 }
-add_action('admin_enqueue_scripts', 'byline_enqueue_presence', 20);
+// Before the admin apps (priority 10) enqueue theirs: every Byline stylesheet is a
+// Tailwind build with the same unlayered utilities, so whichever prints last wins a
+// tie. A page's own bundle must win (the presence copy's `.flex` otherwise overrides
+// the Story Workspace's `lg:grid`).
+add_action('admin_enqueue_scripts', 'byline_enqueue_presence', 5);
