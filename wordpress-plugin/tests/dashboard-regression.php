@@ -22,4 +22,15 @@ if (strpos($source, 'byline_deployment_lifecycle_status') === false || strpos($s
     exit(1);
 }
 
+if (strpos($source, 'byline_dashboard_story_workspace_url') === false
+    || strpos($source, "BYLINE_ADMIN_PLANNING_PAGE") === false
+    || strpos($source, "'story' => $post_id") === false) {
+    fwrite(STDERR, "Dashboard story links must open the Story Workspace.\n");
+    exit(1);
+}
+if (strpos($source, 'get_edit_post_link($post->ID)') !== false) {
+    fwrite(STDERR, "Dashboard story rows must not bypass the Story Workspace for the post editor.\n");
+    exit(1);
+}
+
 fwrite(STDOUT, "Byline newsroom dashboard regression passed.\n");
