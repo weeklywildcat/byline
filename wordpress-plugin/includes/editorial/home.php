@@ -62,6 +62,9 @@ function byline_home_story_rows(int $user_id, bool $editor): array
         }
     }
     $counts = byline_task_counts_for_stories(array_keys($visible), $user_id);
+    if (function_exists('byline_notes_prime_thread_counts')) {
+        byline_notes_prime_thread_counts(array_keys($visible), $user_id);
+    }
     $rows = [];
     foreach ($visible as $id => $post) {
         $row = byline_editorial_planning_story_summary($id, $user_id, $counts, true);

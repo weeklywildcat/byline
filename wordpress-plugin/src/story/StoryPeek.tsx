@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Copy, ExternalLink, LayoutDashboard, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, Copy, ExternalLink, LayoutDashboard, MessageSquareText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { EditorialTask, ContributorEntry, TaskPatch } from "../editorial/editorial-model";
 import { describeEditorialError } from "../editorial/editorial-model";
@@ -27,6 +27,7 @@ import { assigneeAvatars, sectionNames } from "../workspace/workspace-model";
 import { RESOURCE_PURPOSES, type ReportingSummary, type ResourcePurpose, type StoryResource, type StoryWorkspace } from "../workspace/workspace-types";
 import { exactDate, mediaStatusLabels, mediaTypeLabels, resourcePurposeLabels, shortDateTime } from "../home/newsroom-model";
 import { mediaTypeIcons } from "./media-icons";
+import { openNotesLabel, visibleNotes, type ArticleNotesSummary } from "./notes-model";
 import { ActivityRow, RowSkeletons, TaskRow } from "./rows";
 import type { StoryFetchers } from "./story-fetchers";
 import { invalidateStoryData, workspaceKey } from "./story-query";
@@ -69,6 +70,29 @@ function ReportingPeek({ reporting, error, timezone, canAddSource, canAddAppoint
           {stats.length ? <p>{stats.join(" · ")}</p> : null}
           {next ? <p className="text-muted-foreground"><span className="font-medium text-foreground">{next.title}</span> · {appointmentLine({ ...next, status: "confirmed", endAt: null }, timezone)}</p> : null}
         </div>}
+    </PeekSection>
+  </>;
+}
+
+/**
+ * Unresolved WordPress Notes, as one quiet row. It reads the count the workspace
+ * already carries (no extra request) and the whole row opens the real editor,
+ * where Notes live. Nothing renders when there are none or the viewer may not
+ * edit the story.
+ */
+function NotesPeek({ notes }: { notes: ArticleNotesSummary | null | undefined }) {
+  const visible = visibleNotes(notes);
+  if (!visible || visible.openCount === 0 || !visible.editUrl) return null;
+  return <>
+    <Separator />
+    <PeekSection title="Article notes">
+      <ItemGroup role="group" aria-label="Article notes" className="-mx-3 w-auto gap-0">
+        <Item size="sm" render={<a href={visible.editUrl} target="_blank" rel="noopener noreferrer" data-peek-notes="" />}>
+          <ItemMedia variant="icon" className="text-muted-foreground"><MessageSquareText aria-hidden="true" /></ItemMedia>
+          <ItemContent><ItemTitle>{openNotesLabel(visible.openCount)}</ItemTitle><ItemDescription>Review in editor</ItemDescription></ItemContent>
+          <ItemActions><ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" /><span className="sr-only">(opens in a new tab)</span></ItemActions>
+        </Item>
+      </ItemGroup>
     </PeekSection>
   </>;
 }
@@ -178,6 +202,8 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
         </FieldGroup>
         {error ? <InlineAlert>{error}</InlineAlert> : null}
       </FieldSet>
+
+      <NotesPeek notes={story.notes} />
 
       <ReportingPeek reporting={data.reporting} error={data.errors.reporting} timezone={timezone} canAddSource={caps.addSource} canAddAppointment={caps.addAppointment} reportingUrl={workspaceHref ? `${workspaceHref}#ws-reporting` : undefined} />
 

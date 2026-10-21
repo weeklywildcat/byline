@@ -240,8 +240,8 @@ export function WorkflowPanel({
 
       {notes?.available ? (
         <div className="byline-editorial-inline-actions">
-          {notes.url ? <Button variant="secondary" href={notes.url}>Open notes</Button> : null}
-          {!notes.url && onOpenNotes ? <Button variant="secondary" onClick={onOpenNotes}>Open notes</Button> : null}
+          {notes.url ? <Button variant="secondary" href={notes.url}>Review article notes</Button> : null}
+          {!notes.url && onOpenNotes ? <Button variant="secondary" onClick={onOpenNotes}>Review article notes</Button> : null}
         </div>
       ) : notes ? (
         <Notice status="info" isDismissible={false}>

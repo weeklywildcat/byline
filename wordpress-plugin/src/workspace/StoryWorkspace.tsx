@@ -6,6 +6,7 @@ import { ActivitySection } from "./ActivitySection";
 import { BriefSection } from "./BriefSection";
 import { DetailsSection } from "./DetailsSection";
 import { MediaSection } from "./MediaSection";
+import { NotesSection } from "./NotesSection";
 import { ReportingPlan } from "./ReportingPlan";
 import { ReportingSummaryStrip } from "./ReportingSummary";
 import { ResourcesSection } from "./ResourcesSection";
@@ -73,6 +74,7 @@ function WorkspaceScreen(env: WorkspaceEnv) {
         </div>
         <aside aria-label="Story context" className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           <DetailsSection />
+          <NotesSection />
           <ResourcesSection />
           <ActivitySection />
         </aside>
