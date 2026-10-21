@@ -393,7 +393,7 @@ function byline_enqueue_presence(): void
     wp_register_style('byline-presence-toolbar', false, [], $version);
     wp_enqueue_style('byline-presence-toolbar');
     wp_add_inline_style('byline-presence-toolbar', '
-#wpadminbar #wp-admin-bar-byline-presence > .ab-item { display:flex; align-items:center; height:32px; padding:0 5px; }
+#wpadminbar #wp-admin-bar-byline-presence > .ab-item { display:flex; align-items:center; height:32px; padding:0 2px; background:transparent !important; }
 #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root { display:flex; align-items:center; height:32px; line-height:1.5; }
 
 /*
@@ -404,14 +404,26 @@ function byline_enqueue_presence(): void
  * present in style-presence.css. Reassert only the toolbar geometry here; the
  * popover remains outside #wpadminbar in the normal scoped Byline UI root.
  */
+#wpadminbar #wp-admin-bar-byline-presence:hover > .ab-item,
+#wpadminbar #wp-admin-bar-byline-presence.hover > .ab-item,
+#wpadminbar #wp-admin-bar-byline-presence > .ab-item:focus {
+    background:transparent !important;
+}
 #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root button {
     box-sizing:border-box;
     color:inherit;
+    width:auto;
     height:28px;
     min-width:28px;
-    padding:0 3px;
-    border-radius:5px;
+    padding:0;
+    border-radius:9999px;
     line-height:1;
+    background:transparent !important;
+}
+#wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root button:hover,
+#wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root button:focus,
+#wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root button[aria-expanded="true"] {
+    background:transparent !important;
 }
 #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root [data-slot="avatar-group"] {
     display:flex;
@@ -451,20 +463,20 @@ function byline_enqueue_presence(): void
 #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root [data-slot="avatar-badge"] {
     box-sizing:border-box;
     position:absolute;
-    right:-1px;
-    bottom:-1px;
+    right:0;
+    bottom:0;
     display:inline-flex;
     align-items:center;
     justify-content:center;
-    width:11px;
-    height:11px;
+    width:10px;
+    height:10px;
     border-radius:9999px;
     line-height:1;
 }
 #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root [data-slot="avatar-badge"] > svg {
     display:block;
-    width:7px;
-    height:7px;
+    width:6px;
+    height:6px;
 }
 #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root [data-slot="avatar-group-count"] {
     box-sizing:border-box;
@@ -481,7 +493,7 @@ function byline_enqueue_presence(): void
 @media screen and (max-width:782px) {
     #wpadminbar #wp-admin-bar-byline-presence > .ab-item { height:46px; }
     #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root { height:46px; }
-    #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root button { height:36px; min-width:36px; padding:0 4px; }
+    #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root button { height:36px; min-width:32px; padding:0 2px; }
 }
     ');
 
