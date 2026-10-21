@@ -12,6 +12,8 @@
 if (!defined('ABSPATH')) {
     exit;
 }
+
+require_once dirname(__DIR__) . '/integrations/newsletter-permissions.php';
 function byline_command_palette_url(string $page, array $args = []): string
 {
     $query = array_merge(['page' => $page], $args);
@@ -51,7 +53,7 @@ function byline_command_palette_commands(): array
             $add($commands, 'byline/assign-story', 'Assign a story', byline_command_palette_url('byline-planning', ['tab' => 'stories', 'unassigned' => '1']));
         }
         $add($commands, 'byline/move-story', 'Move a story to a stage', byline_command_palette_url('byline-planning', ['tab' => 'stories']));
-        if ($feature_enabled('newsletter')) {
+        if ($feature_enabled('newsletter') && byline_newsletter_can_edit_issues()) {
             $add($commands, 'byline/newsletters', 'Open Newsletters', byline_command_palette_url('byline-newsletters'));
         }
         $add($commands, 'byline/performance', 'Open Performance', byline_command_palette_url('byline-planning', ['tab' => 'performance']));
