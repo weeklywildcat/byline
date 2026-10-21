@@ -106,6 +106,9 @@ test.describe("Stories board", () => {
     await expect(page.getByRole("dialog", { name: title, exact: true })).toHaveCount(0);
     expect(page.url()).toBe(beforeUrl);
 
+    // macOS opens the context menu for Control-click too;
+    // dismiss it before targeting the story again (Linux leaves it closed).
+    await page.keyboard.press("Escape");
     // The explicit context-menu route itself must still load the real workspace.
     await storyTitle.click({ button: "right" });
     await page.getByRole("menuitem", { name: "Open workspace" }).click();

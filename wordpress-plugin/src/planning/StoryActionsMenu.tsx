@@ -93,9 +93,9 @@ export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, w
       onAuxClickCapture={suppressSecondaryActivation}
     />
     <ContextMenuContent className="w-56">
-      <ContextMenuLabel className="max-w-52 truncate">{title}</ContextMenuLabel>
-      <ContextMenuSeparator />
       <ContextMenuGroup>
+        <ContextMenuLabel className="max-w-52 truncate">{title}</ContextMenuLabel>
+        <ContextMenuSeparator />
         <ContextMenuItem disabled={disabled} onClick={() => onOpenStory(story.id)}><PanelRightOpen aria-hidden="true" />{__("Quick view", "weekly-wildcat-headless")}</ContextMenuItem>
         <ContextMenuItem render={<a href={workspaceUrl(story.id)} />}><LayoutDashboard aria-hidden="true" />{__("Open workspace", "weekly-wildcat-headless")}</ContextMenuItem>
         {story.editUrl ? <ContextMenuItem render={<a href={story.editUrl} />}><FilePen aria-hidden="true" />{__("Edit article", "weekly-wildcat-headless")}</ContextMenuItem> : null}
