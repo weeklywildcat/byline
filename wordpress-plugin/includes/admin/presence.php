@@ -407,11 +407,11 @@ function byline_enqueue_presence(): void
 #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root button {
     box-sizing:border-box;
     color:inherit;
-    height:32px;
-    min-width:32px;
-    padding:0 6px;
-    border-radius:6px;
-    line-height:1.5;
+    height:28px;
+    min-width:28px;
+    padding:0 3px;
+    border-radius:5px;
+    line-height:1;
 }
 #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root [data-slot="avatar-group"] {
     display:flex;
@@ -424,10 +424,10 @@ function byline_enqueue_presence(): void
     box-sizing:border-box;
     position:relative;
     display:flex;
-    flex:0 0 32px;
-    width:32px;
-    height:32px;
-    overflow:hidden;
+    flex:0 0 28px;
+    width:28px;
+    height:28px;
+    overflow:visible;
     border-radius:9999px;
 }
 #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root [data-slot="avatar-image"],
@@ -451,25 +451,38 @@ function byline_enqueue_presence(): void
 #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root [data-slot="avatar-badge"] {
     box-sizing:border-box;
     position:absolute;
-    right:0;
-    bottom:0;
-    width:10px;
-    height:10px;
+    right:-1px;
+    bottom:-1px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:11px;
+    height:11px;
     border-radius:9999px;
+    line-height:1;
+}
+#wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root [data-slot="avatar-badge"] > svg {
+    display:block;
+    width:7px;
+    height:7px;
 }
 #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root [data-slot="avatar-group-count"] {
     box-sizing:border-box;
     position:relative;
     display:flex;
-    flex:0 0 32px;
+    flex:0 0 28px;
     align-items:center;
     justify-content:center;
-    width:32px;
-    height:32px;
+    width:28px;
+    height:28px;
     border-radius:9999px;
     line-height:1;
 }
-@media screen and (max-width:782px) { #wpadminbar #wp-admin-bar-byline-presence > .ab-item { height:46px; } #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root { height:46px; } }
+@media screen and (max-width:782px) {
+    #wpadminbar #wp-admin-bar-byline-presence > .ab-item { height:46px; }
+    #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root { height:46px; }
+    #wpadminbar #wp-admin-bar-byline-presence .byline-presence-toolbar-root button { height:36px; min-width:36px; padding:0 4px; }
+}
     ');
 
     $location = byline_presence_current_location();

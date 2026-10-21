@@ -1,17 +1,27 @@
-import { Users } from "lucide-react";
+import { Clock3, Minus, Users } from "lucide-react";
 import { Avatar, AvatarBadge, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage } from "../admin-ui/ui/avatar";
 import { Button } from "../admin-ui/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from "../admin-ui/ui/popover";
 import { groupPresence, initials, presenceActivityLabel, samePresenceLocation, type PresenceLocation, type PresencePerson } from "./presence-model";
 
-const badgeClass = (status: PresencePerson["status"]) => status === "active" ? "bg-emerald-500" : status === "away" ? "bg-amber-400" : "bg-muted-foreground/40";
+const badgeClass = (status: PresencePerson["status"]) => status === "active"
+  ? "bg-emerald-500 text-white"
+  : status === "away"
+    ? "bg-amber-400 text-amber-950"
+    : "bg-muted-foreground/60 text-background";
 
-function PresenceAvatar({ person, size = "default", badge = true }: { person: PresencePerson; size?: "default" | "sm" | "lg"; badge?: boolean }) {
-  return <Avatar size={size} role="img" aria-label={`${person.name}, ${person.status}`}>
+const badgeIcon = (status: PresencePerson["status"]) => status === "away"
+  ? <Clock3 aria-hidden="true" />
+  : status === "offline"
+    ? <Minus aria-hidden="true" />
+    : null;
+
+function PresenceAvatar({ person, size = "default", badge = true, toolbar = false }: { person: PresencePerson; size?: "default" | "sm" | "lg"; badge?: boolean; toolbar?: boolean }) {
+  return <Avatar size={size} className={toolbar ? "size-7" : undefined} role="img" aria-label={`${person.name}, ${person.status}`}>
     {person.avatarUrl ? <AvatarImage src={person.avatarUrl} alt="" /> : null}
-    <AvatarFallback>{initials(person.name)}</AvatarFallback>
-    {badge ? <AvatarBadge className={badgeClass(person.status)} aria-hidden="true" /> : null}
+    <AvatarFallback className={toolbar ? "text-[10px]" : undefined}>{initials(person.name)}</AvatarFallback>
+    {badge ? <AvatarBadge className={badgeClass(person.status)} aria-hidden="true">{badgeIcon(person.status)}</AvatarBadge> : null}
   </Avatar>;
 }
 
@@ -54,15 +64,15 @@ function PresenceSection({ label, people, now, currentLocation }: { label: strin
 export function PresencePanel({ people, now, currentLocation, recentSeconds }: { people: PresencePerson[]; now: number; currentLocation: PresenceLocation; recentSeconds: number }) {
   const groups = groupPresence(people, now, recentSeconds);
   const online = [...groups.active, ...groups.away];
-  const shown = online.slice(0, 4);
+  const shown = online.slice(0, 3);
   const overflow = Math.max(0, online.length - shown.length);
   const activeLabel = groups.active.length === 1 ? "1 person active" : `${groups.active.length} people active`;
 
   return <Popover>
     <PopoverTrigger render={<Button variant="ghost" size="sm" className="h-8 min-w-8 gap-1 rounded-md px-1.5 text-white hover:bg-white/10 hover:text-white focus-visible:ring-white/50" aria-label={`Newsroom presence, ${activeLabel}`} />}>
       {shown.length ? <AvatarGroup className="-space-x-1.5">
-        {shown.map((person) => <PresenceAvatar key={person.id} person={person} />)}
-        {overflow ? <AvatarGroupCount className="bg-neutral-700 text-xs text-white ring-neutral-900">+{overflow}</AvatarGroupCount> : null}
+        {shown.map((person) => <PresenceAvatar key={person.id} person={person} toolbar />)}
+        {overflow ? <AvatarGroupCount className="size-7 bg-neutral-700 text-[10px] text-white ring-neutral-900">+{overflow}</AvatarGroupCount> : null}
       </AvatarGroup> : <Users className="size-4" aria-hidden="true" />}
     </PopoverTrigger>
     <PopoverContent align="end" sideOffset={8} className="w-[22rem] max-w-[calc(100vw-1rem)] gap-2 p-2">
