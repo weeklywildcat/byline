@@ -68,6 +68,14 @@ function add_submenu_page(...$args): string
     return 'byline_page_' . $args[4];
 }
 
+function remove_submenu_page(string $parent, string $slug): void
+{
+    global $byline_matrix_submenus;
+    if (($byline_matrix_submenus[$slug][0] ?? null) === $parent) {
+        unset($byline_matrix_submenus[$slug]);
+    }
+}
+
 function admin_url(string $path = ''): string
 {
     return 'https://cms.example.test/wp-admin/' . $path;
@@ -203,11 +211,11 @@ $profiles = [
 ];
 
 $expected_menus = [
-    'administrator' => ['byline-planning', 'byline'],
-    'editor' => ['byline-planning'],
-    'author' => ['byline-planning'],
+    'administrator' => ['byline'],
+    'editor' => ['byline'],
+    'author' => ['byline'],
     'design-only' => [],
-    'sports-content-editor' => ['byline-planning'],
+    'sports-content-editor' => ['byline'],
     'poll-editor' => [],
     'integration-manager' => ['byline'],
 ];
@@ -215,7 +223,7 @@ $expected_menus = [
 foreach ($profiles as $role => $capabilities) {
     byline_matrix_set_role($role, $capabilities);
     byline_register_admin_app();
-    foreach (['byline-studio', 'byline'] as $menu_slug) {
+    foreach (['byline-studio', 'byline-planning', 'byline'] as $menu_slug) {
         $menu = $byline_matrix_menus[$menu_slug] ?? null;
         $visible = is_array($menu) && current_user_can((string) $menu[2]);
         byline_matrix_assert($visible === in_array($menu_slug, $expected_menus[$role], true), "Menu visibility for {$role} and {$menu_slug} does not match capabilities.");
