@@ -5,7 +5,7 @@ import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Button } from "../admin-ui/ui/button";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
 import { Spinner } from "../admin-ui/ui/spinner";
@@ -89,21 +89,23 @@ function FeedbackRow({ item, fetchers, onOpenStory }: { item: FeedbackItem; fetc
 
     </ContextMenuTrigger>
     <ContextMenuContent className="w-56">
-      <ContextMenuLabel className="capitalize">{item.type}</ContextMenuLabel>
-      <ContextMenuSeparator />
-      {item.story ? <ContextMenuItem onClick={() => onOpenStory(item.story!.id)}><Eye aria-hidden="true" />{__("Quick view story", "weekly-wildcat-headless")}</ContextMenuItem> : null}
-      {fetchers.updateFeedback ? <ContextMenuSub>
-        <ContextMenuSubTrigger disabled={busy}>{__("Status", "weekly-wildcat-headless")}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="min-w-40">
-          <ContextMenuRadioGroup value={item.status} onValueChange={(next) => { if (next && next !== item.status) status.mutate(next as FeedbackStatus); }}>
-            {STATUSES.map((candidate) => <ContextMenuRadioItem key={candidate.value} value={candidate.value}>{candidate.label}</ContextMenuRadioItem>)}
-          </ContextMenuRadioGroup>
-        </ContextMenuSubContent>
-      </ContextMenuSub> : null}
-      {item.type === "correction" && item.story && fetchers.createCorrectionFromFeedback ? <>
+      <ContextMenuGroup>
+        <ContextMenuLabel className="capitalize">{item.type}</ContextMenuLabel>
         <ContextMenuSeparator />
-        <ContextMenuItem disabled={busy} onClick={() => correction.mutate()}><FilePlus2 aria-hidden="true" />{__("Create draft correction", "weekly-wildcat-headless")}</ContextMenuItem>
-      </> : null}
+        {item.story ? <ContextMenuItem onClick={() => onOpenStory(item.story!.id)}><Eye aria-hidden="true" />{__("Quick view story", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+        {fetchers.updateFeedback ? <ContextMenuSub>
+          <ContextMenuSubTrigger disabled={busy}>{__("Status", "weekly-wildcat-headless")}</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-40">
+            <ContextMenuRadioGroup value={item.status} onValueChange={(next) => { if (next && next !== item.status) status.mutate(next as FeedbackStatus); }}>
+              {STATUSES.map((candidate) => <ContextMenuRadioItem key={candidate.value} value={candidate.value}>{candidate.label}</ContextMenuRadioItem>)}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub> : null}
+        {item.type === "correction" && item.story && fetchers.createCorrectionFromFeedback ? <>
+          <ContextMenuSeparator />
+          <ContextMenuItem disabled={busy} onClick={() => correction.mutate()}><FilePlus2 aria-hidden="true" />{__("Create draft correction", "weekly-wildcat-headless")}</ContextMenuItem>
+        </> : null}
+      </ContextMenuGroup>
     </ContextMenuContent>
   </ContextMenu>;
 }

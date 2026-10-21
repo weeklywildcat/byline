@@ -12,7 +12,7 @@ import { ResourceIcon } from "../admin-ui/components/resource-icon";
 import { WorkStatusBadge, mediaIntensity } from "../admin-ui/components/work-status-badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Field, FieldContent, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
@@ -110,14 +110,16 @@ function LinkRow({ link, canManage, disabled, onEdit, onRemove }: { link: StoryR
       </DropdownMenu> : null}
     </ContextMenuTrigger>
     <ContextMenuContent className="w-48">
-      <ContextMenuLabel className="max-w-44 truncate">{link.label}</ContextMenuLabel>
-      <ContextMenuSeparator />
-      <ContextMenuItem render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
-      <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem>
-      {canManage ? <>
-        <ContextMenuItem disabled={disabled} onClick={onEdit}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
-        <ContextMenuItem variant="destructive" disabled={disabled} onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
-      </> : null}
+      <ContextMenuGroup>
+        <ContextMenuLabel className="max-w-44 truncate">{link.label}</ContextMenuLabel>
+        <ContextMenuSeparator />
+        <ContextMenuItem render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
+        <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem>
+        {canManage ? <>
+          <ContextMenuItem disabled={disabled} onClick={onEdit}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
+          <ContextMenuItem variant="destructive" disabled={disabled} onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
+        </> : null}
+      </ContextMenuGroup>
     </ContextMenuContent>
   </ContextMenu>;
 }

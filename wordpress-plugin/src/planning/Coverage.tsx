@@ -9,7 +9,7 @@ import { StoryHoverCard } from "../story/StoryHoverCard";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Button } from "../admin-ui/ui/button";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "../admin-ui/ui/combobox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../admin-ui/ui/dialog";
@@ -74,10 +74,12 @@ function CoverageCard({ item, stories, canManage, fetchers, onOpenStory }: Props
               </ItemActions>
             </ContextMenuTrigger>
             <ContextMenuContent className="w-52">
-              <ContextMenuLabel className="max-w-48 truncate">{decodeEntities(story.title)}</ContextMenuLabel>
-              <ContextMenuSeparator />
-              <ContextMenuItem onClick={() => onOpenStory(story.id)}><Eye aria-hidden="true" />{__("Quick view", "weekly-wildcat-headless")}</ContextMenuItem>
-              {canManage && fetchers.removeStoryFromCoverage ? <ContextMenuItem variant="destructive" disabled={run.isPending} onClick={() => removeStory(story)}><Trash2 aria-hidden="true" />{__("Remove from coverage", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+              <ContextMenuGroup>
+                <ContextMenuLabel className="max-w-48 truncate">{decodeEntities(story.title)}</ContextMenuLabel>
+                <ContextMenuSeparator />
+                <ContextMenuItem onClick={() => onOpenStory(story.id)}><Eye aria-hidden="true" />{__("Quick view", "weekly-wildcat-headless")}</ContextMenuItem>
+                {canManage && fetchers.removeStoryFromCoverage ? <ContextMenuItem variant="destructive" disabled={run.isPending} onClick={() => removeStory(story)}><Trash2 aria-hidden="true" />{__("Remove from coverage", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+              </ContextMenuGroup>
             </ContextMenuContent>
           </ContextMenu>)}</ItemGroup>
           : <p className="text-sm text-muted-foreground">{__("No stories linked yet.", "weekly-wildcat-headless")}</p>}
