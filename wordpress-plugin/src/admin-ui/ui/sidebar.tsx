@@ -19,6 +19,7 @@ import {
 
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
+const SIDEBAR_WIDTH_ICON = "3rem"
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -99,6 +100,7 @@ function SidebarProvider({
           {
             "--sidebar-width": SIDEBAR_WIDTH,
             "--sidebar-width-mobile": SIDEBAR_WIDTH_MOBILE,
+            "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
             ...style,
           } as React.CSSProperties
         }
