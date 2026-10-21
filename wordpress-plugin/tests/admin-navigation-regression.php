@@ -590,17 +590,21 @@ if (strpos($rendered_root, 'id="byline-admin-root"') === false) {
 }
 
 // ---------------------------------------------------------------------------
-// Source-level guarantees: native menu ownership, no custom sidebar shell.
+// Source-level guarantees: native menu ownership, no duplicate global shell.
+// Settings may own local navigation, but it must use the shared shadcn Sidebar.
 // ---------------------------------------------------------------------------
 
 $index_source = file_get_contents(__DIR__ . '/../src/index.tsx');
 $style_source = file_get_contents(__DIR__ . '/../src/style.css');
+$settings_sidebar_source = file_get_contents(__DIR__ . '/../src/settings/SettingsSidebar.tsx');
+$sidebar_primitive_source = file_get_contents(__DIR__ . '/../src/admin-ui/ui/sidebar.tsx');
 $game_source = file_get_contents(__DIR__ . '/../weekly-wildcat-headless.php');
 $roster_source = file_get_contents(__DIR__ . '/../includes/sports-rosters.php');
 $app_source = file_get_contents(__DIR__ . '/../includes/admin/app.php');
 
-if (!is_string($index_source) || !is_string($style_source) || !is_string($game_source)
-    || !is_string($roster_source) || !is_string($app_source)) {
+if (!is_string($index_source) || !is_string($style_source)
+    || !is_string($settings_sidebar_source) || !is_string($sidebar_primitive_source)
+    || !is_string($game_source) || !is_string($roster_source) || !is_string($app_source)) {
     fail('Could not read plugin sources for the navigation regression.');
 }
 
@@ -611,8 +615,16 @@ if (strpos($index_source, 'byline-admin-sidebar') !== false
     || strpos($style_source, 'byline-admin-nav') !== false) {
     fail('The duplicate global Byline sidebar/hash shell regressed.');
 }
-if (strpos($index_source, 'byline-settings-rail') === false) {
-    fail('The unified Settings screen must own a local settings rail.');
+if (strpos($index_source, 'byline-settings-rail') !== false
+    || strpos($style_source, 'byline-settings-rail') !== false) {
+    fail('The retired hand-written Settings rail returned.');
+}
+if (strpos($index_source, '<SettingsSidebar') === false
+    || strpos($settings_sidebar_source, '<SidebarProvider') === false
+    || strpos($settings_sidebar_source, '<SidebarMenuButton') === false
+    || strpos($settings_sidebar_source, 'byline-ui-root byline-settings-sidebar-root') === false
+    || strpos($sidebar_primitive_source, 'function SidebarProvider') === false) {
+    fail('The unified Settings screen must use the shared shadcn Sidebar.');
 }
 if (strpos($game_source, "add_options_page(\n        'Byline Legacy Integration Settings'") !== false
     || strpos($game_source, "'Byline Legacy Settings'") !== false) {
