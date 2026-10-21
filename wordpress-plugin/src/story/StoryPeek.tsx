@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Copy, ExternalLink, LayoutDashboard, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, Copy, ExternalLink, LayoutDashboard, MessageSquareText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { EditorialTask, ContributorEntry, TaskPatch } from "../editorial/editorial-model";
 import { describeEditorialError } from "../editorial/editorial-model";
@@ -12,7 +12,7 @@ import { ResourceIcon } from "../admin-ui/components/resource-icon";
 import { WorkStatusBadge, mediaIntensity } from "../admin-ui/components/work-status-badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Field, FieldContent, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
@@ -27,6 +27,7 @@ import { assigneeAvatars, sectionNames } from "../workspace/workspace-model";
 import { RESOURCE_PURPOSES, type ReportingSummary, type ResourcePurpose, type StoryResource, type StoryWorkspace } from "../workspace/workspace-types";
 import { exactDate, mediaStatusLabels, mediaTypeLabels, resourcePurposeLabels, shortDateTime } from "../home/newsroom-model";
 import { mediaTypeIcons } from "./media-icons";
+import { openNotesLabel, visibleNotes, type ArticleNotesSummary } from "./notes-model";
 import { ActivityRow, RowSkeletons, TaskRow } from "./rows";
 import type { StoryFetchers } from "./story-fetchers";
 import { invalidateStoryData, workspaceKey } from "./story-query";
@@ -73,6 +74,29 @@ function ReportingPeek({ reporting, error, timezone, canAddSource, canAddAppoint
   </>;
 }
 
+/**
+ * Unresolved WordPress Notes, as one quiet row. It reads the count the workspace
+ * already carries (no extra request) and the whole row opens the real editor,
+ * where Notes live. Nothing renders when there are none or the viewer may not
+ * edit the story.
+ */
+function NotesPeek({ notes }: { notes: ArticleNotesSummary | null | undefined }) {
+  const visible = visibleNotes(notes);
+  if (!visible || visible.openCount === 0 || !visible.editUrl) return null;
+  return <>
+    <Separator />
+    <PeekSection title="Article notes">
+      <ItemGroup role="group" aria-label="Article notes" className="-mx-3 w-auto gap-0">
+        <Item size="sm" render={<a href={visible.editUrl} target="_blank" rel="noopener noreferrer" data-peek-notes="" />}>
+          <ItemMedia variant="icon" className="text-muted-foreground"><MessageSquareText aria-hidden="true" /></ItemMedia>
+          <ItemContent><ItemTitle>{openNotesLabel(visible.openCount)}</ItemTitle><ItemDescription>Review in editor</ItemDescription></ItemContent>
+          <ItemActions><ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" /><span className="sr-only">(opens in a new tab)</span></ItemActions>
+        </Item>
+      </ItemGroup>
+    </PeekSection>
+  </>;
+}
+
 type LinkInput = { label: string; url: string; purpose?: ResourcePurpose };
 
 function LinkForm({ resource, pending, onSubmit, onCancel }: { resource: StoryResource | null; pending: boolean; onSubmit: (input: LinkInput) => void; onCancel: () => void }) {
@@ -110,14 +134,16 @@ function LinkRow({ link, canManage, disabled, onEdit, onRemove }: { link: StoryR
       </DropdownMenu> : null}
     </ContextMenuTrigger>
     <ContextMenuContent className="w-48">
-      <ContextMenuLabel className="max-w-44 truncate">{link.label}</ContextMenuLabel>
-      <ContextMenuSeparator />
-      <ContextMenuItem render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
-      <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem>
-      {canManage ? <>
-        <ContextMenuItem disabled={disabled} onClick={onEdit}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
-        <ContextMenuItem variant="destructive" disabled={disabled} onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
-      </> : null}
+      <ContextMenuGroup>
+        <ContextMenuLabel className="max-w-44 truncate">{link.label}</ContextMenuLabel>
+        <ContextMenuSeparator />
+        <ContextMenuItem render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
+        <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem>
+        {canManage ? <>
+          <ContextMenuItem disabled={disabled} onClick={onEdit}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
+          <ContextMenuItem variant="destructive" disabled={disabled} onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
+        </> : null}
+      </ContextMenuGroup>
     </ContextMenuContent>
   </ContextMenu>;
 }
@@ -176,6 +202,8 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
         </FieldGroup>
         {error ? <InlineAlert>{error}</InlineAlert> : null}
       </FieldSet>
+
+      <NotesPeek notes={story.notes} />
 
       <ReportingPeek reporting={data.reporting} error={data.errors.reporting} timezone={timezone} canAddSource={caps.addSource} canAddAppointment={caps.addAppointment} reportingUrl={workspaceHref ? `${workspaceHref}#ws-reporting` : undefined} />
 

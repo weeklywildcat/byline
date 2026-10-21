@@ -111,7 +111,7 @@ export function ResourcesSection() {
   });
 
   const add = canManage ? <AddButton data-ws-add="link" onClick={(event) => dialog.openWith(null, event.currentTarget)}>Add link</AddButton> : null;
-  return <Card size="sm" role="region" aria-labelledby="ws-files-title" id="ws-files" className="order-1 @3xl/ws:order-none">
+  return <Card size="sm" role="region" aria-labelledby="ws-files-title" id="ws-files" className="order-1 lg:order-none">
     <CardHeader>
       <CardTitle id="ws-files-title" role="heading" aria-level={2}>Files &amp; Links</CardTitle>
       {data.resources.length && add ? <CardAction>{add}</CardAction> : null}

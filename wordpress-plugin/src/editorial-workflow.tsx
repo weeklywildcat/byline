@@ -410,7 +410,7 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
 
       {notes?.available ? (
         <div className="byline-workflow-inline-actions">
-          {notes.url ? <Button variant="secondary" href={notes.url}>{__('Open notes', 'weekly-wildcat-headless')}</Button> : null}
+          {notes.url ? <Button variant="secondary" href={notes.url}>{__('Review article notes', 'weekly-wildcat-headless')}</Button> : null}
         </div>
       ) : null}
 

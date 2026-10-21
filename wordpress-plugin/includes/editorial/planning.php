@@ -581,6 +581,9 @@ function byline_editorial_planning_story_summary(int $post_id, ?int $user_id = n
             'legacyNotes' => (string) ($visual['legacyNotes'] ?? ''),
         ],
         'tasks' => ['openCount' => absint($task_count)],
+        // Thread counts only, and only for a viewer who may edit the story. Notes
+        // are WordPress-owned comments; nothing about them is copied here.
+        'notes' => function_exists('byline_notes_summary') ? byline_notes_summary($post_id, $user_id) : null,
         // Note-free roll-ups. Sources, appointments and assignments themselves
         // are loaded only by the protected story read.
         'reporting' => function_exists('byline_story_reporting_summary') ? byline_story_reporting_summary($post_id) : null,
@@ -624,6 +627,10 @@ function byline_editorial_collect_planning_stories(array $filters = [], ?int $us
         : [];
     $items = [];
     $sanitized_filters = byline_editorial_sanitize_planning_filters($filters);
+    // One Notes query for the whole page instead of one per row.
+    if (function_exists('byline_notes_prime_thread_counts')) {
+        byline_notes_prime_thread_counts(array_map(static function ($post): int { return $post instanceof WP_Post ? (int) $post->ID : 0; }, (array) $posts), $user_id);
+    }
 
     foreach ((array) $posts as $post) {
         if (!$post instanceof WP_Post || !byline_editorial_can_view_planning_story((int) $post->ID, $user_id)) {
