@@ -59,19 +59,19 @@ function WorkspaceScreen(env: WorkspaceEnv) {
   if (!data || !value) return <WorkspaceLoadError error={workspaceError(query.error, "The story workspace couldn't be loaded.")} storiesUrl={env.storiesUrl} onRetry={() => void query.refetch()} retrying={query.isFetching} />;
 
   return <WorkspaceContext value={value}>
-    <main className="@container/ws mx-auto mt-3 mb-8 flex max-w-[1320px] flex-col gap-6 pr-5">
+    <main className="mx-auto mt-3 mb-8 flex w-full max-w-[1320px] flex-col gap-6 pr-5">
       <WorkspaceHeader />
       {query.isError ? <InlineAlert onAction={() => void query.refetch()}>This page couldn't refresh, so it may be out of date.</InlineAlert> : null}
       {/* One column in the order a phone reads it; two columns once there is room. The wrappers dissolve on a phone so Files can precede Details. */}
-      <div className="flex flex-col gap-4 @3xl/ws:grid @3xl/ws:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)] @3xl/ws:items-start @3xl/ws:gap-5">
-        <div className="contents @3xl/ws:flex @3xl/ws:flex-col @3xl/ws:gap-4">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)] lg:items-start lg:gap-5">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           <BriefSection />
           <ReportingSummaryStrip />
           <ReportingPlan />
           <TasksSection />
           <MediaSection />
         </div>
-        <aside aria-label="Story context" className="contents @3xl/ws:flex @3xl/ws:flex-col @3xl/ws:gap-4">
+        <aside aria-label="Story context" className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           <DetailsSection />
           <ResourcesSection />
           <ActivitySection />
