@@ -15,7 +15,11 @@ import { openArticleNotesLabel, openNotesSignal } from "./notes-model";
 
 /** The headline, as a button that opens Story Peek. Never a link into the editor: inspect first. */
 export function StoryTitleButton({ story, onOpen, className, ...props }: { story: Pick<PlanningStory, "id" | "title">; onOpen: (storyId: number) => void } & Omit<ComponentProps<"button">, "onClick" | "children">) {
-  return <button type="button" className={cn("min-w-0 text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline focus-visible:outline-none", className)} onClick={() => onOpen(story.id)} {...props}>{decodeEntities(story.title) || "Untitled story"}</button>;
+  // A StoryHoverCard wraps this button and, while its preview is open, passes an onClick of its own.
+  // Spreading that after ours replaced it, so clicking a title the cursor had rested on did nothing.
+  // Run it first, then always open Peek.
+  const { onClick: injected, ...rest } = props as ComponentProps<"button">;
+  return <button type="button" className={cn("min-w-0 text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline focus-visible:outline-none", className)} {...rest} onClick={(event) => { injected?.(event); onOpen(story.id); }}>{decodeEntities(story.title) || "Untitled story"}</button>;
 }
 
 /** "Due tomorrow", "2d overdue", or a quiet fallback. Overdue is the one warning. */

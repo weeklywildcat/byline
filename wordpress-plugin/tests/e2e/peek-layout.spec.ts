@@ -37,3 +37,23 @@ test("clicking a task opens Story Peek in the side sheet on Today and Stories", 
   await page.getByRole("button", { name: title, exact: true }).click();
   await expectSide();
 });
+
+test("clicking a story title the cursor has rested on still opens Story Peek", async ({ adminPage: page, adminSession: session }) => {
+  const unique = token();
+  const title = `${unique} Rested cursor`;
+  await createPlanningStory(session, { title, status: "reporting" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(boardUrl(unique));
+  const heading = page.getByRole("button", { name: title, exact: true });
+  await expect(heading).toBeVisible();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    // Resting on the title opens its hover preview; the click that follows used to be swallowed.
+    await heading.hover();
+    await expect(page.locator("[data-slot=hover-card-content]")).toBeVisible();
+    await heading.click();
+    await expect(page.getByRole("dialog")).toContainText(title);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await page.mouse.move(5, 5);
+  }
+});
