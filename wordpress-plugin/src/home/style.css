@@ -5,3 +5,9 @@
  */
 @import "../admin-ui/admin-ui.css";
 @source "./";
+/*
+ * Home renders Story Peek, task rows and the hover card from ../story. Tailwind only
+ * emits utilities from registered sources, so without this the Peek sheet loses its
+ * width, max-width and padding and fills the whole screen.
+ */
+@source "../story";
