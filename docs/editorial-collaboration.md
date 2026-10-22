@@ -63,6 +63,17 @@ Notes remain progressive enhancement. When the installed WordPress, or the post
 type, does not support Notes, the summary reports `available: false` with zero
 counts and no URL, the UI renders nothing, and the workflow carries on.
 
+### Autosave
+
+A Note is saved the moment it is added, but the anchor tying it to selected text
+or a block lives in the post content and persists only when the post saves. So
+story editors autosave every **30 seconds** (`includes/editorial/editor-autosave.php`
+sets the editor's own `autosaveInterval`; WordPress performs the autosave and
+real-time collaboration is untouched). Sites can change it with the
+`byline_editor_autosave_interval` filter (clamped to 10-300 seconds). WordPress
+autosaves a published post, or one written by someone else, as a revision rather
+than changing the live content, so those still need Save or Update.
+
 ## Byline Tasks
 
 Use a Byline Task when somebody needs to perform a bounded piece of newsroom
