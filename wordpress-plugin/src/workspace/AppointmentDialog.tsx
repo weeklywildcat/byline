@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type Dispatch, type SetStateAction } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FormField, SelectField, TextAreaField, TextField, describedBy } from "../admin-ui/components/form-fields";
@@ -10,7 +10,7 @@ import { Input } from "../admin-ui/ui/input";
 import { RadioGroup, RadioGroupItem } from "../admin-ui/ui/radio-group";
 import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog-shell";
 import { DayField, DayRangeField, PeoplePicker } from "./fields";
-import { appointmentFormToInput, appointmentToForm, applyQuickWindow, emptyAppointmentForm, isValid, setExactDate, setScheduleMode, validateAppointmentForm, type AppointmentForm } from "./appointment-form";
+import { appointmentFormToInput, appointmentToForm, applyQuickWindow, emptyAppointmentForm, isValid, setExactDate, setScheduleMode, validateAppointmentForm, type AppointmentForm, type AppointmentFormErrors } from "./appointment-form";
 import { APPOINTMENT_KIND_LABELS, APPOINTMENT_NOTES_MAX, APPOINTMENT_STATUS_LABELS } from "./reporting-model";
 import { formatLongDay, peopleOptions } from "./workspace-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
@@ -94,7 +94,6 @@ export function AppointmentDialog({ open, appointment, initial, onClose, finalFo
     else focusFirstInvalidField();
   };
   const reloadAndClose = async () => { await reload(); onClose(); };
-  const differentEndDay = form.mode === "exact" && form.endTime && form.endDate && form.endDate !== form.date;
 
   return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={appointment ? "Edit appointment" : "Add appointment"} description="Where and when someone has to be. Leave the schedule open until you know." submitLabel={appointment ? "Save appointment" : "Add appointment"} pending={pending} dirty={dirty} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
     secondary={appointment ? <RemoveControl label="Delete appointment" title="Delete this appointment?" description="Marking it cancelled instead keeps a record." confirmLabel="Delete" pending={pending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
@@ -104,7 +103,20 @@ export function AppointmentDialog({ open, appointment, initial, onClose, finalFo
       <SelectField label="Status" value={form.status} options={statusOptions} onChange={(status) => patch({ status })} />
     </div>
 
-    <FieldSet>
+    <AppointmentTimingFields form={form} setForm={setForm} errors={errors} timezone={timezone} />
+
+    <SourcePicker sources={data.sources} value={form.sourceId} onChange={(sourceId) => patch({ sourceId })} />
+    <PeoplePicker label="Assigned to" options={people} value={form.assigneeIds} onChange={(assigneeIds) => patch({ assigneeIds })} error={errors.assignees} />
+    <TextField label="Location" value={form.location} onChange={(location) => patch({ location })} maxLength={160} optional placeholder="Main office" />
+    <TextAreaField label="Notes" value={form.notes} onChange={(notes) => patch({ notes })} maxLength={APPOINTMENT_NOTES_MAX} error={errors.notes} optional hint="Internal. Not article copy." />
+  </WorkspaceDialog>;
+}
+
+/** Scheduling fields shared by story appointments and shared Collection interviews. */
+export function AppointmentTimingFields({ form, setForm, errors, timezone }: { form: AppointmentForm; setForm: Dispatch<SetStateAction<AppointmentForm>>; errors: AppointmentFormErrors; timezone: string }) {
+  const patch = (changes: Partial<AppointmentForm>) => setForm((current) => ({ ...current, ...changes }));
+  const differentEndDay = form.mode === "exact" && form.endTime && form.endDate && form.endDate !== form.date;
+  return (<FieldSet>
       <FieldLegend variant="label">When is this happening?</FieldLegend>
       <RadioGroup value={form.mode} onValueChange={(mode) => setForm((current) => setScheduleMode(current, mode as ScheduleMode))}>
         {modeOptions.map((option) => <FieldLabel key={option.value} htmlFor={`ws-schedule-${option.value}`}>
@@ -127,11 +139,5 @@ export function AppointmentDialog({ open, appointment, initial, onClose, finalFo
         {differentEndDay ? <FieldDescription>Ends {formatLongDay(form.endDate)}. <Button type="button" variant="link" size="xs" className="h-auto p-0" onClick={() => patch({ endDate: form.date })}>Same day</Button></FieldDescription> : null}
         <FieldDescription>Times are in the site's timezone ({timezone.replace(/_/g, " ")}).</FieldDescription>
       </FieldGroup> : null}
-    </FieldSet>
-
-    <SourcePicker sources={data.sources} value={form.sourceId} onChange={(sourceId) => patch({ sourceId })} />
-    <PeoplePicker label="Assigned to" options={people} value={form.assigneeIds} onChange={(assigneeIds) => patch({ assigneeIds })} error={errors.assignees} />
-    <TextField label="Location" value={form.location} onChange={(location) => patch({ location })} maxLength={160} optional placeholder="Main office" />
-    <TextAreaField label="Notes" value={form.notes} onChange={(notes) => patch({ notes })} maxLength={APPOINTMENT_NOTES_MAX} error={errors.notes} optional hint="Internal. Not article copy." />
-  </WorkspaceDialog>;
+    </FieldSet>);
 }

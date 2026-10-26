@@ -5,7 +5,7 @@
  */
 import { preferredStoriesView, storiesViewFromRoute, type StoriesView } from "../home/navigation-model";
 
-export const PLANNING_DESTINATIONS = ["stories", "media", "coverage", "performance", "content-health", "feedback"] as const;
+export const PLANNING_DESTINATIONS = ["stories", "collections", "media", "coverage", "performance", "content-health", "feedback"] as const;
 export type PlanningDestination = (typeof PLANNING_DESTINATIONS)[number];
 
 /** The sidebar's Calendar entry is Stories opened on its Calendar view; unknown tabs are Stories. */

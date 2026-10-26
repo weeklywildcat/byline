@@ -206,6 +206,7 @@ function byline_editorial_planning_bool($value): bool
 function byline_editorial_sanitize_planning_filters(array $filters): array
 {
     $clean = [];
+    if (!empty($filters['collectionId'])) { $clean['collectionId'] = absint($filters['collectionId']); }
 
     $status = $filters['status'] ?? $filters['workflowStatus'] ?? ($filters['workflow'] ?? '');
     if (is_scalar($status) && $status !== '') {
@@ -452,6 +453,12 @@ function byline_editorial_planning_query_args(array $filters = [], ?int $user_id
         'order' => $filters['order'],
         'suppress_filters' => false,
     ];
+
+    if (!empty($filters['collectionId'])) {
+        $collection_id = absint($filters['collectionId']);
+        $args['post__in'] = function_exists('byline_collection_can_view') && byline_collection_can_view($collection_id)
+            ? (byline_collection_story_ids($collection_id) ?: [0]) : [0];
+    }
 
     if (!empty($filters['query'])) {
         // Search is applied against the normalized summary below so headline,

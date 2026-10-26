@@ -1,3 +1,4 @@
+import { WorkspaceCollections } from "../collections/WorkspaceCollections";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { AdminRoot } from "../admin-ui/components/admin-root";
@@ -74,6 +75,7 @@ function WorkspaceScreen(env: WorkspaceEnv) {
         </div>
         <aside aria-label="Story context" className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           <DetailsSection />
+          <WorkspaceCollections />
           <NotesSection />
           <ResourcesSection />
           <ActivitySection />

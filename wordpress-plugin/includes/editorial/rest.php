@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 // Loading the editorial domain modules from this already-registered transport
 // keeps the new slice available to both the plugin and focused standalone tests
 // without creating a second bootstrap path.
-foreach (['collections', 'story-context', 'editor-autosave', 'notes', 'planning', 'media', 'media-assignments', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors', 'activity', 'presets', 'reporting', 'resources', 'workspace', 'home'] as $byline_editorial_module) {
+foreach (['collections', 'story-context', 'editor-autosave', 'notes', 'planning', 'media', 'media-assignments', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors', 'activity', 'presets', 'reporting', 'resources', 'workspace', 'home', 'collection-workspaces', 'interviews', 'collection-schedule', 'collections-rest'] as $byline_editorial_module) {
     $byline_editorial_module_file = __DIR__ . '/' . $byline_editorial_module . '.php';
     if (is_readable($byline_editorial_module_file)) {
         require_once $byline_editorial_module_file;

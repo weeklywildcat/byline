@@ -29,7 +29,7 @@ export const SETTINGS_TABS = [
   "compatibility",
   "diagnostics"
 ] as const;
-export const PLANNING_TABS = ["today", "stories", "calendar", "media", "coverage", "performance", "content-health", "feedback"] as const;
+export const PLANNING_TABS = ["today", "stories", "collections", "calendar", "media", "coverage", "performance", "content-health", "feedback"] as const;
 export const NEWSLETTER_TABS = ["issues", "settings"] as const;
 
 const knownPageSlugs = new Set<string>(Object.values(ADMIN_PAGE_SLUGS));

@@ -1,3 +1,4 @@
+import { StoryCollectionContext } from "../collections/StoryCollectionContext";
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, Copy, ExternalLink, LayoutDashboard, MessageSquareText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
@@ -149,6 +150,7 @@ function LinkRow({ link, canManage, disabled, onEdit, onRemove }: { link: StoryR
 }
 
 export type StoryPeekContentProps = {
+  collectionContext?: ReactNode;
   data: StoryWorkspace;
   timezone: string;
   now: Date;
@@ -205,6 +207,7 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
 
       <NotesPeek notes={story.notes} />
 
+      {props.collectionContext}
       <ReportingPeek reporting={data.reporting} error={data.errors.reporting} timezone={timezone} canAddSource={caps.addSource} canAddAppointment={caps.addAppointment} reportingUrl={workspaceHref ? `${workspaceHref}#ws-reporting` : undefined} />
 
       {tasks.length || caps.addTask ? <>
@@ -314,7 +317,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
         </div> : null}
       </SheetHeader>
       {peek.isPending ? <div className="py-4"><RowSkeletons count={7} /></div> : peek.isError || !story || !data ? <div className="p-4"><InlineAlert title="The story couldn't be loaded." onAction={() => void peek.refetch()}>{describeEditorialError(peek.error, "The story couldn't be loaded.")}</InlineAlert></div>
-        : <StoryPeekContent data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl} onNewTask={onNewTask} onComplete={onComplete} onUpdateTask={(task, patch, optimistic) => updateTask.mutate({ task, patch, optimistic })} onEditTask={setEditingTask} updatingTaskId={updateTask.isPending ? String(updateTask.variables?.task.id || "") : null} completing={completing}
+        : <StoryPeekContent collectionContext={fetchers.collections ? <StoryCollectionContext storyId={data.story.id} api={fetchers.collections} /> : undefined} data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl} onNewTask={onNewTask} onComplete={onComplete} onUpdateTask={(task, patch, optimistic) => updateTask.mutate({ task, patch, optimistic })} onEditTask={setEditingTask} updatingTaskId={updateTask.isPending ? String(updateTask.variables?.task.id || "") : null} completing={completing}
           onPlan={(patch) => planning.mutate(patch)} onWriters={(value) => writers.mutate(value)}
           onSaveLink={(input, existing) => resources.mutate(existing ? { ...input, id: existing.id } : input)} onRemoveLink={(id) => resources.mutate({ remove: id })}
           planning={planning.isPending} writing={writers.isPending} linking={resources.isPending} error={editError} linkError={linkError} linkFormOpen={linkForm} onLinkForm={(next) => { setLinkError(""); setLinkForm(next); }} />}

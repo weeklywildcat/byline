@@ -45,6 +45,18 @@ const BYLINE_ACTIVITY_LAST_LIVE_REVISION_OPTION = 'byline_activity_last_live_rev
 function byline_activity_action_definitions(): array
 {
     return [
+        'collection_created' => ['summary' => 'Collection created'],
+        'collection_changed' => ['summary' => 'Collection details changed'],
+        'collection_status_changed' => ['summary' => 'Collection status changed'],
+        'collection_archived' => ['summary' => 'Collection archived'],
+        'collection_story_added' => ['summary' => 'Story added to Collection'],
+        'collection_story_removed' => ['summary' => 'Story removed from Collection'],
+        'collection_member_changed' => ['summary' => 'Collection members changed'],
+        'collection_relationship_changed' => ['summary' => 'Collection reporting links changed'],
+        'collection_resource_added' => ['summary' => 'Shared resource added'],
+        'interview_created' => ['summary' => 'Interview created'],
+        'interview_completed' => ['summary' => 'Interview completed'],
+        'interview_changed' => ['summary' => 'Interview status changed'],
         'story_created' => ['summary' => 'Story created'],
         'assignment_changed' => ['summary' => 'Assignment changed'],
         'workflow_changed' => ['summary' => 'Workflow changed'],
@@ -244,6 +256,7 @@ function byline_activity_sanitize_context(array $context): array
         'objectId',
         'taskId',
         'coverageId',
+        'collectionId',
         'correctionId',
         'mediaId',
         'contributorId',

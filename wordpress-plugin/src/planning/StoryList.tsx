@@ -18,6 +18,7 @@ import { movableWorkflowStatuses, type PlanningSort, type PlanningSortKey, type 
 
 export type StoryListProps = {
   stories: PlanningStory[];
+  additionalActions?: (story: PlanningStory) => Array<{ id: string; label: string; run: () => void }>;
   statuses: PlanningWorkflowStatus[];
   sort: PlanningSort;
   canMoveStories: boolean;
@@ -138,8 +139,8 @@ export function StoryList(props: StoryListProps) {
   const { stories, statuses, sort, canMoveStories, canAssignStories, canUpdateStories, movingStoryId, updatingStoryId, timezone, now, workspaceUrl, onSortChange, onMoveStory, onUpdateStory, onOpenStory, hiddenPublished = 0 } = props;
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const busy = (story: PlanningStory) => movingStoryId === story.id || updatingStoryId === story.id;
-  const menu = (story: PlanningStory) => <StoryActionsMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={busy(story)} onMove={onMoveStory} workspaceUrl={workspaceUrl} />;
-  const context = (story: PlanningStory, child: ReactElement) => <StoryContextMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={busy(story)} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>{child}</StoryContextMenu>;
+  const menu = (story: PlanningStory) => <StoryActionsMenu additionalActions={props.additionalActions?.(story)} story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} workspaceUrl={workspaceUrl} />;
+  const context = (story: PlanningStory, child: ReactElement) => <StoryContextMenu additionalActions={props.additionalActions?.(story)} story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>{child}</StoryContextMenu>;
 
   const hidden = hiddenPublished > 0 ? <p className="px-1 text-xs text-muted-foreground">{sprintf(/* translators: %d: number of stories. */ _n("%d published story with nothing left to do is hidden.", "%d published stories with nothing left to do are hidden.", hiddenPublished, "weekly-wildcat-headless"), hiddenPublished)} {__("Use More filters to show them.", "weekly-wildcat-headless")}</p> : null;
   if (!stories.length) return <><Empty className="border"><EmptyHeader><EmptyTitle>{__("No stories match", "weekly-wildcat-headless")}</EmptyTitle><EmptyDescription>{__("Try clearing a filter, or choose a different saved view.", "weekly-wildcat-headless")}</EmptyDescription></EmptyHeader></Empty>{hidden}</>;
@@ -163,10 +164,10 @@ export function StoryList(props: StoryListProps) {
         <TableBody>
           {stories.map((story) => context(story, <TableRow key={story.id} data-story-id={story.id} aria-busy={busy(story) || undefined} className="h-16">
             <TableCell className="py-3 whitespace-normal"><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="text-[15px] font-semibold leading-5" /></StoryHoverCard></TableCell>
-            <TableCell className="py-3"><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories} disabled={busy(story)} onMove={onMoveStory} /></TableCell>
+            <TableCell className="py-3"><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} /></TableCell>
             <TableCell className="max-w-60 py-3 whitespace-normal"><People story={story} /></TableCell>
-            <TableCell className="py-3"><Deadline story={story} timezone={timezone} now={now} editable={canAssignStories && canUpdateStories} disabled={busy(story)} onChange={(deadline) => onUpdateStory(story, { deadline: deadline || "" }, { deadline }, __("Deadline", "weekly-wildcat-headless"))} /></TableCell>
-            <TableCell className="py-3 whitespace-normal"><Publication story={story} timezone={timezone} editable={canAssignStories && canUpdateStories} disabled={busy(story)} onChange={(plannedPublication) => onUpdateStory(story, { plannedPublishAt: plannedPublication || "" }, { plannedPublication }, __("Planned publication", "weekly-wildcat-headless"))} /></TableCell>
+            <TableCell className="py-3"><Deadline story={story} timezone={timezone} now={now} editable={canAssignStories && canUpdateStories && story.canEditPlanning !== false} disabled={busy(story)} onChange={(deadline) => onUpdateStory(story, { deadline: deadline || "" }, { deadline }, __("Deadline", "weekly-wildcat-headless"))} /></TableCell>
+            <TableCell className="py-3 whitespace-normal"><Publication story={story} timezone={timezone} editable={canAssignStories && canUpdateStories && story.canEditPlanning !== false} disabled={busy(story)} onChange={(plannedPublication) => onUpdateStory(story, { plannedPublishAt: plannedPublication || "" }, { plannedPublication }, __("Planned publication", "weekly-wildcat-headless"))} /></TableCell>
             <TableCell className="py-3"><ProductionSummary story={story} className="flex-row gap-2 whitespace-nowrap" /></TableCell>
             <TableCell className="py-3 text-muted-foreground">{story.modifiedAt ? <time dateTime={story.modifiedAt} title={exactDate(story.modifiedAt, timezone)}>{relativeTime(story.modifiedAt, timezone, now)}</time> : "—"}</TableCell>
             <TableCell className="py-3 text-right">{menu(story)}</TableCell>
@@ -179,13 +180,13 @@ export function StoryList(props: StoryListProps) {
             <ItemTitle className="line-clamp-2"><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="font-semibold" /></StoryHoverCard></ItemTitle>
             <div className="text-sm"><People story={story} /></div>
             <div className="flex flex-wrap items-center gap-x-2 text-xs">
-              {canAssignStories && canUpdateStories
+              {canAssignStories && canUpdateStories && story.canEditPlanning !== false
                 ? <DatePicker appearance="value" label={__("Deadline", "weekly-wildcat-headless")} dateOnly value={story.deadline} timezone={timezone} disabled={busy(story)} placeholder={__("No deadline", "weekly-wildcat-headless")} displayValue={story.deadline ? shortDay(story.deadline, timezone) : undefined} onChange={(deadline) => onUpdateStory(story, { deadline: deadline || "" }, { deadline }, __("Deadline", "weekly-wildcat-headless"))} />
                 : <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="Due " empty={__("No deadline", "weekly-wildcat-headless")} />}
               <ProductionSummary story={story} className="flex-row gap-2" empty={null} />
             </div>
           </ItemContent>
-          <ItemActions><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories} disabled={busy(story)} onMove={onMoveStory} />{menu(story)}</ItemActions>
+          <ItemActions><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} />{menu(story)}</ItemActions>
         </Item>))}
       </ItemGroup>}
   </div>{hidden}</div>;

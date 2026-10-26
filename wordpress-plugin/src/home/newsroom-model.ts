@@ -1,3 +1,4 @@
+import { collectionUrl } from "../collections/collection-model";
 import type { EditorialTask, ContributorEntry } from "../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../editorial/activity-model";
 import type { PlanningPerson, PlanningStory } from "../planning/planning-model";
@@ -143,17 +144,17 @@ export function myActiveStories(stories: PlanningStory[], userId: number, timezo
 }
 
 /** `label` is the kind of commitment ("Story deadline", "Interview"); `title`/`detail` identify the work. */
-export type AgendaEvent = { id: string; storyId: number | null; title: string; detail: string; label: string; date: string; day: string };
+export type AgendaEvent = { href?: string; id: string; storyId: number | null; title: string; detail: string; label: string; date: string; day: string };
 export function homeAgenda(data: HomeBootstrap, now = new Date()): AgendaEvent[] {
   const { timezone, currentUser, capabilities } = data;
   const today = siteDay(now, timezone);
   const entries: AgendaEvent[] = [];
   const storyMap = new Map(data.stories.map((s) => [s.id, s]));
-  const add = (id: string, storyId: number | null, title: string, detail: string, label: string, date?: string | null) => {
+  const add = (id: string, storyId: number | null, title: string, detail: string, label: string, date?: string | null, href?: string) => {
     if (!date) return;
     const day = siteDay(date, timezone);
     const delta = dayDistance(date, timezone, now);
-    if (day >= today && delta <= 14) entries.push({ id, storyId, title, detail, label, date, day });
+    if (day >= today && delta <= 14) entries.push({ id, storyId, title, detail, label, date, day, ...(href ? { href } : {}) });
   };
   myOpenTasks(data.tasks, currentUser.id, timezone, now).forEach((task) => add(`task-${task.id}`, task.storyId ?? null, task.title, storyMap.get(task.storyId || 0)?.title || "", "Task deadline", task.dueAt));
   data.stories.filter(activeStory).forEach((story) => {
@@ -174,11 +175,11 @@ export function homeAgenda(data: HomeBootstrap, now = new Date()): AgendaEvent[]
   });
   // Only a confirmed, exact appointment has a day and a time. A target window or
   // an unscheduled idea is never placed on the calendar; it is Waiting for Me's job.
-  upcomingConfirmed(data.appointments || [], timezone, now).forEach((appointment) => add(`appointment-${appointment.id}`, appointment.storyId, appointment.title, appointment.storyTitle, appointmentKindLabels[appointment.kind] || "Appointment", appointment.startAt));
+  upcomingConfirmed(data.appointments || [], timezone, now).forEach((appointment) => add(`appointment-${appointment.id}`, appointment.storyId, appointment.title, appointment.storyTitle, appointmentKindLabels[appointment.kind] || "Appointment", appointment.startAt, appointment.collectionId ? `${collectionUrl(appointment.collectionId)}&interview=${appointment.interviewId}` : undefined));
   return entries.sort((a, b) => a.day.localeCompare(b.day) || a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
 
-export type AttentionItem = { id: string; storyId: number | null; title: string; detail: string; urgent?: boolean };
+export type AttentionItem = { href?: string; id: string; storyId: number | null; title: string; detail: string; urgent?: boolean };
 export function waitingForMe(data: HomeBootstrap, now = new Date()): AttentionItem[] {
   const items: AttentionItem[] = [];
   // Ordinary tasks already live in Up Next. Waiting for Me is reserved for work
@@ -189,7 +190,7 @@ export function waitingForMe(data: HomeBootstrap, now = new Date()): AttentionIt
   // An unscheduled idea or a far-off window never appears here.
   (data.appointments || []).flatMap((a) => { const need = schedulingNeed(a, data.timezone, now); return need ? [{ a, need }] : []; })
     .sort((x, y) => Number(y.need.urgent) - Number(x.need.urgent) || (x.a.windowStart || "").localeCompare(y.a.windowStart || "") || x.a.id.localeCompare(y.a.id)).slice(0, 2)
-    .forEach(({ a, need }) => items.push({ id: `schedule-${a.id}`, storyId: a.storyId, title: a.title, detail: need.label, urgent: need.urgent }));
+    .forEach(({ a, need }) => items.push({ id: `schedule-${a.id}`, storyId: a.storyId, title: a.title, detail: need.label, urgent: need.urgent, ...(a.collectionId ? { href: `${collectionUrl(a.collectionId)}&interview=${a.interviewId}` } : {}) }));
   if (data.capabilities.review) {
     data.visualWork.filter((v) => !v.assignee && v.status === "needed" && dayDistance(v.dueAt, data.timezone, now) <= 1).slice(0, 2).forEach((v) => items.push({ id: `unassigned-${v.story.id}-${v.id}`, storyId: v.story.id, title: mediaAssignmentTitle(v), detail: `${v.story.title} · urgent visual work needs an assignee`, urgent: true }));
   }

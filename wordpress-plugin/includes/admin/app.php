@@ -105,6 +105,7 @@ function byline_admin_planning_menu_items(): array
         // Other destinations keep their query-string links to that page.
         'today' => 'Today',
         'stories' => 'Stories',
+        'collections' => 'Collections',
         'calendar' => 'Calendar',
         'media' => 'Media Desk',
         'coverage' => 'Coverage',
@@ -349,6 +350,7 @@ function byline_admin_page_urls(): array
             'today' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'today']),
             'stories' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'stories']),
             'calendar' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'calendar']),
+            'collections' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'collections']),
             'media' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'media']),
             'coverage' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'coverage']),
             'performance' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'performance']),

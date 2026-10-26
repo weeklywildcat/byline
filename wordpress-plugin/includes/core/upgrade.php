@@ -95,6 +95,14 @@ function byline_upgrade_steps(): array
         ];
     }
 
+    if (defined('BYLINE_COLLECTION_RELATIONSHIPS_SCHEMA_VERSION')) {
+        $steps['collectionRelationships'] = [
+            'label' => 'Collection relationships',
+            'option' => BYLINE_COLLECTION_RELATIONSHIPS_SCHEMA_VERSION_OPTION,
+            'version' => BYLINE_COLLECTION_RELATIONSHIPS_SCHEMA_VERSION,
+            'callback' => 'byline_collection_ensure_schema',
+        ];
+    }
     return $steps;
 }
 

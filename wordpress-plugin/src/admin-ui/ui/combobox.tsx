@@ -91,11 +91,12 @@ function ComboboxContent({
   align = "start",
   alignOffset = 0,
   anchor,
+  positionMethod,
   ...props
 }: ComboboxPrimitive.Popup.Props &
   Pick<
     ComboboxPrimitive.Positioner.Props,
-    "side" | "align" | "sideOffset" | "alignOffset" | "anchor"
+    "side" | "align" | "sideOffset" | "alignOffset" | "anchor" | "positionMethod"
   >) {
   return (
     <ComboboxPrimitive.Portal container={useAdminPortal()}>
@@ -105,6 +106,7 @@ function ComboboxContent({
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
+        positionMethod={positionMethod}
         className="isolate z-50"
       >
         <ComboboxPrimitive.Popup
