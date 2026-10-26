@@ -175,9 +175,9 @@ export type ReportingResponse = { sources: StorySource[]; appointments: StoryApp
 export type MediaAssignmentsResponse = { mediaAssignments: StoryMediaAssignment[]; assignmentId?: string };
 
 /** One row of the Calendar / Home schedule feed (`GET /editorial/schedule`). Notes are never included. */
-export type ScheduleAppointment = Omit<StoryAppointment, "notes" | "createdAt" | "updatedAt"> & { storyId: number; storyTitle: string };
+export type ScheduleAppointment = Omit<StoryAppointment, "notes" | "createdAt" | "updatedAt"> & { storyId: number; storyTitle: string; collectionId?: number; interviewId?: number };
 export type ScheduleMediaDeadline = { id: string; storyId: number; storyTitle: string; title: string; type: MediaAssignmentType; status: MediaAssignmentStatus; dueAt: string; assignee: PlanningPerson | null };
-export type ScheduleTaskDeadline = { id: number; storyId: number | null; storyTitle: string; title: string; dueAt: string; assignee: PlanningPerson | null };
+export type ScheduleTaskDeadline = { collectionId?: number | null; id: number; storyId: number | null; storyTitle: string; title: string; dueAt: string; assignee: PlanningPerson | null };
 export type ScheduleResponse = {
   timezone: string;
   from: string;

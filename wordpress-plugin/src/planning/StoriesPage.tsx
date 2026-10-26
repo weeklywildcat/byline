@@ -109,7 +109,7 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
         : <>
           <TabsContent value="board"><StoryBoard stories={stories} statuses={statuses} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onMoveStory={move} onOpenStory={open} /></TabsContent>
           <TabsContent value="list"><StoryList stories={listStories} hiddenPublished={stories.length - listStories.length} statuses={statuses} sort={sort} canMoveStories={canMove} canAssignStories={canAssign} canUpdateStories={canUpdateStories} movingStoryId={movingStoryId} updatingStoryId={updatingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onUpdateStory={update} onOpenStory={open} /></TabsContent>
-          <TabsContent value="calendar"><StoryCalendar stories={stories} timezone={timezone} getSchedule={fetchers.getSchedule} currentUserId={userId} workspaceUrl={workspaceUrl} onOpenStory={open} /></TabsContent>
+          <TabsContent value="calendar"><StoryCalendar collectionId={filters.collectionId} stories={stories} timezone={timezone} getSchedule={fetchers.getSchedule} currentUserId={userId} workspaceUrl={workspaceUrl} onOpenStory={open} /></TabsContent>
         </>}
     </Tabs>
     <p role="status" aria-live="polite" className="sr-only">{loading ? "" : sprintf(/* translators: %d: story count. */ __("%d stories in this view.", "weekly-wildcat-headless"), stories.length)}</p>

@@ -53,3 +53,5 @@
 /* Schedule-X sizes itself to its wrapper: give the wrapper a height, and let it shrink inside flex and grid parents. */
 .byline-ui-root .sx-react-calendar-wrapper { width: 100%; min-width: 0; height: clamp(34rem, 78vh, 60rem); }
 .byline-ui-root .sx__calendar-wrapper { width: 100%; max-width: 100%; border-radius: 0; }
+
+@source "../collections";

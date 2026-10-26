@@ -18,6 +18,7 @@ const BYLINE_TASK_STATE_META = '_byline_task_state';
 const BYLINE_TASK_ASSIGNEE_META = '_byline_task_assignee_id';
 const BYLINE_TASK_DUE_AT_META = '_byline_task_due_at';
 const BYLINE_TASK_PRIORITY_META = '_byline_task_priority';
+const BYLINE_TASK_COLLECTION_META = '_byline_task_collection_id';
 const BYLINE_TASK_COVERAGE_META = '_byline_task_coverage_id';
 const BYLINE_TASK_COMPLETED_AT_META = '_byline_task_completed_at';
 const BYLINE_TASK_ORDER_META = '_byline_task_order';
@@ -129,6 +130,8 @@ function byline_task_can_view(int $task_id, ?int $user_id = null): bool
         return byline_task_user_can($user_id, 'edit_post', $story_id);
     }
 
+    $collection = (int) get_post_meta($task_id, BYLINE_TASK_COLLECTION_META, true);
+    if ($collection > 0 && function_exists('byline_collection_can_edit')) { return byline_collection_can_edit($collection, $user_id) || (byline_collection_can_view($collection, $user_id) && (int) get_post_meta($task_id, BYLINE_TASK_ASSIGNEE_META, true) === $user_id); }
     return byline_task_user_can($user_id, 'edit_others_posts');
 }
 
@@ -197,6 +200,7 @@ function byline_get_task(int $task_id): array
         'priority' => $priority,
         'storyId' => byline_task_story_id($task_id),
         'coverageId' => byline_task_coverage_id($task_id),
+        'collectionId' => (int) get_post_meta($task_id, BYLINE_TASK_COLLECTION_META, true),
         'creatorId' => absint(get_post_meta($task_id, BYLINE_TASK_CREATOR_META, true)) ?: absint($task->post_author ?? 0),
         'completedAt' => byline_task_datetime(get_post_meta($task_id, BYLINE_TASK_COMPLETED_AT_META, true)),
         'order' => absint(get_post_meta($task_id, BYLINE_TASK_ORDER_META, true)),
@@ -232,9 +236,16 @@ function byline_create_task(array $input, ?int $user_id = null)
         return $link_error;
     }
 
+    $collection_id = absint($input['collectionId'] ?? 0);
+    if ($collection_id > 0 && (!function_exists('byline_collection_can_edit') || !byline_collection_can_edit($collection_id, $user_id))) {
+        return new WP_Error('byline_task_forbidden', 'You cannot add work to this Collection.', ['status' => 403]);
+    }
+    if ($collection_id && $story_id && !in_array($story_id, byline_relation_ids($collection_id, 'story'), true)) {
+        return new WP_Error('byline_task_invalid_story', 'Add this story to the Collection first.', ['status' => 400]);
+    }
     $can_create = $story_id > 0
         ? byline_task_user_can($user_id, 'edit_post', $story_id)
-        : byline_task_user_can($user_id, 'edit_others_posts');
+        : ($collection_id > 0 || byline_task_user_can($user_id, 'edit_others_posts'));
     if (!$can_create) {
         return new WP_Error('byline_task_forbidden', 'You are not allowed to create this task.', ['status' => 403]);
     }
@@ -289,6 +300,7 @@ function byline_create_task(array $input, ?int $user_id = null)
     update_post_meta($task_id, BYLINE_TASK_DUE_AT_META, $due_at);
     update_post_meta($task_id, BYLINE_TASK_PRIORITY_META, $priority);
     update_post_meta($task_id, BYLINE_TASK_COVERAGE_META, $coverage_id);
+    if ($collection_id) { update_post_meta($task_id, BYLINE_TASK_COLLECTION_META, $collection_id); }
     update_post_meta($task_id, BYLINE_TASK_CREATOR_META, $user_id);
     update_post_meta($task_id, BYLINE_TASK_ORDER_META, byline_task_next_order($story_id, $coverage_id));
 
@@ -435,7 +447,7 @@ function byline_list_tasks(array $filters = [], ?int $user_id = null): array
     }
     // Apply assignment/state before the limit. Otherwise other people's work
     // can crowd an assigned task out of Home's bounded collection.
-    foreach (['assigneeId' => BYLINE_TASK_ASSIGNEE_META, 'state' => BYLINE_TASK_STATE_META] as $filter => $key) {
+    foreach (['assigneeId' => BYLINE_TASK_ASSIGNEE_META, 'state' => BYLINE_TASK_STATE_META, 'collectionId' => BYLINE_TASK_COLLECTION_META] as $filter => $key) {
         if (!empty($filters[$filter])) {
             $args['meta_query'][] = $filter === 'state' && $filters[$filter] === 'open'
                 ? ['relation' => 'OR', ['key' => $key, 'value' => 'completed', 'compare' => '!='], ['key' => $key, 'compare' => 'NOT EXISTS']]
@@ -555,6 +567,7 @@ function byline_task_register_meta(): void
             $priority = sanitize_key((string) $value);
             return in_array($priority, byline_task_priorities(), true) ? $priority : 'normal';
         }],
+        BYLINE_TASK_COLLECTION_META => ['type' => 'integer', 'sanitize_callback' => 'absint'],
         BYLINE_TASK_COVERAGE_META => ['type' => 'integer', 'sanitize_callback' => 'absint'],
         BYLINE_TASK_COMPLETED_AT_META => ['type' => 'string', 'sanitize_callback' => 'byline_task_datetime'],
         BYLINE_TASK_ORDER_META => ['type' => 'integer', 'sanitize_callback' => 'absint'],

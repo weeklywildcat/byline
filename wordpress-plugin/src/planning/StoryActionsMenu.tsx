@@ -8,6 +8,7 @@ import { useRef, type MouseEvent as ReactMouseEvent, type ReactElement } from "r
 import { movableWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
 
 export type StoryActionsMenuProps = {
+  additionalActions?: Array<{ id: string; label: string; run: () => void }>;
   story: PlanningStory;
   statuses: PlanningWorkflowStatus[];
   /** Whether the viewer may move stories at all (the server decides; this keeps known-forbidden moves out of the menu). */
@@ -24,7 +25,7 @@ export type StoryActionsMenuProps = {
  * (workspace, article, preview) or move it to another workflow stage. Moving
  * here is the keyboard and touch equivalent of dragging a card.
  */
-export function StoryActionsMenu({ story, statuses, canMove, disabled, onMove, workspaceUrl, className }: StoryActionsMenuProps) {
+export function StoryActionsMenu({ story, statuses, canMove, disabled, onMove, workspaceUrl, className, additionalActions }: StoryActionsMenuProps) {
   const title = story.title || __("Untitled story", "weekly-wildcat-headless");
   // Published is derived from WordPress; it is never a stage to move to or from.
   const movable = canMove && !story.wordpressState.isPublished;
@@ -48,6 +49,7 @@ export function StoryActionsMenu({ story, statuses, canMove, disabled, onMove, w
           </DropdownMenuSubContent>
         </DropdownMenuSub>
       </> : null}
+      {additionalActions?.map((a) => <DropdownMenuItem key={a.id} onClick={a.run}>{a.label}</DropdownMenuItem>)}
     </DropdownMenuContent>
   </DropdownMenu>;
 }
@@ -63,7 +65,7 @@ export type StoryContextMenuProps = StoryActionsMenuProps & {
  * menu instead of replacing it, so touch and keyboard users keep the ordinary
  * action button while mouse/trackpad users can right-click anywhere on a row.
  */
-export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, workspaceUrl, onOpenStory, children }: StoryContextMenuProps) {
+export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, workspaceUrl, onOpenStory, children, additionalActions }: StoryContextMenuProps) {
   const title = story.title || __("Untitled story", "weekly-wildcat-headless");
   const movable = canMove && !story.wordpressState.isPublished;
   const stages = movableWorkflowStatuses(statuses);
@@ -112,6 +114,7 @@ export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, w
           </ContextMenuSubContent>
         </ContextMenuSub>
       </> : null}
+      {additionalActions?.map((a) => <ContextMenuItem key={a.id} onClick={a.run}>{a.label}</ContextMenuItem>)}
     </ContextMenuContent>
   </ContextMenu>;
 }

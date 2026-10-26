@@ -1,3 +1,4 @@
+import { createCollectionApi } from "../collections/collection-api";
 import type { ProtectedEditorialRequest } from "../editorial/editorial-rest";
 import type { ArticleNotesResponse } from "../story/notes-model";
 import type {
@@ -23,6 +24,7 @@ const story = (id: number) => `/byline/v1/editorial/stories/${id}`;
  */
 export function createWorkspaceClient(request: WorkspaceRequest) {
   return {
+    collections: createCollectionApi(request),
     getWorkspace: (storyId: number) => request<StoryWorkspace>({ path: `${story(storyId)}/workspace` }),
     saveBrief: (storyId: number, brief: string, expectedBrief?: string) =>
       request<{ brief: string }>({ path: `${story(storyId)}/brief`, method: "POST", data: { brief, ...(expectedBrief !== undefined ? { expectedBrief } : {}) } }),

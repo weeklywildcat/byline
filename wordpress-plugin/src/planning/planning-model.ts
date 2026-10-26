@@ -93,6 +93,8 @@ export type PlanningFeaturedImage = {
 };
 
 export type PlanningStory = {
+  sections?: string[];
+  canEditPlanning?: boolean;
   id: number;
   title: string;
   editUrl: string;
@@ -138,6 +140,7 @@ export type PlanningSort = { key: PlanningSortKey; direction: PlanningSortDirect
 export const DEFAULT_PLANNING_SORT: PlanningSort = { key: "deadline", direction: "asc" };
 
 export type PlanningFilters = {
+  collectionId?: number;
   query: string;
   workflow: string;
   writerId: number | null;

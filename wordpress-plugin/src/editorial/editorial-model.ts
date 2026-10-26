@@ -310,6 +310,7 @@ export type EditorialTask = {
   priority: TaskPriority;
   storyId?: number | null;
   coverageId?: number | null;
+  collectionId?: number | null;
   createdBy?: ContributorRef | null;
   completedAt?: string | null;
   order: number;
@@ -329,6 +330,7 @@ export type TaskInput = {
   priority: TaskPriority;
   storyId?: number | null;
   coverageId?: number | null;
+  collectionId?: number | null;
 };
 
 export type TaskPatch = Partial<Pick<EditorialTask, "title" | "state" | "assigneeId" | "dueAt" | "priority" | "order">>;

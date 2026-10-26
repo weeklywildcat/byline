@@ -1,3 +1,4 @@
+import { createCollectionApi, type CollectionApi } from "../collections/collection-api";
 import type { PlanningRequestOptions } from "../planning/planning-api";
 import type { HomePresetsPayload } from "../home/home-model";
 import { createEditorialRestClient, type EditorialRestClient } from "../editorial/editorial-rest";
@@ -8,6 +9,7 @@ export type StoryRequest = <T>(options: PlanningRequestOptions) => Promise<T>;
 
 /** What Story Peek and the New story dialog need, whichever screen mounts them. */
 export type StoryFetchers = {
+  collections?: CollectionApi;
   /** The Story Workspace read model: the one source for Peek and the full workspace. */
   getWorkspace?: (storyId: number) => Promise<StoryWorkspace>;
   workspace?: WorkspaceClient;
@@ -26,6 +28,7 @@ export type StoryCapabilities = { editPosts?: boolean; manage?: boolean };
 export function createStoryFetchers(request: StoryRequest, capabilities: StoryCapabilities = {}, paths: { presets?: string } = {}): StoryFetchers {
   const fetchers: StoryFetchers = {};
   if (capabilities.editPosts !== false) {
+    fetchers.collections = createCollectionApi(request);
     fetchers.workspace = createWorkspaceClient(request);
     fetchers.getWorkspace = fetchers.workspace.getWorkspace;
     fetchers.createStory = (title, preset) => request<StoryWorkspace>({ path: "/byline/v1/editorial/stories", method: "POST", data: preset ? { title, preset } : { title } });

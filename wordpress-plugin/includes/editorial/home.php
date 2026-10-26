@@ -186,6 +186,14 @@ function byline_home_appointments(array $rows, int $user_id): array
             ];
         }
     }
+    if (function_exists('byline_collection_schedule')) {
+        $shared = byline_collection_schedule(byline_story_site_today(), gmdate('Y-m-d', strtotime(byline_story_site_today() . ' +60 days')), 0, $user_id);
+        foreach (array_merge($shared['appointments'], $shared['needsScheduling']) as $appointment) {
+            if ($appointment['status'] !== 'completed' && in_array($user_id, $appointment['assigneeIds'], true)) {
+                $items[] = array_diff_key($appointment, ['assignees' => 1, 'assigneeIds' => 1]);
+            }
+        }
+    }
     return array_slice($items, 0, 100);
 }
 

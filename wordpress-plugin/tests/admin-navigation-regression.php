@@ -192,6 +192,7 @@ $planning_children = array_filter($by_parent['byline'] ?? [], static function (a
 $expected_planning = [
     'byline-planning' => ['Today', 'edit_posts'],
     'admin.php?page=byline-planning&tab=stories' => ['Stories', 'edit_posts'],
+    'admin.php?page=byline-planning&tab=collections' => ['Collections', 'edit_posts'],
     'admin.php?page=byline-planning&tab=calendar' => ['Calendar', 'edit_posts'],
     'admin.php?page=byline-planning&tab=media' => ['Media Desk', 'edit_posts'],
     'admin.php?page=byline-planning&tab=coverage' => ['Coverage', 'edit_posts'],

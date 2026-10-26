@@ -197,12 +197,12 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
 
       <div className="flex min-w-0 flex-col gap-5" data-home-column="secondary">
         <Surface title="Coming Up" action={actionUrls?.calendar ? surfaceLink(actionUrls.calendar, "Calendar") : undefined}>
-          {section("stories", agenda.length ? <div className="flex flex-col gap-2">{Array.from(new Set(agenda.map((e) => e.day))).map((day) => <div key={day}><h3 className="px-3 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">{dateLabel(day, timezone, now)}</h3><ItemGroup role="group" className="gap-0">{agenda.filter((e) => e.day === day).map((event) => <AgendaItem key={event.id} event={event} timezone={timezone} onOpen={event.storyId ? () => openStory(event.storyId!) : undefined} />)}</ItemGroup></div>)}</div> : null, "Nothing scheduled in the next two weeks.")}
+          {section("stories", agenda.length ? <div className="flex flex-col gap-2">{Array.from(new Set(agenda.map((e) => e.day))).map((day) => <div key={day}><h3 className="px-3 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">{dateLabel(day, timezone, now)}</h3><ItemGroup role="group" className="gap-0">{agenda.filter((e) => e.day === day).map((event) => <AgendaItem key={event.id} event={event} timezone={timezone} onOpen={event.href ? () => window.location.assign(event.href!) : event.storyId ? () => openStory(event.storyId!) : undefined} />)}</ItemGroup></div>)}</div> : null, "Nothing scheduled in the next two weeks.")}
           {partial ? <p className="px-3 pt-2 text-xs text-muted-foreground">Some assignments could not be checked.</p> : null}
         </Surface>
 
         {showWaiting ? <Surface title="Waiting for Me">{home.isPending ? <RowSkeletons count={2} /> : <ItemGroup role="group" className="gap-0">{[
-          ...attention.map((item) => <AttentionRow key={item.id} item={item} onOpen={() => item.storyId ? openStory(item.storyId) : workRef.current?.focus()} />),
+          ...attention.map((item) => <AttentionRow key={item.id} item={item} onOpen={() => item.href ? window.location.assign(item.href) : item.storyId ? openStory(item.storyId) : workRef.current?.focus()} />),
           ...(failedDeploy && actionUrls?.deployment ? [attentionLink(actionUrls.deployment, "Website publication failed")] : []),
           ...(criticalHealth && actionUrls?.doctor ? [attentionLink(actionUrls.doctor, criticalHealth.label)] : [])
         ]}</ItemGroup>}</Surface> : null}

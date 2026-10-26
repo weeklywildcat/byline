@@ -284,11 +284,12 @@ function byline_editorial_rest_delete_media_assignment(WP_REST_Request $request)
  *
  * @return array<string,list<array<string,mixed>>>
  */
-function byline_workspace_schedule(string $from, string $to, bool $include_tasks, ?int $user_id = null): array
+function byline_workspace_schedule(string $from, string $to, bool $include_tasks, ?int $user_id = null, int $collection_id = 0): array
 {
     $user_id = $user_id ?? get_current_user_id();
     $out = ['appointments' => [], 'needsScheduling' => [], 'mediaDeadlines' => [], 'taskDeadlines' => []];
-    $stories = get_posts([
+    $scope = $collection_id > 0 ? ['post__in' => byline_collection_can_view($collection_id, $user_id) ? (byline_collection_story_ids($collection_id) ?: [0]) : [0]] : [];
+    $stories = get_posts($scope + [
         'post_type' => 'post', 'post_status' => ['draft', 'pending', 'future', 'publish', 'private'],
         'posts_per_page' => 200, 'orderby' => 'modified', 'order' => 'DESC', 'no_found_rows' => true,
         'meta_query' => ['relation' => 'OR',
@@ -335,12 +336,17 @@ function byline_workspace_schedule(string $from, string $to, bool $include_tasks
         }
     }
     if ($include_tasks) {
-        foreach (byline_list_tasks(['state' => 'open', 'limit' => 200], $user_id) as $task) {
+        foreach (byline_list_tasks(['state' => 'open', 'limit' => 200] + ($collection_id ? ['collectionId' => $collection_id] : []), $user_id) as $task) {
             $day = $task['dueAt'] !== '' ? byline_story_site_day($task['dueAt']) : '';
             if ($day !== '' && $day >= $from && $day <= $to) {
-                $out['taskDeadlines'][] = ['id' => $task['id'], 'storyId' => $task['storyId'] ?: null, 'storyTitle' => $task['storyId'] ? (string) get_the_title($task['storyId']) : '', 'title' => $task['title'], 'dueAt' => $task['dueAt'], 'assignee' => byline_editorial_rest_user_person($task['assigneeId'])];
+                $out['taskDeadlines'][] = ['id' => $task['id'], 'collectionId' => $task['collectionId'] ?? null, 'storyId' => $task['storyId'] ?: null, 'storyTitle' => $task['storyId'] ? (string) get_the_title($task['storyId']) : '', 'title' => $task['title'], 'dueAt' => $task['dueAt'], 'assignee' => byline_editorial_rest_user_person($task['assigneeId'])];
             }
         }
+    }
+    if (function_exists('byline_collection_schedule')) {
+        $shared = byline_collection_schedule($from, $to, $collection_id, $user_id);
+        $out['appointments'] = array_merge($out['appointments'], $shared['appointments']);
+        $out['needsScheduling'] = array_merge($out['needsScheduling'], $shared['needsScheduling']);
     }
     foreach (['appointments' => 'startAt', 'mediaDeadlines' => 'dueAt', 'taskDeadlines' => 'dueAt'] as $key => $field) {
         usort($out[$key], static function (array $a, array $b) use ($field): int { return [$a[$field], (string) $a['id']] <=> [$b[$field], (string) $b['id']]; });
@@ -361,7 +367,7 @@ function byline_editorial_rest_schedule(WP_REST_Request $request)
     }
     $include_tasks = in_array((string) $request->get_param('includeTasks'), ['1', 'true'], true);
     return rest_ensure_response(['timezone' => byline_editorial_planning_timezone()->getName(), 'from' => $from, 'to' => $to]
-        + byline_workspace_schedule($from, $to, $include_tasks));
+        + byline_workspace_schedule($from, $to, $include_tasks, null, absint($request->get_param('collectionId'))));
 }
 
 add_action('rest_api_init', static function (): void {

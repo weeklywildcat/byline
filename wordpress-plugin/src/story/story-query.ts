@@ -1,3 +1,4 @@
+import { collectionsKey } from "../collections/collection-api";
 import { QueryClient } from "@tanstack/react-query";
 import { homeKey } from "../home/home-query";
 import { workspaceKey } from "../workspace/workspace-query";
@@ -16,7 +17,7 @@ export const planningRootKey = ["byline", "planning"] as const;
 export const planningKey = (filters: unknown) => ["byline", "planning", filters] as const;
 export const savedViewsKey = ["byline", "planning-views"] as const;
 export const scheduleRootKey = ["byline", "schedule"] as const;
-export const scheduleKey = (from: string, to: string, includeTasks: boolean) => ["byline", "schedule", from, to, includeTasks] as const;
+export const scheduleKey = (from: string, to: string, includeTasks: boolean, collectionId?: number) => ["byline", "schedule", from, to, includeTasks, ...(collectionId ? [collectionId] : [])] as const;
 export const mediaDeskKey = ["byline", "media-desk"] as const;
 export const coverageKey = ["byline", "coverage"] as const;
 export const feedbackKey = ["byline", "feedback"] as const;
@@ -31,6 +32,8 @@ export { homeKey };
 export function invalidateStoryData(client: QueryClient, storyId?: number | null) {
   return Promise.all([
     client.invalidateQueries({ queryKey: homeKey }),
+    client.invalidateQueries({ queryKey: collectionsKey }),
+    client.invalidateQueries({ queryKey: ["byline", "story-collections"] }),
     client.invalidateQueries({ queryKey: planningRootKey }),
     client.invalidateQueries({ queryKey: scheduleRootKey }),
     client.invalidateQueries({ queryKey: mediaDeskKey }),
