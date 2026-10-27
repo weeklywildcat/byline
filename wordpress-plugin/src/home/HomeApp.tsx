@@ -164,7 +164,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
   const renderWorkGroups = (items: HomeWorkItem[]) => <div className="flex flex-col">{HOME_WORK_GROUPS.map((group) => {
     const grouped = items.filter((item) => item.group === group.id);
     if (!grouped.length) return null;
-    return <section key={group.id} aria-label={group.label}><h3 className="border-y border-border/70 bg-muted/20 px-3 py-1 text-xs font-medium text-muted-foreground first:border-t-0">{group.label}</h3><ItemGroup role="group" className={homeGroupClassName}>{grouped.map(renderWorkItem)}</ItemGroup></section>;
+    return <div key={group.id} role="group" aria-label={group.label}><h3 className="border-y border-border/70 bg-muted/20 px-3 py-1 text-xs font-medium text-muted-foreground first:border-t-0">{group.label}</h3><ItemGroup role="group" className={homeGroupClassName}>{grouped.map(renderWorkItem)}</ItemGroup></div>;
   })}</div>;
   const section = (key: keyof HomeBootstrap["errors"], content: ReactNode, empty: string) => home.isPending ? <RowSkeletons /> : home.isError ? <Quiet>Work is temporarily unavailable.</Quiet> : data?.errors[key] ? <InlineAlert className="mx-1.5 w-auto" onAction={() => void home.refetch()}>{data.errors[key]}</InlineAlert> : content || <Quiet>{empty}</Quiet>;
   const failedDeploy = deployment.data?.lifecycle === "failed";
