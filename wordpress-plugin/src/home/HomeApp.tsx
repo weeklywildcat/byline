@@ -6,24 +6,23 @@ import { describeEditorialError, setTaskCompletionState, type EditorialTask } fr
 import { cn } from "../admin-ui/lib/utils";
 import { AdminRoot } from "../admin-ui/components/admin-root";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
-import { Badge } from "../admin-ui/ui/badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Empty, EmptyDescription } from "../admin-ui/ui/empty";
-import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
+import { ItemGroup } from "../admin-ui/ui/item";
 import { Kbd, KbdGroup } from "../admin-ui/ui/kbd";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../admin-ui/ui/sheet";
 import type { HomeFetchers } from "./home-api";
 import { createAdminQueryClient } from "../story/story-query";
 import { homeKey, workspaceKey, replaceHomeTask, replaceWorkspaceTask } from "./home-query";
-import { dateLabel, homeAgenda, myActiveStories, myOpenTasks, reviewStories, waitingForMe, type HomeBootstrap } from "./newsroom-model";
+import { dateLabel, HOME_WORK_GROUPS, homeAgenda, myActiveStories, myWork, type HomeBootstrap, type HomeWorkItem } from "./newsroom-model";
 import { HomeCommands, type HomeActionUrls } from "./HomeCommands";
 import { HomeCreate } from "./HomeCreate";
 import { StoryPeek } from "../story/StoryPeek";
 import { StoryHoverProvider } from "../story/StoryHoverCard";
 import type { StoryWorkspace } from "../workspace/workspace-types";
 import { AgendaItem, AttentionRow, MediaAssignmentRow, ReviewRow, StoryRow } from "./components/rows";
-import { ActivityRow, denseRowClassName, RowSkeletons, TaskRow } from "../story/rows";
+import { RowSkeletons, TaskRow } from "../story/rows";
 import { useUpdateTask } from "../story/use-update-task";
 import { TaskEditDialog } from "../story/TaskEditDialog";
 
@@ -58,7 +57,7 @@ function Quiet({ children }: { children: ReactNode }) {
   return <Empty className="min-h-0 items-start px-3 py-2 text-left"><EmptyDescription>{children}</EmptyDescription></Empty>;
 }
 
-const HOME_TASK_PREVIEW_LIMIT = 7;
+const HOME_WORK_PREVIEW_LIMIT = 10;
 
 function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
   const client = useQueryClient();
@@ -147,25 +146,33 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
     },
     onSettled: (_data, _error, task) => { void client.invalidateQueries({ queryKey: homeKey }); if (task.storyId) void client.invalidateQueries({ queryKey: workspaceKey(task.storyId) }); }
   });
-  const tasks = data ? myOpenTasks(data.tasks, data.currentUser.id, timezone, now) : [];
+  const work = data ? myWork(data, now) : [];
   const stories = data ? myActiveStories(data.stories, data.currentUser.id, timezone, now) : [];
   const agenda = data ? homeAgenda(data, now).slice(0, 6) : [];
-  const attention = data ? waitingForMe(data, now) : [];
-  const review = data ? reviewStories(data) : [];
-  const visuals = data?.visualWork.filter((v) => v.status !== "done" && (data.capabilities.review || v.assignee?.id === data.currentUser.id)) || [];
   const newTask = (storyId: number | null = null) => { setTaskStoryId(storyId); setCreateKind("task"); };
   const storyTitle = (id?: number | null) => data?.stories.find((s) => s.id === id)?.title;
   const renderTask = (task: EditorialTask) => <TaskRow key={task.id} dense task={task} storyTitle={storyTitle(task.storyId)} timezone={timezone} now={now} people={data?.people || []} canAssign={Boolean(data?.capabilities.review)} pending={complete.isPending || (updateTask.isPending && String(updateTask.variables?.task.id) === String(task.id))} onOpen={task.storyId ? () => openStory(task.storyId!) : undefined} onEdit={fetchers.editorial ? () => setEditingTask(task) : undefined} onComplete={() => complete.mutate(task)} onUpdate={fetchers.editorial ? (patch, optimistic) => updateTask.mutate({ task, patch, optimistic }) : undefined} />;
+  const renderWorkItem = (item: HomeWorkItem) => {
+    if (item.kind === "task") return renderTask(item.task);
+    if (item.kind === "review") {
+      const writers = item.story.authors.length ? item.story.authors : item.story.writer ? [item.story.writer] : [];
+      return <ReviewRow key={item.id} storyId={item.story.id} title={item.story.title} people={writers} detail={`Review · ${writers.map((person) => person.name).join(", ") || "Unassigned writer"}`} onOpen={() => openStory(item.story.id)} />;
+    }
+    if (item.kind === "media") return <MediaAssignmentRow key={item.id} media={item.media} timezone={timezone} now={now} onOpen={() => openStory(item.media.story.id)} />;
+    return <AttentionRow key={item.id} item={item.item} onOpen={() => item.item.href ? window.location.assign(item.item.href) : item.item.storyId ? openStory(item.item.storyId) : workRef.current?.focus()} />;
+  };
+  const renderWorkGroups = (items: HomeWorkItem[]) => <div className="flex flex-col">{HOME_WORK_GROUPS.map((group) => {
+    const grouped = items.filter((item) => item.group === group.id);
+    if (!grouped.length) return null;
+    return <div key={group.id} role="group" aria-label={group.label}><h3 className="border-y border-border/70 bg-muted/20 px-3 py-1 text-xs font-medium text-muted-foreground first:border-t-0">{group.label}</h3><ItemGroup role="group" className={homeGroupClassName}>{grouped.map(renderWorkItem)}</ItemGroup></div>;
+  })}</div>;
   const section = (key: keyof HomeBootstrap["errors"], content: ReactNode, empty: string) => home.isPending ? <RowSkeletons /> : home.isError ? <Quiet>Work is temporarily unavailable.</Quiet> : data?.errors[key] ? <InlineAlert className="mx-1.5 w-auto" onAction={() => void home.refetch()}>{data.errors[key]}</InlineAlert> : content || <Quiet>{empty}</Quiet>;
   const failedDeploy = deployment.data?.lifecycle === "failed";
   const criticalHealth = health.data?.checks?.find((check) => check.status === "critical");
-  const attentionLink = (href: string, label: string) => <Item size="sm" className={denseRowClassName} render={<a href={href} />}><ItemContent><ItemTitle>{label}</ItemTitle></ItemContent><ItemActions><ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" /></ItemActions></Item>;
-  const partial = data?.errors.tasks || data?.errors.visualWork || data?.errors.appointments;
-  const showWaiting = home.isPending || Boolean(attention.length || failedDeploy || criticalHealth);
-  const showReview = Boolean(data?.capabilities.review && review.length);
-  const showVisuals = Boolean(visuals.length || data?.errors.visualWork);
-  const showActivity = home.isPending || Boolean(data?.activity.length || data?.errors.activity);
-  const hasMoreWork = tasks.length > HOME_TASK_PREVIEW_LIMIT || Boolean(data && tasks.length > 0 && tasks.length >= data.limits.tasks);
+  const workPartial = Boolean(data?.errors.tasks || data?.errors.visualWork || data?.errors.appointments);
+  const agendaPartial = Boolean(data?.errors.stories || data?.errors.appointments);
+  const boundedWork = Boolean(data && (data.tasks.length >= data.limits.tasks || data.visualWork.length >= data.limits.visualWork || data.appointments.length >= data.limits.appointments));
+  const hasMoreWork = work.length > HOME_WORK_PREVIEW_LIMIT || boundedWork;
 
   return <StoryHoverProvider fetchers={fetchers}><main className="@container/home mx-auto mt-6 mb-8 flex max-w-[1320px] flex-col gap-4 pr-5 pl-1">
     <header className="flex items-center justify-between gap-4">
@@ -179,43 +186,27 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
       </div>
     </header>
     {!fetchers.getHome ? <InlineAlert>Story work is not available for this role.</InlineAlert> : home.isError ? <InlineAlert onAction={() => void home.refetch()}>{describeEditorialError(home.error, "Home couldn't be loaded. Try again.")}</InlineAlert> : null}
+    {failedDeploy ? <InlineAlert title="Website publication failed" onAction={actionUrls?.deployment ? () => window.location.assign(actionUrls.deployment!) : undefined} actionLabel="Review deployment">The latest website publication needs attention.</InlineAlert> : null}
+    {criticalHealth ? <InlineAlert title={criticalHealth.label} onAction={actionUrls?.doctor ? () => window.location.assign(actionUrls.doctor!) : undefined} actionLabel="Review content health">A critical publishing check needs attention.</InlineAlert> : null}
     <div className="grid grid-cols-1 gap-4 @3xl/home:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] @3xl/home:items-start">
-      <div className="flex min-w-0 flex-col gap-4" data-home-column="primary">
-        <Surface title="Up Next" subtitle="Your assigned work, in order of urgency" action={fetchers.editorial ? <Button variant="ghost" size="sm" onClick={() => newTask()}><Plus data-icon="inline-start" aria-hidden="true" />Task</Button> : undefined}>
-          <section ref={workRef} tabIndex={-1} aria-label="Assigned tasks" className="outline-none">
-            {section("tasks", tasks.length ? <ItemGroup role="group" className={homeGroupClassName}>{tasks.slice(0, HOME_TASK_PREVIEW_LIMIT).map(renderTask)}</ItemGroup> : null, "No open assignments.")}
-            {hasMoreWork ? <div data-home-work-footer className="flex items-center justify-between border-t border-border/70 px-3 py-2"><Button variant="link" size="sm" onClick={() => setAllWorkOpen(true)}>View all work<ArrowRight data-icon="inline-end" aria-hidden="true" /></Button><span className="text-xs text-muted-foreground">{tasks.length ? `${tasks.length} open` : ""}</span></div> : null}
-          </section>
-          {completionError ? <InlineAlert className="mx-1.5 mt-2 w-auto">{completionError}</InlineAlert> : null}
-        </Surface>
+      <Surface title="My Work" subtitle="Tasks, reviews, reporting and production in one queue" action={fetchers.editorial ? <Button variant="ghost" size="sm" onClick={() => newTask()}><Plus data-icon="inline-start" aria-hidden="true" />Task</Button> : undefined}>
+        <section ref={workRef} tabIndex={-1} aria-label="My work" className="outline-none">
+          {home.isPending ? <RowSkeletons /> : work.length ? renderWorkGroups(work.slice(0, HOME_WORK_PREVIEW_LIMIT)) : <Quiet>{workPartial ? "Some work is temporarily unavailable." : "Nothing needs your attention."}</Quiet>}
+          {workPartial ? <p className="border-t border-border/70 px-3 py-2 text-xs text-muted-foreground">Some work could not be checked. <Button variant="link" size="xs" className="h-auto p-0 align-baseline" onClick={() => void home.refetch()}>Retry</Button></p> : null}
+          {hasMoreWork ? <div data-home-work-footer className="flex items-center justify-between border-t border-border/70 px-3 py-2"><Button variant="link" size="sm" onClick={() => setAllWorkOpen(true)}>View all work<ArrowRight data-icon="inline-end" aria-hidden="true" /></Button><span className="text-xs text-muted-foreground">{work.length ? `${work.length} open` : ""}</span></div> : null}
+        </section>
+        {completionError ? <InlineAlert className="mx-1.5 my-2 w-auto">{completionError}</InlineAlert> : null}
+      </Surface>
 
-        <Surface title="My Stories" action={actionUrls?.planning ? surfaceLink(`${actionUrls.planning}&mine=1`, "All my stories") : undefined}>
-          {section("stories", stories.length ? <ItemGroup role="group" className={homeGroupClassName}>{stories.slice(0, 6).map((story) => <StoryRow key={story.id} story={story} timezone={timezone} now={now} onOpen={() => openStory(story.id)} />)}</ItemGroup> : null, "No active stories assigned to you.")}
-        </Surface>
-
-        {showReview ? <Surface title="Ready for Review" action={<Badge variant="secondary">{review.length}</Badge>}>
-          <ItemGroup role="group" className={homeGroupClassName}>{review.slice(0, 5).map((story) => <ReviewRow key={story.id} storyId={story.id} title={story.title} people={story.authors.length ? story.authors : story.writer ? [story.writer] : []} detail={story.authors.map((a) => a.name).join(", ") || story.writer?.name || "Unassigned writer"} onOpen={() => openStory(story.id)} />)}</ItemGroup>
-        </Surface> : null}
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-4" data-home-column="secondary">
-        <Surface title="Coming Up" action={actionUrls?.calendar ? surfaceLink(actionUrls.calendar, "Calendar") : undefined}>
-          {section("stories", agenda.length ? <div className="flex flex-col">{Array.from(new Set(agenda.map((e) => e.day))).map((day) => <div key={day}><h3 className="border-y border-border/70 bg-muted/20 px-3 py-1 text-xs font-medium text-muted-foreground">{dateLabel(day, timezone, now)}</h3><ItemGroup role="group" className={homeGroupClassName}>{agenda.filter((e) => e.day === day).map((event) => <AgendaItem key={event.id} event={event} timezone={timezone} onOpen={event.href ? () => window.location.assign(event.href!) : event.storyId ? () => openStory(event.storyId!) : undefined} />)}</ItemGroup></div>)}</div> : null, "Nothing scheduled in the next two weeks.")}
-          {partial ? <p className="px-3 pt-2 text-xs text-muted-foreground">Some assignments could not be checked.</p> : null}
-        </Surface>
-
-        {showWaiting ? <Surface title="Waiting for Me">{home.isPending ? <RowSkeletons count={2} /> : <ItemGroup role="group" className={homeGroupClassName}>{[
-          ...attention.map((item) => <AttentionRow key={item.id} item={item} onOpen={() => item.href ? window.location.assign(item.href) : item.storyId ? openStory(item.storyId) : workRef.current?.focus()} />),
-          ...(failedDeploy && actionUrls?.deployment ? [attentionLink(actionUrls.deployment, "Website publication failed")] : []),
-          ...(criticalHealth && actionUrls?.doctor ? [attentionLink(actionUrls.doctor, criticalHealth.label)] : [])
-        ]}</ItemGroup>}</Surface> : null}
-
-        {showVisuals ? <Surface title="Photo & Visual Work" action={actionUrls?.media ? surfaceLink(actionUrls.media, "Media Desk") : undefined}>
-          {section("visualWork", visuals.length ? <ItemGroup role="group" className={homeGroupClassName}>{visuals.slice(0, 5).map((media) => <MediaAssignmentRow key={`${media.story.id}-${media.id}`} media={media} timezone={timezone} now={now} onOpen={() => openStory(media.story.id)} />)}</ItemGroup> : null, "No visual assignments.")}
-        </Surface> : null}
-      </div>
+      <Surface title="Coming Up" subtitle="Interviews, story deadlines and publication commitments" action={actionUrls?.calendar ? surfaceLink(actionUrls.calendar, "Calendar") : undefined}>
+        {section("stories", agenda.length ? <div className="flex flex-col">{Array.from(new Set(agenda.map((e) => e.day))).map((day) => <div key={day}><h3 className="border-y border-border/70 bg-muted/20 px-3 py-1 text-xs font-medium text-muted-foreground first:border-t-0">{dateLabel(day, timezone, now)}</h3><ItemGroup role="group" className={homeGroupClassName}>{agenda.filter((e) => e.day === day).map((event) => <AgendaItem key={event.id} event={event} timezone={timezone} onOpen={event.href ? () => window.location.assign(event.href!) : event.storyId ? () => openStory(event.storyId!) : undefined} />)}</ItemGroup></div>)}</div> : null, "Nothing scheduled in the next two weeks.")}
+        {agendaPartial ? <p className="border-t border-border/70 px-3 py-2 text-xs text-muted-foreground">Some commitments could not be checked.</p> : null}
+      </Surface>
     </div>
-    {showActivity ? <Surface title="Recent Activity">{section("activity", data?.activity.length ? <ItemGroup role="group" className={homeGroupClassName}>{data.activity.slice(0, 8).map((item) => <ActivityRow key={item.id} dense item={item} timezone={timezone} now={now} onOpen={item.storyId ? () => openStory(item.storyId!) : undefined} />)}</ItemGroup> : null, "No recent newsroom activity.")}</Surface> : null}
+
+    <Surface title="My Stories" subtitle="The active stories you're responsible for" action={actionUrls?.planning ? surfaceLink(`${actionUrls.planning}&mine=1`, "All my stories") : undefined}>
+      {section("stories", stories.length ? <ItemGroup role="group" className={homeGroupClassName}>{stories.slice(0, 6).map((story) => <StoryRow key={story.id} story={story} timezone={timezone} now={now} onOpen={() => openStory(story.id)} />)}</ItemGroup> : null, "No active stories assigned to you.")}
+    </Surface>
     <footer className="flex items-center justify-between text-xs text-muted-foreground"><span>{data ? `Dates shown in ${timezone.replace(/_/g, " ")}` : ""}</span><Button variant="link" size="xs" disabled={home.isFetching} onClick={() => void home.refetch()}>{home.isFetching ? "Refreshing…" : "Refresh"}</Button></footer>
     {health.isError || deployment.isError ? <p className="text-xs text-muted-foreground">Some system checks are unavailable. Your work is shown above.</p> : null}
     <span role="status" className="sr-only" aria-live="polite">{completedLabel}</span>
@@ -225,8 +216,8 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
     <TaskEditDialog open={editingTask !== null} onClose={() => setEditingTask(null)} fetchers={fetchers} task={editingTask} people={data?.people || []} canAssign={Boolean(data?.capabilities.review)} timezone={timezone} />
     <Sheet open={allWorkOpen} onOpenChange={setAllWorkOpen}>
       <SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-xl">
-        <SheetHeader><SheetTitle>All my work</SheetTitle><SheetDescription>Your visible open assignments</SheetDescription></SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 pb-4">{tasks.length ? <ItemGroup role="group" className={homeGroupClassName}>{tasks.map(renderTask)}</ItemGroup> : <Quiet>No open assignments.</Quiet>}{data && tasks.length >= data.limits.tasks ? <p className="px-3 pt-3 text-xs text-muted-foreground">Showing the first {data.limits.tasks} assignments.</p> : null}</div>
+        <SheetHeader><SheetTitle>All my work</SheetTitle><SheetDescription>Everything that currently needs your action</SheetDescription></SheetHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 pb-4">{work.length ? renderWorkGroups(work) : <Quiet>Nothing needs your attention.</Quiet>}{boundedWork ? <p className="px-3 pt-3 text-xs text-muted-foreground">Today is showing the bounded work available from the newsroom feed.</p> : null}</div>
       </SheetContent>
     </Sheet>
   </main></StoryHoverProvider>;

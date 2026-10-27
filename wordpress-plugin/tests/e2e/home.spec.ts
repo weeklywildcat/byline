@@ -52,7 +52,7 @@ test("Home creates real drafts, completes work with rollback, preserves peek con
   await expect(checkbox).not.toBeVisible();
   failRelease();
   await expect(checkbox).toBeVisible();
-  await expect(page.getByRole("region", { name: "Up Next" }).getByRole("alert")).toContainText("couldn't be completed");
+  await expect(page.getByRole("region", { name: "My Work" }).getByRole("alert")).toContainText("couldn't be completed");
   await page.unroute(taskRoute);
   await checkbox.click();
   await expect(checkbox).not.toBeVisible();
@@ -106,9 +106,10 @@ test("Home visual QA and independent optional service failures", async ({ adminP
   for (const width of [1440, 1280, 1024, 768, 390]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(homeUrl);
-    await expect(page.getByRole("heading", { name: "Up Next", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "My Work", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Coming Up", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "My Stories", exact: true })).toBeVisible();
     await expect(page.getByRole("checkbox", { name: /Complete Interview 3 students/ })).toBeVisible();
-    await expect(page.locator("[data-home-column]")).toHaveCount(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: `/tmp/byline-home-qa/editor-${width}.png`, fullPage: true, animations: "disabled" });
     if (width === 1440 || width === 390) {
@@ -124,7 +125,7 @@ test("Home visual QA and independent optional service failures", async ({ adminP
   await page.route("**/byline/v1/editorial/home*", (route) => route.fulfill({ json: { ...body, activity: [], errors: { activity: "Activity is temporarily unavailable." } } }));
   await page.reload();
   await expect(page.getByRole("checkbox", { name: /Complete Interview 3 students/ })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Recent Activity" }).getByRole("alert")).toContainText("Activity is temporarily unavailable.");
+  await expect(page.getByRole("region", { name: "Recent Activity" })).toHaveCount(0);
 });
 
 test("authenticated writers see their work, while private story and review data stay protected", async ({ browser, adminSession: session }) => {
@@ -145,7 +146,7 @@ test("authenticated writers see their work, while private story and review data 
     await page.getByRole("button", { name: "Log In", exact: true }).click();
     await page.goto(homeUrl);
     await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Ready for Review", exact: true })).not.toBeVisible();
+    await expect(page.getByRole("heading", { name: "My Work", exact: true })).toBeVisible();
     await expect(page.getByText("Private editor planning", { exact: false })).not.toBeVisible();
     await page.getByRole("button", { name: "New story", exact: true }).click();
     await page.getByLabel("Story title").fill(`Caroline's reporting ${Date.now()}`);

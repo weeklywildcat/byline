@@ -7,11 +7,13 @@ public.
 
 ## Operating model
 
-- **Home / Today** is the personal starting page: assigned tasks, upcoming
-  commitments, active stories, selective attention, role-relevant review and
-  visual work, and recent activity. Story Peek preserves list context; Gutenberg
-  remains the writing environment. See [Byline Home](byline-home.md) for the
-  protected read model, private links, Nova components and validation.
+- **Home / Today** is the personal starting page: one **My Work** queue unifies
+  actionable tasks, review, reporting/scheduling and assigned production; **Coming
+  Up** is reserved for real calendar commitments; **My Stories** keeps ownership
+  context. System failures stay page-level instead of becoming editorial work.
+  Story Peek preserves list context; Gutenberg remains the writing environment.
+  See [Byline Home](byline-home.md) for the protected read model, private links,
+  Nova components and validation.
 - **Story Workspace** is the coordination page for one story: brief, writers and
   editor, a reporting plan (sources and appointments, including appointments whose
   exact time is not yet known), tasks, production assignments, resource links and

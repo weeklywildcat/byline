@@ -58,7 +58,7 @@ export function MediaAssignmentRow({ media, timezone, now, onOpen }: { media: Ho
     {media.assignee && anyPicture([media.assignee]) ? <ItemMedia><PeopleAvatars people={[media.assignee]} /></ItemMedia> : null}
     <ItemContent className="min-w-0 gap-0.5">
       <ItemTitle className="block w-full line-clamp-2 leading-5">{decodeEntities(title)}</ItemTitle>
-      <ItemDescription className="text-xs leading-4">{decodeEntities(media.story.title)} · {mediaTypeLabels[media.type] || "Visual"} · {media.assignee?.name || "Unassigned"}{media.dueAt ? ` · ${dateLabel(media.dueAt, timezone, now)}` : ""}</ItemDescription>
+      <ItemDescription className="text-xs leading-4">{decodeEntities(media.story.title)} · {mediaTypeLabels[media.type] || "Visual"}{media.dueAt ? ` · ${dateLabel(media.dueAt, timezone, now)}` : ""}</ItemDescription>
     </ItemContent>
     <ItemActions><WorkStatusBadge kind="production" intensity={mediaIntensity(media.status)} className="max-w-32">{mediaStatusLabels[media.status] || "Needed"}</WorkStatusBadge></ItemActions>
   </ItemButton>;
