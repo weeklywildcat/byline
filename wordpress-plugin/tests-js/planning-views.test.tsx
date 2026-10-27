@@ -2,10 +2,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { decodeEntities } from "../src/admin-ui/lib/text";
 import { StoryBoard } from "../src/planning/StoryBoard";
-import { StoryList } from "../src/planning/StoryList";
+import { StoryList, type StoryListProps } from "../src/planning/StoryList";
 import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, hideFinishedPublished, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "../src/planning/planning-model";
 import { destinationForTab, initialStoriesView, storiesViewHref } from "../src/planning/planning-routing";
-import { productionSignal, storySignals, workflowBadgeSpec, WorkflowBadge } from "../src/story/story-parts";
+import { ProductionSummary, productionSignal, storySignals, workflowBadgeSpec, WorkflowBadge } from "../src/story/story-parts";
 import { sectionNames } from "../src/workspace/workspace-model";
 
 const now = new Date("2026-10-20T12:00:00Z");
@@ -126,7 +126,7 @@ describe("StoryList", () => {
   it("folds tasks and production into one Work cell, and shows a planned day without the placeholder noon", () => {
     expect(html).toContain("3 tasks");
     expect(html).toContain("Photo assigned");
-    expect(html).toContain("Oct 24, 2026");
+    expect(html).toContain("Oct 24");
     expect(html).not.toMatch(/>[^<]*12:00\s?PM/);
   });
 
@@ -150,9 +150,79 @@ describe("StoryList", () => {
     expect((html.match(/data-slot="context-menu-trigger"/g) || []).length).toBe(stories.length);
     expect(html).toContain('aria-label="Actions for Canteen could return"');
   });
+
+  it("uses a compact, separated table with clamped accessible headline buttons", () => {
+    expect(html).toContain("table-fixed border-collapse");
+    const rows = [...html.matchAll(/<tr[^>]*data-story-id="\d+"[^>]*>/g)].map(([row]) => row);
+    expect(rows).toHaveLength(stories.length);
+    for (const row of rows) {
+      expect(row).toContain("border-b border-border/70 hover:bg-muted/40");
+      expect(row).not.toContain("h-16");
+      expect(row).not.toMatch(/role="button"|tabindex/);
+    }
+    expect(html).not.toContain("py-3");
+    expect(html).toMatch(/<button[^>]*line-clamp-2[^>]*>Canteen could return<\/button>/);
+  });
+
+  it("keeps Work in one horizontal ProductionSummary cluster", () => {
+    const cells = [...html.matchAll(/<td[^>]*>(.*?)<\/td>/g)].map((match) => match[1]!);
+    expect(cells[5]).toContain("flex-row gap-x-1.5 gap-y-1");
+    expect(cells[5]).toContain("3 tasks");
+    expect(cells[5]).toContain("Photo assigned");
+  });
+
+  it("removes redundant Draft/Published lines while distinguishing scheduled and planned dates", () => {
+    const published = story({ id: 3, workflow: stage("published"), wordpressState: { id: "publish", label: "Published", isPublished: true, isScheduled: false, publishedAt: "2026-10-19T18:15:00Z" } });
+    for (const editable of [true, false]) {
+      const markup = renderToStaticMarkup(<StoryList {...props([...stories, published, story({ id: 4 })])} canUpdateStories={editable} sort={DEFAULT_PLANNING_SORT} onSortChange={vi.fn()} />);
+      const cells = [...markup.matchAll(/<td[^>]*>(.*?)<\/td>/g)].map((match) => match[1]!);
+      expect(cells[4]).toContain("Oct 24");
+      expect(cells[4]).toContain(">Planned<");
+      expect(cells[12]).toContain(">Scheduled<");
+      expect(cells[20]).toContain('dateTime="2026-10-19T18:15:00Z"');
+      expect(cells[20]).not.toContain("Published");
+      expect(cells[28]).toContain("—");
+      expect(cells[28]).not.toContain("Draft");
+    }
+  });
+
+  it("keeps writer overflow and editor information without placeholder avatars", () => {
+    const authors = ["Ava", "Mia", "Noah", "Pat", "Sam"].map((name, index) => ({ ...person(index + 10, name), avatarUrl: `https://example.test/${name}.jpg` }));
+    const markup = renderToStaticMarkup(<StoryList {...props([story({ id: 3, authors, editor: person(2, "Gibson Bell") })])} sort={DEFAULT_PLANNING_SORT} onSortChange={vi.fn()} />);
+    expect(markup).toContain("and 2 more: Pat, Sam");
+    expect(markup).toContain('title="Ava, Mia, Noah, Pat, Sam"');
+    expect(markup).toContain("Edited by Gibson Bell");
+    expect(markup).toContain('<span class="flex shrink-0"><div data-slot="avatar-group"');
+    expect(html).not.toContain('data-slot="avatar"');
+  });
+
+  it("retains overdue text, exact Updated timestamps, permissions and busy controls", () => {
+    const item = story({ id: 3, deadline: "2026-10-19", modifiedAt: "2026-10-20T11:30:00Z" });
+    const render = (patch: Partial<StoryListProps>) => renderToStaticMarkup(<StoryList {...props([item])} {...patch} sort={DEFAULT_PLANNING_SORT} onSortChange={vi.fn()} />);
+    const readonly = render({ canAssignStories: false, canMoveStories: false });
+    expect(readonly).toContain("1d overdue");
+    expect(readonly).toContain("text-warning");
+    expect(readonly).toMatch(/<time dateTime="2026-10-20T11:30:00Z" title="[^"]+">/);
+    expect(readonly).not.toContain('aria-label="Change deadline"');
+    expect(readonly).not.toContain('aria-label="Workflow:');
+    const busy = render({ updatingStoryId: item.id });
+    expect(busy).toContain('aria-busy="true"');
+    expect(busy).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Change deadline"/);
+  });
 });
 
 describe("story signals", () => {
+  it("discloses overflow on demand for dense lists without changing other summaries", () => {
+    const item = story({ id: 1, needsReview: true, openTaskCount: 1, reporting: { sources: 0, interviewed: 0, needsScheduling: 2, toSchedule: 2, nextAppointment: null }, visual: { type: "photo", status: "needed" } });
+    const full = renderToStaticMarkup(<ProductionSummary story={item} />);
+    const compact = renderToStaticMarkup(<ProductionSummary story={item} maxSignals={2} />);
+    for (const label of ["Needs review", "2 to schedule", "1 task", "Photo needed"]) expect(full).toContain(label);
+    expect(compact).toContain("Needs review");
+    expect(compact).toContain("2 to schedule");
+    expect(compact).toContain('aria-label="2 more work signals"');
+    expect(compact).not.toContain("Photo needed");
+  });
+
   it("raises what needs a person and keeps the rest quiet", () => {
     const signals = storySignals(story({ id: 1, needsReview: true, openTaskCount: 1, reporting: { sources: 0, interviewed: 0, needsScheduling: 2, toSchedule: 2, nextAppointment: null }, visual: { type: "photo", status: "needed" } }));
     expect(signals.map((signal) => [signal.key, signal.tone])).toEqual([["review", "attention"], ["scheduling", "attention"], ["tasks", "neutral"], ["media", "attention"]]);
