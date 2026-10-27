@@ -1,6 +1,5 @@
-import { readFile } from "node:fs/promises";
 import { expect, test } from "./fixtures";
-import { addDays, createPlanningStory, currentUserId, siteToday, token } from "./planning-fixture";
+import { addDays, createPhotoContributor, createPlanningStory, currentUserId, siteToday, token } from "./planning-fixture";
 
 const listUrl = "/wp-admin/admin.php?page=byline-planning&tab=stories&view=list";
 
@@ -15,21 +14,9 @@ test("Stories List keeps readable dense rows, separators, horizontal work signal
     ids.push(id);
   }
   const firstId = ids[0]!;
-  // Use a real uploaded profile photo through the contributor/Planning API.
-  // A local headshot may replace the tiny image fixture for visual review.
-  const image = process.env.BYLINE_E2E_PROFILE_PHOTO
-    ? await readFile(process.env.BYLINE_E2E_PROFILE_PHOTO)
-    : Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
-  const nonce = await page.evaluate(() => (window as Window & { wpApiSettings?: { nonce?: string } }).wpApiSettings?.nonce ?? "");
-  const uploaded = await page.context().request.post("/wp-json/wp/v2/media", { headers: { "X-WP-Nonce": nonce, "Content-Disposition": `attachment; filename="${unique}-profile.png"`, "Content-Type": "image/png" }, data: image });
-  expect(uploaded.ok()).toBe(true);
-  const photoId = ((await uploaded.json()) as { id: number }).id;
-  session.addCleanup(async () => { await session.rest(`/wp/v2/media/${photoId}?force=true`, "DELETE"); });
   const writerName = `Caroline Elrod ${unique}`;
-  const writer = await session.rest<{ id: number }>("/byline/v1/admin/contributors/guests", "POST", { displayName: writerName, imageId: photoId, hasProfilePage: false });
-  expect(writer.ok).toBe(true);
-  session.addCleanup(async () => { await session.rest(`/byline/v1/admin/contributors/guests/${writer.payload.id}`, "DELETE"); });
-  expect((await session.rest(`/byline/v1/editorial/stories/${firstId}/contributors`, "POST", { contributors: [{ id: writer.payload.id, kind: "guest" }] })).ok).toBe(true);
+  const writer = await createPhotoContributor(page, session, writerName);
+  expect((await session.rest(`/byline/v1/editorial/stories/${firstId}/contributors`, "POST", { contributors: [{ id: writer.id, kind: "guest" }] })).ok).toBe(true);
   expect((await session.rest(`/byline/v1/editorial/stories/${firstId}`, "POST", { editorId: me, plannedPublishAt: `${addDays(day, 3)}T12:00` })).ok).toBe(true);
   expect((await session.rest(`/byline/v1/editorial/stories/${firstId}/tasks`, "POST", { title: "Check budget", assigneeId: me })).ok).toBe(true);
   expect((await session.rest(`/byline/v1/editorial/stories/${firstId}/media-assignments`, "POST", { title: "Campus photo", type: "photo" })).ok).toBe(true);

@@ -3,6 +3,7 @@ import { QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tan
 import { ArrowRight, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { describeEditorialError, setTaskCompletionState, type EditorialTask } from "../editorial/editorial-model";
+import { cn } from "../admin-ui/lib/utils";
 import { AdminRoot } from "../admin-ui/components/admin-root";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { Badge } from "../admin-ui/ui/badge";
@@ -22,7 +23,7 @@ import { StoryPeek } from "../story/StoryPeek";
 import { StoryHoverProvider } from "../story/StoryHoverCard";
 import type { StoryWorkspace } from "../workspace/workspace-types";
 import { AgendaItem, AttentionRow, MediaAssignmentRow, ReviewRow, StoryRow } from "./components/rows";
-import { ActivityRow, RowSkeletons, TaskRow } from "../story/rows";
+import { ActivityRow, denseRowClassName, RowSkeletons, TaskRow } from "../story/rows";
 import { useUpdateTask } from "../story/use-update-task";
 import { TaskEditDialog } from "../story/TaskEditDialog";
 
@@ -35,15 +36,17 @@ export function HomeApp(props: HomeAppProps) {
 }
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+// ItemGroup's size variants otherwise reintroduce gaps between separated rows.
+const homeGroupClassName = "gap-0 has-data-[size=sm]:gap-0 has-data-[size=xs]:gap-0";
 
 /** A titled Card whose rows are flush with its edges. */
 function Surface({ title, subtitle, action, className, children }: { title: string; subtitle?: string; action?: ReactNode; className?: string; children: ReactNode }) {
   const id = useId();
-  return <Card size="sm" role="region" aria-labelledby={id} className={className}>
-    <CardHeader>
+  return <Card size="sm" role="region" aria-labelledby={id} className={cn("gap-0 py-0", className)}>
+    <CardHeader className="items-center border-b border-border/70 bg-muted/40 px-3 py-1.5 [.border-b]:pb-1.5">
       <CardTitle id={id} role="heading" aria-level={2}>{title}</CardTitle>
-      {subtitle ? <CardDescription>{subtitle}</CardDescription> : null}
-      {action ? <CardAction>{action}</CardAction> : null}
+      {subtitle ? <CardDescription className="text-xs">{subtitle}</CardDescription> : null}
+      {action ? <CardAction className="self-center">{action}</CardAction> : null}
     </CardHeader>
     <CardContent className="px-0">{children}</CardContent>
   </Card>;
@@ -152,11 +155,11 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
   const visuals = data?.visualWork.filter((v) => v.status !== "done" && (data.capabilities.review || v.assignee?.id === data.currentUser.id)) || [];
   const newTask = (storyId: number | null = null) => { setTaskStoryId(storyId); setCreateKind("task"); };
   const storyTitle = (id?: number | null) => data?.stories.find((s) => s.id === id)?.title;
-  const renderTask = (task: EditorialTask) => <TaskRow key={task.id} task={task} storyTitle={storyTitle(task.storyId)} timezone={timezone} now={now} people={data?.people || []} canAssign={Boolean(data?.capabilities.review)} pending={complete.isPending || (updateTask.isPending && String(updateTask.variables?.task.id) === String(task.id))} onOpen={task.storyId ? () => openStory(task.storyId!) : undefined} onEdit={fetchers.editorial ? () => setEditingTask(task) : undefined} onComplete={() => complete.mutate(task)} onUpdate={fetchers.editorial ? (patch, optimistic) => updateTask.mutate({ task, patch, optimistic }) : undefined} />;
+  const renderTask = (task: EditorialTask) => <TaskRow key={task.id} dense task={task} storyTitle={storyTitle(task.storyId)} timezone={timezone} now={now} people={data?.people || []} canAssign={Boolean(data?.capabilities.review)} pending={complete.isPending || (updateTask.isPending && String(updateTask.variables?.task.id) === String(task.id))} onOpen={task.storyId ? () => openStory(task.storyId!) : undefined} onEdit={fetchers.editorial ? () => setEditingTask(task) : undefined} onComplete={() => complete.mutate(task)} onUpdate={fetchers.editorial ? (patch, optimistic) => updateTask.mutate({ task, patch, optimistic }) : undefined} />;
   const section = (key: keyof HomeBootstrap["errors"], content: ReactNode, empty: string) => home.isPending ? <RowSkeletons /> : home.isError ? <Quiet>Work is temporarily unavailable.</Quiet> : data?.errors[key] ? <InlineAlert className="mx-1.5 w-auto" onAction={() => void home.refetch()}>{data.errors[key]}</InlineAlert> : content || <Quiet>{empty}</Quiet>;
   const failedDeploy = deployment.data?.lifecycle === "failed";
   const criticalHealth = health.data?.checks?.find((check) => check.status === "critical");
-  const attentionLink = (href: string, label: string) => <Item size="sm" render={<a href={href} />}><ItemContent><ItemTitle>{label}</ItemTitle></ItemContent><ItemActions><ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" /></ItemActions></Item>;
+  const attentionLink = (href: string, label: string) => <Item size="sm" className={denseRowClassName} render={<a href={href} />}><ItemContent><ItemTitle>{label}</ItemTitle></ItemContent><ItemActions><ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" /></ItemActions></Item>;
   const partial = data?.errors.tasks || data?.errors.visualWork || data?.errors.appointments;
   const showWaiting = home.isPending || Boolean(attention.length || failedDeploy || criticalHealth);
   const showReview = Boolean(data?.capabilities.review && review.length);
@@ -164,7 +167,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
   const showActivity = home.isPending || Boolean(data?.activity.length || data?.errors.activity);
   const hasMoreWork = tasks.length > HOME_TASK_PREVIEW_LIMIT || Boolean(data && tasks.length > 0 && tasks.length >= data.limits.tasks);
 
-  return <StoryHoverProvider fetchers={fetchers}><main className="@container/home mx-auto mt-6 mb-8 flex max-w-[1320px] flex-col gap-5 pr-5 pl-1">
+  return <StoryHoverProvider fetchers={fetchers}><main className="@container/home mx-auto mt-6 mb-8 flex max-w-[1320px] flex-col gap-4 pr-5 pl-1">
     <header className="flex items-center justify-between gap-4">
       <div>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Today</h1>
@@ -176,43 +179,43 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
       </div>
     </header>
     {!fetchers.getHome ? <InlineAlert>Story work is not available for this role.</InlineAlert> : home.isError ? <InlineAlert onAction={() => void home.refetch()}>{describeEditorialError(home.error, "Home couldn't be loaded. Try again.")}</InlineAlert> : null}
-    <div className="grid grid-cols-1 gap-5 @3xl/home:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] @3xl/home:items-start">
-      <div className="flex min-w-0 flex-col gap-5" data-home-column="primary">
+    <div className="grid grid-cols-1 gap-4 @3xl/home:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] @3xl/home:items-start">
+      <div className="flex min-w-0 flex-col gap-4" data-home-column="primary">
         <Surface title="Up Next" subtitle="Your assigned work, in order of urgency" action={fetchers.editorial ? <Button variant="ghost" size="sm" onClick={() => newTask()}><Plus data-icon="inline-start" aria-hidden="true" />Task</Button> : undefined}>
           <section ref={workRef} tabIndex={-1} aria-label="Assigned tasks" className="outline-none">
-            {section("tasks", tasks.length ? <ItemGroup role="group" className="gap-0">{tasks.slice(0, HOME_TASK_PREVIEW_LIMIT).map(renderTask)}</ItemGroup> : null, "No open assignments.")}
-            {hasMoreWork ? <div data-home-work-footer className="mt-1 flex items-center justify-between border-t px-1.5 pt-2"><Button variant="link" size="sm" onClick={() => setAllWorkOpen(true)}>View all work<ArrowRight data-icon="inline-end" aria-hidden="true" /></Button><span className="text-xs text-muted-foreground">{tasks.length ? `${tasks.length} open` : ""}</span></div> : null}
+            {section("tasks", tasks.length ? <ItemGroup role="group" className={homeGroupClassName}>{tasks.slice(0, HOME_TASK_PREVIEW_LIMIT).map(renderTask)}</ItemGroup> : null, "No open assignments.")}
+            {hasMoreWork ? <div data-home-work-footer className="flex items-center justify-between border-t border-border/70 px-3 py-2"><Button variant="link" size="sm" onClick={() => setAllWorkOpen(true)}>View all work<ArrowRight data-icon="inline-end" aria-hidden="true" /></Button><span className="text-xs text-muted-foreground">{tasks.length ? `${tasks.length} open` : ""}</span></div> : null}
           </section>
           {completionError ? <InlineAlert className="mx-1.5 mt-2 w-auto">{completionError}</InlineAlert> : null}
         </Surface>
 
         <Surface title="My Stories" action={actionUrls?.planning ? surfaceLink(`${actionUrls.planning}&mine=1`, "All my stories") : undefined}>
-          {section("stories", stories.length ? <ItemGroup role="group" className="gap-0">{stories.slice(0, 6).map((story) => <StoryRow key={story.id} story={story} timezone={timezone} now={now} onOpen={() => openStory(story.id)} />)}</ItemGroup> : null, "No active stories assigned to you.")}
+          {section("stories", stories.length ? <ItemGroup role="group" className={homeGroupClassName}>{stories.slice(0, 6).map((story) => <StoryRow key={story.id} story={story} timezone={timezone} now={now} onOpen={() => openStory(story.id)} />)}</ItemGroup> : null, "No active stories assigned to you.")}
         </Surface>
 
         {showReview ? <Surface title="Ready for Review" action={<Badge variant="secondary">{review.length}</Badge>}>
-          <ItemGroup role="group" className="gap-0">{review.slice(0, 5).map((story) => <ReviewRow key={story.id} storyId={story.id} title={story.title} detail={`${story.authors.map((a) => a.name).join(", ") || story.writer?.name || "Unassigned writer"} · Ready for review`} onOpen={() => openStory(story.id)} />)}</ItemGroup>
+          <ItemGroup role="group" className={homeGroupClassName}>{review.slice(0, 5).map((story) => <ReviewRow key={story.id} storyId={story.id} title={story.title} people={story.authors.length ? story.authors : story.writer ? [story.writer] : []} detail={story.authors.map((a) => a.name).join(", ") || story.writer?.name || "Unassigned writer"} onOpen={() => openStory(story.id)} />)}</ItemGroup>
         </Surface> : null}
       </div>
 
-      <div className="flex min-w-0 flex-col gap-5" data-home-column="secondary">
+      <div className="flex min-w-0 flex-col gap-4" data-home-column="secondary">
         <Surface title="Coming Up" action={actionUrls?.calendar ? surfaceLink(actionUrls.calendar, "Calendar") : undefined}>
-          {section("stories", agenda.length ? <div className="flex flex-col gap-2">{Array.from(new Set(agenda.map((e) => e.day))).map((day) => <div key={day}><h3 className="px-3 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">{dateLabel(day, timezone, now)}</h3><ItemGroup role="group" className="gap-0">{agenda.filter((e) => e.day === day).map((event) => <AgendaItem key={event.id} event={event} timezone={timezone} onOpen={event.href ? () => window.location.assign(event.href!) : event.storyId ? () => openStory(event.storyId!) : undefined} />)}</ItemGroup></div>)}</div> : null, "Nothing scheduled in the next two weeks.")}
+          {section("stories", agenda.length ? <div className="flex flex-col">{Array.from(new Set(agenda.map((e) => e.day))).map((day) => <div key={day}><h3 className="border-y border-border/70 bg-muted/20 px-3 py-1 text-xs font-medium text-muted-foreground">{dateLabel(day, timezone, now)}</h3><ItemGroup role="group" className={homeGroupClassName}>{agenda.filter((e) => e.day === day).map((event) => <AgendaItem key={event.id} event={event} timezone={timezone} onOpen={event.href ? () => window.location.assign(event.href!) : event.storyId ? () => openStory(event.storyId!) : undefined} />)}</ItemGroup></div>)}</div> : null, "Nothing scheduled in the next two weeks.")}
           {partial ? <p className="px-3 pt-2 text-xs text-muted-foreground">Some assignments could not be checked.</p> : null}
         </Surface>
 
-        {showWaiting ? <Surface title="Waiting for Me">{home.isPending ? <RowSkeletons count={2} /> : <ItemGroup role="group" className="gap-0">{[
+        {showWaiting ? <Surface title="Waiting for Me">{home.isPending ? <RowSkeletons count={2} /> : <ItemGroup role="group" className={homeGroupClassName}>{[
           ...attention.map((item) => <AttentionRow key={item.id} item={item} onOpen={() => item.href ? window.location.assign(item.href) : item.storyId ? openStory(item.storyId) : workRef.current?.focus()} />),
           ...(failedDeploy && actionUrls?.deployment ? [attentionLink(actionUrls.deployment, "Website publication failed")] : []),
           ...(criticalHealth && actionUrls?.doctor ? [attentionLink(actionUrls.doctor, criticalHealth.label)] : [])
         ]}</ItemGroup>}</Surface> : null}
 
         {showVisuals ? <Surface title="Photo & Visual Work" action={actionUrls?.media ? surfaceLink(actionUrls.media, "Media Desk") : undefined}>
-          {section("visualWork", visuals.length ? <ItemGroup role="group" className="gap-0">{visuals.slice(0, 5).map((media) => <MediaAssignmentRow key={`${media.story.id}-${media.id}`} media={media} timezone={timezone} now={now} onOpen={() => openStory(media.story.id)} />)}</ItemGroup> : null, "No visual assignments.")}
+          {section("visualWork", visuals.length ? <ItemGroup role="group" className={homeGroupClassName}>{visuals.slice(0, 5).map((media) => <MediaAssignmentRow key={`${media.story.id}-${media.id}`} media={media} timezone={timezone} now={now} onOpen={() => openStory(media.story.id)} />)}</ItemGroup> : null, "No visual assignments.")}
         </Surface> : null}
       </div>
     </div>
-    {showActivity ? <Surface title="Recent Activity">{section("activity", data?.activity.length ? <ItemGroup role="group" className="gap-0">{data.activity.slice(0, 8).map((item) => <ActivityRow key={item.id} item={item} timezone={timezone} now={now} onOpen={item.storyId ? () => openStory(item.storyId!) : undefined} />)}</ItemGroup> : null, "No recent newsroom activity.")}</Surface> : null}
+    {showActivity ? <Surface title="Recent Activity">{section("activity", data?.activity.length ? <ItemGroup role="group" className={homeGroupClassName}>{data.activity.slice(0, 8).map((item) => <ActivityRow key={item.id} dense item={item} timezone={timezone} now={now} onOpen={item.storyId ? () => openStory(item.storyId!) : undefined} />)}</ItemGroup> : null, "No recent newsroom activity.")}</Surface> : null}
     <footer className="flex items-center justify-between text-xs text-muted-foreground"><span>{data ? `Dates shown in ${timezone.replace(/_/g, " ")}` : ""}</span><Button variant="link" size="xs" disabled={home.isFetching} onClick={() => void home.refetch()}>{home.isFetching ? "Refreshing…" : "Refresh"}</Button></footer>
     {health.isError || deployment.isError ? <p className="text-xs text-muted-foreground">Some system checks are unavailable. Your work is shown above.</p> : null}
     <span role="status" className="sr-only" aria-live="polite">{completedLabel}</span>
@@ -223,7 +226,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
     <Sheet open={allWorkOpen} onOpenChange={setAllWorkOpen}>
       <SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-xl">
         <SheetHeader><SheetTitle>All my work</SheetTitle><SheetDescription>Your visible open assignments</SheetDescription></SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 pb-4">{tasks.length ? <ItemGroup role="group" className="gap-0">{tasks.map(renderTask)}</ItemGroup> : <Quiet>No open assignments.</Quiet>}{data && tasks.length >= data.limits.tasks ? <p className="px-3 pt-3 text-xs text-muted-foreground">Showing the first {data.limits.tasks} assignments.</p> : null}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 pb-4">{tasks.length ? <ItemGroup role="group" className={homeGroupClassName}>{tasks.map(renderTask)}</ItemGroup> : <Quiet>No open assignments.</Quiet>}{data && tasks.length >= data.limits.tasks ? <p className="px-3 pt-3 text-xs text-muted-foreground">Showing the first {data.limits.tasks} assignments.</p> : null}</div>
       </SheetContent>
     </Sheet>
   </main></StoryHoverProvider>;
