@@ -17,6 +17,13 @@ a story, and one full detail page.
 A test (`tests-js/story-peek-single.test.ts`) pins that there is exactly one
 `StoryPeek` implementation and no Planning quick view.
 
+Peek puts open tasks and production before supporting reporting context.
+Collections and explicitly linked interviews/resources share one collapsed
+summary below that work; expanding it exposes navigation and the existing
+relationship pickers. Empty reporting has one workspace action instead of
+separate source and appointment buttons. The full workspace keeps the expanded
+Collection controls.
+
 ## Bundles and routing
 
 | Address | Bundle (private React 19) |

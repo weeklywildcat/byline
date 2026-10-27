@@ -141,6 +141,7 @@ test("Collections coordinates independent reporting with equivalent touch/contex
     exact: true,
   });
   await expect(storyPeek).toBeVisible();
+  await storyPeek.getByRole("button", { name: /Collections & interviews/ }).click();
   await storyPeek.getByLabel("Add from Collection", { exact: true }).click();
   await page
     .getByLabel("Search add from collection", { exact: true })

@@ -85,9 +85,9 @@ test("Story Peek, sparse: calm header, native sections, no dead space, clear foo
     // Sections with nothing to show are not rendered; the rest are compact.
     await expect(peek.getByRole("region", { name: "Recent activity" })).toHaveCount(0);
     await expect(peek.getByRole("region", { name: "Reporting" }).getByText("No sources or interviews yet.")).toBeVisible();
-    await expect(peek.getByRole("region", { name: "Reporting" }).getByRole("link", { name: "Add source" })).toBeVisible();
+    await expect(peek.getByRole("region", { name: "Reporting" }).getByRole("link", { name: "Add reporting" })).toBeVisible();
     const reportingBox = await peek.getByRole("region", { name: "Reporting" }).boundingBox();
-    expect(reportingBox!.height).toBeLessThan(140);
+    expect(reportingBox!.height).toBeLessThan(90);
     // Tasks align and overdue reads as text, not only colour.
     await expect(peek.getByRole("checkbox", { name: /Complete Interview 3 students/ })).toBeVisible();
     await expect(peek.getByText("1d overdue")).toBeVisible();

@@ -59,14 +59,20 @@ describe("Story Peek, sparse", () => {
     expect(anchor("Preview")).not.toContain("bg-primary");
   });
 
-  it("shows a compact native Empty for Reporting, with the add actions, only to people who can add", () => {
+  it("keeps empty Reporting to one sentence and a single workspace action", () => {
     const manager = render(canteen({ capabilities: { ...capabilities, addSource: true, addAppointment: true } }));
-    expect(manager).toContain('data-slot="empty"');
     expect(manager).toContain("No sources or interviews yet.");
-    expect(manager).toContain("Add people you plan to talk to.");
-    expect(manager).toContain("Add source");
-    expect(manager).toContain("Add appointment");
-    expect(manager).toContain("items-start");
+    expect(manager).toContain("Add reporting");
+    expect(manager).toContain('href="/wp-admin/admin.php?page=byline-planning&amp;story=7#ws-reporting"');
+    expect(manager).not.toContain("Add source");
+    expect(manager).not.toContain("Add appointment");
+    expect(manager.indexOf("Production")).toBeLessThan(manager.indexOf("Add reporting"));
+  });
+
+  it("puts tasks and production before the optional collection context", () => {
+    const html = renderToStaticMarkup(<StoryPeekContent {...props(canteen())} collectionContext={<section>Collection context</section>} />);
+    expect(html.indexOf("Interview 3 students")).toBeLessThan(html.indexOf("Collection context"));
+    expect(html.indexOf("Production")).toBeLessThan(html.indexOf("Collection context"));
   });
 });
 

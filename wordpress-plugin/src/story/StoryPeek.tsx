@@ -14,7 +14,6 @@ import { WorkStatusBadge, mediaIntensity } from "../admin-ui/components/work-sta
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Field, FieldContent, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemHeader, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
@@ -46,8 +45,6 @@ function PeekSection({ title, action, children }: { title: string; action?: Reac
   </section>;
 }
 
-const compactEmpty = "items-start gap-2 border-0 p-0 text-left";
-
 /** A compact, note-free roll-up. A target window is shown as a window; it never acquires a clock time. */
 function ReportingPeek({ reporting, error, timezone, canAddSource, canAddAppointment, reportingUrl }: { reporting: ReportingSummary | null; error?: string; timezone: string; canAddSource: boolean; canAddAppointment: boolean; reportingUrl?: string }) {
   const next = reporting?.nextAppointment;
@@ -58,15 +55,9 @@ function ReportingPeek({ reporting, error, timezone, canAddSource, canAddAppoint
   if (!error && empty && !canAdd) return null;
   return <>
     <Separator />
-    <PeekSection title="Reporting">
+    <PeekSection title="Reporting" action={canAdd ? <a className={buttonVariants({ variant: "ghost", size: "sm" })} href={reportingUrl}>{empty ? "Add reporting" : "Manage"}</a> : null}>
       {error ? <InlineAlert>Reporting couldn't be loaded.</InlineAlert> : empty
-        ? <Empty className={compactEmpty}>
-          <EmptyHeader className="items-start gap-0.5"><EmptyTitle>No sources or interviews yet.</EmptyTitle><EmptyDescription>Add people you plan to talk to.</EmptyDescription></EmptyHeader>
-          <EmptyContent className="flex-row flex-wrap">
-            {canAddSource ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={reportingUrl}><Plus data-icon="inline-start" aria-hidden="true" />Add source</a> : null}
-            {canAddAppointment ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={reportingUrl}><Plus data-icon="inline-start" aria-hidden="true" />Add appointment</a> : null}
-          </EmptyContent>
-        </Empty>
+        ? <p className="text-sm text-muted-foreground">No sources or interviews yet.</p>
         : <div className="flex flex-col gap-1 text-sm">
           {stats.length ? <p>{stats.join(" · ")}</p> : null}
           {next ? <p className="text-muted-foreground"><span className="font-medium text-foreground">{next.title}</span> · {appointmentLine({ ...next, status: "confirmed", endAt: null }, timezone)}</p> : null}
@@ -207,9 +198,6 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
 
       <NotesPeek notes={story.notes} />
 
-      {props.collectionContext}
-      <ReportingPeek reporting={data.reporting} error={data.errors.reporting} timezone={timezone} canAddSource={caps.addSource} canAddAppointment={caps.addAppointment} reportingUrl={workspaceHref ? `${workspaceHref}#ws-reporting` : undefined} />
-
       {tasks.length || caps.addTask ? <>
         <Separator />
         <PeekSection title="Tasks" action={caps.addTask ? <Button variant="outline" size="sm" data-peek-add-task="" onClick={() => onNewTask(story.id)}><Plus data-icon="inline-start" aria-hidden="true" />Add task</Button> : null}>
@@ -236,6 +224,9 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
           })}</ItemGroup>}
         </PeekSection>
       </> : null}
+
+      <ReportingPeek reporting={data.reporting} error={data.errors.reporting} timezone={timezone} canAddSource={caps.addSource} canAddAppointment={caps.addAppointment} reportingUrl={workspaceHref ? `${workspaceHref}#ws-reporting` : undefined} />
+      {props.collectionContext}
 
       {data.resources.length || canManageLinks || draft ? <>
         <Separator />
@@ -317,7 +308,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
         </div> : null}
       </SheetHeader>
       {peek.isPending ? <div className="py-4"><RowSkeletons count={7} /></div> : peek.isError || !story || !data ? <div className="p-4"><InlineAlert title="The story couldn't be loaded." onAction={() => void peek.refetch()}>{describeEditorialError(peek.error, "The story couldn't be loaded.")}</InlineAlert></div>
-        : <StoryPeekContent collectionContext={fetchers.collections ? <StoryCollectionContext storyId={data.story.id} api={fetchers.collections} /> : undefined} data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl} onNewTask={onNewTask} onComplete={onComplete} onUpdateTask={(task, patch, optimistic) => updateTask.mutate({ task, patch, optimistic })} onEditTask={setEditingTask} updatingTaskId={updateTask.isPending ? String(updateTask.variables?.task.id || "") : null} completing={completing}
+        : <StoryPeekContent collectionContext={fetchers.collections ? <StoryCollectionContext storyId={data.story.id} api={fetchers.collections} compact /> : undefined} data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl} onNewTask={onNewTask} onComplete={onComplete} onUpdateTask={(task, patch, optimistic) => updateTask.mutate({ task, patch, optimistic })} onEditTask={setEditingTask} updatingTaskId={updateTask.isPending ? String(updateTask.variables?.task.id || "") : null} completing={completing}
           onPlan={(patch) => planning.mutate(patch)} onWriters={(value) => writers.mutate(value)}
           onSaveLink={(input, existing) => resources.mutate(existing ? { ...input, id: existing.id } : input)} onRemoveLink={(id) => resources.mutate({ remove: id })}
           planning={planning.isPending} writing={writers.isPending} linking={resources.isPending} error={editError} linkError={linkError} linkFormOpen={linkForm} onLinkForm={(next) => { setLinkError(""); setLinkForm(next); }} />}

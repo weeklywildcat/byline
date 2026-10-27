@@ -57,3 +57,57 @@ test("clicking a story title the cursor has rested on still opens Story Peek", a
     await page.mouse.move(5, 5);
   }
 });
+
+test("collection context stays compact until expanded at desktop and phone widths", async ({ adminPage: page, adminSession: session }) => {
+  const unique = token();
+  const title = `${unique} Compact context`;
+  const id = await createPlanningStory(session, { title, status: "reporting" });
+  const collection = { id: 90001, name: "Election coverage and community reporting with a very long collection name", archived: false, canEdit: true };
+  const interview = { id: 90002, collectionId: collection.id, interviewee: "School principal", canEdit: true };
+  await page.route(new RegExp(`/byline/v1/editorial/stories/${id}/collections(?:\\?.*)?$`), (route) => route.fulfill({ json: {
+    canManage: true, collections: [collection], interviews: [interview], availableInterviews: [],
+    resources: [{ id: 90003, label: "Interview recording", url: "https://example.test/recording", kind: "Audio" }],
+  } }));
+  await page.route(/\/byline\/v1\/editorial\/collections(?:\?.*)?$/, (route) => route.fulfill({ json: { collections: [collection], pages: 1 } }));
+  const fs = await import("node:fs/promises");
+  await fs.mkdir("/tmp/byline-peek-qa", { recursive: true });
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(boardUrl(unique));
+    await page.getByRole("button", { name: title, exact: true }).click();
+    const peek = page.getByRole("dialog", { name: title, exact: true });
+    const section = peek.getByRole("region", { name: "Story Collections", exact: true });
+    const toggle = section.getByRole("button", { name: /Collections & interviews/ });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(section).toContainText("1 shared interview · 1 shared resource");
+    await expect(section.getByLabel("Story collections", { exact: true })).toBeHidden();
+    await expect(section.getByText("School principal", { exact: false })).toBeHidden();
+    const box = (await section.boundingBox())!;
+    expect(box.height).toBeLessThan(105);
+    const tasks = (await peek.getByRole("region", { name: "Tasks", exact: true }).boundingBox())!;
+    expect(tasks.y + tasks.height).toBeLessThanOrEqual(box.y);
+    await peek.screenshot({ path: `/tmp/byline-peek-qa/collapsed-${width}.png` });
+
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(section.getByRole("link", { name: /School principal/ })).toHaveAttribute("href", /collection=90001&interview=90002/);
+    await expect(section.getByRole("link", { name: /Interview recording/ })).toHaveAttribute("target", "_blank");
+    await section.getByLabel("Add from Collection", { exact: true }).click();
+    await page.getByLabel("Search add from collection", { exact: true }).fill("principal");
+    const option = page.getByRole("option", { name: "School principal", exact: true });
+    await expect(option).toBeVisible();
+    const popup = (await option.boundingBox())!;
+    expect(popup.x).toBeGreaterThanOrEqual(0);
+    expect(popup.x + popup.width).toBeLessThanOrEqual(width);
+    await page.keyboard.press("Escape");
+    await expect(option).toBeHidden();
+    await expect(peek).toBeVisible();
+    expect(await peek.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await peek.screenshot({ path: `/tmp/byline-peek-qa/expanded-${width}.png` });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await page.keyboard.press("Escape");
+    await expect(peek).toBeHidden();
+  }
+});
