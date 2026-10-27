@@ -10,6 +10,7 @@ import { ItemButton } from "../admin-ui/components/item-button";
 import type { ContributorEntry } from "../editorial/editorial-model";
 import type { StoryFetchers } from "../story/story-fetchers";
 import { exactDate } from "../home/newsroom-model";
+import { CollectionPublicCoverage } from "./CollectionPublicCoverage";
 import { CollectionBrief } from "./CollectionBrief";
 import { CollectionProperties } from "./CollectionProperties";
 import { CollectionTasks } from "./CollectionTasks";
@@ -103,6 +104,7 @@ export function CollectionOverview({
             preview
           />
         </section>
+        <div className="order-7 lg:order-none"><CollectionPublicCoverage detail={detail} actions={actions} /></div>
       </div>
       <CollectionProperties
         collection={detail.collection}

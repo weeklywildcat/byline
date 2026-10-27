@@ -121,7 +121,6 @@ function byline_editorial_default_presets(): array
             ],
             'mediaAssignments' => [],
             'associations' => [
-                'coverageId' => 0,
                 'gameId' => 0,
                 'eventId' => 0,
                 'teamIds' => [],
@@ -152,7 +151,6 @@ function byline_editorial_default_presets(): array
             ],
             'mediaAssignments' => [],
             'associations' => [
-                'coverageId' => 0,
                 'gameId' => 0,
                 'eventId' => 0,
                 'teamIds' => [],
@@ -180,7 +178,6 @@ function byline_editorial_default_presets(): array
             'tasks' => [],
             'mediaAssignments' => [],
             'associations' => [
-                'coverageId' => 0,
                 'gameId' => 0,
                 'eventId' => 0,
                 'teamIds' => [],
@@ -210,7 +207,6 @@ function byline_editorial_default_presets(): array
                 ['key' => 'photo-assignment', 'title' => 'Photo assignment', 'type' => 'photo', 'dueOffsetDays' => 2],
             ],
             'associations' => [
-                'coverageId' => 0,
                 'gameId' => 0,
                 'eventId' => 0,
                 'teamIds' => [],
@@ -244,7 +240,6 @@ function byline_editorial_default_presets(): array
             ],
             'mediaAssignments' => [],
             'associations' => [
-                'coverageId' => 0,
                 'gameId' => 0,
                 'eventId' => 0,
                 'teamIds' => [],
@@ -448,7 +443,7 @@ function byline_editorial_preset_sanitize_media_assignments(array $input): array
 function byline_editorial_preset_sanitize_associations(array $input): array
 {
     $result = [];
-    foreach (['storyId', 'coverageId', 'gameId', 'eventId', 'teamId'] as $field) {
+    foreach (['storyId', 'gameId', 'eventId', 'teamId'] as $field) {
         if (!array_key_exists($field, $input) || !is_scalar($input[$field])) {
             continue;
         }
@@ -801,7 +796,7 @@ function byline_apply_editorial_preset(string $type, array $context = [], array 
     $association_context = isset($context['associations']) && is_array($context['associations'])
         ? $context['associations']
         : [];
-    foreach (['storyId', 'coverageId', 'gameId', 'eventId', 'teamId', 'teamIds'] as $field) {
+    foreach (['storyId', 'gameId', 'eventId', 'teamId', 'teamIds'] as $field) {
         if (array_key_exists($field, $context)) {
             $association_context[$field] = $context[$field];
         }
@@ -809,7 +804,7 @@ function byline_apply_editorial_preset(string $type, array $context = [], array 
     $safe_associations = byline_editorial_preset_sanitize_associations($association_context);
     $existing_associations = is_array($preset['associations'] ?? null) ? $preset['associations'] : [];
 
-    foreach (['storyId', 'coverageId', 'gameId', 'eventId', 'teamId'] as $field) {
+    foreach (['storyId', 'gameId', 'eventId', 'teamId'] as $field) {
         if (isset($safe_associations[$field]) && $safe_associations[$field] > 0) {
             $existing_associations[$field] = $safe_associations[$field];
         }

@@ -67,7 +67,6 @@ type BylineAdminConfig = {
   tasksPath?: string;
   readinessPath?: string;
   mediaPath?: string;
-  coveragePath?: string;
   feedbackPath?: string;
   distributionPath?: string;
   newsletterPath?: string;
@@ -141,8 +140,6 @@ type AdminUrls = {
     stories: string;
     calendar: string;
     media: string;
-    coverage: string;
-    performance: string;
     contentHealth: string;
     feedback: string;
   };
@@ -374,7 +371,7 @@ const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     label: "Connections",
     items: [
       { id: "newsletter", label: "Newsletter", description: "Connect the provider used for newsletter signup and delivery.", icon: Mail, capability: "manageIntegrations", feature: "newsletter" },
-      { id: "analytics", label: "Analytics", description: "Connect Plausible or Cloudflare for newsroom performance data.", icon: Activity, capability: "manageIntegrations" },
+      { id: "analytics", label: "Analytics", description: "Connect Plausible or Cloudflare for publication analytics.", icon: Activity, capability: "manageIntegrations" },
       { id: "discord", label: "Discord", description: "Connect the newsroom bot, server, channels, and workflow sync.", icon: MessageCircle, capability: "manageIntegrations", feature: "discord" },
       { id: "deployment", label: "Deployment", description: "Configure the private build hook used after content changes.", icon: Rocket, capability: "manageIntegrations" }
     ]

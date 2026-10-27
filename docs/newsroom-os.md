@@ -27,7 +27,7 @@ public.
 - **Editorial workflow** tracks pitch, assignment, reporting, writing, editing,
   ready for review, on hold, dropped, and derived published state. It is
   separate from WordPress `post_status`.
-- **Coverage** is a first-class public collection. The static `/coverage/`
+- **Collections** coordinate grouped reporting and optionally publish reader-facing coverage. The static `/coverage/`
   index links to each published `/coverage/<slug>/` page; coverage records and
   their linked stories are read from the public Byline API at build time.
 - **Distribution and newsletters** are provider adapters. They compose from

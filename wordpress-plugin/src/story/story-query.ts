@@ -19,9 +19,7 @@ export const savedViewsKey = ["byline", "planning-views"] as const;
 export const scheduleRootKey = ["byline", "schedule"] as const;
 export const scheduleKey = (from: string, to: string, includeTasks: boolean, collectionId?: number) => ["byline", "schedule", from, to, includeTasks, ...(collectionId ? [collectionId] : [])] as const;
 export const mediaDeskKey = ["byline", "media-desk"] as const;
-export const coverageKey = ["byline", "coverage"] as const;
 export const feedbackKey = ["byline", "feedback"] as const;
-export const performanceKey = ["byline", "performance"] as const;
 export const contentHealthKey = ["byline", "content-health"] as const;
 export { homeKey };
 

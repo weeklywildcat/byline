@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 // Loading the editorial domain modules from this already-registered transport
 // keeps the new slice available to both the plugin and focused standalone tests
 // without creating a second bootstrap path.
-foreach (['collections', 'story-context', 'editor-autosave', 'notes', 'planning', 'media', 'media-assignments', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors', 'activity', 'presets', 'reporting', 'resources', 'workspace', 'home', 'collection-workspaces', 'interviews', 'collection-schedule', 'collections-rest'] as $byline_editorial_module) {
+foreach (['collections', 'story-context', 'editor-autosave', 'notes', 'planning', 'media', 'media-assignments', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors', 'activity', 'presets', 'reporting', 'resources', 'workspace', 'home', 'collection-workspaces', 'collection-public', 'interviews', 'collection-schedule', 'collections-rest'] as $byline_editorial_module) {
     $byline_editorial_module_file = __DIR__ . '/' . $byline_editorial_module . '.php';
     if (is_readable($byline_editorial_module_file)) {
         require_once $byline_editorial_module_file;
@@ -127,9 +127,6 @@ function byline_editorial_rest_payload(int $post_id): array
         'tasks' => function_exists('byline_task_count_for_story')
             ? ['openCount' => byline_task_count_for_story($post_id)]
             : ['openCount' => 0],
-        'coverage' => function_exists('byline_get_story_coverage_summary')
-            ? byline_get_story_coverage_summary($post_id, null)
-            : [],
         'contributors' => function_exists('byline_get_story_contributors')
             ? byline_get_story_contributors($post_id)
             : [],
@@ -256,9 +253,6 @@ function byline_editorial_rest_bootstrap_payload(int $post_id): array
     $readiness = function_exists('byline_get_story_readiness')
         ? byline_get_story_readiness($post_id)
         : [];
-    $coverage = function_exists('byline_get_story_coverage_summary')
-        ? byline_get_story_coverage_summary($post_id, null)
-        : [];
     $contributor_count = function_exists('byline_get_story_contributor_entries')
         ? count(byline_get_story_contributor_entries($post_id, true))
         : (function_exists('byline_get_story_contributors') ? count(byline_get_story_contributors($post_id)) : 0);
@@ -291,7 +285,6 @@ function byline_editorial_rest_bootstrap_payload(int $post_id): array
                 ? byline_task_count_for_story($post_id)
                 : 0,
         ],
-        'coverage' => $coverage,
         'contributors' => ['count' => $contributor_count],
         'corrections' => ['count' => $correction_count],
         'readiness' => $readiness === [] ? null : [
@@ -327,7 +320,7 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
         }
     }
 
-    foreach (['plannedPublishAt', 'media', 'visualRequest', 'coverageIds', 'contributors'] as $field) {
+    foreach (['plannedPublishAt', 'media', 'visualRequest', 'contributors'] as $field) {
         if (array_key_exists($field, $body)) {
             $extended[$field] = $body[$field];
         }
@@ -370,7 +363,7 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
 
     // Validate the shape and object references for every grouped field before
     // applying the primary workflow state. This keeps a mixed request atomic
-    // from an editor's point of view: an invalid coverage/contributor/media
+    // from an editor's point of view: an invalid contributor/media
     // change cannot leave status or assignment partially updated.
     if (array_key_exists('media', $extended) || array_key_exists('visualRequest', $extended)) {
         $media = $extended['media'] ?? $extended['visualRequest'];
@@ -386,19 +379,6 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
                 && function_exists('byline_editorial_media_assignee_can_be_set')
                 && !byline_editorial_media_assignee_can_be_set($post_id, (int) $media_request['assigneeId'])) {
                 return new WP_Error('byline_editorial_media_assignment_forbidden', 'Only an editor can assign media work to another user.', ['status' => 403]);
-            }
-        }
-    }
-
-    if (array_key_exists('coverageIds', $extended)) {
-        if (!is_array($extended['coverageIds']) || !function_exists('byline_set_story_coverage_ids')) {
-            return new WP_Error('byline_editorial_invalid_coverage', 'Coverage membership could not be updated.', ['status' => 400]);
-        }
-        if (function_exists('byline_sanitize_coverage_ids') && function_exists('byline_coverage_exists')) {
-            foreach (byline_sanitize_coverage_ids($extended['coverageIds']) as $coverage_id) {
-                if (!byline_coverage_exists((int) $coverage_id)) {
-                    return new WP_Error('byline_coverage_not_found', 'One of the selected coverage objects does not exist.', ['status' => 404]);
-                }
             }
         }
     }
@@ -530,19 +510,6 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
         }
     }
 
-    if (array_key_exists('coverageIds', $extended)) {
-        $previous_coverage = function_exists('byline_get_story_coverage_ids')
-            ? byline_get_story_coverage_ids($post_id)
-            : [];
-        $coverage_result = byline_set_story_coverage_ids($post_id, $extended['coverageIds']);
-        if (is_wp_error($coverage_result)) {
-            return $fail($coverage_result);
-        }
-        $rollbacks[] = static function () use ($post_id, $previous_coverage) {
-            return !is_wp_error(byline_set_story_coverage_ids($post_id, $previous_coverage));
-        };
-    }
-
     if (array_key_exists('contributors', $extended)) {
         $previous_contributors = function_exists('byline_get_story_contributor_entries')
             ? byline_get_story_contributor_entries($post_id, false)
@@ -664,19 +631,7 @@ function byline_editorial_rest_can_view_correction(WP_REST_Request $request)
     return true;
 }
 
-function byline_editorial_rest_can_edit_coverage(WP_REST_Request $request)
-{
-    $coverage_id = absint($request->get_param('id'));
-    if ($coverage_id > 0 && function_exists('byline_coverage_exists') && !byline_coverage_exists($coverage_id)) {
-        return new WP_Error('byline_coverage_not_found', 'The coverage could not be found.', ['status' => 404]);
-    }
 
-    return $coverage_id > 0
-        ? (function_exists('byline_coverage_can_edit') && byline_coverage_can_edit($coverage_id)
-            ? true
-            : new WP_Error('byline_coverage_forbidden', 'You are not allowed to edit this coverage.', ['status' => rest_authorization_required_code()]))
-        : byline_editorial_rest_can_edit_posts();
-}
 
 function byline_editorial_rest_can_view_feedback(WP_REST_Request $request)
 {
@@ -852,18 +807,6 @@ function byline_editorial_rest_planning_story(array $row): array
         }
     }
 
-    $coverage = [];
-    foreach ((array) ($row['coverage'] ?? []) as $item) {
-        if (!is_array($item) || absint($item['id'] ?? 0) <= 0) {
-            continue;
-        }
-        $coverage[] = [
-            'id' => absint($item['id']),
-            'title' => sanitize_text_field((string) ($item['title'] ?? '')),
-            'slug' => sanitize_title((string) ($item['slug'] ?? '')),
-        ];
-    }
-
     $deadline = (string) ($row['deadline'] ?? '');
     $planned = (string) ($row['plannedPublishAt'] ?? '');
     $modified = (string) ($row['modifiedAt'] ?? '');
@@ -910,7 +853,6 @@ function byline_editorial_rest_planning_story(array $row): array
         'notes' => is_array($row['notes'] ?? null) ? $row['notes'] : null,
         'reporting' => is_array($row['reporting'] ?? null) ? $row['reporting'] : null,
         'mediaSummary' => is_array($row['media'] ?? null) ? $row['media'] : null,
-        'coverage' => $coverage,
         'featuredImage' => $featured_id > 0 ? ['id' => $featured_id, 'isSelectedVisual' => !empty($featured['isLinked'])] : null,
         'needsReview' => $workflow_id === 'ready',
     ];
@@ -946,7 +888,6 @@ function byline_editorial_rest_planning_filters(array $filters): array
         'plannedTo' => (string) ($filters['plannedTo'] ?? ''),
         'wordpressState' => (string) ($filters['postStatus'] ?? ''),
         'visualStatus' => (string) ($filters['visualStatus'] ?? ''),
-        'coverageId' => !empty($filters['coverage']) && is_numeric($filters['coverage']) ? absint($filters['coverage']) : null,
         'mine' => !empty($filters['mine']),
         'unassigned' => !empty($filters['unassigned']),
         'overdue' => !empty($filters['overdue']),
@@ -994,7 +935,6 @@ function byline_editorial_rest_planning(WP_REST_Request $request)
             'canAssign' => $can_assign,
             'canManageSavedViews' => $can_edit_posts,
             'canManageMedia' => $can_edit_posts,
-            'canManageCoverage' => $can_edit_posts,
             'canManageFeedback' => $can_manage_feedback,
         ],
         'currentUser' => $current_user,
@@ -1164,7 +1104,6 @@ function byline_editorial_rest_task_item(array $task): array
     $task['assignee'] = byline_editorial_rest_user_person(absint($task['assigneeId'] ?? 0));
     $task['createdBy'] = byline_editorial_rest_user_person(absint($task['creatorId'] ?? 0));
     $task['storyId'] = absint($task['storyId'] ?? 0) ?: null;
-    $task['coverageId'] = absint($task['coverageId'] ?? 0) ?: null;
     $task['dueAt'] = (string) ($task['dueAt'] ?? '') !== '' ? (string) $task['dueAt'] : null;
     $task['completedAt'] = (string) ($task['completedAt'] ?? '') !== '' ? (string) $task['completedAt'] : null;
 
@@ -1299,234 +1238,6 @@ function byline_editorial_rest_public_coverage(WP_REST_Request $request)
     return $coverage === null
         ? new WP_Error('byline_coverage_not_found', 'That public coverage could not be found.', ['status' => 404])
         : rest_ensure_response($coverage);
-}
-
-/**
- * Return the private Coverage record with nested story IDs filtered by the
- * current user's object-level story capability. The raw record is useful to
- * storage code, but it must never be handed to a broad collection endpoint.
- * Staff relationships are newsroom-wide planning metadata and are reserved
- * for editors/Byline managers.
- *
- * @return array<string,mixed>
- */
-function byline_editorial_rest_filter_coverage_record(array $coverage): array
-{
-    if (function_exists('byline_coverage_editable_story_ids')) {
-        $coverage['storyIds'] = byline_coverage_editable_story_ids(
-            (array) ($coverage['storyIds'] ?? [])
-        );
-    } else {
-        $coverage['storyIds'] = [];
-    }
-
-    if (!current_user_can('edit_others_posts') && !current_user_can('manage_byline')) {
-        $coverage['staffIds'] = [];
-    }
-
-    return $coverage;
-}
-
-/** @return array<string,mixed> */
-function byline_editorial_rest_admin_coverage_item(array $coverage): array
-{
-    $story_ids = function_exists('byline_coverage_editable_story_ids')
-        ? byline_coverage_editable_story_ids((array) ($coverage['storyIds'] ?? []))
-        : [];
-    $stories = [];
-    $planned_count = 0;
-    foreach ($story_ids as $story_id) {
-        $story = get_post($story_id);
-        if (!$story instanceof WP_Post || $story->post_type !== 'post') {
-            continue;
-        }
-        if ($story->post_status !== 'publish') {
-            $planned_count++;
-        }
-        $stories[] = [
-            'id' => $story_id,
-            'title' => sanitize_text_field((string) ($story->post_title ?? '')),
-            'editUrl' => function_exists('get_edit_post_link') ? esc_url_raw((string) get_edit_post_link($story_id, '')) : '',
-            'isPublished' => $story->post_status === 'publish',
-        ];
-    }
-
-    $staff = [];
-    if (current_user_can('edit_others_posts') || current_user_can('manage_byline')) {
-        foreach ((array) ($coverage['staffIds'] ?? []) as $staff_id) {
-            $person = byline_editorial_rest_user_person(absint($staff_id));
-            if ($person !== null) {
-                $staff[] = $person;
-            }
-        }
-    }
-
-    $artwork = function_exists('byline_coverage_public_artwork')
-        ? byline_coverage_public_artwork(absint($coverage['id'] ?? 0))
-        : null;
-
-    return [
-        'id' => absint($coverage['id'] ?? 0),
-        'title' => sanitize_text_field((string) ($coverage['title'] ?? '')),
-        'slug' => sanitize_title((string) ($coverage['slug'] ?? '')),
-        'shortDescription' => sanitize_text_field((string) ($coverage['description'] ?? '')),
-        'artwork' => $artwork,
-        'startAt' => (string) ($coverage['startAt'] ?? '') !== '' ? (string) $coverage['startAt'] : null,
-        'endAt' => (string) ($coverage['endAt'] ?? '') !== '' ? (string) $coverage['endAt'] : null,
-        'status' => sanitize_key((string) ($coverage['status'] ?? 'upcoming')),
-        'publicLandingEnabled' => !empty($coverage['public']),
-        'staff' => $staff,
-        'storyCount' => count($story_ids),
-        'plannedStoryCount' => $planned_count,
-        'stories' => $stories,
-    ];
-}
-
-function byline_editorial_rest_admin_coverages(WP_REST_Request $request)
-{
-    $params = byline_editorial_rest_request_params($request);
-    $limit = min(100, max(1, absint($params['limit'] ?? 50)));
-    $query = [
-        'post_type' => BYLINE_COVERAGE_POST_TYPE,
-        'post_status' => 'any',
-        'posts_per_page' => $limit,
-        'numberposts' => $limit,
-        'orderby' => 'modified',
-        'order' => 'DESC',
-    ];
-    $items = [];
-    foreach ((array) get_posts($query) as $post) {
-        if (!$post instanceof WP_Post) {
-            continue;
-        }
-        $item = byline_get_coverage((int) $post->ID);
-        if ($item === []) {
-            continue;
-        }
-        if (isset($params['status']) && sanitize_key((string) $params['status']) !== (string) $item['status']) {
-            continue;
-        }
-        $items[] = byline_editorial_rest_filter_coverage_record($item);
-    }
-
-    return rest_ensure_response([
-        'coverage' => array_map('byline_editorial_rest_admin_coverage_item', $items),
-        'capabilities' => ['canManageCoverage' => current_user_can('edit_posts')],
-        // Preserve the private domain collection for existing authenticated
-        // consumers; the normalized key is the Planning client contract.
-        'items' => $items,
-        'count' => count($items),
-    ]);
-}
-
-function byline_editorial_rest_create_coverage(WP_REST_Request $request)
-{
-    $body = byline_editorial_rest_body($request);
-    $user_id = function_exists('get_current_user_id') ? absint(get_current_user_id()) : 0;
-    $result = byline_create_coverage($body, $user_id);
-
-    return is_wp_error($result) ? $result : rest_ensure_response(byline_editorial_rest_filter_coverage_record($result));
-}
-
-function byline_editorial_rest_get_coverage(WP_REST_Request $request)
-{
-    $coverage = byline_get_coverage(absint($request->get_param('id')));
-
-    return $coverage === []
-        ? new WP_Error('byline_coverage_not_found', 'The coverage could not be found.', ['status' => 404])
-        : rest_ensure_response(byline_editorial_rest_filter_coverage_record($coverage));
-}
-
-function byline_editorial_rest_update_coverage(WP_REST_Request $request)
-{
-    $result = byline_update_coverage(absint($request->get_param('id')), byline_editorial_rest_body($request));
-
-    return is_wp_error($result) ? $result : rest_ensure_response(byline_editorial_rest_filter_coverage_record($result));
-}
-
-function byline_editorial_rest_delete_coverage(WP_REST_Request $request)
-{
-    $coverage_id = absint($request->get_param('id'));
-    if (!byline_coverage_exists($coverage_id)) {
-        return new WP_Error('byline_coverage_not_found', 'The coverage could not be found.', ['status' => 404]);
-    }
-    if (!current_user_can('delete_post', $coverage_id) && !current_user_can('edit_others_posts')) {
-        return new WP_Error('byline_coverage_forbidden', 'You are not allowed to delete this coverage.', ['status' => 403]);
-    }
-    if (!function_exists('wp_delete_post') || !wp_delete_post($coverage_id, true)) {
-        return new WP_Error('byline_coverage_delete_failed', 'The coverage could not be deleted.', ['status' => 500]);
-    }
-
-    return rest_ensure_response(['deleted' => true]);
-}
-
-function byline_editorial_rest_add_coverage_story(WP_REST_Request $request)
-{
-    $coverage_id = absint($request->get_param('id'));
-    if (!byline_coverage_exists($coverage_id)) {
-        return new WP_Error('byline_coverage_not_found', 'The coverage could not be found.', ['status' => 404]);
-    }
-
-    $body = byline_editorial_rest_body($request);
-    $story_id = absint($body['storyId'] ?? $body['postId'] ?? 0);
-    if ($story_id <= 0) {
-        $title = sanitize_text_field((string) ($body['title'] ?? ''));
-        if ($title === '') {
-            return new WP_Error('byline_coverage_story_title_required', 'Choose a story or provide a title for a new draft.', ['status' => 400]);
-        }
-        $story_id = wp_insert_post([
-            'post_type' => 'post',
-            'post_status' => 'draft',
-            'post_title' => $title,
-            'post_author' => byline_editorial_rest_current_user_id(),
-        ], true);
-        if (is_wp_error($story_id)) {
-            return $story_id;
-        }
-        $story_id = absint($story_id);
-    }
-
-    $story = get_post($story_id);
-    if (!$story instanceof WP_Post || $story->post_type !== 'post') {
-        return new WP_Error('byline_coverage_story_not_found', 'That story does not exist.', ['status' => 404]);
-    }
-    if (!current_user_can('edit_post', $story_id)) {
-        return new WP_Error('byline_coverage_story_forbidden', 'You are not allowed to change that story\'s coverage.', ['status' => 403]);
-    }
-
-    $coverage_ids = byline_get_story_coverage_ids($story_id);
-    if (!in_array($coverage_id, $coverage_ids, true)) {
-        $coverage_ids[] = $coverage_id;
-    }
-    $result = byline_set_story_coverage_ids($story_id, $coverage_ids);
-    if (is_wp_error($result)) {
-        return $result;
-    }
-
-    return rest_ensure_response(byline_editorial_rest_admin_coverage_item(byline_get_coverage($coverage_id)));
-}
-
-function byline_editorial_rest_remove_coverage_story(WP_REST_Request $request)
-{
-    $coverage_id = absint($request->get_param('id'));
-    $story_id = absint($request->get_param('story'));
-    if (!byline_coverage_exists($coverage_id)) {
-        return new WP_Error('byline_coverage_not_found', 'The coverage could not be found.', ['status' => 404]);
-    }
-    if (!byline_coverage_is_story($story_id)) {
-        return new WP_Error('byline_coverage_story_not_found', 'That story does not exist.', ['status' => 404]);
-    }
-    if (!current_user_can('edit_post', $story_id)) {
-        return new WP_Error('byline_coverage_story_forbidden', 'You are not allowed to change that story\'s coverage.', ['status' => 403]);
-    }
-
-    $coverage_ids = array_values(array_diff(byline_get_story_coverage_ids($story_id), [$coverage_id]));
-    $result = byline_set_story_coverage_ids($story_id, $coverage_ids);
-    if (is_wp_error($result)) {
-        return $result;
-    }
-
-    return rest_ensure_response(byline_editorial_rest_admin_coverage_item(byline_get_coverage($coverage_id)));
 }
 
 function byline_editorial_rest_readiness(WP_REST_Request $request)
@@ -2472,46 +2183,6 @@ function byline_editorial_register_extended_rest_routes(): void
         'callback' => 'byline_editorial_rest_public_coverage',
         'permission_callback' => '__return_true',
     ]);
-    register_rest_route(BYLINE_REST_NAMESPACE, '/admin/coverage', [
-        [
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => 'byline_editorial_rest_admin_coverages',
-            'permission_callback' => 'byline_editorial_rest_can_edit_posts',
-        ],
-        [
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => 'byline_editorial_rest_create_coverage',
-            'permission_callback' => 'byline_editorial_rest_can_edit_posts',
-        ],
-    ]);
-    register_rest_route(BYLINE_REST_NAMESPACE, '/admin/coverage/(?P<id>\d+)', [
-        [
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => 'byline_editorial_rest_get_coverage',
-            'permission_callback' => 'byline_editorial_rest_can_edit_coverage',
-        ],
-        [
-            'methods' => WP_REST_Server::EDITABLE,
-            'callback' => 'byline_editorial_rest_update_coverage',
-            'permission_callback' => 'byline_editorial_rest_can_edit_coverage',
-        ],
-        [
-            'methods' => 'DELETE',
-            'callback' => 'byline_editorial_rest_delete_coverage',
-            'permission_callback' => 'byline_editorial_rest_can_edit_coverage',
-        ],
-    ]);
-    register_rest_route(BYLINE_REST_NAMESPACE, '/admin/coverage/(?P<id>\d+)/stories', [
-        'methods' => WP_REST_Server::CREATABLE,
-        'callback' => 'byline_editorial_rest_add_coverage_story',
-        'permission_callback' => 'byline_editorial_rest_can_edit_coverage',
-    ]);
-    register_rest_route(BYLINE_REST_NAMESPACE, '/admin/coverage/(?P<id>\d+)/stories/(?P<story>\d+)', [
-        'methods' => 'DELETE',
-        'callback' => 'byline_editorial_rest_remove_coverage_story',
-        'permission_callback' => 'byline_editorial_rest_can_edit_coverage',
-    ]);
-
     register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/readiness/(?P<id>\d+)', [
         'methods' => WP_REST_Server::READABLE,
         'callback' => 'byline_editorial_rest_readiness',

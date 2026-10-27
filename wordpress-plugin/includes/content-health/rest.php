@@ -95,7 +95,7 @@ function byline_content_health_filter_issues(array $issues, string $issue_type =
         if (!is_array($issue)) {
             return false;
         }
-        if ($issue_type !== '' && sanitize_key((string) ($issue['id'] ?? '')) !== $issue_type) {
+        if ($issue_type !== '' && sanitize_key((string) ($issue['checkId'] ?? $issue['type'] ?? $issue['id'] ?? '')) !== $issue_type) {
             return false;
         }
         return $severity === '' || sanitize_key((string) ($issue['severity'] ?? '')) === $severity;
@@ -222,6 +222,11 @@ function byline_content_health_rest_issue(array $issue): array
     $result = [
         'id' => sanitize_key((string) ($issue['id'] ?? 'content-issue')),
         'type' => sanitize_key((string) ($issue['type'] ?? $issue['id'] ?? 'content')),
+        'checkId' => sanitize_key((string) ($issue['checkId'] ?? $issue['type'] ?? $issue['id'] ?? 'content')),
+        'category' => sanitize_key((string) ($issue['category'] ?? 'images-accessibility')),
+        'state' => (string) ($issue['state'] ?? 'existing'),
+        'ignored' => $issue['ignored'] ?? null,
+        'data' => ['url' => (string) ($issue['data']['url'] ?? '')],
         'severity' => $severity,
         'problem' => byline_content_health_text($issue['problem'] ?? $issue['message'] ?? $issue['label'] ?? 'Content issue', 500),
         'story' => $story,
@@ -247,93 +252,109 @@ function byline_content_health_rest_issues(array $issues): array
         if ($post_id > 0 && !byline_content_health_user_can_view_story($post_id)) {
             continue;
         }
+        if (in_array($issue['severity'] ?? '', ['good', 'pass'], true)) { continue; }
         $result[] = byline_content_health_rest_issue($issue);
     }
 
     return $result;
 }
 
+/** Read durable results only; loading this queue never performs HTTP checks. */
 function byline_content_health_summary(int $post_id = 0, string $issue_type = '', string $severity = ''): array
 {
-    $items = [];
-    $scanned = 0;
-    if ($post_id > 0) {
-        if (!byline_content_health_user_can_view_story($post_id)) {
-            return [];
+    $ids = $post_id ? [$post_id] : get_posts(['post_type' => 'post', 'post_status' => 'publish', 'numberposts' => -1, 'fields' => 'ids', 'orderby' => 'ID', 'order' => 'ASC']);
+    $items = []; $ignored_items = []; $stories = []; $checked = 0; $eligible = 0; $outdated = false;
+    $disabled = (array) get_option('byline_content_health_disabled_checks', []);
+    foreach ($ids as $id) {
+        $id = (int) $id;
+        if (!byline_content_health_user_can_view_story($id)) { continue; }
+        $post = get_post($id);
+        if (!$post || $post->post_type !== 'post' || $post->post_status !== 'publish') { continue; }
+        $eligible++;
+        $snapshot = byline_content_health_cached_story($id);
+        if (!$snapshot) { continue; }
+        $checked++;
+        if (strtotime((string) ($post->post_modified_gmt ?? '')) > strtotime($snapshot['checkedAt'])) { $outdated = true; }
+        $ignores = (array) get_post_meta($id, BYLINE_CONTENT_HEALTH_IGNORED, true);
+        $active = []; $observed_types = [];
+        foreach (byline_content_health_filter_issues((array) ($snapshot['issues'] ?? []), $issue_type, $severity) as $issue) {
+            if (in_array($issue['severity'] ?? '', ['good', 'pass'], true)) { continue; }
+            $type = (string) ($issue['checkId'] ?? $issue['type'] ?? '');
+            $observed_types[] = $type;
+            $issue['postId'] = $id;
+            if (isset($ignores[$type]) || isset($disabled[$type])) {
+                $issue['ignored'] = $ignores[$type] ?? $disabled[$type];
+                $issue['ignored']['scope'] = isset($disabled[$type]) ? 'global' : 'story';
+                $ignored_items[] = $issue;
+            } else { $items[] = $issue; $active[] = $issue; }
         }
-        $payload = byline_content_health_cached_story($post_id);
-        if (!is_array($payload)) {
-            // Page-load reads deliberately perform only local metadata checks.
-            $payload = byline_content_health_check_story($post_id, ['checkLinks' => false]);
+        foreach ($ignores as $type => $audit) {
+            if (in_array($type, $observed_types, true) || !is_array($audit)) { continue; }
+            $definition = byline_content_health_definitions()[$type] ?? null;
+            if (!$definition) { continue; }
+            $ignored_issue = ['id' => $id . '-ignored-' . $type, 'checkId' => $type, 'type' => $type,
+                'category' => $definition['category'], 'severity' => $definition['severity'], 'state' => 'existing',
+                'message' => $definition['title'] . ' — ignored for this story; no current occurrence.',
+                'postId' => $id, 'checkedAt' => $snapshot['checkedAt'], 'ignored' => $audit + ['scope' => 'story']];
+            if (byline_content_health_filter_issues([$ignored_issue], $issue_type, $severity)) { $ignored_items[] = $ignored_issue; }
         }
-        $issues = byline_content_health_filter_issues((array) ($payload['issues'] ?? []), $issue_type, $severity);
-        return [
-            'postId' => $post_id,
-            'scanned' => 1,
-            'issues' => byline_content_health_rest_issues($issues),
-            'checkedAt' => (string) ($payload['checkedAt'] ?? ''),
-            'lastRunAt' => (string) ($payload['checkedAt'] ?? ''),
-            'scannerAvailable' => true,
-            'remoteLinksChecked' => !empty($payload['remoteLinksChecked']),
-            'cached' => byline_content_health_cached_story($post_id) !== null,
-        ];
+        $stories[] = ['id' => $id, 'title' => (string) $post->post_title, 'editUrl' => (string) get_edit_post_link($id, ''),
+            'lastCheckedAt' => $snapshot['checkedAt'], 'issueCount' => count($active)];
     }
-    if (function_exists('get_posts')) {
-        try {
-            $posts = get_posts([
-                'post_type' => 'post',
-                'post_status' => 'publish',
-                'posts_per_page' => 25,
-                'fields' => 'ids',
-                'orderby' => 'modified',
-                'order' => 'DESC',
-                'no_found_rows' => true,
-                'ignore_sticky_posts' => true,
-            ]);
-        } catch (Throwable $exception) {
-            $posts = [];
-        }
-        foreach (is_array($posts) ? $posts : [] as $id) {
-            $id = absint($id);
-            if ($id <= 0 || !byline_content_health_user_can_edit_story($id)) {
-                continue;
-            }
-            $payload = byline_content_health_cached_story($id);
-            if (!is_array($payload)) {
-                // No remote requests are made for uncached stories in this
-                // collection endpoint. Manual recheck or cron owns that work.
-                $payload = byline_content_health_check_story($id, ['checkLinks' => false]);
-            }
-            $issues = byline_content_health_filter_issues((array) ($payload['issues'] ?? []), $issue_type, $severity);
-            foreach ($issues as $issue) {
-                if (!is_array($issue)) {
-                    continue;
-                }
-                $issue['postId'] = $id;
-                $items[] = $issue;
-            }
-            $scanned++;
-        }
-    }
-    $warnings = 0;
-    $errors = 0;
-    foreach ($items as $issue) {
-        if (($issue['severity'] ?? '') === 'warning') {
-            $warnings++;
-        } elseif (($issue['severity'] ?? '') === 'error') {
-            $errors++;
-        }
-    }
+    $state = (array) get_option(BYLINE_CONTENT_HEALTH_SCAN_STATE, []);
     return [
-        'postId' => 0,
-        'scanned' => $scanned,
-        'issues' => byline_content_health_rest_issues(array_slice($items, 0, 100)),
-        'counts' => ['warning' => $warnings, 'error' => $errors, 'total' => count($items)],
-        'lastRunAt' => null,
-        'scannerAvailable' => true,
-        'remoteLinksChecked' => false,
-        'cached' => false,
+        'postId' => $post_id, 'scanned' => $checked, 'eligible' => $eligible,
+        'issues' => byline_content_health_rest_issues($items), 'ignored' => byline_content_health_rest_issues($ignored_items),
+        'stories' => $stories, 'definitions' => byline_content_health_definitions(),
+        'scan' => $state, 'lastRunAt' => $state['lastFullScanAt'] ?? null,
+        'stale' => $outdated || $checked < $eligible || empty($state['lastFullScanAt']) || !empty($state['failed']) || strtotime($state['lastFullScanAt']) < time() - DAY_IN_SECONDS,
+        'canScan' => byline_content_health_can_scan(), 'canManageChecks' => byline_content_health_can_manage_all(),
+        'disabledChecks' => $disabled, 'scannerAvailable' => function_exists('wp_schedule_single_event'),
     ];
+}
+
+function byline_content_health_can_scan(): bool
+{
+    return byline_content_health_can_manage_all() || current_user_can('edit_others_posts');
+}
+
+/** Ignore one check for one story, or explicitly disable it publication-wide. */
+function byline_content_health_rest_disposition($request)
+{
+    $type = sanitize_key((string) byline_content_health_rest_param($request, 'checkId', ''));
+    if (!isset(byline_content_health_definitions()[$type])) { return new WP_Error('byline_health_check', 'Unknown check.', ['status' => 400]); }
+    $global = byline_content_health_rest_param($request, 'scope', 'story') === 'global';
+    $id = byline_content_health_rest_requested_post_id($request);
+    if (($global && !byline_content_health_can_manage_all()) || (!$global && !byline_content_health_user_can_edit_story($id))) {
+        return new WP_Error('byline_health_forbidden', 'You cannot change this check.', ['status' => 403]);
+    }
+    $restore = rest_sanitize_boolean(byline_content_health_rest_param($request, 'restore', false));
+    $entry = ['by' => get_current_user_id(), 'at' => gmdate('c'), 'reason' => byline_content_health_text(byline_content_health_rest_param($request, 'reason', ''), 300)];
+    $key = $global ? 'byline_content_health_disabled_checks' : BYLINE_CONTENT_HEALTH_IGNORED;
+    $current = (array) ($global ? get_option($key, []) : get_post_meta($id, $key, true));
+    // Compare-and-swap protects concurrent ignores from silently replacing each other.
+    for ($attempt = 0; $attempt < 4; $attempt++) {
+        $raw = $global ? get_option($key, null) : get_post_meta($id, $key, true);
+        $current = is_array($raw) ? $raw : [];
+        $next = $current;
+        if ($restore) { unset($next[$type]); } else { $next[$type] = $entry; }
+        if ($next === $current) { break; }
+        if ($global) {
+            // Global writes require a short lock because options lack meta CAS.
+            if (!add_option('byline_health_disposition_lock', time(), '', false)) { return new WP_Error('byline_health_conflict', 'Another check setting is being saved. Try again.', ['status' => 409]); }
+            try {
+                $next = (array) get_option($key, []);
+                if ($restore) { unset($next[$type]); } else { $next[$type] = $entry; }
+                update_option($key, $next, false);
+            } finally { delete_option('byline_health_disposition_lock'); }
+            break;
+        }
+        $written = metadata_exists('post', $id, $key) ? update_post_meta($id, $key, wp_slash($next), $raw) : add_post_meta($id, $key, wp_slash($next), true);
+        if ($written) { break; }
+        wp_cache_delete($id, 'post_meta');
+        if ($attempt === 3) { return new WP_Error('byline_health_conflict', 'The ignored checks changed. Try again.', ['status' => 409]); }
+    }
+    return rest_ensure_response(['ok' => true]);
 }
 
 function byline_content_health_rest_summary($request)
@@ -354,20 +375,15 @@ function byline_content_health_rest_recheck($request)
     if (!byline_content_health_can_edit_story($request)) {
         return new WP_Error('byline_content_health_forbidden', 'You are not allowed to recheck that story.', ['status' => rest_authorization_required_code()]);
     }
-    $payload = byline_content_health_scan_story(byline_content_health_rest_requested_post_id($request), true);
-    if (is_array($payload) && isset($payload['issues']) && is_array($payload['issues'])) {
-        $payload['issues'] = byline_content_health_rest_issues($payload['issues']);
-        $payload['lastRunAt'] = $payload['checkedAt'] ?? null;
-        $payload['scannerAvailable'] = true;
-    }
-    return rest_ensure_response($payload);
+    try { byline_content_health_scan_story(byline_content_health_rest_requested_post_id($request), true); }
+    catch (Throwable $error) { return new WP_Error('byline_health_scan_failed', $error->getMessage(), ['status' => 500]); }
+    return rest_ensure_response(byline_content_health_summary(byline_content_health_rest_requested_post_id($request)));
 }
 
 function byline_content_health_rest_scan($request)
 {
-    $limit = byline_content_health_scan_limit(byline_content_health_rest_param($request, 'limit', BYLINE_CONTENT_HEALTH_SCAN_BATCH_SIZE));
-    $cursor = byline_content_health_scan_cursor(byline_content_health_rest_param($request, 'cursor', get_option(BYLINE_CONTENT_HEALTH_SCAN_CURSOR_OPTION, 0)));
-    return rest_ensure_response(byline_content_health_scan_batch($limit, $cursor));
+    // Start or resume a generation. WP-Cron owns all bounded HTTP work.
+    return rest_ensure_response(byline_content_health_start_scan());
 }
 
 /**
@@ -646,6 +662,11 @@ function byline_register_content_health_routes(): void
         'callback' => 'byline_content_health_rest_summary',
         'permission_callback' => 'byline_content_health_can_view',
     ]);
+    register_rest_route('byline/v1', '/admin/content-health/story/(?P<id>\d+)/recheck', [
+        'methods' => WP_REST_Server::CREATABLE,
+        'callback' => 'byline_content_health_rest_recheck',
+        'permission_callback' => 'byline_content_health_can_edit_story',
+    ]);
     register_rest_route('byline/v1', '/admin/content-health/recheck/(?P<id>\d+)', [
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'byline_content_health_rest_recheck',
@@ -661,10 +682,12 @@ function byline_register_content_health_routes(): void
     register_rest_route('byline/v1', '/admin/content-health/scan', [
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'byline_content_health_rest_scan',
-        'permission_callback' => static function (): bool {
-            return current_user_can(defined('BYLINE_MANAGE_INTEGRATIONS_CAPABILITY') ? BYLINE_MANAGE_INTEGRATIONS_CAPABILITY : 'manage_byline_integrations')
-                || current_user_can(defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline');
-        },
+        'permission_callback' => 'byline_content_health_can_scan',
+    ]);
+    register_rest_route('byline/v1', '/admin/content-health/disposition', [
+        'methods' => WP_REST_Server::CREATABLE,
+        'callback' => 'byline_content_health_rest_disposition',
+        'permission_callback' => 'byline_content_health_can_view',
     ]);
     register_rest_route('byline/v1', '/admin/content-health/story/(?P<id>\d+)', [
         'methods' => WP_REST_Server::READABLE,

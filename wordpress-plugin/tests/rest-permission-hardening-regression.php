@@ -363,7 +363,8 @@ function get_posts(array $query = []): array
     usort($posts, static function ($left, $right): int {
         return ((int) ($right->ID ?? 0)) <=> ((int) ($left->ID ?? 0));
     });
-    $limit = absint($query['posts_per_page'] ?? $query['numberposts'] ?? 10);
+    $raw_limit = (int) ($query['posts_per_page'] ?? $query['numberposts'] ?? 10);
+    $limit = $raw_limit === -1 ? count($posts) : absint($raw_limit);
     $limit = $limit > 0 ? $limit : 10;
     $posts = array_slice($posts, absint($query['offset'] ?? 0), $limit);
     if (($query['fields'] ?? '') === 'ids') {
@@ -455,12 +456,12 @@ update_post_meta(202, BYLINE_FEEDBACK_STORY_META, 11);
 update_post_meta(101, BYLINE_TASK_ASSIGNEE_META, 2);
 update_post_meta(102, BYLINE_TASK_ASSIGNEE_META, 3);
 
-$rest_permission_transients[byline_content_health_story_cache_key(10)] = [
+$rest_permission_meta[10][BYLINE_CONTENT_HEALTH_SNAPSHOT] = [
     'issues' => [['id' => 'headline', 'type' => 'headline', 'severity' => 'warning', 'problem' => 'Review the headline.', 'checkedAt' => '2026-08-22T12:00:00Z']],
     'checkedAt' => '2026-08-22T12:00:00Z',
     'remoteLinksChecked' => false,
 ];
-$rest_permission_transients[byline_content_health_story_cache_key(11)] = [
+$rest_permission_meta[11][BYLINE_CONTENT_HEALTH_SNAPSHOT] = [
     'issues' => [['id' => 'private-copy', 'type' => 'copy', 'severity' => 'error', 'problem' => 'Private story issue.', 'checkedAt' => '2026-08-22T12:00:00Z']],
     'checkedAt' => '2026-08-22T12:00:00Z',
     'remoteLinksChecked' => false,
@@ -507,7 +508,6 @@ $health_story_route = rest_permission_test_route('/admin/content-health/story/(?
 $distribution_state_route = rest_permission_test_route('/editorial/distribution/(?P<id>\\d+)', 'GET');
 $distribution_action_route = rest_permission_test_route('/editorial/distribution/(?P<id>\\d+)/social', 'POST');
 $story_distribution_action_route = rest_permission_test_route('/editorial/stories/(?P<id>\\d+)/distribution/(?P<channelId>[a-z0-9_-]+)', 'POST');
-$performance_route = rest_permission_test_route('/admin/analytics/performance', 'GET');
 
 global $rest_permission_current_user;
 
@@ -557,11 +557,6 @@ rest_permission_test_assert($distribution_state_route['permission_callback'](new
 rest_permission_test_assert($distribution_action_route['permission_callback'](new WP_REST_Request(['id' => 10])) === false, 'Contributor could mark a public channel as distributed.');
 rest_permission_test_assert($story_distribution_action_route['permission_callback'](new WP_REST_Request(['id' => 10, 'channelId' => 'discord'])) instanceof WP_Error, 'Contributor could use the story distribution send action.');
 
-rest_permission_test_assert($performance_route['permission_callback'](new WP_REST_Request()) === true, 'Contributor lost intended aggregate analytics performance access.');
-rest_permission_test_assert($performance_route['permission_callback'](new WP_REST_Request(['postId' => 10])) === true, 'Contributor could not view analytics for an editable published story.');
-rest_permission_test_assert($performance_route['permission_callback'](new WP_REST_Request(['postId' => 11])) === false, 'Contributor could target another writer\'s story analytics.');
-rest_permission_test_assert($performance_route['permission_callback'](new WP_REST_Request(['postId' => 12])) === false, 'Contributor could target draft analytics.');
-rest_permission_test_assert($performance_route['permission_callback'](new WP_REST_Request(['path' => '/private-draft'])) === false, 'Analytics accepted an unbound path that could identify private content.');
 
 // Editor: the same routes retain newsroom-wide collection access and can open
 // another writer\'s story-scoped records, while draft performance remains out
@@ -579,7 +574,5 @@ rest_permission_test_assert($feedback_correction_route['permission_callback'](ne
 rest_permission_test_assert($health_story_route['permission_callback'](new WP_REST_Request(['id' => 11])) === true, 'Editor could not open another writer\'s Content Health story URL.');
 rest_permission_test_assert($distribution_action_route['permission_callback'](new WP_REST_Request(['id' => 11])) === true, 'Editor could not mark a public channel as distributed.');
 rest_permission_test_assert($story_distribution_action_route['permission_callback'](new WP_REST_Request(['id' => 11, 'channelId' => 'discord'])) === true, 'Editor could not use the story distribution send action.');
-rest_permission_test_assert($performance_route['permission_callback'](new WP_REST_Request(['postId' => 11])) === true, 'Editor could not view analytics for a published story.');
-rest_permission_test_assert($performance_route['permission_callback'](new WP_REST_Request(['postId' => 12])) === false, 'Analytics exposed draft targeting to an editor.');
 
 echo "Byline REST permission hardening regression passed.\n";

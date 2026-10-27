@@ -288,11 +288,6 @@ function byline_editorial_sanitize_planning_filters(array $filters): array
         $clean['visualStatus'] = sanitize_key((string) $visual_status);
     }
 
-    $coverage = $filters['coverage'] ?? ($filters['coverageId'] ?? null);
-    if ($coverage !== null && is_scalar($coverage) && (string) $coverage !== '') {
-        $clean['coverage'] = sanitize_key((string) $coverage);
-    }
-
     $query = $filters['query'] ?? ($filters['search'] ?? '');
     if (is_scalar($query)) {
         $query = sanitize_text_field((string) $query);
@@ -543,9 +538,6 @@ function byline_editorial_planning_story_summary(int $post_id, ?int $user_id = n
     } else {
         $task_count = 0;
     }
-    $coverage = function_exists('byline_get_story_coverage_summary')
-        ? byline_get_story_coverage_summary($post_id, $user_id)
-        : [];
 
     $bylines = $author ? [$author] : [];
     if (function_exists('byline_get_story_contributors')) {
@@ -595,7 +587,6 @@ function byline_editorial_planning_story_summary(int $post_id, ?int $user_id = n
         // are loaded only by the protected story read.
         'reporting' => function_exists('byline_story_reporting_summary') ? byline_story_reporting_summary($post_id) : null,
         'media' => function_exists('byline_media_assignments_summary') ? byline_media_assignments_summary($post_id) : null,
-        'coverage' => is_array($coverage) ? $coverage : [],
         'featuredImage' => ['present' => $has_thumbnail, 'attachmentId' => $thumbnail_id],
         'modifiedAt' => $modified !== '' ? byline_editorial_normalize_datetime(str_replace(' ', 'T', $modified) . 'Z') : '',
     ];
@@ -666,19 +657,9 @@ function byline_editorial_collect_planning_stories(array $filters = [], ?int $us
             if (is_array($summary['editor'] ?? null)) {
                 $searchable .= ' ' . strtolower((string) ($summary['editor']['name'] ?? ''));
             }
-            foreach ((array) ($summary['coverage'] ?? []) as $coverage) {
-                if (is_array($coverage)) {
-                    $searchable .= ' ' . strtolower((string) ($coverage['title'] ?? ''));
-                }
-            }
             if (strpos($searchable, $search) === false) {
                 continue;
             }
-        }
-
-        if (!empty($sanitized_filters['coverage']) && function_exists('byline_story_has_coverage')
-            && !byline_story_has_coverage((int) $post->ID, $sanitized_filters['coverage'])) {
-            continue;
         }
 
         if (!empty($sanitized_filters['mine']) && $user_id > 0) {

@@ -3,10 +3,8 @@ import {
   type ContentHealthResponse,
   type ContentHealthFixTarget,
   type ContentHealthSeverity,
-  type CoverageResponse,
   type FeedbackResponse,
   type MediaDeskResponse,
-  type PerformanceResponse,
   type PlanningFilters,
   type PlanningResponse,
   type SavedPlanningView
@@ -34,10 +32,8 @@ export const PLANNING_REST_ROUTES = {
   savedViews: "/byline/v1/editorial/planning/views",
   media: "/byline/v1/admin/media",
   schedule: "/byline/v1/editorial/schedule",
-  coverage: "/byline/v1/admin/coverage",
   feedback: "/byline/v1/admin/feedback",
   corrections: "/byline/v1/admin/editorial/corrections",
-  performance: "/byline/v1/admin/analytics/performance",
   contentHealth: "/byline/v1/admin/content-health"
 } as const;
 
@@ -132,6 +128,11 @@ export function normalizeContentHealthResponse(payload: unknown): ContentHealthR
       id: String(value.id ?? `${String(value.type ?? "content")}-${index}`),
       type: String(value.type ?? value.id ?? "content"),
       severity,
+      checkId: String(value.checkId ?? value.type ?? value.id ?? "content").replace(/^link-[a-f0-9]+$/, "broken-link"),
+      category: String(value.category ?? (String(value.type ?? value.id).startsWith("link") || value.type === "broken-link" ? "links" : "images-accessibility")),
+      state: value.state === "new" || value.state === "regressed" ? value.state as "new" | "regressed" : "existing" as const,
+      data: isRecord(value.data) ? { url: typeof value.data.url === "string" ? value.data.url : undefined } : undefined,
+      ignored: isRecord(value.ignored) ? { by: Number(value.ignored.by), at: String(value.ignored.at), reason: String(value.ignored.reason ?? ""), scope: value.ignored.scope === "global" ? "global" as const : "story" as const } : null,
       problem: String(value.problem ?? value.message ?? value.label ?? "Content issue"),
       story,
       lastCheckedAt: value.lastCheckedAt == null ? (value.checkedAt == null ? null : String(value.checkedAt)) : String(value.lastCheckedAt),
@@ -144,7 +145,13 @@ export function normalizeContentHealthResponse(payload: unknown): ContentHealthR
   return {
     issues,
     lastRunAt: checkedAt == null ? null : String(checkedAt),
-    scannerAvailable: source.scannerAvailable !== false
+    scannerAvailable: source.scannerAvailable !== false,
+    ignored: Array.isArray(source.ignored) ? normalizeContentHealthResponse({ issues: source.ignored }).issues : [],
+    scanned: Number(source.scanned ?? 0), eligible: Number(source.eligible ?? 0),
+    stale: source.stale !== false, canScan: source.canScan === true, canManageChecks: source.canManageChecks === true,
+    definitions: isRecord(source.definitions) ? source.definitions as ContentHealthResponse["definitions"] : {},
+    scan: isRecord(source.scan) ? source.scan as ContentHealthResponse["scan"] : {},
+    disabledChecks: isRecord(source.disabledChecks) ? source.disabledChecks as ContentHealthResponse["disabledChecks"] : {}
   };
 }
 
@@ -167,17 +174,13 @@ export type PlanningFetchers = {
   updateMediaAssignment?: (storyId: number, assignmentId: string, changes: Record<string, unknown>) => Promise<unknown>;
   /** The Calendar's schedule feed. Site-local day range, at most about four months. */
   getSchedule?: (from: string, to: string, includeTasks?: boolean, collectionId?: number) => Promise<ScheduleResponse>;
-  getCoverage?: () => Promise<CoverageResponse>;
-  createCoverage?: (input: Record<string, unknown>) => Promise<unknown>;
-  addStoryToCoverage?: (coverageId: number, storyId: number) => Promise<unknown>;
-  removeStoryFromCoverage?: (coverageId: number, storyId: number) => Promise<unknown>;
-  createCoverageStory?: (coverageId: number, title: string) => Promise<unknown>;
   getFeedback?: () => Promise<FeedbackResponse>;
   updateFeedback?: (feedbackId: number, status: string) => Promise<unknown>;
   createCorrectionFromFeedback?: (feedbackId: number, input?: { text?: string; type?: string }) => Promise<unknown>;
-  getPerformance?: (query?: Record<string, string | number | boolean | undefined>) => Promise<PerformanceResponse>;
   getContentHealth?: (query?: Record<string, string | number | boolean | undefined>) => Promise<ContentHealthResponse>;
-  recheckContentHealth?: (issueId?: string) => Promise<unknown>;
+  runContentHealthScan?: () => Promise<unknown>;
+  recheckContentHealth?: (storyId: number) => Promise<unknown>;
+  setContentHealthDisposition?: (input: { storyId?: number; checkId: string; scope?: "story" | "global"; restore?: boolean; reason?: string }) => Promise<unknown>;
 };
 
 function queryPath(path: string, query: Record<string, string | number | boolean | undefined>): string {
@@ -204,7 +207,6 @@ export function planningFilterParams(filters?: Partial<PlanningFilters>): Record
   if (applied.plannedTo) params.planned_to = applied.plannedTo;
   if (applied.wordpressState) params.wordpress_state = applied.wordpressState;
   if (applied.visualStatus) params.visual_status = applied.visualStatus;
-  if (applied.coverageId !== null) params.coverage = applied.coverageId;
   if (applied.mine) params.mine = 1;
   if (applied.unassigned) params.unassigned = 1;
   if (applied.overdue) params.overdue = 1;
@@ -290,31 +292,6 @@ export function createPlanningFetchers(request: PlanningRequest): PlanningFetche
       path: queryPath(PLANNING_REST_ROUTES.schedule, { from, to, includeTasks: includeTasks ? 1 : undefined, collectionId })
     }),
 
-    getCoverage: () => request<CoverageResponse>({ path: PLANNING_REST_ROUTES.coverage }),
-
-    createCoverage: (input) => request({
-      path: PLANNING_REST_ROUTES.coverage,
-      method: "POST",
-      data: input
-    }),
-
-    addStoryToCoverage: (coverageId, storyId) => request({
-      path: `${idPath(PLANNING_REST_ROUTES.coverage, coverageId)}/stories`,
-      method: "POST",
-      data: { storyId }
-    }),
-
-    removeStoryFromCoverage: (coverageId, storyId) => request({
-      path: `${idPath(PLANNING_REST_ROUTES.coverage, coverageId)}/stories/${encodeURIComponent(String(storyId))}`,
-      method: "DELETE"
-    }),
-
-    createCoverageStory: (coverageId, title) => request({
-      path: `${idPath(PLANNING_REST_ROUTES.coverage, coverageId)}/stories`,
-      method: "POST",
-      data: { title }
-    }),
-
     getFeedback: () => request<FeedbackResponse>({ path: PLANNING_REST_ROUTES.feedback }),
 
     updateFeedback: (feedbackId, status) => request({
@@ -329,17 +306,16 @@ export function createPlanningFetchers(request: PlanningRequest): PlanningFetche
       data: input ?? {}
     }),
 
-    getPerformance: (query) => request<PerformanceResponse>({
-      path: queryPath(PLANNING_REST_ROUTES.performance, query ?? {})
-    }),
-
     getContentHealth: (query) => request<unknown>({
       path: queryPath(PLANNING_REST_ROUTES.contentHealth, query ?? {})
     }).then(normalizeContentHealthResponse),
 
-    recheckContentHealth: (issueId) => request({
-      path: issueId ? `${idPath(PLANNING_REST_ROUTES.contentHealth, issueId)}/recheck` : `${PLANNING_REST_ROUTES.contentHealth}/recheck`,
-      method: "POST"
+    runContentHealthScan: () => request({ path: `${PLANNING_REST_ROUTES.contentHealth}/scan`, method: "POST" }),
+    recheckContentHealth: (storyId) => request({
+      path: `${PLANNING_REST_ROUTES.contentHealth}/story/${storyId}/recheck`, method: "POST"
+    }),
+    setContentHealthDisposition: (input) => request({
+      path: `${PLANNING_REST_ROUTES.contentHealth}/disposition`, method: "POST", data: { ...input, postId: input.storyId }
     })
   };
 }

@@ -20,6 +20,13 @@ describe("secondary Planning shadcn patterns", () => {
     expect(source).not.toContain("<Card");
   });
 
+  it("builds Content Health triage with shared queue and disclosure primitives", () => {
+    const source = read("ContentHealth.tsx");
+    for (const primitive of ["<ItemGroup", "<Collapsible", '<TabsList variant="line">', "<InputGroup", "<InlineAlert", "<StoryHoverCard", "<DropdownMenu"]) expect(source).toContain(primitive);
+    expect(source).not.toContain("<Card");
+    expect(source).not.toContain("<Accordion");
+  });
+
   it("shows an actual shadcn Spinner while Content Health work is pending", () => {
     const source = read("ContentHealth.tsx");
     expect(source).toContain('from "../admin-ui/ui/spinner"');

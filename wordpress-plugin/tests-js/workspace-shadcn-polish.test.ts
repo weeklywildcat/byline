@@ -33,7 +33,6 @@ describe("Story Workspace shadcn polish", () => {
       "story/StoryCreateDialog.tsx",
       "story/TaskCreateDialog.tsx",
       "planning/SavedViews.tsx",
-      "planning/Coverage.tsx"
     ]) {
       expect(read(file), file).toContain("<Spinner");
     }

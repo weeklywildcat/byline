@@ -1158,7 +1158,7 @@ function byline_editorial_activity_on_task_changed($task_id, $task = [], $operat
         'state' => $task['state'] ?? ($task['status'] ?? ''),
         'operation' => $operation,
     ];
-    foreach (['assigneeId', 'coverageId'] as $field) {
+    foreach (['assigneeId', 'collectionId'] as $field) {
         if (isset($task[$field])) {
             $context[$field] = $task[$field];
         }

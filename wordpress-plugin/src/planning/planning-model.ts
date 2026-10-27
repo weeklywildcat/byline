@@ -15,9 +15,7 @@ export const PLANNING_VIEW_IDS = [
   "list",
   "calendar",
   "media",
-  "coverage",
   "feedback",
-  "performance",
   "content-health"
 ] as const;
 
@@ -77,12 +75,6 @@ export type PlanningVisualSummary = {
   attachmentIds?: number[];
 };
 
-export type PlanningCoverageReference = {
-  id: number;
-  title: string;
-  slug?: string;
-};
-
 export type PlanningFeaturedImage = {
   id: number;
   url?: string | null;
@@ -110,7 +102,6 @@ export type PlanningStory = {
   modifiedAt: string | null;
   visual: PlanningVisualSummary;
   openTaskCount: number;
-  coverage: PlanningCoverageReference[];
   featuredImage: PlanningFeaturedImage | null;
   needsReview?: boolean;
   /** Note-free reporting roll-up (sources, interviews, appointments). Absent on older servers. */
@@ -129,7 +120,6 @@ export type PlanningCapabilities = {
   canAssign: boolean;
   canManageSavedViews: boolean;
   canManageMedia: boolean;
-  canManageCoverage: boolean;
   canManageFeedback: boolean;
 };
 
@@ -151,7 +141,6 @@ export type PlanningFilters = {
   plannedTo: string;
   wordpressState: string;
   visualStatus: string;
-  coverageId: number | null;
   mine: boolean;
   unassigned: boolean;
   overdue: boolean;
@@ -169,7 +158,6 @@ export const EMPTY_PLANNING_FILTERS: PlanningFilters = {
   plannedTo: "",
   wordpressState: "",
   visualStatus: "",
-  coverageId: null,
   mine: false,
   unassigned: false,
   overdue: false,
@@ -329,29 +317,6 @@ export function reportingSummaryLine(reporting: ReportingSummary | null | undefi
   return parts.join(" · ");
 }
 
-export type CoverageStatus = "active" | "upcoming" | "past" | "draft" | "archived";
-
-export type CoverageItem = {
-  id: number;
-  title: string;
-  slug: string;
-  shortDescription?: string;
-  artwork?: { url: string; alt?: string; width?: number; height?: number } | null;
-  startAt: string | null;
-  endAt: string | null;
-  status: CoverageStatus;
-  publicLandingEnabled: boolean;
-  staff: PlanningPerson[];
-  storyCount: number;
-  plannedStoryCount: number;
-  stories?: Array<{ id: number; title: string; editUrl: string; isPublished: boolean }>;
-};
-
-export type CoverageResponse = {
-  coverage: CoverageItem[];
-  capabilities?: Pick<PlanningCapabilities, "canManageCoverage">;
-};
-
 export type FeedbackStatus = "new" | "reviewed" | "closed" | "spam";
 export type FeedbackType = "correction" | "tip" | "general";
 
@@ -369,24 +334,6 @@ export type FeedbackItem = {
 export type FeedbackResponse = {
   feedback: FeedbackItem[];
   capabilities?: Pick<PlanningCapabilities, "canManageFeedback">;
-};
-
-export type PerformanceMetric = {
-  id: string;
-  label: string;
-  value?: number | string | null;
-  formatted?: string | null;
-  supported: boolean;
-  description?: string;
-};
-
-export type PerformanceResponse = {
-  provider?: { id: string; label: string; configured: boolean } | null;
-  metrics: PerformanceMetric[];
-  topStories?: Array<{ story: PlanningStory; views?: number; trend?: number | null }>;
-  sources?: Array<{ label: string; value: number; percentage?: number }>;
-  newsletter?: { label: string; value?: number | string | null; supported: boolean }[];
-  searchGaps?: Array<{ query: string; count: number }>;
 };
 
 export type ContentHealthSeverity = "error" | "warning" | "info";
@@ -424,6 +371,11 @@ export type ContentHealthIssue = {
   type: string;
   severity: ContentHealthSeverity;
   problem: string;
+  checkId?: string;
+  category?: string;
+  state?: "new" | "existing" | "regressed";
+  data?: { url?: string };
+  ignored?: { by: number; at: string; reason?: string; scope?: "story" | "global" } | null;
   story?: { id: number; title: string; editUrl: string } | null;
   lastCheckedAt?: string | null;
   fixUrl?: string | null;
@@ -434,6 +386,15 @@ export type ContentHealthResponse = {
   issues: ContentHealthIssue[];
   lastRunAt?: string | null;
   scannerAvailable?: boolean;
+  ignored?: ContentHealthIssue[];
+  scanned?: number;
+  eligible?: number;
+  stale?: boolean;
+  canScan?: boolean;
+  canManageChecks?: boolean;
+  definitions?: Record<string, { title: string; category: string; severity: ContentHealthSeverity; explanation: string; why: string; action: string }>;
+  scan?: { running?: boolean; checked?: number; total?: number; failed?: number; startedAt?: string; lastFullScanAt?: string | null };
+  disabledChecks?: Record<string, { by: number; at: string; reason?: string }>;
 };
 
 /**
@@ -616,7 +577,6 @@ export function normalizePlanningFilters(filters?: Partial<PlanningFilters>): Pl
     workflow: filters?.workflow ?? EMPTY_PLANNING_FILTERS.workflow,
     writerId: filters?.writerId ?? EMPTY_PLANNING_FILTERS.writerId,
     editorId: filters?.editorId ?? EMPTY_PLANNING_FILTERS.editorId,
-    coverageId: filters?.coverageId ?? EMPTY_PLANNING_FILTERS.coverageId,
     mine: Boolean(filters?.mine),
     unassigned: Boolean(filters?.unassigned),
     overdue: Boolean(filters?.overdue),
@@ -639,7 +599,6 @@ export function filterPlanningStories(
       story.writer?.name,
       story.editor?.name,
       ...story.authors.map((author) => author.name),
-      ...story.coverage.map((coverage) => coverage.title)
     ].join(" "));
 
     if (query && !searchText.includes(query)) return false;
@@ -650,7 +609,6 @@ export function filterPlanningStories(
     if (!inDateRange(story.plannedPublication, applied.plannedFrom, applied.plannedTo)) return false;
     if (applied.wordpressState && story.wordpressState.id !== applied.wordpressState) return false;
     if (applied.visualStatus && story.visual.status !== applied.visualStatus) return false;
-    if (applied.coverageId !== null && !story.coverage.some((coverage) => coverage.id === applied.coverageId)) return false;
     if (applied.mine && (!currentUserId || (story.writer?.id !== currentUserId && story.editor?.id !== currentUserId))) return false;
     if (applied.unassigned && story.editor !== null) return false;
     if (applied.overdue && !isPlanningDateOverdue(story.deadline, now)) return false;
