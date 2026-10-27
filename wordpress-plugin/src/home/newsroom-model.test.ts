@@ -69,7 +69,7 @@ describe("site dates and role-relevant attention", () => {
     expect(homeAgenda(data, now).some((event) => event.id.startsWith("task-") || event.id.startsWith("media-"))).toBe(false);
     expect(homeAgenda(bootstrap({ stories: [story({ authors: [], writer: { id: 9, name: "Other" } })] }), now)).toEqual([]);
   });
-  it("leaves overdue tasks to Up Next instead of duplicating them, and gates review", () => {
+  it("keeps overdue tasks out of duplicate attention signals and gates review", () => {
     const data = bootstrap({ tasks: [task(1, "2026-10-19T12:00:00Z"), task(2, "2026-10-18T12:00:00Z")], stories: [story({ workflow: { id: "ready", label: "Ready for Review", group: "main", selectable: true } })] });
     expect(waitingForMe(data, now)).toEqual([]);
     expect(reviewStories(data)).toEqual([]);
@@ -118,7 +118,7 @@ describe("unified My Work", () => {
   });
 });
 
-describe("appointments in Coming Up and Waiting for Me", () => {
+describe("appointments in Coming Up and My Work attention", () => {
   it("shows a confirmed exact appointment with its real time, and never a target window", () => {
     const data = bootstrap({ stories: [story({ deadline: null })], appointments: [appointment(), appointment({ id: "t1", status: "tentative", startAt: "2026-10-22T14:00:00Z" }), windowAppointment({ status: "confirmed" }), appointment({ id: "u1", scheduleMode: "unscheduled", startAt: null, status: "planned" })] });
     const events = homeAgenda(data, now);
@@ -133,7 +133,7 @@ describe("appointments in Coming Up and Waiting for Me", () => {
   it("keeps appointments beyond two weeks and in the past out of Coming Up", () => {
     expect(homeAgenda(bootstrap({ stories: [], appointments: [appointment({ startAt: "2026-11-20T15:00:00Z" }), appointment({ id: "p1", startAt: "2026-10-19T15:00:00Z" })] }), now)).toEqual([]);
   });
-  it("lists an upcoming target window in Waiting for Me, but not a far-future window or an undated idea", () => {
+  it("turns an upcoming target window into a scheduling action, but not a far-future window or undated idea", () => {
     const near = bootstrap({ stories: [], appointments: [windowAppointment()] });
     expect(waitingForMe(near, now)).toEqual([{ id: "schedule-w1", storyId: 1, title: "Interview local reporter", detail: "Needs scheduling for next week", urgent: false }]);
     const far = bootstrap({ stories: [], appointments: [windowAppointment({ windowStart: "2026-12-07", windowEnd: "2026-12-11" }), appointment({ id: "u1", scheduleMode: "unscheduled", startAt: null, status: "planned" }), appointment()] });
