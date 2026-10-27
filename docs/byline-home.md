@@ -39,6 +39,19 @@ a large blank gap before **Waiting for Me** or visual work. Empty states use the
 compact Nova `Empty` treatment, and **View all work** is only shown when the
 task preview is actually truncated.
 
+Today uses continuous, separated work queues within those sections: quiet
+horizontal rules, subtle row hover, compact muted headers and smaller secondary
+text. Story and task headlines remain prominent and clamp at two lines. Real
+profile photos appear for single writers as well as contributor groups; missing
+photos still render no placeholder. Overdue story deadlines retain their warning
+text and color.
+
+Wide task rows align the title and story context beside assignee, priority and
+due-date controls. A container breakpoint moves those controls below the title
+when a row becomes narrow. The seven-task preview and All my work drawer keep
+their existing behavior. Shared task/activity rows opt into this density only on
+Today, so Story Peek and Collections retain their existing layouts.
+
 All dates use the WordPress site timezone, including fixed UTC offsets. A
 date-only story deadline remains a calendar date, independent of the browser's
 timezone. Internal deadlines, editorial publication targets and actual WordPress
@@ -179,7 +192,11 @@ Reviewed against the current official product documentation on 2026-10-20:
 
 Run the normal repository checks and packaging checks. Focused Home coverage is
 in `src/home/newsroom-model.test.ts`, `tests/home-resources-regression.php`,
-`tests/integration/home.php` and `tests/e2e/home.spec.ts`.
+`tests/integration/home.php`, `tests/e2e/home.spec.ts` and
+`tests/e2e/today-density.spec.ts`. The density spec checks actual row geometry,
+loaded profile photos, contiguous separators, the task drawer, inline editors,
+and keyboard opening at desktop and phone widths. Set `BYLINE_E2E_PROFILE_PHOTO`
+to a local PNG to use a headshot in visual captures; CI uses a small image fixture.
 
 ```sh
 npm run typecheck:plugin

@@ -3,6 +3,7 @@ import { dateLabel } from "../home/newsroom-model";
 import { AssigneePicker, DatePicker, valueSelectTriggerClass } from "../admin-ui/components/pickers";
 import { WorkStatusBadge, type WorkIntensity } from "../admin-ui/components/work-status-badge";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "../admin-ui/ui/select";
+import { cn } from "../admin-ui/lib/utils";
 
 export const TASK_PRIORITY_OPTIONS: Array<{ value: TaskPriority; label: string }> = [
   { value: "low", label: "Low" },
@@ -24,7 +25,8 @@ export function TaskQuickFields({
   canAssign,
   disabled,
   onUpdate,
-  showAssignee = true
+  showAssignee = true,
+  className
 }: {
   task: EditorialTask;
   timezone: string;
@@ -34,12 +36,13 @@ export function TaskQuickFields({
   disabled?: boolean;
   onUpdate: TaskQuickUpdate;
   showAssignee?: boolean;
+  className?: string;
 }) {
   const assignee = task.assignee
     ? people.find((person) => Number(person.id) === Number(task.assignee?.id)) || ({ ...task.assignee, kind: "user" } as ContributorEntry)
     : null;
 
-  return <span className="flex min-w-0 flex-wrap items-center gap-1.5" data-task-quick-fields="">
+  return <span className={cn("flex min-w-0 flex-wrap items-center gap-1.5", className)} data-task-quick-fields="">
     {showAssignee && canAssign ? <AssigneePicker
       people={people}
       value={assignee}
