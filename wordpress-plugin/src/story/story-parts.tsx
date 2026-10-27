@@ -5,8 +5,11 @@
  */
 import type { ComponentProps } from "react";
 import { MessageSquareText } from "lucide-react";
+import { __, _n, sprintf } from "@wordpress/i18n";
 import { WorkStatusBadge, mediaIntensity, type WorkIntensity, type WorkKind } from "../admin-ui/components/work-status-badge";
 import { cn } from "../admin-ui/lib/utils";
+import { Button } from "../admin-ui/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "../admin-ui/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../admin-ui/ui/tooltip";
 import { decodeEntities } from "../admin-ui/lib/text";
 import { dateLabel, dayDistance, exactDate, mediaStatusLabels, mediaTypeLabels, siteDay } from "../home/newsroom-model";
@@ -121,10 +124,15 @@ export function StorySignals({ story, className }: { story: PlanningStory; class
 }
 
 /** Tasks, scheduling and production use the same color vocabulary in the List. */
-export function ProductionSummary({ story, className, empty = "—" }: { story: PlanningStory; className?: string; /** Null hides the empty state in compact rows. */ empty?: string | null }) {
+export function ProductionSummary({ story, className, empty = "—", maxSignals }: { story: PlanningStory; className?: string; /** Null hides the empty state in compact rows. */ empty?: string | null; /** Dense collections can disclose additional signals on demand. */ maxSignals?: number }) {
   const signals = storySignals(story);
+  const shown = maxSignals === undefined ? signals : signals.slice(0, maxSignals);
+  const more = signals.slice(shown.length);
   const hasNotes = openNotesSignal(story.notes) > 0;
   return signals.length || hasNotes
-    ? <span className={cn("flex flex-wrap items-center gap-1.5", className)}>{signals.map((signal) => <WorkStatusBadge key={signal.key} kind={signal.kind} intensity={signal.intensity}>{signal.label}</WorkStatusBadge>)}<StoryNotesIndicator story={story} /></span>
+    ? <span className={cn("flex flex-wrap items-center gap-1.5", className)}>{shown.map((signal) => <WorkStatusBadge key={signal.key} kind={signal.kind} intensity={signal.intensity}>{signal.label}</WorkStatusBadge>)}{more.length ? <Popover>
+      <PopoverTrigger render={<Button variant="ghost" size="xs" className="h-5 px-1 text-xs text-muted-foreground" aria-label={sprintf(/* translators: %d: number of additional work signals. */ _n("%d more work signal", "%d more work signals", more.length, "weekly-wildcat-headless"), more.length)} />}><span aria-hidden="true">+{more.length}</span></PopoverTrigger>
+      <PopoverContent align="start" className="w-64"><p className="text-xs font-semibold text-muted-foreground">{__("More work", "weekly-wildcat-headless")}</p><span className="flex flex-wrap items-center gap-1.5">{more.map((signal) => <WorkStatusBadge key={signal.key} kind={signal.kind} intensity={signal.intensity}>{signal.label}</WorkStatusBadge>)}</span></PopoverContent>
+    </Popover> : null}<StoryNotesIndicator story={story} /></span>
     : empty === null ? null : <span className={cn("text-xs text-muted-foreground", className)}>{empty}</span>;
 }

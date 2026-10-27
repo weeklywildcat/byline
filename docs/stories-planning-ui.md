@@ -100,6 +100,16 @@ Publication, Work, Updated) and the existing sort; below about 820px of
 available width it becomes compact rows. TanStack Table is not used: nothing
 here needs column visibility, multi-sort, selection or pagination.
 
+The desktop List uses a collapsed, fixed-layout table with quiet horizontal
+separators, a 36px header and approximately 48–57px rows. Headlines clamp at two
+lines; full titles remain in the accessible title button and Story Hover Card.
+Publication emphasizes the date, with only planned/scheduled qualifiers. Work
+keeps two signals visible and discloses any others through a named `+N` popover;
+other `ProductionSummary` consumers continue to show all signals. Bare cell
+padding also opens Peek, while every descendant keeps its own interaction.
+Scrolling stays with the document: the existing horizontal overflow wrapper
+would trap a sticky header, so the List adds no nested vertical scroll region.
+
 The List is also the fastest editing surface. High-frequency scalar values use
 direct manipulation instead of forcing a Story Peek round-trip: click **Workflow**
 to open the native shadcn `Select`, click **Deadline** or an editable planned
