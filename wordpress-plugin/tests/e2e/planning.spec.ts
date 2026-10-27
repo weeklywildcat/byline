@@ -192,7 +192,7 @@ test.describe("Story Peek everywhere", () => {
     const sections = async () => {
       // Collection context loads separately from the workspace. Compare fully
       // loaded Peeks rather than racing that second protected request.
-      await expect(peek.getByRole("heading", { name: "Shared interviews", exact: true })).toBeVisible();
+      await expect(peek.getByRole("button", { name: /Collections & interviews/ })).toBeVisible();
       return (await peek.getByRole("heading", { level: 3 }).allTextContents()).join("|");
     };
 

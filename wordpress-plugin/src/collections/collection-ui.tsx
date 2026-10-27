@@ -161,6 +161,7 @@ export function EntityPicker<T extends { id: number }>({
   onSearch,
   itemDisabled,
   appearance = "field",
+  triggerLabel,
 }: {
   label: string;
   items: T[];
@@ -172,6 +173,7 @@ export function EntityPicker<T extends { id: number }>({
   onSearch?: (query: string) => void;
   itemDisabled?: (item: T) => boolean;
   appearance?: "field" | "value";
+  triggerLabel?: string;
 }) {
   return (
     <Combobox
@@ -198,9 +200,9 @@ export function EntityPicker<T extends { id: number }>({
         }
       >
         <span className="truncate">
-          {selected.length
+          {triggerLabel || (selected.length
             ? selected.map(itemLabel).join(", ")
-            : `Choose ${label.toLowerCase()}…`}
+            : `Choose ${label.toLowerCase()}…`)}
         </span>
       </ComboboxTrigger>
       <ComboboxContent
