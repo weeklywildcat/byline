@@ -1,6 +1,6 @@
 /**
  * Small story presentation pieces composed differently by Home, the Stories
- * board and list, Media and Coverage. Each answers one question about a story;
+ * board and list, Media Desk and Collections. Each answers one question about a story;
  * none is a configurable "universal story row".
  */
 import type { ComponentProps } from "react";

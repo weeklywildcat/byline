@@ -8,7 +8,7 @@ import { replaceHomeTask } from "./home-query";
 const now = new Date("2026-10-20T12:00:00Z");
 const timezone = "America/New_York";
 function story(patch: Partial<PlanningStory> = {}): PlanningStory {
-  return { id: 1, title: "Canteen", editUrl: "post.php?post=1&action=edit", authors: [{ id: 7, name: "Caroline", kind: "user" }], writer: { id: 8, name: "Gibson" }, editor: null, workflow: { id: "reporting", label: "Reporting", group: "main", selectable: true }, wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null, modifiedAt: "2026-10-20T11:00:00Z", visual: { type: "none", status: "needed" }, openTaskCount: 2, coverage: [], featuredImage: null, ...patch };
+  return { id: 1, title: "Canteen", editUrl: "post.php?post=1&action=edit", authors: [{ id: 7, name: "Caroline", kind: "user" }], writer: { id: 8, name: "Gibson" }, editor: null, workflow: { id: "reporting", label: "Reporting", group: "main", selectable: true }, wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null, modifiedAt: "2026-10-20T11:00:00Z", visual: { type: "none", status: "needed" }, openTaskCount: 2, featuredImage: null, ...patch };
 }
 function task(id: number, dueAt: string | null, patch: Partial<EditorialTask> = {}): EditorialTask {
   return { id, title: `Task ${id}`, state: "open", assigneeId: 7, dueAt, priority: "normal", storyId: 1, order: id, ...patch };

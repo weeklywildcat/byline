@@ -33,9 +33,10 @@ require __DIR__ . '/../includes/commands/commands.php';
 $commands = byline_command_palette_commands();
 $names = array_column($commands, 'name');
 command_assert(in_array('byline/new-story', $names, true) && !in_array('byline/studio', $names, true), 'Authorized navigation commands were not registered.');
-foreach (['byline/find-story', 'byline/new-coverage', 'byline/upload-photos', 'byline/assign-story', 'byline/move-story', 'byline/content-health', 'byline/create-correction', 'byline/home', 'byline/health-check'] as $expected_command) {
+foreach (['byline/find-story', 'byline/collections', 'byline/upload-photos', 'byline/assign-story', 'byline/move-story', 'byline/content-health', 'byline/create-correction', 'byline/home', 'byline/health-check'] as $expected_command) {
     command_assert(in_array($expected_command, $names, true), "Expected command {$expected_command} was not registered for an authorized user.");
 }
+command_assert(!in_array('byline/coverage', $names, true) && !in_array('byline/new-coverage', $names, true) && !in_array('byline/performance', $names, true), 'Retired newsroom destinations leaked into the Command Palette.');
 command_assert(!in_array('byline/deployment', $names, true), 'Deployment command bypassed its integration capability gate.');
 command_assert(!in_array('byline/newsletters', $names, true), 'Disabled newsletter feature exposed a newsletter command.');
 

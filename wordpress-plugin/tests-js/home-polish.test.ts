@@ -20,7 +20,6 @@ function story(patch: Partial<PlanningStory> = {}): PlanningStory {
     modifiedAt: "2026-10-20T12:00:00Z",
     visual: { type: "none", status: "needed" },
     openTaskCount: 0,
-    coverage: [],
     featuredImage: null,
     ...patch
   };

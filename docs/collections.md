@@ -1,8 +1,8 @@
-# Internal Collections
+# Collections
 
 Collections live inside Planning (`admin.php?page=byline-planning&tab=collections`).
 A workspace uses `&collection=<id>`; an interview can be opened directly with
-`&interview=<id>`. They coordinate independent stories; membership never moves,
+`&interview=<id>`. Collections are the single newsroom grouping primitive. They coordinate independent stories; membership never moves,
 copies, or changes publication of a story.
 
 ## Workflow and presentation
@@ -105,18 +105,51 @@ API pagination, and appointment adapters. `tests/e2e/collections.spec.ts` covers
 the reporting workflow and a realistic five-story/four-person/six-interview desk
 at 1440, 1280, 1024, 768, and 390px, including popup geometry and document overflow.
 
-## Deferred public phase
+## Optional public coverage
 
-No public Collection routes, templates, article blocks, or build manifests are
-added. A later phase can use these existing identities and relationships for:
+The Overview ends with a compact Public coverage section. A Collection remains
+newsroom-only until a user with both Collection edit access and `publish_posts`
+explicitly saves its public presentation. Publish as coverage opens a dialog;
+public controls do not compete with reporting coordination on the overview.
 
-- Public Collection landing pages
-- “Part of our coverage” article treatment
-- Related coverage
-- Public ordering and featured stories
-- Homepage promotion
-- Collection SEO
+The private `_byline_collection_public` meta object contains `publicEnabled`,
+`publicTitle`, `publicSlug`, `publicDescription`, `publicOverview`,
+`artworkAttachmentId`, `featuredStoryId` and `storyOrder`. Public wording is
+independent from the internal name/brief. Dates reuse the Collection's existing
+start/end fields. Story order references existing relationship edges; it cannot
+add a second membership. The featured story appears first, followed by the
+selected order and any newly linked stories. Unpublished, private and
+password-protected stories are always excluded. Public settings writes validate
+membership, unique URL slugs, image attachments and publication capability.
+Disabling public coverage preserves its settings for later use.
 
-A newsroom-wide Sources directory UI is also deferred. Public presentation fields
-can be added to the existing Collection identity without migrating membership or
-reporting relationships.
+Reader-facing `/coverage/` and `/coverage/:slug/` routes, SEO, breadcrumbs,
+CollectionPage structured data and static path generation keep their existing
+contracts. `/byline/v1/coverage` and `/byline/v1/coverage/:slug` are allow-list
+adapters backed by public Collections. The build snapshot uses the same
+projection. It never serializes Collection brief, people, interviews, tasks,
+resources, notes, contacts or activity. Public settings/dates/status, membership
+changes and artwork edits invalidate the existing public build revision.
+
+## Legacy Coverage migration
+
+The upgrade coordinator runs `byline_migrate_coverage_to_collections` after
+installing the existing relationship table. Each legacy `byline_coverage` gets
+its own private Collection; no matching by title or overlapping stories occurs.
+The insertion includes `_byline_collection_legacy_coverage_id`, allowing retries
+to resume an interrupted migration without duplicating the Collection. A lock
+prevents concurrent migrations. Source records remain intact for recovery.
+
+The migration carries title, exact public slug, dek/overview, dates, artwork,
+public visibility, staff memberships and story relationships. Status maps
+Upcoming → Planning, Active → Active, Past → Wrapping up, Archived → Archived.
+Legacy source status remains recoverable. Public URLs resolve under the same
+slugs without redirects. Legacy creation/editing routes and screens are retired;
+only storage readers, the hidden legacy CPT and migration compatibility remain.
+
+Old `tab=coverage` and `#/planning/coverage` bookmarks lead to Collections.
+An old `coverage=<id>` query preserves the migrated Collection when possible.
+Planning Performance bookmarks lead to Today. Analytics provider settings and
+its protected metrics/test endpoints remain available in Settings.
+
+A newsroom-wide Sources directory UI remains deferred.

@@ -612,120 +612,6 @@ function byline_analytics_rest_metrics($request = null): WP_REST_Response
     return rest_ensure_response(byline_analytics_query($query, false));
 }
 
-/**
- * Return the deliberately small, provider-neutral shape consumed by Planning.
- * The provider query remains the source of truth; this adapter only labels
- * metrics that the configured provider actually supports and never turns an
- * unavailable metric into a fabricated zero.
- */
-function byline_analytics_rest_performance($request = null): WP_REST_Response
-{
-    $query = ['view' => 'aggregate'];
-    if (is_object($request) && method_exists($request, 'get_param')) {
-        foreach (['dateRange', 'path', 'postId'] as $key) {
-            $value = $request->get_param($key);
-            if ($value !== null) {
-                $query[$key] = $value;
-            }
-        }
-    }
-
-    $state = byline_analytics_query($query, false);
-    $provider_id = byline_analytics_provider_alias((string) ($state['provider'] ?? 'none'));
-    $definitions = byline_analytics_provider_definitions();
-    $definition = is_array($definitions[$provider_id] ?? null) ? $definitions[$provider_id] : [];
-    $configured = !empty($state['configured']);
-    $values = is_array($state['metrics'] ?? null) ? $state['metrics'] : [];
-
-    $supported = $provider_id === 'plausible'
-        ? ['visitors', 'pageviews', 'visits']
-        : ($provider_id === 'cloudflare' ? ['requests', 'visits', 'bytes'] : []);
-    $labels = [
-        'visitors' => ['Visitors', 'Unique visitors reported by the analytics provider.'],
-        'pageviews' => ['Pageviews', 'Pageviews reported by the analytics provider.'],
-        'visits' => ['Visits', 'Visits reported by the analytics provider.'],
-        'requests' => ['Requests', 'Eyeball requests reported by Cloudflare.'],
-        'bytes' => ['Bytes served', 'Response bytes reported by Cloudflare.'],
-    ];
-    $metrics = [];
-    foreach (array_keys($labels) as $metric_id) {
-        $is_supported = $configured && in_array($metric_id, $supported, true);
-        $value = array_key_exists($metric_id, $values) ? $values[$metric_id] : null;
-        $formatted = is_numeric($value)
-            ? (function_exists('number_format_i18n') ? number_format_i18n((float) $value) : number_format((float) $value))
-            : null;
-        $metrics[] = [
-            'id' => $metric_id,
-            'label' => $labels[$metric_id][0],
-            'value' => is_numeric($value) ? (float) $value : null,
-            'formatted' => $formatted,
-            'supported' => $is_supported,
-            'description' => $labels[$metric_id][1],
-        ];
-    }
-
-    $search_gaps = function_exists('byline_search_gaps_top') ? byline_search_gaps_top(20) : [];
-
-    return rest_ensure_response([
-        'provider' => [
-            'id' => $provider_id,
-            'label' => (string) ($definition['label'] ?? ($provider_id === 'none' ? 'Not connected' : $provider_id)),
-            'configured' => $configured,
-        ],
-        'metrics' => $metrics,
-        'topStories' => [],
-        'sources' => [],
-        'newsletter' => [],
-        'searchGaps' => $search_gaps,
-        'available' => !empty($state['available']),
-        'error' => (string) ($state['error'] ?? ''),
-        'fetchedAt' => $state['fetchedAt'] ?? null,
-    ]);
-}
-
-function byline_analytics_performance_post_id($request): int
-{
-    if (is_object($request) && method_exists($request, 'get_param')) {
-        return absint($request->get_param('postId'));
-    }
-
-    return 0;
-}
-
-function byline_analytics_performance_path($request): string
-{
-    if (is_object($request) && method_exists($request, 'get_param')) {
-        $path = $request->get_param('path');
-        return is_scalar($path) ? trim((string) $path) : '';
-    }
-
-    return '';
-}
-
-function byline_analytics_can_view_performance($request = null): bool
-{
-    $can_manage = byline_analytics_can_manage();
-    if (!$can_manage && !current_user_can('edit_posts')) {
-        return false;
-    }
-
-    $post_id = byline_analytics_performance_post_id($request);
-    $path = byline_analytics_performance_path($request);
-    if ($post_id > 0) {
-        $post = function_exists('get_post') ? get_post($post_id) : null;
-        if (!is_object($post) || (($post->post_type ?? 'post') !== 'post') || (($post->post_status ?? '') !== 'publish')) {
-            return false;
-        }
-
-        return $can_manage || (bool) current_user_can('edit_post', $post_id);
-    }
-
-    // A bare path cannot establish that the corresponding article is public.
-    // Story-scoped analytics must carry a published post ID so private and draft
-    // URLs cannot be used as a side channel through the aggregate endpoint.
-    return $path === '';
-}
-
 function byline_register_analytics_routes(): void
 {
     if (!function_exists('register_rest_route')) {
@@ -753,11 +639,7 @@ function byline_register_analytics_routes(): void
         'callback' => 'byline_analytics_rest_metrics',
         'permission_callback' => 'byline_analytics_can_manage',
     ]);
-    register_rest_route('byline/v1', '/admin/analytics/performance', [
-        'methods' => WP_REST_Server::READABLE,
-        'callback' => 'byline_analytics_rest_performance',
-        'permission_callback' => 'byline_analytics_can_view_performance',
-    ]);
+
 }
 
 function byline_register_analytics_hooks(): void

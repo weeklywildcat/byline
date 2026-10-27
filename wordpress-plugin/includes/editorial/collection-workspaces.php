@@ -60,6 +60,7 @@ function byline_relation_set(int $owner, string $relation, int $target, bool $li
 {
     global $wpdb;
     $table = $wpdb->prefix . 'byline_relationships';
+    if ($relation === 'story' && function_exists('byline_public_mutation') && !empty(byline_collection_public_settings($owner)['publicEnabled']) && in_array($target, byline_relation_ids($owner, $relation), true) !== $linked) { byline_public_mutation('public-coverage'); }
     if ($linked) {
         $result = $wpdb->query($wpdb->prepare("INSERT IGNORE INTO $table (owner_id, relation, target_id) VALUES (%d, %s, %d)", $owner, $relation, $target));
     } else {
@@ -125,6 +126,9 @@ function byline_collection_item(int $id): array
         'createdAt' => str_replace(' ', 'T', $post->post_date_gmt) . 'Z', 'updatedAt' => str_replace(' ', 'T', $post->post_modified_gmt) . 'Z',
         'storyIds' => $story_ids, 'storyCount' => count($story_ids), 'storySummary' => $summary,
         'interviewCount' => count(byline_collection_child_ids($id, BYLINE_INTERVIEW_POST_TYPE)), 'openTaskCount' => count($tasks),
+        'publicPresentation' => byline_collection_public_settings($id),
+        'publicUrl' => byline_collection_public_settings($id)['publicEnabled'] ? byline_publication_absolute_url('/coverage/' . byline_collection_public_settings($id)['publicSlug'] . '/') : '',
+        'canPublish' => current_user_can('publish_posts'),
         'canEdit' => byline_collection_can_edit($id), 'canDuplicate' => current_user_can('edit_others_posts'),
     ];
 }
@@ -136,6 +140,8 @@ function byline_collection_save(array $input, int $id = 0)
 {
     if (!$id && !current_user_can('edit_others_posts')) { return byline_collection_error('Only editors can create Collections.', 403); }
     if ($id && !byline_collection_can_edit($id)) { return byline_collection_error('You cannot edit this Collection.', 403); }
+    $public = array_key_exists('publicPresentation', $input) ? byline_collection_public_input($input['publicPresentation'], $id) : null;
+    if (is_wp_error($public)) { return $public; }
     $old = $id ? byline_collection_item($id) : [];
     $name = byline_task_text($input['name'] ?? ($old['name'] ?? ''), 240);
     $type = $input['type'] ?? ($old['type'] ?? 'other');
@@ -174,6 +180,7 @@ function byline_collection_save(array $input, int $id = 0)
         $input_key = ['lead' => 'leadId', 'start' => 'startDate', 'end' => 'endDate'][$key] ?? $key;
         if (!$id || array_key_exists($input_key, $input)) { update_post_meta($saved, '_byline_collection_' . $key, $value); }
     }
+    if ($public !== null) { update_post_meta($saved, BYLINE_COLLECTION_PUBLIC_META, wp_slash($public)); }
     $event = !$id ? 'collection_created' : (($old['status'] ?? '') !== $status ? ($status === 'archived' ? 'collection_archived' : 'collection_status_changed') : 'collection_changed');
     if (!$id || array_diff_assoc(array_intersect_key($input, array_flip(['name','type','leadId','status','startDate','endDate'])), $old)) {
         byline_collection_activity((int) $saved, $event);

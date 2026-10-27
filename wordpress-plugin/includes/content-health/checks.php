@@ -204,7 +204,7 @@ function byline_content_health_check_url($value, bool $refresh = false): array
     } else {
         try {
             $response = wp_safe_remote_get($url, [
-                'timeout' => 4,
+                'timeout' => 1,
                 'redirection' => 2,
                 'limit_response_size' => 65536,
                 'reject_unsafe_urls' => true,
@@ -398,13 +398,16 @@ function byline_content_health_link_fix_target(string $content, string $url): ?a
 
 function byline_content_health_issue(string $id, string $severity, string $label, string $message, int $post_id, string $fix_url = '', array $data = []): array
 {
-    $severity = in_array($severity, ['good', 'warning', 'error'], true) ? $severity : 'warning';
+    $severity = in_array($severity, ['good', 'warning', 'error', 'info'], true) ? $severity : 'warning';
     $fix_target = is_array($data['fixTarget'] ?? null) ? $data['fixTarget'] : null;
     if ($fix_target !== null) {
         unset($data['fixTarget']);
     }
     $issue = [
-        'id' => sanitize_key($id),
+        'id' => $post_id . '-' . sanitize_key($id),
+        'checkId' => strpos($id, 'link-') === 0 ? 'broken-link' : sanitize_key($id),
+        'type' => strpos($id, 'link-') === 0 ? 'broken-link' : sanitize_key($id),
+        'category' => strpos($id, 'link-') === 0 || $id === 'links' ? 'links' : 'images-accessibility',
         'severity' => $severity,
         'label' => byline_content_health_text($label, 120),
         'message' => byline_content_health_text($message, 500),
@@ -462,9 +465,6 @@ function byline_content_health_story_results(int $post_id, array $options = []):
         $checks[] = byline_content_health_image_credit($featured_id) !== ''
             ? byline_content_health_issue('image-credit', 'good', 'Image credit', 'The featured image has a credit.', $post_id, $fix_url, ['fixTarget' => $featured_target])
             : byline_content_health_issue('image-credit', 'warning', 'Image credit', 'Add a credit or confirm the publication-wide default.', $post_id, $fix_url, ['attachmentId' => $featured_id, 'fixTarget' => $featured_target]);
-    } else {
-        $checks[] = byline_content_health_issue('featured-image-alt', 'warning', 'Featured image alt text', 'Alt text can be checked after a featured image is selected.', $post_id, $fix_url, ['fixTarget' => $featured_target]);
-        $checks[] = byline_content_health_issue('image-credit', 'warning', 'Image credit', 'A credit can be checked after a featured image is selected.', $post_id, $fix_url, ['fixTarget' => $featured_target]);
     }
 
     $content = (string) ($post->post_content ?? '');
@@ -510,9 +510,6 @@ function byline_content_health_check_story(int $post_id, array $options = []): a
 
 function byline_content_health_cached_story(int $post_id): ?array
 {
-    if (!function_exists('get_transient')) {
-        return null;
-    }
-    $cached = get_transient(byline_content_health_story_cache_key($post_id));
+    $cached = get_post_meta($post_id, '_byline_content_health_snapshot', true);
     return is_array($cached) ? $cached : null;
 }

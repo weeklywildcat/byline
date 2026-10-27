@@ -709,7 +709,6 @@ function normalizeWorkflowPayload(value: unknown, fallback: WorkflowPayload | nu
   }).filter((status) => status.id);
   const rawCapabilities = record(raw.capabilities ?? fallback?.capabilities);
   const rawVisual = record(rawStory.visual ?? raw.media);
-  const rawCoverage = arrayValue(rawStory.coverage ?? raw.coverage).map((item) => stringValue(record(item).slug || record(item).title || item)).filter(Boolean);
   const workflowStatus = stringValue(rawStory.status ?? fallbackStory.status, 'pitch');
   const revision = numberValue(rawStory.revision ?? fallbackStory.revision, -1);
 
@@ -735,7 +734,6 @@ function normalizeWorkflowPayload(value: unknown, fallback: WorkflowPayload | nu
       } : null,
       visuals: stringValue(rawStory.visuals ?? fallbackStory.visuals) || null,
       tasksOpen: numberValue(record(raw.tasks).openCount, 0),
-      coverage: rawCoverage,
       modifiedAt: stringValue(rawStory.modifiedAt) || null
     },
     statuses,
@@ -814,7 +812,6 @@ function normalizeTask(value: unknown): EditorialTask | null {
     dueAt: stringValue(item.dueAt) || null,
     priority: (['low', 'normal', 'high', 'urgent'].includes(priority) ? priority : 'normal') as 'low' | 'normal' | 'high' | 'urgent',
     storyId: numberValue(item.storyId, 0) || null,
-    coverageId: numberValue(item.coverageId, 0) || null,
     createdBy: normalizeContributor(item.createdBy),
     completedAt: stringValue(item.completedAt) || null,
     order: numberValue(item.order, 0)
@@ -1818,7 +1815,12 @@ function EditorialWorkflowPlugin() {
   // Navigating between stories remounts the lazy newsroom panels, but the
   // workflow PanelBody belongs to this entrypoint. Reset its controlled state
   // so a panel requested for one story cannot remain focused on another.
+  const panelsPostId = useRef(postId);
   useEffect(() => {
+    // An effect replay on the same story must not erase a consumed navigation
+    // command. Reset only when the editor actually changes stories.
+    if (panelsPostId.current === postId) return;
+    panelsPostId.current = postId;
     setOpenPanels(createStorySidebarPanelOpenState());
   }, [postId]);
 

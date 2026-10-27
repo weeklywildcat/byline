@@ -29,7 +29,7 @@ export const SETTINGS_TABS = [
   "compatibility",
   "diagnostics"
 ] as const;
-export const PLANNING_TABS = ["today", "stories", "collections", "calendar", "media", "coverage", "performance", "content-health", "feedback"] as const;
+export const PLANNING_TABS = ["today", "stories", "collections", "calendar", "media", "content-health", "feedback"] as const;
 export const NEWSLETTER_TABS = ["issues", "settings"] as const;
 
 const knownPageSlugs = new Set<string>(Object.values(ADMIN_PAGE_SLUGS));
@@ -39,6 +39,8 @@ export function normalizeAdminPage(page: string | undefined) {
 }
 
 export function normalizeAdminTab(page: string, tab: string | undefined) {
+  if (page === ADMIN_PAGE_SLUGS.planning && tab === "coverage") return "collections";
+  if (page === ADMIN_PAGE_SLUGS.planning && tab === "performance") return "today";
   const tabs = page === ADMIN_PAGE_SLUGS.publication
     ? PUBLICATION_TABS
     : page === ADMIN_PAGE_SLUGS.integrations
@@ -106,8 +108,8 @@ const legacyDestinations: Record<string, LegacyAdminDestination> = {
   "/planning/stories": { page: ADMIN_PAGE_SLUGS.planning, tab: "stories" },
   "/planning/calendar": { page: ADMIN_PAGE_SLUGS.planning, tab: "calendar" },
   "/planning/media": { page: ADMIN_PAGE_SLUGS.planning, tab: "media" },
-  "/planning/coverage": { page: ADMIN_PAGE_SLUGS.planning, tab: "coverage" },
-  "/planning/performance": { page: ADMIN_PAGE_SLUGS.planning, tab: "performance" },
+  "/planning/coverage": { page: ADMIN_PAGE_SLUGS.planning, tab: "collections" },
+  "/planning/performance": { page: ADMIN_PAGE_SLUGS.planning, tab: "today" },
   "/planning/content-health": { page: ADMIN_PAGE_SLUGS.planning, tab: "content-health" },
   "/planning/feedback": { page: ADMIN_PAGE_SLUGS.planning, tab: "feedback" },
   "/newsletters/issues": { page: ADMIN_PAGE_SLUGS.newsletters, tab: "issues" },
@@ -131,4 +133,16 @@ const legacyDestinations: Record<string, LegacyAdminDestination> = {
 export function legacyHashDestination(hash: string): LegacyAdminDestination | null {
   if (!hash) return null;
   return legacyDestinations[normalizeAdminRoute(hash)] || legacyDestinations["/dashboard"];
+}
+
+/** Native Home/Planning roots still accept bookmarks from the former hash SPA. */
+export function legacyHashHref(hash: string, currentHref: string): string | null {
+  const destination = hash ? legacyDestinations[normalizeAdminRoute(hash)] : null;
+  if (!destination) return null;
+  const url = new URL(currentHref);
+  url.searchParams.set("page", destination.page);
+  if (destination.tab) url.searchParams.set("tab", destination.tab);
+  else url.searchParams.delete("tab");
+  url.hash = "";
+  return url.href;
 }

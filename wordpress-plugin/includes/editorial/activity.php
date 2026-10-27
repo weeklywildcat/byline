@@ -69,6 +69,7 @@ function byline_activity_action_definitions(): array
         'correction_created' => ['summary' => 'Correction recorded'],
         'correction_edited' => ['summary' => 'Correction updated'],
         'correction_deleted' => ['summary' => 'Correction removed'],
+        // Read-only vocabulary for retained historical Coverage activity.
         'coverage_added' => ['summary' => 'Coverage linked'],
         'coverage_removed' => ['summary' => 'Coverage unlinked'],
         'coverage_changed' => ['summary' => 'Coverage updated'],
@@ -1158,7 +1159,7 @@ function byline_editorial_activity_on_task_changed($task_id, $task = [], $operat
         'state' => $task['state'] ?? ($task['status'] ?? ''),
         'operation' => $operation,
     ];
-    foreach (['assigneeId', 'coverageId'] as $field) {
+    foreach (['assigneeId', 'collectionId'] as $field) {
         if (isset($task[$field])) {
             $context[$field] = $task[$field];
         }
@@ -1185,30 +1186,6 @@ function byline_editorial_activity_on_correction_changed($correction_id, $correc
         'correctionId' => $correction_id,
         'operation' => $operation,
     ]);
-}
-
-function byline_editorial_activity_on_coverage_changed($story_id, $previous = [], $next = []): void
-{
-    $story_id = byline_activity_absint($story_id);
-    $previous = is_array($previous) ? array_map('byline_activity_absint', $previous) : [];
-    $next = is_array($next) ? array_map('byline_activity_absint', $next) : [];
-    $added = array_values(array_diff($next, $previous));
-    $removed = array_values(array_diff($previous, $next));
-
-    foreach ($added as $coverage_id) {
-        byline_record_activity($story_id, 'coverage_added', [
-            'objectType' => 'coverage',
-            'coverageId' => $coverage_id,
-            'operation' => 'added',
-        ]);
-    }
-    foreach ($removed as $coverage_id) {
-        byline_record_activity($story_id, 'coverage_removed', [
-            'objectType' => 'coverage',
-            'coverageId' => $coverage_id,
-            'operation' => 'removed',
-        ]);
-    }
 }
 
 function byline_editorial_activity_on_build_started($expected_revision = 0, $reason = 'content'): void
@@ -1291,7 +1268,6 @@ function byline_register_editorial_activity_hooks(): void
     add_action('byline_story_contributors_updated', 'byline_editorial_activity_on_contributors_updated', 10, 3);
     add_action('byline_editorial_task_changed', 'byline_editorial_activity_on_task_changed', 10, 3);
     add_action('byline_editorial_correction_changed', 'byline_editorial_activity_on_correction_changed', 10, 3);
-    add_action('byline_editorial_coverage_changed', 'byline_editorial_activity_on_coverage_changed', 10, 3);
     add_action('byline_editorial_build_started', 'byline_editorial_activity_on_build_started', 10, 2);
     add_action('byline_editorial_build_failed', 'byline_editorial_activity_on_build_failed', 10, 2);
     add_action('byline_editorial_build_live', 'byline_editorial_activity_on_build_live', 10, 2);
