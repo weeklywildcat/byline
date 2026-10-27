@@ -164,13 +164,13 @@ export function ReportingPlan() {
         </Empty></div>
         : <>
           <section aria-labelledby="ws-sources">
-            <GroupHeading id="ws-sources" title="Sources" action={data.sources.length ? addSource : null} />
+            <GroupHeading id="ws-sources" title="Sources" action={addSource} />
             {data.sources.length
               ? <ItemGroup role="group" aria-labelledby="ws-sources" className="gap-0">{data.sources.map((source) => <SourceRow key={source.id} source={source} people={who(source.assignees)} timing={sourceTimingLine(source, data.appointments, timezone)} onOpen={openSource(source)} busy={statusBusy(source.id)} onStatus={caps.manageReporting ? (status) => quickStatus.mutate({ kind: "source", id: source.id, status, updatedAt: source.updatedAt }) : undefined} />)}</ItemGroup>
               : <p className="px-3 text-sm text-muted-foreground">No sources yet. {caps.addSource ? "Add the people you plan to interview." : "None are assigned to you."}</p>}
           </section>
           <section aria-labelledby="ws-appointments">
-            <GroupHeading id="ws-appointments" title="Appointments" action={noAppointments ? null : addAppointment} />
+            <GroupHeading id="ws-appointments" title="Appointments" action={addAppointment} />
             <div className="flex flex-col gap-2">
               {days.map(({ day, items }) => <div key={day} className="flex flex-col"><h4 className="px-3 pt-2 pb-0.5 text-xs font-medium text-muted-foreground">{formatDay(day, false)}</h4>
                 <ItemGroup role="group" aria-label={formatDay(day, false)} className="gap-0">{items.map((appointment) => <ExactRow key={appointment.id} appointment={appointment} people={who(appointment.assignees)} timezone={timezone} onOpen={openAppointment(appointment)} busy={statusBusy(appointment.id)} onStatus={caps.manageReporting ? (status) => quickStatus.mutate({ kind: "appointment", id: appointment.id, status, updatedAt: appointment.updatedAt }) : undefined} />)}</ItemGroup>
