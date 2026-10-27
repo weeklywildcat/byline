@@ -250,9 +250,17 @@ export function myWork(data: HomeBootstrap, now = new Date()): HomeWorkItem[] {
   const groupRank: Record<HomeWorkGroup, number> = { attention: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
   const kindRank: Record<HomeWorkItem["kind"], number> = { attention: 0, review: 1, task: 2, media: 3 };
   const dateOf = (item: HomeWorkItem) => item.kind === "task" ? item.task.dueAt : item.kind === "media" ? item.media.dueAt : item.kind === "review" ? item.story.modifiedAt : null;
+  const attentionRank = (item: HomeWorkItem) => {
+    if (item.group !== "attention") return 0;
+    if (item.kind === "task") return dayDistance(item.task.dueAt, data.timezone, now) < 0 ? 0 : 1;
+    if (item.kind === "media") return dayDistance(item.media.dueAt, data.timezone, now) < 0 ? 0 : 3;
+    if (item.kind === "attention") return item.item.urgent ? 1 : 4;
+    return 2;
+  };
 
   return items.sort((a, b) =>
     groupRank[a.group] - groupRank[b.group]
+    || attentionRank(a) - attentionRank(b)
     || kindRank[a.kind] - kindRank[b.kind]
     || (dateOf(a) || "9999").localeCompare(dateOf(b) || "9999")
     || a.id.localeCompare(b.id, undefined, { numeric: true })
