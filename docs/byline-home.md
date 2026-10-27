@@ -6,51 +6,59 @@ Home is a custom React application, independent of the public site.
 
 ## Daily work
 
-- **Up Next** shows your visible open tasks. Overdue work comes first, followed
-  by today, tomorrow, the next seven days, later work and undated work. Within
-  each group, priority precedes the due time and stable task order. The first
-  seven rows are shown; **View all work** opens the rest of the bounded result.
-- **Coming Up** shows the next two weeks of commitments, initially six events.
-  Tasks, story deadlines and visual assignments keep their distinct labels.
-  A WordPress publication schedule takes precedence over a planned target on
-  the same site day. Both values remain visible in story detail. Editors also
-  see visible newsroom deadlines and publication events.
-- **My Stories** includes canonical co-writers, assigned editors and the legacy
-  primary author. Published and dropped stories are excluded. Six stories are
-  shown, ordered by overdue status, deadline, planned target and recent activity.
-- **Waiting for Me** is reserved for work that needs a decision or coordination
-  action: missed story deadlines, interviews that need scheduling, and urgent
-  unassigned visual work. Ordinary overdue tasks stay only in **Up Next**, and
-  assigned production stays only in **Photo & Visual Work**, so Home does not
-  repeat the same work in multiple sections. Serious system failures are small
-  links, shown only to accounts that can inspect the corresponding service.
-- **Ready for Review** is shown to accounts with `edit_others_posts` only when
-  the queue contains stories. **Photo & Visual Work** uses structured media
-  assignments and appears only when there is relevant work (or a media error).
-  Its header links to Media Desk. Legacy generic labels such as “Visual request”
-  are rendered as useful type/status labels such as “Photo needed.”
-- **Recent Activity** shows at most eight existing, authorized activity records
-  and disappears when there is nothing to show. It has its own failure state
-  and does not block assigned work.
+Today is intentionally organized around three questions instead of the storage
+type behind each piece of work:
 
-On wide screens Home uses two independent vertical stacks rather than locking
-cards into shared grid rows. A short **Coming Up** card therefore does not leave
-a large blank gap before **Waiting for Me** or visual work. Empty states use the
-compact Nova `Empty` treatment, and **View all work** is only shown when the
-task preview is actually truncated.
+1. **My Work — what do I need to do?** One personal queue combines assigned
+   tasks, reviews an editor can act on, reporting appointments that need
+   scheduling, the signed-in user's production assignments, missed personal
+   story deadlines, and urgent unassigned production that needs an editor.
+   Underlying objects stay separate — a production assignment does not become a
+   task — but Today normalizes their urgency into **Needs attention**, **Today**,
+   **Tomorrow**, **This week**, and **Later**. Overdue work and urgent blockers
+   lead; nonurgent scheduling reminders cannot outrank already overdue work.
+   The first ten rows are shown and **View all work** opens the rest of the
+   bounded feed. Ordinary task completion/editing still uses the canonical task
+   APIs and optimistic rollback.
+2. **Coming Up — what commitments are on the calendar?** The next two weeks show
+   confirmed exact appointments, story deadlines, planned publication targets,
+   and actual WordPress schedules. Ordinary task and production due dates stay
+   in My Work instead of appearing twice. A WordPress schedule takes precedence
+   over a planned target on the same site day. Editors can still see visible
+   newsroom story/publication commitments; writers see their own.
+3. **My Stories — what am I responsible for overall?** Canonical co-writers,
+   assigned editors, and the legacy primary author determine membership.
+   Published and dropped stories are excluded. Six stories are shown, ordered by
+   overdue status, deadline, planned target and recent activity.
 
-Today uses continuous, separated work queues within those sections: quiet
-horizontal rules, subtle row hover, compact muted headers and smaller secondary
-text. Story and task headlines remain prominent and clamp at two lines. Real
-profile photos appear for single writers as well as contributor groups; missing
-photos still render no placeholder. Overdue story deadlines retain their warning
-text and color.
+Ready-for-review work, production assignments and interview scheduling no longer
+create separate Today cards. They appear in **My Work** with enough story/type
+context to explain why each row is present. Editors do not inherit every
+colleague's ordinary production assignment merely because they can review the
+newsroom; they see their own production work plus urgent unassigned production
+that genuinely needs an editor.
 
-Wide task rows align the title and story context beside assignee, priority and
+Serious system problems are not mixed into personal editorial work. A failed
+website publication or critical publishing-health check appears as a page-level
+alert with its direct action. Informational **Recent Activity** is no longer a
+Today section; story activity remains available in Story Peek/Workspace, and a
+future Inbox can own newsroom updates without diluting the daily work queue.
+
+On wide screens **My Work** and **Coming Up** form the first row, with **My
+Stories** as a full-width context section underneath. On smaller screens they
+collapse naturally into one column. Empty states use the compact Nova Empty
+treatment and group headings render only when that group contains work.
+
+Today keeps continuous, separated rows: quiet horizontal rules, subtle row
+hover, compact muted section headers and smaller secondary text. Story and task
+headlines remain prominent and clamp at two lines. Real profile photos appear
+where available; missing photos render no placeholder. Overdue deadlines retain
+warning text and color.
+
+Wide task rows still align title/story context beside assignee, priority and
 due-date controls. A container breakpoint moves those controls below the title
-when a row becomes narrow. The seven-task preview and All my work drawer keep
-their existing behavior. Shared task/activity rows opt into this density only on
-Today, so Story Peek and Collections retain their existing layouts.
+when a row becomes narrow. Shared rows opt into this density only on Today, so
+Story Peek and Collections retain their existing layouts.
 
 All dates use the WordPress site timezone, including fixed UTC offsets. A
 date-only story deadline remains a calendar date, independent of the browser's
