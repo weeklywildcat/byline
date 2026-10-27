@@ -129,6 +129,30 @@ export function myOpenTasks(tasks: EditorialTask[], userId: number, timezone: st
     || a.order - b.order || String(a.id).localeCompare(String(b.id), undefined, { numeric: true }));
 }
 
+export type HomeWorkGroup = "attention" | "today" | "tomorrow" | "week" | "later";
+export const HOME_WORK_GROUPS: Array<{ id: HomeWorkGroup; label: string }> = [
+  { id: "attention", label: "Needs attention" },
+  { id: "today", label: "Today" },
+  { id: "tomorrow", label: "Tomorrow" },
+  { id: "week", label: "This week" },
+  { id: "later", label: "Later" }
+];
+
+export type HomeWorkItem =
+  | { id: string; kind: "task"; group: HomeWorkGroup; task: EditorialTask }
+  | { id: string; kind: "review"; group: "attention"; story: PlanningStory }
+  | { id: string; kind: "attention"; group: "attention"; item: AttentionItem }
+  | { id: string; kind: "media"; group: HomeWorkGroup; media: HomeVisualWork };
+
+function workGroup(value: string | null | undefined, timezone: string, now: Date, urgent = false): HomeWorkGroup {
+  const distance = dayDistance(value, timezone, now);
+  if (urgent || distance < 0) return "attention";
+  if (distance === 0) return "today";
+  if (distance === 1) return "tomorrow";
+  if (distance <= 7) return "week";
+  return "later";
+}
+
 export function activeStory(story: PlanningStory): boolean {
   return !story.wordpressState.isPublished && !["publish", "trash", "auto-draft"].includes(story.wordpressState.id) && !["published", "dropped"].includes(story.workflow.id);
 }
@@ -149,14 +173,12 @@ export function homeAgenda(data: HomeBootstrap, now = new Date()): AgendaEvent[]
   const { timezone, currentUser, capabilities } = data;
   const today = siteDay(now, timezone);
   const entries: AgendaEvent[] = [];
-  const storyMap = new Map(data.stories.map((s) => [s.id, s]));
   const add = (id: string, storyId: number | null, title: string, detail: string, label: string, date?: string | null, href?: string) => {
     if (!date) return;
     const day = siteDay(date, timezone);
     const delta = dayDistance(date, timezone, now);
     if (day >= today && delta <= 14) entries.push({ id, storyId, title, detail, label, date, day, ...(href ? { href } : {}) });
   };
-  myOpenTasks(data.tasks, currentUser.id, timezone, now).forEach((task) => add(`task-${task.id}`, task.storyId ?? null, task.title, storyMap.get(task.storyId || 0)?.title || "", "Task deadline", task.dueAt));
   data.stories.filter(activeStory).forEach((story) => {
     if (!capabilities.review && !myStory(story, currentUser.id)) return;
     add(`deadline-${story.id}`, story.id, story.title, "", "Story deadline", story.deadline);
@@ -168,13 +190,8 @@ export function homeAgenda(data: HomeBootstrap, now = new Date()): AgendaEvent[]
       add(`planned-${story.id}`, story.id, story.title, "", "Planned publication", story.plannedPublication);
     }
   });
-  data.visualWork.forEach((media) => {
-    if (media.status !== "done" && (capabilities.review || media.assignee?.id === currentUser.id)) {
-      add(`media-${media.story.id}-${media.id}`, media.story.id, media.title || media.story.title, media.story.title, "Production due", media.dueAt);
-    }
-  });
   // Only a confirmed, exact appointment has a day and a time. A target window or
-  // an unscheduled idea is never placed on the calendar; it is Waiting for Me's job.
+  // an unscheduled idea is work to schedule, not a calendar commitment.
   upcomingConfirmed(data.appointments || [], timezone, now).forEach((appointment) => add(`appointment-${appointment.id}`, appointment.storyId, appointment.title, appointment.storyTitle, appointmentKindLabels[appointment.kind] || "Appointment", appointment.startAt, appointment.collectionId ? `${collectionUrl(appointment.collectionId)}&interview=${appointment.interviewId}` : undefined));
   return entries.sort((a, b) => a.day.localeCompare(b.day) || a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
@@ -200,6 +217,46 @@ export function waitingForMe(data: HomeBootstrap, now = new Date()): AttentionIt
 
 export function reviewStories(data: HomeBootstrap): PlanningStory[] {
   return data.capabilities.review ? data.stories.filter((s) => activeStory(s) && s.workflow.id === "ready").sort((a, b) => (a.modifiedAt || "").localeCompare(b.modifiedAt || "") || a.id - b.id) : [];
+}
+
+/**
+ * One personal queue for every kind of work the signed-in user has to act on.
+ * The source objects stay distinct; Home only normalizes their urgency and order.
+ */
+export function myWork(data: HomeBootstrap, now = new Date()): HomeWorkItem[] {
+  const items: HomeWorkItem[] = [];
+  const reviews = reviewStories(data);
+  const reviewStoryIds = new Set(reviews.map((story) => story.id));
+
+  for (const task of myOpenTasks(data.tasks, data.currentUser.id, data.timezone, now)) {
+    items.push({ id: `task-${task.id}`, kind: "task", group: workGroup(task.dueAt, data.timezone, now, task.priority === "urgent"), task });
+  }
+
+  for (const story of reviews) {
+    items.push({ id: `review-${story.id}`, kind: "review", group: "attention", story });
+  }
+
+  for (const item of waitingForMe(data, now)) {
+    // A ready story that is also late has one clearer action: review it.
+    if (item.id.startsWith("late-story-") && item.storyId && reviewStoryIds.has(item.storyId)) continue;
+    items.push({ id: `attention-${item.id}`, kind: "attention", group: "attention", item });
+  }
+
+  for (const media of data.visualWork) {
+    if (media.status === "done" || media.assignee?.id !== data.currentUser.id) continue;
+    items.push({ id: `media-${media.story.id}-${media.id}`, kind: "media", group: workGroup(media.dueAt, data.timezone, now), media });
+  }
+
+  const groupRank: Record<HomeWorkGroup, number> = { attention: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
+  const kindRank: Record<HomeWorkItem["kind"], number> = { attention: 0, review: 1, task: 2, media: 3 };
+  const dateOf = (item: HomeWorkItem) => item.kind === "task" ? item.task.dueAt : item.kind === "media" ? item.media.dueAt : item.kind === "review" ? item.story.modifiedAt : null;
+
+  return items.sort((a, b) =>
+    groupRank[a.group] - groupRank[b.group]
+    || kindRank[a.kind] - kindRank[b.kind]
+    || (dateOf(a) || "9999").localeCompare(dateOf(b) || "9999")
+    || a.id.localeCompare(b.id, undefined, { numeric: true })
+  );
 }
 
 export function activityCopy(item: EditorialActivityRecord): string {
