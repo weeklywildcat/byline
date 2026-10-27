@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { EditorialTask } from "../editorial/editorial-model";
 import type { PlanningStory } from "../planning/planning-model";
 import type { HomeAppointment } from "../workspace/workspace-types";
-import { activeStory, dayDistance, homeAgenda, myActiveStories, myOpenTasks, myStory, reviewStories, siteDay, waitingForMe, workspaceUrlFor, type HomeBootstrap, type HomeVisualWork } from "./newsroom-model";
+import { activeStory, dayDistance, homeAgenda, myActiveStories, myOpenTasks, myStory, myWork, reviewStories, siteDay, waitingForMe, workspaceUrlFor, type HomeBootstrap, type HomeVisualWork } from "./newsroom-model";
 import { replaceHomeTask } from "./home-query";
 
 const now = new Date("2026-10-20T12:00:00Z");
@@ -63,9 +63,10 @@ describe("site dates and role-relevant attention", () => {
     expect(dayDistance("2026-11-02", timezone, new Date("2026-11-01T04:30:00Z"))).toBe(1);
     expect(siteDay("2026-10-20T22:00:00Z", "+05:30")).toBe("2026-10-21");
   });
-  it("combines commitments in chronological order and deduplicates identical publication instants", () => {
+  it("keeps Coming Up focused on calendar commitments and deduplicates identical publication instants", () => {
     const data = bootstrap({ stories: [story({ deadline: "2026-10-20", plannedPublication: "2026-10-22T10:00:00-04:00", wordpressState: { id: "future", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-10-22T14:00:00Z" } })], tasks: [task(1, "2026-10-21T12:00:00Z")], visualWork: [visual()] });
-    expect(homeAgenda(data, now).map((e) => e.id)).toEqual(["deadline-1", "media-1-m1", "task-1", "scheduled-1"]);
+    expect(homeAgenda(data, now).map((e) => e.id)).toEqual(["deadline-1", "scheduled-1"]);
+    expect(homeAgenda(data, now).some((event) => event.id.startsWith("task-") || event.id.startsWith("media-"))).toBe(false);
     expect(homeAgenda(bootstrap({ stories: [story({ authors: [], writer: { id: 9, name: "Other" } })] }), now)).toEqual([]);
   });
   it("leaves overdue tasks to Up Next instead of duplicating them, and gates review", () => {
@@ -76,17 +77,44 @@ describe("site dates and role-relevant attention", () => {
   });
 });
 
-describe("production assignments in Coming Up", () => {
-  it("lists each assignment under its own title and label, and ids stay strings across stories", () => {
+describe("unified My Work", () => {
+  it("combines tasks, review, scheduling and assigned production into one urgency queue", () => {
+    const ready = story({ workflow: { id: "ready", label: "Ready for Review", group: "main", selectable: true } });
     const data = bootstrap({
-      stories: [story({ deadline: null }), story({ id: 2, title: "Band", deadline: null })],
-      visualWork: [visual({ id: "legacy-v1" }), visual({ id: "legacy-v1", story: { id: 2, title: "Band", editUrl: "" }, title: "Band portraits", type: "audio", dueAt: "2026-10-22T14:00:00Z" }), visual({ id: "m3", title: "Done", status: "done" }), visual({ id: "m4", title: "Someone else's", assignee: { id: 9, name: "Other" } })]
+      capabilities: { review: true, createStory: true, uploadMedia: true },
+      stories: [ready],
+      tasks: [task(1, "2026-10-19T12:00:00Z")],
+      appointments: [windowAppointment()],
+      visualWork: [visual(), visual({ id: "other", title: "Someone else's photos", assignee: { id: 9, name: "Other" } })]
     });
-    const events = homeAgenda(data, now);
-    expect(events.map((e) => e.id)).toEqual(["media-1-legacy-v1", "media-2-legacy-v1"]);
-    expect(events[0]).toMatchObject({ title: "Cafeteria photos", detail: "Canteen", label: "Production due", storyId: 1 });
-    expect(events.every((e) => typeof e.id === "string")).toBe(true);
-    expect(homeAgenda({ ...data, capabilities: { ...data.capabilities, review: true } }, now).map((e) => e.id)).toContain("media-1-m4");
+    const items = myWork(data, now);
+    expect(items.map((item) => item.id)).toEqual(["task-1", "review-1", "attention-schedule-w1", "media-1-m1"]);
+    expect(items.map((item) => item.group)).toEqual(["attention", "attention", "attention", "today"]);
+  });
+
+  it("keeps other people's assigned production out while surfacing urgent unassigned production to editors", () => {
+    const data = bootstrap({
+      capabilities: { review: true, createStory: true, uploadMedia: true },
+      stories: [story({ deadline: null })],
+      visualWork: [
+        visual({ id: "mine" }),
+        visual({ id: "other", assignee: { id: 9, name: "Other" } }),
+        visual({ id: "unassigned", status: "needed", assignee: null, dueAt: "2026-10-20T18:00:00Z" })
+      ]
+    });
+    const ids = myWork(data, now).map((item) => item.id);
+    expect(ids).toContain("media-1-mine");
+    expect(ids).toContain("attention-unassigned-1-unassigned");
+    expect(ids).not.toContain("media-1-other");
+    expect(ids).not.toContain("media-1-unassigned");
+  });
+
+  it("does not duplicate a late story when review is the clearer action", () => {
+    const data = bootstrap({
+      capabilities: { review: true, createStory: true, uploadMedia: true },
+      stories: [story({ deadline: "2026-10-19", workflow: { id: "ready", label: "Ready for Review", group: "main", selectable: true } })]
+    });
+    expect(myWork(data, now).map((item) => item.id)).toEqual(["review-1"]);
   });
 });
 
