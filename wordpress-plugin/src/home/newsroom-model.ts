@@ -199,9 +199,9 @@ export function homeAgenda(data: HomeBootstrap, now = new Date()): AgendaEvent[]
 export type AttentionItem = { href?: string; id: string; storyId: number | null; title: string; detail: string; urgent?: boolean };
 export function waitingForMe(data: HomeBootstrap, now = new Date()): AttentionItem[] {
   const items: AttentionItem[] = [];
-  // Ordinary tasks already live in Up Next. Waiting for Me is reserved for work
-  // that needs a decision, assignment, or scheduling action instead of duplicating
-  // the same overdue task in two Home sections.
+  // Ordinary tasks are already first-class My Work items. These attention signals
+  // are reserved for decisions, assignment or scheduling actions instead of
+  // duplicating the same overdue task as a second kind of work.
   data.stories.filter((s) => activeStory(s) && myStory(s, data.currentUser.id) && dayDistance(s.deadline, data.timezone, now) < 0).slice(0, 2).forEach((s) => items.push({ id: `late-story-${s.id}`, storyId: s.id, title: s.title, detail: "Story deadline has passed", urgent: true }));
   // A reporting appointment whose target window is about to open, is open, or only just lapsed.
   // An unscheduled idea or a far-off window never appears here.
