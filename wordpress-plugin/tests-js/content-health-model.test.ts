@@ -11,6 +11,7 @@ import {
 import {
   PLANNING_TABS,
   legacyHashDestination,
+  legacyHashHref,
   normalizeAdminTab,
 } from "../src/admin-routing";
 import type { ContentHealthIssue } from "../src/planning/planning-model";
@@ -122,6 +123,22 @@ describe("published content triage", () => {
       "content-health",
       "feedback",
     ]);
+    expect(
+      legacyHashHref(
+        "#/planning/coverage",
+        "https://cms.test/wp-admin/admin.php?page=byline#/planning/coverage",
+      ),
+    ).toBe(
+      "https://cms.test/wp-admin/admin.php?page=byline-planning&tab=collections",
+    );
+    expect(
+      legacyHashHref(
+        "#/planning/performance",
+        "https://cms.test/wp-admin/admin.php?page=byline#/planning/performance",
+      ),
+    ).toBe(
+      "https://cms.test/wp-admin/admin.php?page=byline-planning&tab=today",
+    );
     expect(normalizeAdminTab("byline-planning", "coverage")).toBe(
       "collections",
     );

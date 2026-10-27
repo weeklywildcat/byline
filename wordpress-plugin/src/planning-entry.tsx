@@ -1,3 +1,4 @@
+import { legacyHashHref } from "./admin-routing";
 import apiFetch from "@wordpress/api-fetch";
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -27,7 +28,9 @@ class PlanningBoundary extends Component<{ children: ReactNode }, { failed: bool
 
 const root = document.getElementById("byline-admin-root");
 const config = window.bylinePlanning;
-if (root && config) {
+const legacyTarget = legacyHashHref(window.location.hash, window.location.href);
+if (legacyTarget) window.location.replace(legacyTarget);
+if (root && config && !legacyTarget) {
   apiFetch.use(apiFetch.createNonceMiddleware(config.nonce));
   const request = <T,>(options: Parameters<typeof apiFetch>[0]) => apiFetch(options) as Promise<T>;
   const fetchers = { ...createPlanningFetchers(request), ...createStoryFetchers(request, config.capabilities) };

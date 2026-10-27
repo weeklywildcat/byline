@@ -240,8 +240,27 @@ test.describe("Planning destinations are one design system", () => {
     await page
       .getByRole("option", { name: `${unique} Published lead`, exact: true })
       .click();
+    await dialog
+      .getByRole("button", {
+        name: `Move ${unique} Published first down`,
+        exact: true,
+      })
+      .click();
     await dialog.getByRole("button", { name: "Save public coverage" }).click();
     await expect(dialog).not.toBeVisible();
+    const saved = await session.rest<{
+      collection: {
+        publicPresentation: { storyOrder: number[]; featuredStoryId: number };
+      };
+    }>(`/byline/v1/editorial/collections/${id}`);
+    expect(saved.payload.collection.publicPresentation.storyOrder).toEqual([
+      lead,
+      first,
+      draft,
+    ]);
+    expect(saved.payload.collection.publicPresentation.featuredStoryId).toBe(
+      lead,
+    );
     const publicResponse = await session.rest<{
       title: string;
       stories: { id: number }[];

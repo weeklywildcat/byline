@@ -32,6 +32,8 @@ wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plug
 wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/story-workspace.php
 # Collection relationships, reporting permissions, and private REST boundaries.
 wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/collections.php
+# Durable published-content health, scan progress and triage dispositions.
+wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/content-health.php
 # Core Notes read through the adapter: the edit_post boundary, public non-exposure and no copies.
 wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/article-notes.php
 WP_BASE_URL="${WP_BASE_URL:-http://localhost:8888}" \

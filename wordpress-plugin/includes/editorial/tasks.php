@@ -105,7 +105,6 @@ function byline_task_story_id(int $task_id): int
     return absint(get_post_meta($task_id, '_byline_task_story_id', true));
 }
 
-
 function byline_task_can_view(int $task_id, ?int $user_id = null): bool
 {
     $task = byline_task_post($task_id);

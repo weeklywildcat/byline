@@ -63,7 +63,8 @@ The older numeric story recheck aliases remain compatible. Arbitrary occurrence
 strings are never used as story route IDs. Rechecks invalidate the shared query
 and update triage in place, with Sonner success/failure messages.
 
-Backend regression coverage tests URL safety, dependency suppression, durable
+`tests/integration/content-health.php` exercises actual WordPress REST, meta and
+keyset scanning for more than 25 stories. Backend regression coverage tests URL safety, dependency suppression, durable
 state transitions, permissions, ignores and full progress beyond 25 stories.
 The Planning browser suite covers the triage workflows and responsive widths
 1440, 1280, 1024, 768 and 390 pixels.

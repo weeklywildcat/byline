@@ -1815,7 +1815,12 @@ function EditorialWorkflowPlugin() {
   // Navigating between stories remounts the lazy newsroom panels, but the
   // workflow PanelBody belongs to this entrypoint. Reset its controlled state
   // so a panel requested for one story cannot remain focused on another.
+  const panelsPostId = useRef(postId);
   useEffect(() => {
+    // An effect replay on the same story must not erase a consumed navigation
+    // command. Reset only when the editor actually changes stories.
+    if (panelsPostId.current === postId) return;
+    panelsPostId.current = postId;
     setOpenPanels(createStorySidebarPanelOpenState());
   }, [postId]);
 

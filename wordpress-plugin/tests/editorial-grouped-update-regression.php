@@ -214,9 +214,7 @@ require __DIR__ . '/../includes/editorial/workflow.php';
 require __DIR__ . '/../includes/editorial/rest.php';
 
 $story = new WP_Post(['ID' => 10, 'post_type' => 'post', 'post_author' => 1]);
-$coverage = new WP_Post(['ID' => 20, 'post_type' => BYLINE_COVERAGE_POST_TYPE, 'post_title' => 'Election night']);
-$replacement_coverage = new WP_Post(['ID' => 21, 'post_type' => BYLINE_COVERAGE_POST_TYPE, 'post_title' => 'Budget']);
-$grouped_posts = [10 => $story, 20 => $coverage, 21 => $replacement_coverage];
+$grouped_posts = [10 => $story];
 $grouped_users = [1 => true, 4 => true];
 
 byline_set_editorial_status(10, 'writing');
@@ -267,7 +265,6 @@ grouped_assert(strpos($failed->get_error_message(), 'SQL') === false && strpos($
 // The client's revision is still authoritative, so its next optimistic write
 // succeeds instead of hitting a phantom conflict.
 $grouped_actions['byline_editorial_story_updated'] = [];
-$grouped_posts[21] = $replacement_coverage;
 $after_rollback = byline_editorial_rest_update_story(new WP_REST_Request(['id' => 10], [
     'status' => 'ready',
     'expectedRevision' => $revision_before_failure,
@@ -297,7 +294,6 @@ $grouped_actions['byline_editorial_story_updated'] = [];
 
 // --- legacy callers that omit expectedRevision still work --------------------
 
-$grouped_actions['byline_editorial_coverage_changed'] = [];
 $legacy = byline_editorial_rest_update_story(new WP_REST_Request(['id' => 10], ['status' => 'writing']));
 grouped_assert(!is_wp_error($legacy), 'A legacy caller without expectedRevision was rejected.');
 grouped_assert(byline_get_editorial_status(10) === 'writing', 'A legacy grouped update did not apply.');

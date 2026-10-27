@@ -27,12 +27,9 @@ function byline_content_health_rest_post_id($request): int
 
 function byline_content_health_rest_requested_post_id($request): int
 {
-    $post_id = absint(byline_content_health_rest_param($request, 'postId', 0));
-    if ($post_id > 0) {
-        return $post_id;
-    }
-
-    return byline_content_health_rest_post_id($request);
+    $route_id = byline_content_health_rest_post_id($request);
+    if ($route_id > 0) { return $route_id; }
+    return absint(byline_content_health_rest_param($request, 'postId', 0));
 }
 
 function byline_content_health_can_manage_all(): bool
@@ -263,6 +260,9 @@ function byline_content_health_rest_issues(array $issues): array
 function byline_content_health_summary(int $post_id = 0, string $issue_type = '', string $severity = ''): array
 {
     $ids = $post_id ? [$post_id] : get_posts(['post_type' => 'post', 'post_status' => 'publish', 'numberposts' => -1, 'fields' => 'ids', 'orderby' => 'ID', 'order' => 'ASC']);
+    // Prime the same native post/meta caches used by the Collection queues;
+    // a complete result set must not issue one SQL round-trip per story.
+    if (function_exists('_prime_post_caches')) { _prime_post_caches(array_map('intval', $ids), false, true); }
     $items = []; $ignored_items = []; $stories = []; $checked = 0; $eligible = 0; $outdated = false;
     $disabled = (array) get_option('byline_content_health_disabled_checks', []);
     foreach ($ids as $id) {
@@ -331,7 +331,6 @@ function byline_content_health_rest_disposition($request)
     $restore = rest_sanitize_boolean(byline_content_health_rest_param($request, 'restore', false));
     $entry = ['by' => get_current_user_id(), 'at' => gmdate('c'), 'reason' => byline_content_health_text(byline_content_health_rest_param($request, 'reason', ''), 300)];
     $key = $global ? 'byline_content_health_disabled_checks' : BYLINE_CONTENT_HEALTH_IGNORED;
-    $current = (array) ($global ? get_option($key, []) : get_post_meta($id, $key, true));
     // Compare-and-swap protects concurrent ignores from silently replacing each other.
     for ($attempt = 0; $attempt < 4; $attempt++) {
         $raw = $global ? get_option($key, null) : get_post_meta($id, $key, true);
@@ -341,7 +340,10 @@ function byline_content_health_rest_disposition($request)
         if ($next === $current) { break; }
         if ($global) {
             // Global writes require a short lock because options lack meta CAS.
-            if (!add_option('byline_health_disposition_lock', time(), '', false)) { return new WP_Error('byline_health_conflict', 'Another check setting is being saved. Try again.', ['status' => 409]); }
+            if (!add_option('byline_health_disposition_lock', time(), '', false)) {
+                if ((int) get_option('byline_health_disposition_lock') < time() - 60) { delete_option('byline_health_disposition_lock'); }
+                return new WP_Error('byline_health_conflict', 'Another check setting is being saved. Try again.', ['status' => 409]);
+            }
             try {
                 $next = (array) get_option($key, []);
                 if ($restore) { unset($next[$type]); } else { $next[$type] = $entry; }
@@ -567,6 +569,9 @@ function byline_content_health_enqueue_editor_navigation(string $hook): void
             // The Story bundle owns the sidebar and PanelBody state. Publish a
             // closed command vocabulary instead of reaching into Gutenberg's
             // DOM or trying to infer panel markup from this transport bridge.
+            // The bridge can exist before its React subscriber mounts. Open
+            // the sidebar explicitly so its pending panel command is consumed.
+            editorActions.openGeneralSidebar('byline-editorial-workflow/byline-editorial-workflow-sidebar');
             var navigation = window.bylineStorySidebarNavigation;
             // A plugin bundle/load-order mismatch should still leave the user
             // at the safe Story sidebar rather than turning a valid edit link
@@ -578,7 +583,6 @@ function byline_content_health_enqueue_editor_navigation(string $hook): void
                     : {};
                 pendingNavigation.pending = { panel: target.panel };
                 window.bylineStorySidebarNavigation = pendingNavigation;
-                editorActions.openGeneralSidebar('byline-editorial-workflow/byline-editorial-workflow-sidebar');
                 return Promise.resolve(true);
             }
             return Promise.resolve(navigation.publish({ panel: target.panel }) ? true : null);

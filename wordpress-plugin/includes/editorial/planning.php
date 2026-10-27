@@ -457,8 +457,8 @@ function byline_editorial_planning_query_args(array $filters = [], ?int $user_id
 
     if (!empty($filters['query'])) {
         // Search is applied against the normalized summary below so headline,
-        // writer, editor, and Coverage all share one contract.  A WP_Query
-        // `s` clause would discard writer/editor/Coverage matches before that
+        // writer and editor share one contract.  A WP_Query
+        // `s` clause would discard writer/editor matches before that
         // post-filter could see them.  Keep this bounded to the collection's
         // maximum rather than allowing a free-form newsroom export.
         $args['posts_per_page'] = max((int) $args['posts_per_page'], BYLINE_EDITORIAL_PLANNING_MAX_RESULTS);

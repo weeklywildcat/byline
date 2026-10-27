@@ -21,7 +21,7 @@ export function CollectionBrief({
     <section className="flex flex-col gap-3">
       <header className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Coverage brief</h2>
+          <h2 className="text-base font-semibold">Reporting brief</h2>
           <p className="text-sm text-muted-foreground">
             The plan, key angles, and what we’re still missing.
           </p>
@@ -58,7 +58,7 @@ export function CollectionBrief({
           }}
         >
           <Textarea
-            aria-label="Coverage brief and key angles"
+            aria-label="Reporting brief and key angles"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={8}

@@ -1,3 +1,4 @@
+import { legacyHashHref } from "./admin-routing";
 import apiFetch from "@wordpress/api-fetch";
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -30,7 +31,9 @@ class HomeBoundary extends Component<{ children: ReactNode }, { failed: boolean 
 
 const root = document.getElementById("byline-admin-root");
 const config = window.bylineHome;
-if (root && config) {
+const legacyTarget = legacyHashHref(window.location.hash, window.location.href);
+if (legacyTarget) window.location.replace(legacyTarget);
+if (root && config && !legacyTarget) {
   apiFetch.use(apiFetch.createNonceMiddleware(config.nonce));
   const fetchers = createHomeFetchers((options) => apiFetch(options), {}, config.capabilities);
   createRoot(root).render(<HomeBoundary><HomeApp fetchers={fetchers} currentUserId={config.currentUserId} actionUrls={{

@@ -340,7 +340,7 @@ export function NewsletterEditor({ fetchers, newsletterId, initialNewsletter, br
               {actions.includes("schedule") ? <Button variant="secondary" onClick={() => void performAction("schedule")} isBusy={isActing === "schedule"} disabled={Boolean(isActing) || isSaving}>{__("Schedule", "weekly-wildcat-headless")}</Button> : null}
               {actions.includes("send") ? <Button variant="primary" onClick={() => void performAction("send")} isBusy={isActing === "send"} disabled={Boolean(isActing) || isSaving}>{__("Send now", "weekly-wildcat-headless")}</Button> : null}
               {actions.includes("cancel") ? <Button variant="tertiary" onClick={() => void performAction("cancel")} isBusy={isActing === "cancel"} disabled={Boolean(isActing) || isSaving}>{__("Cancel schedule", "weekly-wildcat-headless")}</Button> : null}
-              {draft.status === "sent" && selectedProvider?.capabilities.stats ? <Button variant="secondary" disabled>{__("Stats available in Performance", "weekly-wildcat-headless")}</Button> : null}
+              {draft.status === "sent" && selectedProvider?.capabilities.stats ? <Button variant="secondary" disabled>{__("Statistics available from provider", "weekly-wildcat-headless")}</Button> : null}
             </div>
             {!actions.length && draft.status !== "sent" ? <OptionalUnavailable>{selectedProvider ? __("No delivery actions are available for this provider or issue state.", "weekly-wildcat-headless") : __("Delivery actions will appear after a configured provider is selected.", "weekly-wildcat-headless")}</OptionalUnavailable> : null}
           </div>

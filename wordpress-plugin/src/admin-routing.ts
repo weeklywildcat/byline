@@ -134,3 +134,15 @@ export function legacyHashDestination(hash: string): LegacyAdminDestination | nu
   if (!hash) return null;
   return legacyDestinations[normalizeAdminRoute(hash)] || legacyDestinations["/dashboard"];
 }
+
+/** Native Home/Planning roots still accept bookmarks from the former hash SPA. */
+export function legacyHashHref(hash: string, currentHref: string): string | null {
+  const destination = hash ? legacyDestinations[normalizeAdminRoute(hash)] : null;
+  if (!destination) return null;
+  const url = new URL(currentHref);
+  url.searchParams.set("page", destination.page);
+  if (destination.tab) url.searchParams.set("tab", destination.tab);
+  else url.searchParams.delete("tab");
+  url.hash = "";
+  return url.href;
+}

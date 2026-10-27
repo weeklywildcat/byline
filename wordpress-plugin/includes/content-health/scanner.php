@@ -4,7 +4,6 @@ if (!defined('ABSPATH')) { exit; }
 if (!function_exists('byline_content_health_check_story')) { require_once __DIR__ . '/checks.php'; }
 const BYLINE_CONTENT_HEALTH_SCAN_HOOK = 'byline_content_health_scan';
 const BYLINE_CONTENT_HEALTH_CONTINUE_HOOK = 'byline_content_health_continue';
-const BYLINE_CONTENT_HEALTH_SCAN_CURSOR_OPTION = 'byline_content_health_scan_cursor';
 const BYLINE_CONTENT_HEALTH_SCAN_BATCH_SIZE = 1;
 const BYLINE_CONTENT_HEALTH_SCAN_STATE = 'byline_content_health_full_scan';
 const BYLINE_CONTENT_HEALTH_SNAPSHOT = '_byline_content_health_snapshot';
@@ -24,7 +23,6 @@ function byline_content_health_definitions(): array
     ];
 }
 function byline_content_health_scan_limit($value): int { return 1; }
-function byline_content_health_scan_cursor($value): int { return absint($value); }
 
 /** Resolution history is capped; ignores are separate and survive resolution. */
 function byline_content_health_store_story(array $payload): bool
@@ -106,6 +104,10 @@ function byline_content_health_scan_batch($limit = BYLINE_CONTENT_HEALTH_SCAN_BA
         return $state;
     }
     try {
+        // Re-read after acquiring the lock: a previous worker may have finished
+        // between this request's first read and the lock acquisition.
+        $state = (array) get_option(BYLINE_CONTENT_HEALTH_SCAN_STATE, []);
+        if (empty($state['running'])) { return $state; }
         global $wpdb;
         $ids = $wpdb->get_col($wpdb->prepare("SELECT ID FROM {$wpdb->posts} WHERE post_type = 'post' AND post_status = 'publish' AND ID > %d AND ID <= %d ORDER BY ID ASC LIMIT %d", (int) $state['cursor'], (int) $state['upperId'], byline_content_health_scan_limit($limit)));
         foreach ($ids as $id) {

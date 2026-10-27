@@ -1,3 +1,4 @@
+import { waitForBylineEditorReady } from "./editor-helpers";
 import { expect, test } from "./fixtures";
 import { createPlanningStory, token } from "./planning-fixture";
 
@@ -100,3 +101,55 @@ for (const width of [1440, 1280, 1024, 768, 390]) {
     expect(errors).toEqual([]);
   });
 }
+
+test("Content Health Fix targets still focus Gutenberg blocks, featured image and Story tasks", async ({
+  adminPage: page,
+  adminSession: session,
+}) => {
+  const id = await createPlanningStory(session, {
+    title: `${token()} Fix navigation`,
+    published: true,
+  });
+  const saved = await session.rest(`/wp/v2/posts/${id}`, "POST", {
+    content:
+      "<!-- wp:paragraph --><p>First block.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p>Focused health block.</p><!-- /wp:paragraph -->",
+  });
+  expect(saved.ok).toBe(true);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const fix = (target: Record<string, unknown>) =>
+    `/wp-admin/post.php?post=${id}&action=edit&byline_content_health_target=${encodeURIComponent(
+      JSON.stringify(target),
+    )}`;
+  await page.goto(
+    fix({ kind: "block", blockPath: [1], blockName: "core/paragraph" }),
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const store = (window as any).wp?.data?.select("core/block-editor");
+        return store?.getSelectedBlock()?.attributes?.content;
+      }),
+    )
+    .toContain("Focused health block");
+  await page.goto(fix({ kind: "featured-image" }));
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).wp?.data
+            ?.select("core/edit-post")
+            ?.getActiveGeneralSidebarName(),
+      ),
+    )
+    .toBe("edit-post/document");
+  await page.goto(fix({ kind: "story-sidebar", panel: "tasks" }));
+  await waitForBylineEditorReady(page);
+  await expect(
+    page
+      .locator(".byline-editorial-sidebar")
+      .getByRole("button", { name: /^Tasks(?:\s+·\s+\d+\s+open)?$/i })
+      .first(),
+  ).toHaveAttribute("aria-expanded", "true");
+  expect(errors).toEqual([]);
+});

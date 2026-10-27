@@ -494,6 +494,7 @@ function rest_permission_test_data($response)
 
 byline_editorial_register_extended_rest_routes();
 byline_register_content_health_routes();
+rest_permission_test_assert(!isset($rest_permission_routes['byline/v1/admin/analytics/performance']), 'Retired Planning Performance endpoint must not be registered.');
 byline_register_distribution_routes();
 byline_register_analytics_routes();
 

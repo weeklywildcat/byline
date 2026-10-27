@@ -271,6 +271,7 @@ byline_register_content_health_hooks();
 health_assert(isset($actions['rest_api_init']) && isset($actions[BYLINE_CONTENT_HEALTH_SCAN_HOOK]), 'Content-health registration hooks were not explicit and discoverable.');
 health_assert(isset($actions['admin_enqueue_scripts']) && in_array('byline_content_health_enqueue_editor_navigation', $actions['admin_enqueue_scripts'], true), 'Content-health editor navigation was not registered on the admin enqueue hook.');
 byline_register_content_health_routes();
+health_assert(byline_content_health_rest_requested_post_id(new HealthTestRequest(['id' => 5, 'postId' => 7])) === 5, 'A body field overrode the explicit numeric story route.');
 $summary_route = $routes['byline/v1/admin/content-health'] ?? null;
 $recheck_route = $routes['byline/v1/admin/content-health/recheck/(?P<id>\\d+)'] ?? null;
 health_assert(is_array($summary_route) && $summary_route['permission_callback']() === false, 'Content-health summary route was not capability protected.');
