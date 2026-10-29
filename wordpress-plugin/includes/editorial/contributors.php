@@ -655,40 +655,9 @@ function byline_story_contributor_reference_exists(array $reference): bool
 }
 
 /**
- * Keep post_author represented whenever an explicit list is written. It can
- * still appear after a guest/user entry, which lets the editor reorder the
- * complete byline while making it impossible to accidentally erase the legacy
- * primary author identity.
- *
- * @param array<int,array{type:string,id:int}> $contributors
- * @return array<int,array{type:string,id:int}>
- */
-function byline_story_contributors_preserve_primary(int $post_id, array $contributors): array
-{
-    if (!function_exists('get_post')) {
-        return $contributors;
-    }
-
-    $post = get_post($post_id);
-    $primary_id = $post instanceof WP_Post ? absint($post->post_author) : 0;
-    if ($primary_id <= 0 || !byline_story_contributor_reference_exists(['type' => 'user', 'id' => $primary_id])) {
-        return $contributors;
-    }
-
-    foreach ($contributors as $reference) {
-        if (($reference['type'] ?? '') === 'user' && absint($reference['id'] ?? 0) === $primary_id) {
-            return $contributors;
-        }
-    }
-
-    array_unshift($contributors, ['type' => 'user', 'id' => $primary_id]);
-
-    return array_slice($contributors, 0, BYLINE_CONTRIBUTOR_MAX_PER_STORY);
-}
-
-/**
- * Read ordered refs. This function never writes on read, so legacy posts and
- * malformed historical records remain recoverable and diagnosable.
+ * Read ordered refs. Only legacy stories without contributor metadata fall
+ * back to post_author: an explicit empty list is a valid, uncredited byline.
+ * This function never writes on read.
  *
  * @return array<int,array{type:string,id:int}>
  */
@@ -699,6 +668,8 @@ function byline_get_story_contributor_entries(int $post_id, bool $include_primar
         return [];
     }
 
+    $has_explicit_list = function_exists('metadata_exists')
+        && metadata_exists('post', $post_id, BYLINE_STORY_CONTRIBUTORS_META);
     $stored = function_exists('get_post_meta')
         ? get_post_meta($post_id, BYLINE_STORY_CONTRIBUTORS_META, true)
         : [];
@@ -711,8 +682,8 @@ function byline_get_story_contributor_entries(int $post_id, bool $include_primar
         'byline_story_contributor_reference_exists'
     ));
 
-    if ($contributors !== []) {
-        return byline_story_contributors_preserve_primary($post_id, $contributors);
+    if ($has_explicit_list) {
+        return $contributors;
     }
 
     if (!$include_primary_fallback || !function_exists('get_post')) {
@@ -815,7 +786,8 @@ function byline_guest_can_edit(int $guest_id, ?int $user_id = null): bool
 function byline_set_story_contributors(int $post_id, array $contributors, ?int $user_id = null)
 {
     $post_id = absint($post_id);
-    if (!function_exists('get_post') || !(get_post($post_id) instanceof WP_Post) || get_post($post_id)->post_type !== 'post') {
+    $post = function_exists('get_post') ? get_post($post_id) : null;
+    if (!$post instanceof WP_Post || $post->post_type !== 'post') {
         return new WP_Error('byline_unknown_story', 'This story does not exist.', ['status' => 404]);
     }
 
@@ -834,12 +806,52 @@ function byline_set_story_contributors(int $post_id, array $contributors, ?int $
         }
     }
 
-    $normalised = byline_story_contributors_preserve_primary($post_id, $normalised);
+    // The byline is authoritative. If the current WP author is removed, promote
+    // the first remaining WP user while retaining the editor's chosen order.
+    // With only guests (or no writers), keep post_author as an internal owner.
+    $primary_id = absint($post->post_author);
+    $primary_selected = false;
+    $next_primary = 0;
+    foreach ($normalised as $reference) {
+        if ($reference['type'] !== 'user') {
+            continue;
+        }
+        if ($next_primary === 0) {
+            $next_primary = $reference['id'];
+        }
+        if ($reference['id'] === $primary_id) {
+            $primary_selected = true;
+        }
+    }
+    $changing_primary = !$primary_selected && $next_primary > 0 && $next_primary !== $primary_id;
+    if ($changing_primary) {
+        $can_change_author = $user_id === null
+            ? current_user_can('edit_others_posts')
+            : user_can($user_id, 'edit_others_posts');
+        if (!$can_change_author) {
+            return new WP_Error('byline_primary_author_forbidden', 'Only an editor can change the WordPress post author.', ['status' => 403]);
+        }
+    }
 
-    if ($normalised === []) {
-        delete_post_meta($post_id, BYLINE_STORY_CONTRIBUTORS_META);
-    } else {
-        update_post_meta($post_id, BYLINE_STORY_CONTRIBUTORS_META, $normalised);
+    // Write the byline first so save_post hooks triggered by an author change
+    // observe the new credit list. Persist even [] to suppress legacy fallback.
+    // If WordPress rejects an author change, restore the previous metadata.
+    $had_contributors = metadata_exists('post', $post_id, BYLINE_STORY_CONTRIBUTORS_META);
+    $previous_contributors = $had_contributors ? get_post_meta($post_id, BYLINE_STORY_CONTRIBUTORS_META, true) : [];
+    update_post_meta($post_id, BYLINE_STORY_CONTRIBUTORS_META, $normalised);
+
+    if ($changing_primary) {
+        $updated = wp_update_post(['ID' => $post_id, 'post_author' => $next_primary], true);
+        if (is_wp_error($updated) || !$updated) {
+            if ($had_contributors) {
+                update_post_meta($post_id, BYLINE_STORY_CONTRIBUTORS_META, $previous_contributors);
+            } else {
+                delete_post_meta($post_id, BYLINE_STORY_CONTRIBUTORS_META);
+            }
+            return is_wp_error($updated)
+                ? $updated
+                : new WP_Error('byline_primary_author_update_failed', 'The WordPress post author could not be changed.', ['status' => 500]);
+        }
     }
 
     do_action('byline_story_contributors_updated', $post_id, $normalised, $user_id);

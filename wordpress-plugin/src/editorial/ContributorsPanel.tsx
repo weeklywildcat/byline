@@ -127,7 +127,7 @@ export function ContributorsPanel({
       {actionError ? <Notice status="error" isDismissible={false}>{actionError}</Notice> : null}
 
       <p className="byline-editorial-muted">
-        Keep the primary WordPress author first. Guest contributors can be ordered alongside users; private account details stay private.
+        Removing the primary writer makes the first remaining WordPress writer the post author. With only guests or no writers, the WordPress owner stays internal.
       </p>
 
       {canEdit ? (
