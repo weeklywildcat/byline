@@ -252,6 +252,9 @@ function byline_activity_safe_enum($value, array $allowed): string
 function byline_activity_sanitize_context(array $context): array
 {
     $result = [];
+    foreach (['mcpTool', 'requestId'] as $field) {
+        if (isset($context[$field]) && is_string($context[$field]) && preg_match('/^[a-zA-Z0-9_.-]{1,80}$/', $context[$field])) { $result[$field] = $context[$field]; }
+    }
     $id_fields = [
         'objectId',
         'taskId',
@@ -307,7 +310,7 @@ function byline_activity_sanitize_context(array $context): array
         'objectType' => ['story', 'task', 'coverage', 'correction', 'media', 'game', 'event', 'design', 'newsletter', 'source', 'appointment', 'media-assignment'],
         'kind' => ['photo', 'video', 'audio', 'document', 'news', 'sports', 'opinion', 'breaking', 'design', 'newsletter',
             'gallery', 'graphic', 'other', 'interview', 'meeting', 'event', 'press-conference', 'game', 'performance', 'reporting'],
-        'source' => ['wordpress', 'worker', 'deploy', 'manual', 'system'],
+        'source' => ['wordpress', 'worker', 'deploy', 'manual', 'system', 'mcp'],
     ];
 
     foreach ($enum_fields as $field => $allowed) {
@@ -687,6 +690,7 @@ function byline_record_activity($story_id, $action, array $context = [], ?int $a
     if ($occurred_at === '') {
         $occurred_at = byline_activity_now();
     }
+    $context = array_merge($context, (array) ($GLOBALS['byline_remote_activity_context'] ?? []));
     $safe_context = byline_activity_sanitize_context($context);
     $summary = byline_activity_summary($action, $context);
     $actor_id = byline_activity_current_user_id($actor_id);

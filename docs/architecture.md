@@ -29,6 +29,11 @@ static public presentation.
   deployed separately and is excluded from the WordPress release archive. It is
   a consumer of the editorial workflow domain, not its owner.
 
+- The remote MCP Worker in `apps/mcp/` is another private domain consumer. It
+  uses per-user WordPress Application Passwords behind Cloudflare OAuth and typed
+  semantic adapters. It owns auth state, never newsroom records or public
+  rendering. See [MCP architecture and deployment](mcp.md).
+
 The plugin source lives under `wordpress-plugin/` while retaining its installed
 path and main file. Canonical GitHub releases still publish
 `weekly-wildcat-headless.zip`; canonical Byline APIs adapt to legacy CPTs,

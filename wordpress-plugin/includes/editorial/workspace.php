@@ -168,6 +168,7 @@ function byline_workspace_payload(int $story_id, array $access): array
         'appointments' => $reporting['appointments'],
         'reporting' => $reporting['summary'],
         'mediaAssignments' => $read('media', static function () use ($story_id, $access): array { return byline_workspace_media($story_id, $access); }, []),
+        'resourcesVersion' => function_exists('byline_resources_version') ? byline_resources_version($story_id) : '',
         'resources' => $read('resources', static function () use ($story_id): array { return byline_get_story_resources($story_id); }, []),
         // The audit trail names other people's work; participants who hold only an
         // assignment do not receive it.
@@ -222,7 +223,7 @@ function byline_editorial_rest_save_source(WP_REST_Request $request)
 function byline_editorial_rest_delete_source(WP_REST_Request $request)
 {
     $story_id = absint($request->get_param('id'));
-    $result = byline_story_source_delete($story_id, (string) $request->get_param('source'));
+    $result = byline_story_source_delete($story_id, (string) $request->get_param('source'), null, byline_editorial_rest_body($request)['expectedUpdatedAt'] ?? null);
     return is_wp_error($result) ? $result : byline_workspace_reporting_response($story_id);
 }
 
@@ -244,7 +245,7 @@ function byline_editorial_rest_save_appointment(WP_REST_Request $request)
 function byline_editorial_rest_delete_appointment(WP_REST_Request $request)
 {
     $story_id = absint($request->get_param('id'));
-    $result = byline_story_appointment_delete($story_id, (string) $request->get_param('appointment'));
+    $result = byline_story_appointment_delete($story_id, (string) $request->get_param('appointment'), null, byline_editorial_rest_body($request)['expectedUpdatedAt'] ?? null);
     return is_wp_error($result) ? $result : byline_workspace_reporting_response($story_id);
 }
 
@@ -271,7 +272,7 @@ function byline_editorial_rest_save_media_assignment(WP_REST_Request $request)
 function byline_editorial_rest_delete_media_assignment(WP_REST_Request $request)
 {
     $story_id = absint($request->get_param('id'));
-    $result = byline_media_assignment_delete($story_id, (string) $request->get_param('assignment'));
+    $result = byline_media_assignment_delete($story_id, (string) $request->get_param('assignment'), null, byline_editorial_rest_body($request)['expectedUpdatedAt'] ?? null);
     return is_wp_error($result) ? $result : byline_editorial_rest_media_assignments_response($story_id);
 }
 
@@ -357,6 +358,26 @@ function byline_workspace_schedule(string $from, string $to, bool $include_tasks
     return $out;
 }
 
+/** Bounded, authorized planning and native publication dates alongside reporting commitments. */
+function byline_workspace_story_dates(string $from, string $to, int $collection_id = 0): array
+{
+    $scope = $collection_id ? ['post__in' => byline_collection_can_view($collection_id) ? (byline_collection_story_ids($collection_id) ?: [0]) : [0]] : [];
+    $posts = get_posts($scope + ['post_type'=>'post','post_status'=>['draft','pending','future','publish','private'],'posts_per_page'=>200,'orderby'=>'modified','order'=>'DESC']);
+    $dates = [];
+    foreach ($posts as $post) {
+        $id = (int)$post->ID;
+        if (!byline_story_context_can_view($id)) { continue; }
+        $values = ['story-deadline' => byline_get_editorial_story_state($id)['deadline'] ?? '', 'planned-publication' => byline_get_editorial_planned_publish_at($id)];
+        if ($post->post_status === 'future') { $values['wordpress-scheduled'] = str_replace(' ','T',$post->post_date_gmt).'Z'; }
+        foreach ($values as $kind => $at) {
+            $day = $kind === 'story-deadline' ? $at : byline_story_site_day($at);
+            if (!$day || $day < $from || $day > $to) { continue; }
+            $dates[] = ['id'=>$kind.':'.$id,'storyId'=>$id,'title'=>$post->post_title,'kind'=>$kind,'at'=>$at,'day'=>$day];
+        }
+    }
+    return ['storyDates'=>$dates,'bounded'=>true,'storyCandidateLimit'=>200];
+}
+
 function byline_editorial_rest_schedule(WP_REST_Request $request)
 {
     $today = byline_story_site_today();
@@ -367,7 +388,8 @@ function byline_editorial_rest_schedule(WP_REST_Request $request)
     }
     $include_tasks = in_array((string) $request->get_param('includeTasks'), ['1', 'true'], true);
     return rest_ensure_response(['timezone' => byline_editorial_planning_timezone()->getName(), 'from' => $from, 'to' => $to]
-        + byline_workspace_schedule($from, $to, $include_tasks, null, absint($request->get_param('collectionId'))));
+        + byline_workspace_schedule($from, $to, $include_tasks, null, absint($request->get_param('collectionId')))
+        + byline_workspace_story_dates($from, $to, absint($request->get_param('collectionId'))));
 }
 
 add_action('rest_api_init', static function (): void {

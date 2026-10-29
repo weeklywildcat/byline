@@ -206,6 +206,7 @@ function byline_editorial_planning_bool($value): bool
 function byline_editorial_sanitize_planning_filters(array $filters): array
 {
     $clean = [];
+    if (!empty($filters['sectionId'])) { $clean['sectionId'] = absint($filters['sectionId']); }
     if (!empty($filters['collectionId'])) { $clean['collectionId'] = absint($filters['collectionId']); }
 
     $status = $filters['status'] ?? $filters['workflowStatus'] ?? ($filters['workflow'] ?? '');
@@ -454,6 +455,7 @@ function byline_editorial_planning_query_args(array $filters = [], ?int $user_id
         'suppress_filters' => false,
     ];
 
+    if (!empty($filters['sectionId'])) { $args['category__in'] = [absint($filters['sectionId'])]; }
     if (!empty($filters['collectionId'])) {
         $collection_id = absint($filters['collectionId']);
         $args['post__in'] = function_exists('byline_collection_can_view') && byline_collection_can_view($collection_id)
@@ -700,8 +702,8 @@ function byline_editorial_get_planning_collection(array $filters = [], ?int $use
     $filters = byline_editorial_sanitize_planning_filters($filters);
 
     return [
-        'items' => $items,
-        'count' => count($items),
+        'items' => array_slice($items, 0, (int) ($filters['limit'] ?? 50)),
+        'count' => min(count($items), (int) ($filters['limit'] ?? 50)),
         'hasMore' => count($items) >= (int) ($filters['limit'] ?? 50),
         'filters' => $filters,
     ];

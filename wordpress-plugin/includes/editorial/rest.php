@@ -327,7 +327,7 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
         }
     }
 
-    foreach (['plannedPublishAt', 'media', 'visualRequest', 'coverageIds', 'contributors'] as $field) {
+    foreach (['plannedPublishAt', 'media', 'visualRequest', 'coverageIds', 'contributors', 'sectionIds'] as $field) {
         if (array_key_exists($field, $body)) {
             $extended[$field] = $body[$field];
         }
@@ -366,6 +366,15 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
         && byline_editorial_sanitize_planned_publish_at($extended['plannedPublishAt']) === ''
         && trim((string) $extended['plannedPublishAt']) !== '') {
         return new WP_Error('byline_editorial_invalid_planned_publish', 'Use a valid planned publication date/time.', ['status' => 400]);
+    }
+
+    if (array_key_exists('sectionIds', $extended)) {
+        $taxonomy = get_taxonomy('category');
+        if (!current_user_can($taxonomy->cap->assign_terms)) { return new WP_Error('byline_sections_forbidden','You cannot assign sections.',['status'=>403]); }
+        if (!is_array($extended['sectionIds']) || count($extended['sectionIds']) > 30) { return new WP_Error('byline_sections_invalid','Choose up to 30 existing sections.',['status'=>400]); }
+        foreach ($extended['sectionIds'] as $section_id) {
+            if (!is_int($section_id) || $section_id < 1 || !term_exists($section_id,'category')) { return new WP_Error('byline_sections_invalid','Choose existing section IDs.',['status'=>400]); }
+        }
     }
 
     // Validate the shape and object references for every grouped field before
@@ -554,6 +563,13 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
         $rollbacks[] = static function () use ($post_id, $previous_contributors) {
             return !is_wp_error(byline_set_story_contributors($post_id, $previous_contributors));
         };
+    }
+
+    if (array_key_exists('sectionIds', $extended)) {
+        $previous_sections = wp_get_post_categories($post_id);
+        $saved_sections = wp_set_post_categories($post_id,$extended['sectionIds']);
+        if (is_wp_error($saved_sections)) { return $fail($saved_sections); }
+        $rollbacks[] = static function () use ($post_id,$previous_sections) { return !is_wp_error(wp_set_post_categories($post_id,$previous_sections)); };
     }
 
     if ($changes !== [] || $extended !== []) {
@@ -1161,6 +1177,7 @@ function byline_editorial_rest_set_media_featured(WP_REST_Request $request)
 /** @return array<string,mixed> */
 function byline_editorial_rest_task_item(array $task): array
 {
+    $task['version'] = function_exists('byline_task_version') ? byline_task_version((int) $task['id']) : '';
     $task['assignee'] = byline_editorial_rest_user_person(absint($task['assigneeId'] ?? 0));
     $task['createdBy'] = byline_editorial_rest_user_person(absint($task['creatorId'] ?? 0));
     $task['storyId'] = absint($task['storyId'] ?? 0) ?: null;

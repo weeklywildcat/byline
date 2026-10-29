@@ -17,6 +17,9 @@ poll_files=(
   includes/polls/post-type.php
   includes/polls/model.php
   includes/polls/rest.php
+  includes/polls/editorial-rest.php
+  includes/editorial/articles.php
+  includes/editorial/remote-access.php
   includes/polls/admin.php
   includes/polls/migration.php
   includes/polls/cli.php

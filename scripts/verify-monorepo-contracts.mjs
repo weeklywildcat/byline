@@ -48,6 +48,10 @@ for (const retired of ["POLLS_DB", "poll_votes", "poll_options", "voter_key", "S
 const outputRoot = "apps/web/out";
 const forbiddenPublicValues = [
   "BYLINE_TEST_SECRET_DO_NOT_EXPORT",
+  "CREDENTIAL_KEYS",
+  "_byline_receipt_",
+  "_byline_remote_lock_",
+  "X-Byline-MCP-Tool",
   "BYLINE_DEPLOYMENT_HOOK_URL",
   "BYLINE_DISCORD_BRIDGE_SECRET",
   "WWH_DISCORD_BRIDGE_SECRET",
