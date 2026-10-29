@@ -171,6 +171,11 @@ function get_post_meta(int $post_id, string $key, bool $single = false)
     global $byline_contributor_test_meta;
     return $byline_contributor_test_meta[$post_id][$key] ?? '';
 }
+function metadata_exists(string $type, int $post_id, string $key): bool
+{
+    global $byline_contributor_test_meta;
+    return $type === 'post' && array_key_exists($key, $byline_contributor_test_meta[$post_id] ?? []);
+}
 function update_post_meta(int $post_id, string $key, $value): void
 {
     global $byline_contributor_test_meta;
@@ -253,6 +258,9 @@ function wp_insert_post(array $data, bool $wp_error = false)
 
 function wp_update_post(array $data, bool $wp_error = false)
 {
+    if (!empty($GLOBALS['byline_contributor_test_fail_author_update']) && array_key_exists('post_author', $data)) {
+        return new WP_Error('test_author_update_failed', 'WordPress could not update the author.');
+    }
     $post = get_post(absint($data['ID'] ?? 0));
     if (!$post instanceof WP_Post) {
         return $wp_error ? new WP_Error('not_found', 'Post not found.') : 0;
@@ -339,6 +347,7 @@ $byline_contributor_test_capabilities = [
     'publish_posts' => true,
     'user:1:edit_posts' => true,
     'user:1:edit_post' => [10 => true],
+    'user:1:edit_others_posts' => true,
     'user:1:manage_byline' => true,
     'user:1:publish_posts' => true,
 ];
@@ -422,7 +431,7 @@ $available_guests = array_column(byline_list_available_guests(1), 'name');
 contributors_test_assert(in_array('Alex Smith', $available_guests, true), 'Existing guests must be offered in the story sidebar.');
 
 // Old stories have no contributor meta and resolve to post_author without a
-// migration write. New lists retain that primary user while preserving order.
+// migration write. Explicit lists can reassign the primary WordPress author.
 $fallback = byline_get_story_contributor_entries(10);
 contributors_test_assert($fallback === [['type' => 'user', 'id' => 1]], 'Old single-author stories must fall back to post_author.');
 contributors_test_assert(!array_key_exists(BYLINE_STORY_CONTRIBUTORS_META, $byline_contributor_test_meta[10] ?? []), 'Reading legacy authors must not write contributor metadata.');
@@ -433,11 +442,10 @@ $explicit = byline_set_story_contributors(10, [
 ], 1);
 contributors_test_assert(!is_wp_error($explicit), 'An editor should be able to save ordered story contributors.');
 contributors_test_assert($explicit === [
-    ['type' => 'user', 'id' => 1],
     ['type' => 'guest', 'id' => $guest_id],
     ['type' => 'user', 'id' => 2],
-], 'Saving contributors must retain the primary author and deterministic order.');
-contributors_test_assert($byline_contributor_test_posts[10]->post_author === 1, 'Contributor editing must never rewrite post_author.');
+], 'Removing the primary writer must not silently re-add them.');
+contributors_test_assert($byline_contributor_test_posts[10]->post_author === 2, 'The first remaining WordPress writer must become post_author.');
 
 $ordered = byline_set_story_contributors(10, [
     ['type' => 'user', 'id' => 2],
@@ -449,6 +457,34 @@ contributors_test_assert($ordered === [
     ['type' => 'guest', 'id' => $guest_id],
     ['type' => 'user', 'id' => 1],
 ], 'An explicit contributor list must preserve editor-selected order.');
+
+$byline_contributor_test_capabilities['user:1:edit_others_posts'] = false;
+$blocked_reassignment = byline_set_story_contributors(10, [['type' => 'user', 'id' => 1]], 1);
+contributors_test_assert(is_wp_error($blocked_reassignment) && $blocked_reassignment->get_error_code() === 'byline_primary_author_forbidden', 'A writer must not be able to transfer WordPress ownership without editor permission.');
+contributors_test_assert(byline_get_story_contributor_entries(10) === $ordered && get_post(10)->post_author === 2, 'A forbidden reassignment must leave both the byline and WordPress author unchanged.');
+$byline_contributor_test_capabilities['user:1:edit_others_posts'] = true;
+
+$byline_contributor_test_fail_author_update = true;
+$failed_reassignment = byline_set_story_contributors(10, [['type' => 'user', 'id' => 1]], 1);
+contributors_test_assert(is_wp_error($failed_reassignment) && $failed_reassignment->get_error_code() === 'test_author_update_failed', 'A WordPress author update failure must reach the editor.');
+contributors_test_assert(byline_get_story_contributor_entries(10) === $ordered && get_post(10)->post_author === 2, 'A failed WordPress author update must roll back the byline.');
+$byline_contributor_test_fail_author_update = false;
+
+$reassigned = byline_set_story_contributors(10, [['type' => 'guest', 'id' => $guest_id], ['type' => 'user', 'id' => 1]], 1);
+contributors_test_assert($reassigned === [['type' => 'guest', 'id' => $guest_id], ['type' => 'user', 'id' => 1]] && get_post(10)->post_author === 1, 'Removing the primary author should promote the next WordPress user even after a guest.');
+
+$guest_only = byline_set_story_contributors(10, [['type' => 'guest', 'id' => $guest_id]], 1);
+contributors_test_assert($guest_only === [['type' => 'guest', 'id' => $guest_id]] && get_post(10)->post_author === 1, 'A guest-only byline must leave the WordPress owner internal without crediting them.');
+contributors_test_assert(array_column(byline_get_story_contributors(10), 'name') === ['Guest alert(1)'], 'The public byline must not restore an unselected WordPress author.');
+
+$empty = byline_set_story_contributors(10, [], 1);
+contributors_test_assert($empty === [] && metadata_exists('post', 10, BYLINE_STORY_CONTRIBUTORS_META), 'Clearing every writer must persist an explicit empty list.');
+contributors_test_assert(byline_get_story_contributor_entries(10) === [], 'Reading an intentionally empty byline must not fall back to post_author.');
+contributors_test_assert(get_post(10)->post_author === 1, 'Clearing writers must keep the WordPress post owner.');
+
+byline_set_story_contributors(10, [['type' => 'user', 'id' => 2]], 1);
+byline_set_story_contributors(10, $ordered, 1);
+contributors_test_assert(get_post(10)->post_author === 2, 'Restoring a user byline should synchronize the WordPress primary author.');
 
 $public_contributors = byline_get_post_contributors(10);
 contributors_test_assert(array_column($public_contributors, 'name') === ['Second Writer', 'Guest alert(1)', 'Primary Writer'], 'Public contributors must resolve in persisted order.');

@@ -553,15 +553,24 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
     }
 
     if (array_key_exists('contributors', $extended)) {
-        $previous_contributors = function_exists('byline_get_story_contributor_entries')
-            ? byline_get_story_contributor_entries($post_id, false)
-            : [];
+        $had_contributors = metadata_exists('post', $post_id, BYLINE_STORY_CONTRIBUTORS_META);
+        $previous_contributors = $had_contributors ? get_post_meta($post_id, BYLINE_STORY_CONTRIBUTORS_META, true) : [];
+        $previous_author = absint(get_post($post_id)->post_author ?? 0);
         $contributors_result = byline_set_story_contributors($post_id, $extended['contributors']);
         if (is_wp_error($contributors_result)) {
             return $fail($contributors_result);
         }
-        $rollbacks[] = static function () use ($post_id, $previous_contributors) {
-            return !is_wp_error(byline_set_story_contributors($post_id, $previous_contributors));
+        $rollbacks[] = static function () use ($post_id, $had_contributors, $previous_contributors, $previous_author) {
+            if ($had_contributors) {
+                update_post_meta($post_id, BYLINE_STORY_CONTRIBUTORS_META, $previous_contributors);
+            } else {
+                delete_post_meta($post_id, BYLINE_STORY_CONTRIBUTORS_META);
+            }
+            if (absint(get_post($post_id)->post_author ?? 0) !== $previous_author) {
+                $restored = wp_update_post(['ID' => $post_id, 'post_author' => $previous_author], true);
+                return !is_wp_error($restored) && (bool) $restored;
+            }
+            return true;
         };
     }
 

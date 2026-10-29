@@ -27,6 +27,18 @@ describe("public editorial surfaces", () => {
     expect(contributors[1]).toMatchObject({ role: "Community contributor", socials: { website: "https://jordan.example.test" } });
   });
 
+  it("honors removed WordPress authors and explicitly cleared bylines", () => {
+    const post = publicEditorialPosts[0];
+    const guestOnly = Array.isArray(post.contributors) ? post.contributors.slice(1) : [];
+    expect(guestOnly).toHaveLength(1);
+
+    expect(getPostContributors({ ...post, contributors: guestOnly }).map((person) => person.name)).toEqual(["Jordan Guest"]);
+    expect(getPostContributors({ ...post, contributors: [] })).toEqual([]);
+    expect(getPostContributors({ ...post, contributors: undefined }).map((person) => person.name)).toEqual(["Alex Rivera"]);
+    expect(getNewsArticleSchema({ ...post, contributors: guestOnly }).author).toMatchObject({ name: "Jordan Guest" });
+    expect(JSON.stringify(getNewsArticleSchema({ ...post, contributors: [] }).author)).not.toContain("Alex Rivera");
+  });
+
   it("keeps one NewsArticle author backwards-compatible and uses an array for co-bylines", () => {
     const singleAuthorPost = { ...publicEditorialPosts[0], contributors: undefined };
     const singleSchema = getNewsArticleSchema(singleAuthorPost);
