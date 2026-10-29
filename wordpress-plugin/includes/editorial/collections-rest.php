@@ -5,9 +5,10 @@ function byline_collections_permission(): bool { return current_user_can('edit_p
 function byline_collection_rest_list(WP_REST_Request $request)
 {
     $page = max(1, absint($request->get_param('page') ?? 1));
+    $bounded = $request->get_param('bounded') === '1';
     $query = new WP_Query(['post_type' => BYLINE_COLLECTION_POST_TYPE, 'post_status' => 'private', 'posts_per_page' => 100,
         'paged' => $page, 'orderby' => 'modified', 'order' => 'DESC', 's' => byline_task_text($request->get_param('search') ?? '', 100)]);
-    return rest_ensure_response(['collections' => array_map(static function ($p) { $item = byline_collection_item((int) $p->ID); $item['storyIdsTruncated'] = count($item['storyIds']) > 100; $item['storyIds'] = array_slice($item['storyIds'],0,100); return $item; }, $query->posts),
+    return rest_ensure_response(['collections' => array_map(static function ($p) use ($bounded) { $item = byline_collection_item((int) $p->ID); $item['storyIdsTruncated'] = $bounded && count($item['storyIds']) > 100; if ($bounded) { $item['storyIds'] = array_slice($item['storyIds'],0,100); } return $item; }, $query->posts),
         'total' => (int) $query->found_posts, 'pages' => (int) $query->max_num_pages,
         'people' => array_map(static function ($person) { return $person + ['imageUrl' => $person['avatarUrl'] ?? '']; }, byline_editorial_rest_task_people()), 'timezone' => byline_editorial_planning_timezone()->getName(),
         'canCreate' => current_user_can('edit_others_posts')]);
@@ -16,21 +17,26 @@ function byline_collection_rest_detail(WP_REST_Request $request)
 {
     $id = absint($request['id']);
     if (!byline_collection_can_view($id)) { return byline_collection_error('Collection not found.', 404); }
+    $bounded = $request->get_param('bounded') === '1';
     $work = [];
     $story_ids = byline_collection_story_ids($id);
     foreach (array_slice($story_ids,0,50) as $story_id) {
         $access = byline_story_context($story_id);
         $work[] = ['storyId'=>$story_id,'tasks'=>byline_workspace_tasks($story_id,$access),'production'=>byline_workspace_media($story_id,$access)] + byline_workspace_reporting($story_id,$access);
     }
+    $story_limit = $bounded ? 100 : count($story_ids);
     $collection = byline_collection_item($id);
-    $collection['storyIds'] = array_slice($story_ids,0,100);
-    $collection['storyIdsTruncated'] = count($story_ids)>100;
+    $collection['storyIds'] = array_slice($story_ids,0,$story_limit);
+    $collection['storyIdsTruncated'] = $bounded && count($story_ids)>100;
     $interview_ids = byline_collection_child_ids($id,BYLINE_INTERVIEW_POST_TYPE);
-    return rest_ensure_response(['storyLimit'=>100,'hasMoreStories'=>count($story_ids)>100,'interviewLimit'=>100,'hasMoreInterviews'=>count($interview_ids)>100,'work'=>$work,'workLimit'=>50,'hasMoreWork'=>count($story_ids)>50,'collection' => $collection, 'appointments' => byline_collection_story_appointments($id),
-        'stories' => array_map(static function ($story) { return byline_collection_story_row($story); }, array_slice($story_ids,0,100)),
-        'interviews' => array_map('byline_interview_item', array_slice($interview_ids,0,100)),
+    $interview_limit = $bounded ? 100 : count($interview_ids);
+    $resource_ids = byline_relation_ids($id,'resource');
+    if ($bounded) { $resource_ids = array_slice($resource_ids,0,100); }
+    return rest_ensure_response(['storyLimit'=>$story_limit,'hasMoreStories'=>$bounded && count($story_ids)>100,'interviewLimit'=>$interview_limit,'hasMoreInterviews'=>$bounded && count($interview_ids)>100,'work'=>$work,'workLimit'=>50,'hasMoreWork'=>count($story_ids)>50,'collection' => $collection, 'appointments' => byline_collection_story_appointments($id,$bounded?100:0),
+        'stories' => array_map(static function ($story) { return byline_collection_story_row($story); }, array_slice($story_ids,0,$story_limit)),
+        'interviews' => array_map('byline_interview_item', array_slice($interview_ids,0,$interview_limit)),
         'tasks' => array_map('byline_editorial_rest_task_item', byline_list_tasks(['collectionId' => $id, 'limit' => 200])),
-        'resources' => array_values(array_filter(array_map('byline_collection_resource_item', array_slice(byline_relation_ids($id, 'resource'),0,100)))),
+        'resources' => array_values(array_filter(array_map('byline_collection_resource_item', $resource_ids))),
         'activity' => byline_collection_activity_items($id)]);
 }
 function byline_collection_rest_create_story(WP_REST_Request $request)

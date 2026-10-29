@@ -1047,7 +1047,9 @@ read(
   }),
   "/editorial/collections",
   async ({ query: search, ...v }, ctx) =>
-    ctx.wp.request(query("/byline/v1/editorial/collections", { ...v, search })),
+    ctx.wp.request(
+      query("/byline/v1/editorial/collections", { ...v, search, bounded: 1 }),
+    ),
 );
 read(
   "collection.get",
@@ -1056,7 +1058,8 @@ read(
   z.strictObject({ collectionId: s.id }),
   s.collectionDetail,
   "/editorial/collections/{id}",
-  async (v, ctx) => ctx.wp.request(collectionPath(v.collectionId)),
+  async (v, ctx) =>
+    ctx.wp.request(query(collectionPath(v.collectionId), { bounded: 1 })),
 );
 const collectionFields = {
   name: s.title,
@@ -1174,7 +1177,9 @@ for (const action of ["add_stories", "remove_stories"] as const)
         async (item) => {
           if (v.dryRun) {
             const detail = s.collectionDetail.parse(
-              await ctx.wp.request(collectionPath(v.collectionId)),
+              await ctx.wp.request(
+                query(collectionPath(v.collectionId), { bounded: 1 }),
+              ),
             );
             const w = await getWorkspace(ctx, item.id);
             if (!detail.collection.canEdit || w.capabilities.role !== "manager")
@@ -1202,7 +1207,8 @@ read(
   z.strictObject({ collectionId: s.id }),
   z.object({ interviews: z.array(s.interview) }),
   "/editorial/collections/{id}",
-  async (v, ctx) => ctx.wp.request(collectionPath(v.collectionId)),
+  async (v, ctx) =>
+    ctx.wp.request(query(collectionPath(v.collectionId), { bounded: 1 })),
 );
 const interviewFields = {
   interviewee: s.title,

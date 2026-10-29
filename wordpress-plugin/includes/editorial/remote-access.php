@@ -112,7 +112,9 @@ function byline_remote_dispatch($override, WP_REST_Request $request, string $rou
         if ($previous) {
             if (($previous['fingerprint'] ?? '') !== $fingerprint || empty($previous['readRoute'])) { return new WP_Error('byline_idempotency_conflict', 'This request key is already used or its outcome is uncertain. Inspect the original work.', ['status'=>409]); }
             // Re-read through current object permissions. Receipts never cache private payloads.
-            $replay = rest_do_request(new WP_REST_Request('GET', $previous['readRoute']));
+            $replay_request = new WP_REST_Request('GET', $previous['readRoute']);
+            $replay_request->set_query_params(['bounded'=>'1']);
+            $replay = rest_do_request($replay_request);
             if ($replay->is_error()) { return $replay; }
             $data = $replay->get_data();
             foreach ($previous['ids'] ?? [] as $field => $value) {

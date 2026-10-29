@@ -90,6 +90,13 @@ try {
  // Persist only sanitized read payloads for SDK adapter contract tests; no credentials.
  $fixtures=['workspace'=>$call('/editorial/stories/'.$id.'/workspace')->get_data(),'home'=>$call('/editorial/home')->get_data(),'planning'=>$call('/editorial/planning')->get_data(),'collection'=>$detail,'schedule'=>$call('/editorial/schedule?from=2026-10-01&to=2026-12-01&includeTasks=1')->get_data(),'notes'=>$call('/editorial/stories/'.$id.'/notes')->get_data(),'presets'=>$call('/editorial/presets')->get_data(),'feedback'=>$call('/admin/feedback')->get_data(),'health'=>$call('/admin/content-health')->get_data(),'activity'=>$call('/editorial/stories/'.$id.'/activity')->get_data()];
  file_put_contents(__DIR__.'/../.mcp-contracts.json',wp_json_encode($fixtures,JSON_PRETTY_PRINT));
+ // Bounded MCP reads must not truncate existing UI clients' Collection detail.
+ $large=$call('/editorial/collections','POST',['name'=>'Large MCP coverage'])->get_data();$posts[]=$large['id'];
+ for($n=0;$n<101;$n++) { $story_id=wp_insert_post(['post_type'=>'post','post_status'=>'draft','post_author'=>$editor,'post_title'=>'Bounded story '.$n]);$posts[]=$story_id;byline_relation_set($large['id'],'story',$story_id,true); }
+ $normal=$call('/editorial/collections/'.$large['id'])->get_data();
+ $bounded=$call('/editorial/collections/'.$large['id'].'?bounded=1')->get_data();
+ $assert(count($normal['stories'])===101 && count($normal['collection']['storyIds'])===101,'Existing UI detail keeps its complete Collection membership.');
+ $assert(count($bounded['stories'])===100 && count($bounded['collection']['storyIds'])===100 && $bounded['hasMoreStories'] && $bounded['collection']['storyIdsTruncated'],'MCP gets explicit bounded Collection results and truncation flags.');
  echo "MCP WordPress integration passed ($checks checks).\n";
 } finally {
  wp_set_current_user(1);foreach(array_reverse($posts) as $id){wp_delete_post($id,true);}foreach($users as $id){wp_delete_user($id);}update_option('timezone_string',$old_timezone);

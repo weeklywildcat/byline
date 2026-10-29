@@ -20,7 +20,7 @@ The canonical plugin extensions are available to other authenticated clients too
 - `/editorial/story-plans` creates a canonical draft/preset and explicitly reports each setup outcome. A setup failure preserves the draft, with per-step `ok` and HTTP status; it does not silently claim a complete plan.
 - `/editorial/articles/{id}` and its named mutation routes guard content/publication writes and delegate to WordPress's native posts controller.
 - Task, link and Collection version tokens, conditional REST writes, bounded idempotency receipts, delete preconditions and MCP activity context extend existing domains.
-- The schedule includes distinctly typed story deadlines, planned publication and native WordPress schedules. Collection detail includes up to 50 stories' authorized reporting/work aggregates, with `hasMoreWork`.
+- The schedule includes distinctly typed story deadlines, planned publication and native WordPress schedules. Collection detail adds up to 50 stories' authorized reporting/work aggregates, with `hasMoreWork`. MCP selects `bounded=1` for Collection reads; existing UI clients retain their original detail results.
 - `/editorial/polls` exposes protected poll definitions and aggregate results only.
 
 ## Authentication and consent
