@@ -7,7 +7,7 @@ export interface ToolContext {
   wp: WordPress;
   access: Access;
   requestId: string;
-  disconnect: () => Promise<{ revoked: true; credentialRevoked: boolean }>;
+  disconnect: () => Promise<{ revoked: true }>;
 }
 export interface ToolDefinition {
   name: string;
@@ -159,10 +159,10 @@ read(
 write(
   "byline.disconnect",
   "Disconnect this Byline connection",
-  "Permanently revoke this connection and its WordPress Application Password. Other client connections remain separate. This connection stops working immediately; WordPress cleanup retries after an outage.",
+  "Permanently revoke this WordPress OAuth connection and all of its access and refresh tokens. Other client connections remain separate. Access stops immediately.",
   empty,
-  z.object({ revoked: z.literal(true), credentialRevoked: z.boolean() }),
-  "OAuth connection vault",
+  z.object({ revoked: z.literal(true) }),
+  "WordPress OAuth grant",
   async (_, ctx) => ctx.disconnect(),
   {
     destructive: true,

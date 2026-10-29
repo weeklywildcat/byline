@@ -11,6 +11,7 @@ out/
 apps/web/test-results/
 wordpress-plugin/test-results/
 node_modules/
+vendor/
 wordpress/
 public/_wordpress-media/
 apps/web/public/_wordpress-media/

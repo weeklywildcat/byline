@@ -26,7 +26,7 @@
     "test:discord": "npm run test --workspace @byline/discord-bot",
     "test:e2e": "npm run test:e2e:wp71",
     "test:e2e:wp71": "npm run test:e2e:primary --workspace @byline/wordpress-plugin",
-    "build": "npm run build:frontend && npm run build:plugin && npm run build:discord && npm run build:mcp",
+    "build": "npm run build:frontend && npm run build:plugin && npm run build:discord",
     "build:frontend": "npm run build --workspace @byline/web",
     "build:cloudflare": "node scripts/build-cloudflare.mjs",
     "build:plugin": "npm run build --workspace @byline/wordpress-plugin",
@@ -35,12 +35,12 @@
     "story-presentation": "node scripts/story-presentation.mjs",
     "verify:contracts": "node scripts/verify-monorepo-contracts.mjs && node scripts/verify-updater-transition.mjs && node scripts/verify-shared-style-contracts.mjs && node scripts/verify-editor-canvas-contract.mjs && node --test scripts/prepare-release.test.mjs scripts/story-presentation.test.mjs && npm run verify:mcp-catalog",
     "test:frontend:snapshot-build": "npm run test:snapshot-build --workspace @byline/web",
-    "typecheck:mcp": "npm run typecheck --workspace @byline/mcp",
-    "test:mcp": "npm run test --workspace @byline/mcp",
-    "build:mcp": "npm run build --workspace @byline/mcp",
-    "mcp:catalog": "npm run catalog --workspace @byline/mcp",
+    "typecheck:mcp": "npm run typecheck --workspace @byline/mcp-contracts",
+    "test:mcp": "npm run test --workspace @byline/mcp-contracts",
+    "build:mcp": "bash scripts/build-plugin-mcp.sh",
+    "mcp:catalog": "npm run catalog --workspace @byline/mcp-contracts",
     "test:mcp:wordpress": "bash scripts/test-mcp-wordpress.sh",
-    "verify:mcp-catalog": "npm run catalog --workspace @byline/mcp -- --check"
+    "verify:mcp-catalog": "npm run verify --workspace @byline/mcp-contracts"
   },
   "devDependencies": {
     "@types/react": "19.2.18",

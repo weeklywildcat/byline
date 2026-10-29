@@ -6,33 +6,20 @@ import {
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { createServer } from "../src/server";
 import { tools, type ToolContext } from "../src/catalog";
-import { WordPress } from "../src/wordpress";
-import type { Env } from "../src/types";
 import { BylineError } from "../src/errors";
-export const env = {
-  PUBLIC_URL: "https://mcp.example.test",
-  WORDPRESS_URL: "https://cms.example.test",
-  APPLICATION_ID: "cf2276ae-6bbb-4f7e-ae25-1b4929461791",
-  ALLOWED_ORIGINS: "",
-  ACTIVE_KEY_ID: "v1",
-  CREDENTIAL_KEYS: JSON.stringify({ v1: btoa("a".repeat(32)) }),
-} as Env;
 export function context(
   fetcher: typeof fetch = vi.fn(async () => Response.json({})) as typeof fetch,
   editor = true,
 ): ToolContext {
   return {
-    wp: new WordPress(
-      env,
-      {
-        username: "actor",
-        password: "SECRET_APP_PASSWORD",
-        userId: 7,
-        uuid: crypto.randomUUID(),
-      },
-      "test-request",
-      fetcher,
-    ),
+    wp: {request: async (path, method = "GET", body) => {
+      const response=await fetcher(`https://cms.example.test/wp-json${path}`, {
+        method, body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const raw=await response.json() as {data?:{current?:{version?:string}}};
+      if (!response.ok) throw new BylineError(response.status === 403 ? "forbidden" : response.status === 409 ? "conflict" : "upstream_unavailable", response.status, raw.data?.current);
+      return raw;
+    }},
     requestId: "test-request",
     access: {
       user: { id: 7, name: "Connected person" },
@@ -50,7 +37,7 @@ export function context(
         canReadPolls: editor,
       },
     },
-    disconnect: async () => ({ revoked: true, credentialRevoked: true }),
+    disconnect: async () => ({ revoked: true }),
   };
 }
 const clients: Client[] = [];

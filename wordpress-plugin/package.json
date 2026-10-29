@@ -3,7 +3,7 @@
   "version": "0.3.60",
   "private": true,
   "scripts": {
-    "build": "wp-scripts build",
+    "build": "wp-scripts build && bash ../scripts/build-plugin-mcp.sh",
     "start": "wp-scripts start",
     "test": "vitest run",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
