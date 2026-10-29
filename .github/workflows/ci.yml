@@ -81,6 +81,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
+          tools: composer:v2
 
       - name: Install workspace dependencies
         run: npm ci
@@ -120,8 +121,6 @@ jobs:
         run: |
           npm run build:plugin
           npm run build:discord
-          npm run build:mcp
-          npm run test:worker --workspace @byline/mcp
 
 
       - name: Verify compatibility and updater transition
@@ -154,6 +153,12 @@ jobs:
 
       - name: Install workspace dependencies
         run: npm ci
+
+      - name: Set up PHP for the bundled MCP runtime
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          tools: composer:v2
 
       - name: Build plugin assets
         run: npm run build:plugin

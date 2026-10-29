@@ -1,0 +1,5 @@
+{
+  "name": "byline/php-build-tools",
+  "require": { "humbug/php-scoper": "^0.18.18" },
+  "config": { "allow-plugins": false, "platform": { "php": "8.2.0" } }
+}
