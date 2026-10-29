@@ -1,6 +1,6 @@
 {
   "name": "@byline/wordpress-plugin",
-  "version": "0.3.60",
+  "version": "0.3.61",
   "private": true,
   "scripts": {
     "build": "wp-scripts build && bash ../scripts/build-plugin-mcp.sh",
