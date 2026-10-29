@@ -117,6 +117,7 @@ function byline_collection_item(int $id): array
     }
     $tasks = byline_list_tasks(['collectionId' => $id, 'state' => 'open', 'limit' => 200]);
     return [
+        'version' => function_exists('byline_collection_version') ? byline_collection_version($id) : '',
         'id' => $id, 'name' => $post->post_title, 'brief' => metadata_exists('post', $id, '_byline_collection_brief') ? (string) get_post_meta($id, '_byline_collection_brief', true) : $post->post_content,
         'type' => $get('type') ?: 'other', 'status' => $get('status') ?: 'planning',
         'lead' => byline_editorial_rest_user_person((int) $get('lead')),

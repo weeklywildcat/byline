@@ -120,6 +120,8 @@ jobs:
         run: |
           npm run build:plugin
           npm run build:discord
+          npm run build:mcp
+          npm run test:worker --workspace @byline/mcp
 
 
       - name: Verify compatibility and updater transition

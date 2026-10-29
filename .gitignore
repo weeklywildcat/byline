@@ -20,3 +20,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Disposable WordPress MCP contract test payloads.
+wordpress-plugin/tests/.mcp-contracts.json

@@ -35,7 +35,7 @@ function byline_collection_schedule(string $from, string $to, int $collection_id
 function byline_collection_story_appointments(int $collection_id): array
 {
     $result = [];
-    foreach (byline_collection_story_ids($collection_id) as $story) {
+    foreach (array_slice(byline_collection_story_ids($collection_id),0,100) as $story) {
         $access = byline_story_context($story);
         foreach (byline_story_appointments($story) as $appointment) {
             if (!$access['manage'] && !in_array($access['user'], $appointment['assigneeIds'], true)) { continue; }
