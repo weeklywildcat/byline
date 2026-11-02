@@ -257,6 +257,9 @@ function byline_deployment_status(): array
     return $status;
 }
 
+/** The longest a queued deploy can be pushed back by later saves, in seconds. */
+const BYLINE_DEPLOYMENT_MAX_DEFER = 120;
+
 /**
  * Enqueue or coalesce the durable deployment job for one expected revision.
  *
@@ -274,6 +277,7 @@ function byline_deployment_enqueue_job(string $reason, int $expected_revision, i
         'reason' => $reason,
         'expectedRevision' => $expected_revision,
         'requestedAt' => gmdate(DATE_ATOM),
+        'firstQueuedAt' => time(),
         'reasons' => [$reason],
     ];
     $job = byline_deployment_job_internal();
@@ -281,6 +285,11 @@ function byline_deployment_enqueue_job(string $reason, int $expected_revision, i
 
     if ($job && in_array($job['status'], ['queued', 'retry_waiting'], true)) {
         $old_payload = is_array($job['payload'] ?? null) ? $job['payload'] : [];
+        // Each save pushes the deploy back, so a steady stream (live coverage)
+        // could postpone it forever. Never defer past the first request + cap.
+        $first_queued_at = absint($old_payload['firstQueuedAt'] ?? 0) ?: (strtotime((string) ($old_payload['requestedAt'] ?? '')) ?: time());
+        $payload['firstQueuedAt'] = $first_queued_at;
+        $due_at = min($due_at, max(time(), $first_queued_at + BYLINE_DEPLOYMENT_MAX_DEFER));
         $payload['reasons'] = array_values(array_unique(array_filter(array_merge(
             (array) ($old_payload['reasons'] ?? []),
             [(string) ($old_payload['reason'] ?? ''), $reason]

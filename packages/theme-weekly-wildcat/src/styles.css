@@ -166,6 +166,18 @@
   line-height: 1.2;
 }
 
+:where(.byline-publication-preview) .home-story-live {
+  background: #c8102e;
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 4px 6px;
+  text-transform: uppercase;
+}
+
 :where(.byline-publication-preview) .home-story-category {
   color: var(--accent);
   font-size: 0.72rem;

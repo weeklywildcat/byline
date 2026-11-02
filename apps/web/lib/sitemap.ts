@@ -9,6 +9,7 @@ import {
   getPageIndexing,
   getPostContributors,
   getPostHref,
+  getPostLiveCoverage,
   getPostRouteParts,
   isGuestContributor,
   type WordPressCategory,
@@ -77,7 +78,11 @@ export function buildSitemapEntries(input: SitemapInput): SitemapEntry[] {
     entries.push(entry);
   };
 
-  const postDates = new Map(posts.map((post) => [post.id, modifiedAt(post, timeZone)]));
+  // A live story's newest update is newer than the post's own modified time.
+  const postDates = new Map(posts.map((post) => {
+    const newestUpdate = getPostLiveCoverage(post)?.updates[0]?.date;
+    return [post.id, latest([modifiedAt(post, timeZone), newestUpdate ? new Date(newestUpdate) : undefined])];
+  }));
   const latestModified = latest([...postDates.values()]);
 
   add({ url: url("/"), lastModified: latestModified, changeFrequency: "daily", priority: 1 });

@@ -6,6 +6,7 @@ import {
   getFeaturedMedia,
   getPostContributors,
   getPostHref,
+  getPostLiveCoverage,
   type WordPressPost
 } from "@/lib/wordpress";
 
@@ -66,6 +67,7 @@ export function StoryTeaser({ post, variant = "standard", showImage = true, show
       <div className="story-teaser-body">
         <ArticleByline contributors={contributors} category={showCategory ? category : null} date={post.date} />
         <h2>
+          {getPostLiveCoverage(post)?.status === "live" ? <span className="story-teaser-live">Live</span> : null}
           <a href={href}>{title}</a>
         </h2>
         {shouldShowExcerpt ? <div className="story-excerpt" dangerouslySetInnerHTML={{ __html: excerpt }} /> : null}

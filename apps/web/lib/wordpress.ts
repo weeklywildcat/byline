@@ -238,6 +238,8 @@ export type WordPressPost = {
   contributors?: unknown;
   bylines?: unknown;
   corrections?: unknown;
+  /** Live coverage (snapshot posts carry it here; REST posts inside `byline`). */
+  live?: unknown;
   _embedded?: {
     author?: WordPressAuthor[];
     "wp:featuredmedia"?: WordPressMedia[];
@@ -253,6 +255,26 @@ export type WordPressPostSettings = {
   contributors?: unknown;
   authors?: unknown;
   corrections?: unknown;
+  live?: unknown;
+};
+
+export type WordPressLiveUpdate = {
+  id: number;
+  title: string;
+  html: string;
+  date: string;
+  modified: string;
+  pinned: boolean;
+  author: string;
+  image: { url: string; alt: string; width: number | null; height: number | null; credit?: string } | null;
+};
+
+export type WordPressLiveCoverage = {
+  status: "live" | "ended";
+  startedAt: string;
+  endedAt: string;
+  /** Newest first. */
+  updates: WordPressLiveUpdate[];
 };
 
 export type WordPressCorrectionType = "correction" | "clarification" | "editor-note" | "substantive-update";
@@ -665,7 +687,8 @@ function publicPost(value: unknown): WordPressPost | null {
       ...(terms.length ? { "wp:term": terms } : {})
     },
     ...(contributors.length ? { contributors } : {}),
-    ...(correctionValues ? { corrections: correctionValues } : {})
+    ...(correctionValues ? { corrections: correctionValues } : {}),
+    ...([value.live, byline.live, weeklyWildcat.live].find(isRecord) ? { live: [value.live, byline.live, weeklyWildcat.live].find(isRecord) } : {})
   };
 }
 
@@ -1609,6 +1632,44 @@ export function getPostPrimaryGameId(post: WordPressPost) {
  * How an author chose to present the story. Anything missing or unrecognized
  * (including stories from before the setting existed) is Standard, bottom left.
  */
+/**
+ * The story's live coverage, newest update first, or null for an ordinary
+ * story. Snapshot posts are used as-is, so this is the one validation point.
+ */
+export function getPostLiveCoverage(post: WordPressPost): WordPressLiveCoverage | null {
+  const value = [post.live, post.byline?.live, post.weeklyWildcat?.live].find(isRecord);
+  if (!value || (value.status !== "live" && value.status !== "ended")) return null;
+  const updates = (Array.isArray(value.updates) ? value.updates : []).flatMap((entry): WordPressLiveUpdate[] => {
+    if (!isRecord(entry)) return [];
+    const id = positiveInteger(entry.id);
+    const date = typeof entry.date === "string" ? entry.date : "";
+    if (!id || !date) return [];
+    const image = isRecord(entry.image) && publicUrl(entry.image.url) ? {
+      url: publicUrl(entry.image.url),
+      alt: textValue(entry.image.alt),
+      width: positiveInteger(entry.image.width) ?? null,
+      height: positiveInteger(entry.image.height) ?? null,
+      ...(textValue(entry.image.credit) ? { credit: textValue(entry.image.credit) } : {})
+    } : null;
+    return [{
+      id,
+      title: textValue(entry.title),
+      html: typeof entry.html === "string" ? entry.html : "",
+      date,
+      modified: typeof entry.modified === "string" && entry.modified ? entry.modified : date,
+      pinned: entry.pinned === true,
+      author: textValue(entry.author),
+      image
+    }];
+  }).sort((left, right) => right.date.localeCompare(left.date) || right.id - left.id);
+  return {
+    status: value.status,
+    startedAt: typeof value.startedAt === "string" ? value.startedAt : "",
+    endedAt: value.status === "ended" && typeof value.endedAt === "string" ? value.endedAt : "",
+    updates
+  };
+}
+
 export function getPostStoryPresentation(post: WordPressPost): { presentation: "standard" | "immersive"; immersiveAlignment: "bottom-left" | "center" } {
   const settings = post.byline ?? post.weeklyWildcat;
   return {

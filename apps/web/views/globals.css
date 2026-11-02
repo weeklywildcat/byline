@@ -1679,6 +1679,21 @@ h1.masthead-logo {
   grid-template-columns: 92px minmax(0, 1fr);
 }
 
+.story-teaser-live {
+  background: #c8102e;
+  color: #fff;
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: 0.62em;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  margin-right: 8px;
+  padding: 4px 6px;
+  text-transform: uppercase;
+  vertical-align: 0.2em;
+}
+
 .story-teaser-lead .featured-image img {
   aspect-ratio: 16 / 9;
   object-fit: cover;

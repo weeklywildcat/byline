@@ -104,6 +104,10 @@ function byline_snapshot_post($post, array &$attachments): ?array
         $result['byline'] = $result['weeklyWildcat'] = byline_snapshot_pick(wwh_rest_post_settings(['id' => $post->ID]), ['primaryGameId', 'gameScoreGameIds', 'presentation', 'immersiveAlignment']);
         $result['contributors'] = array_map('byline_snapshot_contributor', byline_get_public_story_contributors($post->ID));
         $result['corrections'] = array_map(static fn($item) => byline_snapshot_pick($item, ['id', 'type', 'text', 'date']), byline_get_public_corrections($post->ID));
+        // Live coverage rides on the post like corrections, so a new update
+        // changes this article's render inputs and nothing else.
+        $live = function_exists('byline_public_live_coverage') ? byline_public_live_coverage($post->ID) : null;
+        if ($live !== null) $result['live'] = $live;
         // Core's canonical embed serializer, restricted to its public embed
         // context. No HTTP or REST dispatch back to this installation.
         $author = get_user_by('id', $post->post_author);

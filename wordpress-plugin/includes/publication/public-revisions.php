@@ -45,7 +45,7 @@ add_filter('wp_insert_post_data', static function ($data, $postarr): array {
 
 function byline_snapshot_public_type(string $type): bool
 {
-    return in_array($type, ['post', 'page', 'byline_guest', 'byline_coverage', 'byline_correction', 'ww_school_event'], true);
+    return in_array($type, ['post', 'page', 'byline_guest', 'byline_coverage', 'byline_correction', 'byline_live_update', 'ww_school_event'], true);
 }
 
 function byline_revision_on_status($new_status, $old_status, $post): void
@@ -98,6 +98,7 @@ function byline_revision_on_post_meta($meta_id, $id, $key, $value = null): void
         '_byline_guest_display_name', '_byline_guest_role', '_byline_guest_bio', '_byline_guest_image_id', '_byline_guest_public_links', '_byline_guest_profile_page',
         '_byline_coverage_description', '_byline_coverage_overview', '_byline_coverage_start_at', '_byline_coverage_end_at', '_byline_coverage_status', '_byline_coverage_public_enabled', '_byline_coverage_story_ids',
         '_byline_correction_type', '_byline_correction_text', '_byline_correction_recorded_at',
+        '_byline_live_status', '_byline_live_started_at', '_byline_live_ended_at', '_byline_live_update_pinned', '_byline_live_update_image_id',
         '_ww_event_start_datetime', '_ww_event_end_datetime', '_ww_event_all_day', '_ww_event_location', '_ww_event_description', '_ww_event_external_url', '_ww_event_status', '_ww_event_type'
     ], true)) byline_public_mutation('public-metadata');
 }

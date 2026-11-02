@@ -817,12 +817,63 @@ function byline_editorial_preview_presentation(int $post_id): array
             'modifiedAt' => $modified_at,
             'label' => 'This story was updated after initial publication on ' . byline_editorial_preview_date_label($modified_at) . '.',
         ] : null,
+        'live' => byline_editorial_preview_live($post_id),
         'relatedStories' => $related,
         'moreByAuthorStories' => $more_by_author,
         'publication' => [
             'shortName' => $short_name,
             'contactHref' => byline_editorial_preview_public_url((string) ($publication['urls']['contact'] ?? '/contact/'), '/contact/'),
         ],
+    ];
+}
+
+/** "Nov 2, 4:12 PM" in the site timezone, matching formatLiveTime() on the public site. */
+function byline_editorial_preview_live_time(string $iso): string
+{
+    $timestamp = strtotime($iso);
+    if (!$timestamp) return $iso;
+    return function_exists('wp_date') ? (string) wp_date('M j, g:i A', $timestamp) : gmdate('M j, g:i A', $timestamp);
+}
+
+/**
+ * The live section as apps/web/lib/live-coverage.ts builds it. Unlike the public
+ * projection it also works for a draft story, so editors can preview it.
+ *
+ * @return array<string,mixed>|null
+ */
+function byline_editorial_preview_live(int $post_id): ?array
+{
+    if (!function_exists('byline_live_story_state')) return null;
+    $state = byline_live_story_state($post_id);
+    if ($state['status'] === '') return null;
+    $views = array_map(static function (array $update): array {
+        $image = byline_live_update_image((int) $update['imageId']);
+        return [
+            'id' => (int) $update['id'],
+            'title' => (string) $update['title'],
+            'html' => (string) $update['html'],
+            'date' => (string) $update['date'],
+            'dateLabel' => byline_editorial_preview_live_time((string) $update['date']),
+            'author' => (string) $update['author'],
+            'pinned' => (bool) $update['pinned'],
+            'image' => $image ? ['src' => $image['url'], 'alt' => $image['alt'], 'width' => $image['width'], 'height' => $image['height']] + (isset($image['credit']) ? ['credit' => $image['credit']] : []) : null,
+        ];
+    }, byline_list_live_updates($post_id));
+    $pinned = null;
+    foreach ($views as $view) if ($view['pinned']) { $pinned = $view; break; }
+    $updates = array_values(array_filter($views, static fn($view) => !$view['pinned']));
+    $updated_at = $views[0]['date'] ?? $state['startedAt'];
+    return [
+        'postId' => $post_id,
+        'status' => $state['status'],
+        'startedAt' => $state['startedAt'],
+        'endedAt' => $state['endedAt'] ?: null,
+        'endedLabel' => $state['endedAt'] ? byline_editorial_preview_live_time($state['endedAt']) : null,
+        'updatedAt' => $updated_at,
+        'updatedLabel' => byline_editorial_preview_live_time($updated_at),
+        'keyPoints' => $pinned,
+        'updates' => $updates,
+        'feedUrl' => '/_byline/live/' . $post_id . '.json',
     ];
 }
 

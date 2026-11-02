@@ -8,6 +8,7 @@ import { getPublicationConfig } from "@/lib/publication";
 import {
   getFeaturedMedia,
   getMediaArtDirection,
+  getPostLiveCoverage,
   getContributorDescription,
   contributorHasProfilePage,
   getContributorHref,
@@ -462,12 +463,38 @@ function getArticleImageSchema(image: WordPressMedia | null, articleUrl: string)
 }
 
 /** Timezone-aware ISO timestamps for a post, for JSON-LD and Open Graph. */
-export function getPostTimestamps(post: Pick<WordPressPost, "date" | "date_gmt" | "modified" | "modified_gmt">) {
+export function getPostTimestamps(post: Pick<WordPressPost, "date" | "date_gmt" | "modified" | "modified_gmt"> & Partial<Pick<WordPressPost, "live" | "byline" | "weeklyWildcat">>) {
   const published = getWordPressIsoTimestamp({ gmt: post.date_gmt, local: post.date }, publication.timezone);
   const modified = getWordPressIsoTimestamp({ gmt: post.modified_gmt, local: post.modified }, publication.timezone);
+  // Live updates are separate records, so the post's own modified time lags them.
+  const newestUpdate = getPostLiveCoverage(post as WordPressPost)?.updates[0]?.date;
+  const latest = [modified ?? published, newestUpdate].filter((value): value is string => Boolean(value)).sort().at(-1);
 
-  return { published, modified: modified ?? published };
+  return { published, modified: latest ?? published };
 }
+
+/**
+ * Google's LiveBlogPosting fields for a story that has been live: coverage
+ * times and the newest updates, each linking to its anchor on the page.
+ */
+function getLiveBlogFields(post: WordPressPost, articleUrl: string) {
+  const live = getPostLiveCoverage(post);
+  if (!live) return null;
+  return {
+    coverageStartTime: live.startedAt || undefined,
+    coverageEndTime: live.endedAt || undefined,
+    liveBlogUpdate: live.updates.slice(0, LIVE_BLOG_UPDATE_LIMIT).map((update) => ({
+      "@type": "BlogPosting",
+      headline: update.title || stripHtml(update.html).slice(0, 110) || undefined,
+      datePublished: update.date,
+      dateModified: update.modified,
+      url: `${articleUrl}#update-${update.id}`,
+      articleBody: stripHtml(update.html) || undefined
+    }))
+  };
+}
+
+const LIVE_BLOG_UPDATE_LIMIT = 50;
 
 /** Canonical profile URLs for the contributors who have a public profile page. One-off guests have none. */
 export function getArticleAuthorProfileUrls(post: WordPressPost) {
@@ -564,9 +591,12 @@ export function getNewsArticleSchema(post: WordPressPost) {
         name: `${publication.identity.shortName} Staff`
       }];
 
+  const liveBlog = getLiveBlogFields(post, articleUrl);
+
   return {
     "@context": "https://schema.org",
-    "@type": "NewsArticle",
+    // A live story is both: NewsArticle for news surfaces, LiveBlogPosting for the LIVE label.
+    "@type": liveBlog ? ["NewsArticle", "LiveBlogPosting"] : "NewsArticle",
     "@id": `${articleUrl}#article`,
     mainEntityOfPage: {
       "@type": "WebPage",
@@ -584,6 +614,7 @@ export function getNewsArticleSchema(post: WordPressPost) {
     image: imageSchema.length > 0 ? imageSchema : undefined,
     primaryImageOfPage: imageSchema[0]?.["@id"] ? { "@id": imageSchema[0]["@id"] } : undefined,
     isAccessibleForFree: true,
-    articleBody: articleBody || undefined
+    articleBody: articleBody || undefined,
+    ...(liveBlog ?? {})
   };
 }

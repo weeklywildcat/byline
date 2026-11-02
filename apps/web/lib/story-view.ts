@@ -10,6 +10,7 @@ import {
   getMediaCredit,
   getPostAuthor,
   getPostHref,
+  getPostLiveCoverage,
   type WordPressMedia,
   type WordPressPost
 } from "@/lib/wordpress";
@@ -73,6 +74,7 @@ export function toStoryView(post: WordPressPost, options: StoryViewOptions = {})
     readingTime: options.includeReadingTime ? getReadingTime(post) : null,
     category: category ? { name: decodeHtml(category.name), href: `/category/${category.slug}/` } : null,
     author: author ? { name: author.name, href: getAuthorHref(author) } : null,
+    ...(getPostLiveCoverage(post)?.status === "live" ? { live: true } : {}),
     image: toStoryImageView(image, credit)
   };
 }

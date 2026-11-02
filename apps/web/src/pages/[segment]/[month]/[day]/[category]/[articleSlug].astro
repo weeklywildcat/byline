@@ -55,6 +55,11 @@ const slots = {
     if (body?.querySelector(articleEnhancementSelector)) {
       import("@byline/ui/article-enhancements").then(({ enhanceArticleStory }) => enhanceArticleStory(body));
     }
+    // Only a story whose coverage is running downloads the live checker.
+    const live = document.querySelector<HTMLElement>('[data-byline-live][data-status="live"]');
+    if (live) {
+      import("@byline/ui/live-updates").then(({ startLiveUpdates }) => startLiveUpdates(live));
+    }
   </script>
   <div class="astro-island-relocation" data-target="article-share-island-slot"><ArticleShareActions title={title} url={articleUrl} client:idle /></div>
   <div class="astro-island-relocation" data-target="article-poll-island-slot"><NewsroomPollHydrator client:load /></div>

@@ -7,6 +7,7 @@ import {
   ArticleExcerpt,
   ArticleHeadline,
   ArticleImageCaption,
+  ArticleLive,
   ArticleMeta,
   ArticleShell,
   ArticleStandardEnding,
@@ -62,6 +63,7 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
               ) : null}
             </div>
             <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} />
+            <ArticleLive presentation={presentation} />
             <ArticleStoryFooter presentation={presentation} slots={slots} />
           </article>
           <ArticleStandardEnding presentation={presentation} />

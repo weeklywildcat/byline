@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ArticleLiveBadge, ArticleLiveCoverage, type ArticleLiveView } from "./article-live";
 
 /**
  * The article boundary between a content adapter and a renderer.
@@ -86,6 +87,8 @@ export type ArticlePresentation = {
   corrections: ArticleCorrectionView[];
   topics: ArticleTopicView[];
   update?: { modifiedAt: string; label: string } | null;
+  /** Live coverage, while live and after it ends; absent for ordinary stories. */
+  live?: ArticleLiveView | null;
   relatedStories: ArticleStoryCardView[];
   moreByAuthorStories: ArticleStoryCardView[];
   publication: {
@@ -223,8 +226,19 @@ export function ArticleShell({ as: Tag = "main", className, children }: { as?: "
 
 /** The section label ("News", "Sports") linking to the category archive. */
 export function ArticleCategory({ presentation, className }: ArticlePieceProps): ReactNode {
-  if (!presentation.category) return null;
-  return <a className={joinClassNames("article-section-label", className)} href={presentation.category.href}>{presentation.category.label}</a>;
+  const badge = <ArticleLiveBadge live={presentation.live} />;
+  if (!presentation.category) return badge;
+  return (
+    <>
+      {badge}
+      <a className={joinClassNames("article-section-label", className)} href={presentation.category.href}>{presentation.category.label}</a>
+    </>
+  );
+}
+
+/** Live updates under the story body; nothing for an ordinary story. */
+export function ArticleLive({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  return <ArticleLiveCoverage live={presentation.live} />;
 }
 
 /** The article's only `<h1>`. */
@@ -468,6 +482,7 @@ export function ArticleView({ presentation, slots = {}, className = "" }: Articl
         </header>
 
         <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} />
+        <ArticleLive presentation={presentation} />
         <ArticleStoryFooter presentation={presentation} slots={slots} />
       </article>
 

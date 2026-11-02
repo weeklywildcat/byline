@@ -157,8 +157,12 @@ if ($build_available) {
             byline_test_fail("The workflow bundle does not declare the WordPress dependency {$required}.");
         }
     }
-    foreach ($deps as $dependency) {
-        if ($dependency === 'react' || $dependency === 'react-dom') {
+    // `react` is WordPress's own script handle (wp-element depends on it), so a
+    // third-party component may declare it. What must never happen is React's
+    // own source being compiled into the bundle.
+    $bundle = (string) file_get_contents(__DIR__ . '/../build/editorial-workflow.js');
+    foreach (['__SECRET_INTERNALS_DO_NOT_USE', '__CLIENT_INTERNALS_DO_NOT_USE', 'react.production'] as $marker) {
+        if (strpos($bundle, $marker) !== false) {
             byline_test_fail('The workflow bundle bundles React instead of using the WordPress-provided copy.');
         }
     }
