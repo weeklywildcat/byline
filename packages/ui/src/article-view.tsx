@@ -17,6 +17,8 @@ export type ArticleImageView = {
   captionHtml?: string;
   fallbackCaption?: string;
   credit?: string;
+  /** CSS object-position from the editor's focal point; absent when centred or already cropped. */
+  objectPosition?: string;
 };
 
 export type ArticleLinkView = {
@@ -177,6 +179,7 @@ function ArticleImage({ image, priority = false, showCaption = true }: { image: 
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : "auto"}
           decoding="async"
+          style={image.objectPosition ? { objectPosition: image.objectPosition } : undefined}
         />
       </div>
       {showCaption && hasCaption ? <figcaption><ArticleImageCaption image={image} /></figcaption> : null}

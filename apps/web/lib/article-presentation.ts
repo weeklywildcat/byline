@@ -1,3 +1,4 @@
+import type { ImageCropShape } from "@byline/core";
 import type { ArticleImageView, ArticlePresentation, ArticleStoryCardView } from "@byline/ui";
 import { getResponsiveImageProps, type ImageSearchVisibility } from "@/lib/media";
 import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory, getPublicTopicTags, isAthleteSpotlightPost, isHiddenCategory, isVisibleContentPost } from "@/lib/content";
@@ -43,9 +44,9 @@ export function hasArticleUpdatedDate(post: WordPressPost) {
   return Number.isFinite(published) && Number.isFinite(modified) && modified - published > 60 * 60 * 1000;
 }
 
-function articleImage(image: WordPressMedia | null, sizes?: string, priority = false, imageSearchVisibility: ImageSearchVisibility = "canonical"): ArticleImageView | null {
+function articleImage(image: WordPressMedia | null, sizes?: string, priority = false, imageSearchVisibility: ImageSearchVisibility = "canonical", shape?: ImageCropShape): ArticleImageView | null {
   if (!image?.source_url) return null;
-  const responsive = getResponsiveImageProps(image, { sizes, priority, imageSearchVisibility });
+  const responsive = getResponsiveImageProps(image, { sizes, priority, imageSearchVisibility, shape });
   if (!responsive) return null;
   const captionHtml = image.caption?.rendered?.trim() || "";
   const fallbackCaption = stripHtml(image.media_details?.image_meta?.caption ?? "");
@@ -60,13 +61,15 @@ function articleImage(image: WordPressMedia | null, sizes?: string, priority = f
     height: responsive.height ?? null,
     ...(captionHtml ? { captionHtml } : {}),
     ...(fallbackCaption ? { fallbackCaption } : {}),
-    ...(credit ? { credit } : {})
+    ...(credit ? { credit } : {}),
+    ...(responsive.objectPosition ? { objectPosition: responsive.objectPosition } : {})
   };
 }
 
 function articleStoryCard(post: WordPressPost): ArticleStoryCardView {
   const category = getPrimaryVisibleCategory(post);
-  const image = articleImage(getFeaturedMedia(post), "(max-width: 900px) 100vw, 360px", false, "presentation");
+  // Compact teasers are square (globals.css .story-teaser-compact).
+  const image = articleImage(getFeaturedMedia(post), "(max-width: 900px) 100vw, 360px", false, "presentation", "square");
   return {
     id: post.id,
     title: stripHtml(post.title.rendered),

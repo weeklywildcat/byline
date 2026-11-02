@@ -1,3 +1,4 @@
+import { normalizeArtDirection, type ImageArtDirection } from "@byline/core";
 import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
 import { REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { mirrorWordPressMediaInValue } from "@/lib/media";
@@ -210,6 +211,8 @@ export type WordPressImageCredit = {
     copyrightNotice: string;
     licenseUrl: string;
     acquireLicensePage: string;
+    /** Editor focal point, crop boxes and cropped files; see packages/core/src/image-crops.ts. */
+    artDirection?: ImageArtDirection | null;
 };
 
 export type WordPressPost = {
@@ -268,6 +271,8 @@ export type WordPressCoverageArtwork = {
   alt: string;
   width?: number | null;
   height?: number | null;
+  /** The editor's focal point as CSS object-position; artwork is shown square. */
+  objectPosition?: string;
 };
 
 export type WordPressCoverage = {
@@ -375,7 +380,9 @@ function publicPhoto(value: unknown) {
     url,
     alt: textValue(value.alt ?? value.alt_text),
     width: typeof value.width === "number" ? value.width : null,
-    height: typeof value.height === "number" ? value.height : null
+    height: typeof value.height === "number" ? value.height : null,
+    // "30% 20%" from the editor's focal point; never anything else in a style.
+    ...(typeof value.objectPosition === "string" && /^\d{1,3}(?:\.\d+)?% \d{1,3}(?:\.\d+)?%$/.test(value.objectPosition) ? { objectPosition: value.objectPosition } : {})
   };
 }
 
@@ -390,11 +397,23 @@ function publicImageCredit(value: unknown): WordPressImageCredit | undefined {
   const licenseUrl = publicUrl(value.licenseUrl ?? value.license_url);
   const acquireLicensePage = publicUrl(value.acquireLicensePage ?? value.acquire_license_url);
 
-  if (!creditText && !creator && !copyrightNotice && !licenseUrl && !acquireLicensePage) {
+  const artDirection = publicArtDirection(value.artDirection);
+
+  if (!creditText && !creator && !copyrightNotice && !licenseUrl && !acquireLicensePage && !artDirection) {
     return undefined;
   }
 
-  return { creator, creditText, copyrightNotice, licenseUrl, acquireLicensePage };
+  return { creator, creditText, copyrightNotice, licenseUrl, acquireLicensePage, ...(artDirection ? { artDirection } : {}) };
+}
+
+function publicArtDirection(value: unknown) {
+  const art = normalizeArtDirection(value);
+  if (!art) return null;
+  const renditions = Object.fromEntries(Object.entries(art.renditions).flatMap(([shape, files]) => {
+    const publicFiles = (files ?? []).flatMap((file) => publicUrl(file.url) ? [{ ...file, url: publicUrl(file.url) }] : []);
+    return publicFiles.length ? [[shape, publicFiles]] : [];
+  }));
+  return { ...art, renditions };
 }
 
 function publicSocialLinks(value: unknown) {
@@ -1424,7 +1443,7 @@ export function normalizePublicCoverage(value: unknown): WordPressCoverage | nul
     title,
     description,
     overview,
-    artwork: artwork ? { url: artwork.url, alt: artwork.alt ?? title, width: artwork.width, height: artwork.height } : null,
+    artwork: artwork ? { url: artwork.url, alt: artwork.alt ?? title, width: artwork.width, height: artwork.height, ...(artwork.objectPosition ? { objectPosition: artwork.objectPosition } : {}) } : null,
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
     ...(modified ? { modified } : {}),
@@ -1499,6 +1518,13 @@ export function getMediaCredit(image: WordPressMedia | null | undefined) {
   ).trim();
 
   return credit.replace(/^(?:photos?|photograph|photography|image|credit)(?:\s+by\s+|\s*[:\-–—]\s*)/i, "").trim();
+}
+
+// The editor's art direction for an image (focal point, crops, cropped files), or
+// null. Snapshot posts are not passed through publicMedia(), so always read it here.
+export function getMediaArtDirection(image: WordPressMedia | null | undefined): ImageArtDirection | null {
+  if (!image) return null;
+  return normalizeArtDirection(image.bylineImage?.artDirection ?? image.weeklyWildcatImage?.artDirection);
 }
 
 export function getPostDateParts(post: WordPressPost) {

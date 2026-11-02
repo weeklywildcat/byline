@@ -139,8 +139,14 @@ function byline_editorial_preview_date_label(string $value): string
         : $date_time->format('F j, Y');
 }
 
-/** @return array<string,mixed>|null */
-function byline_editorial_preview_image(int $attachment_id, string $sizes = '(max-width: 900px) 100vw, 900px', bool $include_attribution = true): ?array
+/**
+ * The same image fields the public site builds (apps/web/lib/article-presentation.ts),
+ * including the editor's crop for `$shape` or its focal point, so Preview as
+ * Byline matches the published page.
+ *
+ * @return array<string,mixed>|null
+ */
+function byline_editorial_preview_image(int $attachment_id, string $sizes = '(max-width: 900px) 100vw, 900px', bool $include_attribution = true, string $shape = ''): ?array
 {
     if ($attachment_id <= 0 || !function_exists('wp_get_attachment_image_url')) {
         return null;
@@ -172,6 +178,14 @@ function byline_editorial_preview_image(int $attachment_id, string $sizes = '(ma
         'width' => $width > 0 ? $width : null,
         'height' => $height > 0 ? $height : null,
     ];
+    if (function_exists('byline_image_shape_attributes')) {
+        $art = byline_image_shape_attributes($attachment_id, $shape !== '' ? $shape : 'none');
+        if ($art['srcset'] !== '') {
+            $image = array_merge($image, ['src' => (string) esc_url_raw($art['src']), 'srcSet' => $art['srcset'], 'width' => $art['width'], 'height' => $art['height']]);
+        } elseif ($art['style'] !== '') {
+            $image['objectPosition'] = substr($art['style'], strlen('object-position:'));
+        }
+    }
 
     if (!$include_attribution) {
         return $image;
@@ -181,9 +195,10 @@ function byline_editorial_preview_image(int $attachment_id, string $sizes = '(ma
     $fallback_caption = is_array($metadata) && is_array($metadata['image_meta'] ?? null)
         ? byline_editorial_preview_plain_text((string) ($metadata['image_meta']['caption'] ?? ''))
         : '';
-    $credit = function_exists('byline_editorial_media_attachment_meta_value')
-        ? byline_editorial_media_attachment_meta_value($attachment_id, 'creditText')
-        : (function_exists('wwh_image_meta_value') ? wwh_image_meta_value($attachment_id, 'credit_text') : '');
+    // The public resolver: Image Creator first, then the credit line.
+    $credit = function_exists('byline_photo_credit_for_attachment')
+        ? byline_photo_credit_for_attachment($attachment_id)
+        : (function_exists('byline_editorial_media_attachment_meta_value') ? byline_editorial_media_attachment_meta_value($attachment_id, 'creditText') : '');
 
     if (trim($caption) !== '') {
         $image['captionHtml'] = wp_kses_post($caption);
@@ -439,7 +454,7 @@ function byline_editorial_preview_story_card(WP_Post $post): array
         'title' => byline_editorial_preview_plain_text((string) ($post->post_title ?? '')),
         'href' => (string) esc_url_raw(get_permalink($post)),
         'excerptHtml' => trim(wp_kses_post((string) get_the_excerpt($post))),
-        'image' => byline_editorial_preview_image(absint(get_post_thumbnail_id($post->ID)), '92px'),
+        'image' => byline_editorial_preview_image(absint(get_post_thumbnail_id($post->ID)), '92px', true, 'square'),
         'category' => $category instanceof WP_Term ? byline_editorial_preview_plain_text((string) ($category->name ?? '')) : null,
         'date' => $date,
         'dateLabel' => byline_editorial_preview_date_label($date),

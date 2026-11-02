@@ -15,6 +15,7 @@
     "./article-enhancement-selector": "./src/article-enhancements/selector.ts"
   },
   "dependencies": {
+    "@byline/core": "0.1.0",
     "@byline/theme-contract": "0.1.0",
     "@iconify/react": "^6.0.2"
   },

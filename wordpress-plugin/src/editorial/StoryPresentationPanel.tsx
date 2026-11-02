@@ -1,4 +1,4 @@
-import { Notice, RadioControl } from '@wordpress/components';
+import { Button, Notice, RadioControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import {
   IMMERSIVE_ALIGNMENT_OPTIONS,
@@ -12,13 +12,15 @@ export type StoryPresentationPanelProps = {
   alignment: ImmersiveAlignment;
   hasFeaturedImage: boolean;
   onChange: (change: { presentation?: StoryPresentation; alignment?: ImmersiveAlignment }) => void;
+  /** Opens the photo crops dialog for the featured image. */
+  onEditCrops?: () => void;
 };
 
 /**
  * The only presentation controls an author gets. Colors, fonts and layout are
  * the site's code, not a setting.
  */
-export function StoryPresentationPanel({ presentation, alignment, hasFeaturedImage, onChange }: StoryPresentationPanelProps) {
+export function StoryPresentationPanel({ presentation, alignment, hasFeaturedImage, onChange, onEditCrops }: StoryPresentationPanelProps) {
   return (
     <div className="byline-story-presentation">
       <RadioControl
@@ -44,6 +46,16 @@ export function StoryPresentationPanel({ presentation, alignment, hasFeaturedIma
             </Notice>
           ) : null}
         </>
+      ) : null}
+      {hasFeaturedImage && onEditCrops ? (
+        <div className="byline-story-presentation-crops">
+          <Button variant="secondary" onClick={onEditCrops}>
+            {__('Crops & placements', 'weekly-wildcat-headless')}
+          </Button>
+          <p className="byline-editorial-muted">
+            {__('Choose what stays in view on the homepage, in lists and on social cards.', 'weekly-wildcat-headless')}
+          </p>
+        </div>
       ) : null}
     </div>
   );

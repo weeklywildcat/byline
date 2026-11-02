@@ -197,9 +197,22 @@ check(in_array($keep['id'], array_column(byline_story_sources(10), 'id'), true) 
 check(count(array_filter($GLOBALS['fired'], function ($f) { return $f[0] === 'byline_story_appointment_changed'; })) > 0, 'Domain changes announce themselves for activity and notifications.');
 
 /* ----------------------------------------------------------- summary data */
+$saved_appointments = $GLOBALS['meta'][10][BYLINE_STORY_APPOINTMENTS_META];
+// Summary fixtures follow the clock; fixed dates above test timezone conversion.
+$past = $appt;
+$past['startAt'] = gmdate('Y-m-d\TH:i:s\Z', time() - 2 * 86400);
+$past['endAt'] = gmdate('Y-m-d\TH:i:s\Z', time() - 86400);
+$GLOBALS['meta'][10][BYLINE_STORY_APPOINTMENTS_META] = [$past];
+check(byline_story_reporting_summary(10)['nextAppointment'] === null, 'Past appointments are not the next appointment.');
+$upcoming = $appt;
+$upcoming['startAt'] = gmdate('Y-m-d\TH:i:s\Z', time() + 86400);
+$upcoming['endAt'] = gmdate('Y-m-d\TH:i:s\Z', time() + 2 * 86400);
+$GLOBALS['meta'][10][BYLINE_STORY_APPOINTMENTS_META] = [$upcoming];
 $summary = byline_story_reporting_summary(10);
 check(isset($summary['sources'], $summary['interviewed'], $summary['needsScheduling'], $summary['nextAppointment']) && !array_key_exists('notes', (array) $summary['nextAppointment']), 'The planning summary exposes counts and a note-free next appointment.');
+check($summary['nextAppointment']['id'] === $upcoming['id'], 'The summary identifies the upcoming appointment.');
 check(strpos(json_encode($summary), 'Bring recorder') === false && strpos(json_encode($summary), 'Prefers mornings') === false, 'Summaries never carry source or appointment notes.');
+$GLOBALS['meta'][10][BYLINE_STORY_APPOINTMENTS_META] = $saved_appointments;
 
 /* --------------------------------------------------------------- the stale */
 $stale = byline_story_appointment_save(10, ['title' => 'Edited'], $exact_again['id']);

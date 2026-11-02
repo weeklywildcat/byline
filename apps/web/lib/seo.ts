@@ -1,3 +1,4 @@
+import { artDirectedSource } from "@byline/core";
 import type { Metadata } from "@/lib/metadata";
 import { getPrimaryVisibleCategory } from "@/lib/content";
 import { getWordPressIsoTimestamp } from "@/lib/dates";
@@ -6,6 +7,7 @@ import { getMeaningfulImageAlt } from "@/lib/image-alt";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getFeaturedMedia,
+  getMediaArtDirection,
   getContributorDescription,
   contributorHasProfilePage,
   getContributorHref,
@@ -125,20 +127,25 @@ function isWordPressMedia(image: SeoImage): image is WordPressMedia {
   return "source_url" in image;
 }
 
+// The 1200×630 social card WordPress cut from the editor's crop or focal point.
+function getSocialCrop(image: SeoImage) {
+  return isWordPressMedia(image) ? artDirectedSource(getMediaArtDirection(image), "social") : null;
+}
+
 function getImageUrl(image: SeoImage | null | undefined) {
   if (!image) {
     return undefined;
   }
 
-  return isWordPressMedia(image) ? image.source_url : image.url;
+  return getSocialCrop(image)?.src ?? (isWordPressMedia(image) ? image.source_url : image.url);
 }
 
 function getImageWidth(image: SeoImage) {
-  return isWordPressMedia(image) ? image.media_details?.width : image.width ?? undefined;
+  return getSocialCrop(image)?.width ?? (isWordPressMedia(image) ? image.media_details?.width : image.width ?? undefined);
 }
 
 function getImageHeight(image: SeoImage) {
-  return isWordPressMedia(image) ? image.media_details?.height : image.height ?? undefined;
+  return getSocialCrop(image)?.height ?? (isWordPressMedia(image) ? image.media_details?.height : image.height ?? undefined);
 }
 
 function getMediaAlt(image: SeoImage | null | undefined) {
@@ -368,10 +375,11 @@ const GOOGLE_IMAGE_MIN_PIXELS = 50_000;
 type ImageCandidate = { url: string; width: number; height: number };
 
 /**
- * The original plus the largest registered WordPress size in each of Google's
- * preferred ratios (16:9, 4:3, 1:1) that the upload already has. WordPress sizes
- * keep the photo's own proportions, so a 16:9 photo yields 16:9 variants, a 4:3
- * photo 4:3 variants, and so on. No crops are generated here.
+ * The original plus one image in each of Google's preferred ratios (16:9, 4:3,
+ * 1:1). An editor's crop for that ratio (Wide, Standard, Square) wins; otherwise
+ * the largest registered WordPress size that already has the ratio. WordPress
+ * sizes keep the photo's own proportions, so without editor crops a 16:9 photo
+ * yields 16:9 variants only. No crops are generated here.
  */
 export function getArticleImageCandidates(image: WordPressMedia): ImageCandidate[] {
   const original: ImageCandidate | null = image.source_url && image.media_details?.width && image.media_details?.height
@@ -381,11 +389,18 @@ export function getArticleImageCandidates(image: WordPressMedia): ImageCandidate
     .filter((size) => size.source_url && size.width > 0 && size.height > 0)
     .map((size) => ({ url: size.source_url, width: size.width, height: size.height }));
   const best = new Map<number, ImageCandidate>();
+  const art = getMediaArtDirection(image);
+  const editorCrops = ([[16 / 9, "wide"], [4 / 3, "standard"], [1, "square"]] as const).flatMap(([ratio, shape]) => {
+    const crop = artDirectedSource(art, shape);
+    return crop && crop.width * crop.height >= GOOGLE_IMAGE_MIN_PIXELS ? [[ratio, { url: crop.src, width: crop.width, height: crop.height }] as const] : [];
+  });
+  for (const [ratio, crop] of editorCrops) best.set(ratio, crop);
 
   for (const candidate of [...(original ? [original] : []), ...sized]) {
     if (candidate.width * candidate.height < GOOGLE_IMAGE_MIN_PIXELS) continue;
     const ratio = GOOGLE_IMAGE_RATIOS.find((target) => Math.abs(candidate.width / candidate.height - target) / target <= GOOGLE_IMAGE_RATIO_TOLERANCE);
     if (ratio === undefined) continue;
+    if (editorCrops.some(([cropRatio]) => cropRatio === ratio)) continue;
     const current = best.get(ratio);
     if (!current || candidate.width > current.width) best.set(ratio, candidate);
   }

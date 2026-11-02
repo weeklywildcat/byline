@@ -1234,6 +1234,8 @@ function wwh_media_image(int $attachment_id, string $size = 'large'): array
     }
 
     $alt = get_post_meta($attachment_id, '_wp_attachment_image_alt', true);
+    // The editor's focal point, for photos the site shows cropped (collection artwork).
+    $position = function_exists('byline_image_shape_attributes') ? byline_image_shape_attributes($attachment_id, 'square', $size)['style'] : '';
 
     return [
         'id' => $attachment_id,
@@ -1241,7 +1243,7 @@ function wwh_media_image(int $attachment_id, string $size = 'large'): array
         'alt' => is_scalar($alt) ? (string) $alt : '',
         'width' => isset($source[1]) ? absint($source[1]) : null,
         'height' => isset($source[2]) ? absint($source[2]) : null,
-    ];
+    ] + ($position !== '' ? ['objectPosition' => substr($position, strlen('object-position:'))] : []);
 }
 
 function wwh_sports_team_options(): array
@@ -2563,6 +2565,8 @@ function wwh_rest_image_credit(array $attachment): array
         'copyrightNotice' => $metadata('copyrightNotice', 'copyright_notice'),
         'licenseUrl' => $metadata('licenseUrl', 'license_url'),
         'acquireLicensePage' => $metadata('acquireLicensePage', 'acquire_license_url'),
+        // Focal point, crop boxes and cropped files; null until an editor sets them.
+        'artDirection' => function_exists('byline_image_art_direction') ? byline_image_art_direction($attachment_id) : null,
     ];
 }
 
@@ -3424,6 +3428,7 @@ require_once __DIR__ . '/includes/sports/archive.php';
 require_once __DIR__ . '/includes/content/newsroom-blocks.php';
 require_once __DIR__ . '/includes/content/gallery-media.php';
 require_once __DIR__ . '/includes/content/photo-credits.php';
+require_once __DIR__ . '/includes/content/image-art-direction.php';
 require_once __DIR__ . '/includes/content/story-presentation.php';
 require_once __DIR__ . '/includes/discord-integration.php';
 require_once __DIR__ . '/includes/integrations/discord.php';
