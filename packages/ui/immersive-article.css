@@ -36,6 +36,10 @@
   text-transform: uppercase;
 }
 
+.immersive-article .immersive-article-hero .article-live-badge {
+  color: #fff;
+}
+
 .immersive-article .immersive-article-headline {
   color: #fff;
   font-family: var(--font-headline);

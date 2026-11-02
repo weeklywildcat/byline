@@ -167,14 +167,12 @@
 }
 
 :where(.byline-publication-preview) .home-story-live {
-  background: #c8102e;
-  color: #fff;
+  color: var(--accent);
   font-family: var(--font-ui);
   font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1;
-  padding: 4px 6px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 

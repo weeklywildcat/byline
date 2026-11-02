@@ -77,3 +77,35 @@ test("ordinary articles do not download or run the live enhancement", async ({ p
   await expect(page.locator('article h1')).toBeVisible();
   expect(liveRequests).toEqual([]);
 });
+
+for (const width of [320, 768, 1280]) {
+  test(`live reporting keeps a readable newspaper layout at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(ARTICLE);
+    await page.evaluate(() => document.fonts.ready);
+    const update = page.locator('#update-903');
+    const time = await update.locator('.article-live-update-time').boundingBox();
+    const author = await update.locator('.article-live-update-author').boundingBox();
+    const body = await update.locator('.article-live-update-body').boundingBox();
+    expect(author!.y).toBeGreaterThanOrEqual(time!.y + time!.height);
+    expect(body!.y - (author!.y + author!.height)).toBeGreaterThanOrEqual(20);
+    const typography = await update.locator('.article-live-update-body').evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { family: style.fontFamily, size: parseFloat(style.fontSize), lineHeight: parseFloat(style.lineHeight) };
+    });
+    expect(typography.family).toContain('Newsreader');
+    expect(typography.size).toBeGreaterThanOrEqual(20);
+    expect(typography.lineHeight / typography.size).toBeGreaterThanOrEqual(1.5);
+    const first = await update.boundingBox();
+    const second = await page.locator('#update-902').boundingBox();
+    expect(second!.y - (body!.y + body!.height)).toBeGreaterThanOrEqual(28);
+    expect(first!.width).toBeLessThanOrEqual(760);
+    await update.locator('.article-live-update-body').evaluate((node) => {
+      const link = document.createElement('a');
+      link.href = 'https://example.test/';
+      link.textContent = `https://example.test/${'long-reporting-link-'.repeat(15)}`;
+      node.append(link);
+    });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}

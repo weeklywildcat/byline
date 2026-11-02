@@ -1680,18 +1680,16 @@ h1.masthead-logo {
 }
 
 .story-teaser-live {
-  background: #c8102e;
-  color: #fff;
+  color: var(--accent);
   display: inline-block;
   font-family: var(--font-ui);
   font-size: 0.62em;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
   margin-right: 8px;
-  padding: 4px 6px;
   text-transform: uppercase;
-  vertical-align: 0.2em;
+  vertical-align: baseline;
 }
 
 .story-teaser-lead .featured-image img {
