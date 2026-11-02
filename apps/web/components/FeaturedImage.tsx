@@ -1,4 +1,5 @@
 import { stripHtml } from "@/lib/format";
+import type { ImageCropShape } from "@byline/core";
 import { getResponsiveImageProps, type ImageSearchVisibility } from "@/lib/media";
 import { getMediaCredit, type WordPressMedia } from "@/lib/wordpress";
 
@@ -10,9 +11,11 @@ type FeaturedImageProps = {
   showCredit?: boolean;
   sizes?: string;
   imageSearchVisibility?: ImageSearchVisibility;
+  /** The crop shape this placement's CSS shows (the editor's crop or focal point applies). */
+  shape?: ImageCropShape;
 };
 
-export function FeaturedImage({ image, priority = false, showCaption = true, showCredit = false, sizes, imageSearchVisibility = "canonical" }: FeaturedImageProps) {
+export function FeaturedImage({ image, priority = false, showCaption = true, showCredit = false, sizes, imageSearchVisibility = "canonical", shape }: FeaturedImageProps) {
   if (!image?.source_url) {
     return null;
   }
@@ -21,17 +24,20 @@ export function FeaturedImage({ image, priority = false, showCaption = true, sho
   const fallbackCaption = stripHtml(image.media_details?.image_meta?.caption ?? "");
   const credit = getMediaCredit(image);
   const hasCaptionDetails = Boolean(caption || fallbackCaption || credit);
-  const imageProps = getResponsiveImageProps(image, { priority, sizes, imageSearchVisibility });
+  const imageProps = getResponsiveImageProps(image, { priority, sizes, imageSearchVisibility, shape });
 
   if (!imageProps) {
     return null;
   }
 
+  const { objectPosition, ...imgProps } = imageProps;
+
   return (
     <figure className="featured-image">
       <div className="featured-image-frame">
         <img
-          {...imageProps}
+          {...imgProps}
+          style={objectPosition ? { objectPosition } : undefined}
         />
       </div>
       {showCaption && hasCaptionDetails ? (

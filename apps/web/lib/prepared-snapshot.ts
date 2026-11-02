@@ -78,6 +78,7 @@ export function validateBuildSnapshot(value: unknown): PublicBuildSnapshot {
       if (name === "posts") requireCondition(row.status === "publish" && row.type === "post" && Array.isArray(row.categories) && Array.isArray(row.tags) && record(row._embedded), "posts: incomplete public relationships");
       if (["authors", "guests", "categories", "tags"].includes(name)) requireCondition(typeof row.name === "string" && typeof row.slug === "string", `${name}: missing name/slug`);
       if (name === "attachments") requireCondition(typeof row.source_url === "string" && record(row.media_details), "attachments: missing media metadata");
+      if (name === "attachments") requireCondition(row.bylineImage?.artDirection == null || record(row.bylineImage.artDirection), "attachments: invalid art direction");
       if (name === "schoolEvents") requireCondition(typeof row.startDate === "string" && typeof row.endDate === "string" && typeof row.title === "string" && typeof row.allDay === "boolean" && record(row.display) && typeof row.display.date === "string" && typeof row.display.time === "string", "schoolEvents: incomplete event");
       if (name === "coverages") requireCondition(typeof row.slug === "string" && typeof row.title === "string" && Array.isArray(row.stories), "coverages: incomplete collection");
       if (name === "corrections") requireCondition(typeof row.text === "string" && typeof row.type === "string" && typeof row.date === "string", "corrections: incomplete correction");

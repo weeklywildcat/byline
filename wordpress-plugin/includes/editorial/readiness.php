@@ -27,9 +27,22 @@ function byline_readiness_text($value, int $maximum = 320): string
 }
 
 /** @return array<string,mixed> */
-function byline_readiness_check(string $id, string $label, string $status, string $explanation, string $fix_url = ''): array
+/**
+ * `$action` names an in-editor fix (`['id' => ..., 'label' => ...]`), e.g. opening
+ * the photo crops dialog. Outside the editor the fix URL still applies.
+ *
+ * @return array<string,mixed>
+ */
+function byline_readiness_check(string $id, string $label, string $status, string $explanation, string $fix_url = '', array $action = []): array
 {
     $status = in_array($status, ['pass', 'warning', 'error'], true) ? $status : 'warning';
+    $fix = $fix_url !== '' && function_exists('esc_url_raw')
+        ? ['url' => esc_url_raw($fix_url), 'label' => 'Open story']
+        : null;
+    if ($fix !== null && !empty($action['id'])) {
+        $fix['actionId'] = sanitize_key((string) $action['id']);
+        $fix['actionLabel'] = byline_readiness_text((string) ($action['label'] ?? ''), 60);
+    }
 
     return [
         'id' => sanitize_key($id),
@@ -37,10 +50,74 @@ function byline_readiness_check(string $id, string $label, string $status, strin
         'status' => $status,
         'severity' => $status === 'error' ? 'error' : ($status === 'warning' ? 'warning' : 'info'),
         'explanation' => byline_readiness_text($explanation),
-        'fix' => $fix_url !== '' && function_exists('esc_url_raw')
-            ? ['url' => esc_url_raw($fix_url), 'label' => 'Open story']
-            : null,
+        'fix' => $fix,
     ];
+}
+
+const BYLINE_READINESS_PHOTO_CROPS_ACTION = ['id' => 'open-photo-crops', 'label' => 'Adjust crops'];
+// A photo narrower than this looks soft as a full-width opening; social cards need 1200.
+const BYLINE_READINESS_LARGE_IMAGE_WIDTH = 1600;
+const BYLINE_READINESS_SOCIAL_IMAGE_WIDTH = 1200;
+const BYLINE_READINESS_TITLE_MAX = 70;
+
+/**
+ * Size and crop checks for the featured image: whether it is big enough for the
+ * places it appears, and whether an unusually tall or wide photo has a focal
+ * point (a centred crop of those is the one most likely to cut off a face).
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function byline_readiness_featured_image_presentation_checks(int $post_id, int $featured_id, string $fix_url): array
+{
+    $metadata = function_exists('wp_get_attachment_metadata') ? wp_get_attachment_metadata($featured_id) : [];
+    $width = is_array($metadata) ? absint($metadata['width'] ?? 0) : 0;
+    $height = is_array($metadata) ? absint($metadata['height'] ?? 0) : 0;
+    $immersive = function_exists('byline_story_presentation_settings') && byline_story_presentation_settings($post_id)['presentation'] === 'immersive';
+    $checks = [];
+
+    if ($width > 0 && $width < BYLINE_READINESS_SOCIAL_IMAGE_WIDTH) {
+        $checks[] = byline_readiness_check('featured-image-size', 'Featured image size', 'warning', sprintf('This photo is %dpx wide. Upload one at least %dpx wide; smaller photos look soft on social cards and large placements.', $width, BYLINE_READINESS_LARGE_IMAGE_WIDTH), $fix_url);
+    } elseif ($width > 0 && $width < BYLINE_READINESS_LARGE_IMAGE_WIDTH && $immersive) {
+        $checks[] = byline_readiness_check('featured-image-size', 'Featured image size', 'warning', sprintf('This photo is %dpx wide. An Immersive opening fills the screen; a photo at least %dpx wide will look sharper.', $width, BYLINE_READINESS_LARGE_IMAGE_WIDTH), $fix_url);
+    } else {
+        $checks[] = byline_readiness_check('featured-image-size', 'Featured image size', 'pass', 'The featured image is large enough for every placement.');
+    }
+
+    $art = function_exists('byline_image_art_direction') ? byline_image_art_direction($featured_id) : null;
+    $ratio = $width > 0 && $height > 0 ? $width / $height : 1.5;
+    if ($art !== null) {
+        $checks[] = byline_readiness_check('featured-image-crops', 'Photo crops', 'pass', 'A focal point is set, so cards, lists and social posts keep the subject in view.');
+    } elseif ($ratio < 0.9 || $ratio > 2.0) {
+        $shape = $ratio < 0.9 ? 'tall' : 'wide';
+        $checks[] = byline_readiness_check('featured-image-crops', 'Photo crops', 'warning', sprintf('This is a %s photo, so cards and social posts crop it heavily. Set a focal point so the subject stays in view.', $shape), $fix_url, BYLINE_READINESS_PHOTO_CROPS_ACTION);
+    } else {
+        $checks[] = byline_readiness_check('featured-image-crops', 'Photo crops', 'pass', 'Crops are centred. Set a focal point if the subject is near an edge.');
+    }
+
+    return $checks;
+}
+
+/**
+ * Social-preview checks fed into the `seo-social-preview` readiness check. The
+ * excerpt has its own check ('excerpt'), and the photo its size and crop checks.
+ *
+ * @return array<int,array<string,string>>
+ */
+function byline_readiness_social_preview_records(array $records, int $post_id): array
+{
+    $post = function_exists('get_post') ? get_post($post_id) : null;
+    if (!$post instanceof WP_Post) return $records;
+
+    $title = trim(wp_strip_all_tags((string) $post->post_title));
+    $length = function_exists('mb_strlen') ? mb_strlen($title) : strlen($title);
+    if ($length > BYLINE_READINESS_TITLE_MAX) {
+        $records[] = ['status' => 'warning', 'explanation' => sprintf('The headline is %d characters. Search results and social cards cut off around %d.', $length, BYLINE_READINESS_TITLE_MAX)];
+    }
+
+    return $records;
+}
+if (function_exists('add_filter')) {
+    add_filter('byline_story_readiness_seo', 'byline_readiness_social_preview_records', 10, 2);
 }
 
 function byline_readiness_fix_url(int $post_id): string
@@ -220,6 +297,7 @@ function byline_story_readiness_checks(int $post_id, array $context = []): array
         $checks[] = byline_readiness_image_credit($featured_id) !== ''
             ? byline_readiness_check('image-credit', 'Image credit', 'pass', 'The featured image has a credit.')
             : byline_readiness_check('image-credit', 'Image credit', 'warning', 'Add an image credit or confirm the publication-wide default.', $fix_url);
+        $checks = array_merge($checks, byline_readiness_featured_image_presentation_checks($post_id, $featured_id, $fix_url));
     } else {
         $checks[] = byline_readiness_check('featured-image-alt', 'Featured image alt text', 'warning', 'Alt text can be checked after a featured image is selected.', $fix_url);
         $checks[] = byline_readiness_check('image-credit', 'Image credit', 'warning', 'A credit can be checked after a featured image is selected.', $fix_url);
