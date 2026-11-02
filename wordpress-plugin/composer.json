@@ -1,0 +1,17 @@
+{
+  "name": "byline/plugin-mcp",
+  "description": "Bundled WordPress-native MCP transport and OAuth server",
+  "type": "library",
+  "require": {
+    "php": "^8.2",
+    "mcp/sdk": "0.9.0",
+    "league/oauth2-server": "9.4.1",
+    "nyholm/psr7": "^1.8",
+    "nyholm/psr7-server": "^1.1"
+  },
+  "config": {
+    "platform": { "php": "8.2.0" },
+    "sort-packages": true,
+    "allow-plugins": false
+  }
+}

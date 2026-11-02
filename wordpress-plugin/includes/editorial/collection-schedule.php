@@ -32,10 +32,12 @@ function byline_collection_schedule(string $from, string $to, int $collection_id
     }
     return $out;
 }
-function byline_collection_story_appointments(int $collection_id): array
+function byline_collection_story_appointments(int $collection_id, int $limit = 0): array
 {
     $result = [];
-    foreach (byline_collection_story_ids($collection_id) as $story) {
+    $story_ids = byline_collection_story_ids($collection_id);
+    if ($limit > 0) { $story_ids = array_slice($story_ids,0,$limit); }
+    foreach ($story_ids as $story) {
         $access = byline_story_context($story);
         foreach (byline_story_appointments($story) as $appointment) {
             if (!$access['manage'] && !in_array($access['user'], $appointment['assigneeIds'], true)) { continue; }

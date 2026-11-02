@@ -505,7 +505,7 @@ function byline_story_source_save(int $story_id, array $input, string $id = '', 
  *
  * @return array{sources:list<array<string,mixed>>,appointments:list<array<string,mixed>>}|WP_Error
  */
-function byline_story_source_delete(int $story_id, string $id, ?int $user_id = null)
+function byline_story_source_delete(int $story_id, string $id, ?int $user_id = null, ?string $expected_updated_at = null)
 {
     $access = byline_story_reporting_access($story_id, $user_id);
     if (is_wp_error($access)) {
@@ -513,7 +513,7 @@ function byline_story_source_delete(int $story_id, string $id, ?int $user_id = n
     }
     $id = byline_story_valid_uuid($id);
     $removed = null;
-    $stored = byline_story_collection_update($story_id, BYLINE_STORY_SOURCES_META, static function (array $sources) use ($id, $access, &$removed) {
+    $stored = byline_story_collection_update($story_id, BYLINE_STORY_SOURCES_META, static function (array $sources) use ($id, $access, &$removed, $expected_updated_at) {
         foreach ($sources as $index => $source) {
             if ($source['id'] !== $id) {
                 continue;
@@ -521,6 +521,7 @@ function byline_story_source_delete(int $story_id, string $id, ?int $user_id = n
             if (!$access['manage'] && !in_array($access['user'], $source['assigneeIds'], true)) {
                 return new WP_Error('byline_source_forbidden', 'You can remove only sources assigned to you.', ['status' => 403]);
             }
+            if ($expected_updated_at !== null && $expected_updated_at !== $source['updatedAt']) { return byline_story_stale(); }
             $removed = $source;
             unset($sources[$index]);
             return $sources;
@@ -605,7 +606,7 @@ function byline_story_appointment_save(int $story_id, array $input, string $id =
 }
 
 /** Remove an appointment only; its source, tasks and links are untouched. */
-function byline_story_appointment_delete(int $story_id, string $id, ?int $user_id = null)
+function byline_story_appointment_delete(int $story_id, string $id, ?int $user_id = null, ?string $expected_updated_at = null)
 {
     $access = byline_story_reporting_access($story_id, $user_id);
     if (is_wp_error($access)) {
@@ -613,7 +614,7 @@ function byline_story_appointment_delete(int $story_id, string $id, ?int $user_i
     }
     $id = byline_story_valid_uuid($id);
     $removed = null;
-    $stored = byline_story_collection_update($story_id, BYLINE_STORY_APPOINTMENTS_META, static function (array $rows) use ($id, $access, &$removed) {
+    $stored = byline_story_collection_update($story_id, BYLINE_STORY_APPOINTMENTS_META, static function (array $rows) use ($id, $access, &$removed, $expected_updated_at) {
         foreach ($rows as $index => $row) {
             if ($row['id'] !== $id) {
                 continue;
@@ -621,6 +622,7 @@ function byline_story_appointment_delete(int $story_id, string $id, ?int $user_i
             if (!$access['manage'] && !in_array($access['user'], $row['assigneeIds'], true)) {
                 return new WP_Error('byline_appointment_forbidden', 'You can remove only appointments assigned to you.', ['status' => 403]);
             }
+            if ($expected_updated_at !== null && $expected_updated_at !== $row['updatedAt']) { return byline_story_stale(); }
             $removed = $row;
             unset($rows[$index]);
             return $rows;

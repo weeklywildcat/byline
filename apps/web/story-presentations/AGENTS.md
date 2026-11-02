@@ -149,6 +149,8 @@ Do not render a second hidden or duplicate copy of the featured image merely to 
 
 Use `object-fit`, `object-position`, absolute positioning, clipping, masks, and overlays around the real image as needed.
 
+When the editor set a focal point, `presentation.image.objectPosition` carries it (e.g. `"30% 20%"`); apply it to any cover-cropped lead image rather than hard-coding a position.
+
 If text sits over photography, ensure it remains readable against both bright and dark parts of the actual image. Use a restrained scrim/gradient when necessary.
 
 ## Responsive requirements

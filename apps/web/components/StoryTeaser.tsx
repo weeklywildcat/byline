@@ -32,6 +32,13 @@ function getStoryTeaserImageSizes(variant: StoryTeaserVariant) {
   return "(max-width: 900px) 100vw, 45vw";
 }
 
+// Matches the aspect ratios in globals.css (.story-teaser-* .featured-image img).
+function getStoryTeaserImageShape(variant: StoryTeaserVariant) {
+  if (variant === "lead") return "wide";
+  if (variant === "standard") return "standard";
+  return "square";
+}
+
 export function StoryTeaser({ post, variant = "standard", showImage = true, showCategory = true, priority = false }: StoryTeaserProps) {
   const href = getPostHref(post);
   const image = getFeaturedMedia(post);
@@ -52,6 +59,7 @@ export function StoryTeaser({ post, variant = "standard", showImage = true, show
           showCaption={false}
           showCredit={variant === "lead" || variant === "standard"}
           sizes={getStoryTeaserImageSizes(variant)}
+          shape={getStoryTeaserImageShape(variant)}
           imageSearchVisibility="presentation"
         />
       ) : null}

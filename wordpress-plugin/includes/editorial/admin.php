@@ -98,6 +98,8 @@ function byline_editorial_enqueue_editor_assets(string $hook): void
         'previewUrl' => function_exists('byline_editorial_preview_page_url')
             ? byline_editorial_preview_page_url()
             : admin_url('admin.php?page=byline-article-preview'),
+        // Shown on the social-card and search-result mockups in the photo crops dialog.
+        'publicHost' => function_exists('wwh_public_site_url') ? (string) wp_parse_url(wwh_public_site_url(), PHP_URL_HOST) : '',
     ]);
 }
 add_action('admin_enqueue_scripts', 'byline_editorial_enqueue_editor_assets');

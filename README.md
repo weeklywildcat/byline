@@ -7,6 +7,7 @@ Byline powers the Weekly Wildcat newsroom and static public site. This monorepo 
 - `apps/web/` — public Astro app. It reads one normalized build snapshot and
   produces a static export; it has no auth, database, SSR, or runtime app server.
 - `apps/discord-bot/` — separately deployed, stateless Discord newsroom service.
+- `packages/mcp-contracts/` — development-only MCP schemas, catalog generator and cross-language contract tests.
 - `wordpress-plugin/` — WordPress control plane and newsroom tools. The installable
   folder remains `weekly-wildcat-headless/` and the main file remains
   `weekly-wildcat-headless.php`.
@@ -44,6 +45,12 @@ npm run package:plugin
 npm run test:discord
 npm run typecheck:discord
 npm run build:discord
+
+npm run typecheck:mcp
+npm run test:mcp
+npm run build:mcp
+npm run test:mcp:wordpress
+npm run mcp:catalog
 ```
 
 `npm run package:plugin` writes and validates
@@ -124,6 +131,16 @@ The service in `apps/discord-bot/` uses WordPress as the durable story/link
 store. Its `.env.example`, Dockerfile, and compose example document deployment.
 It is tested and built by monorepo CI but is always excluded from the WordPress
 ZIP.
+
+## Remote MCP
+
+The WordPress plugin serves 82 typed newsroom tools directly at your CMS URL’s
+`/mcp` endpoint. Staff connect with OAuth and their own WordPress login; existing
+Byline permissions remain authoritative. The release ZIP bundles the PHP MCP and
+OAuth libraries. No separate Worker, Node server, Cloudflare binding or manual
+secret setup is required. MCP needs PHP 8.2+ and OpenSSL; the rest of the plugin
+retains PHP 7.4 compatibility. See [setup, security and client instructions](docs/mcp.md)
+and the generated [tool catalog](docs/mcp-tools.md).
 
 ## Architecture and operations
 

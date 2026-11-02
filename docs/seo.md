@@ -82,8 +82,12 @@ The newsletter block links to Google's no-JavaScript preferred-source deeplink
 
 ## Article image variants
 
-`NewsArticle.image` lists the original and, where the upload already has one, the
-largest size in each of Google's 16:9, 4:3 and 1:1 ratios. WordPress sizes keep the
-photo's own proportions, so no crops are generated. Registering cropped sizes in the
-plugin would add real 16:9/4:3/1:1 variants for new uploads; it is left as follow-up
-work because every size is mirrored into the static export.
+`NewsArticle.image` lists the original and one image in each of Google's 16:9, 4:3
+and 1:1 ratios. An editor's crop for that ratio (Wide, Standard, Square) wins.
+Otherwise it is the largest WordPress size that already has the ratio; WordPress sizes
+keep the photo's own proportions. Crops are generated only for photos an editor
+art-directs (see `docs/newsroom-blocks.md`, *Photo crops*), never for every upload,
+because every file is mirrored into the static export.
+
+Open Graph and X cards use the editor's 1200×630 social crop when the featured image
+has art direction, and the original photo otherwise.

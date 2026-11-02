@@ -154,30 +154,28 @@ $GLOBALS['race'] = null;
 /* ------------------------------------------------------------ appointments */
 $unscheduled = byline_story_appointment_save(10, ['title' => 'Interview local reporter', 'kind' => 'interview', 'assigneeIds' => [1]]);
 check(!is_wp_error($unscheduled) && $unscheduled['appointment']['scheduleMode'] === 'unscheduled' && $unscheduled['appointment']['startAt'] === null && $unscheduled['appointment']['windowStart'] === null, 'An unscheduled appointment needs no window and no time.');
-// Keep scheduling fixtures upcoming while retaining October's EDT conversion.
-$schedule_year = (int) date('Y') + 1;
-$window = byline_story_appointment_save(10, ['scheduleMode' => 'window', 'windowStart' => "{$schedule_year}-10-26", 'windowEnd' => "{$schedule_year}-10-30"], $unscheduled['appointment']['id']);
-check($window['appointment']['windowStart'] === "{$schedule_year}-10-26" && $window['appointment']['windowEnd'] === "{$schedule_year}-10-30" && $window['appointment']['startAt'] === null, 'A target window is date-only and creates no timestamp.');
+$window = byline_story_appointment_save(10, ['scheduleMode' => 'window', 'windowStart' => '2026-10-26', 'windowEnd' => '2026-10-30'], $unscheduled['appointment']['id']);
+check($window['appointment']['windowStart'] === '2026-10-26' && $window['appointment']['windowEnd'] === '2026-10-30' && $window['appointment']['startAt'] === null, 'A target window is date-only and creates no timestamp.');
 check(code(byline_story_appointment_save(10, ['title' => 'Bad', 'scheduleMode' => 'window'])) === 'byline_appointment_window_start_required', 'A window needs a start date.');
-check(code(byline_story_appointment_save(10, ['title' => 'Bad', 'scheduleMode' => 'window', 'windowStart' => "{$schedule_year}-10-30", 'windowEnd' => "{$schedule_year}-10-26"])) === 'byline_appointment_window_order', 'A window cannot end before it starts.');
+check(code(byline_story_appointment_save(10, ['title' => 'Bad', 'scheduleMode' => 'window', 'windowStart' => '2026-10-30', 'windowEnd' => '2026-10-26'])) === 'byline_appointment_window_order', 'A window cannot end before it starts.');
 check(code(byline_story_appointment_save(10, ['title' => 'Bad', 'scheduleMode' => 'window', 'windowStart' => '2026-02-31'])) === 'byline_invalid_date', 'An impossible calendar date is rejected.');
-check(!is_wp_error(byline_story_appointment_save(10, ['title' => 'One day', 'scheduleMode' => 'window', 'windowStart' => "{$schedule_year}-10-28"])) , 'A window end is optional.');
+check(!is_wp_error(byline_story_appointment_save(10, ['title' => 'One day', 'scheduleMode' => 'window', 'windowStart' => '2026-10-28'])) , 'A window end is optional.');
 check(code(byline_story_appointment_save(10, ['title' => 'Bad', 'scheduleMode' => 'exact'])) === 'byline_appointment_start_required', 'Exact mode requires a start.');
-check(code(byline_story_appointment_save(10, ['title' => 'Bad', 'scheduleMode' => 'exact', 'startAt' => "{$schedule_year}-10-27T11:00", 'endAt' => "{$schedule_year}-10-27T10:00"])) === 'byline_appointment_time_order', 'An exact end cannot precede its start.');
+check(code(byline_story_appointment_save(10, ['title' => 'Bad', 'scheduleMode' => 'exact', 'startAt' => '2026-10-27T11:00', 'endAt' => '2026-10-27T10:00'])) === 'byline_appointment_time_order', 'An exact end cannot precede its start.');
 check(code(byline_story_appointment_save(10, ['title' => 'Bad', 'scheduleMode' => 'exact', 'startAt' => 'tomorrow-ish'])) === 'byline_invalid_datetime', 'Free-form times are not guessed.');
 
 $interview = byline_story_appointment_save(10, [
     'title' => 'Interview Mrs. Hamby', 'kind' => 'interview', 'status' => 'confirmed', 'scheduleMode' => 'exact',
-    'startAt' => "{$schedule_year}-10-27T10:15", 'endAt' => "{$schedule_year}-10-27T10:35", 'location' => 'Main office', 'assigneeIds' => [1], 'sourceId' => $hamby['id'], 'notes' => 'Bring recorder',
+    'startAt' => '2026-10-27T10:15', 'endAt' => '2026-10-27T10:35', 'location' => 'Main office', 'assigneeIds' => [1], 'sourceId' => $hamby['id'], 'notes' => 'Bring recorder',
 ]);
 $appt = $interview['appointment'];
-check($appt['startAt'] === "{$schedule_year}-10-27T14:15:00Z" && $appt['endAt'] === "{$schedule_year}-10-27T14:35:00Z", 'Site-local wall times (EDT) normalize to UTC.');
-check(byline_story_site_day($appt['startAt']) === "{$schedule_year}-10-27", 'The site timezone, not the browser, decides the calendar day.');
+check($appt['startAt'] === '2026-10-27T14:15:00Z' && $appt['endAt'] === '2026-10-27T14:35:00Z', 'Site-local wall times (EDT) normalize to UTC.');
+check(byline_story_site_day($appt['startAt']) === '2026-10-27', 'The site timezone, not the browser, decides the calendar day.');
 check($appt['windowStart'] === null && $appt['windowEnd'] === null && $appt['sourceId'] === $hamby['id'], 'Exact appointments carry no window and link a source.');
-$back_to_window = byline_story_appointment_save(10, ['scheduleMode' => 'window', 'windowStart' => "{$schedule_year}-10-26"], $appt['id'])['appointment'];
-check($back_to_window['startAt'] === null && $back_to_window['endAt'] === null && $back_to_window['windowStart'] === "{$schedule_year}-10-26", 'Switching back to a window leaves no stale exact timestamps.');
-$exact_again = byline_story_appointment_save(10, ['scheduleMode' => 'exact', 'startAt' => "{$schedule_year}-10-27T10:15"], $appt['id'])['appointment'];
-check($exact_again['windowStart'] === null && $exact_again['windowEnd'] === null && $exact_again['startAt'] === "{$schedule_year}-10-27T14:15:00Z", 'Switching to exact clears window fields.');
+$back_to_window = byline_story_appointment_save(10, ['scheduleMode' => 'window', 'windowStart' => '2026-10-26'], $appt['id'])['appointment'];
+check($back_to_window['startAt'] === null && $back_to_window['endAt'] === null && $back_to_window['windowStart'] === '2026-10-26', 'Switching back to a window leaves no stale exact timestamps.');
+$exact_again = byline_story_appointment_save(10, ['scheduleMode' => 'exact', 'startAt' => '2026-10-27T10:15'], $appt['id'])['appointment'];
+check($exact_again['windowStart'] === null && $exact_again['windowEnd'] === null && $exact_again['startAt'] === '2026-10-27T14:15:00Z', 'Switching to exact clears window fields.');
 check(code(byline_story_appointment_save(10, ['title' => 'Bad link', 'sourceId' => byline_story_uuid()])) === 'byline_appointment_unknown_source', 'A new link to a nonexistent source is rejected.');
 check(code(byline_story_appointment_save(10, ['title' => 'x', 'kind' => 'rave'])) === 'byline_appointment_invalid_kind', 'Appointment kinds are an allowlist.');
 check(code(byline_story_appointment_save(10, ['title' => ''])) === 'byline_appointment_title_required', 'An appointment needs a title.');
@@ -199,9 +197,22 @@ check(in_array($keep['id'], array_column(byline_story_sources(10), 'id'), true) 
 check(count(array_filter($GLOBALS['fired'], function ($f) { return $f[0] === 'byline_story_appointment_changed'; })) > 0, 'Domain changes announce themselves for activity and notifications.');
 
 /* ----------------------------------------------------------- summary data */
+$saved_appointments = $GLOBALS['meta'][10][BYLINE_STORY_APPOINTMENTS_META];
+// Summary fixtures follow the clock; fixed dates above test timezone conversion.
+$past = $appt;
+$past['startAt'] = gmdate('Y-m-d\TH:i:s\Z', time() - 2 * 86400);
+$past['endAt'] = gmdate('Y-m-d\TH:i:s\Z', time() - 86400);
+$GLOBALS['meta'][10][BYLINE_STORY_APPOINTMENTS_META] = [$past];
+check(byline_story_reporting_summary(10)['nextAppointment'] === null, 'Past appointments are not the next appointment.');
+$upcoming = $appt;
+$upcoming['startAt'] = gmdate('Y-m-d\TH:i:s\Z', time() + 86400);
+$upcoming['endAt'] = gmdate('Y-m-d\TH:i:s\Z', time() + 2 * 86400);
+$GLOBALS['meta'][10][BYLINE_STORY_APPOINTMENTS_META] = [$upcoming];
 $summary = byline_story_reporting_summary(10);
 check(isset($summary['sources'], $summary['interviewed'], $summary['needsScheduling'], $summary['nextAppointment']) && !array_key_exists('notes', (array) $summary['nextAppointment']), 'The planning summary exposes counts and a note-free next appointment.');
+check($summary['nextAppointment']['id'] === $upcoming['id'], 'The summary identifies the upcoming appointment.');
 check(strpos(json_encode($summary), 'Bring recorder') === false && strpos(json_encode($summary), 'Prefers mornings') === false, 'Summaries never carry source or appointment notes.');
+$GLOBALS['meta'][10][BYLINE_STORY_APPOINTMENTS_META] = $saved_appointments;
 
 /* --------------------------------------------------------------- the stale */
 $stale = byline_story_appointment_save(10, ['title' => 'Edited'], $exact_again['id']);

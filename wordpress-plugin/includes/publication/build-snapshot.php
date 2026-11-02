@@ -17,7 +17,7 @@ function byline_snapshot_text($value): array
 
 function byline_snapshot_photo($value): ?array
 {
-    return is_array($value) ? byline_snapshot_pick($value, ['id', 'url', 'alt', 'width', 'height']) : null;
+    return is_array($value) ? byline_snapshot_pick($value, ['id', 'url', 'alt', 'width', 'height', 'objectPosition']) : null;
 }
 
 function byline_snapshot_contributor(array $value): array
@@ -77,7 +77,7 @@ function byline_snapshot_media(int $id): ?array
     }
     $result['media_details']['image_meta'] = byline_snapshot_pick((array) ($details['image_meta'] ?? []), ['caption', 'copyright', 'credit']);
     foreach (['bylineImage', 'weeklyWildcatImage'] as $field) {
-        $result[$field] = byline_snapshot_pick(wwh_rest_image_credit(['id' => $id]), ['creator', 'creditText', 'copyrightNotice', 'licenseUrl', 'acquireLicensePage']);
+        $result[$field] = byline_snapshot_pick(wwh_rest_image_credit(['id' => $id]), ['creator', 'creditText', 'copyrightNotice', 'licenseUrl', 'acquireLicensePage', 'artDirection']);
     }
     return $result;
 }

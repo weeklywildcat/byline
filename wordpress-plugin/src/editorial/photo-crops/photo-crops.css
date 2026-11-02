@@ -1,0 +1,232 @@
+.byline-photo-crops {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .byline-photo-crops {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.byline-photo-crops-editor {
+  display: grid;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+}
+
+.byline-photo-crops-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.byline-photo-crops-hint {
+  margin: 0;
+  color: #50575e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.byline-photo-crops-cropper {
+  position: relative;
+  height: min(60vh, 520px);
+  background: #1e1e1e;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.byline-photo-crops-cropper-controls {
+  display: flex;
+  align-items: end;
+  gap: 16px;
+}
+
+.byline-photo-crops-cropper-controls > :first-child {
+  flex: 1;
+}
+
+.byline-photo-crops-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #dcdcde;
+}
+
+.byline-photo-crops-placements {
+  display: grid;
+  gap: 24px;
+}
+
+.byline-photo-crops-placements h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.byline-photo-crops-placements * + h3 {
+  margin-top: 16px;
+}
+
+.byline-photo-crops-placements section > .byline-photo-crops-frame {
+  max-width: 240px;
+  margin-top: 8px;
+}
+
+.byline-photo-crops-frame {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  background: #f0f0f1;
+}
+
+.byline-photo-crops-frame img {
+  display: block;
+  user-select: none;
+}
+
+.byline-photo-crops-hero-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 12px;
+  align-items: end;
+  margin-top: 8px;
+}
+
+.byline-photo-crops-frame.is-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.6), transparent 60%);
+}
+
+.byline-photo-crops-hero-headline {
+  position: absolute;
+  z-index: 1;
+  left: 8%;
+  right: 8%;
+  bottom: 8%;
+  color: #fff;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(11px, 1.6vw, 18px);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.byline-photo-crops-frame.is-phone .byline-photo-crops-hero-headline {
+  font-size: 9px;
+}
+
+.byline-photo-crops-shape-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.byline-photo-crops-shape,
+.byline-photo-crops-social {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.byline-photo-crops-shape:hover,
+.byline-photo-crops-social:hover {
+  border-color: #dcdcde;
+}
+
+.byline-photo-crops-shape.is-selected,
+.byline-photo-crops-social.is-selected {
+  border-color: var(--wp-admin-theme-color, #3858e9);
+  box-shadow: 0 0 0 1px var(--wp-admin-theme-color, #3858e9);
+}
+
+.byline-photo-crops-shape-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.byline-photo-crops-badge {
+  padding: 0 6px;
+  border-radius: 2px;
+  background: #f0f0f1;
+  color: #50575e;
+  font-size: 11px;
+}
+
+.byline-photo-crops-badge.is-custom {
+  background: #e7f5ee;
+  color: #00703c;
+}
+
+.byline-photo-crops-warning {
+  color: #b32d2e;
+  font-size: 11px;
+}
+
+.byline-photo-crops-social {
+  width: 100%;
+  max-width: 420px;
+  padding: 0;
+  border: 1px solid #dcdcde;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.byline-photo-crops-social-text,
+.byline-photo-crops-search-text {
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px 12px;
+  font-size: 13px;
+}
+
+.byline-photo-crops-social-host {
+  color: #646970;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.byline-photo-crops-social-excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #50575e;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.byline-photo-crops-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 12px;
+  align-items: center;
+  max-width: 420px;
+  margin-top: 12px;
+}
+
+.byline-photo-crops-search-text {
+  padding: 0;
+}
+
+.byline-photo-crops-search-text strong {
+  color: #1a0dab;
+  font-weight: 400;
+  font-size: 16px;
+}
+
+.byline-photo-crops-frame.is-search-thumb {
+  border-radius: 8px;
+}

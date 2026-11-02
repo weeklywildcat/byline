@@ -32,8 +32,6 @@ $make_user = static function (string $role, string $name) use (&$cleanup): int {
 
 try {
     update_option('timezone_string', 'America/New_York');
-    // Keep the upcoming-appointment fixture future-facing, with October's UTC offset.
-    $schedule_year = (int) wp_date('Y') + 1;
     $editor = $make_user('editor', 'Gibson Bell');
     $writer = $make_user('author', 'Caroline Elrod');       // co-writer; does not own the post
     $photog = $make_user('author', 'Maycie Photographer');  // holds only a production assignment
@@ -70,18 +68,22 @@ try {
     $hamby = $r->get_data()['sourceId'];
     $local = $call("/editorial/stories/$story/sources", 'POST', ['label' => 'Local reporter', 'organization' => 'Index-Journal', 'status' => 'needs-scheduling', 'assigneeIds' => [$editor]])->get_data()['sourceId'];
     $call("/editorial/stories/$story/sources", 'POST', ['label' => 'Mr. Sprowl', 'role' => 'Cafeteria', 'status' => 'interviewed', 'assigneeIds' => [$writer]]);
-    $exact = $call("/editorial/stories/$story/appointments", 'POST', ['title' => 'Interview Mrs. Hamby', 'kind' => 'interview', 'status' => 'confirmed', 'scheduleMode' => 'exact', 'startAt' => "{$schedule_year}-10-27T10:15", 'endAt' => "{$schedule_year}-10-27T10:35", 'location' => 'Main office', 'assigneeIds' => [$editor], 'sourceId' => $hamby]);
+    $exact = $call("/editorial/stories/$story/appointments", 'POST', ['title' => 'Interview Mrs. Hamby', 'kind' => 'interview', 'status' => 'confirmed', 'scheduleMode' => 'exact', 'startAt' => '2026-10-27T10:15', 'endAt' => '2026-10-27T10:35', 'location' => 'Main office', 'assigneeIds' => [$editor], 'sourceId' => $hamby]);
     $assert($exact->get_status() === 201, 'Creating an appointment returns 201: ' . wp_json_encode($exact->get_data()));
     $exact_id = $exact->get_data()['appointmentId'];
-    $fuzzy = $call("/editorial/stories/$story/appointments", 'POST', ['title' => 'Interview local reporter', 'kind' => 'interview', 'scheduleMode' => 'window', 'windowStart' => "{$schedule_year}-10-26", 'windowEnd' => "{$schedule_year}-10-30", 'assigneeIds' => [$editor], 'sourceId' => $local]);
+    $fuzzy = $call("/editorial/stories/$story/appointments", 'POST', ['title' => 'Interview local reporter', 'kind' => 'interview', 'scheduleMode' => 'window', 'windowStart' => '2026-10-26', 'windowEnd' => '2026-10-30', 'assigneeIds' => [$editor], 'sourceId' => $local]);
     $fuzzy_id = $fuzzy->get_data()['appointmentId'];
     $stored = byline_story_appointments($story);
     $by_id = array_column($stored, null, 'id');
-    $assert($by_id[$exact_id]['startAt'] === "{$schedule_year}-10-27T14:15:00Z", 'Exact times are stored as UTC from the site timezone.');
-    $assert($by_id[$fuzzy_id]['startAt'] === null && $by_id[$fuzzy_id]['windowStart'] === "{$schedule_year}-10-26", 'A target window stores no fabricated time.');
-    $assert($call("/editorial/stories/$story/appointments", 'POST', ['title' => 'Bad', 'scheduleMode' => 'exact', 'startAt' => "{$schedule_year}-10-27T11:00", 'endAt' => "{$schedule_year}-10-27T10:00"])->get_status() === 400, 'End before start is rejected over REST.');
+    $assert($by_id[$exact_id]['startAt'] === '2026-10-27T14:15:00Z', 'Exact times are stored as UTC from the site timezone.');
+    $assert($by_id[$fuzzy_id]['startAt'] === null && $by_id[$fuzzy_id]['windowStart'] === '2026-10-26', 'A target window stores no fabricated time.');
+    $assert($call("/editorial/stories/$story/appointments", 'POST', ['title' => 'Bad', 'scheduleMode' => 'exact', 'startAt' => '2026-10-27T11:00', 'endAt' => '2026-10-27T10:00'])->get_status() === 400, 'End before start is rejected over REST.');
 
     /* ---- workspace read model */
+    // Keep the fixed dates above for timezone/feed checks; this one must be upcoming.
+    $upcoming = $call("/editorial/stories/$story/appointments", 'POST', ['title' => 'Upcoming interview', 'scheduleMode' => 'exact', 'startAt' => gmdate('Y-m-d\TH:i:s\Z', time() + 86400), 'notes' => 'PRIVATE appointment note']);
+    $assert($upcoming->get_status() === 201, 'Creating the upcoming appointment returns 201.');
+    $upcoming_id = $upcoming->get_data()['appointmentId'];
     $workspace = $call("/editorial/stories/$story/workspace");
     $data = $workspace->get_data();
     $assert($workspace->get_status() === 200, 'The workspace loads for the editor.');
@@ -89,12 +91,13 @@ try {
         $assert(array_key_exists($key, $data), "The workspace payload includes $key.");
     }
     $assert(strpos(wp_json_encode($data), 'SECRET ARTICLE BODY') === false && !isset($data['story']['content']), 'The workspace never includes the article body.');
-    $assert(count($data['sources']) === 3 && count($data['appointments']) === 2 && $data['reporting']['interviewed'] === 1, 'Reporting appears with its summary.');
+    $assert(count($data['sources']) === 3 && count($data['appointments']) === 3 && $data['reporting']['interviewed'] === 1, 'Reporting appears with its summary.');
     $assert($data['capabilities']['role'] === 'manager' && $data['capabilities']['assign'] === true, 'An editor gets manager capabilities.');
-    $assert($data['reporting']['nextAppointment']['id'] !== null, 'The summary names the next appointment.');
+    $assert($data['reporting']['nextAppointment']['id'] === $upcoming_id && !array_key_exists('notes', $data['reporting']['nextAppointment']), 'The summary names the upcoming appointment without its notes.');
     $planning = $call('/editorial/planning')->get_data();
     $row = array_values(array_filter($planning['stories'], static function ($s) use ($story) { return $s['id'] === $story; }))[0];
     $assert($row['reporting']['sources'] === 3 && strpos(wp_json_encode($row), 'PRIVATE source note') === false && strpos(wp_json_encode($row), 'Main office') === false, 'The Planning list carries counts, never notes or locations.');
+    $assert($call("/editorial/stories/$story/appointments/$upcoming_id", 'DELETE')->get_status() === 200, 'The summary fixture is removed before the remaining appointment checks.');
 
     /* ---- context access */
     wp_set_current_user($writer);
@@ -119,20 +122,20 @@ try {
     update_post_meta($attachment, '_wp_attachment_image_alt', 'A cafeteria');
     update_post_meta($attachment, '_ww_image_creator', 'Maycie');
     update_post_meta($attachment, '_ww_image_copyright_notice', 'Weekly Wildcat');
-    $legacy_request = ['type' => 'photo', 'status' => 'assigned', 'assigneeId' => $photog, 'dueAt' => "{$schedule_year}-10-28T17:00:00Z", 'notes' => 'Legacy note', 'attachmentIds' => [$attachment]];
+    $legacy_request = ['type' => 'photo', 'status' => 'assigned', 'assigneeId' => $photog, 'dueAt' => '2026-10-28T17:00:00Z', 'notes' => 'Legacy note', 'attachmentIds' => [$attachment]];
     update_post_meta($legacy_story, BYLINE_EDITORIAL_MEDIA_REQUEST_META, $legacy_request);
     $legacy_snapshot = get_post_meta($legacy_story, BYLINE_EDITORIAL_MEDIA_REQUEST_META, true);
     $projected = $call("/editorial/stories/$legacy_story/workspace")->get_data()['mediaAssignments'];
     $assert(count($projected) === 1 && $projected[0]['id'] === 'legacy-v1' && $projected[0]['isLegacy'] === true && $projected[0]['assigneeId'] === $photog && $projected[0]['attachmentIds'] === [$attachment], 'The installed request projects as one assignment.');
     $assert($projected[0]['mediaReadiness']['missingAltIds'] === [] && $projected[0]['mediaReadiness']['ready'] === true, 'Projection keeps readiness (alt, credit, rights).');
     $assert(!byline_media_assignments_materialized($legacy_story), 'Reads never migrate data.');
-    $added = $call("/editorial/stories/$legacy_story/media-assignments", 'POST', ['title' => 'Competitive-food timeline', 'type' => 'graphic', 'assigneeId' => $editor, 'dueAt' => "{$schedule_year}-10-29T17:00"]);
+    $added = $call("/editorial/stories/$legacy_story/media-assignments", 'POST', ['title' => 'Competitive-food timeline', 'type' => 'graphic', 'assigneeId' => $editor, 'dueAt' => '2026-10-29T17:00']);
     $assert($added->get_status() === 201, 'A second assignment can be added: ' . wp_json_encode($added->get_data()));
     $all = $call("/editorial/stories/$legacy_story/workspace")->get_data()['mediaAssignments'];
     $assert(count($all) === 2 && byline_media_assignments_materialized($legacy_story), 'The first v2 mutation materializes the projection.');
     $assert($all[0]['id'] === 'legacy-v1' && $all[0]['assigneeId'] === $photog && $all[0]['status'] === 'assigned' && $all[0]['attachmentIds'] === [$attachment] && $all[1]['type'] === 'graphic', 'The projected state survives and the new assignment is independent.');
     $assert(get_post_meta($legacy_story, BYLINE_EDITORIAL_MEDIA_REQUEST_META, true) === $legacy_snapshot, 'The installed v1 value is untouched.');
-    $assert($all[1]['status'] === 'assigned' && $all[1]['dueAt'] === "{$schedule_year}-10-29T21:00:00Z", 'Assignee and due date are per assignment.');
+    $assert($all[1]['status'] === 'assigned' && $all[1]['dueAt'] === '2026-10-29T21:00:00Z', 'Assignee and due date are per assignment.');
     $assert($call("/editorial/stories/$legacy_story/media")->get_data()['type'] === 'photo', 'The original single-request endpoint still answers (primary assignment).');
     $call("/editorial/stories/$legacy_story/media", 'POST', ['notes' => 'Updated via the old endpoint']);
     $assert(byline_media_assignments_stored($legacy_story)[0]['notes'] === 'Updated via the old endpoint' && get_post_meta($legacy_story, BYLINE_EDITORIAL_MEDIA_REQUEST_META, true) === $legacy_snapshot, 'Old clients write the primary assignment; v1 stays untouched.');
@@ -159,12 +162,12 @@ try {
     $assert($call("/editorial/stories/$story/resources", 'POST', ['label' => 'Bad', 'url' => 'https://example.org', 'purpose' => 'secrets'])->get_status() === 400, 'Unknown purposes are rejected.');
 
     /* ---- schedule feed */
-    $feed = $call("/editorial/schedule?from={$schedule_year}-10-26&to={$schedule_year}-11-01")->get_data();
+    $feed = $call('/editorial/schedule?from=2026-10-26&to=2026-11-01')->get_data();
     $ours = static function (array $rows) use ($story) { return array_values(array_filter($rows, static function ($r) use ($story) { return $r['storyId'] === $story; })); };
     $mine_exact = $ours($feed['appointments']);
-    $assert(count($mine_exact) === 1 && $mine_exact[0]['title'] === 'Interview Mrs. Hamby' && byline_story_site_day($mine_exact[0]['startAt']) === "{$schedule_year}-10-27", 'An exact appointment lands on its site-local day.');
+    $assert(count($mine_exact) === 1 && $mine_exact[0]['title'] === 'Interview Mrs. Hamby' && byline_story_site_day($mine_exact[0]['startAt']) === '2026-10-27', 'An exact appointment lands on its site-local day.');
     $mine_fuzzy = $ours($feed['needsScheduling']);
-    $assert(count($mine_fuzzy) >= 1 && $mine_fuzzy[0]['windowStart'] === "{$schedule_year}-10-26" && $mine_fuzzy[0]['startAt'] === null, 'A target window is listed under needs scheduling, with no time.');
+    $assert(count($mine_fuzzy) >= 1 && $mine_fuzzy[0]['windowStart'] === '2026-10-26' && $mine_fuzzy[0]['startAt'] === null, 'A target window is listed under needs scheduling, with no time.');
     $assert(strpos(wp_json_encode($feed), 'PRIVATE source note') === false, 'The schedule feed carries no notes.');
     $assert($call('/editorial/schedule?from=2026-01-01&to=2027-12-31')->get_status() === 400, 'The schedule range is bounded.');
 
@@ -173,7 +176,7 @@ try {
     $home_mine = array_values(array_filter($home['appointments'], static function ($a) use ($story) { return $a['storyId'] === $story; }));
     $assert(array_key_exists('appointments', $home) && count($home_mine) === 2, 'Home carries the editor\'s open appointments.');
     $fuzzy_row = array_values(array_filter($home_mine, static function ($a) { return $a['scheduleMode'] === 'window'; }))[0];
-    $assert($fuzzy_row['startAt'] === null && $fuzzy_row['windowStart'] === "{$schedule_year}-10-26", 'Home receives the target window, not a fake date.');
+    $assert($fuzzy_row['startAt'] === null && $fuzzy_row['windowStart'] === '2026-10-26', 'Home receives the target window, not a fake date.');
 
     /* ---- delete semantics */
     $call("/editorial/stories/$story/sources/$local", 'DELETE');
@@ -203,14 +206,14 @@ try {
         }));
     };
     wp_set_current_user($editor);
-    $notified = $call("/editorial/stories/$story/appointments", 'POST', ['title' => 'Interview Mr. Sprowl', 'kind' => 'interview', 'status' => 'confirmed', 'scheduleMode' => 'exact', 'startAt' => "{$schedule_year}-10-28T09:00", 'location' => 'Cafeteria', 'assigneeIds' => [$writer, $editor]])->get_data()['appointmentId'];
+    $notified = $call("/editorial/stories/$story/appointments", 'POST', ['title' => 'Interview Mr. Sprowl', 'kind' => 'interview', 'status' => 'confirmed', 'scheduleMode' => 'exact', 'startAt' => '2026-10-28T09:00', 'location' => 'Cafeteria', 'assigneeIds' => [$writer, $editor]])->get_data()['appointmentId'];
     $assert(count($appointment_jobs($writer, 'assigned')) === 1 && $appointment_jobs($editor) === [], 'A new assignee is notified once; the actor never is.');
     $job_json = wp_json_encode($payloads());
     $assert(strpos($job_json, 'Sprowl') === false && strpos($job_json, 'Cafeteria') === false, 'Queued notifications carry opaque references, not titles or places.');
     $call("/editorial/stories/$story/appointments/$notified", 'POST', ['notes' => 'Bring the recorder']);
     $call("/editorial/stories/$story/sources", 'POST', ['label' => 'Noise', 'status' => 'contacted', 'assigneeIds' => [$writer]]);
     $assert(count($appointment_jobs($writer)) === 1, 'Notes and source status changes send no email.');
-    $call("/editorial/stories/$story/appointments/$notified", 'POST', ['startAt' => "{$schedule_year}-10-28T11:30", 'endAt' => "{$schedule_year}-10-28T12:00"]);
+    $call("/editorial/stories/$story/appointments/$notified", 'POST', ['startAt' => '2026-10-28T11:30', 'endAt' => '2026-10-28T12:00']);
     $assert(count($appointment_jobs($writer, 'changed')) === 1, 'Moving a scheduled appointment notifies its assignee.');
     $call("/editorial/stories/$story/appointments/$notified", 'POST', ['status' => 'cancelled']);
     $assert(count($appointment_jobs($writer, 'cancelled')) === 1, 'Cancelling notifies its assignee.');
@@ -233,15 +236,15 @@ try {
     wp_set_current_user($editor);
     $media_story = (int) $call('/editorial/stories', 'POST', ['title' => 'Media desk story'])->get_data()['story']['id'];
     $cleanup['posts'][] = $media_story;
-    $call("/editorial/stories/$media_story/media-assignments", 'POST', ['title' => 'Cafeteria photos', 'type' => 'photo', 'assigneeId' => $photog, 'dueAt' => "{$schedule_year}-10-28T17:00"]);
-    $call("/editorial/stories/$media_story/media-assignments", 'POST', ['title' => 'Reaction clips', 'type' => 'video', 'dueAt' => "{$schedule_year}-10-30T17:00"]);
+    $call("/editorial/stories/$media_story/media-assignments", 'POST', ['title' => 'Cafeteria photos', 'type' => 'photo', 'assigneeId' => $photog, 'dueAt' => '2026-10-28T17:00']);
+    $call("/editorial/stories/$media_story/media-assignments", 'POST', ['title' => 'Reaction clips', 'type' => 'video', 'dueAt' => '2026-10-30T17:00']);
     $desk = $call('/editorial/media')->get_data();
     $mine = array_values(array_filter($desk['assignments'], static function ($row) use ($media_story) { return $row['story']['id'] === $media_story; }));
     $assert(count($mine) === 2 && array_column($mine, 'title') === ['Cafeteria photos', 'Reaction clips'], 'The Media Desk lists one row per production assignment, soonest due first.');
     $assert(count(array_filter($payloads(), static function ($p) use ($photog, $media_story) { return ($p['event'] ?? '') === 'media-assignment' && ($p['recipientId'] ?? 0) === $photog && ($p['storyId'] ?? 0) === $media_story; })) === 1, 'A newly assigned photographer is notified once.');
     $filtered = $call('/editorial/media?type=video')->get_data()['assignments'];
     $assert(count(array_filter($filtered, static function ($row) { return $row['type'] !== 'video'; })) === 0, 'Media Desk type filtering works per assignment.');
-    $feed = $call("/editorial/schedule?from={$schedule_year}-10-26&to={$schedule_year}-11-01")->get_data();
+    $feed = $call('/editorial/schedule?from=2026-10-26&to=2026-11-01')->get_data();
     $assert(count(array_filter($feed['mediaDeadlines'], static function ($d) { return $d['title'] === 'Cafeteria photos'; })) === 1, 'Production due dates appear in the schedule feed.');
     wp_set_current_user($photog);
     $own_rows = $call('/editorial/media')->get_data()['assignments'];
