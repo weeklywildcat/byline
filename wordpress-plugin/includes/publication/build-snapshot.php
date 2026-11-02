@@ -107,7 +107,14 @@ function byline_snapshot_post($post, array &$attachments): ?array
         // Live coverage rides on the post like corrections, so a new update
         // changes this article's render inputs and nothing else.
         $live = function_exists('byline_public_live_coverage') ? byline_public_live_coverage($post->ID) : null;
-        if ($live !== null) $result['live'] = $live;
+        if ($live !== null) {
+            $result['live'] = $live;
+            foreach ($live['updates'] as $update) {
+                $image_id = (int) ($update['image']['id'] ?? 0);
+                $image = $image_id > 0 ? byline_snapshot_media($image_id) : null;
+                if ($image) $attachments[$image_id] = $image;
+            }
+        }
         // Core's canonical embed serializer, restricted to its public embed
         // context. No HTTP or REST dispatch back to this installation.
         $author = get_user_by('id', $post->post_author);

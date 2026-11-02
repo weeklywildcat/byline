@@ -64,9 +64,9 @@ function byline_snapshot_attachment_is_used(int $id): bool
     $like_id = 'wp-image-' . $id . '([^0-9]|$)';
     $like_json = '"(id|mediaId|imageId)"[[:space:]]*:[[:space:]]*' . $id . '([^0-9]|$)';
     $like_url = $url ? '%' . $wpdb->esc_like((string) $url) . '%' : '%__byline_no_attachment_source__%';
-    $public_types = ['post', 'page', 'byline_coverage', 'byline_guest'];
+    $public_types = ['post', 'page', 'byline_coverage', 'byline_guest', 'byline_live_update'];
     $types = "'" . implode("','", $public_types) . "'";
-    $used = $wpdb->get_var($wpdb->prepare("SELECT p.ID FROM {$wpdb->posts} p LEFT JOIN {$wpdb->postmeta} m ON m.post_id = p.ID WHERE p.post_status = 'publish' AND p.post_type IN ($types) AND ((m.meta_key IN ('_thumbnail_id','_byline_guest_image_id') AND m.meta_value = %s) OR p.post_content REGEXP %s OR p.post_content REGEXP %s OR p.post_content LIKE %s) LIMIT 1", (string) $id, $like_id, $like_json, $like_url));
+    $used = $wpdb->get_var($wpdb->prepare("SELECT p.ID FROM {$wpdb->posts} p LEFT JOIN {$wpdb->postmeta} m ON m.post_id = p.ID WHERE p.post_status = 'publish' AND p.post_type IN ($types) AND ((m.meta_key IN ('_thumbnail_id','_byline_guest_image_id','_byline_live_update_image_id') AND m.meta_value = %s) OR p.post_content REGEXP %s OR p.post_content REGEXP %s OR p.post_content LIKE %s) LIMIT 1", (string) $id, $like_id, $like_json, $like_url));
     if ($used) return true;
     return (bool) $wpdb->get_var($wpdb->prepare("SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = '_ww_author_photo_id' AND meta_value = %s LIMIT 1", (string) $id));
 }

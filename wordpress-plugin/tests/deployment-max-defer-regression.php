@@ -97,4 +97,11 @@ $jobs[1]['payload']['firstQueuedAt'] = time() - 500;
 byline_deployment_enqueue_job('live-update', 4, time() + 60);
 defer_assert($jobs[1]['dueAt'] === time() && $jobs[1]['payload']['firstQueuedAt'] === time() - 500, 'A deploy already past the cap runs now and keeps its first-queued time.');
 
+// Retry backoff remains a lower bound even after the original debounce cap.
+$jobs[1]['status'] = 'retry_waiting';
+$jobs[1]['nextAttemptAt'] = time() + 90;
+byline_deployment_enqueue_job('live-update', 5, time() + 60);
+defer_assert($jobs[1]['dueAt'] === $jobs[1]['nextAttemptAt'], 'A new save must preserve retry backoff instead of scheduling an immediate retry storm.');
+defer_assert(count($jobs) === 1 && $jobs[1]['payload']['expectedRevision'] === 5, 'Rapid updates coalesce into one durable job with the newest revision.');
+
 echo "Deployment max-defer regression passed.\n";

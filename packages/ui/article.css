@@ -113,7 +113,7 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .article-live-key-points { background: color-mix(in srgb, var(--rule) 45%, transparent); border-left: 3px solid var(--accent); margin: 0 0 20px; padding: 14px 18px; }
 .byline-article-view .article-live-key-points h3 { font-family: var(--font-ui); font-size: .8rem; font-weight: 800; letter-spacing: .04em; margin: 0 0 6px; text-transform: uppercase; }
 .byline-article-view .article-live-key-points ul, .byline-article-view .article-live-update-body ul { margin: 6px 0; padding-left: 1.2em; }
-.byline-article-view .article-live-new { position: sticky; text-align: center; top: calc(var(--sticky-header-h, 64px) + 8px); z-index: 2; }
+.byline-article-view .article-live-new { height: 0; position: sticky; text-align: center; top: calc(var(--sticky-header-h, 64px) + 8px); z-index: 2; }
 .byline-article-view .article-live-new-button { background: var(--ink); border: 0; border-radius: 999px; box-shadow: 0 4px 14px rgb(0 0 0 / .18); color: var(--page); cursor: pointer; font-family: var(--font-ui); font-size: .82rem; font-weight: 700; padding: 9px 16px; }
 .byline-article-view .article-live-new-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .byline-article-view .article-live-updates { display: grid; }
@@ -124,6 +124,7 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .article-live-update-time:hover, .byline-article-view .article-live-update-time:focus-visible { text-decoration: underline; }
 .byline-article-view .article-live-update-author { color: var(--muted); }
 .byline-article-view .article-live-update-title { font-family: var(--font-ui); font-size: 1.2rem; font-weight: 800; line-height: 1.2; margin: 6px 0 4px; }
+.byline-article-view .article-live-update-body { overflow-wrap: anywhere; }
 .byline-article-view .article-live-update-body p { margin: 8px 0; }
 .byline-article-view .article-live-update-image { margin: 10px 0; }
 .byline-article-view .article-live-update-image img { height: auto; width: 100%; }

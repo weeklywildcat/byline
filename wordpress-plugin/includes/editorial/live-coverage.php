@@ -25,7 +25,6 @@ const BYLINE_LIVE_ENDED_AT_META = '_byline_live_ended_at';
 const BYLINE_LIVE_UPDATE_PINNED_META = '_byline_live_update_pinned';
 const BYLINE_LIVE_UPDATE_IMAGE_META = '_byline_live_update_image_id';
 const BYLINE_LIVE_STATUSES = ['live', 'ended'];
-const BYLINE_LIVE_UPDATE_LIMIT = 500;
 const BYLINE_LIVE_UPDATE_TEXT_MAX = 5000;
 const BYLINE_LIVE_UPDATE_TITLE_MAX = 160;
 
@@ -37,9 +36,11 @@ function byline_live_status_value($value): string
 function byline_live_datetime($value): string
 {
     $value = trim((string) $value);
-    if ($value === '') return '';
+    if ($value === '' || !preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/i', $value)) return '';
     try {
         $date = new DateTimeImmutable($value, new DateTimeZone('UTC'));
+        $errors = DateTimeImmutable::getLastErrors();
+        if ($errors && ($errors['warning_count'] || $errors['error_count'])) return '';
     } catch (Exception $exception) {
         return '';
     }
@@ -182,15 +183,15 @@ function byline_list_live_updates(int $story_id): array
         'post_type' => BYLINE_LIVE_UPDATE_POST_TYPE,
         'post_status' => 'publish',
         'post_parent' => $story_id,
-        'posts_per_page' => BYLINE_LIVE_UPDATE_LIMIT,
-        'numberposts' => BYLINE_LIVE_UPDATE_LIMIT,
+        'posts_per_page' => -1,
+        'numberposts' => -1,
         'orderby' => 'date',
         'order' => 'DESC',
         'no_found_rows' => true,
     ]);
     $updates = [];
     foreach (is_array($records) ? $records : [] as $record) {
-        if (!$record instanceof WP_Post || (int) ($record->post_parent ?? 0) !== $story_id) continue;
+        if (!$record instanceof WP_Post || $record->post_type !== BYLINE_LIVE_UPDATE_POST_TYPE || $record->post_status !== 'publish' || !empty($record->post_password) || (int) ($record->post_parent ?? 0) !== $story_id) continue;
         $item = byline_get_live_update((int) $record->ID);
         if ($item !== [] && ($item['text'] !== '' || $item['title'] !== '' || $item['imageId'] > 0)) $updates[] = $item;
     }
@@ -207,7 +208,7 @@ function byline_public_live_coverage(int $story_id): ?array
 {
     $story = byline_live_story($story_id);
     $state = byline_live_story_state($story_id);
-    if (!$story || $story->post_status !== 'publish' || $state['status'] === '') return null;
+    if (!$story || $story->post_status !== 'publish' || !empty($story->post_password) || $state['status'] === '') return null;
     $updates = array_map(static function (array $update): array {
         $image = byline_live_update_image((int) $update['imageId']);
         return [
@@ -274,8 +275,8 @@ function byline_create_live_update(int $story_id, array $input, int $user_id)
         'post_status' => 'publish',
         'post_parent' => $story_id,
         'post_author' => $user_id,
-        'post_title' => $title,
-        'post_content' => $text,
+        'post_title' => function_exists('wp_slash') ? wp_slash($title) : $title,
+        'post_content' => function_exists('wp_slash') ? wp_slash($text) : $text,
     ], true);
     if (is_wp_error($post_id)) return $post_id;
     $post_id = absint($post_id);
@@ -302,7 +303,8 @@ function byline_update_live_update(int $story_id, int $update_id, array $input)
     if ($text === '' && $title === '' && $image_id === 0) {
         return new WP_Error('byline_live_update_empty', 'An update cannot be empty. Delete it instead.', ['status' => 400]);
     }
-    wp_update_post(['ID' => $update_id, 'post_title' => $title, 'post_content' => $text]);
+    $result = wp_update_post(['ID' => $update_id, 'post_title' => function_exists('wp_slash') ? wp_slash($title) : $title, 'post_content' => function_exists('wp_slash') ? wp_slash($text) : $text], true);
+    if (is_wp_error($result)) return $result;
     if ($image_id > 0) update_post_meta($update_id, BYLINE_LIVE_UPDATE_IMAGE_META, $image_id);
     else delete_post_meta($update_id, BYLINE_LIVE_UPDATE_IMAGE_META);
     if (array_key_exists('pinned', $input)) {
@@ -401,11 +403,36 @@ function byline_live_rest_delete_update(WP_REST_Request $request)
         : new WP_Error('byline_live_update_not_found', 'The update could not be found.', ['status' => 404]);
 }
 
+/** Publishing into a public story requires publish rights as well as story access. */
+function byline_live_rest_write_permission(WP_REST_Request $request)
+{
+    $permission = byline_editorial_rest_permission($request);
+    if ($permission !== true) return $permission;
+    $story = byline_live_story(absint($request->get_param('id')));
+    if ($story && $story->post_status === 'publish' && !current_user_can('publish_posts')) {
+        return new WP_Error('byline_live_forbidden', 'You are not allowed to publish live updates.', ['status' => 403]);
+    }
+    return true;
+}
+
+/** Public, published-only projection. The Worker builds presentation from this same snapshot shape. */
+function byline_live_rest_public(WP_REST_Request $request)
+{
+    $live = byline_public_live_coverage(absint($request->get_param('id')));
+    if (!$live) return new WP_Error('byline_live_not_found', 'Coverage not found.', ['status' => 404]);
+    $response = rest_ensure_response($live);
+    $response->header('Cache-Control', 'no-store');
+    return $response;
+}
+
 function byline_live_register_rest_routes(): void
 {
-    $permission = 'byline_editorial_rest_permission';
+    register_rest_route(BYLINE_REST_NAMESPACE, '/live/(?P<id>\\d+)', [
+        'methods' => WP_REST_Server::READABLE, 'callback' => 'byline_live_rest_public', 'permission_callback' => '__return_true',
+    ]);
+    $permission = 'byline_live_rest_write_permission';
     register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/stories/(?P<id>\d+)/live', [
-        ['methods' => WP_REST_Server::READABLE, 'callback' => 'byline_live_rest_get', 'permission_callback' => $permission],
+        ['methods' => WP_REST_Server::READABLE, 'callback' => 'byline_live_rest_get', 'permission_callback' => 'byline_editorial_rest_permission'],
         ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'byline_live_rest_set_status', 'permission_callback' => $permission],
     ]);
     register_rest_route(BYLINE_REST_NAMESPACE, '/editorial/stories/(?P<id>\d+)/live/updates', [

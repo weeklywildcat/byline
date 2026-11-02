@@ -17,14 +17,14 @@ const liveStory = post({ id: 9, live: { status: "live", startedAt: "2026-10-14T2
 const endedStory = post({ id: 9, live: { status: "ended", startedAt: "2026-10-14T22:20:00Z", endedAt: "2026-10-15T01:00:00Z", updates } });
 
 describe("live coverage on the public site", () => {
-  it("splits out the key points and lists the rest newest first with absolute times", () => {
+  it("splits out the key points and preserves the complete timeline newest first with absolute times", () => {
     const view = buildArticleLiveView(liveStory)!;
     expect(view.keyPoints?.id).toBe(30);
-    expect(view.updates.map((update) => update.id)).toEqual([31, 29]);
-    expect(view.updatedAt).toBe("2026-10-14T23:40:00Z");
+    expect(view.updates.map((update) => update.id)).toEqual([31, 29, 30]);
+    expect(view.updatedAt).toBe("2026-10-14T23:40:00.000Z");
     expect(view.updates[0].dateLabel).toBe(formatLiveTime("2026-10-14T23:40:00Z"));
     expect(formatLiveTime("2026-10-14T23:40:00Z")).toBe("Oct 14, 7:40 PM");
-    expect(view.feedUrl).toBe("/_byline/live/9.json");
+    expect(view.feedUrl).toBe("/api/live/9");
     expect(buildArticleLiveView(post())).toBeNull();
   });
 
@@ -40,20 +40,20 @@ describe("live coverage on the public site", () => {
     expect(ended).toContain("Live coverage ended");
     expect(ended).not.toContain("article-live-badge");
     expect(ended).not.toContain("article-live-new");
-    for (const id of [31, 29]) expect(ended).toContain(`id="update-${id}"`);
+    for (const id of [31, 29, 30]) expect(ended).toContain(`id="update-${id}"`);
   });
 
   it("dates the story by its newest update", () => {
     const presentation = buildArticlePresentation({ post: liveStory, allPosts: [liveStory], contributors: [], author: null });
-    expect(presentation.modifiedAt).toBe("2026-10-14T23:40:00Z");
+    expect(presentation.modifiedAt).toBe("2026-10-14T23:40:00.000Z");
     expect(presentation.update).toBeNull();
-    expect(getPostTimestamps(liveStory).modified).toBe("2026-10-14T23:40:00Z");
+    expect(getPostTimestamps(liveStory).modified).toBe("2026-10-14T23:40:00.000Z");
   });
 
   it("publishes the feed the page polls, rendered by the same component", () => {
     const feed = buildLiveFeed(liveStory)!;
     expect(feed.status).toBe("live");
-    expect(feed.updates.map((update) => update.id)).toEqual([31, 29]);
+    expect(feed.updates.map((update) => update.id)).toEqual([31, 29, 30]);
     expect(feed.updates[0].html).toContain('id="update-31"');
     expect(feed.updates[0].html).toContain("Halftime: 14-7.");
     expect(buildLiveFeed(post())).toBeNull();
@@ -62,15 +62,15 @@ describe("live coverage on the public site", () => {
   it("describes the story as a LiveBlogPosting with its updates", () => {
     const schema = getNewsArticleSchema(endedStory) as Record<string, any>;
     expect(schema["@type"]).toEqual(["NewsArticle", "LiveBlogPosting"]);
-    expect(schema.coverageStartTime).toBe("2026-10-14T22:20:00Z");
-    expect(schema.coverageEndTime).toBe("2026-10-15T01:00:00Z");
+    expect(schema.coverageStartTime).toBe("2026-10-14T22:20:00.000Z");
+    expect(schema.coverageEndTime).toBe("2026-10-15T01:00:00.000Z");
     expect(schema.liveBlogUpdate[0]).toMatchObject({ "@type": "BlogPosting", headline: "Halftime: 14-7.", url: expect.stringMatching(/#update-31$/) });
     expect(getNewsArticleSchema(post())["@type"]).toBe("NewsArticle");
   });
 
-  it("keeps a running live story in the news sitemap past the two-day window", () => {
+  it("keeps the news sitemap publication window for running and ended stories", () => {
     const options = { siteUrl: "https://weeklywildcat.com", publicationName: "Weekly Wildcat", timeZone: "America/New_York", now: Date.parse("2026-10-20T12:00:00Z") };
-    expect(buildNewsSitemapXml([liveStory], options)).toContain("<loc>");
+    expect(buildNewsSitemapXml([liveStory], options)).not.toContain("<loc>");
     expect(buildNewsSitemapXml([endedStory], options)).not.toContain("<loc>");
   });
 
@@ -78,5 +78,35 @@ describe("live coverage on the public site", () => {
     expect(toStoryView(liveStory).live).toBe(true);
     expect(toStoryView(endedStory).live).toBeUndefined();
     expect(renderToStaticMarkup(<StoryCard story={toStoryView(liveStory)} variant="grid" fallbackAuthorName="Staff" />)).toContain('<span class="home-story-live">Live</span>');
+  });
+});
+
+describe("live data boundary", () => {
+  it("orders instants across time zones, rejects invalid dates, and drops duplicate IDs", () => {
+    const story = post({ live: { status: "live", startedAt: "2026-11-02T19:00:00Z", updates: [
+      { ...updates[0], id: 1, date: "2026-11-02T15:00:00-05:00" },
+      { ...updates[0], id: 2, date: "2026-11-02T20:30:00Z" },
+      { ...updates[0], id: 1, date: "2026-11-02T20:00:00Z" },
+      { ...updates[0], id: 3, date: "2026-02-31T20:00:00Z" },
+      { ...updates[0], id: 4, date: "not a date" }
+    ] } });
+    expect(buildArticleLiveView(story)?.updates.map((update) => update.id)).toEqual([2, 1]);
+    expect(buildArticleLiveView(story)?.updates[1].date).toBe("2026-11-02T20:00:00.000Z");
+  });
+  it("renders an empty live story and a pinned photo as complete static content", () => {
+    const empty = post({ live: { status: "live", startedAt: "2026-11-02T19:00:00Z", updates: [] } });
+    const view = buildArticleLiveView(empty)!;
+    expect(view.updatedAt).toBe("2026-11-02T19:00:00.000Z");
+    expect(renderToStaticMarkup(<ArticleView presentation={buildArticlePresentation({ post: empty, allPosts: [empty], contributors: [], author: null })} />)).toContain("Updates will appear here.");
+    const pinned = post({ live: { status: "ended", startedAt: "2026-11-02T19:00:00Z", endedAt: "2026-11-02T21:00:00Z", updates: [
+      { ...updates[0], pinned: true, title: '<headline>', author: 'Ana & Jo', image: { url: '/_wordpress-media/photo.jpg', alt: 'A "photo"', width: 900, height: 600, credit: 'Jo & Ana' } }
+    ] } });
+    const feed = buildLiveFeed(pinned)!;
+    expect(feed.updates).toHaveLength(1);
+    expect(feed.updates[0].html).toContain('id="update-31"');
+    expect(feed.updates[0].html).toContain('alt="A &quot;photo&quot;"');
+    expect(feed.updates[0].html).toContain('Photo: Jo &amp; Ana');
+    expect(feed.updates[0].html).toContain('&lt;headline&gt;');
+    expect(getPostTimestamps(pinned).modified).toBe("2026-11-02T21:00:00.000Z");
   });
 });

@@ -290,6 +290,8 @@ function byline_deployment_enqueue_job(string $reason, int $expected_revision, i
         $first_queued_at = absint($old_payload['firstQueuedAt'] ?? 0) ?: (strtotime((string) ($old_payload['requestedAt'] ?? '')) ?: time());
         $payload['firstQueuedAt'] = $first_queued_at;
         $due_at = min($due_at, max(time(), $first_queued_at + BYLINE_DEPLOYMENT_MAX_DEFER));
+        // Coalescing must not bypass a failed job's retry backoff.
+        if ($job['status'] === 'retry_waiting') $due_at = max($due_at, (int) ($job['nextAttemptAt'] ?? 0));
         $payload['reasons'] = array_values(array_unique(array_filter(array_merge(
             (array) ($old_payload['reasons'] ?? []),
             [(string) ($old_payload['reason'] ?? ''), $reason]

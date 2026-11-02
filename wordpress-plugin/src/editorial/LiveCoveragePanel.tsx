@@ -72,7 +72,7 @@ export function LiveCoveragePanel({ postId }: Props) {
   };
 
   const published = isPublished
-    ? __('Posted. It appears on the site after the next publish, usually within a few minutes.', 'weekly-wildcat-headless')
+    ? __('Posted. Live readers receive this update shortly; the next publish adds it to the permanent page.', 'weekly-wildcat-headless')
     : __('Saved. Updates appear when the story is published.', 'weekly-wildcat-headless');
 
   const submit = async () => {
@@ -121,6 +121,7 @@ export function LiveCoveragePanel({ postId }: Props) {
           __nextHasNoMarginBottom
           __next40pxDefaultSize
           label={__('Headline (optional)', 'weekly-wildcat-headless')}
+          disabled={isBusy}
           value={draft.title}
           onChange={(title) => setDraft({ ...draft, title })}
         />
@@ -129,6 +130,7 @@ export function LiveCoveragePanel({ postId }: Props) {
           label={editing ? __('Edit update', 'weekly-wildcat-headless') : __('Update', 'weekly-wildcat-headless')}
           help={__('Blank line for a new paragraph. Start lines with "- " for a list. Links work as typed.', 'weekly-wildcat-headless')}
           rows={5}
+          disabled={isBusy}
           value={draft.text}
           onChange={(text) => setDraft({ ...draft, text })}
         />
@@ -139,8 +141,8 @@ export function LiveCoveragePanel({ postId }: Props) {
             onSelect={(media: { id?: number }) => setDraft({ ...draft, imageId: Number(media?.id) || 0 })}
             render={({ open }: { open: () => void }) => (
               <div className="byline-live-panel-photo">
-                <Button variant="secondary" onClick={open}>{draft.imageId ? __('Replace photo', 'weekly-wildcat-headless') : __('Add photo', 'weekly-wildcat-headless')}</Button>
-                {draft.imageId ? <Button variant="link" isDestructive onClick={() => setDraft({ ...draft, imageId: 0 })}>{__('Remove photo', 'weekly-wildcat-headless')}</Button> : null}
+                <Button variant="secondary" disabled={isBusy} onClick={open}>{draft.imageId ? __('Replace photo', 'weekly-wildcat-headless') : __('Add photo', 'weekly-wildcat-headless')}</Button>
+                {draft.imageId ? <Button variant="link" isDestructive disabled={isBusy} onClick={() => setDraft({ ...draft, imageId: 0 })}>{__('Remove photo', 'weekly-wildcat-headless')}</Button> : null}
               </div>
             )}
           />
@@ -149,11 +151,12 @@ export function LiveCoveragePanel({ postId }: Props) {
           __nextHasNoMarginBottom
           label={__('Pin as key points', 'weekly-wildcat-headless')}
           help={__('Shown in a box above every other update. Only one update is pinned.', 'weekly-wildcat-headless')}
+          disabled={isBusy}
           checked={draft.pinned}
           onChange={(pinned) => setDraft({ ...draft, pinned })}
         />
         <div className="byline-live-panel-actions">
-          {editing ? <Button variant="tertiary" onClick={() => { setEditing(null); setDraft(EMPTY_LIVE_UPDATE); }}>{__('Cancel', 'weekly-wildcat-headless')}</Button> : null}
+          {editing ? <Button variant="tertiary" disabled={isBusy} onClick={() => { setEditing(null); setDraft(EMPTY_LIVE_UPDATE); }}>{__('Cancel', 'weekly-wildcat-headless')}</Button> : null}
           <Button variant="primary" onClick={submit} isBusy={isBusy} disabled={isBusy || !canPostLiveUpdate(draft)}>
             {editing ? __('Save update', 'weekly-wildcat-headless') : __('Post update', 'weekly-wildcat-headless')}
           </Button>
@@ -169,8 +172,8 @@ export function LiveCoveragePanel({ postId }: Props) {
             {update.title ? <strong>{update.title}</strong> : null}
             <p>{update.text.length > 140 ? `${update.text.slice(0, 140)}…` : update.text}</p>
             <span className="byline-live-panel-item-actions">
-              <Button variant="link" onClick={() => { setEditing(update); setDraft({ title: update.title, text: update.text, imageId: update.imageId, pinned: update.pinned }); }}>{__('Edit', 'weekly-wildcat-headless')}</Button>
-              <Button variant="link" isDestructive onClick={() => remove(update)}>{__('Delete', 'weekly-wildcat-headless')}</Button>
+              <Button variant="link" disabled={isBusy} onClick={() => { setEditing(update); setDraft({ title: update.title, text: update.text, imageId: update.imageId, pinned: update.pinned }); }}>{__('Edit', 'weekly-wildcat-headless')}</Button>
+              <Button variant="link" isDestructive disabled={isBusy} onClick={() => remove(update)}>{__('Delete', 'weekly-wildcat-headless')}</Button>
             </span>
           </li>
         ))}

@@ -11,8 +11,8 @@ const LIVE_PREFIX = "_byline/live/";
 
 // Astro ignores underscore-prefixed page directories, so keep the required
 // /_byline/ path as the only explicit prerendered catch-all endpoint. It also
-// emits /_byline/live/<postId>.json for every story that has been live; open
-// live pages re-read it (no-cache, see scripts/generate-headers.mjs).
+// emits /_byline/live/<postId>.json for every story that has been live; the static
+// archive is uncached (see scripts/generate-headers.mjs).
 export async function getStaticPaths() {
   const snapshot = await getBuildSnapshot();
   const livePaths = snapshot.posts
@@ -31,7 +31,7 @@ export async function GET({ params }: { params: { path?: string } }) {
   if (params.path?.startsWith(LIVE_PREFIX)) {
     const snapshot = await getBuildSnapshot();
     const id = Number(params.path.slice(LIVE_PREFIX.length));
-    const post = snapshot.posts.find((candidate) => candidate.id === id);
+    const post = snapshot.posts.find((candidate) => candidate.id === id && isVisibleContentPost(candidate));
     const feed = post ? buildLiveFeed(post) : null;
     return feed ? json(feed) : new Response("Not Found", { status: 404 });
   }

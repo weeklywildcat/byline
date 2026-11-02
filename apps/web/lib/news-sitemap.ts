@@ -1,6 +1,6 @@
 import { getWordPressInstant } from "@/lib/dates";
 import { stripHtml } from "@/lib/format";
-import { getPostHref, getPostLiveCoverage, getPostRouteParts, type WordPressPost } from "@/lib/wordpress";
+import { getPostHref, getPostRouteParts, type WordPressPost } from "@/lib/wordpress";
 
 const NEWS_NAMESPACE = "http://www.google.com/schemas/sitemap-news/0.9";
 const SITEMAP_NAMESPACE = "http://www.sitemaps.org/schemas/sitemap/0.9";
@@ -39,9 +39,7 @@ export function buildNewsSitemapXml(posts: WordPressPost[], { siteUrl, publicati
       const published = publishedAt(post, timeZone);
       if (!published || !getPostRouteParts(post)) return [];
       const age = now - published.getTime();
-      // Live coverage stays listed while it is running, however long that is.
-      const isLive = getPostLiveCoverage(post)?.status === "live";
-      if (age < 0 || (age > NEWS_RECENCY_WINDOW_MS && !isLive)) return [];
+      if (age < 0 || age > NEWS_RECENCY_WINDOW_MS) return [];
 
       return [`  <url>
     <loc>${escapeXml(`${siteUrl}${getPostHref(post)}`)}</loc>

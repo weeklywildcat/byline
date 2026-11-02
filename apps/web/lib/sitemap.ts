@@ -80,8 +80,10 @@ export function buildSitemapEntries(input: SitemapInput): SitemapEntry[] {
 
   // A live story's newest update is newer than the post's own modified time.
   const postDates = new Map(posts.map((post) => {
-    const newestUpdate = getPostLiveCoverage(post)?.updates[0]?.date;
-    return [post.id, latest([modifiedAt(post, timeZone), newestUpdate ? new Date(newestUpdate) : undefined])];
+    const live = getPostLiveCoverage(post);
+    const dates = [live?.startedAt, live?.endedAt, ...(live?.updates.map((update) => update.modified) ?? [])]
+      .filter((date): date is string => Boolean(date)).map((date) => new Date(date));
+    return [post.id, latest([modifiedAt(post, timeZone), ...dates])];
   }));
   const latestModified = latest([...postDates.values()]);
 

@@ -467,8 +467,9 @@ export function getPostTimestamps(post: Pick<WordPressPost, "date" | "date_gmt" 
   const published = getWordPressIsoTimestamp({ gmt: post.date_gmt, local: post.date }, publication.timezone);
   const modified = getWordPressIsoTimestamp({ gmt: post.modified_gmt, local: post.modified }, publication.timezone);
   // Live updates are separate records, so the post's own modified time lags them.
-  const newestUpdate = getPostLiveCoverage(post as WordPressPost)?.updates[0]?.date;
-  const latest = [modified ?? published, newestUpdate].filter((value): value is string => Boolean(value)).sort().at(-1);
+  const live = getPostLiveCoverage(post as WordPressPost);
+  const latest = [modified ?? published, live?.startedAt, live?.endedAt, ...(live?.updates.map((update) => update.modified) ?? [])]
+    .filter((value): value is string => Boolean(value)).sort((a, b) => Date.parse(a) - Date.parse(b)).at(-1);
 
   return { published, modified: latest ?? published };
 }
@@ -489,7 +490,8 @@ function getLiveBlogFields(post: WordPressPost, articleUrl: string) {
       datePublished: update.date,
       dateModified: update.modified,
       url: `${articleUrl}#update-${update.id}`,
-      articleBody: stripHtml(update.html) || undefined
+      articleBody: stripHtml(update.html) || undefined,
+      ...(update.author ? { author: { "@type": "Person", name: update.author } } : {})
     }))
   };
 }
