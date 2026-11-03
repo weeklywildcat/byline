@@ -270,6 +270,5 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-series-pa
 @container byline-content (min-width: 900px) {
   .byline-article-view .article-primary-video { margin-inline: calc((100% - min(var(--article-wide-width), 100cqi - 40px)) / 2); }
 }
-.byline-article-view .story-video-badge, .story-video-badge { align-items: center; color: var(--accent); display: inline-flex; font-family: var(--font-ui); font-size: .72rem; font-weight: 700; gap: 4px; letter-spacing: .02em; line-height: 1.2; text-transform: uppercase; white-space: nowrap; }
-.story-video-badge svg { flex: none; }
-.story-video-duration { font-variant-numeric: tabular-nums; }
+/* The card label takes the font of the kicker it sits in, like the section name beside it. */
+.story-video-badge { color: var(--accent); text-transform: uppercase; white-space: nowrap; }

@@ -305,7 +305,7 @@ export function SearchPageClient({ publicationName, searchGapEndpoint, searchInd
               <article className="search-result" key={item.id}>
                 <div className="search-result-meta">
                   {getItemKind(item) !== "story" ? <span className="search-result-kind">{getResultLabel(getItemKind(item))}</span> : null}
-                  {item.video ? <StoryVideoBadge video={item.video} /> : null}
+                  {item.video ? <StoryVideoBadge /> : null}
                   {item.category && getItemKind(item) === "story" ? <span className="search-result-section"><HighlightedText value={item.category} terms={terms} /></span> : null}
                 </div>
                 <h3>

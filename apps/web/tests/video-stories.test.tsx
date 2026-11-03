@@ -240,10 +240,14 @@ describe("discovery", () => {
 });
 
 describe("story cards", () => {
-  it("label a video story with its running time and leave articles alone", () => {
+  it("label a video story and leave articles alone", () => {
     const videoTeaser = renderToStaticMarkup(<StoryTeaser post={videoStory()} />);
     expect(videoTeaser).toContain("story-video-badge");
-    expect(videoTeaser).toContain("1:32");
+    // The label is just "Video"; the running time stays in the structured data.
+    // In the small byline line above the headline, never inside the headline itself.
+    expect(videoTeaser).toMatch(/<div class="article-byline"><span class="story-video-badge">Video<\/span>/);
+    expect(videoTeaser.slice(videoTeaser.indexOf("<h2"))).not.toContain("story-video-badge");
+    expect(videoTeaser).not.toContain("1:32");
     expect(renderToStaticMarkup(<StoryTeaser post={article} />)).not.toContain("story-video-badge");
 
     const card = renderToStaticMarkup(<StoryCard story={toStoryView(videoStory())} variant="grid" fallbackAuthorName="Staff" />);

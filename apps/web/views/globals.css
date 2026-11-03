@@ -2039,12 +2039,6 @@ h1.masthead-logo {
   grid-template-columns: 92px minmax(0, 1fr);
 }
 
-.story-teaser h2 .story-teaser-video-label {
-  font-size: 0.62em;
-  margin-right: 8px;
-  vertical-align: baseline;
-}
-
 .story-teaser-live {
   color: var(--accent);
   display: inline-block;

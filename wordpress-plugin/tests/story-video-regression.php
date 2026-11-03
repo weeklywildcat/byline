@@ -22,6 +22,12 @@ function add_action(string $hook, $callback, int $priority = 10, int $args = 1):
     $actions[$hook][] = $callback;
 }
 function current_user_can(string $capability): bool { return true; }
+$removed_supports = [];
+function remove_post_type_support(string $post_type, string $feature): void
+{
+    global $removed_supports;
+    $removed_supports[] = [$post_type, $feature];
+}
 function register_post_meta(string $post_type, string $key, array $args): bool
 {
     global $registered;
@@ -179,5 +185,10 @@ story_video_assert($registered['post'][BYLINE_STORY_FORMAT_META]['show_in_rest']
 story_video_assert($registered['post'][BYLINE_STORY_FORMAT_META]['default'] === 'standard', 'format defaults to standard');
 story_video_assert(strpos(BYLINE_STORY_VIDEO_DETAILS_META, '_') === 0, 'cached details are protected meta');
 story_video_assert(isset($actions['updated_post_meta'], $actions['added_post_meta'], $actions['transition_post_status']), 'lookup hooks are registered');
+
+// One Format control: the theme's core post formats are hidden from posts.
+story_video_assert(in_array('byline_story_video_remove_core_post_formats', $actions['init'], true), 'core post formats are removed on init');
+byline_story_video_remove_core_post_formats();
+story_video_assert($removed_supports === [['post', 'post-formats']], 'core post formats are removed from posts only');
 
 fwrite(STDOUT, "Story video regression passed.\n");

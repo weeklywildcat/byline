@@ -1,3 +1,4 @@
+import { StoryVideoBadge } from "@byline/ui";
 import { decodeHtml, formatDisplayDate } from "@/lib/format";
 import { isHiddenCategory } from "@/lib/content";
 import {
@@ -19,14 +20,17 @@ type ArticleBylineProps = {
   contributors?: WordPressContributor[];
   category: WordPressCategory | null;
   date: string;
+  /** A video story leads the line with a small "Video" label. */
+  video?: boolean;
 };
 
-export function ArticleByline({ author, contributors, category, date }: ArticleBylineProps) {
+export function ArticleByline({ author, contributors, category, date, video = false }: ArticleBylineProps) {
   const visibleCategory = category && !isHiddenCategory(category) ? category : null;
   const bylineContributors = contributors?.length ? contributors : author ? [author] : [];
 
   return (
     <div className="article-byline">
+      {video ? <StoryVideoBadge /> : null}
       {visibleCategory ? (
         <a className="eyebrow-link" href={getCategoryHref(visibleCategory)}>
           {decodeHtml(visibleCategory.name)}

@@ -248,14 +248,9 @@ function ArticleImage({ image, priority = false, showCaption = true }: { image: 
   );
 }
 
-/** "Video · 4:13" on a video story's card. */
-export function StoryVideoBadge({ video, className }: { video: StoryVideoBadgeView; className?: string }): ReactNode {
-  return (
-    <span className={joinClassNames("story-video-badge", className)}>
-      <svg aria-hidden="true" viewBox="0 0 16 16" width="10" height="10" focusable="false"><path d="M4 2.5v11l9-5.5z" fill="currentColor" /></svg>
-      Video{video.duration ? <span className="story-video-duration"> · {video.duration}</span> : null}
-    </span>
-  );
+/** "Video" on a video story's card, in the typography of the kicker it sits in. */
+export function StoryVideoBadge({ className }: { className?: string }): ReactNode {
+  return <span className={joinClassNames("story-video-badge", className)}>Video</span>;
 }
 
 function StoryCard({ story }: { story: ArticleStoryCardView }): ReactNode {
@@ -264,7 +259,7 @@ function StoryCard({ story }: { story: ArticleStoryCardView }): ReactNode {
       {story.image ? <ArticleImage image={story.image} showCaption={false} /> : null}
       <div className="story-teaser-body">
         <div className="article-byline">
-          {story.video ? <StoryVideoBadge video={story.video} /> : null}
+          {story.video ? <StoryVideoBadge /> : null}
           {story.category ? <span>{story.category}</span> : null}
           {story.dateLabel ? <time dateTime={story.date ?? undefined}>{story.dateLabel}</time> : null}
         </div>
