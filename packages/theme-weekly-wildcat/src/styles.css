@@ -184,6 +184,12 @@
   text-transform: uppercase;
 }
 
+:where(.byline-publication-preview) .home-story-video {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+}
+
 :where(.byline-publication-preview) .home-story-category:hover {
   color: var(--accent-dark);
 }

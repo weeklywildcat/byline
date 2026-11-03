@@ -403,7 +403,18 @@ function byline_register_story_video_meta(): void
         'auth_callback' => static fn() => current_user_can('edit_posts'),
     ]);
 }
+/**
+ * Byline's Format (Article or Video) is the only format a post has. A theme's
+ * core post formats do nothing on the headless site and would show writers a
+ * second, different "Format" control in the editor. Stored values are kept.
+ */
+function byline_story_video_remove_core_post_formats(): void
+{
+    remove_post_type_support('post', 'post-formats');
+}
+
 add_action('init', 'byline_register_story_video_meta');
+add_action('init', 'byline_story_video_remove_core_post_formats', 20);
 add_action('added_post_meta', 'byline_story_video_meta_changed', 10, 3);
 add_action('updated_post_meta', 'byline_story_video_meta_changed', 10, 3);
 add_action('transition_post_status', 'byline_story_video_on_publish', 10, 3);
