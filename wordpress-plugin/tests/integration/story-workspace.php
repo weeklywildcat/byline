@@ -80,6 +80,10 @@ try {
     $assert($call("/editorial/stories/$story/appointments", 'POST', ['title' => 'Bad', 'scheduleMode' => 'exact', 'startAt' => '2026-10-27T11:00', 'endAt' => '2026-10-27T10:00'])->get_status() === 400, 'End before start is rejected over REST.');
 
     /* ---- workspace read model */
+    // Keep the fixed dates above for timezone/feed checks; this one must be upcoming.
+    $upcoming = $call("/editorial/stories/$story/appointments", 'POST', ['title' => 'Upcoming interview', 'scheduleMode' => 'exact', 'startAt' => gmdate('Y-m-d\TH:i:s\Z', time() + 86400), 'notes' => 'PRIVATE appointment note']);
+    $assert($upcoming->get_status() === 201, 'Creating the upcoming appointment returns 201.');
+    $upcoming_id = $upcoming->get_data()['appointmentId'];
     $workspace = $call("/editorial/stories/$story/workspace");
     $data = $workspace->get_data();
     $assert($workspace->get_status() === 200, 'The workspace loads for the editor.');
@@ -87,12 +91,13 @@ try {
         $assert(array_key_exists($key, $data), "The workspace payload includes $key.");
     }
     $assert(strpos(wp_json_encode($data), 'SECRET ARTICLE BODY') === false && !isset($data['story']['content']), 'The workspace never includes the article body.');
-    $assert(count($data['sources']) === 3 && count($data['appointments']) === 2 && $data['reporting']['interviewed'] === 1, 'Reporting appears with its summary.');
+    $assert(count($data['sources']) === 3 && count($data['appointments']) === 3 && $data['reporting']['interviewed'] === 1, 'Reporting appears with its summary.');
     $assert($data['capabilities']['role'] === 'manager' && $data['capabilities']['assign'] === true, 'An editor gets manager capabilities.');
-    $assert($data['reporting']['nextAppointment']['id'] !== null, 'The summary names the next appointment.');
+    $assert($data['reporting']['nextAppointment']['id'] === $upcoming_id && !array_key_exists('notes', $data['reporting']['nextAppointment']), 'The summary names the upcoming appointment without its notes.');
     $planning = $call('/editorial/planning')->get_data();
     $row = array_values(array_filter($planning['stories'], static function ($s) use ($story) { return $s['id'] === $story; }))[0];
     $assert($row['reporting']['sources'] === 3 && strpos(wp_json_encode($row), 'PRIVATE source note') === false && strpos(wp_json_encode($row), 'Main office') === false, 'The Planning list carries counts, never notes or locations.');
+    $assert($call("/editorial/stories/$story/appointments/$upcoming_id", 'DELETE')->get_status() === 200, 'The summary fixture is removed before the remaining appointment checks.');
 
     /* ---- context access */
     wp_set_current_user($writer);

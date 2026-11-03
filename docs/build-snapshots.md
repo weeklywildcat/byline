@@ -128,6 +128,12 @@ deterministic paths, responsive variants, gallery originals, image sitemap
 originals, profile images, presentation aliases, attachment fallback and explicit
 missing-media fallback remain. Failed/non-image responses cannot become corrupt
 image files. Snapshot attachment metadata replaces late CMS attachment requests.
+An attachment's `bylineImage.artDirection` (focal point, crop boxes and the URLs of
+editor-cropped files; see `docs/newsroom-blocks.md`, *Photo crops*) travels with it.
+The cropped files are ordinary uploads URLs inside the render inputs, so they are
+mirrored like any other photograph. Responsive srcsets also leave out WordPress
+sizes whose shape differs from the photo (hard crops such as the 150×150
+thumbnail).
 
 Production clears the local media directory before materialization. **There is no
 persistent media cache.** The install probe deleted a custom subdirectory under

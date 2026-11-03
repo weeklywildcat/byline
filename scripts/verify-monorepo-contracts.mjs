@@ -49,6 +49,7 @@ const outputRoot = "apps/web/out";
 const forbiddenPublicValues = [
   "BYLINE_TEST_SECRET_DO_NOT_EXPORT",
   "CREDENTIAL_KEYS",
+  "byline_mcp_keys",
   "_byline_receipt_",
   "_byline_remote_lock_",
   "X-Byline-MCP-Tool",

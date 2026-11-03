@@ -1,50 +1,82 @@
-# Byline remote MCP
+# Byline MCP inside WordPress
 
-Byline MCP makes the existing newsroom programmable through typed actions. It is a separately deployed Cloudflare Worker in `apps/mcp/`, using MCP **2026-07-28**, TypeScript SDK **v2**, Zod 4 and `createMcpHandler` from `agents/mcp/server`. The pinned SDK version matches Agents' exact peer requirement. The endpoint also accepts legacy stateless Streamable HTTP clients. It has no standalone HTTP+SSE endpoint, `McpAgent` or protocol-session Durable Object.
+The Byline plugin serves its remote MCP endpoint at **`https://<your-cms>/mcp`**.
+For Weekly Wildcat that is `https://cms.weeklywildcat.com/mcp`. The hostname is
+an installation example, not a hard-coded default.
 
-## Architecture and ownership
+Install/update the normal Byline release ZIP. There is no separate MCP service,
+Cloudflare Worker, KV namespace, Durable Object, Node process, deployment or
+manual encryption-key configuration. Astro remains the static public build client.
+
+## Setup
+
+1. Update the installed Byline plugin with the complete release ZIP.
+2. The CMS needs HTTPS, PHP **8.2+** and OpenSSL. WordPress must route normal
+   permalinks through its front controller. No permalink flush is needed.
+3. Connect your MCP client to your CMS URL followed by `/mcp`, using OAuth.
+4. Sign in to WordPress and approve the named client. You act as that WordPress
+   user, with their current permissions on every call.
+5. Try “What needs attention in the newsroom today?”
+
+Your **WordPress → Users → Profile → Byline MCP** section shows the endpoint and
+lets you disconnect individual clients. Site settings, keys and auth storage are
+created automatically. On older PHP the rest of Byline still works; the MCP
+endpoint returns a clear unavailable response and the profile explains the requirement.
+
+## Architecture
 
 ```text
-MCP client → Cloudflare OAuth resource server → typed newsroom adapter
-                                                ↓ per-user Application Password
-                                    protected WordPress /byline/v1 API
-                                                ↓
-                            existing Byline domains and WordPress storage
+MCP client → WordPress /mcp → PHP MCP SDK → typed newsroom adapter
+                                            ↓ authenticated WordPress user
+                                   rest_do_request(/byline/v1/...)
+                                            ↓ normal permission callbacks
+                                   existing Byline domain/storage
 ```
 
-WordPress and the Byline plugin remain the durable control plane. The Worker does not query tables, own newsroom records, duplicate domain authorization, execute prompts, or involve Astro. Astro remains a static public build consumer. The Worker and Discord service are independently deployable and excluded from the plugin ZIP.
+`wordpress-plugin/includes/mcp/` owns the runtime. The official `mcp/sdk` PHP
+library handles the current **2026-07-28** protocol and older Streamable HTTP
+handshake clients. `league/oauth2-server` handles authorization codes, S256 PKCE,
+access tokens and rotating refresh tokens. The build locks and bundles these
+libraries under the private `BylineMcpVendor` namespace to avoid other plugins’
+dependency versions. End users do not install Composer or another plugin.
 
-The canonical plugin extensions are available to other authenticated clients too:
+`packages/mcp-contracts/` is development-only: it owns the shared Zod schemas,
+generated tool metadata, reference adapter and SDK tests. Its TypeScript is not
+executed on the CMS. There is no second newsroom database, remote HTTP proxy,
+shared administrator or MCP-specific role system. PHP adapters dispatch locally
+through the same protected canonical REST routes and domain permissions.
 
-- `/editorial/access`, `/editorial/staff`, `/editorial/system` and `/editorial/terms/{category|post_tag}` provide safe discovery.
-- `/editorial/story-plans` creates a canonical draft/preset and explicitly reports each setup outcome. A setup failure preserves the draft, with per-step `ok` and HTTP status; it does not silently claim a complete plan.
-- `/editorial/articles/{id}` and its named mutation routes guard content/publication writes and delegate to WordPress's native posts controller.
-- Task, link and Collection version tokens, conditional REST writes, bounded idempotency receipts, delete preconditions and MCP activity context extend existing domains.
-- The schedule includes distinctly typed story deadlines, planned publication and native WordPress schedules. Collection detail adds up to 50 stories' authorized reporting/work aggregates, with `hasMoreWork`. MCP selects `bounded=1` for Collection reads; existing UI clients retain their original detail results.
-- `/editorial/polls` exposes protected poll definitions and aggregate results only.
+## Authentication and revocation
 
-## Authentication and consent
-
-The Worker hosts separate `OAuthAuthorizationServer` and `OAuthResourceServer` roles using Cloudflare's OAuth Provider. They share a deployment here; the resource validator calls the authorization server's public API. A future split can use the provider's service-binding topology without changing tools.
-
-1. A client discovers RFC 9728 protected-resource and RFC 8414 authorization-server metadata. Tokens are bound to the canonical `/mcp` resource.
-2. Cloudflare validates the client and exact redirect URI, with CIMD support and DCR compatibility. The browser consent page shows the client identity/domain, redirect host, local-app warning, and access being granted. Client strings are HTML escaped.
-3. Cloudflare's consent and upstream helpers protect browser binding, CSRF, one-time state and expiry. Client authorization uses S256 PKCE. The consent POST also checks its Origin.
-4. Only after consent, the user goes to the configured WordPress installation's `/wp-admin/authorize-application.php`, authorizing **Byline MCP** (with a unique connection suffix so multiple clients can coexist) with the stable configured `APPLICATION_ID` UUID.
-5. WordPress sends its logged-in user's `user_login` and new Application Password to `/wordpress/callback`. The callback ignores supplied `site_url`, validates browser-bound state and uses a serialized replay claim.
-6. The Worker authenticates to the **configured** installation, introspects the new password's UUID and `app_id`, then reads the authenticated Byline identity. A caller cannot choose another WordPress user without possessing that user's valid credential.
-7. The credential is encrypted with AES-256-GCM using a random IV, key ID and connection-bound associated data. The auth-only `ConnectionVault` Durable Object stores ciphertext and minimal connection lifecycle metadata. It stores neither newsroom data nor MCP sessions. OAuth props contain only a random connection ID.
-8. Each MCP request verifies the OAuth token/audience, active connection and current WordPress identity/capabilities. Tool calls use that exact user's REST credential. No shared administrator credential exists.
-
-Raw WordPress passwords never go to MCP clients, tool results or logs. Access tokens last 15 minutes; refresh grants last 30 days. The `byline` OAuth scope identifies this resource's consent, not a parallel role system: WordPress capabilities still determine every operation.
-
-### Application Password lifecycle and revocation
-
-Every connection has its own password UUID and connection ID, including connections made by the same WordPress user. `byline.disconnect` immediately denies the connection before attempting upstream cleanup, revokes its OAuth grant and deletes exactly its own Application Password. Cleanup failure is reported as `credentialRevoked:false`; the vault retries hourly. No other password is deleted.
-
-The normal OAuth RFC 7009 revocation endpoint is `/oauth/token`. Revoking a refresh grant removes its access tokens through the provider. The vault reconciles grant existence hourly and then deletes its WordPress password. An abandoned authorization that never exchanges its code is cleaned up after approximately 15 minutes. Provider KV expiry cleanup runs hourly.
-
-Staff may also revoke the specific **Byline MCP** Application Password in **WordPress → Users → Profile → Application Passwords**. WordPress then refuses subsequent REST calls, regardless of OAuth token lifetime. Removing a client entry locally is not proof of server-side revocation: disconnect first, or revoke the WordPress password. Keep decryption keys available until all associated credentials have been removed.
+- Public OAuth metadata is served at `/.well-known/oauth-authorization-server`
+  and `/.well-known/oauth-protected-resource/mcp` relative to the CMS base URL.
+- Dynamic registration at `/mcp/register` supports public clients with exact
+  registered redirects, HTTPS web callbacks and loopback HTTP callbacks.
+  It does not fetch client-supplied URLs or advertise CIMD support.
+- `/mcp/authorize` uses the actual WordPress login and an explicit consent form.
+  WordPress nonces bind consent to the user and complete OAuth request. Client
+  names are self-reported, escaped and accompanied by the exact return address.
+- The maintained OAuth library validates codes, redirect matching and PKCE.
+  Only S256 is accepted. Five-minute codes are single-use; redemption and refresh
+  rotation are serialized. Access tokens last 15 minutes, refresh tokens up to
+  30 days, with a maximum connection lifetime of 30 days.
+- JWT signatures, times, issuer, resource audience, active grant and current
+  WordPress account permissions are checked on each request. A WordPress browser
+  cookie alone never authorizes `/mcp`.
+- No WordPress Application Password is created, stored or passed to a client.
+  There is no upstream credential to copy or clean up. The WordPress-native
+  login removes the need for the former Worker’s Application Password bridge.
+- The plugin automatically generates signing/encryption keys and stores them
+  encrypted using the installation’s WordPress salts. Back up the database and
+  `wp-config.php` together. Keys never ship in the ZIP or public snapshots.
+- `byline.disconnect`, `/mcp/revoke` and the owner’s WordPress profile disconnect
+  invalidate the connection’s access and refresh tokens immediately. Other
+  connections are unaffected. Password reset and account deletion revoke the
+  user’s grants; capability removal takes effect on the next request.
+- OAuth state, rate counters and compatibility handshake metadata live in a
+  dedicated WordPress auth table. It contains no newsroom record copies.
+  Expired entries are removed by an hourly WP Cron job. Modern MCP is stateless;
+  older clients’ bounded compatibility state is scoped to their OAuth grant.
 
 ## Permissions, privacy and trust
 
@@ -102,109 +134,106 @@ Collection membership and bulk workflow operations require at most 20 explicit I
 
 ## Limits and observability
 
-The Worker limits each connection to 120 requests/minute, search/summary work to 30/minute and auth attempts to 30/minute per hashed network identity. Durable Object counters enforce the limit across Worker isolates. Bulk lists have 20-item bounds; search defaults to 50 and caps at 100 with bounded offsets. Canonical candidate scans may also be bounded, so results are samples, not an implicit database export. The schedule reports its 200-story candidate bound; Collection work reports its 50-story work bound and 100-story/interview detail bounds. Use stories.search with collectionId for further story pages.
+Each connection is limited to 120 requests/minute; search/summary calls to 30/minute;
+authentication endpoints to 30/minute per hashed network identity. Atomic WordPress
+counters enforce limits across PHP workers. Tool bodies cap at 1 MiB, auth bodies at
+16 KiB, draft markup at 512 KiB and individual canonical responses at 4 MiB. Existing
+collection, search and bulk bounds remain in force.
 
-MCP request bodies cap at 1 MiB; auth bodies at 16 KiB; draft markup at 512 KiB. Upstream JSON reads cap at 4 MiB and time out after 20 seconds. Redirects are refused for authenticated WordPress calls. The installation URL is configuration, never tool input. Production requests require HTTPS and the exact configured host; browser Origins are checked against exact configured origins. Requests without Origin are supported for native clients.
+The endpoint derives its host from WordPress and validates browser Origins. Native
+clients without an Origin are supported. Browser deployments can allow additional
+exact origins using the `byline_mcp_allowed_origins` WordPress filter. Do not use `*`.
+Production requires HTTPS; loopback HTTP is accepted only for disposable WordPress
+installations explicitly marked `WP_ENVIRONMENT_TYPE=local`.
 
-Logs contain request ID, tool name, numeric actor ID, latency, status and upstream HTTP status/error class only. Never log tokens, passwords, request bodies, callback URLs/query strings, article text, notes, locations or resource URLs. Worker invocation logs are disabled and Worker query-string redaction is enabled because WordPress's Core authorization callback carries a credential in its query. **Configure Cloudflare HTTP/Logpush/APM/WAF logging to exclude or redact the entire `/wordpress/callback` query**, and do the same in any additional proxy. Application logging cannot sanitize a platform access log that runs before the Worker. Responses use no-store and callback/consent pages use no-referrer protections.
-
-Canonical activity events gain `source=mcp`, the validated tool name and correlation ID while retaining their actual WordPress actor. No conversation prompt is stored. Human activity summaries preserve the existing domain's private-content exclusions.
-
-## Deployment
-
-Deploy the updated plugin first; the Worker requires its protected extensions. The release ZIP still contains only the plugin. Use Node 24+ and a Cloudflare account with Workers, KV and SQLite-backed Durable Objects.
-
-1. Create a dedicated OAuth KV namespace with `npx wrangler kv namespace create OAUTH_KV` from `apps/mcp/`; put its real ID in your deployment configuration.
-2. Set a custom Worker domain/route. Set `PUBLIC_URL` to its HTTPS origin, `WORDPRESS_URL` to the canonical HTTPS WordPress installation root (subdirectories supported), and `ALLOWED_ORIGINS` to comma-separated exact browser origins you intend to allow. Native MCP clients generally omit Origin. No publication-specific domain is baked into the logic.
-3. Keep `APPLICATION_ID` stable across redeployments. The supplied UUID identifies this application, not a user or a secret; another installation may configure its own stable UUID.
-4. Generate a random 32-byte AES key locally and supply **only through a secret binding**. `CREDENTIAL_KEYS` is JSON such as `{"v1":"<base64 of 32 random bytes>"}`; `ACTIVE_KEY_ID=v1` selects the encryption key. Run `npx wrangler secret put CREDENTIAL_KEYS` interactively. Do not pass real keys/passwords in command arguments or commit them.
-5. Keep the `CONNECTIONS` binding and `v1` Durable Object migration and the `OAUTH_KV` binding. These store auth state only. Retain the hourly trigger. Review account logging/redaction before enabling traffic.
-6. Run `npm run typecheck:mcp`, `npm run test:mcp` and `npm run build:mcp`, then deploy with `npm run deploy --workspace @byline/mcp` using your configured domain/bindings.
-
-Keep `global_fetch_strictly_public` enabled: the OAuth provider requires it for safe CIMD resolution.
-
-The checked-in `wrangler.jsonc` deliberately has non-routable example origins and a placeholder KV ID. It must be configured before production use. No Cloudflare secrets or credentials are bundled into the plugin. Separate deployments must use separate bindings and encryption keys.
-
-For rotation, first add a second key while retaining old keys, set the new `ACTIVE_KEY_ID`, then redeploy. Existing records decrypt by their stored key ID and new connections encrypt with the active key. Reconnect/revoke old connections before removing old keys. Back up the keyring securely: losing it prevents credential cleanup and requires staff to revoke the passwords directly in WordPress.
-
-## Local development and validation
-
-```sh
-npm ci
-npm run typecheck:mcp
-npm run test:mcp
-npm run build:mcp
-npm run test:worker --workspace @byline/mcp
-npm run mcp:catalog
-npm run verify:mcp-catalog
-npm run build:plugin
-npm run test:mcp:wordpress
-```
-
-The WordPress command starts disposable `wp-env`, creates editor/writer/participant test users and records, checks real REST authorization/concurrency/publication/privacy, cleans up those records, and writes ignored synthetic response contracts for the SDK adapter tests. Run `npx wp-env stop --config=.wp-env.json` when finished. The ordinary root typecheck/test/build commands include MCP. CI also runs the WordPress tests in the real WordPress job and checks that plugin packaging excludes the Worker.
-
-For a complete interactive OAuth loop use an HTTPS development hostname/tunnel and HTTPS WordPress installation with Application Passwords enabled. Set the canonical origins accordingly; the application does not relax production URL validation for localhost. Put local keys in ignored `.dev.vars`, and run `npm run dev --workspace @byline/mcp`. Test users/credentials must be disposable. Do not use a production administrator password for local testing.
-
-### MCP Inspector
-
-Against your configured HTTPS development endpoint:
-
-```sh
-npx @modelcontextprotocol/inspector
-```
-
-Choose Streamable HTTP, enter `https://<your-development-host>/mcp`, and follow OAuth. Check server discovery, tool schemas/annotations, resources, the newsroom prompt and a read such as `byline.capabilities`. Exercise a writer and an editor separately. Read before changing a record, intentionally retry a stale token, and confirm the structured 409. Create with an idempotency key twice and verify one object. Test schedule/publish/Trash only on disposable drafts with explicit approval. Disconnect and confirm subsequent calls fail and the exact Application Password disappears.
-
-Automated protocol tests use the actual v2 client pinned to `2026-07-28`; no handwritten JSON-RPC substitutes for negotiation. OAuth tests use the actual Cloudflare provider, with test storage/runtime shims, for consent, state, PKCE, token issuance, grant revocation and password cleanup. A live client OAuth round trip and platform access-log configuration still require an operator-owned deployment.
+Responses are not cached; consent pages use no-referrer and frame protections.
+Errors never expose raw exception messages, stack traces, passwords or tokens.
+The optional `byline_mcp_tool_event` action receives only request ID, tool, actor ID,
+latency and status. Do not configure server/APM logging to capture Authorization
+headers, OAuth request/response bodies or private tool content.
 
 ## Connecting clients
 
 ### ChatGPT
 
-Use a workspace/account where custom remote MCP connections are enabled. In the developer/custom-plugin connection flow, enter the production HTTPS `/mcp` URL, choose OAuth and complete the Byline consent and WordPress authorization. Add/enable the connection in a chat and start with “What needs attention today?” Review write/destructive tool approvals. Account availability and admin policy vary; follow the current [ChatGPT connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt).
+Where account/workspace policy permits, add a custom MCP server/plugin with your
+CMS’s `/mcp` URL, choose OAuth and follow WordPress login and consent. Enable the
+resulting connection in a new chat. See the current
+[ChatGPT connection guide](https://developers.openai.com/plugins/deploy/connect-chatgpt).
 
 ### Codex
 
 ```sh
-codex mcp add byline --url https://<your-mcp-host>/mcp
+codex mcp add byline --url https://<your-cms>/mcp
 codex mcp login byline
-codex mcp list
 ```
 
-Keep interactive approval enabled for publication, content replacement, deletion and deployment. No WordPress credential belongs in `config.toml`. See the current [Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+No WordPress password belongs in `config.toml`. See [Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
 
 ### Claude Code and VS Code
 
 ```sh
-claude mcp add --transport http byline https://<your-mcp-host>/mcp
+claude mcp add --transport http byline https://<your-cms>/mcp
 ```
 
-In Claude Code, use `/mcp` to connect and complete OAuth. For VS Code's MCP configuration:
+Use `/mcp` in Claude Code to authenticate. For VS Code:
 
 ```json
-{"servers":{"byline":{"type":"http","url":"https://<your-mcp-host>/mcp"}}}
+{"servers":{"byline":{"type":"http","url":"https://<your-cms>/mcp"}}}
 ```
 
-Use each client's built-in OAuth and tool approval controls. Never paste a WordPress Application Password into client tool arguments.
+Keep client approval controls enabled for publishing, content replacement,
+deletion and deployment. Start with a read such as `byline.capabilities`.
+
+## Development and release
+
+Use Node 24+, PHP 8.2+, OpenSSL and Composer 2 on the build machine:
+
+```sh
+npm ci
+npm run mcp:catalog
+npm run typecheck:mcp
+npm run test:mcp
+npm run build:plugin
+npm run package:plugin
+npm run test:mcp:wordpress
+```
+
+`build:plugin` installs locked PHP dependencies, prefixes their namespaces and
+bundles them into `wordpress-plugin/build/mcp/vendor/` before building admin assets.
+`package:plugin` verifies that both the PHP SDK and OAuth server ship. CI and release
+jobs perform this automatically. Do not commit vendor or build directories.
+
+The disposable WordPress tests cover real local-domain authorization and mutations,
+OAuth consent/PKCE/replay/refresh/revocation, plus browser-cookie authorization and
+actual SDK clients for modern and legacy protocol eras. `mcp:catalog` generates both
+`docs/mcp-tools.md` and the packaged `includes/mcp/catalog.json` schemas;
+`verify:mcp-catalog` detects drift. Keep the PHP adapter and TypeScript reference
+contract consistent when adding tools.
+
+For MCP Inspector, run `npx @modelcontextprotocol/inspector`, select Streamable HTTP,
+enter your CMS’s `/mcp` URL and follow OAuth. Test reads before mutations and use
+only disposable drafts for publication tests.
+
+## Troubleshooting
+
+- **503:** check PHP 8.2+, OpenSSL and that the complete release ZIP was installed.
+  If WordPress salts/site URL changed, the old signing key may no longer decrypt.
+  Revoke/reset MCP grants and its encrypted key option with an administrator, then
+  reconnect; no WordPress passwords need cleanup.
+- **Login page instead of discovery/401:** ensure `/mcp`, `/mcp/*` and OAuth metadata
+  reach WordPress and are not intercepted by a cache, extra login gateway or proxy.
+- **401:** reconnect and verify the proxy preserves the Bearer Authorization header.
+- **403:** the WordPress account or target object does not permit the action.
+- **Conflict:** reread the object and decide whether to apply the change again.
+  Never automatically overwrite a newer revision.
+- **Partial story setup:** inspect `setup` and repair the surviving draft instead of
+  creating a duplicate. Uncertain idempotency receipts remain fenced; inspect the
+  original work before starting a new intent.
+- **429:** honor Retry-After and pause. Do not retry creates with a fresh key.
 
 ## Intentionally unsupported operations
 
 The first implementation leaves poll creation/editing/open/close in WordPress's native poll editor; only protected poll reads/results are exposed. The existing poll mutation surface is admin-form/nonce based, and a complete protected mutation API with vote-history concurrency is a separate canonical domain extension. No vote insertion, voter data or reset/export tool exists.
 
 Collections are archived via typed status updates; permanent Collection deletion is not a current canonical route. Built-in presets can be edited/reset, not created as arbitrary new identities or permanently deleted. Core Notes writes/replies/resolution remain in Gutenberg/Core, matching Byline's deliberately read-only adapter. Feedback can be triaged; content-health issues are rechecked rather than falsely marked fixed. Retired Performance, sports management, arbitrary settings, secret diagnostics and remote file downloads are not exposed.
-
-## Troubleshooting
-
-- **401 / unauthenticated:** reconnect; verify WordPress receives Basic Authorization and Application Passwords are enabled. Reversed proxies must preserve Authorization. A deleted WP password cannot be repaired by refreshing MCP tokens.
-- **403 / forbidden:** inspect current capabilities/target workspace. A writer cannot assign editors/deadlines or publish without the underlying capability; participation does not grant article/Notes access.
-- **Conflict:** reread the object. Decide with the user whether to reapply the change. Do not replace a newer version silently.
-- **Create reported partial setup:** inspect returned `setup` and the surviving workspace; repair only failed steps, using current tokens. Do not create another story.
-- **Idempotency outcome uncertain:** inspect the original target and relevant activity before a new intent. See the receipt/lock recovery guidance above.
-- **OAuth callback fails:** verify exact canonical origins, browser cookies, state expiry and the configured stable app ID. Start a new authorization; never copy/replay a callback URL containing a password.
-- **Wrong local time:** read the returned site timezone; send an explicit offset for exact instants and date-only windows for fuzzy commitments. Do not use the workstation timezone as a substitute.
-- **Rate limited / upstream unavailable:** honor retry guidance; never automatically replay a non-idempotent create with a fresh key. Check WordPress health without logging raw responses.
-- **Credential cleanup pending:** connection access is already denied locally. Restore upstream connectivity and the retained keyring; the vault retries cleanup. Staff may revoke the UUID directly in their WordPress profile.
-
-## Reference implementations
-
-The implementation follows the [MCP TypeScript v2 SDK](https://ts.sdk.modelcontextprotocol.io/v2/), [Cloudflare stateless MCP support](https://developers.cloudflare.com/changelog/product/agents/), [Cloudflare OAuth Provider split roles](https://github.com/cloudflare/workers-oauth-provider/blob/main/docs/resource-servers.md), its [browser consent/upstream flow](https://github.com/cloudflare/workers-oauth-provider/blob/main/docs/upstream-sign-in.md), and [WordPress Application Password REST lifecycle](https://developer.wordpress.org/rest-api/reference/application-passwords/).

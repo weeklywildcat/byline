@@ -1,9 +1,9 @@
 {
   "name": "@byline/wordpress-plugin",
-  "version": "0.3.60",
+  "version": "0.3.62",
   "private": true,
   "scripts": {
-    "build": "wp-scripts build",
+    "build": "wp-scripts build && bash ../scripts/build-plugin-mcp.sh",
     "start": "wp-scripts start",
     "test": "vitest run",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
@@ -44,6 +44,7 @@
     "date-fns": "^4.4.0",
     "lucide-react": "^1.60.0",
     "react-day-picker": "^10.0.1",
+    "react-easy-crop": "6.2.4",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",
     "temporal-polyfill": "0.3.2"

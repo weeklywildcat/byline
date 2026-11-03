@@ -216,6 +216,40 @@ is not finished (no photograph, no text) is not published.
   takeaway and the dek as the precise measure, then source, notes and credit.
 - **Preview as Byline** shows the Standard or Immersive opening you chose. A one-off
   layout a developer built for a single story is not previewed.
+- **Photo crops.** *Story presentation → Crops & placements* opens the featured
+  image. Click the most important part of the photo (usually a face) to set its
+  **focal point**; every card, list and the Immersive opening keep it in view. For a
+  shape that still looks wrong, open its tab (Wide 16:9, Card 3:2, Standard 4:3,
+  Square 1:1, Portrait 4:5, Social 1.91:1) and drag or zoom to draw your own crop;
+  *Reset to focal point* undoes it. The right-hand side redraws every placement as you
+  work, including the social card and a search result. Crops belong to the photo, so
+  every story that uses it agrees. The pre-publish checks flag photos that are too
+  small, and tall or panoramic photos with no focal point.
+
+### Photo crops: how they reach the site
+
+`packages/core/src/image-crops.ts` defines the shapes and the crop math; the PHP copy
+in `includes/content/image-art-direction.php` is kept identical by
+`tests/image-art-direction-regression.php`. The attachment stores
+`_byline_image_focal`, `_byline_image_crops` and `_byline_image_renditions`
+(`GET|POST /byline/v1/media/<id>/art-direction`, `upload_files` + `edit_post`).
+
+- A **focal point** is applied as CSS `object-position`. The "Auto" crop is defined
+  by the same rule, so the editor preview and the page always agree. No files are
+  made.
+- A **custom crop** gets real cropped files for that shape only, at the widths in the
+  shape table and never upscaled. **Social** always gets one 1200×630 file once a
+  photo has art direction. These files live in their own meta, never in
+  `_wp_attachment_metadata`, so Core's srcset never mixes a cropped file into a
+  normal photograph. Older files are deleted when the crop changes or the attachment
+  is deleted.
+- Each placement asks for its shape: list teasers (lead wide, standard 4:3, compact
+  square), homepage cards (`storyCardImageShape()`), the athlete spotlight
+  (portrait), related stories at the end of an article (square), and Related
+  Coverage (standard). It uses the cropped files when there are some and the focal
+  point otherwise. The Immersive hero, the article lead and collection artwork use
+  the focal point only. Open Graph, X and Discord use the social file. `NewsArticle.image`
+  prefers the editor's 16:9, 4:3 and 1:1 crops.
 
 ## Shared rendering and widths
 

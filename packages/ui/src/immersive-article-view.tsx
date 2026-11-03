@@ -42,6 +42,7 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
         scrim={0.5}
         className="immersive-article-hero"
         image={image?.src ? { ...image, sizes: "100vw" } : null}
+        imagePosition={image?.objectPosition}
       >
         <ArticleCategory presentation={presentation} className="immersive-article-category" />
         <ArticleHeadline presentation={presentation} className="immersive-article-headline" />

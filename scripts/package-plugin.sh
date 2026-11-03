@@ -148,6 +148,11 @@ for required_file in weekly-wildcat-headless.php "${build_assets[@]}" "${admin_a
   test -f "$plugin_root/$required_file"
 done
 
+# Remote MCP is part of the installed plugin, including its isolated PHP SDK/OAuth libraries.
+test -s "$plugin_root/includes/mcp/catalog.json"
+test -s "$plugin_root/build/mcp/vendor/autoload.php"
+php -r 'require $argv[1]; foreach (["BylineMcpVendor\\Mcp\\Server", "BylineMcpVendor\\League\\OAuth2\\Server\\AuthorizationServer"] as $class) { if (!class_exists($class)) { exit(1); } }' "$plugin_root/build/mcp/vendor/autoload.php"
+
 # The readme has to document the version actually being packaged, or the update
 # screen shows a changelog for the wrong release.
 readme_stable_tag="$(grep -E '^Stable tag:' "$plugin_root/readme.txt" | head -n 1 | sed -E 's/^Stable tag:[[:space:]]*//')"
@@ -226,6 +231,12 @@ rsync -a "$plugin_root/" "$stage_root/weekly-wildcat-headless/" \
   --exclude '.gitignore' \
   --exclude '.github' \
   --exclude 'node_modules' \
+  --exclude '/vendor' \
+  --exclude '/composer.json' \
+  --exclude '/composer.lock' \
+  --exclude '/build/mcp/composer.json' \
+  --exclude '/build/mcp/composer.lock' \
+  --exclude '/build/mcp' \
   --exclude '.env' \
   --exclude '.env.*' \
   --exclude 'tests' \
@@ -245,6 +256,12 @@ rsync -a "$plugin_root/" "$stage_root/weekly-wildcat-headless/" \
   --exclude '*.zip' \
   --exclude '*.map' \
   --exclude '.DS_Store'
+
+# Third-party SDK sources are executable runtime files, unlike the plugin's TS src/.
+mkdir -p "$stage_root/weekly-wildcat-headless/build/mcp/vendor"
+rsync -a "$plugin_root/build/mcp/vendor/" "$stage_root/weekly-wildcat-headless/build/mcp/vendor/" \
+  --exclude 'tests' --exclude 'test' --exclude 'fixtures' --exclude '.git' --exclude '*.map'
+php -r 'require $argv[1]; $server=BylineMcpVendor\Mcp\Server::builder()->setServerInfo("packaged-byline", "test")->build(); if (!$server instanceof BylineMcpVendor\Mcp\Server || !class_exists("BylineMcpVendor\\League\\OAuth2\\Server\\AuthorizationServer")) { exit(1); }' "$stage_root/weekly-wildcat-headless/build/mcp/vendor/autoload.php"
 
 # zip adds to an existing archive rather than replacing it, so a file that was
 # removed from the plugin would otherwise keep shipping in every later release.
@@ -347,7 +364,8 @@ if [[ "$main_plugin_files" -ne 1 ]]; then
   exit 1
 fi
 
-if grep -Eq '(^|/)(node_modules|tests|tests-js|src|discord-bot|apps|\.git)(/|$)' <<<"$archive_files"; then
+development_files="$(grep -v '^weekly-wildcat-headless/build/mcp/vendor/' <<<"$archive_files")"
+if grep -Eq '(^|/)(node_modules|tests|tests-js|src|discord-bot|apps|\.git)(/|$)' <<<"$development_files"; then
   echo "Plugin archive contains development or repository-only content." >&2
   exit 1
 fi
