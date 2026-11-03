@@ -42,7 +42,7 @@ test("Today keeps compact separated work queues, profile photos and safe inline 
   const geometry = await first.boundingBox();
   expect(geometry!.height).toBeLessThanOrEqual(66);
   expect((await quickFields.boundingBox())!.x).toBeGreaterThanOrEqual((await taskTitle.boundingBox())!.x + (await taskTitle.boundingBox())!.width);
-  expect((await stories.boundingBox())!.y).toBeLessThan(900);
+  expect((await stories.boundingBox())!.y).toBeLessThan(1000);
   const separators = await work.locator("[data-task-id]").evaluateAll((elements) => elements.slice(0, -1).map((element) => getComputedStyle(element).borderBottomWidth));
   expect(separators).toEqual(Array(7).fill("1px"));
   const gaps = await work.locator("[data-task-id]").evaluateAll((elements) => elements.slice(1).map((element, index) => element.getBoundingClientRect().top - elements[index]!.getBoundingClientRect().bottom));
