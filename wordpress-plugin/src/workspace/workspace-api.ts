@@ -1,5 +1,6 @@
 import { createCollectionApi } from "../collections/collection-api";
 import type { ProtectedEditorialRequest } from "../editorial/editorial-rest";
+import type { StoryVideoSettings } from "../editorial/story-video-model";
 import type { ArticleNotesResponse } from "../story/notes-model";
 import type {
   AppointmentInput,
@@ -28,6 +29,10 @@ export function createWorkspaceClient(request: WorkspaceRequest) {
     getWorkspace: (storyId: number) => request<StoryWorkspace>({ path: `${story(storyId)}/workspace` }),
     saveBrief: (storyId: number, brief: string, expectedBrief?: string) =>
       request<{ brief: string }>({ path: `${story(storyId)}/brief`, method: "POST", data: { brief, ...(expectedBrief !== undefined ? { expectedBrief } : {}) } }),
+
+    /** Article or Video, and the YouTube URL; needs `edit_post`. */
+    saveFormat: (storyId: number, input: { format?: StoryVideoSettings["format"]; videoUrl?: string }) =>
+      request<StoryVideoSettings>({ path: `${story(storyId)}/format`, method: "POST", data: input }),
 
     saveSource: (storyId: number, input: SourceInput, sourceId?: string) =>
       request<ReportingResponse>({ path: `${story(storyId)}/sources${sourceId ? `/${sourceId}` : ""}`, method: "POST", data: input }),

@@ -8,6 +8,7 @@ import { getPublicationConfig } from "@/lib/publication";
 import { getBylineRestUrl } from "@/lib/byline-rest";
 import { toSearchFacetValue } from "@/lib/search";
 import { getPostContributors, getPostHref } from "@/lib/wordpress";
+import { getStoryVideoBadge } from "@/lib/story-video";
 
 const publication = getPublicationConfig();
 
@@ -50,6 +51,7 @@ export async function getSearchPageProps() {
       ? contributors.map((contributor) => contributor.name).join(", ")
       : `${publication.identity.shortName} Staff`;
     const sectionLabel = category ? stripHtml(category.name) : "";
+    const video = getStoryVideoBadge(post);
 
     return {
       id: post.id,
@@ -66,7 +68,8 @@ export async function getSearchPageProps() {
       topics: topicEntries.map((topic) => topic.value),
       topicLabels: Object.fromEntries(topicEntries.map((topic) => [topic.value, topic.label])),
       date: formatDisplayDate(post.date),
-      sortDate: post.date
+      sortDate: post.date,
+      ...(video ? { video, searchTokens: ["video"] } : {})
     };
   });
   const archiveItems: SearchIndexItem[] = pages.filter((page) => page.bylinePage?.sportsArchive).map((page) => ({

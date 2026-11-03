@@ -479,6 +479,28 @@ foreach ($readiness_with_image['checks'] as $check) {
 byline_slice_assert($readiness_with_image['errors'] === 0, 'A good story failed readiness.');
 byline_slice_assert($readiness_by_id['featured-image-alt']['status'] === 'pass' && $readiness_by_id['image-credit']['status'] === 'pass', 'Image alt or credit readiness did not detect existing metadata.');
 
+// A video story needs its YouTube video before publishing; an article is never asked for one.
+require_once __DIR__ . '/../includes/content/story-video.php';
+$readiness_check = static function (int $post_id, string $id): ?array {
+    foreach (byline_get_story_readiness($post_id)['checks'] as $check) {
+        if ($check['id'] === $id) {
+            return $check;
+        }
+    }
+    return null;
+};
+byline_slice_assert($readiness_check($story, 'primary-video') === null, 'An article was asked for a video.');
+update_post_meta($story, BYLINE_STORY_FORMAT_META, 'video');
+$video_check = $readiness_check($story, 'primary-video');
+byline_slice_assert($video_check !== null && $video_check['status'] === 'error' && $video_check['explanation'] === 'Add a YouTube video before publishing.', 'A video story without a video was not blocked.');
+byline_slice_assert(byline_get_story_readiness($story)['canPublish'] === false, 'A video story without a video could publish.');
+update_post_meta($story, BYLINE_STORY_VIDEO_URL_META, byline_story_video_url_value('https://example.test/not-youtube'));
+byline_slice_assert($readiness_check($story, 'primary-video')['status'] === 'error', 'A non-YouTube link satisfied the video check.');
+update_post_meta($story, BYLINE_STORY_VIDEO_URL_META, byline_story_video_url_value('https://youtu.be/dQw4w9WgXcQ?si=share'));
+byline_slice_assert($readiness_check($story, 'primary-video')['status'] === 'pass' && byline_get_story_readiness($story)['errors'] === 0, 'A video story with a YouTube video was not ready.');
+update_post_meta($story, BYLINE_STORY_FORMAT_META, 'standard');
+update_post_meta($story, BYLINE_STORY_VIDEO_URL_META, '');
+
 $honeypot = byline_submit_reader_feedback(['storyId' => $story, 'message' => 'Bot', 'honeypot' => 'filled'], '203.0.113.10', 'https://news.example.test');
 byline_slice_assert(is_wp_error($honeypot) && $honeypot->get_error_code() === 'byline_feedback_spam', 'Feedback honeypot was accepted.');
 $bad_origin = byline_submit_reader_feedback(['storyId' => $story, 'message' => 'A note'], '203.0.113.11', 'https://evil.example.test');

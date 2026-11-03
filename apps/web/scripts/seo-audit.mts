@@ -228,6 +228,7 @@ export function auditPage(html: string, route: string, { origin, siteName }: Pag
       }
     }
     if (!nodes.some((node) => typesOf(node).includes("BreadcrumbList"))) fail("missing BreadcrumbList JSON-LD");
+    for (const message of auditVideoWatchPage(html, page, canonical)) fail(message);
     if (page.mastheadHasTime) fail("the masthead build date <time> is rendered on an article page");
   }
 
@@ -261,7 +262,62 @@ export function auditPage(html: string, route: string, { origin, siteName }: Pag
   return issues;
 }
 
-export type SitemapPage = { canonical: string; robots: string; kind?: string };
+/** A YouTube player URL in the one form the site uses everywhere. */
+const YOUTUBE_EMBED = /^https:\/\/www\.youtube\.com\/embed\/[A-Za-z0-9_-]{11}$/;
+
+export type PageVideo = { name: string; description: string; thumbnailUrl: string; embedUrl: string; uploadDate: string; duration?: string };
+
+/** The page's VideoObject, when it has one, flattened for comparison with the video sitemap. */
+export function pageVideoObject(html: string, route = ""): PageVideo | null {
+  const video = nodesOf(parsePage(html, route)).find((node) => typesOf(node).includes("VideoObject"));
+  if (!video) return null;
+  const text = (value: unknown) => typeof value === "string" ? value : "";
+  return {
+    name: text(video.name),
+    description: text(video.description),
+    thumbnailUrl: text(([] as unknown[]).concat(video.thumbnailUrl ?? [])[0]),
+    embedUrl: text(video.embedUrl),
+    uploadDate: text(video.uploadDate),
+    ...(typeof video.duration === "string" ? { duration: video.duration } : {})
+  };
+}
+
+/** The `src` of every YouTube iframe in the page's own markup. */
+function youTubeIframeSources(html: string) {
+  return [...html.matchAll(/<iframe\b[^>]*\bsrc=("([^"]*)"|'([^']*)')[^>]*>/gi)]
+    .map((match) => decodeEntities(match[2] ?? match[3] ?? ""))
+    .filter((src) => /youtube(?:-nocookie)?\.com\//.test(src));
+}
+
+/**
+ * A video story is a watch page: its VideoObject has Google's required fields
+ * and names the player that is actually in the rendered HTML, and the
+ * NewsArticle links to it. A page with a primary player must have both.
+ */
+function auditVideoWatchPage(html: string, page: ParsedPage, canonical: string): string[] {
+  const issues: string[] = [];
+  const nodes = nodesOf(page);
+  const video = nodes.find((node) => typesOf(node).includes("VideoObject"));
+  const primaryPlayer = /class="[^"]*\barticle-primary-video\b/.test(html);
+  if (!video) {
+    if (primaryPlayer) issues.push("has a primary video player but no VideoObject JSON-LD");
+    return issues;
+  }
+  const flat = pageVideoObject(html, page.route)!;
+  if (!flat.name.trim()) issues.push("VideoObject.name is missing");
+  if (!/^https:\/\//.test(flat.thumbnailUrl)) issues.push(`VideoObject.thumbnailUrl is not an https URL: "${flat.thumbnailUrl}"`);
+  if (!ISO_WITH_ZONE.test(flat.uploadDate) || Number.isNaN(Date.parse(flat.uploadDate))) issues.push(`VideoObject.uploadDate is not a timezone-aware ISO timestamp: "${flat.uploadDate}"`);
+  if (flat.duration !== undefined && !/^P(?:\d+D)?T(?:\d+H)?(?:\d+M)?(?:\d+S)?$/.test(flat.duration)) issues.push(`VideoObject.duration is not an ISO 8601 duration: "${flat.duration}"`);
+  if (!YOUTUBE_EMBED.test(flat.embedUrl)) issues.push(`VideoObject.embedUrl is not a YouTube embed URL: "${flat.embedUrl}"`);
+  if (video["@id"] !== `${canonical}#video`) issues.push(`VideoObject.@id should be ${canonical}#video`);
+  const sources = youTubeIframeSources(html);
+  if (!primaryPlayer || !sources.includes(flat.embedUrl)) issues.push(`the rendered page has no primary player iframe for ${flat.embedUrl}`);
+  const article = nodes.find((node) => typesOf(node).includes("NewsArticle"));
+  if ((article?.video as Record<string, unknown> | undefined)?.["@id"] !== video["@id"]) issues.push("NewsArticle.video does not reference the VideoObject");
+  return issues;
+}
+
+export type SitemapPage = { canonical: string; robots: string; kind?: string; video?: PageVideo | null };
 
 export function sitemapLocations(xml: string) {
   return [...xml.matchAll(/<loc>([\s\S]*?)<\/loc>/g)].map((match) => decodeEntities(match[1].trim()));
@@ -347,6 +403,42 @@ export function auditNewsSitemap(xml: string, pages: Map<string, SitemapPage>, o
     }
   }
 
+  return issues;
+}
+
+/**
+ * Each video sitemap entry is a generated article page whose VideoObject names
+ * the same video: identical title, description, thumbnail and player URL.
+ */
+export function auditVideoSitemap(xml: string, pages: Map<string, SitemapPage>, origin: string): AuditIssue[] {
+  const issues: AuditIssue[] = [];
+  const listed = new Set<string>();
+  const tag = (block: string, name: string) => decodeEntities(block.match(new RegExp(`<video:${name}>([\\s\\S]*?)</video:${name}>`))?.[1].trim() ?? "");
+
+  if (!xml.includes('xmlns:video="http://www.google.com/schemas/sitemap-video/1.1"')) issues.push({ route: "/video-sitemap.xml", message: "video sitemap: missing the sitemap-video namespace" });
+  for (const block of xml.matchAll(/<url>([\s\S]*?)<\/url>/g)) {
+    const loc = decodeEntities(block[1].match(/<loc>([\s\S]*?)<\/loc>/)?.[1].trim() ?? "");
+    const fail = (message: string) => issues.push({ route: loc || "(video sitemap)", message: `video sitemap: ${message}` });
+    const route = loc.startsWith(origin) ? loc.slice(origin.length) : "";
+    const page = pages.get(route);
+    if (listed.has(loc)) fail("listed more than once");
+    listed.add(loc);
+    if (!page || !isArticleRoute(route)) { fail("is not a generated article page"); continue; }
+    if (/^noindex/.test(page.robots)) fail("is marked noindex");
+    if (page.canonical !== loc) fail(`canonical is ${page.canonical}`);
+    const entry = { thumbnailUrl: tag(block[1], "thumbnail_loc"), name: tag(block[1], "title"), description: tag(block[1], "description"), embedUrl: tag(block[1], "player_loc") };
+    for (const [field, value] of Object.entries(entry)) if (!value) fail(`missing ${field}`);
+    if (!YOUTUBE_EMBED.test(entry.embedUrl)) fail(`player_loc is not a YouTube embed URL: ${entry.embedUrl}`);
+    if (!page.video) { fail("the page has no VideoObject"); continue; }
+    for (const field of ["name", "description", "thumbnailUrl", "embedUrl"] as const) {
+      if (entry[field] !== page.video[field]) fail(`${field} disagrees with the page's VideoObject`);
+    }
+  }
+  for (const [route, page] of pages) {
+    if (page.video && isArticleRoute(route) && !/^noindex/.test(page.robots) && !listed.has(page.canonical)) {
+      issues.push({ route, message: "video sitemap: a video story page is not listed" });
+    }
+  }
   return issues;
 }
 

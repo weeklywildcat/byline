@@ -1,6 +1,7 @@
 import { CODE_ROUTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { getWordPressInstant } from "@/lib/dates";
 import { getPostSitemapImages } from "@/lib/sitemap-images";
+import { getVideoStories } from "@/lib/story-video";
 import type { SitemapEntry } from "@/lib/metadata";
 import {
   contributorHasProfilePage,
@@ -112,6 +113,12 @@ export function buildSitemapEntries(input: SitemapInput): SitemapEntry[] {
 
   if (input.coverages.length > 0) {
     add({ url: url("/coverage/"), lastModified: latestModified, changeFrequency: "weekly", priority: 0.6 });
+  }
+
+  // The video hub is listed once there is a video; with none it is noindex.
+  const videoStories = getVideoStories(posts);
+  if (videoStories.length > 0) {
+    add({ url: url("/watch/"), lastModified: latest(videoStories.map((post) => postDates.get(post.id))), changeFrequency: "daily", priority: 0.6 });
   }
 
   for (const page of input.pages) {

@@ -1,16 +1,20 @@
 
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { describeEditorialError, type ContributorEntry } from "../editorial/editorial-model";
+import { checkVideoUrl, normalizeStoryVideoSettings, STORY_FORMAT_OPTIONS, videoDurationLabel, videoStoryProblem, type StoryFormat } from "../editorial/story-video-model";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
 import { AssigneePicker, DatePicker, WritersPicker, valueSelectTriggerClass } from "../admin-ui/components/pickers";
 import { Card, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Field, FieldContent, FieldGroup, FieldTitle } from "../admin-ui/ui/field";
+import { Input } from "../admin-ui/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "../admin-ui/ui/toggle-group";
 import { dateLabel, exactDate } from "../home/newsroom-model";
 import { SectionFailed } from "./parts";
-import { applyWorkflowPayload, patchStory, type StoryPatch } from "./workspace-cache";
+import { applyFormat, applyWorkflowPayload, patchStory, type StoryPatch } from "./workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { workspaceError } from "./workspace-errors";
 import { names, peopleOptions, sectionNames } from "./workspace-model";
@@ -95,10 +99,62 @@ export function DetailsSection() {
         </Property>
         <Property label="WordPress state">{wpState.label}{scheduled}</Property>
         <Property label="Section">{sectionNames(data.sections) || "None"}</Property>
+        <FormatProperties />
       </FieldGroup>
       {update.isError && update.error && workspaceError(update.error).conflict ? <InlineAlert className="mt-3" onAction={() => void reload()} actionLabel="Reload">{workspaceError(update.error).message}</InlineAlert> : null}
     </CardContent>
   </Card>;
+}
+
+/**
+ * Article or Video. A video story needs only its YouTube link: the title,
+ * thumbnail, duration and everything search engines read are filled in from
+ * YouTube and the story itself.
+ */
+function FormatProperties() {
+  const { storyId, client, data, caps, announce, sectionError } = useWorkspace();
+  const cache = useWorkspaceCache();
+  const settings = normalizeStoryVideoSettings(data.format);
+  const [draft, setDraft] = useState(settings.videoUrl);
+  useEffect(() => setDraft(settings.videoUrl), [settings.videoUrl]);
+
+  const save = useMutation({
+    mutationFn: (input: { format?: StoryFormat; videoUrl?: string }) => client.saveFormat(storyId, input),
+    onSuccess: (saved) => { cache.write((current) => applyFormat(current, saved)); announce(saved.format === "video" ? "Format saved: Video." : "Format saved: Article."); },
+    onError: (error) => { const failure = workspaceError(error, "The format couldn't be saved. Try again."); toast.error(failure.message); announce(failure.message); }
+  });
+  if (sectionError("format") || !data.format) return null;
+
+  const commitUrl = () => { if (draft.trim() !== settings.videoUrl) save.mutate({ videoUrl: draft.trim() }); };
+  const check = checkVideoUrl(draft);
+  const problem = draft === settings.videoUrl ? videoStoryProblem(settings.format, draft) : check.state === "invalid" ? videoStoryProblem("video", draft) : null;
+  const known = check.state === "valid" && settings.video?.videoId === check.videoId ? settings.video : null;
+  const duration = known ? videoDurationLabel(known.duration) : null;
+
+  return <>
+    <Property label="Format">
+      {caps.editArticle ? <ToggleGroup aria-label="Format" variant="outline" size="sm" spacing={0} value={[settings.format]} disabled={save.isPending}
+        onValueChange={(value) => { const next = value[0] as StoryFormat | undefined; if (next && next !== settings.format) save.mutate({ format: next }); }}>
+        {STORY_FORMAT_OPTIONS.map((option) => <ToggleGroupItem key={option.value} value={option.value}>{option.label}</ToggleGroupItem>)}
+      </ToggleGroup> : STORY_FORMAT_OPTIONS.find((option) => option.value === settings.format)?.label}
+    </Property>
+    {settings.format === "video" ? <Property label="YouTube video">
+      <div className="flex flex-col gap-2">
+        {caps.editArticle ? <Input type="url" inputMode="url" aria-label="YouTube video" placeholder="Paste a YouTube link" value={draft} disabled={save.isPending}
+          aria-invalid={problem ? true : undefined} aria-describedby={problem ? "ws-video-problem" : undefined}
+          onChange={(event) => setDraft(event.target.value)} onBlur={commitUrl}
+          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commitUrl(); } }} /> : null}
+        {problem ? <p id="ws-video-problem" className="text-xs text-destructive">{problem}</p> : null}
+        {check.state === "valid" ? <a className="flex items-center gap-3 rounded-lg border p-2 text-sm no-underline hover:bg-muted" href={`https://www.youtube.com/watch?v=${check.videoId}`} target="_blank" rel="noreferrer">
+          <img src={known?.thumbnailUrl ?? check.thumbnailUrl} alt="" width={96} height={54} className="aspect-video w-24 flex-none rounded object-cover" />
+          <span className="min-w-0">
+            <span className="block truncate font-medium text-foreground">{known?.title || "YouTube video"}</span>
+            <span className="block text-xs text-muted-foreground">{duration ? `${duration} · ` : ""}Opens on YouTube</span>
+          </span>
+        </a> : null}
+      </div>
+    </Property> : null}
+  </>;
 }
 
 /** A story fact as a native horizontal Field: a muted label column, then the value or its control. */

@@ -2541,6 +2541,8 @@ function wwh_register_rest_routes(): void
                 'immersiveAlignment' => ['type' => 'string', 'enum' => BYLINE_STORY_IMMERSIVE_ALIGNMENTS],
                 'live' => ['type' => ['object', 'null']],
                 'reportingNote' => ['type' => 'string'],
+                'format' => ['type' => 'string', 'enum' => BYLINE_STORY_FORMATS],
+                'video' => ['type' => ['object', 'null']],
             ],
         ],
     ]);
@@ -2557,6 +2559,9 @@ function wwh_rest_post_settings(array $post): array
     ] + byline_story_presentation_settings($post_id) + [
         'reportingNote' => function_exists('byline_story_reporting_note') ? byline_story_reporting_note($post_id) : '',
         'live' => function_exists('byline_public_live_coverage') ? byline_public_live_coverage($post_id) : null,
+        // Only a video story with a valid primary YouTube video carries `video`.
+        'format' => function_exists('byline_story_format') ? byline_story_format($post_id) : 'standard',
+        'video' => function_exists('byline_public_primary_video') ? byline_public_primary_video($post_id) : null,
     ];
 }
 
@@ -3444,6 +3449,7 @@ require_once __DIR__ . '/includes/content/photo-credits.php';
 require_once __DIR__ . '/includes/content/image-art-direction.php';
 require_once __DIR__ . '/includes/content/story-presentation.php';
 require_once __DIR__ . '/includes/content/reporting-note.php';
+require_once __DIR__ . '/includes/content/story-video.php';
 require_once __DIR__ . '/includes/discord-integration.php';
 require_once __DIR__ . '/includes/integrations/discord.php';
 require_once __DIR__ . '/includes/core/upgrade.php';

@@ -61,6 +61,26 @@ export type ArticleStoryCardView = {
   category?: string | null;
   date?: string | null;
   dateLabel?: string | null;
+  /** Present for a video story; the card shows a small Video label. */
+  video?: StoryVideoBadgeView | null;
+};
+
+/** A video story's card treatment: the label and, when known, the running time ("4:13"). */
+export type StoryVideoBadgeView = {
+  duration: string | null;
+};
+
+/**
+ * A video story's one primary video. The player is a real iframe in the
+ * rendered HTML, and `embedUrl` is the same URL the structured data and the
+ * video sitemap name.
+ */
+export type ArticleVideoView = {
+  videoId: string;
+  embedUrl: string;
+  /** Accessible name for the player. */
+  title: string;
+  duration?: string | null;
 };
 
 export type ArticleSeriesPartView = {
@@ -108,6 +128,8 @@ export type ArticlePresentation = {
   storyPresentation?: "standard" | "immersive";
   /** Headline position for an immersive story. Absent means bottom-left. */
   immersiveAlignment?: "bottom-left" | "center";
+  /** A video story's primary video; absent for an article, even one with embeds in its body. */
+  video?: ArticleVideoView | null;
   contributors: ArticleContributorView[];
   fallbackByline: string;
   publishedAt: string;
@@ -226,12 +248,23 @@ function ArticleImage({ image, priority = false, showCaption = true }: { image: 
   );
 }
 
+/** "Video · 4:13" on a video story's card. */
+export function StoryVideoBadge({ video, className }: { video: StoryVideoBadgeView; className?: string }): ReactNode {
+  return (
+    <span className={joinClassNames("story-video-badge", className)}>
+      <svg aria-hidden="true" viewBox="0 0 16 16" width="10" height="10" focusable="false"><path d="M4 2.5v11l9-5.5z" fill="currentColor" /></svg>
+      Video{video.duration ? <span className="story-video-duration"> · {video.duration}</span> : null}
+    </span>
+  );
+}
+
 function StoryCard({ story }: { story: ArticleStoryCardView }): ReactNode {
   return (
     <article className={`story-teaser story-teaser-compact${story.image ? "" : " story-teaser-no-image"}`}>
       {story.image ? <ArticleImage image={story.image} showCaption={false} /> : null}
       <div className="story-teaser-body">
         <div className="article-byline">
+          {story.video ? <StoryVideoBadge video={story.video} /> : null}
           {story.category ? <span>{story.category}</span> : null}
           {story.dateLabel ? <time dateTime={story.date ?? undefined}>{story.dateLabel}</time> : null}
         </div>
@@ -345,6 +378,36 @@ export function ArticleMeta({ presentation, shareActions, className }: ArticlePi
 /** The lead image as a captioned figure. Use `ArticleImageCaption` when the image is painted another way. */
 export function ArticleFeaturedImage({ presentation, priority = true, showCaption = true }: { presentation: ArticlePresentation; priority?: boolean; showCaption?: boolean }): ReactNode {
   return presentation.image?.src ? <ArticleImage image={presentation.image} priority={priority} showCaption={showCaption} /> : null;
+}
+
+/**
+ * A video story's player: a real YouTube iframe in the rendered HTML, 16:9 and
+ * full article width, with nothing to click before it exists.
+ */
+export function ArticlePrimaryVideo({ presentation, className }: ArticlePieceProps): ReactNode {
+  const video = presentation.video;
+  if (!video) return null;
+  return (
+    <figure className={joinClassNames("article-primary-video", className)} data-video-id={video.videoId}>
+      <div className="article-primary-video-frame">
+        <iframe
+          src={video.embedUrl}
+          title={video.title}
+          width={1280}
+          height={720}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+        />
+      </div>
+    </figure>
+  );
+}
+
+/** The "Video" kicker on a video story. */
+export function ArticleVideoLabel({ presentation, className }: ArticlePieceProps): ReactNode {
+  if (!presentation.video) return null;
+  return <span className={joinClassNames("article-video-label", className)}>Video</span>;
 }
 
 /** The WordPress body (with the legacy primary-game card ahead of it), or the empty state. */
@@ -624,12 +687,15 @@ export function ArticleStandardEnding({ presentation }: { presentation: ArticleP
 }
 
 export function ArticleView({ presentation, slots = {}, className = "" }: ArticleViewProps): ReactNode {
+  // A video story is a watch page: its player takes the lead image's place, above the body.
+  const video = Boolean(presentation.video);
   return (
     <ArticleShell className={className}>
       {slots.metadata}
-      <article className="article-story">
+      <article className="article-story" data-story-format={video ? "video" : undefined}>
         <header className="article-header">
           <div className="article-kicker">
+            <ArticleVideoLabel presentation={presentation} />
             <ArticleCategory presentation={presentation} />
             <ArticleSeriesLabel presentation={presentation} />
           </div>
@@ -637,7 +703,7 @@ export function ArticleView({ presentation, slots = {}, className = "" }: Articl
           <ArticleExcerpt presentation={presentation} />
           <ArticleAthleteMeta presentation={presentation} />
           <ArticleMeta presentation={presentation} shareActions={slots.shareActions} />
-          <ArticleFeaturedImage presentation={presentation} />
+          {video ? <ArticlePrimaryVideo presentation={presentation} /> : <ArticleFeaturedImage presentation={presentation} />}
         </header>
 
         <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} />

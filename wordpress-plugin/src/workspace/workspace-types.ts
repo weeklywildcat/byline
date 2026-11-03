@@ -8,6 +8,7 @@
 import type { ContributorEntry, EditorialTask } from "../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../editorial/activity-model";
 import type { ContributorPayload } from "../editorial/editorial-rest";
+import type { StoryVideoSettings } from "../editorial/story-video-model";
 import type { MediaAttachment, MediaReadiness, PlanningPerson, PlanningStory } from "../planning/planning-model";
 
 export const SOURCE_STATUSES = ["planned", "contacted", "waiting", "needs-scheduling", "scheduled", "interviewed", "declined", "unavailable"] as const;
@@ -126,7 +127,7 @@ export type WorkspaceStatus = { id: string; label: string; group: string; select
 /** `story` is a Planning row plus the reporting roll-up. */
 export type WorkspaceStory = PlanningStory & { reporting: ReportingSummary | null; mediaSummary: MediaSummary | null };
 
-export type WorkspaceSection = "reporting" | "brief" | "contributors" | "tasks" | "media" | "resources" | "activity";
+export type WorkspaceSection = "reporting" | "brief" | "format" | "contributors" | "tasks" | "media" | "resources" | "activity";
 
 export type StoryWorkspace = {
   story: WorkspaceStory;
@@ -135,6 +136,8 @@ export type StoryWorkspace = {
   now: string;
   currentUser: PlanningPerson | null;
   brief: string;
+  /** Article or Video, and a video story's YouTube URL. Older servers omit it. */
+  format?: StoryVideoSettings;
   sections: string[];
   contributors: ContributorPayload;
   statuses: WorkspaceStatus[];

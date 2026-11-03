@@ -3,6 +3,7 @@ import { cleanDeckText, stripBracketedEllipsis, type AthleteSpotlightView, type 
 import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { getMeaningfulImageAlt } from "@/lib/image-alt";
+import { getStoryVideoBadge } from "@/lib/story-video";
 import { getCroppedImageSource, getResponsiveImageProps } from "@/lib/media";
 import {
   getAuthorHref,
@@ -62,6 +63,7 @@ export function toStoryView(post: WordPressPost, options: StoryViewOptions = {})
   const image = getFeaturedMedia(post);
   const credit = getMediaCredit(image);
   const cleanDeck = options.cleanDeck ?? false;
+  const video = getStoryVideoBadge(post);
 
   return {
     id: post.id,
@@ -75,6 +77,7 @@ export function toStoryView(post: WordPressPost, options: StoryViewOptions = {})
     category: category ? { name: decodeHtml(category.name), href: `/category/${category.slug}/` } : null,
     author: author ? { name: author.name, href: getAuthorHref(author) } : null,
     ...(getPostLiveCoverage(post)?.status === "live" ? { live: true } : {}),
+    ...(video ? { video } : {}),
     image: toStoryImageView(image, credit)
   };
 }

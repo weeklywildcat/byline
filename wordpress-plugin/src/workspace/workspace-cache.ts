@@ -4,6 +4,7 @@
  */
 import type { EditorialTask } from "../editorial/editorial-model";
 import type { EditorialWorkflowPayload } from "../editorial/editorial-model";
+import type { StoryVideoSettings } from "../editorial/story-video-model";
 import type { MediaAssignmentsResponse, ReportingResponse, StoryResource, StoryWorkspace, WorkspaceStory } from "./workspace-types";
 
 type Data = StoryWorkspace | undefined;
@@ -23,6 +24,10 @@ export function applyResources(data: Data, resources: StoryResource[]): Data {
 
 export function applyBrief(data: Data, brief: string): Data {
   return data ? { ...data, brief } : data;
+}
+
+export function applyFormat(data: Data, format: StoryVideoSettings): Data {
+  return data ? { ...data, format } : data;
 }
 
 export function applyTask(data: Data, task: EditorialTask): Data {

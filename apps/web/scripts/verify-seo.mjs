@@ -1,7 +1,7 @@
 import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { auditFeed, auditNewsSitemap, auditPage, auditSitemap, auditSitemapImages, decodeEntities, parsePage, sitemapImageLocations, sitemapLocations } from "./seo-audit.mts";
+import { auditFeed, auditNewsSitemap, auditPage, auditSitemap, auditSitemapImages, auditVideoSitemap, decodeEntities, pageVideoObject, parsePage, sitemapImageLocations, sitemapLocations } from "./seo-audit.mts";
 
 // Fails the build when generated pages drift from the search/social contract:
 // absolute canonical and social URLs, timezone-aware dates, a sitemap that lists
@@ -48,7 +48,7 @@ for (const file of htmlFiles) {
   const kind = kindByRoute.get(route);
   const html = await readFile(file, "utf8");
   const parsed = parsePage(html, route);
-  pages.set(route, { canonical: parsed.canonicals[0] ?? "", robots: parsed.robots, kind });
+  pages.set(route, { canonical: parsed.canonicals[0] ?? "", robots: parsed.robots, kind, video: pageVideoObject(html, route) });
   // Redirects and 404s are verified by verify-build.mjs; they must only stay out of the sitemap.
   if (kind === "redirect" || kind === "not-found" || route === "/404.html") continue;
   issues.push(...auditPage(html, route, { origin, siteName, kind }));
@@ -57,6 +57,7 @@ for (const file of htmlFiles) {
 for (const [name, audit] of [
   ["sitemap.xml", (xml) => [...auditSitemap(xml, pages, origin), ...auditSitemapImages(xml, origin)]],
   ["news-sitemap.xml", (xml) => auditNewsSitemap(xml, pages, origin, Date.now())],
+  ["video-sitemap.xml", (xml) => auditVideoSitemap(xml, pages, origin)],
   ["feed.xml", (xml) => auditFeed(xml, pages, origin)]
 ]) {
   const file = path.join(outputRoot, name);
@@ -114,7 +115,7 @@ for (const file of htmlFiles) {
 }
 
 const robots = await readFile(path.join(outputRoot, "robots.txt"), "utf8");
-for (const sitemap of ["sitemap.xml", "news-sitemap.xml"]) {
+for (const sitemap of ["sitemap.xml", "news-sitemap.xml", "video-sitemap.xml"]) {
   if (!robots.includes(`Sitemap: ${origin}/${sitemap}`)) issues.push({ route: "/robots.txt", message: `does not advertise ${origin}/${sitemap}` });
 }
 if (!robots.includes("Disallow: /_byline/presentation-media/")) {
@@ -124,4 +125,4 @@ if (!robots.includes("Disallow: /_byline/presentation-media/")) {
 if (issues.length) {
   throw new Error(`SEO verification failed (${issues.length}):\n${issues.map((issue) => `  ${issue.route}: ${issue.message}`).join("\n")}`);
 }
-console.log(`SEO verification passed for ${pages.size} HTML documents, the sitemap, news sitemap and feed.`);
+console.log(`SEO verification passed for ${pages.size} HTML documents, the sitemap, news and video sitemaps and feed.`);

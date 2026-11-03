@@ -14,6 +14,7 @@ below is generated at build time and checked by `apps/web/scripts/verify-seo.mjs
 | Image alt fallbacks | `apps/web/lib/image-alt.ts` |
 | `sitemap.xml` | `apps/web/lib/sitemap.ts`, `views/sitemap.ts` |
 | `news-sitemap.xml` | `apps/web/lib/news-sitemap.ts` |
+| `video-sitemap.xml`, video `VideoObject` | `apps/web/lib/video-sitemap.ts`, `apps/web/lib/story-video.ts` |
 | `feed.xml` (RSS 2.0) | `apps/web/lib/feed.ts`, `src/pages/feed.xml.ts` |
 | Build audit | `apps/web/scripts/seo-audit.mts`, `scripts/verify-seo.mjs` |
 
@@ -58,6 +59,38 @@ below is generated at build time and checked by `apps/web/scripts/verify-seo.mjs
   page, internal CMS pages and `noindex` pages are never listed. Authors without
   published stories and sections without stories are not listed.
 - The news sitemap keeps Google News's two-day window.
+
+## Video stories
+
+A video story is an ordinary post whose **Format** is Video (`byline_story_format`
+= `video`) and which has one primary YouTube video (`byline_primary_video_url`).
+There is no video post type or category. Writers set Format and paste a YouTube
+link, in the Story Workspace's Details or the editor's Format panel; nothing else.
+A YouTube embed in an ordinary article's body never makes it a video story.
+
+- WordPress (`includes/content/story-video.php`) parses the link to its video ID
+  and, when the link changes, looks the video up once: the YouTube Data API when
+  `BYLINE_YOUTUBE_API_KEY` (constant or environment) is set, otherwise YouTube's
+  keyless oEmbed (title and thumbnail only). The result is cached in the protected
+  `_byline_primary_video` meta, so builds never call YouTube. A failed lookup never
+  blocks saving. Readiness blocks publishing a video story without a valid video.
+- The `byline` REST field and the build snapshot carry `format` and `video`.
+  `packages/core/src/story-video.ts` is the one parser/validator both sides use.
+- The story's own URL is the watch page. `ArticleView` renders a real YouTube
+  `<iframe>` (`https://www.youtube.com/embed/<id>`) in place of the lead photo,
+  above the body, at the wide measure; no click-to-load poster. Immersive does not
+  apply to video stories.
+- The article's JSON-LD becomes one `@graph`: the unchanged `NewsArticle` (with
+  `video` → `#video`) and a `VideoObject` (`#video`). `name` is the YouTube title,
+  else the headline; `description` the deck, else YouTube's description, else the
+  opening of the story; `thumbnailUrl` YouTube's best thumbnail; `uploadDate`
+  YouTube's publication time, else the story's; `duration` only when YouTube
+  reported one. The video sitemap repeats exactly these values and the same
+  player URL, and is advertised in `robots.txt`.
+- `/watch/` lists every video story (noindex while there are none). It is a hub,
+  not a watch page, and never a canonical URL for a story.
+- The build audit fails when a video page's player iframe, `VideoObject` and
+  video sitemap entry disagree, or a required `VideoObject` field is invalid.
 
 ## Page indexing
 

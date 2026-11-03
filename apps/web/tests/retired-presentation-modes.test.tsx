@@ -95,7 +95,7 @@ describe("the custom article hero is gone", () => {
     // The shared PresentedArticleView renders the normal ArticleView unless the author chose Immersive.
     expect(readSource("../story-presentations/StoryArticle.tsx")).toContain("<PresentedArticleView");
     expect(articleRenderer.match(/className="article-header"/g)).toHaveLength(1);
-    expect(articleRenderer).toContain('<article className="article-story">');
+    expect(articleRenderer.match(/<article className="article-story"/g)).toHaveLength(1);
   });
 
   it("keeps the rest of the canonical article intact", () => {

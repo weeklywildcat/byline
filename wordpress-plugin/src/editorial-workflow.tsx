@@ -38,6 +38,8 @@ import { LiveCoveragePanel } from './editorial/LiveCoveragePanel';
 import { ContributorsPanel } from './editorial/ContributorsPanel';
 import { DistributionPanel } from './editorial/DistributionPanel';
 import { StoryPresentationPanel } from './editorial/StoryPresentationPanel';
+import { StoryFormatPanel } from './editorial/StoryFormatPanel';
+import { readStoryVideoMeta, storyVideoMetaPatch } from './editorial/story-video-model';
 import { ReportingNotePanel } from './editorial/ReportingNotePanel';
 import { readReportingNote, reportingNoteMetaPatch } from './editorial/reporting-note-model';
 import { OPEN_PHOTO_CROPS_EVENT, PhotoCropsDialog } from './editorial/photo-crops/PhotoCropsDialog';
@@ -1798,6 +1800,19 @@ function StoryPresentationSettings() {
   );
 }
 
+/** Article or Video, and a video story's YouTube link. Post meta, so it saves with the post. */
+function StoryFormatSettings() {
+  const meta = useSelect((select: any) => select('core/editor')?.getEditedPostAttribute?.('meta') as unknown, []);
+  const { editPost } = useDispatch('core/editor') as { editPost?: (edits: Record<string, unknown>) => void };
+  const { format, videoUrl } = readStoryVideoMeta(meta);
+
+  return (
+    <PluginDocumentSettingPanel name="byline-story-format" title={__('Format', 'weekly-wildcat-headless')} className="byline-story-format-panel">
+      <StoryFormatPanel format={format} videoUrl={videoUrl} onChange={(change) => editPost?.({ meta: storyVideoMetaPatch(change) })} />
+    </PluginDocumentSettingPanel>
+  );
+}
+
 /** "How we reported this". Post meta, so it saves with the post. */
 function ReportingNoteSettings() {
   const meta = useSelect((select: any) => select('core/editor')?.getEditedPostAttribute?.('meta') as unknown, []);
@@ -1904,6 +1919,7 @@ function EditorialWorkflowPlugin() {
 
   return (
     <>
+      <StoryFormatSettings />
       <StoryPresentationSettings />
       <ReportingNoteSettings />
       <PhotoCropsHost />
