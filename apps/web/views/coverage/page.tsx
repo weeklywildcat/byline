@@ -1,10 +1,11 @@
 import type { Metadata } from "@/lib/metadata";
 import { optionalBuildData } from "@/lib/build-data";
-import { formatDisplayDate } from "@/lib/format";
+import { buildCoveragePresentation, type CoveragePresentation } from "@/lib/coverage-presentation";
 import { getPresentationMediaUrl } from "@/lib/media";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import {
+  getAllPosts,
   getAllPublicCoverages,
   getCoverageHref,
   type WordPressCoverage
@@ -31,37 +32,35 @@ function coverageSortValue(coverage: WordPressCoverage) {
   return coverage.modified || coverage.startDate || "";
 }
 
-function CoverageCard({ coverage }: { coverage: WordPressCoverage }) {
-  const href = getCoverageHref(coverage);
-  const dateLabel = coverage.startDate || coverage.endDate
-    ? [coverage.startDate, coverage.endDate]
-        .filter(Boolean)
-        .map((date) => formatDisplayDate(date as string))
-        .join(" – ")
-    : "";
-
+function CoverageCard({ view }: { view: CoveragePresentation }) {
+  const latest = view.format === "series"
+    ? view.stories[0]
+    : [...view.stories].sort((left, right) => (right.date ?? "").localeCompare(left.date ?? ""))[0];
   return (
-    <article className="coverage-story">
-      {coverage.artwork ? (
-        <img
-          className="coverage-artwork"
-          src={getPresentationMediaUrl(coverage.artwork.url)}
-          alt={coverage.artwork.alt}
-          width={coverage.artwork.width ?? undefined}
-          height={coverage.artwork.height ?? undefined}
-          style={coverage.artwork.objectPosition ? { objectPosition: coverage.artwork.objectPosition } : undefined}
-          loading="lazy"
-        />
-      ) : null}
-      <p className="coverage-story-kicker">Coverage</p>
-      <h2><a href={href}>{coverage.title}</a></h2>
-      {coverage.description || coverage.overview ? (
-        <p>{coverage.description || coverage.overview}</p>
-      ) : null}
-      <p className="coverage-story-meta">
-        {dateLabel ? <span>{dateLabel}</span> : null}
-        <span>{coverage.stories.length === 1 ? "1 published story" : `${coverage.stories.length} published stories`}</span>
-      </p>
+    <article className={view.artwork ? "coverage-card" : "coverage-card coverage-card-no-art"}>
+      <a className="coverage-card-art" href={view.href} tabIndex={-1} aria-hidden="true">
+        {view.artwork ? (
+          <img
+            src={getPresentationMediaUrl(view.artwork.url)}
+            alt=""
+            width={view.artwork.width ?? undefined}
+            height={view.artwork.height ?? undefined}
+            style={view.artwork.objectPosition ? { objectPosition: view.artwork.objectPosition } : undefined}
+            loading="lazy"
+            decoding="async"
+          />
+        ) : <span>{view.title}</span>}
+      </a>
+      <div className="coverage-card-body">
+        <p className="coverage-card-kicker">{view.format === "series" ? "Series" : "Coverage"} · {view.countLabel}</p>
+        <h2><a href={view.href}>{view.title}</a></h2>
+        {view.description ? <p className="coverage-card-description">{view.description}</p> : null}
+        {latest ? (
+          <p className="coverage-card-latest">
+            <span>{view.format === "series" ? "Start with" : "Latest"}</span> <a href={latest.href}>{latest.title}</a>
+          </p>
+        ) : null}
+      </div>
     </article>
   );
 }
@@ -96,6 +95,7 @@ export default async function CoverageIndexPage() {
   const sortedCoverages = [...coverages].sort((a, b) =>
     coverageSortValue(b).localeCompare(coverageSortValue(a)) || a.title.localeCompare(b.title)
   );
+  const allPosts = await getAllPosts();
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", path: "/" },
     { name: "Coverage", path: "/coverage/" }
@@ -113,16 +113,14 @@ export default async function CoverageIndexPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
       />
-      <header className="section-heading">
-        <div>
-          <h1>Coverage</h1>
-          <p>Follow the stories and reporting projects shaping the {publication.identity.shortName} community.</p>
-        </div>
+      <header className="coverage-index-header">
+        <h1>Series &amp; Coverage</h1>
+        <p>In-depth series and ongoing reporting from the {publication.identity.shortName} newsroom, collected in one place.</p>
       </header>
 
       {sortedCoverages.length > 0 ? (
-        <div className="coverage-story-list" aria-label="Coverage projects">
-          {sortedCoverages.map((coverage) => <CoverageCard key={coverage.id} coverage={coverage} />)}
+        <div className="coverage-card-grid" aria-label="Series and coverage">
+          {sortedCoverages.map((coverage) => <CoverageCard key={coverage.id} view={buildCoveragePresentation(coverage, allPosts)} />)}
         </div>
       ) : (
         <p className="empty-state">No special coverage is available yet. Check back as reporting projects develop.</p>

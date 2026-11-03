@@ -1,5 +1,5 @@
 import type { ImageCropShape } from "@byline/core";
-import type { ArticleImageView, ArticlePresentation, ArticleStoryCardView } from "@byline/ui";
+import type { ArticleImageView, ArticlePresentation, ArticleSeriesPartView, ArticleSeriesView, ArticleStoryCardView } from "@byline/ui";
 import { getResponsiveImageProps, type ImageSearchVisibility } from "@/lib/media";
 import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory, getPublicTopicTags, isAthleteSpotlightPost, isHiddenCategory, isVisibleContentPost } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
@@ -9,6 +9,7 @@ import { getPublicationConfig } from "@/lib/publication";
 import {
   getAuthorProfile,
   contributorHasProfilePage,
+  getCoverageHref,
   getContributorHref,
   getContributorName,
   getContributorPhoto,
@@ -19,6 +20,7 @@ import {
   getPostCategories,
   getPostContributors,
   getPostHref,
+  getPostReportingNote,
   getPostStoryPresentation,
   getPostTags,
   getPublicCorrectionsForPost,
@@ -26,6 +28,7 @@ import {
   type WordPressAuthor,
   type WordPressCategory,
   type WordPressContributor,
+  type WordPressCoverage,
   type WordPressMedia,
   type WordPressPost
 } from "@/lib/wordpress";
@@ -66,10 +69,12 @@ function articleImage(image: WordPressMedia | null, sizes?: string, priority = f
   };
 }
 
-function articleStoryCard(post: WordPressPost): ArticleStoryCardView {
+// Compact teasers are square (globals.css .story-teaser-compact).
+const COMPACT_CARD_IMAGE = { shape: "square", sizes: "(max-width: 900px) 100vw, 360px" } as const;
+
+export function articleStoryCard(post: WordPressPost, imageOptions: { shape: ImageCropShape; sizes: string } = COMPACT_CARD_IMAGE): ArticleStoryCardView {
   const category = getPrimaryVisibleCategory(post);
-  // Compact teasers are square (globals.css .story-teaser-compact).
-  const image = articleImage(getFeaturedMedia(post), "(max-width: 900px) 100vw, 360px", false, "presentation", "square");
+  const image = articleImage(getFeaturedMedia(post), imageOptions.sizes, false, "presentation", imageOptions.shape);
   return {
     id: post.id,
     title: stripHtml(post.title.rendered),
@@ -153,6 +158,78 @@ function relatedPosts(post: WordPressPost, posts: WordPressPost[]) {
     .map(({ post: relatedPost }) => relatedPost);
 }
 
+const COVERAGE_GUIDE_LIMIT = 4;
+
+/** Coverage whose stories are complete; a series still in progress promises no total. */
+export function isCoverageComplete(coverage: Pick<WordPressCoverage, "status">) {
+  return coverage.status === "past" || coverage.status === "archived";
+}
+
+/**
+ * The public stories of a coverage, in the editor's order, as full posts.
+ * Coverage lists only published stories, but a story can still be hidden
+ * from the public site (e.g. an internal category), so it is dropped here.
+ */
+export function getCoverageStories(coverage: WordPressCoverage, postsById: ReadonlyMap<number, WordPressPost>) {
+  return coverage.stories.flatMap((story) => {
+    const post = postsById.get(story.id);
+    return post && isVisibleContentPost(post) ? [post] : [];
+  });
+}
+
+/** A story in more than one public coverage reads as part of the first series, else the first coverage. */
+export function findStoryCoverage(post: WordPressPost, coverages: readonly WordPressCoverage[]) {
+  const containing = coverages.filter((coverage) => coverage.stories.some((story) => story.id === post.id));
+  return containing.find((coverage) => coverage.format === "series") ?? containing[0] ?? null;
+}
+
+function seriesPart(post: WordPressPost, number: number, current: boolean, withImage = false): ArticleSeriesPartView {
+  return {
+    id: post.id,
+    number,
+    title: stripHtml(post.title.rendered),
+    href: getPostHref(post),
+    current,
+    date: post.date,
+    dateLabel: formatDisplayDate(post.date),
+    ...(withImage ? { image: articleImage(getFeaturedMedia(post), "(max-width: 700px) 30vw, 180px", false, "presentation", "standard") } : {})
+  };
+}
+
+/** Where a story sits in its public series or coverage. */
+export function buildArticleSeries(post: WordPressPost, coverages: readonly WordPressCoverage[], allPosts: readonly WordPressPost[]): ArticleSeriesView | null {
+  const coverage = findStoryCoverage(post, coverages);
+  if (!coverage) return null;
+  const memberIds = new Set(coverage.stories.map((story) => story.id));
+  const stories = getCoverageStories(coverage, new Map(allPosts.filter((candidate) => memberIds.has(candidate.id)).map((candidate) => [candidate.id, candidate])));
+  const index = stories.findIndex((story) => story.id === post.id);
+  if (index < 0) return null;
+  const parts = stories.map((story, storyIndex) => seriesPart(story, storyIndex + 1, storyIndex === index));
+  const base = {
+    title: coverage.title,
+    href: getCoverageHref(coverage),
+    ...(coverage.description ? { description: coverage.description } : {}),
+    complete: isCoverageComplete(coverage),
+    position: index + 1,
+    total: stories.length
+  };
+  if (coverage.format === "coverage") {
+    const others = parts
+      .filter((part) => !part.current)
+      .sort((left, right) => new Date(right.date ?? 0).getTime() - new Date(left.date ?? 0).getTime())
+      .slice(0, COVERAGE_GUIDE_LIMIT);
+    return { format: "coverage", ...base, previous: null, next: null, parts: others };
+  }
+  const next = stories[index + 1];
+  return {
+    format: "series",
+    ...base,
+    previous: index > 0 ? parts[index - 1] : null,
+    next: next ? seriesPart(next, index + 2, false, true) : null,
+    parts
+  };
+}
+
 export type BuildArticlePresentationOptions = {
   post: WordPressPost;
   allPosts: WordPressPost[];
@@ -161,10 +238,12 @@ export type BuildArticlePresentationOptions = {
   visiblePosts?: WordPressPost[];
   authorPosts?: WordPressPost[];
   relatedCandidates?: WordPressPost[];
+  /** Public series and coverage, to place the story in its series. */
+  coverages?: readonly WordPressCoverage[];
 };
 
 /** Build the public route's normalized model without importing any renderer. */
-export function buildArticlePresentation({ post, allPosts, contributors, author, visiblePosts: indexedVisiblePosts, authorPosts: indexedAuthorPosts, relatedCandidates }: BuildArticlePresentationOptions): ArticlePresentation {
+export function buildArticlePresentation({ post, allPosts, contributors, author, visiblePosts: indexedVisiblePosts, authorPosts: indexedAuthorPosts, relatedCandidates, coverages = [] }: BuildArticlePresentationOptions): ArticlePresentation {
   const category = getPrimaryVisibleCategory(post);
   const image = articleImage(getFeaturedMedia(post), "(max-width: 900px) 100vw, 900px", true);
   const topicTags = getPublicTopicTags(post);
@@ -179,7 +258,10 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
   const authorPosts = indexedAuthorPosts ?? (displayContributors.length > 0
     ? visiblePosts.filter((candidate) => displayContributors.some((contributor) => postHasContributor(candidate, contributor)))
     : []);
-  const related = relatedPosts(post, relatedCandidates ?? visiblePosts);
+  const series = buildArticleSeries(post, coverages, allPosts);
+  // The series guide already lists the other parts; do not repeat them as related stories.
+  const seriesIds = new Set(series?.format === "series" ? series.parts.map((part) => part.id) : []);
+  const related = relatedPosts(post, (relatedCandidates ?? visiblePosts).filter((candidate) => !seriesIds.has(candidate.id)));
   const relatedIds = new Set(related.map((relatedPost) => relatedPost.id));
   const moreByAuthor = authorPosts.filter((candidate) => candidate.id !== post.id && !relatedIds.has(candidate.id)).slice(0, 3);
   const storyPresentation = getPostStoryPresentation(post);
@@ -216,8 +298,10 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
     })),
     topics: topicTerms.map((term) => ({ id: `${term.taxonomy}-${term.id}`, name: decodeHtml(term.name) })),
     update: updated ? { modifiedAt: post.modified, label: `This story was updated after initial publication on ${formatDisplayDate(post.modified)}.` } : null,
-    relatedStories: related.map(articleStoryCard),
-    moreByAuthorStories: moreByAuthor.map(articleStoryCard),
+    relatedStories: related.map((story) => articleStoryCard(story)),
+    moreByAuthorStories: moreByAuthor.map((story) => articleStoryCard(story)),
+    reportingNote: getPostReportingNote(post),
+    series,
     publication: { shortName: publication.identity.shortName, contactHref: publication.urls.contact }
   };
 }

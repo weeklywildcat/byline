@@ -9,11 +9,13 @@ import { StoryArticle } from "@/story-presentations/StoryArticle";
 import { getPrimaryVisibleCategory, getPublicTopicTags, isVisibleContentPost } from "@/lib/content";
 import { stripHtml, decodeHtml } from "@/lib/format";
 import { buildArticlePresentation } from "@/lib/article-presentation";
+import { optionalBuildData } from "@/lib/build-data";
 import { getSportsGameById } from "@/lib/headless";
 import { absoluteUrl, buildPageMetadata, getArticleAuthorProfileUrls, getBreadcrumbSchema, getNewsArticleSchema, getPostTimestamps, serializeJsonLd } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getAllPosts,
+  getAllPublicCoverages,
   getBylineRestUrl,
   getFeaturedMedia,
   getPostBySlug,
@@ -67,7 +69,11 @@ export async function getMetadata({ params }: ArticlePageProps): Promise<Metadat
 
 export default async function ArticlePage({ params }: ArticlePageProps) {
   const routeParams = await params;
-  const [post, allPosts] = await Promise.all([getPostBySlug(routeParams.articleSlug), getAllPosts()]);
+  const [post, allPosts, coverages] = await Promise.all([
+    getPostBySlug(routeParams.articleSlug),
+    getAllPosts(),
+    optionalBuildData("/wp-json/byline/v1/coverage", getAllPublicCoverages, [])
+  ]);
   if (!post || !isVisibleContentPost(post)) notFound();
 
   const route = getPostRouteParts(post);
@@ -80,7 +86,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const showLegacyPrimaryGame = Boolean(primaryGame && !getPostGameScoreGameIds(post).includes(primaryGame.id));
   const title = stripHtml(post.title.rendered);
   const articleUrl = absoluteUrl(getPostHref(post));
-  const presentation = buildArticlePresentation({ post, allPosts, contributors, author });
+  const presentation = buildArticlePresentation({ post, allPosts, contributors, author, coverages });
   const category = getPrimaryVisibleCategory(post);
   const metadata = (
     <>
