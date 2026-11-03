@@ -14,6 +14,8 @@ export type StoryFetchers = {
   getWorkspace?: (storyId: number) => Promise<StoryWorkspace>;
   workspace?: WorkspaceClient;
   editorial?: EditorialRestClient;
+  /** Search newsroom stories for the universal command palette. */
+  searchStories?: (query: string) => Promise<{ stories: Array<{ id: number; title: string }> }>;
   /** Creates a draft, optionally from a template preset; resolves with the full workspace payload plus `workspaceUrl`/`template`. */
   createStory?: (title: string, preset?: string) => Promise<StoryWorkspace>;
   getPresets?: () => Promise<HomePresetsPayload>;
@@ -31,6 +33,7 @@ export function createStoryFetchers(request: StoryRequest, capabilities: StoryCa
     fetchers.collections = createCollectionApi(request);
     fetchers.workspace = createWorkspaceClient(request);
     fetchers.getWorkspace = fetchers.workspace.getWorkspace;
+    fetchers.searchStories = (query) => request({ path: `/byline/v1/editorial/home/search?query=${encodeURIComponent(query)}` });
     fetchers.createStory = (title, preset) => request<StoryWorkspace>({ path: "/byline/v1/editorial/stories", method: "POST", data: preset ? { title, preset } : { title } });
     fetchers.editorial = createEditorialRestClient(request);
   }

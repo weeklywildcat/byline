@@ -13,7 +13,7 @@ type PlanningConfig = {
   tab: string;
   view: string;
   capabilities: { manage?: boolean; editPosts?: boolean };
-  urls: { planning: { stories: string } };
+  urls: { planning: { stories: string; calendar?: string; media?: string; coverage?: string; performance?: string; contentHealth?: string; feedback?: string } };
 };
 declare global { interface Window { bylinePlanning?: PlanningConfig } }
 
@@ -32,6 +32,23 @@ if (root && config) {
   const request = <T,>(options: Parameters<typeof apiFetch>[0]) => apiFetch(options) as Promise<T>;
   const fetchers = { ...createPlanningFetchers(request), ...createStoryFetchers(request, config.capabilities) };
   createRoot(root).render(<PlanningBoundary>
-    <PlanningApp fetchers={fetchers} tab={config.tab} view={config.view} currentUserId={Number(config.currentUserId) || null} storiesUrl={config.urls?.planning?.stories || "admin.php?page=byline-planning&tab=stories"} mine={new URLSearchParams(window.location.search).get("mine") === "1"} />
+    <PlanningApp
+      fetchers={fetchers}
+      tab={config.tab}
+      view={config.view}
+      currentUserId={Number(config.currentUserId) || null}
+      storiesUrl={config.urls?.planning?.stories || "admin.php?page=byline-planning&tab=stories"}
+      mine={new URLSearchParams(window.location.search).get("mine") === "1"}
+      commandUrls={{
+        stories: config.urls?.planning?.stories,
+        calendar: config.urls?.planning?.calendar,
+        media: config.urls?.planning?.media,
+        coverage: config.urls?.planning?.coverage,
+        performance: config.urls?.planning?.performance,
+        contentHealth: config.urls?.planning?.contentHealth,
+        feedback: config.urls?.planning?.feedback,
+        upload: config.capabilities.editPosts ? "media-new.php" : undefined
+      }}
+    />
   </PlanningBoundary>);
 }

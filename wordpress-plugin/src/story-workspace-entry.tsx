@@ -14,7 +14,7 @@ type WorkspaceConfig = {
   storyId: number;
   /** Empty unless a deep link names an appointment. */
   appointmentId: string;
-  urls: { planning: { stories: string } };
+  urls: { planning: { stories: string; calendar?: string; media?: string; coverage?: string; performance?: string; contentHealth?: string; feedback?: string } };
 };
 declare global { interface Window { bylineWorkspace?: WorkspaceConfig } }
 
@@ -35,6 +35,24 @@ if (root && config && config.storyId > 0) {
   const request = <T,>(options: Parameters<typeof apiFetch>[0]) => apiFetch(options) as Promise<T>;
   const storiesUrl = config.urls?.planning?.stories || "admin.php?page=byline-planning&tab=stories";
   createRoot(root).render(<WorkspaceBoundary storiesUrl={storiesUrl}>
-    <StoryWorkspaceApp storyId={config.storyId} appointmentId={config.appointmentId || ""} currentUserId={config.currentUserId} storiesUrl={storiesUrl} client={createWorkspaceClient(request)} editorial={createEditorialRestClient(request)} />
+    <StoryWorkspaceApp
+      storyId={config.storyId}
+      appointmentId={config.appointmentId || ""}
+      currentUserId={config.currentUserId}
+      storiesUrl={storiesUrl}
+      client={createWorkspaceClient(request)}
+      editorial={createEditorialRestClient(request)}
+      searchStories={(query) => request<{ stories: Array<{ id: number; title: string }> }>({ path: `/byline/v1/editorial/home/search?query=${encodeURIComponent(query)}` })}
+      commandUrls={{
+        stories: config.urls?.planning?.stories,
+        calendar: config.urls?.planning?.calendar,
+        media: config.urls?.planning?.media,
+        coverage: config.urls?.planning?.coverage,
+        performance: config.urls?.planning?.performance,
+        contentHealth: config.urls?.planning?.contentHealth,
+        feedback: config.urls?.planning?.feedback,
+        upload: "media-new.php"
+      }}
+    />
   </WorkspaceBoundary>);
 }

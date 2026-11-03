@@ -4,6 +4,7 @@ import type { EditorialRestClient } from "../editorial/editorial-rest";
 import type { WorkspaceClient } from "./workspace-api";
 import { workspaceKey } from "./workspace-query";
 import type { StoryWorkspace, WorkspaceCapabilities, WorkspaceSection } from "./workspace-types";
+import type { NewsroomCommandUrls, StorySearchResult } from "../story/NewsroomCommands";
 
 export type WorkspaceEnv = {
   storyId: number;
@@ -13,6 +14,8 @@ export type WorkspaceEnv = {
   storiesUrl: string;
   client: WorkspaceClient;
   editorial: EditorialRestClient;
+  searchStories?: (query: string) => Promise<{ stories: StorySearchResult[] }>;
+  commandUrls?: NewsroomCommandUrls;
 };
 
 export type WorkspaceContextValue = WorkspaceEnv & {
