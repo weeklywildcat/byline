@@ -1,0 +1,7 @@
+/* Editor-only chrome for this block. Its public presentation lives in
+   packages/ui/src/newsroom/interactive.css and loads once through the shared newsroom stylesheet;
+   the canvas uses those same classes, so the figure here is the figure readers get.
+   The title, description and credit fields reuse Chart / Map's `byline-viz-field`. */
+.byline-interactive-upload .components-placeholder__fieldset { align-items: flex-start; flex-direction: column; gap: 12px; }
+.byline-interactive-file { margin: 0 0 8px; overflow-wrap: anywhere; }
+.byline-interactive > .components-notice { margin: 12px 0 0; }

@@ -566,6 +566,102 @@
           []
         ]
       }
+    },
+    {
+      "id": 10,
+      "date": "2026-08-10T09:00:00",
+      "date_gmt": "2026-08-10T13:00:00",
+      "modified": "2026-08-10T09:00:00",
+      "modified_gmt": "2026-08-10T13:00:00",
+      "slug": "weekly-wildcat-visual-story-fixture",
+      "status": "publish",
+      "type": "post",
+      "link": "https://weeklywildcat.com/2026/08/10/news/weekly-wildcat-visual-story-fixture/",
+      "title": {
+        "rendered": "Weekly Wildcat visual story fixture"
+      },
+      "content": {
+        "rendered": "<p>The WordPress text edition of the visual story fixture, for feeds and search.</p>"
+      },
+      "excerpt": {
+        "rendered": "<p>A flagship visual story fixture.</p>"
+      },
+      "author": 1,
+      "featured_media": 800,
+      "categories": [
+        2
+      ],
+      "tags": [],
+      "sticky": false,
+      "_embedded": {
+        "wp:featuredmedia": [
+          {
+            "id": 800,
+            "date": "2026-08-16T09:00:00",
+            "slug": "newsroom-meeting",
+            "type": "attachment",
+            "link": "https://weeklywildcat.com/newsroom-meeting/",
+            "title": {
+              "rendered": "Newsroom meeting"
+            },
+            "author": 1,
+            "caption": {
+              "rendered": "<p>Staff plan the publishing schedule.</p>"
+            },
+            "alt_text": "Two staff members review a tablet at a conference table.",
+            "media_type": "image",
+            "mime_type": "image/jpeg",
+            "media_details": {
+              "width": 1600,
+              "height": 1067,
+              "sizes": {
+                "medium": {
+                  "file": "newsroom-meeting-640.jpg",
+                  "width": 640,
+                  "height": 427,
+                  "mime_type": "image/jpeg",
+                  "source_url": "https://weeklywildcat.com/newsroom/newsroom-meeting-640.jpg"
+                },
+                "large": {
+                  "file": "newsroom-meeting-1000.jpg",
+                  "width": 1000,
+                  "height": 667,
+                  "mime_type": "image/jpeg",
+                  "source_url": "https://weeklywildcat.com/newsroom/newsroom-meeting-1000.jpg"
+                }
+              }
+            },
+            "bylineImage": {
+              "creator": "Fixture Photographer"
+            },
+            "source_url": "https://weeklywildcat.com/newsroom/newsroom-meeting-1600.jpg"
+          }
+        ],
+        "author": [
+          {
+            "id": 1,
+            "name": "Weekly Wildcat Staff",
+            "slug": "weekly-wildcat-staff",
+            "description": "Student journalists serving the Ninety Six community.",
+            "avatar_urls": {}
+          }
+        ],
+        "wp:term": [
+          [
+            {
+              "id": 2,
+              "count": 6,
+              "description": "Weekly Wildcat campus reporting.",
+              "link": "https://weeklywildcat.com/category/news/",
+              "name": "News",
+              "slug": "news",
+              "taxonomy": "category",
+              "parent": 0
+            }
+          ],
+          []
+        ]
+      }
     }
   ]
 }

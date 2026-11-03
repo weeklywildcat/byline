@@ -32,7 +32,9 @@ describe('visualization provider boundary', () => {
   it('maps semantic heights and bounds authenticated resize payloads', () => {
     expect(['compact','standard','tall','map','invalid'].map(visualizationHeight)).toEqual([320,480,680,560,480]);
     expect(visualizationMessageHeight({ 'datawrapper-height': { AbCdE: 611 } }, 'datawrapper','AbCdE')).toBe(611);
-    expect(visualizationMessageHeight(JSON.stringify({ source: 'Flourish', context: 'iframe.resize', height: 702 }), 'flourish','123')).toBe(702);
+    // Flourish's real wire format (flo.uri.sh, checked 2026-11): a JSON string with `sender`.
+    expect(visualizationMessageHeight(JSON.stringify({ sender: 'Flourish', context: 'iframe.resize', method: 'resize', height: 559.0625, src: 'https://flo.uri.sh/visualisation/123/embed?auto=1' }), 'flourish','123')).toBe(559.0625);
+    expect(visualizationMessageHeight(JSON.stringify({ source: 'Flourish', context: 'iframe.resize', height: 702 }), 'flourish','123')).toBeNull();
     for (const height of [-10,0,2500,Infinity,'500',null]) expect(visualizationMessageHeight({ 'datawrapper-height': { AbCdE: height } }, 'datawrapper','AbCdE')).toBeNull();
     expect(visualizationMessageHeight({ 'datawrapper-height': { other: 600 } }, 'datawrapper','AbCdE')).toBeNull();
     expect(visualizationMessageHeight('bad json', 'flourish','123')).toBeNull();

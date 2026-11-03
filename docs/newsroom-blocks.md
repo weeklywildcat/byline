@@ -82,8 +82,8 @@ The tools are organised around what a reporter is trying to do:
 | --- | --- |
 | Present photographs and video | Photo Gallery, Portrait + Text, Visual Chapter, and Core's Image (Wide / Full width in the alignment toolbar), Video and Audio |
 | Explain the reporting and the evidence | Reported Quote, Pull Quote, Key Facts, Context Box, Margin Note, Editor's Note, Expandable Section, Document Viewer, Footnotes |
-| Show data, maps and comparisons | Chart / Map, Data Table, Comparison, Three Key Numbers, Before / After, Annotated Image |
-| Build visual narratives and chronological stories | Timeline, Scrollytelling, Visual Chapter, Photo Essay (pattern) |
+| Show data, maps and comparisons | Chart / Map, Interactive, Data Table, Comparison, Three Key Numbers, Before / After, Annotated Image |
+| Build visual narratives and chronological stories | Timeline, Visual Chapter, Photo Essay (pattern); scrollytelling and other scroll-driven features are flagship visual stories built in the repository ([custom-story-presentations.md](custom-story-presentations.md#flagship-visual-stories)) |
 | Provide supporting context and related coverage | Related Coverage, In This Story, Context Box, Margin Note |
 
 | Editor-facing name | Underlying block | Intended use | Mobile behavior |
@@ -198,11 +198,6 @@ is not finished (no photograph, no text) is not published.
   Before, Replace After and Swap are in the toolbar. If the photographs are different
   shapes, choose between cropping the right-hand one and showing both complete. Before
   is always on the left, After on the right.
-- **Scrollytelling.** A photograph pins beside the reporting while readers scroll
-  (linear on phones and for readers who prefer less motion). The *story board* at the
-  top shows every step; Add, Duplicate, Earlier, Later and Remove arrange them (arrow
-  keys browse, Alt+arrow moves). *As the reader sees it* previews the selected step. A
-  step without a photograph keeps the previous one on the stage.
 - **Timeline.** Click into any event and type a date label, a headline and an
   explanation; Enter moves on and, after the last explanation, adds the next event.
   The toolbar adds, duplicates, moves and removes the event you are in; *Latest* marks
@@ -214,6 +209,11 @@ is not finished (no photograph, no text) is not published.
   "Preview" badge; the editor and Preview as Byline never load the provider. Pick
   Compact (320px), Standard (480), Tall (680) or Map (560). Write the title as the
   takeaway and the dek as the precise measure, then source, notes and credit.
+- **Interactive** (editors and administrators). For a small interactive that no chart
+  tool makes: a calculator, quiz, custom chart, map or data explorer. Ask Claude (or
+  another coding agent) for *one self-contained HTML file*, upload it, then write a
+  title and a description of what it shows for readers who cannot use it. See
+  [Interactive](#interactive) below.
 - **Preview as Byline** shows the Standard or Immersive opening you chose. A one-off
   layout a developer built for a single story is not previewed.
 - **Photo crops.** *Story presentation → Crops & placements* opens the featured
@@ -225,6 +225,55 @@ is not finished (no photograph, no text) is not published.
   work, including the social card and a search result. Crops belong to the photo, so
   every story that uses it agrees. The pre-publish checks flag photos that are too
   small, and tall or panoramic photos with no focal point.
+
+### Interactive
+
+The Interactive block (`byline/interactive`) shows one uploaded HTML file inside
+the article, isolated from it. It is for small self-contained pieces; use Chart /
+Map for Datawrapper, Flourish and map embeds, and a [flagship visual
+story](custom-story-presentations.md#flagship-visual-stories) for anything that
+must share the page's layout or scrolling.
+
+**Writer workflow.** Ask a coding agent for the interactive as *a single HTML file
+with its CSS and JavaScript inline* (libraries may load from a CDN such as
+cdnjs or jsDelivr). An editor inserts **Interactive**, chooses *Upload HTML file*,
+and types a title and a description; the canvas runs the file in the same sandbox
+readers get. There is no code editor: to change the interactive, upload a new file
+(*Replace file* in the toolbar). Credit and starting height (the Chart / Map
+presets) are optional.
+
+**What the file can do.** It runs in an iframe whose `srcdoc` is the file,
+sandboxed with `allow-scripts` and nothing else. Its origin is opaque, so it
+cannot read or change the article, its cookies or storage (`localStorage` throws),
+navigate the page, open windows or popups, submit forms (handle input with
+JavaScript events instead) or show `alert` dialogs. It can fetch public data and
+scripts. A small reporter appended to the file posts its height, and the article
+(`article-enhancements/interactive.ts`) accepts that one message, clamped to
+120-4000px, only from that frame's own window.
+
+**Who can add one.** Only users with `unfiltered_html` (editors and administrators)
+see the block in the inserter. On every save, `wp_insert_post_data` drops any
+interactive that is new or whose file changed when the user lacks that capability;
+an interactive already in the post survives anyone's edits, including revisions and
+autosaves (checked against the parent post). The file is stored base64-encoded in
+the block's `document` attribute so that kses, which filters block attributes for
+those users, cannot silently strip its scripts.
+
+**Rendering.** A dynamic block: `includes/content/interactive-block.php` prints a
+figure with the title (`h3`), the description (which names the frame through
+`aria-describedby`), the frame (`title`, lazy, no referrer), a `<noscript>` note and
+the credit. The file is escaped into `srcdoc` without collapsing entities, with
+shortcode brackets made inert. A block with no valid file, title or description
+prints nothing. Files over 512 KB, or that are not UTF-8 HTML, are refused in the
+editor and ignored at render. The static site prints WordPress's rendering as it
+does any body block; nothing is hosted separately.
+
+**Tests.** `wordpress-plugin/tests/interactive-block-regression.php` (render,
+escaping, sandbox, unfinished blocks, the save guard, the fixture matching the
+renderer), `wordpress-plugin/tests-js/interactive.test.ts` (PHP/TypeScript contract,
+storage, height messages, the enhancer) and
+`apps/web/tests/browser/interactive.spec.ts` (isolation in a real browser,
+resizing, accessibility, no-JavaScript and phone layout).
 
 ### Photo crops: how they reach the site
 
@@ -340,7 +389,6 @@ Patterns are unlocked starters; they are not article formats or templates.
 | In This Story | `byline/table-of-contents` | Dynamic custom block | H2/H3 contents navigation | Local anchors | One column | Complete nav |
 | Annotated Image | `byline/annotated-image` | Custom | Plans/photos with up to 12 stable annotation records | Marker/list synchronization, keyboard focus | List below image | Marker anchors and complete annotation list |
 | Before / After | `byline/before-after` | Custom | Two photographs showing change | Drag the divider on the photograph (mouse, touch) or use the arrow keys | Same control, 48px handle | Both complete labeled images and the caption |
-| Scrollytelling / Story Step | `byline/scrolly`, `byline/scrolly-step` | Custom parent/child system | Linear image-based visual narrative | Sticky decorative image switches as each step crosses a fixed reading line | Linear under 900px; reduced motion always linear | Every image, caption and text in sequence |
 
 ### Authoring
 
@@ -384,12 +432,9 @@ Patterns are unlocked starters; they are not article formats or templates.
   and use contained images, preserving the complete evidence in the fallback.
   Readers drag the divider on the photograph, or tab to it and use the arrow
   keys (see the interaction contracts below).
-- **Scrollytelling:** Start with two Story Steps. Each has one image, optional
-  caption and ordinary text blocks. Add/reorder steps through normal block
-  controls or List View. Choose complete-image or explicit crop/fill for the
-  sticky stage. There are no scroll locks or interactive iframes in the stage.
-  Text fields in the new blocks keep what is typed locally, so fast typing never
-  loses characters while the editor catches up.
+
+Text fields in these blocks keep what is typed locally, so fast typing never
+loses characters while the editor catches up.
 
 **Photo credits on body images.** Core's Image and Media & Text blocks do not
 print credit, so `wordpress-plugin/includes/content/photo-credits.php` adds
@@ -447,16 +492,6 @@ leaves vertical scrolling alone. Focus draws a 3px outline around the
 comparison and on the handle. Both complete images, the Before/After labels and
 the caption stay in the DOM and are visible without JavaScript.
 
-**Scrollytelling.** A step is active while it covers a fixed reading line
-`SCROLLY_ACTIVATION_LINE` (40) percent from the top of the viewport; the stage
-exposes it as `data-activation-line`. One `IntersectionObserver` watches a 1%
-band at that line (measured against the article document, so the private preview
-iframe behaves the same). The largest-visible-area rule is deliberately not
-used: a long previous step must not outvote a step that has reached the line.
-No scroll handlers, no scroll-jacking; the sticky, `aria-hidden` stage exists
-only at 900px and wider without reduced motion, and the linear story is never
-altered.
-
 **Width contract.** Prose is 760px, `alignwide` 1040px and `alignfull` 1440px,
 each capped by the article canvas: the content box of the `byline-content`
 shell, which is what `100cqw` resolves against. Blocks are centered in that
@@ -471,11 +506,10 @@ classic scrollbar. Tolerances stay at 1-2px.
 
 **Preview as Byline.** The preview uses the same CSS and enhancer inside its
 iframe at 1200, 768 and 390px of real layout width. Disclosures, the comparison
-range, annotation selection and scrolly stepping work; outgoing navigation is
+range and annotation selection work; outgoing navigation is
 blocked and third-party embeds show their fallback.
 
 **Intentional limitations.** Four allowlisted embed providers; the private
-preview never loads third-party frames; scrolly stages show images (reporting
-blocks stay in the linear story); Core Cover video backgrounds autoplay muted
+preview never loads third-party frames; Core Cover video backgrounds autoplay muted
 as Core defines them. Astro remains static, with no migration, new article
 format, homepage editor or frontend server.

@@ -1,5 +1,10 @@
 # Visual storytelling audit (Byline 0.3.24)
 
+> Historical record. The Scrollytelling and Story Step blocks it reviews were
+> later removed from WordPress; scroll-driven stories are now built as flagship
+> visual stories in `apps/web/story-presentations/` (see
+> [custom-story-presentations.md](custom-story-presentations.md)).
+
 An audit of the tools introduced or touched by PRs #132, #135, #137, #141 and #142,
 done against the real thing: a local WordPress 7.1 (wp-env), the built plugin, the
 static Astro site built from that WordPress, and Playwright at 1440, 1100, 820, 768

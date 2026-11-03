@@ -62,7 +62,7 @@ test.describe("public Astro site", () => {
     await expect(page.locator(".live-lead")).toContainText("Weekly Wildcat fixture story");
     await expect(page.locator(".top-stories-left-rail")).toHaveCount(0);
     await expect(page.locator(".top-stories-rail")).toBeVisible();
-    await expect(page.locator(".right-now-list .home-story")).toHaveCount(1);
+    await expect(page.locator(".right-now-list .home-story")).toHaveCount(2);
 
     const layout = page.locator("[data-homepage-top-stories]");
     const directChildren = await layout.locator(":scope > *").evaluateAll((elements) => elements.map((element) => ({

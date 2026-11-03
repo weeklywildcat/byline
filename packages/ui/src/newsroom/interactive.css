@@ -1,0 +1,53 @@
+/*
+ * Interactive: a small self-contained interactive (chart, calculator, quiz,
+ * map) in a sandboxed frame. It shares Chart / Map's figure language: a
+ * hairline rule, a title and a description, then the frame at wide width.
+ * The frame starts at its `data-height` preset (the Chart / Map presets) and
+ * then takes the height the interactive reports, so nothing jumps on load.
+ */
+.byline-interactive { --interactive-height: 480px; }
+.byline-interactive[data-height="compact"] { --interactive-height: 320px; }
+.byline-interactive[data-height="tall"] { --interactive-height: 680px; }
+.byline-interactive[data-height="map"] { --interactive-height: 560px; }
+
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-interactive {
+  border-block-start: var(--story-rule);
+  margin-block: var(--story-moment-space);
+  padding-block-start: 18px;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-interactive-title {
+  color: var(--ink, #121212);
+  font-family: var(--story-headline);
+  font-size: clamp(1.4rem, 1.15rem + 1vw, 1.8rem);
+  font-weight: 600;
+  letter-spacing: -.012em;
+  line-height: 1.14;
+  margin: 0 0 .3em;
+  text-wrap: balance;
+}
+:is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) .byline-interactive-description {
+  color: var(--story-muted);
+  font-family: var(--story-serif);
+  font-size: 1.05rem;
+  line-height: 1.45;
+  margin: 0 0 1.1rem;
+  max-width: var(--article-width, 760px);
+  text-wrap: pretty;
+}
+.byline-interactive-frame {
+  background: var(--page, #fff);
+  border: 0;
+  display: block;
+  height: var(--interactive-height);
+  width: 100%;
+}
+/* Without scripting the interactive cannot run: the description above stands in for it. */
+@media (scripting: none) {
+  .byline-interactive-frame { display: none; }
+}
+.byline-interactive-noscript {
+  color: var(--story-muted);
+  font-family: var(--story-sans);
+  font-size: .9rem;
+  margin: 0;
+}

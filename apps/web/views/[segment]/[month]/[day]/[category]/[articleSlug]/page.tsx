@@ -13,6 +13,8 @@ import { optionalBuildData } from "@/lib/build-data";
 import { getSportsGameById } from "@/lib/headless";
 import { absoluteUrl, buildPageMetadata, getArticleAuthorProfileUrls, getBreadcrumbSchema, getPostTimestamps, serializeJsonLd } from "@/lib/seo";
 import { getArticleJsonLd } from "@/lib/story-video";
+import { getStoryPresentation } from "@/story-presentations/registry";
+import { isVisualStory } from "@/story-presentations/types";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getAllPosts,
@@ -91,7 +93,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const category = getPrimaryVisibleCategory(post);
   const metadata = (
     <>
-      <script id="newsarticle-json-ld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(getArticleJsonLd(post)) }} />
+      <script id="newsarticle-json-ld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(getArticleJsonLd(post, { articleBody: !isVisualStory(getStoryPresentation(post.id)) })) }} />
       <script id="article-breadcrumb-json-ld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(getBreadcrumbSchema([
         { name: "Home", path: "/" },
         ...(category ? [{ name: decodeHtml(category.name), path: `/category/${category.slug}/` }] : []),

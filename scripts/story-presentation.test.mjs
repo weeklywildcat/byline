@@ -4,7 +4,8 @@ import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { componentName, createStoryPresentation, registerInSource, registryHasId } from "./story-presentation.mjs";
+import { fileURLToPath } from "node:url";
+import { componentName, createStoryPresentation, registerInSource, registryHasId, visualClientSource, visualIndexSource, visualStylesSource } from "./story-presentation.mjs";
 
 const registry = `import type { StoryPresentationRegistry } from "./types";
 import Fixture from "./stories/reveal-fixture";
@@ -54,6 +55,55 @@ test("creates the files and registers the post ID without touching the fixture r
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("without --visual, the presentation keeps the WordPress body and gets no client code", async () => {
+  const root = await workspace();
+  try {
+    await createStoryPresentation({ id: "384", name: "need-a-lift", root });
+    const directory = path.join(root, "apps/web/story-presentations/stories/need-a-lift");
+    const index = await readFile(path.join(directory, "index.tsx"), "utf8");
+    assert.doesNotMatch(index, /defineVisualStory/);
+    assert.equal(existsSync(path.join(directory, "client.ts")), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("--visual creates a flagship visual story: its own narrative, styles and client, registered by post ID", async () => {
+  const root = await workspace();
+  try {
+    const result = await createStoryPresentation({ id: "402", name: "lunch-line", visual: true, root });
+    const base = path.join(root, "apps/web/story-presentations");
+    const index = await readFile(path.join(base, "stories/lunch-line/index.tsx"), "utf8");
+    const styles = await readFile(path.join(base, "stories/lunch-line/styles.css"), "utf8");
+    const client = await readFile(path.join(base, "stories/lunch-line/client.ts"), "utf8");
+    const updated = await readFile(path.join(base, "registry.ts"), "utf8");
+
+    assert.equal(result.registered, true);
+    assert.match(index, /export default defineVisualStory\(\{ name: "lunch-line", Component: LunchLine \}\);/);
+    assert.match(index, /WordPress post 402/);
+    // The WordPress body is never printed by a visual story; the standard systems are.
+    assert.doesNotMatch(index, /ArticleBody/);
+    for (const piece of ["ArticleHeadline", "ArticleMeta", "ArticleFeaturedImage", "ArticleStoryFooter", "ArticleStandardEnding"]) assert.match(index, new RegExp(`<${piece} `));
+    assert.match(styles, /\.story-lunch-line \.story-lunch-line-sequence/);
+    assert.doesNotMatch(styles.replace(/\.story-lunch-line\b[^{]*\{/g, ""), /^[^\s/@}][^{]*\{/m);
+    assert.match(client, /export default enhance;/);
+    assert.match(client, /IntersectionObserver/);
+    assert.doesNotMatch(client, /addEventListener\(["']scroll|scrollTo|scrollBy/);
+    assert.match(updated, /import LunchLine from "\.\/stories\/lunch-line";/);
+    assert.match(updated, /\{\n  402: LunchLine,\n\};/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("the fixture visual story is exactly what --visual generates", async () => {
+  const directory = fileURLToPath(new URL("../apps/web/story-presentations/stories/visual-fixture/", import.meta.url));
+  const args = { id: 10, name: "visual-fixture" };
+  assert.equal(await readFile(path.join(directory, "index.tsx"), "utf8"), visualIndexSource(args));
+  assert.equal(await readFile(path.join(directory, "styles.css"), "utf8"), visualStylesSource(args));
+  assert.equal(await readFile(path.join(directory, "client.ts"), "utf8"), visualClientSource(args));
 });
 
 test("refuses bad input and duplicates before writing anything", async () => {
