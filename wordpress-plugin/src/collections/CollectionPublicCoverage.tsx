@@ -38,9 +38,11 @@ export function CollectionPublicCoverage({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<PublicCoveragePresentation | null>(null);
   const enabled = Boolean(c.publicPresentation?.publicEnabled);
+  const isSeries = c.publicPresentation?.publicFormat === "series";
   function edit() {
     const initial = c.publicPresentation ?? {
       publicEnabled: false,
+      publicFormat: "coverage" as const,
       publicTitle: c.name,
       publicSlug: "",
       publicDescription: "",
@@ -51,6 +53,7 @@ export function CollectionPublicCoverage({
     };
     setDraft({
       ...initial,
+      publicFormat: initial.publicFormat === "series" ? "series" : "coverage",
       publicEnabled: true,
       publicTitle: initial.publicTitle || c.name,
     });
@@ -80,11 +83,15 @@ export function CollectionPublicCoverage({
             {enabled
               ? c.publicPresentation?.publicTitle
               : "Newsroom-only Collection"}{" "}
-            <Badge variant="outline">{enabled ? "Public" : "Private"}</Badge>
+            <Badge variant="outline">
+              {enabled ? (isSeries ? "Public series" : "Public") : "Private"}
+            </Badge>
           </ItemTitle>
           <ItemDescription>
             {enabled
-              ? "Published stories appear on the public coverage page."
+              ? isSeries
+                ? "Published stories appear as numbered parts, with links to the next part in each story."
+                : "Published stories appear on the public coverage page."
               : "Coordinate reporting here. Publish a reader-facing coverage page when ready."}
           </ItemDescription>
         </ItemContent>
@@ -140,6 +147,22 @@ export function CollectionPublicCoverage({
               { value: "public", label: "Public coverage" },
             ]}
             onChange={(v) => patch({ publicEnabled: v === "public" })}
+          />
+          <SelectField
+            label="Format"
+            hint={
+              draft.publicFormat === "series"
+                ? "Stories are numbered Part 1, Part 2… and link to each other in order."
+                : "Readers follow developing reporting on one page."
+            }
+            value={draft.publicFormat === "series" ? "series" : "coverage"}
+            options={[
+              { value: "coverage", label: "Ongoing coverage" },
+              { value: "series", label: "Numbered series" },
+            ]}
+            onChange={(v) =>
+              patch({ publicFormat: v === "series" ? "series" : "coverage" })
+            }
           />
           <TextField
             label="Public title"
@@ -214,9 +237,13 @@ export function CollectionPublicCoverage({
             onChange={(v) => patch({ featuredStoryId: Number(v) })}
           />
           <div>
-            <h3 className="mb-2 text-sm font-medium">Public story order</h3>
+            <h3 className="mb-2 text-sm font-medium">
+              {draft.publicFormat === "series" ? "Part order" : "Public story order"}
+            </h3>
             <p className="mb-2 text-xs text-muted-foreground">
-              The lead story appears first. Unpublished stories remain private.
+              {draft.publicFormat === "series"
+                ? "Parts are numbered in this order; the lead story is Part 1. Unpublished stories are skipped until they publish."
+                : "The lead story appears first. Unpublished stories remain private."}
             </p>
             <ItemGroup className="gap-0 rounded-lg border">
               {order.map((id, index) => {

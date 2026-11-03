@@ -104,7 +104,7 @@ function byline_revision_on_post_meta($meta_id, $id, $key, $value = null): void
     // Only metadata read by public serializers/rendered blocks. Private notes,
     // visual requests, workflow status and editorial tasks are excluded.
     if (in_array($key, [
-        '_thumbnail_id', 'weekly_wildcat_primary_game_id', '_byline_story_contributors', '_byline_story_coverage_ids', '_byline_sports_archive_key', '_byline_sports_archive_routes',
+        '_thumbnail_id', 'weekly_wildcat_primary_game_id', 'byline_reporting_note', '_byline_story_contributors', '_byline_story_coverage_ids', '_byline_sports_archive_key', '_byline_sports_archive_routes',
         '_byline_page_eyebrow', '_byline_page_indexing',
         '_byline_guest_display_name', '_byline_guest_role', '_byline_guest_bio', '_byline_guest_image_id', '_byline_guest_public_links', '_byline_guest_profile_page',
         '_byline_coverage_description', '_byline_coverage_overview', '_byline_coverage_start_at', '_byline_coverage_end_at', '_byline_coverage_status', '_byline_coverage_public_enabled', '_byline_coverage_story_ids',

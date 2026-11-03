@@ -120,13 +120,13 @@ add `styles.css`, and add the import and the `id: Component` entry to the regist
 | Piece | Renders |
 | --- | --- |
 | `ArticleShell` | The `byline-article-view` theme scope and the `byline-content` container the wide/full-bleed blocks measure against. `ArticleBody` must sit inside one. |
-| `ArticleCategory`, `ArticleHeadline` (the only `<h1>`), `ArticleExcerpt`, `ArticleAthleteMeta` | The header pieces. All accept a `className`. |
+| `ArticleCategory`, `ArticleSeriesLabel`, `ArticleHeadline` (the only `<h1>`), `ArticleExcerpt`, `ArticleAthleteMeta` | The header pieces. All accept a `className`. `ArticleSeriesLabel` is the series kicker ("The Lunch Squeeze · Part 2") and prints nothing outside a public series or coverage. |
 | `ArticleMeta` | Avatars, byline, published/updated times, reading time and the share actions slot. |
 | `ArticleFeaturedImage` | The lead image as a captioned figure. |
 | `ArticleImageCaption` | Only the caption and "Photo: credit", for layouts that paint the image another way. |
 | `ArticleBody` | The WordPress body (with the legacy primary-game card ahead of it) or the empty state. |
-| `ArticleStoryFooter` | Corrections, poll, topics, update notice, feedback and newsletter, in the standard order. |
-| `ArticleCorrections`, `ArticleTopics`, `ArticleUpdateNotice` | The individual pieces of the footer. |
+| `ArticleStoryFooter` | How we reported this, corrections, the series guide, poll, topics, update notice, feedback and newsletter, in the standard order. |
+| `ArticleReportingNote`, `ArticleCorrections`, `ArticleSeriesGuide`, `ArticleTopics`, `ArticleUpdateNotice` | The individual pieces of the footer. |
 | `ArticleStandardEnding` | About the writers, related stories, more by the author and the newsroom tip. Or compose `ArticleAuthors`, `ArticleRelatedStories`, `ArticleMoreByAuthor`, `ArticleTipCallout`. |
 | `HeroReveal`, `HeroRevealContent` | The fullscreen reveal (see [fullscreen-hero-reveal.md](fullscreen-hero-reveal.md)). |
 | `ImmersiveArticleView` | The whole Immersive article. An override that only wants a different look can start from its source. |

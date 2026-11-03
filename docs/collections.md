@@ -113,7 +113,7 @@ explicitly saves its public presentation. Publish as coverage opens a dialog;
 public controls do not compete with reporting coordination on the overview.
 
 The private `_byline_collection_public` meta object contains `publicEnabled`,
-`publicTitle`, `publicSlug`, `publicDescription`, `publicOverview`,
+`publicFormat`, `publicTitle`, `publicSlug`, `publicDescription`, `publicOverview`,
 `artworkAttachmentId`, `featuredStoryId` and `storyOrder`. Public wording is
 independent from the internal name/brief. Dates reuse the Collection's existing
 start/end fields. Story order references existing relationship edges; it cannot
@@ -130,6 +130,36 @@ adapters backed by public Collections. The build snapshot uses the same
 projection. It never serializes Collection brief, people, interviews, tasks,
 resources, notes, contacts or activity. Public settings/dates/status, membership
 changes and artwork edits invalidate the existing public build revision.
+
+### Series
+
+`publicFormat` is `coverage` (the default, including for settings saved before
+it existed) or `series`. Format changes presentation only: membership and order
+are the same edges and `storyOrder` as above, and the public projection and build
+snapshot carry it as `format`.
+
+- **Series** numbers the published stories in the public order (the lead story
+  is Part 1). Unpublished stories are skipped, so numbering never has gaps. While
+  the Collection is Planning or Active the site says "Part 2" and "3 parts so
+  far"; once it is Wrapping up or Archived it says "Part 2 of 3". Each part shows
+  a kicker linking to the series, and after the story a guide with the next part
+  and every part, the current one marked. Other parts are not repeated as
+  related stories. The series page leads with "Start with Part 1".
+- **Coverage** shows the kicker and, after the story, up to four other stories
+  from the coverage, newest first. The coverage page leads with its first story.
+
+A story in several public Collections reads as part of the first series, else
+the first coverage. Article routes depend on their series in the incremental
+build cache; coverage routes depend on their stories' cards.
+
+## How we reported this
+
+Separately from Collections, a story can carry a short reader-facing
+`byline_reporting_note` (plain text, blank lines between paragraphs, trimmed to
+1,500 characters) from the block editor's **How we reported this** panel. It is
+published in the `byline` post settings and the build snapshot as
+`reportingNote`, renders after the body (and in Preview as Byline), and prints
+nothing when empty.
 
 ## Legacy Coverage migration
 

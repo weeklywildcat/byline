@@ -101,7 +101,7 @@ function byline_snapshot_post($post, array &$attachments): ?array
     if ($post->post_type === 'page') {
         $result['bylinePage'] = byline_snapshot_pick((array) ($data['bylinePage'] ?? []), ['eyebrow', 'indexing', 'sportsArchive']);
     } else {
-        $result['byline'] = $result['weeklyWildcat'] = byline_snapshot_pick(wwh_rest_post_settings(['id' => $post->ID]), ['primaryGameId', 'gameScoreGameIds', 'presentation', 'immersiveAlignment']);
+        $result['byline'] = $result['weeklyWildcat'] = byline_snapshot_pick(wwh_rest_post_settings(['id' => $post->ID]), ['primaryGameId', 'gameScoreGameIds', 'presentation', 'immersiveAlignment', 'reportingNote']);
         $result['contributors'] = array_map('byline_snapshot_contributor', byline_get_public_story_contributors($post->ID));
         $result['corrections'] = array_map(static fn($item) => byline_snapshot_pick($item, ['id', 'type', 'text', 'date']), byline_get_public_corrections($post->ID));
         // Core's canonical embed serializer, restricted to its public embed
@@ -165,7 +165,7 @@ function byline_collect_public_build_snapshot(int $revision): array
         foreach (get_posts(['post_type' => BYLINE_COLLECTION_POST_TYPE, 'post_status' => 'private', 'posts_per_page' => -1, 'orderby' => 'date', 'order' => 'DESC']) as $post) {
             $coverage = byline_get_public_coverage($post->ID);
             if ($coverage) {
-                $safe = byline_snapshot_pick($coverage, ['id', 'slug', 'title', 'description', 'overview', 'startAt', 'endAt', 'status']);
+                $safe = byline_snapshot_pick($coverage, ['id', 'slug', 'title', 'format', 'description', 'overview', 'startAt', 'endAt', 'status']);
                 $safe['artwork'] = byline_snapshot_photo($coverage['artwork'] ?? null);
                 $safe['stories'] = [];
                 $public_ids = array_column($datasets['posts'], 'id');

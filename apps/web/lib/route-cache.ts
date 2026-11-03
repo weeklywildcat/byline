@@ -1,5 +1,6 @@
 import { stableDigest } from "@byline/content";
 import { buildArticlePresentation } from "./article-presentation";
+import { buildCoveragePresentation } from "./coverage-presentation";
 import { isVisibleContentPost } from "./content";
 import { getPublicationConfig } from "./publication";
 import { getPostContributors, isGuestContributor, getPostPrimaryGameId, type WordPressAuthor, type WordPressPost } from "./wordpress";
@@ -21,7 +22,7 @@ export function articleRenderInputs(snapshot: WebBuildSnapshot, post: WordPressP
     ...post.tags.flatMap((id) => snapshot.indexes.postsByTag.get(id) ?? [])
   ].map((candidate) => [candidate.id, candidate])).values()].filter(isVisibleContentPost);
   return {
-    presentation: buildArticlePresentation({ post, allPosts: snapshot.posts, contributors, author, visiblePosts: snapshot.posts.filter(isVisibleContentPost), authorPosts, relatedCandidates: related }),
+    presentation: buildArticlePresentation({ post, allPosts: snapshot.posts, contributors, author, visiblePosts: snapshot.posts.filter(isVisibleContentPost), authorPosts, relatedCandidates: related, coverages: snapshot.sports.coverages }),
     primaryGame: snapshot.games.find((game) => game.id === getPostPrimaryGameId(post)) ?? null
   };
 }
@@ -39,7 +40,7 @@ export function routeCacheDependency(snapshot: WebBuildSnapshot, kind: DynamicRo
     if (!post || !isVisibleContentPost(post)) throw new Error(`No public article ${id} for incremental rendering`);
     const render = articleRenderInputs(snapshot, post);
     data = { post, ...render };
-    dependencies = { post: post.id, related: render.presentation.relatedStories.map((entry) => entry.id), moreBy: render.presentation.moreByAuthorStories.map((entry) => entry.id), contributors: render.presentation.contributors.map((entry) => entry.id) };
+    dependencies = { post: post.id, related: render.presentation.relatedStories.map((entry) => entry.id), moreBy: render.presentation.moreByAuthorStories.map((entry) => entry.id), contributors: render.presentation.contributors.map((entry) => entry.id), series: render.presentation.series?.href ?? null };
   } else if (kind === "category") {
     const category = snapshot.categories.find((entry) => String(entry.id) === String(id));
     const posts = snapshot.posts.filter((post) => post.categories.includes(Number(id)) && isVisibleContentPost(post));
@@ -54,8 +55,10 @@ export function routeCacheDependency(snapshot: WebBuildSnapshot, kind: DynamicRo
     data = snapshot.pages.find((entry) => entry.slug === id);
     dependencies = { page: id };
   } else {
-    data = snapshot.sports.coverages.find((entry) => entry.slug === id);
-    dependencies = { coverage: id };
+    const coverage = snapshot.sports.coverages.find((entry) => entry.slug === id);
+    // The page shows each story's photo, byline and reading time, not just the coverage record.
+    data = coverage ? buildCoveragePresentation(coverage, snapshot.posts) : undefined;
+    dependencies = { coverage: id, posts: coverage?.stories.map((story) => story.id) ?? [] };
   }
   const environment = {
     publicSite: process.env.NEXT_PUBLIC_SITE_URL || publication.urls.publicSite,

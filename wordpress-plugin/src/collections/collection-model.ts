@@ -25,8 +25,12 @@ export const interviewStatuses = {
   "follow-up": "Needs follow-up",
   cancelled: "Cancelled",
 };
+/** Ongoing coverage, or a numbered series read in the public story order. */
+export type PublicCoverageFormat = "coverage" | "series";
 export type PublicCoveragePresentation = {
   publicEnabled: boolean;
+  /** Absent on settings saved before series existed; read as coverage. */
+  publicFormat?: PublicCoverageFormat;
   publicTitle: string;
   publicSlug: string;
   publicDescription: string;
