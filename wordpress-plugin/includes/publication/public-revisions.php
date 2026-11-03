@@ -40,6 +40,7 @@ add_action('shutdown', 'byline_flush_public_mutations', PHP_INT_MAX);
 add_filter('wp_insert_post_data', static function ($data, $postarr): array {
     $old = !empty($postarr['ID']) ? get_post((int) $postarr['ID']) : null;
     if (byline_snapshot_public_type((string) ($data['post_type'] ?? '')) && (($data['post_status'] ?? '') === 'publish' || ($old instanceof WP_Post && $old->post_status === 'publish'))) byline_public_mutation('public-content');
+    if ($old instanceof WP_Post && $old->post_type === 'byline_collection' && $old->post_status !== ($data['post_status'] ?? '') && !empty(byline_collection_public_settings((int) $old->ID)['publicEnabled'])) byline_public_mutation('public-coverage');
     return $data;
 }, 20, 2);
 
@@ -59,6 +60,10 @@ add_action('transition_post_status', 'byline_revision_on_status', 20, 3);
 function byline_snapshot_attachment_is_used(int $id): bool
 {
     global $wpdb;
+    foreach (get_posts(['post_type' => 'byline_collection', 'post_status' => 'private', 'numberposts' => -1, 'fields' => 'ids', 'meta_key' => '_byline_collection_public']) as $collection) {
+        $presentation = get_post_meta($collection, '_byline_collection_public', true);
+        if (is_array($presentation) && !empty($presentation['publicEnabled']) && (int) ($presentation['artworkAttachmentId'] ?? 0) === $id) return true;
+    }
     $url = wp_get_attachment_url($id);
     if ($url && strpos(wp_json_encode(byline_get_publication_config()), (string) $url) !== false) return true;
     $like_id = 'wp-image-' . $id . '([^0-9]|$)';
@@ -74,6 +79,7 @@ function byline_snapshot_attachment_is_used(int $id): bool
 function byline_revision_on_delete(int $id): void
 {
     $post = get_post($id);
+    if ($post instanceof WP_Post && $post->post_type === 'byline_collection' && !empty(byline_collection_public_settings($id)['publicEnabled'])) byline_public_mutation('public-coverage');
     if ($post instanceof WP_Post && (($post->post_status === 'publish' && byline_snapshot_public_type($post->post_type)) || ($post->post_type === 'attachment' && byline_snapshot_attachment_is_used($id)))) byline_public_mutation('public-delete');
 }
 add_action('before_delete_post', 'byline_revision_on_delete');
@@ -87,6 +93,11 @@ function byline_revision_on_post_meta($meta_id, $id, $key, $value = null): void
         if (!byline_snapshot_attachment_is_used((int) $id)) return;
         if (in_array($key, ['_wp_attachment_metadata', '_wp_attached_file', '_wp_attachment_image_alt', '_byline_story_image_credit'], true)
             || strpos($key, '_ww_image_') === 0 || strpos($key, '_byline_image_') === 0) byline_public_mutation('public-media');
+        return;
+    }
+    if ($post->post_type === 'byline_collection') {
+        $presentation = get_post_meta((int) $id, '_byline_collection_public', true);
+        if ($key === '_byline_collection_public' || (!empty($presentation['publicEnabled']) && in_array($key, ['_byline_collection_start', '_byline_collection_end', '_byline_collection_status'], true))) byline_public_mutation('public-coverage');
         return;
     }
     if ($post->post_status !== 'publish' || !byline_snapshot_public_type($post->post_type)) return;

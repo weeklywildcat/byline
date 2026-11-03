@@ -9,10 +9,8 @@ import type { StoryFetchers } from "../story/story-fetchers";
 import { createAdminQueryClient } from "../story/story-query";
 import type { StoryWorkspace } from "../workspace/workspace-types";
 import { ContentHealth } from "./ContentHealth";
-import { Coverage } from "./Coverage";
 import { Feedback } from "./Feedback";
 import { MediaDesk } from "./MediaDesk";
-import { Performance } from "./Performance";
 import { StoriesPage } from "./StoriesPage";
 import { createWorkspaceUrlBuilder } from "./calendar-model";
 import type { PlanningFetchers } from "./planning-api";
@@ -23,7 +21,7 @@ export type PlanningAppFetchers = PlanningFetchers & StoryFetchers;
 
 export type PlanningAppProps = {
   fetchers: PlanningAppFetchers;
-  /** The WordPress sidebar entry: stories, calendar, media, coverage, performance, content-health or feedback. */
+  /** The WordPress sidebar entry: stories, collections, calendar, media, content-health or feedback. */
   tab: string;
   /** `view=` from the address, when it names one. */
   view?: string;
@@ -60,9 +58,7 @@ function PlanningBody({ fetchers, tab, view, currentUserId, mine, workspaceUrl }
     {destination === "stories" ? <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={{ mine: Boolean(mine), collectionId: Number(new URLSearchParams(window.location.search).get("collection")) || undefined }} workspaceUrl={workspaceUrl} onNewStory={fetchers.createStory ? () => setCreating(true) : undefined} /> : null}
     {destination === "collections" ? <CollectionsPage fetchers={fetchers} currentUserId={currentUserId} workspaceUrl={workspaceUrl} /> : null}
     {destination === "media" ? <MediaDesk fetchers={fetchers} workspaceUrl={workspaceUrl} onOpenStory={openStory} /> : null}
-    {destination === "coverage" ? <Coverage fetchers={fetchers} onOpenStory={openStory} /> : null}
     {destination === "feedback" ? <Feedback fetchers={fetchers} onOpenStory={openStory} /> : null}
-    {destination === "performance" ? <Performance fetchers={fetchers} onOpenStory={openStory} /> : null}
     {destination === "content-health" ? <ContentHealth fetchers={fetchers} onOpenStory={openStory} /> : null}
     <StoryCreateDialog open={creating} onClose={() => setCreating(false)} onCreated={openCreated} fetchers={fetchers} />
   </main>;

@@ -25,7 +25,6 @@ function story(): PlanningStory {
     modifiedAt: "2026-10-20T10:00:00Z",
     visual: { type: "none", status: "needed" },
     openTaskCount: 1,
-    coverage: [],
     featuredImage: null
   };
 }

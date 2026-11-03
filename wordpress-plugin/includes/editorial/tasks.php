@@ -19,6 +19,7 @@ const BYLINE_TASK_ASSIGNEE_META = '_byline_task_assignee_id';
 const BYLINE_TASK_DUE_AT_META = '_byline_task_due_at';
 const BYLINE_TASK_PRIORITY_META = '_byline_task_priority';
 const BYLINE_TASK_COLLECTION_META = '_byline_task_collection_id';
+// Legacy task-to-Coverage meta is retained only for Collection migration.
 const BYLINE_TASK_COVERAGE_META = '_byline_task_coverage_id';
 const BYLINE_TASK_COMPLETED_AT_META = '_byline_task_completed_at';
 const BYLINE_TASK_ORDER_META = '_byline_task_order';
@@ -104,11 +105,6 @@ function byline_task_story_id(int $task_id): int
     return absint(get_post_meta($task_id, '_byline_task_story_id', true));
 }
 
-function byline_task_coverage_id(int $task_id): int
-{
-    return absint(get_post_meta($task_id, BYLINE_TASK_COVERAGE_META, true));
-}
-
 function byline_task_can_view(int $task_id, ?int $user_id = null): bool
 {
     $task = byline_task_post($task_id);
@@ -149,7 +145,7 @@ function byline_task_can_assign(int $task_id, int $assignee_id, ?int $user_id = 
     return byline_task_user_can($user_id, 'edit_others_posts');
 }
 
-function byline_task_next_order(int $story_id = 0, int $coverage_id = 0): int
+function byline_task_next_order(int $story_id = 0, int $collection_id = 0): int
 {
     $highest = 0;
     $tasks = function_exists('get_posts') ? get_posts([
@@ -163,7 +159,7 @@ function byline_task_next_order(int $story_id = 0, int $coverage_id = 0): int
         if (!$task instanceof WP_Post) {
             continue;
         }
-        if (byline_task_story_id((int) $task->ID) !== $story_id || byline_task_coverage_id((int) $task->ID) !== $coverage_id) {
+        if (byline_task_story_id((int) $task->ID) !== $story_id || (int) get_post_meta((int) $task->ID, BYLINE_TASK_COLLECTION_META, true) !== $collection_id) {
             continue;
         }
         $highest = max($highest, absint(get_post_meta((int) $task->ID, BYLINE_TASK_ORDER_META, true)));
@@ -199,7 +195,6 @@ function byline_get_task(int $task_id): array
         'dueAt' => byline_task_datetime(get_post_meta($task_id, BYLINE_TASK_DUE_AT_META, true)),
         'priority' => $priority,
         'storyId' => byline_task_story_id($task_id),
-        'coverageId' => byline_task_coverage_id($task_id),
         'collectionId' => (int) get_post_meta($task_id, BYLINE_TASK_COLLECTION_META, true),
         'creatorId' => absint(get_post_meta($task_id, BYLINE_TASK_CREATOR_META, true)) ?: absint($task->post_author ?? 0),
         'completedAt' => byline_task_datetime(get_post_meta($task_id, BYLINE_TASK_COMPLETED_AT_META, true)),
@@ -209,17 +204,13 @@ function byline_get_task(int $task_id): array
     ];
 }
 
-function byline_task_validate_links(int $story_id, int $coverage_id): ?WP_Error
+function byline_task_validate_links(int $story_id): ?WP_Error
 {
     if ($story_id > 0) {
         $story = get_post($story_id);
         if (!$story instanceof WP_Post || $story->post_type !== 'post') {
             return new WP_Error('byline_task_invalid_story', 'Choose an existing story for this task.', ['status' => 400]);
         }
-    }
-
-    if ($coverage_id > 0 && function_exists('byline_coverage_exists') && !byline_coverage_exists($coverage_id)) {
-        return new WP_Error('byline_task_invalid_coverage', 'Choose an existing coverage for this task.', ['status' => 400]);
     }
 
     return null;
@@ -230,8 +221,7 @@ function byline_create_task(array $input, ?int $user_id = null)
 {
     $user_id = byline_task_current_user_id($user_id);
     $story_id = absint($input['storyId'] ?? $input['postId'] ?? 0);
-    $coverage_id = absint($input['coverageId'] ?? 0);
-    $link_error = byline_task_validate_links($story_id, $coverage_id);
+    $link_error = byline_task_validate_links($story_id);
     if ($link_error instanceof WP_Error) {
         return $link_error;
     }
@@ -299,10 +289,9 @@ function byline_create_task(array $input, ?int $user_id = null)
     update_post_meta($task_id, BYLINE_TASK_ASSIGNEE_META, $assignee_id);
     update_post_meta($task_id, BYLINE_TASK_DUE_AT_META, $due_at);
     update_post_meta($task_id, BYLINE_TASK_PRIORITY_META, $priority);
-    update_post_meta($task_id, BYLINE_TASK_COVERAGE_META, $coverage_id);
     if ($collection_id) { update_post_meta($task_id, BYLINE_TASK_COLLECTION_META, $collection_id); }
     update_post_meta($task_id, BYLINE_TASK_CREATOR_META, $user_id);
-    update_post_meta($task_id, BYLINE_TASK_ORDER_META, byline_task_next_order($story_id, $coverage_id));
+    update_post_meta($task_id, BYLINE_TASK_ORDER_META, byline_task_next_order($story_id, $collection_id));
 
     $task = byline_get_task($task_id);
     if (function_exists('do_action')) {
@@ -462,9 +451,6 @@ function byline_list_tasks(array $filters = [], ?int $user_id = null): array
         }
         $task = byline_get_task((int) $post->ID);
         if ($task === []) {
-            continue;
-        }
-        if (!empty($filters['coverageId']) && (int) $task['coverageId'] !== absint($filters['coverageId'])) {
             continue;
         }
         if (!empty($filters['assigneeId']) && (int) $task['assigneeId'] !== absint($filters['assigneeId'])) {

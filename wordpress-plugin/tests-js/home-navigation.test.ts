@@ -38,7 +38,6 @@ function story(overrides: Partial<PlanningStory> = {}): PlanningStory {
     modifiedAt: "2026-08-27T12:00:00Z",
     visual: { type: "none", status: "done" },
     openTaskCount: 0,
-    coverage: [],
     featuredImage: null,
     ...overrides
   };
@@ -57,7 +56,6 @@ function homeData(stories: PlanningStory[]): HomeData {
       canAssign: true,
       canManageSavedViews: true,
       canManageMedia: true,
-      canManageCoverage: true,
       canManageFeedback: true
     }
   };

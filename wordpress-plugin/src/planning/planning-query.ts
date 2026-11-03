@@ -38,8 +38,8 @@ export type OptionalQuery<T> = { data: T | undefined; error: string | null; isLo
  * Secondary destinations share one failure policy: unavailable data is a
  * visible message with a retry, never a reason for anything else to fail.
  */
-export function useOptionalQuery<T>(key: QueryKey, fetcher: (() => Promise<T>) | undefined, label: string): OptionalQuery<T> {
-  const query = useQuery({ queryKey: key, queryFn: () => fetcher!(), enabled: Boolean(fetcher), retry: false });
+export function useOptionalQuery<T>(key: QueryKey, fetcher: (() => Promise<T>) | undefined, label: string, pollWhile?: (data: T | undefined) => boolean): OptionalQuery<T> {
+  const query = useQuery({ queryKey: key, queryFn: () => fetcher!(), enabled: Boolean(fetcher), retry: false, refetchInterval: pollWhile ? (query) => pollWhile(query.state.data) ? 2500 : false : false });
   return {
     data: query.data,
     error: !fetcher ? __("This isn't available in this install.", "weekly-wildcat-headless") : query.isError ? describePlanningError(query.error, `${label} is unavailable right now.`) : null,

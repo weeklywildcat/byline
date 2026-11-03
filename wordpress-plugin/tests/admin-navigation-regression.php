@@ -195,8 +195,6 @@ $expected_planning = [
     'admin.php?page=byline-planning&tab=collections' => ['Collections', 'edit_posts'],
     'admin.php?page=byline-planning&tab=calendar' => ['Calendar', 'edit_posts'],
     'admin.php?page=byline-planning&tab=media' => ['Media Desk', 'edit_posts'],
-    'admin.php?page=byline-planning&tab=coverage' => ['Coverage', 'edit_posts'],
-    'admin.php?page=byline-planning&tab=performance' => ['Performance', 'edit_posts'],
     'admin.php?page=byline-planning&tab=content-health' => ['Content Health', 'edit_posts'],
     'admin.php?page=byline-planning&tab=feedback' => ['Feedback', 'edit_others_posts'],
 ];
@@ -507,8 +505,6 @@ foreach ([
     'stories' => 'admin.php?page=byline-planning&tab=stories',
     'calendar' => 'admin.php?page=byline-planning&tab=calendar',
     'media' => 'admin.php?page=byline-planning&tab=media',
-    'coverage' => 'admin.php?page=byline-planning&tab=coverage',
-    'performance' => 'admin.php?page=byline-planning&tab=performance',
     'content-health' => 'admin.php?page=byline-planning&tab=content-health',
     'feedback' => 'admin.php?page=byline-planning&tab=feedback',
 ] as $planning_tab => $expected_submenu) {

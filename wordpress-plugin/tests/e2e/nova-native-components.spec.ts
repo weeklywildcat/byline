@@ -76,7 +76,7 @@ test("Story Peek, sparse: calm header, native sections, no dead space, clear foo
   for (const width of [1440, 1280, 1024, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(homeUrl);
-    await expect(page.getByRole("heading", { name: "Up Next", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "My Work", exact: true })).toBeVisible();
     const peek = await openPeek(page, canteen.title);
 
     // Identity lives in the header: workflow and section, and the writer as an Avatar.
