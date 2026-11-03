@@ -10,7 +10,9 @@ test("the permanent archive and pinned permalink are complete without JavaScript
     await page.goto(new URL(ARTICLE, test.info().project.use.baseURL).href);
     await expect(page.locator(".article-live-updates [data-update-id]")).toHaveCount(3);
     await expect(page.locator("#update-902 time")).toHaveAttribute("datetime", "2026-08-15T13:05:00.000Z");
-    await expect(page.locator("#update-903")).toContainText("Fixture Reporter");
+    await expect(page.locator("#update-903 .article-live-update-name a")).toHaveAttribute("href", "/author/weekly-wildcat-staff/");
+    await expect(page.locator("#update-903 img.article-live-update-avatar")).toBeVisible();
+    await expect(page.locator("#update-901")).toContainText("Fixture Reporter");
     await expect(page.locator(".article-live-key-points")).toContainText("Bring a clear bag.");
     const feed = await (await request.get(STATIC_FEED)).json();
     expect(feed.updates.map((update: { id: number }) => update.id)).toEqual([903, 902, 901]);

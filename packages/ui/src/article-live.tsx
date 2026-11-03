@@ -27,6 +27,11 @@ export type ArticleLiveUpdateView = {
   /** "Nov. 2, 4:12 PM" in the publication's timezone. */
   dateLabel: string;
   author?: string;
+  /** The author's profile page; the name is plain text without one. */
+  authorHref?: string | null;
+  /** "Sports editor", "Reporting from the stadium" and the like. */
+  authorRole?: string | null;
+  authorPhoto?: { src: string; width?: number | null; height?: number | null } | null;
   image?: ArticleLiveImageView | null;
 };
 
@@ -72,22 +77,23 @@ export function ArticleLiveCoverage({ live }: { live?: ArticleLiveView | null })
       data-status={live.status}
       data-feed={live.feedUrl}
     >
-      <div className="article-live-status" role="status">
-        {isLive ? (
-          <>
-            <ArticleLiveBadge live={live} />
-            <span>
-              Updated <time dateTime={live.updatedAt} data-live-relative="" data-live-updated="">{live.updatedLabel}</time>
+      <header className="article-live-header">
+        <h2 id="article-live-heading" className="article-live-heading">{isLive ? "Live updates" : "Updates"}</h2>
+        <div className="article-live-status" role="status">
+          {isLive ? (
+            <>
+              <ArticleLiveBadge live={live} />
+              <span>
+                Updated <time dateTime={live.updatedAt} data-live-relative="" data-live-updated="">{live.updatedLabel}</time>
+              </span>
+            </>
+          ) : (
+            <span className="article-live-ended">
+              Live coverage ended{live.endedAt ? <> <time dateTime={live.endedAt}>{live.endedLabel}</time></> : null}. Every update is below.
             </span>
-          </>
-        ) : (
-          <span className="article-live-ended">
-            Live coverage ended{live.endedAt ? <> <time dateTime={live.endedAt}>{live.endedLabel}</time></> : null}. Every update is below.
-          </span>
-        )}
-      </div>
-
-      <h2 id="article-live-heading" className="article-live-heading">{isLive ? "Live updates" : "Updates"}</h2>
+          )}
+        </div>
+      </header>
 
       {live.keyPoints ? (
         <aside className="article-live-key-points" aria-label="Key points" dangerouslySetInnerHTML={{ __html: liveKeyPointsHtml(live.keyPoints) }} />

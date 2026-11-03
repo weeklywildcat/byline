@@ -514,7 +514,7 @@
       }
     },
     {
-      "live": {"status": "live", "startedAt": "2026-08-15T13:00:00Z", "endedAt": "", "updates": [{"id": 903, "title": "Gates open", "html": "<p>Fans are filing in. Parking lot B is full.</p>", "date": "2026-08-15T14:10:00Z", "modified": "2026-08-15T14:10:00Z", "pinned": false, "author": "Fixture Reporter"}, {"id": 902, "title": "What to know", "html": "<ul><li>Kickoff is at 7 p.m.</li><li>Bring a clear bag.</li></ul>", "date": "2026-08-15T13:05:00Z", "modified": "2026-08-15T13:05:00Z", "pinned": true, "author": ""}, {"id": 901, "title": "", "html": "<p>Live coverage of the season opener starts now.</p>", "date": "2026-08-15T13:00:00Z", "modified": "2026-08-15T13:00:00Z", "pinned": false, "author": "Fixture Reporter"}]},
+      "live": {"status": "live", "startedAt": "2026-08-15T13:00:00Z", "endedAt": "", "updates": [{"id": 903, "title": "Gates open", "html": "<p>Fans are filing in. Parking lot B is full.</p>", "date": "2026-08-15T14:10:00Z", "modified": "2026-08-15T14:10:00Z", "pinned": false, "author": "Weekly Wildcat Staff", "authorSlug": "weekly-wildcat-staff", "authorRole": "Reporting from Wildcat Stadium", "authorPhoto": {"url": "/newsroom/newsroom-laughing-640.jpg", "width": 640, "height": 427}}, {"id": 902, "title": "What to know", "html": "<ul><li>Kickoff is at 7 p.m.</li><li>Bring a clear bag.</li></ul>", "date": "2026-08-15T13:05:00Z", "modified": "2026-08-15T13:05:00Z", "pinned": true, "author": ""}, {"id": 901, "title": "", "html": "<p>Live coverage of the season opener starts now.</p>", "date": "2026-08-15T13:00:00Z", "modified": "2026-08-15T13:00:00Z", "pinned": false, "author": "Fixture Reporter"}]},
       "id": 9,
       "date": "2026-08-15T09:00:00",
       "date_gmt": "2026-08-15T13:00:00",

@@ -31,6 +31,8 @@ function get_post_meta(int $id, string $key, bool $single = false) { global $liv
 function update_post_meta(int $id, string $key, $value): void { global $live_meta; $live_meta[$id][$key] = $value; }
 function delete_post_meta(int $id, string $key): void { global $live_meta; unset($live_meta[$id][$key]); }
 function get_the_author_meta(string $field, int $user_id): string { return $user_id === 3 ? 'Ana Reporter' : ''; }
+function byline_project_user_contributor(int $user_id): ?array { return $user_id === 3 ? ['slug' => 'ana-reporter', 'role' => 'Sports editor', 'imageId' => 77] : null; }
+function wwh_media_image(int $id, string $size): array { return $id === 77 && $size === 'thumbnail' ? ['url' => 'https://cms.example/ana-150.jpg', 'width' => 150, 'height' => 150] : []; }
 function wp_insert_post(array $data, bool $wp_error = false)
 {
     global $live_posts, $live_clock;
@@ -82,6 +84,8 @@ $public = byline_public_live_coverage(10);
 live_assert(array_column($public['updates'], 'id') === [$second['id'], $key_points['id'], $first['id']], 'Updates are listed newest first.');
 live_assert($public['updates'][2]['title'] === 'Kickoff' && $public['updates'][2]['author'] === 'Ana Reporter', 'Updates carry their headline and author name.');
 live_assert(!array_key_exists('text', $public['updates'][0]) && !array_key_exists('authorId', $public['updates'][0]), 'The public projection drops editor-only fields.');
+live_assert(($public['updates'][0]['authorSlug'] ?? '') === 'ana-reporter' && ($public['updates'][0]['authorRole'] ?? '') === 'Sports editor' && ($public['updates'][0]['authorPhoto']['url'] ?? '') === 'https://cms.example/ana-150.jpg', 'Updates carry their author\'s profile slug, role and headshot.');
+live_assert(byline_live_author_profile(99) === [], 'An author without a public profile adds nothing.');
 live_assert(byline_public_live_coverage(11) === null, 'A draft story publishes no live coverage.');
 
 // Edit and delete stay scoped to the story.

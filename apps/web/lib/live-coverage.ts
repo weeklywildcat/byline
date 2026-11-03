@@ -1,6 +1,6 @@
 import { createArticleLiveView, createLiveFeed, formatLiveTime as formatTime } from "@byline/ui/live-feed";
 import { getPublicationConfig } from "@/lib/publication";
-import { getPostLiveCoverage, type WordPressPost } from "@/lib/wordpress";
+import { getContributorHref, getPostLiveCoverage, type WordPressContributor, type WordPressPost } from "@/lib/wordpress";
 
 const publication = getPublicationConfig();
 
@@ -15,7 +15,9 @@ export function buildArticleLiveView(post: WordPressPost) {
   const live = getPostLiveCoverage(post);
   return live ? createArticleLiveView(live, {
     postId: post.id, locale: publication.locale, timeZone: publication.timezone,
-    feedUrl: `/api/live/${post.id}`, fallbackDate: post.date_gmt || post.date
+    feedUrl: `/api/live/${post.id}`, fallbackDate: post.date_gmt || post.date,
+    // Update authors are WordPress users, who always have a profile page.
+    authorHref: (slug) => getContributorHref({ slug } as WordPressContributor)
   }) : null;
 }
 

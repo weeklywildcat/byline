@@ -853,6 +853,8 @@ function byline_editorial_preview_live(int $post_id): ?array
     $records = byline_list_live_updates($post_id);
     $views = array_map(static function (array $update): array {
         $image = byline_live_update_image((int) $update['imageId']);
+        $profile = byline_live_author_profile((int) $update['authorId']);
+        $photo = $profile['authorPhoto'] ?? null;
         return [
             'id' => (int) $update['id'],
             'title' => (string) $update['title'],
@@ -860,6 +862,9 @@ function byline_editorial_preview_live(int $post_id): ?array
             'date' => (string) $update['date'],
             'dateLabel' => byline_editorial_preview_live_time((string) $update['date']),
             'author' => (string) $update['author'],
+            'authorHref' => isset($profile['authorSlug']) && function_exists('get_author_posts_url') ? (string) get_author_posts_url((int) $update['authorId'], $profile['authorSlug']) : null,
+            'authorRole' => $profile['authorRole'] ?? null,
+            'authorPhoto' => $photo ? ['src' => $photo['url'], 'width' => $photo['width'], 'height' => $photo['height']] : null,
             'pinned' => (bool) $update['pinned'],
             'image' => $image ? ['src' => $image['url'], 'alt' => $image['alt'], 'width' => $image['width'], 'height' => $image['height']] + (isset($image['credit']) ? ['credit' => $image['credit']] : []) : null,
         ];

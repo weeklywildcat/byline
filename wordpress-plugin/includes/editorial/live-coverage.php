@@ -132,6 +132,25 @@ function byline_live_author_name(int $user_id): string
     return function_exists('sanitize_text_field') ? sanitize_text_field((string) get_the_author_meta('display_name', $user_id)) : (string) get_the_author_meta('display_name', $user_id);
 }
 
+/**
+ * The public face of an update's author for the NYT-style update header: the
+ * profile slug, role and headshot from the same allowlisted projection as
+ * article bylines. Empty when the author has no public profile.
+ */
+function byline_live_author_profile(int $user_id): array
+{
+    $contributor = $user_id > 0 && function_exists('byline_project_user_contributor') ? byline_project_user_contributor($user_id) : null;
+    if (!$contributor || ($contributor['slug'] ?? '') === '') return [];
+    $profile = ['authorSlug' => (string) $contributor['slug']];
+    if (($contributor['role'] ?? '') !== '') $profile['authorRole'] = (string) $contributor['role'];
+    $image_id = (int) ($contributor['imageId'] ?? 0);
+    $photo = $image_id > 0 && function_exists('wwh_media_image') ? wwh_media_image($image_id, 'thumbnail') : [];
+    if (($photo['url'] ?? '') !== '') {
+        $profile['authorPhoto'] = ['url' => (string) $photo['url'], 'width' => $photo['width'] ?? null, 'height' => $photo['height'] ?? null];
+    }
+    return $profile;
+}
+
 /** The update's photo with alt text and credit, or null. */
 function byline_live_update_image(int $attachment_id): ?array
 {
@@ -219,7 +238,7 @@ function byline_public_live_coverage(int $story_id): ?array
             'modified' => (string) $update['modified'],
             'pinned' => (bool) $update['pinned'],
             'author' => (string) $update['author'],
-        ] + ($image ? ['image' => $image] : []);
+        ] + byline_live_author_profile((int) $update['authorId']) + ($image ? ['image' => $image] : []);
     }, byline_list_live_updates($story_id));
     return $state + ['updates' => $updates];
 }

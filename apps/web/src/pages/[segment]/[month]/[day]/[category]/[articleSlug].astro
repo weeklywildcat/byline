@@ -60,6 +60,10 @@ const slots = {
     if (live) {
       import("@byline/ui/live-updates").then(({ startLiveUpdates }) => startLiveUpdates(live));
     }
+    const liveSection = document.querySelector<HTMLElement>("[data-byline-live]");
+    if (liveSection) {
+      import("@byline/ui/live-share").then(({ bindLiveShare }) => bindLiveShare(liveSection));
+    }
   </script>
   <div class="astro-island-relocation" data-target="article-share-island-slot"><ArticleShareActions title={title} url={articleUrl} client:idle /></div>
   <div class="astro-island-relocation" data-target="article-poll-island-slot"><NewsroomPollHydrator client:load /></div>

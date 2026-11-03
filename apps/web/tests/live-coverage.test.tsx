@@ -93,6 +93,21 @@ describe("live data boundary", () => {
     expect(buildArticleLiveView(story)?.updates.map((update) => update.id)).toEqual([2, 1]);
     expect(buildArticleLiveView(story)?.updates[1].date).toBe("2026-11-02T20:00:00.000Z");
   });
+  it("credits each update to its own author with a headshot, profile link and role", () => {
+    const story = post({ live: { status: "live", startedAt: "2026-11-02T19:00:00Z", updates: [
+      { ...updates[0], id: 2, author: "Ana Reporter", authorSlug: "ana-reporter", authorRole: "Reporting from the stadium", authorPhoto: { url: "/_wordpress-media/ana.jpg", width: 150, height: 150 } },
+      { ...updates[0], id: 1, date: "2026-11-02T18:00:00Z", author: "Jo Writer", authorSlug: "../evil", authorPhoto: { url: "javascript:alert(1)", width: 150, height: 150 } }
+    ] } });
+    const [ana, jo] = buildLiveFeed(story)!.updates.map((update) => update.html);
+    expect(ana).toContain('class="article-live-update-avatar author-avatar" src="/_wordpress-media/ana.jpg"');
+    expect(ana).toContain('<a href="/author/ana-reporter/">Ana Reporter</a>');
+    expect(ana).toContain('<span class="article-live-update-role">Reporting from the stadium</span>');
+    expect(ana).toContain('data-live-share="update-2"');
+    // An unusable slug or photo falls back to the plain name and an initial.
+    expect(jo).not.toContain("<a href=\"/author/");
+    expect(jo).not.toContain("javascript:");
+    expect(jo).toContain('author-avatar-fallback" aria-hidden="true">J</span>');
+  });
   it("renders an empty live story and a pinned photo as complete static content", () => {
     const empty = post({ live: { status: "live", startedAt: "2026-11-02T19:00:00Z", updates: [] } });
     const view = buildArticleLiveView(empty)!;

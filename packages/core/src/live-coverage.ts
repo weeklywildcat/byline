@@ -6,6 +6,10 @@ export type LiveCoverageUpdate = {
   modified: string;
   pinned: boolean;
   author: string;
+  /** The author's public profile (`/author/<slug>/`), role and headshot. */
+  authorSlug?: string;
+  authorRole?: string;
+  authorPhoto?: { url: string; width: number | null; height: number | null };
   image: { url: string; alt: string; width: number | null; height: number | null; credit?: string } | null;
 };
 
@@ -59,6 +63,13 @@ export function normalizeLiveCoverage(input: unknown): LiveCoverage | null {
       height: positiveInteger(entry.image.height) ?? null,
       ...(textValue(entry.image.credit) ? { credit: textValue(entry.image.credit) } : {})
     } : null;
+    const authorSlug = textValue(entry.authorSlug);
+    const authorRole = textValue(entry.authorRole).trim();
+    const authorPhoto = isRecord(entry.authorPhoto) && publicUrl(entry.authorPhoto.url) ? {
+      url: publicUrl(entry.authorPhoto.url),
+      width: positiveInteger(entry.authorPhoto.width) ?? null,
+      height: positiveInteger(entry.authorPhoto.height) ?? null
+    } : null;
     return [{
       id,
       title: textValue(entry.title),
@@ -67,6 +78,9 @@ export function normalizeLiveCoverage(input: unknown): LiveCoverage | null {
       modified: instant(entry.modified) || date,
       pinned: entry.pinned === true,
       author: textValue(entry.author),
+      ...(/^[a-z0-9%][a-z0-9%_-]*$/i.test(authorSlug) ? { authorSlug } : {}),
+      ...(authorRole ? { authorRole } : {}),
+      ...(authorPhoto ? { authorPhoto } : {}),
       image
     }];
   }).sort((left, right) => right.date.localeCompare(left.date) || right.id - left.id);
