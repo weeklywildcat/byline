@@ -43,8 +43,7 @@ function byline_command_palette_commands(): array
         $add($commands, 'byline/planning', 'Open Planning', byline_command_palette_url('byline-planning'));
         $add($commands, 'byline/my-stories', 'My Stories', byline_command_palette_url('byline-planning', ['tab' => 'stories', 'mine' => '1']));
         $add($commands, 'byline/ready-for-review', 'Ready for Review', byline_command_palette_url('byline-planning', ['tab' => 'stories', 'workflow' => 'ready']));
-        $add($commands, 'byline/coverage', 'Open Coverage', byline_command_palette_url('byline-planning', ['tab' => 'coverage']));
-        $add($commands, 'byline/new-coverage', 'New coverage', byline_command_palette_url('byline-planning', ['tab' => 'coverage']));
+        $add($commands, 'byline/collections', 'Open Collections', byline_command_palette_url('byline-planning', ['tab' => 'collections']));
         $add($commands, 'byline/media-desk', 'Open Media Desk', byline_command_palette_url('byline-planning', ['tab' => 'media']));
         if (current_user_can('upload_files')) {
             $add($commands, 'byline/upload-photos', 'Upload photos', function_exists('admin_url') ? admin_url('media-new.php') : 'media-new.php');
@@ -56,7 +55,6 @@ function byline_command_palette_commands(): array
         if ($feature_enabled('newsletter') && byline_newsletter_can_edit_issues()) {
             $add($commands, 'byline/newsletters', 'Open Newsletters', byline_command_palette_url('byline-newsletters'));
         }
-        $add($commands, 'byline/performance', 'Open Performance', byline_command_palette_url('byline-planning', ['tab' => 'performance']));
         $add($commands, 'byline/content-health', 'Open Content Health', byline_command_palette_url('byline-planning', ['tab' => 'content-health']));
         if (current_user_can('edit_others_posts') || current_user_can(defined('BYLINE_MANAGE_CAPABILITY') ? BYLINE_MANAGE_CAPABILITY : 'manage_byline')) {
             $add($commands, 'byline/create-correction', 'Create a correction', byline_command_palette_url('byline-planning', ['tab' => 'feedback']));

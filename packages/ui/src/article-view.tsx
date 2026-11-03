@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ArticleLiveBadge, ArticleLiveCoverage, type ArticleLiveView } from "./article-live";
 
 /**
  * The article boundary between a content adapter and a renderer.
@@ -62,6 +63,38 @@ export type ArticleStoryCardView = {
   dateLabel?: string | null;
 };
 
+export type ArticleSeriesPartView = {
+  id: number | string;
+  /** 1-based reading order among the published stories. */
+  number: number;
+  title: string;
+  href: string;
+  current: boolean;
+  date?: string | null;
+  dateLabel?: string | null;
+  image?: ArticleImageView | null;
+};
+
+/**
+ * The public series or ongoing coverage a story belongs to. A series is read
+ * in order (Part 1, Part 2…); coverage is a set of stories on one subject.
+ */
+export type ArticleSeriesView = {
+  format: "series" | "coverage";
+  title: string;
+  href: string;
+  description?: string;
+  /** False while more parts may still be published, so no total is promised. */
+  complete: boolean;
+  /** This story's part number among the published stories. */
+  position: number;
+  total: number;
+  previous?: ArticleSeriesPartView | null;
+  next?: ArticleSeriesPartView | null;
+  /** Every published part for a series; the other stories, newest first, for coverage. */
+  parts: ArticleSeriesPartView[];
+};
+
 export type ArticlePresentation = {
   id: number | string;
   url: string;
@@ -86,8 +119,14 @@ export type ArticlePresentation = {
   corrections: ArticleCorrectionView[];
   topics: ArticleTopicView[];
   update?: { modifiedAt: string; label: string } | null;
+  /** Live coverage, while live and after it ends; absent for ordinary stories. */
+  live?: ArticleLiveView | null;
   relatedStories: ArticleStoryCardView[];
   moreByAuthorStories: ArticleStoryCardView[];
+  /** "How we reported this", as plain-text paragraphs. Absent or empty prints nothing. */
+  reportingNote?: string[];
+  /** The public series or coverage this story is part of, if any. */
+  series?: ArticleSeriesView | null;
   publication: {
     shortName: string;
     contactHref: string;
@@ -223,8 +262,35 @@ export function ArticleShell({ as: Tag = "main", className, children }: { as?: "
 
 /** The section label ("News", "Sports") linking to the category archive. */
 export function ArticleCategory({ presentation, className }: ArticlePieceProps): ReactNode {
-  if (!presentation.category) return null;
-  return <a className={joinClassNames("article-section-label", className)} href={presentation.category.href}>{presentation.category.label}</a>;
+  const badge = <ArticleLiveBadge live={presentation.live} />;
+  if (!presentation.category) return badge;
+  return (
+    <>
+      {badge}
+      <a className={joinClassNames("article-section-label", className)} href={presentation.category.href}>{presentation.category.label}</a>
+    </>
+  );
+}
+
+/** Live updates under the story body; nothing for an ordinary story. */
+export function ArticleLive({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  return <ArticleLiveCoverage live={presentation.live} />;
+}
+
+function seriesPartLabel(series: ArticleSeriesView, number: number) {
+  return series.complete ? `Part ${number} of ${series.total}` : `Part ${number}`;
+}
+
+/** The series kicker beside the section label: "The Lunch Squeeze · Part 2 of 4". */
+export function ArticleSeriesLabel({ presentation, className }: ArticlePieceProps): ReactNode {
+  const series = presentation.series;
+  if (!series) return null;
+  return (
+    <p className={joinClassNames("article-series-label", className)}>
+      <a href={series.href}>{series.title}</a>
+      {series.format === "series" ? <span>{seriesPartLabel(series, series.position)}</span> : null}
+    </p>
+  );
 }
 
 /** The article's only `<h1>`. */
@@ -330,14 +396,118 @@ export function ArticleUpdateNotice({ presentation }: { presentation: ArticlePre
   );
 }
 
+/** "How we reported this": the author's note on how the story was reported. */
+export function ArticleReportingNote({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  const paragraphs = presentation.reportingNote ?? [];
+  if (paragraphs.length === 0) return null;
+  return (
+    <aside className="article-reporting-note" aria-labelledby="article-reporting-note-heading">
+      <h2 id="article-reporting-note-heading">How we reported this</h2>
+      {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+    </aside>
+  );
+}
+
+function SeriesNextLink({ series, part }: { series: ArticleSeriesView; part: ArticleSeriesPartView }): ReactNode {
+  return (
+    <a className={joinClassNames("article-series-next", !part.image && "article-series-next-no-image")} href={part.href}>
+      {part.image ? (
+        <img
+          src={part.image.src}
+          srcSet={part.image.srcSet}
+          sizes={part.image.sizes}
+          alt=""
+          width={part.image.width ?? undefined}
+          height={part.image.height ?? undefined}
+          loading="lazy"
+          decoding="async"
+          style={part.image.objectPosition ? { objectPosition: part.image.objectPosition } : undefined}
+        />
+      ) : null}
+      <span className="article-series-next-text">
+        <span className="article-series-next-label">Next: {seriesPartLabel(series, part.number)}</span>
+        <span className="article-series-next-title">{part.title}</span>
+      </span>
+      <span className="article-series-next-arrow" aria-hidden="true">→</span>
+    </a>
+  );
+}
+
 /**
- * Everything that follows the body inside `<article>`: corrections, the poll,
- * topics, the update notice, reader feedback and the newsletter signup.
+ * Where this story sits in its series (every part, this one marked, and the
+ * next part to read) or, for ongoing coverage, the latest other stories.
+ */
+export function ArticleSeriesGuide({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  const series = presentation.series;
+  if (!series) return null;
+
+  if (series.format === "coverage") {
+    if (series.parts.length === 0) return null;
+    return (
+      <aside className="article-series-guide article-series-guide-coverage" aria-labelledby="article-series-guide-heading">
+        <header className="article-series-guide-header">
+          <p className="article-series-guide-kicker">More coverage</p>
+          <h2 id="article-series-guide-heading"><a href={series.href}>{series.title}</a></h2>
+        </header>
+        <ul className="article-series-parts">
+          {series.parts.map((part) => (
+            <li key={part.id}>
+              <a href={part.href}>
+                <span className="article-series-part-title">{part.title}</span>
+                {part.dateLabel ? <time dateTime={part.date ?? undefined}>{part.dateLabel}</time> : null}
+              </a>
+            </li>
+          ))}
+        </ul>
+        <a className="article-series-all" href={series.href}>All {series.total} stories <span aria-hidden="true">→</span></a>
+      </aside>
+    );
+  }
+
+  const count = series.complete ? `${series.total} parts` : `${series.total} ${series.total === 1 ? "part" : "parts"} so far`;
+  return (
+    <nav className="article-series-guide" aria-labelledby="article-series-guide-heading">
+      <header className="article-series-guide-header">
+        <p className="article-series-guide-kicker">A series · {count}</p>
+        <h2 id="article-series-guide-heading"><a href={series.href}>{series.title}</a></h2>
+        {series.description ? <p className="article-series-guide-description">{series.description}</p> : null}
+      </header>
+      {series.next ? <SeriesNextLink series={series} part={series.next} /> : (
+        <p className="article-series-end">{series.complete ? "You’ve reached the end of the series." : "This is the latest part. More is on the way."}</p>
+      )}
+      <ol className="article-series-parts">
+        {series.parts.map((part) => (
+          <li key={part.id} className={part.current ? "article-series-part-current" : undefined}>
+            {part.current ? (
+              <span aria-current="page">
+                <span className="article-series-part-number">Part {part.number}</span>
+                <span className="article-series-part-title">{part.title}</span>
+                <span className="article-series-part-status">You’re reading</span>
+              </span>
+            ) : (
+              <a href={part.href}>
+                <span className="article-series-part-number">Part {part.number}</span>
+                <span className="article-series-part-title">{part.title}</span>
+              </a>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+/**
+ * Everything that follows the body inside `<article>`: how it was reported,
+ * corrections, the series guide, the poll, topics, the update notice, reader
+ * feedback and the newsletter signup.
  */
 export function ArticleStoryFooter({ presentation, slots = {} }: { presentation: ArticlePresentation; slots?: ArticleViewSlots }): ReactNode {
   return (
     <>
+      <ArticleReportingNote presentation={presentation} />
       <ArticleCorrections presentation={presentation} />
+      <ArticleSeriesGuide presentation={presentation} />
       {slots.poll}
       <ArticleTopics presentation={presentation} />
       <ArticleUpdateNotice presentation={presentation} />
@@ -459,7 +629,10 @@ export function ArticleView({ presentation, slots = {}, className = "" }: Articl
       {slots.metadata}
       <article className="article-story">
         <header className="article-header">
-          <ArticleCategory presentation={presentation} />
+          <div className="article-kicker">
+            <ArticleCategory presentation={presentation} />
+            <ArticleSeriesLabel presentation={presentation} />
+          </div>
           <ArticleHeadline presentation={presentation} />
           <ArticleExcerpt presentation={presentation} />
           <ArticleAthleteMeta presentation={presentation} />
@@ -468,6 +641,7 @@ export function ArticleView({ presentation, slots = {}, className = "" }: Articl
         </header>
 
         <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} />
+        <ArticleLive presentation={presentation} />
         <ArticleStoryFooter presentation={presentation} slots={slots} />
       </article>
 

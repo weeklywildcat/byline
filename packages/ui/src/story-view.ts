@@ -57,6 +57,8 @@ export type StoryView = {
   category: { name: string; href: string } | null;
   author: { name: string; href: string | null } | null;
   image: StoryImageView | null;
+  // True while the story's live coverage is running (shows a LIVE kicker).
+  live?: boolean;
 };
 
 // A school-calendar entry after the week-window filtering and the

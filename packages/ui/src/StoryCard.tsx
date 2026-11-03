@@ -98,6 +98,7 @@ export function StoryCard({
 
       <div className="home-story-body">
         <div className="home-story-meta">
+          {story.live ? <span className="home-story-live">Live</span> : null}
           {showCategory && story.category ? (
             <a className="home-story-category" href={story.category.href}>
               {story.category.name}

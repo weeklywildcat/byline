@@ -99,7 +99,6 @@ export type WorkflowStory = {
   /** Legacy free-text visual need, retained for compatibility. */
   visuals?: string | null;
   tasksOpen?: number;
-  coverage?: string[];
   modifiedAt?: string | null;
 };
 
@@ -309,7 +308,6 @@ export type EditorialTask = {
   dueAt?: string | null;
   priority: TaskPriority;
   storyId?: number | null;
-  coverageId?: number | null;
   collectionId?: number | null;
   createdBy?: ContributorRef | null;
   completedAt?: string | null;
@@ -329,7 +327,6 @@ export type TaskInput = {
   dueAt?: string | null;
   priority: TaskPriority;
   storyId?: number | null;
-  coverageId?: number | null;
   collectionId?: number | null;
 };
 

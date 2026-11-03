@@ -509,3 +509,49 @@ describe("no database binding", () => {
     }
   });
 });
+
+describe("live coverage enhancement proxy", () => {
+  const coverage = { status: "live", startedAt: "2026-11-02T19:00:00Z", endedAt: "", updates: [
+    { id: 1, title: 'Latest <news>', html: '<p>Published update.</p>', date: "2026-11-02T20:00:00Z", author: 'Ana & Jo', pinned: true }
+  ] };
+  it("reads fresh published data between builds, sharing the static renderer and publication timezone", async () => {
+    const worker = await loadWorker();
+    const assets = assetsBinding({ locale: "en-US", timezone: "America/New_York", urls: { cms: CMS } });
+    fetchMock.mockResolvedValueOnce(upstream(coverage));
+    const response = await worker.fetch(new Request(`${SITE}/api/live/9?preview=1`, { headers: { Cookie: 'wordpress_logged_in=secret', Authorization: 'Bearer browser' } }), {
+      ASSETS: assets, BYLINE_CMS_URL: CMS, BYLINE_CMS_AUTH_HEADER: 'Authorization', BYLINE_CMS_AUTH_VALUE: 'Bearer server'
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${CMS}/wp-json/byline/v1/live/9`);
+    expect(init.cache).toBe("no-store");
+    expect(init.cf).toEqual({ cacheTtl: 0, cacheEverything: false });
+    expect(init.headers.get("Cookie")).toBeNull();
+    expect(init.headers.get("Authorization")).toBe('Bearer server');
+    const feed = await response.json();
+    expect(feed.updatedLabel).toBe("Nov 2, 3:00 PM");
+    expect(feed.updates[0].html).toContain('Latest &lt;news&gt;');
+    expect(feed.updates[0].html).toContain('Ana &amp; Jo');
+    expect(feed.keyPoints.id).toBe(1);
+  });
+  it("rejects writes locally and never proxies arbitrary paths", async () => {
+    const worker = await loadWorker();
+    const env = { ASSETS: assetsBinding(), BYLINE_CMS_URL: CMS };
+    expect((await worker.fetch(new Request(`${SITE}/api/live/9`, { method: 'POST' }), env)).status).toBe(405);
+    for (const path of ['/api/live/0', '/api/live/9/updates', '/api/live/9/extra', '/api/live/-1']) {
+      await worker.fetch(new Request(`${SITE}${path}`), env);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("does not fall back to stale static data on unpublish, outages, redirects, or malformed responses", async () => {
+    const worker = await loadWorker();
+    const env = { ASSETS: assetsBinding(), BYLINE_CMS_URL: CMS };
+    for (const [reply, status] of [[upstream({}, { status: 404 }), 404], [upstream({}, { status: 302 }), 502], [upstream('Bad gateway'), 502], [upstream({ status: 'live' }), 502]] as const) {
+      fetchMock.mockResolvedValueOnce(reply);
+      const response = await worker.fetch(new Request(`${SITE}/api/live/9`), env);
+      expect(response.status).toBe(status);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+    }
+  });
+});

@@ -25,7 +25,24 @@ export const interviewStatuses = {
   "follow-up": "Needs follow-up",
   cancelled: "Cancelled",
 };
+/** Ongoing coverage, or a numbered series read in the public story order. */
+export type PublicCoverageFormat = "coverage" | "series";
+export type PublicCoveragePresentation = {
+  publicEnabled: boolean;
+  /** Absent on settings saved before series existed; read as coverage. */
+  publicFormat?: PublicCoverageFormat;
+  publicTitle: string;
+  publicSlug: string;
+  publicDescription: string;
+  publicOverview: string;
+  artworkAttachmentId: number;
+  featuredStoryId: number;
+  storyOrder: number[];
+};
 export type Collection = {
+  publicPresentation?: PublicCoveragePresentation;
+  publicUrl?: string;
+  canPublish?: boolean;
   id: number;
   name: string;
   brief: string;
@@ -107,7 +124,7 @@ export type CollectionInput = Partial<
     Collection,
     "name" | "brief" | "type" | "status" | "startDate" | "endDate"
   >
-> & { leadId?: number; expectedBrief?: string };
+> & { leadId?: number; expectedBrief?: string; publicPresentation?: PublicCoveragePresentation };
 export type InterviewInput = Partial<
   Pick<
     Interview,

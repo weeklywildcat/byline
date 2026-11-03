@@ -22,6 +22,13 @@ const cssRule = defaultConfig.module.rules.find((rule) => rule.test?.test('style
 const adminConfig = {
   name: 'admin',
   ...defaultConfig,
+  plugins: defaultConfig.plugins.map((plugin) => plugin.constructor.name === 'DependencyExtractionWebpackPlugin'
+    ? new DependencyExtractionWebpackPlugin({
+        // Editor libraries share WordPress' React through the element facade.
+        requestToExternal: (request) => request === 'react' ? ['wp', 'element'] : undefined,
+        requestToHandle: (request) => request === 'react' ? 'wp-element' : undefined,
+      })
+    : plugin),
   module: {
     ...defaultConfig.module,
     rules: [
