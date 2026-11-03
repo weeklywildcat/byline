@@ -64,7 +64,7 @@ function CoverageStoryImage({ story }: { story: CoverageStoryView }) {
 function CoverageStoryMeta({ story }: { story: CoverageStoryView }) {
   return (
     <p className="coverage-part-meta">
-      {story.video ? <StoryVideoBadge video={story.video} /> : null}
+      {story.video ? <StoryVideoBadge /> : null}
       {story.byline ? <span>By {story.byline}</span> : null}
       {story.dateLabel ? <time dateTime={story.date ?? undefined}>{story.dateLabel}</time> : null}
       <span>{story.readingTime}</span>

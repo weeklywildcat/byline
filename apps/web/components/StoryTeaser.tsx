@@ -1,4 +1,3 @@
-import { StoryVideoBadge } from "@byline/ui";
 import { ArticleByline } from "@/components/ArticleByline";
 import { FeaturedImage } from "@/components/FeaturedImage";
 import { getPrimaryVisibleCategory } from "@/lib/content";
@@ -76,10 +75,9 @@ export function StoryTeaser({ post, variant = "standard", showImage = true, show
         </figure>
       ) : null}
       <div className="story-teaser-body">
-        <ArticleByline contributors={contributors} category={showCategory ? category : null} date={post.date} />
+        <ArticleByline contributors={contributors} category={showCategory ? category : null} date={post.date} video={Boolean(video)} />
         <h2>
           {getPostLiveCoverage(post)?.status === "live" ? <span className="story-teaser-live">Live</span> : null}
-          {video ? <StoryVideoBadge video={{ duration: video.durationLabel }} className="story-teaser-video-label" /> : null}
           <a href={href}>{title}</a>
         </h2>
         {shouldShowExcerpt ? <div className="story-excerpt" dangerouslySetInnerHTML={{ __html: excerpt }} /> : null}

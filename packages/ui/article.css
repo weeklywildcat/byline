@@ -272,4 +272,3 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-series-pa
 }
 /* The card label takes the font of the kicker it sits in, like the section name beside it. */
 .story-video-badge { color: var(--accent); text-transform: uppercase; white-space: nowrap; }
-.story-video-duration { font-variant-numeric: tabular-nums; }
