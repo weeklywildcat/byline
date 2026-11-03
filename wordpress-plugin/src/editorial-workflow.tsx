@@ -38,6 +38,8 @@ import { LiveCoveragePanel } from './editorial/LiveCoveragePanel';
 import { ContributorsPanel } from './editorial/ContributorsPanel';
 import { DistributionPanel } from './editorial/DistributionPanel';
 import { StoryPresentationPanel } from './editorial/StoryPresentationPanel';
+import { ReportingNotePanel } from './editorial/ReportingNotePanel';
+import { readReportingNote, reportingNoteMetaPatch } from './editorial/reporting-note-model';
 import { OPEN_PHOTO_CROPS_EVENT, PhotoCropsDialog } from './editorial/photo-crops/PhotoCropsDialog';
 import { readStoryPresentation, storyPresentationMetaPatch } from './editorial/story-presentation-model';
 import { TasksPanel } from './editorial/TasksPanel';
@@ -1796,6 +1798,18 @@ function StoryPresentationSettings() {
   );
 }
 
+/** "How we reported this". Post meta, so it saves with the post. */
+function ReportingNoteSettings() {
+  const meta = useSelect((select: any) => select('core/editor')?.getEditedPostAttribute?.('meta') as unknown, []);
+  const { editPost } = useDispatch('core/editor') as { editPost?: (edits: Record<string, unknown>) => void };
+
+  return (
+    <PluginDocumentSettingPanel name="byline-reporting-note" title={__('How we reported this', 'weekly-wildcat-headless')} className="byline-reporting-note-panel">
+      <ReportingNotePanel note={readReportingNote(meta)} onChange={(note) => editPost?.({ meta: reportingNoteMetaPatch(note) })} />
+    </PluginDocumentSettingPanel>
+  );
+}
+
 /**
  * Hosts the photo crops dialog for the featured image. It lives at the plugin
  * root because the panels that open it (Story presentation, the pre-publish
@@ -1891,6 +1905,7 @@ function EditorialWorkflowPlugin() {
   return (
     <>
       <StoryPresentationSettings />
+      <ReportingNoteSettings />
       <PhotoCropsHost />
       <PluginPostStatusInfo className="byline-workflow-summary-slot">
         <div className="byline-workflow-summary">

@@ -40,6 +40,45 @@
   color: #fff;
 }
 
+.immersive-article .immersive-article-kicker {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.immersive-article .immersive-article-kicker:empty {
+  display: none;
+}
+
+.immersive-article-center .immersive-article-kicker {
+  justify-content: center;
+}
+
+.immersive-article .immersive-article-series {
+  color: rgba(255, 255, 255, 0.86);
+  display: inline-flex;
+  flex-wrap: wrap;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  gap: 0 8px;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5);
+  text-transform: uppercase;
+}
+
+.immersive-article .immersive-article-series a {
+  color: #fff;
+}
+
+.immersive-article .immersive-article-series a:hover,
+.immersive-article .immersive-article-series a:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .immersive-article .immersive-article-headline {
   color: #fff;
   font-family: var(--font-headline);

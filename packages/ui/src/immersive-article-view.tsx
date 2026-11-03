@@ -9,6 +9,7 @@ import {
   ArticleImageCaption,
   ArticleLive,
   ArticleMeta,
+  ArticleSeriesLabel,
   ArticleShell,
   ArticleStandardEnding,
   ArticleStoryFooter,
@@ -45,7 +46,10 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
         image={image?.src ? { ...image, sizes: "100vw" } : null}
         imagePosition={image?.objectPosition}
       >
-        <ArticleCategory presentation={presentation} className="immersive-article-category" />
+        <div className="article-kicker immersive-article-kicker">
+          <ArticleCategory presentation={presentation} className="immersive-article-category" />
+          <ArticleSeriesLabel presentation={presentation} className="immersive-article-series" />
+        </div>
         <ArticleHeadline presentation={presentation} className="immersive-article-headline" />
         <ArticleExcerpt presentation={presentation} className="immersive-article-excerpt" />
       </HeroReveal>

@@ -6,12 +6,14 @@ const BYLINE_COLLECTION_COVERAGE_MIGRATION_OPTION = 'byline_collection_coverage_
 const BYLINE_COLLECTION_COVERAGE_MIGRATION_VERSION = 1;
 const BYLINE_COLLECTION_PUBLIC_META = '_byline_collection_public';
 const BYLINE_COLLECTION_LEGACY_COVERAGE_META = '_byline_collection_legacy_coverage_id';
+/** Ongoing coverage, or a numbered series read in the editor's order. */
+const BYLINE_COLLECTION_PUBLIC_FORMATS = ['coverage', 'series'];
 
 function byline_collection_public_settings(int $id): array
 {
     $stored = get_post_meta($id, BYLINE_COLLECTION_PUBLIC_META, true);
     return array_merge([
-        'publicEnabled' => false, 'publicTitle' => '', 'publicSlug' => '',
+        'publicEnabled' => false, 'publicFormat' => 'coverage', 'publicTitle' => '', 'publicSlug' => '',
         'publicDescription' => '', 'publicOverview' => '', 'artworkAttachmentId' => 0,
         'featuredStoryId' => 0, 'storyOrder' => [],
     ], is_array($stored) ? $stored : []);
@@ -22,12 +24,13 @@ function byline_collection_public_input($input, int $id)
 {
     if (!is_array($input)) { return byline_collection_error('Use valid public coverage settings.'); }
     if (!current_user_can('publish_posts')) { return byline_collection_error('You cannot change public coverage.', 403); }
-    foreach (['publicTitle', 'publicSlug', 'publicDescription', 'publicOverview', 'artworkAttachmentId', 'featuredStoryId', 'publicEnabled'] as $key) {
+    foreach (['publicFormat', 'publicTitle', 'publicSlug', 'publicDescription', 'publicOverview', 'artworkAttachmentId', 'featuredStoryId', 'publicEnabled'] as $key) {
         if (isset($input[$key]) && !is_scalar($input[$key])) { return byline_collection_error('Use valid public coverage fields.'); }
     }
     $next = array_merge(byline_collection_public_settings($id), $input);
     $next = [
         'publicEnabled' => rest_sanitize_boolean($next['publicEnabled']),
+        'publicFormat' => byline_collection_public_format($next['publicFormat']),
         'publicTitle' => byline_sanitize_coverage_text($next['publicTitle'], 240),
         'publicSlug' => substr(sanitize_title((string) $next['publicSlug']), 0, 200),
         'publicDescription' => byline_sanitize_coverage_text($next['publicDescription'], 320),
@@ -64,6 +67,11 @@ function byline_collection_public_input($input, int $id)
         }
     }
     return $next;
+}
+
+function byline_collection_public_format($value): string
+{
+    return is_string($value) && in_array($value, BYLINE_COLLECTION_PUBLIC_FORMATS, true) ? $value : 'coverage';
 }
 
 function byline_collection_for_legacy_coverage(int $legacy_id): int
@@ -155,6 +163,7 @@ function byline_collection_public_coverage(int $id): ?array
     $status = (string) get_post_meta($id, '_byline_collection_status', true);
     return [
         'id' => $id, 'slug' => $p['publicSlug'], 'title' => $p['publicTitle'],
+        'format' => byline_collection_public_format($p['publicFormat']),
         'description' => $p['publicDescription'], 'overview' => $p['publicOverview'],
         'startAt' => (string) get_post_meta($id, '_byline_collection_start', true),
         'endAt' => (string) get_post_meta($id, '_byline_collection_end', true),

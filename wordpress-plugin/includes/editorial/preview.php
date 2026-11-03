@@ -805,6 +805,7 @@ function byline_editorial_preview_presentation(int $post_id): array
         'athleteMeta' => byline_editorial_preview_athlete_meta($post),
         'storyPresentation' => $story_presentation['presentation'],
         'immersiveAlignment' => $story_presentation['immersiveAlignment'],
+        'reportingNote' => function_exists('byline_story_reporting_note') ? byline_story_reporting_note_paragraphs(byline_story_reporting_note($post_id)) : [],
         'contributors' => $contributor_views,
         'fallbackByline' => $short_name . ' Staff',
         'publishedAt' => $published_at,

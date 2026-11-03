@@ -252,6 +252,7 @@ export type WordPressPostSettings = {
   gameScoreGameIds?: number[];
   presentation?: unknown;
   immersiveAlignment?: unknown;
+  reportingNote?: unknown;
   contributors?: unknown;
   authors?: unknown;
   corrections?: unknown;
@@ -280,12 +281,20 @@ export type WordPressCoverageArtwork = {
   objectPosition?: string;
 };
 
+/** Ongoing coverage, or a numbered series read in the editor's order. */
+export type WordPressCoverageFormat = "coverage" | "series";
+
 export type WordPressCoverage = {
   id: number | string;
   slug: string;
   title: string;
+  format: WordPressCoverageFormat;
   description: string;
   overview: string;
+  /** The overview as plain-text paragraphs. */
+  overviewParagraphs: string[];
+  /** upcoming, active, past or archived; past and archived coverage is complete. */
+  status?: string;
   artwork: WordPressCoverageArtwork | null;
   startDate?: string;
   endDate?: string;
@@ -1423,6 +1432,9 @@ export function normalizePublicCoverage(value: unknown): WordPressCoverage | nul
   const artwork = publicPhoto(value.artwork ?? value.featuredMedia ?? value.image);
   const description = textValue(value.description ?? value.shortDescription);
   const overview = textValue(value.overview ?? value.content);
+  const overviewSource = value.overview ?? value.content;
+  const overviewHtml = typeof overviewSource === "string" ? overviewSource : isRecord(overviewSource) && typeof overviewSource.rendered === "string" ? overviewSource.rendered : "";
+  const overviewParagraphs = overviewHtml.split(/<\/p>|<br\s*\/?>|\n\s*\n/i).map(stripHtml).filter(Boolean);
   const startDate = typeof value.startDate === "string"
     ? value.startDate
     : typeof value.start_date === "string"
@@ -1447,8 +1459,11 @@ export function normalizePublicCoverage(value: unknown): WordPressCoverage | nul
     id: typeof idValue === "number" ? idValue : String(idValue),
     slug,
     title,
+    format: value.format === "series" ? "series" : "coverage",
     description,
     overview,
+    overviewParagraphs,
+    ...(status ? { status } : {}),
     artwork: artwork ? { url: artwork.url, alt: artwork.alt ?? title, width: artwork.width, height: artwork.height, ...(artwork.objectPosition ? { objectPosition: artwork.objectPosition } : {}) } : null,
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
@@ -1626,6 +1641,16 @@ export function getPostStoryPresentation(post: WordPressPost): { presentation: "
     presentation: settings?.presentation === "immersive" ? "immersive" : "standard",
     immersiveAlignment: settings?.immersiveAlignment === "center" ? "center" : "bottom-left"
   };
+}
+
+/**
+ * The "How we reported this" note as paragraphs. Plain text from WordPress;
+ * blank lines separate paragraphs. Empty when the author wrote none.
+ */
+export function getPostReportingNote(post: WordPressPost): string[] {
+  const note = (post.byline ?? post.weeklyWildcat)?.reportingNote;
+  if (typeof note !== "string") return [];
+  return note.replace(/\r\n?/g, "\n").split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean);
 }
 
 export function getPostGameScoreGameIds(post: WordPressPost) {
