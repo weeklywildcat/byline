@@ -1,4 +1,4 @@
-import { normalizeArtDirection, normalizeLiveCoverage, type ImageArtDirection, type LiveCoverage as WordPressLiveCoverage } from "@byline/core";
+import { normalizeArtDirection, normalizeLiveCoverage, normalizePrimaryVideo, normalizeStoryFormat, type ImageArtDirection, type LiveCoverage as WordPressLiveCoverage, type PrimaryVideo } from "@byline/core";
 import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
 import { REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { mirrorWordPressMediaInValue } from "@/lib/media";
@@ -253,6 +253,9 @@ export type WordPressPostSettings = {
   presentation?: unknown;
   immersiveAlignment?: unknown;
   reportingNote?: unknown;
+  /** "standard" or "video"; see packages/core/src/story-video.ts. */
+  format?: unknown;
+  video?: unknown;
   contributors?: unknown;
   authors?: unknown;
   corrections?: unknown;
@@ -1641,6 +1644,16 @@ export function getPostStoryPresentation(post: WordPressPost): { presentation: "
     presentation: settings?.presentation === "immersive" ? "immersive" : "standard",
     immersiveAlignment: settings?.immersiveAlignment === "center" ? "center" : "bottom-left"
   };
+}
+
+/**
+ * The primary YouTube video of a video story, or null for an article. Only the
+ * story format makes a video story: a YouTube embed in an ordinary article's
+ * body never does.
+ */
+export function getPostPrimaryVideo(post: WordPressPost): PrimaryVideo | null {
+  const settings = post.byline ?? post.weeklyWildcat;
+  return normalizeStoryFormat(settings?.format) === "video" ? normalizePrimaryVideo(settings?.video) : null;
 }
 
 /**

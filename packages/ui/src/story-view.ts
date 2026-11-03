@@ -59,6 +59,8 @@ export type StoryView = {
   image: StoryImageView | null;
   // True while the story's live coverage is running (shows a LIVE kicker).
   live?: boolean;
+  // A video story: the card shows a small Video label and its running time.
+  video?: { duration: string | null } | null;
 };
 
 // A school-calendar entry after the week-window filtering and the

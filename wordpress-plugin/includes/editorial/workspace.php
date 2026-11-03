@@ -160,6 +160,7 @@ function byline_workspace_payload(int $story_id, array $access): array
         'now' => byline_story_now(),
         'currentUser' => byline_editorial_rest_user_person($user_id),
         'brief' => $read('brief', static function () use ($story_id): string { return byline_get_story_brief($story_id); }, ''),
+        'format' => $read('format', static function () use ($story_id): array { return byline_story_video_settings($story_id); }, ['format' => 'standard', 'videoUrl' => '', 'video' => null]),
         'sections' => array_map(static function ($term): string { return $term->name; }, wp_get_post_categories($story_id, ['fields' => 'all'])),
         'contributors' => $contributors,
         'statuses' => byline_editorial_rest_statuses(),
@@ -203,6 +204,17 @@ function byline_editorial_rest_save_brief(WP_REST_Request $request)
     $expected = isset($body['expectedBrief']) && is_string($body['expectedBrief']) ? $body['expectedBrief'] : null;
     $saved = byline_set_story_brief($story_id, $body['brief'] ?? null, $expected);
     return is_wp_error($saved) ? $saved : rest_ensure_response(['brief' => $saved]);
+}
+
+/** Article or Video, and the primary YouTube URL. Changes the public story, so it needs `edit_post`. */
+function byline_editorial_rest_save_format(WP_REST_Request $request)
+{
+    $story_id = absint($request->get_param('id'));
+    if (!byline_story_context($story_id)['edit']) {
+        return new WP_Error('byline_format_forbidden', 'You cannot change this story\'s format.', ['status' => rest_authorization_required_code()]);
+    }
+    $body = byline_editorial_rest_body($request);
+    return rest_ensure_response(byline_set_story_video_settings($story_id, array_intersect_key($body, ['format' => true, 'videoUrl' => true])));
 }
 
 function byline_editorial_rest_save_source(WP_REST_Request $request)
@@ -400,6 +412,9 @@ add_action('rest_api_init', static function (): void {
     ]);
     register_rest_route(BYLINE_REST_NAMESPACE, $story . '/brief', [
         'methods' => WP_REST_Server::EDITABLE, 'callback' => 'byline_editorial_rest_save_brief', 'permission_callback' => $permission,
+    ]);
+    register_rest_route(BYLINE_REST_NAMESPACE, $story . '/format', [
+        'methods' => WP_REST_Server::EDITABLE, 'callback' => 'byline_editorial_rest_save_format', 'permission_callback' => $permission,
     ]);
     foreach ([
         'sources' => ['source', 'byline_editorial_rest_save_source', 'byline_editorial_rest_delete_source'],

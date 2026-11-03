@@ -178,3 +178,43 @@ describe("sitemap audits", () => {
     expect(auditFeed(feed(`${origin}/nope/`), pages, origin).map((i) => i.message)).toEqual(["feed: item link is not a generated page"]);
   });
 });
+
+describe("video watch page audit", () => {
+  const embedUrl = "https://www.youtube.com/embed/dQw4w9WgXcQ";
+  const videoJson = {
+    "@type": "VideoObject", "@id": `${url}#video`, name: "Homecoming in 90 seconds", description: "The whole week.",
+    thumbnailUrl: ["https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"], uploadDate: "2026-10-14T20:00:00.000Z", embedUrl, duration: "PT1M32S"
+  };
+  const graph = (article: Record<string, unknown> = { ...articleJson, video: { "@id": `${url}#video` } }, video: Record<string, unknown> = videoJson) => {
+    const { "@context": _context, ...node } = article;
+    return ld({ "@context": "https://schema.org", "@graph": [node, video] });
+  };
+  const player = (src = embedUrl) => `<figure class="article-primary-video"><div class="article-primary-video-frame"><iframe src="${src}" title="Homecoming"></iframe></div></figure>`;
+
+  it("accepts a video story whose VideoObject names the rendered player", () => {
+    expect(messages(articlePage({}, `${graph()}${ld(breadcrumbJson)}${player()}`))).toEqual([]);
+  });
+
+  it("requires the player iframe in the HTML, not only in structured data", () => {
+    expect(messages(articlePage({}, `${graph()}${ld(breadcrumbJson)}`))).toContain(`the rendered page has no primary player iframe for ${embedUrl}`);
+    expect(messages(articlePage({}, `${graph()}${ld(breadcrumbJson)}${player("https://www.youtube.com/embed/aaaaaaaaaaa")}`))).toContain(`the rendered page has no primary player iframe for ${embedUrl}`);
+  });
+
+  it("requires Google's fields and the link from the NewsArticle", () => {
+    const broken = messages(articlePage({}, `${graph(articleJson, { ...videoJson, name: "", uploadDate: "October 14", thumbnailUrl: [], embedUrl: "https://youtu.be/dQw4w9WgXcQ", duration: "92" })}${ld(breadcrumbJson)}${player()}`));
+    expect(broken).toEqual(expect.arrayContaining([
+      "VideoObject.name is missing",
+      'VideoObject.uploadDate is not a timezone-aware ISO timestamp: "October 14"',
+      'VideoObject.thumbnailUrl is not an https URL: ""',
+      'VideoObject.embedUrl is not a YouTube embed URL: "https://youtu.be/dQw4w9WgXcQ"',
+      'VideoObject.duration is not an ISO 8601 duration: "92"',
+      "NewsArticle.video does not reference the VideoObject"
+    ]));
+  });
+
+  it("flags a primary player without a VideoObject, and leaves body embeds alone", () => {
+    expect(messages(articlePage({}, `${ld(articleJson)}${ld(breadcrumbJson)}${player()}`))).toContain("has a primary video player but no VideoObject JSON-LD");
+    const bodyEmbed = `<div class="article-body"><iframe src="https://www.youtube.com/embed/aaaaaaaaaaa?feature=oembed"></iframe></div>`;
+    expect(messages(articlePage({}, `${ld(articleJson)}${ld(breadcrumbJson)}${bodyEmbed}`))).toEqual([]);
+  });
+});

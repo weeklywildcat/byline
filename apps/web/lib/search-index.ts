@@ -44,7 +44,8 @@ function isSearchIndexItem(value: unknown): value is SearchIndexItem {
     (value.topics === undefined || isStringArray(value.topics)) &&
     (value.topicLabels === undefined || isStringRecord(value.topicLabels)) &&
     (value.sortDate === undefined || typeof value.sortDate === "string") &&
-    (value.searchTokens === undefined || isStringArray(value.searchTokens))
+    (value.searchTokens === undefined || isStringArray(value.searchTokens)) &&
+    (value.video === undefined || (isRecord(value.video) && (value.video.duration === null || typeof value.video.duration === "string")))
   );
 }
 

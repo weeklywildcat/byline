@@ -458,7 +458,13 @@ function byline_editorial_preview_story_card(WP_Post $post): array
         'category' => $category instanceof WP_Term ? byline_editorial_preview_plain_text((string) ($category->name ?? '')) : null,
         'date' => $date,
         'dateLabel' => byline_editorial_preview_date_label($date),
-    ];
+    ] + byline_editorial_preview_video_field(function_exists('byline_story_video_badge') ? byline_story_video_badge((int) $post->ID) : null);
+}
+
+/** Only a video story carries `video`, so an article's preview model is unchanged. */
+function byline_editorial_preview_video_field(?array $video): array
+{
+    return $video === null ? [] : ['video' => $video];
 }
 
 /** @return array<int,WP_Term> */
@@ -805,6 +811,7 @@ function byline_editorial_preview_presentation(int $post_id): array
         'athleteMeta' => byline_editorial_preview_athlete_meta($post),
         'storyPresentation' => $story_presentation['presentation'],
         'immersiveAlignment' => $story_presentation['immersiveAlignment'],
+    ] + byline_editorial_preview_video_field(function_exists('byline_story_video_article_view') ? byline_story_video_article_view($post_id, $title) : null) + [
         'reportingNote' => function_exists('byline_story_reporting_note') ? byline_story_reporting_note_paragraphs(byline_story_reporting_note($post_id)) : [],
         'contributors' => $contributor_views,
         'fallbackByline' => $short_name . ' Staff',

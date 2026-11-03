@@ -83,8 +83,9 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
  * a standard story. The public routes and the private Preview as Byline both
  * ask this, so they cannot disagree.
  */
-export function usesImmersivePresentation(presentation: Pick<ArticleViewProps["presentation"], "storyPresentation" | "image">): boolean {
-  return presentation.storyPresentation === "immersive" && Boolean(presentation.image?.src);
+export function usesImmersivePresentation(presentation: Pick<ArticleViewProps["presentation"], "storyPresentation" | "image" | "video">): boolean {
+  // A video story always opens on its player, never a fullscreen photo.
+  return presentation.storyPresentation === "immersive" && Boolean(presentation.image?.src) && !presentation.video;
 }
 
 /** The article the author chose in WordPress: Immersive, or the normal `ArticleView`. */

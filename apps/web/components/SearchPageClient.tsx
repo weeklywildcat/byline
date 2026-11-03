@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { StoryVideoBadge } from "@byline/ui";
 import { SiteIcon } from "@/components/SiteIcon";
 import { reportZeroResultSearch } from "@/lib/search-gap";
 import {
@@ -304,6 +305,7 @@ export function SearchPageClient({ publicationName, searchGapEndpoint, searchInd
               <article className="search-result" key={item.id}>
                 <div className="search-result-meta">
                   {getItemKind(item) !== "story" ? <span className="search-result-kind">{getResultLabel(getItemKind(item))}</span> : null}
+                  {item.video ? <StoryVideoBadge video={item.video} /> : null}
                   {item.category && getItemKind(item) === "story" ? <span className="search-result-section"><HighlightedText value={item.category} terms={terms} /></span> : null}
                 </div>
                 <h3>

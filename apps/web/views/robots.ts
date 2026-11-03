@@ -10,6 +10,6 @@ export default function robots(): RobotsDocument {
       disallow: "/_byline/presentation-media/"
     },
     host: getSiteUrl(),
-    sitemap: [absoluteUrl("/sitemap.xml"), absoluteUrl("/news-sitemap.xml")]
+    sitemap: [absoluteUrl("/sitemap.xml"), absoluteUrl("/news-sitemap.xml"), absoluteUrl("/video-sitemap.xml")]
   };
 }

@@ -7,6 +7,7 @@ import { absoluteUrl } from "@/lib/seo";
 import { getMediaCredit } from "@/lib/wordpress";
 import { getPublicationConfig } from "@/lib/publication";
 import { buildArticleLiveView } from "@/lib/live-coverage";
+import { getArticleVideoView, getStoryVideoBadge } from "@/lib/story-video";
 import {
   getAuthorProfile,
   contributorHasProfilePage,
@@ -70,6 +71,11 @@ function articleImage(image: WordPressMedia | null, sizes?: string, priority = f
   };
 }
 
+/** Only a video story carries `video`, so an article's model is unchanged. */
+function withVideo<T>(video: T | null) {
+  return video ? { video } : {};
+}
+
 // Compact teasers are square (globals.css .story-teaser-compact).
 const COMPACT_CARD_IMAGE = { shape: "square", sizes: "(max-width: 900px) 100vw, 360px" } as const;
 
@@ -84,7 +90,8 @@ export function articleStoryCard(post: WordPressPost, imageOptions: { shape: Ima
     image,
     category: category ? decodeHtml(category.name) : null,
     date: post.date,
-    dateLabel: formatDisplayDate(post.date)
+    dateLabel: formatDisplayDate(post.date),
+    ...withVideo(getStoryVideoBadge(post))
   };
 }
 
@@ -286,6 +293,7 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
     athleteMeta,
     storyPresentation: storyPresentation.presentation,
     immersiveAlignment: storyPresentation.immersiveAlignment,
+    ...withVideo(getArticleVideoView(post)),
     contributors: displayContributors.map((contributor) => contributorView(contributor, getCoverageAreas(visiblePosts.filter((candidate) => postHasContributor(candidate, contributor))))),
     fallbackByline: `${publication.identity.shortName} Staff`,
     publishedAt: post.date,

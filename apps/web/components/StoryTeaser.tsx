@@ -1,7 +1,9 @@
+import { StoryVideoBadge } from "@byline/ui";
 import { ArticleByline } from "@/components/ArticleByline";
 import { FeaturedImage } from "@/components/FeaturedImage";
 import { getPrimaryVisibleCategory } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
+import { getVideoStoryMetadata } from "@/lib/story-video";
 import {
   getFeaturedMedia,
   getPostContributors,
@@ -47,9 +49,12 @@ export function StoryTeaser({ post, variant = "standard", showImage = true, show
   const category = getPrimaryVisibleCategory(post);
   const excerpt = post.excerpt.rendered.trim();
   const title = stripHtml(post.title.rendered);
+  const video = getVideoStoryMetadata(post);
   const shouldShowImage = Boolean(showImage && image);
+  // A video story without a featured image shows its YouTube thumbnail instead of nothing.
+  const showVideoThumbnail = Boolean(showImage && !image && video);
   const shouldShowExcerpt = excerpt && variant !== "compact" && variant !== "list";
-  const className = `story-teaser story-teaser-${variant}${shouldShowImage ? "" : " story-teaser-no-image"}`;
+  const className = `story-teaser story-teaser-${variant}${shouldShowImage || showVideoThumbnail ? "" : " story-teaser-no-image"}${video ? " story-teaser-video" : ""}`;
 
   return (
     <article className={className}>
@@ -63,11 +68,18 @@ export function StoryTeaser({ post, variant = "standard", showImage = true, show
           shape={getStoryTeaserImageShape(variant)}
           imageSearchVisibility="presentation"
         />
+      ) : showVideoThumbnail && video ? (
+        <figure className="featured-image">
+          <div className="featured-image-frame">
+            <img src={video.thumbnailUrl} alt="" width={480} height={360} loading={priority ? "eager" : "lazy"} decoding="async" />
+          </div>
+        </figure>
       ) : null}
       <div className="story-teaser-body">
         <ArticleByline contributors={contributors} category={showCategory ? category : null} date={post.date} />
         <h2>
           {getPostLiveCoverage(post)?.status === "live" ? <span className="story-teaser-live">Live</span> : null}
+          {video ? <StoryVideoBadge video={{ duration: video.durationLabel }} className="story-teaser-video-label" /> : null}
           <a href={href}>{title}</a>
         </h2>
         {shouldShowExcerpt ? <div className="story-excerpt" dangerouslySetInnerHTML={{ __html: excerpt }} /> : null}
