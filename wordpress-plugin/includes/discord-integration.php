@@ -166,7 +166,7 @@ function wwh_discord_story(int $post_id): array
         'visuals' => $editorial['visuals'],
         'wordpressUrl' => get_edit_post_link($post_id, 'raw') ?: admin_url('post.php?post=' . $post_id . '&action=edit'),
         'publicUrl' => $post->post_status === 'publish' ? get_permalink($post_id) : '',
-        'featuredImageUrl' => $featured_id ? (wp_get_attachment_image_url($featured_id, 'large') ?: '') : '',
+        'featuredImageUrl' => $featured_id ? ((function_exists('byline_image_social_url') ? byline_image_social_url($featured_id) : '') ?: (wp_get_attachment_image_url($featured_id, 'large') ?: '')) : '',
         'discord' => [
             'threadId' => (string) get_post_meta($post_id, WWH_DISCORD_THREAD_META, true),
             'cardMessageId' => (string) get_post_meta($post_id, WWH_DISCORD_CARD_META, true),

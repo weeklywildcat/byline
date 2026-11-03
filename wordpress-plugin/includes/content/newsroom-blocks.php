@@ -86,13 +86,22 @@ function byline_newsroom_render_heading(string $heading, string $fallback): stri
     return '<h2>' . esc_html($heading) . '</h2>';
 }
 
-function byline_newsroom_render_image(int $attachment_id, string $alt, string $class = 'featured-image'): string
+/**
+ * `$shape` names the editor crop the layout shows (Related Coverage is 4:3, so
+ * `standard`); its cropped files replace the photo when there are some. Any other
+ * layout positions the photo at the editor's focal point.
+ */
+function byline_newsroom_render_image(int $attachment_id, string $alt, string $class = 'featured-image', string $shape = ''): string
 {
     if ($attachment_id <= 0 || !function_exists('wwh_media_image')) {
         return '';
     }
 
     $image = wwh_media_image($attachment_id, 'large');
+    $art = function_exists('byline_image_shape_attributes') ? byline_image_shape_attributes($attachment_id, $shape !== '' ? $shape : 'none') : [];
+    if (($art['srcset'] ?? '') !== '') {
+        $image = ['url' => $art['src'], 'alt' => $image['alt'] ?? '', 'width' => $art['width'], 'height' => $art['height']];
+    }
     $url = byline_newsroom_public_url($image['url'] ?? '');
     if ($url === '') {
         return '';
@@ -104,7 +113,10 @@ function byline_newsroom_render_image(int $attachment_id, string $alt, string $c
     $dimensions = $width > 0 ? ' width="' . esc_attr((string) $width) . '"' : '';
     $dimensions .= $height > 0 ? ' height="' . esc_attr((string) $height) . '"' : '';
 
-    return '<figure class="' . esc_attr($class) . '"><div class="featured-image-frame"><img src="' . esc_url($url) . '" alt="' . esc_attr($alt) . '"' . $dimensions . ' loading="lazy"></div></figure>';
+    $srcset = ($art['srcset'] ?? '') !== '' ? ' srcset="' . esc_attr($art['srcset']) . '" sizes="(max-width: 640px) 72px, 96px"' : '';
+    $style = ($art['style'] ?? '') !== '' ? ' style="' . esc_attr($art['style']) . '"' : '';
+
+    return '<figure class="' . esc_attr($class) . '"><div class="featured-image-frame"><img src="' . esc_url($url) . '"' . $srcset . ' alt="' . esc_attr($alt) . '"' . $dimensions . $style . ' loading="lazy"></div></figure>';
 }
 
 /**
@@ -167,7 +179,9 @@ function byline_newsroom_story_card(WP_Post $post, string $variant, array $attri
     $title = get_the_title($post);
     $href = get_permalink($post);
     $show_image = ($attributes['showImage'] ?? true) !== false;
-    $image = $show_image ? byline_newsroom_render_image(absint(get_post_thumbnail_id($post->ID)), $title) : '';
+    // Related Coverage shows 4:3 thumbnails (story-base.css); other layouts are 16:10.
+    $shape = ($attributes['layout'] ?? '') === 'related' ? 'standard' : '';
+    $image = $show_image ? byline_newsroom_render_image(absint(get_post_thumbnail_id($post->ID)), $title, 'featured-image', $shape) : '';
     $class = 'story-teaser story-teaser-' . sanitize_html_class($variant);
     if ($image === '') {
         $class .= ' story-teaser-no-image';

@@ -1,5 +1,7 @@
 import { packageHeadingId } from "./package-dom";
 import { StoryCard } from "./StoryCard";
+import { StoryImage } from "./StoryImage";
+import { storyImageAttributes } from "./story-view";
 import { sportsPackageHasContent, type AthleteSpotlightView, type ResolvedSportsPackage } from "./sports-view";
 
 export type SportsPackageProps = {
@@ -15,13 +17,7 @@ function AthleteFeature({ athlete }: { athlete: AthleteSpotlightView }) {
     <article className="sports-athlete-feature">
       {athlete.image ? (
         <a className="sports-athlete-image" href={athlete.href} aria-label={athlete.name}>
-          <img
-            src={athlete.image.src}
-            alt={athlete.image.alt}
-            width={athlete.image.width ?? undefined}
-            height={athlete.image.height ?? undefined}
-            loading="lazy"
-          />
+          <StoryImage image={athlete.image} attributes={storyImageAttributes(athlete.image, "portrait", "128px")} loading="lazy" />
         </a>
       ) : null}
       <div className="sports-athlete-body">

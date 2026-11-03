@@ -49,6 +49,7 @@ function CoverageCard({ coverage }: { coverage: WordPressCoverage }) {
           alt={coverage.artwork.alt}
           width={coverage.artwork.width ?? undefined}
           height={coverage.artwork.height ?? undefined}
+          style={coverage.artwork.objectPosition ? { objectPosition: coverage.artwork.objectPosition } : undefined}
           loading="lazy"
         />
       ) : null}
