@@ -128,6 +128,7 @@ export default async function CoveragePage({ params }: CoveragePageProps) {
             alt={coverage.artwork.alt}
             width={coverage.artwork.width ?? undefined}
             height={coverage.artwork.height ?? undefined}
+          style={coverage.artwork.objectPosition ? { objectPosition: coverage.artwork.objectPosition } : undefined}
           />
         ) : null}
         <div>

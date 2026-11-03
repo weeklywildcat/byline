@@ -1,3 +1,5 @@
+import type { ImageCropShape } from "@byline/core";
+
 // The decoupling boundary between content and presentation.
 //
 // Renderers must not know what a WordPress post looks like. The resolver flattens
@@ -12,7 +14,33 @@ export type StoryImageView = {
   height: number | null;
   // Photographer or source line, already plain text. Shown under larger images.
   credit?: string;
+  // Responsive candidates of the uncropped photo; the renderer supplies `sizes`.
+  srcSet?: string;
+  // CSS object-position from the editor's focal point (absent when centred).
+  objectPosition?: string;
+  // Files an editor cropped for a shape. A placement showing that shape uses
+  // them in place of the photo; see packages/core/src/image-crops.ts.
+  crops?: Partial<Record<ImageCropShape, StoryImageCrop>>;
 };
+
+export type StoryImageCrop = { src: string; srcSet: string; width: number; height: number };
+
+/**
+ * `<img>` attributes for a placement that shows `shape` at `sizes`: the editor's
+ * cropped files when there are some, otherwise the photo at its focal point.
+ */
+export function storyImageAttributes(image: StoryImageView, shape: ImageCropShape, sizes: string) {
+  const crop = image.crops?.[shape];
+  if (crop) return { src: crop.src, srcSet: crop.srcSet, sizes, width: crop.width, height: crop.height, style: undefined };
+  return {
+    src: image.src,
+    srcSet: image.srcSet,
+    sizes: image.srcSet ? sizes : undefined,
+    width: image.width ?? undefined,
+    height: image.height ?? undefined,
+    style: image.objectPosition ? { objectPosition: image.objectPosition } : undefined
+  };
+}
 
 export type StoryView = {
   id: number;

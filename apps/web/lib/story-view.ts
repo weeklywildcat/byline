@@ -1,20 +1,44 @@
-import { cleanDeckText, stripBracketedEllipsis, type AthleteSpotlightView, type StoryView } from "@byline/ui";
+import { IMAGE_CROP_SHAPES, type ImageCropShape } from "@byline/core";
+import { cleanDeckText, stripBracketedEllipsis, type AthleteSpotlightView, type StoryImageCrop, type StoryImageView, type StoryView } from "@byline/ui";
 import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { getMeaningfulImageAlt } from "@/lib/image-alt";
-import { getPresentationMediaUrl } from "@/lib/media";
+import { getCroppedImageSource, getResponsiveImageProps } from "@/lib/media";
 import {
   getAuthorHref,
   getFeaturedMedia,
   getMediaCredit,
   getPostAuthor,
   getPostHref,
+  type WordPressMedia,
   type WordPressPost
 } from "@/lib/wordpress";
 
 // Turns build-time WordPress records into the presentation-neutral view models
 // the shared renderers consume. Everything WordPress-shaped stops here; the
 // canonical resolver in @byline/content never sees a WordPressPost.
+
+// The photo for a card, with its srcset, the editor's focal point and any
+// per-shape crops. The card renderer picks the shape and `sizes` per variant.
+function toStoryImageView(image: WordPressMedia | null, credit: string): StoryImageView | null {
+  const photo = getResponsiveImageProps(image, { imageSearchVisibility: "presentation" });
+  if (!image || !photo) return null;
+  const crops: Partial<Record<ImageCropShape, StoryImageCrop>> = {};
+  for (const shape of IMAGE_CROP_SHAPES) {
+    const cropped = getCroppedImageSource(image, shape, "presentation");
+    if (cropped) crops[shape] = cropped;
+  }
+  return {
+    src: photo.src,
+    alt: getMeaningfulImageAlt(image),
+    width: photo.width ?? null,
+    height: photo.height ?? null,
+    ...(credit ? { credit } : {}),
+    ...(photo.srcSet ? { srcSet: photo.srcSet } : {}),
+    ...(photo.objectPosition ? { objectPosition: photo.objectPosition } : {}),
+    ...(Object.keys(crops).length ? { crops } : {})
+  };
+}
 
 function getCleanDeck(post: WordPressPost) {
   return cleanDeckText(stripHtml(post.content.rendered || post.excerpt.rendered));
@@ -49,15 +73,7 @@ export function toStoryView(post: WordPressPost, options: StoryViewOptions = {})
     readingTime: options.includeReadingTime ? getReadingTime(post) : null,
     category: category ? { name: decodeHtml(category.name), href: `/category/${category.slug}/` } : null,
     author: author ? { name: author.name, href: getAuthorHref(author) } : null,
-    image: image?.source_url
-      ? {
-          src: getPresentationMediaUrl(image.source_url),
-          alt: getMeaningfulImageAlt(image),
-          width: image.media_details?.width ?? null,
-          height: image.media_details?.height ?? null,
-          ...(credit ? { credit } : {})
-        }
-      : null
+    image: toStoryImageView(image, credit)
   };
 }
 
@@ -97,14 +113,6 @@ export function toAthleteSpotlightView(post: WordPressPost): AthleteSpotlightVie
     eyebrow: getAthleteSpotlightLabel(post),
     sport: getAthleteSportLabel(post),
     blurb: blurb || null,
-    image: image?.source_url
-      ? {
-          src: getPresentationMediaUrl(image.source_url),
-          alt: getMeaningfulImageAlt(image),
-          width: image.media_details?.width ?? null,
-          height: image.media_details?.height ?? null,
-          ...(credit ? { credit } : {})
-        }
-      : null
+    image: toStoryImageView(image, credit)
   };
 }
