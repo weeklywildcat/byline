@@ -95,7 +95,7 @@ describe("live data boundary", () => {
   });
   it("credits each update to its own author with a headshot, profile link and role", () => {
     const story = post({ live: { status: "live", startedAt: "2026-11-02T19:00:00Z", updates: [
-      { ...updates[0], id: 2, author: "Ana Reporter", authorSlug: "ana-reporter", authorRole: "Reporting from the stadium", authorPhoto: { url: "/_wordpress-media/ana.jpg", width: 150, height: 150 } },
+      { ...updates[0], id: 2, date: "2026-11-02T20:00:00Z", author: "Ana Reporter", authorSlug: "ana-reporter", authorRole: "Reporting from the stadium", authorPhoto: { url: "/_wordpress-media/ana.jpg", width: 150, height: 150 } },
       { ...updates[0], id: 1, date: "2026-11-02T18:00:00Z", author: "Jo Writer", authorSlug: "../evil", authorPhoto: { url: "javascript:alert(1)", width: 150, height: 150 } }
     ] } });
     const [ana, jo] = buildLiveFeed(story)!.updates.map((update) => update.html);
