@@ -1,8 +1,11 @@
+import { normalizeLiveCoverage } from "@byline/core";
+import { createArticleLiveView, createLiveFeed } from "@byline/ui/live-feed";
+
 /**
  * Byline static-site Worker.
  *
- * Everything except the poll API is served straight from the static export.
- * The poll routes are a thin same-origin proxy in front of the WordPress poll
+ * Everything except the poll and live-update APIs is served straight from the static export.
+ * The API routes are a thin same-origin proxy in front of the WordPress poll
  * API: WordPress owns poll definitions, lifecycle, results, and vote records,
  * and this Worker owns no poll business logic, no SQL, and no database binding.
  *
@@ -82,6 +85,8 @@ let resolvedCmsOrigin;
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const live = url.pathname.match(/^\/api\/live\/([1-9]\d*)$/);
+    if (live) return handleLiveRoute(request, env, live[1]);
     const route = POLL_ROUTES[url.pathname];
 
     if (route) {
@@ -91,6 +96,36 @@ export default {
     return env.ASSETS.fetch(request);
   }
 };
+
+/** Read-only enhancement. No browser credentials or cookies enter WordPress. */
+async function handleLiveRoute(request, env, id) {
+  if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { Allow: "GET" });
+  try {
+    const origin = await cmsOrigin(request, env);
+    if (!origin) throw new Error("No CMS");
+    const headers = new Headers({ Accept: "application/json", "Cache-Control": "no-cache" });
+    for (const [name, value] of upstreamAuthHeaders(env)) {
+      if (name !== "X-Byline-Poll-Proxy") headers.set(name, value);
+    }
+    const upstream = await fetch(`${origin}/wp-json/byline/v1/live/${id}`, {
+      method: "GET", headers, redirect: "manual", cache: "no-store",
+      cf: { cacheTtl: 0, cacheEverything: false }, signal: AbortSignal.timeout(10_000)
+    });
+    if (upstream.status === 404) return json({ error: "Coverage not found." }, 404);
+    if (!upstream.ok) throw new Error("CMS unavailable");
+    const live = normalizeLiveCoverage(await upstream.json());
+    if (!live) throw new Error("Invalid coverage");
+    const manifest = await env.ASSETS.fetch(new Request(new URL(PUBLICATION_MANIFEST_PATH, request.url)));
+    if (!manifest.ok) throw new Error("No publication");
+    const publication = await manifest.json();
+    const view = createArticleLiveView(live, {
+      postId: id, locale: publication.locale, timeZone: publication.timezone, feedUrl: `/api/live/${id}`
+    });
+    return json(createLiveFeed(view));
+  } catch {
+    return json({ error: "Live coverage is unavailable." }, 502);
+  }
+}
 
 async function handlePollRoute(request, env, route) {
   if (request.method === "OPTIONS") {

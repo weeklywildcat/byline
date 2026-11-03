@@ -27,6 +27,7 @@ trap cleanup EXIT
 
 wp-env start --config="$config"
 wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/build-snapshot.php
+wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/live-coverage.php
 # Real REST, role and capability behavior for Home and the Story Workspace.
 wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/home.php
 wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/story-workspace.php

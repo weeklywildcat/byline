@@ -1,4 +1,4 @@
-import { normalizeArtDirection, type ImageArtDirection } from "@byline/core";
+import { normalizeArtDirection, normalizeLiveCoverage, type ImageArtDirection, type LiveCoverage as WordPressLiveCoverage } from "@byline/core";
 import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
 import { REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { mirrorWordPressMediaInValue } from "@/lib/media";
@@ -238,6 +238,8 @@ export type WordPressPost = {
   contributors?: unknown;
   bylines?: unknown;
   corrections?: unknown;
+  /** Live coverage (snapshot posts carry it here; REST posts inside `byline`). */
+  live?: unknown;
   _embedded?: {
     author?: WordPressAuthor[];
     "wp:featuredmedia"?: WordPressMedia[];
@@ -254,7 +256,10 @@ export type WordPressPostSettings = {
   contributors?: unknown;
   authors?: unknown;
   corrections?: unknown;
+  live?: unknown;
 };
+
+export type { LiveCoverage as WordPressLiveCoverage, LiveCoverageUpdate as WordPressLiveUpdate } from "@byline/core";
 
 export type WordPressCorrectionType = "correction" | "clarification" | "editor-note" | "substantive-update";
 
@@ -674,7 +679,8 @@ function publicPost(value: unknown): WordPressPost | null {
       ...(terms.length ? { "wp:term": terms } : {})
     },
     ...(contributors.length ? { contributors } : {}),
-    ...(correctionValues ? { corrections: correctionValues } : {})
+    ...(correctionValues ? { corrections: correctionValues } : {}),
+    ...([value.live, byline.live, weeklyWildcat.live].find(isRecord) ? { live: [value.live, byline.live, weeklyWildcat.live].find(isRecord) } : {})
   };
 }
 
@@ -1621,9 +1627,14 @@ export function getPostPrimaryGameId(post: WordPressPost) {
 }
 
 /**
- * How an author chose to present the story. Anything missing or unrecognized
- * (including stories from before the setting existed) is Standard, bottom left.
+ * The story's live coverage, newest update first, or null for an ordinary
+ * story. Snapshot posts are used as-is, so this is the one validation point.
  */
+export function getPostLiveCoverage(post: WordPressPost): WordPressLiveCoverage | null {
+  return normalizeLiveCoverage([post.live, post.byline?.live, post.weeklyWildcat?.live].find(isRecord));
+}
+
+/** Missing presentation settings use the standard layout, bottom left. */
 export function getPostStoryPresentation(post: WordPressPost): { presentation: "standard" | "immersive"; immersiveAlignment: "bottom-left" | "center" } {
   const settings = post.byline ?? post.weeklyWildcat;
   return {

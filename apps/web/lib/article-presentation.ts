@@ -6,6 +6,7 @@ import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { absoluteUrl } from "@/lib/seo";
 import { getMediaCredit } from "@/lib/wordpress";
 import { getPublicationConfig } from "@/lib/publication";
+import { buildArticleLiveView } from "@/lib/live-coverage";
 import {
   getAuthorProfile,
   contributorHasProfilePage,
@@ -252,7 +253,11 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
   const articleUrl = absoluteUrl(getPostHref(post));
   const publicCorrections = getPublicCorrectionsForPost(post);
   const hasPublicCorrectionNotice = publicCorrections.length > 0;
-  const updated = hasArticleUpdatedDate(post) && !hasPublicCorrectionNotice;
+  const live = buildArticleLiveView(post);
+  // A live story's "Updated" time is its newest update, and the live section
+  // replaces the generic "updated after publication" notice.
+  const updated = !live && hasArticleUpdatedDate(post) && !hasPublicCorrectionNotice;
+  const liveUpdated = live && live.updatedAt !== live.startedAt ? live : null;
   const visiblePosts = indexedVisiblePosts ?? allPosts.filter(isVisibleContentPost);
   const displayContributors = contributors.length > 0 ? contributors : author ? [author] : [];
   const authorPosts = indexedAuthorPosts ?? (displayContributors.length > 0
@@ -285,8 +290,8 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
     fallbackByline: `${publication.identity.shortName} Staff`,
     publishedAt: post.date,
     publishedLabel: formatDisplayDate(post.date),
-    modifiedAt: updated ? post.modified : null,
-    modifiedLabel: updated ? formatDisplayDate(post.modified) : null,
+    modifiedAt: liveUpdated ? liveUpdated.updatedAt : updated ? post.modified : null,
+    modifiedLabel: liveUpdated ? liveUpdated.updatedLabel : updated ? formatDisplayDate(post.modified) : null,
     readingTime: getArticleReadingTime(post),
     image,
     corrections: publicCorrections.filter((correction) => !correction.legacy).map((correction) => ({
@@ -298,6 +303,7 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
     })),
     topics: topicTerms.map((term) => ({ id: `${term.taxonomy}-${term.id}`, name: decodeHtml(term.name) })),
     update: updated ? { modifiedAt: post.modified, label: `This story was updated after initial publication on ${formatDisplayDate(post.modified)}.` } : null,
+    live,
     relatedStories: related.map((story) => articleStoryCard(story)),
     moreByAuthorStories: moreByAuthor.map((story) => articleStoryCard(story)),
     reportingNote: getPostReportingNote(post),

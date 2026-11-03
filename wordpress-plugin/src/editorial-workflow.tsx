@@ -34,6 +34,7 @@ import type { ComponentType, ReactNode } from 'react';
 import { normalizeBylineError } from '@byline/admin-runtime';
 
 import { CorrectionsPanel } from './editorial/CorrectionsPanel';
+import { LiveCoveragePanel } from './editorial/LiveCoveragePanel';
 import { ContributorsPanel } from './editorial/ContributorsPanel';
 import { DistributionPanel } from './editorial/DistributionPanel';
 import { StoryPresentationPanel } from './editorial/StoryPresentationPanel';
@@ -1382,6 +1383,15 @@ function EditorialNewsroomPanels({
             onDelete={async (id) => { await client.deleteCorrection(postId, id); await refreshCorrections(); }}
           />
         ) : null}
+      </PanelBody>
+
+      <PanelBody
+        className="byline-editorial-sidebar-panel"
+        title={__('Live coverage', 'weekly-wildcat-headless')}
+        icon={<Icon icon={megaphone} aria-hidden="true" />}
+        initialOpen={false}
+      >
+        {({ opened }) => opened ? <LiveCoveragePanel postId={postId} /> : null}
       </PanelBody>
 
       <PanelBody
