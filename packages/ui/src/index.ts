@@ -16,6 +16,7 @@ export * from "./ThisWeekCard";
 export * from "./PollCard";
 export * from "./Icon";
 export * from "./article-view";
+export * from "./article-live";
 export * from "./HeroReveal";
 export * from "./immersive-article-view";
 

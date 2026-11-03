@@ -22,13 +22,13 @@ public.
   editor. See [Story Workspace](story-workspace.md).
 - **Planning** is the daily queue: Stories Board/List, Calendar (story dates,
   appointments, production deadlines and a Needs Scheduling area), Media Desk
-  (one row per production assignment), Coverage, Performance, Content Health,
+  (one row per production assignment), Collections, Content Health,
   Feedback, and per-user saved views.
 - **Editorial workflow** tracks pitch, assignment, reporting, writing, editing,
   ready for review, on hold, dropped, and derived published state. It is
   separate from WordPress `post_status`.
-- **Coverage** is a first-class public collection. The static `/coverage/`
-  index links to each published `/coverage/<slug>/` page; coverage records and
+- **Collections** coordinate grouped reporting and optionally publish reader-facing coverage. The static `/coverage/`
+  index links to each published `/coverage/<slug>/` page; public Collection projections and
   their linked stories are read from the public Byline API at build time.
 - **Distribution and newsletters** are provider adapters. They compose from
   canonical stories and keep provider credentials and delivery state private.
@@ -64,7 +64,7 @@ private records and must not mutate state.
 5. Use provider-specific test sends before sending a newsletter. A failed
    provider call must leave the issue retryable and must not expose API keys or
    subscriber data in logs or REST responses.
-6. After publication, use Performance and provider reports as signals, not as
+6. After publication, use provider reports as signals, not as
    replacements for editorial judgment. Investigate search gaps and broken
    links while preserving the public static export contract.
 

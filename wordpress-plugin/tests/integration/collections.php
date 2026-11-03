@@ -102,6 +102,39 @@ try {
     $encoded = wp_json_encode($public->get_data());
     $assert($public->get_status() === 200, 'Published story still public');
     foreach (['INTERNAL NOTES', 'PRIVATE CONTACT', 'private-recording', 'Confirm scores', 'Team reporting'] as $secret) { $assert(strpos($encoded, $secret) === false, 'No internal reporting in public post REST'); }
+    wp_set_current_user($users['editor']);
+    $public_slug = 'collection-public-' . wp_generate_uuid4();
+    $request("collections/$id/links/story/{$stories[0]}", 'POST');
+    $public_settings = ['publicEnabled' => true, 'publicTitle' => 'Public championship guide', 'publicSlug' => $public_slug,
+        'publicDescription' => 'Public dek', 'publicOverview' => '<p>Public overview</p>', 'featuredStoryId' => $stories[0], 'storyOrder' => array_reverse($stories)];
+    $published = $request("collections/$id", 'POST', ['publicPresentation' => $public_settings]);
+    $assert($published->get_status() === 200, 'Enable public Collection presentation');
+    $assert($published->get_data()['name'] !== 'Public championship guide', 'Public title stays independent from internal name');
+    wp_set_current_user(0);
+    $public_request = new WP_REST_Request('GET', '/byline/v1/coverage/' . $public_slug);
+    $projection = rest_do_request($public_request);
+    $assert($projection->get_status() === 200 && array_column($projection->get_data()['stories'], 'id') === [$stories[0]], 'Public coverage only contains published Collection members');
+    foreach (['brief', 'members', 'interviews', 'tasks', 'resources', 'activity'] as $field) $assert(!array_key_exists($field, $projection->get_data()), 'No private field in public projection: ' . $field);
+    wp_set_current_user($users['editor']);
+    $assert($request("collections/$id", 'POST', ['publicPresentation' => ['publicEnabled' => false]])->get_status() === 200, 'Disable public presentation');
+    $assert(rest_do_request($public_request)->get_status() === 404, 'Disabled public coverage is not readable');
+    // Create a historical source fixture directly; the legacy write API no longer exists.
+    $legacy = wp_insert_post(['post_type' => BYLINE_COVERAGE_POST_TYPE, 'post_status' => 'publish', 'post_title' => $c['name'], 'post_name' => 'legacy-' . wp_generate_uuid4()]);
+    $created[] = $legacy;
+    update_post_meta($legacy, BYLINE_COVERAGE_PUBLIC_META, true);
+    update_post_meta($legacy, BYLINE_COVERAGE_DESCRIPTION_META, 'Legacy dek');
+    update_post_meta($legacy, BYLINE_COVERAGE_OVERVIEW_META, '<p>Legacy public overview</p>');
+    update_post_meta($legacy, BYLINE_COVERAGE_STORIES_META, $stories);
+    update_post_meta($legacy, BYLINE_COVERAGE_STAFF_META, [$users['author']]);
+    $assert(byline_migrate_coverage_to_collections(), 'Legacy migration succeeds on real WP storage');
+    $migrated = byline_collection_for_legacy_coverage($legacy); $created[] = $migrated;
+    $assert($migrated !== $id && $migrated > 0, 'Migration does not merge matching names');
+    $assert(byline_migrate_coverage_to_collections() && byline_collection_for_legacy_coverage($legacy) === $migrated, 'Migration is idempotent');
+    $assert(byline_relation_ids($migrated, 'story') === $stories, 'Migration preserves normalized story edges');
+    $assert(in_array($users['author'], byline_relation_ids($migrated, 'member'), true), 'Migration preserves members');
+    wp_set_current_user(0);
+    $legacy_page = rest_do_request(new WP_REST_Request('GET', '/byline/v1/coverage/' . get_post($legacy)->post_name));
+    $assert($legacy_page->get_status() === 200 && $legacy_page->get_data()['description'] === 'Legacy dek', 'Legacy public URL resolves through its Collection');
     echo "Collections WordPress integration passed ($checks checks).\n";
 } finally {
     wp_set_current_user(1);

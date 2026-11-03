@@ -537,3 +537,16 @@
   align-items: center;
   gap: 8px;
 }
+
+/* Live coverage panel */
+.byline-live-panel { display: grid; gap: 12px; }
+.byline-live-panel-status { font-weight: 600; margin: 0; }
+.byline-live-panel-status.is-live { color: #c8102e; }
+.byline-live-panel-composer { border: 1px solid #dcdcde; border-radius: 2px; display: grid; gap: 10px; padding: 12px; }
+.byline-live-panel-photo, .byline-live-panel-actions { align-items: center; display: flex; gap: 8px; justify-content: space-between; }
+.byline-live-panel-actions { justify-content: flex-end; }
+.byline-live-panel-updates { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; }
+.byline-live-panel-updates li { border-left: 2px solid #dcdcde; display: grid; gap: 2px; padding-left: 10px; }
+.byline-live-panel-updates li.is-pinned { border-left-color: #c8102e; }
+.byline-live-panel-updates p { margin: 0; white-space: pre-line; }
+.byline-live-panel-item-actions { display: flex; gap: 12px; }

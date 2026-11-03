@@ -15,7 +15,6 @@ import "./editorial.css";
 
 export type TasksPanelProps = {
   storyId?: number;
-  coverageId?: number;
   tasks: EditorialTask[];
   people?: ContributorRef[];
   capabilities: TaskPermissionContext;
@@ -46,7 +45,6 @@ function taskAssigneeId(task: EditorialTask): string {
 /** Lightweight newsroom tasks with explicit permission and idempotent actions. */
 export function TasksPanel({
   storyId,
-  coverageId,
   tasks,
   people = [],
   capabilities,
@@ -96,7 +94,6 @@ export function TasksPanel({
         dueAt: dueAt || null,
         priority,
         storyId: storyId ?? null,
-        coverageId: coverageId ?? null
       });
       setTitle("");
       setAssigneeId("");
@@ -126,7 +123,6 @@ export function TasksPanel({
       dueAt: task.dueAt ?? null,
       priority: task.priority,
       storyId: task.storyId ?? storyId ?? null,
-      coverageId: task.coverageId ?? coverageId ?? null
     };
     setUndoDelete(null);
     run(String(task.id), async () => {

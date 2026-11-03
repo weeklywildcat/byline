@@ -5,7 +5,7 @@
  * declaration is what lets the TypeScript test suite drive it.
  */
 type BylineWorkerEnv = {
-  /** Static asset binding for the Next.js export. */
+  /** Static asset binding for the Astro export. */
   ASSETS: { fetch(request: Request): Promise<Response> };
   /** Optional CMS origin override; otherwise read from the published publication. */
   BYLINE_CMS_URL?: string;

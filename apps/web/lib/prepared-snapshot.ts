@@ -13,7 +13,7 @@ export type PublicBuildDatasets = {
   tags: WordPressTag[];
   pages: WordPressPage[];
   corrections: Array<{ id: number | string; type: string; text: string; date: string; storyId: number; story: { id: number; title: string; url: string; slug: string } }>;
-  coverages: Array<{ id: number | string; slug: string; title: string; description: string; overview: string; startAt?: string; endAt?: string; status: string; artwork: { id?: number; url: string; alt: string } | null; stories: Array<{ id: number; slug: string; title: string; url: string; excerpt: string; publishedAt: string; modifiedAt: string }> }>;
+  coverages: Array<{ id: number | string; slug: string; title: string; format?: string; description: string; overview: string; startAt?: string; endAt?: string; status: string; artwork: { id?: number; url: string; alt: string } | null; stories: Array<{ id: number; slug: string; title: string; url: string; excerpt: string; publishedAt: string; modifiedAt: string }> }>;
   schoolEvents: SchoolEvent[];
   attachments: WordPressMedia[];
 };

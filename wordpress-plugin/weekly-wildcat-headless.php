@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Byline
  * Description: Publishing tools and integrations for the Weekly Wildcat newsroom.
- * Version: 0.3.62
+ * Version: 0.3.63
  * Requires PHP: 7.4
  * Author: Byline Contributors
  * License: GPL-2.0-or-later
@@ -2517,6 +2517,14 @@ function wwh_register_rest_routes(): void
                     'enum' => BYLINE_STORY_IMMERSIVE_ALIGNMENTS,
                     'description' => 'Headline position for an immersive story.',
                 ],
+                'live' => [
+                    'type' => ['object', 'null'],
+                    'description' => 'Live coverage: status, start and end times and every published update; null when the story was never live.',
+                ],
+                'reportingNote' => [
+                    'type' => 'string',
+                    'description' => 'Reader-facing "How we reported this" note, as plain text.',
+                ],
             ],
         ],
     ]);
@@ -2531,6 +2539,8 @@ function wwh_register_rest_routes(): void
                 'gameScoreGameIds' => ['type' => 'array', 'items' => ['type' => 'integer']],
                 'presentation' => ['type' => 'string', 'enum' => BYLINE_STORY_PRESENTATIONS],
                 'immersiveAlignment' => ['type' => 'string', 'enum' => BYLINE_STORY_IMMERSIVE_ALIGNMENTS],
+                'live' => ['type' => ['object', 'null']],
+                'reportingNote' => ['type' => 'string'],
             ],
         ],
     ]);
@@ -2544,7 +2554,10 @@ function wwh_rest_post_settings(array $post): array
     return [
         'primaryGameId' => absint(get_post_meta($post_id, WWH_PRIMARY_GAME_META, true)),
         'gameScoreGameIds' => function_exists('byline_newsroom_game_score_game_ids') ? byline_newsroom_game_score_game_ids($post_id) : [],
-    ] + byline_story_presentation_settings($post_id);
+    ] + byline_story_presentation_settings($post_id) + [
+        'reportingNote' => function_exists('byline_story_reporting_note') ? byline_story_reporting_note($post_id) : '',
+        'live' => function_exists('byline_public_live_coverage') ? byline_public_live_coverage($post_id) : null,
+    ];
 }
 
 function wwh_rest_image_credit(array $attachment): array
@@ -3430,6 +3443,7 @@ require_once __DIR__ . '/includes/content/gallery-media.php';
 require_once __DIR__ . '/includes/content/photo-credits.php';
 require_once __DIR__ . '/includes/content/image-art-direction.php';
 require_once __DIR__ . '/includes/content/story-presentation.php';
+require_once __DIR__ . '/includes/content/reporting-note.php';
 require_once __DIR__ . '/includes/discord-integration.php';
 require_once __DIR__ . '/includes/integrations/discord.php';
 require_once __DIR__ . '/includes/core/upgrade.php';

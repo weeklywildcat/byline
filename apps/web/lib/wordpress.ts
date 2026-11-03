@@ -1,4 +1,4 @@
-import { normalizeArtDirection, type ImageArtDirection } from "@byline/core";
+import { normalizeArtDirection, normalizeLiveCoverage, type ImageArtDirection, type LiveCoverage as WordPressLiveCoverage } from "@byline/core";
 import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
 import { REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { mirrorWordPressMediaInValue } from "@/lib/media";
@@ -238,6 +238,8 @@ export type WordPressPost = {
   contributors?: unknown;
   bylines?: unknown;
   corrections?: unknown;
+  /** Live coverage (snapshot posts carry it here; REST posts inside `byline`). */
+  live?: unknown;
   _embedded?: {
     author?: WordPressAuthor[];
     "wp:featuredmedia"?: WordPressMedia[];
@@ -250,10 +252,14 @@ export type WordPressPostSettings = {
   gameScoreGameIds?: number[];
   presentation?: unknown;
   immersiveAlignment?: unknown;
+  reportingNote?: unknown;
   contributors?: unknown;
   authors?: unknown;
   corrections?: unknown;
+  live?: unknown;
 };
+
+export type { LiveCoverage as WordPressLiveCoverage, LiveCoverageUpdate as WordPressLiveUpdate } from "@byline/core";
 
 export type WordPressCorrectionType = "correction" | "clarification" | "editor-note" | "substantive-update";
 
@@ -275,12 +281,20 @@ export type WordPressCoverageArtwork = {
   objectPosition?: string;
 };
 
+/** Ongoing coverage, or a numbered series read in the editor's order. */
+export type WordPressCoverageFormat = "coverage" | "series";
+
 export type WordPressCoverage = {
   id: number | string;
   slug: string;
   title: string;
+  format: WordPressCoverageFormat;
   description: string;
   overview: string;
+  /** The overview as plain-text paragraphs. */
+  overviewParagraphs: string[];
+  /** upcoming, active, past or archived; past and archived coverage is complete. */
+  status?: string;
   artwork: WordPressCoverageArtwork | null;
   startDate?: string;
   endDate?: string;
@@ -665,7 +679,8 @@ function publicPost(value: unknown): WordPressPost | null {
       ...(terms.length ? { "wp:term": terms } : {})
     },
     ...(contributors.length ? { contributors } : {}),
-    ...(correctionValues ? { corrections: correctionValues } : {})
+    ...(correctionValues ? { corrections: correctionValues } : {}),
+    ...([value.live, byline.live, weeklyWildcat.live].find(isRecord) ? { live: [value.live, byline.live, weeklyWildcat.live].find(isRecord) } : {})
   };
 }
 
@@ -1417,6 +1432,9 @@ export function normalizePublicCoverage(value: unknown): WordPressCoverage | nul
   const artwork = publicPhoto(value.artwork ?? value.featuredMedia ?? value.image);
   const description = textValue(value.description ?? value.shortDescription);
   const overview = textValue(value.overview ?? value.content);
+  const overviewSource = value.overview ?? value.content;
+  const overviewHtml = typeof overviewSource === "string" ? overviewSource : isRecord(overviewSource) && typeof overviewSource.rendered === "string" ? overviewSource.rendered : "";
+  const overviewParagraphs = overviewHtml.split(/<\/p>|<br\s*\/?>|\n\s*\n/i).map(stripHtml).filter(Boolean);
   const startDate = typeof value.startDate === "string"
     ? value.startDate
     : typeof value.start_date === "string"
@@ -1441,8 +1459,11 @@ export function normalizePublicCoverage(value: unknown): WordPressCoverage | nul
     id: typeof idValue === "number" ? idValue : String(idValue),
     slug,
     title,
+    format: value.format === "series" ? "series" : "coverage",
     description,
     overview,
+    overviewParagraphs,
+    ...(status ? { status } : {}),
     artwork: artwork ? { url: artwork.url, alt: artwork.alt ?? title, width: artwork.width, height: artwork.height, ...(artwork.objectPosition ? { objectPosition: artwork.objectPosition } : {}) } : null,
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
@@ -1606,15 +1627,30 @@ export function getPostPrimaryGameId(post: WordPressPost) {
 }
 
 /**
- * How an author chose to present the story. Anything missing or unrecognized
- * (including stories from before the setting existed) is Standard, bottom left.
+ * The story's live coverage, newest update first, or null for an ordinary
+ * story. Snapshot posts are used as-is, so this is the one validation point.
  */
+export function getPostLiveCoverage(post: WordPressPost): WordPressLiveCoverage | null {
+  return normalizeLiveCoverage([post.live, post.byline?.live, post.weeklyWildcat?.live].find(isRecord));
+}
+
+/** Missing presentation settings use the standard layout, bottom left. */
 export function getPostStoryPresentation(post: WordPressPost): { presentation: "standard" | "immersive"; immersiveAlignment: "bottom-left" | "center" } {
   const settings = post.byline ?? post.weeklyWildcat;
   return {
     presentation: settings?.presentation === "immersive" ? "immersive" : "standard",
     immersiveAlignment: settings?.immersiveAlignment === "center" ? "center" : "bottom-left"
   };
+}
+
+/**
+ * The "How we reported this" note as paragraphs. Plain text from WordPress;
+ * blank lines separate paragraphs. Empty when the author wrote none.
+ */
+export function getPostReportingNote(post: WordPressPost): string[] {
+  const note = (post.byline ?? post.weeklyWildcat)?.reportingNote;
+  if (typeof note !== "string") return [];
+  return note.replace(/\r\n?/g, "\n").split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean);
 }
 
 export function getPostGameScoreGameIds(post: WordPressPost) {

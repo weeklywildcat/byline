@@ -103,6 +103,14 @@ function byline_upgrade_steps(): array
             'callback' => 'byline_collection_ensure_schema',
         ];
     }
+    if (defined('BYLINE_COLLECTION_COVERAGE_MIGRATION_VERSION')) {
+        $steps['collectionCoverage'] = [
+            'label' => 'Legacy Coverage migration',
+            'option' => BYLINE_COLLECTION_COVERAGE_MIGRATION_OPTION,
+            'version' => BYLINE_COLLECTION_COVERAGE_MIGRATION_VERSION,
+            'callback' => 'byline_migrate_coverage_to_collections',
+        ];
+    }
     return $steps;
 }
 

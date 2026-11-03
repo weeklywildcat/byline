@@ -101,9 +101,20 @@ function byline_snapshot_post($post, array &$attachments): ?array
     if ($post->post_type === 'page') {
         $result['bylinePage'] = byline_snapshot_pick((array) ($data['bylinePage'] ?? []), ['eyebrow', 'indexing', 'sportsArchive']);
     } else {
-        $result['byline'] = $result['weeklyWildcat'] = byline_snapshot_pick(wwh_rest_post_settings(['id' => $post->ID]), ['primaryGameId', 'gameScoreGameIds', 'presentation', 'immersiveAlignment']);
+        $result['byline'] = $result['weeklyWildcat'] = byline_snapshot_pick(wwh_rest_post_settings(['id' => $post->ID]), ['primaryGameId', 'gameScoreGameIds', 'presentation', 'immersiveAlignment', 'reportingNote']);
         $result['contributors'] = array_map('byline_snapshot_contributor', byline_get_public_story_contributors($post->ID));
         $result['corrections'] = array_map(static fn($item) => byline_snapshot_pick($item, ['id', 'type', 'text', 'date']), byline_get_public_corrections($post->ID));
+        // Live coverage rides on the post like corrections, so a new update
+        // changes this article's render inputs and nothing else.
+        $live = function_exists('byline_public_live_coverage') ? byline_public_live_coverage($post->ID) : null;
+        if ($live !== null) {
+            $result['live'] = $live;
+            foreach ($live['updates'] as $update) {
+                $image_id = (int) ($update['image']['id'] ?? 0);
+                $image = $image_id > 0 ? byline_snapshot_media($image_id) : null;
+                if ($image) $attachments[$image_id] = $image;
+            }
+        }
         // Core's canonical embed serializer, restricted to its public embed
         // context. No HTTP or REST dispatch back to this installation.
         $author = get_user_by('id', $post->post_author);
@@ -162,10 +173,10 @@ function byline_collect_public_build_snapshot(int $revision): array
             if ($guest && !empty($guest['hasProfilePage'])) $datasets['guests'][] = byline_snapshot_contributor($guest);
         }
         // Iterate all published records, not the REST list endpoints' 50/100 limit.
-        foreach (get_posts(['post_type' => BYLINE_COVERAGE_POST_TYPE, 'post_status' => 'publish', 'posts_per_page' => -1, 'orderby' => 'date', 'order' => 'DESC']) as $post) {
+        foreach (get_posts(['post_type' => BYLINE_COLLECTION_POST_TYPE, 'post_status' => 'private', 'posts_per_page' => -1, 'orderby' => 'date', 'order' => 'DESC']) as $post) {
             $coverage = byline_get_public_coverage($post->ID);
             if ($coverage) {
-                $safe = byline_snapshot_pick($coverage, ['id', 'slug', 'title', 'description', 'overview', 'startAt', 'endAt', 'status']);
+                $safe = byline_snapshot_pick($coverage, ['id', 'slug', 'title', 'format', 'description', 'overview', 'startAt', 'endAt', 'status']);
                 $safe['artwork'] = byline_snapshot_photo($coverage['artwork'] ?? null);
                 $safe['stories'] = [];
                 $public_ids = array_column($datasets['posts'], 'id');

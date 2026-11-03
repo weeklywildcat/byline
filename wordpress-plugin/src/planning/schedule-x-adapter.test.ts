@@ -18,7 +18,7 @@ const story = (patch: Partial<PlanningStory> = {}): PlanningStory => ({
   id: 41, title: "Cafeteria changes", editUrl: "/wp-admin/post.php?post=41&action=edit", authors: [], writer: null, editor: null,
   workflow: { id: "writing", label: "Writing", group: "main", selectable: true },
   wordpressState: { id: "future", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-11-03T15:00:00Z", publishedAt: null },
-  deadline: "2026-10-30", plannedPublication: "2026-11-02", modifiedAt: null, visual: { type: "photo", status: "needed" }, openTaskCount: 0, coverage: [], featuredImage: null, ...patch
+  deadline: "2026-10-30", plannedPublication: "2026-11-02", modifiedAt: null, visual: { type: "photo", status: "needed" }, openTaskCount: 0, featuredImage: null, ...patch
 });
 const one = (event: ReturnType<typeof scheduleCalendarEvents>[number]) => toScheduleXEvent(event, timezone)!;
 

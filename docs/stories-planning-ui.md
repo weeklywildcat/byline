@@ -1,6 +1,6 @@
 # Stories and Planning on Nova
 
-Planning (Stories, Calendar, Media Desk, Coverage, Performance, Content Health,
+Planning (Stories, Collections, Calendar, Media Desk, Content Health,
 Feedback) is the third screen of the newsroom workflow UI, built on the same
 stack as [Home](byline-home.md) and the [Story Workspace](story-workspace.md):
 React 19, TypeScript, TanStack Query, Tailwind 4, shadcn base-nova on Base UI,
@@ -9,7 +9,7 @@ a story, and one full detail page.
 
 | Level | Component | Purpose |
 | --- | --- | --- |
-| Collection | Stories (Board, List, Calendar), Media Desk, Coverage… | See many stories |
+| Collection | Stories (Board, List, Calendar), Collections, Media Desk… | See many stories |
 | Inspect | `StoryPeek` (`src/story/StoryPeek.tsx`) | Quick context, from any row, card or event |
 | Coordinate | `StoryWorkspace` (`?page=byline-planning&story=<id>`) | Reporting, tasks, production, links |
 | Write | Gutenberg | The article |
@@ -29,7 +29,7 @@ Collection controls.
 | Address | Bundle (private React 19) |
 | --- | --- |
 | `page=byline-planning` (Today) | `home` |
-| `page=byline-planning&tab=stories\|calendar\|media\|coverage\|performance\|content-health\|feedback` | `planning` |
+| `page=byline-planning&tab=stories\|collections\|calendar\|media\|content-health\|feedback` | `planning` |
 | `page=byline-planning&story=<id>` | `story-workspace` |
 | Settings, Newsletters | `index` (WordPress React; out of scope here) |
 
@@ -176,18 +176,17 @@ a Files popover built on `Attachment`, and a menu. Its search uses
 and every assignment row also has a right-click menu for Quick view, Workspace
 and status changes.
 
-Coverage keeps a `Card` per coverage package because each package is a
-standalone object with its own stories and controls. Choosing an existing story
-from the Combobox links it immediately; quick-create submits on Enter. Removing
-a story from a package is a lightweight relationship change, so it happens
-immediately with an **Undo** toast instead of a confirmation dialog.
+Collections own reporting coordination and an optional public coverage presentation.
+The Overview keeps public controls behind a compact row and dialog. See
+[Collections](collections.md) for persistence, migration and compatibility.
 
 Feedback is an inbox-like `ItemGroup`, not a grid of cards: each note is one
 scannable item with its status action attached. Status changes are optimistic
 and reversible from the toast, and the row context menu exposes the same triage
 actions without hunting for controls. Content Health issues likewise expose
-Quick view, Fix and Recheck from their native context menu. Performance remains
-read-only Cards for metrics and titled sections. Pending actions use the shared
+Quick view, Fix and Recheck from their native context menu. Its line Tabs expose
+Issues grouped by check, Stories and Ignored; the scanner stores durable results
+and reports full-scan progress. See [Content Health](content-health.md). Pending actions use the shared
 `Spinner` when the wait itself needs to be visible.
 
 These choices follow the component semantics rather than using Cards as a
