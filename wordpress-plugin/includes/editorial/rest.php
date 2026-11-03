@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 // Loading the editorial domain modules from this already-registered transport
 // keeps the new slice available to both the plugin and focused standalone tests
 // without creating a second bootstrap path.
-foreach (['collections', 'story-context', 'planning', 'media', 'media-assignments', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors', 'activity', 'presets', 'reporting', 'resources', 'workspace', 'home'] as $byline_editorial_module) {
+foreach (['collections', 'story-context', 'editor-autosave', 'notes', 'planning', 'media', 'media-assignments', 'tasks', 'coverage', 'readiness', 'corrections', 'feedback', 'contributors', 'activity', 'presets', 'reporting', 'resources', 'workspace', 'home', 'collection-workspaces', 'interviews', 'collection-schedule', 'collections-rest'] as $byline_editorial_module) {
     $byline_editorial_module_file = __DIR__ . '/' . $byline_editorial_module . '.php';
     if (is_readable($byline_editorial_module_file)) {
         require_once $byline_editorial_module_file;
@@ -147,36 +147,13 @@ function byline_editorial_rest_payload(int $post_id): array
 }
 
 /**
- * WordPress Notes are progressive enhancement. Core 6.9 stores Notes as
- * ordinary comments with comment_type=note and exposes their support through
- * the post-type editor sub-feature. Do not call private/unstable Note helpers
- * or create a second Byline datastore just to render this action.
+ * WordPress Notes are progressive enhancement. The adapter in notes.php owns
+ * feature detection and every read of Core Notes; this stays the stable name the
+ * editor sidebar payload has always used.
  */
 function byline_editorial_rest_notes_support(int $post_id = 0): array
 {
-    $editor_supports_notes = false;
-    if ($post_id > 0 && function_exists('get_all_post_type_supports')) {
-        $supports = get_all_post_type_supports('post');
-        $editor = is_array($supports['editor'] ?? null) ? ($supports['editor'][0] ?? []) : [];
-        $editor_supports_notes = is_array($editor) && !empty($editor['notes']);
-    }
-
-    // is_avatar_comment_type() is a public Core function. The 'note' value was
-    // added with the Core Notes feature in 6.9, so this is a useful version/API
-    // signal while still allowing a site to disable Notes for posts.
-    $core_notes_api = function_exists('get_comments')
-        && function_exists('is_avatar_comment_type')
-        && is_avatar_comment_type('note');
-    $edit_url = $post_id > 0 && function_exists('get_edit_post_link')
-        ? (string) get_edit_post_link($post_id, 'raw')
-        : '';
-    $available = $editor_supports_notes && $core_notes_api && $edit_url !== '';
-
-    return [
-        'available' => $available,
-        'url' => $available ? esc_url_raw($edit_url) : '',
-        'message' => $available ? '' : 'Notes are not available for this story in the current WordPress editor.',
-    ];
+    return byline_notes_support($post_id);
 }
 
 /**
@@ -350,7 +327,7 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
         }
     }
 
-    foreach (['plannedPublishAt', 'media', 'visualRequest', 'coverageIds', 'contributors'] as $field) {
+    foreach (['plannedPublishAt', 'media', 'visualRequest', 'coverageIds', 'contributors', 'sectionIds'] as $field) {
         if (array_key_exists($field, $body)) {
             $extended[$field] = $body[$field];
         }
@@ -389,6 +366,15 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
         && byline_editorial_sanitize_planned_publish_at($extended['plannedPublishAt']) === ''
         && trim((string) $extended['plannedPublishAt']) !== '') {
         return new WP_Error('byline_editorial_invalid_planned_publish', 'Use a valid planned publication date/time.', ['status' => 400]);
+    }
+
+    if (array_key_exists('sectionIds', $extended)) {
+        $taxonomy = get_taxonomy('category');
+        if (!current_user_can($taxonomy->cap->assign_terms)) { return new WP_Error('byline_sections_forbidden','You cannot assign sections.',['status'=>403]); }
+        if (!is_array($extended['sectionIds']) || count($extended['sectionIds']) > 30) { return new WP_Error('byline_sections_invalid','Choose up to 30 existing sections.',['status'=>400]); }
+        foreach ($extended['sectionIds'] as $section_id) {
+            if (!is_int($section_id) || $section_id < 1 || !term_exists($section_id,'category')) { return new WP_Error('byline_sections_invalid','Choose existing section IDs.',['status'=>400]); }
+        }
     }
 
     // Validate the shape and object references for every grouped field before
@@ -577,6 +563,13 @@ function byline_editorial_rest_update_story(WP_REST_Request $request)
         $rollbacks[] = static function () use ($post_id, $previous_contributors) {
             return !is_wp_error(byline_set_story_contributors($post_id, $previous_contributors));
         };
+    }
+
+    if (array_key_exists('sectionIds', $extended)) {
+        $previous_sections = wp_get_post_categories($post_id);
+        $saved_sections = wp_set_post_categories($post_id,$extended['sectionIds']);
+        if (is_wp_error($saved_sections)) { return $fail($saved_sections); }
+        $rollbacks[] = static function () use ($post_id,$previous_sections) { return !is_wp_error(wp_set_post_categories($post_id,$previous_sections)); };
     }
 
     if ($changes !== [] || $extended !== []) {
@@ -929,6 +922,8 @@ function byline_editorial_rest_planning_story(array $row): array
             'attachmentIds' => array_values(array_map('absint', (array) ($visual['attachmentIds'] ?? []))),
         ],
         'openTaskCount' => absint($row['tasks']['openCount'] ?? 0),
+        // Private; `null` unless the viewer may edit the story (see notes.php).
+        'notes' => is_array($row['notes'] ?? null) ? $row['notes'] : null,
         'reporting' => is_array($row['reporting'] ?? null) ? $row['reporting'] : null,
         'mediaSummary' => is_array($row['media'] ?? null) ? $row['media'] : null,
         'coverage' => $coverage,
@@ -1182,6 +1177,7 @@ function byline_editorial_rest_set_media_featured(WP_REST_Request $request)
 /** @return array<string,mixed> */
 function byline_editorial_rest_task_item(array $task): array
 {
+    $task['version'] = function_exists('byline_task_version') ? byline_task_version((int) $task['id']) : '';
     $task['assignee'] = byline_editorial_rest_user_person(absint($task['assigneeId'] ?? 0));
     $task['createdBy'] = byline_editorial_rest_user_person(absint($task['creatorId'] ?? 0));
     $task['storyId'] = absint($task['storyId'] ?? 0) ?: null;

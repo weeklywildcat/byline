@@ -62,6 +62,9 @@ function byline_home_story_rows(int $user_id, bool $editor): array
         }
     }
     $counts = byline_task_counts_for_stories(array_keys($visible), $user_id);
+    if (function_exists('byline_notes_prime_thread_counts')) {
+        byline_notes_prime_thread_counts(array_keys($visible), $user_id);
+    }
     $rows = [];
     foreach ($visible as $id => $post) {
         $row = byline_editorial_planning_story_summary($id, $user_id, $counts, true);
@@ -181,6 +184,14 @@ function byline_home_appointments(array $rows, int $user_id): array
                 'storyId' => (int) $row['id'], 'storyTitle' => $row['title'],
                 'sourceLabel' => $appointment['sourceId'] !== null ? ($labels[$appointment['sourceId']] ?? null) : null,
             ];
+        }
+    }
+    if (function_exists('byline_collection_schedule')) {
+        $shared = byline_collection_schedule(byline_story_site_today(), gmdate('Y-m-d', strtotime(byline_story_site_today() . ' +60 days')), 0, $user_id);
+        foreach (array_merge($shared['appointments'], $shared['needsScheduling']) as $appointment) {
+            if ($appointment['status'] !== 'completed' && in_array($user_id, $appointment['assigneeIds'], true)) {
+                $items[] = array_diff_key($appointment, ['assignees' => 1, 'assigneeIds' => 1]);
+            }
         }
     }
     return array_slice($items, 0, 100);

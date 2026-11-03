@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactElement, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarClock, ListTodo } from "lucide-react";
 import { PeopleAvatars } from "../admin-ui/components/people-avatars";
@@ -67,7 +67,7 @@ function StoryHoverBody({ summary, loading, failed, timezone, note }: {
   </div>;
 }
 
-export function StoryHoverCard({ storyId, title, story, note, children }: {
+export function StoryHoverCard(props: {
   storyId: number;
   title: string;
   story?: StoryHoverSummary;
@@ -75,15 +75,30 @@ export function StoryHoverCard({ storyId, title, story, note, children }: {
   children: ReactElement;
 }) {
   const context = useContext(StoryHoverContext);
+  if (!context?.fetchers.getWorkspace || props.storyId <= 0) return props.children;
+  return <StoryHoverCardQuery {...props} context={context} />;
+}
+
+function StoryHoverCardQuery({ storyId, title, story, note, children, context }: {
+  storyId: number;
+  title: string;
+  story?: StoryHoverSummary;
+  note?: string;
+  children: ReactElement;
+  context: StoryHoverContextValue;
+}) {
   const [open, setOpen] = useState(false);
+  const blockOpenUntil = useRef(0);
+  const suppressForSecondaryPress = () => {
+    blockOpenUntil.current = performance.now() + 750;
+    setOpen(false);
+  };
   const preview = useQuery({
     queryKey: workspaceKey(storyId),
-    queryFn: () => context!.fetchers.getWorkspace!(storyId),
-    enabled: open && storyId > 0 && Boolean(context?.fetchers.getWorkspace),
+    queryFn: () => context.fetchers.getWorkspace!(storyId),
+    enabled: open,
     staleTime: 30_000
   });
-
-  if (!context || storyId <= 0) return children;
 
   const workspace = preview.data;
   const resolved: StoryHoverSummary = workspace?.story || story || { id: storyId, title };
@@ -91,9 +106,20 @@ export function StoryHoverCard({ storyId, title, story, note, children }: {
     ? { ...resolved, openTaskCount: openTasks(workspace.tasks).length, reporting: workspace.reporting || resolved.reporting, mediaSummary: workspace.story.mediaSummary || resolved.mediaSummary }
     : resolved;
   const timezone = workspace?.timezone || "UTC";
-  return <HoverCard open={open} onOpenChange={setOpen}>
-    <HoverCardTrigger delay={260} closeDelay={140} render={children} />
-    <HoverCardContent className="w-[22rem] max-w-[calc(100vw-1rem)]">
+  return <HoverCard open={open} onOpenChange={(next) => {
+    if (next && performance.now() < blockOpenUntil.current) return;
+    setOpen(next);
+  }}>
+    <HoverCardTrigger
+      delay={260}
+      closeDelay={140}
+      render={children}
+      onPointerDownCapture={(event) => {
+        if (event.button === 2 || (event.button === 0 && event.ctrlKey)) suppressForSecondaryPress();
+      }}
+      onContextMenuCapture={suppressForSecondaryPress}
+    />
+    <HoverCardContent className="pointer-events-none w-[22rem] max-w-[calc(100vw-1rem)]">
       <StoryHoverBody summary={enriched} loading={preview.isPending && !workspace} failed={preview.isError} timezone={timezone} note={note} />
     </HoverCardContent>
   </HoverCard>;

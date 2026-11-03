@@ -37,6 +37,7 @@ import { CorrectionsPanel } from './editorial/CorrectionsPanel';
 import { ContributorsPanel } from './editorial/ContributorsPanel';
 import { DistributionPanel } from './editorial/DistributionPanel';
 import { StoryPresentationPanel } from './editorial/StoryPresentationPanel';
+import { OPEN_PHOTO_CROPS_EVENT, PhotoCropsDialog } from './editorial/photo-crops/PhotoCropsDialog';
 import { readStoryPresentation, storyPresentationMetaPatch } from './editorial/story-presentation-model';
 import { TasksPanel } from './editorial/TasksPanel';
 import {
@@ -410,7 +411,7 @@ function WorkflowControls(workflow: WorkflowControlsProps) {
 
       {notes?.available ? (
         <div className="byline-workflow-inline-actions">
-          {notes.url ? <Button variant="secondary" href={notes.url}>{__('Open notes', 'weekly-wildcat-headless')}</Button> : null}
+          {notes.url ? <Button variant="secondary" href={notes.url}>{__('Review article notes', 'weekly-wildcat-headless')}</Button> : null}
         </div>
       ) : null}
 
@@ -766,7 +767,10 @@ function normalizeReadiness(value: unknown, storyId: number): ReadinessCheck[] {
       label: stringValue(item.label, 'Readiness check'),
       state: (status === 'pass' || status === 'error' ? status : 'warning') as 'pass' | 'warning' | 'error',
       explanation: stringValue(item.explanation, 'Review this check before publishing.'),
-      ...(fix.href || fix.url || fix.label ? {
+      // Inside the editor an in-place fix (e.g. the photo crops dialog) beats reopening the story.
+      ...(stringValue(fix.actionId) ? {
+        fix: { label: stringValue(fix.actionLabel || fix.label, 'Review'), actionId: stringValue(fix.actionId) }
+      } : fix.href || fix.url || fix.label ? {
         fix: {
           label: stringValue(fix.label, 'Review'),
           ...(stringValue(fix.href || fix.url) ? { href: stringValue(fix.href || fix.url) } : {})
@@ -1523,7 +1527,9 @@ function PrePublishReadinessPanel({ postId, client }: { postId: number; client: 
                 <strong>{check.label}</strong>
                 <p>{check.explanation}</p>
               </div>
-              {check.fix?.href ? <a href={check.fix.href}>{check.fix.label}</a> : null}
+              {check.fix?.actionId === 'open-photo-crops' ? (
+                <Button variant="link" onClick={() => window.dispatchEvent(new Event(OPEN_PHOTO_CROPS_EVENT))}>{check.fix.label}</Button>
+              ) : check.fix?.href ? <a href={check.fix.href}>{check.fix.label}</a> : null}
             </li>
           ))}
         </ul>
@@ -1777,9 +1783,37 @@ function StoryPresentationSettings() {
         alignment={alignment}
         hasFeaturedImage={featuredMedia > 0}
         onChange={(change) => editPost?.({ meta: storyPresentationMetaPatch(change) })}
+        onEditCrops={() => window.dispatchEvent(new Event(OPEN_PHOTO_CROPS_EVENT))}
       />
     </PluginDocumentSettingPanel>
   );
+}
+
+/**
+ * Hosts the photo crops dialog for the featured image. It lives at the plugin
+ * root because the panels that open it (Story presentation, the pre-publish
+ * checks) are unmounted while another sidebar is showing.
+ */
+function PhotoCropsHost() {
+  const { featuredMedia, title, excerpt } = useSelect((select: any) => {
+    const editor = select('core/editor');
+    return {
+      featuredMedia: Number(editor?.getEditedPostAttribute?.('featured_media')) || 0,
+      title: String(editor?.getEditedPostAttribute?.('title') ?? ''),
+      excerpt: String(editor?.getEditedPostAttribute?.('excerpt') ?? '')
+    };
+  }, []);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const open = () => setIsOpen(true);
+    window.addEventListener(OPEN_PHOTO_CROPS_EVENT, open);
+    return () => window.removeEventListener(OPEN_PHOTO_CROPS_EVENT, open);
+  }, []);
+
+  return isOpen && featuredMedia > 0
+    ? <PhotoCropsDialog attachmentId={featuredMedia} title={title} excerpt={excerpt} onClose={() => setIsOpen(false)} />
+    : null;
 }
 
 function EditorialWorkflowPlugin() {
@@ -1845,6 +1879,7 @@ function EditorialWorkflowPlugin() {
   return (
     <>
       <StoryPresentationSettings />
+      <PhotoCropsHost />
       <PluginPostStatusInfo className="byline-workflow-summary-slot">
         <div className="byline-workflow-summary">
           <span>{__('Workflow', 'weekly-wildcat-headless')}</span>

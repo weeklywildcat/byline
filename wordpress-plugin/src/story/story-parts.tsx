@@ -4,15 +4,25 @@
  * none is a configurable "universal story row".
  */
 import type { ComponentProps } from "react";
+import { MessageSquareText } from "lucide-react";
+import { __, _n, sprintf } from "@wordpress/i18n";
 import { WorkStatusBadge, mediaIntensity, type WorkIntensity, type WorkKind } from "../admin-ui/components/work-status-badge";
 import { cn } from "../admin-ui/lib/utils";
+import { Button } from "../admin-ui/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "../admin-ui/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../admin-ui/ui/tooltip";
 import { decodeEntities } from "../admin-ui/lib/text";
 import { dateLabel, dayDistance, exactDate, mediaStatusLabels, mediaTypeLabels, siteDay } from "../home/newsroom-model";
 import { isPlannedDayOnly, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
+import { openArticleNotesLabel, openNotesSignal } from "./notes-model";
 
 /** The headline, as a button that opens Story Peek. Never a link into the editor: inspect first. */
 export function StoryTitleButton({ story, onOpen, className, ...props }: { story: Pick<PlanningStory, "id" | "title">; onOpen: (storyId: number) => void } & Omit<ComponentProps<"button">, "onClick" | "children">) {
-  return <button type="button" className={cn("min-w-0 text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline focus-visible:outline-none", className)} onClick={() => onOpen(story.id)} {...props}>{decodeEntities(story.title) || "Untitled story"}</button>;
+  // A StoryHoverCard wraps this button and, while its preview is open, passes an onClick of its own.
+  // Spreading that after ours replaced it, so clicking a title the cursor had rested on did nothing.
+  // Run it first, then always open Peek.
+  const { onClick: injected, ...rest } = props as ComponentProps<"button">;
+  return <button type="button" className={cn("min-w-0 text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline focus-visible:outline-none", className)} {...rest} onClick={(event) => { injected?.(event); onOpen(story.id); }}>{decodeEntities(story.title) || "Untitled story"}</button>;
 }
 
 /** "Due tomorrow", "2d overdue", or a quiet fallback. Overdue is the one warning. */
@@ -83,19 +93,46 @@ export function storySignals(story: PlanningStory): StorySignal[] {
   return signals;
 }
 
+/**
+ * Unresolved WordPress Notes as a quiet icon and count. It is deliberately not a
+ * WorkStatusBadge: it must never compete with an overdue deadline or a workflow
+ * attention state. Nothing renders unless the viewer may edit the story, Core
+ * Notes exist, and at least one thread is open. The count is real text and is
+ * read in full by assistive tech; the Tooltip only repeats it.
+ */
+export function StoryNotesIndicator({ story, className }: { story: Pick<PlanningStory, "notes">; className?: string }) {
+  const open = openNotesSignal(story.notes);
+  if (!open) return null;
+  const label = openArticleNotesLabel(open);
+  return <Tooltip>
+    <TooltipTrigger render={<span data-story-notes={open} className={cn("relative inline-flex items-center gap-1 text-xs text-muted-foreground tabular-nums", className)} />}>
+      <MessageSquareText className="size-3.5" aria-hidden="true" /><span aria-hidden="true">{open}</span><span className="sr-only">{label}</span>
+    </TooltipTrigger>
+    <TooltipContent>{label}</TooltipContent>
+  </Tooltip>;
+}
+
 /** Category is encoded by hue; action intensity is encoded by filled strength. */
 export function StorySignals({ story, className }: { story: PlanningStory; className?: string }) {
   const signals = storySignals(story);
-  if (!signals.length) return null;
+  const hasNotes = openNotesSignal(story.notes) > 0;
+  if (!signals.length && !hasNotes) return null;
   return <ul aria-label="Story signals" className={cn("flex flex-wrap items-center gap-1.5 text-xs", className)}>
     {signals.map((signal) => <li key={signal.key}><WorkStatusBadge kind={signal.kind} intensity={signal.intensity}>{signal.label}</WorkStatusBadge></li>)}
+    {hasNotes ? <li><StoryNotesIndicator story={story} /></li> : null}
   </ul>;
 }
 
 /** Tasks, scheduling and production use the same color vocabulary in the List. */
-export function ProductionSummary({ story, className, empty = "—" }: { story: PlanningStory; className?: string; /** Null hides the empty state in compact rows. */ empty?: string | null }) {
+export function ProductionSummary({ story, className, empty = "—", maxSignals }: { story: PlanningStory; className?: string; /** Null hides the empty state in compact rows. */ empty?: string | null; /** Dense collections can disclose additional signals on demand. */ maxSignals?: number }) {
   const signals = storySignals(story);
-  return signals.length
-    ? <span className={cn("flex flex-wrap items-center gap-1.5", className)}>{signals.map((signal) => <WorkStatusBadge key={signal.key} kind={signal.kind} intensity={signal.intensity}>{signal.label}</WorkStatusBadge>)}</span>
+  const shown = maxSignals === undefined ? signals : signals.slice(0, maxSignals);
+  const more = signals.slice(shown.length);
+  const hasNotes = openNotesSignal(story.notes) > 0;
+  return signals.length || hasNotes
+    ? <span className={cn("flex flex-wrap items-center gap-1.5", className)}>{shown.map((signal) => <WorkStatusBadge key={signal.key} kind={signal.kind} intensity={signal.intensity}>{signal.label}</WorkStatusBadge>)}{more.length ? <Popover>
+      <PopoverTrigger render={<Button variant="ghost" size="xs" className="h-5 px-1 text-xs text-muted-foreground" aria-label={sprintf(/* translators: %d: number of additional work signals. */ _n("%d more work signal", "%d more work signals", more.length, "weekly-wildcat-headless"), more.length)} />}><span aria-hidden="true">+{more.length}</span></PopoverTrigger>
+      <PopoverContent align="start" className="w-64"><p className="text-xs font-semibold text-muted-foreground">{__("More work", "weekly-wildcat-headless")}</p><span className="flex flex-wrap items-center gap-1.5">{more.map((signal) => <WorkStatusBadge key={signal.key} kind={signal.kind} intensity={signal.intensity}>{signal.label}</WorkStatusBadge>)}</span></PopoverContent>
+    </Popover> : null}<StoryNotesIndicator story={story} /></span>
     : empty === null ? null : <span className={cn("text-xs text-muted-foreground", className)}>{empty}</span>;
 }

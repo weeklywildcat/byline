@@ -19,7 +19,10 @@ const fetchers = createNewsletterFetchers((options) => apiFetch(options));
 `createNewsletterFetchers` targets the protected routes under
 `/byline/v1/admin/newsletters` and uses `/byline/v1/editorial/planning` for
 story search. The host remains responsible for `apiFetch` nonce middleware and
-capability handling; the UI never receives or renders provider secrets.
+capability handling; the UI never receives or renders provider secrets. Issue
+access requires `publish_posts` or `edit_others_posts`; Contributors do not
+have access to newsletter drafts. Provider settings remain restricted to
+integration managers.
 
 Individual views are also exported when the host already has navigation:
 

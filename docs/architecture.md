@@ -29,6 +29,12 @@ static public presentation.
   deployed separately and is excluded from the WordPress release archive. It is
   a consumer of the editorial workflow domain, not its owner.
 
+- The plugin’s native MCP endpoint at `/mcp` is a private domain consumer. It
+  authenticates each staff member through WordPress OAuth and dispatches typed
+  newsroom operations locally through the existing protected REST/domain layer.
+  The release ZIP bundles its isolated PHP SDK/OAuth dependencies; it needs no
+  separate service and never involves Astro rendering. See [MCP setup](mcp.md).
+
 The plugin source lives under `wordpress-plugin/` while retaining its installed
 path and main file. Canonical GitHub releases still publish
 `weekly-wildcat-headless.zip`; canonical Byline APIs adapt to legacy CPTs,

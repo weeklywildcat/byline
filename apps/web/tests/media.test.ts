@@ -36,7 +36,7 @@ describe("responsive WordPress media", () => {
     expect(getResponsiveImageProps(image(), { sizes: "(max-width: 900px) 100vw, 45vw" })).toEqual({
       src: "/_wordpress-media/hero.jpg",
       srcSet:
-        "/_wordpress-media/hero-150.jpg 150w, /_wordpress-media/hero-768.jpg 768w, /_wordpress-media/hero-1024.jpg 1024w, /_wordpress-media/hero.jpg 1600w",
+        "/_wordpress-media/hero-768.jpg 768w, /_wordpress-media/hero-1024.jpg 1024w, /_wordpress-media/hero.jpg 1600w",
       sizes: "(max-width: 900px) 100vw, 45vw",
       width: 1600,
       height: 900,
@@ -125,7 +125,7 @@ describe("responsive WordPress media", () => {
     expect(canonical?.src).toBe("/_wordpress-media/hero.jpg");
     expect(presentation?.src).toBe("/_byline/presentation-media/hero.jpg");
     expect(presentation?.srcSet).toBe(
-      "/_byline/presentation-media/hero-150.jpg 150w, /_byline/presentation-media/hero-768.jpg 768w, /_byline/presentation-media/hero-1024.jpg 1024w, /_byline/presentation-media/hero.jpg 1600w"
+      "/_byline/presentation-media/hero-768.jpg 768w, /_byline/presentation-media/hero-1024.jpg 1024w, /_byline/presentation-media/hero.jpg 1600w"
     );
     expect(getPresentationMediaUrl("https://weeklywildcat.com/_wordpress-media/hero.jpg")).toBe(
       "https://weeklywildcat.com/_byline/presentation-media/hero.jpg"
@@ -133,5 +133,40 @@ describe("responsive WordPress media", () => {
     expect(getPresentationMediaUrl("https://cms.weeklywildcat.com/wp-content/uploads/hero.jpg")).toBe(
       "https://cms.weeklywildcat.com/wp-content/uploads/hero.jpg"
     );
+  });
+
+  it("leaves hard-cropped sizes such as the square thumbnail out of a landscape srcset", () => {
+    const result = getResponsiveImageProps(image());
+    expect(result?.srcSet).not.toContain("hero-150.jpg");
+  });
+
+  it("positions the photo at the editor's focal point when the placement has no crop", () => {
+    const art = { focalPoint: { x: 30, y: 20 }, crops: {}, renditions: {} };
+    expect(getResponsiveImageProps(image({ bylineImage: { artDirection: art } }), { shape: "square" })?.objectPosition).toBe("30% 20%");
+    expect(getResponsiveImageProps(image({ bylineImage: { artDirection: { ...art, focalPoint: { x: 50, y: 50 } } } }))?.objectPosition).toBeUndefined();
+  });
+
+  it("uses the editor's cropped files for a shape that has them", () => {
+    const artDirection = {
+      focalPoint: { x: 30, y: 20 },
+      crops: { square: { x: 0.2, y: 0, w: 0.5, h: 0.9 } },
+      renditions: {
+        square: [
+          { url: "/_wordpress-media/hero-byline-square-640.jpg", width: 640, height: 640 },
+          { url: "/_wordpress-media/hero-byline-square-320.jpg", width: 320, height: 320 }
+        ]
+      }
+    };
+    const result = getResponsiveImageProps(image({ bylineImage: { artDirection } }), { shape: "square", imageSearchVisibility: "presentation", sizes: "92px" });
+    expect(result).toMatchObject({
+      src: "/_byline/presentation-media/hero-byline-square-640.jpg",
+      srcSet: "/_byline/presentation-media/hero-byline-square-320.jpg 320w, /_byline/presentation-media/hero-byline-square-640.jpg 640w",
+      width: 640,
+      height: 640,
+      sizes: "92px"
+    });
+    expect(result?.objectPosition).toBeUndefined();
+    // Another shape keeps the normal photo, positioned at the focal point.
+    expect(getResponsiveImageProps(image({ bylineImage: { artDirection } }), { shape: "wide" })).toMatchObject({ src: "/_wordpress-media/hero.jpg", objectPosition: "30% 20%" });
   });
 });

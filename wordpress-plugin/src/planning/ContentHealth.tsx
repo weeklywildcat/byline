@@ -9,7 +9,7 @@ import { StatusBadge } from "../admin-ui/components/status-badge";
 import { Alert, AlertDescription } from "../admin-ui/ui/alert";
 import { Badge } from "../admin-ui/ui/badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
 import { Spinner } from "../admin-ui/ui/spinner";
@@ -69,11 +69,13 @@ export function ContentHealth({ fetchers, onOpenStory }: { fetchers: PlanningFet
               </ItemActions>
             </ContextMenuTrigger>
             <ContextMenuContent className="w-52">
-              <ContextMenuLabel className="max-w-48 truncate">{issue.type}</ContextMenuLabel>
-              <ContextMenuSeparator />
-              {issue.story ? <ContextMenuItem onClick={() => onOpenStory(issue.story!.id)}><Eye aria-hidden="true" />{__("Quick view story", "weekly-wildcat-headless")}</ContextMenuItem> : null}
-              {fix ? <ContextMenuItem render={<a href={fix} />}><Wrench aria-hidden="true" />{__("Fix issue", "weekly-wildcat-headless")}</ContextMenuItem> : null}
-              {fetchers.recheckContentHealth ? <ContextMenuItem disabled={busyId !== null} onClick={() => recheck.mutate(issue.id)}><RefreshCw aria-hidden="true" />{__("Recheck", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+              <ContextMenuGroup>
+                <ContextMenuLabel className="max-w-48 truncate">{issue.type}</ContextMenuLabel>
+                <ContextMenuSeparator />
+                {issue.story ? <ContextMenuItem onClick={() => onOpenStory(issue.story!.id)}><Eye aria-hidden="true" />{__("Quick view story", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+                {fix ? <ContextMenuItem render={<a href={fix} />}><Wrench aria-hidden="true" />{__("Fix issue", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+                {fetchers.recheckContentHealth ? <ContextMenuItem disabled={busyId !== null} onClick={() => recheck.mutate(issue.id)}><RefreshCw aria-hidden="true" />{__("Recheck", "weekly-wildcat-headless")}</ContextMenuItem> : null}
+              </ContextMenuGroup>
             </ContextMenuContent>
           </ContextMenu>;
         })}</ItemGroup>

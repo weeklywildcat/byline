@@ -7,6 +7,7 @@
  */
 
 import { siteDay } from "../home/newsroom-model";
+import type { ArticleNotesSummary } from "../story/notes-model";
 import type { MediaSummary, ReportingSummary } from "../workspace/workspace-types";
 
 export const PLANNING_VIEW_IDS = [
@@ -92,6 +93,8 @@ export type PlanningFeaturedImage = {
 };
 
 export type PlanningStory = {
+  sections?: string[];
+  canEditPlanning?: boolean;
   id: number;
   title: string;
   editUrl: string;
@@ -114,6 +117,11 @@ export type PlanningStory = {
   reporting?: ReportingSummary | null;
   /** Roll-up of production assignments. Absent on older servers. */
   mediaSummary?: MediaSummary | null;
+  /**
+   * WordPress Core Notes thread counts. Private, and `null` unless the viewer
+   * may edit the story (not merely see it in the workspace). Absent on older servers.
+   */
+  notes?: ArticleNotesSummary | null;
 };
 
 export type PlanningCapabilities = {
@@ -132,6 +140,7 @@ export type PlanningSort = { key: PlanningSortKey; direction: PlanningSortDirect
 export const DEFAULT_PLANNING_SORT: PlanningSort = { key: "deadline", direction: "asc" };
 
 export type PlanningFilters = {
+  collectionId?: number;
   query: string;
   workflow: string;
   writerId: number | null;

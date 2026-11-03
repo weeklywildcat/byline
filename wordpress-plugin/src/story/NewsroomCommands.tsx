@@ -47,7 +47,7 @@ function matches(query: string, text: string) {
 }
 
 function destinationActions(urls: NewsroomCommandUrls): NewsroomCommandAction[] {
-  return [
+  const actions: Array<NewsroomCommandAction | null> = [
     urls.stories ? { id: "stories", label: "Open Stories", keywords: "planning board list stories", icon: <FileText />, href: urls.stories } : null,
     urls.calendar ? { id: "calendar", label: "Open Calendar", keywords: "schedule dates deadlines calendar", icon: <CalendarDays />, href: urls.calendar } : null,
     urls.media ? { id: "media", label: "Open Media Desk", keywords: "photos visuals production media", icon: <ImagePlus />, href: urls.media } : null,
@@ -56,7 +56,8 @@ function destinationActions(urls: NewsroomCommandUrls): NewsroomCommandAction[] 
     urls.contentHealth ? { id: "content-health", label: "Open Content Health", keywords: "health errors warnings content", icon: <HeartPulse />, href: urls.contentHealth } : null,
     urls.performance ? { id: "performance", label: "Open Performance", keywords: "analytics performance metrics", icon: <HeartPulse />, href: urls.performance } : null,
     urls.upload ? { id: "upload", label: "Upload media", keywords: "upload image photo media", icon: <ImagePlus />, href: urls.upload } : null
-  ].filter((action): action is NewsroomCommandAction => Boolean(action));
+  ];
+  return actions.filter((action): action is NewsroomCommandAction => Boolean(action));
 }
 
 export function NewsroomCommands({

@@ -29,8 +29,27 @@ import { NewsletterApp, NewsletterSettings, createNewsletterFetchers } from "./n
 import type { NewsletterBranding } from "./newsletters/render";
 import { stripMarkupForText } from "./safe-text";
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Activity,
+  Building2,
+  Code2,
+  LogIn,
+  Mail,
+  Menu,
+  MessageCircle,
+  Palette,
+  Puzzle,
+  RefreshCw,
+  Rocket,
+  Share2,
+  Shield,
+  Stethoscope
+} from "lucide-react";
 import { DoctorApp, type DoctorActionId, type DoctorActionResponse, type DoctorDiagnostics } from "./doctor";
+import { SettingsSidebar } from "./settings/SettingsSidebar";
 import "./style.css";
+import "./settings/style.css";
 
 type BylineAdminConfig = {
   page: string;
@@ -334,6 +353,7 @@ type SettingsNavItem = {
   id: SettingsTab;
   label: string;
   description: string;
+  icon: LucideIcon;
   capability: "manage" | "manageIntegrations";
   feature?: string;
 };
@@ -343,35 +363,35 @@ const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
   {
     label: "Publication",
     items: [
-      { id: "identity", label: "Publication", description: "Name, location, URLs, licensing, and search defaults.", capability: "manage" },
-      { id: "branding", label: "Branding", description: "Masthead, logos, social image, and app icons.", capability: "manage" },
-      { id: "navigation", label: "Navigation", description: "Sections and the links readers see around the site.", capability: "manage" },
-      { id: "social", label: "Social", description: "Publication social profiles and reader-facing links.", capability: "manage" },
-      { id: "features", label: "Features", description: "Turn optional newsroom and public modules on or off.", capability: "manage" }
+      { id: "identity", label: "Publication", description: "Name, location, URLs, licensing, and search defaults.", icon: Building2, capability: "manage" },
+      { id: "branding", label: "Branding", description: "Masthead, logos, social image, and app icons.", icon: Palette, capability: "manage" },
+      { id: "navigation", label: "Navigation", description: "Sections and the links readers see around the site.", icon: Menu, capability: "manage" },
+      { id: "social", label: "Social", description: "Publication social profiles and reader-facing links.", icon: Share2, capability: "manage" },
+      { id: "features", label: "Features", description: "Turn optional newsroom and public modules on or off.", icon: Puzzle, capability: "manage" }
     ]
   },
   {
     label: "Connections",
     items: [
-      { id: "newsletter", label: "Newsletter", description: "Connect the provider used for newsletter signup and delivery.", capability: "manageIntegrations", feature: "newsletter" },
-      { id: "analytics", label: "Analytics", description: "Connect Plausible or Cloudflare for newsroom performance data.", capability: "manageIntegrations" },
-      { id: "discord", label: "Discord", description: "Connect the newsroom bot, server, channels, and workflow sync.", capability: "manageIntegrations", feature: "discord" },
-      { id: "deployment", label: "Deployment", description: "Configure the private build hook used after content changes.", capability: "manageIntegrations" }
+      { id: "newsletter", label: "Newsletter", description: "Connect the provider used for newsletter signup and delivery.", icon: Mail, capability: "manageIntegrations", feature: "newsletter" },
+      { id: "analytics", label: "Analytics", description: "Connect Plausible or Cloudflare for newsroom performance data.", icon: Activity, capability: "manageIntegrations" },
+      { id: "discord", label: "Discord", description: "Connect the newsroom bot, server, channels, and workflow sync.", icon: MessageCircle, capability: "manageIntegrations", feature: "discord" },
+      { id: "deployment", label: "Deployment", description: "Configure the private build hook used after content changes.", icon: Rocket, capability: "manageIntegrations" }
     ]
   },
   {
     label: "WordPress",
     items: [
-      { id: "login", label: "Login screen", description: "Configure the Unsplash-powered WordPress login background.", capability: "manage" }
+      { id: "login", label: "Login screen", description: "Configure the Unsplash-powered WordPress login background.", icon: LogIn, capability: "manage" }
     ]
   },
   {
     label: "Advanced",
     items: [
-      { id: "access", label: "Access", description: "See the capabilities that control Byline administration.", capability: "manage" },
-      { id: "api", label: "API", description: "Inspect Byline's versioned REST and schema contracts.", capability: "manage" },
-      { id: "compatibility", label: "Compatibility", description: "Review the legacy contracts retained for installed sites.", capability: "manage" },
-      { id: "diagnostics", label: "Diagnostics", description: "Run Byline Doctor and collect a support report.", capability: "manage" }
+      { id: "access", label: "Access", description: "See the capabilities that control Byline administration.", icon: Shield, capability: "manage" },
+      { id: "api", label: "API", description: "Inspect Byline's versioned REST and schema contracts.", icon: Code2, capability: "manage" },
+      { id: "compatibility", label: "Compatibility", description: "Review the legacy contracts retained for installed sites.", icon: RefreshCw, capability: "manage" },
+      { id: "diagnostics", label: "Diagnostics", description: "Run Byline Doctor and collect a support report.", icon: Stethoscope, capability: "manage" }
     ]
   }
 ];
@@ -1463,6 +1483,16 @@ function SettingsSectionHeader({ item }: { item?: SettingsNavItem }) {
 
 function SettingsShell({ activeTab, children }: { activeTab: SettingsTab; children: ReactNode }) {
   const groups = settingsNavigationGroups();
+  const sidebarGroups = groups.map((group) => ({
+    label: group.label,
+    items: group.items.map((item) => ({
+      id: item.id,
+      label: item.label,
+      href: adminUrl(config?.urls.settings[item.id]),
+      icon: item.icon
+    }))
+  }));
+
   return (
     <div className="byline-settings-page">
       <header className="byline-settings-page-header">
@@ -1471,25 +1501,7 @@ function SettingsShell({ activeTab, children }: { activeTab: SettingsTab; childr
         <p>Publication identity, connections, WordPress behavior, and advanced configuration in one place.</p>
       </header>
       <div className="byline-settings-layout">
-        <aside className="byline-settings-rail" aria-label="Settings sections">
-          {groups.map((group) => (
-            <section key={group.label} className="byline-settings-rail-group">
-              <h2>{group.label}</h2>
-              <nav>
-                {group.items.map((item) => (
-                  <a
-                    key={item.id}
-                    href={adminUrl(config?.urls.settings[item.id])}
-                    className={activeTab === item.id ? "is-active" : undefined}
-                    aria-current={activeTab === item.id ? "page" : undefined}
-                  >
-                    {item.label}
-                  </a>
-                ))}
-              </nav>
-            </section>
-          ))}
-        </aside>
+        <SettingsSidebar groups={sidebarGroups} activeId={activeTab} />
         <section className="byline-settings-content">
           {children}
         </section>

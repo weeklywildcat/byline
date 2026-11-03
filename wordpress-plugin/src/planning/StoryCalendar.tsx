@@ -21,6 +21,7 @@ import { describePlanningError, planningCalendarEvents, type PlanningStory } fro
 import { CATEGORY_BY_EVENT_TYPE, CATEGORY_LABELS, SCHEDULE_X_CALENDARS, toScheduleXEvents, visibleRangeDays, type BylineScheduleXEvent } from "./schedule-x-adapter";
 
 export type StoryCalendarProps = {
+  collectionId?: number;
   stories: PlanningStory[];
   /** The WordPress site timezone. Required: Schedule-X reads every event in it, never in the browser's. */
   timezone: string;
@@ -51,7 +52,7 @@ const FILTERS: Array<{ key: keyof CalendarFilters; label: string }> = [
  * Dragging is intentionally off: changing a date is a decision made in the
  * story, appointment, production or WordPress form it belongs to.
  */
-export function StoryCalendar({ stories, timezone, getSchedule, currentUserId, workspaceUrl, onOpenStory }: StoryCalendarProps) {
+export function StoryCalendar({ collectionId, stories, timezone, getSchedule, currentUserId, workspaceUrl, onOpenStory }: StoryCalendarProps) {
   const [filters, setFilters] = useState<CalendarFilters>(DEFAULT_CALENDAR_FILTERS);
   const [controller] = useState(createCalendarController);
   const [eventsService] = useState(() => createEventsServicePlugin());
@@ -78,6 +79,7 @@ export function StoryCalendar({ stories, timezone, getSchedule, currentUserId, w
         if ((uiEvent.target as HTMLElement | null)?.closest?.("a[href]")) return;
         const storyId = Number((event as BylineScheduleXEvent).storyId);
         if (storyId > 0) openStory.current(storyId);
+        else if ((event as BylineScheduleXEvent).editHref) window.location.assign((event as BylineScheduleXEvent).editHref!);
       }
     }
   });
@@ -86,8 +88,8 @@ export function StoryCalendar({ stories, timezone, getSchedule, currentUserId, w
   const range = snapshot.range ? visibleRangeDays(snapshot.range) : null;
   const feedRange = range ? scheduleRangeFor([{ key: range.from }, { key: range.to }], 1) : null;
   const schedule = useQuery({
-    queryKey: feedRange ? scheduleKey(feedRange.from, feedRange.to, filters.tasks) : ["byline", "schedule", "idle"],
-    queryFn: () => getSchedule!(feedRange!.from, feedRange!.to, filters.tasks),
+    queryKey: feedRange ? scheduleKey(feedRange.from, feedRange.to, filters.tasks, collectionId) : ["byline", "schedule", "idle"],
+    queryFn: () => getSchedule!(feedRange!.from, feedRange!.to, filters.tasks, collectionId),
     enabled: Boolean(getSchedule && feedRange),
     placeholderData: keepPreviousData
   });

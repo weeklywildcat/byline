@@ -79,13 +79,30 @@ test("the workspace reads as Nova: sources, appointments, tasks, files and a sch
   await expect(dialog).toBeHidden();
   await expect(reporting.getByRole("button", { name: /Call the athletic director/ })).toBeVisible();
 
-  // Tasks: a checkbox field; completed work lives in a Collapsible.
+  // Tasks: high-frequency fields edit directly; the title still has a full edit dialog.
   const tasks = page.getByRole("region", { name: "Tasks", exact: true });
-  const task = tasks.getByRole("checkbox", { name: "Interview three students" });
+  await tasks.getByRole("combobox", { name: "Task priority: normal" }).first().click();
+  await page.getByRole("option", { name: "High", exact: true }).click();
+  await expect(tasks.getByRole("combobox", { name: "Task priority: high" }).first()).toBeVisible();
+
+  await tasks.getByRole("button", { name: "Change task due date" }).first().click();
+  await page.getByRole("button", { name: "Clear date" }).click();
+  // A task without a date sorts after dated ones, so look for it rather than assume it stays first.
+  await expect(tasks.getByRole("button", { name: "Change task due date" }).filter({ hasText: "No due date" })).toHaveCount(1);
+
+  await tasks.getByRole("button", { name: "Interview three students", exact: true }).click();
+  const taskDialog = page.getByRole("dialog", { name: "Edit task" });
+  await taskDialog.getByLabel("What needs doing?").fill("Interview four students");
+  await taskDialog.getByRole("button", { name: "Save task" }).click();
+  await expect(taskDialog).toBeHidden();
+  await expect(tasks.getByRole("button", { name: "Interview four students", exact: true })).toBeVisible();
+
+  // Completion still moves the task into the completed Collapsible.
+  const task = tasks.getByRole("checkbox", { name: "Interview four students" });
   await task.click();
   await expect(task).toHaveCount(0);
   await tasks.getByRole("button", { name: /^Completed/ }).click();
-  await expect(tasks.getByRole("checkbox", { name: "Interview three students" })).toBeChecked();
+  await expect(tasks.getByRole("checkbox", { name: "Interview four students" })).toBeChecked();
 
   // Files & Links: each row is a link that opens a new tab; management lives in a menu.
   const files = page.getByRole("region", { name: "Files & Links", exact: true });
@@ -108,7 +125,7 @@ test("the workspace reads as Nova: sources, appointments, tasks, files and a sch
   // The styles belong to the Byline screens only: leave them and nothing is left behind.
   await page.goto("/wp-admin/edit.php");
   expect(await page.locator('link[href*="style-story-workspace"],link[href*="style-home"]').count()).toBe(0);
-  expect(await page.locator(".byline-ui-root").count()).toBe(0);
+  expect(await page.locator("#byline-admin-root .byline-ui-root").count()).toBe(0);
 });
 
 test("the workspace keeps its layout from 1440 down to a phone", async ({ adminPage: page, adminSession: session }) => {
@@ -120,6 +137,14 @@ test("the workspace keeps its layout from 1440 down to a phone", async ({ adminP
     await expect(page.getByRole("heading", { level: 1, name: fixture.title })).toBeVisible();
     await expect(page.getByRole("region", { name: "Reporting", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    if (width === 1440) {
+      const briefBox = await page.getByRole("region", { name: "Brief", exact: true }).boundingBox();
+      const detailsBox = await page.getByRole("region", { name: "Details", exact: true }).boundingBox();
+      expect(briefBox).not.toBeNull();
+      expect(detailsBox).not.toBeNull();
+      expect(detailsBox!.x).toBeGreaterThan(briefBox!.x + briefBox!.width);
+      expect(Math.abs(detailsBox!.y - briefBox!.y)).toBeLessThan(24);
+    }
     await page.screenshot({ path: `/tmp/byline-workspace-qa/workspace-${width}.png`, fullPage: true, animations: "disabled" });
     if (width === 1440 || width === 390) {
       await page.getByRole("region", { name: "Reporting", exact: true }).getByRole("button", { name: /Interview local reporter/ }).click();
@@ -131,9 +156,9 @@ test("the workspace keeps its layout from 1440 down to a phone", async ({ adminP
       await expect(dialog).toBeHidden();
     }
   }
-  // On a phone the page reads in the order a reporter works: brief, reporting, tasks, media, files, details, activity.
+  // On a phone the page reads in the order a reporter works: brief, reporting, tasks, media, files, details, article notes, activity.
   const order = await page.evaluate(() => Array.from(document.querySelectorAll("main [role=region][aria-labelledby]"))
     .map((section) => ({ title: section.querySelector("[role=heading][aria-level='2']")?.textContent, top: section.getBoundingClientRect().top }))
     .filter((section) => section.title).sort((a, b) => a.top - b.top).map((section) => section.title));
-  expect(order).toEqual(["Brief", "Reporting", "Tasks", "Media & Production", "Files & Links", "Details", "Recent Activity"]);
+  expect(order).toEqual(["Brief", "Reporting", "Tasks", "Media & Production", "Files & Links", "Details", "Article Notes", "Recent Activity"]);
 });

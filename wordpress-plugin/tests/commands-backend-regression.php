@@ -10,6 +10,7 @@ const BYLINE_MANAGE_INTEGRATIONS_CAPABILITY = 'manage_byline_integrations';
 $capabilities = ['edit_posts' => true, 'upload_files' => true, 'edit_others_posts' => true, 'manage_byline' => true, 'edit_byline_design' => true, 'manage_byline_integrations' => false];
 $scripts = ['wp-commands' => true, 'wp-data' => true];
 $actions = [];
+$newsletter_enabled = false;
 
 function command_assert(bool $condition, string $message): void
 {
@@ -25,7 +26,7 @@ function add_query_arg(array $args, string $url): string { return $url . '?' . h
 function wp_json_encode($value): string { return json_encode($value); }
 function wp_script_is(string $handle, string $status): bool { global $scripts; return !empty($scripts[$handle]); }
 function add_action(string $hook, $callback, int $priority = 10, int $accepted_args = 1): void { global $actions; $actions[$hook][] = $callback; }
-function byline_admin_feature_enabled(string $feature): bool { return $feature === 'sports'; }
+function byline_admin_feature_enabled(string $feature): bool { return $feature === 'sports' || ($feature === 'newsletter' && $GLOBALS['newsletter_enabled']); }
 
 require __DIR__ . '/../includes/commands/commands.php';
 
@@ -52,6 +53,14 @@ foreach ($editor_commands_with_home as $editor_command) {
     }
 }
 command_assert(is_array($editor_home) && strpos((string) ($editor_home['url'] ?? ''), 'page=byline-planning') !== false && strpos((string) ($editor_home['url'] ?? ''), 'tab=today') !== false, 'Editor Home command did not preserve the permission-aware Today destination.');
+
+$newsletter_enabled = true;
+command_assert(!in_array('byline/newsletters', array_column(byline_command_palette_commands(), 'name'), true), 'Contributors must not see Open Newsletters even when the module is enabled.');
+foreach (['publish_posts', 'edit_others_posts'] as $newsletter_capability) {
+    $capabilities[$newsletter_capability] = true;
+    command_assert(in_array('byline/newsletters', array_column(byline_command_palette_commands(), 'name'), true), 'Newsletter commands must remain available to publishers and editors.');
+    $capabilities[$newsletter_capability] = false;
+}
 
 $scripts = ['wp-commands' => false, 'wp-data' => false];
 ob_start();

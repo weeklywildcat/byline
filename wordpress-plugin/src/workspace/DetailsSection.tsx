@@ -70,7 +70,7 @@ export function DetailsSection() {
   const busy = update.isPending;
 
   const shownWriters = data.contributors.contributors.length ? data.contributors.contributors : story.authors;
-  return <Card size="sm" role="region" aria-labelledby="ws-details-title" id="ws-details" className="order-2 @3xl/ws:order-none">
+  return <Card size="sm" role="region" aria-labelledby="ws-details-title" id="ws-details" className="order-2 lg:order-none">
     <CardHeader><CardTitle id="ws-details-title" role="heading" aria-level={2}>Details</CardTitle></CardHeader>
     <CardContent>
       <FieldGroup className="gap-2">

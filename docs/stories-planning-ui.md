@@ -17,6 +17,13 @@ a story, and one full detail page.
 A test (`tests-js/story-peek-single.test.ts`) pins that there is exactly one
 `StoryPeek` implementation and no Planning quick view.
 
+Peek puts open tasks and production before supporting reporting context.
+Collections and explicitly linked interviews/resources share one collapsed
+summary below that work; expanding it exposes navigation and the existing
+relationship pickers. Empty reporting has one workspace action instead of
+separate source and appointment buttons. The full workspace keeps the expanded
+Collection controls.
+
 ## Bundles and routing
 
 | Address | Bundle (private React 19) |
@@ -99,6 +106,16 @@ A native shadcn `Table` with seven columns (Story, Workflow, People, Deadline,
 Publication, Work, Updated) and the existing sort; below about 820px of
 available width it becomes compact rows. TanStack Table is not used: nothing
 here needs column visibility, multi-sort, selection or pagination.
+
+The desktop List uses a collapsed, fixed-layout table with quiet horizontal
+separators, a 36px header and approximately 48–57px rows. Headlines clamp at two
+lines; full titles remain in the accessible title button and Story Hover Card.
+Publication emphasizes the date, with only planned/scheduled qualifiers. Work
+keeps two signals visible and discloses any others through a named `+N` popover;
+other `ProductionSummary` consumers continue to show all signals. Bare cell
+padding also opens Peek, while every descendant keeps its own interaction.
+Scrolling stays with the document: the existing horizontal overflow wrapper
+would trap a sticky header, so the List adds no nested vertical scroll region.
 
 The List is also the fastest editing surface. High-frequency scalar values use
 direct manipulation instead of forcing a Story Peek round-trip: click **Workflow**

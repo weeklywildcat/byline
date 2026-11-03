@@ -30,5 +30,14 @@ wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plug
 # Real REST, role and capability behavior for Home and the Story Workspace.
 wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/home.php
 wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/story-workspace.php
+# Collection relationships, reporting permissions, and private REST boundaries.
+wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/collections.php
+# Remote integration primitives use the same real permissions and concurrency.
+wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/mcp.php
+wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/plugin-mcp.php
+npm run test:mcp
+npm run test:plugin --workspace @byline/mcp-contracts
+# Core Notes read through the adapter: the edit_post boundary, public non-exposure and no copies.
+wp-env run cli --config="$config" wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/article-notes.php
 WP_BASE_URL="${WP_BASE_URL:-http://localhost:8888}" \
   playwright test --config=wordpress-plugin/e2e/playwright.config.ts "$@"

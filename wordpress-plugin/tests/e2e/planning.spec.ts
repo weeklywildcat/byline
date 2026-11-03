@@ -106,6 +106,9 @@ test.describe("Stories board", () => {
     await expect(page.getByRole("dialog", { name: title, exact: true })).toHaveCount(0);
     expect(page.url()).toBe(beforeUrl);
 
+    // macOS opens the context menu for Control-click too;
+    // dismiss it before targeting the story again (Linux leaves it closed).
+    await page.keyboard.press("Escape");
     // The explicit context-menu route itself must still load the real workspace.
     await storyTitle.click({ button: "right" });
     await page.getByRole("menuitem", { name: "Open workspace" }).click();
@@ -206,7 +209,12 @@ test.describe("Story Peek everywhere", () => {
     const id = await createPlanningStory(session, { title, status: "reporting", deadline: day, writers: [me] });
     await page.setViewportSize({ width: 1440, height: 1000 });
     const peek = page.getByRole("dialog", { name: title, exact: true });
-    const sections = async () => (await peek.getByRole("heading", { level: 3 }).allTextContents()).join("|");
+    const sections = async () => {
+      // Collection context loads separately from the workspace. Compare fully
+      // loaded Peeks rather than racing that second protected request.
+      await expect(peek.getByRole("button", { name: /Collections & interviews/ })).toBeVisible();
+      return (await peek.getByRole("heading", { level: 3 }).allTextContents()).join("|");
+    };
 
     await page.goto(storiesUrl + "&view=board");
     await page.getByRole("searchbox", { name: "Search stories" }).fill(unique);

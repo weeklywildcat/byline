@@ -166,7 +166,7 @@ export type PlanningFetchers = {
   /** Update one production assignment (`MediaAssignmentInput`: status, assigneeId, dueAt, attachmentIds, notes, title, type). */
   updateMediaAssignment?: (storyId: number, assignmentId: string, changes: Record<string, unknown>) => Promise<unknown>;
   /** The Calendar's schedule feed. Site-local day range, at most about four months. */
-  getSchedule?: (from: string, to: string, includeTasks?: boolean) => Promise<ScheduleResponse>;
+  getSchedule?: (from: string, to: string, includeTasks?: boolean, collectionId?: number) => Promise<ScheduleResponse>;
   getCoverage?: () => Promise<CoverageResponse>;
   createCoverage?: (input: Record<string, unknown>) => Promise<unknown>;
   addStoryToCoverage?: (coverageId: number, storyId: number) => Promise<unknown>;
@@ -193,6 +193,7 @@ export function planningFilterParams(filters?: Partial<PlanningFilters>): Record
   const applied = normalizePlanningFilters(filters);
   const params: Record<string, string | number> = {};
 
+  if (applied.collectionId) params.collectionId = applied.collectionId;
   if (applied.query) params.search = applied.query;
   if (applied.workflow) params.workflow = applied.workflow;
   if (applied.writerId !== null) params.writer = applied.writerId;
@@ -285,8 +286,8 @@ export function createPlanningFetchers(request: PlanningRequest): PlanningFetche
       data: changes
     }),
 
-    getSchedule: (from, to, includeTasks = false) => request<ScheduleResponse>({
-      path: queryPath(PLANNING_REST_ROUTES.schedule, { from, to, includeTasks: includeTasks ? 1 : undefined })
+    getSchedule: (from, to, includeTasks = false, collectionId) => request<ScheduleResponse>({
+      path: queryPath(PLANNING_REST_ROUTES.schedule, { from, to, includeTasks: includeTasks ? 1 : undefined, collectionId })
     }),
 
     getCoverage: () => request<CoverageResponse>({ path: PLANNING_REST_ROUTES.coverage }),

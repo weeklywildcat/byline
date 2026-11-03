@@ -404,7 +404,7 @@ function byline_media_assignment_save(int $story_id, array $input, string $id = 
 }
 
 /** @return array{assignments:list<array<string,mixed>>}|WP_Error */
-function byline_media_assignment_delete(int $story_id, string $id, ?int $user_id = null)
+function byline_media_assignment_delete(int $story_id, string $id, ?int $user_id = null, ?string $expected_updated_at = null)
 {
     $access = byline_story_context($story_id, $user_id);
     if (!$access['exists'] || !$access['view']) {
@@ -415,11 +415,12 @@ function byline_media_assignment_delete(int $story_id, string $id, ?int $user_id
     }
     $id = byline_media_assignment_valid_id($id);
     $removed = null;
-    $stored = byline_story_collection_update($story_id, BYLINE_MEDIA_ASSIGNMENTS_META, static function (array $rows) use ($story_id, $id, &$removed) {
+    $stored = byline_story_collection_update($story_id, BYLINE_MEDIA_ASSIGNMENTS_META, static function (array $rows) use ($story_id, $id, &$removed, $expected_updated_at) {
         foreach ($rows as $index => $row) {
             if ($row['id'] !== $id) {
                 continue;
             }
+            if ($expected_updated_at !== null && $expected_updated_at !== $row['updatedAt']) { return byline_story_stale(); }
             $featured = byline_editorial_media_attachment_featured_id($story_id);
             if ($featured > 0 && in_array($featured, $row['attachmentIds'], true)) {
                 $elsewhere = false;

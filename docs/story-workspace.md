@@ -173,8 +173,9 @@ planning dates keep their existing capability checks.
 | Participant holding only assigned work | edit records assigned to them; create appointments for themselves only | status, notes and files of their own assignment | none |
 | Everyone else | no access (403) | no access | none |
 
-A participant's read model contains only the records assigned to them and no
-activity trail.
+A participant's read model contains only the records assigned to them, no
+activity trail, and no information about WordPress Notes (`story.notes` is
+`null`): Note visibility follows `edit_post`, never this context.
 
 ## Fast editing interaction model
 
@@ -210,6 +211,7 @@ One bounded aggregate (no per-source/per-task requests), never the article body:
 | Route beneath `/byline/v1` | Purpose |
 | --- | --- |
 | `GET /editorial/stories/<id>/workspace` | story, brief, sections, contributors, statuses, tasks, sources, appointments, mediaAssignments, resources, activity, previewUrl, people, capabilities, `errors` |
+| `GET /editorial/stories/<id>/notes[?limit=3]` | WordPress Core Notes: `{summary, open[]}` for the Article Notes card. Read-only, lazy, `edit_post` only (not the workspace context). See `docs/editorial-collaboration.md` |
 | `POST /editorial/stories/<id>/brief` | save the brief (`expectedBrief` for conflicts) |
 | `POST /editorial/stories/<id>/sources[/<uuid>]`, `DELETE …/<uuid>` | source CRUD |
 | `POST /editorial/stories/<id>/appointments[/<uuid>]`, `DELETE …/<uuid>` | appointment CRUD |
@@ -218,6 +220,8 @@ One bounded aggregate (no per-source/per-task requests), never the article body:
 | `GET /editorial/schedule?from&to[&includeTasks=1]` | note-free calendar feed: exact appointments, needs-scheduling, production due dates |
 | `POST /editorial/stories` | now accepts `{title, preset?}` and returns the workspace payload + `workspaceUrl` |
 | `GET /editorial/media` | adds `assignments` (one row per assignment); `requests` is kept |
+
+`story.notes` in the workspace payload is the small `{available, canView, openCount, resolvedCount, editUrl}` thread summary, or `null` for a participant who cannot edit the story. Note text never travels in the aggregate.
 
 Each optional section of the workspace payload is read independently: a failure
 reports under `errors` and the rest renders. `GET …/quick-view` remains only as a
@@ -276,7 +280,8 @@ appointment's title and timing. Deleting a story removes its private meta with i
 npm run typecheck:plugin && npm run test:plugin && npm run test:php && npm run build:plugin
 npx wp-env start --config=.wp-env.json
 npx wp-env run cli --config=.wp-env.json wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/story-workspace.php
-npx playwright test --config=wordpress-plugin/e2e/playwright.config.ts story-workspace.spec.ts
+npx wp-env run cli --config=.wp-env.json wp eval-file wp-content/plugins/wordpress-plugin/tests/integration/article-notes.php
+npx playwright test --config=wordpress-plugin/e2e/playwright.config.ts story-workspace.spec.ts article-notes.spec.ts
 ```
 
 `tests/story-reporting-regression.php` covers sanitization, limits, UUIDs,

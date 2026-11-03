@@ -35,3 +35,21 @@ export function useElementWidth<T extends HTMLElement>(): [RefObject<T | null>, 
   }, []);
   return [ref, width];
 }
+
+
+const MOBILE_BREAKPOINT = 768;
+
+/** Whether the current viewport is below the shadcn Sidebar mobile breakpoint. */
+export function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT
+  );
+  useEffect(() => {
+    const media = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const update = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    media.addEventListener("change", update);
+    update();
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return isMobile;
+}

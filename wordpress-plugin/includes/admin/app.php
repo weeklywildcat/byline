@@ -4,6 +4,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+require_once dirname(__DIR__) . '/integrations/newsletter-permissions.php';
+
 const BYLINE_ADMIN_PAGE = 'byline';
 const BYLINE_ADMIN_PLANNING_PAGE = 'byline-planning';
 const BYLINE_ADMIN_PUBLICATION_PAGE = 'byline-publication';
@@ -45,8 +47,8 @@ function byline_admin_page_capability(string $page): string
         BYLINE_ADMIN_PLANNING_PAGE => 'edit_posts',
         BYLINE_ADMIN_PUBLICATION_PAGE => BYLINE_MANAGE_CAPABILITY,
         BYLINE_ADMIN_INTEGRATIONS_PAGE => BYLINE_MANAGE_INTEGRATIONS_CAPABILITY,
-        BYLINE_ADMIN_SETTINGS_PAGE => byline_admin_menu_capability(),
-        BYLINE_ADMIN_NEWSLETTERS_PAGE => 'edit_posts',
+        BYLINE_ADMIN_SETTINGS_PAGE => byline_admin_settings_capability(),
+        BYLINE_ADMIN_NEWSLETTERS_PAGE => byline_newsletter_issue_capability(),
         // Retained for the redirect below; polls themselves use their own
         // mapped capability family, not a generic post capability.
         BYLINE_ADMIN_POLLS_PAGE => 'edit_byline_polls',
@@ -62,9 +64,8 @@ function byline_admin_feature_enabled(string $feature): bool
 }
 
 /**
- * Byline's own top-level menu is publication/platform configuration only.
- * Newsroom workflows (Sports, Polls, Events) are first-class WordPress
- * menus of their own and are deliberately not listed here.
+ * Home and Settings share Byline's top-level menu with the Planning destinations.
+ * Polls, Events, and Newsletters retain their own native menus.
  */
 function byline_admin_page_definitions(): array
 {
@@ -82,7 +83,7 @@ function byline_admin_page_definitions(): array
             'menu_title' => 'Settings',
             // Settings contains both publication and integration sections. The
             // React app hides sections the current user cannot administer.
-            'capability' => byline_admin_menu_capability(),
+            'capability' => byline_admin_settings_capability(),
             'callback' => 'byline_render_admin_app',
         ],
     ];
@@ -91,7 +92,7 @@ function byline_admin_page_definitions(): array
 }
 
 /**
- * Planning's destinations. These are real WordPress submenu entries so the
+ * Byline's Planning destinations. These are real WordPress submenu entries so the
  * sidebar is the only place a user has to look for Stories, Calendar, Media
  * Desk, Coverage, Performance, Content Health, or Feedback. They reuse the
  * existing `page=byline-planning&tab=...` URLs: navigation hierarchy and URL
@@ -100,10 +101,11 @@ function byline_admin_page_definitions(): array
 function byline_admin_planning_menu_items(): array
 {
     return [
-        // The landing entry reuses the parent slug, which is how WordPress is
-        // told not to add a second "Planning" child above it.
+        // Today registers the existing Planning page as a real Byline child.
+        // Other destinations keep their query-string links to that page.
         'today' => 'Today',
         'stories' => 'Stories',
+        'collections' => 'Collections',
         'calendar' => 'Calendar',
         'media' => 'Media Desk',
         'coverage' => 'Coverage',
@@ -157,11 +159,10 @@ function byline_admin_doctor_menu_slug(): string
 }
 
 /**
- * Byline is configuration, so its top-level entry is visible to a user who can
- * administer the publication or its integrations. Editing posts alone does not grant access. Individual submenu registrations
- * still carry their own minimum capability and every callback checks it again.
+ * Settings is restricted to publication and integration managers. Editing posts
+ * grants access to the newsroom menu, but never to its configuration screens.
  */
-function byline_admin_menu_capability(): string
+function byline_admin_settings_capability(): string
 {
     foreach ([
         BYLINE_MANAGE_CAPABILITY,
@@ -176,34 +177,26 @@ function byline_admin_menu_capability(): string
 }
 
 /**
- * Menu positions.
- *
- * Core content menus occupy 5 (Posts) through 25 (Comments), and the first
- * separator sits at 59. Byline's newsroom workflows therefore claim 26-31 so
- * they read as a continuation of the content block without displacing core.
- *
- * Byline configuration sits at 100, below the last core separator (99), which
- * places it after Settings (80) in the administration block.
+ * The shared menu is also visible to writers. Each child keeps its own capability.
  */
-const BYLINE_MENU_POSITION_PLANNING = 26;
-// Claimed by the byline_poll post type's own top-level menu.
+function byline_admin_menu_capability(): string
+{
+    $settings_capability = byline_admin_settings_capability();
+    if (current_user_can($settings_capability)) {
+        return $settings_capability;
+    }
+
+    return current_user_can('edit_posts') ? 'edit_posts' : BYLINE_MANAGE_CAPABILITY;
+}
+
+// Byline precedes Dashboard (2). Optional content menus retain their positions.
+const BYLINE_MENU_POSITION_MAIN = 1;
 const BYLINE_MENU_POSITION_POLLS = 29;
 const BYLINE_MENU_POSITION_EVENTS = 30;
 const BYLINE_MENU_POSITION_NEWSLETTERS = 31;
-const BYLINE_MENU_POSITION_CONFIG = 100;
 
 function byline_register_admin_app(): void
 {
-    add_menu_page(
-        'Planning',
-        'Planning',
-        'edit_posts',
-        BYLINE_ADMIN_PLANNING_PAGE,
-        'byline_render_admin_app',
-        'dashicons-calendar-alt',
-        BYLINE_MENU_POSITION_PLANNING
-    );
-
     add_menu_page(
         'Byline',
         'Byline',
@@ -211,32 +204,18 @@ function byline_register_admin_app(): void
         BYLINE_ADMIN_PAGE,
         'byline_render_admin_app',
         'dashicons-welcome-write-blog',
-        BYLINE_MENU_POSITION_CONFIG
+        BYLINE_MENU_POSITION_MAIN
     );
 
     if (byline_admin_feature_enabled('newsletter')) {
         add_menu_page(
             'Newsletters',
             'Newsletters',
-            'edit_posts',
+            byline_newsletter_issue_capability(),
             BYLINE_ADMIN_NEWSLETTERS_PAGE,
             'byline_render_admin_app',
             'dashicons-email-alt',
             BYLINE_MENU_POSITION_NEWSLETTERS
-        );
-    }
-
-    // Planning destinations are submenu entries of the Planning menu. No
-    // callback is passed: every one of them resolves to the already registered
-    // byline-planning page, which authorizes itself.
-    foreach (byline_admin_planning_menu_items() as $planning_tab => $planning_title) {
-        add_submenu_page(
-            BYLINE_ADMIN_PLANNING_PAGE,
-            $planning_title,
-            $planning_title,
-            byline_admin_planning_menu_capability($planning_tab),
-            byline_admin_planning_menu_slug($planning_tab),
-            ''
         );
     }
 
@@ -251,8 +230,65 @@ function byline_register_admin_app(): void
         );
     }
 
+    // Insert the newsroom destinations after Home and before Settings. Today
+    // registers the existing Planning page; the other tabs reuse that callback.
+    $planning_position = 1;
+    foreach (byline_admin_planning_menu_items() as $planning_tab => $planning_title) {
+        add_submenu_page(
+            BYLINE_ADMIN_PAGE,
+            $planning_title,
+            $planning_title,
+            byline_admin_planning_menu_capability($planning_tab),
+            byline_admin_planning_menu_slug($planning_tab),
+            $planning_tab === 'today' ? 'byline_render_admin_app' : '',
+            $planning_position++
+        );
+    }
+
+    // WordPress inserts a copy of the parent when Home is not available.
+    // Writers should land directly on Today, and integration managers on Settings.
+    if (!current_user_can(BYLINE_MANAGE_CAPABILITY)) {
+        remove_submenu_page(BYLINE_ADMIN_PAGE, BYLINE_ADMIN_PAGE);
+    }
 }
 add_action('admin_menu', 'byline_register_admin_app');
+
+/**
+ * Contributors use Today as their newsroom landing screen. Preserve Dashboard
+ * for users who also hold editorial or administrative privileges.
+ */
+function byline_admin_contributor_dashboard_hidden(): bool
+{
+    if (is_network_admin() || is_user_admin()
+        || !current_user_can('edit_posts')
+        || current_user_can('edit_others_posts')
+        || current_user_can('manage_options')
+        || current_user_can(BYLINE_MANAGE_CAPABILITY)
+        || current_user_can(BYLINE_MANAGE_INTEGRATIONS_CAPABILITY)) {
+        return false;
+    }
+
+    return in_array('contributor', (array) wp_get_current_user()->roles, true);
+}
+
+function byline_admin_hide_contributor_dashboard(): void
+{
+    if (byline_admin_contributor_dashboard_hidden()) {
+        remove_menu_page('index.php');
+    }
+}
+add_action('admin_menu', 'byline_admin_hide_contributor_dashboard', 999);
+
+function byline_admin_redirect_contributor_dashboard(): void
+{
+    if (byline_admin_contributor_dashboard_hidden()) {
+        wp_safe_redirect(byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'today']));
+        exit;
+    }
+}
+// Scope the redirect to the native Dashboard; editors, profile pages, REST,
+// AJAX, and other admin requests retain their normal behavior.
+add_action('load-index.php', 'byline_admin_redirect_contributor_dashboard');
 
 /**
  * The Sports team screen was previously duplicated as a Byline-owned page.
@@ -314,6 +350,7 @@ function byline_admin_page_urls(): array
             'today' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'today']),
             'stories' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'stories']),
             'calendar' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'calendar']),
+            'collections' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'collections']),
             'media' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'media']),
             'coverage' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'coverage']),
             'performance' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'performance']),
@@ -648,10 +685,10 @@ function byline_admin_parent_file(?string $parent_file): ?string
         return BYLINE_ADMIN_PAGE;
     }
 
-    // Every Planning tab is a child of the Planning menu, including the ones
+    // Every Planning tab belongs to Byline, including the ones
     // reached by a direct link or a refresh.
     if ($page === BYLINE_ADMIN_PLANNING_PAGE) {
-        return BYLINE_ADMIN_PLANNING_PAGE;
+        return BYLINE_ADMIN_PAGE;
     }
 
     $screen = get_current_screen();

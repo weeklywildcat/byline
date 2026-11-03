@@ -1,8 +1,9 @@
+import { StoryCollectionContext } from "../collections/StoryCollectionContext";
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Copy, ExternalLink, LayoutDashboard, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, Copy, ExternalLink, LayoutDashboard, MessageSquareText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { EditorialTask, ContributorEntry } from "../editorial/editorial-model";
+import type { EditorialTask, ContributorEntry, TaskPatch } from "../editorial/editorial-model";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { InlineAlert } from "../admin-ui/components/inline-alert";
 import { decodeEntities } from "../admin-ui/lib/text";
@@ -12,8 +13,7 @@ import { ResourceIcon } from "../admin-ui/components/resource-icon";
 import { WorkStatusBadge, mediaIntensity } from "../admin-ui/components/work-status-badge";
 import { Button, buttonVariants } from "../admin-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Field, FieldContent, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "../admin-ui/ui/field";
 import { Input } from "../admin-ui/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemHeader, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
@@ -27,9 +27,12 @@ import { assigneeAvatars, sectionNames } from "../workspace/workspace-model";
 import { RESOURCE_PURPOSES, type ReportingSummary, type ResourcePurpose, type StoryResource, type StoryWorkspace } from "../workspace/workspace-types";
 import { exactDate, mediaStatusLabels, mediaTypeLabels, resourcePurposeLabels, shortDateTime } from "../home/newsroom-model";
 import { mediaTypeIcons } from "./media-icons";
+import { openNotesLabel, visibleNotes, type ArticleNotesSummary } from "./notes-model";
 import { ActivityRow, RowSkeletons, TaskRow } from "./rows";
 import type { StoryFetchers } from "./story-fetchers";
 import { invalidateStoryData, workspaceKey } from "./story-query";
+import { useUpdateTask } from "./use-update-task";
+import { TaskEditDialog } from "./TaskEditDialog";
 
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
 const PEEK_ACTIVITY = 3;
@@ -42,8 +45,6 @@ function PeekSection({ title, action, children }: { title: string; action?: Reac
   </section>;
 }
 
-const compactEmpty = "items-start gap-2 border-0 p-0 text-left";
-
 /** A compact, note-free roll-up. A target window is shown as a window; it never acquires a clock time. */
 function ReportingPeek({ reporting, error, timezone, canAddSource, canAddAppointment, reportingUrl }: { reporting: ReportingSummary | null; error?: string; timezone: string; canAddSource: boolean; canAddAppointment: boolean; reportingUrl?: string }) {
   const next = reporting?.nextAppointment;
@@ -54,19 +55,36 @@ function ReportingPeek({ reporting, error, timezone, canAddSource, canAddAppoint
   if (!error && empty && !canAdd) return null;
   return <>
     <Separator />
-    <PeekSection title="Reporting">
+    <PeekSection title="Reporting" action={canAdd ? <a className={buttonVariants({ variant: "ghost", size: "sm" })} href={reportingUrl}>{empty ? "Add reporting" : "Manage"}</a> : null}>
       {error ? <InlineAlert>Reporting couldn't be loaded.</InlineAlert> : empty
-        ? <Empty className={compactEmpty}>
-          <EmptyHeader className="items-start gap-0.5"><EmptyTitle>No sources or interviews yet.</EmptyTitle><EmptyDescription>Add people you plan to talk to.</EmptyDescription></EmptyHeader>
-          <EmptyContent className="flex-row flex-wrap">
-            {canAddSource ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={reportingUrl}><Plus data-icon="inline-start" aria-hidden="true" />Add source</a> : null}
-            {canAddAppointment ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={reportingUrl}><Plus data-icon="inline-start" aria-hidden="true" />Add appointment</a> : null}
-          </EmptyContent>
-        </Empty>
+        ? <p className="text-sm text-muted-foreground">No sources or interviews yet.</p>
         : <div className="flex flex-col gap-1 text-sm">
           {stats.length ? <p>{stats.join(" · ")}</p> : null}
           {next ? <p className="text-muted-foreground"><span className="font-medium text-foreground">{next.title}</span> · {appointmentLine({ ...next, status: "confirmed", endAt: null }, timezone)}</p> : null}
         </div>}
+    </PeekSection>
+  </>;
+}
+
+/**
+ * Unresolved WordPress Notes, as one quiet row. It reads the count the workspace
+ * already carries (no extra request) and the whole row opens the real editor,
+ * where Notes live. Nothing renders when there are none or the viewer may not
+ * edit the story.
+ */
+function NotesPeek({ notes }: { notes: ArticleNotesSummary | null | undefined }) {
+  const visible = visibleNotes(notes);
+  if (!visible || visible.openCount === 0 || !visible.editUrl) return null;
+  return <>
+    <Separator />
+    <PeekSection title="Article notes">
+      <ItemGroup role="group" aria-label="Article notes" className="-mx-3 w-auto gap-0">
+        <Item size="sm" render={<a href={visible.editUrl} target="_blank" rel="noopener noreferrer" data-peek-notes="" />}>
+          <ItemMedia variant="icon" className="text-muted-foreground"><MessageSquareText aria-hidden="true" /></ItemMedia>
+          <ItemContent><ItemTitle>{openNotesLabel(visible.openCount)}</ItemTitle><ItemDescription>Review in editor</ItemDescription></ItemContent>
+          <ItemActions><ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" /><span className="sr-only">(opens in a new tab)</span></ItemActions>
+        </Item>
+      </ItemGroup>
     </PeekSection>
   </>;
 }
@@ -108,25 +126,31 @@ function LinkRow({ link, canManage, disabled, onEdit, onRemove }: { link: StoryR
       </DropdownMenu> : null}
     </ContextMenuTrigger>
     <ContextMenuContent className="w-48">
-      <ContextMenuLabel className="max-w-44 truncate">{link.label}</ContextMenuLabel>
-      <ContextMenuSeparator />
-      <ContextMenuItem render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
-      <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem>
-      {canManage ? <>
-        <ContextMenuItem disabled={disabled} onClick={onEdit}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
-        <ContextMenuItem variant="destructive" disabled={disabled} onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
-      </> : null}
+      <ContextMenuGroup>
+        <ContextMenuLabel className="max-w-44 truncate">{link.label}</ContextMenuLabel>
+        <ContextMenuSeparator />
+        <ContextMenuItem render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
+        <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem>
+        {canManage ? <>
+          <ContextMenuItem disabled={disabled} onClick={onEdit}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
+          <ContextMenuItem variant="destructive" disabled={disabled} onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
+        </> : null}
+      </ContextMenuGroup>
     </ContextMenuContent>
   </ContextMenu>;
 }
 
 export type StoryPeekContentProps = {
+  collectionContext?: ReactNode;
   data: StoryWorkspace;
   timezone: string;
   now: Date;
   workspaceUrl?: (storyId: number) => string;
   onNewTask: (storyId: number) => void;
   onComplete: (task: EditorialTask) => void;
+  onUpdateTask: (task: EditorialTask, patch: TaskPatch, optimistic?: Partial<EditorialTask>) => void;
+  onEditTask: (task: EditorialTask) => void;
+  updatingTaskId?: string | null;
   completing?: boolean;
   /** Mutations. Each rejects through `error`; none is called when the user lacks the capability. */
   onPlan: (patch: { deadline?: string | null; plannedPublishAt?: string | null; status?: string }) => void;
@@ -145,7 +169,7 @@ export type StoryPeekContentProps = {
 
 /** What the peek says about one story: identity in the header, then only the sections that have something to show or do. */
 export function StoryPeekContent(props: StoryPeekContentProps) {
-  const { data, timezone, now, workspaceUrl, onNewTask, onComplete, completing, onPlan, onWriters, onSaveLink, onRemoveLink, planning, writing, linking, error, linkError, linkFormOpen, onLinkForm } = props;
+  const { data, timezone, now, workspaceUrl, onNewTask, onComplete, onUpdateTask, onEditTask, updatingTaskId, completing, onPlan, onWriters, onSaveLink, onRemoveLink, planning, writing, linking, error, linkError, linkFormOpen, onLinkForm } = props;
   const { story } = data;
   const cp = data.contributors;
   const contributors = cp.contributors;
@@ -172,12 +196,12 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
         {error ? <InlineAlert>{error}</InlineAlert> : null}
       </FieldSet>
 
-      <ReportingPeek reporting={data.reporting} error={data.errors.reporting} timezone={timezone} canAddSource={caps.addSource} canAddAppointment={caps.addAppointment} reportingUrl={workspaceHref ? `${workspaceHref}#ws-reporting` : undefined} />
+      <NotesPeek notes={story.notes} />
 
       {tasks.length || caps.addTask ? <>
         <Separator />
         <PeekSection title="Tasks" action={caps.addTask ? <Button variant="outline" size="sm" data-peek-add-task="" onClick={() => onNewTask(story.id)}><Plus data-icon="inline-start" aria-hidden="true" />Add task</Button> : null}>
-          {tasks.length ? <ItemGroup role="group" aria-label="Open tasks" className="-mx-3 w-auto gap-0">{tasks.map((task) => <TaskRow key={task.id} task={task} storyTitle={story.title} compact timezone={timezone} now={now} onComplete={() => onComplete(task)} pending={completing} />)}</ItemGroup> : <p className="text-sm text-muted-foreground">No open tasks.</p>}
+          {tasks.length ? <ItemGroup role="group" aria-label="Open tasks" className="-mx-3 w-auto gap-0">{tasks.map((task) => <TaskRow key={task.id} task={task} storyTitle={story.title} compact timezone={timezone} now={now} people={data.people} canAssign={caps.assign} onComplete={() => onComplete(task)} onEdit={caps.addTask ? () => onEditTask(task) : undefined} onUpdate={caps.addTask ? (patch, optimistic) => onUpdateTask(task, patch, optimistic) : undefined} pending={Boolean(completing || (updatingTaskId && updatingTaskId === String(task.id)))} />)}</ItemGroup> : <p className="text-sm text-muted-foreground">No open tasks.</p>}
         </PeekSection>
       </> : null}
 
@@ -200,6 +224,9 @@ export function StoryPeekContent(props: StoryPeekContentProps) {
           })}</ItemGroup>}
         </PeekSection>
       </> : null}
+
+      <ReportingPeek reporting={data.reporting} error={data.errors.reporting} timezone={timezone} canAddSource={caps.addSource} canAddAppointment={caps.addAppointment} reportingUrl={workspaceHref ? `${workspaceHref}#ws-reporting` : undefined} />
+      {props.collectionContext}
 
       {data.resources.length || canManageLinks || draft ? <>
         <Separator />
@@ -231,12 +258,14 @@ export type StoryPeekProps = { storyId: number | null; fetchers: StoryFetchers; 
 
 export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComplete, completing, onNewTask, now, workspaceUrl }: StoryPeekProps) {
   const client = useQueryClient();
+  const updateTask = useUpdateTask(fetchers);
   const peek = useQuery({ queryKey: workspaceKey(storyId || 0), queryFn: () => fetchers.getWorkspace!(storyId!), enabled: Boolean(storyId && fetchers.getWorkspace) });
   const data = peek.data;
   const story = data?.story;
   const [linkForm, setLinkForm] = useState<boolean | StoryResource>(false);
   const [linkError, setLinkError] = useState("");
   const [editError, setEditError] = useState("");
+  const [editingTask, setEditingTask] = useState<EditorialTask | null>(null);
   const refresh = () => invalidateStoryData(client, storyId);
 
   const planning = useMutation({
@@ -268,7 +297,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
 
   const writerList = data?.contributors.contributors.length ? data.contributors.contributors : story?.authors || [];
   const editor = story?.editor ? { name: story.editor.name, imageUrl: data?.people.find((candidate) => Number(candidate.id) === story.editor!.id)?.imageUrl } : null;
-  return <Sheet open={Boolean(storyId)} onOpenChange={(open) => { if (!open && !resources.isPending && !writers.isPending && !planning.isPending) { setLinkForm(false); setEditError(""); setLinkError(""); onClose(); } }}>
+  return <><Sheet open={Boolean(storyId)} onOpenChange={(open) => { if (!open && !resources.isPending && !writers.isPending && !planning.isPending) { setLinkForm(false); setEditError(""); setLinkError(""); setEditingTask(null); onClose(); } }}>
     <SheetContent className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md" finalFocus={() => { if (origin?.isConnected) return origin; return document.querySelector<HTMLElement>("[data-home-search]"); }}>
       <SheetHeader className="gap-1 border-b pr-12">
         <SheetTitle className="text-lg leading-snug [overflow-wrap:anywhere]">{decodeEntities(story?.title) || "Story details"}</SheetTitle>
@@ -279,10 +308,12 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComp
         </div> : null}
       </SheetHeader>
       {peek.isPending ? <div className="py-4"><RowSkeletons count={7} /></div> : peek.isError || !story || !data ? <div className="p-4"><InlineAlert title="The story couldn't be loaded." onAction={() => void peek.refetch()}>{describeEditorialError(peek.error, "The story couldn't be loaded.")}</InlineAlert></div>
-        : <StoryPeekContent data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl} onNewTask={onNewTask} onComplete={onComplete} completing={completing}
+        : <StoryPeekContent collectionContext={fetchers.collections ? <StoryCollectionContext storyId={data.story.id} api={fetchers.collections} compact /> : undefined} data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl} onNewTask={onNewTask} onComplete={onComplete} onUpdateTask={(task, patch, optimistic) => updateTask.mutate({ task, patch, optimistic })} onEditTask={setEditingTask} updatingTaskId={updateTask.isPending ? String(updateTask.variables?.task.id || "") : null} completing={completing}
           onPlan={(patch) => planning.mutate(patch)} onWriters={(value) => writers.mutate(value)}
           onSaveLink={(input, existing) => resources.mutate(existing ? { ...input, id: existing.id } : input)} onRemoveLink={(id) => resources.mutate({ remove: id })}
           planning={planning.isPending} writing={writers.isPending} linking={resources.isPending} error={editError} linkError={linkError} linkFormOpen={linkForm} onLinkForm={(next) => { setLinkError(""); setLinkForm(next); }} />}
     </SheetContent>
-  </Sheet>;
+  </Sheet>
+  <TaskEditDialog open={editingTask !== null} onClose={() => setEditingTask(null)} fetchers={fetchers} task={editingTask} people={data?.people || []} canAssign={Boolean(data?.capabilities.assign)} timezone={data?.timezone || timezone || "UTC"} />
+  </>;
 }

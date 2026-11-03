@@ -17,6 +17,11 @@ $iterator = new RecursiveIteratorIterator(
 );
 foreach ($iterator as $file_info) {
     if ($file_info->isFile() && $file_info->getExtension() === 'php') {
+        // This optional module is loaded only after its PHP 8.2 guard. Its safe
+        // bootstrap remains covered by this baseline scan and the loader test.
+        if (strpos($file_info->getPathname(), '/includes/mcp/') !== false && $file_info->getBasename() !== 'bootstrap.php') {
+            continue;
+        }
         $production_files[] = $file_info->getPathname();
     }
 }
@@ -45,6 +50,11 @@ if (count($production_files) < 20
 }
 
 $entrypoint = file_get_contents(__DIR__ . '/../weekly-wildcat-headless.php');
+$mcp_bootstrap = file_get_contents(__DIR__ . '/../includes/mcp/bootstrap.php');
+if (strpos($mcp_bootstrap, 'PHP_VERSION_ID >= 80200') === false
+    || strpos($mcp_bootstrap, 'if (!byline_mcp_available()) { return false; }') === false) {
+    throw new RuntimeException('Optional MCP runtime must remain behind the PHP version guard.');
+}
 if (!is_string($entrypoint)
     || strpos($entrypoint, 'Requires PHP: 7.4') === false
     || strpos($entrypoint, "includes/core/compatibility.php") === false) {

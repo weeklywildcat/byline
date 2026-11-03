@@ -23,7 +23,7 @@ export function WorkspaceHeader({ onSearch }: { onSearch?: () => void }) {
         <BreadcrumbItem className="min-w-0"><BreadcrumbPage className="truncate">{title}</BreadcrumbPage></BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
-    <div className="flex flex-col gap-4 @2xl/ws:flex-row @2xl/ws:items-start @2xl/ws:justify-between">
+    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
       <div className="flex min-w-0 flex-col gap-2">
         <h1 className="font-heading text-2xl leading-tight font-semibold tracking-tight text-balance [overflow-wrap:anywhere]">{title}</h1>
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">

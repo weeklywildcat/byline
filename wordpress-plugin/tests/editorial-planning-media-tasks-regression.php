@@ -614,6 +614,9 @@ $task = byline_create_task([
 editorial_test_assert(is_array($task) && strpos($task['title'], '<script>') === false && $task['storyId'] === 10, 'A linked newsroom task was not stored safely.');
 editorial_test_assert(byline_create_task(['title' => 'Unlinked'], 2) instanceof WP_Error, 'A writer could create an unlinked newsroom task.');
 editorial_test_assert(byline_update_task($task['id'], ['assigneeId' => 3], 2) instanceof WP_Error, 'A writer could reassign a task to another user.');
+$cleared = byline_update_task($task['id'], ['dueAt' => null], 2);
+editorial_test_assert(is_array($cleared) && ($cleared['dueAt'] ?? '') === '', 'The task UI clears a due date with null, which must remove it instead of being rejected.');
+editorial_test_assert(byline_update_task($task['id'], ['dueAt' => 'not a date'], 2) instanceof WP_Error, 'An invalid due date must still be rejected.');
 editorial_test_assert(byline_complete_task($task['id'], 2)['state'] === 'completed', 'A writer could not complete a task linked to their story.');
 editorial_test_assert(byline_complete_task($task['id'], 2)['state'] === 'completed', 'Completing a task was not idempotent.');
 editorial_test_assert(byline_reopen_task($task['id'], 2)['state'] === 'open', 'A completed task could not be reopened.');

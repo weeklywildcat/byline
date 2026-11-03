@@ -8,7 +8,7 @@ import { WorkStatusBadge, sourceIntensity, appointmentIntensity, appointmentStat
 import { Button } from "../admin-ui/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../admin-ui/ui/collapsible";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemHeader, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { AppointmentDialog } from "./AppointmentDialog";
@@ -30,17 +30,19 @@ function QuickStatusContext({ title, current, options, disabled, onOpen, onStatu
   return <ContextMenu>
     <ContextMenuTrigger render={<div className="contents" />}>{children}</ContextMenuTrigger>
     <ContextMenuContent className="w-52">
-      <ContextMenuLabel className="max-w-48 truncate">{title}</ContextMenuLabel>
-      <ContextMenuSeparator />
-      <ContextMenuItem onClick={(event) => onOpen(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit</ContextMenuItem>
-      {onStatus ? <ContextMenuSub>
-        <ContextMenuSubTrigger disabled={disabled}>Status</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="min-w-44">
-          <ContextMenuRadioGroup value={current} onValueChange={(value) => { if (value && value !== current) onStatus(String(value)); }}>
-            {options.map((option) => <ContextMenuRadioItem key={option.value} value={option.value}>{option.label}</ContextMenuRadioItem>)}
-          </ContextMenuRadioGroup>
-        </ContextMenuSubContent>
-      </ContextMenuSub> : null}
+      <ContextMenuGroup>
+        <ContextMenuLabel className="max-w-48 truncate">{title}</ContextMenuLabel>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={(event) => onOpen(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit</ContextMenuItem>
+        {onStatus ? <ContextMenuSub>
+          <ContextMenuSubTrigger disabled={disabled}>Status</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-44">
+            <ContextMenuRadioGroup value={current} onValueChange={(value) => { if (value && value !== current) onStatus(String(value)); }}>
+              {options.map((option) => <ContextMenuRadioItem key={option.value} value={option.value}>{option.label}</ContextMenuRadioItem>)}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub> : null}
+      </ContextMenuGroup>
     </ContextMenuContent>
   </ContextMenu>;
 }
@@ -162,13 +164,13 @@ export function ReportingPlan() {
         </Empty></div>
         : <>
           <section aria-labelledby="ws-sources">
-            <GroupHeading id="ws-sources" title="Sources" action={data.sources.length ? addSource : null} />
+            <GroupHeading id="ws-sources" title="Sources" action={addSource} />
             {data.sources.length
               ? <ItemGroup role="group" aria-labelledby="ws-sources" className="gap-0">{data.sources.map((source) => <SourceRow key={source.id} source={source} people={who(source.assignees)} timing={sourceTimingLine(source, data.appointments, timezone)} onOpen={openSource(source)} busy={statusBusy(source.id)} onStatus={caps.manageReporting ? (status) => quickStatus.mutate({ kind: "source", id: source.id, status, updatedAt: source.updatedAt }) : undefined} />)}</ItemGroup>
               : <p className="px-3 text-sm text-muted-foreground">No sources yet. {caps.addSource ? "Add the people you plan to interview." : "None are assigned to you."}</p>}
           </section>
           <section aria-labelledby="ws-appointments">
-            <GroupHeading id="ws-appointments" title="Appointments" action={noAppointments ? null : addAppointment} />
+            <GroupHeading id="ws-appointments" title="Appointments" action={addAppointment} />
             <div className="flex flex-col gap-2">
               {days.map(({ day, items }) => <div key={day} className="flex flex-col"><h4 className="px-3 pt-2 pb-0.5 text-xs font-medium text-muted-foreground">{formatDay(day, false)}</h4>
                 <ItemGroup role="group" aria-label={formatDay(day, false)} className="gap-0">{items.map((appointment) => <ExactRow key={appointment.id} appointment={appointment} people={who(appointment.assignees)} timezone={timezone} onOpen={openAppointment(appointment)} busy={statusBusy(appointment.id)} onStatus={caps.manageReporting ? (status) => quickStatus.mutate({ kind: "appointment", id: appointment.id, status, updatedAt: appointment.updatedAt }) : undefined} />)}</ItemGroup>

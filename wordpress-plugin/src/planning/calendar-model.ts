@@ -13,6 +13,7 @@
  * instant read in the WordPress site timezone; a target window is date-only and
  * is NEVER given a day cell or a time. Windows go to the "Needs scheduling" list.
  */
+import { collectionUrl } from "../collections/collection-model";
 import { siteDay } from "../home/newsroom-model";
 import {
   addDays,
@@ -136,7 +137,7 @@ function appointmentEvent(appointment: ScheduleAppointment, timezone: string, wo
     timing: { kind: "timed", start: appointment.startAt, end: appointment.endAt },
     storyId: appointment.storyId,
     storyTitle: appointment.storyTitle,
-    storyUrl: workspaceUrl(appointment.storyId),
+    storyUrl: appointment.collectionId ? collectionUrl(appointment.collectionId) : workspaceUrl(appointment.storyId),
     type: "appointment",
     date,
     exactDate: appointmentLine(appointment, timezone),
@@ -153,7 +154,7 @@ function appointmentEvent(appointment: ScheduleAppointment, timezone: string, wo
     ]),
     assigneeIds: (appointment.assignees || []).map((person) => person.id),
     assigneeNames: names,
-    href: workspaceUrl(appointment.storyId, appointment.id),
+    href: appointment.collectionId ? `${collectionUrl(appointment.collectionId)}&interview=${appointment.interviewId}` : workspaceUrl(appointment.storyId, appointment.id),
     completed: appointment.status === "completed"
   };
 }
@@ -206,7 +207,7 @@ function taskEvent(item: ScheduleTaskDeadline, timezone: string, workspaceUrl: W
     ]),
     assigneeIds: item.assignee ? [item.assignee.id] : [],
     assigneeNames: item.assignee ? [item.assignee.name] : [],
-    href: item.storyId ? workspaceUrl(item.storyId) : undefined
+    href: item.storyId ? workspaceUrl(item.storyId) : item.collectionId ? collectionUrl(item.collectionId) : undefined
   };
 }
 
@@ -302,7 +303,7 @@ export function needsSchedulingItems(
         assigneeNames: nameList(appointment.assignees),
         target: hasTarget ? `Target: ${formatWindow(appointment.windowStart as string, appointment.windowEnd)}` : "No target date",
         hasTarget,
-        href: workspaceUrl(appointment.storyId, appointment.id)
+        href: appointment.collectionId ? `${collectionUrl(appointment.collectionId)}&interview=${appointment.interviewId}` : workspaceUrl(appointment.storyId, appointment.id)
       };
     });
 }

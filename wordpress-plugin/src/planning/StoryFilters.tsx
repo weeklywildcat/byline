@@ -79,15 +79,15 @@ export function StoryFilters({ filters, onChange, statuses, writers, editors, sa
   const workflowOptions: Option[] = [{ value: ALL, label: __("All workflows", "weekly-wildcat-headless") }, ...statuses.filter((status) => status.group !== "derived").map((status) => ({ value: status.id, label: status.label }))];
 
   return <div className="flex flex-col gap-2" role="search" aria-label={__("Filter stories", "weekly-wildcat-headless")}>
-    <div className="flex flex-wrap items-center gap-2 @4xl/planning:flex-nowrap">
+    <div className="flex flex-wrap items-center gap-1.5 @4xl/planning:flex-nowrap">
       {savedViews}
-      <InputGroup className="min-w-56 flex-[1_1_20rem] @4xl/planning:max-w-md">
+      <InputGroup className="min-w-48 flex-[1_1_12rem]">
         <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
         <InputGroupInput type="search" aria-label={__("Search stories", "weekly-wildcat-headless")} placeholder={__("Search stories…", "weekly-wildcat-headless")} value={filters.query} onChange={(event) => update({ query: event.target.value })} />
       </InputGroup>
-      <OptionSelect label={__("Workflow", "weekly-wildcat-headless")} value={filters.workflow} options={workflowOptions} onChange={(workflow) => update({ workflow })} className="w-40 shrink-0" />
-      <OptionSelect label={__("Writer", "weekly-wildcat-headless")} value={filters.writerId === null ? "" : String(filters.writerId)} options={personOptions(writers, __("Any writer", "weekly-wildcat-headless"))} onChange={(value) => update({ writerId: value ? Number(value) : null })} className="w-36 shrink-0" />
-      <OptionSelect label={__("Editor", "weekly-wildcat-headless")} value={filters.editorId === null ? "" : String(filters.editorId)} options={personOptions(editors, __("Any editor", "weekly-wildcat-headless"))} onChange={(value) => update({ editorId: value ? Number(value) : null })} className="w-36 shrink-0" />
+      <OptionSelect label={__("Workflow", "weekly-wildcat-headless")} value={filters.workflow} options={workflowOptions} onChange={(workflow) => update({ workflow })} className="h-8 w-32 shrink-0" />
+      <OptionSelect label={__("Writer", "weekly-wildcat-headless")} value={filters.writerId === null ? "" : String(filters.writerId)} options={personOptions(writers, __("Any writer", "weekly-wildcat-headless"))} onChange={(value) => update({ writerId: value ? Number(value) : null })} className="h-8 w-32 shrink-0" />
+      <OptionSelect label={__("Editor", "weekly-wildcat-headless")} value={filters.editorId === null ? "" : String(filters.editorId)} options={personOptions(editors, __("Any editor", "weekly-wildcat-headless"))} onChange={(value) => update({ editorId: value ? Number(value) : null })} className="h-8 w-32 shrink-0" />
       <Popover open={moreOpen} onOpenChange={setMoreOpen}>
         <PopoverTrigger render={<Button variant="outline" className="shrink-0" />}><SlidersHorizontal data-icon="inline-start" aria-hidden="true" />{__("More filters", "weekly-wildcat-headless")}{chips.length ? <Badge variant="secondary" className="ml-1">{chips.length}</Badge> : null}<ChevronDown data-icon="inline-end" aria-hidden="true" /></PopoverTrigger>
         <PopoverContent align="start" className="w-80 gap-4">

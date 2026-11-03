@@ -12,7 +12,7 @@ export function ActivitySection() {
   if (caps.role === "participant") return null;
   const failed = sectionError("activity");
   const items = data.activity.slice(0, 8);
-  return <Card size="sm" role="region" aria-labelledby="ws-activity-title" id="ws-activity" className="order-3 @3xl/ws:order-none">
+  return <Card size="sm" role="region" aria-labelledby="ws-activity-title" id="ws-activity" className="order-4 lg:order-none">
     <CardHeader><CardTitle id="ws-activity-title" role="heading" aria-level={2}>Recent Activity</CardTitle></CardHeader>
     <CardContent className="px-0">
       {failed ? <div className="px-3"><SectionFailed what="recent activity" onRetry={() => void reload()} /></div> : items.length

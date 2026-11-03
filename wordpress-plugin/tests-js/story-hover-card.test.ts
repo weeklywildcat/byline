@@ -13,12 +13,19 @@ describe("story hover previews", () => {
     expect(source).toContain("<PreviewCardPrimitive.Portal container={useAdminPortal()}>");
   });
 
-  it("lazy-loads the protected workspace only after the preview opens", () => {
+  it("only enters React Query after a hover provider exists, then lazy-loads on open", () => {
     const source = read("story/StoryHoverCard.tsx");
-    expect(source).toContain("enabled: open && storyId > 0");
+    expect(source).toContain("if (!context?.fetchers.getWorkspace || props.storyId <= 0) return props.children");
+    expect(source).toContain("function StoryHoverCardQuery");
+    expect(source).toContain("enabled: open");
     expect(source).toContain("workspaceKey(storyId)");
     expect(source).toContain("getWorkspace");
     expect(source).toContain('data-slot="story-hover-preview"');
+  });
+
+  it("provides hover data in Planning as well as Home", () => {
+    expect(read("home/HomeApp.tsx")).toContain("<StoryHoverProvider");
+    expect(read("planning/PlanningApp.tsx")).toContain("<StoryHoverProvider");
   });
 
   it("covers persistent story references across Home and Planning", () => {

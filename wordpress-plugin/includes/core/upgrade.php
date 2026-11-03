@@ -95,6 +95,14 @@ function byline_upgrade_steps(): array
         ];
     }
 
+    if (defined('BYLINE_COLLECTION_RELATIONSHIPS_SCHEMA_VERSION')) {
+        $steps['collectionRelationships'] = [
+            'label' => 'Collection relationships',
+            'option' => BYLINE_COLLECTION_RELATIONSHIPS_SCHEMA_VERSION_OPTION,
+            'version' => BYLINE_COLLECTION_RELATIONSHIPS_SCHEMA_VERSION,
+            'callback' => 'byline_collection_ensure_schema',
+        ];
+    }
     return $steps;
 }
 
@@ -391,6 +399,9 @@ function byline_activate_plugin(): void
 
 function byline_deactivate_plugin(): void
 {
+    if (function_exists('wp_clear_scheduled_hook')) {
+        wp_clear_scheduled_hook('byline_mcp_cleanup');
+    }
     if (function_exists('byline_clear_scheduled_deployment')) {
         byline_clear_scheduled_deployment();
     }

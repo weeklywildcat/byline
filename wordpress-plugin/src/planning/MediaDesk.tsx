@@ -89,9 +89,9 @@ function MediaRowContext({ row, editable, saving, workspaceUrl, onOpenStory, upd
   return <ContextMenu>
     <ContextMenuTrigger render={children} />
     <ContextMenuContent className="w-56">
-      <ContextMenuLabel className="max-w-52 truncate">{title}</ContextMenuLabel>
-      <ContextMenuSeparator />
       <ContextMenuGroup>
+        <ContextMenuLabel className="max-w-52 truncate">{title}</ContextMenuLabel>
+        <ContextMenuSeparator />
         <ContextMenuItem onClick={() => onOpenStory(row.story.id)}><Eye aria-hidden="true" />{__("Quick view story", "weekly-wildcat-headless")}</ContextMenuItem>
         <ContextMenuItem render={<a href={workspaceUrl(row.story.id)} />}><LayoutDashboard aria-hidden="true" />{__("Open story workspace", "weekly-wildcat-headless")}</ContextMenuItem>
       </ContextMenuGroup>

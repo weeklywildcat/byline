@@ -38,7 +38,7 @@ export function normalizePicked(raw: unknown): PickedAttachment | null {
 }
 
 /** Open the library. Resolves with the chosen files, or an empty list when it is dismissed. */
-export function pickFromMediaLibrary(type: MediaAssignmentType): Promise<PickedAttachment[]> {
+export function pickFromMediaLibrary(type: MediaAssignmentType, options: { title?: string; buttonLabel?: string; multiple?: boolean } = {}): Promise<PickedAttachment[]> {
   const create = factory();
   if (!create) return Promise.resolve([]);
   return new Promise((resolve) => {
@@ -46,7 +46,7 @@ export function pickFromMediaLibrary(type: MediaAssignmentType): Promise<PickedA
     const finish = (items: PickedAttachment[]) => { if (!settled) { settled = true; resolve(items); } };
     try {
       const kind = libraryType(type);
-      const frame = create({ title: "Add files to this assignment", button: { text: "Add to assignment" }, multiple: "add", ...(kind ? { library: { type: kind } } : {}) });
+      const frame = create({ title: options.title || "Add files to this assignment", button: { text: options.buttonLabel || "Add to assignment" }, multiple: options.multiple === false ? false : "add", ...(kind ? { library: { type: kind } } : {}) });
       frame.on("select", () => finish(frame.state().get("selection").toJSON().map(normalizePicked).filter((item): item is PickedAttachment => item !== null)));
       // WordPress closes the frame first and triggers `select` right after, in the
       // same call. Settle "dismissed" only once that call has finished.

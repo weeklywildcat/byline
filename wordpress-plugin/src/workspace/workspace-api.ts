@@ -1,4 +1,6 @@
+import { createCollectionApi } from "../collections/collection-api";
 import type { ProtectedEditorialRequest } from "../editorial/editorial-rest";
+import type { ArticleNotesResponse } from "../story/notes-model";
 import type {
   AppointmentInput,
   MediaAssignmentInput,
@@ -22,6 +24,7 @@ const story = (id: number) => `/byline/v1/editorial/stories/${id}`;
  */
 export function createWorkspaceClient(request: WorkspaceRequest) {
   return {
+    collections: createCollectionApi(request),
     getWorkspace: (storyId: number) => request<StoryWorkspace>({ path: `${story(storyId)}/workspace` }),
     saveBrief: (storyId: number, brief: string, expectedBrief?: string) =>
       request<{ brief: string }>({ path: `${story(storyId)}/brief`, method: "POST", data: { brief, ...(expectedBrief !== undefined ? { expectedBrief } : {}) } }),
@@ -47,6 +50,10 @@ export function createWorkspaceClient(request: WorkspaceRequest) {
       request<{ resources: StoryResource[] }>({ path: `${story(storyId)}/resources/${encodeURIComponent(resourceId)}`, method: "POST", data: link }),
     removeResource: (storyId: number, resourceId: string) =>
       request<{ resources: StoryResource[] }>({ path: `${story(storyId)}/resources/${encodeURIComponent(resourceId)}`, method: "DELETE" }),
+
+    /** Open Note threads for one story, read from WordPress Core Notes. Read-only; `edit_post` required. */
+    getNotes: (storyId: number, limit?: number) =>
+      request<ArticleNotesResponse>({ path: `${story(storyId)}/notes${limit ? `?limit=${limit}` : ""}` }),
 
     getSchedule: (from: string, to: string, includeTasks = false) =>
       request<ScheduleResponse>({ path: `/byline/v1/editorial/schedule?from=${from}&to=${to}${includeTasks ? "&includeTasks=1" : ""}` })

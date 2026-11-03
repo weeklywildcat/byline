@@ -1,3 +1,4 @@
+import { CollectionsPage } from "../collections/CollectionsPage";
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -5,6 +6,7 @@ import { AdminRoot } from "../admin-ui/components/admin-root";
 import { StoryCreateDialog } from "../story/StoryCreateDialog";
 import { StoryPeekHost } from "../story/StoryPeekHost";
 import { NewsroomCommands, type NewsroomCommandUrls } from "../story/NewsroomCommands";
+import { StoryHoverProvider } from "../story/StoryHoverCard";
 import type { StoryFetchers } from "../story/story-fetchers";
 import { createAdminQueryClient } from "../story/story-query";
 import type { StoryWorkspace } from "../workspace/workspace-types";
@@ -44,9 +46,11 @@ export function PlanningApp(props: PlanningAppProps) {
 
 function PlanningShell(props: PlanningAppProps) {
   const workspaceUrl = useMemo(() => createWorkspaceUrlBuilder(props.storiesUrl), [props.storiesUrl]);
-  return <StoryPeekHost fetchers={props.fetchers} workspaceUrl={(storyId) => workspaceUrl(storyId)}>
-    <PlanningBody {...props} workspaceUrl={workspaceUrl} />
-  </StoryPeekHost>;
+  return <StoryHoverProvider fetchers={props.fetchers}>
+    <StoryPeekHost fetchers={props.fetchers} workspaceUrl={(storyId) => workspaceUrl(storyId)}>
+      <PlanningBody {...props} workspaceUrl={workspaceUrl} />
+    </StoryPeekHost>
+  </StoryHoverProvider>;
 }
 
 function PlanningBody({ fetchers, tab, view, currentUserId, mine, workspaceUrl, commandUrls }: PlanningAppProps & { workspaceUrl: ReturnType<typeof createWorkspaceUrlBuilder> }) {
@@ -58,7 +62,8 @@ function PlanningBody({ fetchers, tab, view, currentUserId, mine, workspaceUrl, 
   // A new story opens its full Story Workspace, exactly as it does from Home.
   const openCreated = (created: StoryWorkspace) => window.location.assign(created.workspaceUrl || workspaceUrl(created.story.id));
   return <PlanningSearchProvider onSearch={() => setCommandsOpen(true)}><main className="@container/planning mx-auto mt-6 mb-8 flex max-w-[1600px] flex-col gap-4 pr-5 pl-1">
-    {destination === "stories" ? <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={{ mine: Boolean(mine) }} workspaceUrl={workspaceUrl} onNewStory={fetchers.createStory ? () => setCreating(true) : undefined} /> : null}
+    {destination === "stories" ? <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={{ mine: Boolean(mine), collectionId: Number(new URLSearchParams(window.location.search).get("collection")) || undefined }} workspaceUrl={workspaceUrl} onNewStory={fetchers.createStory ? () => setCreating(true) : undefined} /> : null}
+    {destination === "collections" ? <CollectionsPage fetchers={fetchers} currentUserId={currentUserId} workspaceUrl={workspaceUrl} /> : null}
     {destination === "media" ? <MediaDesk fetchers={fetchers} workspaceUrl={workspaceUrl} onOpenStory={openStory} /> : null}
     {destination === "coverage" ? <Coverage fetchers={fetchers} onOpenStory={openStory} /> : null}
     {destination === "feedback" ? <Feedback fetchers={fetchers} onOpenStory={openStory} /> : null}

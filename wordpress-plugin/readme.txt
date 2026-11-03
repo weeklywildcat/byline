@@ -4,7 +4,7 @@ Tags: newsroom, editorial, journalism, headless, student-journalism
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.3.42
+Stable tag: 0.3.62
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,87 @@ WordPress publication state, a fixed Weekly Wildcat homepage, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==
+
+= 0.3.62 =
+
+* Let editors choose how photos are cropped across the site (#220)
+
+= 0.3.61 =
+
+* Serve Byline MCP and per-user OAuth inside the WordPress plugin (#219)
+
+= 0.3.60 =
+
+* Add remote MCP newsroom server with per-user WordPress OAuth (#216)
+
+= 0.3.59 =
+
+* Simplify Today into one My Work queue (#214)
+
+= 0.3.58 =
+
+* Simplify article quick-view context (#213)
+
+= 0.3.57 =
+
+* Make Today work queues compact and scannable (#212)
+
+= 0.3.56 =
+
+* Keep reporting add actions available (#211)
+
+= 0.3.55 =
+
+* Make Stories List compact and scannable (#210)
+
+= 0.3.54 =
+
+* Add internal Collections reporting workspaces (#209)
+
+= 0.3.53 =
+
+* Autosave story drafts every 30 seconds (#206)
+
+= 0.3.52 =
+
+* Story Peek side sheet on Today, and title clicks that did nothing (#207)
+
+= 0.3.51 =
+
+* Task due-date clearing, workspace stylesheet order, stale E2E specs (#205)
+
+= 0.3.50 =
+
+* Fix context-menu crashes in Planning and story tools (#203)
+
+= 0.3.49 =
+
+* Restrict Contributor access to the Dashboard and newsletters (#201)
+
+= 0.3.48 =
+
+* Extend plugin changelog back to 0.2.4 (#199)
+
+= 0.3.47 =
+
+* Move Planning into Byline at the top of the admin sidebar (#200)
+
+= 0.3.46 =
+
+* Restore the desktop Story Workspace layout (#198)
+
+= 0.3.45 =
+
+* Remove the presence toolbar hover rectangle (#196)
+
+= 0.3.44 =
+
+* Make task fields directly editable (#192)
+
+= 0.3.43 =
+
+* Fix hover/context-menu and updated E2E flows (#194)
+* Compact newsroom presence in the WordPress header (#195)
 
 = 0.3.42 =
 
@@ -394,7 +475,139 @@ makes Studio a real homepage editor.**
   unaffected and continues to render normally.
 * Homepage designs saved while these settings existed continue to load.
 
+= 0.2.8 =
+
+**Makes WordPress the authoritative home for polls and votes.**
+
+* Adds native WordPress poll editing, ordered answers, voting windows, results,
+  CSV exports, and controls to open, close, reopen, duplicate, or reset a poll.
+* Stores votes in WordPress with duplicate-vote protection and prevents removing
+  answers that already have votes. Poll permissions follow newsroom roles.
+* Replaces the public site's Cloudflare D1 poll implementation with a thin
+  same-origin proxy to WordPress. Existing poll URLs, voter cookies, signatures,
+  and voter-key derivation stay compatible.
+* Adds D1 export and WordPress import tooling that preserves poll and answer
+  identifiers and vote records. Existing installations must migrate their data
+  and retain the same signing secret before switching the public proxy.
+
+= 0.2.7 =
+
+**Organizes WordPress navigation around newsroom work.**
+
+* Promotes Studio, Sports, Polls, and Events to top-level WordPress menus. Sports
+  opens directly on Games, with its roster and import/export tools beneath it.
+* Moves Byline below Settings and limits it to publication configuration:
+  Overview, Publication, Theme, Integrations, and Settings.
+* Uses each screen's own capability for menu visibility, hides disabled modules,
+  and fixes active-menu highlighting for sports utilities.
+* Preserves existing screen URLs and redirects the retired Team Settings page to
+  the Sports team screen.
+
+= 0.2.6 =
+
+**Fixes the WordPress admin crash and adds Discord connection settings.**
+
+* Fixes the fatal error introduced in 0.2.5 when WordPress passes a null value to
+  the admin menu filters, including on the Plugins screen.
+* Adds a Discord settings screen for the bot connection, server, storyboard
+  Forum, announcements channel, staff role, and synchronization behavior.
+* Loads server, channel, and role choices from Discord, with manual ID fields
+  when those choices cannot be loaded, and reports connection health.
+* Keeps saved secrets write-only. The bot loads settings through the signed
+  WordPress bridge and retains environment configuration as a fallback.
+* Adds a signed reconciliation endpoint for Sync now.
+
+= 0.2.5 =
+
+**Moves Byline navigation into native WordPress screens.**
+
+* Replaces the admin app's primary hash navigation with native WordPress menu
+  pages and stable URLs for Dashboard, Studio, Publication, Theme, Integrations,
+  Settings, and enabled newsroom modules.
+* Keeps related settings in local WordPress-style tabs and translates old hash
+  bookmarks to their new screen URLs.
+* Checks capabilities on each screen and directs users with limited access to
+  an allowed landing page.
+* Fixes Studio publication style parity with the public site.
+
+= 0.2.4 =
+
+**Publishes the first canonical Byline monorepo release.**
+
+* Ships the WordPress plugin alongside the static public site, optional Discord
+  bot, and shared content, design, and presentation packages in one repository.
+* Adds design schema v2 and shared lead and sports package renderers to Studio
+  and the public homepage. Existing designs retain legacy content that cannot
+  be converted faithfully.
+* Fails static builds on content-fetch errors while allowing genuinely empty
+  publications, and fixes PHP 7.4 compatibility and Discord user metadata
+  registration.
+* Exposes plugin metadata at the repository root so existing installations can
+  update from the standalone repository's 0.2.3 bridge to canonical releases.
+  The installed plugin folder, main file, updater slug, and ZIP name stay the
+  same.
+
 == Upgrade Notice ==
+
+= 0.3.62 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.61 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.60 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.59 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.58 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.57 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.56 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.55 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.54 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.53 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.52 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.51 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.50 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.49 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.48 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.47 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.46 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.45 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.44 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.43 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
 
 = 0.3.42 =
 Maintenance and feature update. Nothing needs reconfiguring after updating.

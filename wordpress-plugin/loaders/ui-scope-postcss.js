@@ -1,6 +1,6 @@
-// The shared admin UI (Home and the Story Workspace) is the only Tailwind
-// consumer. Prefix compiled selectors as a second boundary in addition to
-// conditional WordPress enqueueing. No Preflight.
+// The shared admin UI is consumed by scoped newsroom surfaces and small isolated
+// admin islands such as Settings navigation. Prefix compiled selectors as a
+// second boundary in addition to conditional WordPress enqueueing. No Preflight.
 const ROOT = '.byline-ui-root';
 
 module.exports = {

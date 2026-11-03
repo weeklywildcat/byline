@@ -1,0 +1,22 @@
+{
+  "name": "@byline/mcp-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "catalog": "node --import tsx scripts/catalog.ts && node --import tsx scripts/plugin-catalog.ts",
+    "verify": "node --import tsx scripts/catalog.ts --check && node --import tsx scripts/plugin-catalog.ts --check",
+    "test:plugin": "node --import tsx tests/plugin-smoke.ts"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/server": "2.3.1",
+    "zod": "4.6.7",
+    "@modelcontextprotocol/client": "2.3.1",
+    "@types/node": "24.10.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11",
+    "tsx": "4.23.15"
+  }
+}

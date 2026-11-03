@@ -5,7 +5,7 @@ import { ItemButton } from "../admin-ui/components/item-button";
 import { PeopleAvatars, anyPicture } from "../admin-ui/components/people-avatars";
 import { WorkStatusBadge, mediaIntensity } from "../admin-ui/components/work-status-badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "../admin-ui/ui/context-menu";
 import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
 import { ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
 import { mediaTypeIcons } from "../story/media-icons";
@@ -48,17 +48,19 @@ function MediaRow({ assignment, people, timezone, now, onOpen, onStatus, busy }:
 
     </ItemButton></ContextMenuTrigger>
     <ContextMenuContent className="w-52">
-      <ContextMenuLabel className="max-w-48 truncate">{assignment.title}</ContextMenuLabel>
-      <ContextMenuSeparator />
-      <ContextMenuItem onClick={(event) => onOpen(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit assignment</ContextMenuItem>
-      <ContextMenuSub>
-        <ContextMenuSubTrigger disabled={busy}>Status</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="min-w-44">
-          <ContextMenuRadioGroup value={assignment.status} onValueChange={(value) => { if (value && value !== assignment.status) onStatus(value as MediaAssignmentStatus); }}>
-            {STATUS_OPTIONS.map((option) => <ContextMenuRadioItem key={option.value} value={option.value}>{option.label}</ContextMenuRadioItem>)}
-          </ContextMenuRadioGroup>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
+      <ContextMenuGroup>
+        <ContextMenuLabel className="max-w-48 truncate">{assignment.title}</ContextMenuLabel>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={(event) => onOpen(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit assignment</ContextMenuItem>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger disabled={busy}>Status</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-44">
+            <ContextMenuRadioGroup value={assignment.status} onValueChange={(value) => { if (value && value !== assignment.status) onStatus(value as MediaAssignmentStatus); }}>
+              {STATUS_OPTIONS.map((option) => <ContextMenuRadioItem key={option.value} value={option.value}>{option.label}</ContextMenuRadioItem>)}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      </ContextMenuGroup>
     </ContextMenuContent>
   </ContextMenu>;
 }
