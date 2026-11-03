@@ -56,7 +56,6 @@ function story(patch: Partial<PlanningStory> = {}): PlanningStory {
     modifiedAt: null,
     visual: { type: "photo", status: "needed" },
     openTaskCount: 0,
-    coverage: [],
     featuredImage: null,
     ...patch
   };

@@ -162,7 +162,7 @@ function byline_collect_public_build_snapshot(int $revision): array
             if ($guest && !empty($guest['hasProfilePage'])) $datasets['guests'][] = byline_snapshot_contributor($guest);
         }
         // Iterate all published records, not the REST list endpoints' 50/100 limit.
-        foreach (get_posts(['post_type' => BYLINE_COVERAGE_POST_TYPE, 'post_status' => 'publish', 'posts_per_page' => -1, 'orderby' => 'date', 'order' => 'DESC']) as $post) {
+        foreach (get_posts(['post_type' => BYLINE_COLLECTION_POST_TYPE, 'post_status' => 'private', 'posts_per_page' => -1, 'orderby' => 'date', 'order' => 'DESC']) as $post) {
             $coverage = byline_get_public_coverage($post->ID);
             if ($coverage) {
                 $safe = byline_snapshot_pick($coverage, ['id', 'slug', 'title', 'description', 'overview', 'startAt', 'endAt', 'status']);

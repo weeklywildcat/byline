@@ -22,20 +22,21 @@ describe("fast editing interactions", () => {
   });
 
   it("uses reversible removal for lightweight relationships", () => {
-    expect(read("planning/Coverage.tsx")).toContain('label: __("Undo"');
+    expect(read("collections/collection-query.ts")).toContain('label: "Undo"');
     expect(read("workspace/ResourcesSection.tsx")).toContain('label: "Undo"');
     expect(read("story/StoryPeek.tsx")).toContain('label: "Undo"');
     expect(read("workspace/ResourcesSection.tsx")).toContain("Copy link");
     expect(read("story/StoryPeek.tsx")).toContain("Copy link");
-    expect(read("planning/Coverage.tsx")).not.toContain("<ConfirmRemoveDialog");
+    expect(read("collections/CollectionAddDialog.tsx")).not.toContain("<ConfirmRemoveDialog");
     expect(read("story/StoryPeek.tsx")).toContain("<ContextMenu");
   });
 
-  it("removes extra submit clicks from coverage linking", () => {
-    const source = read("planning/Coverage.tsx");
-    expect(source).toContain("onValueChange={(story) => {");
-    expect(source).toContain('placeholder={run.isPending ? __("Adding…"');
-    expect(source).toContain('<form className="flex gap-2" onSubmit=');
+  it("keeps public coverage subordinate to Collection coordination", () => {
+    const source = read("collections/CollectionPublicCoverage.tsx");
+    expect(source).toContain("Newsroom-only Collection");
+    expect(source).toContain("Publish as coverage");
+    expect(source).toContain("<WorkspaceDialog");
+    expect(source).toContain("pickFromMediaLibrary");
   });
 
   it("lets existing workspace tasks be edited without recreating them", () => {

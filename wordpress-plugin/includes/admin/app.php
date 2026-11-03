@@ -94,7 +94,7 @@ function byline_admin_page_definitions(): array
 /**
  * Byline's Planning destinations. These are real WordPress submenu entries so the
  * sidebar is the only place a user has to look for Stories, Calendar, Media
- * Desk, Coverage, Performance, Content Health, or Feedback. They reuse the
+ * Desk, Collections, Content Health, or Feedback. They reuse the
  * existing `page=byline-planning&tab=...` URLs: navigation hierarchy and URL
  * ownership stay independent.
  */
@@ -108,8 +108,6 @@ function byline_admin_planning_menu_items(): array
         'collections' => 'Collections',
         'calendar' => 'Calendar',
         'media' => 'Media Desk',
-        'coverage' => 'Coverage',
-        'performance' => 'Performance',
         'content-health' => 'Content Health',
         'feedback' => 'Feedback',
     ];
@@ -303,6 +301,17 @@ function byline_admin_redirect_legacy_pages(): void
     $page = byline_admin_current_page();
     $tab = byline_admin_query_key('tab');
 
+    if ($page === BYLINE_ADMIN_PLANNING_PAGE && in_array($tab, ['coverage', 'performance'], true)) {
+        $args = ['tab' => $tab === 'coverage' ? 'collections' : 'today'];
+        $legacy_id = absint($_GET['coverage'] ?? 0);
+        if ($legacy_id && function_exists('byline_collection_for_legacy_coverage')) {
+            $collection_id = byline_collection_for_legacy_coverage($legacy_id);
+            if ($collection_id) { $args['collection'] = $collection_id; }
+        }
+        wp_safe_redirect(byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, $args));
+        exit;
+    }
+
     if ($page === BYLINE_ADMIN_LEGACY_TEAMS_PAGE) {
         wp_safe_redirect(byline_sports_team_settings_url());
         exit;
@@ -352,8 +361,6 @@ function byline_admin_page_urls(): array
             'calendar' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'calendar']),
             'collections' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'collections']),
             'media' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'media']),
-            'coverage' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'coverage']),
-            'performance' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'performance']),
             'contentHealth' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'content-health']),
             'feedback' => byline_admin_page_url(BYLINE_ADMIN_PLANNING_PAGE, ['tab' => 'feedback']),
         ],
@@ -421,8 +428,8 @@ function byline_admin_legacy_hash_urls(array $page_urls): array
         '/planning/stories' => $page_urls['planning']['stories'],
         '/planning/calendar' => $page_urls['planning']['calendar'],
         '/planning/media' => $page_urls['planning']['media'],
-        '/planning/coverage' => $page_urls['planning']['coverage'],
-        '/planning/performance' => $page_urls['planning']['performance'],
+        '/planning/coverage' => $page_urls['planning']['collections'],
+        '/planning/performance' => $page_urls['planning']['today'],
         '/planning/content-health' => $page_urls['planning']['contentHealth'],
         '/planning/feedback' => $page_urls['planning']['feedback'],
         '/newsletters/issues' => $page_urls['newsletters']['issues'],
@@ -621,7 +628,6 @@ function byline_enqueue_admin_app(string $hook_suffix): void
         'tasksPath' => '/' . BYLINE_REST_NAMESPACE . '/editorial/tasks',
         'readinessPath' => '/' . BYLINE_REST_NAMESPACE . '/editorial/readiness',
         'mediaPath' => '/' . BYLINE_REST_NAMESPACE . '/editorial/media',
-        'coveragePath' => '/' . BYLINE_REST_NAMESPACE . '/admin/coverage',
         'feedbackPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/feedback',
         'distributionPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/distribution',
         'newsletterPath' => '/' . BYLINE_REST_NAMESPACE . '/admin/newsletters',

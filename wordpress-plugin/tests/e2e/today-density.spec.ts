@@ -4,7 +4,7 @@ import type { HomeBootstrap } from "../../src/home/newsroom-model";
 
 const todayUrl = "/wp-admin/admin.php?page=byline-planning&tab=today";
 
-test("Today keeps compact separated work queues, profile photos and safe inline task controls", async ({ adminPage: page, adminSession: session }, testInfo) => {
+test("Today keeps one compact work queue, profile photos and safe inline task controls", async ({ adminPage: page, adminSession: session }, testInfo) => {
   const unique = token();
   const me = await currentUserId(session);
   const { day } = await siteToday(session);
@@ -17,7 +17,7 @@ test("Today keeps compact separated work queues, profile photos and safe inline 
   }
   expect((await session.rest(`/byline/v1/editorial/stories/${ids[0]}/contributors`, "POST", { contributors: [{ id: me, kind: "user" }, photoWriter] })).ok).toBe(true);
   const taskIds: number[] = [];
-  for (const title of ["Interview principal", "Check budget", "Get student quotes", "Confirm library hours", "Finish first draft", "Choose photos", "Check final facts", "Send to editor"]) {
+  for (const title of ["Interview principal", "Check budget", "Get student quotes", "Confirm library hours", "Finish first draft", "Choose photos", "Check final facts", "Send to editor", "Review captions", "Verify spelling", "Submit final copy"]) {
     const task = await session.rest<{ id: number }>("/byline/v1/editorial/tasks", "POST", { title, storyId: ids[0], assigneeId: me, dueAt: `${addDays(day, 1)}T12:00:00`, priority: "normal" });
     expect(task.ok).toBe(true);
     taskIds.push(task.payload.id);
@@ -33,23 +33,29 @@ test("Today keeps compact separated work queues, profile photos and safe inline 
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(todayUrl);
-  const work = page.getByRole("region", { name: "Up Next", exact: true });
+  const work = page.getByRole("region", { name: "My Work", exact: true });
   const stories = page.getByRole("region", { name: "My Stories", exact: true });
-  await expect(work.locator("[data-task-id]")).toHaveCount(7);
+  // The ten-item preview includes the overdue-story action and review alongside tasks.
+  await expect(work.getByRole("group", { name: "Needs attention", exact: true })).toContainText("Winter concert");
+  const previewRows = work.locator('[data-slot="item-group"] > *');
+  await expect(previewRows).toHaveCount(10);
+  expect(await previewRows.evaluateAll((rows) => Math.max(...rows.map((row) => row.getBoundingClientRect().height)))).toBeLessThanOrEqual(66);
+  await expect(work.locator("[data-task-id]")).toHaveCount(8);
   const first = work.locator(`[data-task-id="${taskIds[0]}"]`);
   const taskTitle = first.locator('[data-slot="item-title"]');
   const quickFields = first.locator("[data-task-quick-fields]");
   const geometry = await first.boundingBox();
   expect(geometry!.height).toBeLessThanOrEqual(66);
   expect((await quickFields.boundingBox())!.x).toBeGreaterThanOrEqual((await taskTitle.boundingBox())!.x + (await taskTitle.boundingBox())!.width);
-  expect((await stories.boundingBox())!.y).toBeLessThan(900);
+  // The unified preview has ten rows plus group headings before My Stories.
+  expect((await stories.boundingBox())!.y).toBeLessThan(1100);
   const separators = await work.locator("[data-task-id]").evaluateAll((elements) => elements.slice(0, -1).map((element) => getComputedStyle(element).borderBottomWidth));
-  expect(separators).toEqual(Array(6).fill("1px"));
+  expect(separators).toEqual(Array(7).fill("1px"));
   const gaps = await work.locator("[data-task-id]").evaluateAll((elements) => elements.slice(1).map((element, index) => element.getBoundingClientRect().top - elements[index]!.getBoundingClientRect().bottom));
   expect(gaps.every((gap) => Math.abs(gap) <= 1)).toBe(true);
   expect((await work.locator('[data-slot="card-header"]').boundingBox())!.height).toBeLessThanOrEqual(54);
-  // Forty pixels of header content/padding plus its one-pixel separator.
-  expect((await stories.locator('[data-slot="card-header"]').boundingBox())!.height).toBeLessThanOrEqual(41);
+  // Both queue headers include a compact title and description.
+  expect((await stories.locator('[data-slot="card-header"]').boundingBox())!.height).toBeLessThanOrEqual(54);
   const portrait = stories.getByRole("img", { name: photoWriter.name, exact: true });
   await expect(portrait).toBeVisible();
   await expect.poll(() => portrait.locator("img").evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true);
@@ -65,10 +71,11 @@ test("Today keeps compact separated work queues, profile photos and safe inline 
 
   await work.getByRole("button", { name: "View all work", exact: true }).click();
   const allWork = page.getByRole("dialog", { name: "All my work", exact: true });
-  await expect(allWork.locator("[data-task-id]")).toHaveCount(8);
+  await expect(allWork.locator("[data-task-id]")).toHaveCount(11);
+  await expect(allWork.getByText("Cafeteria photos", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(allWork).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Photo & Visual Work", exact: true })).toContainText("Cafeteria photos");
+  await expect(page.getByRole("region", { name: "Photo & Visual Work", exact: true })).toHaveCount(0);
 
   const peek = page.getByRole("dialog", { name: titles[0], exact: true });
   await first.getByRole("combobox", { name: "Task priority: normal" }).click();

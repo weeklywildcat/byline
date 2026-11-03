@@ -427,7 +427,7 @@ test("realistic Collection remains usable at desktop, iPad, and narrow touch wid
       }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Coverage brief", exact: true }),
+      page.getByRole("heading", { name: "Reporting brief", exact: true }),
     ).toBeVisible();
     expect(
       await page.evaluate(

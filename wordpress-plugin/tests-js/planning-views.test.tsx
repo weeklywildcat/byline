@@ -16,7 +16,7 @@ function story(patch: Partial<PlanningStory> & { id: number }): PlanningStory {
   return {
     title: `Story ${patch.id}`, editUrl: `/wp-admin/post.php?post=${patch.id}&action=edit`, previewUrl: `/?p=${patch.id}&preview=true`, authors: [], writer: null, editor: null, workflow,
     wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: null, plannedPublication: null, modifiedAt: null,
-    visual: { type: "none", status: "needed" }, openTaskCount: 0, coverage: [], featuredImage: null, ...patch
+    visual: { type: "none", status: "needed" }, openTaskCount: 0, featuredImage: null, ...patch
   };
 }
 const stage = (id: string) => DEFAULT_WORKFLOW_STATUSES.find((status) => status.id === id)!;
@@ -245,7 +245,7 @@ describe("Planning addresses", () => {
   });
 
   it("maps every sidebar tab to a destination", () => {
-    expect(["stories", "calendar", "media", "coverage", "performance", "content-health", "contentHealth", "feedback", "nonsense"].map(destinationForTab)).toEqual(["stories", "stories", "media", "coverage", "performance", "content-health", "content-health", "feedback", "stories"]);
+    expect(["stories", "calendar", "media", "coverage", "performance", "content-health", "contentHealth", "feedback", "nonsense"].map(destinationForTab)).toEqual(["stories", "stories", "media", "collections", "stories", "content-health", "content-health", "feedback", "stories"]);
   });
 });
 

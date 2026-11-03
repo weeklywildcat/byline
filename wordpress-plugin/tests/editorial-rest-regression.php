@@ -121,10 +121,6 @@ $expected_routes = [
     '/coverage',
     '/coverage/(?P<slug>[a-z0-9-]+)',
     '/corrections',
-    '/admin/coverage',
-    '/admin/coverage/(?P<id>\\d+)',
-    '/admin/coverage/(?P<id>\\d+)/stories',
-    '/admin/coverage/(?P<id>\\d+)/stories/(?P<story>\\d+)',
     '/editorial/readiness/(?P<id>\\d+)',
     '/editorial/stories/(?P<id>\\d+)/corrections',
     '/editorial/corrections/(?P<id>\\d+)',
@@ -187,3 +183,5 @@ $no_photo = byline_editorial_rest_person(['id' => 10, 'name' => 'No Photo']);
 editorial_rest_test_assert(!array_key_exists('avatarUrl', $no_photo), 'Planning must not invent a placeholder avatar when no real profile photo exists.');
 
 echo "Grouped editorial REST regression passed (" . count($editorial_rest_test_routes) . " routes).\n";
+
+foreach (array_keys($editorial_rest_test_routes) as $route) { editorial_rest_test_assert(strpos($route, '/admin/coverage') === false, 'Legacy Coverage write routes must stay retired.'); }

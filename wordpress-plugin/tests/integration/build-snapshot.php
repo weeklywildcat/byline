@@ -22,10 +22,11 @@ $guest_id = wp_insert_post(['post_type' => BYLINE_GUEST_POST_TYPE, 'post_status'
 update_post_meta($guest_id, BYLINE_GUEST_PROFILE_PAGE_META, '1');
 update_post_meta($guest_id, '_byline_private_notes', $secret);
 byline_set_story_contributors($story_id, [['type' => 'guest', 'id' => $guest_id], ['type' => 'user', 'id' => 1]], 1);
-$coverage_id = wp_insert_post(['post_type' => BYLINE_COVERAGE_POST_TYPE, 'post_status' => 'publish', 'post_title' => 'Snapshot public coverage']);
-update_post_meta($coverage_id, BYLINE_COVERAGE_PUBLIC_META, '1');
+$coverage = byline_collection_save(['name' => 'Snapshot public coverage', 'publicPresentation' => ['publicEnabled' => true, 'publicTitle' => 'Snapshot public coverage', 'publicSlug' => 'snapshot-coverage-' . uniqid()]]);
+byline_snapshot_integration_assert(!is_wp_error($coverage), 'Public Collection creation should succeed.');
+$coverage_id = $coverage['id'];
 update_post_meta($coverage_id, '_byline_private_notes', $secret);
-byline_set_coverage_story_ids($coverage_id, [$story_id, $draft_id, $protected_id]);
+foreach ([$story_id, $draft_id, $protected_id] as $linked_story) byline_relation_set($coverage_id, 'story', $linked_story, true);
 $correction = byline_create_correction($story_id, ['type' => 'correction', 'text' => 'A public correction.'], 1);
 byline_snapshot_integration_assert(!is_wp_error($correction), 'Canonical public correction should be created.');
 $event_id = wp_insert_post(['post_type' => WWH_SCHOOL_EVENT_POST_TYPE, 'post_status' => 'publish', 'post_title' => 'Snapshot public event']);

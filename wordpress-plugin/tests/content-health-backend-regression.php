@@ -9,6 +9,7 @@ define('ABSPATH', __DIR__ . '/../');
 const BYLINE_MANAGE_CAPABILITY = 'manage_byline';
 const BYLINE_MANAGE_INTEGRATIONS_CAPABILITY = 'manage_byline_integrations';
 const HOUR_IN_SECONDS = 3600;
+const DAY_IN_SECONDS = 86400;
 
 $posts = [];
 $post_meta = [];
@@ -83,6 +84,27 @@ function esc_url_raw($url, array $protocols = []): string
 function wp_parse_url($url, $component = -1) { return parse_url($url, $component); }
 function absint($value): int { return abs((int) $value); }
 function get_post_meta(int $post_id, string $key, $single = false) { global $post_meta; return $post_meta[$post_id][$key] ?? ($single ? '' : []); }
+function wp_slash($value) { return $value; }
+function update_post_meta($id, $key, $value, $previous = null): bool { global $post_meta; $post_meta[$id][$key] = $value; return true; }
+function add_post_meta($id, $key, $value, $unique = false): bool { global $post_meta; if (isset($post_meta[$id][$key])) return false; $post_meta[$id][$key] = $value; return true; }
+function metadata_exists($type, $id, $key): bool { global $post_meta; return isset($post_meta[$id][$key]); }
+function wp_cache_delete(...$args): void {}
+function rest_sanitize_boolean($value): bool { return filter_var($value, FILTER_VALIDATE_BOOLEAN); }
+function get_current_user_id(): int { return 42; }
+function add_option($key, $value, ...$args): bool { global $options; if (isset($options[$key])) return false; $options[$key] = $value; return true; }
+function delete_option($key): bool { global $options; unset($options[$key]); return true; }
+function wp_schedule_single_event($timestamp, $hook): bool { global $options; $options['scheduled:' . $hook] = $timestamp; return true; }
+class HealthDatabase {
+    public $posts = 'posts';
+    function prepare($sql, ...$args) { foreach ($args as $arg) $sql = preg_replace('/%d/', (string) (int) $arg, $sql, 1); return $sql; }
+    function get_col($sql): array {
+        global $posts;
+        preg_match('/ID > (\d+) AND ID <= (\d+).*LIMIT (\d+)/', $sql, $m);
+        return array_slice(array_values(array_filter(array_keys($posts), function($id) use ($posts, $m) { return $posts[$id]->post_type === 'post' && $posts[$id]->post_status === 'publish' && $id > (int) ($m[1] ?? 0) && $id <= (int) ($m[2] ?? PHP_INT_MAX); })), 0, (int) ($m[3] ?? 10000));
+    }
+    function get_var($sql) { $ids = $this->get_col($sql); return strpos($sql, 'COUNT') !== false ? count($ids) : ($ids ? max($ids) : 0); }
+}
+$wpdb = new HealthDatabase();
 function get_post_thumbnail_id(int $post_id): int { return absint(get_post_meta($post_id, '_thumbnail_id', true)); }
 function get_post(int $post_id) { global $posts; return $posts[$post_id] ?? null; }
 function get_edit_post_link(int $post_id, string $context = 'display'): string { return 'https://cms.example.test/wp-admin/post.php?post=' . $post_id . '&action=edit'; }
@@ -124,7 +146,8 @@ function get_posts(array $query = []): array
             return in_array((string) ($posts[$id]->post_status ?? ''), $post_statuses, true);
         }));
     }
-    return array_slice($ids, (int) ($query['offset'] ?? 0), (int) ($query['posts_per_page'] ?? 10));
+    $limit = $query['numberposts'] ?? $query['posts_per_page'] ?? 10;
+    return $limit === -1 ? $ids : array_slice($ids, (int) ($query['offset'] ?? 0), $limit);
 }
 function wp_remote_retrieve_response_code($response): int { return (int) ($response['response']['code'] ?? 0); }
 function wp_safe_remote_get(string $url, array $args = [])
@@ -154,8 +177,8 @@ function rest_ensure_response($value) { return $value; }
 function wp_schedule_event(int $timestamp, string $recurrence, string $hook): bool { global $options; $options['scheduled:' . $hook] = $timestamp; return true; }
 function wp_next_scheduled(string $hook) { global $options; return $options['scheduled:' . $hook] ?? false; }
 
-$posts[5] = (object) ['ID' => 5, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => 'A link https://public.example.test/story.'];
-$posts[6] = (object) ['ID' => 6, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => 'No external links.'];
+$posts[5] = (object) ['ID' => 5, 'post_title' => 'Published story', 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => 'A link https://public.example.test/story.'];
+$posts[6] = (object) ['ID' => 6, 'post_title' => 'Another published story', 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => 'No external links.'];
 $posts[7] = (object) ['ID' => 7, 'post_status' => 'draft', 'post_type' => 'post', 'post_title' => 'Private draft story', 'post_content' => 'Private newsroom work.'];
 $posts[8] = (object) ['ID' => 8, 'post_status' => 'private', 'post_type' => 'post', 'post_title' => 'Private story', 'post_content' => 'Private newsroom work.'];
 
@@ -181,10 +204,10 @@ $failed_link = byline_content_health_check_url('https://public.example.test/fail
 health_assert($failed_link['severity'] === 'error' && $failed_link['status'] === 503, 'An external HTTP failure was not normalized as an error.');
 
 $health = byline_content_health_check_story(5, ['checkLinks' => false]);
-$ids = array_column($health['issues'], 'id');
-health_assert(in_array('featured-image', $ids, true) && in_array('image-credit', $ids, true), 'Missing featured-image/content-credit checks were not returned.');
+$ids = array_column($health['issues'], 'checkId');
+health_assert(in_array('featured-image', $ids, true) && !in_array('image-credit', $ids, true) && !in_array('featured-image-alt', $ids, true), 'Missing featured-image/content-credit checks were not returned.');
 foreach ($health['issues'] as $issue) {
-    if (in_array($issue['id'], ['featured-image', 'featured-image-alt', 'image-credit'], true)) {
+    if (in_array($issue['checkId'], ['featured-image', 'featured-image-alt', 'image-credit'], true)) {
         health_assert(($issue['fixTarget']['kind'] ?? '') === 'featured-image', 'Featured-image issues did not receive a structured featured-image target.');
         health_assert(!isset($issue['fixTarget']['clientId']), 'A featured-image target unexpectedly exposed a clientId.');
     }
@@ -193,7 +216,7 @@ health_assert($remote_count === 2, 'A normal story check unexpectedly made a rem
 $link_health = byline_content_health_check_story(5, ['checkLinks' => true]);
 $link_issue = null;
 foreach ($link_health['issues'] as $issue) {
-    if (strpos((string) ($issue['id'] ?? ''), 'link-') === 0) {
+    if (($issue['checkId'] ?? '') === 'broken-link') {
         $link_issue = $issue;
         break;
     }
@@ -222,7 +245,7 @@ $post_meta[44]['_ww_image_credit_text'] = '';
 $image_health = byline_content_health_check_story(6, ['checkLinks' => false]);
 $image_by_id = [];
 foreach ($image_health['issues'] as $issue) {
-    $image_by_id[$issue['id']] = $issue['severity'];
+    $image_by_id[$issue['checkId']] = $issue['severity'];
 }
 health_assert(($image_by_id['featured-image-alt'] ?? '') === 'warning' && ($image_by_id['image-credit'] ?? '') === 'warning', 'Missing alt/credit metadata was not detected.');
 $post_meta[44]['_wp_attachment_image_alt'] = 'A described photo';
@@ -230,7 +253,7 @@ $post_meta[44]['_ww_image_credit_text'] = 'Campus photo';
 $image_health_good = byline_content_health_check_story(6, ['checkLinks' => false]);
 $good_by_id = [];
 foreach ($image_health_good['issues'] as $issue) {
-    $good_by_id[$issue['id']] = $issue['severity'];
+    $good_by_id[$issue['checkId']] = $issue['severity'];
 }
 health_assert(($good_by_id['featured-image-alt'] ?? '') === 'good' && ($good_by_id['image-credit'] ?? '') === 'good', 'Valid alt/credit metadata did not pass.');
 
@@ -239,14 +262,16 @@ byline_content_health_summary();
 health_assert($remote_count === $remote_before_summary, 'Content-health summary performed remote link checks on page load.');
 $remote_code = 200;
 $checked_story = byline_content_health_scan_story(5, true);
-health_assert(isset($transients[byline_content_health_story_cache_key(5)]) && $checked_story['remoteLinksChecked'] === true, 'Manual story recheck did not store a bounded scan result.');
+health_assert(isset($post_meta[5][BYLINE_CONTENT_HEALTH_SNAPSHOT]) && $checked_story['remoteLinksChecked'] === true, 'Manual story recheck did not store a bounded scan result.');
+byline_content_health_start_scan();
 $scan = byline_content_health_scan_batch(100, 0);
-health_assert(($last_query['posts_per_page'] ?? 100) <= 25 && $scan['scanned'] <= 25, 'Content-health scanner exceeded the bounded batch size.');
+health_assert($scan['checked'] <= BYLINE_CONTENT_HEALTH_SCAN_BATCH_SIZE, 'Content-health scanner exceeded the bounded batch size.');
 
 byline_register_content_health_hooks();
 health_assert(isset($actions['rest_api_init']) && isset($actions[BYLINE_CONTENT_HEALTH_SCAN_HOOK]), 'Content-health registration hooks were not explicit and discoverable.');
 health_assert(isset($actions['admin_enqueue_scripts']) && in_array('byline_content_health_enqueue_editor_navigation', $actions['admin_enqueue_scripts'], true), 'Content-health editor navigation was not registered on the admin enqueue hook.');
 byline_register_content_health_routes();
+health_assert(byline_content_health_rest_requested_post_id(new HealthTestRequest(['id' => 5, 'postId' => 7])) === 5, 'A body field overrode the explicit numeric story route.');
 $summary_route = $routes['byline/v1/admin/content-health'] ?? null;
 $recheck_route = $routes['byline/v1/admin/content-health/recheck/(?P<id>\\d+)'] ?? null;
 health_assert(is_array($summary_route) && $summary_route['permission_callback']() === false, 'Content-health summary route was not capability protected.');
@@ -275,4 +300,41 @@ health_assert(!empty(array_filter($capability_checks, static function (array $ch
     return $check[0] === 'edit_post' && ($check[1][0] ?? 0) === 7;
 })), 'Content-health story permissions did not evaluate edit_post for the requested story.');
 
+// Consecutive durable scans distinguish new/existing/regressed after resolution.
+$can_manage = true;
+$capabilities = [];
+$remote_code = 503;
+$first = byline_content_health_scan_story(5);
+$link = array_values(array_filter($first['issues'], fn($i) => $i['checkId'] === 'broken-link'))[0];
+health_assert($link['state'] === 'new', 'First failing link was not new.');
+$again = byline_content_health_scan_story(5);
+health_assert(array_values(array_filter($again['issues'], fn($i) => $i['checkId'] === 'broken-link'))[0]['state'] === 'existing', 'Persistent finding was not existing.');
+$remote_code = 200;
+$resolved = byline_content_health_scan_story(5);
+health_assert(!in_array('broken-link', array_column($resolved['issues'], 'checkId')), 'Resolved link remained active.');
+$remote_code = 503;
+$regressed = byline_content_health_scan_story(5);
+health_assert(array_values(array_filter($regressed['issues'], fn($i) => $i['checkId'] === 'broken-link'))[0]['state'] === 'regressed', 'Resolution history did not detect regression.');
+$before = count(byline_content_health_summary(5)['issues']);
+byline_content_health_rest_disposition(new HealthTestRequest(['postId' => 5, 'checkId' => 'broken-link', 'reason' => 'Source temporarily unavailable']));
+$ignored = byline_content_health_summary(5);
+health_assert(count($ignored['issues']) === $before - 1 && count($ignored['ignored']) === 1, 'Ignored findings still counted as active.');
+health_assert($ignored['ignored'][0]['ignored']['by'] === 42 && !empty($ignored['ignored'][0]['ignored']['at']), 'Ignore audit was lost.');
+byline_content_health_scan_story(5);
+health_assert(count(byline_content_health_summary(5)['ignored']) === 1, 'Recheck lost story ignore state.');
+byline_content_health_rest_disposition(new HealthTestRequest(['postId' => 5, 'checkId' => 'broken-link', 'restore' => true]));
+health_assert(count(byline_content_health_summary(5)['issues']) === $before, 'Restoring a finding did not return it to triage.');
+$options[BYLINE_CONTENT_HEALTH_SCAN_STATE] = [];
+for ($i = 100; $i < 132; $i++) $posts[$i] = (object) ['ID' => $i, 'post_type' => 'post', 'post_status' => 'publish', 'post_title' => "Published $i", 'post_content' => ''];
+$initial = byline_content_health_start_scan();
+health_assert($initial['total'] === 34 && $initial['checked'] === 0, 'Full scan did not count all eligible published stories.');
+$resumed = byline_content_health_start_scan();
+health_assert($resumed === $initial, 'Run scan reset an active generation.');
+for ($i = 0; $i < 40; $i++) { $progress = byline_content_health_scan_batch(); if (!$progress['running']) break; }
+health_assert(!$progress['running'] && $progress['checked'] === 34 && $progress['failed'] === 0 && !empty($progress['lastFullScanAt']), 'Full scan failed to progress past 25 stories.');
+health_assert(byline_content_health_summary()['scanned'] === 34, 'Durable summary hid stories beyond the recent 25.');
+$transients = [];
+health_assert(byline_content_health_cached_story(100) !== null, 'Story results expired with transient data.');
+$finished = byline_content_health_scan_batch();
+health_assert($finished === $progress, 'A leftover continuation restarted a completed full scan.');
 echo "Byline content-health backend regression passed.\n";

@@ -250,7 +250,7 @@ function story(notes: ArticleNotesSummary | null | undefined): PlanningStory {
     id: 7, title: "Canteen", editUrl, authors: [], writer: null, editor: null,
     workflow: { id: "reporting", label: "Reporting", group: "main", selectable: true },
     wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
-    deadline: null, plannedPublication: null, modifiedAt: null, visual: { type: "none", status: "needed" }, openTaskCount: 0, coverage: [], featuredImage: null,
+    deadline: null, plannedPublication: null, modifiedAt: null, visual: { type: "none", status: "needed" }, openTaskCount: 0, featuredImage: null,
     ...(notes !== undefined ? { notes } : {})
   } as PlanningStory;
 }
