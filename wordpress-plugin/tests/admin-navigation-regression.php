@@ -609,7 +609,7 @@ if (strpos($rendered_root, 'id="byline-admin-root"') === false) {
 $index_source = file_get_contents(__DIR__ . '/../src/index.tsx');
 $style_source = file_get_contents(__DIR__ . '/../src/style.css');
 $settings_sidebar_source = file_get_contents(__DIR__ . '/../src/settings/SettingsSidebar.tsx');
-$sidebar_primitive_source = file_get_contents(__DIR__ . '/../src/admin-ui/ui/sidebar.tsx');
+$sidebar_primitive_source = file_get_contents(__DIR__ . '/../../packages/newsroom-ui/src/ui/sidebar.tsx');
 $game_source = file_get_contents(__DIR__ . '/../weekly-wildcat-headless.php');
 $roster_source = file_get_contents(__DIR__ . '/../includes/sports-rosters.php');
 $app_source = file_get_contents(__DIR__ . '/../includes/admin/app.php');
