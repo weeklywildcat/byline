@@ -1,7 +1,7 @@
 import { stableDigest } from "@byline/content";
 import { buildArticlePresentation } from "./article-presentation";
 import { buildCoveragePresentation } from "./coverage-presentation";
-import { isVisibleContentPost } from "./content";
+import { isGeneralEditorialPost, isVisibleContentPost } from "./content";
 import { getPublicationConfig } from "./publication";
 import { getPostContributors, isGuestContributor, getPostPrimaryGameId, type WordPressAuthor, type WordPressPost } from "./wordpress";
 import type { WebBuildSnapshot } from "./build-snapshot";
@@ -43,7 +43,7 @@ export function routeCacheDependency(snapshot: WebBuildSnapshot, kind: DynamicRo
     dependencies = { post: post.id, related: render.presentation.relatedStories.map((entry) => entry.id), moreBy: render.presentation.moreByAuthorStories.map((entry) => entry.id), contributors: render.presentation.contributors.map((entry) => entry.id), series: render.presentation.series?.href ?? null };
   } else if (kind === "category") {
     const category = snapshot.categories.find((entry) => String(entry.id) === String(id));
-    const posts = snapshot.posts.filter((post) => post.categories.includes(Number(id)) && isVisibleContentPost(post));
+    const posts = snapshot.posts.filter((post) => post.categories.includes(Number(id)) && isGeneralEditorialPost(post));
     data = { category, posts };
     dependencies = { category: id, posts: posts.map((post) => post.id) };
   } else if (kind === "author") {

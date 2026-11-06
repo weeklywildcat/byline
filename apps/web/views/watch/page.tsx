@@ -1,7 +1,7 @@
 import type { Metadata } from "@/lib/metadata";
 import { SectionHeader } from "@/components/SectionHeader";
 import { StoryTeaser } from "@/components/StoryTeaser";
-import { filterVisibleContentPosts } from "@/lib/content";
+import { filterGeneralEditorialPosts } from "@/lib/content";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import { getVideoStories } from "@/lib/story-video";
@@ -16,7 +16,7 @@ const DESCRIPTION = `Video reporting from ${publication.identity.shortName}.`;
  * not one: each story's own URL is the page search engines index as a video.
  */
 async function getWatchStories() {
-  return getVideoStories(filterVisibleContentPosts(await getAllPosts()));
+  return getVideoStories(filterGeneralEditorialPosts(await getAllPosts()));
 }
 
 export async function getMetadata(): Promise<Metadata> {

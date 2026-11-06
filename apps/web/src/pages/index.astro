@@ -3,6 +3,7 @@ import BaseLayout from "@/src/layouts/BaseLayout.astro";
 import React from "react";
 import { getHomepagePageData, metadata } from "@/views/page";
 import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
+import { BehindTheScenesSection } from "@/components/BehindTheScenesSection";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { PollWidget } from "@/components/PollWidget";
 import { HomepagePackages, ThisWeekCard, packageHeadingId } from "@byline/ui";
@@ -25,6 +26,7 @@ const relocateScript = `document.querySelectorAll('.astro-island-relocation[data
         calendar: ({ package: resolvedPackage, packageId }) => "latest" in resolvedPackage ? React.createElement(ThisWeekCard, { entries: toCalendarEntries(data.sportsSchedule.schoolEvents, data.sportsSchedule.upcomingGames, resolvedPackage.utility.calendarLimit ?? 3), heading: resolvedPackage.utility.calendarHeading ?? "At NSHS", scheduleHref: "/sports/schedule/", headingId: packageHeadingId(`${packageId}-calendar`, "this-week-heading") }) : null,
         newsletter: ({ packageId }) => React.createElement("div", { id: `home-newsletter-${packageId}-slot` })
       }} />
+      <BehindTheScenesSection posts={data.behindTheScenesPosts} />
   </main>
   {leadPackages.map((entry) => <>
     <HomepageHeroRailLimiter client:load />
