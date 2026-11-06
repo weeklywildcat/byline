@@ -106,6 +106,8 @@ export default buildConfig({
       header: ["/ui/shell/BylineAppHeader#BylineAppHeader"],
       views: {
         dashboard: { Component: "/components/BylineHome#BylineHome" },
+        // Byline Stories. Payload's raw Stories list stays at /collections/stories for administrators.
+        stories: { Component: "/components/BylineStories#BylineStories", path: "/stories" },
         // Administrators only: the entry to Payload's raw collection screens.
         system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system" }
       }

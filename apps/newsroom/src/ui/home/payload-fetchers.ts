@@ -19,8 +19,11 @@ import type { MediaAssignmentsResponse, ReportingResponse, ResourcePurpose, Stor
  */
 export type ScreenError = { message: string; code: string; data: { status: number } };
 
-export function createPayloadHomeFetchers(api: string): HomeFetchers {
-  async function request<T>(path: string, method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE" = "GET", data?: unknown): Promise<T> {
+type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+
+/** One request to `/api/byline/...` as the signed-in user, failing with the screens' error shape. */
+export function createBylineRequest(api: string) {
+  return async function request<T>(path: string, method: Method = "GET", data?: unknown): Promise<T> {
     const response = await fetch(`${api}/byline${path}`, {
       method,
       credentials: "include",
@@ -38,8 +41,11 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
       throw error;
     }
     return body as T;
-  }
+  };
+}
 
+export function createPayloadHomeFetchers(api: string): HomeFetchers {
+  const request = createBylineRequest(api);
   const notYet = (what: string) => () => Promise.reject<never>({ message: `${what} isn't available in the newsroom yet.`, code: "byline_not_ported", data: { status: 501 } } satisfies ScreenError);
 
   const getWorkspace = (storyId: number) => request<StoryWorkspace>(`/stories/${storyId}/workspace`);

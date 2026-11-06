@@ -5,7 +5,7 @@
  * filters, and a view is "active" only while the current filters still match
  * it exactly. Saved views are the reader's own presets, stored by the host.
  */
-import { DEFAULT_PLANNING_SORT, EMPTY_PLANNING_FILTERS, normalizePlanningFilters, samePlanningFilters, type PlanningFilters, type PlanningSort, type SavedPlanningView } from "./planning-model";
+import { DEFAULT_PLANNING_SORT, EMPTY_PLANNING_FILTERS, normalizePlanningFilters, samePlanningFilters, sanitizePlanningFilters, sanitizePlanningSort, type PlanningFilters, type PlanningSort, type SavedPlanningView } from "./planning-model";
 
 export type BuiltInStoryViewId = "all" | "mine" | "review" | "overdue" | "unassigned" | "published" | "on-hold";
 
@@ -63,3 +63,29 @@ export function applySavedView(view: SavedPlanningView): AppliedView {
 /** The most saved views one account keeps. Hosts enforce it on the server too. */
 export const SAVED_VIEW_LIMIT = 25;
 export const SAVED_VIEW_NAME_MAX_LENGTH = 80;
+
+/** A saved view's id: what a host generated (a UUID, a WordPress key), never markup or a path. */
+const SAVED_VIEW_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+/**
+ * Untrusted stored saved views (a preference value, a server response) as a
+ * valid list: an array, each record with a safe unique id, a trimmed name of
+ * at most SAVED_VIEW_NAME_MAX_LENGTH, sanitized filters and sort; malformed
+ * records are dropped and at most SAVED_VIEW_LIMIT are kept.
+ */
+export function normalizeSavedPlanningViews(value: unknown): SavedPlanningView[] {
+  if (!Array.isArray(value)) return [];
+  const views: SavedPlanningView[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (views.length === SAVED_VIEW_LIMIT) break;
+    if (!isRecord(item) || typeof item.id !== "string" || !SAVED_VIEW_ID.test(item.id) || seen.has(item.id)) continue;
+    const name = typeof item.name === "string" ? item.name.trim().slice(0, SAVED_VIEW_NAME_MAX_LENGTH).trim() : "";
+    if (!name || !isRecord(item.filters)) continue;
+    seen.add(item.id);
+    views.push({ id: item.id, name, filters: sanitizePlanningFilters(item.filters), sort: sanitizePlanningSort(item.sort), ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}) });
+  }
+  return views;
+}

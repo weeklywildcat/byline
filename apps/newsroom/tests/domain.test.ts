@@ -4,7 +4,7 @@ import { atLeast, newsroomUser, relationIds } from "../src/access/user";
 import { passwordSignInAllowed } from "../src/collections/Users";
 import { validResourceUrl } from "../src/collections/StoryPlans";
 import { addDays, localDay, localToInstant } from "../src/domain/dates";
-import { activeNavKey, administrationFor, canAdministerSystem, createActionsFor, locationFor, navigationFor, storyIdFromPath } from "../src/domain/navigation";
+import { activeNavKey, administrationFor, canAdministerSystem, createActionsFor, locationFor, NAVIGATION, navigationFor, storyIdFromPath } from "../src/domain/navigation";
 import { dateOnly, normalizeAppointmentTiming, TimingError } from "../src/domain/schedule";
 import { isSlug, slugify } from "../src/domain/slug";
 import { CORRECTION_TYPES, STORY_FORMATS, WORKFLOW_STAGES } from "../src/domain/vocabulary";
@@ -152,7 +152,17 @@ describe("navigation", () => {
     for (const role of ["staff", "editor", "administrator"] as const) {
       expect(navigationFor(role).every((item) => !item.path.startsWith("/collections/"))).toBe(true);
     }
-    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home"]);
+    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories"]);
+  });
+
+  it("sends staff to Byline Stories and keeps Payload's raw Stories list as System administration", () => {
+    const stories = NAVIGATION.find((item) => item.key === "stories")!;
+    expect(stories).toEqual({ key: "stories", label: "Stories", path: "/stories", minimumRole: "staff" });
+    expect(activeNavKey(navigationFor("staff"), "/admin/stories", "/admin")).toBe("stories");
+    expect(activeNavKey(navigationFor("staff"), "/admin/collections/stories", "/admin")).toBeNull();
+    expect(locationFor("/admin/stories", "/admin")).toEqual([{ label: "Stories" }]);
+    expect(locationFor("/admin/collections/stories", "/admin")).toEqual([{ label: "System administration", path: "/system" }, { label: "Stories" }]);
+    expect(locationFor("/admin/collections/stories/12", "/admin")).toEqual([{ label: "Story" }]);
   });
 
   it("keeps raw Payload screens in an administrators-only section", () => {

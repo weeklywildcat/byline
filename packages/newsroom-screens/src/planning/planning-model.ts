@@ -174,10 +174,14 @@ export const EMPTY_PLANNING_FILTERS: PlanningFilters = {
   needsReview: false
 };
 
+/**
+ * One reader's saved filters and sort. Each host keeps them per account (the
+ * WordPress plugin in user meta, the Payload newsroom in Payload Preferences),
+ * so a view carries no owner: whoever receives it owns it.
+ */
 export type SavedPlanningView = {
   id: string;
   name: string;
-  ownerId: number;
   filters: PlanningFilters;
   sort: PlanningSort;
   updatedAt?: string | null;
@@ -732,20 +736,6 @@ export function replacePlanningStory(
   return stories.map((story) => story.id === storyId && (!expectedCurrent || story === expectedCurrent) ? nextStory : story);
 }
 
-export function filterSavedViewsForUser(views: SavedPlanningView[], ownerId: number): SavedPlanningView[] {
-  return views.filter((view) => view.ownerId === ownerId);
-}
-
-export function serializeSavedPlanningView(view: SavedPlanningView): string {
-  return JSON.stringify({
-    id: view.id,
-    name: view.name.trim(),
-    ownerId: view.ownerId,
-    filters: normalizePlanningFilters(view.filters),
-    sort: view.sort
-  });
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
@@ -754,25 +744,6 @@ function isPlanningSort(value: unknown): value is PlanningSort {
   if (!isRecord(value)) return false;
   return ["story", "workflow", "writer", "deadline", "planned", "modified"].includes(String(value.key))
     && (value.direction === "asc" || value.direction === "desc");
-}
-
-export function deserializeSavedPlanningView(value: string, expectedOwnerId?: number): SavedPlanningView | null {
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!isRecord(parsed) || typeof parsed.id !== "string" || typeof parsed.name !== "string" || !parsed.name.trim()) return null;
-    if (typeof parsed.ownerId !== "number" || !isRecord(parsed.filters) || !isPlanningSort(parsed.sort)) return null;
-    if (expectedOwnerId !== undefined && parsed.ownerId !== expectedOwnerId) return null;
-
-    return {
-      id: parsed.id,
-      name: parsed.name.trim(),
-      ownerId: parsed.ownerId,
-      filters: normalizePlanningFilters(parsed.filters as Partial<PlanningFilters>),
-      sort: parsed.sort
-    };
-  } catch {
-    return null;
-  }
 }
 
 /**

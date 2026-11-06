@@ -21,7 +21,10 @@ const allowed = (role: Role) => (item: { minimumRole: Role }) => RANK[role] >= R
  * (docs/payload-migration.md §7.2). Visibility is a convenience; every
  * destination enforces its own access on the server.
  */
-export const NAVIGATION: readonly NavItem[] = [{ key: "home", label: "Home", path: "", minimumRole: "staff" }];
+export const NAVIGATION: readonly NavItem[] = [
+  { key: "home", label: "Home", path: "", minimumRole: "staff" },
+  { key: "stories", label: "Stories", path: "/stories", minimumRole: "staff" }
+];
 
 export function navigationFor(role: Role): NavItem[] {
   return NAVIGATION.filter(allowed(role));

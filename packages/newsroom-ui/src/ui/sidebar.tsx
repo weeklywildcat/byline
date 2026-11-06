@@ -534,7 +534,9 @@ function SidebarMenuButton({
     /** Shown only while the sidebar is collapsed to icons on desktop. */
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
-  const { isMobile, state } = useSidebar()
+  // Optional: a contextual rail (a module's views beside the page) uses menu
+  // buttons outside any Sidebar. Only the collapsed-icon tooltip needs one.
+  const sidebar = React.useContext(SidebarContext)
   const comp = useRender({
     defaultTagName: "button",
     props: mergeProps<"button">(
@@ -557,7 +559,7 @@ function SidebarMenuButton({
   }
 
   const content = typeof tooltip === "string" ? { children: tooltip } : tooltip
-  const hidden = state !== "collapsed" || isMobile
+  const hidden = !sidebar || sidebar.state !== "collapsed" || sidebar.isMobile
 
   return (
     <Tooltip>
