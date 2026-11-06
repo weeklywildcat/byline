@@ -17,7 +17,7 @@ let payload: Payload;
 const accounts: Record<string, User> = {};
 const people: Record<string, number> = {};
 const story: Record<string, number> = {};
-let coverageId: number;
+let collectionId: number;
 const TZ = "America/New_York";
 const NOW = new Date("2026-11-09T15:00:00Z");
 const BULK = 120;
@@ -98,7 +98,7 @@ beforeAll(async () => {
   // 22:00 on the 12th in New York is already the 13th in UTC: the planned day is the newsroom's.
   expect((await workflow("editor", "ready", { plannedPublishAt: "2026-11-12T22:00" })).status).toBe(200);
 
-  coverageId = (await payload.create({ collection: "coverages", data: { title: "Town budget", stories: [story.budget, story.library] } as never, req: await reqAs("editor"), overrideAccess: false })).id;
+  collectionId = (await payload.create({ collection: "collections", data: { name: "Town budget", type: "ongoing", stories: [story.budget, story.library] } as never, req: await reqAs("editor"), overrideAccess: false })).id;
 
   // More stories than any default page: the collection must never be a first page.
   for (let index = 0; index < BULK; index += 1) await create("editor", `Bulk story ${index}`);
@@ -190,9 +190,9 @@ describe("Stories filters", () => {
   it("unassigned", async () => expect(only(await planning("alice", { unassigned: true }))).toEqual(ids("ready")));
   it("overdue", async () => expect(only(await planning("editor", { overdue: true }))).toEqual(ids("budget")));
   it("needs review", async () => expect(only(await planning("editor", { needsReview: true }))).toEqual(ids("ready")));
-  it("coverage membership, from the coverage's own story list and within the reader's scope", async () => {
-    expect(only(await planning("editor", { collectionId: coverageId }))).toEqual(ids("budget", "library"));
-    expect(only(await planning("alice", { collectionId: coverageId }))).toEqual(ids("budget"));
+  it("Collection membership, from the Collection's own story list and within the reader's scope", async () => {
+    expect(only(await planning("editor", { collectionId }))).toEqual(ids("budget", "library"));
+    expect(only(await planning("alice", { collectionId }))).toEqual(ids("budget"));
     expect((await planning("editor", { collectionId: 999_999 })).stories).toEqual([]);
   });
 });

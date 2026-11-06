@@ -73,7 +73,9 @@ export interface Config {
     media: Media;
     sections: Section;
     topics: Topic;
-    coverages: Coverage;
+    collections: Collection;
+    'collection-interviews': CollectionInterview;
+    'collection-resources': CollectionResource;
     corrections: Correction;
     pages: Page;
     'live-updates': LiveUpdate;
@@ -108,7 +110,9 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     sections: SectionsSelect<false> | SectionsSelect<true>;
     topics: TopicsSelect<false> | TopicsSelect<true>;
-    coverages: CoveragesSelect<false> | CoveragesSelect<true>;
+    collections: CollectionsSelect<false> | CollectionsSelect<true>;
+    'collection-interviews': CollectionInterviewsSelect<false> | CollectionInterviewsSelect<true>;
+    'collection-resources': CollectionResourcesSelect<false> | CollectionResourcesSelect<true>;
     corrections: CorrectionsSelect<false> | CorrectionsSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
     'live-updates': LiveUpdatesSelect<false> | LiveUpdatesSelect<true>;
@@ -515,27 +519,95 @@ export interface StoryPlan {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "coverages".
+ * via the `definition` "collections".
  */
-export interface Coverage {
+export interface Collection {
   id: number;
-  title: string;
+  name: string;
+  type: 'event' | 'ongoing' | 'series' | 'project' | 'other';
+  status: 'planning' | 'active' | 'wrapping-up' | 'archived';
   /**
-   * Part of the public URL. Changing it after publication breaks links.
+   * Private: what we're covering, why it matters, the angles, what's missing.
    */
-  slug: string;
-  format: 'coverage' | 'series';
-  status: 'upcoming' | 'active' | 'past' | 'archived';
-  description?: string | null;
-  overview?: string | null;
-  artwork?: (number | null) | Media;
+  brief?: string | null;
+  lead?: (number | null) | User;
+  members?: (number | User)[] | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  /**
+   * Membership. A story's Collections are derived from here.
+   */
+  stories?: (number | Story)[] | null;
+  /**
+   * Optional. A Collection is newsroom-only until an editor presents it as public coverage or a series.
+   */
+  publicPresentation?: {
+    enabled?: boolean | null;
+    format?: ('coverage' | 'series') | null;
+    title?: string | null;
+    /**
+     * /coverage/<slug>/
+     */
+    slug?: string | null;
+    description?: string | null;
+    /**
+     * Plain text. Separate paragraphs with a blank line.
+     */
+    overview?: string | null;
+    artwork?: (number | null) | Media;
+    featuredStory?: (number | null) | Story;
+    storyOrder?: (number | Story)[] | null;
+  };
+  createdBy?: (number | null) | User;
+  legacyWordPressId?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collection-interviews".
+ */
+export interface CollectionInterview {
+  id: number;
+  collection: number | Collection;
+  interviewee: string;
+  status: 'planned' | 'scheduled' | 'completed' | 'follow-up' | 'cancelled';
+  scheduleMode: 'unscheduled' | 'window' | 'exact';
   startAt?: string | null;
   endAt?: string | null;
   /**
-   * In reading order for a series.
+   * First day (YYYY-MM-DD).
    */
+  windowStart?: string | null;
+  /**
+   * Last day (YYYY-MM-DD), optional.
+   */
+  windowEnd?: string | null;
+  location?: string | null;
+  interviewers?: (number | User)[] | null;
   stories?: (number | Story)[] | null;
-  legacyWordPressId?: number | null;
+  notes?: string | null;
+  followUps?: string | null;
+  privateContact?: string | null;
+  resources?: (number | CollectionResource)[] | null;
+  completedAt?: string | null;
+  createdBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collection-resources".
+ */
+export interface CollectionResource {
+  id: number;
+  label: string;
+  kind: 'link' | 'document' | 'recording' | 'schedule' | 'reference';
+  url?: string | null;
+  media?: (number | null) | Media;
+  collections?: (number | Collection)[] | null;
+  stories?: (number | Story)[] | null;
+  createdBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
 }
@@ -634,7 +706,8 @@ export interface LiveUpdate {
  */
 export interface Task {
   id: number;
-  story: number | Story;
+  story?: (number | null) | Story;
+  collection?: (number | null) | Collection;
   title: string;
   assignees?: (number | User)[] | null;
   due?: string | null;
@@ -887,8 +960,16 @@ export interface PayloadLockedDocument {
         value: number | Topic;
       } | null)
     | ({
-        relationTo: 'coverages';
-        value: number | Coverage;
+        relationTo: 'collections';
+        value: number | Collection;
+      } | null)
+    | ({
+        relationTo: 'collection-interviews';
+        value: number | CollectionInterview;
+      } | null)
+    | ({
+        relationTo: 'collection-resources';
+        value: number | CollectionResource;
       } | null)
     | ({
         relationTo: 'corrections';
@@ -1145,20 +1226,73 @@ export interface TopicsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "coverages_select".
+ * via the `definition` "collections_select".
  */
-export interface CoveragesSelect<T extends boolean = true> {
-  title?: T;
-  slug?: T;
-  format?: T;
+export interface CollectionsSelect<T extends boolean = true> {
+  name?: T;
+  type?: T;
   status?: T;
-  description?: T;
-  overview?: T;
-  artwork?: T;
+  brief?: T;
+  lead?: T;
+  members?: T;
+  startDate?: T;
+  endDate?: T;
+  stories?: T;
+  publicPresentation?:
+    | T
+    | {
+        enabled?: T;
+        format?: T;
+        title?: T;
+        slug?: T;
+        description?: T;
+        overview?: T;
+        artwork?: T;
+        featuredStory?: T;
+        storyOrder?: T;
+      };
+  createdBy?: T;
+  legacyWordPressId?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collection-interviews_select".
+ */
+export interface CollectionInterviewsSelect<T extends boolean = true> {
+  collection?: T;
+  interviewee?: T;
+  status?: T;
+  scheduleMode?: T;
   startAt?: T;
   endAt?: T;
+  windowStart?: T;
+  windowEnd?: T;
+  location?: T;
+  interviewers?: T;
   stories?: T;
-  legacyWordPressId?: T;
+  notes?: T;
+  followUps?: T;
+  privateContact?: T;
+  resources?: T;
+  completedAt?: T;
+  createdBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collection-resources_select".
+ */
+export interface CollectionResourcesSelect<T extends boolean = true> {
+  label?: T;
+  kind?: T;
+  url?: T;
+  media?: T;
+  collections?: T;
+  stories?: T;
+  createdBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1217,6 +1351,7 @@ export interface LiveUpdatesSelect<T extends boolean = true> {
  */
 export interface TasksSelect<T extends boolean = true> {
   story?: T;
+  collection?: T;
   title?: T;
   assignees?: T;
   due?: T;

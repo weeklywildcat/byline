@@ -2,30 +2,8 @@ import type { CollectionConfig } from "payload";
 import { inIds, scopeManages, storyScope } from "../access/story-context";
 import { administratorsOnly, editorsOnly, relationId, requestUser, signedIn } from "../access/user";
 import { proseEditor } from "../editor/prose";
-import { CORRECTION_TYPE_OPTIONS, COVERAGE_FORMAT_OPTIONS, COVERAGE_STATUS_OPTIONS } from "../domain/vocabulary";
+import { CORRECTION_TYPE_OPTIONS } from "../domain/vocabulary";
 import { legacyIdField, slugField } from "../fields/slug";
-
-/**
- * Coverage and series. The ordered `stories` list here is the one truth about
- * membership; a story's coverage is derived from it, never stored on the story.
- */
-export const Coverages: CollectionConfig = {
-  slug: "coverages",
-  admin: { useAsTitle: "title", defaultColumns: ["title", "format", "status"], group: false },
-  access: { read: signedIn, create: editorsOnly, update: editorsOnly, delete: editorsOnly },
-  fields: [
-    { name: "title", type: "text", required: true, maxLength: 200 },
-    slugField("title", "coverages"),
-    { name: "format", type: "select", required: true, defaultValue: "coverage", options: [...COVERAGE_FORMAT_OPTIONS] },
-    { name: "status", type: "select", required: true, defaultValue: "active", index: true, options: [...COVERAGE_STATUS_OPTIONS] },
-    { name: "description", type: "textarea", maxLength: 600 },
-    { name: "overview", type: "textarea", maxLength: 6000 },
-    { name: "artwork", type: "upload", relationTo: "media" },
-    { type: "row", fields: [{ name: "startAt", type: "date" }, { name: "endAt", type: "date" }] },
-    { name: "stories", type: "relationship", relationTo: "stories", hasMany: true, admin: { description: "In reading order for a series." } },
-    legacyIdField()
-  ]
-};
 
 /** Corrections, clarifications, editor's notes and substantive updates: first-class records on a story. */
 export const Corrections: CollectionConfig = {

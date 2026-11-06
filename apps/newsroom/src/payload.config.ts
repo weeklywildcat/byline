@@ -9,7 +9,8 @@ import { Media, MEDIA_UPLOAD_MAX_BYTES } from "./collections/Media";
 import { mediaFolders } from "./collections/MediaFolders";
 import { People } from "./collections/People";
 import { Polls } from "./collections/Polls";
-import { Coverages, Corrections, LiveUpdates, Pages } from "./collections/Publishing";
+import { CollectionInterviews, CollectionResources, Collections } from "./collections/Collections";
+import { Corrections, LiveUpdates, Pages } from "./collections/Publishing";
 import { Stories } from "./collections/Stories";
 import { StoryPlans } from "./collections/StoryPlans";
 import { Appointments, ProductionAssignments, Sources, Tasks } from "./collections/StoryWork";
@@ -60,7 +61,9 @@ const collections: CollectionConfig[] = [
   Media,
   Sections,
   Topics,
-  Coverages,
+  Collections,
+  CollectionInterviews,
+  CollectionResources,
   Corrections,
   Pages,
   LiveUpdates,

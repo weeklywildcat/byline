@@ -98,7 +98,7 @@ export const ADMINISTRATION: readonly NavItem[] = [
   { key: "raw-plans", label: "Story plans", path: "/collections/story-plans", minimumRole: "administrator" },
   { key: "raw-people", label: "People", path: "/collections/people", minimumRole: "administrator" },
   { key: "raw-media", label: "Media", path: "/collections/media", minimumRole: "administrator" },
-  { key: "raw-coverages", label: "Coverages", path: "/collections/coverages", minimumRole: "administrator" },
+  { key: "raw-collections", label: "Collections", path: "/collections/collections", minimumRole: "administrator" },
   { key: "raw-corrections", label: "Corrections", path: "/collections/corrections", minimumRole: "administrator" },
   { key: "raw-pages", label: "Pages", path: "/collections/pages", minimumRole: "administrator" },
   { key: "raw-polls", label: "Polls", path: "/collections/polls", minimumRole: "administrator" },

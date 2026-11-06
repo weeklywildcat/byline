@@ -27,6 +27,13 @@ export function sameId(left: unknown, right: unknown): boolean {
   return a !== null && b !== null && String(a) === String(b);
 }
 
+/** Whether a relationship changed: two empty values are the same; an ID and its populated document are the same. */
+export function relationChanged(left: unknown, right: unknown): boolean {
+  const a = relationId(left);
+  const b = relationId(right);
+  return a === null || b === null ? a !== b : String(a) !== String(b);
+}
+
 /**
  * The request's user if it is an enabled Byline account. A disabled account
  * is treated exactly like no account, on every operation, even while its

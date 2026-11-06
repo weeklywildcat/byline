@@ -19,12 +19,12 @@ export function createPayloadPlanningFetchers(api: string, preferences: Preferen
     getPlanning: (filters) => request<PlanningResponse>(queryPath("/planning", planningFilterParams(filters))),
     moveStory: (storyId, status) => workflow(storyId, { status }),
     updateStory: workflow,
-    getSchedule: (from, to, includeTasks = false, coverageId) => request<ScheduleResponse>(scheduleQuery(from, to, includeTasks, coverageId)),
+    getSchedule: (from, to, includeTasks = false, collectionId) => request<ScheduleResponse>(scheduleQuery(from, to, includeTasks, collectionId)),
     ...createPreferenceSavedViews(preferences)
   };
 }
 
 /** `GET /api/byline/schedule` for a newsroom-day range; tasks only when asked for. */
-export function scheduleQuery(from: string, to: string, includeTasks = false, coverageId?: number): string {
-  return queryPath("/schedule", { from, to, tasks: includeTasks ? 1 : undefined, coverage: coverageId });
+export function scheduleQuery(from: string, to: string, includeTasks = false, collectionId?: number): string {
+  return queryPath("/schedule", { from, to, tasks: includeTasks ? 1 : undefined, collectionId });
 }

@@ -133,8 +133,11 @@ describe("the schedule range", () => {
   });
 
   it("defaults to a week back and two months ahead of the newsroom's today", () => {
-    expect(parseScheduleQuery(new URLSearchParams(), "2026-11-06")).toEqual({ from: "2026-10-30", to: "2027-01-05", includeTasks: false, coverageId: null });
-    expect(parseScheduleQuery(new URLSearchParams("tasks=1&coverage=4"), "2026-11-06")).toMatchObject({ includeTasks: true, coverageId: 4 });
+    expect(parseScheduleQuery(new URLSearchParams(), "2026-11-06")).toEqual({ from: "2026-10-30", to: "2027-01-05", includeTasks: false, collectionId: null });
+    expect(parseScheduleQuery(new URLSearchParams("tasks=1&collectionId=4"), "2026-11-06")).toMatchObject({ includeTasks: true, collectionId: 4 });
+    // The earlier names are still accepted at the boundary.
+    expect(parseScheduleQuery(new URLSearchParams("coverage=5"), "2026-11-06").collectionId).toBe(5);
+    expect(parseScheduleQuery(new URLSearchParams("collection=6"), "2026-11-06").collectionId).toBe(6);
   });
 
   it("is private, uncached and for signed-in accounts only", async () => {

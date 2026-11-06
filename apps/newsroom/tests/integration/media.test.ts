@@ -328,19 +328,23 @@ describe("one asset", () => {
   it("lists its linked uses, as far as this account may read them", async () => {
     const story = await payload.create({ collection: "stories", draft: true, data: { headline: "AI jobs in Greenwood", featuredMedia: ids.camera } as never, req: await reqAs("editor"), overrideAccess: false });
     await payload.create({ collection: "production-assignments", data: { story: story.id, title: "State championship photos", type: "photo", status: "uploaded", media: [ids.camera] } as never, req: await reqAs("editor"), overrideAccess: false });
-    const coverage = await payload.create({ collection: "coverages", data: { title: "SCBDA live coverage", artwork: ids.camera } as never, req: await reqAs("editor"), overrideAccess: false });
-    expect(coverage.id).toBeGreaterThan(0);
+    const collection = await payload.create({ collection: "collections", data: { name: "SCBDA state finals", type: "event", publicPresentation: { enabled: true, title: "SCBDA live coverage", slug: "scbda-live", artwork: ids.camera } } as never, req: await reqAs("editor"), overrideAccess: false });
+    const resource = await payload.create({ collection: "collection-resources", data: { label: "Finals warm-up photo", kind: "document", media: ids.camera, collections: [collection.id] } as never, req: await reqAs("editor"), overrideAccess: false });
+    expect(resource.id).toBeGreaterThan(0);
     const editor = await call("get", "/byline/media/:id", "editor", { params: { id: String(ids.camera) } });
     expect(editor.body.usages.map((use: { kind: string; title: string }) => `${use.kind}:${use.title}`).sort()).toEqual([
-      "coverage-artwork:SCBDA live coverage",
+      "collection-artwork:SCBDA state finals",
+      "collection-resource:Finals warm-up photo",
       "production-assignment:AI jobs in Greenwood",
       "story-featured:AI jobs in Greenwood"
     ]);
     expect(editor.body.usages.find((use: { kind: string }) => use.kind === "story-featured").storyId).toBe(story.id);
+    expect(editor.body.usages.find((use: { kind: string }) => use.kind === "collection-artwork").collectionId).toBe(collection.id);
+    expect(editor.body.usages.find((use: { kind: string }) => use.kind === "collection-resource").collectionId).toBe(collection.id);
     expect(editor.body.hiddenUsageCount).toBe(0);
-    // Bob manages none of it: he sees the coverage (readable by all) and is told the rest exists.
+    // Bob manages none of it: he sees the Collection's uses (Collections are readable by all) and is told the rest exists.
     const bob = await call("get", "/byline/media/:id", "bob", { params: { id: String(ids.camera) } });
-    expect(bob.body.usages.map((use: { kind: string }) => use.kind)).toEqual(["coverage-artwork"]);
+    expect(bob.body.usages.map((use: { kind: string }) => use.kind)).toEqual(["collection-artwork", "collection-resource"]);
     expect(bob.body.hiddenUsageCount).toBe(2);
   });
 
@@ -348,7 +352,7 @@ describe("one asset", () => {
     expect((await call("delete", "/byline/media/:id", "alice", { params: { id: String(ids.small) } })).status).toBe(403);
     const linked = await call("delete", "/byline/media/:id", "editor", { params: { id: String(ids.camera) } });
     expect(linked.status).toBe(409);
-    expect(linked.body.message).toContain("linked from 3 places");
+    expect(linked.body.message).toContain("linked from 4 places");
     expect((await call("delete", "/byline/media/:id", "editor", { params: { id: String(ids.small) } })).status).toBe(204);
     expect((await payload.count({ collection: "media", where: { id: { equals: ids.small } } })).totalDocs).toBe(0);
   });

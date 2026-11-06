@@ -154,18 +154,70 @@ export const CORRECTION_TYPE_OPTIONS = options<(typeof CORRECTION_TYPES)[number]
   ["substantive-update", "Substantive update"]
 ]);
 
-export const COVERAGE_FORMATS = ["coverage", "series"] as const;
-export const COVERAGE_FORMAT_OPTIONS = options<(typeof COVERAGE_FORMATS)[number]>([
-  ["coverage", "Coverage"],
-  ["series", "Series"]
+/**
+ * Collections: the private newsroom's reporting projects. A Collection's
+ * type and status are newsroom vocabulary (the same as WordPress's
+ * `byline_collection_types()` / `byline_collection_statuses()` and the shared
+ * collection-model.ts); public coverage is only an optional presentation of
+ * one, with its own reader-facing vocabulary below.
+ */
+export const COLLECTION_TYPES = ["event", "ongoing", "series", "project", "other"] as const;
+export type CollectionType = (typeof COLLECTION_TYPES)[number];
+export const COLLECTION_TYPE_OPTIONS = options<CollectionType>([
+  ["event", "Event coverage"],
+  ["ongoing", "Ongoing coverage"],
+  ["series", "Series"],
+  ["project", "Special project"],
+  ["other", "Other"]
 ]);
-export const COVERAGE_STATUSES = ["upcoming", "active", "past", "archived"] as const;
-export const COVERAGE_STATUS_OPTIONS = options<(typeof COVERAGE_STATUSES)[number]>([
-  ["upcoming", "Upcoming"],
+export const COLLECTION_STATUSES = ["planning", "active", "wrapping-up", "archived"] as const;
+export type CollectionStatus = (typeof COLLECTION_STATUSES)[number];
+export const COLLECTION_STATUS_OPTIONS = options<CollectionStatus>([
+  ["planning", "Planning"],
   ["active", "Active"],
-  ["past", "Past"],
+  ["wrapping-up", "Wrapping up"],
   ["archived", "Archived"]
 ]);
+
+export const INTERVIEW_STATUSES = ["planned", "scheduled", "completed", "follow-up", "cancelled"] as const;
+export type InterviewStatus = (typeof INTERVIEW_STATUSES)[number];
+export const INTERVIEW_STATUS_OPTIONS = options<InterviewStatus>([
+  ["planned", "Planned"],
+  ["scheduled", "Scheduled"],
+  ["completed", "Completed"],
+  ["follow-up", "Needs follow-up"],
+  ["cancelled", "Cancelled"]
+]);
+
+/** What a shared Collection resource is. Files are Media assets; nothing names a storage path. */
+export const RESOURCE_KINDS = ["link", "document", "recording", "schedule", "reference"] as const;
+export type ResourceKind = (typeof RESOURCE_KINDS)[number];
+export const RESOURCE_KIND_OPTIONS = options<ResourceKind>([
+  ["link", "Web link"],
+  ["document", "Document"],
+  ["recording", "Recording"],
+  ["schedule", "Schedule"],
+  ["reference", "Reference"]
+]);
+
+/** A Collection's optional public presentation: ongoing coverage, or a numbered series. */
+export const PUBLIC_PRESENTATION_FORMATS = ["coverage", "series"] as const;
+export type PublicPresentationFormat = (typeof PUBLIC_PRESENTATION_FORMATS)[number];
+export const PUBLIC_PRESENTATION_FORMAT_OPTIONS = options<PublicPresentationFormat>([
+  ["coverage", "Ongoing coverage"],
+  ["series", "Numbered series"]
+]);
+
+/**
+ * The public coverage contract's status (apps/web `WordPressCoverage.status`),
+ * projected from a Collection's newsroom status; never stored.
+ */
+export const PUBLIC_COVERAGE_STATUS: Record<CollectionStatus, "upcoming" | "active" | "past" | "archived"> = {
+  planning: "upcoming",
+  active: "active",
+  "wrapping-up": "past",
+  archived: "archived"
+};
 
 export const PERSON_STATUSES = ["active", "alumni", "guest"] as const;
 export const PERSON_STATUS_OPTIONS = options<(typeof PERSON_STATUSES)[number]>([
@@ -190,5 +242,11 @@ export const LIMITS = {
   resourcesPerStory: 24,
   assignees: 4,
   line: 160,
-  notes: 2000
+  notes: 2000,
+  collectionName: 240,
+  publicTitle: 240,
+  publicDescription: 320,
+  publicOverview: 10000,
+  interviewers: 8,
+  url: 2048
 } as const;

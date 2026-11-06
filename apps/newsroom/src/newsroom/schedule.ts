@@ -5,7 +5,7 @@ import { relationId, relationIds } from "../access/user";
 import { addDays, localToInstant } from "../domain/dates";
 import { dateOnly, TimingError } from "../domain/schedule";
 import type { Appointment, ProductionAssignment, Task } from "../payload-types";
-import { coverageStoryIds } from "./planning";
+import { collectionStoryIds } from "./planning";
 import { assigneeList, loadPeople, localToday, readableStories, userPerson, type People, type ScreenContext } from "./screen-models";
 
 /**
@@ -36,11 +36,15 @@ export const SCHEDULE_MAX_DAYS = 124;
 const DEFAULT_BACK_DAYS = 7;
 const DEFAULT_AHEAD_DAYS = 60;
 
-export type ScheduleQuery = { from: string; to: string; includeTasks: boolean; coverageId: number | null };
+export type ScheduleQuery = { from: string; to: string; includeTasks: boolean; collectionId: number | null };
 
 const dayNumber = (day: string) => Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10))) / 86_400_000;
 
-/** `from`, `to` (newsroom days), `tasks=1` and `coverage=<id>` from the query string; a bad range is a 400. */
+/**
+ * `from`, `to` (newsroom days), `tasks=1` and `collectionId=<id>` from the query
+ * string; a bad range is a 400. `coverage=` and `collection=` were the earlier
+ * names of the Collection scope and are still accepted here, at the boundary.
+ */
 export function parseScheduleQuery(params: URLSearchParams, today: string): ScheduleQuery {
   let from: string;
   let to: string;
@@ -53,8 +57,8 @@ export function parseScheduleQuery(params: URLSearchParams, today: string): Sche
   if (to < from) throw new APIError("The date range cannot end before it starts.", 400);
   if (dayNumber(to) - dayNumber(from) > SCHEDULE_MAX_DAYS) throw new APIError("Choose a date range of up to four months.", 400);
   const flag = params.get("tasks") ?? params.get("includeTasks");
-  const coverage = Number(params.get("coverage") ?? params.get("collectionId") ?? "");
-  return { from, to, includeTasks: flag === "1" || flag === "true", coverageId: Number.isSafeInteger(coverage) && coverage > 0 ? coverage : null };
+  const collection = Number(params.get("collectionId") ?? params.get("collection") ?? params.get("coverage") ?? "");
+  return { from, to, includeTasks: flag === "1" || flag === "true", collectionId: Number.isSafeInteger(collection) && collection > 0 ? collection : null };
 }
 
 const asUser = (ctx: ScreenContext) => ({ req: ctx.req, overrideAccess: false as const, depth: 0, pagination: false as const });
@@ -118,11 +122,11 @@ function taskDeadline(people: People, row: Task, titles: Map<number, string>): S
 const byThenId = <T extends { id: string | number }>(key: (item: T) => string) => (a: T, b: T) => key(a).localeCompare(key(b)) || String(a.id).localeCompare(String(b.id));
 
 export async function scheduleResponse(ctx: ScreenContext, query: ScheduleQuery): Promise<ScheduleResponse> {
-  const { from, to, includeTasks, coverageId } = query;
+  const { from, to, includeTasks, collectionId } = query;
   // The newsroom days [from, to] as instants: from local midnight to the next day's local midnight.
   const start = localToInstant(`${from}T00:00`, ctx.timeZone);
   const end = localToInstant(`${addDays(to, 1)}T00:00`, ctx.timeZone);
-  const scope: Where[] = coverageId ? [inIds("story", await coverageStoryIds(ctx, coverageId))] : [];
+  const scope: Where[] = collectionId ? [inIds("story", await collectionStoryIds(ctx, collectionId))] : [];
   const where = (...conditions: Where[]): Where => ({ and: [...scope, ...conditions] });
 
   const [people, exact, waiting, production, tasks] = await Promise.all([

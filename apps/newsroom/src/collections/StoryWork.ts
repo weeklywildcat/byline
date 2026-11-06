@@ -1,5 +1,8 @@
-import { APIError, type CollectionBeforeChangeHook, type CollectionConfig, type Field } from "payload";
+import { APIError, type Access, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type PayloadRequest, type Where } from "payload";
+import { collectionCanManage, collectionScope, managedCollections } from "../access/collection-context";
+import { inIds, scopeManages, storyScope, type StoryScope } from "../access/story-context";
 import {
+  assignedWorkGuard,
   createStoryRecords,
   deleteStoryRecords,
   guardAssignedWork,
@@ -8,7 +11,7 @@ import {
   readStoryRecords,
   updateStoryRecords
 } from "../access/workspace-records";
-import { atLeast, newsroomUser, relationId, sameId } from "../access/user";
+import { atLeast, newsroomUser, relationChanged, relationId, relationIds, sameId } from "../access/user";
 import { normalizeAppointmentTiming, TimingError } from "../domain/schedule";
 import {
   APPOINTMENT_KIND_OPTIONS,
@@ -55,14 +58,69 @@ const shared = {
   }
 } as const;
 
+/**
+ * Tasks: one engine for Story work and Collection work. A task belongs to a
+ * story, to a Collection, or to a story within a Collection (the story must
+ * be one of the Collection's). Story managers manage a story's tasks; a
+ * Collection's lead, team and editors manage its tasks; anyone else sees only
+ * the tasks assigned to them, whoever can browse the Collection.
+ */
+const taskManager = async (scope: StoryScope, storyId: unknown, record: Record<string, unknown>, req: PayloadRequest) =>
+  (relationId(storyId) !== null && scopeManages(scope, storyId)) || (relationId(record.collection) !== null && collectionCanManage(await collectionScope(req), record.collection));
+
+const taskWhere = async (req: PayloadRequest, mine: boolean): Promise<boolean | Where> => {
+  const scope = await storyScope(req);
+  const collections = await collectionScope(req);
+  if (!scope || !collections) return false;
+  if (scope.all) return true;
+  const managed = managedCollections(collections, "collection");
+  return { or: [inIds("story", scope.managed), ...(managed === true ? [] : [managed]), ...(mine ? [{ assignees: { in: [scope.user.id] } }] : [])] };
+};
+
+const createTask: Access = async ({ req, data }) => {
+  const scope = await storyScope(req);
+  const collections = await collectionScope(req);
+  if (!scope || !collections) return false;
+  if (!data) return scope.all || collections.all || scope.managed.length > 0 || collections.led.length + collections.member.length > 0;
+  const story = relationId(data.story);
+  const collection = relationId(data.collection);
+  // A story task needs the story's managers; a Collection task its team; both, both (as in WordPress).
+  if (story !== null && !scopeManages(scope, story)) return false;
+  if (collection !== null && !collectionCanManage(collections, collection)) return false;
+  return story !== null || collection !== null;
+};
+
+/** At least one work context; a story within a Collection must be one of its stories. Neither moves once set. */
+const taskContext: CollectionBeforeChangeHook = async ({ data, originalDoc, operation, req }) => {
+  if (req.context?.bylineImport === true) return data;
+  if (operation === "update" && originalDoc && data.collection !== undefined && relationChanged(data.collection, originalDoc.collection) && req.context?.bylineSystem !== true) {
+    throw new APIError("A task cannot move to another Collection.", 400);
+  }
+  const story = relationId(data.story !== undefined ? data.story : originalDoc?.story);
+  const collection = relationId(data.collection !== undefined ? data.collection : originalDoc?.collection);
+  if (req.context?.bylineSystem === true) return data;
+  if (story === null && collection === null) throw new APIError("Choose a story or a Collection for this task.", 400);
+  if (operation === "create" && story !== null && collection !== null) {
+    const found = await req.payload.find({ collection: "collections", where: { id: { equals: collection } }, depth: 0, limit: 1, select: { stories: true }, overrideAccess: true, req });
+    if (!relationIds(found.docs[0]?.stories).some((id) => sameId(id, story))) throw new APIError("Add this story to the Collection first.", 400);
+  }
+  return data;
+};
+
 export const Tasks: CollectionConfig = {
   slug: "tasks",
   ...shared,
-  admin: { ...shared.admin, useAsTitle: "title", defaultColumns: ["title", "story", "due", "state"] },
-  access: { ...shared.access, create: createStoryRecords({ allowParticipants: false }) },
-  hooks: { beforeChange: [guardAssignedWork] },
+  admin: { ...shared.admin, useAsTitle: "title", defaultColumns: ["title", "story", "collection", "due", "state"] },
+  access: {
+    read: ({ req }) => taskWhere(req, true),
+    update: ({ req }) => taskWhere(req, true),
+    delete: ({ req }) => taskWhere(req, false),
+    create: createTask
+  },
+  hooks: { beforeChange: [taskContext, (args) => assignedWorkGuard(args, (scope, storyId, record) => taskManager(scope, storyId, record, args.req))] },
   fields: [
-    storyField,
+    { ...storyField, required: false } as Field,
+    { name: "collection", type: "relationship", relationTo: "collections", index: true, access: { update: () => false } },
     { name: "title", type: "text", required: true, maxLength: LIMITS.line },
     assigneesField,
     { name: "due", type: "date", index: true, admin: { date: { pickerAppearance: "dayAndTime" } } },

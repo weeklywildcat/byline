@@ -16,7 +16,8 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
 export function BylineStories({ initPageResult, params, searchParams }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult;
   const user = requestUser(req);
-  const coverage = Number(first(searchParams?.coverage));
+  // `coverage=` was the earlier name of the Collection scope; still accepted at the boundary.
+  const collection = Number(first(searchParams?.collection) ?? first(searchParams?.coverage));
   // Payload leaves custom root views bare; its default template brings the Byline shell (Nav, header).
   return (
     <DefaultTemplate i18n={req.i18n} locale={locale} params={params} payload={req.payload} permissions={permissions} req={req} searchParams={searchParams} user={req.user ?? undefined} visibleEntities={visibleEntities}>
@@ -24,7 +25,7 @@ export function BylineStories({ initPageResult, params, searchParams }: AdminVie
         <NewsroomStories
           currentUserId={Number(user.id)}
           view={first(searchParams?.view)}
-          initialFilters={{ mine: first(searchParams?.mine) === "1", ...(Number.isSafeInteger(coverage) && coverage > 0 ? { collectionId: coverage } : {}) }}
+          initialFilters={{ mine: first(searchParams?.mine) === "1", ...(Number.isSafeInteger(collection) && collection > 0 ? { collectionId: collection } : {}) }}
         />
       ) : (
         <Gutter>

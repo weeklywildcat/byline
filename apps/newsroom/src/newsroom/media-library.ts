@@ -19,7 +19,7 @@ import {
 import type { MediaMoveResult } from "@byline/newsroom-screens/media/media-library-api";
 import { sql } from "@payloadcms/db-postgres";
 import { APIError, type Where } from "payload";
-import { atLeast, relationId, sameId } from "../access/user";
+import { atLeast, relationId, relationIds, sameId } from "../access/user";
 import { AUDIO_MIME_TYPES, IMAGE_MIME_TYPES, LIBRARY_PREVIEW_SIZE, MEDIA_MIME_TYPES } from "../collections/Media";
 import { MEDIA_FOLDERS_SLUG } from "../collections/MediaFolders";
 import { addDays, localDay, localToInstant } from "../domain/dates";
@@ -245,10 +245,11 @@ type UsageSearch = { usages: MediaUsage[]; total: number };
 export async function linkedUses(ctx: ScreenContext, mediaId: number): Promise<UsageSearch> {
   const { payload } = ctx.req;
   const system = { req: ctx.req, overrideAccess: true as const };
-  const [stories, assignments, coverages, live, people, totals] = await Promise.all([
+  const [stories, assignments, artwork, resources, live, people, totals] = await Promise.all([
     payload.find({ collection: "stories", where: { featuredMedia: { equals: mediaId } }, draft: true, depth: 0, pagination: false, select: { headline: true }, ...asUser(ctx) }),
     payload.find({ collection: "production-assignments", where: { media: { in: [mediaId] } }, depth: 0, pagination: false, select: { title: true, type: true, story: true }, ...asUser(ctx) }),
-    payload.find({ collection: "coverages", where: { artwork: { equals: mediaId } }, depth: 0, pagination: false, select: { title: true }, ...asUser(ctx) }),
+    payload.find({ collection: "collections", where: { "publicPresentation.artwork": { equals: mediaId } }, depth: 0, pagination: false, select: { name: true }, ...asUser(ctx) }),
+    payload.find({ collection: "collection-resources", where: { media: { equals: mediaId } }, depth: 0, pagination: false, select: { label: true, collections: true }, ...asUser(ctx) }),
     payload.find({ collection: "live-updates", where: { photo: { equals: mediaId } }, depth: 0, pagination: false, select: { headline: true, story: true }, ...asUser(ctx) }),
     payload.find({ collection: "people", where: { portrait: { equals: mediaId } }, depth: 0, pagination: false, select: { name: true }, ...asUser(ctx) }),
     linkedUseTotal(ctx, mediaId, system)
@@ -259,7 +260,8 @@ export async function linkedUses(ctx: ScreenContext, mediaId: number): Promise<U
   const usages: MediaUsage[] = [
     ...stories.docs.filter((story) => headline.has(story.id)).map((story) => ({ kind: "story-featured" as const, title: headline.get(story.id)!, role: "Featured image", storyId: story.id, recordId: story.id })),
     ...assignments.docs.map((row) => ({ kind: "production-assignment" as const, title: headline.get(num(row.story)) ?? row.title, role: `${TYPE_LABEL.get(row.type) ?? "Production"} assignment · ${row.title}`, storyId: headline.has(num(row.story)) ? num(row.story) : null, recordId: row.id })),
-    ...coverages.docs.map((row) => ({ kind: "coverage-artwork" as const, title: row.title, role: "Coverage artwork", storyId: null, recordId: row.id })),
+    ...artwork.docs.map((row) => ({ kind: "collection-artwork" as const, title: row.name, role: "Collection public artwork", storyId: null, collectionId: row.id, recordId: row.id })),
+    ...resources.docs.map((row) => ({ kind: "collection-resource" as const, title: row.label, role: "Collection resource", storyId: null, collectionId: relationIds(row.collections).map(Number)[0] ?? null, recordId: row.id })),
     ...live.docs.map((row) => ({ kind: "live-update-photo" as const, title: row.headline?.trim() || headline.get(num(row.story)) || "Live update", role: "Live update photo", storyId: headline.has(num(row.story)) ? num(row.story) : null, recordId: row.id })),
     ...people.docs.map((row) => ({ kind: "person-portrait" as const, title: row.name, role: "Portrait", storyId: null, recordId: row.id }))
   ];
@@ -273,7 +275,8 @@ async function linkedUseTotal(ctx: ScreenContext, mediaId: number, system: { req
     payload.count({ collection: "stories", where: { featuredMedia: { equals: mediaId } }, ...system }),
     payload.find({ collection: "stories", where: { featuredMedia: { equals: mediaId } }, draft: true, depth: 0, pagination: false, select: { headline: true }, ...system }).then((found) => ({ totalDocs: found.docs.length })),
     payload.count({ collection: "production-assignments", where: { media: { in: [mediaId] } }, ...system }),
-    payload.count({ collection: "coverages", where: { artwork: { equals: mediaId } }, ...system }),
+    payload.count({ collection: "collections", where: { "publicPresentation.artwork": { equals: mediaId } }, ...system }),
+    payload.count({ collection: "collection-resources", where: { media: { equals: mediaId } }, ...system }),
     payload.count({ collection: "live-updates", where: { photo: { equals: mediaId } }, ...system }),
     payload.count({ collection: "people", where: { portrait: { equals: mediaId } }, ...system })
   ]);

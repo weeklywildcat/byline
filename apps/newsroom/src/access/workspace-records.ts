@@ -1,7 +1,7 @@
 import { APIError, type Access, type CollectionBeforeChangeHook, type FieldAccess, type Where } from "payload";
 import { LIMITS } from "../domain/vocabulary";
 import { inIds, scopeManages, scopeParticipates, storyScope } from "./story-context";
-import { relationId, relationIds, requestUser, sameId } from "./user";
+import { relationChanged, relationId, relationIds, requestUser, sameId } from "./user";
 
 /**
  * Access for records that hang off one story and are assigned to people:
@@ -49,17 +49,27 @@ export const managersOnlyField: FieldAccess = async ({ req, doc, data }) => {
  * keep whoever was already assigned; a participant creating a record must be
  * its only assignee. Also pins `story` once set.
  */
-export const guardAssignedWork: CollectionBeforeChangeHook = async ({ req, data, originalDoc, operation }) => {
-  if (req.context?.bylineImport === true) return data;
+export const guardAssignedWork: CollectionBeforeChangeHook = (args) => assignedWorkGuard(args, async (scope, storyId) => scopeManages(scope, storyId));
+
+/**
+ * The assignee rules, with the caller deciding who manages the record: the
+ * story's managers for Story work; for tasks, also the Collection's team
+ * (tasks.ts in collections/StoryWork.ts).
+ */
+export async function assignedWorkGuard(
+  { req, data, originalDoc, operation }: Parameters<CollectionBeforeChangeHook>[0],
+  isManager: (scope: NonNullable<Awaited<ReturnType<typeof storyScope>>>, storyId: unknown, record: Record<string, unknown>) => Promise<boolean>
+) {
+  if (req.context?.bylineImport === true || req.context?.bylineSystem === true) return data;
   const user = requestUser(req);
   const scope = await storyScope(req);
   if (!user || !scope) throw new APIError("Sign in to change newsroom records.", 401);
 
-  if (operation === "update" && originalDoc && data.story !== undefined && !sameId(data.story, originalDoc.story)) {
+  if (operation === "update" && originalDoc && data.story !== undefined && relationChanged(data.story, originalDoc.story)) {
     throw new APIError("A record cannot move to another story.", 400);
   }
   const storyId = data.story ?? originalDoc?.story;
-  const manager = scopeManages(scope, storyId);
+  const manager = await isManager(scope, storyId, { ...originalDoc, ...data });
 
   const existing = relationIds(originalDoc?.assignees);
   const asked = relationIds(data.assignees);
@@ -90,7 +100,7 @@ export const guardAssignedWork: CollectionBeforeChangeHook = async ({ req, data,
   }
   if (data.assignees !== undefined) data.assignees = requested;
   return data;
-};
+}
 
 /** Enforce a per-story maximum on create. */
 export function limitPerStory(collection: "sources" | "appointments" | "production-assignments" | "tasks", maximum: number, noun: string): CollectionBeforeChangeHook {

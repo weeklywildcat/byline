@@ -55,7 +55,7 @@ export type MediaLibraryAsset = {
   canDelete: boolean;
 };
 
-export type MediaUsageKind = "story-featured" | "production-assignment" | "coverage-artwork" | "live-update-photo" | "person-portrait";
+export type MediaUsageKind = "story-featured" | "production-assignment" | "collection-artwork" | "collection-resource" | "live-update-photo" | "person-portrait";
 
 /** A record that links to the asset through a relationship. */
 export type MediaUsage = {
@@ -66,6 +66,8 @@ export type MediaUsage = {
   role: string;
   /** The story it belongs to, when it belongs to one (opens Story Peek). */
   storyId: number | null;
+  /** The Collection it belongs to, when it belongs to one. */
+  collectionId?: number | null;
   recordId: number;
 };
 

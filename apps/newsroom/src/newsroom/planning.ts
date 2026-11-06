@@ -22,9 +22,9 @@ import { loadPeople, localToday, planningStory, STATUSES, storiesWithExtras, use
 
 const asUser = (ctx: ScreenContext) => ({ req: ctx.req, overrideAccess: false as const });
 
-/** The stories in a coverage, from its ordered `stories` list: the one truth about membership. */
-export async function coverageStoryIds(ctx: ScreenContext, coverageId: number): Promise<Array<number | string>> {
-  const found = await ctx.req.payload.find({ collection: "coverages", where: { id: { equals: coverageId } }, depth: 0, limit: 1, select: { stories: true }, ...asUser(ctx) });
+/** A Collection's stories, from its ordered `stories` list: the one truth about membership. */
+export async function collectionStoryIds(ctx: ScreenContext, collectionId: number): Promise<Array<number | string>> {
+  const found = await ctx.req.payload.find({ collection: "collections", where: { id: { equals: collectionId } }, depth: 0, limit: 1, select: { stories: true }, ...asUser(ctx) });
   return relationIds(found.docs[0]?.stories);
 }
 
@@ -65,7 +65,7 @@ export function filterInNewsroomTime(stories: PlanningStory[], filters: Planning
 
 export async function planningResponse(ctx: ScreenContext, filters: PlanningFilters): Promise<PlanningResponse> {
   const where: Where[] = [];
-  if (filters.collectionId) where.push(inIds("story", await coverageStoryIds(ctx, filters.collectionId)));
+  if (filters.collectionId) where.push(inIds("story", await collectionStoryIds(ctx, filters.collectionId)));
   const [people, plans] = await Promise.all([
     loadPeople(ctx),
     ctx.req.payload.find({ collection: "story-plans", where: where.length ? { and: where } : undefined, depth: 0, pagination: false, ...asUser(ctx) })
