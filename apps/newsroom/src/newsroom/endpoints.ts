@@ -9,6 +9,7 @@ import { isWorkflowStage } from "../domain/workflow";
 import { validResourceUrl } from "../collections/StoryPlans";
 import { parsePlanningFilterParams } from "@byline/newsroom-screens/planning/planning-api";
 import { planningResponse } from "./planning";
+import { parseScheduleQuery, scheduleResponse, scheduleToday } from "./schedule";
 import { contributorEntry, editorialTask, homeBootstrap, loadPeople, mediaFor, personIdFor, planFor, reportingFor, screenContext, searchStories, storyResources, storyWorkspace, type ScreenContext } from "./screen-models";
 import type { AppointmentInput, MediaAssignmentInput, SourceInput } from "@byline/newsroom-screens/workspace/workspace-types";
 import { effectiveWorkflow } from "../domain/workflow";
@@ -382,6 +383,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/presets", method: "get", handler: handle(async () => presetsPayload()) },
   // The Stories collection (Board and List). Board moves and inline edits use /stories/:id/workflow.
   { path: "/byline/planning", method: "get", handler: handle((ctx, req) => planningResponse(ctx, parsePlanningFilterParams(req.searchParams))) },
+  { path: "/byline/schedule", method: "get", handler: handle((ctx, req) => scheduleResponse(ctx, parseScheduleQuery(req.searchParams, scheduleToday(ctx)))) },
   { path: "/byline/stories", method: "post", handler: handle(createStory) },
   { path: "/byline/stories/:id/workspace", method: "get", handler: handle((ctx, req) => storyWorkspace(ctx, idParam(req))) },
   { path: "/byline/stories/:id/workflow", method: "post", handler: handle(updateWorkflow) },

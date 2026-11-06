@@ -6,7 +6,8 @@ import type { HomePresetsPayload } from "@byline/newsroom-screens/home/home-mode
 import type { HomeFetchers } from "@byline/newsroom-screens/home/home-api";
 import type { HomeBootstrap } from "@byline/newsroom-screens/home/newsroom-model";
 import type { WorkspaceClient } from "@byline/newsroom-screens/workspace/workspace-api";
-import type { MediaAssignmentsResponse, ReportingResponse, ResourcePurpose, StoryResource, StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
+import type { MediaAssignmentsResponse, ReportingResponse, ResourcePurpose, ScheduleResponse, StoryResource, StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
+import { queryPath } from "@byline/newsroom-screens/planning/planning-api";
 
 /**
  * The Payload newsroom's fetchers for the shared Byline screens
@@ -90,7 +91,7 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
     updateResource: (storyId, resourceId, input) => request(`/stories/${storyId}/resources/${encodeURIComponent(resourceId)}`, "POST", input),
     removeResource: (storyId, resourceId) => request(`/stories/${storyId}/resources/${encodeURIComponent(resourceId)}`, "DELETE"),
     getNotes: notYet("Article notes"),
-    getSchedule: notYet("The calendar")
+    getSchedule: (from: string, to: string, includeTasks = false) => request<ScheduleResponse>(queryPath("/schedule", { from, to, tasks: includeTasks ? 1 : undefined }))
   };
 
   return {

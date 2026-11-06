@@ -23,7 +23,7 @@ import { loadPeople, localToday, planningStory, STATUSES, storiesWithExtras, use
 const asUser = (ctx: ScreenContext) => ({ req: ctx.req, overrideAccess: false as const });
 
 /** The stories in a coverage, from its ordered `stories` list: the one truth about membership. */
-async function coverageStoryIds(ctx: ScreenContext, coverageId: number): Promise<Array<number | string>> {
+export async function coverageStoryIds(ctx: ScreenContext, coverageId: number): Promise<Array<number | string>> {
   const found = await ctx.req.payload.find({ collection: "coverages", where: { id: { equals: coverageId } }, depth: 0, limit: 1, select: { stories: true }, ...asUser(ctx) });
   return relationIds(found.docs[0]?.stories);
 }

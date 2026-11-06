@@ -87,12 +87,26 @@ export function createCalendarWorkspace(storage: CalendarPreferenceStorage = {},
     state = { ...state, ...patch };
     listeners.forEach((listener) => listener());
   };
+  // One save at a time, always of the latest state: quick toggles must not land out of order.
+  let saving: Promise<void> | null = null;
+  let dirty = false;
   const persist = () => {
-    try {
-      void Promise.resolve(storage.save?.({ view: state.view, filters: state.filters })).catch(() => undefined);
-    } catch {
-      // A preference that cannot be saved still applies for this session.
+    if (!storage.save) return;
+    if (saving) {
+      dirty = true;
+      return;
     }
+    saving = (async () => {
+      do {
+        dirty = false;
+        try {
+          await storage.save!({ view: state.view, filters: state.filters });
+        } catch {
+          // A preference that cannot be saved still applies for this session.
+        }
+      } while (dirty);
+      saving = null;
+    })();
   };
 
   const workspace = {

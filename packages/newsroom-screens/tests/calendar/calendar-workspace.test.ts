@@ -147,10 +147,30 @@ describe("the Calendar workspace: one selected date, one filter state, one view"
     workspace.setFilter("mine", true);
     workspace.setFilter("mine", true);
     expect(workspace.getState().filters).toEqual({ ...DEFAULT_CALENDAR_FILTERS, tasks: true, mine: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(save).toHaveBeenCalledTimes(2);
     workspace.setDate(Temporal.PlainDate.from("2026-12-01"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(save).toHaveBeenCalledTimes(2);
     expect(save).toHaveBeenLastCalledWith({ view: null, filters: { ...DEFAULT_CALENDAR_FILTERS, tasks: true, mine: true } });
+  });
+
+  it("saves one at a time, always ending on the latest state, however fast the reader toggles", async () => {
+    const stored: unknown[] = [];
+    let release: () => void = () => {};
+    const save = vi.fn((value: unknown) => new Promise<void>((resolve) => { release = () => { stored.push(value); resolve(); }; }));
+    const workspace = createCalendarWorkspace({ save });
+    workspace.setFilter("tasks", true);
+    workspace.setFilter("deadlines", false);
+    workspace.setFilter("mine", true);
+    expect(save).toHaveBeenCalledTimes(1);
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(save).toHaveBeenCalledTimes(2);
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(stored.at(-1)).toEqual({ view: null, filters: { ...DEFAULT_CALENDAR_FILTERS, tasks: true, deadlines: false, mine: true } });
   });
 
   it("waits for stored preferences once, and survives storage that fails", async () => {

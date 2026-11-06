@@ -135,7 +135,7 @@ export function storyResources(plan: Pick<StoryPlan, "resources"> | null | undef
   }));
 }
 
-function assigneeList(people: People, value: unknown) {
+export function assigneeList(people: People, value: unknown) {
   return relationIds(value)
     .map((id) => people.users.get(String(id)))
     .filter((user): user is NonNullable<typeof user> => Boolean(user))
@@ -335,28 +335,41 @@ export async function storiesWithExtras(ctx: ScreenContext, ids: number[]) {
   if (ids.length === 0) return { stories: [] as Story[], extras: new Map<number, StoryExtras>() };
   const byStory = { story: { in: ids } } satisfies Where;
   const all = { depth: 0, pagination: false, sort: "createdAt", ...asUser(ctx) } as const;
-  const [drafts, live, tasks, production, sources, appointments, scope] = await Promise.all([
-    ctx.req.payload.find({ collection: "stories", where: { id: { in: ids } }, draft: true, depth: 1, pagination: false, select: storySelect, ...asUser(ctx) }),
-    ctx.req.payload.find({ collection: "stories", where: { id: { in: ids } }, depth: 1, pagination: false, select: storySelect, ...asUser(ctx) }),
+  const [stories, tasks, production, sources, appointments] = await Promise.all([
+    readableStories(ctx, ids, storySelect, 1),
     ctx.req.payload.find({ collection: "tasks", where: byStory, ...all }),
     ctx.req.payload.find({ collection: "production-assignments", where: byStory, ...all }),
     ctx.req.payload.find({ collection: "sources", where: byStory, ...all, select: { story: true, status: true } }),
-    ctx.req.payload.find({ collection: "appointments", where: byStory, ...all }),
-    storyScope(ctx.req)
+    ctx.req.payload.find({ collection: "appointments", where: byStory, ...all })
   ]);
-  // Whether a story is live comes from the story itself: a pending rewrite's version reads "draft".
-  const liveById = new Map((live.docs as Story[]).map((story) => [story.id, story]));
-  const stories = (drafts.docs as Story[]).map((draft) => {
-    const current = liveById.get(draft.id);
-    if (current?._status !== "published") return draft;
-    return scopeManages(scope, draft.id) ? { ...draft, _status: current._status, publishedAt: current.publishedAt } : current;
-  });
   const extras = new Map<number, StoryExtras>(ids.map((id) => [id, { tasks: [], production: [], sources: [], appointments: [] }]));
   for (const task of tasks.docs) extras.get(num(task.story))?.tasks.push(task);
   for (const row of production.docs) extras.get(num(row.story))?.production.push(row);
   for (const source of sources.docs) extras.get(num(source.story))?.sources.push(source as Source);
   for (const appointment of appointments.docs) extras.get(num(appointment.story))?.appointments.push(appointment);
   return { stories, extras };
+}
+
+/**
+ * The stories this user may read, as they should see them: a manager reads
+ * the latest draft (with the live publication state), anyone else the
+ * published story, never an unpublished rewrite of it. Complete (no limit).
+ */
+export async function readableStories<S extends Record<string, true>>(ctx: ScreenContext, ids: number[], select: S, depth = 0): Promise<Story[]> {
+  if (ids.length === 0) return [];
+  const fields = { ...select, _status: true, publishedAt: true } as const;
+  const [drafts, live, scope] = await Promise.all([
+    ctx.req.payload.find({ collection: "stories", where: { id: { in: ids } }, draft: true, depth, pagination: false, select: fields, ...asUser(ctx) }),
+    ctx.req.payload.find({ collection: "stories", where: { id: { in: ids } }, depth, pagination: false, select: fields, ...asUser(ctx) }),
+    storyScope(ctx.req)
+  ]);
+  // Whether a story is live comes from the story itself: a pending rewrite's version reads "draft".
+  const liveById = new Map((live.docs as Story[]).map((story) => [story.id, story]));
+  return (drafts.docs as Story[]).map((draft) => {
+    const current = liveById.get(draft.id);
+    if (current?._status !== "published") return draft;
+    return scopeManages(scope, draft.id) ? { ...draft, _status: current._status, publishedAt: current.publishedAt } : current;
+  });
 }
 
 /* ----------------------------------------------------------------- Home */
