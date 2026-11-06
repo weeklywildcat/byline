@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { describeEditorialError } from "../editorial/editorial-model";
-import type { CollectionApi } from "./collection-api";
-import { collectionsKey, collectionKey } from "./collection-api";
-import type { CollectionDetail, CollectionInput } from "./collection-model";
-import { homeKey } from "../home/home-query";
+import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
+import type { CollectionApi } from "@byline/newsroom-screens/collections/collection-api";
+import { collectionsKey, collectionKey } from "@byline/newsroom-screens/collections/collection-api";
+import type { CollectionDetail, CollectionInput } from "@byline/newsroom-screens/collections/collection-model";
+import { homeKey } from "@byline/newsroom-screens/home/home-query";
 export function useCollectionActions(api: CollectionApi, id: number) {
   const client = useQueryClient();
   const refresh = () =>

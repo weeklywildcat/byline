@@ -8,9 +8,9 @@ import {
   DEFAULT_WORKFLOW_STATUSES,
   sortPlanningStories,
   type PlanningSort,
-} from "../planning/planning-model";
+} from "@byline/newsroom-screens/planning/planning-model";
 import type { PlanningAppFetchers } from "../planning/PlanningApp";
-import type { CollectionDetail } from "./collection-model";
+import type { CollectionDetail } from "@byline/newsroom-screens/collections/collection-model";
 export function CollectionStories({
   detail,
   fetchers,

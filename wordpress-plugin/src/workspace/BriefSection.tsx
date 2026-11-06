@@ -11,7 +11,7 @@ import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { ConfirmRemoveDialog } from "./dialog-shell";
 import { SectionFailed } from "./parts";
-import { BRIEF_MAX } from "./reporting-model";
+import { BRIEF_MAX } from "@byline/newsroom-screens/workspace/reporting-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyBrief } from "./workspace-cache";
 import { workspaceError, type WorkspaceError } from "./workspace-errors";

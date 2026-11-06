@@ -8,10 +8,10 @@ import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Card, CardContent } from "@byline/newsroom-ui/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
-import { StoryDueLabel, StorySignals, StoryTitleButton, WorkflowBadge } from "../story/story-parts";
-import { StoryHoverCard } from "../story/StoryHoverCard";
+import { StoryDueLabel, StorySignals, StoryTitleButton, WorkflowBadge } from "@byline/newsroom-screens/story/story-parts";
+import { StoryHoverCard } from "@byline/newsroom-screens/story/StoryHoverCard";
 import { StoryActionsMenu, StoryContextMenu } from "./StoryActionsMenu";
-import { boardWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
+import { boardWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "@byline/newsroom-screens/planning/planning-model";
 
 export type StoryBoardProps = {
   /** Already filtered and in the order each column should show them. */

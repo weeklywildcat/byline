@@ -11,8 +11,11 @@ import { describe, expect, it } from "vitest";
 const src = path.resolve(__dirname, "../src");
 const read = (file: string) => readFileSync(file, "utf8");
 
+const screens = path.resolve(__dirname, "../../packages/newsroom-screens/src");
+const SCREENS = "@byline/newsroom-screens/";
+
 function resolveImport(from: string, specifier: string): string | null {
-  const base = path.resolve(path.dirname(from), specifier);
+  const base = specifier.startsWith(SCREENS) ? path.join(screens, specifier.slice(SCREENS.length)) : path.resolve(path.dirname(from), specifier);
   for (const candidate of [`${base}.tsx`, `${base}.ts`, path.join(base, "index.tsx"), path.join(base, "index.ts"), base]) {
     if (existsSync(candidate) && /\.tsx?$/.test(candidate)) return candidate;
   }
@@ -25,7 +28,7 @@ function closure(entry: string): string[] {
   const visit = (file: string) => {
     if (seen.has(file)) return;
     seen.add(file);
-    for (const match of read(file).matchAll(/(?:from\s+|import\s*\(\s*|import\s+)["'](\.{1,2}\/[^"']+)["']/g)) {
+    for (const match of read(file).matchAll(/(?:from\s+|import\s*\(\s*|import\s+)["']((?:\.{1,2}\/|@byline\/newsroom-screens\/)[^"']+)["']/g)) {
       const next = resolveImport(file, match[1]!);
       if (next) visit(next);
     }

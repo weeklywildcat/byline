@@ -6,9 +6,9 @@
 import { CalendarClock, Camera, CheckCheck, Clock, Flag, ListTodo, Newspaper, type LucideIcon } from "lucide-react";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
-import { StoryHoverCard } from "../story/StoryHoverCard";
+import { StoryHoverCard } from "@byline/newsroom-screens/story/StoryHoverCard";
 import { CATEGORY_BY_EVENT_TYPE, CATEGORY_LABELS, type BylineScheduleXEvent, type ScheduleXCategory } from "./schedule-x-adapter";
-import type { CalendarEventType } from "./planning-model";
+import type { CalendarEventType } from "@byline/newsroom-screens/planning/planning-model";
 
 const ICONS: Record<CalendarEventType, LucideIcon> = { appointment: CalendarClock, deadline: Flag, media: Camera, task: ListTodo, planned: Newspaper, scheduled: Clock, published: CheckCheck };
 

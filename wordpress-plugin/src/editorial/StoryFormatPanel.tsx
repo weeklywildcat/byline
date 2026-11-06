@@ -1,6 +1,6 @@
 import { Notice, RadioControl, TextControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
-import { checkVideoUrl, STORY_FORMAT_OPTIONS, videoStoryProblem, type StoryFormat } from './story-video-model';
+import { checkVideoUrl, STORY_FORMAT_OPTIONS, videoStoryProblem, type StoryFormat } from '@byline/newsroom-screens/editorial/story-video-model';
 
 export type StoryFormatPanelProps = {
   format: StoryFormat;

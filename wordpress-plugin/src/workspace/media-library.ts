@@ -3,7 +3,7 @@
  * outside this React root, so every access is optional: when the library is not
  * loaded the caller simply does not offer the button.
  */
-import type { MediaAssignmentType } from "./workspace-types";
+import type { MediaAssignmentType } from "@byline/newsroom-screens/workspace/workspace-types";
 
 export type PickedAttachment = { id: number; title: string; previewUrl: string | null; mimeType: string | null };
 

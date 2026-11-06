@@ -39,7 +39,7 @@ import { ContributorsPanel } from './editorial/ContributorsPanel';
 import { DistributionPanel } from './editorial/DistributionPanel';
 import { StoryPresentationPanel } from './editorial/StoryPresentationPanel';
 import { StoryFormatPanel } from './editorial/StoryFormatPanel';
-import { readStoryVideoMeta, storyVideoMetaPatch } from './editorial/story-video-model';
+import { readStoryVideoMeta, storyVideoMetaPatch } from '@byline/newsroom-screens/editorial/story-video-model';
 import { ReportingNotePanel } from './editorial/ReportingNotePanel';
 import { readReportingNote, reportingNoteMetaPatch } from './editorial/reporting-note-model';
 import { OPEN_PHOTO_CROPS_EVENT, PhotoCropsDialog } from './editorial/photo-crops/PhotoCropsDialog';
@@ -49,7 +49,7 @@ import {
   createEditorialRestClient,
   type ProtectedEditorialFetcher,
   type ProtectedEditorialRequest
-} from './editorial/editorial-rest';
+} from '@byline/newsroom-screens/editorial/editorial-rest';
 import type {
   ContributorEntry,
   CorrectionRecord,
@@ -60,8 +60,8 @@ import type {
   ReadinessCheck,
   TaskInput,
   TaskPatch,
-} from './editorial/editorial-model';
-import { summarizeReadiness } from './editorial/editorial-model';
+} from '@byline/newsroom-screens/editorial/editorial-model';
+import { summarizeReadiness } from '@byline/newsroom-screens/editorial/editorial-model';
 
 import {
   workflowDiscordState,
@@ -81,7 +81,7 @@ import {
   subscribeToStorySidebarNavigation,
   type StorySidebarPanel,
   type StorySidebarPanelOpenState
-} from './editorial/story-sidebar-navigation';
+} from '@byline/newsroom-screens/editorial/story-sidebar-navigation';
 
 import './editorial-workflow.css';
 

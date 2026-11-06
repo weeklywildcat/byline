@@ -4,11 +4,11 @@ import {
   edgeChanges,
   visibleCollections,
   type Collection,
-} from "../src/collections/collection-model";
-import { interviewAppointment } from "../src/collections/interview-schedule";
+} from "@byline/newsroom-screens/collections/collection-model";
+import { interviewAppointment } from "@byline/newsroom-screens/collections/interview-schedule";
 import { appointmentToForm } from "../src/workspace/appointment-form";
-import type { Interview } from "../src/collections/collection-model";
-import { createCollectionApi } from "../src/collections/collection-api";
+import type { Interview } from "@byline/newsroom-screens/collections/collection-model";
+import { createCollectionApi } from "@byline/newsroom-screens/collections/collection-api";
 const collection = (patch: Partial<Collection> = {}): Collection => ({
   id: 1,
   name: "2026 SCBDA State Championships",

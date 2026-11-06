@@ -2,7 +2,7 @@
  * Pure model for the Media Desk: one row per production assignment, with a
  * graceful fallback to the legacy one-request-per-story collection.
  */
-import { siteDay } from "../home/newsroom-model";
+import { siteDay } from "@byline/newsroom-screens/home/newsroom-model";
 import {
   parsePlanningDate,
   planningDateKey,
@@ -12,7 +12,7 @@ import {
   type MediaRequest,
   type PlanningVisualStatus,
   type PlanningVisualType
-} from "./planning-model";
+} from "@byline/newsroom-screens/planning/planning-model";
 
 export type MediaDeskRow = MediaAssignmentRow & {
   /** `assignment` rows update through the per-assignment route; `request` rows are the legacy story-level fallback. */

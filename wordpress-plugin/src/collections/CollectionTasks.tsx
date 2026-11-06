@@ -1,21 +1,21 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { TaskRow } from "../story/rows";
-import { TaskEditDialog } from "../story/TaskEditDialog";
-import { useUpdateTask } from "../story/use-update-task";
+import { TaskRow } from "@byline/newsroom-screens/story/rows";
+import { TaskEditDialog } from "@byline/newsroom-screens/story/TaskEditDialog";
+import { useUpdateTask } from "@byline/newsroom-screens/story/use-update-task";
 import { ItemGroup } from "@byline/newsroom-ui/ui/item";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
-import type { StoryFetchers } from "../story/story-fetchers";
+import type { StoryFetchers } from "@byline/newsroom-screens/story/story-fetchers";
 import type {
   ContributorEntry,
   EditorialTask,
-} from "../editorial/editorial-model";
-import { describeEditorialError } from "../editorial/editorial-model";
+} from "@byline/newsroom-screens/editorial/editorial-model";
+import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
 import { toast } from "sonner";
-import { collectionKey } from "./collection-api";
-import { CollectionEmpty } from "./collection-ui";
-import type { CollectionDetail } from "./collection-model";
+import { collectionKey } from "@byline/newsroom-screens/collections/collection-api";
+import { CollectionEmpty } from "@byline/newsroom-screens/collections/collection-ui";
+import type { CollectionDetail } from "@byline/newsroom-screens/collections/collection-model";
 export function CollectionTasks({
   detail,
   fetchers,

@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ContributorEntry } from "../editorial/editorial-model";
-import { StoryPeek } from "./StoryPeek";
-import { TaskCreateDialog } from "./TaskCreateDialog";
-import type { StoryFetchers } from "./story-fetchers";
-import { workspaceKey } from "./story-query";
+import type { ContributorEntry } from "@byline/newsroom-screens/editorial/editorial-model";
+import { StoryPeek } from "@byline/newsroom-screens/story/StoryPeek";
+import { TaskCreateDialog } from "@byline/newsroom-screens/story/TaskCreateDialog";
+import type { StoryFetchers } from "@byline/newsroom-screens/story/story-fetchers";
+import { workspaceKey } from "@byline/newsroom-screens/story/story-query";
 import { useCompleteTask } from "./use-complete-task";
-import { StoryHoverProvider } from "./StoryHoverCard";
+import { StoryHoverProvider } from "@byline/newsroom-screens/story/StoryHoverCard";
 
 type StoryPeekApi = { openStory: (storyId: number) => void };
 const StoryPeekContext = createContext<StoryPeekApi | null>(null);

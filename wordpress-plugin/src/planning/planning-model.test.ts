@@ -12,7 +12,7 @@ import {
   storyDateSemantics,
   type PlanningStory,
   type SavedPlanningView
-} from "./planning-model";
+} from "@byline/newsroom-screens/planning/planning-model";
 
 function story(overrides: Partial<PlanningStory> = {}): PlanningStory {
   return {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ResourceIcon } from "../workspace/resource-icon";
+import { ResourceIcon } from "@byline/newsroom-screens/workspace/resource-icon";
 import {
   Item,
   ItemActions,
@@ -11,19 +11,19 @@ import {
   ItemTitle,
 } from "@byline/newsroom-ui/ui/item";
 import { WorkspaceDialog } from "../workspace/dialog-shell";
-import { describeEditorialError } from "../editorial/editorial-model";
-import type { CollectionApi } from "./collection-api";
+import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
+import type { CollectionApi } from "@byline/newsroom-screens/collections/collection-api";
 import {
   edgeChanges,
   type CollectionDetail,
   type SharedResource,
-} from "./collection-model";
+} from "@byline/newsroom-screens/collections/collection-model";
 import {
   ActionMenu,
   CollectionEmpty,
   EntityPicker,
   StoryOption,
-} from "./collection-ui";
+} from "@byline/newsroom-screens/collections/collection-ui";
 export function CollectionResources({
   detail,
   api,

@@ -1,17 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { StoryCollectionContext } from "../src/collections/StoryCollectionContext";
+import { StoryCollectionContext } from "@byline/newsroom-screens/collections/StoryCollectionContext";
 import {
   collectionsKey,
   storyCollectionsKey,
   type CollectionApi,
-} from "../src/collections/collection-api";
+} from "@byline/newsroom-screens/collections/collection-api";
 import type {
   Collection,
   Interview,
   StoryCollections,
-} from "../src/collections/collection-model";
+} from "@byline/newsroom-screens/collections/collection-model";
 
 const collection = {
   id: 1,

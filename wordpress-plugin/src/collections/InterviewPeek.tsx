@@ -38,16 +38,16 @@ import {
 import {
   describeEditorialError,
   type ContributorEntry,
-} from "../editorial/editorial-model";
-import { EntityPicker, StoryOption } from "./collection-ui";
-import type { CollectionApi } from "./collection-api";
+} from "@byline/newsroom-screens/editorial/editorial-model";
+import { EntityPicker, StoryOption } from "@byline/newsroom-screens/collections/collection-ui";
+import type { CollectionApi } from "@byline/newsroom-screens/collections/collection-api";
 import {
   edgeChanges,
   interviewStatuses,
   type CollectionDetail,
   type Interview,
-} from "./collection-model";
-import { interviewAppointment } from "./interview-schedule";
+} from "@byline/newsroom-screens/collections/collection-model";
+import { interviewAppointment } from "@byline/newsroom-screens/collections/interview-schedule";
 export function InterviewPeek({
   interview,
   detail,

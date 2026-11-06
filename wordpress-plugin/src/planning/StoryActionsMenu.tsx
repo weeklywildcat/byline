@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@byline/newsroom-ui/ui/context-menu";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { useRef, type MouseEvent as ReactMouseEvent, type ReactElement } from "react";
-import { movableWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
+import { movableWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "@byline/newsroom-screens/planning/planning-model";
 
 export type StoryActionsMenuProps = {
   additionalActions?: Array<{ id: string; label: string; run: () => void }>;

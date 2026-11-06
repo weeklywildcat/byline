@@ -5,7 +5,6 @@
  */
 import type { ComponentProps } from "react";
 import { MessageSquareText } from "lucide-react";
-import { __, _n, sprintf } from "@wordpress/i18n";
 import { WorkStatusBadge, mediaIntensity, type WorkIntensity, type WorkKind } from "@byline/newsroom-ui/components/work-status-badge";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Button } from "@byline/newsroom-ui/ui/button";
@@ -131,8 +130,8 @@ export function ProductionSummary({ story, className, empty = "—", maxSignals 
   const hasNotes = openNotesSignal(story.notes) > 0;
   return signals.length || hasNotes
     ? <span className={cn("flex flex-wrap items-center gap-1.5", className)}>{shown.map((signal) => <WorkStatusBadge key={signal.key} kind={signal.kind} intensity={signal.intensity}>{signal.label}</WorkStatusBadge>)}{more.length ? <Popover>
-      <PopoverTrigger render={<Button variant="ghost" size="xs" className="h-5 px-1 text-xs text-muted-foreground" aria-label={sprintf(/* translators: %d: number of additional work signals. */ _n("%d more work signal", "%d more work signals", more.length, "weekly-wildcat-headless"), more.length)} />}><span aria-hidden="true">+{more.length}</span></PopoverTrigger>
-      <PopoverContent align="start" className="w-64"><p className="text-xs font-semibold text-muted-foreground">{__("More work", "weekly-wildcat-headless")}</p><span className="flex flex-wrap items-center gap-1.5">{more.map((signal) => <WorkStatusBadge key={signal.key} kind={signal.kind} intensity={signal.intensity}>{signal.label}</WorkStatusBadge>)}</span></PopoverContent>
+      <PopoverTrigger render={<Button variant="ghost" size="xs" className="h-5 px-1 text-xs text-muted-foreground" aria-label={`${more.length} more work ${more.length === 1 ? "signal" : "signals"}`} />}><span aria-hidden="true">+{more.length}</span></PopoverTrigger>
+      <PopoverContent align="start" className="w-64"><p className="text-xs font-semibold text-muted-foreground">More work</p><span className="flex flex-wrap items-center gap-1.5">{more.map((signal) => <WorkStatusBadge key={signal.key} kind={signal.kind} intensity={signal.intensity}>{signal.label}</WorkStatusBadge>)}</span></PopoverContent>
     </Popover> : null}<StoryNotesIndicator story={story} /></span>
     : empty === null ? null : <span className={cn("text-xs text-muted-foreground", className)}>{empty}</span>;
 }

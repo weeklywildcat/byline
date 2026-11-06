@@ -1,14 +1,14 @@
-import { AssigneePicker, DatePicker } from "../editorial/pickers";
+import { AssigneePicker, DatePicker } from "@byline/newsroom-screens/editorial/pickers";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
-import type { ContributorEntry } from "../editorial/editorial-model";
+import type { ContributorEntry } from "@byline/newsroom-screens/editorial/editorial-model";
 import {
   collectionStatuses,
   collectionTypes,
   edgeChanges,
   storySummary,
   type Collection,
-} from "./collection-model";
-import { Choice, EntityPicker } from "./collection-ui";
+} from "@byline/newsroom-screens/collections/collection-model";
+import { Choice, EntityPicker } from "@byline/newsroom-screens/collections/collection-ui";
 import type { ReturnTypeOfCollectionActions } from "./collection-query";
 export function CollectionProperties({
   collection: c,

@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { StoryPeekContent, type StoryPeekContentProps } from "../src/story/StoryPeek";
+import { StoryPeekContent, type StoryPeekContentProps } from "@byline/newsroom-screens/story/StoryPeek";
 import { FileAttachment } from "../src/workspace/MediaDialog";
-import type { StoryWorkspace } from "../src/workspace/workspace-types";
+import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const now = new Date("2026-10-20T12:00:00Z");
 const admin = { id: 1, kind: "user" as const, name: "admin", imageUrl: "https://example.test/admin.jpg" };

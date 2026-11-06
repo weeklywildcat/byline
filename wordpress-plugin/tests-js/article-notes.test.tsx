@@ -2,9 +2,10 @@ import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { readSource } from "./source-files";
 import { TooltipProvider } from "@byline/newsroom-ui/ui/tooltip";
-import { StoryPeekContent, type StoryPeekContentProps } from "../src/story/StoryPeek";
-import { ProductionSummary, StoryNotesIndicator, StorySignals } from "../src/story/story-parts";
+import { StoryPeekContent, type StoryPeekContentProps } from "@byline/newsroom-screens/story/StoryPeek";
+import { ProductionSummary, StoryNotesIndicator, StorySignals } from "@byline/newsroom-screens/story/story-parts";
 import {
   initials,
   moreOpenNotesLabel,
@@ -16,14 +17,14 @@ import {
   visibleNotes,
   type ArticleNotePreview,
   type ArticleNotesSummary
-} from "../src/story/notes-model";
-import type { PlanningStory } from "../src/planning/planning-model";
-import { createWorkspaceClient } from "../src/workspace/workspace-api";
+} from "@byline/newsroom-screens/story/notes-model";
+import type { PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
+import { createWorkspaceClient } from "@byline/newsroom-screens/workspace/workspace-api";
 import { ArticleNotesCard, NotesSection } from "../src/workspace/NotesSection";
 import { WorkspaceContext, type WorkspaceContextValue } from "../src/workspace/workspace-context";
-import type { StoryWorkspace } from "../src/workspace/workspace-types";
+import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 
-const read = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8");
+const read = readSource;
 const now = new Date("2026-10-21T12:00:00Z");
 const timezone = "America/New_York";
 const editUrl = "https://cms.example.test/wp-admin/post.php?post=7&action=edit";

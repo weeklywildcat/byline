@@ -9,8 +9,8 @@ import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, Con
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import type { NeedsSchedulingItem } from "./calendar-model";
-import { StoryTitleButton } from "../story/story-parts";
-import { StoryHoverCard } from "../story/StoryHoverCard";
+import { StoryTitleButton } from "@byline/newsroom-screens/story/story-parts";
+import { StoryHoverCard } from "@byline/newsroom-screens/story/StoryHoverCard";
 
 const PREVIEW = 5;
 

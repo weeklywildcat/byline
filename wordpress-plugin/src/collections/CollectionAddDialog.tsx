@@ -8,14 +8,14 @@ import {
   pickFromMediaLibrary,
 } from "../workspace/media-library";
 import { useDebouncedValue } from "@byline/newsroom-ui/lib/hooks";
-import { describeEditorialError } from "../editorial/editorial-model";
-import type { CollectionApi } from "./collection-api";
+import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
+import type { CollectionApi } from "@byline/newsroom-screens/collections/collection-api";
 import {
   edgeChanges,
   type CollectionDetail,
   type SharedResource,
-} from "./collection-model";
-import { EntityPicker, StoryOption } from "./collection-ui";
+} from "@byline/newsroom-screens/collections/collection-model";
+import { EntityPicker, StoryOption } from "@byline/newsroom-screens/collections/collection-ui";
 export function CollectionAddDialog({
   kind,
   api,

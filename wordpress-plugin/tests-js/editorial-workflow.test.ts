@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createEditorialRestClient } from "../src/editorial/editorial-rest";
+import { createEditorialRestClient } from "@byline/newsroom-screens/editorial/editorial-rest";
 import {
   WORKFLOW_FALLBACK_ERROR,
   createWorkflowMutationQueue,

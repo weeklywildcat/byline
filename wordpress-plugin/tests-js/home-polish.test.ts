@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mediaAssignmentTitle, waitingForMe, type HomeBootstrap, type HomeVisualWork } from "../src/home/newsroom-model";
-import type { PlanningStory } from "../src/planning/planning-model";
+import { mediaAssignmentTitle, waitingForMe, type HomeBootstrap, type HomeVisualWork } from "@byline/newsroom-screens/home/newsroom-model";
+import type { PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 
 const currentUser = { id: 1, name: "Gibson Bell" };
 

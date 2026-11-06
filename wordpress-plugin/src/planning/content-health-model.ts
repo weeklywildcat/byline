@@ -1,7 +1,7 @@
 import type {
   ContentHealthIssue,
   ContentHealthSeverity,
-} from "./planning-model";
+} from "@byline/newsroom-screens/planning/planning-model";
 export const healthSeverityLabels = {
   error: "Critical",
   warning: "Needs attention",

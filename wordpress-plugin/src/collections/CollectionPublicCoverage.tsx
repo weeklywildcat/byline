@@ -20,11 +20,11 @@ import {
   mediaLibraryAvailable,
   pickFromMediaLibrary,
 } from "../workspace/media-library";
-import { describeEditorialError } from "../editorial/editorial-model";
+import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
 import type {
   CollectionDetail,
   PublicCoveragePresentation,
-} from "./collection-model";
+} from "@byline/newsroom-screens/collections/collection-model";
 import type { ReturnTypeOfCollectionActions } from "./collection-query";
 
 export function CollectionPublicCoverage({

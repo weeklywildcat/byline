@@ -4,7 +4,7 @@ import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { PlanningApp, createPlanningFetchers } from "./planning";
-import { createStoryFetchers } from "./story/story-fetchers";
+import { createStoryFetchers } from "@byline/newsroom-screens/story/story-fetchers";
 import "./planning/style.css";
 
 type PlanningConfig = {

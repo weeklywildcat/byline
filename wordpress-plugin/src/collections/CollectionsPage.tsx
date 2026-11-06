@@ -12,13 +12,13 @@ import {
 } from "@byline/newsroom-ui/ui/input-group";
 import { ItemGroup } from "@byline/newsroom-ui/ui/item";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
-import { RowSkeletons } from "../story/rows";
+import { RowSkeletons } from "@byline/newsroom-screens/story/rows";
 import { useStoryPeek } from "../story/StoryPeekHost";
-import { describeEditorialError } from "../editorial/editorial-model";
+import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
 import { CollectionDialog } from "./CollectionDialog";
 import { CollectionWorkspace, type AddKind } from "./CollectionWorkspace";
-import { Choice, CollectionEmpty, CollectionRow } from "./collection-ui";
-import { collectionsKey, collectionKey } from "./collection-api";
+import { Choice, CollectionEmpty, CollectionRow } from "@byline/newsroom-screens/collections/collection-ui";
+import { collectionsKey, collectionKey } from "@byline/newsroom-screens/collections/collection-api";
 import {
   collectionStatuses,
   collectionUrl,
@@ -26,7 +26,7 @@ import {
   type Collection,
   type CollectionAction,
   type CollectionFilters,
-} from "./collection-model";
+} from "@byline/newsroom-screens/collections/collection-model";
 export function CollectionsPage({
   fetchers,
   currentUserId,

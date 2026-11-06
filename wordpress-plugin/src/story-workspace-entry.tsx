@@ -3,9 +3,9 @@ import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { buttonVariants } from "@byline/newsroom-ui/ui/button";
-import { createEditorialRestClient } from "./editorial/editorial-rest";
+import { createEditorialRestClient } from "@byline/newsroom-screens/editorial/editorial-rest";
 import { StoryWorkspaceApp } from "./workspace/StoryWorkspace";
-import { createWorkspaceClient } from "./workspace/workspace-api";
+import { createWorkspaceClient } from "@byline/newsroom-screens/workspace/workspace-api";
 import "./workspace/style.css";
 
 type WorkspaceConfig = {

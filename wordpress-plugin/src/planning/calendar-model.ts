@@ -13,8 +13,8 @@
  * instant read in the WordPress site timezone; a target window is date-only and
  * is NEVER given a day cell or a time. Windows go to the "Needs scheduling" list.
  */
-import { collectionUrl } from "../collections/collection-model";
-import { siteDay } from "../home/newsroom-model";
+import { collectionUrl } from "@byline/newsroom-screens/collections/collection-model";
+import { siteDay } from "@byline/newsroom-screens/home/newsroom-model";
 import {
   addDays,
   appointmentDay,
@@ -23,9 +23,9 @@ import {
   formatTimeRange,
   formatWindow,
   splitAppointments
-} from "../workspace/schedule-model";
-import type { ScheduleAppointment, ScheduleMediaDeadline, ScheduleResponse, ScheduleTaskDeadline } from "../workspace/workspace-types";
-import type { CalendarEventType, PlanningCalendarEvent } from "./planning-model";
+} from "@byline/newsroom-screens/workspace/schedule-model";
+import type { ScheduleAppointment, ScheduleMediaDeadline, ScheduleResponse, ScheduleTaskDeadline } from "@byline/newsroom-screens/workspace/workspace-types";
+import type { CalendarEventType, PlanningCalendarEvent } from "@byline/newsroom-screens/planning/planning-model";
 
 export type CalendarFilters = {
   appointments: boolean;

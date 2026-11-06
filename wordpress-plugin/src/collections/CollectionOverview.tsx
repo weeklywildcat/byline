@@ -7,15 +7,15 @@ import {
   ItemDescription,
 } from "@byline/newsroom-ui/ui/item";
 import { ItemButton } from "@byline/newsroom-ui/components/item-button";
-import type { ContributorEntry } from "../editorial/editorial-model";
-import type { StoryFetchers } from "../story/story-fetchers";
-import { exactDate } from "../home/newsroom-model";
+import type { ContributorEntry } from "@byline/newsroom-screens/editorial/editorial-model";
+import type { StoryFetchers } from "@byline/newsroom-screens/story/story-fetchers";
+import { exactDate } from "@byline/newsroom-screens/home/newsroom-model";
 import { CollectionPublicCoverage } from "./CollectionPublicCoverage";
 import { CollectionBrief } from "./CollectionBrief";
 import { CollectionProperties } from "./CollectionProperties";
 import { CollectionTasks } from "./CollectionTasks";
-import { CollectionEmpty } from "./collection-ui";
-import type { CollectionDetail } from "./collection-model";
+import { CollectionEmpty } from "@byline/newsroom-screens/collections/collection-ui";
+import type { CollectionDetail } from "@byline/newsroom-screens/collections/collection-model";
 import type { ReturnTypeOfCollectionActions } from "./collection-query";
 export type UpcomingItem = {
   id: string;

@@ -5,7 +5,7 @@
  * style-story-workspace.css.
  */
 @import "@byline/newsroom-ui/styles.css";
-@source "../editorial/pickers.tsx"; /* WordPress-bound pickers that sit beside the design system */
+@source "../../../packages/newsroom-screens/src"; /* the shared newsroom screens */
 @source "./";
 /* The workspace uses shared story parts (task fields, hover cards); register them so their utilities are emitted. */
 @source "../story";

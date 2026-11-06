@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import "temporal-polyfill/global";
 import { createWorkspaceUrlBuilder, needsSchedulingItems, scheduleCalendarEvents } from "./calendar-model";
-import { planningCalendarEvents, type PlanningStory } from "./planning-model";
+import { planningCalendarEvents, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 import { CATEGORY_BY_EVENT_TYPE, SCHEDULE_X_CALENDARS, SCHEDULE_X_CATEGORIES, parseSiteTimestamp, toScheduleXEvent, toScheduleXEvents, visibleRangeDays } from "./schedule-x-adapter";
-import type { ScheduleAppointment, ScheduleResponse } from "../workspace/workspace-types";
+import type { ScheduleAppointment, ScheduleResponse } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const timezone = "America/New_York";
 const workspaceUrl = createWorkspaceUrlBuilder("http://example.test/wp-admin/admin.php?page=byline-planning&tab=stories");

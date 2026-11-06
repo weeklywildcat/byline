@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { FileImage, FileText, X } from "lucide-react";
 import { toast } from "sonner";
 import { SelectField, TextAreaField, TextField } from "@byline/newsroom-ui/components/form-fields";
-import { AssigneePicker } from "../editorial/pickers";
+import { AssigneePicker } from "@byline/newsroom-screens/editorial/pickers";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "@byline/newsroom-ui/ui/attachment";
@@ -11,12 +11,12 @@ import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog
 import { DayField } from "./fields";
 import { emptyMediaForm, fileCountLabel, mediaFormToInput, mediaToForm, validateMediaForm, type MediaForm } from "./media-form";
 import { mediaLibraryAvailable, pickFromMediaLibrary, type PickedAttachment } from "./media-library";
-import { MEDIA_STATUS_LABELS, MEDIA_TYPE_LABELS, labelFor } from "./reporting-model";
-import { peopleOptions } from "./workspace-model";
+import { MEDIA_STATUS_LABELS, MEDIA_TYPE_LABELS, labelFor } from "@byline/newsroom-screens/workspace/reporting-model";
+import { peopleOptions } from "@byline/newsroom-screens/workspace/workspace-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyMedia } from "./workspace-cache";
 import { workspaceError } from "./workspace-errors";
-import { MEDIA_ASSIGNMENT_STATUSES, MEDIA_ASSIGNMENT_TYPES, type MediaAssignmentsResponse, type StoryMediaAssignment } from "./workspace-types";
+import { MEDIA_ASSIGNMENT_STATUSES, MEDIA_ASSIGNMENT_TYPES, type MediaAssignmentsResponse, type StoryMediaAssignment } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const typeOptions = MEDIA_ASSIGNMENT_TYPES.map((value) => ({ value, label: MEDIA_TYPE_LABELS[value] }));
 const statusOptions = MEDIA_ASSIGNMENT_STATUSES.map((value) => ({ value, label: MEDIA_STATUS_LABELS[value] }));

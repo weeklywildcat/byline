@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { describeEditorialError, setTaskCompletionState, type EditorialTask } from "../editorial/editorial-model";
-import { homeKey, replaceHomeTask } from "../home/home-query";
-import type { HomeBootstrap } from "../home/newsroom-model";
-import type { StoryWorkspace } from "../workspace/workspace-types";
-import type { StoryFetchers } from "./story-fetchers";
-import { invalidateStoryData, replaceWorkspaceTask, workspaceKey } from "./story-query";
+import { describeEditorialError, setTaskCompletionState, type EditorialTask } from "@byline/newsroom-screens/editorial/editorial-model";
+import { homeKey, replaceHomeTask } from "@byline/newsroom-screens/home/home-query";
+import type { HomeBootstrap } from "@byline/newsroom-screens/home/newsroom-model";
+import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
+import type { StoryFetchers } from "@byline/newsroom-screens/story/story-fetchers";
+import { invalidateStoryData, replaceWorkspaceTask, workspaceKey } from "@byline/newsroom-screens/story/story-query";
 
 /**
  * Completing a task from Story Peek: the checkbox flips at once in the cached

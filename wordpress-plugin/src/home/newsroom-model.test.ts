@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { EditorialTask } from "../editorial/editorial-model";
-import type { PlanningStory } from "../planning/planning-model";
-import type { HomeAppointment } from "../workspace/workspace-types";
-import { activeStory, dayDistance, homeAgenda, myActiveStories, myOpenTasks, myStory, myWork, reviewStories, siteDay, waitingForMe, workspaceUrlFor, type HomeBootstrap, type HomeVisualWork } from "./newsroom-model";
-import { replaceHomeTask } from "./home-query";
+import type { EditorialTask } from "@byline/newsroom-screens/editorial/editorial-model";
+import type { PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
+import type { HomeAppointment } from "@byline/newsroom-screens/workspace/workspace-types";
+import { activeStory, dayDistance, homeAgenda, myActiveStories, myOpenTasks, myStory, myWork, reviewStories, siteDay, waitingForMe, workspaceUrlFor, type HomeBootstrap, type HomeVisualWork } from "@byline/newsroom-screens/home/newsroom-model";
+import { replaceHomeTask } from "@byline/newsroom-screens/home/home-query";
 
 const now = new Date("2026-10-20T12:00:00Z");
 const timezone = "America/New_York";

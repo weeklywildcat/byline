@@ -3,10 +3,10 @@ import apiFetch from "@wordpress/api-fetch";
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
-import { HomeApp } from "./home/HomeApp";
-import { createHomeFetchers } from "./home/home-api";
-import type { HomeNavigationCapabilities } from "./home/home-model";
-import { workspaceUrlFor } from "./home/newsroom-model";
+import { HomeApp } from "@byline/newsroom-screens/home/HomeApp";
+import { createHomeFetchers } from "@byline/newsroom-screens/home/home-api";
+import type { HomeNavigationCapabilities } from "@byline/newsroom-screens/home/home-model";
+import { workspaceUrlFor } from "@byline/newsroom-screens/home/newsroom-model";
 import "./home/style.css";
 
 type HomeConfig = {

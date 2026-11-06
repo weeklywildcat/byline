@@ -5,7 +5,7 @@ import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
-import { DatePicker, valueSelectTriggerClass } from "../editorial/pickers";
+import { DatePicker, valueSelectTriggerClass } from "@byline/newsroom-screens/editorial/pickers";
 import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
 import { WorkStatusBadge, mediaIntensity, workBadgeColors } from "@byline/newsroom-ui/components/work-status-badge";
 import { cn } from "@byline/newsroom-ui/lib/utils";
@@ -22,13 +22,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@byline/newsroom-ui/ui/table";
 import { mediaLibraryAvailable, pickFromMediaLibrary } from "../workspace/media-library";
-import { invalidateStoryData, mediaDeskKey } from "../story/story-query";
-import { StoryTitleButton } from "../story/story-parts";
-import { StoryHoverCard } from "../story/StoryHoverCard";
-import type { PlanningFetchers } from "./planning-api";
+import { invalidateStoryData, mediaDeskKey } from "@byline/newsroom-screens/story/story-query";
+import { StoryTitleButton } from "@byline/newsroom-screens/story/story-parts";
+import { StoryHoverCard } from "@byline/newsroom-screens/story/StoryHoverCard";
+import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
 import { EMPTY_MEDIA_DESK_FILTERS, MEDIA_STATUS_OPTIONS, MEDIA_TYPE_OPTIONS, filterMediaRows, mediaDeskRows, mediaDueDay, mediaReadinessHint, mediaTypeLabel, sortMediaRows, type MediaDeskFilters, type MediaDeskRow } from "./media-desk-model";
 import { describeMediaDeskError } from "./media-desk-errors";
-import { mergeMediaAttachmentIds, removeMediaAttachmentId, type MediaAttachment, type MediaDeskResponse } from "./planning-model";
+import { mergeMediaAttachmentIds, removeMediaAttachmentId, type MediaAttachment, type MediaDeskResponse } from "@byline/newsroom-screens/planning/planning-model";
 import { NothingHere, PageHeader, ResourceGate } from "./PlanningPage";
 import { useOptionalQuery } from "./planning-query";
 

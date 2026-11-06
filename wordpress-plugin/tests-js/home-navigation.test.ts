@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { createHomeFetchers, type HomeRequest } from "../src/home/home-api";
+import { createHomeFetchers, type HomeRequest } from "@byline/newsroom-screens/home/home-api";
 import {
   homeAttentionItems,
   homeComingUp,
   type HomeData
-} from "../src/home/home-model";
+} from "@byline/newsroom-screens/home/home-model";
 import {
   preferredStoriesView,
   readStoriesViewPreference,
   storiesViewFromRoute,
   writeStoriesViewPreference
 } from "../src/home/navigation-model";
-import type { PlanningResponse, PlanningStory } from "../src/planning/planning-model";
+import type { PlanningResponse, PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 
 const now = new Date(2026, 7, 28, 12);
 

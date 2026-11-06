@@ -1,7 +1,7 @@
 import { Button, Notice, Spinner } from "@wordpress/components";
 import { useState } from "@wordpress/element";
-import type { ReadinessCheck } from "./editorial-model";
-import { describeEditorialError, readinessStateLabel, summarizeReadiness, type ReadinessSummary } from "./editorial-model";
+import type { ReadinessCheck } from "@byline/newsroom-screens/editorial/editorial-model";
+import { describeEditorialError, readinessStateLabel, summarizeReadiness, type ReadinessSummary } from "@byline/newsroom-screens/editorial/editorial-model";
 import "./editorial.css";
 
 export type ReadinessPanelProps = {

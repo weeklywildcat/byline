@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import { StoryBoard } from "../src/planning/StoryBoard";
 import { StoryList, type StoryListProps } from "../src/planning/StoryList";
-import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, hideFinishedPublished, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "../src/planning/planning-model";
+import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, hideFinishedPublished, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 import { destinationForTab, initialStoriesView, storiesViewHref } from "../src/planning/planning-routing";
-import { ProductionSummary, productionSignal, storySignals, workflowBadgeSpec, WorkflowBadge } from "../src/story/story-parts";
-import { sectionNames } from "../src/workspace/workspace-model";
+import { ProductionSummary, productionSignal, storySignals, workflowBadgeSpec, WorkflowBadge } from "@byline/newsroom-screens/story/story-parts";
+import { sectionNames } from "@byline/newsroom-screens/workspace/workspace-model";
 
 const now = new Date("2026-10-20T12:00:00Z");
 const person = (id: number, name: string) => ({ id, name });

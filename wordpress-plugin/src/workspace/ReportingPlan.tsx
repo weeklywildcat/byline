@@ -15,13 +15,13 @@ import { AppointmentDialog } from "./AppointmentDialog";
 import { SourceDialog } from "./SourceDialog";
 import { AddButton, SectionFailed } from "./parts";
 import { useDialogTarget } from "./dialog-target";
-import { APPOINTMENT_KIND_LABELS, APPOINTMENT_STATUS_LABELS, SOURCE_STATUS_LABELS, labelFor, sourceTimingLine } from "./reporting-model";
-import { appointmentTiming, formatDay, formatTime, formatTimeRange, splitAppointments } from "./schedule-model";
-import { assigneeAvatars } from "./workspace-model";
+import { APPOINTMENT_KIND_LABELS, APPOINTMENT_STATUS_LABELS, SOURCE_STATUS_LABELS, labelFor, sourceTimingLine } from "@byline/newsroom-screens/workspace/reporting-model";
+import { appointmentTiming, formatDay, formatTime, formatTimeRange, splitAppointments } from "@byline/newsroom-screens/workspace/schedule-model";
+import { assigneeAvatars } from "@byline/newsroom-screens/workspace/workspace-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyReporting } from "./workspace-cache";
 import { workspaceError } from "./workspace-errors";
-import { APPOINTMENT_STATUSES, SOURCE_STATUSES, type AppointmentStatus, type SourceStatus, type StoryAppointment, type StorySource } from "./workspace-types";
+import { APPOINTMENT_STATUSES, SOURCE_STATUSES, type AppointmentStatus, type SourceStatus, type StoryAppointment, type StorySource } from "@byline/newsroom-screens/workspace/workspace-types";
 
 type Open = (element: HTMLElement) => void;
 const Chevron = () => <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />;

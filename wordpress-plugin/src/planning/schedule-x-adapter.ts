@@ -16,7 +16,7 @@
 import "temporal-polyfill/global";
 import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import type { CalendarEvent, CalendarType } from "@schedule-x/calendar";
-import type { CalendarEventType, PlanningCalendarEvent } from "./planning-model";
+import type { CalendarEventType, PlanningCalendarEvent } from "@byline/newsroom-screens/planning/planning-model";
 
 /** Schedule-X "calendars": a small, stable set. Never one per story. */
 export const SCHEDULE_X_CATEGORIES = ["appointment", "story-deadline", "production", "planned-publication", "wordpress-scheduled", "task-deadline"] as const;

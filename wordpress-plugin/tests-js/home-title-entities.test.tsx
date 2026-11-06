@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { AgendaItem, AttentionRow, MediaAssignmentRow, ReviewRow, StoryRow } from "../src/home/components/rows";
-import { ActivityRow, TaskRow } from "../src/story/rows";
-import type { PlanningStory } from "../src/planning/planning-model";
+import { AgendaItem, AttentionRow, MediaAssignmentRow, ReviewRow, StoryRow } from "@byline/newsroom-screens/home/components/rows";
+import { ActivityRow, TaskRow } from "@byline/newsroom-screens/story/rows";
+import type { PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 
 const now = new Date("2026-10-20T12:00:00Z");
 const timezone = "America/New_York";

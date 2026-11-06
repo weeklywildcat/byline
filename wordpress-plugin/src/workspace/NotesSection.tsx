@@ -8,11 +8,11 @@ import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
-import { exactDate, relativeTime } from "../home/newsroom-model";
-import { NOTES_PREVIEW_LIMIT, initials, moreOpenNotesLabel, repliesLabel, resolvedNotesLabel, visibleNotes, type ArticleNotePreview, type ArticleNotesSummary } from "../story/notes-model";
+import { exactDate, relativeTime } from "@byline/newsroom-screens/home/newsroom-model";
+import { NOTES_PREVIEW_LIMIT, initials, moreOpenNotesLabel, repliesLabel, resolvedNotesLabel, visibleNotes, type ArticleNotePreview, type ArticleNotesSummary } from "@byline/newsroom-screens/story/notes-model";
 import { SectionFailed } from "./parts";
 import { useWorkspace } from "./workspace-context";
-import { articleNotesKey } from "./workspace-query";
+import { articleNotesKey } from "@byline/newsroom-screens/workspace/workspace-query";
 
 /**
  * Where unresolved copy feedback exists, at a glance. WordPress Core Notes stay

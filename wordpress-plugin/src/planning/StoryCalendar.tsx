@@ -11,13 +11,13 @@ import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
-import { scheduleKey } from "../story/story-query";
+import { scheduleKey } from "@byline/newsroom-screens/story/story-query";
 import { CALENDAR_COMPONENTS, CATEGORY_DOT_CLASSES } from "./calendar-events";
 import { calendarHeading, createCalendarController } from "./calendar-controller";
 import { DEFAULT_CALENDAR_FILTERS, mergeCalendarEvents, needsSchedulingItems, scheduleCalendarEvents, scheduleRangeFor, type CalendarFilters, type WorkspaceUrl } from "./calendar-model";
 import { NeedsScheduling } from "./NeedsScheduling";
-import type { PlanningFetchers } from "./planning-api";
-import { describePlanningError, planningCalendarEvents, type PlanningStory } from "./planning-model";
+import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
+import { describePlanningError, planningCalendarEvents, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 import { CATEGORY_BY_EVENT_TYPE, CATEGORY_LABELS, SCHEDULE_X_CALENDARS, toScheduleXEvents, visibleRangeDays, type BylineScheduleXEvent } from "./schedule-x-adapter";
 
 export type StoryCalendarProps = {

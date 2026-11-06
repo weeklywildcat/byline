@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { TextField, SelectField } from "@byline/newsroom-ui/components/form-fields";
-import { AssigneePicker } from "../editorial/pickers";
+import { AssigneePicker } from "@byline/newsroom-screens/editorial/pickers";
 import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { WorkspaceDialog } from "../workspace/dialog-shell";
 import { DayRangeField } from "../workspace/fields";
-import type { ContributorEntry } from "../editorial/editorial-model";
-import { describeEditorialError } from "../editorial/editorial-model";
-import { collectionTypes, type Collection } from "./collection-model";
-import type { CollectionApi } from "./collection-api";
+import type { ContributorEntry } from "@byline/newsroom-screens/editorial/editorial-model";
+import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
+import { collectionTypes, type Collection } from "@byline/newsroom-screens/collections/collection-model";
+import type { CollectionApi } from "@byline/newsroom-screens/collections/collection-api";
 export function CollectionDialog({
   api,
   people,

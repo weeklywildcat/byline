@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { __ } from "@wordpress/i18n";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
-import { RowSkeletons } from "../story/rows";
+import { RowSkeletons } from "@byline/newsroom-screens/story/rows";
 import type { OptionalQuery } from "./planning-query";
 
 /** The compact header every Planning destination shares with Home and the Story Workspace. */

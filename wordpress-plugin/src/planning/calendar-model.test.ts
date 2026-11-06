@@ -9,8 +9,8 @@ import {
   scheduleCoversVisible,
   scheduleRangeFor
 } from "./calendar-model";
-import { monthCalendarDays, planningCalendarEvents, reportingSummaryLine, weekCalendarDays, type PlanningStory } from "./planning-model";
-import type { ScheduleAppointment, ScheduleResponse } from "../workspace/workspace-types";
+import { monthCalendarDays, planningCalendarEvents, reportingSummaryLine, weekCalendarDays, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
+import type { ScheduleAppointment, ScheduleResponse } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const timezone = "America/New_York";
 const workspaceUrl = createWorkspaceUrlBuilder("http://example.test/wp-admin/admin.php?page=byline-planning&tab=stories");

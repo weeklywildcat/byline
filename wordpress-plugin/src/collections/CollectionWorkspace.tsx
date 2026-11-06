@@ -23,11 +23,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui
 import { ItemGroup } from "@byline/newsroom-ui/ui/item";
 import { PageHeader } from "../planning/PlanningPage";
 import type { PlanningAppFetchers } from "../planning/PlanningApp";
-import { StoryCreateDialog } from "../story/StoryCreateDialog";
-import { TaskCreateDialog } from "../story/TaskCreateDialog";
-import { ActivityRow, RowSkeletons } from "../story/rows";
-import type { ContributorEntry } from "../editorial/editorial-model";
-import { exactDate, siteDay } from "../home/newsroom-model";
+import { StoryCreateDialog } from "@byline/newsroom-screens/story/StoryCreateDialog";
+import { TaskCreateDialog } from "@byline/newsroom-screens/story/TaskCreateDialog";
+import { ActivityRow, RowSkeletons } from "@byline/newsroom-screens/story/rows";
+import type { ContributorEntry } from "@byline/newsroom-screens/editorial/editorial-model";
+import { exactDate, siteDay } from "@byline/newsroom-screens/home/newsroom-model";
 import { CollectionAddDialog } from "./CollectionAddDialog";
 import { CollectionResources } from "./CollectionResources";
 import { CollectionStories } from "./CollectionStories";
@@ -38,15 +38,15 @@ import {
   Choice,
   CollectionEmpty,
   InterviewRow,
-} from "./collection-ui";
+} from "@byline/newsroom-screens/collections/collection-ui";
 import {
   collectionActions,
   collectionStatuses,
   collectionTypes,
   type Collection,
   type CollectionAction,
-} from "./collection-model";
-import { collectionKey, type CollectionApi } from "./collection-api";
+} from "@byline/newsroom-screens/collections/collection-model";
+import { collectionKey, type CollectionApi } from "@byline/newsroom-screens/collections/collection-api";
 import { useCollectionActions } from "./collection-query";
 export type AddKind = "story" | "existing" | "interview" | "task" | "resource";
 export function CollectionWorkspace({

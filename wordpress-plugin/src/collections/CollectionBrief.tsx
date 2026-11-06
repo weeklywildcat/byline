@@ -5,7 +5,7 @@ import { Pencil } from "lucide-react";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
-import type { Collection } from "./collection-model";
+import type { Collection } from "@byline/newsroom-screens/collections/collection-model";
 import type { ReturnTypeOfCollectionActions } from "./collection-query";
 export function CollectionBrief({
   collection,

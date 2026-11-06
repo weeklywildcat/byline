@@ -2,23 +2,23 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { describeEditorialError, type ContributorEntry } from "../editorial/editorial-model";
-import { checkVideoUrl, normalizeStoryVideoSettings, STORY_FORMAT_OPTIONS, videoDurationLabel, videoStoryProblem, type StoryFormat } from "../editorial/story-video-model";
+import { describeEditorialError, type ContributorEntry } from "@byline/newsroom-screens/editorial/editorial-model";
+import { checkVideoUrl, normalizeStoryVideoSettings, STORY_FORMAT_OPTIONS, videoDurationLabel, videoStoryProblem, type StoryFormat } from "@byline/newsroom-screens/editorial/story-video-model";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
-import { AssigneePicker, DatePicker, WritersPicker, valueSelectTriggerClass } from "../editorial/pickers";
+import { AssigneePicker, DatePicker, WritersPicker, valueSelectTriggerClass } from "@byline/newsroom-screens/editorial/pickers";
 import { Card, CardContent, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
 import { Field, FieldContent, FieldGroup, FieldTitle } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
-import { dateLabel, exactDate } from "../home/newsroom-model";
+import { dateLabel, exactDate } from "@byline/newsroom-screens/home/newsroom-model";
 import { SectionFailed } from "./parts";
 import { applyFormat, applyWorkflowPayload, patchStory, type StoryPatch } from "./workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { workspaceError } from "./workspace-errors";
-import { names, peopleOptions, sectionNames } from "./workspace-model";
-import type { WorkspaceStatus } from "./workspace-types";
+import { names, peopleOptions, sectionNames } from "@byline/newsroom-screens/workspace/workspace-model";
+import type { WorkspaceStatus } from "@byline/newsroom-screens/workspace/workspace-types";
 
 type Changes = { status?: string; editorId?: number | null; deadline?: string | null; plannedPublishAt?: string | null };
 

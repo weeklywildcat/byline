@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ReportingPlan } from "../src/workspace/ReportingPlan";
 import { WorkspaceContext, type WorkspaceContextValue } from "../src/workspace/workspace-context";
-import type { StoryAppointment, StorySource } from "../src/workspace/workspace-types";
+import type { StoryAppointment, StorySource } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const source: StorySource = {
   id: "source-1", label: "Athletic director", role: "", organization: "", status: "planned",

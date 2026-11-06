@@ -7,10 +7,10 @@ import { __, sprintf } from "@wordpress/i18n";
 import { announce } from "@atlaskit/pragmatic-drag-and-drop-live-region";
 import { toast } from "sonner";
 import { decodeEntities } from "@byline/newsroom-ui/lib/text";
-import { describeEditorialError } from "../editorial/editorial-model";
-import { invalidateStoryData, planningKey, planningRootKey } from "../story/story-query";
-import type { PlanningFetchers } from "./planning-api";
-import { planningFilterParams } from "./planning-api";
+import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
+import { invalidateStoryData, planningKey, planningRootKey } from "@byline/newsroom-screens/story/story-query";
+import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
+import { planningFilterParams } from "@byline/newsroom-screens/planning/planning-api";
 import {
   applyPlanningMove,
   describePlanningError,
@@ -19,7 +19,7 @@ import {
   type PlanningResponse,
   type PlanningStory,
   type PlanningWorkflowStatus
-} from "./planning-model";
+} from "@byline/newsroom-screens/planning/planning-model";
 
 export function usePlanningStories(fetchers: PlanningFetchers, filters: PlanningFilters) {
   return useQuery({

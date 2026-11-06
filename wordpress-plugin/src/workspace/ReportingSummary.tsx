@@ -1,4 +1,4 @@
-import { reportingHeadline } from "./workspace-model";
+import { reportingHeadline } from "@byline/newsroom-screens/workspace/workspace-model";
 import { useWorkspace } from "./workspace-context";
 
 /** The reporting situation in two lines. Shown first on a phone, before the full plan. */

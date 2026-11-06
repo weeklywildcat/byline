@@ -4,8 +4,8 @@ import { __ } from "@wordpress/i18n";
 
 import { createUndoableMutation, normalizeBylineError } from "@byline/admin-runtime";
 
-import type { HomeFetchers } from "./home-api";
-import type { HomePreset, HomePresetsPayload } from "./home-model";
+import type { HomeFetchers } from "@byline/newsroom-screens/home/home-api";
+import type { HomePreset, HomePresetsPayload } from "@byline/newsroom-screens/home/home-model";
 
 type PresetsPanelProps = {
   fetchers: Pick<HomeFetchers, "getPresets" | "updatePreset" | "resetPreset">;

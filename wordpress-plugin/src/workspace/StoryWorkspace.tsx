@@ -16,8 +16,8 @@ import { WorkspaceHeader } from "./WorkspaceHeader";
 import { WorkspaceLoadError, WorkspaceSkeleton } from "./WorkspaceStates";
 import { WorkspaceContext, type WorkspaceContextValue, type WorkspaceEnv } from "./workspace-context";
 import { workspaceError } from "./workspace-errors";
-import { workspaceKey, workspaceQueryClient } from "./workspace-query";
-import type { StoryWorkspace as StoryWorkspaceData, WorkspaceSection } from "./workspace-types";
+import { workspaceKey, workspaceQueryClient } from "@byline/newsroom-screens/workspace/workspace-query";
+import type { StoryWorkspace as StoryWorkspaceData, WorkspaceSection } from "@byline/newsroom-screens/workspace/workspace-types";
 
 export type StoryWorkspaceAppProps = WorkspaceEnv;
 

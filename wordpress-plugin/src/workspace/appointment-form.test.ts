@@ -13,7 +13,7 @@ import {
   siteWallParts,
   validateAppointmentForm
 } from "./appointment-form";
-import type { StoryAppointment } from "./workspace-types";
+import type { StoryAppointment } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const timezone = "America/New_York";
 

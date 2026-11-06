@@ -1,9 +1,9 @@
-import { exactDate, relativeTime } from "../home/newsroom-model";
+import { exactDate, relativeTime } from "@byline/newsroom-screens/home/newsroom-model";
 import { Card, CardContent, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
 import { Empty, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { SectionFailed } from "./parts";
-import { workspaceActivityCopy } from "./workspace-model";
+import { workspaceActivityCopy } from "@byline/newsroom-screens/workspace/workspace-model";
 import { useWorkspace } from "./workspace-context";
 
 export function ActivitySection() {
