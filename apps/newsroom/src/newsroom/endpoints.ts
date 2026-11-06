@@ -7,7 +7,10 @@ import { addDays, localDay, localToInstant, newsroomTimeZone } from "../domain/d
 import { findPreset, STORY_PRESETS } from "../domain/presets";
 import { isWorkflowStage } from "../domain/workflow";
 import { validResourceUrl } from "../collections/StoryPlans";
-import { editorialTask, homeBootstrap, loadPeople, personIdFor, planFor, screenContext, searchStories, storyResources, storyWorkspace, contributorEntry, type ScreenContext } from "./screen-models";
+import { contributorEntry, editorialTask, homeBootstrap, loadPeople, mediaFor, personIdFor, planFor, reportingFor, screenContext, searchStories, storyResources, storyWorkspace, type ScreenContext } from "./screen-models";
+import type { AppointmentInput, MediaAssignmentInput, SourceInput } from "@byline/newsroom-screens/workspace/workspace-types";
+import { effectiveWorkflow } from "../domain/workflow";
+import { relationId, sameId } from "../access/user";
 
 /**
  * The newsroom screens' API (`/api/byline/...`), the Payload side of the
@@ -210,8 +213,21 @@ async function updateWorkflow(ctx: ScreenContext, req: PayloadRequest): Promise<
   const editor = atLeast(ctx.user, "editor");
   if (!editor && ("deadline" in data || "plannedPublication" in data || "editor" in data)) throw new APIError("Only editors set deadlines, publication plans and editors.", 403);
   const updated = await req.payload.update({ collection: "story-plans", id: plan.id, data, ...asUser(ctx) });
+  const story = await req.payload.findByID({ collection: "stories", id: storyId, draft: true, depth: 0, select: { _status: true, headline: true }, ...asUser(ctx) });
+  const published = story._status === "published";
   return {
-    story: { postId: storyId, revision: Date.parse(updated.updatedAt) } as EditorialWorkflowPayload["story"],
+    story: {
+      postId: storyId,
+      revision: Date.parse(updated.updatedAt),
+      title: story.headline ?? "",
+      status: effectiveWorkflow(updated.workflow, story._status),
+      storedStatus: updated.workflow,
+      postStatus: published ? "publish" : "draft",
+      isPublished: published,
+      editorId: relationId(updated.editor) === null ? null : Number(relationId(updated.editor)),
+      deadline: updated.deadline ?? null,
+      plannedPublication: updated.plannedPublication ?? null
+    },
     capabilities: { changeStatus: true, assign: editor, changeDeadline: editor, changePlannedPublication: editor }
   };
 }
@@ -224,7 +240,8 @@ async function saveContributors(ctx: ScreenContext, req: PayloadRequest) {
   const personIds = (input.contributors ?? []).map((entry) => personIdFor(people, entry));
   if (personIds.some((id) => id === null)) throw new APIError("One of those writers has no public byline yet.", 400);
   // The byline is article copy: it saves as a draft, like any other edit, and goes live when an editor publishes.
-  await req.payload.update({ collection: "stories", id: storyId, draft: true, data: { contributors: personIds as number[] }, ...asUser(ctx) });
+  // Respect Payload's document lock: someone editing the story owns its fields until they leave.
+  await req.payload.update({ collection: "stories", id: storyId, draft: true, overrideLock: false, data: { contributors: personIds as number[] }, ...asUser(ctx) });
   const contributors = personIds.map((id, order) => contributorEntry(people, id, order)).filter((entry): entry is ContributorEntry => entry !== null);
   return { storyId, contributors, canEdit: true, canCreateGuests: false };
 }
@@ -254,6 +271,107 @@ async function saveResources(ctx: ScreenContext, req: PayloadRequest, change: "a
   return { resources: storyResources(updated) };
 }
 
+/* ------------------------------------------------ workspace records */
+
+type RecordCollection = "sources" | "appointments" | "production-assignments";
+
+/** The record named in the URL, if it belongs to this story and this user may see it. */
+async function storyRecord(ctx: ScreenContext, collection: RecordCollection, storyId: number, recordId: number) {
+  const found = await ctx.req.payload.find({ collection, where: { id: { equals: recordId } }, depth: 0, limit: 1, ...asUser(ctx) });
+  const record = found.docs[0];
+  if (!record || !sameId(record.story, storyId)) throw new APIError("That is no longer on this story.", 404);
+  return record;
+}
+
+/** Compare-and-swap, as in WordPress: a stale edit is a 409, never an overwrite. */
+function checkFresh(record: { updatedAt: string }, expected: unknown) {
+  if (typeof expected === "string" && expected !== "" && Date.parse(expected) !== Date.parse(record.updatedAt)) {
+    throw new APIError("Someone else changed this while you were editing. Reload to see the newer version.", 409);
+  }
+}
+
+const optionalRecordId = (req: PayloadRequest, name: string) => (req.routeParams?.[name] === undefined ? null : idParam(req, name));
+const ids = (value: unknown) => (Array.isArray(value) ? value.map(Number).filter((id) => Number.isSafeInteger(id) && id > 0) : []);
+
+async function saveBrief(ctx: ScreenContext, req: PayloadRequest) {
+  const storyId = idParam(req);
+  const input = await body<{ brief?: string; expectedBrief?: string }>(req);
+  const plan = await planFor(ctx, storyId);
+  if (input.expectedBrief !== undefined && input.expectedBrief !== (plan.brief ?? "")) {
+    throw new APIError("The brief changed while you were editing it. Reload the story to see the newer version.", 409);
+  }
+  const updated = await req.payload.update({ collection: "story-plans", id: plan.id, data: { brief: String(input.brief ?? "") }, ...asUser(ctx) });
+  return { brief: updated.brief ?? "" };
+}
+
+async function saveSource(ctx: ScreenContext, req: PayloadRequest) {
+  const storyId = idParam(req);
+  const sourceId = optionalRecordId(req, "sourceId");
+  const input = await body<SourceInput>(req);
+  const data: Record<string, unknown> = {};
+  for (const key of ["label", "role", "organization", "status", "notes"] as const) if (input[key] !== undefined) data[key] = input[key];
+  if (input.assigneeIds !== undefined) data.assignees = ids(input.assigneeIds);
+  let saved: { id: number };
+  if (sourceId === null) saved = await req.payload.create({ collection: "sources", data: { ...data, story: storyId } as never, ...asUser(ctx) });
+  else {
+    checkFresh(await storyRecord(ctx, "sources", storyId, sourceId), input.expectedUpdatedAt);
+    saved = await req.payload.update({ collection: "sources", id: sourceId, data, ...asUser(ctx) });
+  }
+  return { ...(await reportingFor(ctx, storyId)), sourceId: String(saved.id) };
+}
+
+async function deleteRecord(ctx: ScreenContext, req: PayloadRequest, collection: RecordCollection, param: string) {
+  const storyId = idParam(req);
+  const recordId = idParam(req, param);
+  await storyRecord(ctx, collection, storyId, recordId);
+  await req.payload.delete({ collection, id: recordId, ...asUser(ctx) });
+  return collection === "production-assignments" ? mediaFor(ctx, storyId) : reportingFor(ctx, storyId);
+}
+
+async function saveAppointment(ctx: ScreenContext, req: PayloadRequest) {
+  const storyId = idParam(req);
+  const appointmentId = optionalRecordId(req, "appointmentId");
+  const input = await body<AppointmentInput>(req);
+  const data: Record<string, unknown> = {};
+  for (const key of ["title", "kind", "status", "scheduleMode", "location", "notes"] as const) if (input[key] !== undefined) data[key] = input[key];
+  // A target window stays date-only; exact times arrive newsroom-local and are stored as UTC.
+  if (input.windowStart !== undefined) data.windowStart = input.windowStart || null;
+  if (input.windowEnd !== undefined) data.windowEnd = input.windowEnd || null;
+  if (input.startAt !== undefined) data.startAt = instantOrNull(input.startAt, ctx.timeZone);
+  if (input.endAt !== undefined) data.endAt = instantOrNull(input.endAt, ctx.timeZone);
+  if (input.assigneeIds !== undefined) data.assignees = ids(input.assigneeIds);
+  if (input.sourceId !== undefined) {
+    const source = input.sourceId ? Number(input.sourceId) : null;
+    if (source !== null) await storyRecord(ctx, "sources", storyId, source).catch(() => { throw new APIError("That source is no longer on this story.", 400); });
+    data.source = source;
+  }
+  let saved: { id: number };
+  if (appointmentId === null) saved = await req.payload.create({ collection: "appointments", data: { ...data, story: storyId } as never, ...asUser(ctx) });
+  else {
+    checkFresh(await storyRecord(ctx, "appointments", storyId, appointmentId), input.expectedUpdatedAt);
+    saved = await req.payload.update({ collection: "appointments", id: appointmentId, data, ...asUser(ctx) });
+  }
+  return { ...(await reportingFor(ctx, storyId)), appointmentId: String(saved.id) };
+}
+
+async function saveMediaAssignment(ctx: ScreenContext, req: PayloadRequest) {
+  const storyId = idParam(req);
+  const assignmentId = optionalRecordId(req, "assignmentId");
+  const input = await body<MediaAssignmentInput>(req);
+  const data: Record<string, unknown> = {};
+  for (const key of ["title", "type", "status", "notes"] as const) if (input[key] !== undefined) data[key] = input[key];
+  if (input.attachmentIds !== undefined) data.media = ids(input.attachmentIds);
+  if (input.assigneeId !== undefined) data.assignees = input.assigneeId ? [Number(input.assigneeId)] : [];
+  if (input.dueAt !== undefined) data.deadline = instantOrNull(input.dueAt, ctx.timeZone);
+  let saved: { id: number };
+  if (assignmentId === null) saved = await req.payload.create({ collection: "production-assignments", data: { ...data, story: storyId } as never, ...asUser(ctx) });
+  else {
+    checkFresh(await storyRecord(ctx, "production-assignments", storyId, assignmentId), input.expectedUpdatedAt);
+    saved = await req.payload.update({ collection: "production-assignments", id: assignmentId, data, ...asUser(ctx) });
+  }
+  return { ...(await mediaFor(ctx, storyId)), assignmentId: String(saved.id) };
+}
+
 /* ----------------------------------------------------------- endpoints */
 
 export const newsroomEndpoints: Endpoint[] = [
@@ -267,6 +385,16 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/resources", method: "post", handler: handle((ctx, req) => saveResources(ctx, req, "add")) },
   { path: "/byline/stories/:id/resources/:resourceId", method: "post", handler: handle((ctx, req) => saveResources(ctx, req, "update")) },
   { path: "/byline/stories/:id/resources/:resourceId", method: "delete", handler: handle((ctx, req) => saveResources(ctx, req, "remove")) },
+  { path: "/byline/stories/:id/brief", method: "post", handler: handle(saveBrief) },
+  { path: "/byline/stories/:id/sources", method: "post", handler: handle(saveSource) },
+  { path: "/byline/stories/:id/sources/:sourceId", method: "post", handler: handle(saveSource) },
+  { path: "/byline/stories/:id/sources/:sourceId", method: "delete", handler: handle((ctx, req) => deleteRecord(ctx, req, "sources", "sourceId")) },
+  { path: "/byline/stories/:id/appointments", method: "post", handler: handle(saveAppointment) },
+  { path: "/byline/stories/:id/appointments/:appointmentId", method: "post", handler: handle(saveAppointment) },
+  { path: "/byline/stories/:id/appointments/:appointmentId", method: "delete", handler: handle((ctx, req) => deleteRecord(ctx, req, "appointments", "appointmentId")) },
+  { path: "/byline/stories/:id/media-assignments", method: "post", handler: handle(saveMediaAssignment) },
+  { path: "/byline/stories/:id/media-assignments/:assignmentId", method: "post", handler: handle(saveMediaAssignment) },
+  { path: "/byline/stories/:id/media-assignments/:assignmentId", method: "delete", handler: handle((ctx, req) => deleteRecord(ctx, req, "production-assignments", "assignmentId")) },
   { path: "/byline/tasks", method: "post", handler: handle(createTask) },
   { path: "/byline/tasks/:id", method: "patch", handler: handle(updateTask) },
   { path: "/byline/tasks/:id", method: "delete", handler: handle(deleteTask) }

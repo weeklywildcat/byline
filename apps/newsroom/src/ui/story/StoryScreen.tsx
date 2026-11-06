@@ -2,15 +2,21 @@
 
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
+import { ActivitySection } from "@byline/newsroom-screens/workspace/ActivitySection";
+import { BriefSection } from "@byline/newsroom-screens/workspace/BriefSection";
+import { DetailsSection } from "@byline/newsroom-screens/workspace/DetailsSection";
+import { MediaSection } from "@byline/newsroom-screens/workspace/MediaSection";
+import { ReportingPlan } from "@byline/newsroom-screens/workspace/ReportingPlan";
+import { ReportingSummaryStrip } from "@byline/newsroom-screens/workspace/ReportingSummary";
+import { ResourcesSection } from "@byline/newsroom-screens/workspace/ResourcesSection";
+import { StoryWorkspaceProvider, WorkspaceAnnouncer, WorkspaceGate, WorkspaceStaleNotice } from "@byline/newsroom-screens/workspace/StoryWorkspace";
+import { TasksSection } from "@byline/newsroom-screens/workspace/TasksSection";
 import { useAuth, useConfig, useDocumentInfo } from "@payloadcms/ui";
 import type { CollapsibleFieldClientComponent } from "payload";
-import { useCallback, useEffect, useState } from "react";
-import { getJson, query, type Paginated } from "./api";
+import { useMemo, type FormEvent, type ReactNode } from "react";
+import { createPayloadHomeFetchers } from "../home/payload-fetchers";
 import { HistoryTab } from "./HistoryTab";
-import { PlanTab } from "./PlanTab";
-import { ProductionTab } from "./ProductionTab";
 import { StoryHeader } from "./StoryHeader";
-import type { StoryPlanDoc } from "./types";
 import { WriteTab } from "./WriteTab";
 
 export type StoryScreenContext = {
@@ -29,9 +35,14 @@ export type StoryScreenContext = {
  * It is the custom `Field` of one presentational collapsible that holds every
  * story field, so it renders inside Payload's own Edit view: Payload keeps the
  * form, autosave, validation, drafts, versions, locking and the Live Preview
- * window, and this component is everything the writer sees. Story fields are
- * read and written through Payload's form hooks (one document state); the plan
- * and Story Workspace records are separate, access-controlled documents.
+ * window, and this component is everything the writer sees.
+ *
+ * Write edits the article through Payload's form hooks: the one copy of the
+ * article. Plan and Production are the shared Story Workspace sections
+ * (@byline/newsroom-screens), the same ones the WordPress workspace page
+ * shows, reading and writing the plan and workspace records through
+ * /api/byline. They run with `articleInForm`, so they never write article
+ * fields behind the form's back.
  */
 export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath, parentSchemaPath, indexPath, permissions, readOnly }) => {
   const { config } = useConfig();
@@ -47,51 +58,97 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
     userId: user?.id,
     readOnly: Boolean(readOnly)
   };
-
-  const [plan, setPlan] = useState<StoryPlanDoc | null>(null);
-  const [planError, setPlanError] = useState<string | null>(null);
-  const loadPlan = useCallback(async () => {
-    if (id === undefined || id === null) return;
-    try {
-      const result = await getJson<Paginated<StoryPlanDoc>>(context.api, `/story-plans${query({ "where[story][equals]": String(id), depth: 1, limit: 1 })}`);
-      setPlan(result.docs[0] ?? null);
-      setPlanError(null);
-    } catch (error) {
-      setPlanError(error instanceof Error ? error.message : "The plan could not be loaded.");
-    }
-  }, [context.api, id]);
-  useEffect(() => {
-    void loadPlan();
-  }, [loadPlan]);
-
+  const fetchers = useMemo(() => createPayloadHomeFetchers(context.api), [context.api]);
   const childPaths = { fields: field.fields, parentPath: parentPath ?? "", parentSchemaPath: parentSchemaPath ?? "stories", parentIndexPath: indexPath ?? "", permissions };
+  const storyId = Number(id);
+  // `?appointment=<id>` opens that appointment's scheduler, as in the WordPress workspace.
+  const appointmentId = typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("appointment") ?? "");
+
+  const screen = (
+    <div className="@container/story mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6 md:px-8">
+      <StoryHeader context={context} />
+      <Tabs defaultValue={appointmentId ? "plan" : "write"} className="gap-4">
+        <TabsList>
+          <TabsTrigger value="write">Write</TabsTrigger>
+          <TabsTrigger value="plan">Plan</TabsTrigger>
+          <TabsTrigger value="production">Production</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
+        {/* Write stays mounted so the editor keeps its state while other tabs are open. */}
+        <TabsContent value="write" keepMounted>
+          <WriteTab context={context} paths={childPaths} />
+        </TabsContent>
+        <TabsContent value="plan">
+          <Workspace storyId={storyId}>
+            <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)] lg:items-start lg:gap-5">
+              <div className="flex min-w-0 flex-col gap-4">
+                <BriefSection />
+                <ReportingSummaryStrip />
+                <ReportingPlan />
+                <TasksSection />
+              </div>
+              <aside aria-label="Story context" className="flex min-w-0 flex-col gap-4">
+                <DetailsSection />
+                <ResourcesSection />
+                <ActivitySection />
+              </aside>
+            </div>
+          </Workspace>
+        </TabsContent>
+        <TabsContent value="production">
+          <Workspace storyId={storyId}>
+            <MediaSection />
+          </Workspace>
+        </TabsContent>
+        <TabsContent value="history">
+          <HistoryTab context={context} />
+        </TabsContent>
+      </Tabs>
+      <p className="text-xs text-muted-foreground">Dates shown in {context.timeZone.replace(/_/g, " ")}</p>
+    </div>
+  );
+
+  // A brand-new document has no ID until its first save; it has no plan yet either.
+  if (!Number.isSafeInteger(storyId) || storyId <= 0) return <div style={{ display: "contents" }} onSubmit={keepSubmitsInByline}><AdminRoot className="byline-story">{screen}</AdminRoot></div>;
 
   return (
+    <div style={{ display: "contents" }} onSubmit={keepSubmitsInByline}>
     <AdminRoot className="byline-story">
-      <div className="@container/story mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6 md:px-8">
-        <StoryHeader context={context} plan={plan} />
-        <Tabs defaultValue="write" className="gap-4">
-          <TabsList>
-            <TabsTrigger value="write">Write</TabsTrigger>
-            <TabsTrigger value="plan">Plan</TabsTrigger>
-            <TabsTrigger value="production">Production</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-          </TabsList>
-          {/* Write stays mounted so the editor keeps its state while other tabs are open. */}
-          <TabsContent value="write" keepMounted>
-            <WriteTab context={context} paths={childPaths} />
-          </TabsContent>
-          <TabsContent value="plan">
-            <PlanTab context={context} plan={plan} error={planError} onChange={setPlan} onRetry={loadPlan} />
-          </TabsContent>
-          <TabsContent value="production">
-            <ProductionTab context={context} />
-          </TabsContent>
-          <TabsContent value="history">
-            <HistoryTab context={context} />
-          </TabsContent>
-        </Tabs>
-      </div>
+      <StoryWorkspaceProvider
+        storyId={storyId}
+        appointmentId={appointmentId}
+        currentUserId={Number(user?.id ?? 0)}
+        storiesUrl={context.admin || "/admin"}
+        client={fetchers.workspace!}
+        editorial={fetchers.editorial!}
+        articleInForm
+      >
+        {screen}
+        <WorkspaceAnnouncer />
+      </StoryWorkspaceProvider>
     </AdminRoot>
+    </div>
   );
 };
+
+/**
+ * The Story screen lives inside Payload's document <form>, and React submit
+ * events bubble through portals. A Byline dialog's own <form> (Add source, New
+ * task…) would otherwise also submit Payload's form and save the story. Any
+ * submit that reaches this root came from a nested Byline form, never from
+ * Payload's (an ancestor), so it stops here.
+ */
+const keepSubmitsInByline = (event: FormEvent) => event.stopPropagation();
+
+/** A tab of workspace sections: loading and error states, and the stale-refresh notice. */
+function Workspace({ storyId, children }: { storyId: number; children: ReactNode }) {
+  if (!Number.isSafeInteger(storyId) || storyId <= 0) return <p className="text-sm text-muted-foreground">Save the story once to start planning it.</p>;
+  return (
+    <WorkspaceGate>
+      <div className="flex flex-col gap-4">
+        <WorkspaceStaleNotice />
+        {children}
+      </div>
+    </WorkspaceGate>
+  );
+}

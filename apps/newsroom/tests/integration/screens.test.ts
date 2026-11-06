@@ -191,3 +191,74 @@ describe("/api/byline endpoints", () => {
     expect(created.body.story.deadline).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
+
+describe("Story Workspace endpoints", () => {
+  const story = () => ({ id: String(storyId) });
+
+  it("save the brief, refusing a stale edit", async () => {
+    const saved = await call("post", "/byline/stories/:id/brief", "alice", { brief: "Why routes changed.", expectedBrief: "" }, story());
+    expect(saved.body).toEqual({ brief: "Why routes changed." });
+    const stale = await call("post", "/byline/stories/:id/brief", "alice", { brief: "Overwrite", expectedBrief: "" }, story());
+    expect(stale.status).toBe(409);
+  });
+
+  it("add a source, update it, and refuse a stale update", async () => {
+    const added = await call("post", "/byline/stories/:id/sources", "alice", { label: "Bus driver", status: "planned", assigneeIds: [accounts.alice.id] }, story());
+    expect(added.status).toBe(200);
+    const source = added.body.sources.find((row: { label: string }) => row.label === "Bus driver");
+    expect(added.body.sourceId).toBe(source.id);
+    const updated = await call("post", "/byline/stories/:id/sources/:sourceId", "alice", { status: "contacted", expectedUpdatedAt: source.updatedAt }, { ...story(), sourceId: source.id });
+    expect(updated.body.sources.find((row: { id: string }) => row.id === source.id).status).toBe("contacted");
+    const stale = await call("post", "/byline/stories/:id/sources/:sourceId", "alice", { status: "declined", expectedUpdatedAt: source.updatedAt }, { ...story(), sourceId: source.id });
+    expect(stale.status).toBe(409);
+  });
+
+  it("store an exact appointment in UTC and a window date-only, linked to a source", async () => {
+    const sources = (await call("post", "/byline/stories/:id/sources", "alice", { label: "Superintendent", status: "planned" }, story())).body.sources;
+    const sourceId = sources.find((row: { label: string }) => row.label === "Superintendent").id;
+    const exact = await call("post", "/byline/stories/:id/appointments", "alice", { title: "Interview", kind: "interview", status: "confirmed", scheduleMode: "exact", startAt: "2026-11-10T10:15", sourceId, assigneeIds: [accounts.alice.id] }, story());
+    expect(exact.status).toBe(200);
+    expect(exact.body.appointments.find((row: { title: string }) => row.title === "Interview")).toMatchObject({ startAt: "2026-11-10T15:15:00.000Z", sourceId, sourceLabel: "Superintendent" });
+    const window = await call("post", "/byline/stories/:id/appointments", "alice", { title: "Ride along", kind: "reporting", status: "planned", scheduleMode: "window", windowStart: "2026-11-16", windowEnd: "2026-11-20" }, story());
+    expect(window.body.appointments.find((row: { title: string }) => row.title === "Ride along")).toMatchObject({ windowStart: "2026-11-16", windowEnd: "2026-11-20", startAt: null });
+  });
+
+  it("let a participant schedule only for themselves and update only their own assignment's status", async () => {
+    expect((await call("post", "/byline/stories/:id/appointments", "carol", { title: "Shoot", kind: "photo", status: "planned", scheduleMode: "unscheduled", assigneeIds: [accounts.carol.id] }, story())).status).toBe(200);
+    expect((await call("post", "/byline/stories/:id/appointments", "carol", { title: "For Alice", kind: "photo", status: "planned", scheduleMode: "unscheduled", assigneeIds: [accounts.alice.id] }, story())).status).toBe(403);
+    const mine = (await call("get", "/byline/stories/:id/workspace", "carol", undefined, story())).body.mediaAssignments[0];
+    const saved = await call("post", "/byline/stories/:id/media-assignments/:assignmentId", "carol", { status: "uploaded", title: "Renamed", expectedUpdatedAt: mine.updatedAt }, { ...story(), assignmentId: mine.id });
+    expect(saved.status).toBe(200);
+    expect(saved.body.mediaAssignments[0]).toMatchObject({ status: "uploaded", title: "Bus depot photos" });
+    expect((await call("post", "/byline/stories/:id/sources", "carol", { label: "Sneaky", status: "planned" }, story())).status).toBe(403);
+  });
+
+  it("refuse a record from another story through this story's address", async () => {
+    const other = await payload.create({ collection: "stories", draft: true, data: { headline: "Other story" }, user: accounts.alice, overrideAccess: false });
+    const source = await payload.create({ collection: "sources", data: { story: other.id, label: "Elsewhere", status: "planned" }, user: accounts.alice, overrideAccess: false });
+    const response = await call("post", "/byline/stories/:id/sources/:sourceId", "alice", { status: "contacted" }, { ...story(), sourceId: String(source.id) });
+    expect(response.status).toBe(404);
+  });
+
+  it("delete a source and unlink its appointments", async () => {
+    const workspace = (await call("get", "/byline/stories/:id/workspace", "alice", undefined, story())).body;
+    const linked = workspace.appointments.find((row: { sourceId: string | null }) => row.sourceId);
+    const removed = await call("delete", "/byline/stories/:id/sources/:sourceId", "alice", undefined, { ...story(), sourceId: linked.sourceId });
+    expect(removed.status).toBe(200);
+    expect(removed.body.appointments.find((row: { id: string }) => row.id === linked.id).sourceId).toBeNull();
+  });
+
+  it("return the whole workflow story, so the screens fold the server's view in", async () => {
+    const response = await call("post", "/byline/stories/:id/workflow", "editor", { status: "editing", editorId: accounts.editor.id }, story());
+    expect(response.body.story).toMatchObject({ postId: storyId, status: "editing", storedStatus: "editing", isPublished: false, editorId: accounts.editor.id, deadline: "2026-11-12" });
+  });
+
+  it("respect Payload's document lock for byline changes made outside the editor", async () => {
+    await payload.create({ collection: "payload-locked-documents", data: { document: { relationTo: "stories", value: storyId }, globalSlug: null, user: { relationTo: "users", value: accounts.editor.id } }, overrideAccess: true });
+    const response = await call("put", "/byline/stories/:id/contributors", "alice", { contributors: [{ id: accounts.alice.id, kind: "user", name: "alice" }] }, story());
+    // 423 Locked: the editor's open form owns the article's fields until they leave.
+    expect(response.status).toBe(423);
+    await payload.delete({ collection: "payload-locked-documents", where: { "document.value": { equals: storyId } }, overrideAccess: true });
+  });
+});
+

@@ -467,3 +467,28 @@ export async function planFor(ctx: ScreenContext, storyId: number) {
   return plan;
 }
 
+
+/* ------------------------------------------- workspace mutation responses */
+
+/** Sources, appointments and their roll-up, as this user may see them (ReportingResponse). */
+export async function reportingFor(ctx: ScreenContext, storyId: number, people?: People) {
+  const everyone = people ?? (await loadPeople(ctx));
+  const byStory = { story: { equals: storyId } } satisfies Where;
+  const [sources, appointments] = await Promise.all([
+    ctx.req.payload.find({ collection: "sources", where: byStory, depth: 0, limit: 100, sort: "createdAt", ...asUser(ctx) }),
+    ctx.req.payload.find({ collection: "appointments", where: byStory, depth: 0, limit: 100, sort: "createdAt", ...asUser(ctx) })
+  ]);
+  const labels = new Map(sources.docs.map((source) => [String(source.id), source.label]));
+  return {
+    sources: sources.docs.map((source) => storySource(everyone, source)),
+    appointments: appointments.docs.map((appointment) => storyAppointment(everyone, appointment, labels)),
+    summary: reportingSummary(sources.docs, appointments.docs, ctx.now, localToday(ctx))
+  };
+}
+
+/** Production assignments, as this user may see them (MediaAssignmentsResponse). */
+export async function mediaFor(ctx: ScreenContext, storyId: number) {
+  const people = await loadPeople(ctx);
+  const rows = await ctx.req.payload.find({ collection: "production-assignments", where: { story: { equals: storyId } }, depth: 1, limit: 100, sort: "createdAt", ...asUser(ctx) });
+  return { mediaAssignments: rows.docs.map((row, index) => mediaAssignment(people, row, index)) };
+}

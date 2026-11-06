@@ -531,6 +531,29 @@ Known gaps: the sidebar's "New story" still opens Payload's create route (no
 template dialog); Home's activity stream is empty until activity is ported;
 scheduled publication is not shown (Payload's schedule lives in admin-only jobs).
 
+**The Story Workspace is ported (Phase 1d).** The WordPress workspace page and its
+sections moved to `packages/newsroom-screens` and split into
+`StoryWorkspaceProvider` / `WorkspaceGate` / sections; WordPress rebuilds its page
+from them unchanged. The Story screen's Plan tab is now those sections (brief,
+reporting summary and plan, sources and appointments, tasks, details, files and
+links, activity) and Production is `MediaSection`; the hand-built Plan and
+Production tabs are gone. The header reads workflow, editor and deadline from the
+same workspace data.
+
+- `articleInForm`: inside the Story screen the workspace never writes article
+  fields (writers, format, video). The form is the one copy of the article.
+- Byline changes to a story's byline from outside the editor (Story Peek) pass
+  `overrideLock: false`: while someone has the story open, Payload's lock
+  answers 423 instead of letting their next autosave overwrite the change.
+- Workspace writes go through `/api/byline/stories/:id/{brief,sources,appointments,
+  media-assignments}`; each checks the record belongs to the story in the URL and
+  compares `expectedUpdatedAt` (409 on a stale edit), as WordPress did.
+- Choosing existing media is a host-supplied `MediaPicker`; the newsroom has none
+  until the Byline media picker (Phase 5), so the button is not offered.
+- Found in the browser and fixed: a Byline dialog's `<form>` portalled inside
+  Payload's document form also submitted it, saving the story. The Story screen
+  stops submit events at its root.
+
 **Next slice: the rest of the screens.** Home's whole closure (44 files) touches
 WordPress only through an injected request function, `@wordpress/i18n` in one
 file and a wp-admin URL default. Planning (board, list, Schedule-X calendar), the Media Desk and

@@ -6,7 +6,7 @@ import type { HomePresetsPayload } from "@byline/newsroom-screens/home/home-mode
 import type { HomeFetchers } from "@byline/newsroom-screens/home/home-api";
 import type { HomeBootstrap } from "@byline/newsroom-screens/home/newsroom-model";
 import type { WorkspaceClient } from "@byline/newsroom-screens/workspace/workspace-api";
-import type { ResourcePurpose, StoryResource, StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
+import type { MediaAssignmentsResponse, ReportingResponse, ResourcePurpose, StoryResource, StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 
 /**
  * The Payload newsroom's fetchers for the shared Byline screens
@@ -71,14 +71,15 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
     // WordPress story collections are not part of the Payload model; nothing on Home calls this.
     collections: new Proxy({}, { get: (_target, key) => (typeof key === "string" && key !== "then" ? notYet("Collections") : undefined) }) as WorkspaceClient["collections"],
     getWorkspace,
-    saveBrief: notYet("Editing the brief here (use the story's Plan tab)"),
+    saveBrief: (storyId, brief, expectedBrief) => request<{ brief: string }>(`/stories/${storyId}/brief`, "POST", { brief, ...(expectedBrief !== undefined ? { expectedBrief } : {}) }),
+    // Format and video are article fields: they are edited in the Story screen's form, never here.
     saveFormat: notYet("Changing the format here (use the story's Write tab)"),
-    saveSource: notYet("Sources"),
-    deleteSource: notYet("Sources"),
-    saveAppointment: notYet("Appointments"),
-    deleteAppointment: notYet("Appointments"),
-    saveMediaAssignment: notYet("Production assignments"),
-    deleteMediaAssignment: notYet("Production assignments"),
+    saveSource: (storyId, input, sourceId) => request<ReportingResponse>(`/stories/${storyId}/sources${sourceId ? `/${sourceId}` : ""}`, "POST", input),
+    deleteSource: (storyId, sourceId) => request<ReportingResponse>(`/stories/${storyId}/sources/${sourceId}`, "DELETE"),
+    saveAppointment: (storyId, input, appointmentId) => request<ReportingResponse>(`/stories/${storyId}/appointments${appointmentId ? `/${appointmentId}` : ""}`, "POST", input),
+    deleteAppointment: (storyId, appointmentId) => request<ReportingResponse>(`/stories/${storyId}/appointments/${appointmentId}`, "DELETE"),
+    saveMediaAssignment: (storyId, input, assignmentId) => request<MediaAssignmentsResponse>(`/stories/${storyId}/media-assignments${assignmentId ? `/${assignmentId}` : ""}`, "POST", input),
+    deleteMediaAssignment: (storyId, assignmentId) => request<MediaAssignmentsResponse>(`/stories/${storyId}/media-assignments/${assignmentId}`, "DELETE"),
     addResource: link,
     updateResource: (storyId, resourceId, input) => request(`/stories/${storyId}/resources/${encodeURIComponent(resourceId)}`, "POST", input),
     removeResource: (storyId, resourceId) => request(`/stories/${storyId}/resources/${encodeURIComponent(resourceId)}`, "DELETE"),

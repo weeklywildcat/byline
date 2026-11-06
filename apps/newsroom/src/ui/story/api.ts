@@ -35,4 +35,3 @@ export function query(params: Record<string, string | number>): string {
 }
 
 export const getJson = <T,>(api: string, path: string) => request<T>(api, path);
-export const patchJson = <T,>(api: string, path: string, body: unknown) => request<T>(api, path, { method: "PATCH", body: JSON.stringify(body) });
