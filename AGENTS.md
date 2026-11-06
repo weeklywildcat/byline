@@ -21,6 +21,7 @@ Do not spend time rediscovering architecture that is documented here or in the r
 - `apps/web/` — static Astro public site and public article/page rendering.
 - `wordpress-plugin/` — WordPress control plane, editor UI, REST/meta, publishing tools and authenticated newsroom features.
   - Home, Planning (Stories, Calendar, Media Desk…) and the Story Workspace are private React 19 roots on one shadcn base-nova system (`src/admin-ui`, shared story code in `src/story`) with exactly one `StoryPeek`. See `docs/stories-planning-ui.md`; do not reintroduce WordPress React/components or a second quick view on those screens.
+- `apps/newsroom/` — the private Payload 3 + PostgreSQL newsroom replacing WordPress as the control plane (strangler migration; WordPress stays authoritative until cutover). Read `apps/newsroom/AGENTS.md` and `docs/payload-migration.md` first.
 - `apps/discord-bot/` — optional separately deployed Discord service.
 - `packages/` — shared contracts, UI, design primitives and Weekly Wildcat theme packages.
 - `apps/web/story-presentations/` — per-story presentation resolver and developer-defined bespoke article layouts. Read its scoped `AGENTS.md` before custom story work.
@@ -124,6 +125,20 @@ npm run test:e2e:wp71
 ```
 
 Do not start a local WordPress environment for pure unit/model changes.
+
+### Newsroom (Payload) change
+
+```sh
+npm run typecheck:newsroom
+npm run test:newsroom
+```
+
+Access control, hooks or schema changes also need the PostgreSQL integration suite and, for schema changes, a committed migration:
+
+```sh
+npm run test:newsroom:integration   # BYLINE_TEST_DATABASE_URL, default postgres://localhost:5432/byline_newsroom_test
+npm run migrate:create --workspace @byline/newsroom -- <name>
+```
 
 ### Discord-only change
 

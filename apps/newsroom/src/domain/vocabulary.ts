@@ -1,0 +1,194 @@
+/**
+ * Byline's newsroom vocabularies. Each domain keeps its own statuses on
+ * purpose (docs/story-workspace.md, "Status vocabularies"): a story's workflow,
+ * a task, a production assignment, a source and an appointment never share one
+ * "status" list, and none of them is the publication state.
+ */
+
+type Option<T extends string> = { readonly value: T; readonly label: string };
+
+function options<T extends string>(entries: ReadonlyArray<readonly [T, string]>): ReadonlyArray<Option<T>> {
+  return entries.map(([value, label]) => ({ value, label }));
+}
+
+export const ROLES = ["staff", "editor", "administrator"] as const;
+export type Role = (typeof ROLES)[number];
+export const ROLE_OPTIONS = options<Role>([
+  ["staff", "Staff"],
+  ["editor", "Editor"],
+  ["administrator", "Administrator"]
+]);
+
+/**
+ * Workflow stages. `published` is derived from Payload's `_status` and is
+ * never stored or selected (docs/editorial-workflow.md).
+ */
+export const WORKFLOW_STAGES = ["pitch", "assigned", "reporting", "writing", "editing", "ready", "on-hold", "dropped"] as const;
+export type WorkflowStage = (typeof WORKFLOW_STAGES)[number];
+export type EffectiveWorkflow = WorkflowStage | "published";
+export const WORKFLOW_OPTIONS = options<WorkflowStage>([
+  ["pitch", "Pitch"],
+  ["assigned", "Assigned"],
+  ["reporting", "Reporting"],
+  ["writing", "Writing"],
+  ["editing", "Editing"],
+  ["ready", "Ready for Review"],
+  ["on-hold", "On Hold"],
+  ["dropped", "Dropped"]
+]);
+
+export const STORY_FORMATS = ["standard", "video", "audio"] as const;
+export type StoryFormat = (typeof STORY_FORMATS)[number];
+export const STORY_FORMAT_OPTIONS = options<StoryFormat>([
+  ["standard", "Standard"],
+  ["video", "Video"],
+  ["audio", "Audio"]
+]);
+
+export const STORY_PRESENTATIONS = ["standard", "immersive"] as const;
+export type StoryPresentationChoice = (typeof STORY_PRESENTATIONS)[number];
+export const STORY_PRESENTATION_OPTIONS = options<StoryPresentationChoice>([
+  ["standard", "Standard"],
+  ["immersive", "Immersive"]
+]);
+
+export const IMMERSIVE_ALIGNMENTS = ["bottom-left", "center"] as const;
+export type ImmersiveAlignment = (typeof IMMERSIVE_ALIGNMENTS)[number];
+export const IMMERSIVE_ALIGNMENT_OPTIONS = options<ImmersiveAlignment>([
+  ["bottom-left", "Bottom left"],
+  ["center", "Center"]
+]);
+
+/** `legacy-html` is an imported WordPress body; `byline-v1` is the structured Byline editor. */
+export const CONTENT_FORMATS = ["byline-v1", "legacy-html"] as const;
+export type ContentFormat = (typeof CONTENT_FORMATS)[number];
+
+export const TASK_STATES = ["open", "completed"] as const;
+export const TASK_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+export const TASK_PRIORITY_OPTIONS = options<(typeof TASK_PRIORITIES)[number]>([
+  ["low", "Low"],
+  ["normal", "Normal"],
+  ["high", "High"],
+  ["urgent", "Urgent"]
+]);
+
+export const PRODUCTION_TYPES = ["photo", "gallery", "graphic", "video", "audio", "other"] as const;
+export const PRODUCTION_TYPE_OPTIONS = options<(typeof PRODUCTION_TYPES)[number]>([
+  ["photo", "Photo"],
+  ["gallery", "Gallery"],
+  ["graphic", "Graphic"],
+  ["video", "Video"],
+  ["audio", "Audio"],
+  ["other", "Other"]
+]);
+export const PRODUCTION_STATUSES = ["needed", "assigned", "in-progress", "uploaded", "selected", "done"] as const;
+export const PRODUCTION_STATUS_OPTIONS = options<(typeof PRODUCTION_STATUSES)[number]>([
+  ["needed", "Needed"],
+  ["assigned", "Assigned"],
+  ["in-progress", "In progress"],
+  ["uploaded", "Uploaded"],
+  ["selected", "Selected"],
+  ["done", "Done"]
+]);
+
+export const SOURCE_STATUSES = ["planned", "contacted", "waiting", "needs-scheduling", "scheduled", "interviewed", "declined", "unavailable"] as const;
+export const SOURCE_STATUS_OPTIONS = options<(typeof SOURCE_STATUSES)[number]>([
+  ["planned", "Planned"],
+  ["contacted", "Contacted"],
+  ["waiting", "Waiting"],
+  ["needs-scheduling", "Needs scheduling"],
+  ["scheduled", "Scheduled"],
+  ["interviewed", "Interviewed"],
+  ["declined", "Declined"],
+  ["unavailable", "Unavailable"]
+]);
+
+export const APPOINTMENT_KINDS = ["interview", "meeting", "event", "photo", "press-conference", "game", "performance", "reporting", "other"] as const;
+export const APPOINTMENT_KIND_OPTIONS = options<(typeof APPOINTMENT_KINDS)[number]>([
+  ["interview", "Interview"],
+  ["meeting", "Meeting"],
+  ["event", "Event"],
+  ["photo", "Photo shoot"],
+  ["press-conference", "Press conference"],
+  ["game", "Game"],
+  ["performance", "Performance"],
+  ["reporting", "Reporting"],
+  ["other", "Other"]
+]);
+export const APPOINTMENT_STATUSES = ["planned", "tentative", "confirmed", "completed", "cancelled"] as const;
+export const APPOINTMENT_STATUS_OPTIONS = options<(typeof APPOINTMENT_STATUSES)[number]>([
+  ["planned", "Planned"],
+  ["tentative", "Tentative"],
+  ["confirmed", "Confirmed"],
+  ["completed", "Completed"],
+  ["cancelled", "Cancelled"]
+]);
+export const SCHEDULE_MODES = ["unscheduled", "window", "exact"] as const;
+export type ScheduleMode = (typeof SCHEDULE_MODES)[number];
+export const SCHEDULE_MODE_OPTIONS = options<ScheduleMode>([
+  ["unscheduled", "Unscheduled"],
+  ["window", "Target window"],
+  ["exact", "Exact time"]
+]);
+
+export const RESOURCE_PURPOSES = ["draft", "interview-notes", "transcript", "research", "data", "folder", "other"] as const;
+export const RESOURCE_PURPOSE_OPTIONS = options<(typeof RESOURCE_PURPOSES)[number]>([
+  ["draft", "Working draft"],
+  ["interview-notes", "Interview notes"],
+  ["transcript", "Transcript"],
+  ["research", "Research"],
+  ["data", "Data"],
+  ["folder", "Folder"],
+  ["other", "Other"]
+]);
+
+/**
+ * Correction types. `editor-note` is canonical: it is what every published
+ * WordPress record and the Astro renderer already use, so no alias migration.
+ */
+export const CORRECTION_TYPES = ["correction", "clarification", "editor-note", "substantive-update"] as const;
+export const CORRECTION_TYPE_OPTIONS = options<(typeof CORRECTION_TYPES)[number]>([
+  ["correction", "Correction"],
+  ["clarification", "Clarification"],
+  ["editor-note", "Editor's note"],
+  ["substantive-update", "Substantive update"]
+]);
+
+export const COVERAGE_FORMATS = ["coverage", "series"] as const;
+export const COVERAGE_FORMAT_OPTIONS = options<(typeof COVERAGE_FORMATS)[number]>([
+  ["coverage", "Coverage"],
+  ["series", "Series"]
+]);
+export const COVERAGE_STATUSES = ["upcoming", "active", "past", "archived"] as const;
+export const COVERAGE_STATUS_OPTIONS = options<(typeof COVERAGE_STATUSES)[number]>([
+  ["upcoming", "Upcoming"],
+  ["active", "Active"],
+  ["past", "Past"],
+  ["archived", "Archived"]
+]);
+
+export const PERSON_STATUSES = ["active", "alumni", "guest"] as const;
+export const PERSON_STATUS_OPTIONS = options<(typeof PERSON_STATUSES)[number]>([
+  ["active", "Current staff"],
+  ["alumni", "Alumni"],
+  ["guest", "Guest contributor"]
+]);
+
+export const LIVE_COVERAGE_STATES = ["off", "live", "ended"] as const;
+export const LIVE_COVERAGE_STATE_OPTIONS = options<(typeof LIVE_COVERAGE_STATES)[number]>([
+  ["off", "No live coverage"],
+  ["live", "Live"],
+  ["ended", "Ended"]
+]);
+
+/** Bounded limits carried over from the WordPress Story Workspace. */
+export const LIMITS = {
+  brief: 4000,
+  sourcesPerStory: 30,
+  appointmentsPerStory: 40,
+  productionPerStory: 12,
+  resourcesPerStory: 24,
+  assignees: 4,
+  line: 160,
+  notes: 2000
+} as const;

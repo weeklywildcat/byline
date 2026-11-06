@@ -1,0 +1,20 @@
+// Byline newsroom styles layered on Payload's admin. Calm, dense, no decoration.
+.byline-nav {
+  margin-bottom: var(--base);
+  ul { list-style: none; margin: 0; padding: 0; }
+  &__brand { font-weight: 600; margin: 0 0 calc(var(--base) / 2); }
+  &__link { display: block; padding: calc(var(--base) / 4) 0; }
+}
+
+.byline-home {
+  padding-block: var(--base);
+  &__header { display: flex; align-items: center; justify-content: space-between; gap: var(--base); }
+  &__header h1 { margin: 0; }
+  &__board ul { display: flex; flex-wrap: wrap; gap: calc(var(--base) / 2); list-style: none; padding: 0; }
+  &__board li { display: flex; flex-direction: column; min-width: 7.5rem; padding: calc(var(--base) / 2); border: 1px solid var(--theme-elevation-150); border-radius: var(--style-radius-s); }
+  &__count { font-size: 1.5rem; font-weight: 600; }
+  &__grid { display: grid; gap: calc(var(--base) * 1.5); grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); margin-top: var(--base); }
+  &__list { list-style: none; margin: 0; padding: 0; }
+  &__list li { display: flex; flex-direction: column; gap: 2px; padding: calc(var(--base) / 3) 0; border-bottom: 1px solid var(--theme-elevation-100); }
+  &__meta, &__empty { color: var(--theme-elevation-600); font-size: 0.875rem; }
+}
