@@ -5,7 +5,7 @@ import { s3Storage } from "@payloadcms/storage-s3";
 import { buildConfig, type CollectionConfig, type Plugin } from "payload";
 import sharp from "sharp";
 import { atLeast, newsroomUser } from "./access/user";
-import { Media } from "./collections/Media";
+import { Media, MEDIA_UPLOAD_MAX_BYTES } from "./collections/Media";
 import { mediaFolders } from "./collections/MediaFolders";
 import { People } from "./collections/People";
 import { Polls } from "./collections/Polls";
@@ -78,6 +78,8 @@ export default buildConfig({
   editor: proseEditor,
   sharp,
   collections: collections.map(withImportIdGuard),
+  // Camera originals are larger than Payload's 20 MB multipart default.
+  upload: { limits: { fileSize: MEDIA_UPLOAD_MAX_BYTES } },
   // Payload's native folders, for Media (logical organization, never storage paths).
   folders: mediaFolders,
   db: postgresAdapter({

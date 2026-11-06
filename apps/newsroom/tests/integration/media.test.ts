@@ -125,7 +125,7 @@ describe("native folders", () => {
     expect(sports.children.map((node) => node.name)).toEqual(["Football"]);
     expect(sports.children[0].children.map((node) => node.name)).toEqual(["Homecoming"]);
     expect(navigator.body.folders.find((item: { id: number }) => item.id === folders.football).assetCount).toBe(1);
-    expect(navigator.body.capabilities).toMatchObject({ canUpload: true, canManageFolders: false, canDelete: false });
+    expect(navigator.body.capabilities).toMatchObject({ canUpload: true, canManageFolders: false, canDelete: false, maxUploadBytes: 50 * 1024 * 1024 });
     expect((await call("get", "/byline/media/navigator", "editor")).body.capabilities.canManageFolders).toBe(true);
     expect((await call("get", "/byline/media/navigator", null)).status).toBe(401);
   });

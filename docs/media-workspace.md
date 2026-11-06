@@ -182,10 +182,10 @@ predictable home rather than a remembered folder). Wrong types and files over
 the server's limit are refused before sending. Metadata is never required
 first. Uploads continue in the background if the dialog closes.
 
-The upload size limit is Payload's multipart default (20 MB). Camera
-originals larger than that are refused with a clear message; raising it is a
-storage decision, not part of this slice. The accepted MIME types are
-unchanged (no video, no HEIC).
+The upload size limit is 50 MB per file (`MEDIA_UPLOAD_MAX_BYTES`, set as
+Payload's own multipart limit; Payload's default of 20 MB is below a typical
+camera original). Larger files are refused before sending, and by the server
+with a 413. The accepted MIME types are unchanged (no video, no HEIC).
 
 ## Measured
 

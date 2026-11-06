@@ -27,6 +27,14 @@ export const MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image
 export const IMAGE_MIME_TYPES = MEDIA_MIME_TYPES.filter((type) => type.startsWith("image/"));
 export const AUDIO_MIME_TYPES = MEDIA_MIME_TYPES.filter((type) => type.startsWith("audio/"));
 
+/**
+ * The largest file one upload may carry. Payload's multipart default is
+ * 20 MB, below a typical camera original; 50 MB covers full-resolution
+ * JPEGs from the newsroom's cameras. Applied as Payload's own upload limit
+ * (payload.config.ts), so the server refuses anything larger with a 413.
+ */
+export const MEDIA_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
+
 export const LIBRARY_PREVIEW_SIZE = "library";
 export const LIBRARY_PREVIEW_MAX = 640;
 

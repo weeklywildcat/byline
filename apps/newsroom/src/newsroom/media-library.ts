@@ -217,7 +217,7 @@ export async function mediaNavigator(ctx: ScreenContext): Promise<MediaNavigator
   };
 }
 
-/** Payload's multipart limit (its own default is 20 MB); the upload flow says so before sending a larger file. */
+/** Payload's multipart limit (MEDIA_UPLOAD_MAX_BYTES, 50 MB); the upload flow says so before sending a larger file. */
 export function uploadLimit(ctx: ScreenContext): number {
   const configured = (ctx.req.payload.config.upload as { limits?: { fileSize?: number } } | undefined)?.limits?.fileSize;
   return typeof configured === "number" && configured > 0 ? configured : 20 * 1024 * 1024;

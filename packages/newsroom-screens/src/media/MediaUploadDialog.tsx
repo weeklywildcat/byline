@@ -104,7 +104,8 @@ export function MediaUploadDialog({ open, onOpenChange, fetchers, folderId, onBu
     if (!files) return;
     const items: QueueItem[] = Array.from(files).map((file) => {
       const typeOk = accepted.length === 0 || acceptsFile(file, accepted);
-      const sizeOk = !maxBytes || file.size <= maxBytes;
+      // Payload stops a multipart file once it reaches the limit, so a file of exactly the limit is refused too.
+      const sizeOk = !maxBytes || file.size < maxBytes;
       const error = !typeOk
         ? `Media doesn't accept ${file.type || "this kind of file"}. Use JPEG, PNG, WebP, AVIF, GIF, PDF, MP3, M4A or WAV.`
         : !sizeOk ? `${formatFilesize(file.size)} is over the ${formatFilesize(maxBytes)} upload limit.` : undefined;
