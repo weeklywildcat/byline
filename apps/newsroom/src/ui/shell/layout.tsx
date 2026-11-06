@@ -3,38 +3,63 @@
 import { useIsMobile, useMediaQuery } from "@byline/newsroom-ui/lib/hooks";
 import { usePathname } from "next/navigation";
 import { createContext, use, useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { storyIdFromPath } from "../../domain/navigation";
-import { SIDEBAR_WIDTH, STORY_WORKSPACE_QUERY } from "./shell-config";
+import { isCalendarPath, storyIdFromPath } from "../../domain/navigation";
+import { CALENDAR_WORKSPACE_QUERY, SIDEBAR_WIDTH, STORY_WORKSPACE_QUERY } from "./shell-config";
 
 /**
- * Which composition the one sidebar has on this screen. A saved story's
- * Story screen on a wide enough screen is a Story workspace (the global icon
- * rail plus the Story list); everything else, including a story on a narrower
- * screen, has the ordinary sidebar. Viewport width is a layout capability,
- * never the reader's expanded/collapsed preference.
+ * Which composition the one sidebar has on this screen:
+ * - `default`: the ordinary Byline sidebar (256px).
+ * - `story-workspace`: a saved story's Story screen on a wide enough screen,
+ *   shadcn sidebar-09's nested sidebars: the global icon rail plus the Story list.
+ * - `calendar-workspace`: the Calendar on a wide enough screen: the icon rail
+ *   plus the Calendar's controls (sidebar-12's mini calendar and categories).
+ * Each workspace has its own breakpoint, measured for its own content. Below
+ * it the screen keeps the ordinary sidebar and offers its context in a
+ * temporary sheet. Viewport width is a layout capability, never the reader's
+ * expanded/collapsed preference.
  */
-export type ShellLayout = { storyId: number | null; storyWorkspace: boolean };
+export type ShellComposition = "default" | "story-workspace" | "calendar-workspace";
 
-export function shellLayoutFor(pathname: string, adminRoute: string, wide: boolean): ShellLayout {
-  const storyId = storyIdFromPath(pathname, adminRoute);
-  return { storyId, storyWorkspace: storyId !== null && wide };
+/** What the address says, apart from width: the story whose screen this is, and whether this is the Calendar. */
+export type ShellRoute = { storyId: number | null; calendar: boolean };
+
+export type ShellLayout = ShellRoute & { composition: ShellComposition };
+
+/** Which workspaces the viewport is wide enough for. */
+export type ShellViewport = { storyWorkspace: boolean; calendarWorkspace: boolean };
+
+export function shellRouteFor(pathname: string, adminRoute: string): ShellRoute {
+  return { storyId: storyIdFromPath(pathname, adminRoute), calendar: isCalendarPath(pathname, adminRoute) };
+}
+
+export function shellCompositionFor(route: ShellRoute, viewport: ShellViewport): ShellComposition {
+  if (route.storyId !== null && viewport.storyWorkspace) return "story-workspace";
+  if (route.calendar && viewport.calendarWorkspace) return "calendar-workspace";
+  return "default";
+}
+
+export function shellLayoutFor(pathname: string, adminRoute: string, viewport: ShellViewport): ShellLayout {
+  const route = shellRouteFor(pathname, adminRoute);
+  return { ...route, composition: shellCompositionFor(route, viewport) };
 }
 
 /**
- * The SidebarProvider's variables for a layout. Only the Story workspace
- * reserves sidebar-09's 350px (rail + list); changing it animates the one
- * sidebar's existing gap and container, never a second layout.
+ * The SidebarProvider's variables for a layout. A workspace reserves its
+ * width (rail + contextual pane); changing it animates the one sidebar's
+ * existing gap and container, never a second layout.
  */
-export function shellSidebarStyle(layout: ShellLayout): CSSProperties {
+export function shellSidebarStyle(layout: Pick<ShellLayout, "composition">): CSSProperties {
   return {
     display: "contents",
-    "--sidebar-width": `${layout.storyWorkspace ? SIDEBAR_WIDTH.storyWorkspace : SIDEBAR_WIDTH.default}px`,
+    "--sidebar-width": `${SIDEBAR_WIDTH[COMPOSITION_WIDTH[layout.composition]]}px`,
     "--sidebar-width-icon": `${SIDEBAR_WIDTH.icon}px`,
     "--sidebar-width-mobile": `${SIDEBAR_WIDTH.mobile}px`
   } as CSSProperties;
 }
 
-const ShellLayoutContext = createContext<ShellLayout>({ storyId: null, storyWorkspace: false });
+const COMPOSITION_WIDTH: Record<ShellComposition, keyof typeof SIDEBAR_WIDTH> = { default: "default", "story-workspace": "storyWorkspace", "calendar-workspace": "calendarWorkspace" };
+
+const ShellLayoutContext = createContext<ShellLayout>({ storyId: null, calendar: false, composition: "default" });
 
 export const ShellLayoutProvider = ShellLayoutContext;
 export const useShellLayout = () => use(ShellLayoutContext);
@@ -42,9 +67,10 @@ export const useShellLayout = () => use(ShellLayoutContext);
 /** The current layout, from the address and the viewport (ordinary until hydrated). */
 export function useCurrentShellLayout(adminRoute: string): ShellLayout {
   const pathname = usePathname() ?? "";
-  const wide = useMediaQuery(STORY_WORKSPACE_QUERY);
-  const { storyId, storyWorkspace } = shellLayoutFor(pathname, adminRoute, wide);
-  return useMemo(() => ({ storyId, storyWorkspace }), [storyId, storyWorkspace]);
+  const storyWorkspace = useMediaQuery(STORY_WORKSPACE_QUERY);
+  const calendarWorkspace = useMediaQuery(CALENDAR_WORKSPACE_QUERY);
+  const { storyId, calendar, composition } = shellLayoutFor(pathname, adminRoute, { storyWorkspace, calendarWorkspace });
+  return useMemo(() => ({ storyId, calendar, composition }), [storyId, calendar, composition]);
 }
 
 /**

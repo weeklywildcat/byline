@@ -35,7 +35,7 @@ async function sidebarFor(user: unknown): Promise<SidebarProps | null> {
 describe("Byline sidebar (admin.components.Nav)", () => {
   it("gives staff only Byline destinations and no System administration", async () => {
     const props = (await sidebarFor(account("staff")))!;
-    expect(props.items.map((item) => item.key)).toEqual(["home", "stories"]);
+    expect(props.items.map((item) => item.key)).toEqual(["home", "stories", "calendar"]);
     expect(props.items.every((item) => !item.href.includes("/collections/"))).toBe(true);
     expect(props.systemHref).toBeNull();
     expect(props.user).toEqual({ name: "Gibson Bell", subtitle: "Staff", avatarUrl: null });

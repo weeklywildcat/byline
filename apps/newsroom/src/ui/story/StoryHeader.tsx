@@ -110,9 +110,9 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
  * decides after.
  */
 function StorySwitchButton() {
-  const { storyId, storyWorkspace } = useShellLayout();
+  const { storyId, composition } = useShellLayout();
   const { openSheet } = useStorySwitcher();
-  if (storyId === null || storyWorkspace) return null;
+  if (storyId === null || composition === "story-workspace") return null;
   return (
     <Button type="button" variant="outline" size="sm" onClick={openSheet} className="min-[1300px]:hidden" aria-haspopup="dialog" data-story-switch="">
       <List data-icon="inline-start" aria-hidden="true" />

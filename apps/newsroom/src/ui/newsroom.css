@@ -3,6 +3,8 @@
  * compiled by postcss/byline-ui.cjs and scoped to `.byline-ui-root`.
  */
 @import "@byline/newsroom-ui/styles.css";
+/* The shared newsroom Calendar: Schedule-X's shadcn theme on Nova's tokens. */
+@import "@byline/newsroom-screens/calendar/calendar.css";
 @source "./";
 @source "../components";
 @source "../../../../packages/newsroom-screens/src";

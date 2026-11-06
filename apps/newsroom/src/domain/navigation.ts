@@ -11,19 +11,25 @@ export type NavItem = {
 const RANK: Record<Role, number> = { staff: 1, editor: 2, administrator: 3 };
 const allowed = (role: Role) => (item: { minimumRole: Role }) => RANK[role] >= RANK[item.minimumRole];
 
+/** The Calendar's address below the admin route (a custom root view). */
+export const CALENDAR_PATH = "/calendar";
+
 /**
  * Byline's newsroom navigation: the only primary navigation anyone sees.
  *
  * A destination appears here only once its Byline screen exists; staff are
  * never sent to a generic Payload collection screen. The planned order is
- * Home, Stories, Planning, Calendar, Media, Coverage, then (editors) People,
- * Polls, Feedback; each joins as its screen is ported
- * (docs/payload-migration.md §7.2). Visibility is a convenience; every
+ * Home, Stories, Calendar, Media, Coverage, then the editor tools (People,
+ * Polls, Feedback…); each joins as its screen is ported
+ * (docs/payload-migration.md §7.2). There is no generic Planning
+ * destination: WordPress's Planning page was an umbrella over these screens,
+ * and here each is first-class. Visibility is a convenience; every
  * destination enforces its own access on the server.
  */
 export const NAVIGATION: readonly NavItem[] = [
   { key: "home", label: "Home", path: "", minimumRole: "staff" },
-  { key: "stories", label: "Stories", path: "/stories", minimumRole: "staff" }
+  { key: "stories", label: "Stories", path: "/stories", minimumRole: "staff" },
+  { key: "calendar", label: "Calendar", path: CALENDAR_PATH, minimumRole: "staff" }
 ];
 
 export function navigationFor(role: Role): NavItem[] {
@@ -131,6 +137,11 @@ export function locationFor(pathname: string, adminRoute: string): Crumb[] {
 export function storyIdFromPath(pathname: string, adminRoute: string): number | null {
   const match = /^\/collections\/stories\/(\d+)$/.exec(stripAdmin(pathname, adminRoute));
   return match ? Number(match[1]) : null;
+}
+
+/** Whether a path is the Calendar (with or without a trailing slash or query). */
+export function isCalendarPath(pathname: string, adminRoute: string): boolean {
+  return stripAdmin(pathname, adminRoute) === CALENDAR_PATH;
 }
 
 function stripAdmin(pathname: string, adminRoute: string): string {

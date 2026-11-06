@@ -15,6 +15,7 @@ import { BylineAppHeader as BylineAppHeader_df743355b24789457c434e9f706c269f } f
 import { BylineShellProvider as BylineShellProvider_ad5e83f4f5410d474847f641c17f564e } from '../../../ui/shell/BylineShellProvider'
 import { BylineHome as BylineHome_d2bd63bcc1ef7b276307d8fe9198b9bf } from '../../../components/BylineHome'
 import { BylineStories as BylineStories_ad94ee23d865a316f701cf2cc43c0a69 } from '../../../components/BylineStories'
+import { BylineCalendar as BylineCalendar_2d5b3538f05fbaa029503bd635bee9fa } from '../../../components/BylineCalendar'
 import { SystemAdministration as SystemAdministration_b8606e8d06c732ec95be4959d2dbc53e } from '../../../components/SystemAdministration'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
@@ -37,6 +38,7 @@ export const importMap = {
   "/ui/shell/BylineShellProvider#BylineShellProvider": BylineShellProvider_ad5e83f4f5410d474847f641c17f564e,
   "/components/BylineHome#BylineHome": BylineHome_d2bd63bcc1ef7b276307d8fe9198b9bf,
   "/components/BylineStories#BylineStories": BylineStories_ad94ee23d865a316f701cf2cc43c0a69,
+  "/components/BylineCalendar#BylineCalendar": BylineCalendar_2d5b3538f05fbaa029503bd635bee9fa,
   "/components/SystemAdministration#SystemAdministration": SystemAdministration_b8606e8d06c732ec95be4959d2dbc53e,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

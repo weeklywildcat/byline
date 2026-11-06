@@ -159,17 +159,21 @@ afterEach(async () => {
 /* --------------------------------------------------------------- tests */
 
 describe("the contextual sidebar's layout", () => {
+  const wide = { storyWorkspace: true, calendarWorkspace: true };
+  const narrow = { storyWorkspace: false, calendarWorkspace: false };
+
   it("is a Story workspace only on a saved story's Story screen, on a wide screen", () => {
-    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", true)).toEqual({ storyId: 12, storyWorkspace: true });
-    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", false)).toEqual({ storyId: 12, storyWorkspace: false });
+    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", wide)).toEqual({ storyId: 12, calendar: false, composition: "story-workspace" });
+    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", narrow)).toEqual({ storyId: 12, calendar: false, composition: "default" });
     for (const path of ["/admin", "/admin/stories", "/admin/collections/stories", "/admin/collections/stories/create"]) {
-      expect(shellLayoutFor(path, "/admin", true).storyWorkspace).toBe(false);
+      expect(shellLayoutFor(path, "/admin", wide).composition).toBe("default");
     }
   });
 
-  it("reserves sidebar-09's 350px only for the Story workspace; ordinary screens keep 256px", () => {
-    expect(shellSidebarStyle({ storyId: null, storyWorkspace: false })).toMatchObject({ "--sidebar-width": "256px", "--sidebar-width-icon": "48px" });
-    expect(shellSidebarStyle({ storyId: 4, storyWorkspace: true })).toMatchObject({ "--sidebar-width": "350px", "--sidebar-width-icon": "48px" });
+  it("reserves sidebar-09's 350px only for a workspace; ordinary screens keep 256px", () => {
+    expect(shellSidebarStyle({ composition: "default" })).toMatchObject({ "--sidebar-width": "256px", "--sidebar-width-icon": "48px" });
+    expect(shellSidebarStyle({ composition: "story-workspace" })).toMatchObject({ "--sidebar-width": "350px", "--sidebar-width-icon": "48px" });
+    expect(shellSidebarStyle({ composition: "calendar-workspace" })).toMatchObject({ "--sidebar-width": "350px", "--sidebar-width-icon": "48px" });
   });
 
   it("needs a viewport wide enough for the 760px article beside the workspace, and the header's CSS fallback agrees", () => {

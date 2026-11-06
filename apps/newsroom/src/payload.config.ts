@@ -108,6 +108,8 @@ export default buildConfig({
         dashboard: { Component: "/components/BylineHome#BylineHome" },
         // Byline Stories. Payload's raw Stories list stays at /collections/stories for administrators.
         stories: { Component: "/components/BylineStories#BylineStories", path: "/stories" },
+        // Byline Calendar: the newsroom schedule (Schedule-X), a destination of its own.
+        calendar: { Component: "/components/BylineCalendar#BylineCalendar", path: "/calendar" },
         // Administrators only: the entry to Payload's raw collection screens.
         system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system" }
       }

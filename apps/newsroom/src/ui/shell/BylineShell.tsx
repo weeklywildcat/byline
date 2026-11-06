@@ -11,22 +11,24 @@ import { ShellLayoutProvider, shellSidebarStyle, SidebarWidthSyncProvider, useCu
 import { ShellNavigationProvider } from "./navigation";
 import { BylineSearchProvider } from "./search";
 import { StorySwitcherProvider } from "./StorySwitcher";
+import { CalendarWorkspaceShell } from "../calendar/CalendarWorkspaceShell";
 import { SIDEBAR_COOKIE, SIDEBAR_SHORTCUT } from "./shell-config";
 
 /**
  * The Byline application shell's state, above every admin view: one query
  * cache for all Byline screens, the one shadcn Sidebar state (shared by the
  * Nav, the app header and any screen that needs it), guarded navigation, the
- * Create controller, the command palette, the Story switcher and the
- * newsroom's one toaster (screens inside the shell render none of their own,
+ * Create controller, the command palette, the Story switcher, the Calendar
+ * workspace and the newsroom's one toaster (screens inside the shell render none of their own,
  * so a toast never appears twice).
  *
  * It adds no layout of its own: Payload's template still places the Nav and
  * the view, so Payload's document, form and lock infrastructure is untouched.
  * The Sidebar wrapper is `display: contents` for that reason; it exists only
  * so the shell's CSS variables and `group/sidebar-wrapper` reach both. Those
- * variables follow the layout: the Story workspace reserves sidebar-09's
- * 350px, everything else the ordinary 256px (shell-config.ts), applied once
+ * variables follow the layout's composition: a Story or Calendar workspace
+ * reserves sidebar-09's 350px, everything else the ordinary 256px
+ * (shell-config.ts), applied once
  * the sidebar for the new screen has mounted so the change animates.
  */
 export function BylineShell({ defaultOpen, children }: { defaultOpen: boolean; children: ReactNode }) {
@@ -44,7 +46,9 @@ export function BylineShell({ defaultOpen, children }: { defaultOpen: boolean; c
             <ShellNavigationProvider>
               <BylineCreateProvider>
                 <BylineSearchProvider>
-                  <StorySwitcherProvider>{children}</StorySwitcherProvider>
+                  <StorySwitcherProvider>
+                    <CalendarWorkspaceShell>{children}</CalendarWorkspaceShell>
+                  </StorySwitcherProvider>
                 </BylineSearchProvider>
               </BylineCreateProvider>
             </ShellNavigationProvider>
