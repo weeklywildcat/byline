@@ -38,6 +38,14 @@
   --sx-rounding-small: var(--radius-md);
   --sx-font-small: 0.8125rem;
   --sx-font-extra-small: 0.75rem;
+  /*
+   * Schedule-X sets the week and day grids' height on <html> (from
+   * weekOptions.gridHeight), but its theme also declares the variable as 0 on
+   * :root, which scoping turns into this rule: every hour row would be 1px
+   * tall and the grids blank. Inherit the value Schedule-X sets.
+   */
+  --sx-week-grid-height: inherit;
+  --sx-week-grid-hour-height: inherit;
 }
 
 /* The toolbar above the calendar is Byline's (Nova buttons and menus), so Schedule-X's own header is not shown. */

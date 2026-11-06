@@ -67,9 +67,11 @@ agree. Selected view, open menus, drag state and form text stay local.
 
 `StoriesPage` lives in `@byline/newsroom-screens` and is shared by the WordPress
 admin and the Payload newsroom. It knows no CMS: what only one host has arrives
-as an optional capability. `renderCalendar` supplies the Calendar (WordPress
-passes its Schedule-X `StoryCalendar`; Payload has none yet, so it offers Board
-and List and never shows a Calendar tab), and `viewHref` supplies a view's
+as an optional capability. `renderCalendar` supplies the Calendar view
+(WordPress mounts the shared Schedule-X Calendar from
+`@byline/newsroom-screens/calendar` there; the Payload newsroom passes none,
+offering Board and List only, because its Calendar is its own destination), and
+`viewHref` supplies a view's
 address (WordPress: `planning-routing.ts`; default: `view=` on the current
 address).
 
@@ -190,31 +192,43 @@ production due date, a planned publication and a WordPress schedule are
 different dates changed in different forms, and dragging a rectangle must not
 change one by accident. Schedule-X's own modal is not used either.
 
+The Calendar is shared (`packages/newsroom-screens/src/calendar`): WordPress and
+the Payload newsroom mount one `NewsroomCalendar`. A host supplies the schedule
+feed, the `CalendarLinks` an item opens, optional client navigation, and where
+view/filter preferences live (WordPress: localStorage, through
+`planning/calendar-host.tsx`; Payload: Payload Preferences). The date, the
+filters and the view belong to one `CalendarWorkspace` store, so a contextual
+sidebar and a Filters sheet read the same state as the toolbar.
+
 Flow: the protected schedule feed → TanStack Query → one adapter
 (`schedule-x-adapter.ts`) → `eventsService.set`. Schedule-X never fetches.
-The Byline toolbar (Today, previous/next, view, Filters) drives it through a
-small controller plugin.
+The Byline toolbar (Today, previous/next, view, Filters) and the mini calendar
+drive it through a small controller plugin (`setDate`, `step`, `today`,
+`setView`).
 
 Date rules, all tested (including DST):
 
-- exact appointment: `ZonedDateTime` in the **WordPress site timezone**;
+- exact appointment: `ZonedDateTime` in the **newsroom timezone** (the WordPress site timezone in WordPress);
 - story deadline, production due date, task due date: `PlainDate` (the stored
   time on production and tasks is a placeholder);
 - planned publication: a `PlainDate` unless it carries a real time; the noon the
   picker stores for a day-only choice (`T12:00`, or the instant for noon in the
-  site timezone) counts as a day;
-- WordPress scheduled and published dates: `ZonedDateTime`;
+  newsroom timezone) counts as a day;
+- scheduled and published dates: `ZonedDateTime`;
 - a fuzzy appointment window is **never** an event. It is listed under
   **Needs scheduling**, whose **Schedule** link opens that appointment's own
   editor in the workspace (`story=<id>&appointment=<uuid>`).
 
 Six fixed categories (appointment, story-deadline, production,
-planned-publication, wordpress-scheduled, task-deadline) each carry an icon and a
+planned-publication, publication, task-deadline) each carry an icon and a
 label, so colour is never the only signal. Clicking an event opens Story Peek;
 the agenda rows also offer Edit appointment. On narrow screens Schedule-X's own
 responsive rules switch to the month agenda (view order in the config decides the
 fallback). Its theme tokens are mapped onto Nova's inside `.byline-ui-root`, and
 its own header is hidden (`.sx__calendar-header`) because the toolbar is Byline's.
+Schedule-X sets the Week/Day grid heights on `<html>` while its theme declares
+them `0` on `:root`; scoped to `.byline-ui-root` that blanked the grids, so
+`calendar/calendar.css` makes them `inherit`.
 
 ## Other destinations
 

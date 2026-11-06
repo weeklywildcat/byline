@@ -39,6 +39,15 @@ describe("the React 19 admin stylesheets stay inside .byline-ui-root", () => {
     expect(css).toMatch(/\.byline-ui-root \.sx__calendar-header\s*\{\s*display:\s*none/);
   });
 
+  it("the Calendar inherits the week and day grid heights Schedule-X sets on <html>, after the theme's own zero", async () => {
+    const css = (await compile("src/planning/style.css")).toString();
+    const lastOf = (name: string) => css.lastIndexOf(`--${name}:`);
+    for (const name of ["sx-week-grid-height", "sx-week-grid-hour-height"]) {
+      expect(css).toMatch(new RegExp(`--${name}:\\s*0`));
+      expect(css.slice(lastOf(name), lastOf(name) + 40)).toMatch(new RegExp(`--${name}:\\s*inherit`));
+    }
+  });
+
   it("Schedule-X's keyframes are namespaced like every other keyframe", async () => {
     const css = await compile("src/planning/style.css");
     const names: string[] = [];

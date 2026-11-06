@@ -230,7 +230,7 @@ legacy adapter), `copy-wordpress-media-to-out.mjs` for new media, and the
 
 ```text
 apps/newsroom  (Payload 3 + Next.js 16, private)
-  ├── Payload admin with Byline custom views (Home, Stories, Planning, Calendar,
+  ├── Payload admin with Byline custom views (Home, Stories, Calendar,
   │   Media, Coverage, Search; Polls/Feedback/People for editors;
   │   Pages/Publication/System for administrators)
   ├── collections + access control + hooks  (src/collections, src/access)
@@ -407,7 +407,7 @@ REST.
 
 **Byline supplies every staff-facing surface**, in the one Nova design system
 (`packages/newsroom-ui`, moved out of the WordPress plugin so both admins use
-the same components): Home, Stories, Planning, Calendar, Media Desk, Coverage,
+the same components): Home, Stories, Calendar, Media Desk, Coverage,
 the Story screen (Write / Plan / Production / History), the article editor's
 interface, Preview, People, Polls, Feedback, search and the command palette.
 Buttons, menus, Command, Dialog/AlertDialog, Popover, Tooltip, ContextMenu,
@@ -577,8 +577,9 @@ System administration.
 - **Saved views** are Payload Preferences (`usePreferences()`, key
   `byline:stories:saved-views:v1`, `src/ui/stories/saved-views.ts`): no field,
   collection, migration or endpoint, normalized on every read and written whole.
-- **No Calendar yet:** the newsroom passes no `renderCalendar`, so Stories offers
-  Board and List.
+- **No Calendar tab on Stories:** the newsroom passes no `renderCalendar`, so
+  Stories offers Board and List. The Calendar is its own destination
+  (`/admin/calendar`, §7.2), not a Stories view.
 - **One column, no page-level New story:** the earlier `StoryViewsRail` beside
   the collection was removed (collection views did not justify a second
   permanent navigation column; the views picker does the job), and the
@@ -591,6 +592,54 @@ every filter, coverage, moves and inline edits, Preferences per account),
 `tests/stories-saved-views.test.ts`, the plugin's `stories-page-host.test.tsx`,
 and in the browser at the six shell widths (rail/picker, Save, Edited, Delete +
 Undo through Preferences, Story Peek, `?view=list`).
+
+**Calendar (done): `/admin/calendar`.** The Schedule-X Calendar moved out of
+`wordpress-plugin/src/planning` into `@byline/newsroom-screens/calendar`, so
+WordPress and Payload consume one implementation (WordPress keeps its Calendar
+tab through `planning/calendar-host.tsx`: its wp-admin links, its localStorage
+view, the Stories mount). The shared vocabulary is CMS-neutral: filters are
+appointments, deadlines, production, plannedPublication, publication (scheduled
+and published) and tasks, plus My schedule; labels read Publication, Scheduled
+publication, Published. Schedule-X, `temporal-polyfill` and `react-day-picker`
+are declared by `@byline/newsroom-screens` and `@byline/newsroom-ui`, not by the
+plugin.
+
+- **Read model:** `GET /api/byline/schedule?from&to[&tasks=1][&coverage=]`
+  (`src/newsroom/schedule.ts`) returns the shared `ScheduleResponse`, built from
+  Appointments, Production assignments and Tasks; story dates still come from
+  Stories. There is no calendar collection. `from`/`to` are newsroom days, a
+  range is at most 124 days, malformed or backwards ranges are 400s, and day
+  edges are newsroom midnights (correct across DST). Exact appointments that
+  overlap the range come back unless cancelled (completed and tentative stay,
+  the screens mark them); open window or unscheduled appointments are
+  `needsScheduling` whatever the range and are never given a day or time; open
+  production with a deadline in range; open tasks due in range only when asked.
+  Every read is `overrideAccess: false`, so Story Work access decides: managers
+  see their stories' work, participants only what is assigned to them, and
+  nobody sees a story's unpublished rewrite headline (`readableStories`).
+  Private notes are never selected.
+- **Needs scheduling → Story:** a link opens `…/collections/stories/:id?appointment=:id`
+  and the Story screen opens Plan at that appointment.
+- **Caches:** the Calendar uses the shell's query client (`scheduleKey`,
+  `planningKey`). Story screen edits go through the Story Workspace's own
+  client, so arriving at the Calendar re-reads the stories and the schedule
+  feed is refetched on mount (30s stale time).
+- **Schedule-X in the Nova scope:** Schedule-X sets `--sx-week-grid-height` and
+  `--sx-week-grid-hour-height` on `<html>`, but its theme also declares them as
+  `0` on `:root`, which the scoping turns into `.byline-ui-root { … 0 }`: Week
+  and Day grids were blank (hour rows 1px tall). `calendar/calendar.css` makes
+  them `inherit`. (This also fixes WordPress.)
+- **Not done:** Payload story rows carry no scheduled-publication time yet
+  (Payload's scheduled-publish jobs are not read), so *Scheduled publication*
+  events appear only in WordPress for now; *Published* events appear in both.
+
+Tested: `packages/newsroom-screens/tests` (model, adapter, controller, workspace
+store, and the real Schedule-X mounted in jsdom: mini calendar ↔ calendar sync,
+filters, My schedule, Story Peek, Needs scheduling),
+`apps/newsroom/tests/integration/schedule.test.ts` (range validation, the
+124-day limit, DST edges, per-role scopes, notes never returned, Preferences),
+`apps/newsroom/tests/calendar-workspace-shell.test.ts`, and the plugin's
+`calendar-host.test.ts`; in the browser at 1920/1440/1366/1300/1180/820/390.
 
 **Next slice: the rest of the screens.** Home's whole closure (44 files) touches
 WordPress only through an injected request function, `@wordpress/i18n` in one
@@ -616,15 +665,22 @@ drafts, versions, locks and publishing are exactly Payload's:
 | Extension point | Byline piece (`apps/newsroom/src/ui/shell`) | Role |
 | --- | --- | --- |
 | `admin.components.providers` | `BylineShellProvider` → `BylineShell` | One query cache; the one shadcn `SidebarProvider` (`display: contents`, ⌘\ toggles, state in the `byline_sidebar` cookie read on the server, width by layout); guarded navigation; the Create controller; the command palette; the Story switcher |
-| `admin.components.Nav` | `BylineNav` → `BylineSidebar` | One `Sidebar collapsible="icon"` whose contents are contextual (below): the global sidebar, or the Story workspace's icon rail + Story list; a Sheet on phones |
+| `admin.components.Nav` | `BylineNav` → `BylineSidebar` | One `Sidebar collapsible="icon"` whose contents are contextual (below): the global sidebar, the Story workspace's icon rail + Story list, or the Calendar workspace's icon rail + Calendar controls; a Sheet on phones |
 | `admin.components.header` | `BylineAppHeader` | Sticky header beside the sidebar: trigger, location, Search (⌘K) |
 | `admin.components.views.stories` | `BylineStories` (`/admin/stories`) | Byline Stories (Board, List, story views), account checked on the server |
+| `admin.components.views.calendar` | `BylineCalendar` (`/admin/calendar`) | Byline Calendar (Schedule-X over `GET /api/byline/schedule`), account checked on the server |
 | `admin.components.views.system` | `SystemAdministration` (`/admin/system`) | Administrators' list of raw collection screens, role-checked on the server |
 
 - **Navigation** (`domain/navigation.ts` `NAVIGATION`): only destinations whose
-  Byline screen exists. Today that is Home and Stories. Planned order: Home, Stories,
-  Planning, Calendar, Media, Coverage, then for editors People, Polls,
-  Feedback. Never a generic Payload collection to fill the list.
+  Byline screen exists. Today that is Home, Stories and Calendar. Planned
+  order: Home, Stories, Calendar, Media, Coverage, then the editor tools
+  (People, Polls, Feedback). Never a generic Payload collection to fill the
+  list. **There is no generic Planning destination.** WordPress's Planning page
+  is an umbrella (tabs for Stories, Calendar, Media Desk, Collections, Content
+  Health and Feedback); in Payload each of those is a first-class Byline
+  destination, and the old tab container is not recreated. A Planning
+  destination would be added only for a real standalone planning or agenda
+  product that is meaningfully different from Home, Stories and Calendar.
 - **Create** (`ui/shell/create.tsx`): `BylineCreateProvider` mounts the shared
   `HomeCreate` dialogs (StoryCreateDialog, TaskCreateDialog) once, beside the
   page and outside the Story screen's `<form>`. Anything calls
@@ -656,17 +712,22 @@ drafts, versions, locks and publishing are exactly Payload's:
   shadcn components into `apps/newsroom`.
 
 **One SidebarProvider, contextual composition.** Byline has one
-`SidebarProvider` and one outer `Sidebar`; what it contains depends on the
-screen. `BylineSidebar` chooses from the route (`storyIdFromPath`: a saved
-story's `/collections/stories/:id`, never `/create` or a list) and the viewport
-(`ShellLayout`, `ui/shell/layout.tsx`):
+`SidebarProvider` and one outer `Sidebar`; what it contains is the shell's
+**composition** (`ShellComposition`: `default`, `story-workspace` or
+`calendar-workspace`, `ui/shell/layout.tsx`). It is chosen from the route
+(`ShellRoute`: `storyIdFromPath`, a saved story's `/collections/stories/:id`,
+never `/create` or a list; and `isCalendarPath`) and from which workspaces the
+viewport is wide enough for (`ShellViewport`). Each workspace has its own
+breakpoint, measured for its own content:
 
 | Screen | Sidebar |
 | --- | --- |
 | Normal screens | Global app sidebar (`DefaultSidebar`), 256px |
 | Wide Story workspace (≥1300px) | Global icon rail + contextual Story list, 350px |
-| Collapsed Story workspace | Global icon rail, 48px |
+| Wide Calendar workspace (≥1320px) | Global icon rail + the Calendar's controls, 350px |
+| Collapsed workspace (either) | Global icon rail, 48px |
 | Narrow Story workspace (<1300px) | Normal global sidebar + a temporary Story switcher sheet |
+| Narrow Calendar (<1320px) | Normal global sidebar + the same Calendar controls in a temporary right-hand sheet |
 
 - The wide Story workspace follows shadcn **`sidebar-09`** closely: the outer
   `Sidebar collapsible="icon" className="overflow-hidden
@@ -698,6 +759,46 @@ story's `/collections/stories/:id`, never `/create` or a list) and the viewport
   renders `StorySwitcherContent` in the workspace pane and in the narrow
   screens' Sheet (opened by *Switch story* in `StoryHeader`, from the right;
   the global menu keeps its own trigger and Sheet).
+- **The Calendar workspace** (`CalendarWorkspaceSidebar.tsx`) is the same
+  sidebar-09 composition: the one `BylineIconRail` (no second navigation list;
+  the Calendar icon comes from `NAVIGATION`) and a non-collapsible inner pane,
+  inert when the sidebar is collapsed, holding shadcn **`sidebar-12`**'s calendar
+  controls (`CalendarControls`, shared with WordPress): a mini month
+  (`Calendar` with `captionLayout="dropdown"` and `timeZone` set to the
+  newsroom's) and, instead of sidebar-12's fake named calendars, the newsroom's
+  real categories as whole-row checkboxes with their event colour dot: *My
+  schedule*, then *Show*: Appointments, Story deadlines, Production, Planned
+  publication, Publication, Task due dates. Needs scheduling stays a card on
+  the Calendar; the pane header only shows a count.
+  **One state, two presentations.** A `CalendarWorkspace` store
+  (`calendar-workspace.ts`) is the only owner of the selected date, the filters
+  and the view; the shell holds it (`CalendarWorkspaceShell`, as it holds the
+  Story switcher), so the pane, the Calendar and the sheet never keep their own
+  copy. Picking a day in the mini calendar calls the controller's `setDate`
+  and Schedule-X jumps there; navigating Schedule-X moves the mini calendar's
+  selected day and month. The pane and the sheet render the same
+  `CalendarControls` (sidebar-13's idea: contextual controls shown temporarily
+  where there is no room to reserve sidebar width). The toolbar offers the
+  *Filters* sheet whenever the pane is not showing (narrow screens, or the
+  sidebar collapsed) and omits it when the pane is.
+  Preferences (the view, the category toggles and My schedule) are Payload
+  Preferences, key `byline:calendar:preferences:v1`; the date is navigation
+  and is not stored. Saves are serialized and always end on the latest state
+  (quick toggles otherwise race). Dates are the newsroom timezone's
+  (`admin.custom.newsroomTimeZone`), never the browser's.
+- **Why 1320px for the Calendar** (not the Story workspace's 1300): Schedule-X's
+  grids need their own room. Measured in the browser (1180, 1300, 1366, 1440):
+  the Calendar frame is the viewport − 350 (sidebar) − 48 (the screen's
+  `lg:px-6`) = viewport − 398. The week grid spends 82px on its time axis and
+  gives each of 7 columns (frame − 82) / 7; the month grid gives each cell
+  frame / 7. At 1180: week column 100px, month cell 111px, and an all-day chip
+  read "Robotics t…". At 1300: 117 / 128, borderline. At 1366: 126 / 138,
+  comfortable. A chip with an icon, a time and a title needs about 120px in
+  the week grid and 130px in a month cell, so the limit is the stricter one:
+  398 + 82 + 7 × 120 = **1320px** (`CALENDAR_WORKSPACE_MIN_WIDTH`, with the
+  arithmetic in `CALENDAR_GEOMETRY` and pinned by a test). Below it Schedule-X
+  keeps the full width beside the ordinary 256px sidebar (frame 996px at
+  1300) rather than being squeezed.
 - **Why 1300px:** the Write tab's article measure is 760px. Beside the 350px
   workspace, Payload's Edit view gutters take 120px and the Story screen's
   padding 64px: 350 + 120 + 64 + 760 = 1294. Measured: at 1200 the article
@@ -729,11 +830,11 @@ navigation:
 | Block | Byline use | When |
 | --- | --- | --- |
 | `dashboard-01` | Shell structure: sidebar + sticky header + content | Now |
-| `sidebar-09` (nested) | A contextual pane inside the one sidebar, beside the global icon rail. The Story workspace has it (Story switcher). Calendar, Media and Coverage may get their own context when their screens exist | Story: done. Others: with their screens |
-| `sidebar-13` (sidebar in a dialog) | The narrow-screen Story switcher Sheet (same content as the workspace pane, no second provider) | Done |
+| `sidebar-09` (nested) | A contextual pane inside the one sidebar, beside the global icon rail. The Story workspace (Story switcher) and the Calendar workspace (Calendar controls) have it. Media and Coverage may get their own context when their screens exist | Story, Calendar: done. Others: with their screens |
+| `sidebar-13` (sidebar in a dialog) | The narrow-screen Story switcher Sheet and Calendar controls Sheet (same content as the workspace pane, no second provider) | Done |
 | `sidebar-10` (popover) | Compact contextual actions; universal actions stay in the Command palette | As needed |
 | `sidebar-11` (file tree) | Only for really hierarchical data (Media folders, an investigation's documents) | If such data exists |
-| `sidebar-12` (calendar) | Calendar's left pane: mini calendar, My Schedule, Interviews, Reporting, Production, School events, completed/cancelled toggles | With the real Calendar adapter |
+| `sidebar-12` (calendar) | Calendar's contextual pane: mini calendar plus the newsroom's real categories (above) | Done |
 | `sidebar-14` / `sidebar-15` (right inspector) | The Story screen's inspector for workflow, deadline, editor, presentation, format, readiness and Preview controls not already edited inline; a Sheet on narrow screens | With the editor / Live Preview phase |
 
 **Implementation notes.**
