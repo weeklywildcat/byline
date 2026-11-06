@@ -11,12 +11,12 @@ import { RadioGroup, RadioGroupItem } from "@byline/newsroom-ui/ui/radio-group";
 import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog-shell";
 import { DayField, DayRangeField, PeoplePicker } from "./fields";
 import { appointmentFormToInput, appointmentToForm, applyQuickWindow, emptyAppointmentForm, isValid, setExactDate, setScheduleMode, validateAppointmentForm, type AppointmentForm, type AppointmentFormErrors } from "./appointment-form";
-import { APPOINTMENT_KIND_LABELS, APPOINTMENT_NOTES_MAX, APPOINTMENT_STATUS_LABELS } from "@byline/newsroom-screens/workspace/reporting-model";
-import { formatLongDay, peopleOptions } from "@byline/newsroom-screens/workspace/workspace-model";
+import { APPOINTMENT_KIND_LABELS, APPOINTMENT_NOTES_MAX, APPOINTMENT_STATUS_LABELS } from "./reporting-model";
+import { formatLongDay, peopleOptions } from "./workspace-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyReporting } from "./workspace-cache";
 import { workspaceError } from "./workspace-errors";
-import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES, type ReportingResponse, type ScheduleMode, type StoryAppointment, type StorySource } from "@byline/newsroom-screens/workspace/workspace-types";
+import { APPOINTMENT_KINDS, APPOINTMENT_STATUSES, type ReportingResponse, type ScheduleMode, type StoryAppointment, type StorySource } from "./workspace-types";
 
 const kindOptions = APPOINTMENT_KINDS.map((value) => ({ value, label: APPOINTMENT_KIND_LABELS[value] }));
 const statusOptions = APPOINTMENT_STATUSES.map((value) => ({ value, label: APPOINTMENT_STATUS_LABELS[value] }));

@@ -8,8 +8,8 @@
  * form reads stored instants back in the same timezone. The browser's own
  * timezone never takes part.
  */
-import { quickWindow } from "@byline/newsroom-screens/workspace/schedule-model";
-import type { AppointmentInput, AppointmentKind, AppointmentStatus, ScheduleMode, StoryAppointment } from "@byline/newsroom-screens/workspace/workspace-types";
+import { quickWindow } from "./schedule-model";
+import type { AppointmentInput, AppointmentKind, AppointmentStatus, ScheduleMode, StoryAppointment } from "./workspace-types";
 
 export type AppointmentForm = {
   title: string;

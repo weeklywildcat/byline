@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { StoryPeekContent, type StoryPeekContentProps } from "@byline/newsroom-screens/story/StoryPeek";
-import { FileAttachment } from "../src/workspace/MediaDialog";
+import { FileAttachment } from "@byline/newsroom-screens/workspace/MediaDialog";
 import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const now = new Date("2026-10-20T12:00:00Z");

@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ReportingPlan } from "../src/workspace/ReportingPlan";
-import { WorkspaceContext, type WorkspaceContextValue } from "../src/workspace/workspace-context";
+import { ReportingPlan } from "@byline/newsroom-screens/workspace/ReportingPlan";
+import { WorkspaceContext, type WorkspaceContextValue } from "@byline/newsroom-screens/workspace/workspace-context";
 import type { StoryAppointment, StorySource } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const source: StorySource = {

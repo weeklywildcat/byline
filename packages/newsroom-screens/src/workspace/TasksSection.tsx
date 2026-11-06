@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronRight, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { describeEditorialError, setTaskCompletionState, type ContributorEntry, type EditorialTask, type TaskPatch, type TaskPriority } from "@byline/newsroom-screens/editorial/editorial-model";
+import { describeEditorialError, setTaskCompletionState, type ContributorEntry, type EditorialTask, type TaskPatch, type TaskPriority } from "../editorial/editorial-model";
 import { SelectField, TextField } from "@byline/newsroom-ui/components/form-fields";
-import { AssigneePicker, DatePicker } from "@byline/newsroom-screens/editorial/pickers";
+import { AssigneePicker, DatePicker } from "../editorial/pickers";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
@@ -15,11 +15,11 @@ import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { WorkspaceDialog } from "./dialog-shell";
 import { AddButton, SectionFailed } from "./parts";
-import { TASK_PRIORITY_OPTIONS, TaskQuickFields, type TaskQuickUpdate } from "@byline/newsroom-screens/story/TaskQuickFields";
+import { TASK_PRIORITY_OPTIONS, TaskQuickFields, type TaskQuickUpdate } from "../story/TaskQuickFields";
 import { useDialogTarget } from "./dialog-target";
 import { appendNewTasks, applyTask } from "./workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
-import { completedTasks, dueText, isOverdue, openTasks, peopleOptions } from "@byline/newsroom-screens/workspace/workspace-model";
+import { completedTasks, dueText, isOverdue, openTasks, peopleOptions } from "./workspace-model";
 
 const TASK_LIMIT = 10;
 function TaskItem({ task, timezone, now, busy, editable, people, canAssign, onToggle, onEdit, onUpdate }: { task: EditorialTask; timezone: string; now: Date; busy: boolean; editable: boolean; people: ContributorEntry[]; canAssign: boolean; onToggle: (task: EditorialTask, state: "open" | "completed") => void; onEdit: (task: EditorialTask, element: HTMLElement) => void; onUpdate: TaskQuickUpdate }) {

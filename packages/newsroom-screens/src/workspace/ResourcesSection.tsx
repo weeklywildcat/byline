@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Copy, ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SelectField, TextField } from "@byline/newsroom-ui/components/form-fields";
-import { ResourceIcon } from "@byline/newsroom-screens/workspace/resource-icon";
+import { ResourceIcon } from "./resource-icon";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
@@ -13,12 +13,12 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, 
 import { WorkspaceDialog } from "./dialog-shell";
 import { AddButton, SectionFailed } from "./parts";
 import { useDialogTarget } from "./dialog-target";
-import { RESOURCE_PURPOSE_LABELS } from "@byline/newsroom-screens/workspace/reporting-model";
-import { isHttpUrl, normalizePurpose, resourceSubtitle, validateLink } from "@byline/newsroom-screens/workspace/resource-model";
+import { RESOURCE_PURPOSE_LABELS } from "./reporting-model";
+import { isHttpUrl, normalizePurpose, resourceSubtitle, validateLink } from "./resource-model";
 import { applyResources } from "./workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { workspaceError } from "./workspace-errors";
-import { RESOURCE_PURPOSES, type ResourcePurpose, type StoryResource } from "@byline/newsroom-screens/workspace/workspace-types";
+import { RESOURCE_PURPOSES, type ResourcePurpose, type StoryResource } from "./workspace-types";
 
 const purposeOptions = RESOURCE_PURPOSES.map((value) => ({ value, label: RESOURCE_PURPOSE_LABELS[value] }));
 

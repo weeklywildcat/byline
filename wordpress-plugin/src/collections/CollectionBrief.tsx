@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
-import { ConfirmRemoveDialog } from "../workspace/dialog-shell";
+import { ConfirmRemoveDialog } from "@byline/newsroom-screens/workspace/dialog-shell";
 import { Pencil } from "lucide-react";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";

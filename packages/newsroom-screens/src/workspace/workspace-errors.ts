@@ -1,4 +1,4 @@
-import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
+import { describeEditorialError } from "../editorial/editorial-model";
 
 export type WorkspaceError = {
   message: string;

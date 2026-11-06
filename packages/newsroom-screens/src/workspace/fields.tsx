@@ -2,7 +2,7 @@
 import { useId, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { CalendarDays } from "lucide-react";
-import type { ContributorEntry } from "@byline/newsroom-screens/editorial/editorial-model";
+import type { ContributorEntry } from "../editorial/editorial-model";
 import { PersonAvatar } from "@byline/newsroom-ui/components/person-avatar";
 import { FormField, describedBy, type FieldChrome } from "@byline/newsroom-ui/components/form-fields";
 import { Button } from "@byline/newsroom-ui/ui/button";
@@ -10,9 +10,9 @@ import { Calendar } from "@byline/newsroom-ui/ui/calendar";
 import { Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxItem, ComboboxList } from "@byline/newsroom-ui/ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { dayFromLocalDate, localDateFromDay, rangeToWindow } from "./appointment-form";
-import { MAX_ASSIGNEES } from "@byline/newsroom-screens/workspace/reporting-model";
-import { formatDay } from "@byline/newsroom-screens/workspace/schedule-model";
-import { formatLongDay, peopleForIds } from "@byline/newsroom-screens/workspace/workspace-model";
+import { MAX_ASSIGNEES } from "./reporting-model";
+import { formatDay } from "./schedule-model";
+import { formatLongDay, peopleForIds } from "./workspace-model";
 
 /** Calendar-popover date field. Values are `YYYY-MM-DD` calendar days; never timezone instants. */
 export function DayField({ label, value, onChange, disabled, clearable = true, error, hint, optional, placeholder = "Choose a date" }: FieldChrome & { value: string; onChange: (day: string) => void; disabled?: boolean; clearable?: boolean; placeholder?: string }) {

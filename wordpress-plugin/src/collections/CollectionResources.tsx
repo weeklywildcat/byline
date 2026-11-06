@@ -10,7 +10,7 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@byline/newsroom-ui/ui/item";
-import { WorkspaceDialog } from "../workspace/dialog-shell";
+import { WorkspaceDialog } from "@byline/newsroom-screens/workspace/dialog-shell";
 import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
 import type { CollectionApi } from "@byline/newsroom-screens/collections/collection-api";
 import {

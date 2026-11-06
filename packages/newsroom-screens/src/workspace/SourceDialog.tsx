@@ -4,12 +4,12 @@ import { toast } from "sonner";
 import { SelectField, TextAreaField, TextField } from "@byline/newsroom-ui/components/form-fields";
 import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog-shell";
 import { PeoplePicker } from "./fields";
-import { SOURCE_NOTES_MAX, SOURCE_STATUS_LABELS, emptySourceForm, sourceFormToInput, sourceToForm, validateSourceForm, type SourceForm } from "@byline/newsroom-screens/workspace/reporting-model";
-import { peopleOptions } from "@byline/newsroom-screens/workspace/workspace-model";
+import { SOURCE_NOTES_MAX, SOURCE_STATUS_LABELS, emptySourceForm, sourceFormToInput, sourceToForm, validateSourceForm, type SourceForm } from "./reporting-model";
+import { peopleOptions } from "./workspace-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyReporting } from "./workspace-cache";
 import { workspaceError } from "./workspace-errors";
-import { SOURCE_STATUSES, type StorySource } from "@byline/newsroom-screens/workspace/workspace-types";
+import { SOURCE_STATUSES, type StorySource } from "./workspace-types";
 
 const statusOptions = SOURCE_STATUSES.map((value) => ({ value, label: SOURCE_STATUS_LABELS[value] }));
 

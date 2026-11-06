@@ -3,20 +3,20 @@ import { useMutation } from "@tanstack/react-query";
 import { FileImage, FileText, X } from "lucide-react";
 import { toast } from "sonner";
 import { SelectField, TextAreaField, TextField } from "@byline/newsroom-ui/components/form-fields";
-import { AssigneePicker } from "@byline/newsroom-screens/editorial/pickers";
+import { AssigneePicker } from "../editorial/pickers";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "@byline/newsroom-ui/ui/attachment";
 import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog-shell";
 import { DayField } from "./fields";
 import { emptyMediaForm, fileCountLabel, mediaFormToInput, mediaToForm, validateMediaForm, type MediaForm } from "./media-form";
-import { mediaLibraryAvailable, pickFromMediaLibrary, type PickedAttachment } from "./media-library";
-import { MEDIA_STATUS_LABELS, MEDIA_TYPE_LABELS, labelFor } from "@byline/newsroom-screens/workspace/reporting-model";
-import { peopleOptions } from "@byline/newsroom-screens/workspace/workspace-model";
+import type { PickedAttachment } from "./media-picker";
+import { MEDIA_STATUS_LABELS, MEDIA_TYPE_LABELS, labelFor } from "./reporting-model";
+import { peopleOptions } from "./workspace-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyMedia } from "./workspace-cache";
 import { workspaceError } from "./workspace-errors";
-import { MEDIA_ASSIGNMENT_STATUSES, MEDIA_ASSIGNMENT_TYPES, type MediaAssignmentsResponse, type StoryMediaAssignment } from "@byline/newsroom-screens/workspace/workspace-types";
+import { MEDIA_ASSIGNMENT_STATUSES, MEDIA_ASSIGNMENT_TYPES, type MediaAssignmentsResponse, type StoryMediaAssignment } from "./workspace-types";
 
 const typeOptions = MEDIA_ASSIGNMENT_TYPES.map((value) => ({ value, label: MEDIA_TYPE_LABELS[value] }));
 const statusOptions = MEDIA_ASSIGNMENT_STATUSES.map((value) => ({ value, label: MEDIA_STATUS_LABELS[value] }));
@@ -39,7 +39,7 @@ export type MediaDialogProps = { open: boolean; assignment: StoryMediaAssignment
  * those fields are ever sent for them.
  */
 export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDialogProps) {
-  const { storyId, client, data, timezone, caps, currentUserId, reload } = useWorkspace();
+  const { storyId, client, data, timezone, caps, currentUserId, reload, media } = useWorkspace();
   const cache = useWorkspaceCache();
   const manage = caps.manageMedia;
   const initialForm = assignment ? mediaToForm(assignment, timezone) : emptyMediaForm(caps.assignMedia ? 0 : currentUserId);
@@ -74,7 +74,7 @@ export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDial
   const addFromLibrary = async () => {
     setPicking(true);
     try {
-      const picked = await pickFromMediaLibrary(form.type);
+      const picked = media ? await media.pick(form.type) : [];
       if (picked.length) {
         setPreviews((current) => { const next = new Map(current); picked.forEach((file) => next.set(file.id, file)); return next; });
         setForm((current) => ({ ...current, attachmentIds: Array.from(new Set([...current.attachmentIds, ...picked.map((file) => file.id)])) }));
@@ -113,7 +113,7 @@ export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDial
     <Field>
       <FieldLabel id="ws-media-files-label">Files <span className="font-normal text-muted-foreground">{fileCountLabel(form.attachmentIds.length)}</span></FieldLabel>
       {form.attachmentIds.length ? <AttachmentGroup role="group" aria-labelledby="ws-media-files-label" className="flex-col gap-2 overflow-visible py-0">{form.attachmentIds.map((id) => <FileAttachment key={id} preview={previews.get(id) ?? { id, title: `File ${id}`, previewUrl: null, mimeType: null }} unavailable={invalid.has(id)} disabled={pending} onRemove={() => patch({ attachmentIds: form.attachmentIds.filter((item) => item !== id) })} />)}</AttachmentGroup> : <FieldDescription>No files linked yet.</FieldDescription>}
-      {mediaLibraryAvailable() ? <div><Button type="button" variant="outline" size="sm" disabled={pending || picking} onClick={() => void addFromLibrary()}>Add from Media Library</Button></div> : <FieldDescription>Upload files in the Media Library, then link them here.</FieldDescription>}
+      {media?.available() ? <div><Button type="button" variant="outline" size="sm" disabled={pending || picking} onClick={() => void addFromLibrary()}>{media.label}</Button></div> : media?.unavailableHint ? <FieldDescription>{media.unavailableHint}</FieldDescription> : null}
     </Field>
   </WorkspaceDialog>;
 }

@@ -4,7 +4,8 @@ import { createRoot } from "react-dom/client";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { createEditorialRestClient } from "@byline/newsroom-screens/editorial/editorial-rest";
-import { StoryWorkspaceApp } from "./workspace/StoryWorkspace";
+import { StoryWorkspaceApp } from "@byline/newsroom-screens/workspace/StoryWorkspace";
+import { wordpressMediaPicker } from "./workspace/media-library";
 import { createWorkspaceClient } from "@byline/newsroom-screens/workspace/workspace-api";
 import "./workspace/style.css";
 
@@ -35,6 +36,6 @@ if (root && config && config.storyId > 0) {
   const request = <T,>(options: Parameters<typeof apiFetch>[0]) => apiFetch(options) as Promise<T>;
   const storiesUrl = config.urls?.planning?.stories || "admin.php?page=byline-planning&tab=stories";
   createRoot(root).render(<WorkspaceBoundary storiesUrl={storiesUrl}>
-    <StoryWorkspaceApp storyId={config.storyId} appointmentId={config.appointmentId || ""} currentUserId={config.currentUserId} storiesUrl={storiesUrl} client={createWorkspaceClient(request)} editorial={createEditorialRestClient(request)} />
+    <StoryWorkspaceApp storyId={config.storyId} appointmentId={config.appointmentId || ""} currentUserId={config.currentUserId} storiesUrl={storiesUrl} client={createWorkspaceClient(request)} editorial={createEditorialRestClient(request)} media={wordpressMediaPicker} />
   </WorkspaceBoundary>);
 }

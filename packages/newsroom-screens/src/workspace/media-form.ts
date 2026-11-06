@@ -6,7 +6,7 @@
  * read back in the site timezone.
  */
 import { siteWallParts, isDayValue } from "./appointment-form";
-import type { MediaAssignmentInput, MediaAssignmentStatus, MediaAssignmentType, StoryMediaAssignment } from "@byline/newsroom-screens/workspace/workspace-types";
+import type { MediaAssignmentInput, MediaAssignmentStatus, MediaAssignmentType, StoryMediaAssignment } from "./workspace-types";
 
 export const DEFAULT_DUE_TIME = "17:00";
 

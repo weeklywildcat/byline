@@ -2,10 +2,10 @@
  * Pure transforms of the cached workspace payload. Mutation responses replace
  * only the slice they own; nothing here refetches or reinvents server data.
  */
-import type { EditorialTask } from "@byline/newsroom-screens/editorial/editorial-model";
-import type { EditorialWorkflowPayload } from "@byline/newsroom-screens/editorial/editorial-model";
-import type { StoryVideoSettings } from "@byline/newsroom-screens/editorial/story-video-model";
-import type { MediaAssignmentsResponse, ReportingResponse, StoryResource, StoryWorkspace, WorkspaceStory } from "@byline/newsroom-screens/workspace/workspace-types";
+import type { EditorialTask } from "../editorial/editorial-model";
+import type { EditorialWorkflowPayload } from "../editorial/editorial-model";
+import type { StoryVideoSettings } from "../editorial/story-video-model";
+import type { MediaAssignmentsResponse, ReportingResponse, StoryResource, StoryWorkspace, WorkspaceStory } from "./workspace-types";
 
 type Data = StoryWorkspace | undefined;
 

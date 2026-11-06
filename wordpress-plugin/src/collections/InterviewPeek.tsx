@@ -28,13 +28,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@byline/newsroom-ui/ui/alert-dialog";
-import { AppointmentTimingFields } from "../workspace/AppointmentDialog";
+import { AppointmentTimingFields } from "@byline/newsroom-screens/workspace/AppointmentDialog";
 import {
   appointmentFormToInput,
   appointmentToForm,
   siteWallParts,
   validateAppointmentForm,
-} from "../workspace/appointment-form";
+} from "@byline/newsroom-screens/workspace/appointment-form";
 import {
   describeEditorialError,
   type ContributorEntry,

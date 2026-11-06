@@ -12,7 +12,7 @@ import {
   setScheduleMode,
   siteWallParts,
   validateAppointmentForm
-} from "./appointment-form";
+} from "@byline/newsroom-screens/workspace/appointment-form";
 import type { StoryAppointment } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const timezone = "America/New_York";

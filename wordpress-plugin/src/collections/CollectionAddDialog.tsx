@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { TextField, SelectField } from "@byline/newsroom-ui/components/form-fields";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { WorkspaceDialog } from "../workspace/dialog-shell";
+import { WorkspaceDialog } from "@byline/newsroom-screens/workspace/dialog-shell";
 import {
   mediaLibraryAvailable,
   pickFromMediaLibrary,

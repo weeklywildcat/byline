@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { appendNewTasks, applyBrief, applyReporting, applyResources, applyTask, applyWorkflowPayload } from "./workspace-cache";
+import { appendNewTasks, applyBrief, applyReporting, applyResources, applyTask, applyWorkflowPayload } from "@byline/newsroom-screens/workspace/workspace-cache";
 import { isHttpUrl, resourceSubtitle, validateLink, workingDraft } from "@byline/newsroom-screens/workspace/resource-model";
-import { workspaceError } from "./workspace-errors";
+import { workspaceError } from "@byline/newsroom-screens/workspace/workspace-errors";
 import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const data = {

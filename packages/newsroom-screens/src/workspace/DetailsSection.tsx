@@ -2,23 +2,23 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { describeEditorialError, type ContributorEntry } from "@byline/newsroom-screens/editorial/editorial-model";
-import { checkVideoUrl, normalizeStoryVideoSettings, STORY_FORMAT_OPTIONS, videoDurationLabel, videoStoryProblem, type StoryFormat } from "@byline/newsroom-screens/editorial/story-video-model";
+import { describeEditorialError, type ContributorEntry } from "../editorial/editorial-model";
+import { checkVideoUrl, normalizeStoryVideoSettings, STORY_FORMAT_OPTIONS, videoDurationLabel, videoStoryProblem, type StoryFormat } from "../editorial/story-video-model";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
-import { AssigneePicker, DatePicker, WritersPicker, valueSelectTriggerClass } from "@byline/newsroom-screens/editorial/pickers";
+import { AssigneePicker, DatePicker, WritersPicker, valueSelectTriggerClass } from "../editorial/pickers";
 import { Card, CardContent, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
 import { Field, FieldContent, FieldGroup, FieldTitle } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
-import { dateLabel, exactDate } from "@byline/newsroom-screens/home/newsroom-model";
+import { dateLabel, exactDate } from "../home/newsroom-model";
 import { SectionFailed } from "./parts";
 import { applyFormat, applyWorkflowPayload, patchStory, type StoryPatch } from "./workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { workspaceError } from "./workspace-errors";
-import { names, peopleOptions, sectionNames } from "@byline/newsroom-screens/workspace/workspace-model";
-import type { WorkspaceStatus } from "@byline/newsroom-screens/workspace/workspace-types";
+import { names, peopleOptions, sectionNames } from "./workspace-model";
+import type { WorkspaceStatus } from "./workspace-types";
 
 type Changes = { status?: string; editorId?: number | null; deadline?: string | null; plannedPublishAt?: string | null };
 
@@ -28,7 +28,7 @@ type Changes = { status?: string; editorId?: number | null; deadline?: string | 
  * different things, and are labelled so.
  */
 export function DetailsSection() {
-  const { storyId, editorial, data, timezone, now, caps, reload, announce, sectionError } = useWorkspace();
+  const { storyId, editorial, data, timezone, now, caps, reload, announce, sectionError, articleInForm } = useWorkspace();
   const cache = useWorkspaceCache();
   const { story } = data;
   const contributorsFailed = sectionError("contributors");
@@ -85,7 +85,7 @@ export function DetailsSection() {
           </Select> : story.workflow.label}
         </Property>
         <Property label="Writers">
-          {contributorsFailed ? <SectionFailed what="writers" onRetry={() => void reload()} /> : data.contributors.canEdit ? <WritersPicker people={data.contributors.available || []} value={data.contributors.contributors} onChange={(value) => writers.mutate(value)} disabled={writers.isPending} /> : shownWriters.length ? <span className="flex items-center gap-2"><PeopleAvatars people={shownWriters} tooltips={false} />{names(shownWriters)}</span> : "None"}
+          {contributorsFailed ? <SectionFailed what="writers" onRetry={() => void reload()} /> : data.contributors.canEdit && !articleInForm ? <WritersPicker people={data.contributors.available || []} value={data.contributors.contributors} onChange={(value) => writers.mutate(value)} disabled={writers.isPending} /> : shownWriters.length ? <span className="flex items-center gap-2"><PeopleAvatars people={shownWriters} tooltips={false} />{names(shownWriters)}</span> : "None"}
         </Property>
         <Property label="Editor">
           {caps.assign ? <AssigneePicker appearance="value" label="Editor" placeholder="No editor" people={people} value={editor} onChange={(person) => save({ editorId: person ? Number(person.id) : null })} disabled={busy} /> : story.editor?.name || "None"}
@@ -97,9 +97,10 @@ export function DetailsSection() {
         <Property label="Publication target">
           {caps.assign ? <DatePicker appearance="value" label="Publication target" value={story.plannedPublication} timezone={timezone} disabled={busy} onChange={(plannedPublishAt) => save({ plannedPublishAt })} /> : <>{exactDate(story.plannedPublication, timezone)}</>}
         </Property>
-        <Property label="WordPress state">{wpState.label}{scheduled}</Property>
+        <Property label="Publication">{wpState.label}{scheduled}</Property>
         <Property label="Section">{sectionNames(data.sections) || "None"}</Property>
-        <FormatProperties />
+        {/* With the article in a form on the same screen, format and video are edited there, never here. */}
+        {articleInForm ? null : <FormatProperties />}
       </FieldGroup>
       {update.isError && update.error && workspaceError(update.error).conflict ? <InlineAlert className="mt-3" onAction={() => void reload()} actionLabel="Reload">{workspaceError(update.error).message}</InlineAlert> : null}
     </CardContent>

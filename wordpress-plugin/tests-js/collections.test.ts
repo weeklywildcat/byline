@@ -6,7 +6,7 @@ import {
   type Collection,
 } from "@byline/newsroom-screens/collections/collection-model";
 import { interviewAppointment } from "@byline/newsroom-screens/collections/interview-schedule";
-import { appointmentToForm } from "../src/workspace/appointment-form";
+import { appointmentToForm } from "@byline/newsroom-screens/workspace/appointment-form";
 import type { Interview } from "@byline/newsroom-screens/collections/collection-model";
 import { createCollectionApi } from "@byline/newsroom-screens/collections/collection-api";
 const collection = (patch: Partial<Collection> = {}): Collection => ({

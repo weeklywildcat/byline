@@ -4,8 +4,9 @@
  * loaded the caller simply does not offer the button.
  */
 import type { MediaAssignmentType } from "@byline/newsroom-screens/workspace/workspace-types";
+import type { MediaPicker, PickedAttachment } from "@byline/newsroom-screens/workspace/media-picker";
 
-export type PickedAttachment = { id: number; title: string; previewUrl: string | null; mimeType: string | null };
+export type { PickedAttachment };
 
 type MediaFrame = { on: (event: string, handler: () => void) => void; open: () => void; close: () => void; state: () => { get: (name: string) => { toJSON: () => unknown[] } } };
 type MediaFactory = (options: Record<string, unknown>) => MediaFrame;
@@ -57,3 +58,11 @@ export function pickFromMediaLibrary(type: MediaAssignmentType, options: { title
     }
   });
 }
+
+/** The Story Workspace's media picker in wp-admin. */
+export const wordpressMediaPicker: MediaPicker = {
+  available: mediaLibraryAvailable,
+  pick: pickFromMediaLibrary,
+  label: "Add from Media Library",
+  unavailableHint: "Upload files in the Media Library, then link them here."
+};

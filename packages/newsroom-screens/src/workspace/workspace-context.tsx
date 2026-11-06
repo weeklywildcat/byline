@@ -1,9 +1,10 @@
 import { createContext, useContext } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { EditorialRestClient } from "@byline/newsroom-screens/editorial/editorial-rest";
-import type { WorkspaceClient } from "@byline/newsroom-screens/workspace/workspace-api";
-import { workspaceKey } from "@byline/newsroom-screens/workspace/workspace-query";
-import type { StoryWorkspace, WorkspaceCapabilities, WorkspaceSection } from "@byline/newsroom-screens/workspace/workspace-types";
+import type { EditorialRestClient } from "../editorial/editorial-rest";
+import type { WorkspaceClient } from "./workspace-api";
+import { workspaceKey } from "./workspace-query";
+import type { StoryWorkspace, WorkspaceCapabilities, WorkspaceSection } from "./workspace-types";
+import type { MediaPicker } from "./media-picker";
 
 export type WorkspaceEnv = {
   storyId: number;
@@ -13,6 +14,14 @@ export type WorkspaceEnv = {
   storiesUrl: string;
   client: WorkspaceClient;
   editorial: EditorialRestClient;
+  /** Choosing existing media for an assignment; absent means no "choose" button. */
+  media?: MediaPicker;
+  /**
+   * The article's own fields (writers, format, video) are edited in a document
+   * form on the same screen (the Payload Story screen). The workspace then shows
+   * them but never writes them, so the form stays the one copy of the article.
+   */
+  articleInForm?: boolean;
 };
 
 export type WorkspaceContextValue = WorkspaceEnv & {

@@ -3,8 +3,8 @@ import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@byline/newsroom-ui/ui/breadcrumb";
 import { buttonVariants } from "@byline/newsroom-ui/ui/button";
-import { sectionNames, writerNames } from "@byline/newsroom-screens/workspace/workspace-model";
-import { workingDraft } from "@byline/newsroom-screens/workspace/resource-model";
+import { sectionNames, writerNames } from "./workspace-model";
+import { workingDraft } from "./resource-model";
 import { useWorkspace } from "./workspace-context";
 
 export function WorkspaceHeader() {

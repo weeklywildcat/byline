@@ -20,8 +20,8 @@ import {
 } from "@byline/newsroom-screens/story/notes-model";
 import type { PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 import { createWorkspaceClient } from "@byline/newsroom-screens/workspace/workspace-api";
-import { ArticleNotesCard, NotesSection } from "../src/workspace/NotesSection";
-import { WorkspaceContext, type WorkspaceContextValue } from "../src/workspace/workspace-context";
+import { ArticleNotesCard, NotesSection } from "@byline/newsroom-screens/workspace/NotesSection";
+import { WorkspaceContext, type WorkspaceContextValue } from "@byline/newsroom-screens/workspace/workspace-context";
 import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const read = readSource;

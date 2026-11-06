@@ -8,20 +8,20 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@byline/ne
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@byline/newsroom-ui/ui/context-menu";
 import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
-import { mediaTypeIcons } from "@byline/newsroom-screens/story/media-icons";
+import { mediaTypeIcons } from "../story/media-icons";
 import { MediaDialog } from "./MediaDialog";
 import { AddButton, Meta, SectionFailed } from "./parts";
 import { useDialogTarget } from "./dialog-target";
 import { fileCountLabel, mediaReadinessHints } from "./media-form";
-import { MEDIA_STATUS_LABELS, MEDIA_TYPE_LABELS, labelFor } from "@byline/newsroom-screens/workspace/reporting-model";
-import { assigneeAvatars, dueText, isOverdue } from "@byline/newsroom-screens/workspace/workspace-model";
+import { MEDIA_STATUS_LABELS, MEDIA_TYPE_LABELS, labelFor } from "./reporting-model";
+import { assigneeAvatars, dueText, isOverdue } from "./workspace-model";
 import { useWorkspace, useWorkspaceCache } from "./workspace-context";
 import { applyMedia } from "./workspace-cache";
 import { workspaceError } from "./workspace-errors";
-import type { ContributorEntry } from "@byline/newsroom-screens/editorial/editorial-model";
+import type { ContributorEntry } from "../editorial/editorial-model";
 
 const STATUS_OPTIONS = MEDIA_ASSIGNMENT_STATUSES.map((value) => ({ value, label: labelFor(MEDIA_STATUS_LABELS, value) }));
-import { MEDIA_ASSIGNMENT_STATUSES, type MediaAssignmentStatus, type StoryMediaAssignment } from "@byline/newsroom-screens/workspace/workspace-types";
+import { MEDIA_ASSIGNMENT_STATUSES, type MediaAssignmentStatus, type StoryMediaAssignment } from "./workspace-types";
 
 function MediaRow({ assignment, people, timezone, now, onOpen, onStatus, busy }: { assignment: StoryMediaAssignment; people: ContributorEntry[]; timezone: string; now: Date; onOpen: (element: HTMLElement) => void; onStatus: (status: MediaAssignmentStatus) => void; busy: boolean }) {
   const Icon = mediaTypeIcons[assignment.type] || mediaTypeIcons.other;
