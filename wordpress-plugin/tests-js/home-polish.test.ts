@@ -14,7 +14,7 @@ function story(patch: Partial<PlanningStory> = {}): PlanningStory {
     writer: currentUser,
     editor: null,
     workflow: { id: "reporting", label: "Reporting", group: "main", selectable: true },
-    wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
+    publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
     deadline: null,
     plannedPublication: null,
     modifiedAt: "2026-10-20T12:00:00Z",

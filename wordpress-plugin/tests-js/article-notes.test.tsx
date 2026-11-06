@@ -203,7 +203,7 @@ const admin = { id: 1, kind: "user" as const, name: "admin", imageUrl: "https://
 const capabilities = { role: "manager", editArticle: true, changeStatus: false, assign: false, editContributors: false, editBrief: false, manageReporting: false, addSource: false, addAppointment: false, manageMedia: false, assignMedia: false, addTask: false, manageResources: false, review: false };
 function workspace(notes: ArticleNotesSummary | null | undefined): StoryWorkspace {
   return {
-    story: { id: 7, title: "Canteen", editUrl, authors: [admin], editor: null, workflow: { id: "reporting", label: "Reporting" }, wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null, ...(notes !== undefined ? { notes } : {}) },
+    story: { id: 7, title: "Canteen", editUrl, authors: [admin], editor: null, workflow: { id: "reporting", label: "Reporting" }, publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null, ...(notes !== undefined ? { notes } : {}) },
     revision: 1, timezone, now: now.toISOString(), currentUser: admin, brief: "", sections: [],
     contributors: { canEdit: false, contributors: [admin], available: [] }, statuses: [], tasks: [], sources: [], appointments: [],
     reporting: { sources: 0, interviewed: 0, needsScheduling: 0, toSchedule: 0, nextAppointment: null }, mediaAssignments: [], resources: [], activity: [],
@@ -250,7 +250,7 @@ function story(notes: ArticleNotesSummary | null | undefined): PlanningStory {
   return {
     id: 7, title: "Canteen", editUrl, authors: [], writer: null, editor: null,
     workflow: { id: "reporting", label: "Reporting", group: "main", selectable: true },
-    wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
+    publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
     deadline: null, plannedPublication: null, modifiedAt: null, visual: { type: "none", status: "needed" }, openTaskCount: 0, featuredImage: null,
     ...(notes !== undefined ? { notes } : {})
   } as PlanningStory;

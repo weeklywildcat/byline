@@ -797,6 +797,29 @@ function byline_editorial_rest_wordpress_state(string $status, array $wordpress 
     ];
 }
 
+/**
+ * The shared Planning contract's neutral publication state (`draft`,
+ * `scheduled`, `published`), translated from the post status. The legacy
+ * `wordpressState` keeps the raw status for MCP and older clients.
+ */
+function byline_editorial_rest_publication_state_id(string $status): string
+{
+    if ($status === 'publish') {
+        return 'published';
+    }
+    if ($status === 'future') {
+        return 'scheduled';
+    }
+    return $status === '' ? '' : 'draft';
+}
+
+function byline_editorial_rest_publication_state(string $status, array $wordpress = []): array
+{
+    $state = byline_editorial_rest_wordpress_state($status, $wordpress);
+    $state['id'] = byline_editorial_rest_publication_state_id($status);
+    return $state;
+}
+
 /** @return array<string,mixed> */
 function byline_editorial_rest_planning_preview_url(int $story_id): string
 {
@@ -852,6 +875,7 @@ function byline_editorial_rest_planning_story(array $row): array
             'group' => byline_editorial_status_group($workflow_id),
             'selectable' => $workflow_id !== BYLINE_EDITORIAL_PUBLISHED_STATUS,
         ],
+        'publicationState' => byline_editorial_rest_publication_state($wordpress_status, $wordpress),
         'wordpressState' => byline_editorial_rest_wordpress_state($wordpress_status, $wordpress),
         'deadline' => $deadline !== '' ? $deadline : null,
         'plannedPublication' => $planned !== '' ? $planned : null,
@@ -902,7 +926,7 @@ function byline_editorial_rest_planning_filters(array $filters): array
         'deadlineTo' => (string) ($filters['deadlineTo'] ?? ''),
         'plannedFrom' => (string) ($filters['plannedFrom'] ?? ''),
         'plannedTo' => (string) ($filters['plannedTo'] ?? ''),
-        'wordpressState' => (string) ($filters['postStatus'] ?? ''),
+        'publicationState' => byline_editorial_rest_publication_state_id((string) ($filters['postStatus'] ?? '')),
         'visualStatus' => (string) ($filters['visualStatus'] ?? ''),
         'mine' => !empty($filters['mine']),
         'unassigned' => !empty($filters['unassigned']),

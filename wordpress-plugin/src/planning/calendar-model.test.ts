@@ -50,7 +50,7 @@ function story(patch: Partial<PlanningStory> = {}): PlanningStory {
     writer: null,
     editor: null,
     workflow: { id: "writing", label: "Writing", group: "main", selectable: true },
-    wordpressState: { id: "future", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-11-03T15:00:00Z", publishedAt: null },
+    publicationState: { id: "scheduled", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-11-03T15:00:00Z", publishedAt: null },
     deadline: "2026-10-30",
     plannedPublication: "2026-11-02",
     modifiedAt: null,
@@ -119,7 +119,7 @@ describe("story-derived events stay distinct", () => {
 
   it("reads WordPress timestamps in the site timezone when it is known", () => {
     // 01:00 UTC on Nov 3 is 9 PM on Nov 2 in New York (EST starts Nov 1).
-    const events = planningCalendarEvents([story({ wordpressState: { id: "future", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-11-03T01:00:00Z", publishedAt: null } })], timezone);
+    const events = planningCalendarEvents([story({ publicationState: { id: "scheduled", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-11-03T01:00:00Z", publishedAt: null } })], timezone);
     expect(events.find((event) => event.type === "scheduled")?.date).toBe("2026-11-02");
   });
 });

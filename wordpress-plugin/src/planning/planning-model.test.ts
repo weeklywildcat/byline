@@ -23,7 +23,7 @@ function story(overrides: Partial<PlanningStory> = {}): PlanningStory {
     writer: { id: 2, name: "Writer" },
     editor: null,
     workflow: { id: "writing", label: "Writing", group: "main", selectable: true },
-    wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
+    publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
     deadline: "2026-08-28",
     plannedPublication: "2026-08-30",
     modifiedAt: "2026-08-27T12:00:00Z",
@@ -37,8 +37,8 @@ function story(overrides: Partial<PlanningStory> = {}): PlanningStory {
 describe("planning model", () => {
   it("keeps deadline, planned, scheduled, and published dates distinct", () => {
     const value = story({
-      wordpressState: {
-        id: "future",
+      publicationState: {
+        id: "scheduled",
         label: "Scheduled",
         isPublished: false,
         isScheduled: true,
@@ -71,7 +71,7 @@ describe("planning model", () => {
     const draft = story();
     expect(applyPlanningMove(draft, "ready", statuses).story.workflow.id).toBe("ready");
     expect(applyPlanningMove(draft, "published", statuses).moved).toBe(false);
-    expect(applyPlanningMove(story({ wordpressState: { ...draft.wordpressState, isPublished: true } }), "ready", statuses).moved).toBe(false);
+    expect(applyPlanningMove(story({ publicationState: { ...draft.publicationState, isPublished: true } }), "ready", statuses).moved).toBe(false);
   });
 
   it("rolls back only the failed story and ignores a late response for a newer story state", () => {
@@ -95,7 +95,7 @@ describe("planning model", () => {
   });
 
   it("emits separate calendar events for editorial and WordPress dates", () => {
-    const events = planningCalendarEvents([story({ wordpressState: { id: "future", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-08-31T12:00:00Z", publishedAt: null } })]);
+    const events = planningCalendarEvents([story({ publicationState: { id: "scheduled", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-08-31T12:00:00Z", publishedAt: null } })]);
     expect(events.map((event) => event.type)).toEqual(["deadline", "planned", "scheduled"]);
   });
 });

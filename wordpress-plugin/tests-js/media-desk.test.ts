@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { createPlanningFetchers, type PlanningRequestOptions } from "@byline/newsroom-screens/planning/planning-api";
+import type { PlanningRequestOptions } from "@byline/newsroom-screens/planning/planning-api";
+import { createPlanningFetchers } from "../src/planning/planning-rest";
 import { describeMediaDeskError, MEDIA_FEATURED_IN_USE_CODE } from "../src/planning/media-desk-errors";
 import {
   mergeMediaAttachmentIds,

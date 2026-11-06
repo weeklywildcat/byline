@@ -3,14 +3,13 @@
  * components keep only what is ephemeral (selected view, open menus, drag state).
  */
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import { __, sprintf } from "@wordpress/i18n";
 import { announce } from "@atlaskit/pragmatic-drag-and-drop-live-region";
 import { toast } from "sonner";
 import { decodeEntities } from "@byline/newsroom-ui/lib/text";
-import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
-import { invalidateStoryData, planningKey, planningRootKey } from "@byline/newsroom-screens/story/story-query";
-import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
-import { planningFilterParams } from "@byline/newsroom-screens/planning/planning-api";
+import { describeEditorialError } from "../editorial/editorial-model";
+import { invalidateStoryData, planningKey, planningRootKey } from "../story/story-query";
+import type { PlanningFetchers } from "../planning/planning-api";
+import { planningFilterParams } from "../planning/planning-api";
 import {
   applyPlanningMove,
   describePlanningError,
@@ -19,7 +18,7 @@ import {
   type PlanningResponse,
   type PlanningStory,
   type PlanningWorkflowStatus
-} from "@byline/newsroom-screens/planning/planning-model";
+} from "../planning/planning-model";
 
 export function usePlanningStories(fetchers: PlanningFetchers, filters: PlanningFilters) {
   return useQuery({
@@ -42,7 +41,7 @@ export function useOptionalQuery<T>(key: QueryKey, fetcher: (() => Promise<T>) |
   const query = useQuery({ queryKey: key, queryFn: () => fetcher!(), enabled: Boolean(fetcher), retry: false, refetchInterval: pollWhile ? (query) => pollWhile(query.state.data) ? 2500 : false : false });
   return {
     data: query.data,
-    error: !fetcher ? __("This isn't available in this install.", "weekly-wildcat-headless") : query.isError ? describePlanningError(query.error, `${label} is unavailable right now.`) : null,
+    error: !fetcher ? "This isn't available in this install." : query.isError ? describePlanningError(query.error, `${label} is unavailable right now.`) : null,
     isLoading: Boolean(fetcher) && query.isPending,
     available: Boolean(fetcher) && !query.isError,
     refetch: () => void query.refetch()
@@ -65,7 +64,7 @@ export function useUpdatePlanningStory(fetchers: PlanningFetchers) {
   const client = useQueryClient();
   const mutation = useMutation({
     mutationFn: ({ story, changes }: InlineUpdateVariables) => {
-      if (!fetchers.updateStory) throw new Error(__("Quick edits are not available in this install.", "weekly-wildcat-headless"));
+      if (!fetchers.updateStory) throw new Error("Quick edits are not available in this install.");
       return fetchers.updateStory(story.id, changes);
     },
     onMutate: async ({ story, optimistic }) => {
@@ -81,12 +80,12 @@ export function useUpdatePlanningStory(fetchers: PlanningFetchers) {
           ? { ...old, stories: replacePlanningStory(old.stories, story.id, story, context.optimistic) }
           : old);
       }
-      const message = describeEditorialError(error, sprintf(__("%s could not be saved. The previous value was restored.", "weekly-wildcat-headless"), label));
+      const message = describeEditorialError(error, `${label} could not be saved. The previous value was restored.`);
       toast.error(message);
-      announce(`${story.title || __("Story", "weekly-wildcat-headless")}: ${message}`);
+      announce(`${story.title || "Story"}: ${message}`);
     },
     onSuccess: (_result, { story, label }) => {
-      announce(`${story.title || __("Untitled story", "weekly-wildcat-headless")}: ${label} updated.`);
+      announce(`${story.title || "Untitled story"}: ${label} updated.`);
     },
     onSettled: (_data, _error, variables) => { void invalidateStoryData(client, variables.story.id); }
   });
@@ -112,26 +111,26 @@ export function useMoveStory(fetchers: PlanningFetchers, statuses: PlanningWorkf
   const client = useQueryClient();
   const mutation = useMutation({
     mutationFn: ({ story, status }: MoveVariables) => {
-      if (!fetchers.moveStory) throw new Error(__("Workflow moves are not available in this install.", "weekly-wildcat-headless"));
+      if (!fetchers.moveStory) throw new Error("Workflow moves are not available in this install.");
       return fetchers.moveStory(story.id, status);
     },
     onMutate: async ({ story, status }) => {
       await client.cancelQueries({ queryKey: planningRootKey });
       const result = applyPlanningMove(story, status, statuses);
-      if (!result.moved) throw new Error(result.error || __("That story cannot be moved.", "weekly-wildcat-headless"));
+      if (!result.moved) throw new Error(result.error || "That story cannot be moved.");
       client.setQueriesData<PlanningResponse>({ queryKey: planningRootKey }, (old) => old?.stories ? { ...old, stories: replacePlanningStory(old.stories, story.id, { ...result.story }) } : old);
       return { optimistic: result.story };
     },
     onError: (error, { story }, context) => {
       // Restore only this story, and only if nothing newer replaced the optimistic copy.
       if (context) client.setQueriesData<PlanningResponse>({ queryKey: planningRootKey }, (old) => old?.stories ? { ...old, stories: old.stories.map((item) => item.id === story.id && item.workflow.id === context.optimistic.workflow.id ? story : item) } : old);
-      const message = describeEditorialError(error, __("The workflow move could not be saved. The previous stage was restored.", "weekly-wildcat-headless"));
+      const message = describeEditorialError(error, "The workflow move could not be saved. The previous stage was restored.");
       toast.error(message);
-      announce(`${story.title || __("Story", "weekly-wildcat-headless")}: ${message}`);
+      announce(`${story.title || "Story"}: ${message}`);
     },
     onSuccess: (_result, { story, status }) => {
       const to = statuses.find((item) => item.id === status)?.label || status;
-      const message = `${story.title || __("Untitled story", "weekly-wildcat-headless")} ${__("moved from", "weekly-wildcat-headless")} ${story.workflow.label} ${__("to", "weekly-wildcat-headless")} ${to}.`;
+      const message = `${story.title || "Untitled story"} moved from ${story.workflow.label} to ${to}.`;
       announce(message);
     },
     onSettled: (_data, _error, variables) => { void invalidateStoryData(client, variables.story.id); }

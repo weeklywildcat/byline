@@ -2,16 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { draggable, dropTargetForElements, monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { autoScrollForElements, autoScrollWindowForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-scroll/element";
-import { __ } from "@wordpress/i18n";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Card, CardContent } from "@byline/newsroom-ui/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
-import { StoryDueLabel, StorySignals, StoryTitleButton, WorkflowBadge } from "@byline/newsroom-screens/story/story-parts";
-import { StoryHoverCard } from "@byline/newsroom-screens/story/StoryHoverCard";
+import { StoryDueLabel, StorySignals, StoryTitleButton, WorkflowBadge } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 import { StoryActionsMenu, StoryContextMenu } from "./StoryActionsMenu";
-import { boardWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "@byline/newsroom-screens/planning/planning-model";
+import { boardWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
 
 export type StoryBoardProps = {
   /** Already filtered and in the order each column should show them. */
@@ -29,7 +28,7 @@ export type StoryBoardProps = {
 const DRAG_TYPE = "byline-story";
 
 /** A story can be dragged only if the viewer may move stories and WordPress has not published it. */
-const isMovable = (story: PlanningStory, canMoveStories: boolean) => canMoveStories && !story.wordpressState.isPublished;
+const isMovable = (story: PlanningStory, canMoveStories: boolean) => canMoveStories && !story.publicationState.isPublished;
 
 function BoardCard({ story, statuses, canMoveStories, moving, moved, timezone, now, workspaceUrl, onMoveStory, onOpenStory }: Omit<StoryBoardProps, "stories" | "movingStoryId"> & { story: PlanningStory; moving: boolean; moved: boolean }) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -58,9 +57,9 @@ function BoardCard({ story, statuses, canMoveStories, moving, moved, timezone, n
         <div className="flex min-w-0 items-center gap-2 text-xs">
           {writers.length
             ? <><PeopleAvatars people={writers} /><span className="truncate text-muted-foreground" title={names}>{names}</span></>
-            : <span className="text-muted-foreground">{__("Unassigned", "weekly-wildcat-headless")}</span>}
+            : <span className="text-muted-foreground">Unassigned</span>}
         </div>
-        <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="Due " empty={__("No deadline", "weekly-wildcat-headless")} className="text-xs" />
+        <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="Due " empty={"No deadline"} className="text-xs" />
         <div className="-mb-1 flex items-center justify-between gap-1">
           <StorySignals story={story} className="min-w-0" />
           <StoryActionsMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={moving} onMove={onMoveStory} workspaceUrl={workspaceUrl} className="ml-auto -mr-1.5" />
@@ -93,11 +92,11 @@ function BoardColumn({ status, stories, canMoveStories, ...card }: Omit<StoryBoa
     className="flex min-h-40 w-72 shrink-0 snap-start flex-col gap-2 rounded-xl border bg-background p-2 transition-colors data-[over=true]:bg-muted/60 data-[over=true]:ring-2 data-[over=true]:ring-ring/40 max-sm:w-[80vw] @5xl/planning:w-auto @5xl/planning:min-w-48 @5xl/planning:flex-1">
     <header className="flex items-center justify-between px-1.5 pt-0.5">
       <h3 id={headingId} className="text-sm font-medium"><WorkflowBadge workflow={status} className="max-w-none" /></h3>
-      <Badge variant="secondary" aria-label={`${stories.length} ${stories.length === 1 ? __("story", "weekly-wildcat-headless") : __("stories", "weekly-wildcat-headless")}`}>{stories.length}</Badge>
+      <Badge variant="secondary" aria-label={`${stories.length} ${stories.length === 1 ? "story" : "stories"}`}>{stories.length}</Badge>
     </header>
     <div role="list" aria-labelledby={headingId} className="flex flex-1 flex-col gap-2">
       {stories.map((story) => <BoardCard key={story.id} story={story} canMoveStories={canMoveStories} moving={card.movingStoryId === story.id} moved={card.movedId === story.id} statuses={card.statuses} timezone={card.timezone} now={card.now} workspaceUrl={card.workspaceUrl} onMoveStory={card.onMoveStory} onOpenStory={card.onOpenStory} />)}
-      {stories.length ? null : <p className="px-1.5 py-2 text-xs text-muted-foreground">{__("No stories", "weekly-wildcat-headless")}</p>}
+      {stories.length ? null : <p className="px-1.5 py-2 text-xs text-muted-foreground">No stories</p>}
     </div>
   </section>;
 }
@@ -150,16 +149,16 @@ export function StoryBoard(props: StoryBoardProps) {
     return combine(autoScrollForElements({ element }), autoScrollWindowForElements());
   }, []);
 
-  if (!stories.length && !mainStatuses.length) return <Empty className="border"><EmptyHeader><EmptyTitle>{__("No workflow stages", "weekly-wildcat-headless")}</EmptyTitle><EmptyDescription>{__("No workflow stages are available from the protected Planning API.", "weekly-wildcat-headless")}</EmptyDescription></EmptyHeader></Empty>;
-  if (!stories.length) return <Empty className="border"><EmptyHeader><EmptyTitle>{__("No stories match", "weekly-wildcat-headless")}</EmptyTitle><EmptyDescription>{__("Try clearing a filter, or start a new story.", "weekly-wildcat-headless")}</EmptyDescription></EmptyHeader></Empty>;
+  if (!stories.length && !mainStatuses.length) return <Empty className="border"><EmptyHeader><EmptyTitle>No workflow stages</EmptyTitle><EmptyDescription>No workflow stages are available from the protected Planning API.</EmptyDescription></EmptyHeader></Empty>;
+  if (!stories.length) return <Empty className="border"><EmptyHeader><EmptyTitle>No stories match</EmptyTitle><EmptyDescription>Try clearing a filter, or start a new story.</EmptyDescription></EmptyHeader></Empty>;
 
   const column = (status: PlanningWorkflowStatus) => <BoardColumn key={status.id} {...props} status={status} stories={columns.get(status.id) || []} movedId={movedId} onMoveStory={move} />;
-  return <div className="flex flex-col gap-4" aria-label={__("Stories by workflow stage", "weekly-wildcat-headless")}>
+  return <div className="flex flex-col gap-4" aria-label={"Stories by workflow stage"}>
     <div ref={scroller} data-board-scroller="" className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-2 max-sm:items-start @5xl/planning:snap-none">{mainStatuses.map(column)}</div>
     {sidelined.length ? <section aria-labelledby="board-sidelined" className="flex flex-col gap-2">
-      <h3 id="board-sidelined" className="text-sm font-medium text-muted-foreground">{__("Sidelined", "weekly-wildcat-headless")}</h3>
+      <h3 id="board-sidelined" className="text-sm font-medium text-muted-foreground">Sidelined</h3>
       <div className="flex snap-x gap-3 overflow-x-auto pb-2">{sidelined.map(column)}</div>
     </section> : null}
-    {!canMoveStories ? <p className="text-xs text-muted-foreground">{__("You can view this board, but your account cannot move stories.", "weekly-wildcat-headless")}</p> : null}
+    {!canMoveStories ? <p className="text-xs text-muted-foreground">You can view this board, but your account cannot move stories.</p> : null}
   </div>;
 }

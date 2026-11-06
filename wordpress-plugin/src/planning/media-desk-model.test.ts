@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createPlanningFetchers, mediaAssignmentPath, type PlanningRequestOptions } from "@byline/newsroom-screens/planning/planning-api";
+import type { PlanningRequestOptions } from "@byline/newsroom-screens/planning/planning-api";
+import { createPlanningFetchers, mediaAssignmentPath } from "./planning-rest";
 import { EMPTY_MEDIA_DESK_FILTERS, filterMediaRows, mediaDeskRows, mediaReadinessHint, sortMediaRows } from "./media-desk-model";
 import type { MediaAssignmentRow, MediaRequest } from "@byline/newsroom-screens/planning/planning-model";
 

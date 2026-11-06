@@ -178,7 +178,7 @@ export function CollectionWorkspace({
         open: () => setTab("tasks"),
       })),
     ...data.stories
-      .filter((s) => s.deadline && !s.wordpressState.isPublished)
+      .filter((s) => s.deadline && !s.publicationState.isPublished)
       .map((s) => ({
         id: `s${s.id}`,
         title: s.title,

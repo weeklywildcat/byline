@@ -154,7 +154,7 @@ function workGroup(value: string | null | undefined, timezone: string, now: Date
 }
 
 export function activeStory(story: PlanningStory): boolean {
-  return !story.wordpressState.isPublished && !["publish", "trash", "auto-draft"].includes(story.wordpressState.id) && !["published", "dropped"].includes(story.workflow.id);
+  return !story.publicationState.isPublished && !["published", "trash", "auto-draft"].includes(story.publicationState.id) && !["published", "dropped"].includes(story.workflow.id);
 }
 export function myStory(story: PlanningStory, userId: number): boolean {
   return story.editor?.id === userId || story.writer?.id === userId || story.authors.some((person) => (person as PlanningPerson & { kind?: string }).kind !== "guest" && person.id === userId);
@@ -182,8 +182,8 @@ export function homeAgenda(data: HomeBootstrap, now = new Date()): AgendaEvent[]
   data.stories.filter(activeStory).forEach((story) => {
     if (!capabilities.review && !myStory(story, currentUser.id)) return;
     add(`deadline-${story.id}`, story.id, story.title, "", "Story deadline", story.deadline);
-    const scheduled = story.wordpressState.scheduledAt;
-    if (story.wordpressState.isScheduled) add(`scheduled-${story.id}`, story.id, story.title, "", "Scheduled publication", scheduled);
+    const scheduled = story.publicationState.scheduledAt;
+    if (story.publicationState.isScheduled) add(`scheduled-${story.id}`, story.id, story.title, "", "Scheduled publication", scheduled);
     // One day's publication commitment appears once. The distinct editorial
     // target and actual schedule remain visible in Story Peek.
     if (!scheduled || !story.plannedPublication || siteDay(scheduled, timezone) !== siteDay(story.plannedPublication, timezone)) {

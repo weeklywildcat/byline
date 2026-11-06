@@ -4,10 +4,10 @@ import {
   groupHealthStories,
 } from "../src/planning/content-health-model";
 import {
-  createPlanningFetchers,
   normalizeContentHealthResponse,
   type PlanningRequestOptions,
 } from "@byline/newsroom-screens/planning/planning-api";
+import { createPlanningFetchers } from "../src/planning/planning-rest";
 import {
   PLANNING_TABS,
   legacyHashDestination,

@@ -34,7 +34,7 @@ export function DetailsSection() {
   const contributorsFailed = sectionError("contributors");
   const people = peopleOptions(data.people);
   const statuses = data.statuses.filter((status) => status.selectable);
-  const wpState = story.wordpressState;
+  const wpState = story.publicationState;
   const scheduled = wpState.isScheduled && wpState.scheduledAt ? ` · ${exactDate(wpState.scheduledAt, timezone)}` : wpState.isPublished && wpState.publishedAt ? ` · ${exactDate(wpState.publishedAt, timezone)}` : "";
   const overdue = Boolean(story.deadline) && !wpState.isPublished && dateLabel(story.deadline, timezone, now).endsWith("overdue");
 

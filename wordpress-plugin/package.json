@@ -13,9 +13,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@atlaskit/pragmatic-drag-and-drop": "4.0.0",
-    "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "3.2.1",
-    "@atlaskit/pragmatic-drag-and-drop-live-region": "2.1.0",
     "@base-ui/react": "^1.9.0",
     "@byline/admin-runtime": "0.1.0",
     "@byline/content": "0.1.0",

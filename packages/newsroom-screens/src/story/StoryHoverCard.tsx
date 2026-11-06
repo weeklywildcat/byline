@@ -42,7 +42,7 @@ function StoryHoverBody({ summary, loading, failed, timezone, note }: {
     <div className="flex min-w-0 items-start justify-between gap-3">
       <div className="min-w-0">
         <p className="line-clamp-3 text-sm font-semibold leading-snug [overflow-wrap:anywhere]">{title}</p>
-        {summary.wordpressState?.isPublished ? <p className="mt-0.5 text-xs text-muted-foreground">Published{summary.wordpressState.publishedAt ? ` · ${shortDateTime(summary.wordpressState.publishedAt, timezone)}` : ""}</p> : null}
+        {summary.publicationState?.isPublished ? <p className="mt-0.5 text-xs text-muted-foreground">Published{summary.publicationState.publishedAt ? ` · ${shortDateTime(summary.publicationState.publishedAt, timezone)}` : ""}</p> : null}
       </div>
       {summary.workflow ? <WorkflowBadge workflow={summary.workflow} className="max-w-32 shrink-0" /> : loading ? <Skeleton className="h-5 w-20 shrink-0" /> : null}
     </div>

@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
-import { __ } from "@wordpress/i18n";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
-import { RowSkeletons } from "@byline/newsroom-screens/story/rows";
+import { RowSkeletons } from "../story/rows";
 import type { OptionalQuery } from "./planning-query";
 
 /** The compact header every Planning destination shares with Home and the Story Workspace. */
@@ -22,9 +21,9 @@ export function PageHeader({ title, description, actions }: { title: string; des
  * otherwise. An unavailable destination never takes anything else down.
  */
 export function ResourceGate<T>({ query, label, children }: { query: OptionalQuery<T>; label: string; children: (data: T) => ReactNode }) {
-  if (query.isLoading) return <div role="status" aria-label={`${__("Loading", "weekly-wildcat-headless")} ${label}`} className="pt-2"><RowSkeletons count={5} /></div>;
+  if (query.isLoading) return <div role="status" aria-label={`Loading ${label}`} className="pt-2"><RowSkeletons count={5} /></div>;
   if (query.data === undefined) {
-    return <Empty className="border"><EmptyHeader><EmptyTitle>{label}</EmptyTitle><EmptyDescription>{query.error || `${label} ${__("is unavailable right now.", "weekly-wildcat-headless")}`}</EmptyDescription></EmptyHeader>{query.available || query.error ? <EmptyContent><Button variant="outline" onClick={query.refetch}>{__("Try again", "weekly-wildcat-headless")}</Button></EmptyContent> : null}</Empty>;
+    return <Empty className="border"><EmptyHeader><EmptyTitle>{label}</EmptyTitle><EmptyDescription>{query.error || `${label} is unavailable right now.`}</EmptyDescription></EmptyHeader>{query.available || query.error ? <EmptyContent><Button variant="outline" onClick={query.refetch}>Try again</Button></EmptyContent> : null}</Empty>;
   }
   return <>{children(query.data)}</>;
 }

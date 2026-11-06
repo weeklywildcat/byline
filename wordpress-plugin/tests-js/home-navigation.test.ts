@@ -25,7 +25,7 @@ function story(overrides: Partial<PlanningStory> = {}): PlanningStory {
     writer: null,
     editor: null,
     workflow: { id: "writing", label: "Writing", group: "main", selectable: true },
-    wordpressState: {
+    publicationState: {
       id: "draft",
       label: "Draft",
       isPublished: false,
@@ -75,8 +75,8 @@ describe("Byline Home model", () => {
       story({ id: 10, title: "Overdue", deadline: "2026-08-27" }),
       story({ id: 11, title: "Ready", needsReview: true }),
       story({ id: 12, title: "Visual", visual: { type: "photo", status: "needed" } }),
-      story({ id: 13, title: "Published", wordpressState: {
-        id: "publish",
+      story({ id: 13, title: "Published", publicationState: {
+        id: "published",
         label: "Published",
         isPublished: true,
         isScheduled: false,
@@ -120,16 +120,16 @@ describe("Byline Home model", () => {
   it("counts only unpublished work in the coming-up metrics", () => {
     const metrics = homeComingUp([
       story({ id: 20, deadline: "2026-08-28", plannedPublication: "2026-08-30" }),
-      story({ id: 21, wordpressState: {
-        id: "future",
+      story({ id: 21, publicationState: {
+        id: "scheduled",
         label: "Scheduled",
         isPublished: false,
         isScheduled: true,
         scheduledAt: "2026-08-28T18:00:00Z",
         publishedAt: null
       } }),
-      story({ id: 22, deadline: "2026-08-28", wordpressState: {
-        id: "publish",
+      story({ id: 22, deadline: "2026-08-28", publicationState: {
+        id: "published",
         label: "Published",
         isPublished: true,
         isScheduled: false,

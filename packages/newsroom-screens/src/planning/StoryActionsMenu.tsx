@@ -1,11 +1,10 @@
-import { ArrowRightLeft, ArrowUpRight, FilePen, LayoutDashboard, MoreHorizontal, PanelRightOpen } from "lucide-react";
-import { __ } from "@wordpress/i18n";
+import { ArrowRightLeft, ArrowUpRight, FilePen, FileText, MoreHorizontal, PanelRightOpen } from "lucide-react";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@byline/newsroom-ui/ui/context-menu";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { useRef, type MouseEvent as ReactMouseEvent, type ReactElement } from "react";
-import { movableWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "@byline/newsroom-screens/planning/planning-model";
+import { movableWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
 
 export type StoryActionsMenuProps = {
   additionalActions?: Array<{ id: string; label: string; run: () => void }>;
@@ -21,27 +20,54 @@ export type StoryActionsMenuProps = {
 };
 
 /**
- * Everything you can do with a story from a collection, as one menu: go deeper
- * (workspace, article, preview) or move it to another workflow stage. Moving
- * here is the keyboard and touch equivalent of dragging a card.
+ * Where a story's menu can go. "Open story" is the host's Story screen (the
+ * WordPress Story Workspace, the Payload Story screen). "Edit article" appears
+ * only when the host edits the article somewhere else (Gutenberg); a host whose
+ * Story screen is also its editor never shows two links to one place.
+ * Preview appears only when the host has a real preview.
+ */
+export function storyDestinations(story: Pick<PlanningStory, "id" | "editUrl" | "previewUrl">, workspaceUrl: (storyId: number) => string) {
+  const open = workspaceUrl(story.id);
+  const sameAsOpen = (href: string) => {
+    try {
+      const base = typeof window === "undefined" ? "http://localhost/" : window.location.href;
+      return new URL(href, base).href === new URL(open, base).href;
+    } catch {
+      return href === open;
+    }
+  };
+  return {
+    open,
+    edit: story.editUrl && !sameAsOpen(story.editUrl) ? story.editUrl : null,
+    preview: story.previewUrl || null
+  };
+}
+
+/** Published comes from the publication state; it is never a stage to move to or from. Participants cannot move a story either. */
+export const canMoveFromMenu = (story: PlanningStory, canMove: boolean) => canMove && story.canEditPlanning !== false && !story.publicationState.isPublished;
+
+/**
+ * Everything you can do with a story from a collection, as one menu: open it,
+ * preview it, or move it to another workflow stage. Moving here is the
+ * keyboard and touch equivalent of dragging a card.
  */
 export function StoryActionsMenu({ story, statuses, canMove, disabled, onMove, workspaceUrl, className, additionalActions }: StoryActionsMenuProps) {
-  const title = story.title || __("Untitled story", "weekly-wildcat-headless");
-  // Published is derived from WordPress; it is never a stage to move to or from.
-  const movable = canMove && !story.wordpressState.isPublished;
+  const title = story.title || "Untitled story";
+  const movable = canMoveFromMenu(story, canMove);
   const stages = movableWorkflowStatuses(statuses);
+  const go = storyDestinations(story, workspaceUrl);
   return <DropdownMenu>
-    <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className={cn("shrink-0", className)} disabled={disabled} aria-label={`${__("Actions for", "weekly-wildcat-headless")} ${title}`} data-story-actions={story.id} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
+    <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className={cn("shrink-0", className)} disabled={disabled} aria-label={`Actions for ${title}`} data-story-actions={story.id} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="w-52">
       <DropdownMenuGroup>
-        <DropdownMenuItem render={<a href={workspaceUrl(story.id)} />}><LayoutDashboard aria-hidden="true" />{__("Open workspace", "weekly-wildcat-headless")}</DropdownMenuItem>
-        {story.editUrl ? <DropdownMenuItem render={<a href={story.editUrl} />}><FilePen aria-hidden="true" />{__("Edit article", "weekly-wildcat-headless")}</DropdownMenuItem> : null}
-        {story.previewUrl ? <DropdownMenuItem render={<a href={story.previewUrl} target="_blank" rel="noopener noreferrer" />}><ArrowUpRight aria-hidden="true" />{__("Preview", "weekly-wildcat-headless")}<span className="sr-only"> {__("(opens in a new tab)", "weekly-wildcat-headless")}</span></DropdownMenuItem> : null}
+        <DropdownMenuItem render={<a href={go.open} />}><FileText aria-hidden="true" />Open story</DropdownMenuItem>
+        {go.edit ? <DropdownMenuItem render={<a href={go.edit} />}><FilePen aria-hidden="true" />Edit article</DropdownMenuItem> : null}
+        {go.preview ? <DropdownMenuItem render={<a href={go.preview} target="_blank" rel="noopener noreferrer" />}><ArrowUpRight aria-hidden="true" />Preview<span className="sr-only"> {"(opens in a new tab)"}</span></DropdownMenuItem> : null}
       </DropdownMenuGroup>
       {movable && stages.length ? <>
         <DropdownMenuSeparator />
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger><ArrowRightLeft aria-hidden="true" />{__("Move to", "weekly-wildcat-headless")}</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger><ArrowRightLeft aria-hidden="true" />Move to</DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="min-w-44">
             <DropdownMenuRadioGroup value={story.workflow.id} onValueChange={(value) => { if (value && value !== story.workflow.id) onMove(story, String(value)); }}>
               {stages.map((stage) => <DropdownMenuRadioItem key={stage.id} value={stage.id}>{stage.label}</DropdownMenuRadioItem>)}
@@ -66,9 +92,10 @@ export type StoryContextMenuProps = StoryActionsMenuProps & {
  * action button while mouse/trackpad users can right-click anywhere on a row.
  */
 export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, workspaceUrl, onOpenStory, children, additionalActions }: StoryContextMenuProps) {
-  const title = story.title || __("Untitled story", "weekly-wildcat-headless");
-  const movable = canMove && !story.wordpressState.isPublished;
+  const title = story.title || "Untitled story";
+  const movable = canMoveFromMenu(story, canMove);
   const stages = movableWorkflowStatuses(statuses);
+  const go = storyDestinations(story, workspaceUrl);
   // macOS Control-click is a secondary click even though the browser reports
   // the pointer button as primary. Base UI correctly opens the context menu on
   // the contextmenu event, but WebKit/Chromium can still dispatch a follow-up
@@ -98,15 +125,15 @@ export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, w
       <ContextMenuGroup>
         <ContextMenuLabel className="max-w-52 truncate">{title}</ContextMenuLabel>
         <ContextMenuSeparator />
-        <ContextMenuItem disabled={disabled} onClick={() => onOpenStory(story.id)}><PanelRightOpen aria-hidden="true" />{__("Quick view", "weekly-wildcat-headless")}</ContextMenuItem>
-        <ContextMenuItem render={<a href={workspaceUrl(story.id)} />}><LayoutDashboard aria-hidden="true" />{__("Open workspace", "weekly-wildcat-headless")}</ContextMenuItem>
-        {story.editUrl ? <ContextMenuItem render={<a href={story.editUrl} />}><FilePen aria-hidden="true" />{__("Edit article", "weekly-wildcat-headless")}</ContextMenuItem> : null}
-        {story.previewUrl ? <ContextMenuItem render={<a href={story.previewUrl} target="_blank" rel="noopener noreferrer" />}><ArrowUpRight aria-hidden="true" />{__("Preview", "weekly-wildcat-headless")}<span className="sr-only"> {__("(opens in a new tab)", "weekly-wildcat-headless")}</span></ContextMenuItem> : null}
+        <ContextMenuItem disabled={disabled} onClick={() => onOpenStory(story.id)}><PanelRightOpen aria-hidden="true" />Quick view</ContextMenuItem>
+        <ContextMenuItem render={<a href={go.open} />}><FileText aria-hidden="true" />Open story</ContextMenuItem>
+        {go.edit ? <ContextMenuItem render={<a href={go.edit} />}><FilePen aria-hidden="true" />Edit article</ContextMenuItem> : null}
+        {go.preview ? <ContextMenuItem render={<a href={go.preview} target="_blank" rel="noopener noreferrer" />}><ArrowUpRight aria-hidden="true" />Preview<span className="sr-only"> {"(opens in a new tab)"}</span></ContextMenuItem> : null}
       </ContextMenuGroup>
       {movable && stages.length ? <>
         <ContextMenuSeparator />
         <ContextMenuSub>
-          <ContextMenuSubTrigger disabled={disabled}><ArrowRightLeft aria-hidden="true" />{__("Move to", "weekly-wildcat-headless")}</ContextMenuSubTrigger>
+          <ContextMenuSubTrigger disabled={disabled}><ArrowRightLeft aria-hidden="true" />Move to</ContextMenuSubTrigger>
           <ContextMenuSubContent className="min-w-44">
             <ContextMenuRadioGroup value={story.workflow.id} onValueChange={(value) => { if (value && value !== story.workflow.id) onMove(story, String(value)); }}>
               {stages.map((stage) => <ContextMenuRadioItem key={stage.id} value={stage.id}>{stage.label}</ContextMenuRadioItem>)}

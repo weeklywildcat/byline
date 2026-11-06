@@ -17,7 +17,7 @@ const schedule = (patch: Partial<ScheduleResponse> = {}): ScheduleResponse => ({
 const story = (patch: Partial<PlanningStory> = {}): PlanningStory => ({
   id: 41, title: "Cafeteria changes", editUrl: "/wp-admin/post.php?post=41&action=edit", authors: [], writer: null, editor: null,
   workflow: { id: "writing", label: "Writing", group: "main", selectable: true },
-  wordpressState: { id: "future", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-11-03T15:00:00Z", publishedAt: null },
+  publicationState: { id: "scheduled", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-11-03T15:00:00Z", publishedAt: null },
   deadline: "2026-10-30", plannedPublication: "2026-11-02", modifiedAt: null, visual: { type: "photo", status: "needed" }, openTaskCount: 0, featuredImage: null, ...patch
 });
 const one = (event: ReturnType<typeof scheduleCalendarEvents>[number]) => toScheduleXEvent(event, timezone)!;
@@ -118,14 +118,14 @@ describe("dates stay dates", () => {
   });
 
   it("treats a planned publication that carries a site-local time as a real timestamp", () => {
-    const [planned] = planningCalendarEvents([story({ plannedPublication: "2026-11-02T08:30:00", wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false } })], timezone).filter((event) => event.type === "planned");
+    const [planned] = planningCalendarEvents([story({ plannedPublication: "2026-11-02T08:30:00", publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false } })], timezone).filter((event) => event.type === "planned");
     const mapped = toScheduleXEvent(planned, timezone)!;
     expect((mapped.start as Temporal.ZonedDateTime).toPlainTime().toString()).toBe("08:30:00");
     expect(mapped.timed).toBe(true);
   });
 
   it("keeps a published date as a WordPress event, separate from the schedule", () => {
-    const [published] = planningCalendarEvents([story({ wordpressState: { id: "publish", label: "Published", isPublished: true, isScheduled: false, publishedAt: "2026-10-31T16:00:00Z" } })], timezone).filter((event) => event.type === "published");
+    const [published] = planningCalendarEvents([story({ publicationState: { id: "published", label: "Published", isPublished: true, isScheduled: false, publishedAt: "2026-10-31T16:00:00Z" } })], timezone).filter((event) => event.type === "published");
     const mapped = toScheduleXEvent(published, timezone)!;
     expect((mapped.start as Temporal.ZonedDateTime).toPlainDate().toString()).toBe("2026-10-31");
     expect(mapped.calendarId).toBe("wordpress-scheduled");

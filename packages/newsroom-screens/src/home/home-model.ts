@@ -140,7 +140,7 @@ function isReadyForReview(story: PlanningStory): boolean {
 }
 
 function addStoryAttention(items: HomeAttentionItem[], story: PlanningStory, now: Date): void {
-  if (!story.wordpressState.isPublished && isPlanningDateOverdue(story.deadline, now)) {
+  if (!story.publicationState.isPublished && isPlanningDateOverdue(story.deadline, now)) {
     items.push({
       id: `story-overdue-${story.id}`,
       title: storyTitle(story),
@@ -151,7 +151,7 @@ function addStoryAttention(items: HomeAttentionItem[], story: PlanningStory, now
     });
   }
 
-  if (!story.wordpressState.isPublished && isReadyForReview(story)) {
+  if (!story.publicationState.isPublished && isReadyForReview(story)) {
     items.push({
       id: `story-review-${story.id}`,
       title: storyTitle(story),
@@ -162,7 +162,7 @@ function addStoryAttention(items: HomeAttentionItem[], story: PlanningStory, now
     });
   }
 
-  if (!story.wordpressState.isPublished && story.visual.status === "needed") {
+  if (!story.publicationState.isPublished && story.visual.status === "needed") {
     items.push({
       id: `story-visual-${story.id}`,
       title: storyTitle(story),
@@ -173,7 +173,7 @@ function addStoryAttention(items: HomeAttentionItem[], story: PlanningStory, now
     });
   }
 
-  if (!story.wordpressState.isPublished && story.openTaskCount > 0) {
+  if (!story.publicationState.isPublished && story.openTaskCount > 0) {
     items.push({
       id: `story-tasks-${story.id}`,
       title: storyTitle(story),
@@ -305,9 +305,9 @@ export function homeComingUp(stories: PlanningStory[], now = new Date()): HomeCo
   const soonKey = planningDateKey(soon);
 
   return stories.reduce<HomeComingUp>((result, story) => {
-    if (story.wordpressState.isPublished) return result;
+    if (story.publicationState.isPublished) return result;
     if (localDateKey(story.deadline) === today) result.dueToday += 1;
-    if (localDateKey(story.wordpressState.scheduledAt) === today) result.scheduledToday += 1;
+    if (localDateKey(story.publicationState.scheduledAt) === today) result.scheduledToday += 1;
     const planned = localDateKey(story.plannedPublication);
     if (planned && planned >= today && planned <= soonKey) result.plannedSoon += 1;
     return result;
@@ -328,11 +328,11 @@ export function homeYourStories(stories: PlanningStory[], currentUserId: number 
 
 export function homeRecentlyPublished(stories: PlanningStory[]): PlanningStory[] {
   return stories
-    .filter((story) => story.wordpressState.isPublished)
+    .filter((story) => story.publicationState.isPublished)
     .slice()
     .sort((left, right) => {
-      const leftDate = parsePlanningDate(left.wordpressState.publishedAt || left.modifiedAt)?.getTime() ?? 0;
-      const rightDate = parsePlanningDate(right.wordpressState.publishedAt || right.modifiedAt)?.getTime() ?? 0;
+      const leftDate = parsePlanningDate(left.publicationState.publishedAt || left.modifiedAt)?.getTime() ?? 0;
+      const rightDate = parsePlanningDate(right.publicationState.publishedAt || right.modifiedAt)?.getTime() ?? 0;
       return rightDate - leftDate || storyTitle(left).localeCompare(storyTitle(right));
     })
     .slice(0, 5);

@@ -54,7 +54,17 @@ export type PlanningPerson = {
   avatarUrl?: string | null;
 };
 
-export type PlanningWordPressState = {
+/**
+ * Where a story stands publicly, separate from its editorial workflow.
+ * `Published` is derived from this, never chosen as a workflow stage. Each
+ * host's adapter translates its own storage into these neutral ids (WordPress
+ * `post_status`, Payload `_status`).
+ */
+export const PUBLICATION_STATE_IDS = ["draft", "scheduled", "published"] as const;
+export type PlanningPublicationStateId = (typeof PUBLICATION_STATE_IDS)[number];
+
+export type PlanningPublicationState = {
+  /** One of PUBLICATION_STATE_IDS; a host may pass a finer label (e.g. "Pending review") for a draft. */
   id: string;
   label: string;
   isPublished: boolean;
@@ -96,7 +106,7 @@ export type PlanningStory = {
   writer: PlanningPerson | null;
   editor: PlanningPerson | null;
   workflow: PlanningWorkflowStatus;
-  wordpressState: PlanningWordPressState;
+  publicationState: PlanningPublicationState;
   deadline: string | null;
   plannedPublication: string | null;
   modifiedAt: string | null;
@@ -109,7 +119,7 @@ export type PlanningStory = {
   /** Roll-up of production assignments. Absent on older servers. */
   mediaSummary?: MediaSummary | null;
   /**
-   * WordPress Core Notes thread counts. Private, and `null` unless the viewer
+   * Host editor note thread counts (WordPress Core Notes). Private, and `null` unless the viewer
    * may edit the story (not merely see it in the workspace). Absent on older servers.
    */
   notes?: ArticleNotesSummary | null;
@@ -139,7 +149,7 @@ export type PlanningFilters = {
   deadlineTo: string;
   plannedFrom: string;
   plannedTo: string;
-  wordpressState: string;
+  publicationState: string;
   visualStatus: string;
   mine: boolean;
   unassigned: boolean;
@@ -156,7 +166,7 @@ export const EMPTY_PLANNING_FILTERS: PlanningFilters = {
   deadlineTo: "",
   plannedFrom: "",
   plannedTo: "",
-  wordpressState: "",
+  publicationState: "",
   visualStatus: "",
   mine: false,
   unassigned: false,
@@ -547,12 +557,12 @@ export function storyDateSemantics(story: PlanningStory): PlanningStoryDates {
       exact: exactPlanningDate(story.plannedPublication)
     },
     scheduled: {
-      value: story.wordpressState.scheduledAt ?? null,
-      exact: exactPlanningDate(story.wordpressState.scheduledAt)
+      value: story.publicationState.scheduledAt ?? null,
+      exact: exactPlanningDate(story.publicationState.scheduledAt)
     },
     published: {
-      value: story.wordpressState.publishedAt ?? null,
-      exact: exactPlanningDate(story.wordpressState.publishedAt)
+      value: story.publicationState.publishedAt ?? null,
+      exact: exactPlanningDate(story.publicationState.publishedAt)
     }
   };
 }
@@ -607,11 +617,11 @@ export function filterPlanningStories(
     if (applied.editorId !== null && story.editor?.id !== applied.editorId) return false;
     if (!inDateRange(story.deadline, applied.deadlineFrom, applied.deadlineTo)) return false;
     if (!inDateRange(story.plannedPublication, applied.plannedFrom, applied.plannedTo)) return false;
-    if (applied.wordpressState && story.wordpressState.id !== applied.wordpressState) return false;
+    if (applied.publicationState && story.publicationState.id !== applied.publicationState) return false;
     if (applied.visualStatus && story.visual.status !== applied.visualStatus) return false;
     if (applied.mine && (!currentUserId || (story.writer?.id !== currentUserId && story.editor?.id !== currentUserId))) return false;
     if (applied.unassigned && story.editor !== null) return false;
-    if (applied.overdue && !isPlanningDateOverdue(story.deadline, now)) return false;
+    if (applied.overdue && (story.publicationState.isPublished || !isPlanningDateOverdue(story.deadline, now))) return false;
     if (applied.needsReview && !(story.needsReview || story.workflow.id === "ready" || story.workflow.id === "ready-for-review")) return false;
 
     return true;
@@ -652,12 +662,12 @@ export function storyHasOpenWork(story: PlanningStory): boolean {
 
 /**
  * A published story is finished news, so the List hides it unless something on
- * it is still open. Choosing a WordPress state yourself, or asking for published
+ * it is still open. Choosing a publication state yourself, or asking for published
  * stories, shows them.
  */
-export function hideFinishedPublished(stories: PlanningStory[], options: { showPublished?: boolean; wordpressState?: string } = {}): PlanningStory[] {
-  if (options.showPublished || options.wordpressState) return stories;
-  return stories.filter((story) => !story.wordpressState.isPublished || storyHasOpenWork(story));
+export function hideFinishedPublished(stories: PlanningStory[], options: { showPublished?: boolean; publicationState?: string } = {}): PlanningStory[] {
+  if (options.showPublished || options.publicationState) return stories;
+  return stories.filter((story) => !story.publicationState.isPublished || storyHasOpenWork(story));
 }
 
 export function sortPlanningStories(stories: PlanningStory[], sort: PlanningSort = DEFAULT_PLANNING_SORT): PlanningStory[] {
@@ -680,7 +690,7 @@ export function movableWorkflowStatuses(statuses: PlanningWorkflowStatus[] = DEF
 }
 
 export function canMovePlanningStory(story: PlanningStory, targetStatus: string, statuses: PlanningWorkflowStatus[]): boolean {
-  if (story.wordpressState.isPublished) return false;
+  if (story.publicationState.isPublished) return false;
   const target = statuses.find((status) => status.id === targetStatus);
   return Boolean(target && target.group !== "derived" && target.selectable);
 }
@@ -697,8 +707,8 @@ export function applyPlanningMove(
     return {
       moved: false,
       story,
-      error: story.wordpressState.isPublished
-        ? "Published is derived from WordPress and cannot be moved as a workflow stage."
+      error: story.publicationState.isPublished
+        ? "Published comes from the publication state and cannot be moved as a workflow stage."
         : "That workflow stage is not available for this story."
     };
   }
@@ -766,7 +776,7 @@ export function deserializeSavedPlanningView(value: string, expectedOwnerId?: nu
 }
 
 /**
- * Story-derived events: deadline, planned publication, WordPress schedule and
+ * Story-derived events: deadline, planned publication, scheduled publication and
  * published date stay four separate events. With a site `timezone` the day is
  * read in that zone (matching appointments and production deadlines); without
  * one it falls back to the browser's, as before.
@@ -797,8 +807,8 @@ export function planningCalendarEvents(stories: PlanningStory[], timezone?: stri
     const date = timezone ? siteDay(value, timezone) || planningDateKey(parsePlanningDate(value) as Date) : planningDateKey(parsePlanningDate(value) as Date);
     // A deadline is a day. A planned publication is a day until it carries a
     // real time: the picker stores noon as a placeholder when only a day was
-    // chosen, so exactly 12:00 is still a day. WordPress's schedule and publish
-    // date are always timestamps.
+    // chosen, so exactly 12:00 is still a day. A scheduled or published time
+    // is always a timestamp.
     const timing: CalendarEventTiming = type === "deadline" || (type === "planned" && isPlannedDayOnly(value, timezone))
       ? { kind: "date", date }
       : { kind: "timed", start: value, end: null };
@@ -818,8 +828,8 @@ export function planningCalendarEvents(stories: PlanningStory[], timezone?: stri
   stories.forEach((story) => {
     add(story, "deadline", story.deadline, "Deadline");
     add(story, "planned", story.plannedPublication, "Planned publication");
-    add(story, "scheduled", story.wordpressState.scheduledAt, "Scheduled in WordPress");
-    add(story, "published", story.wordpressState.publishedAt, "Published");
+    add(story, "scheduled", story.publicationState.scheduledAt, "Scheduled publication");
+    add(story, "published", story.publicationState.publishedAt, "Published");
   });
 
   return events.sort((left, right) => left.date.localeCompare(right.date) || left.storyTitle.localeCompare(right.storyTitle));
@@ -868,4 +878,60 @@ export function optionalApiFallback<T>(error: unknown, fallback: T | null, label
     error: describePlanningError(error, `${label} is unavailable right now.`),
     available: false
   };
+}
+
+/* ------------------------------------------------- strict normalization */
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const VISUAL_STATUSES: readonly PlanningVisualStatus[] = ["needed", "assigned", "in-progress", "uploaded", "selected", "done"];
+const SORT_KEYS: readonly PlanningSortKey[] = ["story", "workflow", "writer", "deadline", "planned", "modified"];
+export const PLANNING_QUERY_MAX_LENGTH = 200;
+
+const positiveId = (value: unknown): number | null => {
+  const id = typeof value === "string" && /^\d+$/.test(value.trim()) ? Number(value) : value;
+  return typeof id === "number" && Number.isSafeInteger(id) && id > 0 ? id : null;
+};
+const day = (value: unknown): string => (typeof value === "string" && DAY.test(value) && !Number.isNaN(Date.parse(`${value}T12:00:00Z`)) ? value : "");
+const flag = (value: unknown): boolean => value === true || value === 1 || value === "1" || value === "true";
+
+/**
+ * Untrusted filters (a saved view's JSON, a query string) as a valid
+ * PlanningFilters: every key typed, dates YYYY-MM-DD, ids positive integers,
+ * enums from their vocabulary, unknown keys dropped. Workflow ids are checked
+ * only for shape; the host knows its own stages.
+ */
+export function sanitizePlanningFilters(value: unknown): PlanningFilters {
+  const source = isRecord(value) ? value : {};
+  const workflow = typeof source.workflow === "string" && /^[a-z0-9-]{1,40}$/.test(source.workflow) ? source.workflow : "";
+  const publication = typeof source.publicationState === "string" && (PUBLICATION_STATE_IDS as readonly string[]).includes(source.publicationState) ? source.publicationState : "";
+  const visual = typeof source.visualStatus === "string" && (VISUAL_STATUSES as readonly string[]).includes(source.visualStatus) ? source.visualStatus : "";
+  const collectionId = positiveId(source.collectionId);
+  return {
+    ...(collectionId ? { collectionId } : {}),
+    query: typeof source.query === "string" ? source.query.trim().slice(0, PLANNING_QUERY_MAX_LENGTH) : "",
+    workflow,
+    writerId: positiveId(source.writerId),
+    editorId: positiveId(source.editorId),
+    deadlineFrom: day(source.deadlineFrom),
+    deadlineTo: day(source.deadlineTo),
+    plannedFrom: day(source.plannedFrom),
+    plannedTo: day(source.plannedTo),
+    publicationState: publication,
+    visualStatus: visual,
+    mine: flag(source.mine),
+    unassigned: flag(source.unassigned),
+    overdue: flag(source.overdue),
+    needsReview: flag(source.needsReview)
+  };
+}
+
+export function sanitizePlanningSort(value: unknown): PlanningSort {
+  return isPlanningSort(value) && (SORT_KEYS as readonly string[]).includes(value.key) ? { key: value.key, direction: value.direction } : { ...DEFAULT_PLANNING_SORT };
+}
+
+/** Two filter sets mean the same view (normalization ignores how they were written). */
+export function samePlanningFilters(left: Partial<PlanningFilters>, right: Partial<PlanningFilters>): boolean {
+  const a = normalizePlanningFilters(left);
+  const b = normalizePlanningFilters(right);
+  return (Object.keys(EMPTY_PLANNING_FILTERS) as Array<keyof PlanningFilters>).every((key) => a[key] === b[key]) && (a.collectionId ?? null) === (b.collectionId ?? null);
 }

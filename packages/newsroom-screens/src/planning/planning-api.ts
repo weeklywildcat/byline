@@ -1,5 +1,6 @@
 import {
   normalizePlanningFilters,
+  sanitizePlanningFilters,
   type ContentHealthResponse,
   type ContentHealthFixTarget,
   type ContentHealthSeverity,
@@ -13,10 +14,9 @@ import { normalizeStorySidebarPanel } from "../editorial/story-sidebar-navigatio
 import type { ScheduleResponse } from "../workspace/workspace-types";
 
 /**
- * The caller supplies WordPress' authenticated apiFetch (or a compatible
- * protected transport). Keeping the transport injected makes this package
- * usable from the existing admin shell without importing an entrypoint or
- * leaking credentials into the module.
+ * The Planning screens' data contract. Each host supplies `PlanningFetchers`
+ * over its own protected transport (the WordPress plugin over its REST routes,
+ * the Payload newsroom over /api/byline); nothing here knows a route.
  */
 export type PlanningRequestOptions = {
   path: string;
@@ -25,17 +25,6 @@ export type PlanningRequestOptions = {
 };
 
 export type PlanningRequest = <T>(options: PlanningRequestOptions) => Promise<T>;
-
-export const PLANNING_REST_ROUTES = {
-  collection: "/byline/v1/editorial/planning",
-  story: "/byline/v1/editorial/stories",
-  savedViews: "/byline/v1/editorial/planning/views",
-  media: "/byline/v1/admin/media",
-  schedule: "/byline/v1/editorial/schedule",
-  feedback: "/byline/v1/admin/feedback",
-  corrections: "/byline/v1/admin/editorial/corrections",
-  contentHealth: "/byline/v1/admin/content-health"
-} as const;
 
 export type SavedPlanningViewInput = Pick<SavedPlanningView, "name" | "filters" | "sort"> & { id?: string };
 
@@ -192,6 +181,11 @@ function queryPath(path: string, query: Record<string, string | number | boolean
   return serialized ? `${path}?${serialized}` : path;
 }
 
+/**
+ * The neutral query-string form of PlanningFilters, also the Planning cache
+ * key. A host adapter renames what its server expects (WordPress reads
+ * `wordpress_state`); `parsePlanningFilterParams` reads this form back.
+ */
 export function planningFilterParams(filters?: Partial<PlanningFilters>): Record<string, string | number> {
   const applied = normalizePlanningFilters(filters);
   const params: Record<string, string | number> = {};
@@ -205,7 +199,7 @@ export function planningFilterParams(filters?: Partial<PlanningFilters>): Record
   if (applied.deadlineTo) params.deadline_to = applied.deadlineTo;
   if (applied.plannedFrom) params.planned_from = applied.plannedFrom;
   if (applied.plannedTo) params.planned_to = applied.plannedTo;
-  if (applied.wordpressState) params.wordpress_state = applied.wordpressState;
+  if (applied.publicationState) params.publication_state = applied.publicationState;
   if (applied.visualStatus) params.visual_status = applied.visualStatus;
   if (applied.mine) params.mine = 1;
   if (applied.unassigned) params.unassigned = 1;
@@ -215,109 +209,26 @@ export function planningFilterParams(filters?: Partial<PlanningFilters>): Record
   return params;
 }
 
-function idPath(path: string, id: string | number): string {
-  return `${path}/${encodeURIComponent(String(id))}`;
-}
-
-/** `POST /editorial/stories/<storyId>/media-assignments/<assignmentId>` (a UUID, or `legacy-v1`). */
-export function mediaAssignmentPath(storyId: number, assignmentId: string): string {
-  return `${idPath(PLANNING_REST_ROUTES.story, storyId)}/media-assignments/${encodeURIComponent(assignmentId)}`;
-}
-
-/**
- * Builds the admin slice's REST contract around an authenticated WordPress
- * request function. The route names are intentionally grouped and stable;
- * the PHP layer remains the authority for capability and post-level checks.
- */
-export function createPlanningFetchers(request: PlanningRequest): PlanningFetchers {
-  return {
-    getPlanning: (filters) => request<PlanningResponse>({
-      path: queryPath(PLANNING_REST_ROUTES.collection, planningFilterParams(filters))
-    }),
-
-    moveStory: (storyId, status) => request({
-      path: idPath(PLANNING_REST_ROUTES.story, storyId),
-      method: "POST",
-      data: { status }
-    }),
-
-    updateStory: (storyId, changes) => request({
-      path: idPath(PLANNING_REST_ROUTES.story, storyId),
-      method: "POST",
-      data: changes
-    }),
-
-    createStoryTask: (storyId, input) => request({
-      path: `${idPath(PLANNING_REST_ROUTES.story, storyId)}/tasks`,
-      method: "POST",
-      data: input
-    }),
-
-    updateTask: (taskId, changes) => request({
-      path: idPath("/byline/v1/editorial/tasks", taskId),
-      method: "POST",
-      data: changes
-    }),
-
-    getSavedViews: () => request<SavedPlanningView[]>({ path: PLANNING_REST_ROUTES.savedViews }),
-
-    saveSavedView: (view) => request<SavedPlanningView>({
-      path: PLANNING_REST_ROUTES.savedViews,
-      method: "POST",
-      data: { id: view.id, name: view.name.trim(), filters: view.filters, sort: view.sort }
-    }),
-
-    deleteSavedView: (viewId) => request<void>({
-      path: idPath(PLANNING_REST_ROUTES.savedViews, viewId),
-      method: "DELETE"
-    }),
-
-    getMediaDesk: (filters) => request<MediaDeskResponse>({
-      path: queryPath(PLANNING_REST_ROUTES.media, filters ?? {})
-    }),
-
-    updateMediaRequest: (requestId, changes) => request({
-      path: idPath(PLANNING_REST_ROUTES.media, requestId),
-      method: "POST",
-      data: changes
-    }),
-
-    updateMediaAssignment: (storyId, assignmentId, changes) => request({
-      path: mediaAssignmentPath(storyId, assignmentId),
-      method: "POST",
-      data: changes
-    }),
-
-    getSchedule: (from, to, includeTasks = false, collectionId) => request<ScheduleResponse>({
-      path: queryPath(PLANNING_REST_ROUTES.schedule, { from, to, includeTasks: includeTasks ? 1 : undefined, collectionId })
-    }),
-
-    getFeedback: () => request<FeedbackResponse>({ path: PLANNING_REST_ROUTES.feedback }),
-
-    updateFeedback: (feedbackId, status) => request({
-      path: idPath(PLANNING_REST_ROUTES.feedback, feedbackId),
-      method: "POST",
-      data: { status }
-    }),
-
-    createCorrectionFromFeedback: (feedbackId, input) => request({
-      path: `${idPath(PLANNING_REST_ROUTES.feedback, feedbackId)}/correction`,
-      method: "POST",
-      data: input ?? {}
-    }),
-
-    getContentHealth: (query) => request<unknown>({
-      path: queryPath(PLANNING_REST_ROUTES.contentHealth, query ?? {})
-    }).then(normalizeContentHealthResponse),
-
-    runContentHealthScan: () => request({ path: `${PLANNING_REST_ROUTES.contentHealth}/scan`, method: "POST" }),
-    recheckContentHealth: (storyId) => request({
-      path: `${PLANNING_REST_ROUTES.contentHealth}/story/${storyId}/recheck`, method: "POST"
-    }),
-    setContentHealthDisposition: (input) => request({
-      path: `${PLANNING_REST_ROUTES.contentHealth}/disposition`, method: "POST", data: { ...input, postId: input.storyId }
-    })
-  };
+/** A Planning query string back into validated filters (the server side of `planningFilterParams`). */
+export function parsePlanningFilterParams(params: URLSearchParams): PlanningFilters {
+  const value = (key: string) => params.get(key) ?? undefined;
+  return sanitizePlanningFilters({
+    collectionId: value("collectionId"),
+    query: value("search"),
+    workflow: value("workflow"),
+    writerId: value("writer"),
+    editorId: value("editor"),
+    deadlineFrom: value("deadline_from"),
+    deadlineTo: value("deadline_to"),
+    plannedFrom: value("planned_from"),
+    plannedTo: value("planned_to"),
+    publicationState: value("publication_state"),
+    visualStatus: value("visual_status"),
+    mine: value("mine"),
+    unassigned: value("unassigned"),
+    overdue: value("overdue"),
+    needsReview: value("needs_review")
+  });
 }
 
 export { queryPath };

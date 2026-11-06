@@ -57,9 +57,9 @@ export function plannedLabel(value: string, timezone: string): string {
   return day ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`)) : "";
 }
 
-/** WordPress's publication state in words, quietly. The editorial workflow is what the newsroom steers by. */
-export function wordpressStateText(story: Pick<PlanningStory, "wordpressState">, timezone: string): string {
-  const state = story.wordpressState;
+/** The story's publication state in words, quietly. The editorial workflow is what the newsroom steers by. */
+export function publicationStateText(story: Pick<PlanningStory, "publicationState">, timezone: string): string {
+  const state = story.publicationState;
   if (state.isPublished) return state.publishedAt ? `Published ${exactDate(state.publishedAt, timezone)}` : state.label || "Published";
   if (state.isScheduled) return state.scheduledAt ? `Scheduled ${exactDate(state.scheduledAt, timezone)}` : state.label || "Scheduled";
   return state.label || "Draft";

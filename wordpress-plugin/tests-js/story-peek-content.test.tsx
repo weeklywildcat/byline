@@ -11,7 +11,7 @@ const capabilities = { role: "manager", editArticle: true, changeStatus: false, 
 /** The sparse Canteen story: one writer, two tasks, one assigned photo request, nothing else. */
 function canteen(patch: Record<string, unknown> = {}): StoryWorkspace {
   return {
-    story: { id: 7, title: "Canteen", editUrl: "/wp-admin/post.php?post=7&action=edit", authors: [admin], editor: null, workflow: { id: "reporting", label: "Reporting" }, wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null },
+    story: { id: 7, title: "Canteen", editUrl: "/wp-admin/post.php?post=7&action=edit", authors: [admin], editor: null, workflow: { id: "reporting", label: "Reporting" }, publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null },
     revision: 1, timezone: "America/New_York", now: now.toISOString(), currentUser: admin, brief: "", sections: ["News"],
     contributors: { canEdit: false, contributors: [admin], available: [] }, statuses: [],
     tasks: [

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bookmark, ChevronDown, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { __ } from "@wordpress/i18n";
 import { toast } from "sonner";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Button } from "@byline/newsroom-ui/ui/button";
@@ -11,10 +10,10 @@ import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
-import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
-import { savedViewsKey } from "@byline/newsroom-screens/story/story-query";
-import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
-import { DEFAULT_PLANNING_SORT, EMPTY_PLANNING_FILTERS, filterSavedViewsForUser, normalizePlanningFilters, type PlanningFilters, type PlanningSort, type SavedPlanningView } from "@byline/newsroom-screens/planning/planning-model";
+import { describeEditorialError } from "../editorial/editorial-model";
+import { savedViewsKey } from "../story/story-query";
+import type { PlanningFetchers } from "../planning/planning-api";
+import { DEFAULT_PLANNING_SORT, EMPTY_PLANNING_FILTERS, filterSavedViewsForUser, normalizePlanningFilters, type PlanningFilters, type PlanningSort, type SavedPlanningView } from "../planning/planning-model";
 
 const MINE_FILTERS: PlanningFilters = { ...EMPTY_PLANNING_FILTERS, mine: true };
 const same = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
@@ -49,26 +48,26 @@ export function SavedViews({ fetchers, currentUserId, filters, sort, selectedId,
   const putView = (view: SavedPlanningView) => client.setQueryData<SavedPlanningView[]>(savedViewsKey, (old) => [view, ...(old || []).filter((item) => item.id !== view.id)]);
   const save = useMutation({
     mutationFn: (input: { id?: string; name: string; filters: PlanningFilters; sort: PlanningSort }) => fetchers.saveSavedView!(input),
-    onSuccess: (view, input) => { putView(view); setDialog(null); setError(""); if (!input.id || input.id === selectedId) onApply({ filters: view.filters, sort: view.sort, savedViewId: view.id }); toast.success(input.id ? __("View updated.", "weekly-wildcat-headless") : __("View saved.", "weekly-wildcat-headless")); },
-    onError: (failure) => setError(describeEditorialError(failure, __("The view could not be saved.", "weekly-wildcat-headless")))
+    onSuccess: (view, input) => { putView(view); setDialog(null); setError(""); if (!input.id || input.id === selectedId) onApply({ filters: view.filters, sort: view.sort, savedViewId: view.id }); toast.success(input.id ? "View updated." : "View saved."); },
+    onError: (failure) => setError(describeEditorialError(failure, "The view could not be saved."))
   });
   const restore = useMutation({
     mutationFn: (view: SavedPlanningView) => fetchers.saveSavedView!({ id: view.id, name: view.name, filters: view.filters, sort: view.sort }),
-    onSuccess: (view) => { putView(view); toast.success(__("View restored.", "weekly-wildcat-headless")); },
-    onError: (failure) => toast.error(describeEditorialError(failure, __("The view could not be restored.", "weekly-wildcat-headless")))
+    onSuccess: (view) => { putView(view); toast.success("View restored."); },
+    onError: (failure) => toast.error(describeEditorialError(failure, "The view could not be restored."))
   });
   const remove = useMutation({
     mutationFn: (view: SavedPlanningView) => fetchers.deleteSavedView!(view.id),
     onSuccess: (_result, view) => {
       client.setQueryData<SavedPlanningView[]>(savedViewsKey, (old) => (old || []).filter((item) => item.id !== view.id));
       if (view.id === selectedId) onApply({ filters, sort, savedViewId: null });
-      toast(__("View deleted.", "weekly-wildcat-headless"), { duration: 10_000, action: fetchers.saveSavedView ? { label: __("Undo", "weekly-wildcat-headless"), onClick: () => restore.mutate(view) } : undefined });
+      toast("View deleted.", { duration: 10_000, action: fetchers.saveSavedView ? { label: "Undo", onClick: () => restore.mutate(view) } : undefined });
     },
-    onError: (failure) => toast.error(describeEditorialError(failure, __("The view could not be deleted.", "weekly-wildcat-headless")))
+    onError: (failure) => toast.error(describeEditorialError(failure, "The view could not be deleted."))
   });
 
   const activeKey = selected ? selected.id : same(normalizePlanningFilters(filters), EMPTY_PLANNING_FILTERS) ? "all" : same(normalizePlanningFilters(filters), MINE_FILTERS) ? "mine" : "";
-  const label = selected ? `${selected.name}${dirty ? ` ${__("(modified)", "weekly-wildcat-headless")}` : ""}` : activeKey === "all" ? __("All stories", "weekly-wildcat-headless") : activeKey === "mine" ? __("My stories", "weekly-wildcat-headless") : __("Custom view", "weekly-wildcat-headless");
+  const label = selected ? `${selected.name}${dirty ? ` (modified)` : ""}` : activeKey === "all" ? "All stories" : activeKey === "mine" ? "My stories" : "Custom view";
   const choose = (key: string) => {
     if (key === "all") onApply({ filters: { ...EMPTY_PLANNING_FILTERS }, sort: DEFAULT_PLANNING_SORT, savedViewId: null });
     else if (key === "mine") onApply({ filters: { ...MINE_FILTERS }, sort: DEFAULT_PLANNING_SORT, savedViewId: null });
@@ -79,24 +78,24 @@ export function SavedViews({ fetchers, currentUserId, filters, sort, selectedId,
 
   return <>
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline" aria-label={`${__("Saved view", "weekly-wildcat-headless")}: ${label}`} />}><Bookmark data-icon="inline-start" aria-hidden="true" /><span className="max-w-44 truncate">{label}</span><ChevronDown data-icon="inline-end" aria-hidden="true" /></DropdownMenuTrigger>
+      <DropdownMenuTrigger render={<Button variant="outline" aria-label={`Saved view: ${label}`} />}><Bookmark data-icon="inline-start" aria-hidden="true" /><span className="max-w-44 truncate">{label}</span><ChevronDown data-icon="inline-end" aria-hidden="true" /></DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         <DropdownMenuRadioGroup value={activeKey} onValueChange={(key) => choose(String(key))}>
-          <DropdownMenuRadioItem value="all">{__("All stories", "weekly-wildcat-headless")}</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="mine">{__("My stories", "weekly-wildcat-headless")}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="all">All stories</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="mine">My stories</DropdownMenuRadioItem>
           {views.length ? <DropdownMenuSeparator /> : null}
           {views.map((view) => <DropdownMenuRadioItem key={view.id} value={view.id}>{view.name}</DropdownMenuRadioItem>)}
         </DropdownMenuRadioGroup>
         {canSave || views.length ? <DropdownMenuSeparator /> : null}
-        {canSave && selected && dirty ? <DropdownMenuItem onClick={() => save.mutate({ id: selected.id, name: selected.name, filters, sort })}>{__("Update", "weekly-wildcat-headless")} “{selected.name}”</DropdownMenuItem> : null}
-        {canSave ? <DropdownMenuItem onClick={() => { setError(""); setDialog({ kind: "save" }); }}>{__("Save current view…", "weekly-wildcat-headless")}</DropdownMenuItem> : null}
-        {views.length ? <DropdownMenuItem onClick={() => setDialog({ kind: "manage" })}>{__("Manage views…", "weekly-wildcat-headless")}</DropdownMenuItem> : null}
+        {canSave && selected && dirty ? <DropdownMenuItem onClick={() => save.mutate({ id: selected.id, name: selected.name, filters, sort })}>Update “{selected.name}”</DropdownMenuItem> : null}
+        {canSave ? <DropdownMenuItem onClick={() => { setError(""); setDialog({ kind: "save" }); }}>Save current view…</DropdownMenuItem> : null}
+        {views.length ? <DropdownMenuItem onClick={() => setDialog({ kind: "manage" })}>Manage views…</DropdownMenuItem> : null}
       </DropdownMenuContent>
     </DropdownMenu>
 
     <Dialog open={dialog?.kind === "save" || dialog?.kind === "rename"} onOpenChange={(open) => { if (!open) close(); }}>
       <DialogContent className="sm:max-w-sm">
-        <DialogHeader><DialogTitle>{dialog?.kind === "rename" ? __("Rename view", "weekly-wildcat-headless") : __("Save view", "weekly-wildcat-headless")}</DialogTitle><DialogDescription>{dialog?.kind === "rename" ? __("Choose a new name for this view.", "weekly-wildcat-headless") : __("Keep the current filters and sort as a view only you can see.", "weekly-wildcat-headless")}</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{dialog?.kind === "rename" ? "Rename view" : "Save view"}</DialogTitle><DialogDescription>{dialog?.kind === "rename" ? "Choose a new name for this view." : "Keep the current filters and sort as a view only you can see."}</DialogDescription></DialogHeader>
         <form onSubmit={(event) => {
           event.preventDefault();
           const name = String(new FormData(event.currentTarget).get("name") || "").trim();
@@ -106,31 +105,31 @@ export function SavedViews({ fetchers, currentUserId, filters, sort, selectedId,
           else save.mutate({ name, filters, sort });
         }}>
           <FieldGroup className="gap-4">
-            <Field><FieldLabel htmlFor="saved-view-name">{__("View name", "weekly-wildcat-headless")}</FieldLabel><Input id="saved-view-name" name="name" required maxLength={80} autoFocus defaultValue={dialog?.kind === "rename" ? dialog.view.name : ""} placeholder={__("e.g. Publishing this week", "weekly-wildcat-headless")} disabled={save.isPending} /></Field>
+            <Field><FieldLabel htmlFor="saved-view-name">View name</FieldLabel><Input id="saved-view-name" name="name" required maxLength={80} autoFocus defaultValue={dialog?.kind === "rename" ? dialog.view.name : ""} placeholder={"e.g. Publishing this week"} disabled={save.isPending} /></Field>
             {error ? <InlineAlert>{error}</InlineAlert> : null}
           </FieldGroup>
-          <DialogFooter className="mt-4"><Button type="button" variant="outline" onClick={close} disabled={save.isPending}>{__("Cancel", "weekly-wildcat-headless")}</Button><Button type="submit" disabled={save.isPending}>{save.isPending ? <><Spinner data-icon="inline-start" />{__("Saving…", "weekly-wildcat-headless")}</> : dialog?.kind === "rename" ? __("Rename", "weekly-wildcat-headless") : __("Save view", "weekly-wildcat-headless")}</Button></DialogFooter>
+          <DialogFooter className="mt-4"><Button type="button" variant="outline" onClick={close} disabled={save.isPending}>Cancel</Button><Button type="submit" disabled={save.isPending}>{save.isPending ? <><Spinner data-icon="inline-start" />Saving…</> : dialog?.kind === "rename" ? "Rename" : "Save view"}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
 
     <Dialog open={dialog?.kind === "manage"} onOpenChange={(open) => { if (!open) setDialog(null); }}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>{__("Manage views", "weekly-wildcat-headless")}</DialogTitle><DialogDescription>{__("Rename or delete your saved views.", "weekly-wildcat-headless")}</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Manage views</DialogTitle><DialogDescription>Rename or delete your saved views.</DialogDescription></DialogHeader>
         {views.length
           ? <ItemGroup className="gap-0">{views.map((view) => <Item key={view.id} size="sm">
             <ItemContent><ItemTitle>{view.name}</ItemTitle></ItemContent>
             <ItemActions>
               <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`${__("Actions for view", "weekly-wildcat-headless")} ${view.name}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
+                <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for view ${view.name}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-40">
-                  {canSave ? <DropdownMenuItem onClick={() => setDialog({ kind: "rename", view })}><Pencil aria-hidden="true" />{__("Rename", "weekly-wildcat-headless")}</DropdownMenuItem> : null}
-                  {fetchers.deleteSavedView ? <DropdownMenuItem variant="destructive" onClick={() => remove.mutate(view)}><Trash2 aria-hidden="true" />{__("Delete", "weekly-wildcat-headless")}</DropdownMenuItem> : null}
+                  {canSave ? <DropdownMenuItem onClick={() => setDialog({ kind: "rename", view })}><Pencil aria-hidden="true" />Rename</DropdownMenuItem> : null}
+                  {fetchers.deleteSavedView ? <DropdownMenuItem variant="destructive" onClick={() => remove.mutate(view)}><Trash2 aria-hidden="true" />Delete</DropdownMenuItem> : null}
                 </DropdownMenuContent>
               </DropdownMenu>
             </ItemActions>
           </Item>)}</ItemGroup>
-          : <p className="text-sm text-muted-foreground">{__("You have no saved views.", "weekly-wildcat-headless")}</p>}
+          : <p className="text-sm text-muted-foreground">You have no saved views.</p>}
       </DialogContent>
     </Dialog>
   </>;

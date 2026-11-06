@@ -75,6 +75,9 @@
     "./workspace/workspace-types": "./src/workspace/workspace-types.ts"
   },
   "dependencies": {
+    "@atlaskit/pragmatic-drag-and-drop": "4.0.0",
+    "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "3.2.1",
+    "@atlaskit/pragmatic-drag-and-drop-live-region": "2.1.0",
     "@byline/admin-runtime": "0.1.0",
     "@byline/newsroom-ui": "0.1.0",
     "@tanstack/react-query": "^5.104.5",

@@ -13,6 +13,6 @@ are React-free transport and domain logic; keep UI out of them. Every story
 surface opens the shared Story Peek through `useStoryPeek().openStory(id)`.
 The collection comes from `GET /byline/v1/editorial/planning`; moves use
 `POST /byline/v1/editorial/stories/<id>`; optional destinations use the routes in
-`PLANNING_REST_ROUTES` and show an unavailable state if a route fails.
+`PLANNING_REST_ROUTES` (`planning-rest.ts`) and show an unavailable state if a route fails.
 Deadline, planned publication, WordPress schedule and published date are separate
 fields and are never changed as a side effect of one another.
