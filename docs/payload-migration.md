@@ -629,15 +629,30 @@ plugin.
   `0` on `:root`, which the scoping turns into `.byline-ui-root { … 0 }`: Week
   and Day grids were blank (hour rows 1px tall). `calendar/calendar.css` makes
   them `inherit`. (This also fixes WordPress.)
-- **Not done:** Payload story rows carry no scheduled-publication time yet
-  (Payload's scheduled-publish jobs are not read), so *Scheduled publication*
-  events appear only in WordPress for now; *Published* events appear in both.
+- **Scheduled publication (Stories, Home, Workspace, Calendar):** Payload
+  schedules publishing as jobs, so Byline adds no `scheduledAt` field and no
+  table. `scheduledPublicationsForStories` (`src/newsroom/scheduled-publication.ts`)
+  reads the upcoming `schedulePublish` jobs for *only the unpublished story ids
+  the screen's own access-controlled read returned*, in one query (the same
+  `taskSlug`, `waitUntil > now`, `input.doc.relationTo`/`value` conditions as
+  Payload's Schedule drawer, through the database adapter because no newsroom
+  role may read `payload-jobs`). A future `publish` makes the story
+  `scheduled` at the earliest `waitUntil`; a future `unpublish` does not (the
+  story stays `published` until it runs); jobs for other collections, past
+  jobs and jobs for stories the reader cannot see are ignored, and only
+  `story id → instant` leaves the helper. `planningStory` then orders
+  published, scheduled, draft, independent of workflow, so a published story
+  with a pending rewrite stays published. The shared Calendar needed no change:
+  it already emits *Scheduled publication* from `publicationState`.
 
 Tested: `packages/newsroom-screens/tests` (model, adapter, controller, workspace
 store, and the real Schedule-X mounted in jsdom: mini calendar ↔ calendar sync,
 filters, My schedule, Story Peek, Needs scheduling),
 `apps/newsroom/tests/integration/schedule.test.ts` (range validation, the
 124-day limit, DST edges, per-role scopes, notes never returned, Preferences),
+`apps/newsroom/tests/integration/publication.test.ts` (real `schedulePublish` jobs:
+scheduled/draft/published, unpublish, past, other collection, access, earliest of
+several, one read, the Stories filter and the Calendar event),
 `apps/newsroom/tests/calendar-workspace-shell.test.ts`, and the plugin's
 `calendar-host.test.ts`; in the browser at 1920/1440/1366/1300/1180/820/390.
 

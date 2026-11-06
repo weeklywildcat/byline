@@ -18,6 +18,7 @@ import { atLeast, relationId, relationIds, requestUser, sameId, type NewsroomUse
 import { WORKFLOW_OPTIONS } from "../domain/vocabulary";
 import { effectiveWorkflow, workflowLabel } from "../domain/workflow";
 import type { Appointment, Media, Person, ProductionAssignment, Section, Source, Story, StoryPlan, Task, User } from "../payload-types";
+import { scheduledPublicationsForStories } from "./scheduled-publication";
 
 /**
  * Payload records → the newsroom screens' read models (@byline/newsroom-screens).
@@ -262,12 +263,21 @@ export type StoryExtras = {
   production: ProductionAssignment[];
   sources: Source[];
   appointments: Appointment[];
+  /** The next scheduled publish of an unpublished story, from Payload's own schedule; null when none. */
+  scheduledAt: string | null;
 };
 
 function featured(story: Story): PlanningStory["featuredImage"] {
   const media = story.featuredMedia;
   if (!media || typeof media !== "object") return null;
   return { id: media.id, url: media.url ?? null, alt: media.alt ?? null, width: media.width ?? null, height: media.height ?? null };
+}
+
+/** published, then scheduled, then draft: the live story decides first, and none of it depends on the newsroom workflow. */
+export function publicationState(story: Pick<Story, "_status" | "publishedAt">, scheduledAt: string | null): PlanningStory["publicationState"] {
+  if (story._status === "published") return { id: "published", label: "Published", isPublished: true, isScheduled: false, scheduledAt: null, publishedAt: story.publishedAt ?? null };
+  if (scheduledAt) return { id: "scheduled", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt, publishedAt: null };
+  return { id: "draft", label: "Draft", isPublished: false, isScheduled: false, scheduledAt: null, publishedAt: story.publishedAt ?? null };
 }
 
 export function planningStory(ctx: ScreenContext, people: People, story: Story, plan: StoryPlan | null, extras: StoryExtras): PlanningStory & { reporting: ReportingSummary; mediaSummary: MediaSummary } {
@@ -293,7 +303,7 @@ export function planningStory(ctx: ScreenContext, people: People, story: Story, 
     writer,
     editor: userPerson(people, plan?.editor),
     workflow: { id: status.id, label: workflowLabel(workflow), group: status.group as PlanningStory["workflow"]["group"], selectable: status.selectable },
-    publicationState: { id: published ? "published" : "draft", label: published ? "Published" : "Draft", isPublished: published, isScheduled: false, scheduledAt: null, publishedAt: story.publishedAt ?? null },
+    publicationState: publicationState(story, extras.scheduledAt),
     deadline: plan?.deadline ?? null,
     plannedPublication: plan?.plannedPublication ?? null,
     modifiedAt: story.updatedAt,
@@ -342,7 +352,13 @@ export async function storiesWithExtras(ctx: ScreenContext, ids: number[]) {
     ctx.req.payload.find({ collection: "sources", where: byStory, ...all, select: { story: true, status: true } }),
     ctx.req.payload.find({ collection: "appointments", where: byStory, ...all })
   ]);
-  const extras = new Map<number, StoryExtras>(ids.map((id) => [id, { tasks: [], production: [], sources: [], appointments: [] }]));
+  const extras = new Map<number, StoryExtras>(ids.map((id) => [id, { tasks: [], production: [], sources: [], appointments: [], scheduledAt: null }]));
+  // Only unpublished stories the reads above returned: the schedule is looked up for ids already proven readable.
+  const scheduled = await scheduledPublicationsForStories(ctx, stories.filter((story) => story._status !== "published").map((story) => story.id));
+  for (const [id, at] of scheduled) {
+    const entry = extras.get(id);
+    if (entry) entry.scheduledAt = at;
+  }
   for (const task of tasks.docs) extras.get(num(task.story))?.tasks.push(task);
   for (const row of production.docs) extras.get(num(row.story))?.production.push(row);
   for (const source of sources.docs) extras.get(num(source.story))?.sources.push(source as Source);
