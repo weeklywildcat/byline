@@ -1,9 +1,9 @@
 import { CollectionsPage } from "../collections/CollectionsPage";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { StoryCreateDialog } from "@byline/newsroom-screens/story/StoryCreateDialog";
-import { StoryPeekHost } from "../story/StoryPeekHost";
+import { StoryPeekHost, useStoryPeek } from "@byline/newsroom-screens/story/StoryPeekHost";
 import { StoryHoverProvider } from "@byline/newsroom-screens/story/StoryHoverCard";
 import type { StoryFetchers } from "@byline/newsroom-screens/story/story-fetchers";
 import { createAdminQueryClient } from "@byline/newsroom-screens/story/story-query";
@@ -11,11 +11,12 @@ import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspac
 import { ContentHealth } from "./ContentHealth";
 import { Feedback } from "./Feedback";
 import { MediaDesk } from "./MediaDesk";
-import { StoriesPage } from "./StoriesPage";
+import { StoryCalendar } from "./StoryCalendar";
+import { StoriesPage, type StoriesCalendarProps } from "@byline/newsroom-screens/planning/StoriesPage";
+import type { StoriesView } from "@byline/newsroom-screens/planning/stories-view";
 import { createWorkspaceUrlBuilder } from "./calendar-model";
 import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
-import { destinationForTab, initialStoriesView } from "./planning-routing";
-import { useStoryPeek } from "../story/StoryPeekHost";
+import { destinationForTab, initialStoriesView, storiesViewHref } from "./planning-routing";
 
 export type PlanningAppFetchers = PlanningFetchers & StoryFetchers;
 
@@ -54,8 +55,12 @@ function PlanningBody({ fetchers, tab, view, currentUserId, mine, workspaceUrl }
   const initialView = useMemo(() => initialStoriesView(tab, view, typeof window === "undefined" ? null : window.localStorage), [tab, view]);
   // A new story opens its full Story Workspace, exactly as it does from Home.
   const openCreated = (created: StoryWorkspace) => window.location.assign(created.workspaceUrl || workspaceUrl(created.story.id));
+  // WordPress's Stories calendar is Schedule-X over the protected schedule feed; its events link
+  // appointments too, so it takes the full wp-admin workspace builder rather than the story-only one.
+  const renderCalendar = useCallback((calendar: StoriesCalendarProps) => <StoryCalendar {...calendar} workspaceUrl={workspaceUrl} getSchedule={fetchers.getSchedule} />, [fetchers.getSchedule, workspaceUrl]);
+  const viewHref = useCallback((next: StoriesView) => storiesViewHref(window.location.href, next), []);
   return <main className="@container/planning mx-auto mt-6 mb-8 flex max-w-[1600px] flex-col gap-4 pr-5 pl-1">
-    {destination === "stories" ? <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={{ mine: Boolean(mine), collectionId: Number(new URLSearchParams(window.location.search).get("collection")) || undefined }} workspaceUrl={workspaceUrl} onNewStory={fetchers.createStory ? () => setCreating(true) : undefined} /> : null}
+    {destination === "stories" ? <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={{ mine: Boolean(mine), collectionId: Number(new URLSearchParams(window.location.search).get("collection")) || undefined }} workspaceUrl={workspaceUrl} renderCalendar={renderCalendar} viewHref={viewHref} onNewStory={fetchers.createStory ? () => setCreating(true) : undefined} /> : null}
     {destination === "collections" ? <CollectionsPage fetchers={fetchers} currentUserId={currentUserId} workspaceUrl={workspaceUrl} /> : null}
     {destination === "media" ? <MediaDesk fetchers={fetchers} workspaceUrl={workspaceUrl} onOpenStory={openStory} /> : null}
     {destination === "feedback" ? <Feedback fetchers={fetchers} onOpenStory={openStory} /> : null}

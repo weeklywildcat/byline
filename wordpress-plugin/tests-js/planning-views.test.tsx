@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { decodeEntities } from "@byline/newsroom-ui/lib/text";
-import { StoryBoard } from "../src/planning/StoryBoard";
-import { StoryList, type StoryListProps } from "../src/planning/StoryList";
+import { StoryBoard } from "@byline/newsroom-screens/planning/StoryBoard";
+import { StoryList, type StoryListProps } from "@byline/newsroom-screens/planning/StoryList";
 import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, hideFinishedPublished, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 import { destinationForTab, initialStoriesView, storiesViewHref } from "../src/planning/planning-routing";
 import { ProductionSummary, productionSignal, storySignals, workflowBadgeSpec, WorkflowBadge } from "@byline/newsroom-screens/story/story-parts";

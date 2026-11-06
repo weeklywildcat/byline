@@ -29,8 +29,8 @@ import type { PlanningFetchers } from "@byline/newsroom-screens/planning/plannin
 import { EMPTY_MEDIA_DESK_FILTERS, MEDIA_STATUS_OPTIONS, MEDIA_TYPE_OPTIONS, filterMediaRows, mediaDeskRows, mediaDueDay, mediaReadinessHint, mediaTypeLabel, sortMediaRows, type MediaDeskFilters, type MediaDeskRow } from "./media-desk-model";
 import { describeMediaDeskError } from "./media-desk-errors";
 import { mergeMediaAttachmentIds, removeMediaAttachmentId, type MediaAttachment, type MediaDeskResponse } from "@byline/newsroom-screens/planning/planning-model";
-import { NothingHere, PageHeader, ResourceGate } from "./PlanningPage";
-import { useOptionalQuery } from "./planning-query";
+import { NothingHere, PageHeader, ResourceGate } from "@byline/newsroom-screens/planning/PlanningPage";
+import { useOptionalQuery } from "@byline/newsroom-screens/planning/planning-query";
 
 export type MediaDeskProps = { fetchers: PlanningFetchers; workspaceUrl: (storyId: number, appointmentId?: string) => string; onOpenStory: (storyId: number) => void };
 

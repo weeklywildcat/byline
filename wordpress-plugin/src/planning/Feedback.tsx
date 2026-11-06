@@ -15,8 +15,8 @@ import { StoryTitleButton } from "@byline/newsroom-screens/story/story-parts";
 import { StoryHoverCard } from "@byline/newsroom-screens/story/StoryHoverCard";
 import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
 import { exactPlanningDate, type FeedbackItem, type FeedbackResponse, type FeedbackStatus } from "@byline/newsroom-screens/planning/planning-model";
-import { NothingHere, PageHeader, ResourceGate } from "./PlanningPage";
-import { useOptionalQuery } from "./planning-query";
+import { NothingHere, PageHeader, ResourceGate } from "@byline/newsroom-screens/planning/PlanningPage";
+import { useOptionalQuery } from "@byline/newsroom-screens/planning/planning-query";
 
 const STATUSES: Array<{ value: FeedbackStatus; label: string }> = [
   { value: "new", label: __("New", "weekly-wildcat-headless") },

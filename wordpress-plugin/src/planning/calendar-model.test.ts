@@ -107,12 +107,12 @@ describe("appointments on the calendar", () => {
 });
 
 describe("story-derived events stay distinct", () => {
-  it("keeps deadline, planned publication and the WordPress schedule as three events, never merged", () => {
+  it("keeps deadline, planned publication and the scheduled publication as three events, never merged", () => {
     const events = planningCalendarEvents([story({ plannedPublication: "2026-11-03", deadline: "2026-11-03" })], timezone);
     expect(events.map((event) => [event.type, event.label, event.date])).toEqual([
       ["deadline", "Deadline", "2026-11-03"],
       ["planned", "Planned publication", "2026-11-03"],
-      ["scheduled", "Scheduled in WordPress", "2026-11-03"]
+      ["scheduled", "Scheduled publication", "2026-11-03"]
     ]);
     expect(new Set(events.map((event) => event.id)).size).toBe(3);
   });

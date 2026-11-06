@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { StoryList } from "../planning/StoryList";
+import { StoryList } from "@byline/newsroom-screens/planning/StoryList";
 import {
   useMoveStory,
   useUpdatePlanningStory,
-} from "../planning/planning-query";
+} from "@byline/newsroom-screens/planning/planning-query";
 import {
   DEFAULT_WORKFLOW_STATUSES,
   sortPlanningStories,

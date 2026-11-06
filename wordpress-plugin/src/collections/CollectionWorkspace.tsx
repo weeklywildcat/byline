@@ -21,7 +21,7 @@ import {
 } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
 import { ItemGroup } from "@byline/newsroom-ui/ui/item";
-import { PageHeader } from "../planning/PlanningPage";
+import { PageHeader } from "@byline/newsroom-screens/planning/PlanningPage";
 import type { PlanningAppFetchers } from "../planning/PlanningApp";
 import { StoryCreateDialog } from "@byline/newsroom-screens/story/StoryCreateDialog";
 import { TaskCreateDialog } from "@byline/newsroom-screens/story/TaskCreateDialog";

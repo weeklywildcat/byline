@@ -71,8 +71,8 @@ import type {
   ContentHealthResponse,
   ContentHealthSeverity,
 } from "@byline/newsroom-screens/planning/planning-model";
-import { NothingHere, PageHeader, ResourceGate } from "./PlanningPage";
-import { useOptionalQuery } from "./planning-query";
+import { NothingHere, PageHeader, ResourceGate } from "@byline/newsroom-screens/planning/PlanningPage";
+import { useOptionalQuery } from "@byline/newsroom-screens/planning/planning-query";
 
 type Filters = {
   search: string;

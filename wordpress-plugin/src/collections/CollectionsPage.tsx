@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader } from "../planning/PlanningPage";
+import { PageHeader } from "@byline/newsroom-screens/planning/PlanningPage";
 import type { PlanningAppFetchers } from "../planning/PlanningApp";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import {
@@ -13,7 +13,7 @@ import {
 import { ItemGroup } from "@byline/newsroom-ui/ui/item";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { RowSkeletons } from "@byline/newsroom-screens/story/rows";
-import { useStoryPeek } from "../story/StoryPeekHost";
+import { useStoryPeek } from "@byline/newsroom-screens/story/StoryPeekHost";
 import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
 import { CollectionDialog } from "./CollectionDialog";
 import { CollectionWorkspace, type AddKind } from "./CollectionWorkspace";

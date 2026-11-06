@@ -16,7 +16,7 @@ describe("one Story Peek", () => {
   });
 
   it("is mounted by the Planning host and by Home, and nothing else renders a story detail panel", () => {
-    expect(read(path.join(src, "story/StoryPeekHost.tsx"))).toContain("<StoryPeek ");
+    expect(read(sourcePath("story/StoryPeekHost.tsx"))).toContain("<StoryPeek ");
     expect(read(sourcePath("home/HomeApp.tsx"))).toContain("<StoryPeek ");
     const mounts = everywhere().filter(({ file }) => /<StoryPeek[ \n]/.test(read(file))).map(({ relative }) => relative).sort();
     expect(mounts).toEqual(["home/HomeApp.tsx", "story/StoryPeekHost.tsx"]);

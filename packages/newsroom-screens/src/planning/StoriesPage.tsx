@@ -1,24 +1,27 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { useDebouncedValue, useNow } from "@byline/newsroom-ui/lib/hooks";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
-import { STORIES_VIEW_IDS, storiesViewFromRoute, writeStoriesViewPreference, type StoriesView } from "../home/navigation-model";
+import {
+  availableStoriesViews,
+  storiesViewFromRoute,
+  supportedStoriesView,
+  writeStoriesViewPreference,
+  type StoriesView
+} from "./stories-view";
 import { useStoryPeek } from "../story/StoryPeekHost";
-import type { WorkspaceUrl } from "./calendar-model";
 import { PageHeader } from "./PlanningPage";
 import { SavedViews, type AppliedView } from "./SavedViews";
 import { StoryBoard } from "./StoryBoard";
-import { StoryCalendar } from "./StoryCalendar";
 import { StoryFilters } from "./StoryFilters";
 import { StoryList } from "./StoryList";
-import type { PlanningFetchers } from "../planning/planning-api";
-import { storiesViewHref } from "./planning-routing";
+import type { PlanningFetchers } from "./planning-api";
 import { useMoveStory, usePlanningStories, useUpdatePlanningStory } from "./planning-query";
-import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, filterPlanningStories, hideFinishedPublished, normalizePlanningFilters, sortPlanningStories, type PlanningFilters, type PlanningPerson, type PlanningSort, type PlanningSortKey, type PlanningStory } from "../planning/planning-model";
-import { describePlanningError } from "../planning/planning-model";
+import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, filterPlanningStories, hideFinishedPublished, normalizePlanningFilters, sortPlanningStories, type PlanningFilters, type PlanningPerson, type PlanningSort, type PlanningSortKey, type PlanningStory } from "./planning-model";
+import { describePlanningError } from "./planning-model";
 
 const VIEW_LABELS: Record<StoriesView, string> = { board: "Board", list: "List", calendar: "Calendar" };
 
@@ -29,24 +32,56 @@ function mergePeople(known: PlanningPerson[], stories: PlanningStory[], pick: (s
   return Array.from(people.values()).sort((left, right) => left.name.localeCompare(right.name));
 }
 
+/** A story's full Story Workspace address. Each host builds its own. */
+export type StoryWorkspaceUrl = (storyId: number) => string;
+
+/** What a host's calendar receives: the same filtered stories Board and List show. */
+export type StoriesCalendarProps = {
+  stories: PlanningStory[];
+  /** The newsroom timezone every event is read in, never the browser's. */
+  timezone: string;
+  currentUserId: number | null;
+  collectionId?: number;
+  workspaceUrl: StoryWorkspaceUrl;
+  onOpenStory: (storyId: number) => void;
+};
+
+/** The address of a Stories view when the host does not supply one: the current address with `view=` set. */
+export function defaultStoriesViewHref(currentHref: string, view: StoriesView): string {
+  const url = new URL(currentHref);
+  url.searchParams.set("view", view);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 export type StoriesPageProps = {
   fetchers: PlanningFetchers;
   currentUserId: number | null;
   initialView: StoriesView;
   initialFilters?: Partial<PlanningFilters>;
-  workspaceUrl: WorkspaceUrl;
+  workspaceUrl: StoryWorkspaceUrl;
   onNewStory?: () => void;
+  /**
+   * The host's calendar. Without one Stories offers only Board and List; a
+   * Calendar tab never appears without a calendar behind it.
+   */
+  renderCalendar?: (props: StoriesCalendarProps) => ReactNode;
+  /** The address of a view, so a reload or a shared link lands on it. Defaults to the current address with `view=` set. */
+  viewHref?: (view: StoriesView) => string;
 };
 
 /**
- * Stories: one collection, three views. Board, List and Calendar are Tabs
- * because they are alternate presentations of the same filtered stories; each
- * opens the one Story Peek, and Peek opens the one Story Workspace.
+ * Stories: one collection, several views. Board, List and (when the host has
+ * one) Calendar are Tabs because they are alternate presentations of the same
+ * filtered stories; each opens the one Story Peek, and Peek opens the one
+ * Story Workspace.
  */
-export function StoriesPage({ fetchers, currentUserId, initialView, initialFilters, workspaceUrl, onNewStory }: StoriesPageProps) {
+export function StoriesPage({ fetchers, currentUserId, initialView, initialFilters, workspaceUrl, onNewStory, renderCalendar, viewHref }: StoriesPageProps) {
   const { openStory } = useStoryPeek();
   const now = useNow();
-  const [view, setView] = useState<StoriesView>(initialView);
+  const hasCalendar = Boolean(renderCalendar);
+  const views = useMemo(() => availableStoriesViews(hasCalendar), [hasCalendar]);
+  const [requestedView, setView] = useState<StoriesView>(initialView);
+  const view = supportedStoriesView(requestedView, hasCalendar);
   const [filters, setFilters] = useState<PlanningFilters>(() => normalizePlanningFilters(initialFilters));
   const [sort, setSort] = useState<PlanningSort>(DEFAULT_PLANNING_SORT);
   const [savedViewId, setSavedViewId] = useState<string | null>(null);
@@ -79,9 +114,10 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
   const changeView = useCallback((next: StoriesView) => {
     setView(next);
     writeStoriesViewPreference(next, typeof window === "undefined" ? null : window.localStorage);
-    window.history.pushState({ view: next }, "", storiesViewHref(window.location.href, next));
-  }, []);
+    window.history.pushState({ view: next }, "", viewHref ? viewHref(next) : defaultStoriesViewHref(window.location.href, next));
+  }, [viewHref]);
   useEffect(() => {
+    // Back and forward restore the view the address names; hosts keep `view=` as the generic parameter.
     const restore = () => { const next = storiesViewFromRoute(new URL(window.location.href).searchParams.get("view") || undefined); if (next) setView(next); };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
@@ -97,7 +133,7 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
     <PageHeader title={"Stories"} description={"Track everything the newsroom is working on."} actions={onNewStory ? <Button onClick={onNewStory}><Plus data-icon="inline-start" aria-hidden="true" />New story</Button> : undefined} />
     <Tabs value={view} onValueChange={(next) => changeView(next as StoriesView)} className="gap-3">
       <TabsList variant="line" aria-label={"Stories views"}>
-        {STORIES_VIEW_IDS.map((id) => <TabsTrigger key={id} value={id}>{VIEW_LABELS[id]}</TabsTrigger>)}
+        {views.map((id) => <TabsTrigger key={id} value={id}>{VIEW_LABELS[id]}</TabsTrigger>)}
       </TabsList>
       <StoryFilters filters={filters} onChange={changeFilters} showPublished={view === "list" ? { value: showPublished, onChange: setShowPublished } : undefined} statuses={statuses} writers={people.writers} editors={people.editors}
         savedViews={<SavedViews fetchers={fetchers} currentUserId={userId} filters={filters} sort={sort} selectedId={savedViewId} onApply={apply} initialViews={data?.savedViews} />} />
@@ -108,7 +144,7 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
         : <>
           <TabsContent value="board"><StoryBoard stories={stories} statuses={statuses} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onMoveStory={move} onOpenStory={open} /></TabsContent>
           <TabsContent value="list"><StoryList stories={listStories} hiddenPublished={stories.length - listStories.length} statuses={statuses} sort={sort} canMoveStories={canMove} canAssignStories={canAssign} canUpdateStories={canUpdateStories} movingStoryId={movingStoryId} updatingStoryId={updatingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onUpdateStory={update} onOpenStory={open} /></TabsContent>
-          <TabsContent value="calendar"><StoryCalendar collectionId={filters.collectionId} stories={stories} timezone={timezone} getSchedule={fetchers.getSchedule} currentUserId={userId} workspaceUrl={workspaceUrl} onOpenStory={open} /></TabsContent>
+          {renderCalendar ? <TabsContent value="calendar">{renderCalendar({ collectionId: filters.collectionId, stories, timezone, currentUserId: userId, workspaceUrl, onOpenStory: open })}</TabsContent> : null}
         </>}
     </Tabs>
     <p role="status" aria-live="polite" className="sr-only">{loading ? "" : `${stories.length} ${stories.length === 1 ? "story" : "stories"} in this view.`}</p>
