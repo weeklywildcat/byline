@@ -45,14 +45,14 @@ const asUser = (ctx: ScreenContext) => ({ req: ctx.req, overrideAccess: false as
 const num = (value: unknown) => Number(relationId(value));
 const LIMITS = { stories: 200, tasks: 100, visualWork: 50, appointments: 100, activity: 0 } as const;
 
-const STATUSES = [
+export const STATUSES = [
   ...WORKFLOW_OPTIONS.map((option) => ({ id: option.value, label: option.label, group: option.value === "on-hold" || option.value === "dropped" ? "sidelined" : "main", selectable: true })),
   { id: "published", label: "Published", group: "derived", selectable: false }
 ];
 
 /* --------------------------------------------------------------- people */
 
-type People = {
+export type People = {
   users: Map<string, Pick<User, "id" | "name" | "role" | "linkedPerson">>;
   personToUser: Map<string, number>;
   persons: Map<string, Pick<Person, "id" | "name" | "slug" | "newsroomRole" | "status">>;
@@ -60,8 +60,9 @@ type People = {
 
 export async function loadPeople(ctx: ScreenContext): Promise<People> {
   const [users, persons] = await Promise.all([
-    ctx.req.payload.find({ collection: "users", where: { enabled: { equals: true } }, depth: 0, limit: 500, sort: "name", select: { name: true, role: true, linkedPerson: true }, ...asUser(ctx) }),
-    ctx.req.payload.find({ collection: "people", depth: 0, limit: 1000, sort: "name", select: { name: true, slug: true, newsroomRole: true, status: true }, ...asUser(ctx) })
+    // Everyone, never a first page: a missing account would silently drop someone's name from a byline.
+    ctx.req.payload.find({ collection: "users", where: { enabled: { equals: true } }, depth: 0, pagination: false, sort: "name", select: { name: true, role: true, linkedPerson: true }, ...asUser(ctx) }),
+    ctx.req.payload.find({ collection: "people", depth: 0, pagination: false, sort: "name", select: { name: true, slug: true, newsroomRole: true, status: true }, ...asUser(ctx) })
   ]);
   const people: People = { users: new Map(), personToUser: new Map(), persons: new Map() };
   for (const user of users.docs) {
@@ -73,7 +74,7 @@ export async function loadPeople(ctx: ScreenContext): Promise<People> {
   return people;
 }
 
-function userPerson(people: People, userId: unknown): PlanningPerson | null {
+export function userPerson(people: People, userId: unknown): PlanningPerson | null {
   const user = people.users.get(String(relationId(userId)));
   return user ? { id: user.id, name: user.name, kind: "user", avatarUrl: null } : null;
 }
@@ -256,7 +257,7 @@ function mediaSummary(rows: ProductionAssignment[]): MediaSummary {
 
 /* -------------------------------------------------------------- stories */
 
-type StoryExtras = {
+export type StoryExtras = {
   tasks: Task[];
   production: ProductionAssignment[];
   sources: Source[];
@@ -292,7 +293,7 @@ export function planningStory(ctx: ScreenContext, people: People, story: Story, 
     writer,
     editor: userPerson(people, plan?.editor),
     workflow: { id: status.id, label: workflowLabel(workflow), group: status.group as PlanningStory["workflow"]["group"], selectable: status.selectable },
-    publicationState: { id: published ? "publish" : "draft", label: published ? "Published" : "Draft", isPublished: published, isScheduled: false, scheduledAt: null, publishedAt: story.publishedAt ?? null },
+    publicationState: { id: published ? "published" : "draft", label: published ? "Published" : "Draft", isPublished: published, isScheduled: false, scheduledAt: null, publishedAt: story.publishedAt ?? null },
     deadline: plan?.deadline ?? null,
     plannedPublication: plan?.plannedPublication ?? null,
     modifiedAt: story.updatedAt,
@@ -313,29 +314,49 @@ function scopeManagesSync(ctx: ScreenContext, plan: StoryPlan | null): boolean {
   return sameId(plan.createdBy, ctx.user.id) || sameId(plan.editor, ctx.user.id) || (ctx.user.linkedPerson !== null && relationIds(plan.contributors).some((id) => sameId(id, ctx.user.linkedPerson)));
 }
 
-function localToday(ctx: ScreenContext) {
+export function localToday(ctx: ScreenContext) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: ctx.timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(ctx.now);
 }
 
 const storySelect = { headline: true, _status: true, section: true, contributors: true, featuredMedia: true, updatedAt: true, publishedAt: true, format: true, video: true } as const;
 
-async function storiesWithExtras(ctx: ScreenContext, ids: number[]) {
+/**
+ * Stories with their work, complete: `pagination: false` with no `limit`, because
+ * Payload still applies a limit when pagination is off and a capped read would
+ * silently drop stories, tasks or assignments.
+ *
+ * Draft saves live in the versions table, so the newsroom reads each story's
+ * latest draft. An unpublished rewrite of a published story is its managers'
+ * work in progress (Stories `readVersions`): someone who only holds an
+ * assignment on it reads the published story, never the rewrite. A rewrite
+ * never makes a published story read as unpublished.
+ */
+export async function storiesWithExtras(ctx: ScreenContext, ids: number[]) {
   if (ids.length === 0) return { stories: [] as Story[], extras: new Map<number, StoryExtras>() };
   const byStory = { story: { in: ids } } satisfies Where;
-  const [stories, tasks, production, sources, appointments] = await Promise.all([
-    // Draft saves live in the versions table: read the latest draft for what the newsroom is working on.
-    ctx.req.payload.find({ collection: "stories", where: { id: { in: ids } }, draft: true, depth: 1, limit: ids.length, select: storySelect, ...asUser(ctx) }),
-    ctx.req.payload.find({ collection: "tasks", where: byStory, depth: 0, limit: 1000, pagination: false, sort: "createdAt", ...asUser(ctx) }),
-    ctx.req.payload.find({ collection: "production-assignments", where: byStory, depth: 0, limit: 1000, pagination: false, sort: "createdAt", ...asUser(ctx) }),
-    ctx.req.payload.find({ collection: "sources", where: byStory, depth: 0, limit: 1000, pagination: false, sort: "createdAt", select: { story: true, status: true }, ...asUser(ctx) }),
-    ctx.req.payload.find({ collection: "appointments", where: byStory, depth: 0, limit: 1000, pagination: false, sort: "createdAt", ...asUser(ctx) })
+  const all = { depth: 0, pagination: false, sort: "createdAt", ...asUser(ctx) } as const;
+  const [drafts, live, tasks, production, sources, appointments, scope] = await Promise.all([
+    ctx.req.payload.find({ collection: "stories", where: { id: { in: ids } }, draft: true, depth: 1, pagination: false, select: storySelect, ...asUser(ctx) }),
+    ctx.req.payload.find({ collection: "stories", where: { id: { in: ids } }, depth: 1, pagination: false, select: storySelect, ...asUser(ctx) }),
+    ctx.req.payload.find({ collection: "tasks", where: byStory, ...all }),
+    ctx.req.payload.find({ collection: "production-assignments", where: byStory, ...all }),
+    ctx.req.payload.find({ collection: "sources", where: byStory, ...all, select: { story: true, status: true } }),
+    ctx.req.payload.find({ collection: "appointments", where: byStory, ...all }),
+    storyScope(ctx.req)
   ]);
+  // Whether a story is live comes from the story itself: a pending rewrite's version reads "draft".
+  const liveById = new Map((live.docs as Story[]).map((story) => [story.id, story]));
+  const stories = (drafts.docs as Story[]).map((draft) => {
+    const current = liveById.get(draft.id);
+    if (current?._status !== "published") return draft;
+    return scopeManages(scope, draft.id) ? { ...draft, _status: current._status, publishedAt: current.publishedAt } : current;
+  });
   const extras = new Map<number, StoryExtras>(ids.map((id) => [id, { tasks: [], production: [], sources: [], appointments: [] }]));
   for (const task of tasks.docs) extras.get(num(task.story))?.tasks.push(task);
   for (const row of production.docs) extras.get(num(row.story))?.production.push(row);
   for (const source of sources.docs) extras.get(num(source.story))?.sources.push(source as Source);
   for (const appointment of appointments.docs) extras.get(num(appointment.story))?.appointments.push(appointment);
-  return { stories: stories.docs as Story[], extras };
+  return { stories, extras };
 }
 
 /* ----------------------------------------------------------------- Home */

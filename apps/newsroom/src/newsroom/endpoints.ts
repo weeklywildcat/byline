@@ -7,6 +7,8 @@ import { addDays, localDay, localToInstant, newsroomTimeZone } from "../domain/d
 import { findPreset, STORY_PRESETS } from "../domain/presets";
 import { isWorkflowStage } from "../domain/workflow";
 import { validResourceUrl } from "../collections/StoryPlans";
+import { parsePlanningFilterParams } from "@byline/newsroom-screens/planning/planning-api";
+import { planningResponse } from "./planning";
 import { contributorEntry, editorialTask, homeBootstrap, loadPeople, mediaFor, personIdFor, planFor, reportingFor, screenContext, searchStories, storyResources, storyWorkspace, type ScreenContext } from "./screen-models";
 import type { AppointmentInput, MediaAssignmentInput, SourceInput } from "@byline/newsroom-screens/workspace/workspace-types";
 import { effectiveWorkflow } from "../domain/workflow";
@@ -378,6 +380,8 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/home", method: "get", handler: handle((ctx) => homeBootstrap(ctx)) },
   { path: "/byline/home/search", method: "get", handler: handle((ctx, req) => searchStories(ctx, String(req.searchParams.get("query") ?? ""))) },
   { path: "/byline/presets", method: "get", handler: handle(async () => presetsPayload()) },
+  // The Stories collection (Board and List). Board moves and inline edits use /stories/:id/workflow.
+  { path: "/byline/planning", method: "get", handler: handle((ctx, req) => planningResponse(ctx, parsePlanningFilterParams(req.searchParams))) },
   { path: "/byline/stories", method: "post", handler: handle(createStory) },
   { path: "/byline/stories/:id/workspace", method: "get", handler: handle((ctx, req) => storyWorkspace(ctx, idParam(req))) },
   { path: "/byline/stories/:id/workflow", method: "post", handler: handle(updateWorkflow) },
