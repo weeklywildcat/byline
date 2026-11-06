@@ -98,10 +98,16 @@ export default buildConfig({
     // Byline's Nova surfaces are light; Payload's chrome follows so the two never clash.
     theme: "light",
     components: {
-      // Byline navigation replaces Payload's entirely.
+      // The Byline shell: shadcn Sidebar/Create/Search state above every view,
+      // Byline's sidebar in place of Payload's navigation, and Byline's sticky
+      // app header. Payload's template, document and form infrastructure stay.
+      providers: ["/ui/shell/BylineShellProvider#BylineShellProvider"],
       Nav: "/ui/shell/BylineNav#BylineNav",
+      header: ["/ui/shell/BylineAppHeader#BylineAppHeader"],
       views: {
-        dashboard: { Component: "/components/BylineHome#BylineHome" }
+        dashboard: { Component: "/components/BylineHome#BylineHome" },
+        // Administrators only: the entry to Payload's raw collection screens.
+        system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system" }
       }
     }
   },

@@ -100,13 +100,15 @@ export function SettingsSidebar({
             }
           >
             <div className="flex items-center gap-2 pb-2 md:hidden">
-              <SidebarTrigger aria-label="Open settings navigation" />
+              <SidebarTrigger variant="outline" label="Open settings navigation" />
               <span className="text-sm font-medium text-foreground">
                 Settings sections
               </span>
             </div>
             <Sidebar
               collapsible={isMobile ? "offcanvas" : "none"}
+              mobileTitle="Settings sections"
+              mobileDescription="Navigate between Byline settings sections."
               className="md:sticky md:top-12 md:h-fit md:max-h-[calc(100vh-5rem)] md:border-r md:border-sidebar-border"
             >
               <SettingsSidebarNavigation groups={groups} activeId={activeId} />

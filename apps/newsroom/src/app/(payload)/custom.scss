@@ -3,8 +3,18 @@
 // Byline (src/ui, Nova) owns everything a writer sees; Payload's header,
 // navigation toggler and generic chrome are not part of the product.
 
+// The Byline sidebar (shadcn Sidebar, src/ui/shell) reserves its own width:
+// its `sidebar-gap` is the first grid column (expanded, icons, or nothing on
+// phones, where it is a sheet) and its panel is fixed to the viewport.
+//
+// Payload isolates the template as its own stacking context. Byline's header
+// lives outside it, so that would trap every overlay a view opens (Story
+// Peek, dialogs, the mobile sidebar sheet) underneath the header. Released
+// here; the header sits between Payload's sticky chrome (z 20) and its modals
+// and popups (30+), and Byline overlays (z 50) stay above it.
 .template-default {
-  grid-template-columns: 15rem minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
+  isolation: auto;
 }
 
 .template-default__nav-toggler-wrapper,
@@ -12,22 +22,12 @@
   display: none;
 }
 
-.byline-shell-nav {
+// Byline's app header (`admin.components.header`) sits above the template and
+// stays in view; it offsets itself by the sidebar's width.
+.byline-app-header {
   position: sticky;
   top: 0;
-  height: 100vh;
-  overflow-y: auto;
-}
-
-@media (max-width: 768px) {
-  .template-default {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .byline-shell-nav {
-    position: static;
-    height: auto;
-  }
+  z-index: 25;
 }
 
 // The Byline Story screen (src/ui/story) presents the whole document. Payload's

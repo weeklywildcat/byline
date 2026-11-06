@@ -35,7 +35,8 @@ export type StoryScreenContext = {
  * It is the custom `Field` of one presentational collapsible that holds every
  * story field, so it renders inside Payload's own Edit view: Payload keeps the
  * form, autosave, validation, drafts, versions, locking and the Live Preview
- * window, and this component is everything the writer sees.
+ * window, and this component is everything the writer sees. The Byline shell
+ * (src/ui/shell) around it owns navigation, Create, Search and the one toaster.
  *
  * Write edits the article through Payload's form hooks: the one copy of the
  * article. Plan and Production are the shared Story Workspace sections
@@ -109,11 +110,11 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   );
 
   // A brand-new document has no ID until its first save; it has no plan yet either.
-  if (!Number.isSafeInteger(storyId) || storyId <= 0) return <div style={{ display: "contents" }} onSubmit={keepSubmitsInByline}><AdminRoot className="byline-story">{screen}</AdminRoot></div>;
+  if (!Number.isSafeInteger(storyId) || storyId <= 0) return <div style={{ display: "contents" }} onSubmit={keepSubmitsInByline}><AdminRoot className="byline-story" toaster={false}>{screen}</AdminRoot></div>;
 
   return (
     <div style={{ display: "contents" }} onSubmit={keepSubmitsInByline}>
-    <AdminRoot className="byline-story">
+    <AdminRoot className="byline-story" toaster={false}>
       <StoryWorkspaceProvider
         storyId={storyId}
         appointmentId={appointmentId}

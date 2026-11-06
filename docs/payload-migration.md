@@ -440,10 +440,10 @@ integration, styled so they do not dictate how Byline looks.
      mirrored into the story form.
    A full document-root override is used only if these APIs prove
    insufficient, and that decision is recorded here first.
-4. **Navigation** (`admin.components.Nav`) → Byline navigation only. Nobody
-   sees Payload's generic collection navigation. Administrators get a
-   separate, clearly secondary *Administration* section that links to the raw
-   collection screens for maintenance and debugging.
+4. **The shell** (`admin.components.providers`, `Nav`, `header`) → the Byline
+   application shell (§7.2). Nobody sees Payload's generic collection
+   navigation. Administrators reach the raw collection screens from *System
+   administration* in the account menu, never from the newsroom navigation.
 
 Generic Payload list/edit screens remain reachable by administrators as a
 fallback. They are not the product, and staff are never sent to them; until a
@@ -473,8 +473,9 @@ Built (Phase 1b, branch `feature/payload-newsroom`):
   Tailwind and the `.byline-ui-root` scope **only** for `src/ui/*.css`;
   Payload's own CSS passes through untouched. Nova's `dark:` variant follows
   Payload's `html[data-theme]` (pinned light), never the OS.
-- Byline navigation replaces Payload's `Nav`; Payload's header and nav toggler
-  are hidden. Administrators get a collapsed *Administration* section.
+- The Byline shell (§7.2): the shadcn Sidebar application shell replaces
+  Payload's `Nav`, Byline's sticky app header replaces Payload's, and one global
+  Create and ⌘K palette work on every screen.
 - The Byline Story screen (`src/ui/story`), mounted as the custom `Field` of a
   presentational collapsible around every story field: header (headline,
   Workflow and Publication as separate states, save state, Publish only with
@@ -527,8 +528,7 @@ Integration-tested (`tests/integration/screens.test.ts`, 17 tests) and exercised
 the browser: Home, Story Peek, New task, complete + Undo, New story from a template
 landing on the Story screen.
 
-Known gaps: the sidebar's "New story" still opens Payload's create route (no
-template dialog); Home's activity stream is empty until activity is ported;
+Known gaps: Home's activity stream is empty until activity is ported;
 scheduled publication is not shown (Payload's schedule lives in admin-only jobs).
 
 **The Story Workspace is ported (Phase 1d).** The WordPress workspace page and its
@@ -564,6 +564,100 @@ then supplies its adapter: the plugin keeps its `wp-api-fetch` fetchers, and the
 newsroom implements the same `HomeFetchers`/`StoryFetchers` contracts over
 Payload REST with the plan and workspace collections. Only then do Home and
 Stories join the staff navigation.
+
+### 7.2 The Byline shell
+
+**Rule.** Payload owns infrastructure and the form/document lifecycle.
+`@byline/newsroom-ui` owns the staff-facing component system. The canonical app
+shell is shadcn/Base Nova. Raw Payload UI is administrator fallback only.
+
+It is built from Payload's supported extension points; the template, the
+document root and the Edit view are untouched, so forms, autosave, validation,
+drafts, versions, locks and publishing are exactly Payload's:
+
+| Extension point | Byline piece (`apps/newsroom/src/ui/shell`) | Role |
+| --- | --- | --- |
+| `admin.components.providers` | `BylineShellProvider` → `BylineShell` | One query cache; the shadcn `SidebarProvider` (`display: contents`, ⌘\ toggles, state in the `byline_sidebar` cookie read on the server); the Create controller; the command palette |
+| `admin.components.Nav` | `BylineNav` → `BylineSidebar` | `Sidebar collapsible="icon"`: wordmark, Create, destinations, account footer; a Sheet on phones |
+| `admin.components.header` | `BylineAppHeader` | Sticky header beside the sidebar: trigger, location, Search (⌘K) |
+| `admin.components.views.system` | `SystemAdministration` (`/admin/system`) | Administrators' list of raw collection screens, role-checked on the server |
+
+- **Navigation** (`domain/navigation.ts` `NAVIGATION`): only destinations whose
+  Byline screen exists. Today that is Home. Planned order: Home, Stories,
+  Planning, Calendar, Media, Coverage, then for editors People, Polls,
+  Feedback. Never a generic Payload collection to fill the list.
+- **Create** (`ui/shell/create.tsx`): `BylineCreateProvider` mounts the shared
+  `HomeCreate` dialogs (StoryCreateDialog, TaskCreateDialog) once, beside the
+  page and outside the Story screen's `<form>`. Anything calls
+  `useBylineCreate().openCreate(kind, { storyId })`: the sidebar's Create
+  (expanded: "Create" makes a story, the chevron lists every kind; collapsed:
+  "+" opens the list), Home's My Work "Task", the palette. A task created on a
+  Story screen starts linked to that story; a new story opens its Byline Story
+  screen. **A future kind** (Coverage, Poll, Upload media) is added to
+  `CREATE_ACTIONS` with its minimum role and gets its dialog in
+  `create.tsx`, only when its Byline flow exists. No disabled "coming soon"
+  entries.
+- **Search** (`ui/shell/search.tsx`): the shared `HomeCommands` palette on
+  every screen (⌘K / Ctrl-K or the header). A screen that can show a story in
+  place registers `useBylineSearch().setStoryOpener` (Home's Story Peek);
+  otherwise a chosen story opens its Story screen. People, Media and Coverage
+  join its results with their screens.
+- **Home in the shell**: the shared `HomeApp` takes an optional `shell`
+  (`HomeShell`: query client, `openCreate`, `setStoryOpener`). With it, Home
+  drops its own New story, Search, ⌘K listener, dialogs, toaster and wp-admin
+  gutter; WordPress passes none and keeps all of them.
+- **Account footer**: name, newsroom title (the linked person's
+  `newsroomRole`, else the account role) and portrait or initials; *System
+  administration* for administrators; Sign out. Profile and Preferences join
+  when their Byline screens exist.
+- **Shared primitive**: `@byline/newsroom-ui/ui/sidebar` is the current
+  upstream base-nova Sidebar. Product behavior is opt-in props
+  (`keyboardShortcut`, `persistCookie`, `mobileTitle`, `SidebarTrigger label`),
+  so WordPress Settings keeps its embedded, shortcut-free sidebar. Never copy
+  shadcn components into `apps/newsroom`.
+
+**Sidebar patterns, one per job.** There is exactly one global sidebar. Other
+shadcn sidebar blocks are references for specific surfaces, never extra global
+navigation:
+
+| Block | Byline use | When |
+| --- | --- | --- |
+| `dashboard-01` | Shell structure: sidebar + sticky header + content | Now |
+| `sidebar-09` (nested) | A module's secondary pane beside the global sidebar: Stories (My Work, All, Ready for Review, Published, On Hold), Media (types, My uploads, Needs alt text, Recently used), Coverage (Active, Upcoming, Past, Archived). Build one reusable module-sidebar composition with the first screen that needs it | With Stories / Media / Coverage |
+| `sidebar-10` (popover) | Compact contextual actions; universal actions stay in the Command palette | As needed |
+| `sidebar-11` (file tree) | Only for really hierarchical data (Media folders, an investigation's documents) | If such data exists |
+| `sidebar-12` (calendar) | Calendar's left pane: mini calendar, My Schedule, Interviews, Reporting, Production, School events, completed/cancelled toggles | With the real Calendar adapter |
+| `sidebar-14` / `sidebar-15` (right inspector) | The Story screen's inspector for workflow, deadline, editor, presentation, format, readiness and Preview controls not already edited inline; a Sheet on narrow screens | With the editor / Live Preview phase |
+
+**Implementation notes.**
+
+- Payload's root font is not 16px and the Sidebar's width variables are inline
+  styles the rem→px compile never sees, so `BylineShell` sets them in px.
+- Byline's scoped CSS has no Preflight: the `hidden` attribute alone does not
+  hide an element with a display class (the primitive adds `hidden` too).
+- Payload isolates `.template-default` as a stacking context; that would trap
+  every view's overlay under the header, so `custom.scss` releases it. The
+  header sits at z 25: above Payload's sticky chrome (20), below its modals
+  and popups (30+) and Byline's overlays (50).
+- ⌘\ toggles the sidebar, not shadcn's ⌘B, which is Bold in the editor.
+- Shell dialogs mount their Byline root only while open (`ShellLayer`): a
+  modal a screen already has open (Story Peek) hides everything outside it
+  from assistive technology when it opens, which would include a root that
+  was always there. The one toaster has its own persistent root.
+- Payload renders custom root views bare; `SystemAdministration` wraps itself
+  in `DefaultTemplate` to get the shell.
+
+**Verified** (`tests/shell.test.ts`, `tests/domain.test.ts`, the plugin's
+`settings-shadcn-sidebar.test.ts`, and in Chrome at 1920, 1440, 1366, 1180,
+820 and 390 px wide): staff and editors see only Byline destinations and no
+System administration, administrators reach it and the raw screens with a way
+back; the sidebar collapses to named icons (tooltips) and restores from the
+cookie; on a phone it is a Sheet that Escape closes, with Create and the
+account menu reachable; no horizontal overflow; Create → Story lands on the
+Byline Story screen; autosave from Write still saves; adding a source in Plan
+and creating a task from Create on a Story screen leave the story's versions
+unchanged (no form submit); Production renders; ⌘K works on Home and on the
+Story screen; Sign out ends the session.
 
 ## 8. Editor
 

@@ -4,7 +4,7 @@ import { atLeast, newsroomUser, relationIds } from "../src/access/user";
 import { passwordSignInAllowed } from "../src/collections/Users";
 import { validResourceUrl } from "../src/collections/StoryPlans";
 import { addDays, localDay, localToInstant } from "../src/domain/dates";
-import { administrationFor, navigationFor } from "../src/domain/navigation";
+import { activeNavKey, administrationFor, canAdministerSystem, createActionsFor, locationFor, navigationFor, storyIdFromPath } from "../src/domain/navigation";
 import { dateOnly, normalizeAppointmentTiming, TimingError } from "../src/domain/schedule";
 import { isSlug, slugify } from "../src/domain/slug";
 import { CORRECTION_TYPES, STORY_FORMATS, WORKFLOW_STAGES } from "../src/domain/vocabulary";
@@ -159,6 +159,46 @@ describe("navigation", () => {
     expect(administrationFor("staff")).toEqual([]);
     expect(administrationFor("editor")).toEqual([]);
     expect(administrationFor("administrator").map((item) => item.key)).toContain("raw-stories");
+  });
+
+  it("opens System administration to administrators only", () => {
+    expect(canAdministerSystem("staff")).toBe(false);
+    expect(canAdministerSystem("editor")).toBe(false);
+    expect(canAdministerSystem("administrator")).toBe(true);
+  });
+
+  it("marks the destination a path belongs to, and Home only on Home", () => {
+    const items = [{ key: "home", path: "" }, { key: "stories", path: "/stories" }, { key: "story-ready", path: "/stories/ready" }];
+    expect(activeNavKey(items, "/admin", "/admin")).toBe("home");
+    expect(activeNavKey(items, "/admin/", "/admin")).toBe("home");
+    expect(activeNavKey(items, "/admin/stories?mine=1", "/admin")).toBe("stories");
+    expect(activeNavKey(items, "/admin/stories/ready", "/admin")).toBe("story-ready");
+    expect(activeNavKey(items, "/admin/collections/stories/3", "/admin")).toBeNull();
+    expect(activeNavKey(items, "/admin/storiesque", "/admin")).toBeNull();
+  });
+});
+
+describe("global Create", () => {
+  it("offers every role a story first, then a task", () => {
+    for (const role of ["staff", "editor", "administrator"] as const) {
+      expect(createActionsFor(role).map((action) => action.kind)).toEqual(["story", "task"]);
+    }
+  });
+
+  it("links a task created on a Story screen to that story", () => {
+    expect(storyIdFromPath("/admin/collections/stories/42", "/admin")).toBe(42);
+    expect(storyIdFromPath("/admin/collections/stories/create", "/admin")).toBeNull();
+    expect(storyIdFromPath("/admin", "/admin")).toBeNull();
+  });
+});
+
+describe("app header location", () => {
+  it("names Byline screens and files raw screens under System administration", () => {
+    expect(locationFor("/admin", "/admin")).toEqual([{ label: "Home" }]);
+    expect(locationFor("/admin/collections/stories/3", "/admin")).toEqual([{ label: "Story" }]);
+    expect(locationFor("/admin/system", "/admin")).toEqual([{ label: "System administration" }]);
+    expect(locationFor("/admin/collections/stories", "/admin")).toEqual([{ label: "System administration", path: "/system" }, { label: "Stories" }]);
+    expect(locationFor("/admin/collections/stories/create", "/admin")).toEqual([{ label: "System administration", path: "/system" }, { label: "Stories" }]);
   });
 });
 

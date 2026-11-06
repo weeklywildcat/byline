@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 
 /** The current time, refreshed every minute, so "due tomorrow" stays true on a screen left open. */
 export function useNow(intervalMs = 60_000): Date {
@@ -38,18 +38,24 @@ export function useElementWidth<T extends HTMLElement>(): [RefObject<T | null>, 
 
 
 const MOBILE_BREAKPOINT = 768;
+const MOBILE_QUERY = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`;
 
-/** Whether the current viewport is below the shadcn Sidebar mobile breakpoint. */
+function subscribeMobile(onChange: () => void) {
+  const media = window.matchMedia(MOBILE_QUERY);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+/**
+ * Whether the current viewport is below the shadcn Sidebar mobile breakpoint.
+ * Server-rendered hosts (the Payload newsroom) hydrate as "not mobile" and
+ * then switch, so the markup never mismatches; client-only hosts read the real
+ * width on their first render.
+ */
 export function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT
+  return useSyncExternalStore(
+    subscribeMobile,
+    () => window.matchMedia(MOBILE_QUERY).matches,
+    () => false
   );
-  useEffect(() => {
-    const media = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
-    const update = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    media.addEventListener("change", update);
-    update();
-    return () => media.removeEventListener("change", update);
-  }, []);
-  return isMobile;
 }

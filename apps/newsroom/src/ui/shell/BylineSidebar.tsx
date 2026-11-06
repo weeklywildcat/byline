@@ -1,97 +1,106 @@
 "use client";
 
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
-import { cn } from "@byline/newsroom-ui/lib/utils";
-import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
-import { Separator } from "@byline/newsroom-ui/ui/separator";
-import { House, LogOut, Plus, Wrench } from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  useSidebar
+} from "@byline/newsroom-ui/ui/sidebar";
+import { CalendarDays, FileText, House, Images, KanbanSquare, MessageSquareText, Radio, Users, Vote, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { activeNavKey } from "../../domain/navigation";
+import { CreateMenu } from "./CreateMenu";
+import { NavUser, type ShellUser } from "./NavUser";
 
-type NavLink = { key: string; label: string; href: string };
+export type ShellNavLink = { key: string; label: string; path: string; href: string };
 
-const ICONS: Record<string, typeof House> = { home: House };
+/** One icon per destination, ready for each screen as it lands in NAVIGATION. */
+const ICONS: Record<string, LucideIcon> = {
+  home: House,
+  stories: FileText,
+  planning: KanbanSquare,
+  calendar: CalendarDays,
+  media: Images,
+  coverage: Radio,
+  people: Users,
+  polls: Vote,
+  feedback: MessageSquareText
+};
 
-function isActive(pathname: string, href: string, home: string) {
-  if (href === home) return pathname === home || pathname === `${home}/`;
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-export function BylineSidebar({ items, administration, newStoryHref, homeHref, userName, logoutUrl, loginHref }: {
-  items: NavLink[];
-  administration: NavLink[];
-  newStoryHref: string;
+/**
+ * The global Byline sidebar: shadcn's application-shell Sidebar (collapsible
+ * to icons on desktop, an off-canvas sheet on phones), rendered by Payload's
+ * `admin.components.Nav`. Wordmark, Create, the newsroom destinations, and
+ * the account menu in the footer. Nothing here names Payload.
+ */
+export function BylineSidebar({ items, adminRoute, homeHref, user, systemHref, logoutUrl, loginHref }: {
+  items: ShellNavLink[];
+  adminRoute: string;
   homeHref: string;
-  userName: string;
+  user: ShellUser;
+  systemHref: string | null;
   logoutUrl: string;
   loginHref: string;
 }) {
   const pathname = usePathname() ?? "";
-  const [signingOut, setSigningOut] = useState(false);
-
-  async function signOut() {
-    setSigningOut(true);
-    try {
-      await fetch(logoutUrl, { method: "POST", credentials: "include" });
-    } finally {
-      window.location.assign(loginHref);
-    }
-  }
-
-  const linkClass = (active: boolean) => cn(buttonVariants({ variant: "ghost", size: "sm" }), "w-full justify-start gap-2 font-normal", active && "bg-muted font-medium");
+  const active = activeNavKey(items, pathname, adminRoute);
 
   return (
     <AdminRoot className="byline-shell-nav" toaster={false}>
-      <nav aria-label="Byline" className="flex h-full flex-col gap-3 border-r border-border bg-sidebar px-3 py-4 text-sidebar-foreground">
-        <Link href={homeHref} className="px-2 text-base font-semibold tracking-tight" prefetch={false}>
-          Byline
-        </Link>
-        <Link href={newStoryHref} className={cn(buttonVariants({ size: "sm" }), "w-full justify-start gap-2")} prefetch={false}>
-          <Plus aria-hidden="true" />
-          New story
-        </Link>
-        <ul className="flex flex-col gap-0.5">
-          {items.map((item) => {
-            const Icon = ICONS[item.key];
-            const active = isActive(pathname, item.href, homeHref);
-            return (
-              <li key={item.key}>
-                <Link href={item.href} className={linkClass(active)} aria-current={active ? "page" : undefined} prefetch={false}>
-                  {Icon ? <Icon aria-hidden="true" /> : null}
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-        {administration.length > 0 ? (
-          <details className="group mt-2">
-            <summary className="flex cursor-pointer list-none items-center gap-2 px-2 text-xs font-medium text-muted-foreground">
-              <Wrench className="size-3.5" aria-hidden="true" />
-              Administration
-            </summary>
-            <ul className="mt-1 flex flex-col gap-0.5">
-              {administration.map((item) => (
-                <li key={item.key}>
-                  <Link href={item.href} className={cn(linkClass(isActive(pathname, item.href, homeHref)), "text-muted-foreground")} prefetch={false}>
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : null}
-        <div className="mt-auto flex flex-col gap-2">
-          <Separator />
-          <div className="flex items-center justify-between gap-2 px-2">
-            <span className="truncate text-sm" title={userName}>{userName}</span>
-            <Button variant="ghost" size="icon-sm" onClick={signOut} disabled={signingOut} aria-label="Sign out">
-              <LogOut aria-hidden="true" />
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <Sidebar collapsible="icon" mobileTitle="Byline" mobileDescription="Newsroom navigation and account">
+        <SidebarHeader className="gap-3">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" tooltip="Byline Home" render={<Link href={homeHref} prefetch={false} aria-label="Byline Home" />} className="md:h-10">
+                <span aria-hidden="true" className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-foreground font-heading text-base font-semibold text-background">B</span>
+                <span className="truncate font-heading text-base font-semibold tracking-tight">Byline</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          <CreateMenu />
+        </SidebarHeader>
+        <SidebarContent>
+          <nav aria-label="Byline">
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-0.5">
+                  {items.map((item) => <NavLink key={item.key} item={item} active={item.key === active} />)}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </nav>
+        </SidebarContent>
+        <SidebarFooter>
+          <NavUser user={user} systemHref={systemHref} logoutUrl={logoutUrl} loginHref={loginHref} />
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
     </AdminRoot>
+  );
+}
+
+function NavLink({ item, active }: { item: ShellNavLink; active: boolean }) {
+  const { isMobile, setOpenMobile } = useSidebar();
+  const Icon = ICONS[item.key];
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        isActive={active}
+        tooltip={item.label}
+        render={<Link href={item.href} prefetch={false} aria-current={active ? "page" : undefined} onClick={() => { if (isMobile) setOpenMobile(false); }} />}
+      >
+        {Icon ? <Icon aria-hidden="true" /> : null}
+        <span>{item.label}</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }

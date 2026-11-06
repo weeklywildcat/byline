@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QueryClientProvider, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { ArrowRight, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { describeEditorialError, setTaskCompletionState, type EditorialTask } from "../editorial/editorial-model";
@@ -26,12 +26,25 @@ import { RowSkeletons, TaskRow } from "../story/rows";
 import { useUpdateTask } from "../story/use-update-task";
 import { TaskEditDialog } from "../story/TaskEditDialog";
 
-export type HomeAppProps = { fetchers: HomeFetchers; currentUserId?: number | null; actionUrls?: HomeActionUrls };
+/**
+ * A host application shell that already owns creation, search, toasts and page
+ * chrome (the Payload newsroom). With one, Home uses the shell's query cache,
+ * opens the shell's Create dialogs and leaves ⌘K to the shell. Without one
+ * (WordPress), Home brings its own.
+ */
+export type HomeShell = {
+  queryClient: QueryClient;
+  openCreate: (kind: "story" | "task", options?: { storyId?: number | null }) => void;
+  /** While Home is mounted, stories picked in the shell's search open in Home's Story Peek. */
+  setStoryOpener?: (open: ((storyId: number) => void) | null) => void;
+};
+
+export type HomeAppProps = { fetchers: HomeFetchers; currentUserId?: number | null; actionUrls?: HomeActionUrls; shell?: HomeShell };
 
 const homeQueryClient = createAdminQueryClient();
 
 export function HomeApp(props: HomeAppProps) {
-  return <QueryClientProvider client={homeQueryClient}><AdminRoot><HomeWorkspace {...props} /></AdminRoot></QueryClientProvider>;
+  return <QueryClientProvider client={props.shell?.queryClient ?? homeQueryClient}><AdminRoot toaster={!props.shell}><HomeWorkspace {...props} /></AdminRoot></QueryClientProvider>;
 }
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
@@ -59,7 +72,7 @@ function Quiet({ children }: { children: ReactNode }) {
 
 const HOME_WORK_PREVIEW_LIMIT = 10;
 
-function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
+function HomeWorkspace({ fetchers, actionUrls, shell }: HomeAppProps) {
   const client = useQueryClient();
   const home = useQuery({ queryKey: homeKey, queryFn: () => fetchers.getHome!(), enabled: Boolean(fetchers.getHome) });
   const health = useQuery({ queryKey: ["byline", "home-health"], queryFn: () => fetchers.getHealth!(), enabled: Boolean(fetchers.getHealth) });
@@ -81,6 +94,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    if (shell) return () => clearInterval(timer);
     const shortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -90,7 +104,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
     };
     window.addEventListener("keydown", shortcut, true);
     return () => { clearInterval(timer); window.removeEventListener("keydown", shortcut, true); };
-  }, [createKind]);
+  }, [createKind, shell]);
 
   function openStory(id: number) {
     if (!peekId) setOrigin(document.activeElement instanceof HTMLElement ? document.activeElement : null);
@@ -102,6 +116,13 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
     const url = created.workspaceUrl || actionUrls?.workspace?.(created.story.id);
     if (url) window.location.assign(url); else openStory(created.story.id);
   }
+  const storyOpener = useRef(openStory);
+  useEffect(() => { storyOpener.current = openStory; });
+  useEffect(() => {
+    if (!shell?.setStoryOpener) return undefined;
+    shell.setStoryOpener((id) => storyOpener.current(id));
+    return () => shell.setStoryOpener?.(null);
+  }, [shell]);
   const updateTask = useUpdateTask(fetchers);
   const complete = useMutation({
     mutationFn: (task: EditorialTask) => fetchers.editorial!.updateTask(task.id, { state: "completed" }),
@@ -149,7 +170,7 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
   const work = data ? myWork(data, now) : [];
   const stories = data ? myActiveStories(data.stories, data.currentUser.id, timezone, now) : [];
   const agenda = data ? homeAgenda(data, now).slice(0, 6) : [];
-  const newTask = (storyId: number | null = null) => { setTaskStoryId(storyId); setCreateKind("task"); };
+  const newTask = (storyId: number | null = null) => { if (shell) { shell.openCreate("task", { storyId }); return; } setTaskStoryId(storyId); setCreateKind("task"); };
   const storyTitle = (id?: number | null) => data?.stories.find((s) => s.id === id)?.title;
   const renderTask = (task: EditorialTask) => <TaskRow key={task.id} dense task={task} storyTitle={storyTitle(task.storyId)} timezone={timezone} now={now} people={data?.people || []} canAssign={Boolean(data?.capabilities.review)} pending={complete.isPending || (updateTask.isPending && String(updateTask.variables?.task.id) === String(task.id))} onOpen={task.storyId ? () => openStory(task.storyId!) : undefined} onEdit={fetchers.editorial ? () => setEditingTask(task) : undefined} onComplete={() => complete.mutate(task)} onUpdate={fetchers.editorial ? (patch, optimistic) => updateTask.mutate({ task, patch, optimistic }) : undefined} />;
   const renderWorkItem = (item: HomeWorkItem) => {
@@ -174,16 +195,19 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
   const boundedWork = Boolean(data && (data.tasks.length >= data.limits.tasks || data.visualWork.length >= data.limits.visualWork || data.appointments.length >= data.limits.appointments));
   const hasMoreWork = work.length > HOME_WORK_PREVIEW_LIMIT || boundedWork;
 
-  return <StoryHoverProvider fetchers={fetchers}><main className="@container/home mx-auto mt-6 mb-8 flex max-w-[1320px] flex-col gap-4 pr-5 pl-1">
+  // In a host shell, Home sits in the shell's content area; in wp-admin it lines up with the admin gutter.
+  const layout = shell ? "w-full px-4 py-6 lg:px-6" : "mt-6 mb-8 pr-5 pl-1";
+  return <StoryHoverProvider fetchers={fetchers}><main className={cn("@container/home mx-auto flex max-w-[1320px] flex-col gap-4", layout)}>
     <header className="flex items-center justify-between gap-4">
       <div>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Today</h1>
         <p className="text-sm text-muted-foreground">{new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: timezone }).format(now)}</p>
       </div>
-      <div className="flex items-center gap-2">
+      {/* A host shell has its own Search and Create; Home does not repeat them. */}
+      {shell ? null : <div className="flex items-center gap-2">
         <Button variant="outline" onClick={() => setCommandOpen(true)} aria-keyshortcuts="Control+K Meta+K" data-home-search=""><Search data-icon="inline-start" aria-hidden="true" /><span className="max-sm:hidden">Search</span><KbdGroup className="ml-2 max-sm:hidden"><Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd><Kbd>K</Kbd></KbdGroup></Button>
         {data?.capabilities.createStory ? <Button onClick={() => setCreateKind("story")}><Plus data-icon="inline-start" aria-hidden="true" />New story</Button> : null}
-      </div>
+      </div>}
     </header>
     {!fetchers.getHome ? <InlineAlert>Story work is not available for this role.</InlineAlert> : home.isError ? <InlineAlert onAction={() => void home.refetch()}>{describeEditorialError(home.error, "Home couldn't be loaded. Try again.")}</InlineAlert> : null}
     {failedDeploy ? <InlineAlert title="Website publication failed" onAction={actionUrls?.deployment ? () => window.location.assign(actionUrls.deployment!) : undefined} actionLabel="Review deployment">The latest website publication needs attention.</InlineAlert> : null}
@@ -211,8 +235,10 @@ function HomeWorkspace({ fetchers, actionUrls }: HomeAppProps) {
     {health.isError || deployment.isError ? <p className="text-xs text-muted-foreground">Some system checks are unavailable. Your work is shown above.</p> : null}
     <span role="status" className="sr-only" aria-live="polite">{completedLabel}</span>
     <StoryPeek storyId={peekId} fetchers={fetchers} timezone={timezone} onClose={() => setPeekId(null)} origin={origin} onComplete={(task) => complete.mutate(task)} completing={complete.isPending} onNewTask={newTask} now={now} workspaceUrl={actionUrls?.workspace} />
-    <HomeCommands open={commandOpen} onOpenChange={setCommandOpen} fetchers={fetchers} data={data} recentIds={recentIds} onStory={openStory} onNewStory={() => setCreateKind("story")} onNewTask={newTask} urls={actionUrls} />
-    <HomeCreate kind={createKind} onClose={() => setCreateKind(null)} onStoryCreated={openCreatedStory} fetchers={fetchers} data={data} storyId={taskStoryId} />
+    {shell ? null : <>
+      <HomeCommands open={commandOpen} onOpenChange={setCommandOpen} fetchers={fetchers} data={data} recentIds={recentIds} onStory={openStory} onNewStory={() => setCreateKind("story")} onNewTask={newTask} urls={actionUrls} />
+      <HomeCreate kind={createKind} onClose={() => setCreateKind(null)} onStoryCreated={openCreatedStory} fetchers={fetchers} data={data} storyId={taskStoryId} />
+    </>}
     <TaskEditDialog open={editingTask !== null} onClose={() => setEditingTask(null)} fetchers={fetchers} task={editingTask} people={data?.people || []} canAssign={Boolean(data?.capabilities.review)} timezone={timezone} />
     <Sheet open={allWorkOpen} onOpenChange={setAllWorkOpen}>
       <SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-xl">

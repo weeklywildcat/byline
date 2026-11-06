@@ -32,12 +32,34 @@ snapshot; nothing in this app serves public reading.
 - **Votes** live in `byline_poll_votes` (`src/db/poll-votes.ts`), never a collection.
 - **Nothing private enters a public projection.** Public snapshot/live/poll
   projections (later phases) use explicit allowlists.
-- **Byline UI, Payload underneath.** Every staff-facing surface is Byline's
-  Nova UI (`@byline/newsroom-ui`, `src/ui`), never Payload's generic list/edit
-  screens. Use Payload's extension points (dashboard, list views, `Nav`, custom
-  Field components) and its hooks (`useField`, `useForm`, `useDocumentInfo`)
-  so form state stays Payload's. Do not replace the Edit view or document root:
-  the Story screen is the custom Field of a presentational collapsible.
+- **Byline UI, Payload underneath.** Payload owns infrastructure and the
+  form/document lifecycle. `@byline/newsroom-ui` owns the staff-facing
+  component system. The canonical app shell is shadcn/Base Nova. Raw Payload
+  UI is administrator fallback only. Use Payload's extension points
+  (providers, `Nav`, `header`, dashboard, list and custom views, custom Field
+  components) and its hooks (`useField`, `useForm`, `useDocumentInfo`) so
+  form state stays Payload's. Do not replace the template, the Edit view or
+  the document root: the Story screen is the custom Field of a presentational
+  collapsible.
+- **One shell** (`src/ui/shell`, docs/payload-migration.md §7.2): the provider
+  (`BylineShellProvider`: query cache, shadcn `SidebarProvider`, Create,
+  Search), the sidebar (`BylineNav`/`BylineSidebar`), the sticky header
+  (`BylineAppHeader`). Do not add a second global sidebar; the other shadcn
+  sidebar blocks map to specific future surfaces in §7.2.
+- **Navigation** lists a destination (`src/domain/navigation.ts`) only once its
+  Byline screen exists; never a generic Payload collection. Raw collections are
+  reached by administrators from *System administration* (`/admin/system`) in
+  the account menu.
+- **Create** goes through `useBylineCreate().openCreate(kind)`; the shared
+  dialogs are mounted once in `src/ui/shell/create.tsx`. A new kind joins
+  `CREATE_ACTIONS` and gets its dialog there when its flow exists; no
+  placeholder entries, no second creation form, never Payload's create route.
+- **Search** is the shared `HomeCommands` palette in `src/ui/shell/search.tsx`
+  (⌘K everywhere). Screens that show a story in place register
+  `setStoryOpener`.
+- **shadcn components** are added to `packages/newsroom-ui` only (the CLI
+  aliases in `wordpress-plugin/components.json` point there), never copied
+  into `apps/newsroom`.
 - **Nova inside Payload:** Byline stylesheets live in `src/ui/*.css` (the only
   files `postcss/byline-ui.cjs` compiles and scopes). The Story screen sits
   inside Payload's `<form>`: give every button `type="button"`, stop Enter in
@@ -49,8 +71,13 @@ snapshot; nothing in this app serves public reading.
   over `/api/byline/*` (`src/newsroom/endpoints.ts`). Do not fork a screen to
   fit Payload: map Payload records to the screen contract in
   `src/newsroom/screen-models.ts`. Unported methods reject with 501.
-- **Sizes:** Payload's root font is 13px; `postcss/byline-ui.cjs` compiles Nova's
-  rem to px. Use the design system's classes, never hand-tuned sizes.
+- **Sizes:** Payload's root font is not 16px; `postcss/byline-ui.cjs` compiles
+  Nova's rem to px. Use the design system's classes, never hand-tuned sizes.
+  Inline CSS variables escape that compile: give them in px (`BylineShell`).
+- **No Preflight:** the `hidden` attribute does not beat a display class inside
+  `.byline-ui-root`; hide with the `hidden` class.
+- **Custom root views** (`admin.components.views`) render without Payload's
+  template; wrap them in `DefaultTemplate` so they get the shell.
 - **Writers never get** HTML, CSS, colors, fonts, alignment or layout controls.
   `src/editor/prose.ts` is the whole prose surface.
 - `src/payload-types.ts` is this app's internal type file. It must never become
