@@ -1,20 +1,20 @@
 /**
- * Pure model behind the Planning Calendar's schedule layer.
+ * Pure model behind the newsroom Calendar's schedule layer. CMS-independent:
+ * each host supplies the schedule feed and the links an event opens.
  *
  * The calendar has two sources of events:
  *
- * - Story-derived dates from the Planning collection (`planningCalendarEvents`):
- *   deadline, planned publication, WordPress schedule and published date. These
- *   stay four distinct events and are never merged.
- * - The schedule feed (`GET /byline/v1/editorial/schedule`): exact appointments,
+ * - Story-derived dates from the Stories collection (`planningCalendarEvents`):
+ *   deadline, planned publication, scheduled publication and published date.
+ *   These stay four distinct events and are never merged.
+ * - The protected schedule feed (`ScheduleResponse`): exact appointments,
  *   production deadlines and (optionally) task deadlines.
  *
  * Date rules follow `workspace/schedule-model.ts`: an exact appointment is a UTC
- * instant read in the WordPress site timezone; a target window is date-only and
- * is NEVER given a day cell or a time. Windows go to the "Needs scheduling" list.
+ * instant read in the newsroom timezone; a target window is date-only and is
+ * NEVER given a day cell or a time. Windows go to the "Needs scheduling" list.
  */
-import { collectionUrl } from "@byline/newsroom-screens/collections/collection-model";
-import { siteDay } from "@byline/newsroom-screens/home/newsroom-model";
+import { siteDay } from "../home/newsroom-model";
 import {
   addDays,
   appointmentDay,
@@ -23,42 +23,73 @@ import {
   formatTimeRange,
   formatWindow,
   splitAppointments
-} from "@byline/newsroom-screens/workspace/schedule-model";
-import type { ScheduleAppointment, ScheduleMediaDeadline, ScheduleResponse, ScheduleTaskDeadline } from "@byline/newsroom-screens/workspace/workspace-types";
-import type { CalendarEventType, PlanningCalendarEvent } from "@byline/newsroom-screens/planning/planning-model";
+} from "../workspace/schedule-model";
+import type { ScheduleAppointment, ScheduleMediaDeadline, ScheduleResponse, ScheduleTaskDeadline } from "../workspace/workspace-types";
+import type { CalendarEventType, PlanningCalendarEvent } from "../planning/planning-model";
 
+/**
+ * What the calendar shows. One state, whichever presentation (a contextual
+ * sidebar, a temporary sheet) renders the controls.
+ */
 export type CalendarFilters = {
   appointments: boolean;
+  /** Story deadlines. */
   deadlines: boolean;
   /** Production due dates. */
-  media: boolean;
-  /** Planned publication targets. */
+  production: boolean;
+  /** Planned publication targets (a plan, not a schedule). */
+  plannedPublication: boolean;
+  /** Actual publication: scheduled and published dates. */
   publication: boolean;
-  /** WordPress's own schedule and published dates. */
-  wordpress: boolean;
-  /** Limit appointments, production deadlines and task deadlines to the signed-in user. */
-  mine: boolean;
+  /** Task due dates. Off by default: they are loaded only when asked for. */
   tasks: boolean;
+  /** Limit appointments, production and task due dates to the signed-in user. */
+  mine: boolean;
 };
+
+export type CalendarCategoryFilter = Exclude<keyof CalendarFilters, "mine">;
 
 export const DEFAULT_CALENDAR_FILTERS: CalendarFilters = {
   appointments: true,
   deadlines: true,
-  media: true,
+  production: true,
+  plannedPublication: true,
   publication: true,
-  wordpress: true,
-  mine: false,
-  tasks: false
+  tasks: false,
+  mine: false
 };
 
+/** The category toggles, in display order. */
+export const CALENDAR_CATEGORY_FILTERS: ReadonlyArray<{ key: CalendarCategoryFilter; label: string; scheduleFeed: boolean }> = [
+  { key: "appointments", label: "Appointments", scheduleFeed: true },
+  { key: "deadlines", label: "Story deadlines", scheduleFeed: false },
+  { key: "production", label: "Production", scheduleFeed: true },
+  { key: "plannedPublication", label: "Planned publication", scheduleFeed: false },
+  { key: "publication", label: "Publication", scheduleFeed: false },
+  { key: "tasks", label: "Task due dates", scheduleFeed: true }
+];
+
+/**
+ * Stored filters (a host preference, any age) as the current shape: known
+ * boolean keys only, defaults for the rest. Never throws.
+ */
+export function normalizeCalendarFilters(value: unknown): CalendarFilters {
+  const stored = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const next = { ...DEFAULT_CALENDAR_FILTERS };
+  (Object.keys(next) as Array<keyof CalendarFilters>).forEach((key) => {
+    if (typeof stored[key] === "boolean") next[key] = stored[key] as boolean;
+  });
+  return next;
+}
+
 /** Which filter toggle controls each event type. */
-export const CALENDAR_EVENT_CATEGORY: Record<CalendarEventType, Exclude<keyof CalendarFilters, "mine">> = {
+export const CALENDAR_EVENT_CATEGORY: Record<CalendarEventType, CalendarCategoryFilter> = {
   deadline: "deadlines",
-  planned: "publication",
-  scheduled: "wordpress",
-  published: "wordpress",
+  planned: "plannedPublication",
+  scheduled: "publication",
+  published: "publication",
   appointment: "appointments",
-  media: "media",
+  media: "production",
   task: "tasks"
 };
 
@@ -68,7 +99,7 @@ export const CALENDAR_EVENT_LABELS: Record<CalendarEventType, string> = {
   media: "Production due",
   task: "Task due",
   planned: "Planned publication",
-  scheduled: "Scheduled in WordPress",
+  scheduled: "Scheduled publication",
   published: "Published"
 };
 
@@ -78,26 +109,21 @@ export const CALENDAR_EVENT_ORDER: CalendarEventType[] = ["deadline", "media", "
 /** Types whose "My schedule" filter is the assignee. Story-derived dates are unaffected. */
 const ASSIGNED_TYPES: CalendarEventType[] = ["appointment", "media", "task"];
 
-/** Build a Story Workspace URL. `appointmentId` opens that appointment's scheduling dialog. */
-export type WorkspaceUrl = (storyId: number, appointmentId?: string) => string;
-
 /**
- * `admin.php?page=byline-planning&story=<id>[&appointment=<uuid>]`, derived from
- * a localized Planning admin URL so nothing hardcodes `/wp-admin/`. Any `tab`
- * (and similar route params) on the base URL is dropped: the workspace is a
- * view of the Planning page, not one of its tabs.
+ * Where calendar items lead. Each host builds its own addresses.
+ * - `story`: the story's own screen; with an appointment id it opens that
+ *   appointment so an exact time can be set.
+ * - `collection`: a shared coverage interview, for hosts that have them.
+ *   Without it such an item links to its story.
  */
-export function createWorkspaceUrlBuilder(baseUrl?: string | null): WorkspaceUrl {
-  const base = (baseUrl || "admin.php?page=byline-planning").split("#")[0];
-  const [path, query = ""] = base.split("?");
-  return (storyId, appointmentId) => {
-    const params = new URLSearchParams(query);
-    ["tab", "view", "mine", "story", "appointment"].forEach((key) => params.delete(key));
-    if (!params.has("page")) params.set("page", "byline-planning");
-    params.set("story", String(storyId));
-    if (appointmentId) params.set("appointment", appointmentId);
-    return `${path}?${params.toString()}`;
-  };
+export type CalendarLinks = {
+  story: (storyId: number, appointmentId?: string) => string;
+  collection?: (collectionId: number, interviewId?: number) => string;
+};
+
+function appointmentHref(appointment: ScheduleAppointment, links: CalendarLinks): string {
+  if (appointment.collectionId && links.collection) return links.collection(appointment.collectionId, appointment.interviewId);
+  return links.story(appointment.storyId, appointment.id);
 }
 
 // --- Fetch window ----------------------------------------------------------
@@ -126,7 +152,7 @@ function tooltip(lines: Array<string | null | false | undefined>): string {
   return lines.filter((line): line is string => Boolean(line)).join("\n");
 }
 
-function appointmentEvent(appointment: ScheduleAppointment, timezone: string, workspaceUrl: WorkspaceUrl): PlanningCalendarEvent | null {
+function appointmentEvent(appointment: ScheduleAppointment, timezone: string, links: CalendarLinks): PlanningCalendarEvent | null {
   if (appointment.status === "cancelled" || appointment.scheduleMode !== "exact" || !appointment.startAt) return null;
   const date = appointmentDay(appointment, timezone);
   if (!date) return null;
@@ -137,7 +163,7 @@ function appointmentEvent(appointment: ScheduleAppointment, timezone: string, wo
     timing: { kind: "timed", start: appointment.startAt, end: appointment.endAt },
     storyId: appointment.storyId,
     storyTitle: appointment.storyTitle,
-    storyUrl: appointment.collectionId ? collectionUrl(appointment.collectionId) : workspaceUrl(appointment.storyId),
+    storyUrl: appointment.collectionId && links.collection ? links.collection(appointment.collectionId) : links.story(appointment.storyId),
     type: "appointment",
     date,
     exactDate: appointmentLine(appointment, timezone),
@@ -154,12 +180,12 @@ function appointmentEvent(appointment: ScheduleAppointment, timezone: string, wo
     ]),
     assigneeIds: (appointment.assignees || []).map((person) => person.id),
     assigneeNames: names,
-    href: appointment.collectionId ? `${collectionUrl(appointment.collectionId)}&interview=${appointment.interviewId}` : workspaceUrl(appointment.storyId, appointment.id),
+    href: appointmentHref(appointment, links),
     completed: appointment.status === "completed"
   };
 }
 
-function mediaEvent(item: ScheduleMediaDeadline, timezone: string, workspaceUrl: WorkspaceUrl): PlanningCalendarEvent | null {
+function mediaEvent(item: ScheduleMediaDeadline, timezone: string, links: CalendarLinks): PlanningCalendarEvent | null {
   const date = siteDay(item.dueAt, timezone);
   if (!date) return null;
   return {
@@ -168,7 +194,7 @@ function mediaEvent(item: ScheduleMediaDeadline, timezone: string, workspaceUrl:
     timing: { kind: "date", date },
     storyId: item.storyId,
     storyTitle: item.storyTitle,
-    storyUrl: workspaceUrl(item.storyId),
+    storyUrl: links.story(item.storyId),
     type: "media",
     date,
     exactDate: date,
@@ -182,11 +208,11 @@ function mediaEvent(item: ScheduleMediaDeadline, timezone: string, workspaceUrl:
     ]),
     assigneeIds: item.assignee ? [item.assignee.id] : [],
     assigneeNames: item.assignee ? [item.assignee.name] : [],
-    href: workspaceUrl(item.storyId)
+    href: links.story(item.storyId)
   };
 }
 
-function taskEvent(item: ScheduleTaskDeadline, timezone: string, workspaceUrl: WorkspaceUrl): PlanningCalendarEvent | null {
+function taskEvent(item: ScheduleTaskDeadline, timezone: string, links: CalendarLinks): PlanningCalendarEvent | null {
   const date = siteDay(item.dueAt, timezone);
   if (!date) return null;
   return {
@@ -194,7 +220,7 @@ function taskEvent(item: ScheduleTaskDeadline, timezone: string, workspaceUrl: W
     timing: { kind: "date", date },
     storyId: item.storyId ?? 0,
     storyTitle: item.storyTitle,
-    storyUrl: item.storyId ? workspaceUrl(item.storyId) : "",
+    storyUrl: item.storyId ? links.story(item.storyId) : "",
     type: "task",
     date,
     exactDate: date,
@@ -207,7 +233,7 @@ function taskEvent(item: ScheduleTaskDeadline, timezone: string, workspaceUrl: W
     ]),
     assigneeIds: item.assignee ? [item.assignee.id] : [],
     assigneeNames: item.assignee ? [item.assignee.name] : [],
-    href: item.storyId ? workspaceUrl(item.storyId) : item.collectionId ? collectionUrl(item.collectionId) : undefined
+    href: item.storyId ? links.story(item.storyId) : item.collectionId && links.collection ? links.collection(item.collectionId) : undefined
   };
 }
 
@@ -216,20 +242,20 @@ function taskEvent(item: ScheduleTaskDeadline, timezone: string, workspaceUrl: W
  * with a time), production deadlines and task deadlines. `needsScheduling` is
  * deliberately NOT read here: a target window has no day to sit on.
  */
-export function scheduleCalendarEvents(schedule: ScheduleResponse | null | undefined, workspaceUrl: WorkspaceUrl, timezone?: string): PlanningCalendarEvent[] {
+export function scheduleCalendarEvents(schedule: ScheduleResponse | null | undefined, links: CalendarLinks, timezone?: string): PlanningCalendarEvent[] {
   if (!schedule) return [];
   const zone = timezone || schedule.timezone;
   const events: PlanningCalendarEvent[] = [];
   (schedule.appointments || []).forEach((item) => {
-    const event = appointmentEvent(item, zone, workspaceUrl);
+    const event = appointmentEvent(item, zone, links);
     if (event) events.push(event);
   });
   (schedule.mediaDeadlines || []).forEach((item) => {
-    const event = mediaEvent(item, zone, workspaceUrl);
+    const event = mediaEvent(item, zone, links);
     if (event) events.push(event);
   });
   (schedule.taskDeadlines || []).forEach((item) => {
-    const event = taskEvent(item, zone, workspaceUrl);
+    const event = taskEvent(item, zone, links);
     if (event) events.push(event);
   });
   return events;
@@ -282,11 +308,11 @@ export type NeedsSchedulingItem = {
 /**
  * Open appointments that still need an exact date and time. They are shown
  * beside the calendar, never inside a day cell, and carry no fake time. Each
- * links to the workspace with the appointment's scheduling dialog open.
+ * links to its story with the appointment open for scheduling.
  */
 export function needsSchedulingItems(
   schedule: ScheduleResponse | null | undefined,
-  workspaceUrl: WorkspaceUrl,
+  links: CalendarLinks,
   options: { mine?: boolean; currentUserId?: number | null } = {}
 ): NeedsSchedulingItem[] {
   if (!schedule) return [];
@@ -303,7 +329,7 @@ export function needsSchedulingItems(
         assigneeNames: nameList(appointment.assignees),
         target: hasTarget ? `Target: ${formatWindow(appointment.windowStart as string, appointment.windowEnd)}` : "No target date",
         hasTarget,
-        href: appointment.collectionId ? `${collectionUrl(appointment.collectionId)}&interview=${appointment.interviewId}` : workspaceUrl(appointment.storyId, appointment.id)
+        href: appointmentHref(appointment, links)
       };
     });
 }

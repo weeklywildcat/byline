@@ -38,9 +38,9 @@ describe("story hover previews", () => {
       "planning/StoryList.tsx",
       "planning/MediaDesk.tsx",
       "planning/ContentHealth.tsx",
-      "planning/NeedsScheduling.tsx",
+      "calendar/NeedsScheduling.tsx",
       "planning/Feedback.tsx",
-      "planning/calendar-events.tsx"
+      "calendar/calendar-events.tsx"
     ]) {
       expect(read(file), file).toContain("StoryHoverCard");
     }

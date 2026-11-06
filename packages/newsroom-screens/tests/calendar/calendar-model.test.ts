@@ -1,19 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
+  CALENDAR_CATEGORY_FILTERS,
   DEFAULT_CALENDAR_FILTERS,
-  createWorkspaceUrlBuilder,
   filterCalendarEvents,
   mergeCalendarEvents,
   needsSchedulingItems,
   scheduleCalendarEvents,
   scheduleCoversVisible,
-  scheduleRangeFor
-} from "./calendar-model";
-import { monthCalendarDays, planningCalendarEvents, reportingSummaryLine, weekCalendarDays, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
-import type { ScheduleAppointment, ScheduleResponse } from "@byline/newsroom-screens/workspace/workspace-types";
+  normalizeCalendarFilters,
+  scheduleRangeFor,
+  type CalendarLinks
+} from "../../src/calendar/calendar-model";
+import { monthCalendarDays, planningCalendarEvents, reportingSummaryLine, weekCalendarDays, type PlanningStory } from "../../src/planning/planning-model";
+import type { ScheduleAppointment, ScheduleResponse } from "../../src/workspace/workspace-types";
 
 const timezone = "America/New_York";
-const workspaceUrl = createWorkspaceUrlBuilder("http://example.test/wp-admin/admin.php?page=byline-planning&tab=stories");
+/** A host's links, as any host builds them: here, a newsroom's Story screen with `?appointment=`. */
+const links: CalendarLinks = { story: (storyId, appointmentId) => `/admin/collections/stories/${storyId}${appointmentId ? `?appointment=${appointmentId}` : ""}` };
 
 function appointment(patch: Partial<ScheduleAppointment> = {}): ScheduleAppointment {
   return {
@@ -63,10 +66,10 @@ function story(patch: Partial<PlanningStory> = {}): PlanningStory {
 
 describe("appointments on the calendar", () => {
   it("shows an exact appointment on its site-local day with a time, and links to its scheduling dialog", () => {
-    const [event] = scheduleCalendarEvents(schedule({ appointments: [appointment()] }), workspaceUrl);
+    const [event] = scheduleCalendarEvents(schedule({ appointments: [appointment()] }), links);
     expect(event).toMatchObject({ type: "appointment", date: "2026-10-27", title: "Interview Mrs. Hamby", label: "Appointment", storyId: 41 });
     expect(event.timeLabel).toMatch(/^10:15\sAM$/);
-    expect(event.href).toBe("http://example.test/wp-admin/admin.php?page=byline-planning&story=41&appointment=appt-1");
+    expect(event.href).toBe("/admin/collections/stories/41?appointment=appt-1");
     expect(event.tooltip).toContain("Story: Cafeteria changes");
     expect(event.tooltip).toContain("With: Riley Reporter");
     expect(event.tooltip).toContain("Location: Room 12");
@@ -74,7 +77,7 @@ describe("appointments on the calendar", () => {
 
   it("uses the site day, not the UTC day, for an evening appointment", () => {
     // 02:30 UTC on Oct 28 is 10:30 PM on Oct 27 in New York.
-    const [event] = scheduleCalendarEvents(schedule({ appointments: [appointment({ startAt: "2026-10-28T02:30:00Z", endAt: "2026-10-28T03:00:00Z" })] }), workspaceUrl);
+    const [event] = scheduleCalendarEvents(schedule({ appointments: [appointment({ startAt: "2026-10-28T02:30:00Z", endAt: "2026-10-28T03:00:00Z" })] }), links);
     expect(event.date).toBe("2026-10-27");
     expect(event.timeLabel).toMatch(/^10:30\sPM$/);
   });
@@ -84,24 +87,24 @@ describe("appointments on the calendar", () => {
     const undated = appointment({ id: "u", title: "Photo with principal", scheduleMode: "unscheduled", windowStart: null, windowEnd: null, startAt: null, endAt: null, status: "planned", assignees: [], assigneeIds: [] });
     const feed = schedule({ needsScheduling: [undated, window] });
 
-    expect(scheduleCalendarEvents(feed, workspaceUrl)).toEqual([]);
-    const items = needsSchedulingItems(feed, workspaceUrl);
+    expect(scheduleCalendarEvents(feed, links)).toEqual([]);
+    const items = needsSchedulingItems(feed, links);
     // Dated windows first, "someday" last.
     expect(items.map((item) => [item.title, item.target])).toEqual([
       ["Coach interview", "Target: Oct 26–30"],
       ["Photo with principal", "No target date"]
     ]);
     expect(items.every((item) => !/\d:\d\d|AM|PM/.test(item.target))).toBe(true);
-    expect(items[0].href).toBe("http://example.test/wp-admin/admin.php?page=byline-planning&story=41&appointment=w");
+    expect(items[0].href).toBe("/admin/collections/stories/41?appointment=w");
   });
 
   it("defends against an exact appointment with no instant, and cancelled ones", () => {
-    const events = scheduleCalendarEvents(schedule({ appointments: [appointment({ startAt: null }), appointment({ id: "x", status: "cancelled" })] }), workspaceUrl);
+    const events = scheduleCalendarEvents(schedule({ appointments: [appointment({ startAt: null }), appointment({ id: "x", status: "cancelled" })] }), links);
     expect(events).toEqual([]);
   });
 
   it("marks a completed appointment but still shows it", () => {
-    const [event] = scheduleCalendarEvents(schedule({ appointments: [appointment({ status: "completed" })] }), workspaceUrl);
+    const [event] = scheduleCalendarEvents(schedule({ appointments: [appointment({ status: "completed" })] }), links);
     expect(event.completed).toBe(true);
   });
 });
@@ -117,7 +120,7 @@ describe("story-derived events stay distinct", () => {
     expect(new Set(events.map((event) => event.id)).size).toBe(3);
   });
 
-  it("reads WordPress timestamps in the site timezone when it is known", () => {
+  it("reads publication timestamps in the newsroom timezone when it is known", () => {
     // 01:00 UTC on Nov 3 is 9 PM on Nov 2 in New York (EST starts Nov 1).
     const events = planningCalendarEvents([story({ publicationState: { id: "scheduled", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-11-03T01:00:00Z", publishedAt: null } })], timezone);
     expect(events.find((event) => event.type === "scheduled")?.date).toBe("2026-11-02");
@@ -132,12 +135,12 @@ describe("production and task deadlines", () => {
     taskDeadlines: [{ id: 5, storyId: null, storyTitle: "", title: "Order press passes", dueAt: "2026-10-29", assignee: { id: 7, name: "Riley Reporter" } }]
   });
 
-  it("emits a Production due event on the site-local day", () => {
-    const events = scheduleCalendarEvents(feed, workspaceUrl);
+  it("emits a Production due event on the newsroom-local day", () => {
+    const events = scheduleCalendarEvents(feed, links);
     const media = events.find((event) => event.type === "media")!;
     // 03:00 UTC on Oct 30 is 11 PM on Oct 29 in New York.
     expect(media).toMatchObject({ date: "2026-10-29", title: "Cafeteria photos due", label: "Production due", assigneeIds: [9] });
-    expect(media.href).toBe("http://example.test/wp-admin/admin.php?page=byline-planning&story=41");
+    expect(media.href).toBe("/admin/collections/stories/41");
     const task = events.find((event) => event.type === "task")!;
     expect(task).toMatchObject({ date: "2026-10-29", label: "Task due", storyId: 0 });
     expect(task.href).toBeUndefined();
@@ -150,24 +153,26 @@ describe("filters and My schedule", () => {
     mediaDeadlines: [{ id: "m1", storyId: 41, storyTitle: "Cafeteria changes", title: "Cafeteria photos", type: "photo", status: "assigned", dueAt: "2026-10-30", assignee: { id: 9, name: "Pat" } }],
     taskDeadlines: [{ id: 5, storyId: 41, storyTitle: "Cafeteria changes", title: "Write cutlines", dueAt: "2026-10-29", assignee: { id: 7, name: "Riley" } }]
   });
-  const all = [...planningCalendarEvents([story()], timezone), ...scheduleCalendarEvents(feed, workspaceUrl)];
+  const all = [...planningCalendarEvents([story()], timezone), ...scheduleCalendarEvents(feed, links)];
   const types = (events: ReturnType<typeof filterCalendarEvents>) => events.map((event) => event.type);
 
-  it("defaults to appointments, deadlines, media, publication and the WordPress schedule, with tasks off", () => {
-    expect(DEFAULT_CALENDAR_FILTERS).toEqual({ appointments: true, deadlines: true, media: true, publication: true, wordpress: true, mine: false, tasks: false });
+  it("defaults to appointments, deadlines, production, planned publication and publication, with tasks off", () => {
+    expect(DEFAULT_CALENDAR_FILTERS).toEqual({ appointments: true, deadlines: true, production: true, plannedPublication: true, publication: true, mine: false, tasks: false });
     const visible = filterCalendarEvents(all, DEFAULT_CALENDAR_FILTERS, 7);
     expect(new Set(types(visible))).toEqual(new Set(["appointment", "deadline", "media", "planned", "scheduled"]));
   });
 
   it("toggles each category independently", () => {
     expect(new Set(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, appointments: false }, 7)))).not.toContain("appointment");
-    expect(new Set(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, publication: false }, 7)))).toEqual(new Set(["appointment", "deadline", "media", "scheduled"]));
-    // The WordPress schedule is its own toggle, apart from the planned publication target.
-    expect(new Set(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, wordpress: false }, 7)))).toEqual(new Set(["appointment", "deadline", "media", "planned"]));
+    expect(new Set(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, plannedPublication: false }, 7)))).toEqual(new Set(["appointment", "deadline", "media", "scheduled"]));
+    // Actual publication is its own toggle, apart from the planned publication target.
+    expect(new Set(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, publication: false }, 7)))).toEqual(new Set(["appointment", "deadline", "media", "planned"]));
+    expect(new Set(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, production: false }, 7)))).not.toContain("media");
+    expect(new Set(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, deadlines: false }, 7)))).not.toContain("deadline");
     expect(types(filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, tasks: true }, 7))).toContain("task");
   });
 
-  it("limits appointments, media and tasks to the signed-in user under My schedule, but not story dates", () => {
+  it("limits appointments, production and tasks to the signed-in user under My schedule, but not story dates", () => {
     const mine = filterCalendarEvents(all, { ...DEFAULT_CALENDAR_FILTERS, mine: true, tasks: true }, 7);
     expect(mine.filter((event) => event.type === "appointment").map((event) => event.id)).toEqual(["appointment-appt-1"]);
     expect(types(mine)).not.toContain("media");
@@ -185,8 +190,8 @@ describe("filters and My schedule", () => {
         appointment({ id: "b", title: "Theirs", scheduleMode: "unscheduled", startAt: null, endAt: null, status: "planned", assigneeIds: [8], assignees: [{ id: 8, name: "Sam" }] })
       ]
     });
-    expect(needsSchedulingItems(waiting, workspaceUrl, { mine: true, currentUserId: 7 }).map((item) => item.title)).toEqual(["Mine"]);
-    expect(needsSchedulingItems(waiting, workspaceUrl).map((item) => item.title)).toEqual(["Mine", "Theirs"]);
+    expect(needsSchedulingItems(waiting, links, { mine: true, currentUserId: 7 }).map((item) => item.title)).toEqual(["Mine"]);
+    expect(needsSchedulingItems(waiting, links).map((item) => item.title)).toEqual(["Mine", "Theirs"]);
   });
 });
 
@@ -199,7 +204,7 @@ describe("ordering inside a day", () => {
       ],
       mediaDeadlines: [{ id: "m", storyId: 41, storyTitle: "Cafeteria changes", title: "Photos", type: "photo", status: "assigned", dueAt: "2026-10-27", assignee: null }]
     });
-    const merged = mergeCalendarEvents(planningCalendarEvents([story({ deadline: "2026-10-27" })], timezone), scheduleCalendarEvents(feed, workspaceUrl), DEFAULT_CALENDAR_FILTERS, 7)
+    const merged = mergeCalendarEvents(planningCalendarEvents([story({ deadline: "2026-10-27" })], timezone), scheduleCalendarEvents(feed, links), DEFAULT_CALENDAR_FILTERS, 7)
       .filter((event) => event.date === "2026-10-27");
     expect(merged.map((event) => event.type)).toEqual(["deadline", "media", "appointment", "appointment"]);
     expect(merged.slice(2).map((event) => event.title)).toEqual(["Morning interview", "Evening game"]);
@@ -229,15 +234,33 @@ describe("schedule feed range", () => {
   });
 });
 
-describe("workspace links", () => {
-  it("builds from a localized Planning URL, dropping the tab, without hardcoding wp-admin", () => {
-    const build = createWorkspaceUrlBuilder("/custom-admin/admin.php?page=byline-planning&tab=calendar");
-    expect(build(12)).toBe("/custom-admin/admin.php?page=byline-planning&story=12");
-    expect(build(12, "abc-123")).toBe("/custom-admin/admin.php?page=byline-planning&story=12&appointment=abc-123");
+describe("links", () => {
+  it("lead each kind of item to the host's own screens", () => {
+    const feed = schedule({ appointments: [appointment()], needsScheduling: [appointment({ id: "w", scheduleMode: "window", windowStart: "2026-10-26", startAt: null, endAt: null, status: "planned" })] });
+    expect(scheduleCalendarEvents(feed, links)[0].href).toBe("/admin/collections/stories/41?appointment=appt-1");
+    expect(needsSchedulingItems(feed, links)[0].href).toBe("/admin/collections/stories/41?appointment=w");
   });
 
-  it("falls back to a URL relative to the current admin page", () => {
-    expect(createWorkspaceUrlBuilder()(3)).toBe("admin.php?page=byline-planning&story=3");
+  it("send a shared coverage interview to the host's collection screen, or to its story when the host has none", () => {
+    const shared = appointment({ id: "i", collectionId: 3, interviewId: 9 });
+    const withCollections: CalendarLinks = { ...links, collection: (collectionId, interviewId) => `/coverage/${collectionId}#interview-${interviewId}` };
+    expect(scheduleCalendarEvents(schedule({ appointments: [shared] }), withCollections)[0].href).toBe("/coverage/3#interview-9");
+    expect(scheduleCalendarEvents(schedule({ appointments: [shared] }), links)[0].href).toBe("/admin/collections/stories/41?appointment=i");
+  });
+});
+
+describe("host-neutral vocabulary", () => {
+  it("names categories for a newsroom, never for a CMS", () => {
+    expect(CALENDAR_CATEGORY_FILTERS.map((item) => item.label)).toEqual(["Appointments", "Story deadlines", "Production", "Planned publication", "Publication", "Task due dates"]);
+    const labels = planningCalendarEvents([story({ publicationState: { id: "published", label: "Published", isPublished: true, isScheduled: false, scheduledAt: "2026-11-03T15:00:00Z", publishedAt: "2026-11-04T15:00:00Z" } })], timezone).map((event) => event.label);
+    expect(labels).toEqual(expect.arrayContaining(["Scheduled publication", "Published"]));
+    expect(JSON.stringify([CALENDAR_CATEGORY_FILTERS, labels])).not.toMatch(/wordpress/i);
+  });
+
+  it("reads stored filters of any age as the current shape", () => {
+    expect(normalizeCalendarFilters(null)).toEqual(DEFAULT_CALENDAR_FILTERS);
+    // A key from an old host vocabulary is ignored, never mapped onto a different meaning.
+    expect(normalizeCalendarFilters({ wordpress: false, tasks: true, mine: "yes" })).toEqual({ ...DEFAULT_CALENDAR_FILTERS, tasks: true });
   });
 });
 

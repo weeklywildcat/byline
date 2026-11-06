@@ -1,17 +1,19 @@
 /**
- * A narrow bridge between Schedule-X's own state and Byline's Nova toolbar.
+ * A narrow bridge between Schedule-X's own state and Byline's Nova controls.
  *
  * Schedule-X owns layout, views and responsive behaviour; the toolbar above it
- * (Today, previous/next, the view menu, the heading) is Byline's and is driven
- * through the library's own signals and view definitions. Nothing here reads or
- * writes a newsroom date.
+ * (Today, previous/next, the view menu, the heading) and the mini calendar in
+ * the Calendar's controls are Byline's, and drive it through the library's own
+ * signals and view definitions. The only date written here is the calendar's
+ * own selected date; nothing here ever changes a newsroom record.
  */
+import "temporal-polyfill/global";
 import type { PluginBase } from "@schedule-x/calendar";
 
 type Signal<T> = { value: T; subscribe: (callback: (value: T) => void) => () => void };
 type SxView = { name: string; hasSmallScreenCompat: boolean; hasWideScreenCompat: boolean; backwardForwardFn: (date: Temporal.PlainDate, units: number) => Temporal.PlainDate; backwardForwardUnits: number };
 /** The few parts of Schedule-X's app singleton the bridge touches. */
-type SxApp = {
+export type SxApp = {
   calendarState: { view: Signal<string>; range: Signal<{ start: Temporal.ZonedDateTime; end: Temporal.ZonedDateTime } | null>; isCalendarSmall: Signal<boolean | undefined>; setView: (view: string, date: Temporal.PlainDate) => void };
   datePickerState: { selectedDate: Signal<Temporal.PlainDate> };
   config: { views: Signal<SxView[]>; timezone: Signal<string> };
@@ -21,6 +23,7 @@ export type CalendarViewOption = { name: string; label: string };
 export type CalendarSnapshot = {
   ready: boolean;
   view: string;
+  /** The selected day, a newsroom-local calendar date. */
   date: Temporal.PlainDate | null;
   range: { start: Temporal.ZonedDateTime; end: Temporal.ZonedDateTime } | null;
   /** True when Schedule-X has switched to its small-screen set of views. */
@@ -31,11 +34,11 @@ export type CalendarSnapshot = {
 /** Schedule-X's views, named for a newsroom. Month and Week mean the grid on wide screens and the agenda on narrow ones. */
 export const VIEW_LABELS: Record<string, string> = { "month-grid": "Month", "month-agenda": "Month", week: "Week", "week-agenda": "Week", day: "Day", list: "List" };
 
-const EMPTY: CalendarSnapshot = { ready: false, view: "", date: null, range: null, small: false, views: [] };
+export const EMPTY_CALENDAR_SNAPSHOT: CalendarSnapshot = { ready: false, view: "", date: null, range: null, small: false, views: [] };
 
 export function createCalendarController() {
   let app: SxApp | null = null;
-  let snapshot = EMPTY;
+  let snapshot = EMPTY_CALENDAR_SNAPSHOT;
   let unsubscribe: Array<() => void> = [];
   const listeners = new Set<() => void>();
   const emit = () => {
@@ -49,7 +52,7 @@ export function createCalendarController() {
         small,
         views: app.config.views.value.filter((view) => (small ? view.hasSmallScreenCompat : view.hasWideScreenCompat)).map((view) => ({ name: view.name, label: VIEW_LABELS[view.name] || view.name }))
       };
-    } else snapshot = EMPTY;
+    } else snapshot = EMPTY_CALENDAR_SNAPSHOT;
     listeners.forEach((listener) => listener());
   };
 
@@ -72,7 +75,7 @@ export function createCalendarController() {
     plugin,
     subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
     getSnapshot: () => snapshot,
-    /** Today in the SITE timezone, as Schedule-X's own Today button does. */
+    /** Today in the NEWSROOM timezone, as Schedule-X's own Today button does. */
     today: () => { if (app) app.datePickerState.selectedDate.value = Temporal.Now.plainDateISO(app.config.timezone.value); },
     /** One step backward (-1) or forward (1) in whatever the current view counts in: a day, a week or a month. */
     step: (direction: -1 | 1) => {
@@ -80,7 +83,14 @@ export function createCalendarController() {
       const view = app.config.views.value.find((item) => item.name === app!.calendarState.view.value);
       if (view) app.datePickerState.selectedDate.value = view.backwardForwardFn(app.datePickerState.selectedDate.value, direction * view.backwardForwardUnits);
     },
-    setView: (name: string) => { if (app) app.calendarState.setView(name, app.datePickerState.selectedDate.value); }
+    setView: (name: string) => { if (app) app.calendarState.setView(name, app.datePickerState.selectedDate.value); },
+    /**
+     * Jump to a day (a newsroom-local calendar date, never a browser Date) in
+     * whatever view is showing: the month, week or day that contains it.
+     */
+    setDate: (date: Temporal.PlainDate) => {
+      if (app && !app.datePickerState.selectedDate.value.equals(date)) app.datePickerState.selectedDate.value = date;
+    }
   };
 }
 

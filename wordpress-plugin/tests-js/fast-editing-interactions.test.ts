@@ -12,7 +12,7 @@ describe("fast editing interactions", () => {
     expect(read("planning/MediaDesk.tsx")).toContain("<MediaRowContext");
     expect(read("planning/ContentHealth.tsx")).toContain("<ContextMenu");
     expect(read("planning/Feedback.tsx")).toContain("<ContextMenu");
-    expect(read("planning/NeedsScheduling.tsx")).toContain("<ContextMenu");
+    expect(read("calendar/NeedsScheduling.tsx")).toContain("<ContextMenu");
   });
 
   it("makes low-risk queue edits optimistic instead of waiting for a refetch", () => {

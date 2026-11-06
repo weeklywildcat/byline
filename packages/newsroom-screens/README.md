@@ -1,9 +1,9 @@
 # @byline/newsroom-screens
 
 Byline's newsroom screens and their models, independent of any CMS: Home,
-Stories (Board and List), Story Peek and hover cards, the Story Workspace, the
-New story / task dialogs, the command palette, and the planning, workspace,
-editorial and collection models they render.
+Stories (Board and List), the Calendar, Story Peek and hover cards, the Story
+Workspace, the New story / task dialogs, the command palette, and the planning,
+workspace, editorial and collection models they render.
 
 They never fetch on their own. Each host passes **fetchers** that satisfy the
 contracts in `home/home-api.ts` (`HomeFetchers`) and `story/story-fetchers.ts`
@@ -14,16 +14,32 @@ contracts in `home/home-api.ts` (`HomeFetchers`) and `story/story-fetchers.ts`
   (`apps/newsroom/src/ui/home/payload-fetchers.ts`).
 
 Anything only one host has arrives as an optional **capability**, never an
-import. `StoriesPage` takes `renderCalendar` (WordPress passes its Schedule-X
-`StoryCalendar`; without one Stories offers only Board and List and never shows
+import. `StoriesPage` takes `renderCalendar` (WordPress mounts the shared
+Calendar there; without one Stories offers only Board and List and never shows
 a Calendar tab) and `viewHref` (WordPress keeps its wp-admin addresses in
 `planning-routing.ts`; the default sets a generic `view=` on the current
 address).
+
+The **Calendar** (`calendar/`) is Schedule-X with its shadcn theme behind one
+adapter (`schedule-x-adapter.ts`), a controller bridging Schedule-X's signals
+to Byline's toolbar and mini calendar (`calendar-controller.ts`), and one state
+owner for the selected date, filters and view (`calendar-workspace.ts`,
+provided with `CalendarWorkspaceProvider`). `NewsroomCalendar` is the schedule
+surface; `CalendarControls` (sidebar-12's mini calendar and category list) is
+rendered by the host wherever it fits, persistently or in a sheet, always over
+the same workspace. Hosts supply the schedule feed (`getSchedule`), the
+`CalendarLinks`, optional client `navigate`, and where preferences are kept
+(`CalendarPreferenceStorage`). Its stylesheet, `calendar/calendar.css`, is
+imported into each host's Nova stylesheet. Schedule-X and Temporal are this
+package's dependencies.
 
 Styling is `@byline/newsroom-ui`. Each host's stylesheet must list this
 package's `src` as a Tailwind `@source`.
 
 Nothing here may import WordPress or Payload. Screens still in
-`wordpress-plugin/src` (the Calendar, Collections, Media Desk, Content Health,
+`wordpress-plugin/src` (Collections, Media Desk, Content Health,
 Feedback, the editor panels) move here as they are ported. Every module is a
 package export; a moved module never leaves a duplicate implementation behind.
+
+Tests for the shared modules live in `tests/` (`npm run test:newsroom-screens`,
+part of `npm run test:packages`).

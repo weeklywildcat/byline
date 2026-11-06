@@ -11,10 +11,9 @@ import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspac
 import { ContentHealth } from "./ContentHealth";
 import { Feedback } from "./Feedback";
 import { MediaDesk } from "./MediaDesk";
-import { StoryCalendar } from "./StoryCalendar";
 import { StoriesPage, type StoriesCalendarProps } from "@byline/newsroom-screens/planning/StoriesPage";
 import type { StoriesView } from "@byline/newsroom-screens/planning/stories-view";
-import { createWorkspaceUrlBuilder } from "./calendar-model";
+import { createWorkspaceUrlBuilder, StoryCalendar } from "./calendar-host";
 import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
 import { destinationForTab, initialStoriesView, storiesViewHref } from "./planning-routing";
 

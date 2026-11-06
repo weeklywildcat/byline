@@ -3,23 +3,24 @@
  *
  * Byline's schedule models (`calendar-model`, `planning-model`) stay canonical;
  * Schedule-X only presents them. Nothing here is ever written back: dates change
- * through the story, appointment, media and WordPress publishing domains.
+ * through the story, appointment, production and publishing records they belong to.
  *
  * Date rules (see `workspace/schedule-model`):
- * - A `date` event is a site-local calendar day -> `Temporal.PlainDate`.
+ * - A `date` event is a newsroom-local calendar day -> `Temporal.PlainDate`.
  * - A `timed` event is a real timestamp -> `Temporal.ZonedDateTime` in the
- *   WORDPRESS SITE timezone, never the browser's. A naive `YYYY-MM-DDTHH:mm`
- *   value is already site-local; a value with `Z` or an offset is an instant.
+ *   NEWSROOM timezone, never the browser's. A naive `YYYY-MM-DDTHH:mm`
+ *   value is already newsroom-local; a value with `Z` or an offset is an instant.
  * - A fuzzy appointment window has no day and is never an event. It lives in
  *   "Needs scheduling" (`needsSchedulingItems`), and nothing here can produce it.
  */
 import "temporal-polyfill/global";
 import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import type { CalendarEvent, CalendarType } from "@schedule-x/calendar";
-import type { CalendarEventType, PlanningCalendarEvent } from "@byline/newsroom-screens/planning/planning-model";
+import type { CalendarEventType, PlanningCalendarEvent } from "../planning/planning-model";
+import type { CalendarCategoryFilter } from "./calendar-model";
 
 /** Schedule-X "calendars": a small, stable set. Never one per story. */
-export const SCHEDULE_X_CATEGORIES = ["appointment", "story-deadline", "production", "planned-publication", "wordpress-scheduled", "task-deadline"] as const;
+export const SCHEDULE_X_CATEGORIES = ["appointment", "story-deadline", "production", "planned-publication", "publication", "task-deadline"] as const;
 export type ScheduleXCategory = (typeof SCHEDULE_X_CATEGORIES)[number];
 
 export const CATEGORY_BY_EVENT_TYPE: Record<CalendarEventType, ScheduleXCategory> = {
@@ -28,8 +29,8 @@ export const CATEGORY_BY_EVENT_TYPE: Record<CalendarEventType, ScheduleXCategory
   media: "production",
   task: "task-deadline",
   planned: "planned-publication",
-  scheduled: "wordpress-scheduled",
-  published: "wordpress-scheduled"
+  scheduled: "publication",
+  published: "publication"
 };
 
 export const CATEGORY_LABELS: Record<ScheduleXCategory, string> = {
@@ -37,8 +38,18 @@ export const CATEGORY_LABELS: Record<ScheduleXCategory, string> = {
   "story-deadline": "Story deadline",
   production: "Production",
   "planned-publication": "Planned publication",
-  "wordpress-scheduled": "WordPress schedule",
+  publication: "Publication",
   "task-deadline": "Task due"
+};
+
+/** The category each filter toggle shows, so a control can carry its events' colour. */
+export const FILTER_CATEGORY: Record<CalendarCategoryFilter, ScheduleXCategory> = {
+  appointments: "appointment",
+  deadlines: "story-deadline",
+  production: "production",
+  plannedPublication: "planned-publication",
+  publication: "publication",
+  tasks: "task-deadline"
 };
 
 /** Colour is never the only signal: renderers also show a label and icon. These feed Schedule-X's own per-calendar tokens. */
@@ -51,20 +62,20 @@ export const SCHEDULE_X_CALENDARS: Record<ScheduleXCategory, CalendarType> = {
   "story-deadline": { ...palette("#a16207", "#fef3c7", "#451a03"), colorName: "story-deadline", label: CATEGORY_LABELS["story-deadline"] },
   production: { ...palette("#6d28d9", "#ede9fe", "#2e1065"), colorName: "production", label: CATEGORY_LABELS.production },
   "planned-publication": { ...palette("#047857", "#d1fae5", "#022c22"), colorName: "planned-publication", label: CATEGORY_LABELS["planned-publication"] },
-  "wordpress-scheduled": { ...palette("#475569", "#e2e8f0", "#0f172a"), colorName: "wordpress-scheduled", label: CATEGORY_LABELS["wordpress-scheduled"] },
+  publication: { ...palette("#475569", "#e2e8f0", "#0f172a"), colorName: "publication", label: CATEGORY_LABELS.publication },
   "task-deadline": { ...palette("#52525b", "#f4f4f5", "#18181b"), colorName: "task-deadline", label: CATEGORY_LABELS["task-deadline"] }
 };
 
-/** A point in time (a WordPress schedule, a planned time) has no duration; give it a short, honest block. */
+/** A point in time (a scheduled publication, a planned time) has no duration; give it a short, honest block. */
 export const POINT_EVENT_MINUTES = 30;
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const NAIVE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
 
 /**
- * A timestamp read in the site timezone. Naive values are site-local wall time
- * (an hour skipped by daylight saving moves forward, as WordPress does);
- * anything with `Z` or an offset is an instant shown in site time.
+ * A timestamp read in the newsroom timezone. Naive values are newsroom-local
+ * wall time (an hour skipped by daylight saving moves forward);
+ * anything with `Z` or an offset is an instant shown in newsroom time.
  */
 export function parseSiteTimestamp(value: string, timezone: string): Temporal.ZonedDateTime | null {
   try {
@@ -98,7 +109,7 @@ export type BylineEventData = {
   storyTitle: string;
   /** Short label for the kind of date: "Deadline", "Production due"... */
   typeLabel: string;
-  /** Appointment/production editor in the Story Workspace, when the event has one. */
+  /** The appointment or production item on its story, when the event has one. */
   editHref: string | null;
   timed: boolean;
   completed: boolean;
@@ -139,7 +150,7 @@ export function toScheduleXEvents(events: PlanningCalendarEvent[], timezone: str
   });
 }
 
-/** The site-day range Schedule-X is showing, as the `YYYY-MM-DD` pair the schedule feed takes. */
+/** The newsroom-day range Schedule-X is showing, as the `YYYY-MM-DD` pair the schedule feed takes. */
 export function visibleRangeDays(range: { start: Temporal.ZonedDateTime; end: Temporal.ZonedDateTime }): { from: string; to: string } {
   return { from: range.start.toPlainDate().toString(), to: range.end.toPlainDate().toString() };
 }

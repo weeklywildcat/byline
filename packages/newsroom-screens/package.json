@@ -3,8 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Byline newsroom screens (Home, Stories, Story Peek, the Story Workspace, task dialogs and their models). CMS-independent: each host supplies fetchers and host-only capabilities such as a calendar. Used by the WordPress admin and the Payload newsroom.",
+  "description": "Byline newsroom screens (Home, Stories, Calendar, Story Peek, the Story Workspace, task dialogs and their models). CMS-independent: each host supplies fetchers, links and host-only capabilities. Used by the WordPress admin and the Payload newsroom.",
   "exports": {
+    "./calendar/CalendarControls": "./src/calendar/CalendarControls.tsx",
+    "./calendar/NeedsScheduling": "./src/calendar/NeedsScheduling.tsx",
+    "./calendar/NewsroomCalendar": "./src/calendar/NewsroomCalendar.tsx",
+    "./calendar/calendar.css": "./src/calendar/calendar.css",
+    "./calendar/calendar-controller": "./src/calendar/calendar-controller.ts",
+    "./calendar/calendar-events": "./src/calendar/calendar-events.tsx",
+    "./calendar/calendar-link": "./src/calendar/calendar-link.tsx",
+    "./calendar/calendar-model": "./src/calendar/calendar-model.ts",
+    "./calendar/calendar-workspace": "./src/calendar/calendar-workspace.ts",
+    "./calendar/calendar-workspace-context": "./src/calendar/calendar-workspace-context.tsx",
+    "./calendar/schedule-x-adapter": "./src/calendar/schedule-x-adapter.ts",
     "./collections/StoryCollectionContext": "./src/collections/StoryCollectionContext.tsx",
     "./collections/WorkspaceCollections": "./src/collections/WorkspaceCollections.tsx",
     "./collections/collection-api": "./src/collections/collection-api.ts",
@@ -92,12 +103,25 @@
     "@atlaskit/pragmatic-drag-and-drop-live-region": "2.1.0",
     "@byline/admin-runtime": "0.1.0",
     "@byline/newsroom-ui": "0.1.0",
+    "@schedule-x/calendar": "4.9.1",
+    "@schedule-x/events-service": "4.9.1",
+    "@schedule-x/react": "4.1.0",
+    "@schedule-x/theme-shadcn": "4.9.1",
     "@tanstack/react-query": "^5.104.5",
     "lucide-react": "^1.60.0",
-    "sonner": "^2.0.8"
+    "react-day-picker": "^10.0.1",
+    "sonner": "^2.0.8",
+    "temporal-polyfill": "0.3.2"
   },
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0",
+    "vitest": "4.1.11"
   }
 }

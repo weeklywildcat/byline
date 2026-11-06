@@ -6,9 +6,10 @@
 import { CalendarClock, Camera, CheckCheck, Clock, Flag, ListTodo, Newspaper, type LucideIcon } from "lucide-react";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
-import { StoryHoverCard } from "@byline/newsroom-screens/story/StoryHoverCard";
+import { StoryHoverCard } from "../story/StoryHoverCard";
+import { CalendarLink } from "./calendar-link";
 import { CATEGORY_BY_EVENT_TYPE, CATEGORY_LABELS, type BylineScheduleXEvent, type ScheduleXCategory } from "./schedule-x-adapter";
-import type { CalendarEventType } from "@byline/newsroom-screens/planning/planning-model";
+import type { CalendarEventType } from "../planning/planning-model";
 
 const ICONS: Record<CalendarEventType, LucideIcon> = { appointment: CalendarClock, deadline: Flag, media: Camera, task: ListTodo, planned: Newspaper, scheduled: Clock, published: CheckCheck };
 
@@ -18,11 +19,11 @@ export const CATEGORY_CLASSES: Record<ScheduleXCategory, string> = {
   "story-deadline": "border-l-amber-600 bg-amber-50 text-amber-950",
   production: "border-l-violet-600 bg-violet-50 text-violet-950",
   "planned-publication": "border-l-emerald-600 bg-emerald-50 text-emerald-950",
-  "wordpress-scheduled": "border-l-slate-600 bg-slate-100 text-slate-900",
+  publication: "border-l-slate-600 bg-slate-100 text-slate-900",
   "task-deadline": "border-l-zinc-500 bg-zinc-100 text-zinc-900"
 };
 export const CATEGORY_DOT_CLASSES: Record<ScheduleXCategory, string> = {
-  appointment: "bg-sky-600", "story-deadline": "bg-amber-600", production: "bg-violet-600", "planned-publication": "bg-emerald-600", "wordpress-scheduled": "bg-slate-600", "task-deadline": "bg-zinc-500"
+  appointment: "bg-sky-600", "story-deadline": "bg-amber-600", production: "bg-violet-600", "planned-publication": "bg-emerald-600", publication: "bg-slate-600", "task-deadline": "bg-zinc-500"
 };
 
 /** The event's own words: "Interview Mrs. Hamby", "Canteen due", "Canteen scheduled". */
@@ -69,14 +70,14 @@ export function TimeGridEvent({ calendarEvent: event }: { calendarEvent: BylineS
   </Chip>;
 }
 
-/** A row in the agenda views: the kind of date is spelled out, and the one editor link a row may offer sits at the end. */
+/** A row in the agenda views: the kind of date is spelled out, and the one link a row may offer (its appointment or production item) sits at the end. */
 export function AgendaEvent({ calendarEvent: event }: { calendarEvent: BylineScheduleXEvent }) {
   const text = eventText(event);
   const time = timeOf(event);
   return <Chip event={event} className="gap-2 py-1.5 text-sm">
     <Icon event={event} />
     <span className="flex min-w-0 flex-1 flex-col"><span className="truncate font-medium">{text.primary}</span><span className="truncate text-xs opacity-70">{[time, CATEGORY_LABELS[CATEGORY_BY_EVENT_TYPE[event.bylineType]], text.story].filter(Boolean).join(" · ")}</span></span>
-    {event.editHref && (event.bylineType === "appointment" || event.bylineType === "media") ? <a href={event.editHref} className="shrink-0 rounded px-1 text-xs font-medium underline-offset-2 hover:underline">{event.bylineType === "appointment" ? "Edit appointment" : "Open workspace"}</a> : null}
+    {event.editHref && (event.bylineType === "appointment" || event.bylineType === "media") ? <CalendarLink href={event.editHref} className="shrink-0 rounded px-1 text-xs font-medium underline-offset-2 hover:underline">{event.bylineType === "appointment" ? "Edit appointment" : "Open story"}</CalendarLink> : null}
   </Chip>;
 }
 
