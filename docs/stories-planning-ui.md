@@ -54,8 +54,10 @@ and `TaskCreateDialog` (Home and Stories share them), `useCompleteTask`, the
 query keys and `invalidateStoryData`, `createStoryFetchers`, shared rows, and
 small presentation pieces (`StoryTitleButton`, `StoryDueLabel`, `StorySignals`,
 `ProductionSummary`, `WorkflowBadge`). Planning keeps `planning-api.ts`,
-`planning-model.ts`, `calendar-model.ts` and `media-desk-model.ts`: React-free
-transport and domain logic.
+`planning-model.ts` and `calendar-model.ts`: React-free transport and domain
+logic. The Media Desk is the shared `@byline/newsroom-screens/media/MediaWork`
+(with `media-desk-model.ts`), which the Payload newsroom also renders as Media
+Work ([media-workspace.md](media-workspace.md)).
 
 Server state is TanStack Query: `["byline","planning",filters]`,
 `["byline","workspace",id]` (shared by Peek and the workspace),
@@ -232,8 +234,10 @@ them `0` on `:root`; scoped to `.byline-ui-root` that blanked the grids, so
 
 ## Other destinations
 
-Media Desk is a table of assignments with inline status, assignee and due date,
-a Files popover built on `Attachment`, and a menu. Its search uses
+Media Desk is the shared `MediaWork` screen (`packages/newsroom-screens/src/media`):
+a table of assignments with inline status, assignee and due date,
+a Files popover built on `Attachment`, and a menu. WordPress passes its Media
+Library as the `MediaPicker` and keeps its page header. Its search uses
 `InputGroup`, matching the Stories toolbar. Its inline edits are optimistic,
 and every assignment row also has a right-click menu for Quick view, Workspace
 and status changes.

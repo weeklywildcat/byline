@@ -329,6 +329,13 @@ belong to the story's use of it. Crop shapes and focal point reuse
 `@byline/core` `image-crops.ts`. Candidate widths 320/640/960/1280/1600/2048,
 never upscaled.
 
+The newsroom's **Media** destination (Library + Work) is built
+([media-workspace.md](media-workspace.md)): Payload-native folders on Media
+(logical only, never storage paths), one private `library` image size
+(≤640px WebP, never a publication rendition) for browsing, and the shared
+production desk. `publicDelivery` and `uploadedBy` are system-only fields.
+Public materialization is still this phase's separate pipeline.
+
 ### 4.6 Polls
 
 `polls` holds definitions with stable `pollKey` and answer `optionId`s (IDs
@@ -493,8 +500,8 @@ Still Payload's own UI, each with its replacement planned:
 
 | Surface | Interim | Replacement |
 | --- | --- | --- |
-| Calendar / Media Desk / Coverage | not in staff navigation | Schedule-X calendar, `MediaDesk` ported with Payload adapters (Stories is ported) |
-| Lead image picker | Payload upload field | Byline media picker + drag-and-drop (Phase 5) |
+| Coverage | not in staff navigation | Coverage workspace (Stories, Calendar and Media are ported) |
+| Lead image picker | Payload upload field | `MediaPickerDialog` (built for production files) + drag-and-drop (Phase 5) |
 | Body editing chrome | Payload Lexical toolbar/slash menu | `@byline/editor` Nova interface (Phase 3/6) |
 | Lock / take-over / read-only modals | Payload modals | Byline treatment of the same `useDocumentInfo` lock state |
 | History compare/restore | Payload versions view | Byline History view over the same versions |
@@ -548,8 +555,9 @@ same workspace data.
 - Workspace writes go through `/api/byline/stories/:id/{brief,sources,appointments,
   media-assignments}`; each checks the record belongs to the story in the URL and
   compares `expectedUpdatedAt` (409 on a stale edit), as WordPress did.
-- Choosing existing media is a host-supplied `MediaPicker`; the newsroom has none
-  until the Byline media picker (Phase 5), so the button is not offered.
+- Choosing existing media is a host-supplied `MediaPicker`: the newsroom's is
+  Byline's `MediaPickerDialog` (the Media Library browser in selection mode),
+  shared with Media Work.
 - Found in the browser and fixed: a Byline dialog's `<form>` portalled inside
   Payload's document form also submitted it, saving the story. The Story screen
   stops submit events at its root.
@@ -845,12 +853,12 @@ navigation:
 | Block | Byline use | When |
 | --- | --- | --- |
 | `dashboard-01` | Shell structure: sidebar + sticky header + content | Now |
-| `sidebar-09` (nested) | A contextual pane inside the one sidebar, beside the global icon rail. The Story workspace (Story switcher) and the Calendar workspace (Calendar controls) have it. Media and Coverage may get their own context when their screens exist | Story, Calendar: done. Others: with their screens |
+| `sidebar-09` (nested) | A contextual pane inside the one sidebar, beside the global icon rail. The Story workspace (Story switcher), the Calendar workspace (Calendar controls) and the Media workspace (Media navigator) have it. Coverage may get its own when its screen exists | Story, Calendar, Media: done. Others: with their screens |
 | `sidebar-13` (sidebar in a dialog) | The narrow-screen Story switcher Sheet and Calendar controls Sheet (same content as the workspace pane, no second provider) | Done |
 | `sidebar-10` (popover) | Compact contextual actions; universal actions stay in the Command palette | As needed |
-| `sidebar-11` (file tree) | Only for really hierarchical data (Media folders, an investigation's documents) | If such data exists |
+| `sidebar-11` (file tree) | Only for really hierarchical data: Payload's Media folders (folders only; files stay in the content browser). Library scopes and Work views are plain menu items, never fake folders | Media: done |
 | `sidebar-12` (calendar) | Calendar's contextual pane: mini calendar plus the newsroom's real categories (above) | Done |
-| `sidebar-14` / `sidebar-15` (right inspector) | The Story screen's inspector for workflow, deadline, editor, presentation, format, readiness and Preview controls not already edited inline; a Sheet on narrow screens | With the editor / Live Preview phase |
+| `sidebar-14` / `sidebar-15` (right inspector) | Visual reference only for Media's asset inspector, which is a page-level `ResizablePanelGroup` panel (or a Sheet), not a second sidebar. The Story screen's inspector for workflow, deadline, editor, presentation, format, readiness and Preview controls not already edited inline; a Sheet on narrow screens | With the editor / Live Preview phase |
 
 **Implementation notes.**
 

@@ -57,6 +57,17 @@ snapshot; nothing in this app serves public reading.
   state; never let a screen own sidebar state; the viewport is never a
   collapsed preference. New contextual modes join `ShellLayout` only when
   their screen exists.
+- **Media** (`/admin/media`, [docs/media-workspace.md](../../docs/media-workspace.md))
+  is Library (Payload Media + Payload-native folders) and Work (the shared
+  production desk), kept apart. The wide Media workspace is the rail plus
+  `MediaNavigator` (≥1024px); the asset inspector is a page-level resizable
+  panel (≥1440px) or a Sheet, never a second sidebar. `sidebar-11`'s tree
+  shows Payload folders only, never files; Library scopes and Work views are
+  menu items, never fake folders. Folders are logical (never storage paths);
+  Byline adds no folder schema. Grid previews are the private `library` image
+  size, never originals, and never publication renditions. The address is
+  Media's state (`?folder=`, `?source=`, `?view=work&scope=`, `?asset=`), moved
+  with `history.pushState` so the shell isn't re-rendered.
 - **Leave through the shell.** Payload disables its leave prompt for
   autosaving documents. Shell links use `ShellLink`/`useShellNavigation()`,
   which wait for the Story screen's own autosave (reported by `useLeaveGuard`)

@@ -33,11 +33,17 @@ the same workspace. Hosts supply the schedule feed (`getSchedule`), the
 imported into each host's Nova stylesheet. Schedule-X and Temporal are this
 package's dependencies.
 
+**Media** (`media/`) is the Library (navigator, browser, inspector, upload,
+picker, folder dialogs over `MediaLibraryFetchers`) and Work (`MediaWork`, the
+production desk moved from the plugin; WordPress renders it as its Media
+Desk). Hosts supply the fetchers, the `MediaPicker`, story links and optional
+client `navigate`. See [docs/media-workspace.md](../../docs/media-workspace.md).
+
 Styling is `@byline/newsroom-ui`. Each host's stylesheet must list this
 package's `src` as a Tailwind `@source`.
 
 Nothing here may import WordPress or Payload. Screens still in
-`wordpress-plugin/src` (Collections, Media Desk, Content Health,
+`wordpress-plugin/src` (Collections, Content Health,
 Feedback, the editor panels) move here as they are ported. Every module is a
 package export; a moved module never leaves a duplicate implementation behind.
 
