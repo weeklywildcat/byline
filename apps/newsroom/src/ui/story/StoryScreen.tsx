@@ -11,10 +11,11 @@ import { ReportingSummaryStrip } from "@byline/newsroom-screens/workspace/Report
 import { ResourcesSection } from "@byline/newsroom-screens/workspace/ResourcesSection";
 import { StoryWorkspaceProvider, WorkspaceAnnouncer, WorkspaceGate, WorkspaceStaleNotice } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { TasksSection } from "@byline/newsroom-screens/workspace/TasksSection";
-import { useAuth, useConfig, useDocumentInfo } from "@payloadcms/ui";
+import { useAuth, useConfig, useDocumentInfo, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import type { CollapsibleFieldClientComponent } from "payload";
 import { useMemo, type FormEvent, type ReactNode } from "react";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
+import { useLeaveGuard } from "../shell/navigation";
 import { HistoryTab } from "./HistoryTab";
 import { StoryHeader } from "./StoryHeader";
 import { WriteTab } from "./WriteTab";
@@ -67,6 +68,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
 
   const screen = (
     <div className="@container/story mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6 md:px-8">
+      <StoryLeaveGuard />
       <StoryHeader context={context} />
       <Tabs defaultValue={appointmentId ? "plan" : "write"} className="gap-4">
         <TabsList>
@@ -131,6 +133,20 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
     </div>
   );
 };
+
+/**
+ * Tells the shell whether this story has work that leaving would lose: an
+ * edit Payload's autosave has not saved yet, or a save in flight. The shell
+ * waits for that autosave (or asks) before any shell navigation, such as
+ * switching stories. It reads Payload's own form state and saves nothing.
+ */
+function StoryLeaveGuard() {
+  const modified = useFormModified();
+  const processing = useFormProcessing();
+  const background = useFormBackgroundProcessing();
+  useLeaveGuard(() => ({ modified, saving: processing || background }));
+  return null;
+}
 
 /**
  * The Story screen lives inside Payload's document <form>, and React submit

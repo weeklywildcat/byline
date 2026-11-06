@@ -10,7 +10,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
-import { SidebarGroup, SidebarGroupAction, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuAction, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@byline/newsroom-ui/ui/sidebar";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { savedViewsKey } from "../story/story-query";
@@ -47,9 +46,8 @@ export type StoryViewsOptions = {
 
 /**
  * Which story set the reader is looking at: the built-in views, their own
- * saved views, and saving, renaming, updating and deleting (with Undo). One
- * controller drives both presentations, the wide rail and the compact
- * picker, so the two can never behave differently.
+ * saved views, and saving, renaming, updating and deleting (with Undo),
+ * presented by the picker.
  */
 export type StoryViewsController = {
   active: ActiveStoryView;
@@ -177,18 +175,17 @@ export function useStoryViews({ fetchers, filters, sort, selectedId, onApply, in
 }
 
 /** Rename and Delete for one saved view (and Update, for the selected one while it is modified). */
-function SavedViewActions({ view, canSave, canDelete, onRename, onDelete, onUpdate, trigger }: {
+function SavedViewActions({ view, canSave, canDelete, onRename, onDelete, onUpdate }: {
   view: SavedPlanningView;
   canSave: boolean;
   canDelete: boolean;
   onRename: () => void;
   onDelete: () => void;
   onUpdate?: () => void;
-  trigger?: ReactNode;
 }) {
   if (!canSave && !canDelete) return null;
   return <DropdownMenu>
-    {trigger ?? <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={`Actions for view ${view.name}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>}
+    <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={`Actions for view ${view.name}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="w-44">
       {onUpdate && canSave ? <DropdownMenuItem onClick={onUpdate}><Check aria-hidden="true" />Update view</DropdownMenuItem> : null}
       {canSave ? <DropdownMenuItem onClick={onRename}><Pencil aria-hidden="true" />Rename</DropdownMenuItem> : null}
@@ -197,60 +194,17 @@ function SavedViewActions({ view, canSave, canDelete, onRename, onDelete, onUpda
   </DropdownMenu>;
 }
 
-const isBuiltIn = (active: ActiveStoryView, view: BuiltInStoryView) => active.kind === "built-in" && active.view.id === view.id;
-const isSaved = (active: ActiveStoryView, view: SavedPlanningView) => active.kind === "saved" && active.view.id === view.id;
-
-/* -------------------------------------------------------- wide: the rail */
-
-/**
- * The Stories rail (the sidebar-09 module pane): built-in views, then the
- * reader's saved views, beside Board and List when the Stories container is
- * wide enough. A contextual `<aside>`, not a second app Sidebar.
- */
-export function StoryViewsRail({ views, className }: { views: StoryViewsController; className?: string }) {
-  const { active } = views;
-  return <aside aria-label={"Story views"} className={cn("flex flex-col gap-4 text-sidebar-foreground", className)}>
-    <SidebarGroup className="p-0">
-      <SidebarGroupLabel render={<h2 />}>Stories</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          {views.builtIns.map((view) => <SidebarMenuItem key={view.id}>
-            <SidebarMenuButton type="button" isActive={isBuiltIn(active, view)} aria-current={isBuiltIn(active, view) ? "true" : undefined} onClick={() => views.chooseBuiltIn(view)}><span>{view.label}</span></SidebarMenuButton>
-          </SidebarMenuItem>)}
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
-    <SidebarGroup className="p-0">
-      <SidebarGroupLabel render={<h2 />}>Saved views</SidebarGroupLabel>
-      {views.canSave ? <SidebarGroupAction type="button" className="top-1.5 right-1" title={views.full ? `You can keep up to ${SAVED_VIEW_LIMIT} views` : "Save current view"} aria-label={"Save current view"} disabled={views.full} onClick={views.openSave}><Plus aria-hidden="true" /></SidebarGroupAction> : null}
-      <SidebarGroupContent>
-        {views.savedViews.length
-          ? <SidebarMenu>
-            {views.savedViews.map((view) => {
-              const selected = isSaved(active, view);
-              const modified = selected && active.kind === "saved" && active.modified;
-              return <SidebarMenuItem key={view.id}>
-                <SidebarMenuButton type="button" isActive={selected} aria-current={selected ? "true" : undefined} onClick={() => views.chooseSaved(view)} className={cn(modified && "pr-16")}>
-                  <span>{view.name}{modified ? <span className="sr-only"> (modified)</span> : null}</span>
-                </SidebarMenuButton>
-                {modified ? <SidebarMenuBadge aria-hidden="true" className="right-7 font-normal text-muted-foreground">Edited</SidebarMenuBadge> : null}
-                <SavedViewActions view={view} canSave={views.canSave} canDelete={views.canDelete} onRename={() => views.openRename(view)} onDelete={() => views.remove(view)} onUpdate={modified ? views.updateSelected : undefined}
-                  trigger={<DropdownMenuTrigger render={<SidebarMenuAction type="button" showOnHover aria-label={`Actions for view ${view.name}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>} />
-              </SidebarMenuItem>;
-            })}
-          </SidebarMenu>
-          : <p className="px-2 py-1 text-xs text-muted-foreground">{views.canSave ? "Save the filters you use often." : "No saved views."}</p>}
-      </SidebarGroupContent>
-    </SidebarGroup>
-  </aside>;
-}
-
-/* ---------------------------------------------------- compact: the picker */
+/* ------------------------------------------------------------ the picker */
 
 const BUILT_IN_PREFIX = "built-in:";
 const SAVED_PREFIX = "saved:";
 
-/** The same views as the rail, in one menu, when the Stories container is too narrow for it. */
+/**
+ * Which story set Stories shows: the built-in views, the reader's saved
+ * views, and saving and managing them, in one menu above Board and List.
+ * (A permanent views rail beside the page was removed: collection views did
+ * not justify a second navigation column next to the app sidebar.)
+ */
 export function StoryViewsPicker({ views, className }: { views: StoryViewsController; className?: string }) {
   const { active } = views;
   const value = active.kind === "built-in" ? `${BUILT_IN_PREFIX}${active.view.id}` : active.kind === "saved" ? `${SAVED_PREFIX}${active.view.id}` : "";

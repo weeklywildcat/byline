@@ -9,7 +9,6 @@ import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { useConfig, usePreferences } from "@payloadcms/ui";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { useBylineCreate } from "../shell/create";
 import { useBylineSearch } from "../shell/search";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
 import { createPayloadPlanningFetchers } from "./payload-planning-fetchers";
@@ -26,8 +25,9 @@ const subscribeNever = () => () => {};
 /**
  * Byline Stories (`/admin/stories`): the shared StoriesPage, Board and List,
  * inside the Byline shell. The shell owns the query cache, Create, Search and
- * toasts; this host supplies the Payload fetchers, the one Story Peek, and the
- * Story screen's address. No calendar yet, so Stories offers Board and List.
+ * toasts (so Stories shows no New story of its own); this host supplies the
+ * Payload fetchers, the one Story Peek, and the Story screen's address. No
+ * calendar yet, so Stories offers Board and List.
  */
 export function NewsroomStories({ currentUserId, view, initialFilters }: NewsroomStoriesProps) {
   const { config } = useConfig();
@@ -56,14 +56,14 @@ export function NewsroomStories({ currentUserId, view, initialFilters }: Newsroo
 
 function StoriesBody({ fetchers, currentUserId, initialView, initialFilters, workspaceUrl }: { fetchers: Parameters<typeof StoriesPage>[0]["fetchers"]; currentUserId: number; initialView: StoriesView; initialFilters?: Partial<PlanningFilters>; workspaceUrl: (storyId: number) => string }) {
   const { openStory } = useStoryPeek();
-  const { openCreate } = useBylineCreate();
   const { setStoryOpener } = useBylineSearch();
   // ⌘K opens a story in this screen's Peek rather than leaving Stories.
   useEffect(() => {
     setStoryOpener(openStory);
     return () => setStoryOpener(null);
   }, [openStory, setStoryOpener]);
-  return <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={initialFilters} workspaceUrl={workspaceUrl} onNewStory={() => openCreate("story")} />;
+  // No page-level New story: the shell's Create is already beside it.
+  return <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={initialFilters} workspaceUrl={workspaceUrl} />;
 }
 
 function StoriesPlaceholder() {

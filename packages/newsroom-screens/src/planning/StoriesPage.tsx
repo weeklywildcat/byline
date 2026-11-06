@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Plus } from "lucide-react";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { useDebouncedValue, useNow } from "@byline/newsroom-ui/lib/hooks";
-import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
@@ -15,7 +14,7 @@ import {
 } from "./stories-view";
 import { useStoryPeek } from "../story/StoryPeekHost";
 import { PageHeader } from "./PlanningPage";
-import { StoryViewsPicker, StoryViewsRail, useStoryViews, type AppliedView } from "./StoryViews";
+import { StoryViewsPicker, useStoryViews, type AppliedView } from "./StoryViews";
 import { StoryBoard } from "./StoryBoard";
 import { StoryFilters } from "./StoryFilters";
 import { StoryList } from "./StoryList";
@@ -25,12 +24,6 @@ import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, filterPlanningStories
 import { describePlanningError } from "./planning-model";
 
 const VIEW_LABELS: Record<StoriesView, string> = { board: "Board", list: "List", calendar: "Calendar" };
-
-/** The Stories container width at which the views rail fits beside the List's ~820px table (rail + gap + table + borders). */
-export const STORIES_RAIL_MIN_WIDTH = 1080;
-// Literal class names, so Tailwind finds them; keep them equal to STORIES_RAIL_MIN_WIDTH.
-const STORIES_RAIL_SHOWN = "@min-[1080px]/stories:flex";
-const STORIES_PICKER_HIDDEN = "@min-[1080px]/stories:hidden";
 
 /** Everyone seen so far as a story's people, so a filter's options do not shrink to whoever the current filter left. */
 function mergePeople(known: PlanningPerson[], stories: PlanningStory[], pick: (story: PlanningStory) => Array<PlanningPerson | null>): PlanningPerson[] {
@@ -66,6 +59,10 @@ export type StoriesPageProps = {
   initialView: StoriesView;
   initialFilters?: Partial<PlanningFilters>;
   workspaceUrl: StoryWorkspaceUrl;
+  /**
+   * A page-level New story, for hosts without a global Create (WordPress).
+   * A host whose shell already has Create (the Payload newsroom) omits it.
+   */
   onNewStory?: () => void;
   /**
    * The host's calendar. Without one Stories offers only Board and List; a
@@ -137,35 +134,31 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
   const storyViews = useStoryViews({ fetchers, filters, sort, selectedId: savedViewId, onApply: apply, initialViews: data?.savedViews });
 
   const loading = planning.isPending && !data;
-  // Which story set (the rail, or the picker when the container is too narrow for it), how it is
-  // presented (Board | List | Calendar) and how it is refined (the filter toolbar) stay three controls.
-  // The rail needs ~208px beside the List's ~820px table, so it appears by the Stories container's
-  // width, never the device's: a collapsed app sidebar can make room for it on the same screen.
+  // Which story set (the views picker), how it is presented (Board | List | Calendar) and how it is
+  // refined (the filter toolbar) stay three controls. One column: the app's sidebar is the page's only
+  // navigation column; a permanent views rail beside Stories did not earn a second one.
   return <div className="@container/stories">
-    <div className="flex items-start gap-6">
-      <StoryViewsRail views={storyViews} className={cn("hidden w-52 shrink-0 pt-1", STORIES_RAIL_SHOWN)} />
-      <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <PageHeader title={"Stories"} description={"Track everything the newsroom is working on."} actions={onNewStory ? <Button type="button" onClick={onNewStory}><Plus data-icon="inline-start" aria-hidden="true" />New story</Button> : undefined} />
-        <Tabs value={view} onValueChange={(next) => changeView(next as StoriesView)} className="gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <StoryViewsPicker views={storyViews} className={STORIES_PICKER_HIDDEN} />
-            <TabsList variant="line" aria-label={"Stories presentation"}>
-              {presentations.map((id) => <TabsTrigger key={id} value={id}>{VIEW_LABELS[id]}</TabsTrigger>)}
-            </TabsList>
-          </div>
-          <StoryFilters filters={filters} onChange={changeFilters} showPublished={view === "list" ? { value: showPublished, onChange: setShowPublished } : undefined} statuses={statuses} writers={people.writers} editors={people.editors} />
-      {planning.isError && !data ? <InlineAlert onAction={() => void planning.refetch()}>{describePlanningError(planning.error, "Stories are unavailable right now.")}</InlineAlert> : null}
-      {planning.isError && data ? <InlineAlert onAction={() => void planning.refetch()}>These stories may be out of date. Refreshing failed.</InlineAlert> : null}
-      {loading
-        ? <div role="status" aria-label={"Loading stories"} className="grid gap-3 @3xl/stories:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <div key={i} className="flex flex-col gap-2 rounded-xl border p-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>)}</div>
-        : <>
-          <TabsContent value="board"><StoryBoard stories={stories} statuses={statuses} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onMoveStory={move} onOpenStory={open} /></TabsContent>
-          <TabsContent value="list"><StoryList stories={listStories} hiddenPublished={stories.length - listStories.length} statuses={statuses} sort={sort} canMoveStories={canMove} canAssignStories={canAssign} canUpdateStories={canUpdateStories} movingStoryId={movingStoryId} updatingStoryId={updatingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onUpdateStory={update} onOpenStory={open} /></TabsContent>
-          {renderCalendar ? <TabsContent value="calendar">{renderCalendar({ collectionId: filters.collectionId, stories, timezone, currentUserId: userId, workspaceUrl, onOpenStory: open })}</TabsContent> : null}
-        </>}
-        </Tabs>
-        <p role="status" aria-live="polite" className="sr-only">{loading ? "" : `${stories.length} ${stories.length === 1 ? "story" : "stories"} in this view.`}</p>
-      </div>
+    <div className="flex min-w-0 flex-col gap-4">
+      <PageHeader title={"Stories"} description={"Track everything the newsroom is working on."} actions={onNewStory ? <Button type="button" onClick={onNewStory}><Plus data-icon="inline-start" aria-hidden="true" />New story</Button> : undefined} />
+      <Tabs value={view} onValueChange={(next) => changeView(next as StoriesView)} className="gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <StoryViewsPicker views={storyViews} />
+          <TabsList variant="line" aria-label={"Stories presentation"}>
+            {presentations.map((id) => <TabsTrigger key={id} value={id}>{VIEW_LABELS[id]}</TabsTrigger>)}
+          </TabsList>
+        </div>
+        <StoryFilters filters={filters} onChange={changeFilters} showPublished={view === "list" ? { value: showPublished, onChange: setShowPublished } : undefined} statuses={statuses} writers={people.writers} editors={people.editors} />
+        {planning.isError && !data ? <InlineAlert onAction={() => void planning.refetch()}>{describePlanningError(planning.error, "Stories are unavailable right now.")}</InlineAlert> : null}
+        {planning.isError && data ? <InlineAlert onAction={() => void planning.refetch()}>These stories may be out of date. Refreshing failed.</InlineAlert> : null}
+        {loading
+          ? <div role="status" aria-label={"Loading stories"} className="grid gap-3 @3xl/stories:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <div key={i} className="flex flex-col gap-2 rounded-xl border p-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>)}</div>
+          : <>
+            <TabsContent value="board"><StoryBoard stories={stories} statuses={statuses} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onMoveStory={move} onOpenStory={open} /></TabsContent>
+            <TabsContent value="list"><StoryList stories={listStories} hiddenPublished={stories.length - listStories.length} statuses={statuses} sort={sort} canMoveStories={canMove} canAssignStories={canAssign} canUpdateStories={canUpdateStories} movingStoryId={movingStoryId} updatingStoryId={updatingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onUpdateStory={update} onOpenStory={open} /></TabsContent>
+            {renderCalendar ? <TabsContent value="calendar">{renderCalendar({ collectionId: filters.collectionId, stories, timezone, currentUserId: userId, workspaceUrl, onOpenStory: open })}</TabsContent> : null}
+          </>}
+      </Tabs>
+      <p role="status" aria-live="polite" className="sr-only">{loading ? "" : `${stories.length} ${stories.length === 1 ? "story" : "stories"} in this view.`}</p>
     </div>
     {storyViews.dialogs}
   </div>;

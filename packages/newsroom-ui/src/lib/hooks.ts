@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 
 /** The current time, refreshed every minute, so "due tomorrow" stays true on a screen left open. */
 export function useNow(intervalMs = 60_000): Date {
@@ -37,25 +37,26 @@ export function useElementWidth<T extends HTMLElement>(): [RefObject<T | null>, 
 }
 
 
+/**
+ * Whether a CSS media query matches. Server-rendered hosts (the Payload
+ * newsroom) hydrate with `serverValue` and then switch, so the markup never
+ * mismatches; client-only hosts read the real value on their first render.
+ * Layout that depends on the viewport goes through here, never a component's
+ * own `matchMedia`.
+ */
+export function useMediaQuery(query: string, serverValue = false): boolean {
+  const subscribe = useCallback((onChange: () => void) => {
+    const media = window.matchMedia(query);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, [query]);
+  return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches, () => serverValue);
+}
+
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_QUERY = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`;
 
-function subscribeMobile(onChange: () => void) {
-  const media = window.matchMedia(MOBILE_QUERY);
-  media.addEventListener("change", onChange);
-  return () => media.removeEventListener("change", onChange);
-}
-
-/**
- * Whether the current viewport is below the shadcn Sidebar mobile breakpoint.
- * Server-rendered hosts (the Payload newsroom) hydrate as "not mobile" and
- * then switch, so the markup never mismatches; client-only hosts read the real
- * width on their first render.
- */
+/** Whether the current viewport is below the shadcn Sidebar mobile breakpoint ("not mobile" while hydrating). */
 export function useIsMobile(): boolean {
-  return useSyncExternalStore(
-    subscribeMobile,
-    () => window.matchMedia(MOBILE_QUERY).matches,
-    () => false
-  );
+  return useMediaQuery(MOBILE_QUERY);
 }

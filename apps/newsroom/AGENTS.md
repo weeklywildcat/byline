@@ -46,6 +46,22 @@ snapshot; nothing in this app serves public reading.
   Search), the sidebar (`BylineNav`/`BylineSidebar`), the sticky header
   (`BylineAppHeader`). Do not add a second global sidebar; the other shadcn
   sidebar blocks map to specific future surfaces in §7.2.
+- **One SidebarProvider, contextual composition.** `BylineSidebar` keeps one
+  outer `Sidebar collapsible="icon"` and chooses its contents from the route
+  and viewport (`ui/shell/layout.tsx`). Normal screens get the global app
+  sidebar (256px). A wide Story workspace (a saved story, viewport ≥1300px)
+  gets shadcn `sidebar-09`: the global icon rail (`BylineIconRail`) plus the
+  Story list (`StorySwitcherContent`), 350px. Collapsed, it is the icon rail
+  only. A narrow Story workspace keeps the normal global sidebar plus a
+  temporary Story switcher Sheet. Never mount a second provider or sidebar
+  state; never let a screen own sidebar state; the viewport is never a
+  collapsed preference. New contextual modes join `ShellLayout` only when
+  their screen exists.
+- **Leave through the shell.** Payload disables its leave prompt for
+  autosaving documents. Shell links use `ShellLink`/`useShellNavigation()`,
+  which wait for the Story screen's own autosave (reported by `useLeaveGuard`)
+  or ask. Never `window.location.assign` to another Byline screen, and never a
+  second save path.
 - **Navigation** lists a destination (`src/domain/navigation.ts`) only once its
   Byline screen exists; never a generic Payload collection. Raw collections are
   reached by administrators from *System administration* (`/admin/system`) in

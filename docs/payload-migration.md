@@ -579,6 +579,11 @@ System administration.
   collection, migration or endpoint, normalized on every read and written whole.
 - **No Calendar yet:** the newsroom passes no `renderCalendar`, so Stories offers
   Board and List.
+- **One column, no page-level New story:** the earlier `StoryViewsRail` beside
+  the collection was removed (collection views did not justify a second
+  permanent navigation column; the views picker does the job), and the
+  newsroom passes no `onNewStory`, since the shell's Create sits beside it.
+  Switching stories while writing is the Story workspace's (§7.2).
 
 Tested: `tests/integration/planning.test.ts` (24 tests: response shape, a
 124-story collection, staff/editor/participant scopes, drafts and rewrites,
@@ -610,8 +615,8 @@ drafts, versions, locks and publishing are exactly Payload's:
 
 | Extension point | Byline piece (`apps/newsroom/src/ui/shell`) | Role |
 | --- | --- | --- |
-| `admin.components.providers` | `BylineShellProvider` → `BylineShell` | One query cache; the shadcn `SidebarProvider` (`display: contents`, ⌘\ toggles, state in the `byline_sidebar` cookie read on the server); the Create controller; the command palette |
-| `admin.components.Nav` | `BylineNav` → `BylineSidebar` | `Sidebar collapsible="icon"`: wordmark, Create, destinations, account footer; a Sheet on phones |
+| `admin.components.providers` | `BylineShellProvider` → `BylineShell` | One query cache; the one shadcn `SidebarProvider` (`display: contents`, ⌘\ toggles, state in the `byline_sidebar` cookie read on the server, width by layout); guarded navigation; the Create controller; the command palette; the Story switcher |
+| `admin.components.Nav` | `BylineNav` → `BylineSidebar` | One `Sidebar collapsible="icon"` whose contents are contextual (below): the global sidebar, or the Story workspace's icon rail + Story list; a Sheet on phones |
 | `admin.components.header` | `BylineAppHeader` | Sticky header beside the sidebar: trigger, location, Search (⌘K) |
 | `admin.components.views.stories` | `BylineStories` (`/admin/stories`) | Byline Stories (Board, List, story views), account checked on the server |
 | `admin.components.views.system` | `SystemAdministration` (`/admin/system`) | Administrators' list of raw collection screens, role-checked on the server |
@@ -650,6 +655,73 @@ drafts, versions, locks and publishing are exactly Payload's:
   so WordPress Settings keeps its embedded, shortcut-free sidebar. Never copy
   shadcn components into `apps/newsroom`.
 
+**One SidebarProvider, contextual composition.** Byline has one
+`SidebarProvider` and one outer `Sidebar`; what it contains depends on the
+screen. `BylineSidebar` chooses from the route (`storyIdFromPath`: a saved
+story's `/collections/stories/:id`, never `/create` or a list) and the viewport
+(`ShellLayout`, `ui/shell/layout.tsx`):
+
+| Screen | Sidebar |
+| --- | --- |
+| Normal screens | Global app sidebar (`DefaultSidebar`), 256px |
+| Wide Story workspace (≥1300px) | Global icon rail + contextual Story list, 350px |
+| Collapsed Story workspace | Global icon rail, 48px |
+| Narrow Story workspace (<1300px) | Normal global sidebar + a temporary Story switcher sheet |
+
+- The wide Story workspace follows shadcn **`sidebar-09`** closely: the outer
+  `Sidebar collapsible="icon" className="overflow-hidden
+  *:data-[sidebar=sidebar]:flex-row"`, then `BylineIconRail` (`Sidebar
+  collapsible="none" className="w-[calc(var(--sidebar-width-icon)+1px)]!
+  border-r"`) and the Story pane (`Sidebar collapsible="none" className="hidden
+  flex-1 md:flex"`). `--sidebar-width` is 350px on that route only. ⌘\ or the
+  header's trigger collapses the one sidebar to the icon width, leaving only
+  the rail, and that is still the `byline_sidebar` cookie; there is no second
+  cookie or state. Entering a story with the sidebar collapsed shows the rail
+  alone.
+- **The icon rail** has the global destinations, Create and the account,
+  icons only (`CreateMenu compact`, `NavUser compact`), each with an
+  always-on tooltip (`tooltip={{ children, hidden: false }}`, as upstream)
+  and an accessible name. The Stories icon is current inside a story. The
+  compact "+" always opens the Create menu.
+- **The Story switcher** (`StorySwitcher.tsx`) is a navigation list, not a
+  second Stories screen: *Stories · All stories →*, a queue (My stories,
+  Ready for review for editors and administrators, All stories: the built-in
+  presets from `story-views.ts`), `SidebarInput` search (Planning's `query`,
+  scoped to the queue; ⌘K stays global), then compact rows (headline, then
+  stage · deadline, or who has it). Data is `GET /api/byline/planning` through
+  `usePlanningStories` and the shell's query cache. The open story is
+  `aria-current="page"`; when the queue leaves it out it is pinned under
+  *Current story* from the workspace the Story screen already loaded (the
+  shared `workspaceQueryClient` cache, so no new request; nothing that the
+  account cannot read). The queue is remembered in Payload Preferences
+  (`byline:story-switcher:queue:v1`). One controller, mounted in the shell,
+  renders `StorySwitcherContent` in the workspace pane and in the narrow
+  screens' Sheet (opened by *Switch story* in `StoryHeader`, from the right;
+  the global menu keeps its own trigger and Sheet).
+- **Why 1300px:** the Write tab's article measure is 760px. Beside the 350px
+  workspace, Payload's Edit view gutters take 120px and the Story screen's
+  padding 64px: 350 + 120 + 64 + 760 = 1294. Measured: at 1200 the article
+  shrank to 666px; at 1300, 1366, 1440 and 1920 it is 760px. Below 1300 (1280
+  laptops included) the ordinary sidebar stays.
+- **Leaving a story never loses an edit.** Payload turns off its own
+  leave-without-saving prompt for autosaving documents, and its autosave does
+  not run once the document unmounts. Every shell link (sidebar, rail, Story
+  list, Search, Create) goes through `ShellNavigationProvider`
+  (`navigation.tsx`). The Story screen reports Payload's own `modified` and
+  saving state (`useLeaveGuard`); with nothing pending the link navigates at
+  once (Next client navigation, so Payload's lock release runs). Otherwise it
+  waits for Payload's autosave ("Saving your changes…"). If the edit is still
+  unsaved and nothing is saving after 3s (a failed or skipped save), it asks:
+  *Leave without saving?* (Stay / Leave anyway). It never saves on its own.
+- **Payload remounts the Nav on every navigation** (it lives in each page,
+  not a layout). So the shell keeps the switcher's queue, search and scroll
+  position, and applies a width change only once the new sidebar has mounted
+  (`useSidebarWidthLayout`), so 256 ↔ 350 animates like collapsing does.
+- The viewport is a layout capability, never a preference: a narrow window
+  does not write `byline_sidebar`. Until hydration the server renders the
+  ordinary layout; a hard load of a story on a wide screen then slides to the
+  workspace.
+
 **Sidebar patterns, one per job.** There is exactly one global sidebar. Other
 shadcn sidebar blocks are references for specific surfaces, never extra global
 navigation:
@@ -657,7 +729,8 @@ navigation:
 | Block | Byline use | When |
 | --- | --- | --- |
 | `dashboard-01` | Shell structure: sidebar + sticky header + content | Now |
-| `sidebar-09` (nested) | A module's secondary pane beside the global sidebar: Stories (My Work, All, Ready for Review, Published, On Hold), Media (types, My uploads, Needs alt text, Recently used), Coverage (Active, Upcoming, Past, Archived). Stories has it (`StoryViewsRail`, shown by container width, with `StoryViewsPicker` as its compact form); Media and Coverage reuse that composition | Stories: done. Media / Coverage: with their screens |
+| `sidebar-09` (nested) | A contextual pane inside the one sidebar, beside the global icon rail. The Story workspace has it (Story switcher). Calendar, Media and Coverage may get their own context when their screens exist | Story: done. Others: with their screens |
+| `sidebar-13` (sidebar in a dialog) | The narrow-screen Story switcher Sheet (same content as the workspace pane, no second provider) | Done |
 | `sidebar-10` (popover) | Compact contextual actions; universal actions stay in the Command palette | As needed |
 | `sidebar-11` (file tree) | Only for really hierarchical data (Media folders, an investigation's documents) | If such data exists |
 | `sidebar-12` (calendar) | Calendar's left pane: mini calendar, My Schedule, Interviews, Reporting, Production, School events, completed/cancelled toggles | With the real Calendar adapter |

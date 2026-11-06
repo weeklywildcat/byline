@@ -3,6 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@byline/newsroom-ui/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
+import { cn } from "@byline/newsroom-ui/lib/utils";
 import { ChevronsUpDown, LogOut, Wrench } from "lucide-react";
 import { useState } from "react";
 
@@ -16,13 +17,17 @@ export function initials(name: string): string {
   return (first + last).toLocaleUpperCase();
 }
 
-function Identity({ user }: { user: ShellUser }) {
+function Identity({ user, compact = false }: { user: ShellUser; compact?: boolean }) {
+  const avatar = (
+    <Avatar className="size-8 rounded-lg after:rounded-lg">
+      {user.avatarUrl ? <AvatarImage src={user.avatarUrl} alt="" className="rounded-lg" /> : null}
+      <AvatarFallback className="rounded-lg" aria-hidden="true">{initials(user.name)}</AvatarFallback>
+    </Avatar>
+  );
+  if (compact) return avatar;
   return (
     <>
-      <Avatar className="size-8 rounded-lg after:rounded-lg">
-        {user.avatarUrl ? <AvatarImage src={user.avatarUrl} alt="" className="rounded-lg" /> : null}
-        <AvatarFallback className="rounded-lg" aria-hidden="true">{initials(user.name)}</AvatarFallback>
-      </Avatar>
+      {avatar}
       <span className="grid flex-1 text-left text-sm leading-tight">
         <span className="truncate font-medium">{user.name}</span>
         <span className="truncate text-xs text-muted-foreground">{user.subtitle}</span>
@@ -35,9 +40,11 @@ function Identity({ user }: { user: ShellUser }) {
  * The account menu in the sidebar footer. System administration (the raw
  * Payload maintenance screens) lives here, for administrators only, so it
  * never reads as part of the newsroom's navigation. Profile and Preferences
- * join once their Byline screens exist.
+ * join once their Byline screens exist. `compact` (the Story workspace's icon
+ * rail) shows only the avatar, with the name as its tooltip, whatever state
+ * the sidebar around it is in; the menu is the same.
  */
-export function NavUser({ user, systemHref, logoutUrl, loginHref }: { user: ShellUser; systemHref: string | null; logoutUrl: string; loginHref: string }) {
+export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = false }: { user: ShellUser; systemHref: string | null; logoutUrl: string; loginHref: string; compact?: boolean }) {
   const { isMobile, state } = useSidebar();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -54,9 +61,9 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref }: { user: Shel
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton type="button" size="lg" tooltip={state === "collapsed" ? user.name : undefined} aria-label={`Account: ${user.name}`} className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground" />}>
-            <Identity user={user} />
-            <ChevronsUpDown className="ml-auto size-4" aria-hidden="true" />
+          <DropdownMenuTrigger render={<SidebarMenuButton type="button" size="lg" tooltip={compact ? { children: user.name, hidden: false } : state === "collapsed" ? user.name : undefined} aria-label={`Account: ${user.name}`} className={cn("data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground", compact && "md:h-8 md:p-0")} />}>
+            <Identity user={user} compact={compact} />
+            {compact ? null : <ChevronsUpDown className="ml-auto size-4" aria-hidden="true" />}
           </DropdownMenuTrigger>
           <DropdownMenuContent className="min-w-56" side={isMobile ? "top" : "right"} align="end" sideOffset={4}>
             <DropdownMenuGroup>

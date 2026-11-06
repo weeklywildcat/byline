@@ -4,13 +4,15 @@ import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { useDocumentInfo, useForm, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
-import { Check } from "lucide-react";
+import { Check, List } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { formatDay } from "./parts";
 import { useStoryField } from "./form";
 import type { StoryScreenContext } from "./StoryScreen";
 import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
+import { useShellLayout } from "../shell/layout";
+import { useStorySwitcher } from "../shell/StorySwitcher";
 
 /**
  * The Story header: what the story is, where it is in the newsroom's workflow
@@ -60,6 +62,7 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]">{headline?.trim() || "Untitled story"}</h1>
         <div className="flex items-center gap-2">
+          <StorySwitchButton />
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
             {saving ? <Spinner className="size-3" /> : saveState === "Saved" ? <Check className="size-3" aria-hidden="true" /> : null}
             {saveState}
@@ -96,5 +99,24 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
       </dl>
       {context.readOnly ? <p className="text-sm text-muted-foreground">Someone else is editing this story. You are viewing it read-only.</p> : null}
     </header>
+  );
+}
+
+/**
+ * On screens too narrow for the Story workspace sidebar, the Story list opens
+ * from here in a temporary sheet (the shell's, the same list the workspace
+ * shows). The global navigation keeps its own trigger in the app header.
+ * CSS hides it at the workspace width before hydration; the shell's layout
+ * decides after.
+ */
+function StorySwitchButton() {
+  const { storyId, storyWorkspace } = useShellLayout();
+  const { openSheet } = useStorySwitcher();
+  if (storyId === null || storyWorkspace) return null;
+  return (
+    <Button type="button" variant="outline" size="sm" onClick={openSheet} className="min-[1300px]:hidden" aria-haspopup="dialog" data-story-switch="">
+      <List data-icon="inline-start" aria-hidden="true" />
+      <span className="max-sm:sr-only">Switch story</span>
+    </Button>
   );
 }

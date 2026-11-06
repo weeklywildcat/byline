@@ -8,6 +8,7 @@ import { createPayloadHomeFetchers } from "../home/payload-fetchers";
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { useBylineCreate } from "./create";
 import { ShellLayer } from "./layer";
+import { useShellNavigation } from "./navigation";
 
 type StoryOpener = (storyId: number) => void;
 
@@ -26,12 +27,14 @@ export const useBylineSearch = () => use(SearchContext);
  * Search. It is the shared `HomeCommands` (story search, recent stories and
  * newsroom actions); its Create actions go through the Create controller. A
  * chosen story opens in the current screen's Story Peek when it has one
- * (Home), otherwise on its Story screen.
+ * (Home), otherwise on its Story screen, through the shell's guarded
+ * navigation.
  */
 export function BylineSearchProvider({ children }: { children: ReactNode }) {
   const account = useNewsroomAccount();
   const routes = useNewsroomRoutes();
   const { openCreate, creating } = useBylineCreate();
+  const { navigate } = useShellNavigation();
   const fetchers = useMemo(() => createPayloadHomeFetchers(routes.api), [routes.api]);
   const [open, setOpen] = useState(false);
   const [recentIds, setRecentIds] = useState<number[]>([]);
@@ -56,7 +59,7 @@ export function BylineSearchProvider({ children }: { children: ReactNode }) {
   const openStory = (id: number) => {
     setRecentIds((ids) => [id, ...ids.filter((item) => item !== id)].slice(0, 8));
     if (opener.current) opener.current(id);
-    else window.location.assign(routes.story(id));
+    else navigate(routes.story(id));
   };
 
   return (

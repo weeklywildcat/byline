@@ -1,106 +1,45 @@
 "use client";
 
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarRail,
-  useSidebar
-} from "@byline/newsroom-ui/ui/sidebar";
-import { CalendarDays, FileText, House, Images, KanbanSquare, MessageSquareText, Radio, Users, Vote, type LucideIcon } from "lucide-react";
-import Link from "next/link";
+import { Sidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { usePathname } from "next/navigation";
 import { activeNavKey } from "../../domain/navigation";
-import { CreateMenu } from "./CreateMenu";
-import { NavUser, type ShellUser } from "./NavUser";
+import { DefaultSidebar } from "./DefaultSidebar";
+import { useShellLayout, useSyncSidebarWidthOnMount } from "./layout";
+import type { ShellSidebarProps } from "./nav-items";
+import { StoryWorkspaceSidebar } from "./StoryWorkspaceSidebar";
 
-export type ShellNavLink = { key: string; label: string; path: string; href: string };
+export type { ShellNavLink } from "./nav-items";
 
-/** One icon per destination, ready for each screen as it lands in NAVIGATION. */
-const ICONS: Record<string, LucideIcon> = {
-  home: House,
-  stories: FileText,
-  planning: KanbanSquare,
-  calendar: CalendarDays,
-  media: Images,
-  coverage: Radio,
-  people: Users,
-  polls: Vote,
-  feedback: MessageSquareText
-};
+/** shadcn sidebar-09: the nested inner sidebars lie side by side inside the outer one. */
+export const STORY_WORKSPACE_SIDEBAR_CLASS = "overflow-hidden *:data-[sidebar=sidebar]:flex-row";
 
 /**
- * The global Byline sidebar: shadcn's application-shell Sidebar (collapsible
- * to icons on desktop, an off-canvas sheet on phones), rendered by Payload's
- * `admin.components.Nav`. Wordmark, Create, the newsroom destinations, and
- * the account menu in the footer. Nothing here names Payload.
+ * The global Byline sidebar, rendered by Payload's `admin.components.Nav`.
+ * There is one sidebar (one SidebarProvider, one expanded/collapsed state);
+ * its composition is contextual. Ordinary screens get the global app
+ * sidebar; a story's Story screen on a wide screen is a Story workspace,
+ * shadcn sidebar-09's nested sidebars (the global icon rail plus the Story
+ * list). The outer `Sidebar` stays the same element either way, so moving
+ * between them animates the one sidebar's width. Nothing here names Payload.
  */
-export function BylineSidebar({ items, adminRoute, homeHref, user, systemHref, logoutUrl, loginHref }: {
-  items: ShellNavLink[];
-  adminRoute: string;
-  homeHref: string;
-  user: ShellUser;
-  systemHref: string | null;
-  logoutUrl: string;
-  loginHref: string;
-}) {
-  const pathname = usePathname() ?? "";
-  const active = activeNavKey(items, pathname, adminRoute);
-
+export function BylineSidebar(props: ShellSidebarProps) {
   return (
     <AdminRoot className="byline-shell-nav" toaster={false}>
-      <Sidebar collapsible="icon" mobileTitle="Byline" mobileDescription="Newsroom navigation and account">
-        <SidebarHeader className="gap-3">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton size="lg" tooltip="Byline Home" render={<Link href={homeHref} prefetch={false} aria-label="Byline Home" />} className="md:h-10">
-                <span aria-hidden="true" className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-foreground font-heading text-base font-semibold text-background">B</span>
-                <span className="truncate font-heading text-base font-semibold tracking-tight">Byline</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          <CreateMenu />
-        </SidebarHeader>
-        <SidebarContent>
-          <nav aria-label="Byline">
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarMenu className="gap-0.5">
-                  {items.map((item) => <NavLink key={item.key} item={item} active={item.key === active} />)}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </nav>
-        </SidebarContent>
-        <SidebarFooter>
-          <NavUser user={user} systemHref={systemHref} logoutUrl={logoutUrl} loginHref={loginHref} />
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
+      <ContextualSidebar {...props} />
     </AdminRoot>
   );
 }
 
-function NavLink({ item, active }: { item: ShellNavLink; active: boolean }) {
-  const { isMobile, setOpenMobile } = useSidebar();
-  const Icon = ICONS[item.key];
+function ContextualSidebar(props: ShellSidebarProps) {
+  const pathname = usePathname() ?? "";
+  const { storyWorkspace } = useShellLayout();
+  // Inside the root, so the sidebar element exists when this runs.
+  useSyncSidebarWidthOnMount();
+  const active = activeNavKey(props.items, pathname, props.adminRoute);
   return (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        isActive={active}
-        tooltip={item.label}
-        render={<Link href={item.href} prefetch={false} aria-current={active ? "page" : undefined} onClick={() => { if (isMobile) setOpenMobile(false); }} />}
-      >
-        {Icon ? <Icon aria-hidden="true" /> : null}
-        <span>{item.label}</span>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
+    <Sidebar collapsible="icon" className={storyWorkspace ? STORY_WORKSPACE_SIDEBAR_CLASS : undefined} mobileTitle="Byline" mobileDescription="Newsroom navigation and account" data-composition={storyWorkspace ? "story-workspace" : "default"}>
+      {storyWorkspace ? <StoryWorkspaceSidebar {...props} active={active} /> : <DefaultSidebar {...props} active={active} />}
+    </Sidebar>
   );
 }

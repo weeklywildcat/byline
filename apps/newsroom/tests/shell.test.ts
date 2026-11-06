@@ -100,20 +100,23 @@ describe("System administration view", () => {
 
 describe("Byline shell composition", () => {
   it("is the shadcn Sidebar application shell, not a hand-built nav", () => {
-    const sidebar = src("ui/shell/BylineSidebar.tsx");
-    expect(sidebar).toContain('<Sidebar collapsible="icon"');
-    expect(sidebar).toContain("<SidebarRail />");
-    expect(sidebar).not.toContain("buttonVariants");
-    // Nothing a writer can see names Payload or offers raw administration.
-    const code = sidebar.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
-    expect(code).not.toMatch(/Administration|Payload/);
+    expect(src("ui/shell/BylineSidebar.tsx")).toContain('<Sidebar collapsible="icon"');
+    expect(src("ui/shell/DefaultSidebar.tsx")).toContain("<SidebarRail />");
+    for (const file of ["ui/shell/BylineSidebar.tsx", "ui/shell/DefaultSidebar.tsx", "ui/shell/BylineIconRail.tsx", "ui/shell/StoryWorkspaceSidebar.tsx"]) {
+      const sidebar = src(file);
+      expect(sidebar).not.toContain("buttonVariants");
+      // Nothing a writer can see names Payload or offers raw administration.
+      const code = sidebar.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
+      expect(code).not.toMatch(/Administration|Payload/);
+    }
   });
 
   it("keeps every collapsed control named: tooltips on destinations, Create and the account", () => {
-    expect(src("ui/shell/BylineSidebar.tsx")).toContain("tooltip={item.label}");
-    expect(src("ui/shell/BylineSidebar.tsx")).toContain("aria-current={active ? \"page\" : undefined}");
+    expect(src("ui/shell/DefaultSidebar.tsx")).toContain("tooltip={item.label}");
+    expect(src("ui/shell/DefaultSidebar.tsx")).toContain("aria-current={active ? \"page\" : undefined}");
     const create = src("ui/shell/CreateMenu.tsx");
-    expect(create).toContain('tooltip="Create" aria-label="Create"');
+    // The collapsed "+" is named, and in the Story workspace's rail its tooltip is always on.
+    expect(create).toContain('tooltip={compact ? { children: "Create", hidden: false } : "Create"} aria-label="Create"');
     expect(create).toContain('aria-label="More to create"');
     expect(src("ui/shell/NavUser.tsx")).toContain("aria-label={`Account: ${user.name}`}");
   });

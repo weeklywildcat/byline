@@ -9,7 +9,9 @@
 //   product- or screen-specific string;
 // - `--sidebar-width-mobile` is a provider variable a host can override;
 // - overlays portal into the Byline UI root (../lib/portal.ts, via Sheet and
-//   Tooltip).
+//   Tooltip);
+// - a menu button's object tooltip may set `hidden` itself, as upstream's
+//   does (Byline's no-Preflight scope also needs the `hidden` class).
 
 import * as React from "react"
 import { mergeProps } from "@base-ui/react/merge-props"
@@ -531,7 +533,11 @@ function SidebarMenuButton({
 }: useRender.ComponentProps<"button"> &
   React.ComponentProps<"button"> & {
     isActive?: boolean
-    /** Shown only while the sidebar is collapsed to icons on desktop. */
+    /**
+     * Shown only while the sidebar is collapsed to icons on desktop, unless
+     * the object form sets `hidden` itself (an icon rail that is always
+     * icons, as in shadcn's nested sidebar-09: `{ children, hidden: false }`).
+     */
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
   // Optional: a contextual rail (a module's views beside the page) uses menu
@@ -559,7 +565,9 @@ function SidebarMenuButton({
   }
 
   const content = typeof tooltip === "string" ? { children: tooltip } : tooltip
-  const hidden = !sidebar || sidebar.state !== "collapsed" || sidebar.isMobile
+  const hidden =
+    content.hidden ??
+    (!sidebar || sidebar.state !== "collapsed" || sidebar.isMobile)
 
   return (
     <Tooltip>

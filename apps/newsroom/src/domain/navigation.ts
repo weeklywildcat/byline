@@ -30,8 +30,12 @@ export function navigationFor(role: Role): NavItem[] {
   return NAVIGATION.filter(allowed(role));
 }
 
-/** The navigation entry a path belongs to, if any. Home matches only itself. */
+/**
+ * The navigation entry a path belongs to, if any. Home matches only itself;
+ * a story's Story screen belongs to Stories.
+ */
 export function activeNavKey(items: readonly Pick<NavItem, "key" | "path">[], pathname: string, adminRoute: string): string | null {
+  if (storyIdFromPath(pathname, adminRoute) !== null && items.some((item) => item.key === "stories")) return "stories";
   const path = stripAdmin(pathname, adminRoute);
   const match = items
     .filter((item) => (item.path === "" ? path === "" : path === item.path || path.startsWith(`${item.path}/`)))
@@ -119,7 +123,11 @@ export function locationFor(pathname: string, adminRoute: string): Crumb[] {
   return [];
 }
 
-/** The story whose Story screen a path is, so a task created there starts linked to it. */
+/**
+ * The saved story whose Story screen a path is (never `/create` or a list),
+ * so a task created there starts linked to it and the sidebar can become its
+ * Story workspace.
+ */
 export function storyIdFromPath(pathname: string, adminRoute: string): number | null {
   const match = /^\/collections\/stories\/(\d+)$/.exec(stripAdmin(pathname, adminRoute));
   return match ? Number(match[1]) : null;

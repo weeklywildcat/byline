@@ -183,7 +183,11 @@ describe("navigation", () => {
     expect(activeNavKey(items, "/admin/", "/admin")).toBe("home");
     expect(activeNavKey(items, "/admin/stories?mine=1", "/admin")).toBe("stories");
     expect(activeNavKey(items, "/admin/stories/ready", "/admin")).toBe("story-ready");
-    expect(activeNavKey(items, "/admin/collections/stories/3", "/admin")).toBeNull();
+    // A story's Story screen belongs to Stories; the raw collection and create routes do not.
+    expect(activeNavKey(items, "/admin/collections/stories/3", "/admin")).toBe("stories");
+    expect(activeNavKey(items, "/admin/collections/stories/create", "/admin")).toBeNull();
+    expect(activeNavKey(items, "/admin/collections/stories", "/admin")).toBeNull();
+    expect(activeNavKey([{ key: "home", path: "" }], "/admin/collections/stories/3", "/admin")).toBeNull();
     expect(activeNavKey(items, "/admin/storiesque", "/admin")).toBeNull();
   });
 });

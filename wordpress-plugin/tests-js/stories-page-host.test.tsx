@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { defaultStoriesViewHref, StoriesPage, type StoriesPageProps } from "@byline/newsroom-screens/planning/StoriesPage";
 import { availableStoriesViews, supportedStoriesView } from "@byline/newsroom-screens/planning/stories-view";
 import { activeStoryView, activeStoryViewLabel, applyBuiltInView, applySavedView, BUILT_IN_STORY_VIEWS } from "@byline/newsroom-screens/planning/story-views";
-import { StoryViewsPicker, StoryViewsRail, type StoryViewsController } from "@byline/newsroom-screens/planning/StoryViews";
+import { StoryViewsPicker, type StoryViewsController } from "@byline/newsroom-screens/planning/StoryViews";
 import { DEFAULT_PLANNING_SORT, EMPTY_PLANNING_FILTERS, type SavedPlanningView } from "@byline/newsroom-screens/planning/planning-model";
 import { StoryPeekHost } from "@byline/newsroom-screens/story/StoryPeekHost";
 import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
@@ -90,43 +90,31 @@ function controller(active = activeStoryView(EMPTY_PLANNING_FILTERS, DEFAULT_PLA
   return { active, label: activeStoryViewLabel(active), builtIns: BUILT_IN_STORY_VIEWS, savedViews, canSave: true, canDelete: true, full: false, chooseBuiltIn: vi.fn(), chooseSaved: vi.fn(), updateSelected: vi.fn(), openSave: vi.fn(), openRename: vi.fn(), openManage: vi.fn(), remove: vi.fn(), dialogs: null };
 }
 
-describe("the two presentations of one story-views controller", () => {
-  it("the rail lists every built-in view, then the saved views, with Save as the group action", () => {
-    const html = renderToStaticMarkup(<StoryViewsRail views={controller()} />);
-    expect(html).toMatch(/^<aside aria-label="Story views"/);
-    const labels = Array.from(html.matchAll(/data-sidebar="menu-button"[^>]*><span>([^<]+)</g), (match) => match[1]);
-    expect(labels).toEqual([...BUILT_IN_STORY_VIEWS.map((view) => view.label), "Due this week"]);
-    expect(html).toMatch(/data-sidebar="group-action"[^>]*aria-label="Save current view"/);
-    expect(html).toMatch(/aria-current="true"[^>]*><span>All stories</);
-  });
-
-  it("the rail marks a modified saved view", () => {
-    const html = renderToStaticMarkup(<StoryViewsRail views={controller(activeStoryView({ ...saved.filters, overdue: true }, saved.sort, [saved], saved.id))} />);
-    expect(html).toContain("Edited");
-    expect(html).toContain("Due this week<span class=\"sr-only\"> (modified)</span>");
-  });
-
+describe("Stories views", () => {
   it("the picker names the active view", () => {
     expect(renderToStaticMarkup(<StoryViewsPicker views={controller()} />)).toContain('aria-label="Story view: All stories"');
   });
 
-  it("Stories shows the rail when its container is wide enough and the picker otherwise, never by device width", () => {
+  it("Stories has one navigation column: no views rail, the picker always shown", () => {
     const html = render();
-    const rail = /<aside aria-label="Story views" class="([^"]+)"/.exec(html)?.[1].split(" ") ?? [];
-    expect(rail).toEqual(expect.arrayContaining(["hidden", "@min-[1080px]/stories:flex"]));
+    expect(html).not.toContain("<aside");
+    expect(html).not.toContain('aria-label="Story views"');
+    expect(html).not.toMatch(/@min-\[\d+px\]\/stories:(flex|hidden)/);
     const pickerTag = /<button[^>]*aria-label="Story view: All stories"[^>]*>/.exec(html)?.[0] ?? "";
-    const picker = /class="([^"]+)"/.exec(pickerTag)?.[1].split(" ") ?? [];
-    expect(picker).toContain("@min-[1080px]/stories:hidden");
-    expect(html).toContain('class="@container/stories"');
-    expect([...rail, ...picker].some((name) => /^(sm|md|lg|xl|2xl):/.test(name))).toBe(false);
+    expect(pickerTag).not.toBe("");
+    expect(pickerTag).not.toMatch(/\bhidden\b/);
   });
 
   it("keeps Board and List as line tabs, apart from the story set", () => {
     const html = render();
     expect(html).toMatch(/role="tablist"[^>]*aria-label="Stories presentation"/);
-    const rail = /<aside[\s\S]*?<\/aside>/.exec(html)?.[0] ?? "";
-    expect(rail).toContain("All stories");
-    expect(rail).not.toContain('role="tab"');
+    const tablist = /<div[^>]*role="tablist"[\s\S]*?<\/div>/.exec(html)?.[0] ?? "";
+    expect(tablist).not.toContain("All stories");
+  });
+
+  it("offers a page-level New story only when the host has no Create of its own", () => {
+    expect(render()).not.toContain("New story");
+    expect(render({ onNewStory: vi.fn() })).toContain("New story");
   });
 });
 
@@ -140,5 +128,9 @@ describe("each host's Stories", () => {
     const payload = source("../../apps/newsroom/src/ui/stories/NewsroomStories.tsx");
     expect(payload).toContain("<StoriesPage ");
     expect(payload).not.toMatch(/renderCalendar|StoryCalendar|schedule-x/i);
+  });
+  it("WordPress keeps its New story; the Payload newsroom leaves it to the shell's Create", () => {
+    expect(source("../src/planning/PlanningApp.tsx")).toContain("onNewStory={");
+    expect(source("../../apps/newsroom/src/ui/stories/NewsroomStories.tsx")).not.toContain("onNewStory");
   });
 });

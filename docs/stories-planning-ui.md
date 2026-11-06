@@ -91,21 +91,34 @@ Three controls, three questions:
 
 One controller (`useStoryViews` in `StoryViews.tsx`) owns the story set: the
 built-in and saved views, Save, Rename, Update, Delete and its **Undo** toast,
-and the dialogs, rendered once. It has two presentations that cannot drift
-apart:
+and the dialogs, rendered once. `StoryViewsPicker` presents it as one menu
+above the collection (`[All stories ▾]   Board  List`) with the same views,
+Save current view… and Manage views…. Stories is one column beside the app
+sidebar:
 
-- `StoryViewsRail`, the `sidebar-09` module pane: a contextual `<aside>` built
-  from the Sidebar group/menu primitives (not a second app Sidebar), with *Save
-  current view* as the Saved views group action;
-- `StoryViewsPicker`, one menu (`[All stories ▾]   Board  List`) with the same
-  views, Save current view… and Manage views….
+```
+Stories
+Track everything the newsroom is working on.
 
-Which one shows is decided by the **Stories container**, never the device:
-`@min-[1080px]/stories` (≈208px rail + gap + the List's 820px table). A laptop
-with the app sidebar expanded gets the picker; collapsing the sidebar on the
-same screen makes room for the rail. Measured in the browser: rail at
-1920/1440 (sidebar expanded) and 1366/1180 (collapsed); picker at 1366
-(expanded), 820 and 390.
+[ All stories ▾ ]             Board   List
+[Search] [Workflow] [Writer] [Editor] [More filters]
+actual Board/List
+```
+
+There was a `StoryViewsRail` (a `sidebar-09`-style views pane beside the page
+from a 1080px container width). It was removed: collection views did not
+justify a second permanent navigation column next to the app sidebar, and on
+real screens it competed with the List for width. The picker does the same job
+in one control.
+
+`onNewStory` is an optional host capability: WordPress, which has no global
+Create, passes it and shows **New story**; the Payload newsroom omits it,
+because the shell's Create is already beside Stories.
+
+**Switching between stories while writing** is not Stories' job: in the Payload
+newsroom an open story's sidebar becomes a Story workspace with a compact Story
+switcher (My stories, Ready for review, All stories, plus search), built on the
+same Planning API, presets and query cache (docs/payload-migration.md §7.2).
 
 Saved views are the reader's own. WordPress keeps them in user meta behind its
 REST routes; the Payload newsroom keeps them in Payload Preferences

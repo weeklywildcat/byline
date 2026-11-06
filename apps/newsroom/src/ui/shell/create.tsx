@@ -10,6 +10,7 @@ import { createActionsFor, storyIdFromPath, type CreateAction, type CreateKind }
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { ShellLayer } from "./layer";
+import { useShellNavigation } from "./navigation";
 
 export type CreateOptions = { storyId?: number | null };
 
@@ -44,6 +45,7 @@ export function BylineCreateProvider({ children }: { children: ReactNode }) {
   const account = useNewsroomAccount();
   const routes = useNewsroomRoutes();
   const pathname = usePathname() ?? "";
+  const { navigate } = useShellNavigation();
   const fetchers = useMemo(() => createPayloadHomeFetchers(routes.api), [routes.api]);
   const [request, setRequest] = useState<{ kind: CreateKind; storyId: number | null } | null>(null);
   const actions = useMemo(() => (account ? createActionsFor(account.role) : []), [account?.role]);
@@ -58,7 +60,8 @@ export function BylineCreateProvider({ children }: { children: ReactNode }) {
   }, [actions, pathname, routes.admin]);
 
   const value = useMemo<BylineCreate>(() => ({ actions, openCreate, creating: request !== null }), [actions, openCreate, request]);
-  const openStory = (created: StoryWorkspace) => window.location.assign(created.workspaceUrl || routes.story(created.story.id));
+  // A new story opens its Story screen through the shell, which first lets the story being left finish saving.
+  const openStory = (created: StoryWorkspace) => navigate(created.workspaceUrl || routes.story(created.story.id));
 
   return (
     <CreateContext value={value}>
