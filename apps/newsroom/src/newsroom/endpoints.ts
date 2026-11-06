@@ -8,6 +8,10 @@ import { findPreset, STORY_PRESETS } from "../domain/presets";
 import { isWorkflowStage } from "../domain/workflow";
 import { validResourceUrl } from "../collections/StoryPlans";
 import { parsePlanningFilterParams } from "@byline/newsroom-screens/planning/planning-api";
+import { parseMediaLibraryParams } from "@byline/newsroom-screens/media/media-library-model";
+import type { MediaMetadataPatch } from "@byline/newsroom-screens/media/media-library-model";
+import { createFolder, deleteFolder, deleteMedia, libraryPage, mediaDetail, mediaNavigator, moveMedia, updateFolder, updateMedia, uploadMedia } from "./media-library";
+import { mediaWork } from "./media-work";
 import { planningResponse } from "./planning";
 import { parseScheduleQuery, scheduleResponse, scheduleToday } from "./schedule";
 import { contributorEntry, editorialTask, homeBootstrap, loadPeople, mediaFor, personIdFor, planFor, reportingFor, screenContext, searchStories, storyResources, storyWorkspace, type ScreenContext } from "./screen-models";
@@ -375,6 +379,26 @@ async function saveMediaAssignment(ctx: ScreenContext, req: PayloadRequest) {
   return { ...(await mediaFor(ctx, storyId)), assignmentId: String(saved.id) };
 }
 
+/* --------------------------------------------------------------- media */
+
+const optionalId = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "" || value === "unfiled") return null;
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new APIError("Unknown folder.", 400);
+  return id;
+};
+
+async function uploadToLibrary(ctx: ScreenContext, req: PayloadRequest) {
+  // Multipart: the file, and `_payload` ({ folderId }) as JSON (Payload's own convention).
+  const input = await body<{ folderId?: unknown }>(req);
+  return uploadMedia(ctx, optionalId(input.folderId));
+}
+
+async function moveToFolder(ctx: ScreenContext, req: PayloadRequest) {
+  const input = await body<{ ids?: unknown; folderId?: unknown }>(req);
+  return moveMedia(ctx, ids(input.ids), optionalId(input.folderId));
+}
+
 /* ----------------------------------------------------------- endpoints */
 
 export const newsroomEndpoints: Endpoint[] = [
@@ -401,6 +425,19 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/media-assignments", method: "post", handler: handle(saveMediaAssignment) },
   { path: "/byline/stories/:id/media-assignments/:assignmentId", method: "post", handler: handle(saveMediaAssignment) },
   { path: "/byline/stories/:id/media-assignments/:assignmentId", method: "delete", handler: handle((ctx, req) => deleteRecord(ctx, req, "production-assignments", "assignmentId")) },
+  // Media: the Library (Payload Media and its native folders) and Work (production assignments).
+  // Fixed paths come before `/byline/media/:id`.
+  { path: "/byline/media", method: "get", handler: handle((ctx, req) => libraryPage(ctx, parseMediaLibraryParams(req.searchParams))) },
+  { path: "/byline/media/navigator", method: "get", handler: handle((ctx) => mediaNavigator(ctx)) },
+  { path: "/byline/media/work", method: "get", handler: handle((ctx) => mediaWork(ctx)) },
+  { path: "/byline/media/upload", method: "post", handler: handle(uploadToLibrary) },
+  { path: "/byline/media/move", method: "post", handler: handle(moveToFolder) },
+  { path: "/byline/media/folders", method: "post", handler: handle(async (ctx, req) => createFolder(ctx, await body(req))) },
+  { path: "/byline/media/folders/:id", method: "patch", handler: handle(async (ctx, req) => updateFolder(ctx, idParam(req), await body(req))) },
+  { path: "/byline/media/folders/:id", method: "delete", handler: handle(async (ctx, req) => { await deleteFolder(ctx, idParam(req)); return new Response(null, { status: 204 }); }) },
+  { path: "/byline/media/:id", method: "get", handler: handle((ctx, req) => mediaDetail(ctx, idParam(req))) },
+  { path: "/byline/media/:id", method: "patch", handler: handle(async (ctx, req) => updateMedia(ctx, idParam(req), await body<MediaMetadataPatch>(req))) },
+  { path: "/byline/media/:id", method: "delete", handler: handle(async (ctx, req) => { await deleteMedia(ctx, idParam(req)); return new Response(null, { status: 204 }); }) },
   { path: "/byline/tasks", method: "post", handler: handle(createTask) },
   { path: "/byline/tasks/:id", method: "patch", handler: handle(updateTask) },
   { path: "/byline/tasks/:id", method: "delete", handler: handle(deleteTask) }

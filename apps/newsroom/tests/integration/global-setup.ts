@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import pg from "pg";
 
 /**
@@ -6,7 +9,7 @@ import pg from "pg";
  * PostgreSQL the current user can create databases on; databases named after
  * it are dropped and recreated. Never point it at real data.
  */
-export const TEST_DATABASE_SUFFIXES = ["", "_screens", "_planning", "_schedule", "_publication"] as const;
+export const TEST_DATABASE_SUFFIXES = ["", "_screens", "_planning", "_schedule", "_publication", "_media"] as const;
 
 export default async function setup() {
   const url = new URL(process.env.BYLINE_TEST_DATABASE_URL ?? "postgres://localhost:5432/byline_newsroom_test");
@@ -26,5 +29,9 @@ export default async function setup() {
   process.env.BYLINE_DB_PUSH = "1";
   process.env.BYLINE_NEWSROOM_URL = "http://localhost:3010";
   delete process.env.BYLINE_MEDIA_PRIVATE_BUCKET;
+  // Uploaded test files go to a throwaway directory, never the development media folder.
+  const media = mkdtempSync(path.join(tmpdir(), "byline-newsroom-media-"));
+  process.env.BYLINE_MEDIA_LOCAL_DIR = media;
   delete process.env.BYLINE_GOOGLE_CLIENT_ID;
+  return () => rmSync(media, { recursive: true, force: true });
 }

@@ -22,6 +22,11 @@ import { legacyIdField } from "../fields/slug";
  * collection's `read` access, and it is not a publication rendition: it is
  * never part of `publicDelivery`.
  */
+/** What the newsroom may upload. Video is deliberately absent until large-video storage is decided. */
+export const MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif", "application/pdf", "audio/mpeg", "audio/mp4", "audio/wav"] as const;
+export const IMAGE_MIME_TYPES = MEDIA_MIME_TYPES.filter((type) => type.startsWith("image/"));
+export const AUDIO_MIME_TYPES = MEDIA_MIME_TYPES.filter((type) => type.startsWith("audio/"));
+
 export const LIBRARY_PREVIEW_SIZE = "library";
 export const LIBRARY_PREVIEW_MAX = 640;
 
@@ -34,7 +39,7 @@ export const Media: CollectionConfig = {
   admin: { useAsTitle: "filename", defaultColumns: ["filename", "alt", "credit", "updatedAt"], group: false },
   upload: {
     staticDir: process.env.BYLINE_MEDIA_LOCAL_DIR ?? "media",
-    mimeTypes: ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif", "application/pdf", "audio/mpeg", "audio/mp4", "audio/wav"],
+    mimeTypes: [...MEDIA_MIME_TYPES],
     focalPoint: true,
     crop: false,
     // Public renditions are produced off the request by the media jobs (Phase 5). The one size made on

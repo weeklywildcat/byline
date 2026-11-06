@@ -39,6 +39,8 @@
     "./media/MediaWork": "./src/media/MediaWork.tsx",
     "./media/media-desk-errors": "./src/media/media-desk-errors.ts",
     "./media/media-desk-model": "./src/media/media-desk-model.ts",
+    "./media/media-library-api": "./src/media/media-library-api.ts",
+    "./media/media-library-model": "./src/media/media-library-model.ts",
     "./planning/PlanningPage": "./src/planning/PlanningPage.tsx",
     "./planning/StoriesPage": "./src/planning/StoriesPage.tsx",
     "./planning/StoryActionsMenu": "./src/planning/StoryActionsMenu.tsx",
