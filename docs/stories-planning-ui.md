@@ -65,18 +65,53 @@ agree. Selected view, open menus, drag state and form text stay local.
 
 ## Stories
 
-Board, List and Calendar are `Tabs` because they are alternate presentations of
-one filtered collection. The address always names the view
-(`&tab=stories&view=board|list|calendar`); changing a tab uses `pushState`, Back
-works, and a reload restores it. The sidebar's Calendar entry opens Stories on
-Calendar, and a bare Stories link restores the last view (`byline:stories-view`).
+`StoriesPage` lives in `@byline/newsroom-screens` and is shared by the WordPress
+admin and the Payload newsroom. It knows no CMS: what only one host has arrives
+as an optional capability. `renderCalendar` supplies the Calendar (WordPress
+passes its Schedule-X `StoryCalendar`; Payload has none yet, so it offers Board
+and List and never shows a Calendar tab), and `viewHref` supplies a view's
+address (WordPress: `planning-routing.ts`; default: `view=` on the current
+address).
 
-The toolbar is search, Workflow, Writer and Editor plus **More filters**
-(WordPress state, visual status, date ranges, Mine, Unassigned, Overdue, Needs
-review). Anything set behind More filters shows as a removable chip. **Saved
-views** are one menu (All stories, My stories, your views, Save current view…,
-Manage views…); saving and renaming use a Dialog, and deleting is reversible so
-it happens at once with an **Undo** toast.
+Three controls, three questions:
+
+- **Which story set?** The built-in views (`story-views.ts`: All stories, My
+  stories, Ready for review, Overdue, Unassigned, Published, On hold) and the
+  reader's saved views. A built-in view is active only while the filters match it
+  exactly; a saved view stays selected while edited and reads as *modified*.
+- **How is it presented?** Board | List (| Calendar), line `Tabs`. The address
+  names the view (`view=board|list|calendar`, plus `&tab=stories` in WordPress);
+  changing a tab uses `pushState`, Back works, and a reload restores it. The
+  WordPress sidebar's Calendar entry opens Stories on Calendar, and a bare
+  Stories link restores the last view (`byline:stories-view`).
+- **How is it refined?** The toolbar: search, Workflow, Writer and Editor plus
+  **More filters** (publication state, visual status, date ranges, Mine,
+  Unassigned, Overdue, Needs review). Anything set behind More filters shows as
+  a removable chip.
+
+One controller (`useStoryViews` in `StoryViews.tsx`) owns the story set: the
+built-in and saved views, Save, Rename, Update, Delete and its **Undo** toast,
+and the dialogs, rendered once. It has two presentations that cannot drift
+apart:
+
+- `StoryViewsRail`, the `sidebar-09` module pane: a contextual `<aside>` built
+  from the Sidebar group/menu primitives (not a second app Sidebar), with *Save
+  current view* as the Saved views group action;
+- `StoryViewsPicker`, one menu (`[All stories ▾]   Board  List`) with the same
+  views, Save current view… and Manage views….
+
+Which one shows is decided by the **Stories container**, never the device:
+`@min-[1080px]/stories` (≈208px rail + gap + the List's 820px table). A laptop
+with the app sidebar expanded gets the picker; collapsing the sidebar on the
+same screen makes room for the rail. Measured in the browser: rail at
+1920/1440 (sidebar expanded) and 1366/1180 (collapsed); picker at 1366
+(expanded), 820 and 390.
+
+Saved views are the reader's own. WordPress keeps them in user meta behind its
+REST routes; the Payload newsroom keeps them in Payload Preferences
+(`byline:stories:saved-views:v1`). Either way a view has no owner field, and
+stored views are normalized on read (`normalizeSavedPlanningViews`: at most 25,
+names up to 80 characters, sanitized filters and sort).
 
 ### Board: Pragmatic drag and drop
 

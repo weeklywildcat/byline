@@ -3,13 +3,20 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { defaultStoriesViewHref, StoriesPage, type StoriesPageProps } from "@byline/newsroom-screens/planning/StoriesPage";
 import { availableStoriesViews, supportedStoriesView } from "@byline/newsroom-screens/planning/stories-view";
+import { activeStoryView, activeStoryViewLabel, applyBuiltInView, applySavedView, BUILT_IN_STORY_VIEWS } from "@byline/newsroom-screens/planning/story-views";
+import { StoryViewsPicker, StoryViewsRail, type StoryViewsController } from "@byline/newsroom-screens/planning/StoryViews";
+import { DEFAULT_PLANNING_SORT, EMPTY_PLANNING_FILTERS, type SavedPlanningView } from "@byline/newsroom-screens/planning/planning-model";
 import { StoryPeekHost } from "@byline/newsroom-screens/story/StoryPeekHost";
 import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
 import type { StoryFetchers } from "@byline/newsroom-screens/story/story-fetchers";
+import { readFileSync } from "node:fs";
 import { readSource } from "./source-files";
 
 const fetchers = {
-  getPlanning: vi.fn(() => new Promise(() => {}))
+  getPlanning: vi.fn(() => new Promise(() => {})),
+  getSavedViews: vi.fn(async () => []),
+  saveSavedView: vi.fn(),
+  deleteSavedView: vi.fn()
 } as unknown as PlanningFetchers & StoryFetchers;
 
 function render(props: Partial<StoriesPageProps> = {}) {
@@ -55,5 +62,83 @@ describe("the shared Stories screen", () => {
     const source = readSource("planning/StoriesPage.tsx");
     expect(source).not.toMatch(/StoryCalendar|schedule-x|calendar-model|planning-routing|navigation-model/i);
     expect(source).not.toMatch(/byline-planning|wp-admin|tab=|searchParams\.(?:set|delete|get)\("(?:page|tab|story|appointment)"/);
+  });
+});
+
+const saved: SavedPlanningView = { id: "due", name: "Due this week", filters: { ...EMPTY_PLANNING_FILTERS, deadlineFrom: "2026-11-09", deadlineTo: "2026-11-15" }, sort: { key: "deadline", direction: "asc" } };
+
+describe("which story set is active", () => {
+  it("names a built-in view only while the filters match it exactly", () => {
+    const mine = BUILT_IN_STORY_VIEWS.find((view) => view.id === "mine")!;
+    expect(activeStoryView(applyBuiltInView(mine).filters, DEFAULT_PLANNING_SORT, [], null)).toMatchObject({ kind: "built-in", view: { id: "mine" } });
+    expect(activeStoryView({ ...EMPTY_PLANNING_FILTERS, mine: true, overdue: true }, DEFAULT_PLANNING_SORT, [], null)).toEqual({ kind: "custom" });
+    expect(activeStoryView({ ...EMPTY_PLANNING_FILTERS, mine: true, collectionId: 4 }, DEFAULT_PLANNING_SORT, [], null)).toEqual({ kind: "custom" });
+    expect(activeStoryViewLabel(activeStoryView(EMPTY_PLANNING_FILTERS, DEFAULT_PLANNING_SORT, [], null))).toBe("All stories");
+  });
+
+  it("keeps a saved view selected, and marks it modified, once its filters or sort change", () => {
+    const applied = applySavedView(saved);
+    expect(activeStoryView(applied.filters, applied.sort, [saved], applied.savedViewId)).toEqual({ kind: "saved", view: saved, modified: false });
+    const edited = activeStoryView({ ...applied.filters, query: "budget" }, applied.sort, [saved], applied.savedViewId);
+    expect(edited).toEqual({ kind: "saved", view: saved, modified: true });
+    expect(activeStoryViewLabel(edited)).toBe("Due this week (modified)");
+    expect(activeStoryView(applied.filters, { key: "story", direction: "asc" }, [saved], applied.savedViewId)).toMatchObject({ modified: true });
+  });
+});
+
+function controller(active = activeStoryView(EMPTY_PLANNING_FILTERS, DEFAULT_PLANNING_SORT, [saved], null), savedViews = [saved]): StoryViewsController {
+  return { active, label: activeStoryViewLabel(active), builtIns: BUILT_IN_STORY_VIEWS, savedViews, canSave: true, canDelete: true, full: false, chooseBuiltIn: vi.fn(), chooseSaved: vi.fn(), updateSelected: vi.fn(), openSave: vi.fn(), openRename: vi.fn(), openManage: vi.fn(), remove: vi.fn(), dialogs: null };
+}
+
+describe("the two presentations of one story-views controller", () => {
+  it("the rail lists every built-in view, then the saved views, with Save as the group action", () => {
+    const html = renderToStaticMarkup(<StoryViewsRail views={controller()} />);
+    expect(html).toMatch(/^<aside aria-label="Story views"/);
+    const labels = Array.from(html.matchAll(/data-sidebar="menu-button"[^>]*><span>([^<]+)</g), (match) => match[1]);
+    expect(labels).toEqual([...BUILT_IN_STORY_VIEWS.map((view) => view.label), "Due this week"]);
+    expect(html).toMatch(/data-sidebar="group-action"[^>]*aria-label="Save current view"/);
+    expect(html).toMatch(/aria-current="true"[^>]*><span>All stories</);
+  });
+
+  it("the rail marks a modified saved view", () => {
+    const html = renderToStaticMarkup(<StoryViewsRail views={controller(activeStoryView({ ...saved.filters, overdue: true }, saved.sort, [saved], saved.id))} />);
+    expect(html).toContain("Edited");
+    expect(html).toContain("Due this week<span class=\"sr-only\"> (modified)</span>");
+  });
+
+  it("the picker names the active view", () => {
+    expect(renderToStaticMarkup(<StoryViewsPicker views={controller()} />)).toContain('aria-label="Story view: All stories"');
+  });
+
+  it("Stories shows the rail when its container is wide enough and the picker otherwise, never by device width", () => {
+    const html = render();
+    const rail = /<aside aria-label="Story views" class="([^"]+)"/.exec(html)?.[1].split(" ") ?? [];
+    expect(rail).toEqual(expect.arrayContaining(["hidden", "@min-[1080px]/stories:flex"]));
+    const pickerTag = /<button[^>]*aria-label="Story view: All stories"[^>]*>/.exec(html)?.[0] ?? "";
+    const picker = /class="([^"]+)"/.exec(pickerTag)?.[1].split(" ") ?? [];
+    expect(picker).toContain("@min-[1080px]/stories:hidden");
+    expect(html).toContain('class="@container/stories"');
+    expect([...rail, ...picker].some((name) => /^(sm|md|lg|xl|2xl):/.test(name))).toBe(false);
+  });
+
+  it("keeps Board and List as line tabs, apart from the story set", () => {
+    const html = render();
+    expect(html).toMatch(/role="tablist"[^>]*aria-label="Stories presentation"/);
+    const rail = /<aside[\s\S]*?<\/aside>/.exec(html)?.[0] ?? "";
+    expect(rail).toContain("All stories");
+    expect(rail).not.toContain('role="tab"');
+  });
+});
+
+describe("each host's Stories", () => {
+  const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+  it("WordPress supplies its Schedule-X calendar", () => {
+    expect(source("../src/planning/PlanningApp.tsx")).toMatch(/renderCalendar=\{renderCalendar\}/);
+    expect(source("../src/planning/PlanningApp.tsx")).toContain("<StoryCalendar ");
+  });
+  it("the Payload newsroom supplies none, so it offers Board and List only", () => {
+    const payload = source("../../apps/newsroom/src/ui/stories/NewsroomStories.tsx");
+    expect(payload).toContain("<StoriesPage ");
+    expect(payload).not.toMatch(/renderCalendar|StoryCalendar|schedule-x/i);
   });
 });

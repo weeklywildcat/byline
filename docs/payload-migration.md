@@ -493,7 +493,7 @@ Still Payload's own UI, each with its replacement planned:
 
 | Surface | Interim | Replacement |
 | --- | --- | --- |
-| Stories / Planning / Calendar / Media Desk / Coverage | not in staff navigation | `StoryList`, board, Schedule-X calendar, `MediaDesk` ported with Payload adapters |
+| Calendar / Media Desk / Coverage | not in staff navigation | Schedule-X calendar, `MediaDesk` ported with Payload adapters (Stories is ported) |
 | Lead image picker | Payload upload field | Byline media picker + drag-and-drop (Phase 5) |
 | Body editing chrome | Payload Lexical toolbar/slash menu | `@byline/editor` Nova interface (Phase 3/6) |
 | Lock / take-over / read-only modals | Payload modals | Byline treatment of the same `useDocumentInfo` lock state |
@@ -554,16 +554,49 @@ same workspace data.
   Payload's document form also submitted it, saving the story. The Story screen
   stops submit events at its root.
 
+**Stories is ported (Phase 1e).** `/admin/stories` (`components/BylineStories`,
+a custom root view in `DefaultTemplate`, account checked on the server) mounts
+the shared `StoriesPage` with Board and List; Payload's raw list at
+`/admin/collections/stories` stays the administrators' fallback, reached from
+System administration.
+
+- **Read model:** `GET /api/byline/planning` (`src/newsroom/planning.ts`) returns
+  the shared `PlanningResponse`, never Payload documents. The collection is the
+  stories whose plans the reader may read (editors: all; staff: managed and
+  assigned work), read in full: Payload applies `limit` even with
+  `pagination: false`, so complete reads give none. Every Planning filter runs on
+  the server, dates in the newsroom timezone; coverage membership comes from
+  `coverages.stories`.
+- **Privacy:** reads are the user's (`overrideAccess: false`). A published
+  story's unpublished rewrite is shown only to its managers; a participant reads
+  the published story, and the rewrite never makes the story read as
+  unpublished (`storiesWithExtras`, also behind Home and Peek).
+- **Writes:** Board moves and the List's deadline / planned-publication edits use
+  the existing `POST /api/byline/stories/:id/workflow`; there is no second
+  planning write.
+- **Saved views** are Payload Preferences (`usePreferences()`, key
+  `byline:stories:saved-views:v1`, `src/ui/stories/saved-views.ts`): no field,
+  collection, migration or endpoint, normalized on every read and written whole.
+- **No Calendar yet:** the newsroom passes no `renderCalendar`, so Stories offers
+  Board and List.
+
+Tested: `tests/integration/planning.test.ts` (24 tests: response shape, a
+124-story collection, staff/editor/participant scopes, drafts and rewrites,
+every filter, coverage, moves and inline edits, Preferences per account),
+`tests/stories-saved-views.test.ts`, the plugin's `stories-page-host.test.tsx`,
+and in the browser at the six shell widths (rail/picker, Save, Edited, Delete +
+Undo through Preferences, Story Peek, `?view=list`).
+
 **Next slice: the rest of the screens.** Home's whole closure (44 files) touches
 WordPress only through an injected request function, `@wordpress/i18n` in one
 file and a wp-admin URL default. Planning (board, list, Schedule-X calendar), the Media Desk and
-the full Story Workspace sections move into `packages/newsroom-screens` the same
+the full Story Workspace sections moved into `packages/newsroom-screens` the same
 way, as closures of their entries, never whole folders (`editorial/` also holds
 Gutenberg panels that stay in the plugin). Each host
 then supplies its adapter: the plugin keeps its `wp-api-fetch` fetchers, and the
 newsroom implements the same `HomeFetchers`/`StoryFetchers` contracts over
-Payload REST with the plan and workspace collections. Only then do Home and
-Stories join the staff navigation.
+Payload REST with the plan and workspace collections. Each destination joins the
+staff navigation only once its screen is ported (Home and Stories have).
 
 ### 7.2 The Byline shell
 
@@ -580,10 +613,11 @@ drafts, versions, locks and publishing are exactly Payload's:
 | `admin.components.providers` | `BylineShellProvider` → `BylineShell` | One query cache; the shadcn `SidebarProvider` (`display: contents`, ⌘\ toggles, state in the `byline_sidebar` cookie read on the server); the Create controller; the command palette |
 | `admin.components.Nav` | `BylineNav` → `BylineSidebar` | `Sidebar collapsible="icon"`: wordmark, Create, destinations, account footer; a Sheet on phones |
 | `admin.components.header` | `BylineAppHeader` | Sticky header beside the sidebar: trigger, location, Search (⌘K) |
+| `admin.components.views.stories` | `BylineStories` (`/admin/stories`) | Byline Stories (Board, List, story views), account checked on the server |
 | `admin.components.views.system` | `SystemAdministration` (`/admin/system`) | Administrators' list of raw collection screens, role-checked on the server |
 
 - **Navigation** (`domain/navigation.ts` `NAVIGATION`): only destinations whose
-  Byline screen exists. Today that is Home. Planned order: Home, Stories,
+  Byline screen exists. Today that is Home and Stories. Planned order: Home, Stories,
   Planning, Calendar, Media, Coverage, then for editors People, Polls,
   Feedback. Never a generic Payload collection to fill the list.
 - **Create** (`ui/shell/create.tsx`): `BylineCreateProvider` mounts the shared
@@ -623,7 +657,7 @@ navigation:
 | Block | Byline use | When |
 | --- | --- | --- |
 | `dashboard-01` | Shell structure: sidebar + sticky header + content | Now |
-| `sidebar-09` (nested) | A module's secondary pane beside the global sidebar: Stories (My Work, All, Ready for Review, Published, On Hold), Media (types, My uploads, Needs alt text, Recently used), Coverage (Active, Upcoming, Past, Archived). Build one reusable module-sidebar composition with the first screen that needs it | With Stories / Media / Coverage |
+| `sidebar-09` (nested) | A module's secondary pane beside the global sidebar: Stories (My Work, All, Ready for Review, Published, On Hold), Media (types, My uploads, Needs alt text, Recently used), Coverage (Active, Upcoming, Past, Archived). Stories has it (`StoryViewsRail`, shown by container width, with `StoryViewsPicker` as its compact form); Media and Coverage reuse that composition | Stories: done. Media / Coverage: with their screens |
 | `sidebar-10` (popover) | Compact contextual actions; universal actions stay in the Command palette | As needed |
 | `sidebar-11` (file tree) | Only for really hierarchical data (Media folders, an investigation's documents) | If such data exists |
 | `sidebar-12` (calendar) | Calendar's left pane: mini calendar, My Schedule, Interviews, Reporting, Production, School events, completed/cancelled toggles | With the real Calendar adapter |

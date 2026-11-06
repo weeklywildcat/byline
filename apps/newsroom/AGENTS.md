@@ -78,6 +78,18 @@ snapshot; nothing in this app serves public reading.
   `.byline-ui-root`; hide with the `hidden` class.
 - **Custom root views** (`admin.components.views`) render without Payload's
   template; wrap them in `DefaultTemplate` so they get the shell.
+- **Byline screens own their routes** (`/admin/stories`); Payload's raw
+  collection lists stay administrator fallbacks. Wrap a screen's client root in
+  `AdminRoot toaster={false}` (the scoped Nova styles; the shell owns the toaster).
+- **Complete reads:** Payload applies `limit` even with `pagination: false`. A
+  read that must be complete (a collection, people, a story's work) passes
+  `pagination: false` and no `limit`.
+- **Unpublished rewrites** belong to a story's managers: participants read the
+  published story, and a pending draft never makes a published story read as
+  unpublished (`storiesWithExtras`).
+- **Reader UI state** (saved views) is Payload Preferences via
+  `usePreferences()`, behind a versioned key and normalized on read. Never a
+  Users field, a collection or a Byline endpoint.
 - **Writers never get** HTML, CSS, colors, fonts, alignment or layout controls.
   `src/editor/prose.ts` is the whole prose surface.
 - `src/payload-types.ts` is this app's internal type file. It must never become
