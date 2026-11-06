@@ -2,9 +2,9 @@
 
 import { MEDIA_WORK_SCOPES } from "@byline/newsroom-screens/media/media-desk-model";
 import { MediaFolderDialogs } from "@byline/newsroom-screens/media/MediaFolderDialogs";
-import { MediaInspectorContent, type MediaInspectorGuard } from "@byline/newsroom-screens/media/MediaInspectorContent";
+import { MediaInspectorContent } from "@byline/newsroom-screens/media/MediaInspectorContent";
 import { MediaLibraryBrowser } from "@byline/newsroom-screens/media/MediaLibraryBrowser";
-import { childFolderCount, EMPTY_MEDIA_FILTERS, folderPath, MEDIA_LIBRARY_SOURCES, type MediaLibraryAsset, type MediaLibraryFilters, type MediaRoute } from "@byline/newsroom-screens/media/media-library-model";
+import { childFolderCount, EMPTY_MEDIA_FILTERS, folderPath, MEDIA_LIBRARY_SOURCES, mediaRouteSearch, type MediaLibraryAsset, type MediaLibraryFilters, type MediaRoute } from "@byline/newsroom-screens/media/media-library-model";
 import { mediaAssetKey } from "@byline/newsroom-screens/media/media-library-api";
 import { invalidateMediaLibrary, useMediaNavigator } from "@byline/newsroom-screens/media/media-query";
 import { useQueryClient } from "@tanstack/react-query";
@@ -38,6 +38,7 @@ import { useNewsroomTimeZone } from "../shell/timezone";
 import { createPayloadPlanningFetchers } from "../stories/payload-planning-fetchers";
 import { MediaNavigator } from "./MediaNavigator";
 import { useMediaNavigate, useMediaRoute } from "./media-route";
+import { useMediaUnsaved } from "./media-unsaved";
 import { useBylineMediaPicker, useMediaPreferences, useMediaWorkspace } from "./MediaWorkspaceShell";
 import { createPayloadMediaWorkFetchers } from "./payload-media-fetchers";
 
@@ -111,12 +112,7 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
 
   /* ---------------------------------------------- unsaved inspector edits */
 
-  const guard = useRef<MediaInspectorGuard | null>(null);
-  const [pendingMove, setPendingMove] = useState<(() => void) | null>(null);
-  const guarded = useCallback((proceed: () => void) => {
-    if (guard.current?.dirty()) setPendingMove(() => proceed);
-    else proceed();
-  }, []);
+  const { guard, guarded, dialog: unsavedDialog } = useMediaUnsaved(mediaRouteSearch(route));
   useEffect(() => {
     workspace.setNavigationGuard(guarded);
     return () => workspace.setNavigationGuard(null);
@@ -288,19 +284,7 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
         onDeleted={(deleted) => { if (route.folderId === deleted.id) navigate(deleted.parentId !== null ? libraryRoute({ folderId: deleted.parentId }) : libraryRoute({}), { replace: true }); }}
       />
 
-      <AlertDialog open={pendingMove !== null} onOpenChange={(open) => { if (!open) setPendingMove(null); }}>
-        <AlertDialogContent data-media-unsaved="">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Save your changes to this file?</AlertDialogTitle>
-            <AlertDialogDescription>You've edited this file's details without saving them.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Stay</AlertDialogCancel>
-            <Button variant="outline" onClick={() => { guard.current?.discard(); const proceed = pendingMove; setPendingMove(null); proceed?.(); }}>Discard</Button>
-            <AlertDialogAction onClick={async () => { const proceed = pendingMove; setPendingMove(null); if (await guard.current?.save()) proceed?.(); }}>Save changes</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {unsavedDialog}
 
       <AlertDialog open={confirmDelete !== null} onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}>
         <AlertDialogContent>

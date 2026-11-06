@@ -142,10 +142,13 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
   }, [dirty, save]);
   useImperativeHandle(guardRef, () => ({ dirty: () => dirty, save: saveNow, discard: () => setDraft(initial) }), [dirty, initial, saveNow]);
 
-  // Leaving the page with unsaved details asks first (the browser's own prompt).
+  // Reload, closing the tab or typing another address with unsaved details gets the browser's own generic prompt (only while there are unsaved details). Moves inside the app ask through the screen's Save / Discard / Stay.
   useEffect(() => {
     if (!dirty) return undefined;
-    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = ""; // older browsers only show their prompt when this is set
+    };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
