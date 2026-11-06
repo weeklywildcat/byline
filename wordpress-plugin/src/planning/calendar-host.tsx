@@ -6,7 +6,7 @@
  * shared with the Payload newsroom; nothing here re-implements it.
  */
 import { useMemo, useState } from "react";
-import { collectionUrl } from "@byline/newsroom-screens/collections/collection-model";
+import { wordpressCollectionHref } from "../collections/wordpress-collection-api";
 import type { CalendarLinks } from "@byline/newsroom-screens/calendar/calendar-model";
 import { createCalendarWorkspace, type CalendarPreferenceStorage } from "@byline/newsroom-screens/calendar/calendar-workspace";
 import { CalendarWorkspaceProvider } from "@byline/newsroom-screens/calendar/calendar-workspace-context";
@@ -40,7 +40,7 @@ export function createWorkspaceUrlBuilder(baseUrl?: string | null): WorkspaceUrl
 export function wordPressCalendarLinks(workspaceUrl: WorkspaceUrl): CalendarLinks {
   return {
     story: workspaceUrl,
-    collection: (collectionId, interviewId) => `${collectionUrl(collectionId)}${interviewId ? `&interview=${interviewId}` : ""}`
+    collection: (collectionId, interviewId) => wordpressCollectionHref(collectionId, interviewId ? { interviewId } : { tab: "reporting" })
   };
 }
 

@@ -3,6 +3,7 @@ import { useWorkspace } from "../workspace/workspace-context";
 import { StoryCollectionContext } from "./StoryCollectionContext";
 export function WorkspaceCollections() {
   const { storyId, client } = useWorkspace();
+  if (!client.collections) return null;
   return (
     <Card size="sm">
       <CardContent>

@@ -1,3 +1,4 @@
+import { useCollectionLinks } from "../collections/collection-links";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { QueryClientProvider, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { ArrowRight, Plus, Search } from "lucide-react";
@@ -73,6 +74,7 @@ function Quiet({ children }: { children: ReactNode }) {
 const HOME_WORK_PREVIEW_LIMIT = 10;
 
 function HomeWorkspace({ fetchers, actionUrls, shell }: HomeAppProps) {
+  const collectionLinks = useCollectionLinks();
   const client = useQueryClient();
   const home = useQuery({ queryKey: homeKey, queryFn: () => fetchers.getHome!(), enabled: Boolean(fetchers.getHome) });
   const health = useQuery({ queryKey: ["byline", "home-health"], queryFn: () => fetchers.getHealth!(), enabled: Boolean(fetchers.getHealth) });
@@ -167,9 +169,9 @@ function HomeWorkspace({ fetchers, actionUrls, shell }: HomeAppProps) {
     },
     onSettled: (_data, _error, task) => { void client.invalidateQueries({ queryKey: homeKey }); if (task.storyId) void client.invalidateQueries({ queryKey: workspaceKey(task.storyId) }); }
   });
-  const work = data ? myWork(data, now) : [];
+  const work = data ? myWork(data, now, collectionLinks.href) : [];
   const stories = data ? myActiveStories(data.stories, data.currentUser.id, timezone, now) : [];
-  const agenda = data ? homeAgenda(data, now).slice(0, 6) : [];
+  const agenda = data ? homeAgenda(data, now, collectionLinks.href).slice(0, 6) : [];
   const newTask = (storyId: number | null = null) => { if (shell) { shell.openCreate("task", { storyId }); return; } setTaskStoryId(storyId); setCreateKind("task"); };
   const storyTitle = (id?: number | null) => data?.stories.find((s) => s.id === id)?.title;
   const renderTask = (task: EditorialTask) => <TaskRow key={task.id} dense task={task} storyTitle={storyTitle(task.storyId)} timezone={timezone} now={now} people={data?.people || []} canAssign={Boolean(data?.capabilities.review)} pending={complete.isPending || (updateTask.isPending && String(updateTask.variables?.task.id) === String(task.id))} onOpen={task.storyId ? () => openStory(task.storyId!) : undefined} onEdit={fetchers.editorial ? () => setEditingTask(task) : undefined} onComplete={() => complete.mutate(task)} onUpdate={fetchers.editorial ? (patch, optimistic) => updateTask.mutate({ task, patch, optimistic }) : undefined} />;

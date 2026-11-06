@@ -1,279 +1,197 @@
-import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { ListFilter, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader } from "@byline/newsroom-screens/planning/PlanningPage";
-import type { PlanningAppFetchers } from "../planning/PlanningApp";
+import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@byline/newsroom-ui/ui/input-group";
+import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { ItemGroup } from "@byline/newsroom-ui/ui/item";
+import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
+import { Tabs, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
-import { RowSkeletons } from "@byline/newsroom-screens/story/rows";
-import { useStoryPeek } from "@byline/newsroom-screens/story/StoryPeekHost";
-import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
-import { CollectionDialog } from "./CollectionDialog";
-import { CollectionWorkspace, type AddKind } from "./CollectionWorkspace";
-import { Choice, CollectionEmpty, CollectionRow } from "@byline/newsroom-screens/collections/collection-ui";
-import { collectionsKey, collectionKey } from "@byline/newsroom-screens/collections/collection-api";
+import { useDebouncedValue } from "@byline/newsroom-ui/lib/hooks";
+import { PageHeader } from "../planning/PlanningPage";
+import { RowSkeletons } from "../story/rows";
+import { describeEditorialError } from "../editorial/editorial-model";
+import { Choice, CollectionEmpty, CollectionRow } from "./collection-ui";
+import { useCollectionHost } from "./collection-host";
+import { useCollectionList } from "./collection-query";
 import {
+  activeCollectionFilterCount,
+  collectionSorts,
   collectionStatuses,
-  collectionUrl,
-  visibleCollections,
+  collectionTypes,
+  collectionViews,
   type Collection,
   type CollectionAction,
-  type CollectionFilters,
-} from "@byline/newsroom-screens/collections/collection-model";
+  type CollectionListQuery,
+  type CollectionSort,
+  type CollectionView,
+} from "./collection-model";
+
+/** Rows per page of the index. */
+export const COLLECTIONS_PAGE_SIZE = 50;
+
+/**
+ * The Collections index: a dense, operational list, not a card dashboard.
+ * Built-in views (Active, Mine, All, Archived), a search, one Filters popover
+ * (type, status, lead or team member) and a sort. Rows open the Collection;
+ * their visible menu and context menu share the same actions.
+ */
 export function CollectionsPage({
-  fetchers,
-  currentUserId,
-  workspaceUrl,
+  query,
+  onQueryChange,
+  onAction,
 }: {
-  fetchers: PlanningAppFetchers;
-  currentUserId: number | null;
-  workspaceUrl: (id: number) => string;
+  query: CollectionListQuery;
+  onQueryChange: (next: CollectionListQuery) => void;
+  onAction: (action: CollectionAction, collection: Collection) => void;
 }) {
-  const api = fetchers.collections!;
-  const client = useQueryClient();
-  const { openStory } = useStoryPeek();
-  const list = useQuery({
-    queryKey: collectionsKey,
-    queryFn: () => api.list(),
-  });
-  const [id, setId] = useState(
-    () =>
-      Number(new URLSearchParams(window.location.search).get("collection")) ||
-      0,
-  );
-  const [dialog, setDialog] = useState<Collection | "new" | null>(null);
-  const [add, setAdd] = useState<AddKind | undefined>();
-  const [filters, setFilters] = useState<CollectionFilters>({
-    search: "",
-    status: "",
-    person: "",
-    archive: "active",
-    sort: "updated",
-  });
-  useEffect(() => {
-    const pop = () => {
-      setId(
-        Number(new URLSearchParams(window.location.search).get("collection")) ||
-          0,
-      );
-      setAdd(undefined);
-    };
-    window.addEventListener("popstate", pop);
-    return () => window.removeEventListener("popstate", pop);
-  }, []);
-  function navigate(next: number, nextAdd?: AddKind) {
-    window.history.pushState({}, "", collectionUrl(next || undefined));
-    setAdd(nextAdd);
-    setId(next);
-  }
-  const refresh = () =>
-    Promise.all([
-      client.invalidateQueries({ queryKey: collectionsKey }),
-      client.invalidateQueries({ queryKey: collectionKey(id) }),
-      client.invalidateQueries({ queryKey: ["byline", "story-collections"] }),
-    ]);
-  const change = useMutation({
-    mutationFn: (input: { collection: Collection; duplicate: boolean }) => {
-      const c = input.collection;
-      return input.duplicate
-        ? api.save({
-            name: `${c.name} (copy)`,
-            brief: c.brief,
-            type: c.type,
-            leadId: c.lead?.id || currentUserId || 0,
-            startDate: c.startDate,
-            endDate: c.endDate,
-          })
-        : api.save({ status: c.archived ? "planning" : "archived" }, c.id);
-    },
-    onSuccess: (saved, input) => {
-      if (input.duplicate) {
-        navigate(saved.id);
-        toast.success(
-          "Collection duplicated. Add the reporting this new effort needs.",
-        );
-      } else
-        toast.success(
-          saved.archived ? "Collection archived." : "Collection restored.",
-          {
-            action: {
-              label: "Undo",
-              onClick: () => {
-                void api
-                  .save({ status: input.collection.status }, saved.id)
-                  .then(refresh)
-                  .catch((e) => toast.error(describeEditorialError(e)));
-              },
-            },
-          },
-        );
-    },
-    onError: (e) => toast.error(describeEditorialError(e)),
-    onSettled: refresh,
-  });
-  function action(a: CollectionAction, c: Collection) {
-    if (a === "open") navigate(c.id);
-    else if (a === "story" || a === "interview")
-      navigate(c.id, a === "story" ? "existing" : "interview");
-    else if (a === "edit") setDialog(c);
-    else change.mutate({ collection: c, duplicate: a === "duplicate" });
-  }
-  const filter = (key: keyof CollectionFilters, value: string) =>
-    setFilters((f) => ({ ...f, [key]: value }));
-  if (list.isPending) return <RowSkeletons count={6} />;
-  if (list.isError || !list.data)
-    return (
-      <InlineAlert onAction={() => void list.refetch()}>
-        Collections could not be loaded.
-      </InlineAlert>
-    );
+  const host = useCollectionHost();
+  const [search, setSearch] = useState(query.search);
+  const debounced = useDebouncedValue(search, 250);
+  const applied = { ...query, search: debounced.trim(), limit: COLLECTIONS_PAGE_SIZE };
+  const list = useCollectionList(host.api, applied);
   const data = list.data;
-  const rows = visibleCollections(data.collections, filters);
+  // The typed search becomes the list's query once the reader pauses.
+  const latest = useRef({ query, onQueryChange });
+  latest.current = { query, onQueryChange };
+  useEffect(() => {
+    const { query: current, onQueryChange: change } = latest.current;
+    if (debounced.trim() !== current.search) change({ ...current, search: debounced.trim(), page: 1 });
+  }, [debounced]);
+  const set = (patch: Partial<CollectionListQuery>) => onQueryChange({ ...query, page: 1, ...patch });
+  const filters = activeCollectionFilterCount(query);
+  const canCreate = Boolean(data?.canCreate && host.createCollection);
   return (
     <>
-      {id ? (
-        <CollectionWorkspace
-          key={`${id}-${add || ""}`}
-          id={id}
-          api={api}
-          fetchers={fetchers}
-          people={data.people}
-          timezone={data.timezone}
-          currentUserId={currentUserId || 0}
-          workspaceUrl={workspaceUrl}
-          onStory={openStory}
-          onBack={() => navigate(0)}
-          onAction={action}
-          initialAdd={add}
-        />
-      ) : (
-        <>
-          <PageHeader
-            title="Collections"
-            description="Coordinate related stories and shared reporting."
-            actions={
-              data.canCreate ? (
-                <Button
-                  onClick={() => setDialog("new")}
-                  className="pointer-coarse:min-h-11"
-                >
-                  <Plus data-icon="inline-start" />
-                  New collection
-                </Button>
-              ) : undefined
-            }
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <InputGroup className="min-w-40 flex-1">
-              <InputGroupAddon>
-                <Search aria-hidden="true" />
-              </InputGroupAddon>
-              <InputGroupInput
-                type="search"
-                aria-label="Search collections"
-                placeholder="Search collections…"
-                value={filters.search}
-                onChange={(e) => filter("search", e.target.value)}
-              />
-            </InputGroup>
-            <div className="w-40">
-              <Choice
-                label="Filter status"
-                value={filters.status}
-                options={{ "": "All statuses", ...collectionStatuses }}
-                onChange={(v) => filter("status", v)}
-              />
-            </div>
-            <div className="w-40">
-              <Choice
-                label="Filter lead or member"
-                value={filters.person}
-                options={{
-                  "": "All people",
-                  ...Object.fromEntries(
-                    data.people.map((p) => [String(p.id), p.name]),
-                  ),
-                }}
-                onChange={(v) => filter("person", v)}
-              />
-            </div>
-            <div className="w-44">
-              <Choice
-                label="Active or archived"
-                value={filters.archive}
-                options={{
-                  active: "Active collections",
-                  archived: "Archived collections",
-                  all: "All collections",
-                }}
-                onChange={(v) => filter("archive", v)}
-              />
-            </div>
-            <div className="w-40">
-              <Choice
-                label="Sort collections"
-                value={filters.sort}
-                options={{
-                  updated: "Recently updated",
-                  name: "Name",
-                  date: "Start date",
-                }}
-                onChange={(v) => filter("sort", v)}
-              />
-            </div>
-          </div>
-          {rows.length ? (
-            <ItemGroup
-              className="gap-0 rounded-xl border"
-              aria-label="Collections"
-            >
-              {rows.map((c) => (
-                <CollectionRow
-                  key={c.id}
-                  collection={c}
-                  timezone={data.timezone}
-                  onAction={action}
+      <PageHeader
+        title="Collections"
+        description="Reporting projects: related stories, shared interviews, tasks and resources."
+        actions={
+          canCreate ? (
+            <Button onClick={host.createCollection} className="pointer-coarse:min-h-11">
+              <Plus data-icon="inline-start" />
+              New collection
+            </Button>
+          ) : undefined
+        }
+      />
+      <div className="flex min-w-0 flex-col gap-3">
+        <Tabs value={query.view} onValueChange={(view) => set({ view: view as CollectionView })}>
+          <TabsList aria-label="Collection views" className="max-w-full justify-start overflow-x-auto">
+            {Object.entries(collectionViews).map(([id, label]) => (
+              <TabsTrigger key={id} value={id} className="min-h-9 px-3 pointer-coarse:min-h-11">
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <div className="flex flex-wrap items-center gap-2">
+          <InputGroup className="min-w-48 flex-1">
+            <InputGroupAddon>
+              <Search aria-hidden="true" />
+            </InputGroupAddon>
+            <InputGroupInput
+              type="search"
+              aria-label="Search collections"
+              placeholder="Search collections…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </InputGroup>
+          <Popover>
+            <PopoverTrigger render={<Button variant="outline" className="pointer-coarse:min-h-11" aria-label={filters ? `Filters, ${filters} on` : "Filters"} />}>
+              <ListFilter data-icon="inline-start" aria-hidden="true" />
+              Filters
+              {filters ? <Badge variant="secondary">{filters}</Badge> : null}
+            </PopoverTrigger>
+            <PopoverContent align="end" className="flex w-72 flex-col gap-3">
+              <Field>
+                <FieldLabel>Type</FieldLabel>
+                <Choice label="Filter by type" value={query.type} options={{ "": "Any type", ...collectionTypes }} onChange={(type) => set({ type })} />
+              </Field>
+              <Field>
+                <FieldLabel>Status</FieldLabel>
+                <Choice label="Filter by status" value={query.status} options={{ "": "Any status", ...collectionStatuses }} onChange={(status) => set({ status })} />
+              </Field>
+              <Field>
+                <FieldLabel>Lead or team member</FieldLabel>
+                <Choice
+                  label="Filter by lead or team member"
+                  value={query.person ? String(query.person) : ""}
+                  options={{ "": "Anyone", ...Object.fromEntries((data?.people ?? []).filter((p) => p.kind !== "guest").map((p) => [String(p.id), p.name])) }}
+                  onChange={(person) => set({ person: Number(person) || null })}
                 />
+              </Field>
+              <Button variant="ghost" size="sm" disabled={!filters} onClick={() => set({ type: "", status: "", person: null })}>
+                Clear filters
+              </Button>
+            </PopoverContent>
+          </Popover>
+          <div className="w-44">
+            <Choice label="Sort collections" value={query.sort} options={collectionSorts} onChange={(sort) => set({ sort: sort as CollectionSort })} />
+          </div>
+        </div>
+        {list.isPending && !data ? (
+          <RowSkeletons count={6} />
+        ) : list.isError && !data ? (
+          <InlineAlert onAction={() => void list.refetch()}>{describeEditorialError(list.error, "Collections could not be loaded.")}</InlineAlert>
+        ) : data && data.collections.length ? (
+          <>
+            <ItemGroup className="gap-0 rounded-xl border" aria-label={`${collectionViews[query.view]} collections`} aria-busy={list.isFetching || undefined}>
+              {data.collections.map((c) => (
+                <CollectionRow key={c.id} collection={c} timezone={data.timezone} onAction={onAction} />
               ))}
             </ItemGroup>
-          ) : (
-            <CollectionEmpty
-              title={
-                data.collections.length
-                  ? "No matching collections"
-                  : "Your next reporting effort starts here"
-              }
-            >
-              {data.collections.length
-                ? "Try a different search or filter."
-                : "Create a Collection to coordinate stories, interviews, tasks, and shared resources."}
-            </CollectionEmpty>
-          )}
-        </>
-      )}
-      {dialog ? (
-        <CollectionDialog
-          key={dialog === "new" ? "new" : dialog.id}
-          api={api}
-          people={data.people}
-          currentUserId={currentUserId || 0}
-          collection={dialog === "new" ? undefined : dialog}
-          onClose={() => setDialog(null)}
-          onSaved={(c) => {
-            const isNew = dialog === "new";
-            setDialog(null);
-            void refresh();
-            if (isNew) navigate(c.id);
-          }}
-        />
-      ) : null}
+            {data.pages > 1 ? (
+              <nav aria-label="Collection pages" className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                <span>
+                  {data.total} collections · page {query.page} of {data.pages}
+                </span>
+                <span className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled={query.page <= 1} onClick={() => onQueryChange({ ...query, page: query.page - 1 })}>Previous</Button>
+                  <Button variant="outline" size="sm" disabled={query.page >= data.pages} onClick={() => onQueryChange({ ...query, page: query.page + 1 })}>Next</Button>
+                </span>
+              </nav>
+            ) : null}
+          </>
+        ) : (
+          <CollectionEmpty
+            title={query.search || filters || query.view !== "active" ? "No matching collections" : "Your next reporting effort starts here"}
+            actions={canCreate && !query.search && !filters ? <Button onClick={host.createCollection}>New collection</Button> : undefined}
+          >
+            {query.search || filters || query.view !== "active"
+              ? "Try another view, search or filter."
+              : "A Collection coordinates related stories, shared interviews, tasks and resources."}
+          </CollectionEmpty>
+        )}
+        <p role="status" aria-live="polite" className="sr-only">
+          {data ? `${data.total} ${data.total === 1 ? "collection" : "collections"}` : ""}
+        </p>
+      </div>
     </>
   );
+}
+
+/** Archive or restore from a row or the workspace menu, with Undo. Editors only (the server decides). */
+export function useArchiveCollection(onDone?: () => void) {
+  const host = useCollectionHost();
+  return useMutation({
+    mutationFn: (collection: Collection) =>
+      host.api.update(collection.id, { status: collection.archived ? "planning" : "archived" }),
+    onSuccess: (saved, before) => {
+      toast.success(saved.archived ? "Collection archived." : "Collection restored.", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void host.api.update(saved.id, { status: before.status }).then(onDone).catch((e) => toast.error(describeEditorialError(e)));
+          },
+        },
+      });
+    },
+    onError: (e) => toast.error(describeEditorialError(e)),
+    onSettled: onDone,
+  });
 }

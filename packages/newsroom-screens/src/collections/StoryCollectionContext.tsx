@@ -17,12 +17,17 @@ import {
 } from "@byline/newsroom-ui/ui/item";
 import { describeEditorialError } from "../editorial/editorial-model";
 import {
+  collectionListKey,
   collectionsKey,
   storyCollectionsKey,
   type CollectionApi,
 } from "./collection-api";
-import { collectionUrl, edgeChanges } from "./collection-model";
+import { edgeChanges } from "./collection-model";
+import { useCollectionLinks } from "./collection-links";
 import { EntityPicker } from "./collection-ui";
+/** The Collections a story can be added to: every one the reader can see, archived ones only when already linked. */
+export const STORY_COLLECTION_OPTIONS = { view: "all" as const, limit: 100 };
+
 export function StoryCollectionContext({
   storyId,
   api,
@@ -33,15 +38,16 @@ export function StoryCollectionContext({
   compact?: boolean;
 }) {
   const client = useQueryClient();
+  const links = useCollectionLinks();
   const context = useQuery({
     queryKey: storyCollectionsKey(storyId),
     queryFn: () => api.story(storyId),
   });
   const collections = useQuery({
-    queryKey: collectionsKey,
-    queryFn: () => api.list(),
+    queryKey: collectionListKey(STORY_COLLECTION_OPTIONS),
+    queryFn: () => api.list(STORY_COLLECTION_OPTIONS),
   });
-  const links = useMutation({
+  const save = useMutation({
     mutationFn: async (input: {
       collectionIds?: number[];
       interviewIds?: number[];
@@ -53,7 +59,9 @@ export function StoryCollectionContext({
           data.collections.map((c) => c.id),
           input.collectionIds,
         ))
-          await api.link(change.target, "story", storyId, change.linked);
+          await (change.linked
+            ? api.addStory(change.target, storyId)
+            : api.removeStory(change.target, storyId));
       if (input.interviewIds)
         for (const change of edgeChanges(
           data.interviews.map((i) => i.id),
@@ -63,12 +71,14 @@ export function StoryCollectionContext({
             ...data.interviews,
             ...data.availableInterviews,
           ].find((i) => i.id === change.target)!;
-          await api.link(
+          await api.saveInterview(
             interview.collectionId,
-            "interview-story",
-            storyId,
-            change.linked,
-            interview.id,
+            {
+              storyIds: change.linked
+                ? [...interview.storyIds, storyId]
+                : interview.storyIds.filter((id) => id !== storyId),
+            },
+            interview,
           );
         }
     },
@@ -78,6 +88,7 @@ export function StoryCollectionContext({
         client.invalidateQueries({ queryKey: storyCollectionsKey(storyId) }),
         client.invalidateQueries({ queryKey: collectionsKey }),
         client.invalidateQueries({ queryKey: ["byline", "planning"] }),
+        client.invalidateQueries({ queryKey: ["byline", "collection"] }),
       ]),
   });
   if (context.isPending || collections.isPending)
@@ -123,14 +134,14 @@ export function StoryCollectionContext({
         items={interviews}
         selected={data.interviews}
         itemLabel={(i) => i.interviewee}
-        disabled={links.isPending || !data.canManage}
+        disabled={save.isPending || !data.canManage}
         itemDisabled={(i) => !i.canEdit}
         appearance="value"
         triggerLabel={
           compact ? (data.interviews.length ? "Edit" : "Link") : undefined
         }
         onChange={(next) =>
-          links.mutate({ interviewIds: next.map((i) => i.id) })
+          save.mutate({ interviewIds: next.map((i) => i.id) })
         }
       >
         {(i) => <>{i.interviewee}</>}
@@ -152,14 +163,14 @@ export function StoryCollectionContext({
             items={options}
             selected={data.collections}
             itemLabel={(c) => c.name}
-            disabled={links.isPending || !data.canManage}
+            disabled={save.isPending || !data.canManage}
             itemDisabled={(c) => !c.canEdit}
             appearance="value"
             triggerLabel={
               compact ? (data.collections.length ? "Edit" : "Link") : undefined
             }
             onChange={(next) =>
-              links.mutate({ collectionIds: next.map((c) => c.id) })
+              save.mutate({ collectionIds: next.map((c) => c.id) })
             }
           >
             {(c) => <>{c.name}</>}
@@ -167,11 +178,19 @@ export function StoryCollectionContext({
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2 text-xs">
-        {data.collections.map((c) => (
-          <a key={c.id} href={collectionUrl(c.id)} className="underline">
-            {c.name} ↗
-          </a>
-        ))}
+        {data.collections.map((c) =>
+          links.href ? (
+            <a key={c.id} href={links.href(c.id)} onClick={(event) => {
+              if (!links.open || event.metaKey || event.ctrlKey || event.shiftKey) return;
+              event.preventDefault();
+              links.open(c.id);
+            }} className="underline">
+              {c.name} ↗
+            </a>
+          ) : (
+            <span key={c.id}>{c.name}</span>
+          ),
+        )}
       </div>
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Shared interviews</h3>
@@ -184,9 +203,18 @@ export function StoryCollectionContext({
               key={i.id}
               size="xs"
               render={
-                <a
-                  href={`${collectionUrl(i.collectionId)}&interview=${i.id}`}
-                />
+                links.href ? (
+                  <a
+                    href={links.href(i.collectionId, { interviewId: i.id })}
+                    onClick={(event) => {
+                      if (!links.open || event.metaKey || event.ctrlKey || event.shiftKey) return;
+                      event.preventDefault();
+                      links.open(i.collectionId, { interviewId: i.id });
+                    }}
+                  />
+                ) : (
+                  <div />
+                )
               }
             >
               <ItemContent>

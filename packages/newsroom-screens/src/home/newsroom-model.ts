@@ -1,4 +1,4 @@
-import { collectionUrl } from "../collections/collection-model";
+import type { CollectionHref } from "../collections/collection-model";
 import type { EditorialTask, ContributorEntry } from "../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../editorial/activity-model";
 import type { PlanningPerson, PlanningStory } from "../planning/planning-model";
@@ -169,7 +169,8 @@ export function myActiveStories(stories: PlanningStory[], userId: number, timezo
 
 /** `label` is the kind of commitment ("Story deadline", "Interview"); `title`/`detail` identify the work. */
 export type AgendaEvent = { href?: string; id: string; storyId: number | null; title: string; detail: string; label: string; date: string; day: string };
-export function homeAgenda(data: HomeBootstrap, now = new Date()): AgendaEvent[] {
+/** `collectionHref`: the host's Collection address, for shared interviews (absent: no link). */
+export function homeAgenda(data: HomeBootstrap, now = new Date(), collectionHref?: CollectionHref): AgendaEvent[] {
   const { timezone, currentUser, capabilities } = data;
   const today = siteDay(now, timezone);
   const entries: AgendaEvent[] = [];
@@ -192,12 +193,12 @@ export function homeAgenda(data: HomeBootstrap, now = new Date()): AgendaEvent[]
   });
   // Only a confirmed, exact appointment has a day and a time. A target window or
   // an unscheduled idea is work to schedule, not a calendar commitment.
-  upcomingConfirmed(data.appointments || [], timezone, now).forEach((appointment) => add(`appointment-${appointment.id}`, appointment.storyId, appointment.title, appointment.storyTitle, appointmentKindLabels[appointment.kind] || "Appointment", appointment.startAt, appointment.collectionId ? `${collectionUrl(appointment.collectionId)}&interview=${appointment.interviewId}` : undefined));
+  upcomingConfirmed(data.appointments || [], timezone, now).forEach((appointment) => add(`appointment-${appointment.id}`, appointment.storyId, appointment.title, appointment.storyTitle, appointmentKindLabels[appointment.kind] || "Appointment", appointment.startAt, appointment.collectionId && collectionHref ? collectionHref(appointment.collectionId, { interviewId: appointment.interviewId }) : undefined));
   return entries.sort((a, b) => a.day.localeCompare(b.day) || a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
 
 export type AttentionItem = { href?: string; id: string; storyId: number | null; title: string; detail: string; urgent?: boolean };
-export function waitingForMe(data: HomeBootstrap, now = new Date()): AttentionItem[] {
+export function waitingForMe(data: HomeBootstrap, now = new Date(), collectionHref?: CollectionHref): AttentionItem[] {
   const items: AttentionItem[] = [];
   // Ordinary tasks are already first-class My Work items. These attention signals
   // are reserved for decisions, assignment or scheduling actions instead of
@@ -207,7 +208,7 @@ export function waitingForMe(data: HomeBootstrap, now = new Date()): AttentionIt
   // An unscheduled idea or a far-off window never appears here.
   (data.appointments || []).flatMap((a) => { const need = schedulingNeed(a, data.timezone, now); return need ? [{ a, need }] : []; })
     .sort((x, y) => Number(y.need.urgent) - Number(x.need.urgent) || (x.a.windowStart || "").localeCompare(y.a.windowStart || "") || x.a.id.localeCompare(y.a.id)).slice(0, 2)
-    .forEach(({ a, need }) => items.push({ id: `schedule-${a.id}`, storyId: a.storyId, title: a.title, detail: need.label, urgent: need.urgent, ...(a.collectionId ? { href: `${collectionUrl(a.collectionId)}&interview=${a.interviewId}` } : {}) }));
+    .forEach(({ a, need }) => items.push({ id: `schedule-${a.id}`, storyId: a.storyId, title: a.title, detail: need.label, urgent: need.urgent, ...(a.collectionId && collectionHref ? { href: collectionHref(a.collectionId, { interviewId: a.interviewId }) } : {}) }));
   if (data.capabilities.review) {
     data.visualWork.filter((v) => !v.assignee && v.status === "needed" && dayDistance(v.dueAt, data.timezone, now) <= 1).slice(0, 2).forEach((v) => items.push({ id: `unassigned-${v.story.id}-${v.id}`, storyId: v.story.id, title: mediaAssignmentTitle(v), detail: `${v.story.title} · urgent visual work needs an assignee`, urgent: true }));
   }
@@ -223,7 +224,7 @@ export function reviewStories(data: HomeBootstrap): PlanningStory[] {
  * One personal queue for every kind of work the signed-in user has to act on.
  * The source objects stay distinct; Home only normalizes their urgency and order.
  */
-export function myWork(data: HomeBootstrap, now = new Date()): HomeWorkItem[] {
+export function myWork(data: HomeBootstrap, now = new Date(), collectionHref?: CollectionHref): HomeWorkItem[] {
   const items: HomeWorkItem[] = [];
   const reviews = reviewStories(data);
   const reviewStoryIds = new Set(reviews.map((story) => story.id));
@@ -236,7 +237,7 @@ export function myWork(data: HomeBootstrap, now = new Date()): HomeWorkItem[] {
     items.push({ id: `review-${story.id}`, kind: "review", group: "attention", story });
   }
 
-  for (const item of waitingForMe(data, now)) {
+  for (const item of waitingForMe(data, now, collectionHref)) {
     // A ready story that is also late has one clearer action: review it.
     if (item.id.startsWith("late-story-") && item.storyId && reviewStoryIds.has(item.storyId)) continue;
     items.push({ id: `attention-${item.id}`, kind: "attention", group: "attention", item });

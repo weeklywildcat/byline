@@ -33,7 +33,7 @@ describe("WordPress Calendar links", () => {
 
   it("keeps shared collection interviews on their collection", () => {
     const shared = appointment({ id: "i", collectionId: 3, interviewId: 9 });
-    expect(scheduleCalendarEvents(schedule({ appointments: [shared] }), links)[0].href).toBe("admin.php?page=byline-planning&tab=collections&collection=3&interview=9");
+    expect(scheduleCalendarEvents(schedule({ appointments: [shared] }), links)[0].href).toBe("admin.php?page=byline-planning&tab=collections&collection=3&section=reporting&interview=9");
   });
 });
 

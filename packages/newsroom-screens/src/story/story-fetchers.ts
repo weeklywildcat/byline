@@ -1,4 +1,4 @@
-import { createCollectionApi, type CollectionApi } from "../collections/collection-api";
+import type { CollectionApi } from "../collections/collection-api";
 import type { PlanningRequestOptions } from "../planning/planning-api";
 import type { HomePresetsPayload } from "../home/home-model";
 import { createEditorialRestClient, type EditorialRestClient } from "../editorial/editorial-rest";
@@ -25,11 +25,12 @@ export type StoryCapabilities = { editPosts?: boolean; manage?: boolean };
  * The capability checks keep known-forbidden requests out of the browser while
  * the server remains the final authorization boundary.
  */
-export function createStoryFetchers(request: StoryRequest, capabilities: StoryCapabilities = {}, paths: { presets?: string } = {}): StoryFetchers {
+/** `host.collections`: the host's CollectionApi (Collections are not addressed from here). */
+export function createStoryFetchers(request: StoryRequest, capabilities: StoryCapabilities = {}, paths: { presets?: string } = {}, host: { collections?: CollectionApi } = {}): StoryFetchers {
   const fetchers: StoryFetchers = {};
   if (capabilities.editPosts !== false) {
-    fetchers.collections = createCollectionApi(request);
-    fetchers.workspace = createWorkspaceClient(request);
+    if (host.collections) fetchers.collections = host.collections;
+    fetchers.workspace = createWorkspaceClient(request, { collections: host.collections });
     fetchers.getWorkspace = fetchers.workspace.getWorkspace;
     fetchers.createStory = (title, preset) => request<StoryWorkspace>({ path: "/byline/v1/editorial/stories", method: "POST", data: preset ? { title, preset } : { title } });
     fetchers.editorial = createEditorialRestClient(request);

@@ -33,11 +33,15 @@ describe("fast editing interactions", () => {
   });
 
   it("keeps public coverage subordinate to Collection coordination", () => {
-    const source = read("collections/CollectionPublicCoverage.tsx");
-    expect(source).toContain("Newsroom-only Collection");
-    expect(source).toContain("Publish as coverage");
-    expect(source).toContain("<WorkspaceDialog");
-    expect(source).toContain("pickFromMediaLibrary");
+    const source = read("collections/CollectionPublicPresentation.tsx");
+    expect(source).toContain("Newsroom only");
+    expect(source).toContain("Save public presentation");
+    // The host's media picker (WordPress Media Library, Byline Media), never a CMS API in the shared screen.
+    expect(source).toContain("host.media!.pick(");
+    expect(source).not.toContain("wp.media");
+    // The overview is plain text; there is no HTML escape hatch.
+    expect(source).toContain("Plain text. Separate paragraphs with a blank line.");
+    expect(source).not.toContain("Basic HTML");
   });
 
   it("lets existing workspace tasks be edited without recreating them", () => {

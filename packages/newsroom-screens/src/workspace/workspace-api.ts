@@ -1,4 +1,4 @@
-import { createCollectionApi } from "../collections/collection-api";
+import type { CollectionApi } from "../collections/collection-api";
 import type { ProtectedEditorialRequest } from "../editorial/editorial-rest";
 import type { StoryVideoSettings } from "../editorial/story-video-model";
 import type { ArticleNotesResponse } from "../story/notes-model";
@@ -23,9 +23,10 @@ const story = (id: number) => `/byline/v1/editorial/stories/${id}`;
  * resolves with the freshly stored collection so callers can replace their
  * cache from the response instead of guessing.
  */
-export function createWorkspaceClient(request: WorkspaceRequest) {
+export function createWorkspaceClient(request: WorkspaceRequest, host: { collections?: CollectionApi } = {}) {
   return {
-    collections: createCollectionApi(request),
+    /** The host's Collections (absent: the workspace shows none). */
+    collections: host.collections as CollectionApi | undefined,
     getWorkspace: (storyId: number) => request<StoryWorkspace>({ path: `${story(storyId)}/workspace` }),
     saveBrief: (storyId: number, brief: string, expectedBrief?: string) =>
       request<{ brief: string }>({ path: `${story(storyId)}/brief`, method: "POST", data: { brief, ...(expectedBrief !== undefined ? { expectedBrief } : {}) } }),

@@ -1,99 +1,68 @@
-import type { PlanningResponse } from "../planning/planning-model";
+import type { PlanningStory } from "../planning/planning-model";
 import type { StoryWorkspace } from "../workspace/workspace-types";
-import type { StoryRequest } from "../story/story-fetchers";
 import type {
   Collection,
   CollectionDetail,
   CollectionInput,
   CollectionList,
+  CollectionListQuery,
   Interview,
   InterviewInput,
+  ResourceInput,
   SharedResource,
   StoryCollections,
 } from "./collection-model";
-export function createCollectionApi(request: StoryRequest) {
-  const path = "/byline/v1/editorial/collections";
-  return {
-    async list(): Promise<CollectionList> {
-      const first = await request<CollectionList>({ path });
-      // All pages are loaded before client-side filtering, avoiding silently incomplete lists.
-      for (let page = 2; page <= first.pages; page++) {
-        const next = await request<CollectionList>({
-          path: `${path}?page=${page}`,
-        });
-        first.collections.push(...next.collections);
-      }
-      return first;
-    },
-    stories: (search = "") =>
-      request<PlanningResponse>({
-        path: `${path}/story-options?search=${encodeURIComponent(search)}`,
-      }),
-    createStory: (id: number, title: string, preset?: string) =>
-      request<StoryWorkspace>({
-        path: `${path}/${id}/stories`,
-        method: "POST",
-        data: { title, ...(preset ? { preset } : {}) },
-      }),
-    detail: (id: number) =>
-      request<CollectionDetail>({ path: `${path}/${id}` }),
-    save: (input: CollectionInput, id?: number) =>
-      request<Collection>({
-        path: id ? `${path}/${id}` : path,
-        method: "POST",
-        data: input,
-      }),
-    interview: (id: number, input: InterviewInput, interviewId?: number) =>
-      request<Interview>({
-        path: `${path}/${id}/interviews${interviewId ? `/${interviewId}` : ""}`,
-        method: "POST",
-        data: input,
-      }),
-    link: (
-      id: number,
-      kind: string,
-      target: number,
-      linked: boolean,
-      interview?: number,
-    ) =>
-      request<{ linked: boolean }>({
-        path: `${path}/${id}${
-          interview ? `/interviews/${interview}` : ""
-        }/links/${kind}/${target}`,
-        method: linked ? "POST" : "DELETE",
-      }),
-    resourceOptions: (search = "") =>
-      request<{ resources: SharedResource[] }>({
-        path: `${path}/resource-options?search=${encodeURIComponent(search)}`,
-      }),
-    resourceStory: (
-      id: number,
-      resource: number,
-      story: number,
-      linked: boolean,
-    ) =>
-      request({
-        path: `${path}/${id}/resources/${resource}/links/resource-story/${story}`,
-        method: linked ? "POST" : "DELETE",
-      }),
-    resource: (
-      id: number,
-      input: { label: string; url: string; attachmentId?: number },
-    ) =>
-      request<SharedResource>({
-        path: `${path}/${id}/resources`,
-        method: "POST",
-        data: input,
-      }),
-    story: (id: number) =>
-      request<StoryCollections>({
-        path: `/byline/v1/editorial/stories/${id}/collections`,
-      }),
-  };
-}
-export type CollectionApi = ReturnType<typeof createCollectionApi>;
+
+/**
+ * What the Collection screens need from a host. Semantic operations, never
+ * addresses: WordPress implements them over `/byline/v1/editorial/collections`
+ * (wordpress-plugin/src/collections/wordpress-collection-api.ts), Payload
+ * over `/api/byline/collections` (apps/newsroom). The screens know neither.
+ */
+export type CollectionApi = {
+  /** One page of the list, filtered and sorted (a host may do it in the browser). */
+  list: (query?: Partial<CollectionListQuery>) => Promise<CollectionList>;
+  detail: (id: number) => Promise<CollectionDetail>;
+  create: (input: CollectionInput & { name: string }) => Promise<Collection>;
+  update: (id: number, input: CollectionInput) => Promise<Collection>;
+  /** Stories this reader may add, by headline. */
+  storyOptions: (search?: string) => Promise<{ stories: PlanningStory[] }>;
+  /** A new story through the host's one Story creation flow, then added to the Collection. */
+  createStory: (
+    id: number,
+    title: string,
+    preset?: string,
+  ) => Promise<StoryWorkspace>;
+  addStory: (id: number, storyId: number) => Promise<unknown>;
+  /** Membership only; the story itself is untouched. */
+  removeStory: (id: number, storyId: number) => Promise<unknown>;
+  addMember: (id: number, userId: number) => Promise<unknown>;
+  removeMember: (id: number, userId: number) => Promise<unknown>;
+  /** Creates or edits a shared interview; its links (stories, interviewers, resources) save with it. */
+  saveInterview: (
+    id: number,
+    input: InterviewInput,
+    interview?: Interview,
+  ) => Promise<Interview>;
+  /** Shared resources from other Collections this reader can see, to reuse. */
+  resourceOptions: (search?: string) => Promise<{ resources: SharedResource[] }>;
+  addResource: (id: number, input: ResourceInput) => Promise<SharedResource>;
+  reuseResource: (id: number, resourceId: number) => Promise<unknown>;
+  /** Removes the resource from this Collection; it stays wherever else it is used. */
+  unlinkResource: (id: number, resourceId: number) => Promise<unknown>;
+  setResourceStories: (
+    id: number,
+    resource: SharedResource,
+    storyIds: number[],
+  ) => Promise<unknown>;
+  /** A story's Collections, interviews and resources (Story Peek, the Story workspace). */
+  story: (storyId: number) => Promise<StoryCollections>;
+};
+
 export const collectionsKey = ["byline", "collections"] as const;
+export const collectionListKey = (query: Partial<CollectionListQuery> = {}) =>
+  [...collectionsKey, "list", query] as const;
 export const collectionKey = (id: number) =>
-  ["byline", "planning", "collection", id] as const;
+  ["byline", "collection", id] as const;
 export const storyCollectionsKey = (id: number) =>
   ["byline", "story-collections", id] as const;

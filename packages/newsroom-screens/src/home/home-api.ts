@@ -1,3 +1,4 @@
+import type { CollectionApi } from "../collections/collection-api";
 import { normalizeContentHealthResponse } from "../planning/planning-api";
 import type {
   ContentHealthResponse,
@@ -61,13 +62,14 @@ const defaultPaths: Required<HomePaths> = {
 export function createHomeFetchers(
   request: HomeRequest,
   paths: HomePaths = {},
-  capabilities: HomeNavigationCapabilities = {}
+  capabilities: HomeNavigationCapabilities = {},
+  host: { collections?: CollectionApi } = {}
 ): HomeFetchers {
   const resolved = { ...defaultPaths, ...paths };
   if (paths.deployment && !paths.deploymentTrigger) {
     resolved.deploymentTrigger = `${resolved.deployment.replace(/\/+$/, "")}/trigger`;
   }
-  const fetchers: HomeFetchers = createStoryFetchers(request, capabilities, { presets: resolved.presets });
+  const fetchers: HomeFetchers = createStoryFetchers(request, capabilities, { presets: resolved.presets }, host);
   if (capabilities.editPosts !== false) {
     fetchers.getHome = () => request<HomeBootstrap>({ path: "/byline/v1/editorial/home" });
     fetchers.searchStories = (query) => request({ path: `/byline/v1/editorial/home/search?query=${encodeURIComponent(query)}` });

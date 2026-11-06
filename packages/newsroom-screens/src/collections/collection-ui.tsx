@@ -49,14 +49,14 @@ import {
 } from "@byline/newsroom-ui/ui/select";
 import { appointmentLine } from "../workspace/schedule-model";
 import { interviewAppointment } from "./interview-schedule";
-import { exactDate } from "../home/newsroom-model";
+import { exactDate, shortDateTime } from "../home/newsroom-model";
 import type { PlanningStory } from "../planning/planning-model";
 import {
   collectionActions,
   collectionStatuses,
   collectionTypes,
   interviewStatuses,
-  storySummary,
+  collectionCounts,
   type Collection,
   type CollectionAction,
   type Interview,
@@ -287,24 +287,14 @@ export function CollectionRow({
             </ItemTitle>
             <ItemDescription className="line-clamp-none">
               {collectionTypes[c.type]} · {collectionStatuses[c.status]}
-              {c.startDate
-                ? ` · ${exactDate(c.startDate, timezone)}${
-                    c.endDate && c.endDate !== c.startDate
-                      ? ` – ${exactDate(c.endDate, timezone)}`
-                      : ""
-                  }`
-                : ""}
+              {collectionDates(c, timezone) ? ` · ${collectionDates(c, timezone)}` : ""}
             </ItemDescription>
-            <span className="text-xs text-muted-foreground">
-              {c.storyCount} stories
-              {storySummary(c) ? ` · ${storySummary(c)}` : ""} ·{" "}
-              {c.interviewCount} interviews · {c.openTaskCount} open tasks
-            </span>
+            <span className="text-xs text-muted-foreground">{collectionCounts(c)}</span>
           </button>
         </ItemContent>
         <ItemActions className="hidden flex-col items-end gap-1 sm:flex">
           <span className="text-sm">{c.lead?.name || "No lead"}</span>
-          <PeopleAvatars people={c.members} />
+          {c.members.length ? <PeopleAvatars people={c.members} /> : null}
         </ItemActions>
         <ItemActions>
           <ActionMenu label={`Actions for ${c.name}`} actions={actions} />
@@ -324,6 +314,12 @@ export function CollectionRow({
     </ContextMenu>
   );
 }
+/** "Oct 24", or "Oct 24 – Oct 26": calendar days, never shifted by a timezone. */
+export function collectionDates(c: Pick<Collection, "startDate" | "endDate">, timezone: string): string {
+  if (!c.startDate) return c.endDate ? `Until ${shortDateTime(c.endDate, timezone)}` : "";
+  return `${shortDateTime(c.startDate, timezone)}${c.endDate && c.endDate !== c.startDate ? ` – ${shortDateTime(c.endDate, timezone)}` : ""}`;
+}
+
 export function InterviewRow({
   interview: i,
   timezone,
@@ -346,7 +342,7 @@ export function InterviewRow({
           {i.interviewers.length
             ? `${i.interviewers.map((p) => p.name).join(", ")} · `
             : ""}
-          {i.storyIds.length} linked stories
+          {i.storyIds.length === 1 ? "1 linked story" : `${i.storyIds.length} linked stories`}
           {i.resourceIds.length ? " · Recording / resource" : ""}
         </ItemDescription>
       </ItemContent>

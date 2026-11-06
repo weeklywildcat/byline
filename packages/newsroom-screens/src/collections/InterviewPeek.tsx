@@ -18,53 +18,56 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@byline/newsroom-ui/ui/sheet";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@byline/newsroom-ui/ui/alert-dialog";
-import { AppointmentTimingFields } from "@byline/newsroom-screens/workspace/AppointmentDialog";
+import { AppointmentTimingFields } from "../workspace/AppointmentDialog";
 import {
   appointmentFormToInput,
   appointmentToForm,
   siteWallParts,
   validateAppointmentForm,
-} from "@byline/newsroom-screens/workspace/appointment-form";
+} from "../workspace/appointment-form";
 import {
   describeEditorialError,
   type ContributorEntry,
-} from "@byline/newsroom-screens/editorial/editorial-model";
-import { EntityPicker, StoryOption } from "@byline/newsroom-screens/collections/collection-ui";
-import type { CollectionApi } from "@byline/newsroom-screens/collections/collection-api";
+} from "../editorial/editorial-model";
+import { EntityPicker, StoryOption } from "./collection-ui";
+import { useCollectionHost } from "./collection-host";
+import { useGuardedEditor } from "./collection-guard";
 import {
   edgeChanges,
   interviewStatuses,
   type CollectionDetail,
   type Interview,
-} from "@byline/newsroom-screens/collections/collection-model";
-import { interviewAppointment } from "@byline/newsroom-screens/collections/interview-schedule";
+} from "./collection-model";
+import { interviewAppointment } from "./interview-schedule";
+/**
+ * One shared interview, inspected and edited in a sheet beside the
+ * Collection (a nested record, so a Sheet is right here; the Collection
+ * itself is never one). Explicit Save; unsaved edits are guarded against
+ * closing, switching sections or Collections, and Back and Forward. The
+ * stale-edit check means someone else's newer save is a conflict, not an
+ * overwrite. Private source details appear only for the Collection's team
+ * and editors.
+ */
 export function InterviewPeek({
   interview,
   detail,
-  api,
   people,
   timezone,
   onClose,
+  onSaved,
   refresh,
 }: {
   interview: Interview;
   detail: CollectionDetail;
-  api: CollectionApi;
   people: ContributorEntry[];
   timezone: string;
+  /** Close as the reader asked (the workspace guard asks first when there are unsaved edits). */
   onClose: () => void;
+  /** Close after a save (nothing left to guard). */
+  onSaved: () => void;
   refresh: () => Promise<unknown>;
 }) {
+  const api = useCollectionHost().api;
   const rootPortal = useAdminPortal();
   const [portal, setPortal] = useState<HTMLDivElement | null>(null);
   const [storyIds, setStoryIds] = useState(interview.storyIds);
@@ -85,32 +88,16 @@ export function InterviewPeek({
     initialCompleted ? `${initialCompleted.date}T${initialCompleted.time}` : "",
   );
   const [attempted, setAttempted] = useState(false);
-  const [discard, setDiscard] = useState(false);
   const timingErrors = attempted ? validateAppointmentForm(form) : {};
   const save = useMutation({
     mutationFn: async () => {
-      for (const [kind, previous, next] of [
-        ["interview-story", interview.storyIds, storyIds],
-        [
-          "interviewer",
-          interview.interviewers.map((person) => person.id),
-          interviewerIds,
-        ],
-        ["recording", interview.resourceIds, resourceIds],
-      ] as const) {
-        for (const change of edgeChanges(previous, next))
-          await api.link(
-            interview.collectionId,
-            kind,
-            change.target,
-            change.linked,
-            interview.id,
-          );
-      }
       const timing = appointmentFormToInput(form, undefined, timezone);
-      return api.interview(
+      return api.saveInterview(
         interview.collectionId,
         {
+          storyIds,
+          interviewerIds,
+          resourceIds,
           interviewee: name,
           status,
           notes,
@@ -125,12 +112,12 @@ export function InterviewPeek({
           location: timing.location,
           expectedUpdatedAt: interview.updatedAt,
         },
-        interview.id,
+        interview,
       );
     },
     onSuccess: async () => {
       await refresh();
-      onClose();
+      onSaved();
     },
   });
   const members = people.map((p) => ({
@@ -180,11 +167,9 @@ export function InterviewPeek({
       (initialCompleted
         ? `${initialCompleted.date}T${initialCompleted.time}`
         : "");
+  useGuardedEditor(`interview-${interview.id}`, "this interview", () => dirty && !save.isSuccess);
   const close = () => {
-    if (!save.isPending) {
-      if (dirty) setDiscard(true);
-      else onClose();
-    }
+    if (!save.isPending) onClose();
   };
   return (
     <>
@@ -352,7 +337,7 @@ export function InterviewPeek({
                       value={contact}
                       onChange={setContact}
                       maxLength={2000}
-                      hint="Visible only to editors and this Collection’s team."
+                      hint="Visible only to editors and this Collection’s lead and team. Never shown on the Calendar, in search or in Story Peek."
                     />
                   </fieldset>
                 ) : null}
@@ -381,24 +366,6 @@ export function InterviewPeek({
           </AdminPortalContext>
         </SheetContent>
       </Sheet>
-      <AlertDialog open={discard} onOpenChange={setDiscard}>
-        <AlertDialogContent size="sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Discard unsaved interview changes?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Your reporting edits haven’t been saved.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={onClose}>
-              Discard changes
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
