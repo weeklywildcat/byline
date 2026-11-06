@@ -4,7 +4,7 @@
  * mount inside the WordPress toolbar; the popover is portalled back into the
  * private AdminRoot so WordPress toolbar styles never own the overlay.
  */
-@import "../admin-ui/admin-ui.css";
+@import "@byline/newsroom-ui/styles.css";
 @source "./";
 
 /*
@@ -14,7 +14,7 @@
  * sources the toolbar gets the PresencePanel classes but not Avatar/Button/etc.
  * sizing, which lets the natural profile image escape the 32px admin bar.
  */
-@source "../admin-ui/ui/avatar.tsx";
-@source "../admin-ui/ui/button.tsx";
-@source "../admin-ui/ui/item.tsx";
-@source "../admin-ui/ui/popover.tsx";
+@source "@byline/newsroom-ui/ui/avatar.tsx";
+@source "@byline/newsroom-ui/ui/button.tsx";
+@source "@byline/newsroom-ui/ui/item.tsx";
+@source "@byline/newsroom-ui/ui/popover.tsx";

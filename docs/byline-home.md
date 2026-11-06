@@ -142,13 +142,15 @@ produce a misleading all-clear message.
 ## Nova, React and WordPress isolation
 
 `wordpress-plugin/components.json` selects **shadcn base-nova** (neutral, Lucide,
-Tailwind 4, Base UI). `src/admin-ui/ui/` holds the generated Nova components
-(MIT), shared by Home and the Story Workspace; the only local change is that
-overlays portal into the `.byline-ui-root` container (`admin-ui/lib/portal.ts`).
-`src/admin-ui/components/` holds only Byline *domain* compositions over them:
+Tailwind 4, Base UI) and generates into the shared `packages/newsroom-ui`
+(`@byline/newsroom-ui`), which the Payload newsroom also uses. `ui/` holds the
+generated Nova components (MIT); the only local change is that overlays portal
+into the `.byline-ui-root` container (`lib/portal.ts`). `components/` holds only
+CMS-independent Byline compositions over them:
 `PeopleAvatars` (nobody, one `Avatar`, an `AvatarGroup`, or three plus an
-`AvatarGroupCount` "+N"), `PersonAvatar`, the writer, assignee and date pickers,
-the resource icon resolver, form-field wiring and the status badge. There are no
+`AvatarGroupCount` "+N"), `PersonAvatar`, form-field wiring and the status badges. The WordPress-bound
+writer/assignee/date pickers and resource icon live in the plugin
+(`src/editorial/pickers.tsx`, `src/workspace/resource-icon.tsx`). There are no
 visual-system wrappers: sections are `Card`, rows are `Item` (a Media Library file
 is an `Attachment`; an external link is an `Item` anchor), story facts are
 horizontal `Field`s, a schedule mode is a `RadioGroup` choice card, a target
@@ -158,7 +160,7 @@ overflow actions are `DropdownMenu`, and destructive confirmations are
 (it needs `@/*` aliases in `tsconfig.json` and `components.json` while it runs;
 revert them and rewrite the generated `@/` and `"cn"` imports to relative ones)
 and re-apply the portal change; do not restyle it by hand.
-`src/admin-ui/admin-ui.css` is the one stylesheet: Nova's neutral tokens
+`@byline/newsroom-ui/styles.css` is the one stylesheet: Nova's neutral tokens
 (black primary, plus one `warning` token),
 WordPress resets and overlay stacking. Layout is Tailwind utilities on the
 components, so `home/style.css` and `workspace/style.css` only import it.

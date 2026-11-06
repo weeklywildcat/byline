@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { TooltipProvider } from "../src/admin-ui/ui/tooltip";
+import { TooltipProvider } from "@byline/newsroom-ui/ui/tooltip";
 import { StoryPeekContent, type StoryPeekContentProps } from "../src/story/StoryPeek";
 import { ProductionSummary, StoryNotesIndicator, StorySignals } from "../src/story/story-parts";
 import {

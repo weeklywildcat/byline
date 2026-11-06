@@ -14,7 +14,7 @@
  *   "Needs scheduling" (`needsSchedulingItems`), and nothing here can produce it.
  */
 import "temporal-polyfill/global";
-import { decodeEntities } from "../admin-ui/lib/text";
+import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import type { CalendarEvent, CalendarType } from "@schedule-x/calendar";
 import type { CalendarEventType, PlanningCalendarEvent } from "./planning-model";
 

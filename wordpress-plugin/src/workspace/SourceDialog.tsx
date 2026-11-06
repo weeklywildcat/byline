@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { SelectField, TextAreaField, TextField } from "../admin-ui/components/form-fields";
+import { SelectField, TextAreaField, TextField } from "@byline/newsroom-ui/components/form-fields";
 import { RemoveControl, WorkspaceDialog, focusFirstInvalidField } from "./dialog-shell";
 import { PeoplePicker } from "./fields";
 import { SOURCE_NOTES_MAX, SOURCE_STATUS_LABELS, emptySourceForm, sourceFormToInput, sourceToForm, validateSourceForm, type SourceForm } from "./reporting-model";

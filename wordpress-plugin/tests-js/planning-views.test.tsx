@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { decodeEntities } from "../src/admin-ui/lib/text";
+import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import { StoryBoard } from "../src/planning/StoryBoard";
 import { StoryList, type StoryListProps } from "../src/planning/StoryList";
 import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, hideFinishedPublished, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "../src/planning/planning-model";

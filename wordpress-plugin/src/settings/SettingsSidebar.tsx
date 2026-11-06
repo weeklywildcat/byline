@@ -2,8 +2,8 @@ import { useState } from "react"
 import type { CSSProperties } from "react"
 import type { LucideIcon } from "lucide-react"
 
-import { AdminPortalContext } from "../admin-ui/lib/portal"
-import { useIsMobile } from "../admin-ui/lib/hooks"
+import { AdminPortalContext } from "@byline/newsroom-ui/lib/portal"
+import { useIsMobile } from "@byline/newsroom-ui/lib/hooks"
 import {
   Sidebar,
   SidebarContent,
@@ -15,7 +15,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
-} from "../admin-ui/ui/sidebar"
+} from "@byline/newsroom-ui/ui/sidebar"
 
 export type SettingsSidebarItem = {
   id: string

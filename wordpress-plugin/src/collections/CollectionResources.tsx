@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ResourceIcon } from "../admin-ui/components/resource-icon";
+import { ResourceIcon } from "../workspace/resource-icon";
 import {
   Item,
   ItemActions,
@@ -9,7 +9,7 @@ import {
   ItemGroup,
   ItemMedia,
   ItemTitle,
-} from "../admin-ui/ui/item";
+} from "@byline/newsroom-ui/ui/item";
 import { WorkspaceDialog } from "../workspace/dialog-shell";
 import { describeEditorialError } from "../editorial/editorial-model";
 import type { CollectionApi } from "./collection-api";

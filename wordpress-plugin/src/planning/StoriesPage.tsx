@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { __, sprintf } from "@wordpress/i18n";
-import { InlineAlert } from "../admin-ui/components/inline-alert";
-import { useDebouncedValue, useNow } from "../admin-ui/lib/hooks";
-import { Button } from "../admin-ui/ui/button";
-import { Skeleton } from "../admin-ui/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../admin-ui/ui/tabs";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { useDebouncedValue, useNow } from "@byline/newsroom-ui/lib/hooks";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
 import { STORIES_VIEW_IDS, storiesViewFromRoute, writeStoriesViewPreference, type StoriesView } from "../home/navigation-model";
 import { useStoryPeek } from "../story/StoryPeekHost";
 import type { WorkspaceUrl } from "./calendar-model";

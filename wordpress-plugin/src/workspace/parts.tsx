@@ -1,8 +1,8 @@
 /** The few Byline-specific pieces the workspace sections share. Everything visual is shadcn Nova. */
 import type { ComponentProps, ReactNode } from "react";
 import { Plus } from "lucide-react";
-import { InlineAlert } from "../admin-ui/components/inline-alert";
-import { Button } from "../admin-ui/ui/button";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { Button } from "@byline/newsroom-ui/ui/button";
 
 export function AddButton({ children, ...props }: { children: ReactNode } & Omit<ComponentProps<typeof Button>, "children">) {
   return <Button type="button" variant="outline" size="sm" {...props}><Plus data-icon="inline-start" aria-hidden="true" />{children}</Button>;

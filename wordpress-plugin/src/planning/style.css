@@ -6,7 +6,8 @@
  * rules Schedule-X's own geometry needs. Must be named style.css so wp-scripts
  * emits style-planning.css.
  */
-@import "../admin-ui/admin-ui.css";
+@import "@byline/newsroom-ui/styles.css";
+@source "../editorial/pickers.tsx"; /* WordPress-bound pickers that sit beside the design system */
 @import "@schedule-x/theme-shadcn/dist/index.css";
 @source "./";
 @source "../story";

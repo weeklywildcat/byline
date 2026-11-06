@@ -1,7 +1,7 @@
 import { exactDate, relativeTime } from "../home/newsroom-model";
-import { Card, CardContent, CardHeader, CardTitle } from "../admin-ui/ui/card";
-import { Empty, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
-import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "../admin-ui/ui/item";
+import { Card, CardContent, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
+import { Empty, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { SectionFailed } from "./parts";
 import { workspaceActivityCopy } from "./workspace-model";
 import { useWorkspace } from "./workspace-context";

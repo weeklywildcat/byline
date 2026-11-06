@@ -1,8 +1,8 @@
 import { CircleAlert } from "lucide-react";
-import { Button, buttonVariants } from "../admin-ui/ui/button";
-import { Card, CardContent } from "../admin-ui/ui/card";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../admin-ui/ui/empty";
-import { Skeleton } from "../admin-ui/ui/skeleton";
+import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
+import { Card, CardContent } from "@byline/newsroom-ui/ui/card";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import type { WorkspaceError } from "./workspace-errors";
 
 function SkeletonRows({ count, lines = 2 }: { count: number; lines?: number }) {

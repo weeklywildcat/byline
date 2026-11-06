@@ -2,9 +2,9 @@ import { CollectionOverview } from "./CollectionOverview";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { PeopleAvatars } from "../admin-ui/components/people-avatars";
-import { InlineAlert } from "../admin-ui/components/inline-alert";
-import { Button } from "../admin-ui/ui/button";
+import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { Button } from "@byline/newsroom-ui/ui/button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,15 +12,15 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "../admin-ui/ui/breadcrumb";
+} from "@byline/newsroom-ui/ui/breadcrumb";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "../admin-ui/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../admin-ui/ui/tabs";
-import { ItemGroup } from "../admin-ui/ui/item";
+} from "@byline/newsroom-ui/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
+import { ItemGroup } from "@byline/newsroom-ui/ui/item";
 import { PageHeader } from "../planning/PlanningPage";
 import type { PlanningAppFetchers } from "../planning/PlanningApp";
 import { StoryCreateDialog } from "../story/StoryCreateDialog";

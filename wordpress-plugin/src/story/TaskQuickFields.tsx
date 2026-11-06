@@ -1,9 +1,9 @@
 import type { ContributorEntry, EditorialTask, TaskPatch, TaskPriority } from "../editorial/editorial-model";
 import { dateLabel } from "../home/newsroom-model";
-import { AssigneePicker, DatePicker, valueSelectTriggerClass } from "../admin-ui/components/pickers";
-import { WorkStatusBadge, type WorkIntensity } from "../admin-ui/components/work-status-badge";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "../admin-ui/ui/select";
-import { cn } from "../admin-ui/lib/utils";
+import { AssigneePicker, DatePicker, valueSelectTriggerClass } from "../editorial/pickers";
+import { WorkStatusBadge, type WorkIntensity } from "@byline/newsroom-ui/components/work-status-badge";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@byline/newsroom-ui/ui/select";
+import { cn } from "@byline/newsroom-ui/lib/utils";
 
 export const TASK_PRIORITY_OPTIONS: Array<{ value: TaskPriority; label: string }> = [
   { value: "low", label: "Low" },

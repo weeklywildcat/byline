@@ -2,7 +2,7 @@ import { legacyHashHref } from "./admin-routing";
 import apiFetch from "@wordpress/api-fetch";
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { InlineAlert } from "./admin-ui/components/inline-alert";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { PlanningApp, createPlanningFetchers } from "./planning";
 import { createStoryFetchers } from "./story/story-fetchers";
 import "./planning/style.css";

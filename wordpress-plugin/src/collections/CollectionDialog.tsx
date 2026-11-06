@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { TextField, SelectField } from "../admin-ui/components/form-fields";
-import { AssigneePicker } from "../admin-ui/components/pickers";
-import { Field, FieldLabel } from "../admin-ui/ui/field";
+import { TextField, SelectField } from "@byline/newsroom-ui/components/form-fields";
+import { AssigneePicker } from "../editorial/pickers";
+import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { WorkspaceDialog } from "../workspace/dialog-shell";
 import { DayRangeField } from "../workspace/fields";
 import type { ContributorEntry } from "../editorial/editorial-model";

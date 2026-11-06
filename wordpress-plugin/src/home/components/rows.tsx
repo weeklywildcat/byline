@@ -1,12 +1,12 @@
 /** Home-only rows. Rows Home shares with Story Peek (tasks, activity, loading) live in story/rows. */
 import { ArrowUpRight, ChevronRight, CircleAlert, CircleDot } from "lucide-react";
-import { ItemButton } from "../../admin-ui/components/item-button";
-import { PeopleAvatars, anyPicture } from "../../admin-ui/components/people-avatars";
-import { WorkStatusBadge, mediaIntensity } from "../../admin-ui/components/work-status-badge";
+import { ItemButton } from "@byline/newsroom-ui/components/item-button";
+import { PeopleAvatars, anyPicture } from "@byline/newsroom-ui/components/people-avatars";
+import { WorkStatusBadge, mediaIntensity } from "@byline/newsroom-ui/components/work-status-badge";
 import { WorkflowBadge } from "../../story/story-parts";
 import { StoryHoverCard } from "../../story/StoryHoverCard";
-import { decodeEntities } from "../../admin-ui/lib/text";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "../../admin-ui/ui/item";
+import { decodeEntities } from "@byline/newsroom-ui/lib/text";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import type { PlanningPerson, PlanningStory } from "../../planning/planning-model";
 import { denseRowClassName, Row } from "../../story/rows";
 import { dateLabel, dayDistance, exactDate, mediaAssignmentTitle, mediaStatusLabels, mediaTypeLabels, type AgendaEvent, type AttentionItem, type HomeVisualWork } from "../newsroom-model";

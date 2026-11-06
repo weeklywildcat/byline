@@ -1,14 +1,14 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import { __ } from "@wordpress/i18n";
-import { Badge } from "../admin-ui/ui/badge";
-import { Button } from "../admin-ui/ui/button";
-import { Checkbox } from "../admin-ui/ui/checkbox";
-import { Field, FieldGroup, FieldLabel } from "../admin-ui/ui/field";
-import { Input } from "../admin-ui/ui/input";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "../admin-ui/ui/input-group";
-import { Popover, PopoverContent, PopoverTrigger } from "../admin-ui/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
+import { Badge } from "@byline/newsroom-ui/ui/badge";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
+import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
+import { Input } from "@byline/newsroom-ui/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { EMPTY_PLANNING_FILTERS, normalizePlanningFilters, type PlanningFilters, type PlanningPerson, type PlanningWorkflowStatus } from "./planning-model";
 
 type Option = { value: string; label: string };

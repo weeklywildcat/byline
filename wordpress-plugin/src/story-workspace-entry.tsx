@@ -1,8 +1,8 @@
 import apiFetch from "@wordpress/api-fetch";
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { InlineAlert } from "./admin-ui/components/inline-alert";
-import { buttonVariants } from "./admin-ui/ui/button";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { createEditorialRestClient } from "./editorial/editorial-rest";
 import { StoryWorkspaceApp } from "./workspace/StoryWorkspace";
 import { createWorkspaceClient } from "./workspace/workspace-api";

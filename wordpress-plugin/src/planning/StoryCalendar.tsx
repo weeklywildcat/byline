@@ -5,12 +5,12 @@ import { createViewDay, createViewList, createViewMonthAgenda, createViewMonthGr
 import { createEventsServicePlugin } from "@schedule-x/events-service";
 import { ScheduleXCalendar, useCalendarApp } from "@schedule-x/react";
 import { __ } from "@wordpress/i18n";
-import { InlineAlert } from "../admin-ui/components/inline-alert";
-import { Button } from "../admin-ui/ui/button";
-import { ButtonGroup } from "../admin-ui/ui/button-group";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../admin-ui/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../admin-ui/ui/select";
-import { Skeleton } from "../admin-ui/ui/skeleton";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { scheduleKey } from "../story/story-query";
 import { CALENDAR_COMPONENTS, CATEGORY_DOT_CLASSES } from "./calendar-events";
 import { calendarHeading, createCalendarController } from "./calendar-controller";

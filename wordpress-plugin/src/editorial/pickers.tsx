@@ -6,15 +6,15 @@
  */
 import { useState } from "react";
 import { CalendarDays } from "lucide-react";
-import { contributorKey, type ContributorEntry } from "../../editorial/editorial-model";
-import { exactDate, siteDay } from "../../home/newsroom-model";
-import { cn } from "../lib/utils";
-import { Button } from "../ui/button";
-import { Calendar } from "../ui/calendar";
-import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger } from "../ui/combobox";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { PeopleAvatars } from "./people-avatars";
-import { PersonAvatar } from "./person-avatar";
+import { contributorKey, type ContributorEntry } from "./editorial-model";
+import { exactDate, siteDay } from "../home/newsroom-model";
+import { cn } from "@byline/newsroom-ui/lib/utils";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Calendar } from "@byline/newsroom-ui/ui/calendar";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger } from "@byline/newsroom-ui/ui/combobox";
+import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
+import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
+import { PersonAvatar } from "@byline/newsroom-ui/components/person-avatar";
 
 export type PickerAppearance = "field" | "value";
 

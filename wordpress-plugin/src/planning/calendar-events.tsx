@@ -4,8 +4,8 @@
  * Card per event. Click opens Story Peek (handled by the calendar, not here).
  */
 import { CalendarClock, Camera, CheckCheck, Clock, Flag, ListTodo, Newspaper, type LucideIcon } from "lucide-react";
-import { cn } from "../admin-ui/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../admin-ui/ui/tooltip";
+import { cn } from "@byline/newsroom-ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
 import { StoryHoverCard } from "../story/StoryHoverCard";
 import { CATEGORY_BY_EVENT_TYPE, CATEGORY_LABELS, type BylineScheduleXEvent, type ScheduleXCategory } from "./schedule-x-adapter";
 import type { CalendarEventType } from "./planning-model";

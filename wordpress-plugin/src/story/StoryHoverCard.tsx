@@ -1,11 +1,11 @@
 import { createContext, useContext, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarClock, ListTodo } from "lucide-react";
-import { PeopleAvatars } from "../admin-ui/components/people-avatars";
-import { decodeEntities } from "../admin-ui/lib/text";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "../admin-ui/ui/hover-card";
-import { Separator } from "../admin-ui/ui/separator";
-import { Skeleton } from "../admin-ui/ui/skeleton";
+import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
+import { decodeEntities } from "@byline/newsroom-ui/lib/text";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@byline/newsroom-ui/ui/hover-card";
+import { Separator } from "@byline/newsroom-ui/ui/separator";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { exactDate, shortDateTime } from "../home/newsroom-model";
 import { reportingSummaryLine, type PlanningStory } from "../planning/planning-model";
 import { ProductionSummary, WorkflowBadge, plannedLabel } from "./story-parts";

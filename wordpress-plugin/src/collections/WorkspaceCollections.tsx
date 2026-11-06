@@ -1,4 +1,4 @@
-import { Card, CardContent } from "../admin-ui/ui/card";
+import { Card, CardContent } from "@byline/newsroom-ui/ui/card";
 import { useWorkspace } from "../workspace/workspace-context";
 import { StoryCollectionContext } from "./StoryCollectionContext";
 export function WorkspaceCollections() {

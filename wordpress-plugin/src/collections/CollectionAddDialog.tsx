@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { TextField, SelectField } from "../admin-ui/components/form-fields";
-import { Button } from "../admin-ui/ui/button";
+import { TextField, SelectField } from "@byline/newsroom-ui/components/form-fields";
+import { Button } from "@byline/newsroom-ui/ui/button";
 import { WorkspaceDialog } from "../workspace/dialog-shell";
 import {
   mediaLibraryAvailable,
   pickFromMediaLibrary,
 } from "../workspace/media-library";
-import { useDebouncedValue } from "../admin-ui/lib/hooks";
+import { useDebouncedValue } from "@byline/newsroom-ui/lib/hooks";
 import { describeEditorialError } from "../editorial/editorial-model";
 import type { CollectionApi } from "./collection-api";
 import {

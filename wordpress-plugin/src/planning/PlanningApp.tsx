@@ -1,7 +1,7 @@
 import { CollectionsPage } from "../collections/CollectionsPage";
 import { useMemo, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { AdminRoot } from "../admin-ui/components/admin-root";
+import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { StoryCreateDialog } from "../story/StoryCreateDialog";
 import { StoryPeekHost } from "../story/StoryPeekHost";
 import { StoryHoverProvider } from "../story/StoryHoverCard";

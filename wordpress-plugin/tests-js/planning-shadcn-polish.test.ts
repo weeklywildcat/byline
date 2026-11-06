@@ -29,7 +29,7 @@ describe("secondary Planning shadcn patterns", () => {
 
   it("shows an actual shadcn Spinner while Content Health work is pending", () => {
     const source = read("ContentHealth.tsx");
-    expect(source).toContain('from "../admin-ui/ui/spinner"');
+    expect(source).toContain('from "@byline/newsroom-ui/ui/spinner"');
     expect(source.match(/<Spinner data-icon="inline-start" \/>/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });

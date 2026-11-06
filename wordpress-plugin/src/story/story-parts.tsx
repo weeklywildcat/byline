@@ -6,12 +6,12 @@
 import type { ComponentProps } from "react";
 import { MessageSquareText } from "lucide-react";
 import { __, _n, sprintf } from "@wordpress/i18n";
-import { WorkStatusBadge, mediaIntensity, type WorkIntensity, type WorkKind } from "../admin-ui/components/work-status-badge";
-import { cn } from "../admin-ui/lib/utils";
-import { Button } from "../admin-ui/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "../admin-ui/ui/popover";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../admin-ui/ui/tooltip";
-import { decodeEntities } from "../admin-ui/lib/text";
+import { WorkStatusBadge, mediaIntensity, type WorkIntensity, type WorkKind } from "@byline/newsroom-ui/components/work-status-badge";
+import { cn } from "@byline/newsroom-ui/lib/utils";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
+import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import { dateLabel, dayDistance, exactDate, mediaStatusLabels, mediaTypeLabels, siteDay } from "../home/newsroom-model";
 import { isPlannedDayOnly, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
 import { openArticleNotesLabel, openNotesSignal } from "./notes-model";

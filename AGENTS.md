@@ -20,7 +20,7 @@ Do not spend time rediscovering architecture that is documented here or in the r
 
 - `apps/web/` — static Astro public site and public article/page rendering.
 - `wordpress-plugin/` — WordPress control plane, editor UI, REST/meta, publishing tools and authenticated newsroom features.
-  - Home, Planning (Stories, Calendar, Media Desk…) and the Story Workspace are private React 19 roots on one shadcn base-nova system (`src/admin-ui`, shared story code in `src/story`) with exactly one `StoryPeek`. See `docs/stories-planning-ui.md`; do not reintroduce WordPress React/components or a second quick view on those screens.
+  - Home, Planning (Stories, Calendar, Media Desk…) and the Story Workspace are private React 19 roots on one shadcn base-nova system (`packages/newsroom-ui`, shared with the Payload newsroom; shared story code in `src/story`) with exactly one `StoryPeek`. See `docs/stories-planning-ui.md`; do not reintroduce WordPress React/components or a second quick view on those screens.
 - `apps/newsroom/` — the private Payload 3 + PostgreSQL newsroom replacing WordPress as the control plane (strangler migration; WordPress stays authoritative until cutover). Read `apps/newsroom/AGENTS.md` and `docs/payload-migration.md` first.
 - `apps/discord-bot/` — optional separately deployed Discord service.
 - `packages/` — shared contracts, UI, design primitives and Weekly Wildcat theme packages.

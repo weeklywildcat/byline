@@ -1,5 +1,5 @@
-import { AssigneePicker, DatePicker } from "../admin-ui/components/pickers";
-import { PeopleAvatars } from "../admin-ui/components/people-avatars";
+import { AssigneePicker, DatePicker } from "../editorial/pickers";
+import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import type { ContributorEntry } from "../editorial/editorial-model";
 import {
   collectionStatuses,

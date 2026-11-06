@@ -4,10 +4,11 @@ import { describe, expect, it } from "vitest";
 
 const src = path.resolve(__dirname, "../src");
 const read = (relative: string) => readFileSync(path.join(src, relative), "utf8");
+const designSystem = path.resolve(__dirname, "../../packages/newsroom-ui/src");
 
 describe("story hover previews", () => {
   it("uses the shadcn Base UI preview-card primitive inside the private admin portal", () => {
-    const source = read("admin-ui/ui/hover-card.tsx");
+    const source = readFileSync(path.join(designSystem, "ui/hover-card.tsx"), "utf8");
     expect(source).toContain('@base-ui/react/preview-card');
     expect(source).toContain("useAdminPortal");
     expect(source).toContain("<PreviewCardPrimitive.Portal container={useAdminPortal()}>");

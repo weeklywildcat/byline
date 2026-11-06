@@ -1,15 +1,15 @@
-import { AdminPortalContext, useAdminPortal } from "../admin-ui/lib/portal";
-import { PeopleAvatars } from "../admin-ui/components/people-avatars";
+import { AdminPortalContext, useAdminPortal } from "@byline/newsroom-ui/lib/portal";
+import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   TextField,
   TextAreaField,
   SelectField,
-} from "../admin-ui/components/form-fields";
-import { InlineAlert } from "../admin-ui/components/inline-alert";
-import { Button } from "../admin-ui/ui/button";
-import { Field, FieldLabel } from "../admin-ui/ui/field";
+} from "@byline/newsroom-ui/components/form-fields";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import {
   Sheet,
   SheetContent,
@@ -17,7 +17,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "../admin-ui/ui/sheet";
+} from "@byline/newsroom-ui/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +27,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "../admin-ui/ui/alert-dialog";
+} from "@byline/newsroom-ui/ui/alert-dialog";
 import { AppointmentTimingFields } from "../workspace/AppointmentDialog";
 import {
   appointmentFormToInput,

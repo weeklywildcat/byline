@@ -6,7 +6,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryKey 
 import { __, sprintf } from "@wordpress/i18n";
 import { announce } from "@atlaskit/pragmatic-drag-and-drop-live-region";
 import { toast } from "sonner";
-import { decodeEntities } from "../admin-ui/lib/text";
+import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { invalidateStoryData, planningKey, planningRootKey } from "../story/story-query";
 import type { PlanningFetchers } from "./planning-api";

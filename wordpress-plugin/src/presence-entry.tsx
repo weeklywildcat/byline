@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
-import { AdminRoot } from "./admin-ui/components/admin-root";
+import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { PresencePanel } from "./presence/PresencePanel";
 import type { PresenceLocation, PresencePayload } from "./presence/presence-model";
 import "./presence/style.css";

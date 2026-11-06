@@ -6,11 +6,11 @@ import { CalendarDays, FileText, HeartPulse, ImagePlus, ListTodo, MessageSquareT
 import type { HomeFetchers } from "./home-api";
 import type { HomeBootstrap } from "./newsroom-model";
 import { activeStory } from "./newsroom-model";
-import { InlineAlert } from "../admin-ui/components/inline-alert";
-import { decodeEntities } from "../admin-ui/lib/text";
-import { Kbd, KbdGroup } from "../admin-ui/ui/kbd";
-import { Spinner } from "../admin-ui/ui/spinner";
-import { CommandDialog, Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from "../admin-ui/ui/command";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { decodeEntities } from "@byline/newsroom-ui/lib/text";
+import { Kbd, KbdGroup } from "@byline/newsroom-ui/ui/kbd";
+import { Spinner } from "@byline/newsroom-ui/ui/spinner";
+import { CommandDialog, Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from "@byline/newsroom-ui/ui/command";
 import { describeEditorialError } from "../editorial/editorial-model";
 
 export type HomeActionUrls = { planning?: string; calendar?: string; media?: string; upload?: string; dashboard?: string; contentHealth?: string; feedback?: string; deployment?: string; doctor?: string; workspace?: (storyId: number) => string };

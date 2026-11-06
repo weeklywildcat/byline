@@ -14,7 +14,7 @@ describe("Settings shadcn sidebar", () => {
     expect(admin).toContain("<SettingsSidebar groups={sidebarGroups}");
     expect(admin).not.toContain('className="byline-settings-rail"');
 
-    expect(sidebar).toContain('from "../admin-ui/ui/sidebar"');
+    expect(sidebar).toContain('from "@byline/newsroom-ui/ui/sidebar"');
     expect(sidebar).toContain("<SidebarProvider");
     expect(sidebar).toContain("<SidebarGroupLabel>");
     expect(sidebar).toContain("<SidebarMenuButton");
@@ -26,7 +26,7 @@ describe("Settings shadcn sidebar", () => {
 
     expect(sidebar).toContain('className="byline-ui-root byline-settings-sidebar-root"');
     expect(sidebar).toContain("<AdminPortalContext.Provider");
-    expect(settingsStyle).toContain('@import "../admin-ui/admin-ui.css"');
+    expect(settingsStyle).toContain('@import "@byline/newsroom-ui/styles.css"');
   });
 
   it("uses the Sidebar mobile sheet instead of stacking the entire settings navigation", () => {

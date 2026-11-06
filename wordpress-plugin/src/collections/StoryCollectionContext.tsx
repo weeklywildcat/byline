@@ -1,20 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ChevronRight } from "lucide-react";
-import { InlineAlert } from "../admin-ui/components/inline-alert";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "../admin-ui/ui/collapsible";
-import { Separator } from "../admin-ui/ui/separator";
+} from "@byline/newsroom-ui/ui/collapsible";
+import { Separator } from "@byline/newsroom-ui/ui/separator";
 import {
   Item,
   ItemContent,
   ItemDescription,
   ItemGroup,
   ItemTitle,
-} from "../admin-ui/ui/item";
+} from "@byline/newsroom-ui/ui/item";
 import { describeEditorialError } from "../editorial/editorial-model";
 import {
   collectionsKey,

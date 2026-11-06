@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { InlineAlert } from "../admin-ui/components/inline-alert";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../admin-ui/ui/alert-dialog";
-import { Button } from "../admin-ui/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../admin-ui/ui/dialog";
-import { Spinner } from "../admin-ui/ui/spinner";
-import { FieldGroup } from "../admin-ui/ui/field";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
+import { Spinner } from "@byline/newsroom-ui/ui/spinner";
+import { FieldGroup } from "@byline/newsroom-ui/ui/field";
 
 export type WorkspaceDialogProps = {
   open: boolean;

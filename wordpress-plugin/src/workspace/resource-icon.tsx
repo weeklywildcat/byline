@@ -1,6 +1,6 @@
 import { File, FileSpreadsheet, FileText, Folder, Link2, Presentation, type LucideIcon } from "lucide-react";
-import { resourceKind, type ResourceKind } from "../../workspace/resource-model";
-import type { StoryResource } from "../../workspace/workspace-types";
+import { resourceKind, type ResourceKind } from "./resource-model";
+import type { StoryResource } from "./workspace-types";
 
 const icons: Record<ResourceKind, LucideIcon> = { doc: FileText, sheet: FileSpreadsheet, slides: Presentation, folder: Folder, pdf: File, link: Link2 };
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { Button } from "../admin-ui/ui/button";
-import { Badge } from "../admin-ui/ui/badge";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Badge } from "@byline/newsroom-ui/ui/badge";
 import {
   Item,
   ItemActions,
@@ -9,12 +9,12 @@ import {
   ItemDescription,
   ItemGroup,
   ItemTitle,
-} from "../admin-ui/ui/item";
+} from "@byline/newsroom-ui/ui/item";
 import {
   TextField,
   TextAreaField,
   SelectField,
-} from "../admin-ui/components/form-fields";
+} from "@byline/newsroom-ui/components/form-fields";
 import { WorkspaceDialog } from "../workspace/dialog-shell";
 import {
   mediaLibraryAvailable,

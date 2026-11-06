@@ -3,9 +3,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { TaskRow } from "../story/rows";
 import { TaskEditDialog } from "../story/TaskEditDialog";
 import { useUpdateTask } from "../story/use-update-task";
-import { ItemGroup } from "../admin-ui/ui/item";
-import { Button } from "../admin-ui/ui/button";
-import { Checkbox } from "../admin-ui/ui/checkbox";
+import { ItemGroup } from "@byline/newsroom-ui/ui/item";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import type { StoryFetchers } from "../story/story-fetchers";
 import type {
   ContributorEntry,

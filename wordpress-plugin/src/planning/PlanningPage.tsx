@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { __ } from "@wordpress/i18n";
-import { Button } from "../admin-ui/ui/button";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../admin-ui/ui/empty";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { RowSkeletons } from "../story/rows";
 import type { OptionalQuery } from "./planning-query";
 

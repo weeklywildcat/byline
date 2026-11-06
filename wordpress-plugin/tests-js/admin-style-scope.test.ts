@@ -10,7 +10,7 @@ const root = path.resolve(__dirname, "..");
 async function compile(entry: string) {
   const postcss = require("postcss");
   const file = path.join(root, entry);
-  const result = await postcss([require("@tailwindcss/postcss")(), require("postcss-nesting")(), require("../loaders/ui-scope-postcss")]).process(readFileSync(file, "utf8"), { from: file });
+  const result = await postcss([require("@tailwindcss/postcss")(), require("postcss-nesting")(), require("@byline/newsroom-ui/postcss-scope")]).process(readFileSync(file, "utf8"), { from: file });
   return result.root as import("postcss").Root;
 }
 

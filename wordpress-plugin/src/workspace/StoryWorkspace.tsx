@@ -1,8 +1,8 @@
 import { WorkspaceCollections } from "../collections/WorkspaceCollections";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { AdminRoot } from "../admin-ui/components/admin-root";
-import { InlineAlert } from "../admin-ui/components/inline-alert";
+import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { ActivitySection } from "./ActivitySection";
 import { BriefSection } from "./BriefSection";
 import { DetailsSection } from "./DetailsSection";

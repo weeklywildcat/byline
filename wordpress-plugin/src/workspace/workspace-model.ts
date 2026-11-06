@@ -1,8 +1,8 @@
 /** Small presentation-free helpers shared by the Story Workspace sections. */
 import type { ContributorEntry, EditorialTask } from "../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../editorial/activity-model";
-import type { AvatarPerson } from "../admin-ui/components/people-avatars";
-import { decodeEntities } from "../admin-ui/lib/text";
+import type { AvatarPerson } from "@byline/newsroom-ui/components/people-avatars";
+import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import { activityCopy, dayDistance, siteDay } from "../home/newsroom-model";
 import { appointmentTiming } from "./schedule-model";
 import type { Assignee, ReportingSummary, StoryWorkspace } from "./workspace-types";

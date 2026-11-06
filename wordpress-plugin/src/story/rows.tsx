@@ -1,16 +1,16 @@
 /** Rows shared by every surface that lists story work: Home, Story Peek and the Stories views. Anything visual comes from Item, Badge, Checkbox and Skeleton. */
 import type { ComponentProps, ReactNode } from "react";
 import { Pencil } from "lucide-react";
-import { cn } from "../admin-ui/lib/utils";
-import { ItemButton } from "../admin-ui/components/item-button";
-import { Checkbox } from "../admin-ui/ui/checkbox";
-import { Button } from "../admin-ui/ui/button";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
-import { Skeleton } from "../admin-ui/ui/skeleton";
+import { cn } from "@byline/newsroom-ui/lib/utils";
+import { ItemButton } from "@byline/newsroom-ui/components/item-button";
+import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import type { ContributorEntry, EditorialTask } from "../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../editorial/activity-model";
 import { activityCopy, dateLabel, dayDistance, exactDate, relativeTime } from "../home/newsroom-model";
-import { decodeEntities } from "../admin-ui/lib/text";
+import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import { StoryHoverCard } from "./StoryHoverCard";
 import { TaskQuickFields, type TaskQuickUpdate } from "./TaskQuickFields";
 

@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
-import { Button } from "../admin-ui/ui/button";
+import { Button } from "@byline/newsroom-ui/ui/button";
 import {
   ItemGroup,
   ItemContent,
   ItemTitle,
   ItemDescription,
-} from "../admin-ui/ui/item";
-import { ItemButton } from "../admin-ui/components/item-button";
+} from "@byline/newsroom-ui/ui/item";
+import { ItemButton } from "@byline/newsroom-ui/components/item-button";
 import type { ContributorEntry } from "../editorial/editorial-model";
 import type { StoryFetchers } from "../story/story-fetchers";
 import { exactDate } from "../home/newsroom-model";

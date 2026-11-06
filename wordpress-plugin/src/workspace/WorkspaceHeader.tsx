@@ -1,8 +1,8 @@
 import { ArrowUpRight, FileText } from "lucide-react";
-import { PeopleAvatars } from "../admin-ui/components/people-avatars";
-import { Badge } from "../admin-ui/ui/badge";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "../admin-ui/ui/breadcrumb";
-import { buttonVariants } from "../admin-ui/ui/button";
+import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
+import { Badge } from "@byline/newsroom-ui/ui/badge";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@byline/newsroom-ui/ui/breadcrumb";
+import { buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { sectionNames, writerNames } from "./workspace-model";
 import { workingDraft } from "./resource-model";
 import { useWorkspace } from "./workspace-context";

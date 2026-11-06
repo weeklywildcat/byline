@@ -40,7 +40,7 @@ fails the release if the planning manifest ever lists a WordPress React or
 component handle.
 
 Everything mounts in `.byline-ui-root` through `AdminRoot` (portals, tooltips,
-toasts). `src/planning/style.css` imports the shared `admin-ui.css` and the
+toasts). `src/planning/style.css` imports the shared `@byline/newsroom-ui/styles.css` and the
 Schedule-X shadcn theme; the PostCSS scoping loader prefixes every selector, and
 `tests-js/admin-style-scope.test.ts` fails if any compiled selector could reach
 wp-admin, Gutenberg, Users or the Media Library. Only on these three screens a

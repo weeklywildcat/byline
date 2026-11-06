@@ -1,10 +1,10 @@
 import { useRef, useState } from "react";
-import { AlertDialogTrigger } from "../admin-ui/ui/alert-dialog";
+import { AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
 import { ConfirmRemoveDialog } from "../workspace/dialog-shell";
 import { Pencil } from "lucide-react";
-import { Button } from "../admin-ui/ui/button";
-import { Textarea } from "../admin-ui/ui/textarea";
-import { InlineAlert } from "../admin-ui/components/inline-alert";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Textarea } from "@byline/newsroom-ui/ui/textarea";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import type { Collection } from "./collection-model";
 import type { ReturnTypeOfCollectionActions } from "./collection-query";
 export function CollectionBrief({

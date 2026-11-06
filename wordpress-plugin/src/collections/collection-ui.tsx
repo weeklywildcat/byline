@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { MoreHorizontal } from "lucide-react";
-import { PeopleAvatars } from "../admin-ui/components/people-avatars";
-import { valueSelectTriggerClass } from "../admin-ui/components/pickers";
-import { Button } from "../admin-ui/ui/button";
-import { Badge } from "../admin-ui/ui/badge";
+import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
+import { valueSelectTriggerClass } from "../editorial/pickers";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Badge } from "@byline/newsroom-ui/ui/badge";
 import {
   Combobox,
   ComboboxContent,
@@ -12,41 +12,41 @@ import {
   ComboboxItem,
   ComboboxList,
   ComboboxTrigger,
-} from "../admin-ui/ui/combobox";
+} from "@byline/newsroom-ui/ui/combobox";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-} from "../admin-ui/ui/context-menu";
+} from "@byline/newsroom-ui/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "../admin-ui/ui/dropdown-menu";
+} from "@byline/newsroom-ui/ui/dropdown-menu";
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "../admin-ui/ui/empty";
+} from "@byline/newsroom-ui/ui/empty";
 import {
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemTitle,
-} from "../admin-ui/ui/item";
-import { ItemButton } from "../admin-ui/components/item-button";
+} from "@byline/newsroom-ui/ui/item";
+import { ItemButton } from "@byline/newsroom-ui/components/item-button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../admin-ui/ui/select";
+} from "@byline/newsroom-ui/ui/select";
 import { appointmentLine } from "../workspace/schedule-model";
 import { interviewAppointment } from "./interview-schedule";
 import { exactDate } from "../home/newsroom-model";
