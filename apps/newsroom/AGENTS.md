@@ -40,8 +40,10 @@ snapshot; nothing in this app serves public reading.
   the Story screen is the custom Field of a presentational collapsible.
 - **Nova inside Payload:** Byline stylesheets live in `src/ui/*.css` (the only
   files `postcss/byline-ui.cjs` compiles and scopes). The Story screen sits
-  inside Payload's `<form>`: never nest a `<form>`, give every button
-  `type="button"`, and stop Enter in one-line inputs.
+  inside Payload's `<form>`: give every button `type="button"`, stop Enter in
+  one-line inputs, and keep the root's submit guard (`keepSubmitsInByline`):
+  shared dialogs have their own `<form>` in portals, and React would bubble
+  their submit into Payload's form and save the story.
 - **Shared screens, local adapters.** Screens come from `@byline/newsroom-screens`
   unchanged; the newsroom supplies fetchers (`src/ui/home/payload-fetchers.ts`)
   over `/api/byline/*` (`src/newsroom/endpoints.ts`). Do not fork a screen to
