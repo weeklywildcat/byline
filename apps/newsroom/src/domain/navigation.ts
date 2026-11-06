@@ -14,6 +14,9 @@ const allowed = (role: Role) => (item: { minimumRole: Role }) => RANK[role] >= R
 /** The Calendar's address below the admin route (a custom root view). */
 export const CALENDAR_PATH = "/calendar";
 
+/** Media's address below the admin route: the Library (files, folders) and Work (production assignments). */
+export const MEDIA_PATH = "/media";
+
 /**
  * Byline's newsroom navigation: the only primary navigation anyone sees.
  *
@@ -29,7 +32,8 @@ export const CALENDAR_PATH = "/calendar";
 export const NAVIGATION: readonly NavItem[] = [
   { key: "home", label: "Home", path: "", minimumRole: "staff" },
   { key: "stories", label: "Stories", path: "/stories", minimumRole: "staff" },
-  { key: "calendar", label: "Calendar", path: CALENDAR_PATH, minimumRole: "staff" }
+  { key: "calendar", label: "Calendar", path: CALENDAR_PATH, minimumRole: "staff" },
+  { key: "media", label: "Media", path: MEDIA_PATH, minimumRole: "staff" }
 ];
 
 export function navigationFor(role: Role): NavItem[] {
@@ -51,7 +55,7 @@ export function activeNavKey(items: readonly Pick<NavItem, "key" | "path">[], pa
 
 /* ---------------------------------------------------------------- Create */
 
-export type CreateKind = "story" | "task";
+export type CreateKind = "story" | "task" | "media";
 
 export type CreateAction = {
   readonly kind: CreateKind;
@@ -62,12 +66,13 @@ export type CreateAction = {
 /**
  * What the global Create control offers, in menu order. The first allowed
  * entry is the primary action. An entry is added only when its Byline flow
- * exists (Coverage, Poll and Upload media join with their screens); the
- * server enforces each create regardless.
+ * exists (Coverage and Poll join with their screens); the server enforces
+ * each create regardless.
  */
 export const CREATE_ACTIONS: readonly CreateAction[] = [
   { kind: "story", label: "Story", minimumRole: "staff" },
-  { kind: "task", label: "Task", minimumRole: "staff" }
+  { kind: "task", label: "Task", minimumRole: "staff" },
+  { kind: "media", label: "Upload media", minimumRole: "staff" }
 ];
 
 export function createActionsFor(role: Role): CreateAction[] {
@@ -142,6 +147,11 @@ export function storyIdFromPath(pathname: string, adminRoute: string): number | 
 /** Whether a path is the Calendar (with or without a trailing slash or query). */
 export function isCalendarPath(pathname: string, adminRoute: string): boolean {
   return stripAdmin(pathname, adminRoute) === CALENDAR_PATH;
+}
+
+/** Whether a path is the Media screen (any view, folder or asset: those are its query). */
+export function isMediaPath(pathname: string, adminRoute: string): boolean {
+  return stripAdmin(pathname, adminRoute) === MEDIA_PATH;
 }
 
 function stripAdmin(pathname: string, adminRoute: string): string {

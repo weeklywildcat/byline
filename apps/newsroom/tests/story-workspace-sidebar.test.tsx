@@ -163,8 +163,8 @@ describe("the contextual sidebar's layout", () => {
   const narrow = { storyWorkspace: false, calendarWorkspace: false };
 
   it("is a Story workspace only on a saved story's Story screen, on a wide screen", () => {
-    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", wide)).toEqual({ storyId: 12, calendar: false, composition: "story-workspace" });
-    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", narrow)).toEqual({ storyId: 12, calendar: false, composition: "default" });
+    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", wide)).toEqual({ storyId: 12, calendar: false, media: false, composition: "story-workspace" });
+    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", narrow)).toEqual({ storyId: 12, calendar: false, media: false, composition: "default" });
     for (const path of ["/admin", "/admin/stories", "/admin/collections/stories", "/admin/collections/stories/create"]) {
       expect(shellLayoutFor(path, "/admin", wide).composition).toBe("default");
     }

@@ -152,7 +152,7 @@ describe("navigation", () => {
     for (const role of ["staff", "editor", "administrator"] as const) {
       expect(navigationFor(role).every((item) => !item.path.startsWith("/collections/"))).toBe(true);
     }
-    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar"]);
+    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar", "media"]);
     // No generic Planning destination: each former Planning tab becomes its own screen.
     expect(NAVIGATION.map((item) => item.key)).not.toContain("planning");
   });
@@ -195,10 +195,11 @@ describe("navigation", () => {
 });
 
 describe("global Create", () => {
-  it("offers every role a story first, then a task", () => {
+  it("offers every role a story first, then a task, then Upload media", () => {
     for (const role of ["staff", "editor", "administrator"] as const) {
-      expect(createActionsFor(role).map((action) => action.kind)).toEqual(["story", "task"]);
+      expect(createActionsFor(role).map((action) => action.kind)).toEqual(["story", "task", "media"]);
     }
+    expect(createActionsFor("staff").find((action) => action.kind === "media")?.label).toBe("Upload media");
   });
 
   it("links a task created on a Story screen to that story", () => {

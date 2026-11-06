@@ -8,6 +8,7 @@ import { DefaultSidebar } from "./DefaultSidebar";
 import { useShellLayout, useSyncSidebarWidthOnMount } from "./layout";
 import type { ShellSidebarProps } from "./nav-items";
 import { CalendarWorkspaceSidebar } from "./CalendarWorkspaceSidebar";
+import { MediaWorkspaceSidebar } from "./MediaWorkspaceSidebar";
 import { StoryWorkspaceSidebar } from "./StoryWorkspaceSidebar";
 
 export type { ShellNavLink } from "./nav-items";
@@ -20,9 +21,10 @@ export const WORKSPACE_SIDEBAR_CLASS = "overflow-hidden *:data-[sidebar=sidebar]
  * There is one sidebar (one SidebarProvider, one expanded/collapsed state);
  * its composition is contextual. Ordinary screens get the global app
  * sidebar; on a wide enough screen a story's Story screen is a Story
- * workspace and the Calendar a Calendar workspace, shadcn sidebar-09's nested
- * sidebars (the global icon rail plus a contextual pane: the Story list, or
- * the Calendar's controls). The outer `Sidebar` stays the same element
+ * workspace, the Calendar a Calendar workspace and Media a Media workspace,
+ * shadcn sidebar-09's nested sidebars (the global icon rail plus a
+ * contextual pane: the Story list, the Calendar's controls, or the Media
+ * navigator). The outer `Sidebar` stays the same element
  * whatever the composition, so moving between them animates the one
  * sidebar's width. Nothing here names Payload.
  */
@@ -42,7 +44,15 @@ function ContextualSidebar(props: ShellSidebarProps) {
   const active = activeNavKey(props.items, pathname, props.adminRoute);
   return (
     <Sidebar collapsible="icon" className={composition === "default" ? undefined : WORKSPACE_SIDEBAR_CLASS} mobileTitle="Byline" mobileDescription="Newsroom navigation and account" data-composition={composition}>
-      {composition === "story-workspace" ? <StoryWorkspaceSidebar {...props} active={active} /> : composition === "calendar-workspace" ? <CalendarWorkspaceSidebar {...props} active={active} /> : <DefaultSidebar {...props} active={active} />}
+      {composition === "story-workspace" ? (
+        <StoryWorkspaceSidebar {...props} active={active} />
+      ) : composition === "calendar-workspace" ? (
+        <CalendarWorkspaceSidebar {...props} active={active} />
+      ) : composition === "media-workspace" ? (
+        <MediaWorkspaceSidebar {...props} active={active} />
+      ) : (
+        <DefaultSidebar {...props} active={active} />
+      )}
     </Sidebar>
   );
 }

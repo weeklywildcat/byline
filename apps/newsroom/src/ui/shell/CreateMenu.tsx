@@ -3,11 +3,11 @@
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
-import { ChevronDown, FileText, ListTodo, Plus, type LucideIcon } from "lucide-react";
+import { ChevronDown, FileText, ListTodo, Plus, Upload, type LucideIcon } from "lucide-react";
 import type { CreateKind } from "../../domain/navigation";
 import { useBylineCreate } from "./create";
 
-const ICONS: Record<CreateKind, LucideIcon> = { story: FileText, task: ListTodo };
+const ICONS: Record<CreateKind, LucideIcon> = { story: FileText, task: ListTodo, media: Upload };
 
 // The one prominent action in the sidebar: primary colors, quiet otherwise.
 const primary = "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground data-open:bg-primary/90 data-open:hover:bg-primary/90 data-open:hover:text-primary-foreground focus-visible:ring-ring/50";

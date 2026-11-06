@@ -353,6 +353,8 @@ export type MediaCapabilities = {
   canDelete: boolean;
   /** The file types the Library accepts (the server enforces the same list). */
   acceptedMimeTypes: string[];
+  /** The largest file one upload may carry (the server's own limit). */
+  maxUploadBytes: number;
 };
 
 /** Everything the Media navigator needs in one cheap read. */

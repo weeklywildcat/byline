@@ -212,9 +212,15 @@ export async function mediaNavigator(ctx: ScreenContext): Promise<MediaNavigator
   return {
     folders,
     counts: { all, recent, mine, "needs-metadata": needs, unfiled },
-    capabilities: { canUpload: true, canManageFolders: editor, canDelete: editor, acceptedMimeTypes: [...MEDIA_MIME_TYPES] },
+    capabilities: { canUpload: true, canManageFolders: editor, canDelete: editor, acceptedMimeTypes: [...MEDIA_MIME_TYPES], maxUploadBytes: uploadLimit(ctx) },
     uploaders
   };
+}
+
+/** Payload's multipart limit (its own default is 20 MB); the upload flow says so before sending a larger file. */
+export function uploadLimit(ctx: ScreenContext): number {
+  const configured = (ctx.req.payload.config.upload as { limits?: { fileSize?: number } } | undefined)?.limits?.fileSize;
+  return typeof configured === "number" && configured > 0 ? configured : 20 * 1024 * 1024;
 }
 
 /** People who have uploaded anything, for the Uploader filter. */

@@ -3,8 +3,8 @@
 import { useIsMobile, useMediaQuery } from "@byline/newsroom-ui/lib/hooks";
 import { usePathname } from "next/navigation";
 import { createContext, use, useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { isCalendarPath, storyIdFromPath } from "../../domain/navigation";
-import { CALENDAR_WORKSPACE_QUERY, SIDEBAR_WIDTH, STORY_WORKSPACE_QUERY } from "./shell-config";
+import { isCalendarPath, isMediaPath, storyIdFromPath } from "../../domain/navigation";
+import { CALENDAR_WORKSPACE_QUERY, MEDIA_WORKSPACE_QUERY, SIDEBAR_WIDTH, STORY_WORKSPACE_QUERY } from "./shell-config";
 
 /**
  * Which composition the one sidebar has on this screen:
@@ -13,28 +13,31 @@ import { CALENDAR_WORKSPACE_QUERY, SIDEBAR_WIDTH, STORY_WORKSPACE_QUERY } from "
  *   shadcn sidebar-09's nested sidebars: the global icon rail plus the Story list.
  * - `calendar-workspace`: the Calendar on a wide enough screen: the icon rail
  *   plus the Calendar's controls (sidebar-12's mini calendar and categories).
+ * - `media-workspace`: Media on a wide enough screen: the icon rail plus the
+ *   Media navigator (Library scopes, Work views, sidebar-11's folder tree).
  * Each workspace has its own breakpoint, measured for its own content. Below
  * it the screen keeps the ordinary sidebar and offers its context in a
  * temporary sheet. Viewport width is a layout capability, never the reader's
  * expanded/collapsed preference.
  */
-export type ShellComposition = "default" | "story-workspace" | "calendar-workspace";
+export type ShellComposition = "default" | "story-workspace" | "calendar-workspace" | "media-workspace";
 
-/** What the address says, apart from width: the story whose screen this is, and whether this is the Calendar. */
-export type ShellRoute = { storyId: number | null; calendar: boolean };
+/** What the address says, apart from width: the story whose screen this is, and whether this is the Calendar or Media. */
+export type ShellRoute = { storyId: number | null; calendar: boolean; media: boolean };
 
 export type ShellLayout = ShellRoute & { composition: ShellComposition };
 
 /** Which workspaces the viewport is wide enough for. */
-export type ShellViewport = { storyWorkspace: boolean; calendarWorkspace: boolean };
+export type ShellViewport = { storyWorkspace: boolean; calendarWorkspace: boolean; mediaWorkspace?: boolean };
 
 export function shellRouteFor(pathname: string, adminRoute: string): ShellRoute {
-  return { storyId: storyIdFromPath(pathname, adminRoute), calendar: isCalendarPath(pathname, adminRoute) };
+  return { storyId: storyIdFromPath(pathname, adminRoute), calendar: isCalendarPath(pathname, adminRoute), media: isMediaPath(pathname, adminRoute) };
 }
 
 export function shellCompositionFor(route: ShellRoute, viewport: ShellViewport): ShellComposition {
   if (route.storyId !== null && viewport.storyWorkspace) return "story-workspace";
   if (route.calendar && viewport.calendarWorkspace) return "calendar-workspace";
+  if (route.media && viewport.mediaWorkspace) return "media-workspace";
   return "default";
 }
 
@@ -57,9 +60,9 @@ export function shellSidebarStyle(layout: Pick<ShellLayout, "composition">): CSS
   } as CSSProperties;
 }
 
-const COMPOSITION_WIDTH: Record<ShellComposition, keyof typeof SIDEBAR_WIDTH> = { default: "default", "story-workspace": "storyWorkspace", "calendar-workspace": "calendarWorkspace" };
+const COMPOSITION_WIDTH: Record<ShellComposition, keyof typeof SIDEBAR_WIDTH> = { default: "default", "story-workspace": "storyWorkspace", "calendar-workspace": "calendarWorkspace", "media-workspace": "mediaWorkspace" };
 
-const ShellLayoutContext = createContext<ShellLayout>({ storyId: null, calendar: false, composition: "default" });
+const ShellLayoutContext = createContext<ShellLayout>({ storyId: null, calendar: false, media: false, composition: "default" });
 
 export const ShellLayoutProvider = ShellLayoutContext;
 export const useShellLayout = () => use(ShellLayoutContext);
@@ -69,8 +72,9 @@ export function useCurrentShellLayout(adminRoute: string): ShellLayout {
   const pathname = usePathname() ?? "";
   const storyWorkspace = useMediaQuery(STORY_WORKSPACE_QUERY);
   const calendarWorkspace = useMediaQuery(CALENDAR_WORKSPACE_QUERY);
-  const { storyId, calendar, composition } = shellLayoutFor(pathname, adminRoute, { storyWorkspace, calendarWorkspace });
-  return useMemo(() => ({ storyId, calendar, composition }), [storyId, calendar, composition]);
+  const mediaWorkspace = useMediaQuery(MEDIA_WORKSPACE_QUERY);
+  const { storyId, calendar, media, composition } = shellLayoutFor(pathname, adminRoute, { storyWorkspace, calendarWorkspace, mediaWorkspace });
+  return useMemo(() => ({ storyId, calendar, media, composition }), [storyId, calendar, media, composition]);
 }
 
 /**

@@ -12,7 +12,7 @@ export const SIDEBAR_SHORTCUT = "\\";
  * rem→px compile, and Payload's root font is not 16px). The icon width is the
  * collapsed sidebar and, in a workspace, the global rail.
  */
-export const SIDEBAR_WIDTH = { default: 256, storyWorkspace: 350, calendarWorkspace: 350, icon: 48, mobile: 288 } as const;
+export const SIDEBAR_WIDTH = { default: 256, storyWorkspace: 350, calendarWorkspace: 350, mediaWorkspace: 320, icon: 48, mobile: 288 } as const;
 
 /**
  * The narrowest viewport that gets the Story workspace sidebar (shadcn's
@@ -52,3 +52,32 @@ export const CALENDAR_WORKSPACE_QUERY = `(min-width: ${CALENDAR_WORKSPACE_MIN_WI
 
 /** The measured geometry the breakpoint derives from (tests pin the arithmetic). */
 export const CALENDAR_GEOMETRY = { sidebar: 350, sidePadding: 48, weekAxis: 82, weekColumnMin: 120, monthCellMin: 130 } as const;
+
+/**
+ * Media's own geometry (not the Story screen's 1300 or the Calendar's 1320).
+ * The Media workspace sidebar is the icon rail plus the Media navigator,
+ * 320px; the screen has 48px of side padding (lg:px-6). Its content is a
+ * grid of thumbnails, each at least 168px (a 4:3 preview, a filename that
+ * stays legible), 12px apart. The navigator earns its place only while at
+ * least three comfortable thumbnails still fit beside it:
+ * 320 + 48 + 3 x 168 + 2 x 12 = 896px, plus a scrollbar and a margin so the
+ * third column never collapses during a sidebar transition. Measured in the
+ * browser (docs/payload-migration.md, Media): see MEDIA_WORKSPACE_MIN_WIDTH.
+ * Below it the ordinary 256px sidebar stays and the navigator opens in a
+ * sheet.
+ */
+export const MEDIA_GEOMETRY = { sidebar: 320, sidePadding: 48, tileMin: 168, gap: 12, inspectorMin: 340 } as const;
+export const MEDIA_WORKSPACE_MIN_WIDTH = 1024;
+export const MEDIA_WORKSPACE_QUERY = `(min-width: ${MEDIA_WORKSPACE_MIN_WIDTH}px)`;
+
+/**
+ * The persistent asset inspector (a resizable panel beside the grid) needs
+ * its own, larger threshold: rail + navigator, the inspector at its 340px
+ * minimum and still three comfortable thumbnails. That fits mathematically
+ * around 1240px, but at 1366 the grid was down to three cramped columns and
+ * every resize of the inspector reflowed it; from 1440 three columns stay
+ * comfortable at the default width. Narrower screens open the same
+ * inspector in a sheet.
+ */
+export const MEDIA_INSPECTOR_MIN_WIDTH = 1440;
+export const MEDIA_INSPECTOR_QUERY = `(min-width: ${MEDIA_INSPECTOR_MIN_WIDTH}px)`;

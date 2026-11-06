@@ -37,7 +37,7 @@ async function call(method: string, routePath: string, key: string | null, optio
 
 /** A real JPEG of a given size: noise, so it compresses like a photograph rather than a flat fixture. */
 async function photo(width: number, height: number, name: string, quality = 92) {
-  const data = await sharp({ create: { width, height, channels: 3, noise: { type: "gaussian", mean: 128, sigma: 40 } } }).jpeg({ quality }).toBuffer();
+  const data = await sharp({ create: { width, height, channels: 3, background: "#808080", noise: { type: "gaussian", mean: 128, sigma: 40 } } }).jpeg({ quality }).toBuffer();
   return { data, mimetype: "image/jpeg", name, size: data.length };
 }
 

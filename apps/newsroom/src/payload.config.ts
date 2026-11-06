@@ -113,6 +113,8 @@ export default buildConfig({
         stories: { Component: "/components/BylineStories#BylineStories", path: "/stories" },
         // Byline Calendar: the newsroom schedule (Schedule-X), a destination of its own.
         calendar: { Component: "/components/BylineCalendar#BylineCalendar", path: "/calendar" },
+        // Byline Media: the asset Library (Payload Media, folders) and production Work. Raw Media stays an administrator fallback.
+        media: { Component: "/components/BylineMedia#BylineMedia", path: "/media", meta: { title: "Media" } },
         // Administrators only: the entry to Payload's raw collection screens.
         system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system" }
       }

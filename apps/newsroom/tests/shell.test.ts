@@ -35,7 +35,7 @@ async function sidebarFor(user: unknown): Promise<SidebarProps | null> {
 describe("Byline sidebar (admin.components.Nav)", () => {
   it("gives staff only Byline destinations and no System administration", async () => {
     const props = (await sidebarFor(account("staff")))!;
-    expect(props.items.map((item) => item.key)).toEqual(["home", "stories", "calendar"]);
+    expect(props.items.map((item) => item.key)).toEqual(["home", "stories", "calendar", "media"]);
     expect(props.items.every((item) => !item.href.includes("/collections/"))).toBe(true);
     expect(props.systemHref).toBeNull();
     expect(props.user).toEqual({ name: "Gibson Bell", subtitle: "Staff", avatarUrl: null });
@@ -133,7 +133,10 @@ describe("Byline shell composition", () => {
   it("creates through the shared Home dialogs, mounted once, and opens new stories on the Byline Story screen", () => {
     const create = src("ui/shell/create.tsx");
     expect(create).toContain("<HomeCreate ");
-    expect(create).toContain("<ShellLayer active={request !== null}>");
+    expect(create).toContain('<ShellLayer active={request !== null && request.kind !== "media"}>');
+    // Upload media is Media's one upload flow, mounted once here too, and stays mounted while uploads finish.
+    expect(create).toContain("<MediaUploadDialog");
+    expect(create).toContain('<ShellLayer active={request?.kind === "media" || uploading}>');
     expect(create).toContain("created.workspaceUrl || routes.story(created.story.id)");
     expect(create).not.toContain("collections/stories/create");
     // No second copy of the shared creation dialogs or screens in the newsroom.

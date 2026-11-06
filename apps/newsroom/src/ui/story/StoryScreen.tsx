@@ -15,6 +15,7 @@ import { useAuth, useConfig, useDocumentInfo, useFormBackgroundProcessing, useFo
 import type { CollapsibleFieldClientComponent } from "payload";
 import { useMemo, type FormEvent, type ReactNode } from "react";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
+import { useBylineMediaPicker } from "../media/MediaWorkspaceShell";
 import { useLeaveGuard } from "../shell/navigation";
 import { HistoryTab } from "./HistoryTab";
 import { StoryHeader } from "./StoryHeader";
@@ -61,6 +62,8 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
     readOnly: Boolean(readOnly)
   };
   const fetchers = useMemo(() => createPayloadHomeFetchers(context.api), [context.api]);
+  // Production assignments link files through Byline's Media picker (never Payload's Media list).
+  const media = useBylineMediaPicker();
   const childPaths = { fields: field.fields, parentPath: parentPath ?? "", parentSchemaPath: parentSchemaPath ?? "stories", parentIndexPath: indexPath ?? "", permissions };
   const storyId = Number(id);
   // `?appointment=<id>` opens that appointment's scheduler, as in the WordPress workspace.
@@ -124,6 +127,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
         storiesUrl={context.admin || "/admin"}
         client={fetchers.workspace!}
         editorial={fetchers.editorial!}
+        media={media}
         articleInForm
       >
         {screen}
