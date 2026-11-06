@@ -6,6 +6,7 @@ import { buildConfig, type CollectionConfig, type Plugin } from "payload";
 import sharp from "sharp";
 import { atLeast, newsroomUser } from "./access/user";
 import { Media } from "./collections/Media";
+import { mediaFolders } from "./collections/MediaFolders";
 import { People } from "./collections/People";
 import { Polls } from "./collections/Polls";
 import { Coverages, Corrections, LiveUpdates, Pages } from "./collections/Publishing";
@@ -77,6 +78,8 @@ export default buildConfig({
   editor: proseEditor,
   sharp,
   collections: collections.map(withImportIdGuard),
+  // Payload's native folders, for Media (logical organization, never storage paths).
+  folders: mediaFolders,
   db: postgresAdapter({
     pool: { connectionString: required("DATABASE_URL") },
     // Development may push schema changes; production applies committed migrations only.
