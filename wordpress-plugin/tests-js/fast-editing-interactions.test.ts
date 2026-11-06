@@ -9,14 +9,14 @@ const read = readSource;
 describe("fast editing interactions", () => {
   it("keeps right-click actions available across story and production queues", () => {
     expect(read("planning/StoryBoard.tsx")).toContain("<StoryContextMenu");
-    expect(read("planning/MediaDesk.tsx")).toContain("<MediaRowContext");
+    expect(read("media/MediaWork.tsx")).toContain("<MediaRowContext");
     expect(read("planning/ContentHealth.tsx")).toContain("<ContextMenu");
     expect(read("planning/Feedback.tsx")).toContain("<ContextMenu");
     expect(read("calendar/NeedsScheduling.tsx")).toContain("<ContextMenu");
   });
 
   it("makes low-risk queue edits optimistic instead of waiting for a refetch", () => {
-    expect(read("planning/MediaDesk.tsx")).toContain("onMutate: async ({ row, changes })");
+    expect(read("media/MediaWork.tsx")).toContain("onMutate: async ({ row, changes })");
     expect(read("planning/Feedback.tsx")).toContain("onMutate: async (next)");
     expect(read("workspace/ReportingPlan.tsx")).toContain("onMutate: async ({ kind, id, status })");
     expect(read("workspace/MediaSection.tsx")).toContain("onMutate: async ({ assignment, status })");

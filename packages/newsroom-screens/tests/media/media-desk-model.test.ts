@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { PlanningRequestOptions } from "@byline/newsroom-screens/planning/planning-api";
-import { createPlanningFetchers, mediaAssignmentPath } from "./planning-rest";
-import { EMPTY_MEDIA_DESK_FILTERS, filterMediaRows, mediaDeskRows, mediaReadinessHint, sortMediaRows } from "./media-desk-model";
-import type { MediaAssignmentRow, MediaRequest } from "@byline/newsroom-screens/planning/planning-model";
+import { EMPTY_MEDIA_DESK_FILTERS, filterMediaRows, isMediaWorkScope, mediaDeskRows, mediaReadinessHint, mediaWorkCounts, scopeMediaRows, sortMediaRows } from "../../src/media/media-desk-model";
+import type { MediaAssignmentRow, MediaRequest } from "../../src/planning/planning-model";
 
 function assignment(patch: Partial<MediaAssignmentRow> = {}): MediaAssignmentRow {
   return {
@@ -79,23 +77,44 @@ describe("readiness hint", () => {
   });
 });
 
-describe("per-assignment routes", () => {
-  it("updates an assignment (including legacy-v1) and reads the schedule feed through the protected routes", async () => {
-    const requests: PlanningRequestOptions[] = [];
-    const api = createPlanningFetchers(async <T>(options: PlanningRequestOptions): Promise<T> => {
-      requests.push(options);
-      return {} as T;
-    });
-    await api.updateMediaAssignment?.(41, "9f8e", { status: "done", dueAt: "2026-10-30" });
-    await api.updateMediaAssignment?.(41, "legacy-v1", { assigneeId: 0 });
-    await api.getSchedule?.("2026-10-12", "2026-11-01");
-    await api.getSchedule?.("2026-10-12", "2026-11-01", true);
-    expect(requests.map(({ path, method, data }) => ({ path, method, data }))).toEqual([
-      { path: "/byline/v1/editorial/stories/41/media-assignments/9f8e", method: "POST", data: { status: "done", dueAt: "2026-10-30" } },
-      { path: "/byline/v1/editorial/stories/41/media-assignments/legacy-v1", method: "POST", data: { assigneeId: 0 } },
-      { path: "/byline/v1/editorial/schedule?from=2026-10-12&to=2026-11-01", method: undefined, data: undefined },
-      { path: "/byline/v1/editorial/schedule?from=2026-10-12&to=2026-11-01&includeTasks=1", method: undefined, data: undefined }
-    ]);
-    expect(mediaAssignmentPath(3, "a b")).toBe("/byline/v1/editorial/stories/3/media-assignments/a%20b");
+describe("work scopes", () => {
+  const today = "2026-11-06";
+  const context = { currentUserId: 9, today, timezone: "America/New_York" };
+  const rows = mediaDeskRows({
+    requests: [],
+    assignments: [
+      assignment({ id: "mine-open", assignee: { id: 9, name: "Pat" }, dueAt: "2026-11-20T17:00:00Z" }),
+      assignment({ id: "mine-done", assignee: { id: 9, name: "Pat" }, status: "done" }),
+      assignment({ id: "overdue", assignee: { id: 4, name: "Lee" }, dueAt: "2026-11-01T17:00:00Z", attachmentIds: [7] }),
+      // 2026-11-10 03:00 UTC is still Nov 9 in New York: inside the three-day window.
+      assignment({ id: "due-local", assignee: null, dueAt: "2026-11-10T03:00:00Z" }),
+      assignment({ id: "due-late", assignee: null, dueAt: "2026-11-10T17:00:00Z", attachmentIds: [8] }),
+      assignment({ id: "undated", assignee: null, dueAt: null })
+    ]
+  });
+  const ids = (scope: Parameters<typeof scopeMediaRows>[1]) => scopeMediaRows(rows, scope, context).map((row) => row.id);
+
+  it("keeps finished work out of every scope but All", () => {
+    expect(ids("all")).toHaveLength(6);
+    expect(ids("mine")).toEqual(["mine-open"]);
+  });
+
+  it("finds due-soon work in the newsroom timezone, overdue included, undated excluded", () => {
+    expect(ids("due")).toEqual(["overdue", "due-local"]);
+  });
+
+  it("finds open work with no files and open work nobody holds", () => {
+    expect(ids("needs-files")).toEqual(["mine-open", "due-local", "undated"]);
+    expect(ids("unassigned")).toEqual(["due-local", "due-late", "undated"]);
+  });
+
+  it("counts every scope from the same rows", () => {
+    expect(mediaWorkCounts(rows, context)).toEqual({ all: 6, mine: 1, due: 2, "needs-files": 3, unassigned: 3 });
+    expect(mediaWorkCounts(rows, { ...context, currentUserId: null }).mine).toBe(0);
+  });
+
+  it("recognises only real scopes", () => {
+    expect(isMediaWorkScope("due")).toBe(true);
+    expect(isMediaWorkScope("folders")).toBe(false);
   });
 });

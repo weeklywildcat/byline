@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PlanningRequestOptions } from "@byline/newsroom-screens/planning/planning-api";
 import { createPlanningFetchers } from "../src/planning/planning-rest";
-import { describeMediaDeskError, MEDIA_FEATURED_IN_USE_CODE } from "../src/planning/media-desk-errors";
+import { describeMediaDeskError, MEDIA_FEATURED_IN_USE_CODE } from "@byline/newsroom-screens/media/media-desk-errors";
 import {
   mergeMediaAttachmentIds,
   normalizeMediaAttachmentIds,

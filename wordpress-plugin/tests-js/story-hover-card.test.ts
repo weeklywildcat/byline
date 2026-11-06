@@ -36,7 +36,7 @@ describe("story hover previews", () => {
       "story/rows.tsx",
       "planning/StoryBoard.tsx",
       "planning/StoryList.tsx",
-      "planning/MediaDesk.tsx",
+      "media/MediaWork.tsx",
       "planning/ContentHealth.tsx",
       "calendar/NeedsScheduling.tsx",
       "planning/Feedback.tsx",

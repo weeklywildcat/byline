@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readSource } from "./source-files";
 
 const src = path.resolve(__dirname, "../src/planning");
 const read = (name: string) => readFileSync(path.join(src, name), "utf8");
 
 describe("secondary Planning shadcn patterns", () => {
   it("uses InputGroup for Media Desk search instead of a standalone search input", () => {
-    const source = read("MediaDesk.tsx");
+    const source = readSource("media/MediaWork.tsx");
     expect(source).toContain("InputGroupInput type=\"search\"");
     expect(source).toContain("<InputGroupAddon><Search");
     expect(source).not.toContain("<Input type=\"search\"");

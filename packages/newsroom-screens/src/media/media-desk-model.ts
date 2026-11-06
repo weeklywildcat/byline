@@ -1,8 +1,10 @@
 /**
- * Pure model for the Media Desk: one row per production assignment, with a
- * graceful fallback to the legacy one-request-per-story collection.
+ * Pure model for Media Work (the production desk, WordPress's "Media Desk"):
+ * one row per production assignment, with a graceful fallback to the legacy
+ * one-request-per-story collection. CMS-independent: WordPress and the
+ * Payload newsroom send the same `MediaDeskResponse`.
  */
-import { siteDay } from "@byline/newsroom-screens/home/newsroom-model";
+import { siteDay } from "../home/newsroom-model";
 import {
   parsePlanningDate,
   planningDateKey,
@@ -12,7 +14,7 @@ import {
   type MediaRequest,
   type PlanningVisualStatus,
   type PlanningVisualType
-} from "@byline/newsroom-screens/planning/planning-model";
+} from "../planning/planning-model";
 
 export type MediaDeskRow = MediaAssignmentRow & {
   /** `assignment` rows update through the per-assignment route; `request` rows are the legacy story-level fallback. */
@@ -168,4 +170,69 @@ export function mediaReadinessHint(row: Pick<MediaDeskRow, "attachmentIds" | "at
   if (missing.length) return { label: `Needs ${missing.join(", ")}`, tone: "warning" };
   if (readiness?.ready === false) return { label: "Needs review", tone: "warning" };
   return { label: "Metadata ready", tone: "success" };
+}
+
+/* ------------------------------------------------------------ scopes */
+
+/**
+ * The Work views the Media navigator offers: real query presets over the
+ * assignments this account may see (the server already limits those to the
+ * account's access), never folders or saved records. The toolbar's detailed
+ * filters (type, status, assignee, due date, story) apply on top.
+ */
+export type MediaWorkScope = "mine" | "all" | "due" | "needs-files" | "unassigned";
+
+export const MEDIA_WORK_SCOPES: ReadonlyArray<{ value: MediaWorkScope; label: string; editorsOnly?: boolean }> = [
+  { value: "mine", label: "My assignments" },
+  { value: "all", label: "All assignments" },
+  { value: "due", label: "Due soon" },
+  { value: "needs-files", label: "Needs files" },
+  { value: "unassigned", label: "Unassigned", editorsOnly: true }
+];
+
+export function isMediaWorkScope(value: unknown): value is MediaWorkScope {
+  return MEDIA_WORK_SCOPES.some((scope) => scope.value === value);
+}
+
+/** "Due soon" reaches this many days ahead, overdue work included. */
+export const MEDIA_DUE_SOON_DAYS = 3;
+
+export type MediaScopeContext = { currentUserId: number | null; today: string; timezone?: string };
+
+function plusDays(day: string, days: number): string {
+  const date = new Date(`${day}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Whether one row belongs to a Work scope. Finished work only appears under All assignments. */
+export function inMediaWorkScope(row: MediaDeskRow, scope: MediaWorkScope, context: MediaScopeContext): boolean {
+  const open = row.status !== "done";
+  switch (scope) {
+    case "all":
+      return true;
+    case "mine":
+      return open && context.currentUserId !== null && row.assignee?.id === context.currentUserId;
+    case "unassigned":
+      return open && !row.assignee;
+    case "needs-files":
+      return open && row.attachmentIds.length === 0;
+    case "due": {
+      const day = mediaDueDay(row.dueAt, context.timezone);
+      return open && day !== "" && day <= plusDays(context.today, MEDIA_DUE_SOON_DAYS);
+    }
+  }
+}
+
+export function scopeMediaRows(rows: MediaDeskRow[], scope: MediaWorkScope, context: MediaScopeContext): MediaDeskRow[] {
+  return rows.filter((row) => inMediaWorkScope(row, scope, context));
+}
+
+/** How many rows each scope holds, for the navigator's badges (computed from the same rows the desk shows). */
+export function mediaWorkCounts(rows: MediaDeskRow[], context: MediaScopeContext): Record<MediaWorkScope, number> {
+  const counts = { mine: 0, all: rows.length, due: 0, "needs-files": 0, unassigned: 0 } satisfies Record<MediaWorkScope, number>;
+  for (const row of rows) {
+    for (const scope of ["mine", "due", "needs-files", "unassigned"] as const) if (inMediaWorkScope(row, scope, context)) counts[scope] += 1;
+  }
+  return counts;
 }

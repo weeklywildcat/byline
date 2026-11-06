@@ -8,7 +8,7 @@ const fetchers = { ...createPlanningFetchers(request), ...createStoryFetchers(re
 <PlanningApp fetchers={fetchers} tab="stories" view="board" currentUserId={id} storiesUrl={storiesUrl} />
 ```
 
-`planning-rest.ts` and `media-desk-model.ts` (with the shared `planning-model`
+`planning-rest.ts` (with the shared `planning-model` and `@byline/newsroom-screens/media/media-desk-model`
 and `calendar-model` in `@byline/newsroom-screens`) are React-free transport and
 domain logic; keep UI out of them. The Calendar is the shared one
 (`@byline/newsroom-screens/calendar`); `calendar-host.tsx` supplies only its

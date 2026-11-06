@@ -10,7 +10,9 @@ import { createAdminQueryClient } from "@byline/newsroom-screens/story/story-que
 import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 import { ContentHealth } from "./ContentHealth";
 import { Feedback } from "./Feedback";
-import { MediaDesk } from "./MediaDesk";
+import { MediaWork } from "@byline/newsroom-screens/media/MediaWork";
+import { PageHeader } from "@byline/newsroom-screens/planning/PlanningPage";
+import { wordpressMediaPicker } from "../workspace/media-library";
 import { StoriesPage, type StoriesCalendarProps } from "@byline/newsroom-screens/planning/StoriesPage";
 import type { StoriesView } from "@byline/newsroom-screens/planning/stories-view";
 import { createWorkspaceUrlBuilder, StoryCalendar } from "./calendar-host";
@@ -33,6 +35,9 @@ export type PlanningAppProps = {
 };
 
 const planningQueryClient = createAdminQueryClient();
+
+/** The shared Media Work desk links files from the WordPress Media Library. */
+const WORDPRESS_DESK_PICKER = { ...wordpressMediaPicker, label: "Link from Media Library" };
 
 export function PlanningApp(props: PlanningAppProps) {
   return <QueryClientProvider client={planningQueryClient}><AdminRoot><PlanningShell {...props} /></AdminRoot></QueryClientProvider>;
@@ -61,7 +66,10 @@ function PlanningBody({ fetchers, tab, view, currentUserId, mine, workspaceUrl }
   return <main className="@container/planning mx-auto mt-6 mb-8 flex max-w-[1600px] flex-col gap-4 pr-5 pl-1">
     {destination === "stories" ? <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={{ mine: Boolean(mine), collectionId: Number(new URLSearchParams(window.location.search).get("collection")) || undefined }} workspaceUrl={workspaceUrl} renderCalendar={renderCalendar} viewHref={viewHref} onNewStory={fetchers.createStory ? () => setCreating(true) : undefined} /> : null}
     {destination === "collections" ? <CollectionsPage fetchers={fetchers} currentUserId={currentUserId} workspaceUrl={workspaceUrl} /> : null}
-    {destination === "media" ? <MediaDesk fetchers={fetchers} workspaceUrl={workspaceUrl} onOpenStory={openStory} /> : null}
+    {destination === "media" ? <>
+      <PageHeader title="Media Desk" description="Every photo, video, graphic and audio assignment across the newsroom. Files stay in the WordPress Media Library." />
+      <MediaWork fetchers={fetchers} workspaceUrl={workspaceUrl} onOpenStory={openStory} media={WORDPRESS_DESK_PICKER} currentUserId={currentUserId} />
+    </> : null}
     {destination === "feedback" ? <Feedback fetchers={fetchers} onOpenStory={openStory} /> : null}
     {destination === "content-health" ? <ContentHealth fetchers={fetchers} onOpenStory={openStory} /> : null}
     <StoryCreateDialog open={creating} onClose={() => setCreating(false)} onCreated={openCreated} fetchers={fetchers} />
