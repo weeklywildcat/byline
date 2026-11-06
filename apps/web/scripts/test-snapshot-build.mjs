@@ -29,6 +29,29 @@ fixture.posts.push({
   content: { rendered: "<p>Reporting that supports the video, below the player.</p>" },
   byline: { format: "video", video: { provider: "youtube", videoId: "dQw4w9WgXcQ", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", title: "Fixture video", thumbnailUrl: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", uploadDate: "2026-08-14T12:00:00Z", duration: "PT1M32S" } }
 });
+// Mixed-category, sticky BTS articles exercise placement through the real
+// snapshot/build boundary, while keeping the general news homepage unchanged.
+const btsCategory = { id: 91, count: 3, name: "Off Deadline", slug: "behind-the-scenes", taxonomy: "category", parent: 0, description: "Stories behind the stories", link: "https://weeklywildcat.com/category/behind-the-scenes/" };
+fixture.categories.push(btsCategory);
+// Exercise video indexing independently of general news/Watch placement, too.
+// This snapshot-only video stays out of the baseline fixture's news packages.
+const videoStory = fixture.posts.find((post) => post.id === 90);
+videoStory.categories = [...videoStory.categories, btsCategory.id];
+videoStory._embedded = { ...videoStory._embedded, "wp:term": [[...videoStory._embedded["wp:term"][0], btsCategory], videoStory._embedded["wp:term"][1] ?? []] };
+for (const [id, day, slug, title] of [
+  [91, "22", "building-the-newsroom", "Building the newsroom website"],
+  [92, "21", "our-reporting-tools", "Inside our reporting tools"]
+]) {
+  fixture.posts.push({ ...structuredClone(plain), id, slug, sticky: true,
+    date: `2026-08-${day}T09:00:00`, date_gmt: `2026-08-${day}T13:00:00`,
+    modified: `2026-08-${day}T09:00:00`, modified_gmt: `2026-08-${day}T13:00:00`,
+    link: `https://weeklywildcat.com/2026/08/${day}/news/${slug}/`,
+    title: { rendered: title }, excerpt: { rendered: "<p>How our newsroom works behind the scenes.</p>" },
+    content: { rendered: "<p>A technical look at the tools we use to publish student journalism.</p>" },
+    categories: [...plain.categories, btsCategory.id],
+    _embedded: { ...structuredClone(plain._embedded), "wp:term": [[...plain._embedded["wp:term"][0], btsCategory], plain._embedded["wp:term"][1] ?? []] }
+  });
+}
 const datasets = { posts: fixture.posts, authors: fixture.authors, categories: fixture.categories, tags: fixture.tags, pages: fixture.pages, guests: [], corrections: [], coverages: [], schoolEvents: [], attachments: [] };
 const bytes = Buffer.from(JSON.stringify({ schemaVersion: 1, revision: publication.revision, generatedAt: new Date().toISOString(), sourceTimezone: publication.timezone, publication, datasets, counts: Object.fromEntries(Object.entries(datasets).map(([key, rows]) => [key, rows.length])) }));
 const digest = createHash("sha256").update(bytes).digest("hex");

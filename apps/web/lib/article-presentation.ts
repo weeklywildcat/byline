@@ -1,7 +1,7 @@
 import type { ImageCropShape } from "@byline/core";
 import type { ArticleImageView, ArticlePresentation, ArticleSeriesPartView, ArticleSeriesView, ArticleStoryCardView } from "@byline/ui";
 import { getResponsiveImageProps, type ImageSearchVisibility } from "@/lib/media";
-import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory, getPublicTopicTags, isAthleteSpotlightPost, isHiddenCategory, isVisibleContentPost } from "@/lib/content";
+import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory, getPublicTopicTags, isAthleteSpotlightPost, isGeneralEditorialPost, isHiddenCategory, isVisibleContentPost } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { absoluteUrl } from "@/lib/seo";
 import { getMediaCredit } from "@/lib/wordpress";
@@ -12,6 +12,7 @@ import {
   getAuthorProfile,
   contributorHasProfilePage,
   getCoverageHref,
+  getCategoryHref,
   getContributorHref,
   getContributorName,
   getContributorPhoto,
@@ -153,7 +154,7 @@ function relatedPosts(post: WordPressPost, posts: WordPressPost[]) {
   const categorySlugs = new Set(getPostCategories(post).map((category) => category.slug));
   const tagSlugs = new Set(getPostTags(post).map((tag) => tag.slug));
   return posts
-    .filter((candidate) => candidate.id !== post.id)
+    .filter((candidate) => candidate.id !== post.id && isGeneralEditorialPost(candidate))
     .map((candidate, index) => ({
       post: candidate,
       score: getPostCategories(candidate).filter((category) => categorySlugs.has(category.slug)).length +
@@ -181,7 +182,7 @@ export function isCoverageComplete(coverage: Pick<WordPressCoverage, "status">) 
 export function getCoverageStories(coverage: WordPressCoverage, postsById: ReadonlyMap<number, WordPressPost>) {
   return coverage.stories.flatMap((story) => {
     const post = postsById.get(story.id);
-    return post && isVisibleContentPost(post) ? [post] : [];
+    return post && isGeneralEditorialPost(post) ? [post] : [];
   });
 }
 
@@ -275,7 +276,7 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
   const seriesIds = new Set(series?.format === "series" ? series.parts.map((part) => part.id) : []);
   const related = relatedPosts(post, (relatedCandidates ?? visiblePosts).filter((candidate) => !seriesIds.has(candidate.id)));
   const relatedIds = new Set(related.map((relatedPost) => relatedPost.id));
-  const moreByAuthor = authorPosts.filter((candidate) => candidate.id !== post.id && !relatedIds.has(candidate.id)).slice(0, 3);
+  const moreByAuthor = authorPosts.filter((candidate) => isGeneralEditorialPost(candidate) && candidate.id !== post.id && !relatedIds.has(candidate.id)).slice(0, 3);
   const storyPresentation = getPostStoryPresentation(post);
   const athleteSpotlight = isAthleteSpotlightPost(post);
   const athleteMeta = athleteSpotlight
@@ -289,7 +290,7 @@ export function buildArticlePresentation({ post, allPosts, contributors, author,
     titleHtml: post.title.rendered,
     excerptHtml: post.excerpt.rendered.trim(),
     contentHtml: post.content.rendered.trim(),
-    category: category ? { label: decodeHtml(category.name), href: `/category/${category.slug}/` } : null,
+    category: category ? { label: decodeHtml(category.name), href: getCategoryHref(category) } : null,
     athleteMeta,
     storyPresentation: storyPresentation.presentation,
     immersiveAlignment: storyPresentation.immersiveAlignment,

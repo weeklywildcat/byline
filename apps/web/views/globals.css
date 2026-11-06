@@ -1864,6 +1864,23 @@ h1.masthead-logo {
   padding-top: 14px;
 }
 
+.home-bts-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.home-bts-grid .story-teaser {
+  border-top: 0;
+  padding: 0;
+}
+
+@media (max-width: 640px) {
+  .home-bts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .category-more > h2 {
   font-family: var(--font-ui);
   font-size: 0.9rem;

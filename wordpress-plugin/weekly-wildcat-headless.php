@@ -20,6 +20,7 @@ require_once __DIR__ . '/includes/publication/config.php';
 require_once __DIR__ . '/includes/design/post-type.php';
 require_once __DIR__ . '/includes/core/diagnostics.php';
 require_once __DIR__ . '/includes/content/pages.php';
+require_once __DIR__ . '/includes/content/behind-the-scenes.php';
 require_once __DIR__ . '/includes/content/page-blocks.php';
 require_once __DIR__ . '/includes/content/editor-canvas.php';
 require_once __DIR__ . '/includes/admin/app.php';
