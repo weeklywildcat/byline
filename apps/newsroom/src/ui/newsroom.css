@@ -5,6 +5,7 @@
 @import "@byline/newsroom-ui/styles.css";
 @source "./";
 @source "../components";
+@source "../../../../packages/newsroom-screens/src";
 
 /*
  * Nova's `dark:` variants follow Payload's admin theme (`html[data-theme]`),

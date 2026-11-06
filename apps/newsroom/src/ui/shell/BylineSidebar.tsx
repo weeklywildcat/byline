@@ -42,7 +42,7 @@ export function BylineSidebar({ items, administration, newStoryHref, homeHref, u
   const linkClass = (active: boolean) => cn(buttonVariants({ variant: "ghost", size: "sm" }), "w-full justify-start gap-2 font-normal", active && "bg-muted font-medium");
 
   return (
-    <AdminRoot className="byline-shell-nav">
+    <AdminRoot className="byline-shell-nav" toaster={false}>
       <nav aria-label="Byline" className="flex h-full flex-col gap-3 border-r border-border bg-sidebar px-3 py-4 text-sidebar-foreground">
         <Link href={homeHref} className="px-2 text-base font-semibold tracking-tight" prefetch={false}>
           Byline

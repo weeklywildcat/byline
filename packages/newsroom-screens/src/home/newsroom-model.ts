@@ -183,7 +183,7 @@ export function homeAgenda(data: HomeBootstrap, now = new Date()): AgendaEvent[]
     if (!capabilities.review && !myStory(story, currentUser.id)) return;
     add(`deadline-${story.id}`, story.id, story.title, "", "Story deadline", story.deadline);
     const scheduled = story.wordpressState.scheduledAt;
-    if (story.wordpressState.isScheduled) add(`scheduled-${story.id}`, story.id, story.title, "", "WordPress publication", scheduled);
+    if (story.wordpressState.isScheduled) add(`scheduled-${story.id}`, story.id, story.title, "", "Scheduled publication", scheduled);
     // One day's publication commitment appears once. The distinct editorial
     // target and actual schedule remain visible in Story Peek.
     if (!scheduled || !story.plannedPublication || siteDay(scheduled, timezone) !== siteDay(story.plannedPublication, timezone)) {

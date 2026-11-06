@@ -18,6 +18,7 @@ import { addPollVotesTable } from "./db/poll-votes";
 import { proseEditor } from "./editor/prose";
 import { dropClientIds } from "./hooks/imported-ids";
 import { newsroomTimeZone } from "./domain/dates";
+import { newsroomEndpoints } from "./newsroom/endpoints";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -86,6 +87,8 @@ export default buildConfig({
     beforeSchemaInit: [addPollVotesTable]
   }),
   graphQL: { disable: true },
+  // The newsroom screens' API (/api/byline/...); every handler re-checks the account.
+  endpoints: newsroomEndpoints,
   admin: {
     user: Users.slug,
     meta: { titleSuffix: " · Byline", robots: "noindex, nofollow" },

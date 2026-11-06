@@ -105,3 +105,8 @@ export function scopeParticipates(scope: StoryScope | null, storyId: unknown): b
 export function inIds(field: string, ids: ReadonlyArray<number | string>): Where {
   return ids.length > 0 ? { [field]: { in: [...ids] } } : { id: { exists: false } };
 }
+
+/** Forget this request's cached scope, after a write that changes who manages what (e.g. creating a story). */
+export function resetStoryScope(req: PayloadRequest): void {
+  delete (req.context as Record<string, unknown>)[SCOPE_KEY];
+}

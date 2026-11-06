@@ -492,7 +492,6 @@ Still Payload's own UI, each with its replacement planned:
 
 | Surface | Interim | Replacement |
 | --- | --- | --- |
-| Home | Interim server-rendered Home | `HomeApp` ported unchanged with a Payload `HomeFetchers` adapter |
 | Stories / Planning / Calendar / Media Desk / Coverage | not in staff navigation | `StoryList`, board, Schedule-X calendar, `MediaDesk` ported with Payload adapters |
 | Lead image picker | Payload upload field | Byline media picker + drag-and-drop (Phase 5) |
 | Body editing chrome | Payload Lexical toolbar/slash menu | `@byline/editor` Nova interface (Phase 3/6) |
@@ -500,11 +499,44 @@ Still Payload's own UI, each with its replacement planned:
 | History compare/restore | Payload versions view | Byline History view over the same versions |
 | Unpublish, schedule | not offered on the Story screen yet | Byline controls over Payload's unpublish and `schedulePublish` |
 
-**Next slice: the screens port.** Home's whole closure (44 files) touches
+**Home is ported (Phase 1c).** `HomeApp`, Story Peek, hover cards, the New
+story / New task / task edit dialogs, the command palette and their models moved,
+unchanged, to `packages/newsroom-screens` (the plugin imports them from there; its
+Home and Planning CSS stayed byte-identical). The newsroom mounts the same
+`HomeApp` as its dashboard with `createPayloadHomeFetchers`
+(`src/ui/home/payload-fetchers.ts`) over `/api/byline/*`
+(`src/newsroom/endpoints.ts`, read models in `src/newsroom/screen-models.ts`):
+
+- reads run as the user (`overrideAccess: false`), so a participant's Story Peek
+  holds only their own work and unrelated staff get 403;
+- identity: a byline person with an enabled account is `{kind: "user", id: userId}`,
+  otherwise a guest, which is what the screens compare against `currentUser.id`;
+- the screens send newsroom-local, offset-free times; the server converts them in
+  the newsroom timezone (`localToInstant`, DST-tested);
+- presets (`src/domain/presets.ts`): News, Sports recap, Opinion, Photo story,
+  Breaking, plus Video story and Investigation. They seed workflow, starter tasks
+  and production, give a deadline only to editors, and never create sources or text;
+- screen methods not ported yet (collections, corrections, distribution,
+  sources/appointments/production editing in Peek, the calendar feed) reject with
+  501 instead of pretending to succeed; Home's links to unported destinations
+  are omitted;
+- Nova renders at true size: Payload pins the root font to 13px, so the newsroom's
+  Byline stylesheet compiles rem to px (WordPress-identical pixels).
+
+Integration-tested (`tests/integration/screens.test.ts`, 17 tests) and exercised in
+the browser: Home, Story Peek, New task, complete + Undo, New story from a template
+landing on the Story screen.
+
+Known gaps: the sidebar's "New story" still opens Payload's create route (no
+template dialog); Home's activity stream is empty until activity is ported;
+scheduled publication is not shown (Payload's schedule lives in admin-only jobs).
+
+**Next slice: the rest of the screens.** Home's whole closure (44 files) touches
 WordPress only through an injected request function, `@wordpress/i18n` in one
-file and a wp-admin URL default. `home/`, `story/`, `workspace/`, `planning/`,
-`editorial/` and `collections/` move from `wordpress-plugin/src` to a shared
-`packages/newsroom-screens`, as a pure move like the design system's. Each host
+file and a wp-admin URL default. Planning (board, list, Schedule-X calendar), the Media Desk and
+the full Story Workspace sections move into `packages/newsroom-screens` the same
+way, as closures of their entries, never whole folders (`editorial/` also holds
+Gutenberg panels that stay in the plugin). Each host
 then supplies its adapter: the plugin keeps its `wp-api-fetch` fetchers, and the
 newsroom implements the same `HomeFetchers`/`StoryFetchers` contracts over
 Payload REST with the plan and workspace collections. Only then do Home and

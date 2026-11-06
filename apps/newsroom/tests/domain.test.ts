@@ -3,13 +3,12 @@ import { managesStory, storyRelationship } from "../src/access/story-context";
 import { atLeast, newsroomUser, relationIds } from "../src/access/user";
 import { passwordSignInAllowed } from "../src/collections/Users";
 import { validResourceUrl } from "../src/collections/StoryPlans";
-import { addDays, localDay } from "../src/domain/dates";
+import { addDays, localDay, localToInstant } from "../src/domain/dates";
 import { administrationFor, navigationFor } from "../src/domain/navigation";
 import { dateOnly, normalizeAppointmentTiming, TimingError } from "../src/domain/schedule";
 import { isSlug, slugify } from "../src/domain/slug";
 import { CORRECTION_TYPES, STORY_FORMATS, WORKFLOW_STAGES } from "../src/domain/vocabulary";
 import { effectiveWorkflow, workflowLabel } from "../src/domain/workflow";
-import { stageCounts } from "../src/newsroom/home";
 
 const staff = { id: 7, role: "staff", enabled: true, linkedPerson: 70, collection: "users" };
 
@@ -80,12 +79,6 @@ describe("workflow", () => {
     expect(workflowLabel("ready")).toBe("Ready for Review");
   });
 
-  it("counts the board in workflow order", () => {
-    const counts = stageCounts([{ workflow: "writing" }, { workflow: "writing" }, { workflow: "published" }]);
-    expect(counts.map((column) => column.stage)).toEqual(["pitch", "assigned", "reporting", "writing", "editing", "ready", "on-hold", "published"]);
-    expect(counts.find((column) => column.stage === "writing")?.count).toBe(2);
-  });
-
   it("keeps formats tiny and live out of them", () => {
     expect(STORY_FORMATS).toEqual(["standard", "video", "audio"]);
     expect(CORRECTION_TYPES).toContain("editor-note");
@@ -137,6 +130,15 @@ describe("dates", () => {
   it("reads the calendar day in the newsroom timezone, not UTC", () => {
     expect(localDay("2026-11-06T03:30:00Z", "America/New_York")).toBe("2026-11-05");
     expect(localDay("2026-11-06T03:30:00Z", "UTC")).toBe("2026-11-06");
+  });
+
+  it("reads the screens' offset-free times in the newsroom timezone, across DST", () => {
+    expect(localToInstant("2026-11-10T17:00", "America/New_York")).toBe("2026-11-10T22:00:00.000Z");
+    expect(localToInstant("2026-07-10T17:00", "America/New_York")).toBe("2026-07-10T21:00:00.000Z");
+    // 1:30 AM happens twice on 2026-11-01; either answer is a real time, never a shifted day.
+    expect(localToInstant("2026-11-01T01:30", "America/New_York")).toMatch(/^2026-11-01T0[56]:30:00.000Z$/);
+    expect(localToInstant("2026-11-10T17:00:00Z", "America/New_York")).toBe("2026-11-10T17:00:00.000Z");
+    expect(() => localToInstant("next tuesday", "America/New_York")).toThrow();
   });
 
   it("moves date-only values across month ends and DST without a timezone", () => {

@@ -42,6 +42,13 @@ snapshot; nothing in this app serves public reading.
   files `postcss/byline-ui.cjs` compiles and scopes). The Story screen sits
   inside Payload's `<form>`: never nest a `<form>`, give every button
   `type="button"`, and stop Enter in one-line inputs.
+- **Shared screens, local adapters.** Screens come from `@byline/newsroom-screens`
+  unchanged; the newsroom supplies fetchers (`src/ui/home/payload-fetchers.ts`)
+  over `/api/byline/*` (`src/newsroom/endpoints.ts`). Do not fork a screen to
+  fit Payload: map Payload records to the screen contract in
+  `src/newsroom/screen-models.ts`. Unported methods reject with 501.
+- **Sizes:** Payload's root font is 13px; `postcss/byline-ui.cjs` compiles Nova's
+  rem to px. Use the design system's classes, never hand-tuned sizes.
 - **Writers never get** HTML, CSS, colors, fonts, alignment or layout controls.
   `src/editor/prose.ts` is the whole prose surface.
 - `src/payload-types.ts` is this app's internal type file. It must never become
