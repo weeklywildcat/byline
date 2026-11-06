@@ -208,10 +208,9 @@ managers; integration-tested), and never a plan.
   `reporting-model.ts`, `appointment-form.ts`, `media-form.ts`,
   `planning/calendar-model.ts`, `home/newsroom-model.ts`) → reused in the
   newsroom views; they have no WordPress imports beyond fetch adapters.
-- The Nova primitives (`wordpress-plugin/src/admin-ui/{ui,lib,components}`,
-  shadcn base-nova) and `StoryPeek` → `packages/newsroom-ui` when the Home and
-  Planning views are ported, so both admin hosts use one copy during the
-  transition.
+- The Nova primitives, CMS-independent compositions, stylesheet and scope
+  plugin → `packages/newsroom-ui` (**done**). `StoryPeek` and the domain
+  components follow as each screen is ported.
 - `packages/core` (`image-crops.ts`, `live-coverage.ts`, `story-video.ts`,
   `publication.ts`) is already CMS-neutral and is used as-is.
 
@@ -388,25 +387,128 @@ type PublicArticleBody =
   is never promoted; jobs coalesce to the newest revision. Autosaves, drafts and
   private collection writes never advance the revision.
 
-## 7. Newsroom UI
+## 7. Newsroom UI: Byline on top, Payload underneath
 
-Payload's admin is the host; Byline owns what writers see. `admin.components`
-replaces the dashboard and nav; custom views are registered at `/admin/home`,
-`/admin/stories`, `/admin/planning`, `/admin/calendar`, `/admin/media`,
-`/admin/coverage`, `/admin/search`, and editor/admin views. Generic collection
-screens stay reachable for administrators. **Every custom view and endpoint
-re-checks the user server-side** (`requireNewsroomUser`), because being inside
-the admin layout is not access control.
+```text
+Byline shadcn/Nova UI          (@byline/newsroom-ui + apps/newsroom/src/ui)
+  → Payload admin/document/form contexts and APIs
+  → Payload domain and storage
+  → PostgreSQL
+```
 
-The Story document view (Phase 3) is a custom `edit.default` view built on
-Payload's `DocumentInfo`/`Form` providers, so autosave, locking, versions and
-publish buttons are Payload's own: tabs Write, Plan, Production, History.
+Payload is the application and data framework, **not** the visual design
+system. Writers and editors use Byline. If replacing WordPress makes the
+newsroom feel like somebody else's CMS, the migration is wrong.
 
-The port reuses the existing React 19 code: Home (`src/home`), Planning board/
-list/calendar (`src/planning`, Schedule-X adapter and Pragmatic DnD), Story
-Workspace sections (`src/workspace`), `StoryPeek` and the Nova primitives. Their
-`*-api.ts` fetch adapters are swapped for Payload REST/Local API adapters; the
-models and components move unchanged where possible.
+**Payload supplies, natively:** authentication and sessions, access control,
+document form state, validation, drafts, autosave, versions, document locking,
+scheduled publishing, upload state, Live Preview plumbing, jobs, Local API and
+REST.
+
+**Byline supplies every staff-facing surface**, in the one Nova design system
+(`packages/newsroom-ui`, moved out of the WordPress plugin so both admins use
+the same components): Home, Stories, Planning, Calendar, Media Desk, Coverage,
+the Story screen (Write / Plan / Production / History), the article editor's
+interface, Preview, People, Polls, Feedback, search and the command palette.
+Buttons, menus, Command, Dialog/AlertDialog, Popover, Tooltip, ContextMenu,
+Tabs, Sheet, avatars, calendars, Cards/Items/Fields, Sonner and the existing
+workflow/status components are Nova's. No second visual library is
+introduced; Payload's UI components appear only where they carry document/form
+integration, styled so they do not dictate how Byline looks.
+
+**Extension points, in order of preference:**
+
+1. **Dashboard** (`admin.components.views.dashboard`) → Byline Home.
+2. **List views** (`collection.admin.components.views.list.Component`) →
+   Byline Stories, Media Desk, People, Coverage, Polls, Feedback.
+3. **Story screen.** Payload's `DefaultEditView` owns the `Form`, autosave, the
+   lock/take-over/read-only handling, leave-without-saving, stale-data
+   detection and the Live Preview window. Replacing it (or the document root)
+   would mean re-implementing that infrastructure and risks a second copy of
+   document state, so the default Edit view **stays as invisible
+   infrastructure** and everything visible is Byline:
+   - the story's fields sit inside one presentational `collapsible` whose
+     custom `Field` component is the Byline Story screen. It reads and writes
+     the real form through `useField`/`useForm`/`useDocumentInfo`, and renders
+     Payload field components (the Lexical engine) through `RenderFields` only
+     where Payload must own the input;
+   - Payload's document header, tabs and controls are hidden on this screen;
+     the Byline header presents the same actions (Publish, Unpublish, Preview,
+     save state) by calling the same form/document APIs Payload's buttons do;
+   - the story plan, sources, appointments, tasks and production are separate
+     records (§4.3/§4.4) and are edited through access-controlled REST, never
+     mirrored into the story form.
+   A full document-root override is used only if these APIs prove
+   insufficient, and that decision is recorded here first.
+4. **Navigation** (`admin.components.Nav`) → Byline navigation only. Nobody
+   sees Payload's generic collection navigation. Administrators get a
+   separate, clearly secondary *Administration* section that links to the raw
+   collection screens for maintenance and debugging.
+
+Generic Payload list/edit screens remain reachable by administrators as a
+fallback. They are not the product, and staff are never sent to them; until a
+Byline view exists for a destination, it is absent from staff navigation.
+
+**Every custom view and endpoint re-checks the user on the server**
+(`requestUser`, Local API with `overrideAccess: false`). Being inside the admin
+layout is not access control.
+
+The port reuses the existing React 19 code: Home (`src/home`), Planning board,
+list and calendar (`src/planning`, Schedule-X adapter, Pragmatic DnD), Story
+Workspace sections (`src/workspace`), `StoryPeek` and the Nova primitives.
+Their `*-api.ts` fetch adapters are swapped for Payload adapters; models and
+components move with as little change as possible. The article editor keeps
+Lexical as its state engine with a Byline interface (slash menu, block
+toolbars, dialogs, media selectors, reorder controls) built from Nova. Live
+Preview's chrome is Byline; Payload supplies the unsaved-document messages, and
+`@byline/story-presentations` renders the page.
+
+### 7.1 Where the UI stands
+
+Built (Phase 1b, branch `feature/payload-newsroom`):
+
+- `@byline/newsroom-ui`: the Nova system, shared by both admins (compiled plugin
+  CSS byte-identical after the move).
+- The Next app compiles it through `postcss/byline-ui.cjs`, which runs
+  Tailwind and the `.byline-ui-root` scope **only** for `src/ui/*.css`;
+  Payload's own CSS passes through untouched. Nova's `dark:` variant follows
+  Payload's `html[data-theme]` (pinned light), never the OS.
+- Byline navigation replaces Payload's `Nav`; Payload's header and nav toggler
+  are hidden. Administrators get a collapsed *Administration* section.
+- The Byline Story screen (`src/ui/story`), mounted as the custom `Field` of a
+  presentational collapsible around every story field: header (headline,
+  Workflow and Publication as separate states, save state, Publish only with
+  publish permission), Write (kicker, headline, deck, byline, section, topics,
+  lead image + caption, Lexical body, format/video, presentation, headline
+  position, reporting note), Plan (workflow, editor and deadline for editors,
+  brief, files & links on `story-plans`), Production (production, tasks,
+  sources, appointments, read with the user's access) and History (version
+  summary). Verified in the browser: typing in Byline fields triggers Payload's
+  native autosave; workflow changes save to the plan without a story save.
+- Publishing is an editor's decision, enforced in `stories` access (Payload
+  derives `hasPublishPermission` from it), integration-tested.
+
+Still Payload's own UI, each with its replacement planned:
+
+| Surface | Interim | Replacement |
+| --- | --- | --- |
+| Home | Interim server-rendered Home | `HomeApp` ported unchanged with a Payload `HomeFetchers` adapter |
+| Stories / Planning / Calendar / Media Desk / Coverage | not in staff navigation | `StoryList`, board, Schedule-X calendar, `MediaDesk` ported with Payload adapters |
+| Lead image picker | Payload upload field | Byline media picker + drag-and-drop (Phase 5) |
+| Body editing chrome | Payload Lexical toolbar/slash menu | `@byline/editor` Nova interface (Phase 3/6) |
+| Lock / take-over / read-only modals | Payload modals | Byline treatment of the same `useDocumentInfo` lock state |
+| History compare/restore | Payload versions view | Byline History view over the same versions |
+| Unpublish, schedule | not offered on the Story screen yet | Byline controls over Payload's unpublish and `schedulePublish` |
+
+**Next slice: the screens port.** Home's whole closure (44 files) touches
+WordPress only through an injected request function, `@wordpress/i18n` in one
+file and a wp-admin URL default. `home/`, `story/`, `workspace/`, `planning/`,
+`editorial/` and `collections/` move from `wordpress-plugin/src` to a shared
+`packages/newsroom-screens`, as a pure move like the design system's. Each host
+then supplies its adapter: the plugin keeps its `wp-api-fetch` fetchers, and the
+newsroom implements the same `HomeFetchers`/`StoryFetchers` contracts over
+Payload REST with the plan and workspace collections. Only then do Home and
+Stories join the staff navigation.
 
 ## 8. Editor
 
@@ -462,6 +564,12 @@ The torture-test story covers scrollytelling with a repository visual story.
   the editor in `@byline/editor`.
 - GraphQL is disabled (`graphQL.disable`); the REST API is used only by the
   admin, Live Preview and the Worker endpoints.
+- **Only editors publish.** Staff, including a story's own writers, save drafts;
+  an editor publishes. If Weekly Wildcat writers held WordPress *Author*
+  publishing rights, this is a deliberate tightening to revisit. Guarding
+  *unpublish* the same way is still open: Payload's unpublish arrives as an
+  ordinary update to `_status: "draft"`, which access cannot tell apart from a
+  draft save without a hook.
 
 ## 11. Phases, gates and status
 

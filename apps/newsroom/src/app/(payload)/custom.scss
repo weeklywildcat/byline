@@ -1,11 +1,36 @@
-// Byline newsroom styles layered on Payload's admin. Calm, dense, no decoration.
-.byline-nav {
-  margin-bottom: var(--base);
-  ul { list-style: none; margin: 0; padding: 0; }
-  &__brand { font-weight: 600; margin: 0 0 calc(var(--base) / 2); }
-  &__link { display: block; padding: calc(var(--base) / 4) 0; }
+// Unscoped overrides of Payload's admin chrome. Payload's styles live in
+// `@layer payload-default`, so these plain rules win without !important.
+// Byline (src/ui, Nova) owns everything a writer sees; Payload's header,
+// navigation toggler and generic chrome are not part of the product.
+
+.template-default {
+  grid-template-columns: 15rem minmax(0, 1fr);
 }
 
+.template-default__nav-toggler-wrapper,
+.template-default .app-header {
+  display: none;
+}
+
+.byline-shell-nav {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .template-default {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .byline-shell-nav {
+    position: static;
+    height: auto;
+  }
+}
+
+// Interim Byline Home (replaced by the ported Home screen).
 .byline-home {
   padding-block: var(--base);
   &__header { display: flex; align-items: center; justify-content: space-between; gap: var(--base); }
@@ -17,4 +42,19 @@
   &__list { list-style: none; margin: 0; padding: 0; }
   &__list li { display: flex; flex-direction: column; gap: 2px; padding: calc(var(--base) / 3) 0; border-bottom: 1px solid var(--theme-elevation-100); }
   &__meta, &__empty { color: var(--theme-elevation-600); font-size: 0.875rem; }
+}
+
+// The Byline Story screen (src/ui/story) presents the whole document. Payload's
+// document header, tabs and controls stay mounted, because autosave, locking and
+// stale-data detection live there, but they are not shown.
+.template-default:has(.byline-story) {
+  .doc-header,
+  .doc-controls,
+  .collection-edit__sidebar-wrap {
+    display: none;
+  }
+
+  .collection-edit__main {
+    padding: 0;
+  }
 }

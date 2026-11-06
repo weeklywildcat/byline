@@ -23,6 +23,8 @@
     "migrate:check": "node scripts/check-migrations.mjs"
   },
   "dependencies": {
+    "@base-ui/react": "1.9.0",
+    "@byline/newsroom-ui": "0.1.0",
     "@payloadcms/db-postgres": "3.92.1",
     "@payloadcms/next": "3.92.1",
     "@payloadcms/richtext-lexical": "3.92.1",
@@ -30,16 +32,22 @@
     "@payloadcms/ui": "3.92.1",
     "drizzle-orm": "0.45.2",
     "graphql": "16.14.2",
+    "lucide-react": "1.60.0",
     "next": "16.4.2",
     "payload": "3.92.1",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "sharp": "0.35.5"
+    "sharp": "0.35.5",
+    "sonner": "2.0.8"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
     "@types/node": "24.10.1",
     "@types/pg": "8.15.6",
     "pg": "8.20.0",
+    "postcss": "8.5.31",
+    "postcss-nesting": "14.0.3",
+    "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
     "vitest": "4.1.11"
   }

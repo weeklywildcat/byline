@@ -4,7 +4,7 @@ import { atLeast, newsroomUser, relationIds } from "../src/access/user";
 import { passwordSignInAllowed } from "../src/collections/Users";
 import { validResourceUrl } from "../src/collections/StoryPlans";
 import { addDays, localDay } from "../src/domain/dates";
-import { navigationFor } from "../src/domain/navigation";
+import { administrationFor, navigationFor } from "../src/domain/navigation";
 import { dateOnly, normalizeAppointmentTiming, TimingError } from "../src/domain/schedule";
 import { isSlug, slugify } from "../src/domain/slug";
 import { CORRECTION_TYPES, STORY_FORMATS, WORKFLOW_STAGES } from "../src/domain/vocabulary";
@@ -146,12 +146,17 @@ describe("dates", () => {
 });
 
 describe("navigation", () => {
-  it("adds editor and administrator destinations by role", () => {
-    const keys = (role: Parameters<typeof navigationFor>[0]) => navigationFor(role).map((item) => item.key);
-    expect(keys("staff")).toEqual(["home", "stories", "media", "coverage"]);
-    expect(keys("editor")).toEqual(["home", "stories", "media", "coverage", "polls", "corrections", "people"]);
-    expect(keys("administrator")).toContain("pages");
-    expect(keys("administrator")).toContain("system");
+  it("offers only Byline destinations that exist, to every role", () => {
+    for (const role of ["staff", "editor", "administrator"] as const) {
+      expect(navigationFor(role).every((item) => !item.path.startsWith("/collections/"))).toBe(true);
+    }
+    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home"]);
+  });
+
+  it("keeps raw Payload screens in an administrators-only section", () => {
+    expect(administrationFor("staff")).toEqual([]);
+    expect(administrationFor("editor")).toEqual([]);
+    expect(administrationFor("administrator").map((item) => item.key)).toContain("raw-stories");
   });
 });
 

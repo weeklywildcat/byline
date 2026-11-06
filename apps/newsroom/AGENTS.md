@@ -32,6 +32,16 @@ snapshot; nothing in this app serves public reading.
 - **Votes** live in `byline_poll_votes` (`src/db/poll-votes.ts`), never a collection.
 - **Nothing private enters a public projection.** Public snapshot/live/poll
   projections (later phases) use explicit allowlists.
+- **Byline UI, Payload underneath.** Every staff-facing surface is Byline's
+  Nova UI (`@byline/newsroom-ui`, `src/ui`), never Payload's generic list/edit
+  screens. Use Payload's extension points (dashboard, list views, `Nav`, custom
+  Field components) and its hooks (`useField`, `useForm`, `useDocumentInfo`)
+  so form state stays Payload's. Do not replace the Edit view or document root:
+  the Story screen is the custom Field of a presentational collapsible.
+- **Nova inside Payload:** Byline stylesheets live in `src/ui/*.css` (the only
+  files `postcss/byline-ui.cjs` compiles and scopes). The Story screen sits
+  inside Payload's `<form>`: never nest a `<form>`, give every button
+  `type="button"`, and stop Enter in one-line inputs.
 - **Writers never get** HTML, CSS, colors, fonts, alignment or layout controls.
   `src/editor/prose.ts` is the whole prose surface.
 - `src/payload-types.ts` is this app's internal type file. It must never become

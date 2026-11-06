@@ -128,10 +128,16 @@ export const Stories: CollectionConfig = {
       if (!scope) return false;
       return scope.all ? true : inIds("parent", scope.managed);
     },
-    create: ({ req }) => requestUser(req) !== null,
-    update: async ({ req }) => {
+    // Publishing is an editor's decision. Payload also calls these with `_status: "published"`
+    // to decide whether to offer Publish, so the button follows the same rule.
+    create: ({ req, data }) => {
+      const user = requestUser(req);
+      return Boolean(user) && (data?._status !== "published" || atLeast(user, "editor"));
+    },
+    update: async ({ req, data }) => {
       const scope = await storyScope(req);
       if (!scope) return false;
+      if (data?._status === "published" && !atLeast(scope.user, "editor")) return false;
       return scope.all ? true : inIds("id", scope.managed);
     },
     delete: ({ req }) => atLeast(requestUser(req), "editor")
@@ -141,74 +147,83 @@ export const Stories: CollectionConfig = {
     afterChange: [syncPlan]
   },
   fields: [
-    { name: "headline", type: "text", required: true, maxLength: 300 },
-    { name: "deck", type: "textarea", maxLength: 600 },
-    { name: "kicker", type: "text", maxLength: 80 },
     {
-      type: "row",
-      fields: [
-        { name: "section", type: "relationship", relationTo: "sections", index: true },
-        { name: "topics", type: "relationship", relationTo: "topics", hasMany: true }
-      ]
-    },
-    { name: "contributors", type: "relationship", relationTo: "people", hasMany: true, admin: { description: "The byline, in order." } },
-    { name: "featuredMedia", type: "upload", relationTo: "media" },
-    { name: "featuredCaption", type: "textarea", maxLength: 1000, admin: { description: "This story's caption for the lead image. Credit comes from the photo." } },
-    {
-      name: "contentFormat",
-      type: "select",
-      required: true,
-      defaultValue: "byline-v1",
-      options: CONTENT_FORMATS.map((value) => ({ value, label: value === "byline-v1" ? "Byline editor" : "Imported WordPress body" })),
-      admin: { readOnly: true, position: "sidebar" }
-    },
-    { name: "body", type: "richText", editor: proseEditor, admin: { condition: (data) => data?.contentFormat !== "legacy-html" } },
-    {
-      name: "legacyHtml",
-      label: "Imported body (HTML)",
-      type: "code",
-      admin: { language: "html", readOnly: true, condition: (data) => data?.contentFormat === "legacy-html", description: "Imported from WordPress. It renders as published; converting it to the Byline editor is a separate, reviewed step." }
-    },
-    { name: "legacySource", label: "Original Gutenberg source", type: "code", admin: { language: "html", readOnly: true, hidden: true } },
-    {
+      // Presentational only (no data namespace): its custom Field is the Byline Story
+      // screen, which renders inside Payload's Edit view and form.
       type: "collapsible",
-      label: "Presentation",
-      admin: { initCollapsed: false },
+      label: "Story",
+      admin: { components: { Field: "/ui/story/StoryScreen#StoryScreen" } },
       fields: [
-        { name: "format", type: "select", required: true, defaultValue: "standard", options: [...STORY_FORMAT_OPTIONS] },
+        { name: "headline", type: "text", required: true, maxLength: 300 },
+        { name: "deck", type: "textarea", maxLength: 600 },
+        { name: "kicker", type: "text", maxLength: 80 },
         {
-          name: "video",
-          type: "group",
-          admin: { condition: (data) => data?.format === "video" },
+          type: "row",
           fields: [
-            { name: "url", label: "YouTube URL", type: "text" },
-            { name: "metadata", type: "json", admin: { readOnly: true, hidden: true } }
+            { name: "section", type: "relationship", relationTo: "sections", index: true },
+            { name: "topics", type: "relationship", relationTo: "topics", hasMany: true }
           ]
         },
-        { name: "presentation", type: "select", required: true, defaultValue: "standard", options: [...STORY_PRESENTATION_OPTIONS] },
+        { name: "contributors", type: "relationship", relationTo: "people", hasMany: true, admin: { description: "The byline, in order." } },
+        { name: "featuredMedia", type: "upload", relationTo: "media" },
+        { name: "featuredCaption", type: "textarea", maxLength: 1000, admin: { description: "This story's caption for the lead image. Credit comes from the photo." } },
         {
-          name: "immersiveAlignment",
-          label: "Headline position",
+          name: "contentFormat",
           type: "select",
-          defaultValue: "bottom-left",
-          options: [...IMMERSIVE_ALIGNMENT_OPTIONS],
-          admin: { condition: (data) => data?.presentation === "immersive" }
-        }
+          required: true,
+          defaultValue: "byline-v1",
+          options: CONTENT_FORMATS.map((value) => ({ value, label: value === "byline-v1" ? "Byline editor" : "Imported WordPress body" })),
+          admin: { readOnly: true, position: "sidebar" }
+        },
+        { name: "body", type: "richText", editor: proseEditor, admin: { condition: (data) => data?.contentFormat !== "legacy-html" } },
+        {
+          name: "legacyHtml",
+          label: "Imported body (HTML)",
+          type: "code",
+          admin: { language: "html", readOnly: true, condition: (data) => data?.contentFormat === "legacy-html", description: "Imported from WordPress. It renders as published; converting it to the Byline editor is a separate, reviewed step." }
+        },
+        { name: "legacySource", label: "Original Gutenberg source", type: "code", admin: { language: "html", readOnly: true, hidden: true } },
+        {
+          type: "collapsible",
+          label: "Presentation",
+          admin: { initCollapsed: false },
+          fields: [
+            { name: "format", type: "select", required: true, defaultValue: "standard", options: [...STORY_FORMAT_OPTIONS] },
+            {
+              name: "video",
+              type: "group",
+              admin: { condition: (data) => data?.format === "video" },
+              fields: [
+                { name: "url", label: "YouTube URL", type: "text" },
+                { name: "metadata", type: "json", admin: { readOnly: true, hidden: true } }
+              ]
+            },
+            { name: "presentation", type: "select", required: true, defaultValue: "standard", options: [...STORY_PRESENTATION_OPTIONS] },
+            {
+              name: "immersiveAlignment",
+              label: "Headline position",
+              type: "select",
+              defaultValue: "bottom-left",
+              options: [...IMMERSIVE_ALIGNMENT_OPTIONS],
+              admin: { condition: (data) => data?.presentation === "immersive" }
+            }
+          ]
+        },
+        { name: "reportingNote", label: "How we reported this", type: "textarea", maxLength: 4000 },
+        {
+          name: "liveCoverage",
+          type: "group",
+          admin: { description: "Live coverage is a timeline of updates on this story, not a story format." },
+          fields: [
+            { name: "state", type: "select", defaultValue: "off", options: [...LIVE_COVERAGE_STATE_OPTIONS] },
+            { name: "startedAt", type: "date", admin: { readOnly: true } },
+            { name: "endedAt", type: "date", admin: { readOnly: true } }
+          ]
+        },
+        slugField("headline", "stories"),
+        { name: "publishedAt", type: "date", index: true, admin: { position: "sidebar", readOnly: true, description: "First publication. Part of the article URL." } },
       ]
     },
-    { name: "reportingNote", label: "How we reported this", type: "textarea", maxLength: 4000 },
-    {
-      name: "liveCoverage",
-      type: "group",
-      admin: { description: "Live coverage is a timeline of updates on this story, not a story format." },
-      fields: [
-        { name: "state", type: "select", defaultValue: "off", options: [...LIVE_COVERAGE_STATE_OPTIONS] },
-        { name: "startedAt", type: "date", admin: { readOnly: true } },
-        { name: "endedAt", type: "date", admin: { readOnly: true } }
-      ]
-    },
-    slugField("headline", "stories"),
-    { name: "publishedAt", type: "date", index: true, admin: { position: "sidebar", readOnly: true, description: "First publication. Part of the article URL." } },
     { name: "plan", type: "join", collection: "story-plans", on: "story", admin: { hidden: true } },
     legacyIdField()
   ]

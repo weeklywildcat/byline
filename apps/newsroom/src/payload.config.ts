@@ -17,6 +17,7 @@ import { Users } from "./collections/Users";
 import { addPollVotesTable } from "./db/poll-votes";
 import { proseEditor } from "./editor/prose";
 import { dropClientIds } from "./hooks/imported-ids";
+import { newsroomTimeZone } from "./domain/dates";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -89,8 +90,13 @@ export default buildConfig({
     user: Users.slug,
     meta: { titleSuffix: " · Byline", robots: "noindex, nofollow" },
     importMap: { baseDir: dirname },
+    // Read by Byline's client screens: dates show in the newsroom's timezone, never the browser's.
+    custom: { newsroomTimeZone: newsroomTimeZone() },
+    // Byline's Nova surfaces are light; Payload's chrome follows so the two never clash.
+    theme: "light",
     components: {
-      beforeNavLinks: ["/components/BylineNavLinks#BylineNavLinks"],
+      // Byline navigation replaces Payload's entirely.
+      Nav: "/ui/shell/BylineNav#BylineNav",
       views: {
         dashboard: { Component: "/components/BylineHome#BylineHome" }
       }

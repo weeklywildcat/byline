@@ -108,6 +108,13 @@ describe("stories and their plans", () => {
     expect(next.id).toBe(5001);
   });
 
+  it("leaves publishing to editors, even for a story's own team", async () => {
+    await expect(payload.update({ collection: "stories", id: storyId, data: { _status: "published" }, ...as("alice") })).rejects.toThrow();
+    await expect(payload.create({ collection: "stories", data: { headline: "Straight to print", slug: "straight-to-print", contentFormat: "byline-v1", format: "standard", presentation: "standard", _status: "published" }, ...as("alice") })).rejects.toThrow();
+    const still = await payload.findByID({ collection: "stories", id: storyId, draft: true, overrideAccess: true });
+    expect(still._status).toBe("draft");
+  });
+
   it("shows published stories, but not their plans, to unrelated staff", async () => {
     await payload.update({ collection: "stories", id: storyId, data: { _status: "published", section: null }, ...as("editor") });
     const read = await payload.findByID({ collection: "stories", id: storyId, ...as("erin") });

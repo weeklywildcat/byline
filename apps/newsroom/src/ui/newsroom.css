@@ -1,0 +1,14 @@
+/*
+ * Byline's newsroom surfaces inside Payload: the shared Nova design system,
+ * compiled by postcss/byline-ui.cjs and scoped to `.byline-ui-root`.
+ */
+@import "@byline/newsroom-ui/styles.css";
+@source "./";
+@source "../components";
+
+/*
+ * Nova's `dark:` variants follow Payload's admin theme (`html[data-theme]`),
+ * not the operating system, so Byline and Payload chrome never disagree.
+ * The admin theme is pinned to light in payload.config.ts.
+ */
+@custom-variant dark (&:where([data-theme="dark"] *));
