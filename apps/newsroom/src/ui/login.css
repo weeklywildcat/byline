@@ -1,4 +1,5 @@
 .byline-login {
+  --font-sans: "Mona Sans", system-ui, sans-serif;
   position: fixed;
   inset: 0;
   isolation: isolate;
@@ -8,6 +9,7 @@
   justify-items: center;
   background: #15171b;
   padding-inline: 16px;
+  font-family: var(--font-sans);
   font-size: 0.875rem;
   line-height: 1.5;
 }
@@ -49,6 +51,7 @@
 .byline-login-form { display: grid; gap: 8px; }
 .byline-login-form[hidden] { display: none; }
 .byline-login-form label { font-weight: 600; }
+.byline-login-form :is(input, button) { font-family: inherit; }
 .byline-login-form input { margin-bottom: 4px; font-size: 1rem; min-height: 40px; }
 .byline-login-reset { text-align: center; }
 .byline-login-error { color: #992a24; margin: 0 0 12px; }
