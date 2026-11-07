@@ -1,9 +1,14 @@
 import type { CSSProperties } from "react";
 import { getNavigation, getPublicationConfig } from "@/lib/publication";
+import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
 
 const publication = getPublicationConfig();
+const footerLinks = getNavigation("footer");
+if (!footerLinks.some((link) => link.url === BEHIND_THE_SCENES.path)) {
+  footerLinks.push({ label: BEHIND_THE_SCENES.name, url: BEHIND_THE_SCENES.path, locations: ["footer"], group: "About" });
+}
 const footerGroups = Object.entries(
-  getNavigation("footer").reduce<Record<string, ReturnType<typeof getNavigation>>>(
+  footerLinks.reduce<Record<string, ReturnType<typeof getNavigation>>>(
     (groups, item) => {
       const group = item.group || "More";
       groups[group] = [...(groups[group] ?? []), item];

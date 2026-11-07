@@ -1,6 +1,7 @@
 import { normalizeArtDirection, normalizeLiveCoverage, normalizePrimaryVideo, normalizeStoryFormat, type ImageArtDirection, type LiveCoverage as WordPressLiveCoverage, type PrimaryVideo } from "@byline/core";
 import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
 import { REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
+import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
 import { mirrorWordPressMediaInValue } from "@/lib/media";
 import { getNamespaceApiUrl, getWordPressApiUrl } from "@/lib/byline-rest";
 import { stripHtml } from "@/lib/format";
@@ -1586,7 +1587,7 @@ export function getPostHref(post: WordPressPost) {
 }
 
 export function getCategoryHref(category: WordPressCategory) {
-  return `/category/${category.slug}/`;
+  return category.slug === BEHIND_THE_SCENES.slug ? BEHIND_THE_SCENES.path : `/category/${category.slug}/`;
 }
 
 export function getCoverageHref(coverage: Pick<WordPressCoverage, "slug">) {

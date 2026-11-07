@@ -1,10 +1,11 @@
 import type { Metadata } from "@/lib/metadata";
 import { HomepagePackages, ThisWeekCard as SharedThisWeekCard, packageHeadingId } from "@byline/ui";
 import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
+import { BehindTheScenesSection } from "@/components/BehindTheScenesSection";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { PollWidget } from "@/components/PollWidget";
 import { optionalBuildData } from "@/lib/build-data";
-import { filterPublicHomepagePosts } from "@/lib/content";
+import { filterPublicHomepagePosts, getBehindTheScenesPosts } from "@/lib/content";
 import {
   getSchoolEvents,
   type SchoolEvent
@@ -63,6 +64,7 @@ export default async function HomePage() {
           newsletter: ({ package: resolvedPackage, packageId }) => "label" in resolvedPackage ? <NewsletterSignupForm headingId={packageHeadingId(`${packageId}-heading`, "article-newsletter-heading")} heading={resolvedPackage.heading} showLabel={resolvedPackage.presentation.showLabel} /> : null
         }}
       />
+      <BehindTheScenesSection posts={data.behindTheScenesPosts} />
     </main>
   );
 }
@@ -87,5 +89,5 @@ export async function getHomepagePageData() {
     sportsSchedule
   });
 
-  return { resolvedHome, sportsSchedule, websiteSchema, organizationSchema };
+  return { resolvedHome, sportsSchedule, websiteSchema, organizationSchema, behindTheScenesPosts: getBehindTheScenesPosts(allPosts).slice(0, 2) };
 }

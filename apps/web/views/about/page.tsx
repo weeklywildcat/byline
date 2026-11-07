@@ -109,12 +109,6 @@ export default async function AboutPage() {
                 often take the photographs, edit each other&rsquo;s drafts and help publish the result. Roles overlap, and
                 students often take on more as they get comfortable.
               </p>
-              <p>
-                The staff works mostly online. Assignments and story discussions happen in Discord, meetings in Google Meet,
-                and files in a shared drive, so a story does not live only on one person&rsquo;s laptop. Staff get a
-                separate @weeklywildcat.com account for newspaper work, and the newsroom keeps a few loaner laptops for
-                students who need one.
-              </p>
             </div>
             <dl className="about-roles">
               {ROLES.map((role) => (

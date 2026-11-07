@@ -35,7 +35,6 @@ Leadership is not duplicated here. Only people whose directory role contains "Ed
 | TV Communications class, weekly 5 to 7 minute broadcast, rotating anchor | "A New Era For Student Journalism @ NSHS," January 22, 2026 |
 | Newspaper not regularly produced for 20+ years; restart attempt about four years earlier with Mrs. Blackwell and Mr. Sprowl | Same story |
 | Dan Mackin as adviser | Same story, which lists him as adviser for 2025-26 |
-| Discord, Google Meet, shared drive, @weeklywildcat.com accounts, loaner laptops, no personal laptop needed | Staff Device & Technology Policy (PDF in the media library) |
 | Roles, "you do not need to be an expert" | `/join/` and `/diversity-inclusion/` |
 | Editors assign, review drafts, check details; students lead | `/leadership/` |
 | Fair, accurate, chance to respond, opinion labeled, corrections | The previous About text; `/diversity-inclusion/`; `/leadership/` |

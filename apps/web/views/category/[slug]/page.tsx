@@ -2,7 +2,7 @@ import type { Metadata } from "@/lib/metadata";
 import { notFound } from "@/lib/static-not-found";
 import { SectionHeader } from "@/components/SectionHeader";
 import { StoryTeaser } from "@/components/StoryTeaser";
-import { filterVisibleContentPosts, isHiddenCategory } from "@/lib/content";
+import { filterGeneralEditorialPosts, isHiddenCategory } from "@/lib/content";
 import { decodeHtml, stripHtml } from "@/lib/format";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getCategorySeoDescription } from "@/lib/sections";
@@ -27,7 +27,7 @@ export async function getMetadata({ params }: CategoryPageProps): Promise<Metada
   }
 
   const categoryName = decodeHtml(category.name);
-  const posts = filterVisibleContentPosts(await getPostsByCategory(category.id));
+  const posts = filterGeneralEditorialPosts(await getPostsByCategory(category.id));
 
   return buildPageMetadata({
     title: categoryName,
@@ -50,7 +50,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     notFound();
   }
 
-  const posts = filterVisibleContentPosts(await getPostsByCategory(category.id));
+  const posts = filterGeneralEditorialPosts(await getPostsByCategory(category.id));
   const [leadPost, ...remainingPosts] = posts;
   const categoryName = decodeHtml(category.name);
   const categoryDescription = category.description ? stripHtml(category.description) : `${posts.length} published stories`;
