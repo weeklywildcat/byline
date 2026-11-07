@@ -63,7 +63,7 @@ async function gif(frames: number, size = 64) {
   const colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]];
   const raw = Buffer.concat(Array.from({ length: frames }, (_, index) => Buffer.alloc(size * size * 3, Buffer.from(colors[index % colors.length]))));
   const data = await sharp(raw, { raw: { width: size, height: size * frames, channels: 3, pageHeight: size } as never }).gif({ delay: Array(frames).fill(100) }).toBuffer();
-  return { data, mimetype: "image/gif", name: "spinner.gif", size: data.length };
+  return { data, mimetype: "image/gif", name: "pubmedia-spinner.gif", size: data.length };
 }
 
 function pdf(padding = 0) {
@@ -76,7 +76,7 @@ function pdf(padding = 0) {
   body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("")}`;
   body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   const data = Buffer.from(body, "latin1");
-  return { data, mimetype: "application/pdf", name: "board-minutes.pdf", size: data.length };
+  return { data, mimetype: "application/pdf", name: "pubmedia-minutes.pdf", size: data.length };
 }
 
 async function upload(key: string, file: NonNullable<PayloadRequest["file"]>, complete = true) {

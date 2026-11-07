@@ -6724,13 +6724,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "break_glass": {
-          "name": "break_glass",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
         "google_subject": {
           "name": "google_subject",
           "type": "varchar",
@@ -9012,6 +9005,6 @@
     "tables": {},
     "columns": {}
   },
-  "id": "06f5aa5c-7ad1-4897-8b24-cc80d490fdbe",
+  "id": "4e3971bf-a4dc-4a03-a405-29aa5372a2ec",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }
