@@ -1,6 +1,6 @@
 import { isBlockingIssue, type MediaId } from "@byline/article-body";
 import {
-  collapseRedirects, PUBLIC_SNAPSHOT_SCHEMA_VERSION, publicSnapshotContributor, publicStoryPath, snapshotStoryReference,
+  FIXED_PUBLIC_CONTENT_ROUTES, collapseRedirects, PUBLIC_SNAPSHOT_SCHEMA_VERSION, publicSnapshotContributor, publicStoryPath, snapshotStoryReference,
   validatePublicBuildSnapshotV2, type PublicBuildSnapshotV2, type PublicStorySnapshot
 } from "@byline/content";
 import { escapeHtml, type PublicTerm } from "@byline/content/story";
@@ -152,6 +152,7 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
     return { ...facts.get(row.id)!, body, live: collectLiveCoverage(row, updatesByStory.get(row.id) ?? [], catalog, publication) };
   });
   const paths = new Set([
+    ...FIXED_PUBLIC_CONTENT_ROUTES.map(({ path }) => path),
     ...stories.map((row) => row.href), ...pages.map((row) => row.href), ...sections.map((row) => row.href),
     ...people.filter((row) => row.hasProfilePage).map((row) => `/author/${row.slug}/`),
     ...collections.map((row) => `/coverage/${row.slug}/`)

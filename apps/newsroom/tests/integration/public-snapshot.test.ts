@@ -703,6 +703,43 @@ describe("public URL history", () => {
     expect(persisted.docs.some((row) => row.reason === "section-slug-change")).toBe(true);
   });
 
+  it("keeps the last live pathname through unpublish, draft edits and Section changes", async () => {
+    const section = await payload.create({ collection: "sections", data: { name: "Return desk", slug: "return-desk" } });
+    const id = await draftStory("Story returning to publication", { section: section.id });
+    const first = path("return-desk", "first-address");
+    const last = path("return-desk", "last-address");
+    const next = path("renamed-return-desk", "new-address");
+    await publish(id, { slug: "first-address", publishedAt: time });
+    await publish(id, { slug: "last-address" });
+    // A Story already live when the new routing metadata is introduced has no stored path yet.
+    await (await drizzleFor(payload)).execute(sql`update story_plans set last_public_path = null where story_id = ${id}`);
+    await payload.update({ collection: "stories", id, data: { _status: "draft" } });
+    expect((await snapshot()).datasets.redirects.some((row) => row.from === first)).toBe(false);
+
+    await payload.update({ collection: "sections", id: section.id, data: { slug: "renamed-return-desk" } });
+    await payload.update({ collection: "stories", id, draft: true, autosave: true, data: { slug: "new-address" } });
+    const republished = await publish(id);
+    expect(republished.publishedAt).toBe(time);
+    expect((await snapshot()).datasets.redirects.filter((row) => row.to === next)).toEqual([
+      expect.objectContaining({ from: first, to: next, status: 301 }),
+      expect.objectContaining({ from: last, to: next, status: 301 })
+    ]);
+  });
+
+  it("projects file-shaped redirect sources and code-owned targets without CMS Pages", async () => {
+    const from = "/old-newsroom.html";
+    await payload.create({ collection: "redirects", data: { from: `${from}/`, to: "/media-kit", reason: "manual" } });
+    await payload.create({ collection: "redirects", data: { from: "/old-about", to: "/about/", reason: "manual" } });
+    await payload.create({ collection: "redirects", data: { from: "/old-feed.xml", to: "/feed.xml", reason: "manual" } });
+    const { datasets } = await snapshot();
+    expect(datasets.pages.some((row) => row.href === "/about/" || row.href === "/media-kit/")).toBe(false);
+    expect(datasets.redirects).toEqual(expect.arrayContaining([
+      expect.objectContaining({ from, to: "/media-kit/", status: 301 }),
+      expect.objectContaining({ from: "/old-about/", to: "/about/", status: 301 }),
+      expect.objectContaining({ from: "/old-feed.xml", to: "/feed.xml", status: 301 })
+    ]));
+  });
+
   it("moves published descendant pages when a parent changes and rejects cycles", async () => {
     const page = (title: string, slug: string, parent?: number) => payload.create({ collection: "pages", data: { title, slug, parent, _status: "published" } });
     const parent = await page("URL Parent", "url-parent");

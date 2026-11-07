@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { FIXED_PUBLIC_CONTENT_ROUTES } from "@byline/content";
 import { describe, expect, it } from "vitest";
 import { MAX_STATIC_REDIRECTS, buildRedirectsFile, parseRedirectsFile } from "@/scripts/redirects.mts";
 import { getSportsArchiveRedirects } from "@/lib/sports-archive";
@@ -24,6 +25,11 @@ describe("_redirects generation", () => {
   it("also redirects the form without a trailing slash, which has no file to fall back on", () => {
     expect(rules.get("/sports/football-varsity/2025-26")?.to).toBe("/sports-archive-football-2/#season-2025-26");
     expect(rules.get("/sports")?.to).toBe("/sports-archive/");
+  });
+
+  it("writes a single exact rule for a legacy file path", () => {
+    const rules = parseRedirectsFile(buildRedirectsFile([{ from: "/old-newsroom.html", to: "/media-kit/" }]));
+    expect([...rules]).toEqual([["/old-newsroom.html", { to: "/media-kit/", status: 301 }]]);
   });
 
   it("is deterministic and stays within Cloudflare's static redirect limit", () => {
@@ -66,7 +72,8 @@ describe("historical sports routes are not generated as HTML", () => {
 describe("the staff directory", () => {
   it("lives at /staff/ and leaves /authors/ as an edge redirect rather than a page", () => {
     const snapshot = read("lib/build-snapshot.ts");
-    expect(snapshot).toContain('{ path: "/staff/", kind: "author" }');
+    expect(FIXED_PUBLIC_CONTENT_ROUTES).toContainEqual({ path: "/staff/", kind: "author" });
+    expect(snapshot).toContain("...FIXED_PUBLIC_CONTENT_ROUTES");
     expect(snapshot).toContain('{ path: "/authors/", kind: "redirect", redirectTo: "/staff/", delivery: "edge" }');
     expect(existsSync(path.join(webRoot, "src", "pages", "staff", "index.astro"))).toBe(true);
     expect(existsSync(path.join(webRoot, "src", "pages", "authors"))).toBe(false);

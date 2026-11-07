@@ -513,6 +513,7 @@ export interface FolderInterface {
  */
 export interface StoryPlan {
   id: number;
+  lastPublicPath?: string | null;
   story: number | Story;
   /**
    * Never changes on its own. Published is shown from the story's publication state.
@@ -1275,6 +1276,7 @@ export interface StoriesSelect<T extends boolean = true> {
  * via the `definition` "story-plans_select".
  */
 export interface StoryPlansSelect<T extends boolean = true> {
+  lastPublicPath?: T;
   story?: T;
   workflow?: T;
   editor?: T;

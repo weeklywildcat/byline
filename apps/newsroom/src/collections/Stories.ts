@@ -184,6 +184,7 @@ export const Stories: CollectionConfig = {
       if ((operation === "update" || operation === "restoreVersion") && !overrideAccess && !args.draft && !atLeast(requestUser(req), "editor")) {
         throw new APIError("Only editors can change a public story. Save your edits as a draft.", 403);
       }
+      if (operation === "update" || operation === "restoreVersion") req.context.bylineStoryDraftWrite = args.draft === true;
       if (operation === "restoreVersion") req.context.bylineVersionRestore = { draft: args.draft === true };
       return args;
     }],
@@ -206,7 +207,7 @@ export const Stories: CollectionConfig = {
       };
       return data;
     }, pinContentFormat, requireStoryFacts, guardPrivilegedBlocks, requireCompleteBody, requirePublishableMedia, stampFirstPublication, urlChanges.beforeChange, beforeStoryActivity],
-    afterChange: [urlChanges.afterChange, syncPlan, afterStoryActivity],
+    afterChange: [syncPlan, urlChanges.afterChange, afterStoryActivity],
     beforeDelete: [async ({ id, req }) => {
       // A hard delete removes private dependents; the ordinary trash update keeps them.
       const where = { story: { equals: id } };

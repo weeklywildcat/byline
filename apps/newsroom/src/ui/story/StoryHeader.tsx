@@ -62,7 +62,8 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
   const newerDraft = hasPublishedDoc && (unpublishedVersionCount > 0 || modified);
   const scheduledAt = planned?.publicationState.scheduledAt ?? null;
   const scheduledLabel = scheduledAt ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: context.timeZone }).format(new Date(scheduledAt)) : null;
-  const changedPath = url.config?.path && newPath && newPath !== url.config.path ? { old: url.config.path, next: newPath } : null;
+  const priorPath = url.config?.path || url.config?.previousPath;
+  const changedPath = priorPath && newPath && newPath !== priorPath ? { old: priorPath, next: newPath } : null;
   const canEditPublication = Boolean(hasPublishPermission) && !context.readOnly;
   const publication = !hasPublishedDoc ? "Draft" : newerDraft ? "Published · unpublished changes" : "Published";
   const saving = processing || background;
@@ -145,9 +146,9 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
           </span>
           {hasPublishPermission ? (
             <Button ref={publishTrigger} type="button" size="sm" onClick={() => {
-              if (url.config?.path && newPath && newPath !== url.config.path) setConfirmURL(true);
+              if (changedPath) setConfirmURL(true);
               else void publish();
-            }} disabled={!canPublish || publishing || saving || Boolean(scheduledAt) || (hasPublishedDoc && !url.config)}>
+            }} disabled={!canPublish || publishing || saving || Boolean(scheduledAt) || !url.config}>
               {publishing ? <Spinner /> : null}
               {hasPublishedDoc ? "Publish changes" : "Publish"}
             </Button>
@@ -162,7 +163,7 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
             <AlertDialogDescription>Byline will preserve the old address with a permanent redirect.</AlertDialogDescription>
           </AlertDialogHeader>
           <dl className="grid gap-1 text-sm [overflow-wrap:anywhere]">
-            <dt className="font-medium">Old path</dt><dd>{url.config?.path}</dd>
+            <dt className="font-medium">Old path</dt><dd>{changedPath?.old}</dd>
             <dt className="font-medium">New path</dt><dd>{newPath}</dd>
           </dl>
           <AlertDialogFooter>

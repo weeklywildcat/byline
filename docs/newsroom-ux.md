@@ -45,14 +45,18 @@ Publishing a changed Story or Page address confirms the new path. Updating a
 Section slug in Site reviews the number of live Stories affected. Redirect
 changes are written with their public mutation. A Section move or publication
 timezone change recomputes the affected live Story paths; a Page move preserves
-its published descendants' old paths. Aliases are collapsed to one hop. Manual
+its published descendants' old paths. A Story remembers its last live path
+while unpublished, so republishing after a URL change still preserves that
+address. Aliases collapse to one hop. Manual
 redirects are administrator-only and accept literal same-site paths. A record
 whose destination is offline stays in Site, but is omitted from the deployment
-until the target is public again. Code-owned paths remain reserved.
+until the target is public again. Fixed public pages can be redirect
+destinations; code-owned paths remain reserved as sources.
 
 The existing Snapshot v2 `redirects` dataset carries only ID, source,
-destination and 301 status. The static build emits both slash variants in
-Cloudflare `_redirects`. The public Worker does not look up redirects in Payload.
+destination and 301 status. The static build emits both slash variants for
+directories and one exact rule for file paths in Cloudflare `_redirects`. The
+public Worker does not look up redirects in Payload.
 
 Scheduling is a native job, separate from a Story deadline and publication
 target. Pending drafts and scheduled rewrites remain private to the Story's
@@ -70,6 +74,7 @@ scans on a page load. External checks use bounded HEAD requests to public IPv4
 addresses (DNS pinned; no redirects or credentials). Unreachable destinations
 and transient HTTP errors do not count as confirmed broken links.
 
-The UX migrations add `redirects`, private Story version attribution fields,
+The UX migrations add `redirects`, a private last public path on each Story plan,
+Story version attribution fields,
 `story_activity`, `story_notes` and its replies, and private `content_health` scan
 records. The maintenance task extends Payload's native job task vocabulary.

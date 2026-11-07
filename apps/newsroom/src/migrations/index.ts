@@ -11,6 +11,7 @@ import * as migration_20261107_212937_newsroom_redirects from './20261107_212937
 import * as migration_20261107_214217_newsroom_version_attribution from './20261107_214217_newsroom_version_attribution';
 import * as migration_20261107_215529_newsroom_story_activity from './20261107_215529_newsroom_story_activity';
 import * as migration_20261107_221914_newsroom_notes_and_health from './20261107_221914_newsroom_notes_and_health';
+import * as migration_20261107_224351_remember_story_public_paths from './20261107_224351_remember_story_public_paths';
 
 export const migrations = [
   {
@@ -76,6 +77,11 @@ export const migrations = [
   {
     up: migration_20261107_221914_newsroom_notes_and_health.up,
     down: migration_20261107_221914_newsroom_notes_and_health.down,
-    name: '20261107_221914_newsroom_notes_and_health'
+    name: '20261107_221914_newsroom_notes_and_health',
+  },
+  {
+    up: migration_20261107_224351_remember_story_public_paths.up,
+    down: migration_20261107_224351_remember_story_public_paths.down,
+    name: '20261107_224351_remember_story_public_paths'
   },
 ];

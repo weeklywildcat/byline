@@ -36,9 +36,30 @@ export const REDIRECTED_PAGE_SLUGS: Readonly<Record<string, string>> = {
   "media-assets": "/media-kit/",
   "behind-the-scenes": "/off-deadline/"
 };
+/** Fixed, generated content (excluding aliases and error pages). */
+export const FIXED_PUBLIC_CONTENT_ROUTES: readonly RouteManifestEntry[] = [
+  { path: "/", kind: "home" },
+  { path: "/staff/", kind: "author" },
+  { path: "/corrections/", kind: "other" },
+  { path: "/coverage/", kind: "coverage" },
+  ...CODE_ROUTED_PAGE_SLUGS.map((slug): RouteManifestEntry => ({ path: `/${slug}/`, kind: "page" })),
+  { path: "/media-kit/", kind: "page" },
+  { path: "/open-source/", kind: "page" },
+  { path: "/intranet/", kind: "page" },
+  { path: "/search/", kind: "search" },
+  { path: "/stories/", kind: "other" },
+  { path: "/watch/", kind: "other" },
+  { path: "/feed.xml", kind: "feed" },
+  { path: "/news-sitemap.xml", kind: "feed" },
+  { path: "/video-sitemap.xml", kind: "feed" },
+  { path: "/sitemap.xml", kind: "sitemap" },
+  { path: "/robots.txt", kind: "robots" }
+];
+
 const codePaths = new Set([
-  ...[...CODE_ROUTED_PAGE_SLUGS, ...Object.keys(REDIRECTED_PAGE_SLUGS), "staff", "authors", "corrections", "coverage", "media-kit", "open-source", "intranet", "search", "sports", "sports/schedule", "stories", "watch", "404"].map((slug) => `/${slug}/`),
-  "/", "/feed.xml", "/news-sitemap.xml", "/video-sitemap.xml", "/sitemap.xml", "/robots.txt", "/404.html"
+  ...FIXED_PUBLIC_CONTENT_ROUTES.map(({ path }) => path),
+  ...Object.keys(REDIRECTED_PAGE_SLUGS).map((slug) => `/${slug}/`),
+  "/authors/", "/sports/", "/sports/schedule/", "/404/", "/404.html"
 ]);
 
 export function isCodeOwnedPublicPath(path: string): boolean {

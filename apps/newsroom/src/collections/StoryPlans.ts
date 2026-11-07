@@ -69,6 +69,8 @@ export const StoryPlans: CollectionConfig = {
     ]
   },
   fields: [
+    // Routing remembers the last public address even while the Story is offline.
+    { name: "lastPublicPath", type: "text", hidden: true, access: { create: () => false, update: () => false } },
     { name: "story", type: "relationship", relationTo: "stories", required: true, unique: true, index: true, access: { update: () => false } },
     {
       name: "workflow",

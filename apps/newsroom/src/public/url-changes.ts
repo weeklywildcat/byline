@@ -48,16 +48,41 @@ export async function readPublicPaths(req: PayloadRequest, kind: Kind, id?: numb
   return new Map([...paths].filter(([, path]) => path));
 }
 
+/** Routing metadata stays in the unversioned plan and does not change its edit revision. */
+export async function readLastPublicStoryPath(req: PayloadRequest, id: number): Promise<string | undefined> {
+  const { rows } = await (await drizzleFor(req.payload, req)).execute(sql`select last_public_path from story_plans where story_id = ${id}`);
+  const value = rows[0]?.last_public_path;
+  return typeof value === "string" && value ? value : undefined;
+}
+
+async function rememberStoryPaths(req: PayloadRequest, paths: Map<number, string>) {
+  if (!paths.size) return;
+  const values = [...paths].filter(([id]) => id > 0).map(([id, path]) => sql`(${id}::integer, ${path}::varchar)`);
+  if (!values.length) return;
+  await (await drizzleFor(req.payload, req)).execute(sql`
+    update story_plans set last_public_path = routes.path
+    from (values ${sql.join(values, sql`, `)}) as routes(id, path)
+    where story_plans.story_id = routes.id and last_public_path is distinct from routes.path
+  `);
+}
+
 export function publicURLHooks(kind: Kind): { beforeChange: CollectionBeforeChangeHook; afterChange: CollectionAfterChangeHook } {
   return {
     beforeChange: async ({ req, data, originalDoc, operation }) => {
       if (req.context?.bylineImport === true) return data;
-      if (kind === "sections" && (operation === "create" || !data.slug || data.slug === originalDoc?.slug)) return data;
-      if (kind !== "sections" && data._status === "draft") return data;
+      if (kind === "sections" && (operation === "create" || (
+        (!data.slug || data.slug === originalDoc?.slug) && (data.hidden === undefined || data.hidden === originalDoc?.hidden)
+      ))) return data;
+      const storyGoingOffline = kind === "stories" && data._status === "draft" && operation === "update" && req.context.bylineStoryDraftWrite === false;
+      if (kind !== "sections" && data._status === "draft" && !storyGoingOffline) return data;
       await lockPublicPaths(req);
       const id = originalDoc?.id;
       if (operation === "update" && id != null) {
         const paths = await readPublicPaths(req, kind, Number(id));
+        if (kind === "stories" && !paths.size) {
+          const last = await readLastPublicStoryPath(req, Number(id));
+          if (last) paths.set(Number(id), last);
+        }
         if (kind === "sections" && !originalDoc?.hidden && originalDoc?.slug) paths.set(0, `/category/${originalDoc.slug}/`);
         req.context[key(kind, id)] = paths;
       }
@@ -83,6 +108,11 @@ export function publicURLHooks(kind: Kind): { beforeChange: CollectionBeforeChan
 
 export async function applyPublicPathMoves(req: PayloadRequest, kind: Kind, old: Map<number, string>, current: Map<number, string>) {
   const changed = [...current].filter(([id, path]) => path !== old.get(id));
+  if (kind !== "pages") {
+    // Keep the previous address when a Story goes offline (unpublish, trash or
+    // Section visibility), including Stories that were live before this field existed.
+    await rememberStoryPaths(req, new Map([...old, ...current]));
+  }
   if (!changed.length) return;
   const existing = await readRedirects(req);
   const byId = new Map(existing.map((row) => [row.id, row]));

@@ -6,7 +6,7 @@ import { storyBodyProblems } from "../hooks/story-body";
 import type { Story } from "../payload-types";
 import { publicationMediaReport, storyMediaRequirements } from "../publication-media/readiness";
 import { publicationConfigFromGlobal, readPublishedPublication } from "../public/publication-config";
-import { readPublicPaths } from "../public/url-changes";
+import { readLastPublicStoryPath, readPublicPaths } from "../public/url-changes";
 import type { ScreenContext } from "./screen-models";
 
 function checks(story: Partial<Story>) {
@@ -48,7 +48,7 @@ export async function assertStoryReadyToSchedule({ req }: ScreenContext, story: 
   const [body, media] = await bodyAndMediaChecks(req, story);
   if (!media.ready) throw new APIError("Resolve the story's publication media issues before scheduling.", 400);
   if (body[0]) throw new APIError(body[0], 400);
-  const old = (await readPublicPaths(req, "stories", story.id)).get(story.id);
+  const old = (await readPublicPaths(req, "stories", story.id)).get(story.id) ?? await readLastPublicStoryPath(req, story.id);
   if (!old) return;
   const next = await proposedStoryPath(req, story);
   if (next && next !== old && confirmedPath !== next) throw new APIError("Review the changed public URL before scheduling.", 409);

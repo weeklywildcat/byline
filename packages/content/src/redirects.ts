@@ -1,14 +1,7 @@
-import { normalizePublicRoute } from "./routing";
+import { normalizeRedirectPath } from "./redirect-path";
+export { normalizeRedirectPath } from "./redirect-path";
 
 export type PermanentRedirect = { from: string; to: string; status: 301 | 308; reason: string };
-
-/** Literal same-origin paths only. Cloudflare interprets wildcards and placeholders as rules. */
-export function normalizeRedirectPath(value: string): string {
-  if (typeof value !== "string" || !/^\/(?:[a-z0-9][a-z0-9._~-]*\/)*[a-z0-9][a-z0-9._~-]*\/?$/i.test(value)) {
-    throw new Error("Enter a literal site path such as /about/ (without a domain, query, or fragment).");
-  }
-  return normalizePublicRoute(value);
-}
 
 export function collapseRedirects<T extends Pick<PermanentRedirect, "from" | "to">>(redirects: T[]): T[] {
   const sources = new Map<string, string>();

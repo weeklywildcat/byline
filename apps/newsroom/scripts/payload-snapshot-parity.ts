@@ -85,6 +85,8 @@ async function seed() {
   // 11:30 p.m. Eastern: the next day in UTC; the URL keeps the Eastern date.
   const late = await story({ headline: "Wildcats win the opener late", slug: "wildcats-win-opener", deck: "A fourth-quarter comeback.", section: sports, topics: [football], contributors: [ben, olive], featuredMedia: laughing, body: lexicalFromArticleBody({ ...FIXTURE_ARTICLE_BODY, nodes: FIXTURE_ARTICLE_BODY.nodes.filter((node) => node.type === "paragraph").slice(0, 3), media: {} } as ArticleBody) }, "2026-11-08T04:30:00.000Z");
   const plain = await story({ headline: "Library extends its hours", slug: "library-hours", section: news, contributors: [ada], body: lexicalFromArticleBody({ ...FIXTURE_ARTICLE_BODY, nodes: FIXTURE_ARTICLE_BODY.nodes.filter((node) => node.type === "paragraph").slice(0, 2), media: {} } as ArticleBody) }, "2026-10-20T15:00:00.000Z");
+  await payload.update({ collection: "stories", id: plain, data: { _status: "draft" } });
+  await payload.create({ collection: "redirects", data: { from: "/old-newsroom.html", to: "/media-kit/", reason: "manual" } });
   // Both builds must deploy a permanent alias for each spelling of the historical address.
   await payload.update({ collection: "stories", id: plain, data: { slug: "library-extends-hours", publishedAt: "2026-10-20T15:00:00.000Z", _status: "published" } });
 
@@ -266,6 +268,7 @@ const deployedRedirects = readFileSync(path.join(a.out, "_redirects"), "utf8");
 for (const from of ["/2026/10/20/news/library-hours", "/2026/10/20/news/library-hours/"]) {
   if (!deployedRedirects.split("\n").includes(`${from} /2026/10/20/news/library-extends-hours/ 301`)) problems.push(`missing historical redirect for ${from}`);
 }
+if (!deployedRedirects.split("\n").includes("/old-newsroom.html /media-kit/ 301")) problems.push("missing file redirect to code-owned Media Kit");
 const lateRoute = "2026/11/07/sports/wildcats-win-opener/index.html";
 if (!filesA.includes(`_byline/live/${ids.late}.json`) || !outText.includes("The Wildcats win after a late comeback.")) problems.push("missing the published live update or static live feed");
 if (!filesA.includes("about-the-newsroom/contact-our-newsroom/index.html")) problems.push("missing the nested Page route");
