@@ -378,11 +378,12 @@ file within the configured static-asset size limit or readiness fails with an
 actionable error. Video remains externally hosted until a separate delivery
 architecture is deliberately introduced.
 
-The current `publicDelivery` group is a pre-Phase-5 placeholder and must not
-be given R2 semantics. Before cutover it is renamed or migrated to a
-publication-assets/readiness manifest (for example `publicationAssets`) whose
-state means “prepared for a static build,” not “already public on Cloudflare.”
-`uploadedBy` remains system-controlled.
+The former `publicDelivery` placeholder has been renamed to
+`publicationAssets`. Its states are `not-prepared`, `preparing`, `ready`
+and `failed`; `sourceHash`, the prepared rendition manifest and
+`preparedAt` are system-controlled. “Ready” means suitable files exist for a
+static build, not that the asset is already live on Cloudflare. `uploadedBy`
+remains system-controlled.
 
 ### 4.6 Polls
 
