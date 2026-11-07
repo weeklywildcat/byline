@@ -63,7 +63,7 @@ describe("the media contract", () => {
   });
 
   it("resolves a Payload Media document's credit from creator, then credit line", () => {
-    const asset = articleMediaFromPayload({ id: 7, mimeType: "image/jpeg", filename: "a.jpg", width: 10, height: 5, alt: " Alt ", creator: "", credit: "Photo by Jordan Lee", focalX: 30, focalY: 50 }, (doc) => `/api/media/file/${doc.filename as string}`);
+    const asset = articleMediaFromPayload({ id: 7, mimeType: "image/jpeg", filename: "a.jpg", width: 10, height: 5, alt: " Alt ", creator: "", credit: "Photo by Jordan Lee", artDirection: { version: 1, focalPoint: { x: 30, y: 50 }, crops: {} } }, (doc) => `/api/media/file/${doc.filename as string}`);
     expect(asset).toEqual({ id: 7, kind: "image", src: "/api/media/file/a.jpg", width: 10, height: 5, mimeType: "image/jpeg", filename: "a.jpg", filesize: null, alt: "Alt", credit: "Jordan Lee", focalPoint: { x: 30, y: 50 } } satisfies ArticleMediaAsset);
   });
 
@@ -188,7 +188,8 @@ describe("ordered items", () => {
 describe("package boundaries", () => {
   it("keeps the normalizer, fields and schema free of React and private Payload paths", () => {
     for (const file of ["normalize.ts", "fields.ts", "items.ts"]) {
-      for (const specifier of importsOf(join(SRC, file))) expect(specifier, file).toMatch(/^(?:\.\/|@byline\/article-body$)/);
+      // @byline/core is pure (no React, CMS or runtime): the art-direction intent is read from it.
+      for (const specifier of importsOf(join(SRC, file))) expect(specifier, file).toMatch(/^(?:\.\/|@byline\/article-body$|@byline\/core$)/);
     }
     for (const specifier of importsOf(join(SRC, "schema.ts"))) expect(specifier).toMatch(/^(?:\.\/|@byline\/article-body$|payload$)/);
   });

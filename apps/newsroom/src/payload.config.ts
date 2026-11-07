@@ -23,6 +23,7 @@ import { dropClientIds } from "./hooks/imported-ids";
 import { newsroomTimeZone } from "./domain/dates";
 import { newsroomEndpoints } from "./newsroom/endpoints";
 import { COLLECTIONS_VIEW_PATH } from "./domain/navigation";
+import { preparePublicationMediaTask } from "./publication-media/task";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -39,9 +40,10 @@ function withImportIdGuard(collection: CollectionConfig): CollectionConfig {
 
 /**
  * Media uses Payload's local upload adapter on the newsroom's persistent volume.
- * BYLINE_MEDIA_LOCAL_DIR selects that mounted directory through Media.staticDir.
- * Object storage may be added later for backup/replication; it is not a runtime
- * or public-delivery dependency.
+ * BYLINE_MEDIA_LOCAL_DIR selects that mounted directory through Media.staticDir;
+ * prepared publication files live on a second volume, BYLINE_PUBLICATION_MEDIA_DIR
+ * (docs/publication-media.md). Object storage may be added later for
+ * backup/replication; it is not a runtime or public-delivery dependency.
  */
 
 const collections: CollectionConfig[] = [
@@ -127,6 +129,9 @@ export default buildConfig({
     }
   },
   jobs: {
+    // Per-asset exclusive keys with `supersedes` (prepare-publication-media): one preparation per asset at a time.
+    enableConcurrencyControl: true,
+    // Job API access stays administrator-only; Byline queues its own work as the system.
     access: {
       run: ({ req }) => atLeast(newsroomUser(req.user), "administrator"),
       queue: ({ req }) => atLeast(newsroomUser(req.user), "administrator"),
@@ -136,7 +141,7 @@ export default buildConfig({
       ...defaultJobsCollection,
       admin: { ...defaultJobsCollection.admin, group: "System", hidden: ({ user }) => !atLeast(newsroomUser(user), "administrator") }
     }),
-    tasks: []
+    tasks: [preparePublicationMediaTask]
   },
   typescript: { outputFile: path.resolve(dirname, "payload-types.ts") },
   telemetry: false

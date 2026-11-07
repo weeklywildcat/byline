@@ -12,6 +12,20 @@ import { parseMediaLibraryParams } from "@byline/newsroom-screens/media/media-li
 import type { MediaMetadataPatch } from "@byline/newsroom-screens/media/media-library-model";
 import { createFolder, deleteFolder, deleteMedia, libraryPage, mediaDetail, mediaNavigator, moveMedia, updateFolder, updateMedia, uploadMedia } from "./media-library";
 import { mediaWork } from "./media-work";
+import { artDirectionView, retryPublication, saveArtDirection } from "../publication-media/media-publication";
+import { publicationMediaReport, type MediaRequirement } from "../publication-media/readiness";
+import { buildMediaEndpoint } from "../publication-media/build-endpoint";
+
+/** `?lead=12&ids=3,4`: the lead image and every other Media a story references (at most 200). */
+function readinessQuery(params: URLSearchParams): MediaRequirement[] {
+  const id = (value: string) => {
+    const number = Number(value);
+    return Number.isSafeInteger(number) && number > 0 ? number : null;
+  };
+  const lead = id(params.get("lead") ?? "");
+  const others = (params.get("ids") ?? "").split(",").map(id).filter((value): value is number => value !== null && value !== lead);
+  return [...(lead ? [{ id: lead, role: "image" as const }] : []), ...[...new Set(others)].map((value) => ({ id: value, role: "file" as const }))].slice(0, 200);
+}
 import { planningResponse } from "./planning";
 import { parseScheduleQuery, scheduleResponse, scheduleToday } from "./schedule";
 import {
@@ -510,15 +524,23 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/media/navigator", method: "get", handler: handle((ctx) => mediaNavigator(ctx)) },
   { path: "/byline/media/work", method: "get", handler: handle((ctx) => mediaWork(ctx)) },
   { path: "/byline/media/upload", method: "post", handler: handle(uploadToLibrary) },
+  // Story header preflight: the same server rule Publish enforces, for the Media the form currently references.
+  { path: "/byline/media/publication-readiness", method: "get", handler: handle((ctx, req) => publicationMediaReport(req.payload, readinessQuery(req.searchParams), { req })) },
   { path: "/byline/media/move", method: "post", handler: handle(moveToFolder) },
   { path: "/byline/media/folders", method: "post", handler: handle(async (ctx, req) => createFolder(ctx, await body(req))) },
   { path: "/byline/media/folders/:id", method: "patch", handler: handle(async (ctx, req) => updateFolder(ctx, idParam(req), await body(req))) },
   { path: "/byline/media/folders/:id", method: "delete", handler: handle(async (ctx, req) => { await deleteFolder(ctx, idParam(req)); return new Response(null, { status: 204 }); }) },
+  // Art direction (focal point, custom crops) and publication Retry: the only normal write paths for that state.
+  { path: "/byline/media/:id/art-direction", method: "get", handler: handle((ctx, req) => artDirectionView(ctx, idParam(req))) },
+  { path: "/byline/media/:id/art-direction", method: "put", handler: handle(async (ctx, req) => saveArtDirection(ctx, idParam(req), await body<Record<string, unknown>>(req))) },
+  { path: "/byline/media/:id/publication/retry", method: "post", handler: handle(async (ctx, req) => { await retryPublication(ctx, idParam(req)); return mediaDetail(ctx, idParam(req)); }) },
   { path: "/byline/media/:id", method: "get", handler: handle((ctx, req) => mediaDetail(ctx, idParam(req))) },
   { path: "/byline/media/:id", method: "patch", handler: handle(async (ctx, req) => updateMedia(ctx, idParam(req), await body<MediaMetadataPatch>(req))) },
   { path: "/byline/media/:id", method: "delete", handler: handle(async (ctx, req) => { await deleteMedia(ctx, idParam(req)); return new Response(null, { status: 204 }); }) },
   { path: "/byline/tasks", method: "post", handler: handle(createTask) },
   { path: "/byline/tasks/:id", method: "patch", handler: handle(updateTask) },
   { path: "/byline/tasks/:id", method: "delete", handler: handle(deleteTask) },
-  ...collectionEndpoints
+  ...collectionEndpoints,
+  // Build-only (BYLINE_BUILD_TOKEN), never the signed-in newsroom: prepared publication blobs by SHA-256.
+  buildMediaEndpoint
 ];

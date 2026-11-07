@@ -61,6 +61,7 @@
     "./media/MediaPickerDialog": "./src/media/MediaPickerDialog.tsx",
     "./media/MediaUploadDialog": "./src/media/MediaUploadDialog.tsx",
     "./media/MediaWork": "./src/media/MediaWork.tsx",
+    "./media/art-direction-model": "./src/media/art-direction-model.ts",
     "./media/media-desk-errors": "./src/media/media-desk-errors.ts",
     "./media/media-desk-model": "./src/media/media-desk-model.ts",
     "./media/media-library-api": "./src/media/media-library-api.ts",

@@ -26,6 +26,8 @@ import { addDays, localDay, localToInstant } from "../domain/dates";
 import { PRODUCTION_TYPE_OPTIONS } from "../domain/vocabulary";
 import type { FolderInterface, Media } from "../payload-types";
 import { readableStories, type ScreenContext } from "./screen-models";
+import { effectivePublicationStatus } from "@byline/content";
+import { publicationDetail } from "../publication-media/media-publication";
 
 /**
  * The Byline Media Library over Payload Media (`/api/byline/media/*`).
@@ -71,9 +73,9 @@ function previewUrl(media: Media): string | null {
   return null;
 }
 
+/** The badge/filter state: a stale generation (old revision or recipe) reads as not prepared, never ready. */
 function publicationAssetState(media: Media): MediaPublicationAssetState {
-  const status = media.publicationAssets?.status;
-  return status === "preparing" || status === "ready" || status === "failed" ? status : "not-prepared";
+  return effectivePublicationStatus(media.publicationAssets, media.publicationRevision);
 }
 
 export function libraryAsset(ctx: ScreenContext, media: Media, lookup: Lookup): MediaLibraryAsset {
@@ -301,7 +303,7 @@ export async function mediaDetail(ctx: ScreenContext, id: number): Promise<Media
     path.unshift({ id: current.id, name: current.name });
     current = current.parentId === null ? undefined : byId.get(current.parentId);
   }
-  return { ...asset, folderPath: path, usages: uses.usages, usagesComplete: false, hiddenUsageCount: Math.max(0, uses.total - uses.usages.length) };
+  return { ...asset, publication: publicationDetail(media, asset.canUpdate), folderPath: path, usages: uses.usages, usagesComplete: false, hiddenUsageCount: Math.max(0, uses.total - uses.usages.length) };
 }
 
 /* ----------------------------------------------------------- mutations */

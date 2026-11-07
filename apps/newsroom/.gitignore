@@ -5,3 +5,5 @@ next-env.d.ts
 /media/
 *.tsbuildinfo
 test-results/
+# Prepared publication files (BYLINE_PUBLICATION_MEDIA_DIR defaults to ./publication-media).
+/publication-media/

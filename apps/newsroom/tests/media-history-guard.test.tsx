@@ -23,7 +23,8 @@ const asset = (id: number): MediaAssetDetail => ({
   id, filename: `photo-${id}.jpg`, mimeType: "image/jpeg", kind: "image", filesize: 1000, width: 10, height: 10, previewUrl: null, url: null,
   alt: `Alt ${id}`, creator: "Pat", credit: "Pat / Wildcat", copyright: "© 2026", license: "All rights reserved", sourceUrl: "", capturedAt: null,
   createdAt: "2026-11-01T12:00:00.000Z", updatedAt: "2026-11-01T12:00:00.000Z", uploadedBy: null, folder: null, publicationAssets: "not-prepared", gaps: [],
-  canUpdate: true, canDelete: false, folderPath: [], usages: [], usagesComplete: false, hiddenUsageCount: 0
+  canUpdate: true, canDelete: false, folderPath: [], usages: [], usagesComplete: false, hiddenUsageCount: 0,
+  publication: { state: "not-prepared", reason: "not-prepared", currentRevision: 1, preparedRevision: null, preparedAt: null, failureMessage: null, warnings: [], canRetry: false }
 });
 
 const env = vi.hoisted(() => ({ failSave: false, saves: [] as Array<{ id: number; patch: Record<string, unknown> }>, routes: [] as number[] }));

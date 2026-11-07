@@ -209,9 +209,9 @@ describe("the private library preview", () => {
     // A small image is not enlarged; it still gets its own preview file.
     const small = await payload.findByID({ collection: "media", id: ids.small, depth: 0 });
     expect(small.sizes?.library?.width).toBe(320);
-    // No public rendition was made, and nothing is public.
-    expect(camera.publicationAssets?.status ?? "not-prepared").toBe("not-prepared");
-    expect(camera.publicationAssets?.renditions ?? null).toBeNull();
+    // Upload makes no publication file: preparation is queued for the media worker, never done in the request.
+    expect(camera.publicationAssets?.status).toBe("preparing");
+    expect(camera.publicationAssets?.manifest ?? null).toBeNull();
   });
 
   it("is served under the same access as the original", async () => {
@@ -269,7 +269,8 @@ describe("the Library read model", () => {
     // 17:00 UTC on Nov 4 is Nov 4 in New York.
     expect(names(await library("bob", { capturedFrom: "2026-11-04", capturedTo: "2026-11-04" }))).toEqual(["IMG_4932.jpg"]);
     expect(names(await library("bob", { capturedFrom: "2026-11-05" }))).toEqual([]);
-    expect((await library("bob", { publication: "not-prepared" })).totalDocs).toBe(5);
+    // Every upload queued its preparation; no worker has run in this file, so nothing is ready.
+    expect((await library("bob", { publication: "preparing" })).totalDocs).toBe(5);
     expect((await library("bob", { publication: "ready" })).totalDocs).toBe(0);
   });
 
@@ -319,9 +320,14 @@ describe("one asset", () => {
     expect((await call("patch", "/byline/media/:id", "alice", { params: { id: String(ids.small) }, data: { sourceUrl: "javascript:alert(1)" } })).status).toBe(400);
     expect((await call("patch", "/byline/media/:id", "alice", { params: { id: String(ids.small) }, data: { alt: "x".repeat(601) } })).status).toBe(400);
     // Publication-asset readiness and attribution never change through a metadata edit or a raw update.
-    await payload.update({ collection: "media", id: ids.small, data: { publicationAssets: { status: "ready" }, uploadedBy: accounts.bob.id } as never, overrideAccess: false, req: await reqAs("alice") });
+    const recorded = await payload.findByID({ collection: "media", id: ids.small, depth: 0 });
+    await payload.update({ collection: "media", id: ids.small, data: { publicationAssets: { status: "ready", preparedRevision: 99, recipeVersion: 1, manifest: { schemaVersion: 1 } }, publicationRevision: 99, artDirection: { focalPoint: { x: 1, y: 1 } }, uploadedBy: accounts.bob.id } as never, overrideAccess: false, req: await reqAs("alice") });
     const raw = await payload.findByID({ collection: "media", id: ids.small, depth: 0 });
-    expect(raw.publicationAssets?.status ?? "not-prepared").toBe("not-prepared");
+    expect(raw.publicationAssets?.status).toBe("preparing");
+    expect(raw.publicationAssets?.preparedRevision ?? null).toBeNull();
+    expect(raw.publicationAssets?.manifest ?? null).toBeNull();
+    expect(raw.publicationRevision).toBe(recorded.publicationRevision);
+    expect(raw.artDirection).toEqual(recorded.artDirection);
     expect(raw.uploadedBy).toBe(accounts.alice.id);
   });
 
@@ -366,7 +372,7 @@ describe("upload", () => {
   it("files into the chosen folder, attributes the uploader and leaves publication readiness alone", async () => {
     const result = await call("post", "/byline/media/upload", "photo", { data: { folderId: folders.homecoming, uploadedBy: accounts.editor.id, publicationAssets: { status: "ready" } }, file: await photo(1600, 1200, "sideline.jpg") });
     expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({ filename: "sideline.jpg", folder: { id: folders.homecoming }, uploadedBy: { id: Number(accounts.photo.id) }, publicationAssets: "not-prepared", canUpdate: true, canDelete: false });
+    expect(result.body).toMatchObject({ filename: "sideline.jpg", folder: { id: folders.homecoming }, uploadedBy: { id: Number(accounts.photo.id) }, publicationAssets: "preparing", canUpdate: true, canDelete: false });
     expect(result.body.previewUrl).toContain("640x480");
     // The uploader may then edit it; another staff member may not.
     expect((await call("patch", "/byline/media/:id", "photo", { params: { id: String(result.body.id) }, data: { alt: "Sideline" } })).status).toBe(200);

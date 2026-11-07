@@ -142,6 +142,7 @@ export interface Config {
   user: User;
   jobs: {
     tasks: {
+      'prepare-publication-media': TaskPreparePublicationMedia;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -369,10 +370,13 @@ export interface Media {
     | number
     | boolean
     | null;
+  publicationRevision?: number | null;
   publicationAssets?: {
     status?: ('not-prepared' | 'preparing' | 'ready' | 'failed') | null;
+    preparedRevision?: number | null;
+    recipeVersion?: number | null;
     sourceHash?: string | null;
-    renditions?:
+    manifest?:
       | {
           [k: string]: unknown;
         }
@@ -382,6 +386,11 @@ export interface Media {
       | boolean
       | null;
     preparedAt?: string | null;
+    queuedAt?: string | null;
+    startedAt?: string | null;
+    attempts?: number | null;
+    failureCode?: string | null;
+    failureMessage?: string | null;
   };
   uploadedBy?: (number | null) | User;
   legacyWordPressId?: number | null;
@@ -884,7 +893,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'schedulePublish';
+        taskSlug: 'inline' | 'prepare-publication-media' | 'schedulePublish';
         taskID: string;
         input?:
           | {
@@ -917,10 +926,14 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'schedulePublish') | null;
+  taskSlug?: ('inline' | 'prepare-publication-media' | 'schedulePublish') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
+  /**
+   * Used for concurrency control. Jobs with the same key are subject to exclusive/supersedes rules.
+   */
+  concurrencyKey?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1158,13 +1171,21 @@ export interface MediaSelect<T extends boolean = true> {
   sourceUrl?: T;
   capturedAt?: T;
   artDirection?: T;
+  publicationRevision?: T;
   publicationAssets?:
     | T
     | {
         status?: T;
+        preparedRevision?: T;
+        recipeVersion?: T;
         sourceHash?: T;
-        renditions?: T;
+        manifest?: T;
         preparedAt?: T;
+        queuedAt?: T;
+        startedAt?: T;
+        attempts?: T;
+        failureCode?: T;
+        failureMessage?: T;
       };
   uploadedBy?: T;
   legacyWordPressId?: T;
@@ -1505,6 +1526,7 @@ export interface PayloadJobsSelect<T extends boolean = true> {
   queue?: T;
   waitUntil?: T;
   processing?: T;
+  concurrencyKey?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1560,6 +1582,20 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskPrepare-publication-media".
+ */
+export interface TaskPreparePublicationMedia {
+  input: {
+    mediaId: number;
+    revision: number;
+    recipeVersion: number;
+  };
+  output: {
+    outcome?: string | null;
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

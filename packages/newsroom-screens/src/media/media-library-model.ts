@@ -71,7 +71,28 @@ export type MediaUsage = {
   recordId: number;
 };
 
+/**
+ * The inspector's view of an asset's prepared publication files: what a
+ * person can act on, never storage layout, hashes or the raw manifest.
+ */
+export type MediaPublicationDetail = {
+  state: MediaPublicationAssetState;
+  /** Why it is not ready (or "ready"). "stale-*": prepared files exist but are not current. */
+  reason: "ready" | "not-prepared" | "preparing" | "failed" | "stale-revision" | "stale-recipe" | "invalid-manifest";
+  /** How many times the source, focal point or custom crops have changed. */
+  currentRevision: number;
+  /** The revision the newest prepared files were made from. */
+  preparedRevision: number | null;
+  preparedAt: string | null;
+  failureMessage: string | null;
+  /** Things worth fixing that do not block publication (a soft social image). */
+  warnings: string[];
+  /** This account may queue preparation again. */
+  canRetry: boolean;
+};
+
 export type MediaAssetDetail = MediaLibraryAsset & {
+  publication: MediaPublicationDetail;
   /** Root first, the asset's own folder last. */
   folderPath: MediaFolderRef[];
   usages: MediaUsage[];

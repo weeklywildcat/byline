@@ -1,3 +1,4 @@
+import { normalizeArtDirectionIntent } from "@byline/core";
 import {
   ARTICLE_BODY_FORMAT,
   ARTICLE_BODY_VERSION,
@@ -85,8 +86,8 @@ export function articleMediaFromPayload(doc: Record<string, unknown>, src: (doc:
   if (id === null || !url) return null;
   const mimeType = typeof doc.mimeType === "string" ? doc.mimeType : "";
   const number = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
-  const focalX = number(doc.focalX);
-  const focalY = number(doc.focalY);
+  // Byline's art-direction intent is the only focal point (Payload's native one is off).
+  const focal = normalizeArtDirectionIntent(doc.artDirection).focalPoint;
   return {
     id,
     kind: mediaKindOf(mimeType),
@@ -98,7 +99,7 @@ export function articleMediaFromPayload(doc: Record<string, unknown>, src: (doc:
     filesize: number(doc.filesize),
     alt: typeof doc.alt === "string" ? doc.alt.trim() : "",
     credit: mediaCredit({ creator: doc.creator, credit: doc.credit }),
-    ...(focalX !== null && focalY !== null && (focalX !== 50 || focalY !== 50) ? { focalPoint: { x: focalX, y: focalY } } : {})
+    ...(focal.x !== 50 || focal.y !== 50 ? { focalPoint: focal } : {})
   };
 }
 

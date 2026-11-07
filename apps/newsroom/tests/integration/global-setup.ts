@@ -9,7 +9,7 @@ import pg from "pg";
  * PostgreSQL the current user can create databases on; databases named after
  * it are dropped and recreated. Never point it at real data.
  */
-export const TEST_DATABASE_SUFFIXES = ["", "_screens", "_planning", "_schedule", "_publication", "_media", "_collections", "_people"] as const;
+export const TEST_DATABASE_SUFFIXES = ["", "_screens", "_planning", "_schedule", "_publication", "_media", "_collections", "_people", "_publication_media", "_migration"] as const;
 
 export default async function setup() {
   const url = new URL(process.env.BYLINE_TEST_DATABASE_URL ?? "postgres://localhost:5432/byline_newsroom_test");
@@ -31,6 +31,13 @@ export default async function setup() {
     // Uploaded test files go to a throwaway directory, never the development media folder.
   const media = mkdtempSync(path.join(tmpdir(), "byline-newsroom-media-"));
   process.env.BYLINE_MEDIA_LOCAL_DIR = media;
+  // Prepared publication files: a second, separate throwaway store.
+  const publication = mkdtempSync(path.join(tmpdir(), "byline-newsroom-publication-"));
+  process.env.BYLINE_PUBLICATION_MEDIA_DIR = publication;
+  delete process.env.BYLINE_BUILD_TOKEN;
   delete process.env.BYLINE_GOOGLE_CLIENT_ID;
-  return () => rmSync(media, { recursive: true, force: true });
+  return () => {
+    rmSync(media, { recursive: true, force: true });
+    rmSync(publication, { recursive: true, force: true });
+  };
 }

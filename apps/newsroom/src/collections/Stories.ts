@@ -1,4 +1,5 @@
-import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionConfig, Where } from "payload";
+import { ValidationError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig, type Where } from "payload";
+import { publicationMediaReport, storyMediaRequirements } from "../publication-media/readiness";
 import { inIds, storyScope } from "../access/story-context";
 import { atLeast, relationIds, requestUser } from "../access/user";
 import { articleBodyEditor } from "@byline/editor/server";
@@ -62,6 +63,34 @@ const syncPlan: CollectionAfterChangeHook = async ({ doc, operation, req }) => {
     });
   }
   return doc;
+};
+
+/**
+ * Publishing needs every Media the story publishes directly (lead image and
+ * body blocks) to be publishable now: metadata complete and a current
+ * prepared generation in the store. Drafts and autosaves are never blocked; a
+ * reporter can keep writing while an image prepares. The server decides,
+ * whatever the browser thought (docs/publication-media.md#publishing).
+ */
+const requirePublishableMedia: CollectionBeforeChangeHook = async ({ data, originalDoc, req }) => {
+  if (data._status !== "published" || req.context?.bylineImport === true) return data;
+  const story = {
+    featuredMedia: data.featuredMedia !== undefined ? data.featuredMedia : originalDoc?.featuredMedia,
+    body: data.body !== undefined ? data.body : originalDoc?.body,
+    contentFormat: data.contentFormat ?? originalDoc?.contentFormat
+  };
+  const requirements = storyMediaRequirements(story);
+  const report = await publicationMediaReport(req.payload, requirements, { req });
+  if (report.ready) return data;
+  const featured = requirements.find((item) => item.role === "image")?.id;
+  throw new ValidationError({
+    collection: "stories",
+    req,
+    errors: report.items.filter((item) => item.state !== "ready").flatMap((item) => item.issues.map((issue) => ({
+      path: item.mediaId === featured ? "featuredMedia" : "body",
+      message: `${item.filename ?? `Media ${item.mediaId}`} · ${issue.message}`
+    })))
+  });
 };
 
 /** The first publication time is part of the public URL, so it is set once and kept. */
@@ -146,7 +175,7 @@ export const Stories: CollectionConfig = {
     delete: ({ req }) => atLeast(requestUser(req), "editor")
   },
   hooks: {
-    beforeChange: [pinContentFormat, stampFirstPublication],
+    beforeChange: [pinContentFormat, requirePublishableMedia, stampFirstPublication],
     afterChange: [syncPlan]
   },
   fields: [
