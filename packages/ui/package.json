@@ -16,7 +16,9 @@
     "./article-enhancement-selector": "./src/article-enhancements/selector.ts",
     "./live-feed": "./src/live-feed.ts",
     "./live-updates": "./src/live-updates.ts",
-    "./live-share": "./src/live-share.ts"
+    "./live-share": "./src/live-share.ts",
+    "./contributor-profile": "./src/contributor-profile.tsx",
+    "./contributor-profile.css": "./src/contributor-profile.css"
   },
   "dependencies": {
     "@byline/core": "0.1.0",
