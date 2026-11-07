@@ -5,8 +5,10 @@ import { legacyIdField } from "../fields/slug";
 /**
  * Canonical editorial assets. Originals are private: the file route enforces
  * this collection's `read` access, so an upload is never anonymously public
- * just because it exists. Publishing a story materializes the approved
- * renditions into the public bucket (Phase 5); `publicDelivery` records that.
+ * just because it exists. Phase 5 prepares web-ready publication assets on
+ * the newsroom volume; the static site build copies only referenced files into
+ * its Cloudflare asset bundle. `publicationAssets` records readiness for that
+ * build, not whether a file is already live.
  *
  * Credits belong to the asset. A story's caption belongs to the story.
  * Byline's crop intent (wide, card, standard, square, portrait, social) is
@@ -20,7 +22,7 @@ import { legacyIdField } from "../fields/slug";
  * (at most 640px, WebP), so the Media Library grid never downloads camera
  * originals. It is served by the same file route as the original, under this
  * collection's `read` access, and it is not a publication rendition: it is
- * never part of `publicDelivery`.
+ * never part of `publicationAssets`.
  */
 /** What the newsroom may upload. Video is deliberately absent until large-video storage is decided. */
 export const MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif", "application/pdf", "audio/mpeg", "audio/mp4", "audio/wav"] as const;
@@ -105,16 +107,16 @@ export const Media: CollectionConfig = {
     { name: "capturedAt", type: "date" },
     { name: "artDirection", type: "json", admin: { hidden: true } },
     {
-      name: "publicDelivery",
+      name: "publicationAssets",
       type: "group",
       admin: { readOnly: true, position: "sidebar" },
-      // Publication state belongs to the publication pipeline: an upload or a metadata edit never changes it.
+      // Prepared-asset readiness belongs to the publication pipeline: an upload or metadata edit never marks a file ready.
       access: { create: systemOnly, update: systemOnly },
       fields: [
         { name: "status", type: "select", defaultValue: "private", options: [{ value: "private", label: "Private" }, { value: "queued", label: "Queued" }, { value: "public", label: "Public" }, { value: "failed", label: "Failed" }] },
-        { name: "contentHash", type: "text", admin: { hidden: true } },
+        { name: "sourceHash", type: "text", admin: { hidden: true } },
         { name: "renditions", type: "json", admin: { hidden: true } },
-        { name: "materializedAt", type: "date" }
+        { name: "preparedAt", type: "date" }
       ]
     },
     { name: "uploadedBy", type: "relationship", relationTo: "users", index: true, admin: { readOnly: true, position: "sidebar" }, access: { update: systemOnly } },
