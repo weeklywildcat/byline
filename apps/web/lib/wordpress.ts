@@ -682,7 +682,7 @@ function publicPost(value: unknown): WordPressPost | null {
       ...(media.length ? { "wp:featuredmedia": media } : {}),
       ...(terms.length ? { "wp:term": terms } : {})
     },
-    ...(contributors.length ? { contributors } : {}),
+    ...(contributorValues ? { contributors } : {}),
     ...(correctionValues ? { corrections: correctionValues } : {}),
     ...([value.live, byline.live, weeklyWildcat.live].find(isRecord) ? { live: [value.live, byline.live, weeklyWildcat.live].find(isRecord) } : {})
   };
@@ -1075,7 +1075,7 @@ export async function getPostsByCategory(categoryId: number) {
 
 export async function getPostsByAuthor(authorId: number) {
   const allPosts = await getAllPosts();
-  return allPosts.filter((post) => post.author === authorId || getPostContributors(post).some((contributor) =>
+  return allPosts.filter((post) => getPostContributors(post).some((contributor) =>
     !isGuestContributor(contributor) && contributor.id === authorId
   ));
 }
@@ -1198,22 +1198,12 @@ export function getPostContributors(post: WordPressPost): WordPressContributor[]
     const contributor = normalizePostContributor(value, embeddedAuthors);
     return contributor ? [contributor] : [];
   }) ?? [];
-  const contributors = values.length > 0 ? values : embeddedAuthors;
+  // An explicit list (including []) is the editor's complete byline. Only
+  // legacy posts without the field inherit WordPress's internal author.
+  const contributors = rawValues ? values : embeddedAuthors;
   const deduplicated = contributors.filter((contributor, index, list) =>
     list.findIndex((candidate) => contributorIdentity(candidate) === contributorIdentity(contributor)) === index
   );
-  const primaryAuthor = embeddedAuthors[0] ?? null;
-
-  // A compact REST response may contain only the guest/secondary entry while
-  // `_embedded.author` still carries the backwards-compatible primary author.
-  // Preserve that author at the front without disturbing a complete explicit
-  // byline order.
-  if (primaryAuthor && !deduplicated.some((contributor) =>
-    !isGuestContributor(contributor) && contributor.id === primaryAuthor.id
-  )) {
-    deduplicated.unshift(primaryAuthor);
-  }
-
   return deduplicated;
 }
 

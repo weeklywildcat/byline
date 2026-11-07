@@ -156,6 +156,11 @@ function get_post_meta(int $post_id, string $key, bool $single = false)
     global $byline_guest_hardening_meta;
     return $byline_guest_hardening_meta[$post_id][$key] ?? '';
 }
+function metadata_exists(string $type, int $post_id, string $key): bool
+{
+    global $byline_guest_hardening_meta;
+    return $type === 'post' && array_key_exists($key, $byline_guest_hardening_meta[$post_id] ?? []);
+}
 
 function update_post_meta(int $post_id, string $key, $value): void
 {
@@ -390,15 +395,19 @@ guest_hardening_assert(is_wp_error($guest_slug_collision) && $guest_slug_collisi
 $byline_guest_hardening_object_caps[1]['edit_post'][10] = true;
 $story_contributors = byline_set_story_contributors(10, [
     ['type' => 'guest', 'id' => $publisher_guest_id],
+    ['type' => 'user', 'id' => 1],
     ['type' => 'user', 'id' => 2],
 ], 1);
 guest_hardening_assert(!is_wp_error($story_contributors), 'A Contributor who can edit a story should assign existing contributors.');
 guest_hardening_assert($story_contributors === [
-    ['type' => 'user', 'id' => 1],
     ['type' => 'guest', 'id' => $publisher_guest_id],
+    ['type' => 'user', 'id' => 1],
     ['type' => 'user', 'id' => 2],
-], 'Story contributor assignment must preserve the primary author and order.');
+], 'Story contributor assignment must preserve the requested order.');
 guest_hardening_assert(get_post(10)->post_author === 1, 'Contributor assignment must not rewrite post_author.');
+$cannot_transfer = byline_set_story_contributors(10, [['type' => 'user', 'id' => 2]], 1);
+guest_hardening_assert(is_wp_error($cannot_transfer) && $cannot_transfer->get_error_code() === 'byline_primary_author_forbidden', 'A contributor without edit_others_posts must not transfer WordPress authorship.');
+guest_hardening_assert(get_post(10)->post_author === 1 && byline_get_story_contributor_entries(10) === $story_contributors, 'Forbidden WordPress author transfers must not change the stored byline.');
 
 $legacy_story = guest_hardening_add_story(11, 1);
 guest_hardening_assert(byline_get_story_contributor_entries(11) === [['type' => 'user', 'id' => 1]], 'Legacy single-author stories must still fall back to post_author.');
@@ -406,7 +415,7 @@ guest_hardening_assert(!isset($byline_guest_hardening_meta[11][BYLINE_STORY_CONT
 
 get_post(10)->post_status = 'publish';
 $public_story_contributors = byline_get_public_story_contributors(10);
-guest_hardening_assert(array_column($public_story_contributors, 'name') === ['Contributing Writer', 'Publisher Guest', 'Newsroom Editor'], 'Public contributors must preserve persisted order.');
+guest_hardening_assert(array_column($public_story_contributors, 'name') === ['Publisher Guest', 'Contributing Writer', 'Newsroom Editor'], 'Public contributors must preserve persisted order.');
 guest_hardening_assert(!array_key_exists('email', $public_story_contributors[0]), 'User projections must omit account email fields.');
 guest_hardening_assert(strpos(serialize($public_story_contributors), 'private-1@example.test') === false, 'User account email data must not enter public projections.');
 guest_hardening_assert(strpos(serialize($public_story_contributors), 'private-profile@example.test') === false, 'Private profile email metadata must not enter public projections.');
