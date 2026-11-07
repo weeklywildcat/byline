@@ -72,6 +72,7 @@ export type MediaLibraryBrowserProps = {
   onAssetsChange?: (assets: MediaLibraryAsset[]) => void;
   label?: string;
   compact?: boolean;
+  fixedKind?: MediaKind;
 };
 
 /**
@@ -146,7 +147,7 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
             </InputGroupAddon>
           ) : null}
         </InputGroup>
-        <MediaFilters filters={filters} onChange={onFiltersChange} navigator={navigator} />
+        <MediaFilters filters={filters} onChange={onFiltersChange} navigator={navigator} fixedKind={props.fixedKind} />
         <Select items={MEDIA_SORTS} value={sort} onValueChange={(value) => { if (value) onSortChange(value as MediaLibrarySort); }}>
           <SelectTrigger aria-label="Sort" className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>{MEDIA_SORTS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
@@ -169,7 +170,7 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
           </ToggleGroup>
         ) : null}
         {searching && folderId === null && source !== "all" && onSearchEverywhere ? <Button variant="link" size="sm" className="h-auto p-0" onClick={onSearchEverywhere}>Search all media</Button> : null}
-        {activeFilterCount(filters) ? <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onFiltersChange({ ...EMPTY_MEDIA_FILTERS, search: filters.search, searchScope: filters.searchScope })}>Clear filters</Button> : null}
+        {activeFilterCount(props.fixedKind ? { ...filters, type: "" } : filters) ? <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onFiltersChange({ ...EMPTY_MEDIA_FILTERS, search: filters.search, searchScope: filters.searchScope })}>Clear filters</Button> : null}
       </div>
 
       {library.isError && !library.data ? (
@@ -337,8 +338,8 @@ function TileSkeletons() {
 const TYPE_ITEMS = [{ value: ANY, label: "Any type" }, { value: "image", label: "Images" }, { value: "document", label: "PDFs" }, { value: "audio", label: "Audio" }];
 const DELIVERY_ITEMS = [{ value: ANY, label: "Any state" }, ...(Object.entries(DELIVERY_LABELS) as Array<[MediaDeliveryState, string]>).map(([value, label]) => ({ value, label }))];
 
-function MediaFilters({ filters, onChange, navigator }: { filters: MediaLibraryFilters; onChange: (filters: MediaLibraryFilters) => void; navigator?: MediaNavigatorData }) {
-  const count = activeFilterCount(filters);
+function MediaFilters({ filters, onChange, navigator, fixedKind }: { filters: MediaLibraryFilters; onChange: (filters: MediaLibraryFilters) => void; navigator?: MediaNavigatorData; fixedKind?: MediaKind }) {
+  const count = activeFilterCount(fixedKind ? { ...filters, type: "" } : filters);
   const uploaders = [{ value: ANY, label: "Anyone" }, ...(navigator?.uploaders ?? []).map((person) => ({ value: String(person.id), label: person.name }))];
   const set = (patch: Partial<MediaLibraryFilters>) => onChange({ ...filters, ...patch });
   return (
@@ -350,7 +351,7 @@ function MediaFilters({ filters, onChange, navigator }: { filters: MediaLibraryF
         <FieldGroup className="gap-3">
           <Field>
             <FieldLabel>Type</FieldLabel>
-            <Select items={TYPE_ITEMS} value={filters.type || ANY} onValueChange={(value) => set({ type: !value || value === ANY ? "" : (value as MediaKind) })}>
+            <Select items={TYPE_ITEMS} disabled={Boolean(fixedKind)} value={filters.type || ANY} onValueChange={(value) => set({ type: !value || value === ANY ? "" : (value as MediaKind) })}>
               <SelectTrigger aria-label="Type" className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>{TYPE_ITEMS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
             </Select>

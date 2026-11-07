@@ -14,7 +14,7 @@ import { ShellLayer } from "./layer";
  * (a Collection's brief or interview), so there is no autosave to wait for
  * and leaving asks at once, in the screen's own words (`description`).
  */
-export type DocumentWorkState = { modified: boolean; saving: boolean; explicit?: boolean; description?: string };
+export type DocumentWorkState = { modified: boolean; saving: boolean; explicit?: boolean; description?: string; discard?: () => void };
 export type LeaveGuard = () => DocumentWorkState;
 
 /**
@@ -49,11 +49,13 @@ type ShellNavigation = {
   navigate: (href: string) => void;
   /** Whether leaving the current screen would have to wait for (or risk) unsaved work. */
   hasPendingWork: () => boolean;
+  /** Non-link exits (sign out) use the same leave prompt before changing session state. */
+  runGuarded: (proceed: () => void) => void;
   /** The screen with a document open registers how to read its state while it is mounted. */
   setLeaveGuard: (guard: LeaveGuard | null) => void;
 };
 
-const NavigationContext = createContext<ShellNavigation>({ navigate: () => {}, hasPendingWork: () => false, setLeaveGuard: () => {} });
+const NavigationContext = createContext<ShellNavigation>({ navigate: () => {}, hasPendingWork: () => false, runGuarded: (proceed) => proceed(), setLeaveGuard: () => {} });
 
 export const useShellNavigation = () => use(NavigationContext);
 
@@ -71,7 +73,7 @@ export function ShellNavigationProvider({ children }: { children: ReactNode }) {
   const { startRouteTransition } = useRouteTransition();
   const guard = useRef<LeaveGuard | null>(null);
   const waiting = useRef(false);
-  const [unsavedHref, setUnsavedHref] = useState<string | null>(null);
+  const [unsavedAction, setUnsavedAction] = useState<(() => void) | null>(null);
   const [unsavedText, setUnsavedText] = useState("");
 
   const go = useCallback((href: string) => startRouteTransition(() => router.push(href)), [router, startRouteTransition]);
@@ -80,13 +82,13 @@ export function ShellNavigationProvider({ children }: { children: ReactNode }) {
     return Boolean(state && (state.modified || state.saving));
   }, []);
 
-  const navigate = useCallback((href: string) => {
+  const runGuarded = useCallback((proceed: () => void) => {
     const read = guard.current;
-    if (!read || !hasPendingWork()) return go(href);
+    if (!read || !hasPendingWork()) return proceed();
     const state = read();
     if (state.explicit) {
       setUnsavedText(state.description ?? "");
-      return setUnsavedHref(href);
+      return setUnsavedAction(() => proceed);
     }
     if (waiting.current) return;
     waiting.current = true;
@@ -94,22 +96,23 @@ export function ShellNavigationProvider({ children }: { children: ReactNode }) {
     void waitForSavedDocument(read).then((saved) => {
       waiting.current = false;
       toast.dismiss(notice);
-      if (saved) go(href);
+      if (saved) proceed();
       else {
         setUnsavedText("");
-        setUnsavedHref(href);
+        setUnsavedAction(() => proceed);
       }
     });
-  }, [go, hasPendingWork]);
+  }, [hasPendingWork]);
+  const navigate = useCallback((href: string) => runGuarded(() => go(href)), [runGuarded, go]);
 
   const setLeaveGuard = useCallback((next: LeaveGuard | null) => { guard.current = next; }, []);
-  const value = useMemo<ShellNavigation>(() => ({ navigate, hasPendingWork, setLeaveGuard }), [navigate, hasPendingWork, setLeaveGuard]);
+  const value = useMemo<ShellNavigation>(() => ({ navigate, hasPendingWork, runGuarded, setLeaveGuard }), [navigate, hasPendingWork, runGuarded, setLeaveGuard]);
 
   return (
     <NavigationContext value={value}>
       {children}
-      <ShellLayer active={unsavedHref !== null}>
-        <AlertDialog open={unsavedHref !== null} onOpenChange={(open) => { if (!open) setUnsavedHref(null); }}>
+      <ShellLayer active={unsavedAction !== null}>
+        <AlertDialog open={unsavedAction !== null} onOpenChange={(open) => { if (!open) setUnsavedAction(null); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
@@ -117,7 +120,7 @@ export function ShellNavigationProvider({ children }: { children: ReactNode }) {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{unsavedText ? "Stay" : "Stay on this story"}</AlertDialogCancel>
-              <AlertDialogAction variant="destructive" onClick={() => { const href = unsavedHref; setUnsavedHref(null); if (href) go(href); }}>Leave anyway</AlertDialogAction>
+              <AlertDialogAction variant="destructive" onClick={() => { const proceed = unsavedAction; const state = guard.current?.(); if (state?.explicit) state.discard?.(); setUnsavedAction(null); proceed?.(); }}>Leave anyway</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

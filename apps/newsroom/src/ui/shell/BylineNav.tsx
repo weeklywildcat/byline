@@ -20,7 +20,8 @@ export async function BylineNav({ user, payload }: ServerProps) {
   const shellUser: ShellUser = {
     name: name || "Your account",
     subtitle: person.newsroomRole || ROLE_OPTIONS.find((option) => option.value === account.role)?.label || "",
-    avatarUrl: person.avatarUrl
+    avatarUrl: person.avatarUrl,
+    ...(person.exists ? { profileHref: `${admin}/profile` } : {})
   };
   return (
     <BylineSidebar
@@ -36,14 +37,14 @@ export async function BylineNav({ user, payload }: ServerProps) {
 }
 
 /** The account's byline person, read as the user: their newsroom title and portrait, when there is one. */
-async function linkedPerson(payload: ServerProps["payload"], user: ServerProps["user"], id: number | string | null): Promise<{ newsroomRole: string; avatarUrl: string | null }> {
-  if (id === null) return { newsroomRole: "", avatarUrl: null };
+async function linkedPerson(payload: ServerProps["payload"], user: ServerProps["user"], id: number | string | null): Promise<{ newsroomRole: string; avatarUrl: string | null; exists: boolean }> {
+  if (id === null) return { newsroomRole: "", avatarUrl: null, exists: false };
   try {
     const person = await payload.findByID({ collection: "people", id, depth: 1, overrideAccess: false, user, select: { newsroomRole: true, portrait: true } });
     const portrait = person.portrait;
     const url = portrait && typeof portrait === "object" && relationId(portrait) !== null && typeof portrait.url === "string" && portrait.mimeType?.startsWith("image/") ? portrait.url : null;
-    return { newsroomRole: typeof person.newsroomRole === "string" ? person.newsroomRole.trim() : "", avatarUrl: url };
+    return { newsroomRole: typeof person.newsroomRole === "string" ? person.newsroomRole.trim() : "", avatarUrl: url, exists: true };
   } catch {
-    return { newsroomRole: "", avatarUrl: null };
+    return { newsroomRole: "", avatarUrl: null, exists: false };
   }
 }

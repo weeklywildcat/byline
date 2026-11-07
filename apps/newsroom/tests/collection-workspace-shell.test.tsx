@@ -144,7 +144,7 @@ afterEach(async () => {
 
 describe("Collections in the newsroom", () => {
   it("is the destination after Media, named Collections, never Coverage", () => {
-    expect(NAVIGATION.map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections"]);
+    expect(NAVIGATION.map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections", "people"]);
     expect(NAVIGATION.find((item) => item.key === "collections")).toMatchObject({ label: "Collections", path: "/collections", exact: true });
     expect(JSON.stringify(NAVIGATION)).not.toMatch(/coverage/i);
     expect(ADMINISTRATION.find((item) => item.key === "raw-collections")).toMatchObject({ path: "/collections/collections", minimumRole: "administrator" });

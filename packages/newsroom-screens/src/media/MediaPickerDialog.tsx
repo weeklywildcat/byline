@@ -19,6 +19,8 @@ export type MediaPickerDialogProps = {
   multiple?: boolean;
   /** Start filtered to one kind of file (a photo assignment starts on images); the reader can clear it. */
   kind?: MediaKind | "";
+  /** A relationship that accepts only this file kind (for example a portrait). */
+  restrictedKind?: MediaKind;
   onConfirm: (assets: MediaLibraryAsset[]) => void;
 };
 
@@ -29,7 +31,7 @@ export type MediaPickerDialogProps = {
  * production assignments (and, later, any other asset selector). Its
  * browsing state is its own: it never changes the Media screen's address.
  */
-export function MediaPickerDialog({ open, onOpenChange, fetchers, timezone, title = "Choose files", description = "Browse folders or search the Library, then choose one or more files.", confirmLabel = "Link files", multiple = true, kind = "", onConfirm }: MediaPickerDialogProps) {
+export function MediaPickerDialog({ open, onOpenChange, fetchers, timezone, title = "Choose files", description = "Browse folders or search the Library, then choose one or more files.", confirmLabel = "Link files", multiple = true, kind = "", restrictedKind, onConfirm }: MediaPickerDialogProps) {
   const navigator = useMediaNavigator(fetchers);
   const [route, setRoute] = useState<MediaRoute>(DEFAULT_MEDIA_ROUTE);
   const [filters, setFilters] = useState<MediaLibraryFilters>({ ...EMPTY_MEDIA_FILTERS, type: kind });
@@ -42,21 +44,22 @@ export function MediaPickerDialog({ open, onOpenChange, fetchers, timezone, titl
   useEffect(() => {
     if (!open) return;
     setRoute(DEFAULT_MEDIA_ROUTE);
-    setFilters({ ...EMPTY_MEDIA_FILTERS, type: kind });
+    setFilters({ ...EMPTY_MEDIA_FILTERS, type: restrictedKind ?? kind });
     setSelected(new Map());
-  }, [kind, open]);
+  }, [kind, restrictedKind, open]);
 
   const folders = navigator.data?.folders ?? [];
   const folderName = route.folderId !== null ? folders.find((folder) => folder.id === route.folderId)?.name : undefined;
   const ids = useMemo(() => new Set(selected.keys()), [selected]);
   const toggle = useCallback((asset: MediaLibraryAsset, _event: MouseEvent | null) => {
+    if (restrictedKind && asset.kind !== restrictedKind) return;
     setSelected((current) => {
       const next = new Map(multiple ? current : []);
       if (current.has(asset.id)) next.delete(asset.id);
       else next.set(asset.id, asset);
       return next;
     });
-  }, [multiple]);
+  }, [multiple, restrictedKind]);
   const places = useMemo(() => [
     ...MEDIA_LIBRARY_SOURCES.map((source) => ({ value: `source:${source.value}`, label: source.label })),
     ...folders.map((folder) => ({ value: `folder:${folder.id}`, label: folderPath(folders, folder.id).map((item) => item.name).join(" / ") })).sort((a, b) => a.label.localeCompare(b.label))
@@ -89,7 +92,8 @@ export function MediaPickerDialog({ open, onOpenChange, fetchers, timezone, titl
               folderName={folderName}
               navigator={navigator.data}
               filters={filters}
-              onFiltersChange={setFilters}
+              onFiltersChange={(next) => setFilters(restrictedKind ? { ...next, type: restrictedKind } : next)}
+              fixedKind={restrictedKind}
               sort={sort}
               onSortChange={setSort}
               layout={layout}

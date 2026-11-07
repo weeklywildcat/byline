@@ -12,6 +12,7 @@ export default defineConfig({
         new URL("../../packages/theme-weekly-wildcat/src/index.ts", import.meta.url)
       ),
       // Subpath exports before the package root, which would otherwise match first.
+      "@byline/ui/contributor-profile": fileURLToPath(new URL("../../packages/ui/src/contributor-profile.tsx", import.meta.url)),
       "@byline/ui/live-feed": fileURLToPath(new URL("../../packages/ui/src/live-feed.ts", import.meta.url)),
       "@byline/ui/live-updates": fileURLToPath(new URL("../../packages/ui/src/live-updates.ts", import.meta.url)),
       "@byline/ui/article-body": fileURLToPath(new URL("../../packages/ui/src/article-body/index.ts", import.meta.url)),

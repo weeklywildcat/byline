@@ -79,6 +79,19 @@ snapshot; nothing in this app serves public reading.
   treat these like Story autosave. The public projection in
   `newsroom/public-coverage.ts` is allowlisted and published-only; full snapshot
   delivery/materialization and WordPress cutover remain later work.
+- **People** (`/admin/people`, [docs/people-workspace.md](../../docs/people-workspace.md))
+  is editor+ public identity management, always in the normal global sidebar.
+  `?person=<id>` selects the full editor; URL views/search and Back/Forward use
+  the existing history guard. `/admin/profile` resolves only the account's own
+  linked Person and uses the SAME CMS-neutral PersonEditor with server-derived
+  capabilities. No account setup, linkage or auth fields belong here. Staff
+  edit only their own allowed public fields; raw People administration is admin-only.
+  Explicit Save requires a revision and compares under a PostgreSQL row lock
+  in the same Payload transaction; stale edits return 409. Retirement is Alumni,
+  not deletion; the delete hook protects Stories, trash, versions and plans.
+  Reader presentation/CSS is shared with Astro in `@byline/ui/contributor-profile`.
+  The allowlisted public-people projection is not wired to snapshots. Story
+  guest quick-create and import/cutover remain deferred; do not touch editor code.
 - **Media** (`/admin/media`, [docs/media-workspace.md](../../docs/media-workspace.md))
   is Library (Payload Media + Payload-native folders) and Work (the shared
   production desk), kept apart. The wide Media workspace is the rail plus
@@ -174,3 +187,13 @@ npm run migrate:check --workspace @byline/newsroom         # against an EMPTY da
 ```
 
 Payload 3.92 needs Node ^22.23.4 or ≥24.22.1.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
