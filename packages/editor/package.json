@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@byline/article-body": "0.1.0",
+    "@byline/core": "0.1.0",
     "@byline/newsroom-ui": "0.1.0",
     "@byline/ui": "0.1.0"
   },
