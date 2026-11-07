@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 for (const width of [1920, 1440, 1366, 1180, 820, 390])
   test(`shared Staff and Author presentation at ${width}px`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/staff/");
     const card = page
@@ -58,7 +58,7 @@ for (const width of [1920, 1440, 1366, 1180, 820, 390])
       ),
     ).toBe(true);
     await page.screenshot({
-      path: `/private/tmp/public-author-${width}.png`,
+      path: testInfo.outputPath(`public-author-${width}.png`),
       fullPage: true,
     });
   });
