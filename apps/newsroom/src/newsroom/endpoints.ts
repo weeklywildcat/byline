@@ -14,6 +14,27 @@ import { createFolder, deleteFolder, deleteMedia, libraryPage, mediaDetail, medi
 import { mediaWork } from "./media-work";
 import { planningResponse } from "./planning";
 import { parseScheduleQuery, scheduleResponse, scheduleToday } from "./schedule";
+import {
+  addResource,
+  addStory,
+  collectionDetail,
+  collectionList,
+  createCollection,
+  deleteCollection,
+  deleteResource,
+  parseCollectionQuery,
+  removeStory,
+  resourceOptions,
+  reuseResource,
+  saveInterview,
+  setMember,
+  setResourceStories,
+  storyCollections,
+  storyOptions,
+  unlinkResource,
+  updateCollection
+} from "./collections";
+import type { CollectionInput, InterviewInput, ResourceInput } from "@byline/newsroom-screens/collections/collection-model";
 import { contributorEntry, editorialTask, homeBootstrap, loadPeople, mediaFor, personIdFor, planFor, reportingFor, screenContext, searchStories, storyResources, storyWorkspace, type ScreenContext } from "./screen-models";
 import type { AppointmentInput, MediaAssignmentInput, SourceInput } from "@byline/newsroom-screens/workspace/workspace-types";
 import { effectiveWorkflow } from "../domain/workflow";
@@ -89,8 +110,9 @@ function presetsPayload(): HomePresetsPayload {
   };
 }
 
-async function createStory(ctx: ScreenContext, req: PayloadRequest) {
-  const input = await body<{ title?: string; preset?: string }>(req);
+/** The one Story creation flow (Home, Stories, Create, and a Collection's New story). */
+export async function createStory(ctx: ScreenContext, req: PayloadRequest, given?: { title?: string; preset?: string }) {
+  const input = given ?? (await body<{ title?: string; preset?: string }>(req));
   const title = String(input.title ?? "").trim().slice(0, 300);
   if (!title) throw new APIError("Give the story a working headline.", 400);
   const preset = input.preset ? findPreset(input.preset) : null;
@@ -161,11 +183,12 @@ async function taskPayload(ctx: ScreenContext, taskIds: Array<number | string>, 
 
 async function createTask(ctx: ScreenContext, req: PayloadRequest) {
   const input = await body<TaskInput>(req);
-  if (!input.storyId) throw new APIError("Choose a story for this task.", 400);
+  if (!input.storyId && !input.collectionId) throw new APIError("Choose a story for this task.", 400);
   const task = await req.payload.create({
     collection: "tasks",
     data: {
-      story: Number(input.storyId),
+      story: input.storyId ? Number(input.storyId) : null,
+      collection: input.collectionId ? Number(input.collectionId) : null,
       title: String(input.title ?? "").trim(),
       assignees: input.assigneeId ? [Number(input.assigneeId)] : [],
       due: instantOrNull(input.dueAt, ctx.timeZone),
@@ -174,7 +197,7 @@ async function createTask(ctx: ScreenContext, req: PayloadRequest) {
     },
     ...asUser(ctx)
   });
-  return taskPayload(ctx, [task.id], Number(input.storyId));
+  return taskPayload(ctx, [task.id], input.storyId ? Number(input.storyId) : null);
 }
 
 async function updateTask(ctx: ScreenContext, req: PayloadRequest) {
@@ -399,6 +422,52 @@ async function moveToFolder(ctx: ScreenContext, req: PayloadRequest) {
   return moveMedia(ctx, ids(input.ids), optionalId(input.folderId));
 }
 
+/* ----------------------------------------------------------- collections */
+
+/**
+ * A new story through the one Story creation flow, then added to the
+ * Collection. If the link fails the story still exists (it is the reporter's
+ * work, never silently deleted) and the response says so.
+ */
+async function createCollectionStory(ctx: ScreenContext, req: PayloadRequest) {
+  const id = idParam(req);
+  const input = await body<{ title?: string; preset?: string }>(req);
+  const created = await createStory(ctx, req, input);
+  try {
+    await addStory(ctx, id, created.story.id);
+  } catch {
+    return { ...created, template: { ...created.template, errors: [...created.template.errors, "The story was created but couldn't be added to the Collection. Add it from the Collection's Stories."] } };
+  }
+  return created;
+}
+
+const collectionEndpoints: Endpoint[] = [
+  // Fixed paths come before `/byline/collections/:id`.
+  { path: "/byline/collections", method: "get", handler: handle((ctx, req) => collectionList(ctx, parseCollectionQuery(req.searchParams))) },
+  { path: "/byline/collections", method: "post", handler: handle(async (ctx, req) => createCollection(ctx, await body<CollectionInput>(req))) },
+  { path: "/byline/collections/story-options", method: "get", handler: handle((ctx, req) => storyOptions(ctx, String(req.searchParams.get("search") ?? ""))) },
+  { path: "/byline/collections/resource-options", method: "get", handler: handle((ctx, req) => resourceOptions(ctx, String(req.searchParams.get("search") ?? ""))) },
+  { path: "/byline/collections/:id", method: "get", handler: handle((ctx, req) => collectionDetail(ctx, idParam(req))) },
+  { path: "/byline/collections/:id", method: "patch", handler: handle(async (ctx, req) => updateCollection(ctx, idParam(req), await body<CollectionInput>(req))) },
+  { path: "/byline/collections/:id", method: "delete", handler: handle(async (ctx, req) => { await deleteCollection(ctx, idParam(req)); return new Response(null, { status: 204 }); }) },
+  { path: "/byline/collections/:id/stories", method: "post", handler: handle(async (ctx, req) => addStory(ctx, idParam(req), Number((await body<{ storyId?: number }>(req)).storyId))) },
+  { path: "/byline/collections/:id/stories/new", method: "post", handler: handle(createCollectionStory) },
+  { path: "/byline/collections/:id/stories/:storyId", method: "delete", handler: handle((ctx, req) => removeStory(ctx, idParam(req), idParam(req, "storyId"))) },
+  { path: "/byline/collections/:id/members", method: "post", handler: handle(async (ctx, req) => setMember(ctx, idParam(req), Number((await body<{ userId?: number }>(req)).userId), true)) },
+  { path: "/byline/collections/:id/members/:userId", method: "delete", handler: handle((ctx, req) => setMember(ctx, idParam(req), idParam(req, "userId"), false)) },
+  { path: "/byline/collections/:id/interviews", method: "post", handler: handle(async (ctx, req) => saveInterview(ctx, idParam(req), await body<InterviewInput>(req), null)) },
+  { path: "/byline/collections/:id/interviews/:interviewId", method: "patch", handler: handle(async (ctx, req) => saveInterview(ctx, idParam(req), await body<InterviewInput>(req), idParam(req, "interviewId"))) },
+  { path: "/byline/collections/:id/resources", method: "post", handler: handle(async (ctx, req) => {
+    const input = await body<ResourceInput & { resourceId?: number }>(req);
+    return input.resourceId ? reuseResource(ctx, idParam(req), Number(input.resourceId)) : addResource(ctx, idParam(req), input);
+  }) },
+  { path: "/byline/collections/:id/resources/:resourceId/stories", method: "put", handler: handle(async (ctx, req) => setResourceStories(ctx, idParam(req), idParam(req, "resourceId"), ids((await body<{ storyIds?: unknown }>(req)).storyIds))) },
+  // Remove from this Collection (unlink). Deleting a shared resource is its own, editor-only request below.
+  { path: "/byline/collections/:id/resources/:resourceId", method: "delete", handler: handle((ctx, req) => unlinkResource(ctx, idParam(req), idParam(req, "resourceId"))) },
+  { path: "/byline/collection-resources/:id", method: "delete", handler: handle(async (ctx, req) => { await deleteResource(ctx, idParam(req)); return new Response(null, { status: 204 }); }) },
+  { path: "/byline/stories/:id/collections", method: "get", handler: handle((ctx, req) => storyCollections(ctx, idParam(req))) }
+];
+
 /* ----------------------------------------------------------- endpoints */
 
 export const newsroomEndpoints: Endpoint[] = [
@@ -440,5 +509,6 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/media/:id", method: "delete", handler: handle(async (ctx, req) => { await deleteMedia(ctx, idParam(req)); return new Response(null, { status: 204 }); }) },
   { path: "/byline/tasks", method: "post", handler: handle(createTask) },
   { path: "/byline/tasks/:id", method: "patch", handler: handle(updateTask) },
-  { path: "/byline/tasks/:id", method: "delete", handler: handle(deleteTask) }
+  { path: "/byline/tasks/:id", method: "delete", handler: handle(deleteTask) },
+  ...collectionEndpoints
 ];

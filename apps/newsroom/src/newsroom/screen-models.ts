@@ -17,8 +17,10 @@ import { scopeManages, scopeParticipates, storyScope } from "../access/story-con
 import { atLeast, relationId, relationIds, requestUser, sameId, type NewsroomUser } from "../access/user";
 import { WORKFLOW_OPTIONS } from "../domain/vocabulary";
 import { effectiveWorkflow, workflowLabel } from "../domain/workflow";
-import type { Appointment, Media, Person, ProductionAssignment, Section, Source, Story, StoryPlan, Task, User } from "../payload-types";
+import type { Appointment, CollectionInterview, Media, Person, ProductionAssignment, Section, Source, Story, StoryPlan, Task, User } from "../payload-types";
 import { scheduledPublicationsForStories } from "./scheduled-publication";
+import { collectionNames } from "./collections";
+import { interviewAppointment } from "./schedule";
 
 /**
  * Payload records → the newsroom screens' read models (@byline/newsroom-screens).
@@ -154,8 +156,8 @@ export function editorialTask(people: People, task: Task): EditorialTask {
     assigneeId: assignee ? assignee.id : null,
     dueAt: task.due ?? null,
     priority: (task.priority ?? "normal") as EditorialTask["priority"],
-    storyId: num(task.story),
-    collectionId: null,
+    storyId: num(task.story) || null,
+    collectionId: num(task.collection) || null,
     createdBy: null,
     completedAt: task.completedAt ?? null,
     order: 0
@@ -398,17 +400,21 @@ export async function homeBootstrap(ctx: ScreenContext): Promise<HomeBootstrap> 
   const mine = { assignees: { in: [ctx.user.id] } } satisfies Where;
 
   // Plans are access-limited: editors see the whole newsroom, staff their own and assigned stories.
-  const [plans, tasks, visual, appointments] = await Promise.all([
+  const [plans, tasks, visual, appointments, interviews] = await Promise.all([
     ctx.req.payload.find({ collection: "story-plans", where: { workflow: { not_equals: "dropped" } }, depth: 0, limit: LIMITS.stories, sort: "-updatedAt", ...asUser(ctx) }),
     ctx.req.payload.find({ collection: "tasks", where: { and: [mine, { state: { equals: "open" } }] }, depth: 0, limit: LIMITS.tasks, sort: "due", ...asUser(ctx) }),
     ctx.req.payload.find({ collection: "production-assignments", where: { and: [mine, { status: { not_equals: "done" } }] }, depth: 0, limit: LIMITS.visualWork, sort: "deadline", ...asUser(ctx) }),
-    ctx.req.payload.find({ collection: "appointments", where: { and: [mine, { status: { not_in: ["completed", "cancelled"] } }] }, depth: 0, limit: LIMITS.appointments, sort: "startAt", ...asUser(ctx) })
+    ctx.req.payload.find({ collection: "appointments", where: { and: [mine, { status: { not_in: ["completed", "cancelled"] } }] }, depth: 0, limit: LIMITS.appointments, sort: "startAt", ...asUser(ctx) }),
+    // Shared Collection interviews I'm conducting: Home's upcoming and scheduling signals, linking to the Collection.
+    ctx.req.payload.find({ collection: "collection-interviews", where: { and: [{ interviewers: { in: [ctx.user.id] } }, { status: { not_in: ["completed", "follow-up", "cancelled"] } }] }, depth: 0, limit: LIMITS.appointments, sort: "startAt", select: { collection: true, interviewee: true, status: true, scheduleMode: true, windowStart: true, windowEnd: true, startAt: true, endAt: true, interviewers: true, location: true }, ...asUser(ctx) })
   ]);
   const planByStory = new Map(plans.docs.map((plan) => [num(plan.story), plan]));
   const ids = [...new Set([...planByStory.keys(), ...tasks.docs.map((t) => num(t.story)), ...visual.docs.map((v) => num(v.story)), ...appointments.docs.map((a) => num(a.story))])].filter(Number.isFinite);
   const { stories, extras } = await storiesWithExtras(ctx, ids);
   const rows = stories.map((story) => planningStory(ctx, people, story, planByStory.get(story.id) ?? null, extras.get(story.id)!));
   const title = (id: number) => rows.find((row) => row.id === id)?.title ?? "Story";
+  const shared = interviews.docs as CollectionInterview[];
+  const collectionTitles = await collectionNames(ctx, [...new Set(shared.map((row) => num(row.collection)))]);
 
   return {
     currentUser: me,
@@ -432,10 +438,16 @@ export async function homeBootstrap(ctx: ScreenContext): Promise<HomeBootstrap> 
         attachmentIds: relationIds(row.media).map(Number)
       };
     }),
-    appointments: appointments.docs.map((appointment): HomeAppointment => {
-      const { notes: _notes, assignees: _assignees, assigneeIds: _ids, createdAt: _c, updatedAt: _u, ...rest } = storyAppointment(people, appointment, new Map());
-      return { ...rest, storyId: num(appointment.story), storyTitle: title(num(appointment.story)) };
-    }),
+    appointments: [
+      ...appointments.docs.map((appointment): HomeAppointment => {
+        const { notes: _notes, assignees: _assignees, assigneeIds: _ids, createdAt: _c, updatedAt: _u, ...rest } = storyAppointment(people, appointment, new Map());
+        return { ...rest, storyId: num(appointment.story), storyTitle: title(num(appointment.story)) };
+      }),
+      ...shared.map((row): HomeAppointment => {
+        const { assignees: _assignees, assigneeIds: _ids, ...rest } = interviewAppointment(people, row, collectionTitles);
+        return rest;
+      })
+    ],
     // The activity stream is not ported yet; Home shows none rather than inventing any.
     activity: [],
     errors,

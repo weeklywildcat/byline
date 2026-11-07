@@ -4,7 +4,8 @@ import { inIds } from "../access/story-context";
 import { relationId, relationIds } from "../access/user";
 import { addDays, localToInstant } from "../domain/dates";
 import { dateOnly, TimingError } from "../domain/schedule";
-import type { Appointment, ProductionAssignment, Task } from "../payload-types";
+import type { Appointment, CollectionInterview, ProductionAssignment, Task } from "../payload-types";
+import { collectionNames } from "./collections";
 import { collectionStoryIds } from "./planning";
 import { assigneeList, loadPeople, localToday, readableStories, userPerson, type People, type ScreenContext } from "./screen-models";
 
@@ -27,7 +28,10 @@ import { assigneeList, loadPeople, localToday, readableStories, userPerson, type
  * - open appointments with a target window or no date, whatever the range,
  *   under `needsScheduling`: never given a day or a time;
  * - open production with a deadline in range;
- * - open tasks due in range, only when asked for.
+ * - open tasks due in range, only when asked for, Collection tasks included;
+ * - Collection interviews (shared reporting): an exact one in range is an
+ *   event, a window or unscheduled one waits under `needsScheduling`. They
+ *   link to their Collection, never carry notes or private source details.
  */
 
 /** The longest range one request may ask for, as in WordPress ("up to four months"). */
@@ -105,17 +109,47 @@ function mediaDeadline(people: People, row: ProductionAssignment, titles: Map<nu
   };
 }
 
-function taskDeadline(people: People, row: Task, titles: Map<number, string>): ScheduleTaskDeadline {
+function taskDeadline(people: People, row: Task, titles: Map<number, string>, collections: Map<number, string>): ScheduleTaskDeadline {
   const storyId = Number(relationId(row.story));
+  const collectionId = Number(relationId(row.collection)) || null;
   const assignee = relationIds(row.assignees)[0];
   return {
     id: row.id,
-    collectionId: null,
+    collectionId,
     storyId: Number.isSafeInteger(storyId) && storyId > 0 ? storyId : null,
-    storyTitle: titles.get(storyId) ?? "",
+    storyTitle: titles.get(storyId) ?? (collectionId ? (collections.get(collectionId) ?? "Collection") : ""),
     title: row.title,
     dueAt: row.due!,
     assignee: assignee === undefined ? null : userPerson(people, assignee)
+  };
+}
+
+/** The fields the feed reads from a Collection interview: never notes, follow-ups or private contacts. */
+const INTERVIEW_FIELDS = { collection: true, interviewee: true, status: true, scheduleMode: true, windowStart: true, windowEnd: true, startAt: true, endAt: true, interviewers: true, location: true } as const;
+
+/** A shared Collection interview in the schedule feed: an appointment of its Collection, with no story. */
+export function interviewAppointment(people: People, row: CollectionInterview, collections: Map<number, string>): ScheduleAppointment {
+  const assignees = assigneeList(people, row.interviewers);
+  const collectionId = Number(relationId(row.collection));
+  return {
+    id: `collection-interview-${row.id}`,
+    title: row.interviewee,
+    kind: "interview",
+    status: row.status === "completed" || row.status === "follow-up" ? "completed" : row.status === "scheduled" ? "confirmed" : row.status === "cancelled" ? "cancelled" : "planned",
+    scheduleMode: row.scheduleMode as ScheduleAppointment["scheduleMode"],
+    windowStart: row.windowStart ?? null,
+    windowEnd: row.windowEnd ?? null,
+    startAt: row.startAt ?? null,
+    endAt: row.endAt ?? null,
+    assigneeIds: assignees.map((person) => person.id),
+    assignees,
+    sourceId: null,
+    sourceLabel: row.interviewee,
+    location: row.location ?? "",
+    storyId: 0,
+    storyTitle: collections.get(collectionId) ?? "Collection",
+    collectionId,
+    interviewId: row.id
   };
 }
 
@@ -128,8 +162,11 @@ export async function scheduleResponse(ctx: ScreenContext, query: ScheduleQuery)
   const end = localToInstant(`${addDays(to, 1)}T00:00`, ctx.timeZone);
   const scope: Where[] = collectionId ? [inIds("story", await collectionStoryIds(ctx, collectionId))] : [];
   const where = (...conditions: Where[]): Where => ({ and: [...scope, ...conditions] });
+  // A Collection's own work is in scope too: its tasks and its shared interviews.
+  const taskScope: Where[] = collectionId ? [{ or: [...scope, { collection: { equals: collectionId } }] }] : [];
+  const interviewScope: Where[] = collectionId ? [{ collection: { equals: collectionId } }] : [];
 
-  const [people, exact, waiting, production, tasks] = await Promise.all([
+  const [people, exact, waiting, production, tasks, interviews, waitingInterviews] = await Promise.all([
     loadPeople(ctx),
     ctx.req.payload.find({
       collection: "appointments",
@@ -160,12 +197,25 @@ export async function scheduleResponse(ctx: ScreenContext, query: ScheduleQuery)
     includeTasks
       ? ctx.req.payload.find({
           collection: "tasks",
-          where: where({ state: { equals: "open" } }, { due: { greater_than_equal: start } }, { due: { less_than: end } }),
-          select: { story: true, title: true, due: true, assignees: true },
+          where: { and: [...taskScope, { state: { equals: "open" } }, { due: { greater_than_equal: start } }, { due: { less_than: end } }] },
+          select: { story: true, collection: true, title: true, due: true, assignees: true },
           sort: "due",
           ...asUser(ctx)
         })
-      : Promise.resolve({ docs: [] as Task[] })
+      : Promise.resolve({ docs: [] as Task[] }),
+    ctx.req.payload.find({
+      collection: "collection-interviews",
+      where: { and: [...interviewScope, { scheduleMode: { equals: "exact" } }, { status: { not_equals: "cancelled" } }, { startAt: { less_than: end } }, { or: [{ startAt: { greater_than_equal: start } }, { endAt: { greater_than_equal: start } }] }] },
+      select: INTERVIEW_FIELDS,
+      sort: "startAt",
+      ...asUser(ctx)
+    }),
+    ctx.req.payload.find({
+      collection: "collection-interviews",
+      where: { and: [...interviewScope, { scheduleMode: { in: ["window", "unscheduled"] } }, { status: { not_in: ["completed", "follow-up", "cancelled"] } }] },
+      select: INTERVIEW_FIELDS,
+      ...asUser(ctx)
+    })
   ]);
 
   const appointments = [...exact.docs, ...waiting.docs] as Appointment[];
@@ -178,16 +228,24 @@ export async function scheduleResponse(ctx: ScreenContext, query: ScheduleQuery)
       : Promise.resolve({ docs: [] as Array<{ id: number; label: string }> })
   ]);
   const titles = new Map(stories.map((story) => [story.id, story.headline?.trim() || "Untitled story"]));
+  const shared = [...interviews.docs, ...waitingInterviews.docs] as CollectionInterview[];
+  const collections = await collectionNames(ctx, [...new Set([...shared.map((row) => Number(relationId(row.collection))), ...(tasks.docs as Task[]).map((row) => Number(relationId(row.collection)))].filter((id) => id > 0))]);
   const labels = new Map(sources.docs.map((source) => [String(source.id), source.label]));
 
   return {
     timezone: ctx.timeZone,
     from,
     to,
-    appointments: (exact.docs as Appointment[]).map((row) => scheduleAppointment(people, row, titles, labels)).sort(byThenId((item) => item.startAt ?? "")),
-    needsScheduling: (waiting.docs as Appointment[]).map((row) => scheduleAppointment(people, row, titles, labels)).sort(byThenId((item) => item.windowStart ?? "9999")),
+    appointments: [
+      ...(exact.docs as Appointment[]).map((row) => scheduleAppointment(people, row, titles, labels)),
+      ...(interviews.docs as CollectionInterview[]).map((row) => interviewAppointment(people, row, collections))
+    ].sort(byThenId((item) => item.startAt ?? "")),
+    needsScheduling: [
+      ...(waiting.docs as Appointment[]).map((row) => scheduleAppointment(people, row, titles, labels)),
+      ...(waitingInterviews.docs as CollectionInterview[]).map((row) => interviewAppointment(people, row, collections))
+    ].sort(byThenId((item) => item.windowStart ?? "9999")),
     mediaDeadlines: (production.docs as ProductionAssignment[]).map((row) => mediaDeadline(people, row, titles)).sort(byThenId((item) => item.dueAt)),
-    taskDeadlines: (tasks.docs as Task[]).map((row) => taskDeadline(people, row, titles)).sort(byThenId((item) => item.dueAt))
+    taskDeadlines: (tasks.docs as Task[]).map((row) => taskDeadline(people, row, titles, collections)).sort(byThenId((item) => item.dueAt))
   };
 }
 
