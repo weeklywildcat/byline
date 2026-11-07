@@ -310,7 +310,7 @@ export function mediaLibraryParams(query: MediaLibraryQuery): Record<string, str
   if (query.needsMetadata) params.metadata = "needs";
   if (query.capturedFrom) params.capturedFrom = query.capturedFrom;
   if (query.capturedTo) params.capturedTo = query.capturedTo;
-  if (query.publication) params.delivery = query.delivery;
+  if (query.publication) params.publication = query.publication;
   if (query.sort !== "newest") params.sort = query.sort;
   if (query.page > 1) params.page = String(query.page);
   if (query.limit !== MEDIA_PAGE_SIZE) params.limit = String(query.limit);
