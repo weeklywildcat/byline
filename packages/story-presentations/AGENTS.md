@@ -1,6 +1,6 @@
 # AGENTS.md — Story presentations
 
-These instructions apply to work under `apps/web/story-presentations/`.
+These instructions apply to work under `packages/story-presentations/`. This package is shared by the public site (Astro/Vite) and the newsroom's Live Preview (Next.js): never import `import.meta.glob`, `?inline` CSS or any other bundler-specific syntax here. A story's `styles.css` and `client.ts` stay in its folder; each host loads them on that story's page alone (`apps/web/lib/story-presentation-host.tsx`, `apps/newsroom/src/preview/story-assets.ts`).
 
 This directory is the developer escape hatch for the occasional Weekly Wildcat story that needs a bespoke presentation. By default WordPress remains the source of truth for the journalism and the repository controls only presentation. The one deliberate exception is a **flagship visual story** (below), whose narrative lives here.
 
@@ -34,7 +34,7 @@ Inspect:
 
 - `docs/custom-story-presentations.md`
 - the target story's current content and featured image
-- `registry.ts`
+- `src/registry.ts`
 - an existing presentation, if one is relevant
 - the shared article primitives in `@byline/ui`
 - `HeroReveal` / `HeroRevealContent` if the opening uses the reveal behavior
@@ -88,7 +88,7 @@ Render the WordPress body exactly once with `ArticleBody`.
 
 In a visual story the narrative (text, figures, graphics, data) is written in the story folder as semantic JSX and **replaces** the WordPress body on the page. Everything else above still applies: the headline, deck, byline, dates, lead image with its caption and credit, corrections, topics and series come from WordPress through `presentation` and are never typed.
 
-- `presentation.contentHtml` is empty for a visual story. Never render `ArticleBody` in one.
+- `presentation.body` is empty for a visual story. Never render `ArticleBody` in one.
 - Keep the narrative in the server-rendered JSX. Every word must be in the built HTML; `client.ts` only enhances what is already there and must never inject reporting.
 - Design the scroll experience for the story in front of you: sticky graphics, changing charts, maps, photography, scroll-triggered states. The scaffold's sticky chart is an example, not a schema. Use ordinary document scrolling (IntersectionObserver, CSS `position: sticky`), no `scroll` listeners that move the reader, no scroll-jacking.
 - Under `prefers-reduced-motion`, show each state without animation; the story must make sense without motion and without JavaScript.
@@ -233,7 +233,7 @@ Keep bespoke presentations compatible with static rendering.
 
 Prefer HTML and CSS. Add client JavaScript only when the requested interaction genuinely needs it, and keep it narrowly scoped. Do not introduce a sitewide client framework dependency for a one-off presentation.
 
-Story-specific CSS belongs in the story folder, imported with `?inline` and emitted through `StoryStyles`, so unrelated articles do not download it.
+Story-specific CSS belongs in the story folder as `styles.css`; each host prints or loads it with that story only, so unrelated articles do not download it. Do not import it from the story's `index.tsx`.
 
 Namespace every story-specific selector beneath `.story-<name>`. Do not scatter one-off story selectors through global stylesheets.
 

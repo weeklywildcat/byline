@@ -245,7 +245,7 @@ not depend on Payload Views, JSX converters or node maps.
 ## Why Scrollytelling is not a block
 
 The WordPress Scrollytelling blocks were removed on purpose. Scroll-driven
-stories are repository visual stories (`apps/web/story-presentations/`). No
+stories are repository visual stories (`packages/story-presentations/src/`). No
 Scrollytelling block exists in the registry, and the normalizer reports an
 unknown block type instead of dropping it silently. Interactive is not part of
 this slice; when it comes, it keeps the uploaded-document, sandboxed,

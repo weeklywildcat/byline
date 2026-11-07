@@ -247,7 +247,7 @@ apps/newsroom  (Payload 3 + Next.js 16, private)
   ├── domain rules                           (src/domain: workflow, schedule, presets, readiness)
   ├── public projections                     (src/public: snapshot, live, polls)
   ├── Jobs Queue tasks                       (src/jobs)
-  └── /preview/story/<id>  private Live Preview → @byline/story-presentations
+  └── /preview/story        private Live Preview page → @byline/story-presentations
 PostgreSQL  (@payloadcms/db-postgres; byline_poll_votes via beforeSchemaInit)
 Persistent newsroom volume
   ├── private media originals + Library previews
@@ -396,31 +396,74 @@ screen, no REST/GraphQL exposure. Cookie names, `voterId.base64url(HMAC)` and
 
 ## 5. Live Preview and presentation parity
 
-- Payload `admin.livePreview` on `stories` with a dynamic URL
-  `/preview/story/<id>` and breakpoints Phone 390×844, Tablet 820×1180,
-  Desktop 1440×900.
-- The preview route is in `apps/newsroom/src/app/(preview)`: it requires an
-  authenticated user with story context (`payload.auth({ headers })`), sends
-  `X-Robots-Tag: noindex, nofollow` and `Cache-Control: private, no-store`, loads
-  the initial story through the Local API with `draft: true` and the user's
-  access, then a client island subscribes with `useLivePreview` and re-normalizes
-  each unsaved state into `ArticlePresentation`.
-- The SAME `StoryArticle` from `@byline/story-presentations` renders it, so a
-  registered custom presentation wins over Immersive in preview exactly as it
-  does publicly. The Story header shows "Custom presentation: <name>" when the
-  registry has an entry.
-- Administrators can preview an unregistered presentation against a draft via
-  `?presentation=<name>` from `previewPresentations` (a separate dev-only map in
-  the package). It never affects the public registry or a published page.
-- Draft media in preview uses Payload's authenticated file URLs. Published
-  pages use the content-addressed same-origin URLs materialized into the static
-  export by the build. Dimensions, crops and object positions are identical.
+**Ownership.** Payload owns Live Preview: the document form state, drafts,
+autosave, locks, the open/closed state and its saved preference, the pane and
+iframe, device sizing, zoom, the pop-out window, the postMessage transport and
+the relationship/upload population protocol. Byline owns the page being
+previewed: the canonical Story, the Payload and WordPress adapters, the
+presentation rules, `StoryArticle`, the registry, the article-body renderer,
+and the preview status and error states. There is no second iframe, device
+emulator, popup, message listener, editable Story copy, preview-only renderer
+or autosave clock.
 
-Launch-blocking parity tests (§11 Phase 4 gate) cover every item in the brief:
-Standard/Immersive/custom selection, alignment and featured media updating
-unsaved, crops/focal point, the custom override, the same module identity in
-both hosts, slots/footer/corrections parity, SEO only from the Astro route,
-reduced motion and the three breakpoints.
+```text
+unsaved Payload Story form
+  → Payload's LivePreviewWindow (the only pane/iframe/popup)
+  → /preview/story  (static, same-origin)
+  → @payloadcms/live-preview-react useLivePreview()
+  → Payload relationship/upload population (requestHandler below)
+  → payloadPublicStory()  (apps/newsroom/src/preview/payload-story.ts)
+  → PublicStory + PublicArticleBody  (byline-v1 via normalizePayloadStoryBody, or legacy-html)
+  → buildArticlePresentation()  (@byline/content/story, shared with the WordPress adapter)
+  → StoryArticle  (@byline/story-presentations: custom → Immersive when valid → Standard)
+```
+
+- **Configuration:** `stories.admin.livePreview` is `{ url: "/preview/story",
+  breakpoints: Phone 390×844, Tablet 820×1180, Desktop 1440×900,
+  openByDefault: false }` (`src/preview/config.ts`). The URL is deliberately a
+  static string: Payload 3.92.1 recomputes function URLs during form-state
+  requests, and with frequent autosave an overlapping request can drop the URL
+  and close Live Preview. One `STORY_LIVE_PREVIEW_DEPTH` (2: story → media,
+  story → person → portrait, section, topics, and the body's Photo/Gallery/
+  Document Media) is used for every population request.
+- **Static route, no Story ID in the URL.** `useLivePreview`'s default
+  population request is `stories/<initialData.id>`; this route has no initial
+  document. The official `requestHandler` option fixes only the target: it
+  reads the Story ID Payload's own LivePreviewWindow puts in every form-state
+  message (`data.id`) and sends Payload's request (method override, body,
+  credentials, depth, locale) to `/api/stories/<id>`, so normal collection and
+  relationship access control apply. It also keeps responses in order and
+  answers a failed request with the last good result plus a failure status
+  (`src/preview/population.ts`). `initialData` and `requestHandler` are
+  referentially stable because the hook resubscribes and resets when they change.
+- **Private on its own.** `/preview/story` needs a newsroom session (a
+  signed-out visitor gets a message and no content), every population request
+  runs as that user, and it is `Cache-Control: private, no-store`, `noindex`,
+  `frame-ancestors 'self'`. No secret, no token, a Story ID is not
+  authorization.
+- **Presentation context** (`GET /api/byline/stories/:id/preview-context`):
+  corrections, Related/More by candidates and series placement, read with the
+  signed-in user's access, canonical data only, refreshed when section, topics
+  or contributors change; never per keystroke.
+- **Shell, not SEO.** The page imports the same publication stylesheets as
+  the public site's layout (theme, fonts, article CSS) and renders no JSON-LD,
+  canonical, Open Graph, analytics or site header; SEO stays in Astro. Slots
+  are the shared visual views (`ArticleShareActionsView`, `ReaderFeedbackView`,
+  `NewsletterSignupView`) rendered inert; ordinary article links open
+  separately instead of navigating the frame.
+- **Media** in Preview uses Payload's authenticated file URLs; the public
+  site uses its static media. Dimensions, alt, credit and focal point come
+  from the same Media record, so geometry matches.
+- **Custom and visual stories** come from the one registry in
+  `@byline/story-presentations` (`storyPresentationRegistry({ fixtures })`).
+  A story's stylesheet and `client.ts` load per bundler: Vite in
+  `apps/web/lib/story-presentation-{host,client}`, a dynamic import in
+  `apps/newsroom/src/preview/story-assets.ts`, so a flagship's CSS and JS load
+  only for that story in either host. There is no preview-only presentation
+  override; to exercise a repository presentation in development, set
+  `BYLINE_STORY_PRESENTATION_FIXTURES=1` (story IDs 6 and 10) or register the
+  test Story's ID.
+- **Not built:** click-to-edit overlays (no DOM ↔ field maps).
 
 ## 6. Snapshot v2
 
@@ -532,9 +575,11 @@ Workspace sections (`src/workspace`), `StoryPeek` and the Nova primitives.
 Their `*-api.ts` fetch adapters are swapped for Payload adapters; models and
 components move with as little change as possible. The article editor keeps
 Lexical as its state engine with a Byline interface (slash menu, block
-toolbars, dialogs, media selectors, reorder controls) built from Nova. Live
-Preview's chrome is Byline; Payload supplies the unsaved-document messages, and
-`@byline/story-presentations` renders the page.
+toolbars, dialogs, media selectors, reorder controls) built from Nova. Byline
+owns the Story-level Preview entry control and the preview status; Payload
+owns the Live Preview pane, iframe, toolbar, device sizing, zoom, pop-out,
+synchronization and transport, and `@byline/story-presentations` renders the
+page.
 
 ### 7.1 Where the UI stands
 
@@ -1095,7 +1140,7 @@ The torture-test story covers scrollytelling with a repository visual story.
 | 1b | Google sign-in strategy | invited-only sign-in test | — |
 | 2 | People, Stories, Sections, Topics, Collections and optional public presentations, Corrections, Pages, Workspace records, canonical public model | access/privacy tests | collections + access **done**; People workspace, My profile and public-safe projection done in the parallel People slice; Collections workspace and public compatibility projection done; full snapshot integration, `events`, YouTube metadata job pending |
 | 3 | Story view (Write/Plan/Production/History), Lexical, first blocks, autosave, locking, history | writer acceptance steps 1–6 | Story screen (Write/Plan/Production/History) done. Semantic editor and the first eight blocks built ([article-editor.md](article-editor.md), part of this PR); the full-story autosave check, the lock/undo/width browser specs and editor/public geometry parity are not yet green |
-| 4 | Extract `@byline/story-presentations`, canonical normalization, exact Live Preview | §5 parity suite green | — |
+| 4 | Extract `@byline/story-presentations`, canonical normalization, exact Live Preview | §5 parity suite green | Built (see §14). Done and verified: the provider-neutral `@byline/content/story` model and builder, `PublicArticleBody` through `StoryArticle`, the extracted package with Vite and Next asset hosts, the Payload adapter, the static `/preview/story` bridge, Byline Preview control and presentation status, and a browser pass (live typing, overlapping autosaves, Immersive, alignment, lead-image fallback, section, contributors, body, Phone/Tablet/Desktop/Responsive). Not yet verified: pop-out window, narrow-width layouts (390/820/1180), editing/reordering every block and swapping Photo/Gallery media in one flow, visual-story/custom presentation in Preview, reload parity, a Playwright version of the torture flow |
 | 5 | Media: private source storage, metadata, crops, prepared publication renditions, static-build materialization, drag and drop | media privacy + static public availability tests | Media workspace (Library, folders, upload, inspector, Work) done ([media-workspace.md](media-workspace.md)); the Story editor uses its picker and uploads. Pending: crop/focal integration, local publication-rendition preparation, build-only media delivery and materialization into the Cloudflare static export. No object storage is required |
 | 6 | Full block set | torture-test story authorable | First eight blocks (Photo, Photo Gallery, Reported Quote, Pull Quote, Key Facts, Context, Document, Timeline) built; the rest follow the same contract |
 | 7 | Payload → snapshot v1 projection + direct-source fallback | snapshot build and deliberate no-snapshot fallback both pass Astro verification and produce the same canonical routes/content/media set | — |
@@ -1165,3 +1210,21 @@ media materialization, snapshot + direct-source build projection, import,
 runtime polls/live, Discord, MCP.
 Nothing in `apps/web` or `wordpress-plugin` changed; production still runs on
 WordPress.
+
+## 14. Phase 4 record
+
+Packages: `@byline/content` is provider-neutral (no UI, React, CMS or Astro) and
+owns `@byline/content/story` (`ArticlePresentation`, `PublicStory`,
+`buildArticlePresentation`, `resolveBuiltInPresentation`). The homepage
+resolver, the one module that needed UI view types, moved to
+`@byline/ui/homepage`. `@byline/story-presentations` owns `StoryArticle`, the
+resolver, registry, types and the stories. `ArticlePresentation.body` is a
+`PublicArticleBody` (replacing `contentHtml`); the WordPress adapter
+(`apps/web/lib/adapters/wordpress-story.ts`) emits `legacy-html` and its output
+was compared with the previous builder for every fixture post (identical apart
+from `contentHtml` → `body`).
+
+Baseline at the start: the dedicated newsroom CI job was green; the package
+suite failed on a stale Media Library `delivery` expectation (fixed, separate
+commit); WordPress E2E had existing Planning/Collections/Story-list failures,
+not touched here.

@@ -208,7 +208,7 @@ function failureMessage(reason: PopulationFailure, detail: string): { title: str
 function LivePreviewPage({ origin, publication, fixtures }: { origin: string; publication: PreviewPublication; fixtures: boolean }) {
   // One population bridge for this page's lifetime (stable identity: see the note above).
   const [population] = useState(createStoryPopulation);
-  const { data, isLoading } = useLivePreview<StoryDoc>({
+  const { data } = useLivePreview<StoryDoc>({
     initialData: NO_INITIAL_DATA,
     serverURL: origin,
     depth: STORY_LIVE_PREVIEW_DEPTH,
@@ -241,7 +241,7 @@ function LivePreviewPage({ origin, publication, fixtures }: { origin: string; pu
     if (built && !built.ok) {
       return <Message title="Preview couldn't render" action={<button type="button" onClick={onRetry}>Try again</button>}>{built.error}</Message>;
     }
-    return <Message title={isLoading ? "Connecting…" : "Preparing preview…"} />;
+    return <Message title="Connecting…" />;
   }
 
   // A repository story's stylesheet is its own chunk; show the article only once it is in.

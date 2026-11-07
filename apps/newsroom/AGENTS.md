@@ -103,6 +103,14 @@ snapshot; nothing in this app serves public reading.
   size, never originals, and never publication renditions. The address is
   Media's state (`?folder=`, `?source=`, `?view=work&scope=`, `?asset=`), moved
   with `history.pushState` so the shell isn't re-rendered.
+- **Live Preview** (`src/preview`, docs/payload-migration.md §5): Payload owns
+  the pane, iframe, toolbar, devices, zoom, pop-out, transport and open state;
+  Byline owns the `/preview/story` page and the Preview button
+  (`useLivePreviewContext`). Configured once on `stories` with a static URL, never a
+  function. Never add a second iframe, device/zoom/popup control, `message`
+  listener, editable Story copy, preview-only renderer or autosave clock. Keep
+  `useLivePreview`'s `initialData` and `requestHandler` referentially stable. The
+  page renders the shared `StoryArticle`; SEO and runtime slots stay out.
 - **Leave through the shell.** Payload disables its leave prompt for
   autosaving documents. Shell links use `ShellLink`/`useShellNavigation()`,
   which wait for the Story screen's own autosave (reported by `useLeaveGuard`)

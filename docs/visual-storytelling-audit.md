@@ -2,7 +2,7 @@
 
 > Historical record. The Scrollytelling and Story Step blocks it reviews were
 > later removed from WordPress; scroll-driven stories are now built as flagship
-> visual stories in `apps/web/story-presentations/` (see
+> visual stories in `packages/story-presentations/src/` (see
 > [custom-story-presentations.md](custom-story-presentations.md)).
 
 An audit of the tools introduced or touched by PRs #132, #135, #137, #141 and #142,

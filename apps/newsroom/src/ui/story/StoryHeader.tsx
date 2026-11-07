@@ -61,8 +61,8 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
   return (
     <header className="flex flex-col gap-3 border-b border-border pb-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]">{headline?.trim() || "Untitled story"}</h1>
-        <div className="flex items-center gap-2">
+        <h1 className="min-w-0 flex-[1_1_18rem] text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]">{headline?.trim() || "Untitled story"}</h1>
+        <div className="flex flex-wrap items-center gap-2">
           <StorySwitchButton />
           <PreviewButton />
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
