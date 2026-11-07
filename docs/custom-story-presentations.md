@@ -17,7 +17,7 @@ ArticlePresentation                   (apps/web/lib/article-presentation.ts)
 ```
 
 A repository override always wins over the author's choice. `StoryArticle`
-(`apps/web/story-presentations/StoryArticle.tsx`) makes this decision for both
+(`packages/story-presentations/src/StoryArticle.tsx`) makes this decision for both
 article routes.
 
 Where each kind of work belongs:
@@ -89,7 +89,7 @@ By its **WordPress post ID**, never its slug or headline (those change; the ID
 does not). It is the number in the editor URL (`post.php?post=384&action=edit`) or
 `id` in `/wp-json/wp/v2/posts?slug=...`. `ArticlePresentation.id` carries it.
 
-The registry, `apps/web/story-presentations/registry.ts`, is an explicit map:
+The registry, `packages/story-presentations/src/registry.ts`, is an explicit map:
 
 ```ts
 export const storyPresentations: StoryPresentationRegistry = {
@@ -121,7 +121,7 @@ WordPress post.
 npm run story-presentation -- create 384 need-a-lift
 ```
 
-This creates `apps/web/story-presentations/stories/need-a-lift/` with `index.tsx`
+This creates `packages/story-presentations/src/stories/need-a-lift/` with `index.tsx`
 and `styles.css`, imports the component in `registry.ts` and adds the
 `384: NeedALift,` line. (If the registry has been reshaped and cannot be edited
 safely, the command prints the two lines to add.) The generated component is a
@@ -249,7 +249,7 @@ body is short can pass `readingTime: "12 min read"` to `defineVisualStory`.
   order. The scaffold's narrative carries `article-body`, which gives it the
   article's prose, figure and `alignwide` / `alignfull` styles.
 - **`client.ts` only enhances.** It is loaded as its own chunk, on this story's
-  page alone (`story-presentations/client.ts` finds it by folder name), and
+  page alone (each host's loader finds it by folder name (`apps/web/lib/story-presentation-client.ts`)), and
   receives the story's root element. Use ordinary document scrolling: observe,
   never listen to `scroll` or move the reader. Honour
   `prefers-reduced-motion`: no animation, and nothing that only works in motion.

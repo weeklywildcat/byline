@@ -1,7 +1,7 @@
 import type { Metadata } from "@/lib/metadata";
 import { SectionHeader } from "@/components/SectionHeader";
 import { StoryTeaser } from "@/components/StoryTeaser";
-import { filterVisibleContentPosts } from "@/lib/content";
+import { filterGeneralEditorialPosts } from "@/lib/content";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import { getAllPosts } from "@/lib/wordpress";
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 export default async function StoriesPage() {
-  const posts = filterVisibleContentPosts(await getAllPosts());
+  const posts = filterGeneralEditorialPosts(await getAllPosts());
   const [leadPost, ...remainingPosts] = posts;
   const hasStoryList = remainingPosts.length > 0;
   const breadcrumbSchema = getBreadcrumbSchema([

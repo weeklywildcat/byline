@@ -2,9 +2,10 @@ import { legacyHashHref } from "./admin-routing";
 import apiFetch from "@wordpress/api-fetch";
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { InlineAlert } from "./admin-ui/components/inline-alert";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { PlanningApp, createPlanningFetchers } from "./planning";
-import { createStoryFetchers } from "./story/story-fetchers";
+import { createStoryFetchers } from "@byline/newsroom-screens/story/story-fetchers";
+import { createWordPressCollectionApi } from "./collections/wordpress-collection-api";
 import "./planning/style.css";
 
 type PlanningConfig = {
@@ -33,7 +34,7 @@ if (legacyTarget) window.location.replace(legacyTarget);
 if (root && config && !legacyTarget) {
   apiFetch.use(apiFetch.createNonceMiddleware(config.nonce));
   const request = <T,>(options: Parameters<typeof apiFetch>[0]) => apiFetch(options) as Promise<T>;
-  const fetchers = { ...createPlanningFetchers(request), ...createStoryFetchers(request, config.capabilities) };
+  const fetchers = { ...createPlanningFetchers(request), ...createStoryFetchers(request, config.capabilities, {}, { collections: createWordPressCollectionApi(request, Number(config.currentUserId) || null) }) };
   createRoot(root).render(<PlanningBoundary>
     <PlanningApp fetchers={fetchers} tab={config.tab} view={config.view} currentUserId={Number(config.currentUserId) || null} storiesUrl={config.urls?.planning?.stories || "admin.php?page=byline-planning&tab=stories"} mine={new URLSearchParams(window.location.search).get("mine") === "1"} />
   </PlanningBoundary>);

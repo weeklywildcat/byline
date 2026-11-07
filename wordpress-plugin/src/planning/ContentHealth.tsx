@@ -2,23 +2,23 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, MoreHorizontal, Search } from "lucide-react";
 import { toast } from "sonner";
-import { StoryTitleButton } from "../story/story-parts";
-import { StoryHoverCard } from "../story/StoryHoverCard";
-import { StatusBadge } from "../admin-ui/components/status-badge";
-import { InlineAlert } from "../admin-ui/components/inline-alert";
-import { Badge } from "../admin-ui/ui/badge";
-import { Button, buttonVariants } from "../admin-ui/ui/button";
+import { StoryTitleButton } from "@byline/newsroom-screens/story/story-parts";
+import { StoryHoverCard } from "@byline/newsroom-screens/story/StoryHoverCard";
+import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { Badge } from "@byline/newsroom-ui/ui/badge";
+import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "../admin-ui/ui/collapsible";
+} from "@byline/newsroom-ui/ui/collapsible";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-} from "../admin-ui/ui/context-menu";
+} from "@byline/newsroom-ui/ui/context-menu";
 import {
   Dialog,
   DialogContent,
@@ -26,18 +26,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../admin-ui/ui/dialog";
+} from "@byline/newsroom-ui/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "../admin-ui/ui/dropdown-menu";
+} from "@byline/newsroom-ui/ui/dropdown-menu";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-} from "../admin-ui/ui/input-group";
+} from "@byline/newsroom-ui/ui/input-group";
 import {
   Item,
   ItemActions,
@@ -45,18 +45,18 @@ import {
   ItemDescription,
   ItemGroup,
   ItemTitle,
-} from "../admin-ui/ui/item";
+} from "@byline/newsroom-ui/ui/item";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../admin-ui/ui/select";
-import { Spinner } from "../admin-ui/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../admin-ui/ui/tabs";
-import { describeEditorialError } from "../editorial/editorial-model";
-import { contentHealthKey } from "../story/story-query";
+} from "@byline/newsroom-ui/ui/select";
+import { Spinner } from "@byline/newsroom-ui/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
+import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
+import { contentHealthKey } from "@byline/newsroom-screens/story/story-query";
 import { contentHealthFixHref } from "./content-health-navigation";
 import {
   groupHealthIssues,
@@ -65,14 +65,14 @@ import {
   healthCheckId,
   healthSeverityLabels,
 } from "./content-health-model";
-import type { PlanningFetchers } from "./planning-api";
+import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
 import type {
   ContentHealthIssue,
   ContentHealthResponse,
   ContentHealthSeverity,
-} from "./planning-model";
-import { NothingHere, PageHeader, ResourceGate } from "./PlanningPage";
-import { useOptionalQuery } from "./planning-query";
+} from "@byline/newsroom-screens/planning/planning-model";
+import { NothingHere, PageHeader, ResourceGate } from "@byline/newsroom-screens/planning/PlanningPage";
+import { useOptionalQuery } from "@byline/newsroom-screens/planning/planning-query";
 
 type Filters = {
   search: string;

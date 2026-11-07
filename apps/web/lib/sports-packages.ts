@@ -3,7 +3,7 @@ import {
   resolveSportsPackage as resolveSharedSportsPackage,
   type HomepagePackageResolutionContext,
   type HomepageStoryInput
-} from "@byline/content";
+} from "@byline/ui/homepage";
 import type {
   AthleteSpotlightView,
   ResolvedSportsPackage,
@@ -197,7 +197,7 @@ export type SportsPackageResolutionInput = {
  * The build-time entry point into the canonical sports package resolver.
  *
  * Selection, athlete-spotlight reconciliation and capability reconciliation all
- * live in `@byline/content`. What happens here is the WordPress-shaped part:
+ * live in `@byline/ui/homepage`. What happens here is the WordPress-shaped part:
  * structured sports records become `SportsResultView`/`SportsFixtureView`
  * before the shared resolver decides how many of them the reader sees.
  */

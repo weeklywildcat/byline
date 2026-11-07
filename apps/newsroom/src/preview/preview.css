@@ -1,0 +1,16 @@
+/* Live Preview page chrome. The article itself is the public stylesheets (see app/(preview)/layout.tsx). */
+html { --hero-reveal-header-h: 0px; }
+.byline-preview-page { min-height: 100vh; }
+.byline-preview-message {
+  align-items: center; color: var(--muted, #545454); display: flex; flex-direction: column; font-family: var(--font-ui, system-ui, sans-serif);
+  gap: 12px; justify-content: center; min-height: 100vh; padding: 24px; text-align: center;
+}
+.byline-preview-message h1 { color: var(--ink, #121212); font-size: 1.15rem; margin: 0; }
+.byline-preview-message p { margin: 0; max-width: 34em; }
+.byline-preview-message button {
+  background: var(--ink, #121212); border: 0; border-radius: 4px; color: var(--page, #fff); cursor: pointer; font: inherit; font-size: .9rem; padding: 8px 14px;
+}
+.byline-preview-stale {
+  background: #fff7e0; border: 1px solid #e0c36b; border-radius: 999px; box-shadow: 0 2px 8px rgb(0 0 0 / .12); color: #5c4400;
+  font-family: var(--font-ui, system-ui, sans-serif); font-size: .75rem; padding: 4px 12px; position: fixed; right: 12px; top: 12px; z-index: 9999;
+}

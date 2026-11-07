@@ -5,7 +5,7 @@ import { ArticleShareActions } from "@/components/ArticleShareActions";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
 import { ReaderFeedbackForm } from "@/components/ReaderFeedbackForm";
-import { StoryArticle } from "@/story-presentations/StoryArticle";
+import { StoryArticle, getStoryPresentation } from "@/lib/story-presentation-host";
 import { getPrimaryVisibleCategory, getPublicTopicTags, isVisibleContentPost } from "@/lib/content";
 import { stripHtml, decodeHtml } from "@/lib/format";
 import { buildArticlePresentation } from "@/lib/article-presentation";
@@ -13,8 +13,7 @@ import { optionalBuildData } from "@/lib/build-data";
 import { getSportsGameById } from "@/lib/headless";
 import { absoluteUrl, buildPageMetadata, getArticleAuthorProfileUrls, getBreadcrumbSchema, getPostTimestamps, serializeJsonLd } from "@/lib/seo";
 import { getArticleJsonLd } from "@/lib/story-video";
-import { getStoryPresentation } from "@/story-presentations/registry";
-import { isVisualStory } from "@/story-presentations/types";
+import { isVisualStory } from "@byline/story-presentations";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getAllPosts,

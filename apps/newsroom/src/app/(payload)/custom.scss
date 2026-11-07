@@ -1,0 +1,74 @@
+// Unscoped overrides of Payload's admin chrome. Payload's styles live in
+// `@layer payload-default`, so these plain rules win without !important.
+// Byline (src/ui, Nova) owns everything a writer sees; Payload's header,
+// navigation toggler and generic chrome are not part of the product.
+
+// The Byline sidebar (shadcn Sidebar, src/ui/shell) reserves its own width:
+// its `sidebar-gap` is the first grid column (expanded, icons, or nothing on
+// phones, where it is a sheet) and its panel is fixed to the viewport.
+//
+// Payload isolates the template as its own stacking context. Byline's header
+// lives outside it, so that would trap every overlay a view opens (Story
+// Peek, dialogs, the mobile sidebar sheet) underneath the header. Released
+// here; the header sits between Payload's sticky chrome (z 20) and its modals
+// and popups (30+), and Byline overlays (z 50) stay above it.
+.template-default {
+  grid-template-columns: auto minmax(0, 1fr);
+  isolation: auto;
+}
+
+.template-default__nav-toggler-wrapper,
+.template-default .app-header {
+  display: none;
+}
+
+// Byline's app header (`admin.components.header`) sits above the template and
+// stays in view; it offsets itself by the sidebar's width.
+.byline-app-header {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+}
+
+// The Byline Story screen (src/ui/story) presents the whole document. Payload's
+// document header, tabs and controls stay mounted, because autosave, locking and
+// stale-data detection live there, but they are not shown.
+.template-default:has(.byline-story) {
+  .doc-header,
+  .doc-controls,
+  .collection-edit__sidebar-wrap {
+    display: none;
+  }
+
+  .collection-edit__main {
+    padding: 0;
+  }
+}
+
+// Live Preview on a narrow screen. At Payload's own mid break (1024px) it gives the preview
+// window `width: 100%`, which squeezes the editor column (and the Byline Story header
+// with its Preview button) to nothing. Stack instead: the preview is a sticky panel above the
+// editor, so the same Preview button is always reachable to return to editing. Wider screens
+// keep Payload's side-by-side layout untouched. Between 1024px and 1280px side by side leaves the
+// editor under ~400px, too narrow to write in, so it stacks there too. Only layout properties are set; the pane, its
+// toolbar and its iframe stay Payload's.
+@media (max-width: 1280px) {
+  .collection-edit--stories.collection-edit--is-live-previewing {
+    .collection-edit__main-wrapper {
+      flex-direction: column;
+    }
+
+    .collection-edit__main {
+      width: 100%;
+    }
+
+    .live-preview-window {
+      order: -1;
+      width: 100%;
+      height: 55svh;
+      // Below Byline's sticky app header (48px).
+      top: 48px;
+      z-index: 5;
+    }
+  }
+}

@@ -18,7 +18,7 @@ import {
 
 // Turns build-time WordPress records into the presentation-neutral view models
 // the shared renderers consume. Everything WordPress-shaped stops here; the
-// canonical resolver in @byline/content never sees a WordPressPost.
+// canonical resolver in @byline/ui/homepage never sees a WordPressPost.
 
 // The photo for a card, with its srcset, the editor's focal point and any
 // per-shape crops. The card renderer picks the shape and `sizes` per variant.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { NewsletterSignupView } from "@byline/ui";
 import { getPreferredSourceUrl } from "@/lib/preferred-source";
 import { getPublicationConfig } from "@/lib/publication";
 
@@ -43,22 +44,13 @@ export function NewsletterSignupForm({
   }
 
   return (
-    <aside className="article-newsletter-signup" aria-labelledby={headingId}>
-      <div className="article-newsletter-copy">
-        {showLabel ? <p className="article-newsletter-kicker">Newsletter</p> : null}
-        <h2 id={headingId}>{heading ?? `Get ${publication.identity.shortName} in your inbox`}</h2>
-        <p>Catch the newest stories and campus updates when they publish.</p>
-      </div>
-
-      {usesLegacyKitForm ? <div className="article-newsletter-kit" ref={embedRef} /> : (
-        <a className="article-newsletter-generic-link" href={publication.urls.contact}>Ask about newsletter subscriptions</a>
-      )}
-
-      <p className="article-newsletter-preferred">
-        <a href={getPreferredSourceUrl(publication.urls.publicSite)} target="_blank" rel="noopener">
-          Add {publication.identity.shortName} as a preferred source on Google
-        </a>
-      </p>
-    </aside>
+    <NewsletterSignupView
+      headingId={headingId}
+      heading={heading ?? `Get ${publication.identity.shortName} in your inbox`}
+      showLabel={showLabel}
+      embedRef={embedRef}
+      fallbackLink={usesLegacyKitForm ? null : { href: publication.urls.contact, label: "Ask about newsletter subscriptions" }}
+      preferredSource={{ href: getPreferredSourceUrl(publication.urls.publicSite), label: `Add ${publication.identity.shortName} as a preferred source on Google` }}
+    />
   );
 }

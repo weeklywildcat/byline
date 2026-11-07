@@ -40,7 +40,55 @@ jobs:
           test "$(cat apps/web/node_modules/.astro/cloudflare-cache-sentinel)" = retained
           test -d node_modules/@byline/content
           test ! -d node_modules/@wordpress/env
+          # The private newsroom (Payload) never enters the public build.
+          test ! -d node_modules/payload
           test -s apps/web/out/_byline/manifest.json
+
+  newsroom:
+    name: Newsroom (Payload + PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: byline
+          POSTGRES_PASSWORD: byline
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U byline"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Typecheck and unit-test the newsroom
+        run: npm run typecheck:newsroom && npm run test:newsroom
+
+      - name: Access-control and storage integration tests against PostgreSQL
+        env:
+          BYLINE_TEST_DATABASE_URL: postgres://byline:byline@localhost:5432/byline_newsroom_test
+        run: npm run test:newsroom:integration
+
+      - name: Committed migrations apply to an empty database and match the config
+        env:
+          DATABASE_URL: postgres://byline:byline@localhost:5432/byline_newsroom_migrations
+          PAYLOAD_SECRET: ci-migration-check-secret-0123456789abcdef
+        run: |
+          PGPASSWORD=byline psql -h localhost -U byline -d postgres -c "CREATE DATABASE byline_newsroom_migrations"
+          npm run migrate:check --workspace @byline/newsroom
 
   php-compatibility:
     name: Plugin PHP ${{ matrix.php }} compatibility

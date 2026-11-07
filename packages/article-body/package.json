@@ -1,0 +1,14 @@
+{
+  "name": "@byline/article-body",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The provider-neutral semantic article body (byline-v1): node and block types, block metadata, limits, validation and normalization helpers. No CMS, editor, React or CSS dependencies.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fixtures": "./src/fixtures.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  }
+}

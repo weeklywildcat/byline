@@ -1,0 +1,6 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { getMetadata } from "@/views/behind-the-scenes/page";
+const metadata = await getMetadata();
+---
+<BaseLayout metadata={metadata}><Page /></BaseLayout>

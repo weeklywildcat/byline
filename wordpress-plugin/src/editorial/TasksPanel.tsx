@@ -1,7 +1,7 @@
 import { Button, Notice, SelectControl, Spinner, TextControl } from "@wordpress/components";
 import { useMemo, useState } from "@wordpress/element";
 import type { FormEvent } from "react";
-import type { ContributorRef, EditorialTask, TaskInput, TaskPatch, TaskPermissionContext, TaskPriority } from "./editorial-model";
+import type { ContributorRef, EditorialTask, TaskInput, TaskPatch, TaskPermissionContext, TaskPriority } from "@byline/newsroom-screens/editorial/editorial-model";
 import {
   canAssignTask,
   canDeleteTask,
@@ -10,7 +10,7 @@ import {
   formatExactEditorialDate,
   setTaskCompletionState,
   taskStateLabel
-} from "./editorial-model";
+} from "@byline/newsroom-screens/editorial/editorial-model";
 import "./editorial.css";
 
 export type TasksPanelProps = {

@@ -3,7 +3,7 @@ import {
   takeUnusedStories,
   type HomepageSelection as SharedHomepageSelection,
   type HomepageStoryInput
-} from "@byline/content";
+} from "@byline/ui/homepage";
 import { toHomepageStoryInputs } from "@/lib/homepage-story-input";
 import { getPostCategories, type WordPressPost } from "@/lib/wordpress";
 
@@ -16,7 +16,7 @@ export function hasCategory(post: WordPressPost, slugs: string[]) {
 /**
  * Retained WordPress-shaped helper.
  *
- * The selection algorithm itself lives in `@byline/content`; this wraps the
+ * The selection algorithm itself lives in `@byline/ui/homepage`; this wraps the
  * shared primitive so the existing build-time call sites and their regression
  * tests keep reading WordPress records.
  */
@@ -47,7 +47,7 @@ export { takeUnusedStories };
  * The compatibility homepage selection, expressed in WordPress records.
  *
  * There is one selection algorithm and it is
- * `resolveCompatibilityHomepageSelection` in `@byline/content`, which Studio
+ * `resolveCompatibilityHomepageSelection` in `@byline/ui/homepage`, which Studio
  * runs too. This function only adapts posts in and posts out, and returns the
  * shared selection alongside its WordPress-shaped view so the same object can
  * be handed straight to the canonical package resolvers.

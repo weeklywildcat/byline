@@ -8,6 +8,7 @@
 @import "./newsroom/story-base.css";
 @import "./newsroom/context.css";
 @import "./newsroom/timeline.css";
+@import "./newsroom/document.css";
 @import "./newsroom/annotated-image.css";
 @import "./newsroom/before-after.css";
 @import "./newsroom/visualization.css";

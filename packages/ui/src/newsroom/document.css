@@ -1,0 +1,89 @@
+/*
+ * Document (byline-v1): a source document shown as evidence. Supporting
+ * context, so a strong rule and a label, never a card: what the document is,
+ * why the reader should look, who released it, the pages that matter, then
+ * the file. The direct link is always there; the inline preview is a
+ * progressive extra that a narrow column drops, as the legacy Document
+ * Viewer (story-base.css) does.
+ */
+.byline-article-view .article-body .byline-document {
+  border-block-start: var(--story-rule-strong);
+  display: grid;
+  font-size: 1rem;
+  gap: 14px;
+  line-height: 1.5;
+  margin-block: var(--story-space);
+  padding-block: 14px 0;
+}
+.byline-article-view .article-body .byline-document-details {
+  color: var(--ink, #121212);
+  display: grid;
+  font-family: var(--story-serif);
+  font-size: 1rem;
+  gap: 6px;
+  line-height: 1.5;
+  margin: 0;
+}
+.byline-article-view .article-body .byline-document-details > p { margin: 0; }
+.byline-article-view .article-body .byline-document-title {
+  font-family: var(--story-headline);
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.byline-article-view .article-body .byline-document-title a { color: inherit; text-decoration: none; }
+.byline-article-view .article-body .byline-document-title a:is(:hover, :focus-visible) { color: var(--story-accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.byline-article-view .article-body .byline-document-source { color: var(--story-muted); font-family: var(--story-sans); font-size: .85rem; }
+.byline-article-view .article-body .byline-document-pages { list-style: none; margin: 4px 0 0; padding: 0; }
+.byline-article-view .article-body .byline-document-pages li {
+  align-items: baseline;
+  border-block-start: var(--story-rule);
+  column-gap: 14px;
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  margin: 0;
+  padding: .45em 0;
+}
+.byline-article-view .article-body .byline-document-pages a {
+  font-family: var(--story-sans);
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.byline-article-view .article-body .byline-document-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  font-family: var(--story-sans);
+  font-size: .85rem;
+  gap: 8px 16px;
+}
+.byline-article-view .article-body .byline-document-open {
+  align-items: center;
+  border: 1px solid var(--rule-strong, #aab2bb);
+  color: var(--link, #356875);
+  display: inline-flex;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 14px;
+  text-decoration: none;
+}
+.byline-article-view .article-body .byline-document-open:is(:hover, :focus-visible) { border-color: var(--story-accent); text-decoration: underline; }
+.byline-article-view .article-body .byline-document-file { color: var(--story-soft); }
+.byline-article-view .article-body .byline-document-preview { line-height: 0; }
+.byline-article-view .article-body .byline-document-preview :is(object, iframe, img) {
+  border: var(--story-rule);
+  box-sizing: border-box;
+  display: block;
+  height: clamp(420px, 70svh, 760px);
+  width: 100%;
+}
+@container byline-content (max-width: 500px) {
+  .byline-article-view .article-body .byline-document-preview { display: none; }
+}
+@media (forced-colors: active) {
+  .byline-article-view .article-body .byline-document-open { border-color: LinkText; }
+}

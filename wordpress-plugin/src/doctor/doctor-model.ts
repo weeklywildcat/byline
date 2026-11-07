@@ -1,4 +1,4 @@
-import type { HomeHealthCheck, HomeHealthPayload } from "../home/home-model";
+import type { HomeHealthCheck, HomeHealthPayload } from "@byline/newsroom-screens/home/home-model";
 
 export type DoctorDiagnostics = {
   deployment?: {

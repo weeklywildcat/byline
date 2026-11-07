@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { ReaderFeedbackView } from "@byline/ui";
 
 type ReaderFeedbackFormProps = {
   postId: number;
@@ -105,57 +106,18 @@ export function ReaderFeedbackForm({
   }
 
   return (
-    <section className="reader-feedback" aria-labelledby="reader-feedback-heading">
-      <details>
-        <summary id="reader-feedback-heading">Spot an error or have a note? Send us feedback</summary>
-        <div className="reader-feedback-body">
-          <p>Help us keep this story accurate. We review every submission.</p>
-          <form onSubmit={submitFeedback}>
-            <label>
-              What would you like to share?
-              <select value={feedbackType} onChange={(event) => setFeedbackType(event.target.value)} disabled={submissionState === "submitting"}>
-                <option value="correction">Correction</option>
-                <option value="tip">Tip</option>
-                <option value="general">General feedback</option>
-              </select>
-            </label>
-            <label>
-              Message
-              <textarea
-                required
-                maxLength={5000}
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                disabled={submissionState === "submitting"}
-                rows={5}
-              />
-            </label>
-            <div className="reader-feedback-fields">
-              <label>
-                Name <span>(optional)</span>
-                <input type="text" maxLength={120} value={name} onChange={(event) => setName(event.target.value)} disabled={submissionState === "submitting"} />
-              </label>
-              <label>
-                Email <span>(optional)</span>
-                <input type="email" maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} disabled={submissionState === "submitting"} />
-              </label>
-            </div>
-            <div className="reader-feedback-honeypot" aria-hidden="true">
-              <label>
-                Leave this field empty
-                <input name="website" tabIndex={-1} autoComplete="off" />
-              </label>
-            </div>
-            <button type="submit" disabled={submissionState === "submitting"}>
-              {submissionState === "submitting" ? "Sending…" : "Send feedback"}
-            </button>
-            <p className="reader-feedback-status" role="status" aria-live="polite">
-              {submissionState === "success" ? "Thanks — your feedback was sent to the newsroom." : null}
-              {submissionState === "error" ? errorMessage : null}
-            </p>
-          </form>
-        </div>
-      </details>
-    </section>
+    <ReaderFeedbackView
+      type={feedbackType}
+      message={message}
+      name={name}
+      email={email}
+      submitting={submissionState === "submitting"}
+      status={<>{submissionState === "success" ? "Thanks — your feedback was sent to the newsroom." : null}{submissionState === "error" ? errorMessage : null}</>}
+      onType={setFeedbackType}
+      onMessage={setMessage}
+      onName={setName}
+      onEmail={setEmail}
+      onSubmit={submitFeedback}
+    />
   );
 }

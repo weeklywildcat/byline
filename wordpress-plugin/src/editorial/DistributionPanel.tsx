@@ -1,12 +1,12 @@
 import { Button, Notice, Spinner } from "@wordpress/components";
 import { useState } from "@wordpress/element";
-import type { DistributionAction, DistributionChannel, DistributionCopyKind, DistributionPanelCapabilities } from "./editorial-model";
+import type { DistributionAction, DistributionChannel, DistributionCopyKind, DistributionPanelCapabilities } from "@byline/newsroom-screens/editorial/editorial-model";
 import {
   buildDistributionCopy,
   canUseDistributionAction,
   describeEditorialError,
   distributionStatusLabel
-} from "./editorial-model";
+} from "@byline/newsroom-screens/editorial/editorial-model";
 import "./editorial.css";
 
 export type DistributionPanelProps = {

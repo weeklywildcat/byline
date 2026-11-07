@@ -300,6 +300,29 @@ in `includes/content/image-art-direction.php` is kept identical by
   the focal point only. Open Graph, X and Discord use the social file. `NewsArticle.image`
   prefers the editor's 16:9, 4:3 and 1:1 crops.
 
+## Payload semantic blocks (`byline-v1`)
+
+The Gutenberg blocks in this document are the WordPress implementation and keep
+rendering existing content. New stories in the Payload newsroom store a
+semantic body instead, never Gutenberg markup. The first eight tools exist
+there; the registry is `ARTICLE_BLOCKS` in `@byline/article-body`, and
+[article-editor.md](article-editor.md) is the reference.
+
+| Today (WordPress) | `byline-v1` block | Notes |
+| --- | --- | --- |
+| Core Image, Wide / Full-bleed Photo | `photo` | `placement`: column, wide or full; credit from Media, never stored |
+| Photo Gallery, Photo Pair, Photo Essay | `gallery` | Pair is a gallery of two; Photo Essay is Photo + prose + Gallery |
+| Reported Quote | `reportedQuote` | text and attribution, both required to publish |
+| Pull Quote | `pullQuote` | attribution optional |
+| Key Facts | `keyFacts` | renameable heading, ≤12 rows |
+| Context Box, Why It Matters, What's Next, How We Know | `context` | one block; the writer chooses the heading |
+| Document Viewer | `document` | PDF from Media, structured page references |
+| Timeline | `timeline` | 2–25 events; `label` is text, not a date |
+
+Not carried over: Story Audio / Story Video variations as blocks, Columns, Main
++ Aside, arbitrary Core style variations, Scrollytelling. Everything else in
+this library comes over later on the same contract.
+
 ## Shared rendering and widths
 
 Astro owns a minimal compatibility layer for the Core Gutenberg markup it

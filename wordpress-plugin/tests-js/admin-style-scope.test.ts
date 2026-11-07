@@ -10,7 +10,7 @@ const root = path.resolve(__dirname, "..");
 async function compile(entry: string) {
   const postcss = require("postcss");
   const file = path.join(root, entry);
-  const result = await postcss([require("@tailwindcss/postcss")(), require("postcss-nesting")(), require("../loaders/ui-scope-postcss")]).process(readFileSync(file, "utf8"), { from: file });
+  const result = await postcss([require("@tailwindcss/postcss")(), require("postcss-nesting")(), require("@byline/newsroom-ui/postcss-scope")]).process(readFileSync(file, "utf8"), { from: file });
   return result.root as import("postcss").Root;
 }
 
@@ -37,6 +37,15 @@ describe("the React 19 admin stylesheets stay inside .byline-ui-root", () => {
     expect(css).not.toMatch(/(^|\n):root\s*\{/);
     expect(css).toMatch(/--sx-color-primary:\s*var\(--primary\)/);
     expect(css).toMatch(/\.byline-ui-root \.sx__calendar-header\s*\{\s*display:\s*none/);
+  });
+
+  it("the Calendar inherits the week and day grid heights Schedule-X sets on <html>, after the theme's own zero", async () => {
+    const css = (await compile("src/planning/style.css")).toString();
+    const lastOf = (name: string) => css.lastIndexOf(`--${name}:`);
+    for (const name of ["sx-week-grid-height", "sx-week-grid-hour-height"]) {
+      expect(css).toMatch(new RegExp(`--${name}:\\s*0`));
+      expect(css.slice(lastOf(name), lastOf(name) + 40)).toMatch(new RegExp(`--${name}:\\s*inherit`));
+    }
   });
 
   it("Schedule-X's keyframes are namespaced like every other keyframe", async () => {

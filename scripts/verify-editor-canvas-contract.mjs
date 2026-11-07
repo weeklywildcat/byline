@@ -9,21 +9,26 @@ import postcss from "postcss";
  */
 
 const articlePath = "packages/ui/article.css";
+// The article body's rules moved to article-body.css (shared with the Payload newsroom editor).
+const articleBodyPath = "packages/ui/article-body.css";
 const editorPath = "wordpress-plugin/src/editor-canvas/editor-canvas.css";
 const entryPath = "wordpress-plugin/src/editor-canvas/index.ts";
 
 const article = postcss.parse(await readFile(articlePath, "utf8"), { from: articlePath });
+article.append(postcss.parse(await readFile(articleBodyPath, "utf8"), { from: articleBodyPath }).nodes);
 const editor = postcss.parse(await readFile(editorPath, "utf8"), { from: editorPath });
 
 const view = ".byline-article-view";
 const themed = (selector) => `html[data-byline-theme="weekly-wildcat"] ${selector}`;
+// Body theme rules also match a themed ancestor element (an editor canvas inside an application).
+const themedBody = (selector) => `:is(html[data-byline-theme="weekly-wildcat"], [data-byline-theme="weekly-wildcat"]) ${selector}`;
 const canvas = ".editor-styles-wrapper";
 
 // [article.css selector, editor selector, properties, media query (optional)]
 const pairs = [
   [`${view} .article-body`, `${canvas} .is-root-container`, ["font-size", "line-height"]],
   [`${view} .article-body`, `${canvas} .is-root-container`, ["font-size"], "(max-width: 640px)"],
-  [themed(`${view} .article-body`), `${canvas} .is-root-container`, ["font-family"]],
+  [themedBody(`${view} .article-body`), `${canvas} .is-root-container`, ["font-family"]],
   [`${view} .article-body a`, `${canvas} .is-root-container a`, ["color", "text-decoration", "text-decoration-thickness", "text-underline-offset"]],
   [`${view} .article-body p`, `${canvas} .is-root-container p`, ["margin"]],
   [`${view} .article-body ul`, `${canvas} .is-root-container ul`, ["padding-left"]],
@@ -31,7 +36,7 @@ const pairs = [
   [`${view} .article-body h2`, `${canvas} .is-root-container h2`, ["line-height", "margin"]],
   [`${view} .article-body h2`, `${canvas} .is-root-container h2`, ["font-size"]],
   [`${view} .article-body h3`, `${canvas} .is-root-container h3`, ["font-size"]],
-  [themed(`${view} .article-body h2`), `${canvas} .is-root-container h2`, ["font-family", "font-weight", "letter-spacing"]],
+  [themedBody(`${view} .article-body h2`), `${canvas} .is-root-container h2`, ["font-family", "font-weight", "letter-spacing"]],
   [`${view} .article-body blockquote`, `${canvas} .is-root-container blockquote`, ["border-left", "color", "font-size", "line-height", "padding-left"]],
   [`${view} .article-body .wp-block-pullquote`, `${canvas} .is-root-container .wp-block-pullquote`, ["border-bottom", "border-top", "font-size", "line-height", "margin", "padding", "text-align"]],
   [`${view} .article-body .wp-block-pullquote blockquote`, `${canvas} .is-root-container .wp-block-pullquote blockquote`, ["border-left", "margin-bottom", "padding-left"]],

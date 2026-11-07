@@ -1,3 +1,4 @@
+import { ContributorBiography, ContributorProfileHeader } from "@byline/ui/contributor-profile";
 import type { Metadata } from "@/lib/metadata";
 import { notFound } from "@/lib/static-not-found";
 import { StoryTeaser } from "@/components/StoryTeaser";
@@ -87,45 +88,8 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
       />
-      <header className="author-profile">
-        {photo ? (
-          <img
-            className="author-avatar"
-            src={photo.url}
-            alt={photo.alt?.trim() || contributor.name}
-            width={photo.width ?? 160}
-            height={photo.height ?? 160}
-          />
-        ) : (
-          <div className="author-avatar author-avatar-fallback" aria-hidden="true">
-            {contributor.name.slice(0, 1)}
-          </div>
-        )}
-        <div>
-          <div className="author-profile-meta">
-            <p className="profile-kicker">{getContributorRole(contributor)}</p>
-          </div>
-          <h1>{contributor.name}</h1>
-          {profile?.pronouns ? <p className="author-pronouns">{profile.pronouns}</p> : null}
-          {shortBio ? <p className="author-short-bio">{shortBio}</p> : null}
-          {socialLinks.length > 0 ? (
-              <div className="author-social-links" aria-label={`${contributor.name} social links`}>
-              {socialLinks.map((link) => (
-                <a key={link.label} href={link.href}>
-                  {link.label}
-                </a>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </header>
-
-      {bio ? (
-        <section className="author-about" aria-labelledby="author-about-heading">
-          <h2 id="author-about-heading">About</h2>
-          <p className="author-bio">{bio}</p>
-        </section>
-      ) : null}
+      <ContributorProfileHeader person={{ name: contributor.name, role: getContributorRole(contributor), photo, pronouns: profile?.pronouns, shortBio, socialLinks }} />
+      <ContributorBiography bio={bio} />
 
       <section className="author-story-section" aria-labelledby="author-stories-heading">
         <div className="section-heading">

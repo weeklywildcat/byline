@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Scaffolds a repository-defined story presentation and registers it.
 //
-//   npm run story-presentation -- create <wordpress-post-id> <kebab-case-name>
-//   npm run story-presentation -- create <wordpress-post-id> <kebab-case-name> --visual
+//   npm run story-presentation -- create <story-id> <kebab-case-name>
+//   npm run story-presentation -- create <story-id> <kebab-case-name> --visual
 //
 // --visual makes a flagship visual story: the narrative is written in the
 // story folder and replaces the WordPress body. Without it, WordPress owns
@@ -37,23 +37,21 @@ export function indexSource({ id, name }) {
   HeroReveal,
   HeroRevealContent
 } from "@byline/ui";
-import { StoryStyles } from "../../StoryStyles";
-import type { StoryPresentationProps } from "../../types";
-import css from "./styles.css?inline";
+import { defineStoryPresentation, type StoryPresentationProps } from "../../types";
 
 const SURFACE_ID = "story-${name}-surface";
 
 /**
- * Custom presentation for WordPress post ${id}. WordPress owns every word and
+ * Custom presentation for story ${id}. The CMS owns every word and
  * image: arrange \`presentation\` and \`slots\`, never type story copy here.
+ * Its stylesheet (styles.css) is loaded with this story only by each host.
  * Delete the registry line in ../../registry.ts to return to the normal article.
  * Guide: docs/custom-story-presentations.md
  */
-export default function ${component}({ presentation, slots }: StoryPresentationProps) {
+function ${component}({ presentation, slots }: StoryPresentationProps) {
   const image = presentation.image;
   return (
     <main className="story-${name}">
-      <StoryStyles id="${name}" css={css} />
       <HeroReveal target={SURFACE_ID} align="end" scrim={0.5} image={image?.src ? { ...image, sizes: "100vw" } : null}>
         <ArticleCategory presentation={presentation} className="story-${name}-category" />
         <ArticleHeadline presentation={presentation} className="story-${name}-headline" />
@@ -74,11 +72,13 @@ export default function ${component}({ presentation, slots }: StoryPresentationP
     </main>
   );
 }
+
+export default defineStoryPresentation({ name: "${name}", Component: ${component} });
 `;
 }
 
 export function stylesSource({ id, name }) {
-  return `/* Custom presentation for WordPress post ${id}. Keep every selector under .story-${name}. */
+  return `/* Custom presentation for story ${id}. Keep every selector under .story-${name}. */
 .story-${name} .hero-reveal-copy {
   gap: 14px;
 }
@@ -142,22 +142,21 @@ export function visualIndexSource({ id, name }) {
   ArticleStandardEnding,
   ArticleStoryFooter
 } from "@byline/ui";
-import { StoryStyles } from "../../StoryStyles";
 import { defineVisualStory, type StoryPresentationProps } from "../../types";
-import css from "./styles.css?inline";
 
 /**
- * Flagship visual story for WordPress post ${id}.
+ * Flagship visual story for story ${id}.
  *
- * The narrative below is this story's body: WordPress's body is not printed
+ * The narrative below is this story's body: the CMS body is not printed
  * here. Write the reporting as semantic JSX; it is rendered to static HTML at
  * build time, so every word is in the page without JavaScript. client.ts only
  * enhances it. A change to the narrative is a code change and a deploy.
  *
- * WordPress still owns the headline, deck, byline, dates, lead image,
+ * The CMS still owns the headline, deck, byline, dates, lead image,
  * corrections, topics and series: render them from \`presentation\`, never type
  * them here. Delete the registry line in ../../registry.ts to return the story
- * to its WordPress body.
+ * to its CMS body. Its stylesheet (styles.css) and client.ts are loaded by each
+ * host's asset adapter, on this story only.
  * Guide: docs/custom-story-presentations.md (Flagship visual stories)
  */
 
@@ -199,7 +198,6 @@ function Graphic() {
 function ${component}({ presentation, slots }: StoryPresentationProps) {
   return (
     <ArticleShell className="story-${name}">
-      <StoryStyles id="${name}" css={css} />
       <article className="article-story">
         <header className="article-header">
           <div className="article-kicker">
@@ -214,7 +212,7 @@ function ${component}({ presentation, slots }: StoryPresentationProps) {
 
         {/* The narrative. \`article-body\` gives it the article's prose, figure and wide/full layout styles. */}
         <div className="article-body story-${name}-narrative">
-          <p>Open with the reporting. This paragraph and everything in this narrative replace the WordPress body on this page.</p>
+          <p>Open with the reporting. This paragraph and everything in this narrative replace the CMS body on this page.</p>
           <section className="alignwide story-${name}-sequence">
             <div className="story-${name}-stage"><Graphic /></div>
             <div className="story-${name}-steps">
@@ -240,7 +238,7 @@ export default defineVisualStory({ name: "${name}", Component: ${component} });
 }
 
 export function visualStylesSource({ id, name }) {
-  return `/* Flagship visual story for WordPress post ${id}. Keep every selector under .story-${name}. */
+  return `/* Flagship visual story for story ${id}. Keep every selector under .story-${name}. */
 .story-${name} .story-${name}-sequence {
   /* Where the graphic sticks: clear of the site header. */
   --story-${name}-top: 76px;
@@ -313,7 +311,7 @@ export function visualClientSource({ id, name }) {
   return `import type { VisualStoryClient } from "../../types";
 
 /**
- * Progressive enhancement for WordPress post ${id}'s narrative, loaded on this
+ * Progressive enhancement for story ${id}'s narrative, loaded on this
  * story's page alone. The narrative is complete without it.
  *
  * A step is active while it covers a reading line 40% down the viewport,
@@ -382,9 +380,9 @@ export function registryHasId(source, id) {
 }
 
 export async function createStoryPresentation({ id, name, visual = false, root = path.resolve(here, "..") }) {
-  if (!/^[1-9]\d*$/.test(String(id))) throw new Error(`The post id must be a positive WordPress post ID, got "${id}".`);
+  if (!/^[1-9]\d*$/.test(String(id))) throw new Error(`The post id must be a positive story ID (the WordPress post ID), got "${id}".`);
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name ?? "")) throw new Error(`The name must be kebab-case (letters, digits, hyphens), got "${name ?? ""}".`);
-  const base = path.join(root, "apps/web/story-presentations");
+  const base = path.join(root, "packages/story-presentations/src");
   const registryPath = path.join(base, "registry.ts");
   const directory = path.join(base, "stories", name);
   const registry = await readFile(registryPath, "utf8");
@@ -411,15 +409,15 @@ async function main(argv) {
   const [command, id, name] = argv.filter((arg) => !arg.startsWith("--"));
   const unknown = flags.filter((flag) => flag !== "--visual");
   if (command !== "create" || !id || !name || unknown.length) {
-    console.error("Usage: npm run story-presentation -- create <wordpress-post-id> <kebab-case-name> [--visual]");
+    console.error("Usage: npm run story-presentation -- create <story-id> <kebab-case-name> [--visual]");
     process.exitCode = 1;
     return;
   }
   const visual = flags.includes("--visual");
   try {
     const result = await createStoryPresentation({ id, name, visual });
-    console.log(`Created apps/web/story-presentations/stories/${name}/ (${visual ? "index.tsx, styles.css, client.ts" : "index.tsx, styles.css"}).`);
-    if (result.registered) console.log(`Registered post ${id} in apps/web/story-presentations/registry.ts.`);
+    console.log(`Created packages/story-presentations/src/stories/${name}/ (${visual ? "index.tsx, styles.css, client.ts" : "index.tsx, styles.css"}).`);
+    if (result.registered) console.log(`Registered post ${id} in packages/story-presentations/src/registry.ts.`);
     else console.log(`Could not edit registry.ts automatically. Add these lines to it:\n  ${result.importLine}\n  ${result.entryLine}  (inside storyPresentations)`);
     console.log(visual
       ? "Next: write the narrative in index.tsx (it replaces the WordPress body on this story's page) and its behavior in client.ts. See docs/custom-story-presentations.md."

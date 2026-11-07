@@ -1,4 +1,4 @@
-import { getPrimaryVisibleCategory } from "@/lib/content";
+import { filterGeneralEditorialPosts, getPrimaryVisibleCategory } from "@/lib/content";
 import { getWordPressInstant } from "@/lib/dates";
 import { stripHtml } from "@/lib/format";
 import { escapeXml } from "@/lib/news-sitemap";
@@ -30,7 +30,7 @@ function summarize(post: WordPressPost) {
  * publicly visible stories, newest first.
  */
 export function buildRssFeed(posts: WordPressPost[], { siteUrl, title, description, language, timeZone }: FeedOptions) {
-  const items = posts
+  const items = filterGeneralEditorialPosts(posts)
     .flatMap((post) => {
       const published = getWordPressInstant({ gmt: post.date_gmt, local: post.date }, timeZone);
       if (!published || !getPostRouteParts(post)) return [];

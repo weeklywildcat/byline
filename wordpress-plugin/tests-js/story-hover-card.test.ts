@@ -1,13 +1,15 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readSource } from "./source-files";
 
 const src = path.resolve(__dirname, "../src");
-const read = (relative: string) => readFileSync(path.join(src, relative), "utf8");
+const read = readSource;
+const designSystem = path.resolve(__dirname, "../../packages/newsroom-ui/src");
 
 describe("story hover previews", () => {
   it("uses the shadcn Base UI preview-card primitive inside the private admin portal", () => {
-    const source = read("admin-ui/ui/hover-card.tsx");
+    const source = readFileSync(path.join(designSystem, "ui/hover-card.tsx"), "utf8");
     expect(source).toContain('@base-ui/react/preview-card');
     expect(source).toContain("useAdminPortal");
     expect(source).toContain("<PreviewCardPrimitive.Portal container={useAdminPortal()}>");
@@ -34,11 +36,11 @@ describe("story hover previews", () => {
       "story/rows.tsx",
       "planning/StoryBoard.tsx",
       "planning/StoryList.tsx",
-      "planning/MediaDesk.tsx",
+      "media/MediaWork.tsx",
       "planning/ContentHealth.tsx",
-      "planning/NeedsScheduling.tsx",
+      "calendar/NeedsScheduling.tsx",
       "planning/Feedback.tsx",
-      "planning/calendar-events.tsx"
+      "calendar/calendar-events.tsx"
     ]) {
       expect(read(file), file).toContain("StoryHoverCard");
     }

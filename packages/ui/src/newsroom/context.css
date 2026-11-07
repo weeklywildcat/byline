@@ -11,7 +11,7 @@
 :is(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container, .byline-page-content) {
   /* A variant has to beat the plain Core element rule in article.css, so this scope is a real
      selector, not :where(). Boxes of context. The old per-heading classes keep rendering for published stories. */
-  & .wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-evidence, .is-style-byline-margin-note, .is-style-byline-key-facts) {
+  & :is(.wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-evidence, .is-style-byline-margin-note, .is-style-byline-key-facts), .byline-context, .byline-key-facts) {
     border-block-start: var(--story-rule-strong);
     display: flow-root;
     font-size: 1rem;
@@ -20,7 +20,7 @@
     padding: 14px 0 2px;
   }
   /* The heading is a label, whatever level the writer chose. */
-  & .wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-evidence, .is-style-byline-margin-note, .is-style-byline-key-facts) > :is(h2, h3, h4) {
+  & :is(.wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-evidence, .is-style-byline-margin-note, .is-style-byline-key-facts), .byline-context, .byline-key-facts) > :is(h2, h3, h4) {
     color: var(--story-muted);
     font-family: var(--story-sans);
     font-size: .72rem;
@@ -30,8 +30,8 @@
     margin: 0 0 .75em;
     text-transform: uppercase;
   }
-  & .wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-evidence, .is-style-byline-margin-note, .is-style-byline-key-facts) > :is(p, ul, ol):last-child { margin-bottom: 0; }
-  & .wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-evidence, .is-style-byline-margin-note, .is-style-byline-key-facts) p { margin-bottom: .9em; }
+  & :is(.wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-evidence, .is-style-byline-margin-note, .is-style-byline-key-facts), .byline-context, .byline-key-facts) > :is(p, ul, ol):last-child { margin-bottom: 0; }
+  & :is(.wp-block-group:is(.is-style-byline-context, .is-style-byline-why-it-matters, .is-style-byline-whats-next, .is-style-byline-how-we-know, .is-style-byline-editors-note, .is-style-byline-evidence, .is-style-byline-margin-note, .is-style-byline-key-facts), .byline-context, .byline-key-facts) p { margin-bottom: .9em; }
 
   /* An editor's note is the one context box that speaks for the newsroom: its label takes the accent. */
   & .wp-block-group.is-style-byline-editors-note > :is(h2, h3, h4) { color: var(--story-accent); }
@@ -39,23 +39,23 @@
   & .wp-block-group.is-style-byline-margin-note { border-block-start: var(--story-rule); color: var(--story-muted); font-size: .95rem; }
 
   /* Key Facts: a ruled list, one fact per row. */
-  & .wp-block-group.is-style-byline-key-facts :is(ul, ol) { list-style: none; margin: 0; padding: 0; }
-  & .wp-block-group.is-style-byline-key-facts li { border-block-start: var(--story-rule); margin: 0; padding: .55em 0; }
-  & .wp-block-group.is-style-byline-key-facts li:first-child { border-block-start: 0; padding-top: 0; }
+  & :is(.wp-block-group.is-style-byline-key-facts, .byline-key-facts) :is(ul, ol) { list-style: none; margin: 0; padding: 0; }
+  & :is(.wp-block-group.is-style-byline-key-facts, .byline-key-facts) li { border-block-start: var(--story-rule); margin: 0; padding: .55em 0; }
+  & :is(.wp-block-group.is-style-byline-key-facts, .byline-key-facts) li:first-child { border-block-start: 0; padding-top: 0; }
 
   /* Source Highlight: the quoted record keeps its attribution but loses its own rule inside the box. */
   & .wp-block-group.is-style-byline-evidence .wp-block-quote { border-left: 0; margin-block: 0 .9em; padding: 0; }
 
   /* Reported Quote: one quiet rule, the source named in the label voice. */
-  & .wp-block-quote.is-style-byline-source-quote {
+  & :is(.wp-block-quote.is-style-byline-source-quote, .byline-reported-quote) {
     border-left: 2px solid var(--story-accent);
     color: var(--ink);
     font-family: var(--story-serif);
     margin-block: var(--story-space);
     padding-inline: 18px 0;
   }
-  & .wp-block-quote.is-style-byline-source-quote > p { margin-bottom: .35em; }
-  & :is(.wp-block-quote.is-style-byline-source-quote, .wp-block-pullquote.is-style-byline-feature-quote) cite {
+  & :is(.wp-block-quote.is-style-byline-source-quote, .byline-reported-quote) > p { margin-bottom: .35em; }
+  & :is(.wp-block-quote.is-style-byline-source-quote, .wp-block-pullquote.is-style-byline-feature-quote, .byline-reported-quote, .byline-pull-quote) cite {
     color: var(--story-muted);
     display: block;
     font-family: var(--story-sans);
@@ -65,7 +65,7 @@
   }
 
   /* Pull Quote: a major moment of type between two rules, in the headline face. */
-  & .wp-block-pullquote.is-style-byline-feature-quote {
+  & :is(.wp-block-pullquote.is-style-byline-feature-quote, .byline-pull-quote) {
     border-block: 0;
     border-block-start: var(--story-rule-strong);
     border-block-end: var(--story-rule);
@@ -73,7 +73,7 @@
     padding: 22px 0 20px;
     text-align: left;
   }
-  & .wp-block-pullquote.is-style-byline-feature-quote blockquote {
+  & :is(.wp-block-pullquote.is-style-byline-feature-quote, .byline-pull-quote) blockquote {
     border: 0;
     color: var(--ink);
     font-family: var(--story-headline);
@@ -85,7 +85,7 @@
     padding: 0;
     text-wrap: balance;
   }
-  & .wp-block-pullquote.is-style-byline-feature-quote blockquote > p { margin: 0 0 .5em; }
+  & :is(.wp-block-pullquote.is-style-byline-feature-quote, .byline-pull-quote) blockquote > p { margin: 0 0 .5em; }
 }
 
 /* A margin note sits in the margin when the canvas is wide enough; otherwise it stays inline. */

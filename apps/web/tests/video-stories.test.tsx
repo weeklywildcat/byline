@@ -9,7 +9,7 @@ import { buildVideoSitemapXml } from "@/lib/video-sitemap";
 import { absoluteUrl, serializeJsonLd } from "@/lib/seo";
 import { getPostContributors, getPostHref, getPostPrimaryVideo, type WordPressPost } from "@/lib/wordpress";
 import { StoryTeaser } from "@/components/StoryTeaser";
-import { StoryArticle } from "@/story-presentations/StoryArticle";
+import { StoryArticle } from "@/lib/story-presentation-host";
 import { auditVideoSitemap, pageVideoObject, type SitemapPage } from "@/scripts/seo-audit.mts";
 import { category, media, post } from "@/tests/support/seo-fixtures";
 
