@@ -3,7 +3,7 @@
 import { buildArticlePresentation, type ArticlePresentation, type PublicSeriesInput } from "@byline/content/story";
 import { useLivePreview } from "@payloadcms/live-preview-react";
 import { ArticleShareActionsView, NewsletterSignupView, ReaderFeedbackView, type ArticleViewSlots } from "@byline/ui";
-import { StoryArticle, resolveStoryPresentation, storyPresentationRegistry } from "@byline/story-presentations";
+import { StoryArticle, renderRepositoryInteractive, repositoryInteractiveRegistry, resolveStoryPresentation, storyPresentationRegistry, type RepositoryInteractiveClient, type RepositoryInteractiveRegistry } from "@byline/story-presentations";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { STORY_LIVE_PREVIEW_DEPTH } from "./config";
 import { payloadPresentationContext, payloadPublicStory, payloadStorySummary, type PayloadImage } from "./payload-story";
@@ -83,9 +83,9 @@ function useStoryContext(doc: StoryDoc | null): StoryPreviewContext | null {
 
 type Built = { ok: true; presentation: ArticlePresentation } | { ok: false; error: string };
 
-function build(doc: StoryDoc, context: StoryPreviewContext | null, publication: PreviewPublication): Built {
+function build(doc: StoryDoc, context: StoryPreviewContext | null, publication: PreviewPublication, interactives: RepositoryInteractiveRegistry): Built {
   try {
-    const { story } = payloadPublicStory(doc, { publication, corrections: context?.corrections });
+    const { story } = payloadPublicStory(doc, { publication, corrections: context?.corrections, interactiveKeys: Object.keys(interactives) });
     const self = { ...payloadStorySummary(doc, publication), listed: true };
     const series: PublicSeriesInput<PayloadImage>[] = (context?.series ?? []).map((entry) => ({
       id: entry.id,
@@ -108,8 +108,13 @@ function build(doc: StoryDoc, context: StoryPreviewContext | null, publication: 
 }
 
 /** The inert equivalents of the public site's interactive slots: same look, nothing is sent anywhere. */
-function inertSlots(publication: PreviewPublication): ArticleViewSlots {
+function inertSlots(publication: PreviewPublication, interactives: RepositoryInteractiveRegistry): ArticleViewSlots {
   return {
+    // Dates read in the publication's own locale and timezone; a repository interactive draws its static fallback.
+    bodyHost: {
+      formatDate: (iso) => new Intl.DateTimeFormat(publication.locale, { dateStyle: "medium", timeZone: publication.timeZone }).format(new Date(iso)),
+      renderInteractive: renderRepositoryInteractive(interactives)
+    },
     shareActions: <ArticleShareActionsView copyLabel="Copy link" copyIcon="ph:link" status="" />,
     poll: null,
     feedback: <ReaderFeedbackView inert type="correction" message="" name="" email="" submitting={false} status={null} />,
@@ -151,24 +156,47 @@ function useKeepPreviewInPlace(publicSite: string) {
   }, [publicSite]);
 }
 
-/** Runs the article's own progressive enhancements for an imported (HTML) body, as the public route does. */
-function useArticleEnhancements(presentation: ArticlePresentation | null) {
-  const html = presentation?.body.format === "legacy-html" ? presentation.body.html : null;
+/**
+ * Runs the article's own progressive enhancements as the public route does:
+ * for an imported (HTML) body and for a structured one, so Before / After
+ * gets its divider, Annotated Image its paired notes and Chart / Map its
+ * clearly labelled preview. Repository interactives then load their own
+ * browser enhancement. Re-run whenever the body changes.
+ */
+const loadInteractiveClient = (name: string) => import(`../../../../packages/story-presentations/src/interactives/${name}/client.ts`) as Promise<{ default: RepositoryInteractiveClient }>;
+
+function useArticleEnhancements(presentation: ArticlePresentation | null, interactives: RepositoryInteractiveRegistry) {
+  const body = presentation?.body ?? null;
+  const html = body?.format === "legacy-html" ? body.html : body;
   useEffect(() => {
     if (html === null) return;
     let disposed = false;
     let cleanup: (() => void) | undefined;
     void (async () => {
       const [{ articleEnhancementSelector }, { enhanceArticleStory }] = await Promise.all([import("@byline/ui/article-enhancement-selector"), import("@byline/ui/article-enhancements")]);
-      const body = document.querySelector<HTMLElement>(".article-body");
-      if (disposed || !body || !body.querySelector(articleEnhancementSelector)) return;
-      cleanup = enhanceArticleStory(body, { preview: true });
+      const root = document.querySelector<HTMLElement>(".article-body");
+      if (disposed || !root) return;
+      const stops: Array<() => void> = [];
+      if (root.querySelector(articleEnhancementSelector)) stops.push(enhanceArticleStory(root, { preview: true }));
+      // A registered interactive's browser enhancement, only when a story that places it is shown.
+      for (const element of root.querySelectorAll<HTMLElement>("[data-repository-interactive]")) {
+        const key = element.dataset.repositoryInteractive ?? "";
+        const entry = interactives[key];
+        const mount = element.querySelector<HTMLElement>("[data-interactive-root]");
+        if (!entry?.client || !mount) continue;
+        void loadInteractiveClient(key).then((module) => {
+          if (disposed) return;
+          const stop = module.default(mount);
+          if (typeof stop === "function") stops.push(stop);
+        }).catch(() => undefined);
+      }
+      cleanup = () => stops.forEach((stop) => stop());
     })();
     return () => {
       disposed = true;
       cleanup?.();
     };
-  }, [html]);
+  }, [html, interactives]);
 }
 
 /* ------------------------------------------------------------------- states */
@@ -218,8 +246,9 @@ function LivePreviewPage({ origin, publication, fixtures }: { origin: string; pu
   const doc = isStoryDoc(data) ? data : null;
   const context = useStoryContext(doc);
   const registry = useMemo(() => storyPresentationRegistry({ fixtures }), [fixtures]);
+  const interactives = useMemo(() => repositoryInteractiveRegistry({ fixtures }), [fixtures]);
 
-  const built = useMemo(() => (doc ? build(doc, context, publication) : null), [doc, context, publication]);
+  const built = useMemo(() => (doc ? build(doc, context, publication, interactives) : null), [doc, context, publication, interactives]);
   // The last article that rendered, kept only as a rendering fallback (never edited, never saved).
   const lastGood = useRef<ArticlePresentation | null>(null);
   if (built?.ok) lastGood.current = built.presentation;
@@ -228,9 +257,9 @@ function LivePreviewPage({ origin, publication, fixtures }: { origin: string; pu
   const resolution = presentation ? resolveStoryPresentation(presentation, registry) : null;
   const assets = useStoryAssets(resolution?.entry ?? null);
   useKeepPreviewInPlace(publication.publicSite);
-  useArticleEnhancements(presentation);
+  useArticleEnhancements(presentation, interactives);
 
-  const slots = useMemo(() => inertSlots(publication), [publication]);
+  const slots = useMemo(() => inertSlots(publication, interactives), [publication, interactives]);
   const onRetry = useCallback(() => reload(), []);
 
   if (!presentation) {

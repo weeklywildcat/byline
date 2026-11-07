@@ -7,7 +7,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./resolve": "./src/resolve.ts",
-    "./stories/*": "./src/stories/*"
+    "./stories/*": "./src/stories/*",
+    "./interactives/*": "./src/interactives/*",
+    "./interactives": "./src/interactives/registry.ts"
   },
   "dependencies": {
     "@byline/content": "0.1.0",

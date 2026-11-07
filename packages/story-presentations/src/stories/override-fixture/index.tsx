@@ -19,7 +19,7 @@ function OverrideFixtureStory({ presentation, slots }: StoryPresentationProps) {
       <article className="article-story">
         <ArticleCategory presentation={presentation} />
         <ArticleHeadline presentation={presentation} />
-        <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} />
+        <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} host={slots.bodyHost} />
         <ArticleStoryFooter presentation={presentation} slots={slots} />
       </article>
       <ArticleStandardEnding presentation={presentation} />

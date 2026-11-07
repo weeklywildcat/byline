@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { PublicArticleBody } from "@byline/article-body";
 import { ArticleLiveBadge, ArticleLiveCoverage, type ArticleLiveView } from "./article-live";
-import { StructuredArticleBody } from "./article-body/render";
+import { StructuredArticleBody, type ArticleRenderHost } from "./article-body/render";
 
 import type {
   ArticleImageView,
@@ -42,6 +42,8 @@ export type ArticleViewSlots = {
   poll?: ReactNode;
   feedback?: ReactNode;
   newsletter?: ReactNode;
+  /** What a structured body may borrow from its host: date formatting, repository interactives' static fallbacks. */
+  bodyHost?: ArticleRenderHost;
 };
 
 export type ArticleViewProps = {
@@ -296,7 +298,7 @@ export function hasArticleBody(body: PublicArticleBody): boolean {
  * body renders through the canonical structured renderer. Both sit in the one
  * `.article-body` element, so article CSS and enhancements see one shape.
  */
-export function ArticleBody({ presentation, primaryGame }: { presentation: ArticlePresentation; primaryGame?: ReactNode }): ReactNode {
+export function ArticleBody({ presentation, primaryGame, host }: { presentation: ArticlePresentation; primaryGame?: ReactNode; host?: ArticleRenderHost }): ReactNode {
   const { body } = presentation;
   return (
     <>
@@ -306,7 +308,7 @@ export function ArticleBody({ presentation, primaryGame }: { presentation: Artic
       ) : body.format === "legacy-html" ? (
         <div className="article-body" dangerouslySetInnerHTML={{ __html: body.html }} />
       ) : (
-        <StructuredArticleBody body={body} />
+        <StructuredArticleBody body={body} host={host} />
       )}
     </>
   );
@@ -596,7 +598,7 @@ export function ArticleView({ presentation, slots = {}, className = "" }: Articl
           {video ? <ArticlePrimaryVideo presentation={presentation} /> : <ArticleFeaturedImage presentation={presentation} />}
         </header>
 
-        <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} />
+        <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} host={slots.bodyHost} />
         <ArticleLive presentation={presentation} />
         <ArticleStoryFooter presentation={presentation} slots={slots} />
       </article>

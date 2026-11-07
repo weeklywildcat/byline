@@ -67,7 +67,7 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
                 </div>
               ) : null}
             </div>
-            <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} />
+            <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} host={slots.bodyHost} />
             <ArticleLive presentation={presentation} />
             <ArticleStoryFooter presentation={presentation} slots={slots} />
           </article>

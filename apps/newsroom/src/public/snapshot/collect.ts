@@ -104,9 +104,14 @@ function contentLosingIssues(issues: NormalizeIssue[]): string[] {
     if (issue.kind === "unsupported-node") return [`unsupported ${issue.nodeType} at ${issue.path}`];
     if (issue.kind === "unsupported-format") return [`unsupported ${issue.format} formatting at ${issue.path}`];
     if (issue.kind === "unsafe-link") return [`unsafe link at ${issue.path}`];
+    // Footnotes with no text are left out by design.
+    if (issue.kind === "footnote") return [];
     // A block's unfinished parts are left out by design (`finalizeBlock`), exactly as Live Preview
-    // and the publish readiness rules show them. Media that disappeared is not unfinished.
-    if (issue.issue.code.endsWith("-unavailable")) return [`${issue.issue.type} block ${issue.issue.blockId}: ${issue.issue.message}`];
+    // and the publish readiness rules show them. Media that disappeared is not unfinished. Related
+    // Coverage, Poll and Repository Interactive need public references and the interactive registry,
+    // which only snapshot v2 carries: v1 refuses such a story rather than quietly leaving them out.
+    const { code } = issue.issue;
+    if (code.endsWith("-unavailable") || code === "interactive-unregistered" || code === "related-none") return [`${issue.issue.type} block ${issue.issue.blockId}: ${issue.issue.message}`];
     return [];
   });
 }

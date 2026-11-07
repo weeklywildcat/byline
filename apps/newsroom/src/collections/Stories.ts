@@ -3,6 +3,7 @@ import { publicationMediaReport, storyMediaRequirements } from "../publication-m
 import { inIds, storyScope } from "../access/story-context";
 import { atLeast, relationIds, requestUser } from "../access/user";
 import { articleBodyEditor } from "@byline/editor/server";
+import { guardPrivilegedBlocks, requireCompleteBody } from "../hooks/story-body";
 import type { StoryPlan } from "../payload-types";
 import {
   CONTENT_FORMATS,
@@ -175,7 +176,7 @@ export const Stories: CollectionConfig = {
     delete: ({ req }) => atLeast(requestUser(req), "editor")
   },
   hooks: {
-    beforeChange: [pinContentFormat, requirePublishableMedia, stampFirstPublication],
+    beforeChange: [pinContentFormat, guardPrivilegedBlocks, requireCompleteBody, requirePublishableMedia, stampFirstPublication],
     afterChange: [syncPlan]
   },
   fields: [

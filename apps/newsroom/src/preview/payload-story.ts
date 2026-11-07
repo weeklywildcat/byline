@@ -16,6 +16,7 @@ import {
 } from "@byline/content/story";
 import { formatVideoDuration, parseYouTubeVideoId, youTubeEmbedUrl } from "@byline/core";
 import { publicStoryPath } from "@byline/content";
+import { publicPollReference, publicStoryReference } from "../public/references";
 import { articleMediaFromPayload, normalizePayloadStoryBody, type NormalizeIssue } from "@byline/editor/normalize";
 import type { PreviewPublication } from "./publication";
 
@@ -147,18 +148,27 @@ function primaryVideo(story: Doc, title: string) {
   return { videoId, embedUrl: youTubeEmbedUrl(videoId), title: text(metadata.title) || title, duration: formatVideoDuration(metadata.duration) };
 }
 
-/** Every Media document a Lexical body holds populated, by ID: the normalizer's resolver reads only these. */
-function populatedBodyMedia(body: unknown): Map<string, Doc> {
-  const found = new Map<string, Doc>();
+/**
+ * Every record a Lexical body holds populated, by ID: the normalizer's
+ * resolvers read only these. A populated relationship inside a block is told
+ * by its shape: Media has a MIME type, a Story a headline, a Poll a key.
+ */
+function populatedBodyRecords(body: unknown): { media: Map<string, Doc>; stories: Map<string, Doc>; polls: Map<string, Doc> } {
+  const found = { media: new Map<string, Doc>(), stories: new Map<string, Doc>(), polls: new Map<string, Doc>() };
+  const take = (value: unknown) => {
+    const doc = populated(value as Relation);
+    if (!doc) return;
+    const key = mediaKey(doc.id as MediaId);
+    if (typeof doc.mimeType === "string") found.media.set(key, doc);
+    else if (typeof doc.pollKey === "string") found.polls.set(key, doc);
+    else if (typeof doc.headline === "string") found.stories.set(key, doc);
+  };
   const visit = (node: unknown) => {
     if (!isDoc(node)) return;
     if (node.type === "block" && isDoc(node.fields)) {
-      const fields = node.fields;
-      const media = populated(fields.media as Relation);
-      if (media) found.set(mediaKey(media.id as MediaId), media);
-      for (const item of Array.isArray(fields.items) ? fields.items : []) {
-        const itemMedia = isDoc(item) ? populated(item.media as Relation) : null;
-        if (itemMedia) found.set(mediaKey(itemMedia.id as MediaId), itemMedia);
+      for (const value of Object.values(node.fields)) {
+        take(value);
+        if (Array.isArray(value)) for (const row of value) if (isDoc(row)) for (const inner of Object.values(row)) take(inner);
       }
     }
     for (const child of Array.isArray(node.children) ? node.children : []) visit(child);
@@ -169,6 +179,8 @@ function populatedBodyMedia(body: unknown): Map<string, Doc> {
 
 export type PayloadStoryOptions = {
   publication: PreviewPublication;
+  /** The keys of the repository interactives this host knows (the registry the preview renders with). */
+  interactiveKeys?: ReadonlySet<string> | readonly string[];
   corrections?: PublicCorrection[];
   /** "Now" for an unpublished story's dates. */
   now?: Date;
@@ -189,13 +201,26 @@ export function payloadPublicStory(doc: Doc, options: PayloadStoryOptions): Payl
   const publishedAt = text(doc.publishedAt) || now;
   const modifiedAt = text(doc.updatedAt) || publishedAt;
   const featured = populated(doc.featuredMedia as Relation);
-  const bodyMedia = populatedBodyMedia(doc.body);
+  const records = populatedBodyRecords(doc.body);
+  const interactiveKeys = new Set(options.interactiveKeys ?? []);
   const { body, issues } = normalizePayloadStoryBody(
     { contentFormat: doc.contentFormat, body: doc.body, legacyHtml: doc.legacyHtml },
-    { media: (id) => {
-      const media = bodyMedia.get(mediaKey(id));
-      return media ? previewMediaAsset(media) : null;
-    } }
+    {
+      media: (id) => {
+        const media = records.media.get(mediaKey(id));
+        return media ? previewMediaAsset(media) : null;
+      },
+      references: {
+        story: (id) => {
+          const projected = publicStoryReference(records.stories.get(mediaKey(id)), { timeZone: options.publication.timeZone, excludeId: doc.id as number });
+          // A related story's thumbnail is Media like any other: it joins the same table.
+          if (projected?.thumbnail) records.media.set(mediaKey(projected.thumbnail.id as MediaId), projected.thumbnail);
+          return projected?.reference ?? null;
+        },
+        poll: (id) => publicPollReference(records.polls.get(mediaKey(id)), new Date(options.now ?? Date.now())),
+        interactive: (key) => interactiveKeys.has(key)
+      }
+    }
   );
   const href = storyHref(text(doc.slug), section, publishedAt, options.publication.timeZone);
   const topics = populatedList(doc.topics).map(topicTerm).filter((term): term is PublicTerm => term !== null);

@@ -2022,6 +2022,47 @@ export interface BylineGalleryBlock {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylinePortraitTextBlock".
+ */
+export interface BylinePortraitTextBlock {
+  media: number | Media;
+  altOverride?: string | null;
+  heading?: string | null;
+  body: string;
+  caption?: string | null;
+  side: 'left' | 'right';
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'portraitText';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineVideoBlock".
+ */
+export interface BylineVideoBlock {
+  url: string;
+  title: string;
+  caption?: string | null;
+  captionsConfirmed?: boolean | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'video';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineAudioBlock".
+ */
+export interface BylineAudioBlock {
+  media: number | Media;
+  title: string;
+  caption?: string | null;
+  transcript: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'audio';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "BylineReportedQuoteBlock".
  */
 export interface BylineReportedQuoteBlock {
@@ -2071,6 +2112,38 @@ export interface BylineContextBlock {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineEditorsNoteBlock".
+ */
+export interface BylineEditorsNoteBlock {
+  body: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'editorsNote';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineMarginNoteBlock".
+ */
+export interface BylineMarginNoteBlock {
+  heading?: string | null;
+  body: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'marginNote';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineExpandableBlock".
+ */
+export interface BylineExpandableBlock {
+  heading: string;
+  body: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'expandable';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "BylineDocumentBlock".
  */
 export interface BylineDocumentBlock {
@@ -2091,6 +2164,150 @@ export interface BylineDocumentBlock {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineChartMapBlock".
+ */
+export interface BylineChartMapBlock {
+  mode: 'interactive' | 'static';
+  url?: string | null;
+  image?: (number | null) | Media;
+  altOverride?: string | null;
+  title: string;
+  dek?: string | null;
+  summary: string;
+  source?: string | null;
+  notes?: string | null;
+  credit?: string | null;
+  height: 'compact' | 'standard' | 'tall' | 'map';
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'chartMap';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineDataTableBlock".
+ */
+export interface BylineDataTableBlock {
+  title: string;
+  description?: string | null;
+  columns?:
+    | {
+        label?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  rows?:
+    | {
+        cells?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  presentation: 'standard' | 'comparison';
+  rowHeaders?: boolean | null;
+  source?: string | null;
+  notes?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'dataTable';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineComparisonBlock".
+ */
+export interface BylineComparisonBlock {
+  heading?: string | null;
+  leftLabel?: string | null;
+  leftTitle: string;
+  leftBody: string;
+  rightLabel?: string | null;
+  rightTitle: string;
+  rightBody: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'comparison';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineKeyNumbersBlock".
+ */
+export interface BylineKeyNumbersBlock {
+  heading?: string | null;
+  source?: string | null;
+  items?:
+    | {
+        value?: string | null;
+        label?: string | null;
+        context?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'keyNumbers';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineAnnotatedImageBlock".
+ */
+export interface BylineAnnotatedImageBlock {
+  media: number | Media;
+  altOverride?: string | null;
+  caption?: string | null;
+  placement: 'wide' | 'full';
+  markers?:
+    | {
+        x?: number | null;
+        y?: number | null;
+        title?: string | null;
+        body?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'annotatedImage';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineBeforeAfterBlock".
+ */
+export interface BylineBeforeAfterBlock {
+  before: number | Media;
+  after: number | Media;
+  beforeLabel?: string | null;
+  afterLabel?: string | null;
+  fit: 'cover' | 'contain';
+  caption?: string | null;
+  placement: 'wide' | 'full';
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'beforeAfter';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineVisualChapterBlock".
+ */
+export interface BylineVisualChapterBlock {
+  media: number | Media;
+  altOverride?: string | null;
+  eyebrow?: string | null;
+  heading: string;
+  dek?: string | null;
+  placement: 'wide' | 'full';
+  align: 'bottom-left' | 'center';
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'visualChapter';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "BylineTimelineBlock".
  */
 export interface BylineTimelineBlock {
@@ -2106,6 +2323,54 @@ export interface BylineTimelineBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'timeline';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineRelatedCoverageBlock".
+ */
+export interface BylineRelatedCoverageBlock {
+  heading?: string | null;
+  stories?:
+    | {
+        story?: (number | null) | Story;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'relatedCoverage';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylinePollBlock".
+ */
+export interface BylinePollBlock {
+  poll: number | Poll;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'poll';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineRepositoryInteractiveBlock".
+ */
+export interface BylineRepositoryInteractiveBlock {
+  key: string;
+  title: string;
+  description: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'repositoryInteractive';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineFootnoteInline".
+ */
+export interface BylineFootnoteInline {
+  text?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'footnote';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
