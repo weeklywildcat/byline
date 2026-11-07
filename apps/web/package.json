@@ -8,6 +8,7 @@
     "build:cloudflare": "node ../../scripts/build-cloudflare.mjs",
     "postbuild": "node scripts/report-build.mjs start && node scripts/materialize-static-compatibility.mjs && node scripts/copy-wordpress-media-to-out.mjs && node scripts/materialize-presentation-media.mjs && node scripts/generate-redirects.mjs && node scripts/generate-headers.mjs && node scripts/generate-byline-manifest.mjs && node scripts/verify-static-export.mjs && node scripts/verify-build.mjs && node scripts/verify-seo.mjs && node scripts/report-build.mjs end",
     "test": "vitest run",
+    "materialize:publication-media": "node --import tsx scripts/materialize-publication-media.mts",
     "test:browser": "playwright test --config playwright.public.config.ts",
     "test:packages": "vitest run tests/shared-contracts.test.ts tests/image-crops.test.ts tests/image-art-direction-intent.test.ts tests/publication-media-contract.test.ts tests/story-video.test.ts tests/article-body-renderer.test.tsx",
     "typecheck": "astro check && tsc --noEmit",
