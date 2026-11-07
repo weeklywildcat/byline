@@ -90,8 +90,8 @@ snapshot; nothing in this app serves public reading.
   in the same Payload transaction; stale edits return 409. Retirement is Alumni,
   not deletion; the delete hook protects Stories, trash, versions and plans.
   Reader presentation/CSS is shared with Astro in `@byline/ui/contributor-profile`.
-  The allowlisted public-people projection is not wired to snapshots. Story
-  guest quick-create and import/cutover remain deferred; do not touch editor code.
+  Story guest quick-create uses the same People creation contract. Sign-in accounts
+  are managed under People → Access. See `docs/newsroom-ux.md` for field ownership.
 - **Media** (`/admin/media`, [docs/media-workspace.md](../../docs/media-workspace.md))
   is Library (Payload Media + Payload-native folders) and Work (the shared
   production desk), kept apart. The wide Media workspace is the rail plus
@@ -153,7 +153,8 @@ snapshot; nothing in this app serves public reading.
   unchanged; the newsroom supplies fetchers (`src/ui/home/payload-fetchers.ts`)
   over `/api/byline/*` (`src/newsroom/endpoints.ts`). Do not fork a screen to
   fit Payload: map Payload records to the screen contract in
-  `src/newsroom/screen-models.ts`. Unported methods reject with 501.
+  `src/newsroom/screen-models.ts`. Document remaining unsupported capabilities in
+  `docs/newsroom-ux.md`.
 - **Sizes:** Payload's root font is not 16px; `postcss/byline-ui.cjs` compiles
   Nova's rem to px. Use the design system's classes, never hand-tuned sizes.
   Inline CSS variables escape that compile: give them in px (`BylineShell`).
