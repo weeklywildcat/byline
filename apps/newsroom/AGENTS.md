@@ -142,7 +142,20 @@ snapshot; nothing in this app serves public reading.
   `usePreferences()`, behind a versioned key and normalized on read. Never a
   Users field, a collection or a Byline endpoint.
 - **Writers never get** HTML, CSS, colors, fonts, alignment or layout controls.
-  `src/editor/prose.ts` is the whole prose surface.
+  `@byline/editor`'s `proseFeatures()` (re-used by `src/editor/prose.ts`) is the
+  whole prose surface.
+- **The article editor** ([docs/article-editor.md](../../docs/article-editor.md)):
+  the story body is Payload's Lexical field with `BlocksFeature`, built by
+  `@byline/editor`; the semantic `byline-v1` contract is `@byline/article-body`;
+  the public look is `@byline/ui`. One registry (`ARTICLE_BLOCKS`), one Lexical
+  state: block editors write the Lexical node (`node.setFields`), never a
+  parallel model, an endpoint or a save button. Share the article's CSS and
+  primitives with the public page; keep editor controls in `@byline/editor`
+  (`canvas.css`); never add `isEditing` branches to `@byline/ui`. Never store a
+  credit in a block (Media owns it), never import Payload private paths, Views or
+  JSX converters, never feed Lexical JSON to Astro, never add a Scrollytelling
+  block, never send `legacy-html` through the normalizer. The Media picker is
+  Byline's, never Payload's.
 - `src/payload-types.ts` is this app's internal type file. It must never become
   the public site's content contract.
 

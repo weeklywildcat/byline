@@ -5,8 +5,10 @@ sans-serif labels, ink and hairlines, one accent. A dramatic photograph and a
 contextual note differ in **weight**, never in **dialect**. The rules below are
 implemented once, in `packages/ui/src/newsroom/figure.css` (tokens, captions,
 credits, labels) and the per-feature partials beside it, and they apply
-identically on the public article, in the Gutenberg canvas and in Preview as
-Byline.
+identically on the public article, in the Gutenberg canvas, in Preview as
+Byline and in the Payload newsroom's Story editor canvas, which loads the same
+stylesheets (`article-body.css` plus the partials) instead of restating them;
+see [article-editor.md](article-editor.md).
 
 ## Three weights
 
@@ -16,7 +18,11 @@ Byline.
 | **Supporting context** | Key facts, margin notes, Context boxes, tables, timelines, footnotes, related coverage | A hairline rule on top and a small-caps label. No box, no background, no shadow. Body text one step smaller (1rem). Sits in the prose measure, or beside it at wide widths. |
 | **Major visual moment** | Wide and full-bleed photographs, galleries, annotated images, comparisons, charts and maps, interactives, Visual Chapters | Breaks out to 1040px (`alignwide`) or the full canvas (`alignfull`), with `--story-moment-space` (2.25-3.5rem) above and below. No frame or border around photographs. |
 
-Widths stay 760 / 1040 / 1440. A feature earns `alignwide` when seeing it large
+Widths stay 760 / 1040 / 1440. The measure lives in
+`packages/ui/article-body.css`, shared by the public page and the Payload
+editor canvas, with the provider-neutral block classes (`.byline-photo`,
+`.byline-gallery`, `.byline-context`, ...) styled beside the legacy
+`.wp-block-*` selectors. A feature earns `alignwide` when seeing it large
 changes what the reader understands (a photograph, a comparison, a map); it
 stays at 760 when it is reading (a timeline, a table of facts).
 
@@ -73,6 +79,12 @@ motion respected.
 5. Forced-colors and reduced-motion each get an explicit rule where they matter.
 
 ## Authoring contract
+
+This contract binds the Payload newsroom editor too: `@byline/editor` meets it
+with shadcn components in place of Gutenberg's (empty state = `Empty` with Choose
+from Media / Upload; toolbar = `ButtonGroup`, `ToggleGroup`, `DropdownMenu`;
+secondary settings = `Popover`, or `Sheet` on touch; no inspector). The editor
+adds controls around the article and never restyles it.
 
 The block canvas is the editor. A writer should be able to build and revise any
 story tool without opening the sidebar.

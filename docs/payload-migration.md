@@ -10,7 +10,9 @@ are met. Nothing here deletes WordPress data.
 
 Status is tracked in [§11](#11-phases-gates-and-status). Branch:
 `feature/payload-newsroom` (stacked on `feature/visual-stories`, PR #226, because
-that PR reshapes the presentation registry Phase 4 extracts).
+that PR reshapes the presentation registry Phase 4 extracts). The article editor
+(§8, [article-editor.md](article-editor.md)) is the next focused branch,
+`feature/article-editor`, stacked on it.
 
 ## 1. Invariants
 
@@ -929,15 +931,28 @@ Story screen; Sign out ends the session.
 
 ## 8. Editor
 
-`packages/editor` (`@byline/editor`) owns the Lexical feature list, the Byline
-block schemas (one schema per block shared by the editor, the public projection
-and the renderer), the slash menu (grouped, fuzzy aliases: `/pdf`, `/doc` →
-Document; `/quote`; `/photo`; `/timeline`; `/chart`, `/map` → Chart / Map;
-`/facts` → Key Facts) and the block editor components. Allowed prose: paragraph,
-H2, H3, bold, italic, link, bulleted and numbered lists, plus inline semantics
-present in existing content (`sub`/`sup`, inline code are reviewed against the
-legacy corpus before being enabled). No alignment, color, font, indent or
-HTML features.
+The editor is built; its architecture, block schemas, insertion model and
+component mapping are in [article-editor.md](article-editor.md). In short:
+
+- `@byline/article-body` is the provider-neutral `byline-v1` contract (types,
+  block registry, readiness rules). Nothing in it knows Payload, Lexical, React
+  or CSS.
+- `@byline/ui` renders it (`@byline/ui/article-body`) with shared primitives and
+  the same `article-body.css` the editor canvas loads. There is no
+  editor-only copy of the article's look.
+- `@byline/editor` owns the Payload block configs, the Lexical feature setup, the
+  block editors and the Payload Lexical → `byline-v1` normalizer. The body is
+  Payload's native Lexical field with `BlocksFeature`; Lexical remains the one
+  document state, so autosave, drafts, versions and locking are Payload's.
+- Slash insertion is Payload's native menu (labels and slugs only; `/doc` and
+  `/pdf` find Document (PDF) through its label). The explicit Add menu is a
+  shadcn `Command` over the registry.
+- Allowed prose: paragraph, H2, H3, bold, italic, web links, bulleted and
+  numbered lists. Subscript, superscript and inline code stay off until
+  reviewed against the legacy corpus. No alignment, colour, font, indent,
+  column, table or HTML features.
+- Payload Views are experimental in 3.92.1 and are not part of the contract.
+  Scrollytelling is not a block.
 
 ## 9. Import
 
@@ -956,13 +971,12 @@ database export or snapshot + private REST exports:
 
 ## 10. Decisions
 
-### 10.1 Open: Scrollytelling
+### 10.1 Decided: no Scrollytelling block
 
-The migration brief lists a Scrollytelling block. PR #226 removed the WordPress
-Scrollytelling blocks deliberately: scrollytelling belongs to repository visual
-stories (`defineVisualStory`), with scroll logic in each story's `client.ts`, and
-the guidance in `AGENTS.md` and `apps/web/story-presentations/AGENTS.md` says not
-to reintroduce one. **No Scrollytelling block is built until this is decided.**
+PR #226 removed the WordPress Scrollytelling blocks deliberately: scrollytelling
+belongs to repository visual stories (`defineVisualStory`), with scroll logic in
+each story's `client.ts`. That stands under Payload: there is no Scrollytelling
+block, and the normalizer reports an unknown block type rather than dropping it.
 The torture-test story covers scrollytelling with a repository visual story.
 
 ### 10.2 Made here
@@ -996,10 +1010,10 @@ The torture-test story covers scrollytelling with a repository visual story.
 | 1 | `apps/newsroom`, Postgres, migrations, auth skeleton, roles, storage skeleton, Byline nav/dashboard | boots; migration applies to an empty DB; access tests | **done** (see §13) |
 | 1b | Google sign-in strategy | invited-only sign-in test | — |
 | 2 | People, Stories, Sections, Topics, Collections and optional public presentations, Corrections, Pages, Workspace records, canonical public model | access/privacy tests | collections + access **done**; Collections workspace and public compatibility projection done; full snapshot integration, `events`, YouTube metadata job pending |
-| 3 | Story view (Write/Plan/Production/History), Lexical, first blocks, autosave, locking, history | writer acceptance steps 1–6 | — |
+| 3 | Story view (Write/Plan/Production/History), Lexical, first blocks, autosave, locking, history | writer acceptance steps 1–6 | Story screen (Write/Plan/Production/History) done. Semantic editor and the first eight blocks built ([article-editor.md](article-editor.md), branch `feature/article-editor`); the full-story autosave check, the lock/undo/width browser specs and editor/public geometry parity are not yet green |
 | 4 | Extract `@byline/story-presentations`, canonical normalization, exact Live Preview | §5 parity suite green | — |
-| 5 | Media: private storage, metadata, crops, materialization, drag and drop | media privacy + public availability tests | — |
-| 6 | Full block set | torture-test story authorable | — |
+| 5 | Media: private storage, metadata, crops, materialization, drag and drop | media privacy + public availability tests | Media workspace (Library, folders, upload, inspector, Work) done ([media-workspace.md](media-workspace.md)); the Story editor uses its picker and uploads. Crops/focal use in rendering, R2 storage and public materialization pending |
+| 6 | Full block set | torture-test story authorable | First eight blocks (Photo, Photo Gallery, Reported Quote, Pull Quote, Key Facts, Context, Document, Timeline) built; the rest follow the same contract |
 | 7 | Payload → snapshot v1 projection | shadow build passes Astro verification | — |
 | 8 | WordPress → Payload import | counts/relations/IDs reconcile; custom presentation still resolves imported ID | — |
 | 9 | Snapshot v2 + structured `ArticleBody` | v1 and v2 builds both verify | — |
