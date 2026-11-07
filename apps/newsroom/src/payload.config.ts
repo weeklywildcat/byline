@@ -1,8 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { postgresAdapter } from "@payloadcms/db-postgres";
-import { s3Storage } from "@payloadcms/storage-s3";
-import { buildConfig, type CollectionConfig, type Plugin } from "payload";
+import { buildConfig, type CollectionConfig } from "payload";
 import sharp from "sharp";
 import { atLeast, newsroomUser } from "./access/user";
 import { Media, MEDIA_UPLOAD_MAX_BYTES } from "./collections/Media";
@@ -36,24 +35,12 @@ function withImportIdGuard(collection: CollectionConfig): CollectionConfig {
   return { ...collection, hooks: { ...collection.hooks, beforeValidate: [dropClientIds, ...(collection.hooks?.beforeValidate ?? [])] } };
 }
 
-/** Private originals in R2 when configured; local disk in development. Downloads always pass Payload access control. */
-function mediaStorage(): Plugin[] {
-  const bucket = process.env.BYLINE_MEDIA_PRIVATE_BUCKET;
-  if (!bucket) return [];
-  return [
-    s3Storage({
-      bucket,
-      acl: "private",
-      collections: { media: true },
-      config: {
-        endpoint: required("BYLINE_R2_ENDPOINT"),
-        region: "auto",
-        forcePathStyle: true,
-        credentials: { accessKeyId: required("BYLINE_R2_ACCESS_KEY_ID"), secretAccessKey: required("BYLINE_R2_SECRET_ACCESS_KEY") }
-      }
-    })
-  ];
-}
+/**
+ * Media uses Payload's local upload adapter on the newsroom's persistent volume.
+ * BYLINE_MEDIA_LOCAL_DIR selects that mounted directory through Media.staticDir.
+ * Object storage may be added later for backup/replication; it is not a runtime
+ * or public-delivery dependency.
+ */
 
 const collections: CollectionConfig[] = [
   Stories,
@@ -143,7 +130,6 @@ export default buildConfig({
     }),
     tasks: []
   },
-  plugins: mediaStorage(),
   typescript: { outputFile: path.resolve(dirname, "payload-types.ts") },
   telemetry: false
 });
