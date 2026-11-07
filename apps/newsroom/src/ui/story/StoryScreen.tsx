@@ -17,6 +17,7 @@ import { useMemo, type FormEvent, type ReactNode } from "react";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
 import { useBylineMediaPicker } from "../media/MediaWorkspaceShell";
 import { useLeaveGuard } from "../shell/navigation";
+import { useSettleAutosave } from "./form";
 import { HistoryTab } from "./HistoryTab";
 import { StoryHeader } from "./StoryHeader";
 import { WriteTab } from "./WriteTab";
@@ -151,6 +152,9 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
  * switching stories. It reads Payload's own form state and saves nothing.
  */
 function StoryLeaveGuard() {
+  // Payload keeps `modified` set when anything touched the form mid-autosave; settle it
+  // here so the header and this guard read the truth.
+  useSettleAutosave();
   const modified = useFormModified();
   const processing = useFormProcessing();
   const background = useFormBackgroundProcessing();

@@ -61,6 +61,13 @@ Lexical update. That means:
   field edit is its own history entry: Payload feeds its form from Lexical's
   `OnChangePlugin`, which skips updates tagged `history-merge`, so merging typing
   into one undo step would stop those edits reaching the form and autosave;
+- the Story header's "Unsaved changes" stays honest: Payload only clears the
+  form's `modified` flag after an autosave if nothing called `setModified` while
+  the request ran, even a call that changed no data (a re-emitted editor state, a
+  field re-announcing its value). `useSettleAutosave` (`ui/story/form.ts`) clears
+  the flag when an autosave succeeded and the form's data equals what it started
+  with; a real edit mid-save still differs, so it stays unsaved and autosaves
+  next. The stray call itself was never traced; the check does not depend on it;
 - when Payload marks the story read-only (another user holds the lock), every
   block field is `readOnly`, toolbars and Add controls are not rendered, and the
   article stays readable.
