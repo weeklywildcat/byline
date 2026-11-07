@@ -1,0 +1,28 @@
+{
+  "name": "@byline/editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Byline's journalism editor on Payload Lexical: the story block schemas, the editor feature setup, the block editing interface and the Payload Lexical -> byline-v1 normalizer. Not a renderer: public rendering is @byline/ui.",
+  "exports": {
+    "./server": "./src/server.ts",
+    "./client": "./src/client/index.ts",
+    "./normalize": "./src/normalize.ts",
+    "./fields": "./src/fields.ts",
+    "./canvas.css": "./src/canvas.css"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@byline/article-body": "0.1.0",
+    "@byline/newsroom-ui": "0.1.0",
+    "@byline/ui": "0.1.0"
+  },
+  "peerDependencies": {
+    "@payloadcms/richtext-lexical": "3.92.1",
+    "payload": "3.92.1",
+    "react": "^19.0.0",
+    "sonner": "^2.0.8"
+  }
+}
