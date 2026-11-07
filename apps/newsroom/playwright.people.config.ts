@@ -27,7 +27,6 @@ export default defineConfig({
       BYLINE_NEWSROOM_URL: "http://localhost:3012",
       BYLINE_MEDIA_LOCAL_DIR: "/private/tmp/byline-people-browser-media",
       NEXT_TELEMETRY_DISABLED: "1",
-      BYLINE_MEDIA_PRIVATE_BUCKET: "",
       BYLINE_GOOGLE_CLIENT_ID: "",
     },
   },
