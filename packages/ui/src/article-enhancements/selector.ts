@@ -11,5 +11,5 @@ export const articleEnhancementSelector = [
   '.byline-visualization[data-mode="embed"]',
   ".byline-annotated-image",
   ".byline-before-after",
-  ".byline-scrolly"
+  ".byline-interactive"
 ].join(", ");

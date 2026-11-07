@@ -2,7 +2,7 @@
 
 These instructions apply to work under `apps/web/story-presentations/`.
 
-This directory is the developer escape hatch for the occasional Weekly Wildcat story that needs a bespoke presentation. WordPress remains the source of truth for the journalism. The repository controls only presentation.
+This directory is the developer escape hatch for the occasional Weekly Wildcat story that needs a bespoke presentation. By default WordPress remains the source of truth for the journalism and the repository controls only presentation. The one deliberate exception is a **flagship visual story** (below), whose narrative lives here.
 
 ## When a writer asks for an immersive story
 
@@ -22,6 +22,9 @@ Then decide which of these paths fits the request:
 
 1. **Built-in Immersive is enough.** If the request is only the standard fullscreen featured-image reveal with a bottom-left or centered headline, do not create a repository override. That treatment already exists as the WordPress **Story presentation → Immersive** option.
 2. **Bespoke presentation is warranted.** If the writer wants custom art direction, unusual typography, a different composition, story-specific graphics, custom transitions, or placement beyond the built-in Immersive treatment, create a repository override.
+3. **A flagship visual story is warranted.** Only when the reporting, data, photography, graphics and scrolling must work together as one experience (scrollytelling, a sticky chart that changes with the text, a visual narrative) and mapping WordPress paragraphs to it would make the work worse. Create it with `--visual` (see below). Ask before choosing this for an ordinary story: it moves the narrative out of WordPress.
+
+Not every visual request needs this directory. A Datawrapper or Flourish chart, or an embedded map, is the **Chart / Map** block in WordPress. A small self-contained interactive (calculator, quiz, custom chart) is the **Interactive** block: build one HTML file and an editor uploads it. There is no WordPress scrollytelling block; scrollytelling is always a flagship visual story.
 
 A repository override always wins over the WordPress Standard/Immersive setting.
 
@@ -48,6 +51,14 @@ npm run story-presentation -- create <wordpress-post-id> <kebab-case-name>
 
 It creates the story component, isolated stylesheet, and registry entry.
 
+For a flagship visual story:
+
+```sh
+npm run story-presentation -- create <wordpress-post-id> <kebab-case-name> --visual
+```
+
+It also creates `client.ts` and registers `defineVisualStory({ name, Component })`. Never hand-convert a presentation into a visual story by other means; `defineVisualStory` is the opt-in.
+
 Keep the generated structure unless changing it improves the design. A custom presentation receives only the normalized `ArticlePresentation` and standard article slots.
 
 ## Editorial source of truth
@@ -72,6 +83,21 @@ The writer must be able to edit the story in WordPress after the custom presenta
 Decorative, non-editorial interface text may be coded when appropriate, but avoid inventing labels or chapter text that changes the meaning of the story.
 
 Render the WordPress body exactly once with `ArticleBody`.
+
+## Flagship visual stories
+
+In a visual story the narrative (text, figures, graphics, data) is written in the story folder as semantic JSX and **replaces** the WordPress body on the page. Everything else above still applies: the headline, deck, byline, dates, lead image with its caption and credit, corrections, topics and series come from WordPress through `presentation` and are never typed.
+
+- `presentation.contentHtml` is empty for a visual story. Never render `ArticleBody` in one.
+- Keep the narrative in the server-rendered JSX. Every word must be in the built HTML; `client.ts` only enhances what is already there and must never inject reporting.
+- Design the scroll experience for the story in front of you: sticky graphics, changing charts, maps, photography, scroll-triggered states. The scaffold's sticky chart is an example, not a schema. Use ordinary document scrolling (IntersectionObserver, CSS `position: sticky`), no `scroll` listeners that move the reader, no scroll-jacking.
+- Under `prefers-reduced-motion`, show each state without animation; the story must make sense without motion and without JavaScript.
+- Give graphics a text equivalent (`role="img"` with a `<title>`, or a table) and photographs real alt text and credited captions.
+- Import assets and data from the story folder so they ship with that story only.
+- Put a text edition or summary in the WordPress body; it feeds RSS, site search and the fallback if the registry line is removed. Pass `readingTime` to `defineVisualStory` when the WordPress body does not reflect the narrative's length.
+- A correction to the narrative is a code change: the editor records it in WordPress (the notice prints on the story) and you fix the text here.
+
+The route omits `articleBody` from the structured data for visual stories automatically; do not touch SEO.
 
 ## Required article systems
 
@@ -275,7 +301,8 @@ Do not weaken existing tests simply to accommodate the design.
 Before handing the work back, verify:
 
 - [ ] Correct WordPress post ID is registered.
-- [ ] No editorial copy is hard-coded.
+- [ ] No editorial copy is hard-coded (visual stories: only the narrative is, never the headline, deck, byline, dates or lead-image caption).
+- [ ] A visual story never renders `ArticleBody`, and its narrative reads completely with JavaScript off and with reduced motion.
 - [ ] WordPress remains editable after the override.
 - [ ] Exactly one H1 exists.
 - [ ] Featured image remains a real responsive image.
@@ -298,7 +325,7 @@ Keep the handoff simple. Writers do not need an architecture tour.
 Tell them:
 
 - the story now has a custom presentation
-- WordPress is still where they edit all story content
+- WordPress is still where they edit all story content (for a visual story: the headline, deck, byline, photo and corrections; the narrative itself changes in the repository, so send narrative edits to a developer)
 - later WordPress edits will continue to appear in the custom presentation
 - the custom design is tied to that story's post ID
 - removing the repository override returns it to the normal WordPress-selected presentation

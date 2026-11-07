@@ -25,10 +25,10 @@ test('plain stories never download the interactive enhancement bundle', async ({
   page.on('request', (request) => { if (request.resourceType() === 'script') scripts.push(request.url()); });
   await page.goto('/2026/08/15/news/weekly-wildcat-browser-fixture-six/');
   await page.waitForLoadState('networkidle');
-  expect(await page.locator('.article-body').evaluate((body) => body.querySelector('.wp-block-gallery img, .byline-visualization, .byline-annotated-image, .byline-before-after, .byline-scrolly'))).toBeNull();
+  expect(await page.locator('.article-body').evaluate((body) => body.querySelector('.wp-block-gallery img, .byline-visualization, .byline-annotated-image, .byline-before-after, .byline-interactive'))).toBeNull();
   expect(scripts.filter((url) => /article-enhancements/.test(url))).toEqual([]);
   await page.goto(article);
-  await expect.poll(() => page.locator('.byline-scrolly').evaluate((story) => story.classList.contains('is-enhanced'))).toBe(true);
+  await expect.poll(() => page.locator('.byline-before-after').evaluate((figure) => figure.classList.contains('is-enhanced'))).toBe(true);
 });
 
 test('the shared enhancer still enlarges linked gallery photographs from their full file', async ({ page }) => {
@@ -188,13 +188,13 @@ test('provider resize messages require matching source, origin, ID and bounded h
   await page.goto(article);
   for (const [selector, height, payload] of [
     ['.byline-visualization[data-provider="datawrapper"] iframe', 620, { 'datawrapper-height': { AbCdE: 620 } }],
-    ['.byline-visualization[data-provider="flourish"] iframe', 710, JSON.stringify({ source: 'Flourish', context: 'iframe.resize', height: 710 })]
+    ['.byline-visualization[data-provider="flourish"] iframe', 710, JSON.stringify({ sender: 'Flourish', context: 'iframe.resize', height: 710 })]
   ] as const) {
     const frame = page.locator(selector); await frame.scrollIntoViewIfNeeded();
     const handle = await frame.elementHandle(); const child = await handle!.contentFrame(); await child!.waitForLoadState();
     await child!.evaluate((payload) => window.parent.postMessage(payload, '*'), payload); await expect(frame).toHaveCSS('height', `${height}px`);
     await page.evaluate(({ selector, payload }) => {
-      const invalid = typeof payload === 'string' ? JSON.stringify({ source: 'Flourish', context: 'iframe.resize', height: 999 }) : { 'datawrapper-height': { AbCdE: 999 } };
+      const invalid = typeof payload === 'string' ? JSON.stringify({ sender: 'Flourish', context: 'iframe.resize', height: 999 }) : { 'datawrapper-height': { AbCdE: 999 } };
       const frame = document.querySelector<HTMLIFrameElement>(selector)!;
       // A matching frame with the wrong origin, then the right origin from an unrelated source.
       window.dispatchEvent(new MessageEvent('message', { source: frame.contentWindow, origin: 'https://evil.example', data: invalid }));
@@ -205,9 +205,9 @@ test('provider resize messages require matching source, origin, ID and bounded h
       window.parent.postMessage({ 'datawrapper-height': { AbCdE: 99999 } }, '*');
       window.parent.postMessage({ 'datawrapper-height': { AbCdE: -50 } }, '*');
       window.parent.postMessage({ 'datawrapper-height': { OtherId: 999 } }, '*');
-      window.parent.postMessage(JSON.stringify({ source: 'Flourish', context: 'iframe.resize', height: -2 }), '*');
-      window.parent.postMessage(JSON.stringify({ source: 'Flourish', context: 'iframe.resize', height: 99999 }), '*');
-      window.parent.postMessage(JSON.stringify({ source: 'Flourish', context: 'iframe.resize', height: 'tall' }), '*');
+      window.parent.postMessage(JSON.stringify({ sender: 'Flourish', context: 'iframe.resize', height: -2 }), '*');
+      window.parent.postMessage(JSON.stringify({ sender: 'Flourish', context: 'iframe.resize', height: 99999 }), '*');
+      window.parent.postMessage(JSON.stringify({ sender: 'Flourish', context: 'iframe.resize', height: 'tall' }), '*');
       window.parent.postMessage('not json {', '*');
       window.parent.postMessage(null, '*');
     });
@@ -259,11 +259,6 @@ test('all evidence remains useful without JavaScript', async ({ browser }) => {
   await expect(comparison.locator('img').nth(0)).toBeVisible(); await expect(comparison.locator('img').nth(1)).toBeVisible();
   await expect(comparison.locator('[data-before]')).toBeVisible(); await expect(comparison.locator('[data-after]')).toBeVisible();
   await expect(comparison.locator('figcaption')).toContainText('The campus renovation.'); await expect(comparison.locator('input')).toHaveCount(0);
-  // Scrollytelling: every step image and every word, in order.
-  const steps = page.locator('.byline-scrolly-step'); await expect(steps).toHaveCount(3);
-  for (const index of [0, 1, 2]) await expect(steps.nth(index).locator('img')).toBeVisible();
-  await expect(steps.nth(0)).toContainText('Arriving on campus'); await expect(steps.nth(2)).toContainText('The panorama shows how the pieces fit together.');
-  await expect(page.locator('.byline-scrolly-stage')).toHaveCount(0);
   // Annotated Image: image, marker anchors and the complete list.
   const marker = page.locator('.byline-annotation-marker').first(); await marker.click();
   await expect(page).toHaveURL(/#annotation-campus-entrance$/); await expect(page.locator('#annotation-campus-entrance')).toBeVisible();

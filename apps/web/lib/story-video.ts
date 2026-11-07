@@ -105,8 +105,8 @@ export function getVideoObjectSchema(post: WordPressPost) {
  * The article's JSON-LD. A video story keeps its NewsArticle and adds the
  * VideoObject beside it in one graph, each pointing at the other.
  */
-export function getArticleJsonLd(post: WordPressPost) {
-  const article = getNewsArticleSchema(post);
+export function getArticleJsonLd(post: WordPressPost, options: { articleBody?: boolean } = {}) {
+  const article = getNewsArticleSchema(post, options);
   const video = getVideoObjectSchema(post);
   if (!video) return article;
   const { "@context": context, ...articleNode } = article;

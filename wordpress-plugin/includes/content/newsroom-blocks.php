@@ -21,6 +21,7 @@ if (!function_exists('byline_build_page_section_block_from_inner_blocks')) {
 }
 
 require_once __DIR__ . '/story-blocks.php';
+require_once __DIR__ . '/interactive-block.php';
 
 const BYLINE_NEWSROOM_MAX_LIMIT = 12;
 const BYLINE_NEWSROOM_EDITOR_POLL_ROUTE = '/editor/polls';
@@ -736,13 +737,14 @@ function byline_newsroom_register_block_types(): void
         'events' => 'byline_newsroom_render_events',
         'poll' => 'byline_newsroom_render_poll',
         'game-score' => 'byline_newsroom_render_game_score',
+        'interactive' => 'byline_interactive_render',
     ];
     foreach ($dynamic as $slug => $callback) {
         register_block_type($root . '/' . $slug, ['render_callback' => $callback]);
     }
     register_block_type($root . '/correction-notice');
     register_block_type($root . '/timeline');
-    foreach (['visualization', 'annotated-image', 'before-after', 'scrolly', 'scrolly-step'] as $slug) {
+    foreach (['visualization', 'annotated-image', 'before-after'] as $slug) {
         register_block_type($root . '/' . $slug);
     }
 }

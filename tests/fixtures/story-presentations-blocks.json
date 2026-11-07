@@ -267,8 +267,16 @@
     "name": "byline/timeline",
     "attributes": {
       "items": [
-        { "label": "Earlier", "title": "How it began", "body": "The campus plan is first proposed." },
-        { "label": "Now", "title": "What happened next", "body": "Construction begins on the new library." }
+        {
+          "label": "Earlier",
+          "title": "How it began",
+          "body": "The campus plan is first proposed."
+        },
+        {
+          "label": "Now",
+          "title": "What happened next",
+          "body": "Construction begins on the new library."
+        }
       ]
     }
   },
@@ -1203,105 +1211,6 @@
       },
       "caption": "The campus renovation."
     }
-  },
-  {
-    "name": "core/heading",
-    "attributes": {
-      "level": 2,
-      "content": "A walk through the campus"
-    }
-  },
-  {
-    "name": "byline/scrolly",
-    "attributes": {
-      "align": "full"
-    },
-    "innerBlocks": [
-      {
-        "name": "byline/scrolly-step",
-        "attributes": {
-          "image": {
-            "url": "/test-assets/landscape.svg",
-            "alt": "A campus plan",
-            "width": 900,
-            "height": 600,
-            "credit": "Staff"
-          },
-          "caption": "The first scene."
-        },
-        "innerBlocks": [
-          {
-            "name": "core/heading",
-            "attributes": {
-              "level": 2,
-              "content": "Arriving on campus"
-            }
-          },
-          {
-            "name": "core/paragraph",
-            "attributes": {
-              "content": "The original entrance anchors the reporting."
-            }
-          }
-        ]
-      },
-      {
-        "name": "byline/scrolly-step",
-        "attributes": {
-          "image": {
-            "url": "/test-assets/landscape-after.svg",
-            "alt": "A campus plan",
-            "width": 900,
-            "height": 600,
-            "credit": "Staff"
-          },
-          "caption": "The second scene."
-        },
-        "innerBlocks": [
-          {
-            "name": "core/heading",
-            "attributes": {
-              "level": 2,
-              "content": "The next scene"
-            }
-          },
-          {
-            "name": "core/paragraph",
-            "attributes": {
-              "content": "The renovation changes the public space."
-            }
-          }
-        ]
-      },
-      {
-        "name": "byline/scrolly-step",
-        "attributes": {
-          "image": {
-            "url": "/test-assets/panorama.svg",
-            "alt": "A campus panorama",
-            "width": 1800,
-            "height": 900,
-            "credit": "Staff"
-          },
-          "caption": "The third scene."
-        },
-        "innerBlocks": [
-          {
-            "name": "core/heading",
-            "attributes": {
-              "level": 2,
-              "content": "The last scene"
-            }
-          },
-          {
-            "name": "core/paragraph",
-            "attributes": {
-              "content": "The panorama shows how the pieces fit together."
-            }
-          }
-        ]
-      }
-    ]
   },
   {
     "name": "core/paragraph",

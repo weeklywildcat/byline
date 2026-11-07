@@ -57,6 +57,6 @@ export function visualizationMessageHeight(data: unknown, provider: Visualizatio
   if (!data || typeof data !== 'object') return null;
   const message = data as Record<string, any>;
   const height = provider === 'datawrapper' ? message['datawrapper-height']?.[id]
-    : provider === 'flourish' && message.source === 'Flourish' && message.context === 'iframe.resize' ? message.height : null;
+    : provider === 'flourish' && message.sender === 'Flourish' && message.context === 'iframe.resize' ? message.height : null;
   return typeof height === 'number' && Number.isFinite(height) && height >= 100 && height <= 2400 ? height : null;
 }

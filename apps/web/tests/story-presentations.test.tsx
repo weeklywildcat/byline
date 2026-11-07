@@ -7,11 +7,15 @@ import { ArticleView, HeroReveal, HeroRevealContent, ImmersiveArticleView, type 
 import { buildArticlePresentation } from "@/lib/article-presentation";
 import { getPostContributors, getPostStoryPresentation, isGuestContributor, type WordPressAuthor, type WordPressPost } from "@/lib/wordpress";
 import { getStoryPresentation, resolveStoryPresentation, storyPresentations, fixtureStoryPresentations } from "@/story-presentations/registry";
+import { defineVisualStory, isVisualStory } from "@/story-presentations/types";
+import { getNewsArticleSchema } from "@/lib/seo";
 import { StoryArticle } from "@/story-presentations/StoryArticle";
 import OverrideFixtureStory from "@/story-presentations/stories/override-fixture";
+import VisualFixtureStory from "@/story-presentations/stories/visual-fixture";
 import { publicEditorialPosts } from "@/tests/fixtures/public-editorial-content";
 
 const OVERRIDE_ID = 6;
+const VISUAL_ID = 10;
 const IMMERSIVE_ID = 8;
 
 function basePresentation(overrides: Partial<ArticlePresentation> = {}): ArticlePresentation {
@@ -266,6 +270,105 @@ describe("a repository override and WordPress Immersive together", () => {
   it("goes back to the normal article when the override is removed and the story is Standard", () => {
     const presentation = basePresentation({ id: OVERRIDE_ID });
     expect(renderToStaticMarkup(<StoryArticle presentation={presentation} slots={slots} />)).toBe(renderToStaticMarkup(<ArticleView presentation={presentation} slots={slots} />));
+  });
+});
+
+describe("a flagship visual story", () => {
+  const WORDPRESS_BODY = "<p>The WordPress text edition, for feeds and search.</p>";
+  const visual = (overrides: Partial<ArticlePresentation> = {}) => basePresentation({ id: VISUAL_ID, contentHtml: WORDPRESS_BODY, ...overrides });
+  const render = (presentation: ArticlePresentation = visual()) => {
+    vi.stubEnv("BYLINE_CONTENT_MODE", "weekly-wildcat-fixture");
+    return dom(renderToStaticMarkup(<StoryArticle presentation={presentation} slots={slots} />));
+  };
+
+  it("is a deliberate opt-in: only defineVisualStory makes one", () => {
+    expect(fixtureStoryPresentations[VISUAL_ID]).toBe(VisualFixtureStory);
+    expect(isVisualStory(VisualFixtureStory)).toBe(true);
+    expect(VisualFixtureStory).toMatchObject({ kind: "visual-story", name: "visual-fixture" });
+    expect(isVisualStory(fixtureStoryPresentations[OVERRIDE_ID])).toBe(false);
+    expect(isVisualStory(() => null)).toBe(false);
+    expect(isVisualStory(null)).toBe(false);
+    expect(() => defineVisualStory({ name: "Lunch Line", Component: () => null })).toThrow(/kebab-case/);
+    expect(getStoryPresentation(VISUAL_ID)).toBeNull();
+  });
+
+  it("replaces the WordPress body with its own narrative, rendered as static HTML", () => {
+    const document = render();
+    const narrative = document.querySelector(".story-visual-fixture-narrative")!;
+
+    expect(document.body.textContent).not.toContain("WordPress text edition");
+    expect(document.body.textContent).not.toContain("No article body has been published yet.");
+    expect(document.querySelectorAll(".article-body")).toEqual(document.querySelectorAll(".story-visual-fixture-narrative"));
+    expect(text(narrative)).toContain("Open with the reporting.");
+    expect(narrative.querySelectorAll(".story-visual-fixture-step")).toHaveLength(3);
+    const graphic = narrative.querySelector('svg[role="img"]')!;
+    expect(text(graphic.querySelector("title"))).toBe("First: 32, Second: 21, Third: 12");
+    expect(graphic.getAttribute("aria-labelledby")).toBe(graphic.querySelector("title")!.id);
+    // Nothing is enhanced until client.ts runs in the browser.
+    expect(document.querySelector(".is-enhanced, .is-active, .is-highlighted")).toBeNull();
+  });
+
+  it("is marked for its own client code and keeps the route's structured data outside it", () => {
+    const document = render();
+    const root = document.querySelector('[data-visual-story="visual-fixture"]')!;
+
+    expect(root).not.toBeNull();
+    expect(document.querySelectorAll("#newsarticle-json-ld")).toHaveLength(1);
+    expect(root.querySelector("#newsarticle-json-ld")).toBeNull();
+  });
+
+  it("keeps the WordPress publishing record and the standard article systems", () => {
+    const document = render(visual({
+      title: "A headline edited later",
+      titleHtml: "A headline edited later",
+      excerptHtml: "<p>A deck edited later.</p>",
+      update: { modifiedAt: "2026-08-21T09:00:00", label: "Updated after publication." }
+    }));
+    const lead = [...document.querySelectorAll("img")].filter((img) => img.getAttribute("src") === "/media/lead-1600.jpg");
+
+    expect(document.querySelectorAll("h1")).toHaveLength(1);
+    expect(text(document.querySelector("h1"))).toBe("A headline edited later");
+    expect(text(document.querySelector(".article-excerpt"))).toBe("A deck edited later.");
+    expect(text(document.querySelector(".article-section-label"))).toBe("News");
+    expect(text(document.querySelector(".article-author-line"))).toBe("By Alex Rivera and Jordan Guest");
+    expect(lead).toHaveLength(1);
+    expect(lead[0].getAttribute("alt")).toBe("Students gather in a hallway");
+    expect(document.body.textContent).toContain("Photo: Casey Photographer");
+    expect(document.querySelectorAll(".article-correction-notice")).toHaveLength(1);
+    expect(text(document.querySelector(".article-tags"))).toContain("Campus");
+    expect(text(document.querySelector(".article-update-notice"))).toContain("Updated after publication.");
+    expect(document.querySelector(".article-tip-callout")).not.toBeNull();
+    expect(document.querySelector('.article-meta-block [data-slot="share"]')).not.toBeNull();
+    for (const slot of ["poll", "feedback", "newsletter"]) expect(document.querySelectorAll(`[data-slot="${slot}"]`)).toHaveLength(1);
+    // The narrative sits where the body would: after the header, before the footer.
+    const order = [...document.querySelectorAll(".article-header, .story-visual-fixture-narrative, .article-correction-notices, .article-after")].map((element) => element.className.split(" ").at(-1));
+    expect(order).toEqual(["article-header", "story-visual-fixture-narrative", "article-correction-notices", "article-after"]);
+  });
+
+  it("returns to the WordPress body when its registry line is removed", () => {
+    const presentation = visual();
+    // Outside fixture builds the registry has no entry for this ID.
+    expect(renderToStaticMarkup(<StoryArticle presentation={presentation} slots={slots} />)).toBe(renderToStaticMarkup(<ArticleView presentation={presentation} slots={slots} />));
+  });
+
+  it("can declare its own reading time, since the WordPress body is not its text", () => {
+    const Story = ({ presentation }: { presentation: ArticlePresentation }) => <p data-reading={presentation.readingTime} data-body={presentation.contentHtml} />;
+    const definition = defineVisualStory({ name: "timed", Component: Story, readingTime: "12 min read" });
+    expect(definition.readingTime).toBe("12 min read");
+    expect(defineVisualStory({ name: "untimed", Component: Story }).readingTime).toBeUndefined();
+  });
+});
+
+describe("structured data for a flagship visual story", () => {
+  const post = { ...publicEditorialPosts[0], content: { rendered: "<p>The WordPress text edition.</p>" } } as WordPressPost;
+
+  it("claims the WordPress body only when the page shows it", () => {
+    expect(getNewsArticleSchema(post).articleBody).toBe("The WordPress text edition.");
+    const visual = getNewsArticleSchema(post, { articleBody: false });
+    expect(visual).not.toHaveProperty("articleBody", expect.anything());
+    expect(visual.articleBody).toBeUndefined();
+    expect(visual.headline).toBe(getNewsArticleSchema(post).headline);
+    expect(visual.description).toBe(getNewsArticleSchema(post).description);
   });
 });
 

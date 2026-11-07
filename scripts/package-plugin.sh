@@ -79,18 +79,14 @@ build_assets=(
   build/blocks/before-after/index.js
   build/blocks/before-after/index.asset.php
   build/blocks/before-after/style-index.css
-  build/blocks/scrolly/block.json
-  build/blocks/scrolly/index.js
-  build/blocks/scrolly/index.asset.php
-  build/blocks/scrolly/style-index.css
-  build/blocks/scrolly-step/block.json
-  build/blocks/scrolly-step/index.js
-  build/blocks/scrolly-step/index.asset.php
-  build/blocks/scrolly-step/style-index.css
   build/blocks/timeline/block.json
   build/blocks/timeline/index.js
   build/blocks/timeline/index.asset.php
   build/blocks/timeline/style-index.css
+  build/blocks/interactive/block.json
+  build/blocks/interactive/index.js
+  build/blocks/interactive/index.asset.php
+  build/blocks/interactive/style-index.css
   build/editor-canvas.js
   build/editor-canvas.asset.php
   build/editor-canvas.css
@@ -304,7 +300,7 @@ for font_family in erode-normal-600 newsreader-normal-latin libre-franklin-norma
   fi
 done
 
-for newsroom_block in stories people sports-schedule events poll game-score correction-notice timeline table-of-contents visualization annotated-image before-after scrolly scrolly-step; do
+for newsroom_block in stories people sports-schedule events poll game-score correction-notice timeline table-of-contents visualization annotated-image before-after interactive; do
   grep -qx "weekly-wildcat-headless/build/blocks/$newsroom_block/block.json" <<<"$archive_files"
   grep -qx "weekly-wildcat-headless/build/blocks/$newsroom_block/index.js" <<<"$archive_files"
   grep -qx "weekly-wildcat-headless/build/blocks/$newsroom_block/index.asset.php" <<<"$archive_files"

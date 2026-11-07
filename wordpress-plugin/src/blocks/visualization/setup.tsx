@@ -30,7 +30,7 @@ export function AddressField({ value, diagnosis, onChange, onPaste, onBlur }: { 
 }
 
 /** Four heights, drawn to scale: choosing one resizes the frame on the canvas. */
-export function HeightChoice({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function HeightChoice({ value, onChange, help = 'The frame keeps this height at every width, so the page does not jump when the chart loads. Charts then resize to fit their own content. The fallback graphic is fitted inside the frame, never cropped.' }: { value: string; onChange: (value: string) => void; help?: string }) {
   const name = useId();
   return <fieldset className="byline-viz-heights">
     <legend>Height</legend>
@@ -42,7 +42,7 @@ export function HeightChoice({ value, onChange }: { value: string; onChange: (va
         <span className="byline-viz-height-note">{choice.pixels}px. {choice.note}.</span>
       </label>)}
     </div>
-    <p className="byline-viz-help">The frame keeps this height at every width, so the page does not jump when the chart loads. Charts then resize to fit their own content. The fallback graphic is fitted inside the frame, never cropped.</p>
+    <p className="byline-viz-help">{help}</p>
   </fieldset>;
 }
 

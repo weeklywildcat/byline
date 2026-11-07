@@ -12,6 +12,8 @@ import { getArticleJsonLd } from "@/lib/story-video";
 import { getPostGameScoreGameIds, getPostHref, getPostRouteParts } from "@/lib/wordpress";
 import { stripHtml, decodeHtml } from "@/lib/format";
 import { StoryArticle } from "@/story-presentations/StoryArticle";
+import { getStoryPresentation } from "@/story-presentations/registry";
+import { isVisualStory } from "@/story-presentations/types";
 import { ArticleGameCard } from "@/components/ArticleGameCard";
 import { ArticleShareActions } from "@/components/ArticleShareActions";
 import { ReaderFeedbackForm } from "@/components/ReaderFeedbackForm";
@@ -34,6 +36,7 @@ const title = stripHtml(post.title.rendered);
 const articleUrl = absoluteUrl(getPostHref(post));
 const category = getPrimaryVisibleCategory(post);
 const publication = getPublicationConfig();
+const visualStory = isVisualStory(getStoryPresentation(post.id));
 const slots = {
   shareActions: React.createElement("div", { id: "article-share-island-slot" }),
   primaryGame: showPrimaryGame && primaryGame ? React.createElement(ArticleGameCard, { game: primaryGame, className: "article-primary-game-card" }) : null,
@@ -43,7 +46,7 @@ const slots = {
 };
 ---
 <BaseLayout metadata={metadata} themeColor="#fbfaf7" stickyLogo hideMastheadDate>
-  <script id="newsarticle-json-ld" type="application/ld+json" set:html={serializeJsonLd(getArticleJsonLd(post))}></script>
+  <script id="newsarticle-json-ld" type="application/ld+json" set:html={serializeJsonLd(getArticleJsonLd(post, { articleBody: !visualStory }))}></script>
   <script id="article-breadcrumb-json-ld" type="application/ld+json" set:html={serializeJsonLd(getBreadcrumbSchema([
     { name: "Home", path: "/" },
     ...(category ? [{ name: decodeHtml(category.name), path: `/category/${category.slug}/` }] : []),
@@ -55,6 +58,11 @@ const slots = {
     const body = document.querySelector<HTMLElement>(".article-body");
     if (body?.querySelector(articleEnhancementSelector)) {
       import("@byline/ui/article-enhancements").then(({ enhanceArticleStory }) => enhanceArticleStory(body));
+    }
+    // A flagship visual story's own client code, if it has any, downloads on its page alone.
+    const visualStory = document.querySelector<HTMLElement>("[data-visual-story]");
+    if (visualStory) {
+      import("@/story-presentations/client").then(({ startVisualStory }) => startVisualStory(visualStory));
     }
     // Only a story whose coverage is running downloads the live checker.
     const live = document.querySelector<HTMLElement>('[data-byline-live][data-status="live"]');

@@ -12,6 +12,7 @@
     "./article-enhancements": "./src/article-enhancements/index.ts",
     "./before-after": "./src/article-enhancements/before-after.ts",
     "./visualization": "./src/visualization.ts",
+    "./interactive": "./src/interactive.ts",
     "./article-enhancement-selector": "./src/article-enhancements/selector.ts",
     "./live-feed": "./src/live-feed.ts",
     "./live-updates": "./src/live-updates.ts",

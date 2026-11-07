@@ -1,11 +1,10 @@
 import { enhanceArticleGalleries } from './gallery';
 import { enhanceBeforeAfter } from './before-after';
-import { enhanceScrolly } from './scrolly';
 import { enhanceVisualizations } from './visualization';
 import { enhanceAnnotatedImage } from './annotated-image';
+import { enhanceInteractives } from './interactive';
 
 export { articleEnhancementSelector } from './selector';
-export { SCROLLY_ACTIVATION_LINE } from './scrolly';
 export type ArticleEnhancementOptions = { preview?: boolean };
 const sessions = new WeakMap<ParentNode, () => void>();
 
@@ -23,13 +22,13 @@ export function enhanceArticleStory(root: HTMLElement, options: ArticleEnhanceme
   const cleanups: (() => void)[] = [];
   if (!options.preview) cleanups.push(enhanceArticleGalleries(root));
   cleanups.push(enhanceVisualizations(root, signal, Boolean(options.preview)));
+  cleanups.push(enhanceInteractives(root, signal));
   root.querySelectorAll<HTMLElement>('.byline-annotated-image').forEach((figure) => enhanceAnnotatedImage(figure, signal));
 
   root.querySelectorAll<HTMLElement>('.byline-before-after').forEach((figure) => {
     const undo = enhanceBeforeAfter(figure, signal);
     if (undo) cleanups.push(undo);
   });
-  root.querySelectorAll<HTMLElement>('.byline-scrolly').forEach((story) => cleanups.push(enhanceScrolly(story, signal)));
   const cleanup = () => { abort.abort(); cleanups.forEach((fn) => fn()); sessions.delete(root); };
   sessions.set(root, cleanup);
   return cleanup;

@@ -14,7 +14,7 @@ Byline.
 | --- | --- | --- |
 | **Prose** | Paragraphs, headings, lists | 760px measure, Newsreader body, Erode headings |
 | **Supporting context** | Key facts, margin notes, Context boxes, tables, timelines, footnotes, related coverage | A hairline rule on top and a small-caps label. No box, no background, no shadow. Body text one step smaller (1rem). Sits in the prose measure, or beside it at wide widths. |
-| **Major visual moment** | Wide and full-bleed photographs, galleries, annotated images, comparisons, scrollytelling, charts and maps, Visual Chapters | Breaks out to 1040px (`alignwide`) or the full canvas (`alignfull`), with `--story-moment-space` (2.25-3.5rem) above and below. No frame or border around photographs. |
+| **Major visual moment** | Wide and full-bleed photographs, galleries, annotated images, comparisons, charts and maps, interactives, Visual Chapters | Breaks out to 1040px (`alignwide`) or the full canvas (`alignfull`), with `--story-moment-space` (2.25-3.5rem) above and below. No frame or border around photographs. |
 
 Widths stay 760 / 1040 / 1440. A feature earns `alignwide` when seeing it large
 changes what the reader understands (a photograph, a comparison, a map); it
@@ -56,12 +56,13 @@ zeroed under `prefers-reduced-motion`). Use these instead of new literals.
 
 ## Motion
 
-Motion explains, it does not decorate. The only motion in a story is: the
-Before / After divider following the pointer, the scrollytelling stage changing
-photograph (a 160ms crossfade, instant under reduced motion), and focus and
-selection changes. Nothing animates on scroll except the sticky stage. Under
-`prefers-reduced-motion` the sticky stage is not built and the story is read
-linearly. Nothing hijacks scrolling.
+Motion explains, it does not decorate. The only motion in a WordPress story is
+the Before / After divider following the pointer, and focus and selection
+changes. Nothing animates on scroll and nothing hijacks scrolling. Scroll-driven
+storytelling is a flagship visual story's own code (see
+[custom-story-presentations.md](custom-story-presentations.md)), held to the same
+rules: ordinary scrolling, content readable in order without it, and reduced
+motion respected.
 
 ## CSS rules for contributors
 
