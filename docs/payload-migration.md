@@ -270,23 +270,59 @@ media microservice is required.
 ### 4.1 Accounts and people
 
 - `users` (auth): `email`, `name`, `role` (`staff` | `editor` |
-  `administrator`), `enabled`, `linkedPerson`, `preferences`, `breakGlass`,
-  integration linkage (`googleSubject`, `discordUserId`). Payload's
-  `local` password strategy stays enabled **only** so break-glass
-  administrators can sign in; a `beforeLogin` hook refuses password login for
-  everyone else once Google sign-in is configured (`BYLINE_GOOGLE_CLIENT_ID`).
-  The first account ever created is forced to an enabled break-glass
+  `administrator`), `enabled`, `linkedPerson`, `preferences`, and integration
+  linkage (`googleSubject`, `discordUserId`). Google Workspace is the preferred
+  sign-in, and every enabled invited account can also use Payload's native
+  email/password sign-in. Some school-managed devices cannot use the Weekly
+  Wildcat Google Workspace identity. Preserve both paths. Payload owns password
+  hashing, lockout, sessions and cookies; disabled accounts cannot sign in.
+  The first account ever created is forced to an enabled
   administrator (Payload's create-first-user form would otherwise make Staff),
   and the last enabled administrator cannot be demoted or disabled.
-- Google Workspace sign-in (Phase 1b) is a Payload custom `auth.strategies`
-  entry that verifies a Google ID token (issuer, audience, `hd`, `email_verified`)
-  and then **looks up an existing enabled user** by email/subject. It never
-  creates a user; being on the Workspace domain grants nothing.
+- Google Workspace sign-in (Phase 1b) uses Payload custom endpoints and its
+  native session helpers. The server starts an OpenID Connect code exchange
+  with state, nonce and S256 PKCE and requests only `openid email profile`.
+  Google's Node library verifies signature, issuer and audience. Byline also
+  requires a current expiry, matching nonce and hosted domain, verified email
+  and a valid subject. An existing subject binding takes precedence. Otherwise
+  exactly one existing enabled account must match the normalized email and
+  have a null binding. Binding and session creation commit together, and a
+  subject is never replaced on login. Disabled accounts cannot use either
+  method. Google never provisions users or changes roles. After initial
+  bootstrap, only administrators create accounts. Login redirects stay inside
+  the newsroom.
 - `people`: `name`, `slug`, `pronouns`, `newsroomRole`, `shortBio`, `bio`,
   `portrait`, `directoryVisible`, `publicEmail`, `socials`, `status`
   (`active`/`alumni`/`guest`). Disabling or deleting a user never touches
   people or bylines (`linkedPerson` is on the user, and a person is never
   deleted by a user hook).
+
+Configure Phase 1b on the newsroom server:
+
+- Set `BYLINE_NEWSROOM_URL` to the newsroom's canonical HTTPS origin, and
+  `BYLINE_GOOGLE_CLIENT_ID`, `BYLINE_GOOGLE_CLIENT_SECRET` and
+  `BYLINE_GOOGLE_HOSTED_DOMAIN=weeklywildcat.com` for the Weekly Wildcat
+  Workspace. In Google Cloud, create a **Web application** OAuth client and
+  register the exact authorized redirect URI
+  `https://<newsroom-host>/api/byline/auth/google/callback`. For development
+  at the default port, register
+  `http://localhost:3010/api/byline/auth/google/callback` separately. No
+  authorized JavaScript origin is required for this server-side flow. Configure
+  the consent screen and Workspace app access for staff. Confirm a real
+  Workspace account can sign in after configuration.
+- Set `BYLINE_UNSPLASH_ACCESS_KEY` to enable landscape login photos. The server
+  caches a pool, fetches updates off the login request path and renders
+  attributed Unsplash image URLs. An absent key, cold cache or failed fetch
+  uses the dark background.
+- Outbound email is not configured. Staff should ask a newsroom administrator
+  for a password reset. The native Payload forgot/reset routes stay available
+  for a future real transport; verify delivery before relying on them.
+
+The login browser suite uses a dedicated PostgreSQL test database and signed
+Google fixtures; it does not need Google or Unsplash credentials. Run
+`npm run test:login:browser --workspace @byline/newsroom`, then repeat with
+`BYLINE_LOGIN_GOOGLE_DISABLED=1` for password-only and photo failure coverage.
+Set `BYLINE_LOGIN_TEST_DATABASE_URL` to override the local test database.
 
 ### 4.2 Stories
 
@@ -583,8 +619,11 @@ page.
 
 ### 7.1 Where the UI stands
 
-Built (Phase 1b, branch `feature/payload-newsroom`):
+Built in the newsroom Admin:
 
+- The Byline sign-in view uses the Weekly Wildcat logo, makes Google primary
+  when configured, and offers email and password from the same screen. An
+  optional, attributed Unsplash photo sits behind the login card (see §4.1).
 - `@byline/newsroom-ui`: the Nova system, shared by both admins (compiled plugin
   CSS byte-identical after the move).
 - The Next app compiles it through `postcss/byline-ui.cjs`, which runs
@@ -1137,7 +1176,7 @@ The torture-test story covers scrollytelling with a repository visual story.
 | --- | --- | --- | --- |
 | 0 | This inventory | reviewed | done |
 | 1 | `apps/newsroom`, Postgres, migrations, auth skeleton, roles, storage skeleton, Byline nav/dashboard | boots; migration applies to an empty DB; access tests | **done** (see §13) |
-| 1b | Google sign-in strategy | invited-only sign-in test | — |
+| 1b | Preferred Google Workspace login, password fallback for every enabled invited account, branded login with optional Unsplash photos | invited-only OAuth and native password browser tests | Implemented; Google Workspace and optional Unsplash deployment setup in §4.1 |
 | 2 | People, Stories, Sections, Topics, Collections and optional public presentations, Corrections, Pages, Workspace records, canonical public model | access/privacy tests | collections + access **done**; People workspace, My profile and public-safe projection done in the parallel People slice; Collections workspace and public compatibility projection done; full snapshot integration, `events`, YouTube metadata job pending |
 | 3 | Story view (Write/Plan/Production/History), Lexical, first blocks, autosave, locking, history | writer acceptance steps 1–6 | Story screen (Write/Plan/Production/History) done. Semantic editor and the first eight blocks built ([article-editor.md](article-editor.md), part of this PR); the full-story autosave check, the lock/undo/width browser specs and editor/public geometry parity are not yet green |
 | 4 | Extract `@byline/story-presentations`, canonical normalization, exact Live Preview | §5 parity suite green | Built and browser-verified (§14), except the pop-out window (this environment cannot open pop-ups) and automated Playwright coverage of the torture flow. Verified in Chromium on the real Story screen: live typing before autosave, 12 overlapping autosaves with Preview staying open, Standard/Immersive/alignment/lead-image fallback, section, contributors, topics, body prose, all eight block types edited and reordered, lead/Photo/Gallery media swaps, reporting note, repository custom and visual stories, Phone/Tablet/Desktop/Responsive, widths 1920/1440/1366/1180/820/390, reload parity |

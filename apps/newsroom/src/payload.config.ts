@@ -5,6 +5,7 @@ import { postgresAdapter } from "@payloadcms/db-postgres";
 import { buildConfig, type CollectionConfig } from "payload";
 import sharp from "sharp";
 import { atLeast, newsroomUser } from "./access/user";
+import { googleEndpoints } from "./auth/google-endpoints";
 import { Media, MEDIA_UPLOAD_MAX_BYTES } from "./collections/Media";
 import { mediaFolders } from "./collections/MediaFolders";
 import { People } from "./collections/People";
@@ -85,7 +86,7 @@ export default buildConfig({
   }),
   graphQL: { disable: true },
   // The newsroom screens' API (/api/byline/...); every handler re-checks the account.
-  endpoints: newsroomEndpoints,
+  endpoints: [...newsroomEndpoints, ...googleEndpoints],
   admin: {
     user: Users.slug,
     meta: { titleSuffix: " · Byline", robots: "noindex, nofollow" },
@@ -107,6 +108,7 @@ export default buildConfig({
       Nav: "/ui/shell/BylineNav#BylineNav",
       header: ["/ui/shell/BylineAppHeader#BylineAppHeader"],
       views: {
+        login: { Component: "/auth/BylineLogin#BylineLogin" },
         dashboard: { Component: "/components/BylineHome#BylineHome" },
         // Byline Stories. Payload's raw Stories list stays at /collections/stories for administrators.
         stories: { Component: "/components/BylineStories#BylineStories", path: "/stories" },

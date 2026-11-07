@@ -425,10 +425,6 @@ export interface User {
    */
   linkedPerson?: (number | null) | Person;
   /**
-   * Emergency password sign-in for an administrator when Google sign-in is unavailable.
-   */
-  breakGlass?: boolean | null;
-  /**
    * Set on the first Google sign-in of an invited account.
    */
   googleSubject?: string | null;
@@ -1446,7 +1442,6 @@ export interface UsersSelect<T extends boolean = true> {
   role?: T;
   enabled?: T;
   linkedPerson?: T;
-  breakGlass?: T;
   googleSubject?: T;
   discordUserId?: T;
   preferences?:

@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
-import { getPayload, type Payload } from "payload";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createLocalReq, getPayload, type Payload } from "payload";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { pollVotes } from "../../src/db/poll-votes";
+import { createGoogleSession } from "../../src/auth/google-session";
 import { advanceIdSequences } from "../../src/import/sequences";
 import type { User } from "../../src/payload-types";
 
@@ -27,7 +28,7 @@ const as = (key: string) => ({ user: accounts[key], overrideAccess: false as con
 beforeAll(async () => {
   const { default: config } = await import("../../src/payload.config");
   payload = await getPayload({ config });
-  await account("admin", "administrator");
+  await account("admin", "staff", { enabled: false });
   await account("editor", "editor", { person: true });
   await account("alice", "staff", { person: true });
   await account("bob", "staff", { person: true });
@@ -184,12 +185,73 @@ describe("participants with assigned work", () => {
 });
 
 describe("accounts and anonymous access", () => {
-  it("makes the first account the break-glass administrator", async () => {
+  it("makes the first account an enabled administrator", async () => {
     const first = await payload.findByID({ collection: "users", id: accounts.admin.id, overrideAccess: true });
-    expect(first).toMatchObject({ role: "administrator", enabled: true, breakGlass: true });
+    expect(first).toMatchObject({ role: "administrator", enabled: true });
     // Later accounts keep the role they were given.
     const editor = await payload.findByID({ collection: "users", id: accounts.editor.id, overrideAccess: true });
-    expect(editor).toMatchObject({ role: "editor", breakGlass: false });
+    expect(editor).toMatchObject({ role: "editor" });
+  });
+
+  it("authenticates an enabled staff password with Google configured", async () => {
+    vi.stubEnv("BYLINE_GOOGLE_CLIENT_ID", "test.apps.googleusercontent.com");
+    vi.stubEnv("BYLINE_GOOGLE_CLIENT_SECRET", "test-google-secret");
+    vi.stubEnv("BYLINE_GOOGLE_HOSTED_DOMAIN", "weeklywildcat.com");
+    try {
+      const result = await payload.login({ collection: "users", data: { email: "alice@example.test", password: "pw-alice-123456" } });
+      expect(result.user).toMatchObject({ id: accounts.alice.id, role: "staff" });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("uses the console adapter for native password reset and does not send mail", async () => {
+    expect(payload.email.name).toBe("console");
+    const log = vi.spyOn(payload.logger, "info").mockImplementation(() => {});
+    try {
+      await payload.forgotPassword({ collection: "users", data: { email: "carol@example.test" } });
+      expect(log).toHaveBeenCalledWith({ msg: expect.stringContaining("Email attempted without being configured") });
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("does not provision or bind a disabled or unknown Google account", async () => {
+    const before = await payload.count({ collection: "users" });
+    for (const email of ["uninvited@example.test", "dave@example.test"]) {
+      expect(await createGoogleSession(await createLocalReq({}, payload), { email, subject: "not-invited" })).toBeNull();
+    }
+    expect(await payload.count({ collection: "users" })).toEqual(before);
+    const disabled = await payload.findByID({ collection: "users", id: accounts.dave.id });
+    expect(disabled.googleSubject ?? null).toBeNull();
+  });
+
+  it("allows only one subject to bind a given account under concurrent logins", async () => {
+    const email = "erin@example.test";
+    const subjects = ["google-first", "google-second"];
+    const sessions = await Promise.all(subjects.map(async subject =>
+      createGoogleSession(await createLocalReq({}, payload), { email, subject })));
+    expect(sessions.filter(Boolean)).toHaveLength(1);
+    const user = await payload.findByID({ collection: "users", id: accounts.erin.id });
+    expect(user.googleSubject).toBe(subjects[sessions.findIndex(Boolean)]);
+  });
+
+  it("rejects ambiguous normalized emails and malformed existing bindings", async () => {
+    await account("ambiguous", "staff");
+    const { id } = accounts.ambiguous;
+    try {
+      // Simulate bad historical data that bypassed Payload's email normalization.
+      await payload.db.updateOne({ collection: "users", id, data: { email: "Carol@Example.test" } });
+      expect(await createGoogleSession(await createLocalReq({}, payload), {
+        email: "carol@example.test", subject: "ambiguous-subject",
+      })).toBeNull();
+      await payload.db.updateOne({ collection: "users", id, data: { email: "ambiguous@example.test", googleSubject: " " } });
+      expect(await createGoogleSession(await createLocalReq({}, payload), {
+        email: "ambiguous@example.test", subject: "replacement",
+      })).toBeNull();
+    } finally {
+      await payload.delete({ collection: "users", id });
+    }
   });
 
   it("treats a disabled account as signed out", async () => {
@@ -201,6 +263,10 @@ describe("accounts and anonymous access", () => {
     for (const collection of ["stories", "story-plans", "media", "people", "tasks", "polls"] as const) {
       await expect(payload.find({ collection, overrideAccess: false })).rejects.toThrow();
     }
+    await expect(payload.create({
+      collection: "users", overrideAccess: false,
+      data: { email: "uninvited@example.test", name: "Uninvited", role: "staff", password: "not-a-signup" },
+    })).rejects.toThrow();
   });
 
   it("keeps at least one enabled administrator", async () => {

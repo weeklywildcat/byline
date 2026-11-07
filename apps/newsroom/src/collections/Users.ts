@@ -7,12 +7,6 @@ const selfOrAdministrator = ({ req, id }: { req: PayloadRequest; id?: number | s
   return Boolean(user && (atLeast(user, "administrator") || sameId(user.id, id)));
 };
 
-/** Password sign-in is break-glass only once Google sign-in is configured. */
-export function passwordSignInAllowed(user: { breakGlass?: unknown; role?: unknown }, googleConfigured: boolean): boolean {
-  if (!googleConfigured) return true;
-  return user.breakGlass === true && user.role === "administrator";
-}
-
 /**
  * Private sign-in accounts. A public byline is a `people` record; an account
  * points at its person through `linkedPerson`. Disabling or deleting an account
@@ -22,6 +16,7 @@ export const Users: CollectionConfig = {
   slug: "users",
   labels: { singular: "Account", plural: "Accounts" },
   auth: {
+    useSessions: true,
     tokenExpiration: 60 * 60 * 10,
     maxLoginAttempts: 5,
     lockTime: 15 * 60 * 1000,
@@ -46,18 +41,15 @@ export const Users: CollectionConfig = {
   hooks: {
     beforeLogin: [
       ({ user }) => {
-        if (user.enabled === false) throw new APIError("This account is disabled.", 403);
-        if (!passwordSignInAllowed(user, Boolean(process.env.BYLINE_GOOGLE_CLIENT_ID))) {
-          throw new APIError("Sign in with your Weekly Wildcat Google account.", 403);
-        }
+        if (user.enabled !== true) throw new APIError("This account is disabled.", 403);
       }
     ],
     beforeChange: [
       async ({ req, data, operation }) => {
-        // The very first account is the newsroom's break-glass administrator, whatever the form says.
+        // The very first account is the newsroom's enabled administrator, whatever the form says.
         if (operation !== "create") return data;
         const { totalDocs } = await req.payload.count({ collection: "users", overrideAccess: true, req });
-        if (totalDocs === 0) Object.assign(data, { role: "administrator", enabled: true, breakGlass: true });
+        if (totalDocs === 0) Object.assign(data, { role: "administrator", enabled: true });
         return data;
       },
       async ({ req, data, originalDoc, operation }) => {
@@ -103,19 +95,12 @@ export const Users: CollectionConfig = {
       access: { update: administratorsOnlyField, create: administratorsOnlyField }
     },
     {
-      name: "breakGlass",
-      type: "checkbox",
-      defaultValue: false,
-      admin: { description: "Emergency password sign-in for an administrator when Google sign-in is unavailable." },
-      access: { read: administratorsOnlyField, update: administratorsOnlyField, create: administratorsOnlyField }
-    },
-    {
       name: "googleSubject",
       type: "text",
       unique: true,
       index: true,
       admin: { readOnly: true, description: "Set on the first Google sign-in of an invited account." },
-      access: { read: administratorsOnlyField, update: administratorsOnlyField, create: administratorsOnlyField }
+      access: { read: administratorsOnlyField, update: () => false, create: () => false }
     },
     {
       name: "discordUserId",

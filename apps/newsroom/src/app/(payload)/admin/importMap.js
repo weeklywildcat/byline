@@ -18,6 +18,7 @@ import { FolderField as FolderField_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@pa
 import { BylineNav as BylineNav_f262650f6f93a94d19796cde5d9aff5e } from '../../../ui/shell/BylineNav'
 import { BylineAppHeader as BylineAppHeader_df743355b24789457c434e9f706c269f } from '../../../ui/shell/BylineAppHeader'
 import { BylineShellProvider as BylineShellProvider_ad5e83f4f5410d474847f641c17f564e } from '../../../ui/shell/BylineShellProvider'
+import { BylineLogin as BylineLogin_ad4b7e32c04177d58aa95349f51ba828 } from '../../../auth/BylineLogin'
 import { BylineHome as BylineHome_d2bd63bcc1ef7b276307d8fe9198b9bf } from '../../../components/BylineHome'
 import { BylineStories as BylineStories_ad94ee23d865a316f701cf2cc43c0a69 } from '../../../components/BylineStories'
 import { BylineCalendar as BylineCalendar_2d5b3538f05fbaa029503bd635bee9fa } from '../../../components/BylineCalendar'
@@ -50,6 +51,7 @@ export const importMap = {
   "/ui/shell/BylineNav#BylineNav": BylineNav_f262650f6f93a94d19796cde5d9aff5e,
   "/ui/shell/BylineAppHeader#BylineAppHeader": BylineAppHeader_df743355b24789457c434e9f706c269f,
   "/ui/shell/BylineShellProvider#BylineShellProvider": BylineShellProvider_ad5e83f4f5410d474847f641c17f564e,
+  "/auth/BylineLogin#BylineLogin": BylineLogin_ad4b7e32c04177d58aa95349f51ba828,
   "/components/BylineHome#BylineHome": BylineHome_d2bd63bcc1ef7b276307d8fe9198b9bf,
   "/components/BylineStories#BylineStories": BylineStories_ad94ee23d865a316f701cf2cc43c0a69,
   "/components/BylineCalendar#BylineCalendar": BylineCalendar_2d5b3538f05fbaa029503bd635bee9fa,

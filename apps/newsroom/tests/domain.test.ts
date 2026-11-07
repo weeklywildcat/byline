@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { managesStory, storyRelationship } from "../src/access/story-context";
 import { atLeast, newsroomUser, relationIds } from "../src/access/user";
-import { passwordSignInAllowed } from "../src/collections/Users";
 import { validResourceUrl } from "../src/collections/StoryPlans";
 import { addDays, localDay, localToInstant } from "../src/domain/dates";
 import { activeNavKey, administrationFor, canAdministerSystem, createActionsFor, locationFor, NAVIGATION, navigationFor, storyIdFromPath } from "../src/domain/navigation";
@@ -25,14 +24,6 @@ describe("accounts", () => {
     expect(atLeast(newsroomUser(staff), "editor")).toBe(false);
     expect(atLeast(newsroomUser({ ...staff, role: "editor" }), "editor")).toBe(true);
     expect(atLeast(newsroomUser({ ...staff, role: "administrator" }), "editor")).toBe(true);
-  });
-
-  it("limits password sign-in to break-glass administrators once Google is configured", () => {
-    expect(passwordSignInAllowed({ role: "staff" }, false)).toBe(true);
-    expect(passwordSignInAllowed({ role: "staff" }, true)).toBe(false);
-    expect(passwordSignInAllowed({ role: "administrator" }, true)).toBe(false);
-    expect(passwordSignInAllowed({ role: "administrator", breakGlass: true }, true)).toBe(true);
-    expect(passwordSignInAllowed({ role: "editor", breakGlass: true }, true)).toBe(false);
   });
 });
 

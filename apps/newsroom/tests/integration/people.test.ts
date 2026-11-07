@@ -601,7 +601,7 @@ describe("Privacy, accessible usage and historical integrity", () => {
     expect(
       JSON.stringify((await detail("editor", persons.writer)).body),
     ).not.toMatch(
-      /private-.*@|googleSubject|discordUserId|breakGlass|preferences|password|"enabled"|"role"/,
+      /private-.*@|googleSubject|discordUserId|preferences|password|"enabled"|"role"/,
     );
   });
   it("public projection uses only explicit public fields and publicEmail, never User state", async () => {
@@ -615,7 +615,7 @@ describe("Privacy, accessible usage and historical integrity", () => {
     expect(person.publicEmail).toBe("only-public@example.test");
     const serialized = JSON.stringify(projected);
     expect(serialized).not.toMatch(
-      /private-.*@|googleSubject|discordUserId|breakGlass|accounts|linkedPerson|preferences|password|enabled/,
+      /private-.*@|googleSubject|discordUserId|accounts|linkedPerson|preferences|password|enabled/,
     );
     expect(
       projected.authors.find((person) => person.id === persons.editor)

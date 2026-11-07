@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
  * Browser acceptance for the Story editor (docs/article-editor.md).
  *
  * Runs against a running newsroom (`npm run dev:newsroom`, or this worktree's
- * dev server) with the local break-glass, editor and staff accounts from
+ * dev server) with the local administrator, editor and staff accounts from
  * apps/newsroom/.env. Each run seeds its own Media and stories through the
  * REST API and leaves them as drafts. Like the WordPress E2E suite it is not
  * part of `npm test`: it needs a real Payload, PostgreSQL and browser.

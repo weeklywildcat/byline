@@ -1,0 +1,69 @@
+.byline-login {
+  position: fixed;
+  inset: 0;
+  isolation: isolate;
+  overflow: auto;
+  display: grid;
+  grid-template-rows: minmax(20px, 1fr) auto minmax(44px, 1fr);
+  justify-items: center;
+  background: #15171b;
+  padding-inline: 16px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.byline-login-photo, .byline-login-shade {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
+}
+.byline-login-shade { background: rgb(9 13 20 / 54%); }
+.byline-login-card {
+  grid-row: 2;
+  box-sizing: border-box;
+  width: min(100%, 390px);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--card-foreground);
+  padding: clamp(22px, 6vw, 36px);
+  box-shadow: 0 14px 50px rgb(0 0 0 / 28%);
+}
+.byline-login-logo { display: block; width: min(220px, 100%); height: auto; margin: 0 auto; }
+.byline-login h1 { font: inherit; font-size: 1.25rem; font-weight: 650; text-align: center; margin: 20px 0; }
+.byline-login-options { display: grid; gap: 8px; text-align: center; }
+.byline-login-options > a { min-height: 44px; text-decoration: none; }
+.byline-login-options p, .byline-login-reset { color: var(--muted-foreground); margin: 0; }
+.byline-login-toggle {
+  justify-self: center;
+  min-height: 44px;
+  padding-inline: 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.byline-login-form { display: grid; gap: 8px; }
+.byline-login-form[hidden] { display: none; }
+.byline-login-form label { font-weight: 600; }
+.byline-login-form input { margin-bottom: 4px; font-size: 1rem; min-height: 40px; }
+.byline-login-reset { text-align: center; }
+.byline-login-error { color: #992a24; margin: 0 0 12px; }
+.byline-login-error:empty { margin: 0; }
+.byline-login-credit {
+  grid-row: 3;
+  align-self: end;
+  justify-self: end;
+  margin: 12px 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 65%);
+  color: white;
+  font-size: 0.75rem;
+}
+.byline-login-credit a { color: inherit; text-decoration: underline; }
+.byline-login :focus-visible { outline: 2px solid #2464b2; outline-offset: 3px; }
+.byline-login-credit a:focus-visible { outline-color: white; }
