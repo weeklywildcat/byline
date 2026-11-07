@@ -16,7 +16,7 @@ import { isMediaWorkScope, type MediaWorkScope } from "./media-desk-model";
 /* --------------------------------------------------------------- assets */
 
 export type MediaKind = "image" | "audio" | "document" | "other";
-export type MediaDeliveryState = "private" | "queued" | "public" | "failed";
+export type MediaPublicationAssetState = "not-prepared" | "preparing" | "ready" | "failed";
 /** A concrete, fixable metadata gap. Never a vague "not ready". */
 export type MediaMetadataGap = "alt" | "credit" | "rights";
 
@@ -48,8 +48,8 @@ export type MediaLibraryAsset = {
   updatedAt: string;
   uploadedBy: MediaPersonRef | null;
   folder: MediaFolderRef | null;
-  /** The publication pipeline's state. Upload and metadata edits never change it. */
-  publicDelivery: MediaDeliveryState;
+  /** Whether Byline has web-ready files prepared for a static build. Upload and metadata edits never change it. */
+  publicationAssets: MediaPublicationAssetState;
   gaps: MediaMetadataGap[];
   canUpdate: boolean;
   canDelete: boolean;
@@ -85,7 +85,7 @@ export type MediaAssetDetail = MediaLibraryAsset & {
   hiddenUsageCount: number;
 };
 
-/** The metadata an inspector edits. Files, sizes, hashes, art direction and delivery are never edited here. */
+/** The metadata an inspector edits. Files, sizes, hashes, art direction and publication-asset readiness are never edited here. */
 export type MediaMetadataPatch = {
   alt?: string;
   creator?: string;
@@ -134,7 +134,7 @@ export function mediaMetadataGaps(asset: GapInput): MediaMetadataGap[] {
 
 export const GAP_LABELS: Record<MediaMetadataGap, string> = { alt: "Missing alt text", credit: "Missing credit", rights: "Missing rights/source information" };
 
-export const DELIVERY_LABELS: Record<MediaDeliveryState, string> = { private: "Private", queued: "Queued for publication", public: "Published", failed: "Publication failed" };
+export const PUBLICATION_ASSET_LABELS: Record<MediaPublicationAssetState, string> = { "not-prepared": "Not prepared", preparing: "Preparing", ready: "Ready", failed: "Preparation failed" };
 
 export const KIND_LABELS: Record<MediaKind, string> = { image: "Image", audio: "Audio", document: "PDF", other: "File" };
 
@@ -258,10 +258,10 @@ export type MediaLibraryFilters = {
   /** Newsroom days, inclusive. */
   capturedFrom: string;
   capturedTo: string;
-  delivery: MediaDeliveryState | "";
+  publication: MediaPublicationAssetState | "";
 };
 
-export const EMPTY_MEDIA_FILTERS: MediaLibraryFilters = { search: "", searchScope: "all", type: "", uploaderId: null, needsMetadata: false, capturedFrom: "", capturedTo: "", delivery: "" };
+export const EMPTY_MEDIA_FILTERS: MediaLibraryFilters = { search: "", searchScope: "all", type: "", uploaderId: null, needsMetadata: false, capturedFrom: "", capturedTo: "", publication: "" };
 
 /** One page request to the Library read model. */
 export type MediaLibraryQuery = MediaLibraryFilters & {
@@ -284,7 +284,7 @@ export type MediaLibraryPage = {
 };
 
 export function activeFilterCount(filters: MediaLibraryFilters): number {
-  return [filters.type, filters.uploaderId, filters.needsMetadata, filters.capturedFrom || filters.capturedTo, filters.delivery].filter(Boolean).length;
+  return [filters.type, filters.uploaderId, filters.needsMetadata, filters.capturedFrom || filters.capturedTo, filters.publication].filter(Boolean).length;
 }
 
 /** Whether a search ignores the open folder (and scope) and looks across all media. */
@@ -310,7 +310,7 @@ export function mediaLibraryParams(query: MediaLibraryQuery): Record<string, str
   if (query.needsMetadata) params.metadata = "needs";
   if (query.capturedFrom) params.capturedFrom = query.capturedFrom;
   if (query.capturedTo) params.capturedTo = query.capturedTo;
-  if (query.delivery) params.delivery = query.delivery;
+  if (query.publication) params.delivery = query.delivery;
   if (query.sort !== "newest") params.sort = query.sort;
   if (query.page > 1) params.page = String(query.page);
   if (query.limit !== MEDIA_PAGE_SIZE) params.limit = String(query.limit);
@@ -322,7 +322,7 @@ export function parseMediaLibraryParams(params: URLSearchParams): MediaLibraryQu
   const folderId = positive(params.get("folder"));
   const source = params.get("source");
   const type = params.get("type");
-  const delivery = params.get("delivery");
+  const publication = params.get("publication");
   const sort = params.get("sort");
   const day = (value: string | null) => (value && DAY.test(value) ? value : "");
   const limit = positive(params.get("limit")) ?? MEDIA_PAGE_SIZE;
@@ -336,7 +336,7 @@ export function parseMediaLibraryParams(params: URLSearchParams): MediaLibraryQu
     needsMetadata: params.get("metadata") === "needs",
     capturedFrom: day(params.get("capturedFrom")),
     capturedTo: day(params.get("capturedTo")),
-    delivery: delivery === "private" || delivery === "queued" || delivery === "public" || delivery === "failed" ? delivery : "",
+    publication: publication === "not-prepared" || publication === "preparing" || publication === "ready" || publication === "failed" ? publication : "",
     sort: isMediaSort(sort) ? sort : "newest",
     page: positive(params.get("page")) ?? 1,
     limit: Math.min(limit, MEDIA_PAGE_MAX)
