@@ -210,8 +210,8 @@ describe("the private library preview", () => {
     const small = await payload.findByID({ collection: "media", id: ids.small, depth: 0 });
     expect(small.sizes?.library?.width).toBe(320);
     // No public rendition was made, and nothing is public.
-    expect(camera.publicDelivery?.status ?? "private").toBe("private");
-    expect(camera.publicDelivery?.renditions ?? null).toBeNull();
+    expect(camera.publicationAssets?.status ?? "not-prepared").toBe("not-prepared");
+    expect(camera.publicationAssets?.renditions ?? null).toBeNull();
   });
 
   it("is served under the same access as the original", async () => {
@@ -262,15 +262,15 @@ describe("the Library read model", () => {
     expect((await library("bob", { source: "recent" })).totalDocs).toBe(5);
   });
 
-  it("filters by type, uploader, captured date and delivery state", async () => {
+  it("filters by type, uploader, captured date and publication asset readiness", async () => {
     expect(names(await library("bob", { type: "document" }))).toEqual(["board-minutes.pdf"]);
     expect((await library("bob", { type: "image" })).totalDocs).toBe(4);
     expect(names(await library("bob", { uploaderId: Number(accounts.alice.id) }))).toEqual(["IMG_4932.jpg", "thumb-sized.jpg"]);
     // 17:00 UTC on Nov 4 is Nov 4 in New York.
     expect(names(await library("bob", { capturedFrom: "2026-11-04", capturedTo: "2026-11-04" }))).toEqual(["IMG_4932.jpg"]);
     expect(names(await library("bob", { capturedFrom: "2026-11-05" }))).toEqual([]);
-    expect((await library("bob", { delivery: "private" })).totalDocs).toBe(5);
-    expect((await library("bob", { delivery: "public" })).totalDocs).toBe(0);
+    expect((await library("bob", { publication: "not-prepared" })).totalDocs).toBe(5);
+    expect((await library("bob", { publication: "ready" })).totalDocs).toBe(0);
   });
 
   it("names concrete metadata gaps and finds the files that have them", async () => {
@@ -318,10 +318,10 @@ describe("one asset", () => {
     // Validation.
     expect((await call("patch", "/byline/media/:id", "alice", { params: { id: String(ids.small) }, data: { sourceUrl: "javascript:alert(1)" } })).status).toBe(400);
     expect((await call("patch", "/byline/media/:id", "alice", { params: { id: String(ids.small) }, data: { alt: "x".repeat(601) } })).status).toBe(400);
-    // Delivery and attribution never change through a metadata edit or a raw update.
-    await payload.update({ collection: "media", id: ids.small, data: { publicDelivery: { status: "public" }, uploadedBy: accounts.bob.id } as never, overrideAccess: false, req: await reqAs("alice") });
+    // Publication-asset readiness and attribution never change through a metadata edit or a raw update.
+    await payload.update({ collection: "media", id: ids.small, data: { publicationAssets: { status: "ready" }, uploadedBy: accounts.bob.id } as never, overrideAccess: false, req: await reqAs("alice") });
     const raw = await payload.findByID({ collection: "media", id: ids.small, depth: 0 });
-    expect(raw.publicDelivery?.status ?? "private").toBe("private");
+    expect(raw.publicationAssets?.status ?? "not-prepared").toBe("not-prepared");
     expect(raw.uploadedBy).toBe(accounts.alice.id);
   });
 
@@ -363,10 +363,10 @@ describe("upload", () => {
     expect((await call("post", "/byline/media/upload", null, { data: {}, file: await photo(100, 100, "anon.jpg") })).status).toBe(401);
   });
 
-  it("files into the chosen folder, attributes the uploader and leaves delivery alone", async () => {
-    const result = await call("post", "/byline/media/upload", "photo", { data: { folderId: folders.homecoming, uploadedBy: accounts.editor.id, publicDelivery: { status: "public" } }, file: await photo(1600, 1200, "sideline.jpg") });
+  it("files into the chosen folder, attributes the uploader and leaves publication readiness alone", async () => {
+    const result = await call("post", "/byline/media/upload", "photo", { data: { folderId: folders.homecoming, uploadedBy: accounts.editor.id, publicationAssets: { status: "ready" } }, file: await photo(1600, 1200, "sideline.jpg") });
     expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({ filename: "sideline.jpg", folder: { id: folders.homecoming }, uploadedBy: { id: Number(accounts.photo.id) }, publicDelivery: "private", canUpdate: true, canDelete: false });
+    expect(result.body).toMatchObject({ filename: "sideline.jpg", folder: { id: folders.homecoming }, uploadedBy: { id: Number(accounts.photo.id) }, publicationAssets: "not-prepared", canUpdate: true, canDelete: false });
     expect(result.body.previewUrl).toContain("640x480");
     // The uploader may then edit it; another staff member may not.
     expect((await call("patch", "/byline/media/:id", "photo", { params: { id: String(result.body.id) }, data: { alt: "Sideline" } })).status).toBe(200);
