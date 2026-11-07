@@ -1,4 +1,4 @@
-import type { ContentHealthFixTarget, ContentHealthIssue } from "@byline/newsroom-screens/planning/planning-model";
+import type { ContentHealthFixTarget, ContentHealthIssue } from "./planning-model";
 
 export const CONTENT_HEALTH_FIX_TARGET_QUERY_PARAM = "byline_content_health_target";
 

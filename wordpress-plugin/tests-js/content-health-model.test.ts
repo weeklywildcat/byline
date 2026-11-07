@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   groupHealthIssues,
   groupHealthStories,
-} from "../src/planning/content-health-model";
+} from "@byline/newsroom-screens/planning/content-health-model";
 import {
   normalizeContentHealthResponse,
   type PlanningRequestOptions,

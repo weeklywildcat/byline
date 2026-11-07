@@ -8,7 +8,7 @@ import { StoryHoverProvider } from "@byline/newsroom-screens/story/StoryHoverCar
 import type { StoryFetchers } from "@byline/newsroom-screens/story/story-fetchers";
 import { createAdminQueryClient } from "@byline/newsroom-screens/story/story-query";
 import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
-import { ContentHealth } from "./ContentHealth";
+import { ContentHealth } from "@byline/newsroom-screens/planning/ContentHealth";
 import { Feedback } from "./Feedback";
 import { MediaWork } from "@byline/newsroom-screens/media/MediaWork";
 import { PageHeader } from "@byline/newsroom-screens/planning/PlanningPage";
