@@ -90,13 +90,13 @@ describe("the Library query", () => {
 
   it("sends only what is set and parses back to the same query", () => {
     expect(mediaLibraryParams(query())).toEqual({});
-    const full = query({ folderId: 4, search: "band", searchScope: "folder", type: "image", uploaderId: 9, needsMetadata: true, capturedFrom: "2026-11-01", capturedTo: "2026-11-05", delivery: "private", sort: "captured", page: 3 });
+    const full = query({ folderId: 4, search: "band", searchScope: "folder", type: "image", uploaderId: 9, needsMetadata: true, capturedFrom: "2026-11-01", capturedTo: "2026-11-05", publication: "ready", sort: "captured", page: 3 });
     expect(parseMediaLibraryParams(new URLSearchParams(mediaLibraryParams(full)))).toEqual(full);
     expect(parseMediaLibraryParams(new URLSearchParams(mediaLibraryParams(query({ source: "unfiled" }))))).toEqual(query({ source: "unfiled" }));
   });
 
   it("never passes raw query syntax through, and caps the page size", () => {
-    const parsed = parseMediaLibraryParams(new URLSearchParams("where[filename][equals]=x&type=video&sort=-id&delivery=leaked&capturedFrom=yesterday&limit=10000&folder=abc&source=everything"));
+    const parsed = parseMediaLibraryParams(new URLSearchParams("where[filename][equals]=x&type=video&sort=-id&publication=leaked&delivery=private&capturedFrom=yesterday&limit=10000&folder=abc&source=everything"));
     expect(parsed).toEqual(query({ limit: MEDIA_PAGE_MAX }));
   });
 
