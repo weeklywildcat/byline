@@ -92,7 +92,7 @@ export function MediaArtDirectionDialog({ open, mediaId, fetchers, onClose, cont
       <Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
         <DialogContent
           showCloseButton={false}
-          className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:max-w-none md:h-[calc(100dvh-2rem)] md:w-[calc(100vw-2rem)] md:rounded-xl"
+          className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:max-w-none md:h-[calc(100dvh-2rem)] md:w-[calc(100vw-2rem)] md:rounded-xl"
           data-media-art-direction-dialog=""
         >
           {!image || !draft ? (
@@ -195,8 +195,9 @@ function Editor({ image, draft, setDraft, dirty, fetchers, context, onCancel, on
         {dirty ? <Badge variant="secondary">Unsaved changes</Badge> : null}
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-1">
-        <section className="flex min-h-0 flex-col gap-3 p-3 md:p-4" aria-label="Photo workspace">
+      {/* Narrow: one scrolling column, the cropper a fixed share of the screen. Wide: workspace beside the placements, each scrolling. */}
+      <div className="min-h-0 flex-1 overflow-y-auto lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:overflow-hidden">
+        <section className="flex flex-col gap-3 p-3 md:p-4 lg:min-h-0" aria-label="Photo workspace">
           <Tabs value={tab} onValueChange={(value) => selectTab(value as Tab)}>
             <TabsList className="h-auto max-w-full flex-wrap justify-start" aria-label="Focal point and crop shapes">
               <TabsTrigger value="focal" data-art-tab="focal">Focal point</TabsTrigger>
@@ -218,7 +219,7 @@ function Editor({ image, draft, setDraft, dirty, fetchers, context, onCancel, on
             {shapeCrop ? (shapeCrop.custom ? "Custom crop: Byline makes cropped publication files for it." : "Auto: follows the focal point. Drag or zoom to draw your own.") : null}
           </p>
 
-          <div className="relative min-h-[16rem] flex-1 overflow-hidden rounded-lg bg-neutral-950" data-art-workspace={tab}>
+          <div className="relative h-[55dvh] min-h-[16rem] shrink-0 overflow-hidden rounded-lg bg-neutral-950 lg:h-auto lg:flex-1 lg:shrink" data-art-workspace={tab}>
             {shape === null ? (
               <FocalPicker image={image} focal={draft.focalPoint} editable={editable} onChange={(point) => setDraft((current) => current && setFocalPoint(current, point))} />
             ) : shapeCrop && !shapeLocked ? (
@@ -257,7 +258,7 @@ function Editor({ image, draft, setDraft, dirty, fetchers, context, onCancel, on
           ) : null}
         </section>
 
-        <aside className="min-h-0 overflow-y-auto border-t bg-muted/30 p-3 md:p-4 lg:border-t-0 lg:border-l" aria-label="Where this photo appears">
+        <aside className="border-t bg-muted/30 p-3 md:p-4 lg:min-h-0 lg:overflow-y-auto lg:border-t-0 lg:border-l" aria-label="Where this photo appears">
           <Placements image={image} draft={draft} selected={tab} onSelect={(next) => { if (!image.animated || next === "focal") selectTab(next); }} context={context} />
         </aside>
       </div>

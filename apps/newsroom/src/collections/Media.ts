@@ -58,6 +58,9 @@ const systemOnly = ({ req }: { req: { context?: Record<string, unknown> } }) => 
 /** Art direction is also written by the dedicated art-direction API (which checks Media update access itself). */
 const artDirectionWriter = ({ req }: { req: { context?: Record<string, unknown> } }) => systemOnly({ req }) || req.context?.bylineArtDirection === true;
 
+/** Prepared-file internals (hashes, the manifest): administrators and system reads only. */
+const internalsReader = ({ req }: { req: PayloadRequest }) => systemOnly({ req }) || atLeast(requestUser(req), "administrator");
+
 type MediaData = Record<string, unknown> & { publicationAssets?: Record<string, unknown> | null };
 
 const dimensionsOf = (doc: Record<string, unknown> | undefined): ImageDimensions | null =>
@@ -217,8 +220,9 @@ export const Media: CollectionConfig = {
         { name: "status", type: "select", defaultValue: "not-prepared", options: [{ value: "not-prepared", label: "Not prepared" }, { value: "preparing", label: "Preparing" }, { value: "ready", label: "Ready" }, { value: "failed", label: "Failed" }] },
         { name: "preparedRevision", type: "number", admin: { hidden: true } },
         { name: "recipeVersion", type: "number", admin: { hidden: true } },
-        { name: "sourceHash", type: "text", admin: { hidden: true } },
-        { name: "manifest", type: "json", admin: { hidden: true } },
+        // Machine internals: only administrators and the system read them. Byline's screens get a summary (publication-media/media-publication.ts).
+        { name: "sourceHash", type: "text", admin: { hidden: true }, access: { read: internalsReader } },
+        { name: "manifest", type: "json", admin: { hidden: true }, access: { read: internalsReader } },
         { name: "preparedAt", type: "date" },
         { name: "queuedAt", type: "date", admin: { hidden: true } },
         { name: "startedAt", type: "date", admin: { hidden: true } },

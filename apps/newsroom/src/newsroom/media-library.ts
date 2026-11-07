@@ -27,7 +27,7 @@ import { PRODUCTION_TYPE_OPTIONS } from "../domain/vocabulary";
 import type { FolderInterface, Media } from "../payload-types";
 import { readableStories, type ScreenContext } from "./screen-models";
 import { effectivePublicationStatus } from "@byline/content";
-import { publicationDetail } from "../publication-media/media-publication";
+import { publicationDetail, withPublicationState } from "../publication-media/media-publication";
 
 /**
  * The Byline Media Library over Payload Media (`/api/byline/media/*`).
@@ -189,8 +189,9 @@ export async function libraryPage(ctx: ScreenContext, query: MediaLibraryQuery):
     ...asUser(ctx)
   });
   const lookup = await lookupFor(ctx, result.docs);
+  const docs = await withPublicationState(ctx, result.docs);
   return {
-    assets: result.docs.map((media) => libraryAsset(ctx, media, lookup)),
+    assets: docs.map((media) => libraryAsset(ctx, media, lookup)),
     page: result.page ?? query.page,
     totalPages: result.totalPages,
     totalDocs: result.totalDocs,
@@ -289,8 +290,8 @@ async function linkedUseTotal(ctx: ScreenContext, mediaId: number, system: { req
 
 export async function mediaDetail(ctx: ScreenContext, id: number): Promise<MediaAssetDetail> {
   const found = await ctx.req.payload.find({ collection: "media", where: { id: { equals: id } }, depth: 0, limit: 1, ...asUser(ctx) });
-  const media = found.docs[0];
-  if (!media) throw new APIError("That file is no longer in Media.", 404);
+  if (!found.docs[0]) throw new APIError("That file is no longer in Media.", 404);
+  const [media] = await withPublicationState(ctx, found.docs);
   const folders = await allFolders(ctx);
   const [lookup, uses] = await Promise.all([lookupFor(ctx, [media], folders), linkedUses(ctx, id)]);
   const asset = libraryAsset(ctx, media, lookup);

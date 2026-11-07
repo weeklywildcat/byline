@@ -52,11 +52,11 @@ function resolveDir(value: string | undefined, fallback: string, cwd?: string) {
 }
 
 /** Payload's private upload directory (Media `staticDir`). */
-export function privateMediaDir(env: NodeJS.ProcessEnv = process.env, cwd?: string) {
+export function privateMediaDir(env: Record<string, string | undefined> = process.env, cwd?: string) {
   return resolveDir(env.BYLINE_MEDIA_LOCAL_DIR, DEFAULT_MEDIA_DIR, cwd);
 }
 
 /** The prepared publication store's root. */
-export function publicationMediaDir(env: NodeJS.ProcessEnv = process.env, cwd?: string) {
+export function publicationMediaDir(env: Record<string, string | undefined> = process.env, cwd?: string) {
   return resolveDir(env.BYLINE_PUBLICATION_MEDIA_DIR, DEFAULT_PUBLICATION_DIR, cwd);
 }

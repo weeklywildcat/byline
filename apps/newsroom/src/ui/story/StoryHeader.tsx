@@ -44,14 +44,22 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
   const saveState = saving ? "Saving…" : modified ? "Unsaved changes" : lastUpdateTime ? "Saved" : "";
   const canPublish = Boolean(hasPublishPermission) && !context.readOnly && uploadStatus !== "uploading" && (!hasPublishedDoc || newerDraft);
 
+  /** Why Media blocks publishing right now, from the server, or null. */
+  async function mediaRefusal(): Promise<string | null> {
+    const media = await mediaReadiness.check().catch(() => null);
+    if (!media || media.ready) return null;
+    const line = blockingLines(media)[0]?.text;
+    return line ? line.replace(/\.$/, "") : "its media is still being prepared";
+  }
+
   async function publish() {
     if (id === undefined) return;
     setPublishing(true);
     try {
-      // The server decides at submit; this asks it first, so a known media problem never becomes a vague form error.
-      const media = await mediaReadiness.check().catch(() => null);
-      if (media && !media.ready) {
-        toast.error(media.preparing && !media.blocked ? "Wait for the media to finish preparing, then publish." : `Can't publish yet: ${blockingLines(media)[0]?.text ?? "a file isn't ready"}.`);
+      // The server decides at submit; asking it first means a known media problem never becomes a vague form error.
+      const before = await mediaRefusal();
+      if (before) {
+        toast.error(`Can't publish yet: ${before}.`);
         return;
       }
       const result = await submit({ action: `${context.api}/stories/${id}?depth=0`, overrides: { _status: "published" } });
@@ -60,12 +68,14 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
         setMostRecentVersionIsAutosaved(false);
         setHasPublishedDoc(true);
         toast.success(hasPublishedDoc ? "Changes published." : "Story published.");
+      } else {
+        // Payload already showed the refusal; when Media changed between the check and the submit, say which file and why.
+        const after = await mediaRefusal();
+        if (after) toast.error(`The story was not published: ${after}.`);
       }
     } catch {
-      // Readiness may have changed between the check and the submit: say what the server refused for, when it was media.
-      const media = await mediaReadiness.check().catch(() => null);
-      const line = media && !media.ready ? blockingLines(media)[0]?.text : null;
-      toast.error(line ? `The story could not be published: ${line}.` : media && media.preparing ? "The story could not be published: its media is still preparing." : "The story could not be published. Check the highlighted fields.");
+      const after = await mediaRefusal();
+      toast.error(after ? `The story was not published: ${after}.` : "The story could not be published. Check the highlighted fields.");
     } finally {
       setPublishing(false);
     }

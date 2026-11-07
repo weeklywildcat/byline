@@ -50,11 +50,23 @@ export function publicationDetail(media: Pick<Media, "publicationAssets" | "publ
   };
 }
 
+/**
+ * Media records with their publication state read as the system. The
+ * manifest and source hash are hidden from people's reads (field access), but
+ * Byline's screens need them to summarize readiness; only the summary leaves.
+ */
+export async function withPublicationState<T extends Pick<Media, "id">>(ctx: ScreenContext, docs: T[]): Promise<Array<T & Pick<Media, "publicationAssets" | "publicationRevision">>> {
+  if (!docs.length) return [];
+  const found = await ctx.req.payload.find({ collection: "media", where: { id: { in: docs.map((doc) => doc.id) } }, depth: 0, pagination: false, overrideAccess: true, req: ctx.req, select: { publicationAssets: true, publicationRevision: true } });
+  const state = new Map(found.docs.map((doc) => [doc.id, doc]));
+  return docs.map((doc) => ({ ...doc, publicationAssets: state.get(doc.id)?.publicationAssets ?? undefined, publicationRevision: state.get(doc.id)?.publicationRevision ?? null }));
+}
+
 async function findMedia(ctx: ScreenContext, id: number): Promise<Media> {
   const found = await ctx.req.payload.find({ collection: "media", where: { id: { equals: id } }, depth: 0, limit: 1, ...asUser(ctx) });
   const media = found.docs[0];
   if (!media) throw new APIError("That file is no longer in Media.", 404);
-  return media;
+  return (await withPublicationState(ctx, [media]))[0] as Media;
 }
 
 /** Animated GIF/WebP, from the prepared manifest when it has one, else the original's header. */

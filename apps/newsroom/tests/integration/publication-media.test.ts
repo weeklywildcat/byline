@@ -110,6 +110,7 @@ beforeAll(async () => {
   await account("editor", "editor");
   await account("alice", "staff");
   await account("bob", "staff");
+  await account("admin", "administrator");
 
   ids.photo = await upload("alice", await halves(3000, 2000, "marching-band.jpg"));
   ids.small = await upload("alice", await halves(1000, 750, "small.jpg"));
@@ -219,7 +220,8 @@ describe("preparation", () => {
 
   it("makes the natural ladder without upscaling", async () => {
     expect((await imageManifest(ids.photo)).natural.map((file) => [file.width, file.height])).toEqual([[320, 213], [640, 427], [960, 640], [1440, 960], [1920, 1280], [2560, 1707]]);
-    expect((await imageManifest(ids.small)).natural.map((file) => file.width)).toEqual([320, 640, 960]);
+    // A 1000px source: the targets that fit, then the source width itself (the sharpest real file), never 1440.
+    expect((await imageManifest(ids.small)).natural.map((file) => file.width)).toEqual([320, 640, 960, 1000]);
     expect((await imageManifest(ids.photo)).natural.every((file) => file.mimeType === "image/webp")).toBe(true);
   });
 
@@ -240,9 +242,9 @@ describe("preparation", () => {
   it("crops explicit shapes physically and uses the focal point for automatic SEO crops", async () => {
     const manifest = await imageManifest(ids.small);
     expect(Object.keys(manifest.crops)).toEqual(["square"]);
-    expect(manifest.crops.square!.renditions.map((file) => [file.width, file.height])).toEqual([[320, 320], [640, 640]]);
+    expect(manifest.crops.square!.renditions.map((file) => [file.width, file.height])).toEqual([[320, 320], [640, 640], [750, 750]]);
     // The square crop is the left 75% (mostly red); its largest file also serves search.
-    expect(manifest.seo["1x1"]).toMatchObject({ origin: "custom", publicPath: manifest.crops.square!.renditions[1].publicPath });
+    expect(manifest.seo["1x1"]).toMatchObject({ origin: "custom", publicPath: manifest.crops.square!.renditions[2].publicPath });
     // No custom wide crop: the 16:9 search image is one automatic crop at the focal point.
     expect(manifest.seo["16x9"]).toMatchObject({ origin: "auto", width: 1000, height: 563 });
     expect(manifest.seo["4x3"].origin).toBe("auto");
@@ -440,6 +442,17 @@ describe("build-only acquisition", () => {
     expect((await request(`${blob.sha256}/..`, `Bearer ${BUILD_TOKEN}`)).status).toBe(400);
     // Without a configured token the endpoint does not exist.
     expect((await serveBuildMedia({ routeParams: { sha256: blob.sha256 }, headers: new Headers({ authorization: `Bearer ${BUILD_TOKEN}` }) } as unknown as PayloadRequest, {})).status).toBe(404);
+  });
+
+  it("keeps hashes and the manifest out of people's raw Payload reads (administrators excepted)", async () => {
+    const asStaff = await payload.findByID({ collection: "media", id: ids.photo, depth: 0, overrideAccess: false, req: await reqAs("bob") });
+    expect(asStaff.publicationAssets?.status).toBe("ready");
+    expect(asStaff.publicationAssets?.manifest ?? null).toBeNull();
+    expect(asStaff.publicationAssets?.sourceHash ?? null).toBeNull();
+    const asAdmin = await payload.findByID({ collection: "media", id: ids.photo, depth: 0, overrideAccess: false, req: await reqAs("admin") });
+    expect(asAdmin.publicationAssets?.manifest).toBeTruthy();
+    // Byline's own read model still summarizes readiness for staff.
+    expect((await call("get", "/byline/media/:id", "bob", { params: { id: String(ids.photo) } })).body.publication.state).toBe("ready");
   });
 
   it("can never return a private original", async () => {

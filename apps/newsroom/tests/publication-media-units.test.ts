@@ -81,8 +81,10 @@ describe("the build credential", () => {
 });
 
 describe("the recipe never upscales", () => {
-  it("keeps widths at or below the source, or the source width when it is smaller than all", () => {
-    expect(widthsWithin([320, 640, 960, 1440], 1000)).toEqual([320, 640, 960]);
+  it("keeps widths at or below the source, adds the source width when larger targets were dropped, never more", () => {
+    expect(widthsWithin([320, 640, 960, 1440], 1000)).toEqual([320, 640, 960, 1000]);
+    expect(widthsWithin([320, 640, 960, 1440], 960)).toEqual([320, 640, 960]);
+    expect(widthsWithin([320, 640, 960, 1440], 3000)).toEqual([320, 640, 960, 1440]);
     expect(widthsWithin([480, 960, 1440], 300)).toEqual([300]);
   });
 });

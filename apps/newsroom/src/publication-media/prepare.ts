@@ -155,10 +155,16 @@ async function imageFile(ctx: ImageContext, label: string, image: Sharp, as: "we
 
 type ImageContext = { store: PublicationStore; filename: string; kind: "image"; still: Still; warnings: PublicationMediaWarning[] };
 
-/** Never upscales: widths at or below `available`, or `available` itself when even the smallest is too big. */
+/**
+ * Never upscales: the widths at or below `available`, plus `available` itself
+ * when larger targets had to be dropped (so the sharpest real file is still
+ * offered), or only `available` when even the smallest target is too big.
+ */
 export function widthsWithin(widths: readonly number[], available: number) {
-  const fit = widths.filter((width) => width <= available);
-  return fit.length ? fit : [Math.max(1, available)];
+  const size = Math.max(1, Math.floor(available));
+  const fit = widths.filter((width) => width <= size);
+  if (!fit.length) return [size];
+  return fit.length < widths.length && fit[fit.length - 1] < size ? [...fit, size] : fit;
 }
 
 const ratioHeight = (shape: ImageCropShape, width: number) => {
