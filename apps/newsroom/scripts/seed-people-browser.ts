@@ -25,7 +25,6 @@ await client.end();
 process.env.DATABASE_URL = database.toString();
 process.env.PAYLOAD_SECRET = "people-browser-fixture-secret-0123456789";
 process.env.BYLINE_DB_PUSH = "1";
-delete process.env.BYLINE_MEDIA_PRIVATE_BUCKET;
 delete process.env.BYLINE_GOOGLE_CLIENT_ID;
 process.env.BYLINE_NEWSROOM_URL = "http://localhost:3012";
 process.env.BYLINE_MEDIA_LOCAL_DIR = "/private/tmp/byline-people-browser-media";
