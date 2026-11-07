@@ -442,6 +442,17 @@ recovery to escape corruption.
   revision, each through postbuild verification, and compares the accepted
   snapshot, descriptor set, routes, route keys and every output file.
 
+## Phase 9 blocks and snapshot v1
+
+The v1 bridge renders any native body whose blocks need only Media (every
+new media block, Data Table, Chart / Map, footnotes and so on): the footnote
+list and every block come from the canonical renderer. A body that needs
+Related Coverage, a Poll or a Repository Interactive cannot be rendered by v1
+(it carries no references and no interactive registry): preparation fails with
+`unsupported-story-content` naming the story and block, rather than leaving the
+block out. These stories need snapshot v2. The v1 gates (`payload-snapshot-parity`,
+`public-snapshot.test.ts`) seed from `FIXTURE_FIRST_PHASE_BODY`.
+
 ## What Phase 9 changes
 
 Snapshot v2 carries `PublicArticleBody` and the prepared-media manifests

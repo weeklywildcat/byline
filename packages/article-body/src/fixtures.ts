@@ -293,3 +293,15 @@ export const FIXTURE_ARTICLE_BODY: ArticleBody = {
     paragraph("Until then, Okafor said, she will keep eating on the steps.")
   ]
 };
+
+/**
+ * The first eight blocks and prose only, with no related stories, polls or
+ * repository interactives: the story the snapshot v1 gates (which render
+ * through the compatibility bridge and carry no references) seed from.
+ */
+const FIRST_PHASE = new Set(["photo", "gallery", "reportedQuote", "pullQuote", "keyFacts", "context", "document", "timeline"]);
+export const FIXTURE_FIRST_PHASE_BODY: ArticleBody = {
+  ...FIXTURE_ARTICLE_BODY,
+  references: undefined,
+  nodes: FIXTURE_ARTICLE_BODY.nodes.filter((node) => node.type === "paragraph" || node.type === "heading" || node.type === "list" || FIRST_PHASE.has(node.type))
+};

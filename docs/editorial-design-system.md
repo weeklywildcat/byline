@@ -43,6 +43,19 @@ stays at 760 when it is reading (a timeline, a table of facts).
   (the active marker, the current timeline entry), never decoration.
 - **Alt text** describes the photograph; the caption never doubles as alt text.
 
+## The semantic blocks
+
+The Payload newsroom's tools follow the same three weights. Prose-weight
+reading material: Key Numbers, Comparison, Related Coverage, Expandable, Data
+Table, Audio, Editor's Note (rule + accent label, never a coloured alert box),
+Margin Note (a hairline, floated into the margin at wide container widths, in
+order when narrow) and footnotes (superscript links, one ordered list at the
+end). Major visual moments: Portrait + Text, Video, Chart / Map, Annotated
+Image, Before / After and Visual Chapter (full-bleed, headline on the shared
+scrim, never arbitrary positioning). Their CSS is `newsroom/story-blocks.css`
+beside the existing partials; Chart / Map, Annotated Image and Before / After
+reuse `visualization.css`, `annotated-image.css` and `before-after.css`.
+
 ## Tokens (defined in `figure.css`, available to every partial)
 
 `--story-sans`, `--story-serif`, `--story-headline`, `--story-rule`,

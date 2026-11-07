@@ -304,24 +304,93 @@ in `includes/content/image-art-direction.php` is kept identical by
 
 The Gutenberg blocks in this document are the WordPress implementation and keep
 rendering existing content. New stories in the Payload newsroom store a
-semantic body instead, never Gutenberg markup. The first eight tools exist
-there; the registry is `ARTICLE_BLOCKS` in `@byline/article-body`, and
-[article-editor.md](article-editor.md) is the reference.
+semantic body instead, never Gutenberg markup. The registry is `ARTICLE_BLOCKS`
+in `@byline/article-body` and [article-editor.md](article-editor.md) is the
+reference. There are 24 tools, in four Add-menu groups, plus inline footnotes.
 
-| Today (WordPress) | `byline-v1` block | Notes |
+| Group | Tool (`type`) | Data and rules |
 | --- | --- | --- |
-| Core Image, Wide / Full-bleed Photo | `photo` | `placement`: column, wide or full; credit from Media, never stored |
-| Photo Gallery, Photo Pair, Photo Essay | `gallery` | Pair is a gallery of two; Photo Essay is Photo + prose + Gallery |
-| Reported Quote | `reportedQuote` | text and attribution, both required to publish |
-| Pull Quote | `pullQuote` | attribution optional |
-| Key Facts | `keyFacts` | renameable heading, ≤12 rows |
-| Context Box, Why It Matters, What's Next, How We Know | `context` | one block; the writer chooses the heading |
-| Document Viewer | `document` | PDF from Media, structured page references |
-| Timeline | `timeline` | 2–25 events; `label` is text, not a date |
+| Media | Photo (`photo`) | media, caption, alt override, `placement`: column / wide / full; credit from Media |
+| | Photo Gallery (`gallery`) | 2–24 photographs, "Whole photographs" or "Even grid"; no column count |
+| | Portrait + Text (`portraitText`) | portrait, heading, passage, caption, `side` left / right; stacks portrait-first when narrow; warns (does not block) on a very wide photograph |
+| | Video (`video`) | YouTube only, via the canonical parser; stores `videoId`, title, caption; the editor's `captionsConfirmed` flag gates publishing and never reaches the public body; privacy-enhanced lazy iframe, no autoplay or loop, watch link |
+| | Audio (`audio`) | Media audio file, title, context, **transcript required** (≤40k characters); native `<audio controls preload="metadata">`, transcript in a native `<details>` |
+| Explain | Reported Quote, Pull Quote, Key Facts, Context | as before; Context now holds Why it matters / What's next / How we know as heading choices |
+| | Editor's Note (`editorsNote`) | editors and administrators only; always labelled "Editor's note" |
+| | Margin Note (`marginNote`) | optional heading; sits in the margin on wide layouts, in order on narrow ones |
+| | Expandable (`expandable`) | required heading, body; native `<details>`, closed, no script |
+| | Document (`document`) | PDF, title, context, source, ≤12 page references |
+| Data & visual | Chart / Map (`chartMap`) | interactive (Datawrapper, Flourish, Google Maps embed, OpenStreetMap embed only) or static graphic; title and visible summary required; source, notes, credit; height preset; direct provider link always printed |
+| | Data Table (`dataTable`) | 2–8 columns, ≤40 rows, ≤500 characters per cell; real `<table>` with caption, `scope` headers; Standard or Comparison treatment; TSV paste, Tab / Shift+Tab / Enter navigation |
+| | Comparison (`comparison`) | exactly two sides (label, title, passage); Swap sides |
+| | Key Numbers (`keyNumbers`) | 2–4 figures (value, label, context), optional heading and shared source |
+| | Annotated Image (`annotatedImage`) | photograph, ≤12 markers (x, y, title, note); markers are links to an always-visible ordered list |
+| | Before / After (`beforeAfter`) | two photographs, labels, `fit` cover / contain, caption; native range input; Before is always left |
+| Structure & interact | Visual Chapter (`visualChapter`) | photograph, eyebrow, heading (an H2 of the story), dek, wide / full, bottom-left / centred |
+| | Timeline (`timeline`) | 2–25 events |
+| | Related Coverage (`relatedCoverage`) | 1–3 published Stories chosen from a search; only the relationship is stored |
+| | Poll (`poll`) | a Poll record; only the relationship is stored |
+| | Repository Interactive (`repositoryInteractive`) | editors and administrators only; a registered key plus title and text alternative; never HTML, script, CSS or a URL |
 
-Not carried over: Story Audio / Story Video variations as blocks, Columns, Main
-+ Aside, arbitrary Core style variations, Scrollytelling. Everything else in
-this library comes over later on the same contract.
+**Footnotes** are an inline block, not a card. Insert one from the selection
+toolbar or `/` (Footnote); a Popover (a bottom Sheet on touch) opens for the
+note. The stored reference is `{ id, text }`; the visible number is derived from
+document order, so moving or deleting a reference renumbers the rest. The
+public page prints a superscript link, and one `Footnotes` ordered list at the
+end with a backlink for each note, with no script.
+
+**Deliberately not blocks:** Photo Essay (prose + Photo + Gallery), In This Story
+(derived from H2s and Visual Chapters, `articleOutline`), Correction Notice
+(canonical correction records), Game Score / Sports Schedule (legacy only),
+Stories / People / Events grids (page concepts), Scrollytelling (repository
+visual stories), generic Interactive / HTML (retired; Repository Interactive is
+the only custom-code path), Button / CTA / Divider / Columns / Spacer.
+
+### Related stories and Polls travel as references
+
+A block stores only the relationship ID. Normalization resolves public-safe facts
+into the body's optional `references` table (`stories`: headline, href, section,
+`publishedAt`, thumbnail Media key; `polls`: public key, question, answers,
+`votingOpen`, counts only for a closed poll whose results were released), so
+Live Preview and snapshots use one model and the renderer never calls the CMS.
+Private or draft records resolve to nothing and the block is dropped or omitted
+with an issue.
+
+### Repository Interactive registry
+
+`@byline/story-presentations` holds `repositoryInteractives` (empty until a
+developer builds one for a real story) and a fixture-only registry
+(`fixture-lunch-line`, enabled by `BYLINE_STORY_PRESENTATION_FIXTURES=1`, never in
+production). An entry is plain data plus one server-rendered `Fallback`
+component and an optional `client.ts` enhancement loaded by the host's bundler
+only when a story that places it is shown. The renderer takes the fallback
+through `ArticleRenderHost.renderInteractive`; it never imports the registry. A
+key that is not registered is a publication error, never a blank frame.
+
+### Readiness: omitted versus dropped
+
+`finalizeBlock` returns issues with `effect: "omitted"` (the whole block is left
+out) or `"dropped"` (one part is). Drafts keep everything. Publishing is refused
+(`requireCompleteBody`, one message per block) for any omitted block and for
+drops that would lose substantive content (`isBlockingIssue`: an unavailable
+story, photograph, fallback graphic, or a half-written number). Empty markers,
+table rows and page references are dropped without blocking. Examples: Video
+without captions confirmed, Audio without a transcript, Chart / Map without a
+title or summary, Data Table without headers or data, Before / After missing a
+side, a Poll that is a draft, an unregistered interactive.
+
+### Who may write what
+
+Editor's Note and Repository Interactive are editor/administrator only. The
+inserter hides them and the blocks render read-only for staff, but the rule is
+enforced on the server (`guardPrivilegedBlocks`, `enforcePrivilegedBlocks`): for
+a non-editor, a privileged block that was added is removed, one that was changed
+or removed is restored in place, and the rest of the save is kept. An unchanged
+privileged block always survives an unrelated edit. Account-less system writes
+(scripts, jobs, import) are trusted.
+
+Not carried over: Story Audio / Story Video variations as separate blocks, Columns,
+Main + Aside, arbitrary Core style variations, Scrollytelling.
 
 ## Shared rendering and widths
 

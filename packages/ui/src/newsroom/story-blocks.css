@@ -65,7 +65,8 @@
   & .byline-data-table { margin-block: var(--story-space); }
   & .byline-data-table-scroll { overflow-x: auto; }
   & .byline-data-table table { border-collapse: collapse; font-family: var(--story-sans); font-size: .95rem; font-variant-numeric: tabular-nums; line-height: 1.4; min-width: 30rem; width: 100%; }
-  & .byline-data-table caption { caption-side: top; display: grid; gap: 3px; padding-block-end: 10px; text-align: left; }
+  & .byline-data-table caption { caption-side: top; padding-block-end: 10px; text-align: left; }
+  & .byline-data-table-title, & .byline-data-table-description { display: block; }
   & .byline-data-table-title { color: var(--ink, #121212); font-family: var(--story-headline); font-size: 1.3rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.2; }
   & .byline-data-table-description { color: var(--story-muted); font-family: var(--story-serif); font-size: 1rem; }
   & .byline-data-table thead th { border-block-end: var(--story-rule-strong); color: var(--story-muted); font-size: .72rem; font-weight: 700; letter-spacing: .08em; padding: .5em .9em .5em 0; text-align: left; text-transform: uppercase; vertical-align: bottom; }

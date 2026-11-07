@@ -1,6 +1,6 @@
 "use client";
 
-import { $isBlockNode, $isInlineBlockNode, INSERT_BLOCK_COMMAND } from "@payloadcms/richtext-lexical/client";
+import { $isBlockNode, INSERT_BLOCK_COMMAND } from "@payloadcms/richtext-lexical/client";
 import {
   $createParagraphNode,
   $getNodeByKey,
@@ -133,6 +133,9 @@ export function insertStoryBlock(editor: LexicalEditor, type: ArticleBlockType):
 export function useCanvasEditable(): boolean {
   return useLexicalEditable();
 }
+
+/** Inline blocks are told by node type, not `instanceof`, so a second copy of the Lexical modules cannot hide them. */
+const $isInlineBlockNode = (node: LexicalNode | null | undefined): node is LexicalNode & { getFields: () => unknown; setFields: (fields: never, preventFormStateUpdate?: boolean) => void } => Boolean(node) && node!.getType() === "inlineBlock";
 
 /** Every footnote reference in reading order. Numbers are never stored: they are positions in this list. */
 function $footnoteKeys(): string[] {

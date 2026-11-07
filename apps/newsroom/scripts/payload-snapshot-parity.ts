@@ -27,7 +27,7 @@ import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ArticleBody, ArticleBodyNode } from "@byline/article-body";
-import { FIXTURE_ARTICLE_BODY } from "@byline/article-body/fixtures";
+import { FIXTURE_FIRST_PHASE_BODY as FIXTURE_ARTICLE_BODY } from "@byline/article-body/fixtures";
 import { sql } from "@payloadcms/db-postgres";
 import { createLocalReq, getPayload } from "payload";
 import { lexicalFromArticleBody } from "../../../packages/editor/tests/lexical-fixture";

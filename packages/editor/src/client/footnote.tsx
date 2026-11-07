@@ -3,6 +3,7 @@
 import { ARTICLE_BLOCK_LIMITS as LIMITS } from "@byline/article-body";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
+import { useInlineBlockComponentContext } from "@payloadcms/richtext-lexical/client";
 import { Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { SettingsSurface } from "./chrome";
@@ -15,9 +16,11 @@ import { useFootnote } from "./lexical";
  * number is derived from document order (never typed or stored); clicking the
  * reference, or inserting a new one, opens a compact Popover (a bottom Sheet on
  * touch) for the note. Removing the reference removes the note. Payload's
- * inline block calls this with the reference's node key.
+ * inline block provides the reference's node key through its context.
  */
-export function BylineFootnote({ nodeKey }: { nodeKey: string }) {
+export function BylineFootnote() {
+  // Payload renders this server-side-registered component inside the node's own provider, which knows the node.
+  const { nodeKey } = useInlineBlockComponentContext() as unknown as { nodeKey: string };
   const { text, number, editable, write, remove } = useFootnote(nodeKey);
   const announce = useAnnounce();
   const [open, setOpen] = useState(false);

@@ -23,7 +23,7 @@ Payload or Lexical JSON. The editor draws the **same** primitives and the
 
 | Package | Owns | Never contains |
 | --- | --- | --- |
-| `@byline/article-body` | The `byline-v1` types, the block registry (type, label, description, aliases, family, icon), limits, readiness rules (`finalizeBlock`), credit resolution, a fixture story | Payload, Lexical, React, Next, Astro, WordPress, CSS classes, components, HTML |
+| `@byline/article-body` | The `byline-v1` types, the 24-block registry, limits, the pure data-table / footnote / reference / outline helpers, the closed runtime validator, the Chart / Map provider allowlist (type, label, description, aliases, family, icon), limits, readiness rules (`finalizeBlock`), credit resolution, a fixture story | Payload, Lexical, React, Next, Astro, WordPress, CSS classes, components, HTML |
 | `@byline/ui` (`/article-body`, `article-body.css`, `newsroom/*.css`) | The article's measure, prose, block frames, the visual primitives (`StoryFigure`, `GalleryLayout`, `ReportedQuoteView`, `PullQuoteView`, `SupportingContext`, `DocumentFigure`, `TimelineList/Item`) and the canonical renderer | Payload or Lexical imports; editing state; "isEditing" branches |
 | `@byline/editor` | Payload block configs, the Lexical feature setup, the block editors, the Add menu, `canvas.css` (editor chrome only), and the Payload Lexical → `byline-v1` normalizer | The public renderer |
 | `apps/newsroom` | Wiring: the Story screen, the article canvas wrapper, the Media host adapter, the lead-image control | Block logic |
@@ -85,7 +85,7 @@ enabling them is a reviewed decision, not a default. There is no font, size,
 colour, background, alignment, indent, column, table, code, HTML or raw-embed
 feature, and no permanent formatting toolbar.
 
-## The eight block schemas
+## The block schemas (first eight; the full set of 24 is in [newsroom-blocks.md](newsroom-blocks.md))
 
 Semantic data (the contract; `packages/article-body/src/types.ts`):
 
@@ -283,16 +283,60 @@ exact private preview iframe
 The body from this slice drops straight into that path: the renderer reads only
 `ArticleBody`, and there is no preview-only block renderer.
 
-## Out of this slice
+## The final authoring surface (Phase 9, blocks)
 
-Live Preview, presentation extraction, public snapshot v1/v2, the importer,
-public static-media materialization, and the rest of the block library (portrait +
-text, visual chapter, video/audio, expandable, footnotes, chart/map, data table,
-comparison, key numbers, annotated image, before/after, related coverage, poll,
-margin and editor's notes, Repository Interactive). Retired WordPress concepts do
-not come over: Photo Essay (Photo + prose + Gallery), Photo Pair (a Gallery with
-two photographs), Why It Matters / What's Next / How We Know (Context headings),
-Story Audio / Story Video variations, arbitrary Columns, Main + Aside.
+All 24 tools and inline footnotes use the same machinery. Shared pieces, each
+small and used by several tools: `InlineText` (typed where readers see it),
+`BlockShell` (toolbar, readiness note), `SettingsSurface` (a Popover, or a
+bottom Sheet on touch; `SecondarySetting` and the Footnote note use it),
+`ChoiceToggle`, `ImageSlot` / `ImageActions`, `ParagraphFields`, the pure
+`items.ts` and `data-table.ts` list models, and a record store per kind of
+record (Media, Stories, Polls) in the editor host. The host also supplies
+`canUsePrivilegedBlocks`, story and poll search, and the interactive registry
+as plain data.
+
+- **Insertion** is unchanged (`/`, the visible Add menu, a sheet on touch). The
+  menu is grouped Media / Explain / Data & visual / Structure & interact and
+  searches reporter words (graph, map, stats, methodology, compare, interview,
+  YouTube, read more). Payload 3.92.1 has no supported way to add aliases to
+  the slash menu, so slash matches labels and slugs only (`/chart`, `/table`,
+  `/video`, `/poll`); the Add menu carries the aliases. Privileged tools are not
+  offered to staff.
+- **Footnotes** use Payload's supported inline blocks: a Footnote button in the
+  selection toolbar plus the slash entry. The reference is edited through its
+  own Popover/Sheet; closing an empty one removes it.
+- **Chart / Map** never loads a provider frame in the canvas: it shows the
+  fallback graphic or a labelled placeholder and a "Preview" badge. Live Preview
+  runs the same enhancer in preview mode.
+- **Before / After** runs the public enhancer in the canvas, so the divider is the
+  real native range input; a "Show both complete" note appears when the two
+  photographs' shapes differ.
+- **Annotated Image**: click the photograph (once the block is active) or use Add
+  marker; drag a marker (one edit when released); arrows move 1%, Shift+arrow 5%;
+  `[` and `]` reorder; Delete removes; Enter jumps to its note.
+- **Data Table**: Tab, Shift+Tab, Enter; Alt+Shift+arrows move rows and columns;
+  pasting copied cells (or "Paste table") fills the grid and clips at the bounds.
+
+Every edit is an ordinary Lexical `setFields(..., true)` update, so undo,
+autosave, versions and Live Preview behave as for the first eight. Stored table
+cells use a JSON array per row; no other field uses a side channel.
+
+`normalizePayloadArticleBody(state, { media, references })` also resolves the
+reference table and registered interactives; `collectMediaIds` and
+`collectReferenceIds` read the one exhaustive `blockMediaIds` / `blockStoryIds` /
+`blockPollIds` in `@byline/article-body`, so a new block cannot be missed by media
+readiness. `validateArticleBody` is the closed runtime validator for a complete
+public body (unknown properties, node or block types, `captionsConfirmed`,
+Lexical or Payload fields, unresolved media or references are errors).
+
+## Not done yet
+
+Snapshot v2 (the structured body as the native Payload build format, v1/v2
+negotiation and parity), the public Astro build's client loading of repository
+interactives, the Payload-side poll vote transport (Phase 11: an open poll
+renders and hydrates with the existing widget, but there is no Payload vote
+endpoint yet), and the full browser torture-test suite. See
+[payload-migration.md](payload-migration.md).
 
 ## Testing
 

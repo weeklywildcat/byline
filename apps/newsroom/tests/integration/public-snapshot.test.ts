@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { ARTICLE_BLOCK_TYPES, type ArticleBody, type ArticleBodyNode } from "@byline/article-body";
-import { FIXTURE_ARTICLE_BODY } from "@byline/article-body/fixtures";
+import { FIXTURE_FIRST_PHASE_BODY as FIXTURE_ARTICLE_BODY } from "@byline/article-body/fixtures";
 import { validatePublicationMediaManifest, largestNaturalImage, publicationManifestBlobs, type PublicationImageManifest } from "@byline/content";
 import { commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction, type Payload, type PayloadRequest } from "payload";
 import sharp from "sharp";
@@ -65,6 +65,8 @@ async function upload(file: { data: Buffer; mimetype: string; name: string; size
   const created = await payload.create({ collection: "media", data: { alt: "A described photograph", credit: "The Weekly Wildcat", copyright: "© 2026 The Weekly Wildcat" }, file, overrideAccess: true });
   return created.id as number;
 }
+/** The v1 gate seeds the first eight blocks: the rest need snapshot v2 (references). */
+const FIRST_PHASE_TYPES = ["photo", "gallery", "reportedQuote", "pullQuote", "keyFacts", "context", "document", "timeline"];
 const runMedia = () => payload.jobs.run({ queue: "media", limit: 50 });
 
 /** A FIXTURE_ARTICLE_BODY (every registered block) on real Media. */
@@ -453,7 +455,7 @@ describe("the projection", () => {
     const html: string = post.content.rendered;
     expect(html).not.toContain('"root"');
     expect(html.startsWith('<div class="article-body"')).toBe(false);
-    for (const type of ARTICLE_BLOCK_TYPES) expect(html, type).toContain(`byline-block-${type}`);
+    for (const type of FIRST_PHASE_TYPES) expect(html, type).toContain(`byline-block-${type}`);
     const paths = [...html.matchAll(/\/_byline\/media\/[^"'\s)]+/g)].map((match) => match[0]);
     expect(paths.length).toBeGreaterThan(0);
     expect(html).not.toMatch(/\/api\/media\/file\//);

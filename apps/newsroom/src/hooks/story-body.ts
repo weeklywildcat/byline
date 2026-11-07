@@ -28,6 +28,8 @@ export const repositoryInteractivesForServer = () => repositoryInteractiveRegist
 export const guardPrivilegedBlocks: CollectionBeforeChangeHook = ({ data, originalDoc, req }) => {
   if (req.context?.bylineImport === true || req.context?.bylineSystem === true) return data;
   if (data.body === undefined) return data;
+  // Scripts, jobs and the importer run without an account; access control already decided who may reach an HTTP save.
+  if (!req.user) return data;
   if (atLeast(requestUser(req), "editor")) return data;
   const { body, restored, rejected } = enforcePrivilegedBlocks(data.body, originalDoc?.body);
   if (restored.length || rejected.length) {

@@ -412,3 +412,12 @@ After deploying Phase 5, run `payload migrate`, start the worker, then
   `tests/integration/publication-media-migration.test.ts`.
 - Browser: `tests/browser/publication-media.spec.ts` (needs a running newsroom
   and `jobs:media`).
+
+## Body media discovery (Phase 9 blocks)
+
+`storyMediaRequirements` uses `collectMediaIds`, which reads one exhaustive
+`blockMediaIds` in `@byline/article-body`: Photo, Photo Gallery, Portrait + Text,
+Visual Chapter, Audio, Document, Chart / Map (fallback or static image),
+Annotated Image and Before / After (both photographs). Video is external
+YouTube and never enters preparation. A related Story's thumbnail is Media in the
+body's table once references resolve; its preparation belongs to snapshot v2.
