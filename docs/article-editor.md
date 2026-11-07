@@ -260,8 +260,9 @@ Media references in order, finalizes every block, and returns `issues` for
 anything it does not know (unsupported nodes and formats, unsafe links, left-out
 blocks) rather than dropping it silently. `collectMediaIds` lists the assets to
 resolve first; `articleMediaFromPayload` builds the media record from a Media
-document (the host chooses `src`). Media references stay provider-neutral here;
-public R2 URLs and renditions are a later snapshot step.
+document (the host chooses `src`). Media references stay provider-neutral here. Public same-origin static URLs are
+assigned later when the Astro build materializes referenced prepared renditions
+into its Cloudflare asset bundle.
 
 ## What exact Live Preview consumes next
 
@@ -285,7 +286,7 @@ The body from this slice drops straight into that path: the renderer reads only
 ## Out of this slice
 
 Live Preview, presentation extraction, public snapshot v1/v2, the importer,
-public media materialization, and the rest of the block library (portrait +
+public static-media materialization, and the rest of the block library (portrait +
 text, visual chapter, video/audio, expandable, footnotes, chart/map, data table,
 comparison, key numbers, annotated image, before/after, related coverage, poll,
 margin and editor's notes, Repository Interactive). Retired WordPress concepts do
