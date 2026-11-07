@@ -312,9 +312,11 @@ BYLINE_NEWSROOM_BUILD_MEDIA_URL=https://newsroom.example/api/byline/build/media 
 BYLINE_BUILD_TOKEN=… npm run materialize:publication-media --workspace @byline/web -- --descriptors media.json
 ```
 
-It is **not** wired into the WordPress `postbuild`: production media still
-comes from the WordPress materializers until Phase 7 feeds this from the
-Payload snapshot.
+It runs inside the Astro build wrapper for a Payload snapshot (Phase 7): after
+Astro succeeds and before `postbuild`, the closed descriptor set named by the
+snapshot's attachment manifests is acquired from
+`<BYLINE_NEWSROOM_BUILD_URL>/media`. It is not part of the WordPress path:
+WordPress snapshots keep the WordPress media materializers.
 
 `verify-static-export.mjs` checks that every `_byline/media` file is named by
 its own SHA-256, is within the static limit and carries no EXIF/XMP (a camera
@@ -342,6 +344,20 @@ Failed is a terminal state shown in the inspector and the Story header; Retry
 is offered to the uploader and editors. A transient crash retries once
 automatically.
 
+## Phase 7 (done) and the boundary
+
+> Phase 5 prepares immutable publication media. Phase 7 names the exact
+> prepared generations in an immutable public snapshot and the static build
+> acquires those exact bytes. ([payload-build-snapshots.md](payload-build-snapshots.md))
+
+A snapshot's attachment carries `bylinePublication.manifest`, validated with
+`validatePublicationMediaManifest`; a referenced asset without a current
+generation (or with a file missing from the store) stops the snapshot as
+`media-not-ready`. A successful preparation promotion re-queues
+`prepare-public-snapshot` for the current public revision (never advancing it).
+Astro's SEO layer uses the manifest's explicit 16:9, 4:3 and 1:1 files and the
+prepared social image for Payload attachments.
+
 ## Phase 7–9 compatibility
 
 - Snapshot v1 maps the largest natural file to the compatibility
@@ -351,7 +367,7 @@ automatically.
 - SEO and social descriptors are available to the Astro SEO layer.
 - Phase 9 can consume the manifest directly instead of WordPress shapes.
 - The materializer is the consumer; Phase 7 supplies descriptors from the
-  canonical snapshot. Public rendering never depends on the newsroom's local
+  canonical snapshot (done). Public rendering never depends on the newsroom's local
   storage layout.
 
 ## Object storage (later)
@@ -363,7 +379,7 @@ build endpoint contract. It is not a runtime or public-delivery dependency.
 ## Garbage collection (later)
 
 Nothing deletes prepared objects today: a deployed or retained snapshot may
-reference an older generation. When snapshot retention is defined (Phase 7+),
+reference an older generation. Snapshot retention is now defined (Phase 7: the current artifact, the four newest, a one-day reader grace, at most twenty), but blob deletion stays a separate, later operation. When it is built,
 a collector can delete objects referenced by no current manifest and no
 retained snapshot, after a grace period. Staging files older than an hour can
 be cleared safely (`clearAbandonedStaging`).
