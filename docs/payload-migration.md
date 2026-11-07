@@ -10,9 +10,9 @@ are met. Nothing here deletes WordPress data.
 
 Status is tracked in [§11](#11-phases-gates-and-status). Branch:
 `feature/payload-newsroom` (stacked on `feature/visual-stories`, PR #226, because
-that PR reshapes the presentation registry Phase 4 extracts). The article editor
-(§8, [article-editor.md](article-editor.md)) is the next focused branch,
-`feature/article-editor`, stacked on it.
+that PR reshapes the presentation registry Phase 4 extracts). The semantic article
+editor and People workspace are now folded into this migration branch; their
+remaining gates are tracked below rather than as separate migration branches.
 
 ## 1. Invariants
 
@@ -22,9 +22,15 @@ These do not change at any phase.
   runtime article fetches, no Next.js public renderer. The newspaper keeps
   serving if Payload or PostgreSQL is down; only newsroom editing and the live/
   poll runtime APIs degrade.
-- **One small discovery pointer + one immutable snapshot artifact** per
-  production build. The build blocks every CMS request and fails postbuild on a
-  violation (`build-snapshots.md`).
+- **A completed immutable snapshot is the preferred production build input, not
+  a single point of failure.** Normally the build reads one small discovery
+  pointer and one immutable snapshot artifact, then blocks further CMS data
+  requests. If Payload has no completed snapshot for the current public
+  revision, the build may use the explicit direct-source recovery path: read the
+  same canonical public projection from Payload, verify the public revision is
+  unchanged before accepting it, and write the result into the same local
+  snapshot contract before Astro renders. A missing snapshot may fall back;
+  a corrupt, invalid or digest-mismatched snapshot never silently does.
 - **SEO stays in Astro**: metadata, canonical URLs, Open Graph, NewsArticle,
   VideoObject, LiveBlogPosting, Person, NewsMediaOrganization, sitemaps (image,
   news, video), RSS, robots. Payload supplies editorial facts only.
@@ -66,7 +72,7 @@ These do not change at any phase.
 | Corrections | `byline_correction` + legacy inline notices (`includes/editorial/corrections.php`) | `corrections` |
 | Live coverage | `byline_live_update` child posts + coverage state meta (`includes/editorial/live-coverage.php`) | `live-updates` + `stories.liveCoverage` group |
 | Pages | `page` + page blocks (`includes/content/pages.php`, `page-blocks.php`) | `pages` (Versions + Drafts) |
-| Media | attachments + creator/credit/copyright/license/source meta, `bylineImage.artDirection` crops (`image-art-direction.php`, `photo-credits.php`) | `media` (uploads, private storage, materialization) |
+| Media | attachments + creator/credit/copyright/license/source meta, `bylineImage.artDirection` crops (`image-art-direction.php`, `photo-credits.php`) | `media` (private source files, Library previews, prepared publication renditions; public delivery through the static build) |
 | Tasks | `byline_task` | `tasks` |
 | Brief | `_byline_story_brief` (4,000 chars) | `story-plans.brief` |
 | Sources | `_byline_story_sources_v1` (30, serialized) | `sources` |
@@ -106,7 +112,7 @@ is why `apps/web/lib/article-presentation.ts` is typed around `WordPressPost`.
 | `corrections` | id, type, text, date, storyId, story summary | `byline_correction` | `corrections` on published stories |
 | `coverages` (public dataset name, unchanged) | slug, title, format, description, overview, overviewParagraphs, start/end, status, artwork, published stories in reading order | public Collections (`byline_collection_public_coverage()`) | public Collections (`src/newsroom/public-coverage.ts`) |
 | `schoolEvents` | canonical event records | `ww_school_event` | `events` |
-| `attachments` | referenced public metadata, sizes, `bylineImage.artDirection` | attachments | materialized `media` (public URLs only) |
+| `attachments` | referenced public metadata, sizes, `bylineImage.artDirection` | attachments | public-safe `media` projection + prepared rendition descriptors; the build rewrites them to same-origin static asset URLs |
 
 Phase 7 emits this **same v1 shape** from Payload (a compatibility projection,
 so the unchanged Astro build can run shadow builds). Phase 9 adds v2 (§6).
@@ -170,9 +176,9 @@ managers; integration-tested), and never a plan.
 | --- | --- | --- |
 | Polls | Worker `/api/polls/{active,vote}` → `wp-json/byline/v1/polls/*`; votes table with `UNIQUE(poll_id, voter_key)`; HMAC cookie | Worker → Payload endpoints `/api/byline/polls/*`; Postgres `byline_poll_votes` with the same unique key; same cookie format and secret |
 | Live coverage | Worker `/api/live/<id>` → `wp-json/byline/v1/live/<id>`; static `/_byline/live/<id>.json` | Worker → Payload `/api/byline/live/<id>` (published-safe projection) |
-| Build discovery | `wp-json/byline/v1/build-snapshot` pointer → uploads artifact | public R2 pointer + immutable artifact |
+| Build discovery | `wp-json/byline/v1/build-snapshot` pointer → uploads artifact | Payload completed-snapshot pointer → immutable artifact on the newsroom volume; if no completed snapshot exists, explicit direct-source recovery produces the same local snapshot contract after a revision-stability check |
 | Build trigger | WordPress durable job → deploy hook | Payload job → Cloudflare deploy hook |
-| Media at build | Astro downloads WordPress uploads (`copy-wordpress-media-to-out.mjs`) | permanent public R2 URLs in the snapshot; mirroring kept only for `legacy` media during transition |
+| Media at build | Astro downloads WordPress uploads (`copy-wordpress-media-to-out.mjs`) | Astro downloads only referenced prepared Payload renditions, validates them, and materializes a closed set under `out/_byline/media`; legacy WordPress media keeps the current mirror during transition |
 | Discord bot | calls `byline/v1` + `weekly-wildcat/v1` with signed requests | calls a Payload adapter; saves never wait on Discord |
 | MCP | PHP SDK in the plugin, WordPress OAuth | Node adapter in `apps/newsroom` over Local API, `@byline/mcp-contracts` unchanged |
 
@@ -225,8 +231,10 @@ notifications, Discord and MCP adapters.
 longer need it, `docs/updater-transition.md`), `scripts/{package-plugin.sh,
 build-plugin-mcp.sh, test-plugin-php.sh, run-wordpress-e2e.sh}`,
 `apps/web/lib/wordpress.ts` as a source (its types survive only inside the
-legacy adapter), `copy-wordpress-media-to-out.mjs` for new media, and the
-`/wp-json` Worker upstreams. `legacy-html` rendering stays forever.
+legacy adapter), the WordPress-specific `copy-wordpress-media-to-out.mjs`
+implementation (replaced by the provider-neutral Payload static-media
+materializer), and the `/wp-json` Worker upstreams. `legacy-html` rendering
+stays forever.
 
 ## 4. Target architecture
 
@@ -241,13 +249,23 @@ apps/newsroom  (Payload 3 + Next.js 16, private)
   ├── Jobs Queue tasks                       (src/jobs)
   └── /preview/story/<id>  private Live Preview → @byline/story-presentations
 PostgreSQL  (@payloadcms/db-postgres; byline_poll_votes via beforeSchemaInit)
-R2 private  (originals, drafts)        R2 public (materialized media + snapshots)
-apps/web    (Astro, unchanged contract) ← pointer + immutable snapshot
+Persistent newsroom volume
+  ├── private media originals + Library previews
+  ├── prepared publication renditions
+  └── immutable snapshot artifacts
+apps/web    (Astro, unchanged public contract)
+  ← preferred snapshot pointer + artifact
+  ← direct canonical Payload projection only when no completed snapshot exists
+  → materializes referenced media into out/_byline/media
+Cloudflare Worker Static Assets serves the deployed Astro output + media
 ```
 
 Production topology: one Payload/Next service, one dedicated `payload jobs:run`
-worker (same image), PostgreSQL, two R2 buckets, the existing Cloudflare site.
-No Redis, search service or extra microservices.
+worker (same image), PostgreSQL, a persistent newsroom volume, and the existing
+Cloudflare site. R2/S3 is not required for runtime or public delivery. Object
+storage may be added later for off-site backup, archival replication or disaster
+recovery without changing public media URLs. No Redis, search service or extra
+media microservice is required.
 
 ### 4.1 Accounts and people
 
@@ -321,22 +339,50 @@ converted to an instant. Sources keep **no contact fields**.
 
 ### 4.5 Media
 
-Upload originals go to a private bucket (R2 via `@payloadcms/storage-s3`,
-`signedDownloads`); the newsroom and Live Preview read them through Payload's
-authenticated file route. Publishing a story enqueues `materialize-public-media`,
-which writes content-hashed renditions (`/media/<sha256>/<width>.<ext>`) to the
-public bucket and records them on the media document. Public objects are never
-deleted because a media record changed. Credits belong to the asset; captions
-belong to the story's use of it. Crop shapes and focal point reuse
-`@byline/core` `image-crops.ts`. Candidate widths 320/640/960/1280/1600/2048,
-never upscaled.
+Payload stores originals on the newsroom service's persistent volume. They are
+private editorial source files: the newsroom and Live Preview read them through
+Payload's authenticated file route, and a public page never points at an
+original just because it was uploaded. The existing local upload boundary stays
+replaceable so off-site backup/object storage can be added later without
+changing the Media or public-rendering contracts.
 
 The newsroom's **Media** destination (Library + Work) is built
-([media-workspace.md](media-workspace.md)): Payload-native folders on Media
-(logical only, never storage paths), one private `library` image size
-(≤640px WebP, never a publication rendition) for browsing, and the shared
-production desk. `publicDelivery` and `uploadedBy` are system-only fields.
-Public materialization is still this phase's separate pipeline.
+([media-workspace.md](media-workspace.md)): Payload-native folders on Media are
+logical only (moving a Media record never moves or renames the source file), the
+private `library` image size (≤640px WebP) keeps browsing fast, and the shared
+production desk uses the same Media records as Story authoring. Credits belong
+to the asset; captions belong to the story's use of it.
+
+Publication assets are **prepared, not uploaded to a public bucket**. A media
+job prepares the bounded web renditions required by Byline after a source or its
+art-direction data changes. Crop shapes and focal point reuse
+`@byline/core/image-crops.ts`; normal image candidates are
+320/640/960/1280/1600/2048 and are never upscaled. Each prepared file records
+its MIME type, dimensions, byte size and content hash. A changed source or crop
+therefore produces different immutable public bytes without cache invalidation.
+
+During the Astro build, media discovery walks the canonical public dataset,
+deduplicates referenced assets sitewide, chooses only the renditions required by
+the rendered placements and downloads those files through a narrowly scoped
+build-only Payload media route. The build validates the expected MIME type,
+byte count/content hash, writes content-addressed files under
+`out/_byline/media/`, and records a closed media manifest. Wrangler deploys
+that directory with the rest of `apps/web/out`; normal reader requests are
+served by the existing Cloudflare Worker Static Assets binding with no CMS,
+database or image-proxy request.
+
+The build never copies the whole Media Library. Large camera originals can stay
+private even when the publication provider would reject them as static assets.
+Images publish prepared web renditions; PDFs and audio must have a publication
+file within the configured static-asset size limit or readiness fails with an
+actionable error. Video remains externally hosted until a separate delivery
+architecture is deliberately introduced.
+
+The current `publicDelivery` group is a pre-Phase-5 placeholder and must not
+be given R2 semantics. Before cutover it is renamed or migrated to a
+publication-assets/readiness manifest (for example `publicationAssets`) whose
+state means “prepared for a static build,” not “already public on Cloudflare.”
+`uploadedBy` remains system-controlled.
 
 ### 4.6 Polls
 
@@ -365,9 +411,9 @@ screen, no REST/GraphQL exposure. Cookie names, `voterId.base64url(HMAC)` and
 - Administrators can preview an unregistered presentation against a draft via
   `?presentation=<name>` from `previewPresentations` (a separate dev-only map in
   the package). It never affects the public registry or a published page.
-- Draft media in preview uses Payload's authenticated file URLs; the published
-  projection switches to public R2 URLs. Dimensions, crops and object positions
-  are identical.
+- Draft media in preview uses Payload's authenticated file URLs. Published
+  pages use the content-addressed same-origin URLs materialized into the static
+  export by the build. Dimensions, crops and object positions are identical.
 
 Launch-blocking parity tests (§11 Phase 4 gate) cover every item in the brief:
 Standard/Immersive/custom selection, alignment and featured media updating
@@ -389,12 +435,29 @@ type PublicArticleBody =
   runtime validator). Private block fields (none today) are stripped.
 - `ArticleBody` in `@byline/ui` renders both: legacy through the current HTML
   path, structured through Byline block components.
-- Lifecycle (from the WordPress generator): commit → advance public revision in
-  the same transaction → enqueue `prepare-snapshot` → generate against R →
-  validate → verify R unchanged → bytes + SHA-256 → upload immutable artifact →
-  promote pointer → `request-cloudflare-build` → `verify-deployment`. A stale R
-  is never promoted; jobs coalesce to the newest revision. Autosaves, drafts and
-  private collection writes never advance the revision.
+- Preferred lifecycle (from the WordPress generator): commit → advance public
+  revision in the same transaction → enqueue `prepare-snapshot` → generate
+  against R → validate → verify R unchanged → bytes + SHA-256 → atomically write
+  the immutable artifact on the newsroom volume → promote the completed pointer
+  → `request-cloudflare-build` → `verify-deployment`. A stale R is never
+  promoted; jobs coalesce to the newest revision. Autosaves, drafts and private
+  collection writes never advance the revision.
+- **No-snapshot recovery path:** if discovery explicitly reports that there is
+  no completed snapshot for the current revision, the build may acquire the same
+  canonical public projection directly from a build-only Payload endpoint. It
+  captures public revision R before acquisition, fetches the allowlisted public
+  datasets and prepared media descriptors, rereads the revision after
+  acquisition, and accepts the result only when it is still R. A revision change
+  causes a bounded retry or a hard build failure; a partial/mixed revision is
+  never deployed. The accepted direct result is written locally in the same
+  snapshot schema so indexing, rendering, media discovery and verification use
+  one downstream path.
+- Direct-source recovery is only for **absence/not-ready** of a completed
+  snapshot. If a snapshot exists but fails schema, digest, byte-count or privacy
+  validation, the build fails instead of hiding corruption by falling back.
+  Likewise, an unreachable or unauthenticated Payload service is a build
+  failure. Snapshot mode remains preferred because it is immutable, faster and
+  requires only pointer + artifact acquisition.
 
 ## 7. Newsroom UI: Byline on top, Payload underneath
 
@@ -1032,11 +1095,11 @@ The torture-test story covers scrollytelling with a repository visual story.
 | 2 | People, Stories, Sections, Topics, Collections and optional public presentations, Corrections, Pages, Workspace records, canonical public model | access/privacy tests | collections + access **done**; People workspace, My profile and public-safe projection done in the parallel People slice; Collections workspace and public compatibility projection done; full snapshot integration, `events`, YouTube metadata job pending |
 | 3 | Story view (Write/Plan/Production/History), Lexical, first blocks, autosave, locking, history | writer acceptance steps 1–6 | Story screen (Write/Plan/Production/History) done. Semantic editor and the first eight blocks built ([article-editor.md](article-editor.md), part of this PR); the full-story autosave check, the lock/undo/width browser specs and editor/public geometry parity are not yet green |
 | 4 | Extract `@byline/story-presentations`, canonical normalization, exact Live Preview | §5 parity suite green | — |
-| 5 | Media: private storage, metadata, crops, materialization, drag and drop | media privacy + public availability tests | Media workspace (Library, folders, upload, inspector, Work) done ([media-workspace.md](media-workspace.md)); the Story editor uses its picker and uploads. Crops/focal use in rendering, R2 storage and public materialization pending |
+| 5 | Media: private source storage, metadata, crops, prepared publication renditions, static-build materialization, drag and drop | media privacy + static public availability tests | Media workspace (Library, folders, upload, inspector, Work) done ([media-workspace.md](media-workspace.md)); the Story editor uses its picker and uploads. Pending: crop/focal integration, local publication-rendition preparation, build-only media delivery and materialization into the Cloudflare static export. No object storage is required |
 | 6 | Full block set | torture-test story authorable | First eight blocks (Photo, Photo Gallery, Reported Quote, Pull Quote, Key Facts, Context, Document, Timeline) built; the rest follow the same contract |
-| 7 | Payload → snapshot v1 projection | shadow build passes Astro verification | — |
+| 7 | Payload → snapshot v1 projection + direct-source fallback | snapshot build and deliberate no-snapshot fallback both pass Astro verification and produce the same canonical routes/content/media set | — |
 | 8 | WordPress → Payload import | counts/relations/IDs reconcile; custom presentation still resolves imported ID | — |
-| 9 | Snapshot v2 + structured `ArticleBody` | v1 and v2 builds both verify | — |
+| 9 | Snapshot v2 + structured `ArticleBody` | v1/v2 snapshot builds and direct-source recovery both verify through the same downstream contract | — |
 | 10 | Shadow builds from both CMSs, diffed | route/URL/SEO/sitemap/RSS/media diffs explained | — |
 | 11 | Live updates, polls + vote table, feedback | Worker parity tests, cookie compatibility | — |
 | 12 | Discord, MCP | contract suites green | — |
@@ -1096,7 +1159,8 @@ Verified:
   headline as "Workflow: Pitch · Publication: Draft".
 
 Not done in Phase 1 (each listed in §11): Google sign-in, the Story document
-view, Live Preview and presentation extraction, media materialization and R2
-public delivery, snapshot projection, import, runtime polls/live, Discord, MCP.
+view, Live Preview and presentation extraction, publication-rendition/static
+media materialization, snapshot + direct-source build projection, import,
+runtime polls/live, Discord, MCP.
 Nothing in `apps/web` or `wordpress-plugin` changed; production still runs on
 WordPress.
