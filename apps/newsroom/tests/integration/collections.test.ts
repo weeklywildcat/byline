@@ -13,6 +13,7 @@ import type { User } from "../../src/payload-types";
  * interviews and resources, and their Calendar and Home read models.
  */
 let payload: Payload;
+let publishingSection: number;
 const accounts: Record<string, User> = {};
 const people: Record<string, number> = {};
 const story: Record<string, number> = {};
@@ -47,7 +48,7 @@ async function draft(key: string, headline: string) {
   return (await payload.create({ collection: "stories", draft: true, data: { headline }, req: await reqAs(key), overrideAccess: false })).id;
 }
 async function published(headline: string) {
-  return (await payload.create({ collection: "stories", data: { headline, _status: "published" } as never, req: await reqAs("editor"), overrideAccess: false })).id;
+  return (await payload.create({ collection: "stories", data: { headline, section: publishingSection, _status: "published" } as never, req: await reqAs("editor"), overrideAccess: false })).id;
 }
 
 let band: number;
@@ -59,6 +60,7 @@ beforeAll(async () => {
   process.env.DATABASE_URL = url.toString();
   const { default: config } = await import("../../src/payload.config");
   payload = await getPayload({ config });
+  publishingSection = (await payload.create({ collection: "sections", data: { name: "Publishing fixture", slug: "publishing-fixture" } })).id;
   await account("root", "administrator");
   await account("editor", "editor");
   await account("lead", "staff");

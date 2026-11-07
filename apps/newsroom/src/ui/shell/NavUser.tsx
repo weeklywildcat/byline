@@ -1,10 +1,11 @@
 "use client";
 
+import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { Avatar, AvatarFallback, AvatarImage } from "@byline/newsroom-ui/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { cn } from "@byline/newsroom-ui/lib/utils";
-import { ChevronsUpDown, LogOut, UserRound, Wrench } from "lucide-react";
+import { ChevronsUpDown, HeartPulse, LogOut, UserRound, Wrench } from "lucide-react";
 import { useState } from "react";
 import { ShellLink, useShellNavigation } from "./navigation";
 
@@ -46,6 +47,8 @@ function Identity({ user, compact = false }: { user: ShellUser; compact?: boolea
  * the sidebar around it is in; the menu is the same.
  */
 export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = false }: { user: ShellUser; systemHref: string | null; logoutUrl: string; loginHref: string; compact?: boolean }) {
+  const account = useNewsroomAccount();
+  const { admin } = useNewsroomRoutes();
   const { isMobile, state } = useSidebar();
   const [signingOut, setSigningOut] = useState(false);
   const { runGuarded } = useShellNavigation();
@@ -75,9 +78,11 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             {user.profileHref ? <><DropdownMenuItem render={<ShellLink href={user.profileHref} />}><UserRound aria-hidden="true" />My profile</DropdownMenuItem><DropdownMenuSeparator /></> : null}
+            {account && account.role !== "staff" ? <DropdownMenuItem render={<ShellLink href={`${admin}/content-health`} />}><HeartPulse aria-hidden="true" />Content Health</DropdownMenuItem> : null}
             {systemHref ? (
               <>
                 <DropdownMenuGroup>
+                  <DropdownMenuItem render={<ShellLink href={`${admin}/site`} />}>Site</DropdownMenuItem>
                   <DropdownMenuItem render={<ShellLink href={systemHref} />}><Wrench aria-hidden="true" />System administration</DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />

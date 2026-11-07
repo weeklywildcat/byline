@@ -4,28 +4,23 @@ import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger } from "@byline/newsroom-ui/ui/combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getJson, query, type Paginated } from "./api";
 import type { Id, NamedDoc } from "./types";
 
 export type Option = { id: Id; label: string };
 
+export const relationshipOptionsKey = (collection: string) => ["byline", "relationship-options", collection] as const;
+
 /** Options for a relationship, read with the signed-in user's access. */
 export function useOptions(api: string, collection: string, labelField: "name" | "title" | "label", where: Record<string, string> = {}) {
-  const [options, setOptions] = useState<Option[]>([]);
-  const key = JSON.stringify(where);
-  useEffect(() => {
-    let live = true;
-    getJson<Paginated<NamedDoc>>(api, `/${collection}${query({ limit: 200, depth: 0, sort: labelField, ...JSON.parse(key) })}`)
-      .then((result) => {
-        if (live) setOptions(result.docs.map((doc) => ({ id: doc.id, label: String(doc[labelField] ?? doc.id) })));
-      })
-      .catch(() => live && setOptions([]));
-    return () => {
-      live = false;
-    };
-  }, [api, collection, labelField, key]);
-  return options;
+  return useQuery({
+    queryKey: [...relationshipOptionsKey(collection), api, labelField, where],
+    queryFn: async () => {
+      const result = await getJson<Paginated<NamedDoc>>(api, `/${collection}${query({ pagination: "false", depth: 0, sort: labelField, ...where })}`);
+      return result.docs.map((doc) => ({ id: doc.id, label: String(doc[labelField] ?? doc.id) }));
+    }
+  }).data ?? [];
 }
 
 const triggerClass = "-ml-2 h-auto min-h-7 max-w-full justify-start px-2 py-1 text-left font-normal whitespace-normal";

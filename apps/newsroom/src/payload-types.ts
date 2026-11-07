@@ -69,6 +69,9 @@ export interface Config {
   collections: {
     stories: Story;
     'story-plans': StoryPlan;
+    'story-activity': StoryActivity;
+    'story-notes': StoryNote;
+    'content-health': ContentHealth;
     people: Person;
     media: Media;
     sections: Section;
@@ -77,6 +80,7 @@ export interface Config {
     'collection-interviews': CollectionInterview;
     'collection-resources': CollectionResource;
     corrections: Correction;
+    redirects: Redirect;
     pages: Page;
     events: Event;
     'live-updates': LiveUpdate;
@@ -107,6 +111,9 @@ export interface Config {
   collectionsSelect: {
     stories: StoriesSelect<false> | StoriesSelect<true>;
     'story-plans': StoryPlansSelect<false> | StoryPlansSelect<true>;
+    'story-activity': StoryActivitySelect<false> | StoryActivitySelect<true>;
+    'story-notes': StoryNotesSelect<false> | StoryNotesSelect<true>;
+    'content-health': ContentHealthSelect<false> | ContentHealthSelect<true>;
     people: PeopleSelect<false> | PeopleSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     sections: SectionsSelect<false> | SectionsSelect<true>;
@@ -115,6 +122,7 @@ export interface Config {
     'collection-interviews': CollectionInterviewsSelect<false> | CollectionInterviewsSelect<true>;
     'collection-resources': CollectionResourcesSelect<false> | CollectionResourcesSelect<true>;
     corrections: CorrectionsSelect<false> | CorrectionsSelect<true>;
+    redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
     events: EventsSelect<false> | EventsSelect<true>;
     'live-updates': LiveUpdatesSelect<false> | LiveUpdatesSelect<true>;
@@ -151,6 +159,7 @@ export interface Config {
       'prepare-publication-media': TaskPreparePublicationMedia;
       'prepare-public-snapshot': TaskPreparePublicSnapshot;
       'advance-public-revision': TaskAdvancePublicRevision;
+      'scan-content-health': TaskScanContentHealth;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -244,7 +253,7 @@ export interface Story {
     endedAt?: string | null;
   };
   /**
-   * Part of the public URL. Changing it after publication breaks links.
+   * Part of the public URL. Changing a published Story, Page or Section path preserves the old address with a redirect.
    */
   slug: string;
   /**
@@ -256,6 +265,8 @@ export interface Story {
     hasNextPage?: boolean;
     totalDocs?: number;
   };
+  versionActor?: number | null;
+  versionRestored?: boolean | null;
   legacyWordPressId?: number | null;
   updatedAt: string;
   createdAt: string;
@@ -270,7 +281,7 @@ export interface Section {
   id: number;
   name: string;
   /**
-   * Part of the public URL. Changing it after publication breaks links.
+   * Part of the public URL. Changing a published Story, Page or Section path preserves the old address with a redirect.
    */
   slug: string;
   description?: string | null;
@@ -290,7 +301,7 @@ export interface Topic {
   id: number;
   name: string;
   /**
-   * Part of the public URL. Changing it after publication breaks links.
+   * Part of the public URL. Changing a published Story, Page or Section path preserves the old address with a redirect.
    */
   slug: string;
   description?: string | null;
@@ -306,7 +317,7 @@ export interface Person {
   id: number;
   name: string;
   /**
-   * Part of the public URL. Changing it after publication breaks links.
+   * Part of the public URL. Changing a published Story, Page or Section path preserves the old address with a redirect.
    */
   slug: string;
   pronouns?: string | null;
@@ -532,6 +543,84 @@ export interface StoryPlan {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "story-activity".
+ */
+export interface StoryActivity {
+  id: number;
+  story: number | Story;
+  action:
+    | 'story-created'
+    | 'story-published'
+    | 'story-unpublished'
+    | 'workflow-changed'
+    | 'editor-changed'
+    | 'contributors-changed'
+    | 'task-created'
+    | 'task-completed'
+    | 'task-reopened'
+    | 'source-added'
+    | 'source-updated'
+    | 'appointment-added'
+    | 'appointment-updated'
+    | 'appointment-completed'
+    | 'production-added'
+    | 'production-changed'
+    | 'publication-scheduled'
+    | 'publication-rescheduled'
+    | 'publication-cancelled'
+    | 'version-restored'
+    | 'url-changed'
+    | 'correction-added'
+    | 'correction-updated'
+    | 'correction-removed';
+  actor?: (number | null) | User;
+  recordId?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "story-notes".
+ */
+export interface StoryNote {
+  id: number;
+  story: number | Story;
+  author?: (number | null) | User;
+  text: string;
+  resolved?: boolean | null;
+  replies?:
+    | {
+        author?: (number | null) | User;
+        text: string;
+        at: string;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "content-health".
+ */
+export interface ContentHealth {
+  id: number;
+  key: string;
+  kind: 'scan' | 'story' | 'disposition';
+  data:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "collections".
  */
 export interface Collection {
@@ -646,13 +735,26 @@ export interface Correction {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "redirects".
+ */
+export interface Redirect {
+  id: number;
+  from: string;
+  to: string;
+  reason: 'manual' | 'story-url-change' | 'page-url-change' | 'section-slug-change';
+  createdBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "pages".
  */
 export interface Page {
   id: number;
   title: string;
   /**
-   * Part of the public URL. Changing it after publication breaks links.
+   * Part of the public URL. Changing a published Story, Page or Section path preserves the old address with a redirect.
    */
   slug: string;
   parent?: (number | null) | Page;
@@ -691,7 +793,7 @@ export interface Event {
   id: number;
   title: string;
   /**
-   * Part of the public URL. Changing it after publication breaks links.
+   * Part of the public URL. Changing a published Story, Page or Section path preserves the old address with a redirect.
    */
   slug: string;
   eventType?: string | null;
@@ -936,6 +1038,7 @@ export interface PayloadJob {
           | 'prepare-publication-media'
           | 'prepare-public-snapshot'
           | 'advance-public-revision'
+          | 'scan-content-health'
           | 'schedulePublish';
         taskID: string;
         input?:
@@ -975,6 +1078,7 @@ export interface PayloadJob {
         | 'prepare-publication-media'
         | 'prepare-public-snapshot'
         | 'advance-public-revision'
+        | 'scan-content-health'
         | 'schedulePublish'
       )
     | null;
@@ -1034,6 +1138,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'corrections';
         value: number | Correction;
+      } | null)
+    | ({
+        relationTo: 'redirects';
+        value: number | Redirect;
       } | null)
     | ({
         relationTo: 'pages';
@@ -1154,6 +1262,8 @@ export interface StoriesSelect<T extends boolean = true> {
   slug?: T;
   publishedAt?: T;
   plan?: T;
+  versionActor?: T;
+  versionRestored?: T;
   legacyWordPressId?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -1181,6 +1291,49 @@ export interface StoryPlansSelect<T extends boolean = true> {
       };
   contributors?: T;
   createdBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "story-activity_select".
+ */
+export interface StoryActivitySelect<T extends boolean = true> {
+  story?: T;
+  action?: T;
+  actor?: T;
+  recordId?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "story-notes_select".
+ */
+export interface StoryNotesSelect<T extends boolean = true> {
+  story?: T;
+  author?: T;
+  text?: T;
+  resolved?: T;
+  replies?:
+    | T
+    | {
+        author?: T;
+        text?: T;
+        at?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "content-health_select".
+ */
+export interface ContentHealthSelect<T extends boolean = true> {
+  key?: T;
+  kind?: T;
+  data?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1381,6 +1534,18 @@ export interface CorrectionsSelect<T extends boolean = true> {
   publishedAt?: T;
   createdBy?: T;
   legacyWordPressId?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "redirects_select".
+ */
+export interface RedirectsSelect<T extends boolean = true> {
+  from?: T;
+  to?: T;
+  reason?: T;
+  createdBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1963,6 +2128,17 @@ export interface TaskPreparePublicSnapshot {
 export interface TaskAdvancePublicRevision {
   input: {
     reason?: string | null;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskScan-content-health".
+ */
+export interface TaskScanContentHealth {
+  input: {
+    revision: number;
+    storyId?: number | null;
   };
   output?: unknown;
 }

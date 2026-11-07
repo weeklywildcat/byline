@@ -48,17 +48,18 @@ export type ArticleNotesCardProps = {
 /** The presentation only: counts, up to three open threads, and the way into the editor. */
 export function ArticleNotesCard({ summary, fallbackEditUrl = "", notes, status, onRetry, timezone, now }: ArticleNotesCardProps) {
   const open = summary.openCount;
+  const general = summary.kind === "story";
   const more = status === "ready" ? moreOpenNotesLabel(open, notes.length) : null;
   const editUrl = summary.editUrl || fallbackEditUrl;
   return <Card size="sm" role="region" aria-labelledby="ws-notes-title" id="ws-notes" className="order-3 lg:order-none">
     <CardHeader>
-      <CardTitle id="ws-notes-title" role="heading" aria-level={2} className="flex min-w-0 items-center gap-2"><MessageSquareText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />Article Notes</CardTitle>
+      <CardTitle id="ws-notes-title" role="heading" aria-level={2} className="flex min-w-0 items-center gap-2"><MessageSquareText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />{general ? "Story notes" : "Article Notes"}</CardTitle>
       {open > 0 ? <CardAction><Badge variant="secondary">{open} open</Badge></CardAction> : null}
     </CardHeader>
     <CardContent className="px-0">
       {open === 0
         ? <div className="px-3"><Empty className="gap-2 p-3 py-4">
-          <EmptyHeader className="gap-1"><EmptyTitle>No open article notes</EmptyTitle><EmptyDescription>Copy-editing comments and suggestions will appear here.</EmptyDescription></EmptyHeader>
+          <EmptyHeader className="gap-1"><EmptyTitle>{general ? "No open story notes" : "No open article notes"}</EmptyTitle><EmptyDescription>{general ? "General editorial notes will appear here." : "Copy-editing comments and suggestions will appear here."}</EmptyDescription></EmptyHeader>
         </Empty></div>
         : status === "error"
           ? <div className="px-3"><SectionFailed what="article notes" onRetry={onRetry} /></div>
@@ -73,7 +74,7 @@ export function ArticleNotesCard({ summary, fallbackEditUrl = "", notes, status,
     {editUrl ? <CardFooter>
       {/* WordPress documents no deep link to the Notes panel, so this opens the editor itself. */}
       <a className={buttonVariants({ variant: "outline", className: "w-full" })} href={editUrl} target="_blank" rel="noopener noreferrer">
-        {open > 0 ? "Review notes in editor" : "Open article in editor"}<ArrowUpRight data-icon="inline-end" aria-hidden="true" /><span className="sr-only"> (opens in a new tab)</span>
+        {general ? "Open story notes" : open > 0 ? "Review notes in editor" : "Open article in editor"}<ArrowUpRight data-icon="inline-end" aria-hidden="true" /><span className="sr-only"> (opens in a new tab)</span>
       </a>
     </CardFooter> : null}
   </Card>;

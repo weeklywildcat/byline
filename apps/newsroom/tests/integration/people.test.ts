@@ -11,6 +11,7 @@ import { publicPeople } from "../../src/newsroom/public-people";
 import type { User } from "../../src/payload-types";
 
 let payload: Payload;
+let publishingSection: number;
 const accounts: Record<string, User> = {};
 const persons: Record<string, number> = {};
 let portrait: number;
@@ -66,6 +67,7 @@ beforeAll(async () => {
   process.env.DATABASE_URL = url.toString();
   const { default: config } = await import("../../src/payload.config");
   payload = await getPayload({ config });
+  publishingSection = (await payload.create({ collection: "sections", data: { name: "Publishing fixture", slug: "publishing-fixture" } })).id;
   for (const [key, role] of [
     ["admin", "administrator"],
     ["editor", "editor"],
@@ -135,6 +137,7 @@ beforeAll(async () => {
       collection: "stories",
       data: {
         headline: "Historical reporting",
+        section: publishingSection,
         contributors: [persons.writer],
         _status: "published",
       } as never,

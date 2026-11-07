@@ -1,3 +1,4 @@
+import { lockAccountChanges, requireOtherAdministrator } from "../newsroom/accounts";
 import { APIError, type CollectionConfig, type PayloadRequest } from "payload";
 import { administratorsOnly, administratorsOnlyField, atLeast, newsroomUser, requestUser, sameId } from "../access/user";
 import { ROLE_OPTIONS } from "../domain/vocabulary";
@@ -39,6 +40,17 @@ export const Users: CollectionConfig = {
     unlock: administratorsOnly
   },
   hooks: {
+    beforeOperation: [async ({ operation, args, req, overrideAccess }) => {
+      if (!overrideAccess && (operation === "update" || operation === "delete") && !("id" in args)) {
+        throw new APIError("Change one sign-in account at a time.", 400);
+      }
+      if (operation === "create" || operation === "update" || operation === "delete") await lockAccountChanges(req);
+      return args;
+    }],
+    beforeDelete: [async ({ req, id }) => {
+      const account = await req.payload.findByID({ collection: "users", id, depth: 0, overrideAccess: true, req });
+      if (account.role === "administrator" && account.enabled === true) await requireOtherAdministrator(req, id);
+    }],
     beforeLogin: [
       ({ user }) => {
         if (user.enabled !== true) throw new APIError("This account is disabled.", 403);
@@ -57,13 +69,7 @@ export const Users: CollectionConfig = {
         if (operation !== "update" || originalDoc?.role !== "administrator" || originalDoc?.enabled === false) return data;
         const demoted = (data.role !== undefined && data.role !== "administrator") || data.enabled === false;
         if (!demoted) return data;
-        const { totalDocs } = await req.payload.count({
-          collection: "users",
-          where: { and: [{ role: { equals: "administrator" } }, { enabled: { equals: true } }, { id: { not_equals: originalDoc.id } }] },
-          overrideAccess: true,
-          req
-        });
-        if (totalDocs === 0) throw new APIError("Byline needs at least one enabled administrator.", 400);
+        await requireOtherAdministrator(req, originalDoc.id);
         return data;
       }
     ]

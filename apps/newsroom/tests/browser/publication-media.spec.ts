@@ -152,23 +152,27 @@ test("the Story lead image opens the same editor, and the header explains media 
   } finally {
     renameSync(`${original}.hidden`, original);
   }
-  const storyId = await createStory(request, baseURL!, editorToken, { headline: "E2E lead image readiness", featuredMedia: id });
+  const sections = await (await request.get("/api/sections?depth=0&limit=1", { headers: auth(baseURL!, editorToken) })).json();
+  const storyId = await createStory(request, baseURL!, editorToken, { headline: "E2E lead image readiness", featuredMedia: id, section: sections.docs[0].id });
 
   await signIn(context, baseURL!, editorToken);
   await page.goto(`/admin/collections/stories/${storyId}`);
   const readiness = page.locator("[data-story-media-readiness]");
-  await expect(readiness).toContainText("Publication file preparation failed", { timeout: 60_000 });
   await page.getByRole("button", { name: "Publish", exact: true }).click();
-  await expect(page.getByText(/Can't publish yet: .*tablet\.jpg/)).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Publication checks" })).toBeVisible();
+  await expect(readiness).toContainText("Publication file preparation failed", { timeout: 60_000 });
+  await page.keyboard.press("Escape");
 
   await page.locator("[data-lead-art-direction]").click();
   await expect(dialog(page)).toBeVisible();
   await expect(page.locator("[data-art-focal]")).toHaveAttribute("data-art-focal", "30,30");
   await page.getByRole("button", { name: "Cancel" }).last().click();
 
+  await page.getByRole("button", { name: /publication issue/ }).click();
   await readiness.getByRole("button", { name: "Retry" }).click();
   await expect(readiness).toContainText("Preparing 1 file");
   await expect(readiness).toHaveCount(0, { timeout: 60_000 });
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.locator("dl")).toContainText("Published", { timeout: 30_000 });
 });

@@ -13,6 +13,7 @@ import type { User } from "../../src/payload-types";
  * (`payload.jobs.queue`), never a fake `scheduledAt` on a story.
  */
 let payload: Payload;
+let publishingSection: number;
 const accounts: Record<string, User> = {};
 const people: Record<string, number> = {};
 const story: Record<string, number> = {};
@@ -60,12 +61,13 @@ beforeAll(async () => {
   process.env.DATABASE_URL = url.toString();
   const { default: config } = await import("../../src/payload.config");
   payload = await getPayload({ config });
+  publishingSection = (await payload.create({ collection: "sections", data: { name: "Publishing fixture", slug: "publishing-fixture" } })).id;
   await account("editor", "editor");
   await account("alice", "staff");
   await account("bob", "staff");
   await account("photo", "staff", false);
 
-  const publish = async (headline: string) => (await payload.create({ collection: "stories", data: { headline, _status: "published" } as never, req: await reqAs("editor"), overrideAccess: false })).id;
+  const publish = async (headline: string) => (await payload.create({ collection: "stories", data: { headline, section: publishingSection, _status: "published" } as never, req: await reqAs("editor"), overrideAccess: false })).id;
 
   story.draft = await create("alice", "Plain draft", { contributors: [people.alice] });
   story.scheduled = await create("alice", "Scheduled for Thursday", { contributors: [people.alice] });
@@ -129,9 +131,8 @@ describe("publication state in the Stories read model", () => {
   });
 
   it("keeps a published story with a newer rewrite published, for managers and for participants", async () => {
-    for (const key of ["editor", "photo"]) {
-      expect(row(await planning(key), "rewrite").publicationState).toMatchObject({ id: "published", isPublished: true, isScheduled: false, scheduledAt: null });
-    }
+    expect(row(await planning("editor"), "rewrite").publicationState).toMatchObject({ id: "published", isPublished: true, isScheduled: true, scheduledAt: SOON });
+    expect(row(await planning("photo"), "rewrite").publicationState).toMatchObject({ id: "published", isPublished: true, isScheduled: false, scheduledAt: null });
     expect(row(await planning("editor"), "rewrite").title).toBe("Library to close (embargoed)");
     expect(row(await planning("photo"), "rewrite").title).toBe("Library hours change");
   });
@@ -192,7 +193,7 @@ describe("Stories filters and Calendar", () => {
 
   it("puts a scheduled story on the Calendar as Scheduled publication, with no Payload special case", async () => {
     const events = planningCalendarEvents((await planning("editor")).stories, TZ).filter((event) => event.type === "scheduled");
-    expect(events.map((event) => [event.storyId, event.label]).sort()).toEqual([story.scheduled, story.multiple, story.private].sort().map((id) => [id, "Scheduled publication"]));
+    expect(events.map((event) => [event.storyId, event.label]).sort()).toEqual([story.scheduled, story.multiple, story.private, story.rewrite].sort().map((id) => [id, "Scheduled publication"]));
     expect(events.find((event) => event.storyId === story.multiple)?.date).toBe("2026-11-14");
   });
 });

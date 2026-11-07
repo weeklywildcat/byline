@@ -29,3 +29,18 @@ export function buildRouteManifest(entries: Iterable<RouteManifestEntry>) {
   }
   return [...routes.values()].sort((left, right) => left.path.localeCompare(right.path));
 }
+
+/** Institutional addresses the public Astro application owns in code. */
+export const CODE_ROUTED_PAGE_SLUGS: readonly string[] = ["about", "join", "diversity-inclusion", "off-deadline"];
+export const REDIRECTED_PAGE_SLUGS: Readonly<Record<string, string>> = {
+  "media-assets": "/media-kit/",
+  "behind-the-scenes": "/off-deadline/"
+};
+const codePaths = new Set([
+  ...[...CODE_ROUTED_PAGE_SLUGS, ...Object.keys(REDIRECTED_PAGE_SLUGS), "staff", "authors", "corrections", "coverage", "media-kit", "open-source", "intranet", "search", "sports", "sports/schedule", "stories", "watch", "404"].map((slug) => `/${slug}/`),
+  "/", "/feed.xml", "/news-sitemap.xml", "/video-sitemap.xml", "/sitemap.xml", "/robots.txt", "/404.html"
+]);
+
+export function isCodeOwnedPublicPath(path: string): boolean {
+  return codePaths.has(path) || /^\/(?:api|_astro|brand|wp-content|media)\//.test(path);
+}

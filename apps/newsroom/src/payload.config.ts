@@ -1,3 +1,8 @@
+import { StoryNotes } from "./collections/StoryNotes";
+import { ContentHealth } from "./collections/ContentHealth";
+import { contentHealthTask } from "./newsroom/health/content-health";
+import { StoryActivity } from "./collections/StoryActivity";
+import { Redirects } from "./collections/Redirects";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describeRepositoryInteractives, describeStoryPresentations, repositoryInteractiveRegistry, storyPresentationRegistry } from "@byline/story-presentations";
@@ -59,6 +64,9 @@ function withImportIdGuard(collection: CollectionConfig): CollectionConfig {
 const collections: CollectionConfig[] = [
   Stories,
   StoryPlans,
+  StoryActivity,
+  StoryNotes,
+  ContentHealth,
   People,
   Media,
   Sections,
@@ -67,6 +75,7 @@ const collections: CollectionConfig[] = [
   CollectionInterviews,
   CollectionResources,
   Corrections,
+  Redirects,
   Pages,
   Events,
   LiveUpdates,
@@ -138,6 +147,8 @@ export default buildConfig({
         collections: { Component: "/components/BylineCollections#BylineCollections", path: COLLECTIONS_VIEW_PATH, exact: true, meta: { title: "Collections" } },
         people: { Component: "/components/BylinePeople#BylinePeople", path: "/people", exact: true, meta: { title: "People" } },
         profile: { Component: "/components/BylineProfile#BylineProfile", path: "/profile", exact: true, meta: { title: "My profile" } },
+        contentHealth: { Component: "/components/BylineContentHealth#BylineContentHealth", path: "/content-health", exact: true, meta: { title: "Content Health" } },
+        site: { Component: "/components/BylineSite#BylineSite", path: "/site", exact: true, meta: { title: "Site" } },
         // Administrators only: the entry to Payload's raw collection screens.
         system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system" }
       }
@@ -159,7 +170,7 @@ export default buildConfig({
     }),
     // Queue ownership: `media` → `jobs:media` (Phase 5), `publication` → `jobs:publication`
     // (public snapshots), `default` → `jobs:scheduled` (Payload's scheduled publish).
-    tasks: [preparePublicationMediaTask, preparePublicSnapshotTask, advancePublicRevisionTask]
+    tasks: [preparePublicationMediaTask, preparePublicSnapshotTask, advancePublicRevisionTask, contentHealthTask]
   },
   typescript: { outputFile: path.resolve(dirname, "payload-types.ts") },
   telemetry: false

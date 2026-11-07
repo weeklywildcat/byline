@@ -294,7 +294,7 @@ export async function createPerson(
     )
   )
     throw new APIError(
-      "Create a public identity here. Accounts are managed in System administration.",
+      "Create a public identity here. Manage sign-in accounts under People → Access.",
       400,
     );
   const data = {

@@ -4,6 +4,8 @@ import { HomeApp, type HomeShell } from "@byline/newsroom-screens/home/HomeApp";
 import { useConfig } from "@payloadcms/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { useNewsroomAccount } from "../shell/account";
+import { createBylineRequest } from "./payload-fetchers";
 import { useBylineCreate } from "../shell/create";
 import { useBylineSearch } from "../shell/search";
 import { createPayloadHomeFetchers } from "./payload-fetchers";
@@ -19,10 +21,14 @@ export function NewsroomHome({ currentUserId }: { currentUserId: number | null }
   const { config } = useConfig();
   const api = config.routes.api;
   const admin = config.routes.admin;
-  const fetchers = useMemo(() => createPayloadHomeFetchers(api), [api]);
+  const account = useNewsroomAccount();
+  const editor = account?.role === "editor" || account?.role === "administrator";
+  const fetchers = useMemo(() => ({ ...createPayloadHomeFetchers(api), ...(editor ? {
+    getContentHealth: () => createBylineRequest(api)<import("@byline/newsroom-screens/planning/planning-model").ContentHealthResponse>("/content-health")
+  } : {}) }), [api, editor]);
   const queryClient = useQueryClient();
   const { openCreate } = useBylineCreate();
   const { setStoryOpener } = useBylineSearch();
   const shell = useMemo<HomeShell>(() => ({ queryClient, openCreate, setStoryOpener }), [queryClient, openCreate, setStoryOpener]);
-  return <HomeApp fetchers={fetchers} currentUserId={currentUserId} shell={shell} actionUrls={{ workspace: (storyId) => `${admin}/collections/stories/${storyId}` }} />;
+  return <HomeApp fetchers={fetchers} currentUserId={currentUserId} shell={shell} actionUrls={{ contentHealth: editor ? `${admin}/content-health` : undefined, workspace: (storyId) => `${admin}/collections/stories/${storyId}` }} />;
 }

@@ -121,6 +121,7 @@ export const ADMINISTRATION: readonly NavItem[] = [
   { key: "raw-media", label: "Media", path: "/collections/media", minimumRole: "administrator" },
   { key: "raw-collections", label: "Collections", path: "/collections/collections", minimumRole: "administrator" },
   { key: "raw-corrections", label: "Corrections", path: "/collections/corrections", minimumRole: "administrator" },
+  { key: "raw-redirects", label: "Redirects", path: "/collections/redirects", minimumRole: "administrator" },
   { key: "raw-pages", label: "Pages", path: "/collections/pages", minimumRole: "administrator" },
   { key: "raw-polls", label: "Polls", path: "/collections/polls", minimumRole: "administrator" },
   { key: "raw-sections", label: "Sections", path: "/collections/sections", minimumRole: "administrator" },
@@ -148,6 +149,9 @@ export function locationFor(pathname: string, adminRoute: string): Crumb[] {
   const nav = NAVIGATION.find((item) => item.path === path);
   if (nav) return [{ label: nav.label }];
   if (/^\/collections\/stories\/[^/]+$/.test(path) && !path.endsWith("/create")) return [{ label: "Story" }];
+  if (path === "/site") return [{ label: "Site" }];
+  if (path === "/content-health") return [{ label: "Content Health" }];
+  if (/^\/collections\/pages\/\d+$/.test(path)) return [{ label: "Site", path: "/site?tab=pages" }, { label: "Page" }];
   if (path === SYSTEM_ADMINISTRATION_PATH) return [{ label: "System administration" }];
   const raw = ADMINISTRATION.find((item) => path === item.path || path.startsWith(`${item.path}/`));
   if (raw) return [{ label: "System administration", path: SYSTEM_ADMINISTRATION_PATH }, { label: raw.label }];

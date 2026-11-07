@@ -14,6 +14,7 @@ import { createPreferenceSavedViews, SAVED_VIEWS_PREFERENCE_KEY, type Preference
  * Payload Preferences.
  */
 let payload: Payload;
+let publishingSection: number;
 const accounts: Record<string, User> = {};
 const people: Record<string, number> = {};
 const story: Record<string, number> = {};
@@ -77,6 +78,7 @@ beforeAll(async () => {
   process.env.DATABASE_URL = url.toString();
   const { default: config } = await import("../../src/payload.config");
   payload = await getPayload({ config });
+  publishingSection = (await payload.create({ collection: "sections", data: { name: "Publishing fixture", slug: "publishing-fixture" } })).id;
   await account("editor", "editor");
   await account("alice", "staff");
   await account("bob", "staff");
@@ -86,7 +88,7 @@ beforeAll(async () => {
   story.budget = await create("alice", "Budget vote delayed", { contributors: [people.alice] });
   story.ready = await create("alice", "Ready piece on parking", { contributors: [people.alice] });
   story.private = await create("editor", "Editor's private draft");
-  const published = await payload.create({ collection: "stories", data: { headline: "Library hours change", _status: "published" } as never, req: await reqAs("editor"), overrideAccess: false });
+  const published = await payload.create({ collection: "stories", data: { headline: "Library hours change", section: publishingSection, _status: "published" } as never, req: await reqAs("editor"), overrideAccess: false });
   story.library = published.id;
   await payload.update({ collection: "stories", id: story.library, draft: true, data: { headline: "Library to close (embargoed)" }, req: await reqAs("editor"), overrideAccess: false });
   await payload.create({ collection: "production-assignments", data: { story: story.library, title: "Library photos", type: "photo", status: "assigned", assignees: [accounts.photo.id] }, req: await reqAs("editor"), overrideAccess: false });

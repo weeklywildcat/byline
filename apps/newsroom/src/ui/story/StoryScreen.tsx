@@ -13,12 +13,14 @@ import { StoryWorkspaceProvider, WorkspaceAnnouncer, WorkspaceGate, WorkspaceSta
 import { TasksSection } from "@byline/newsroom-screens/workspace/TasksSection";
 import { useAuth, useConfig, useDocumentInfo, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import type { CollapsibleFieldClientComponent } from "payload";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useMemo, type FormEvent, type ReactNode } from "react";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
 import { useBylineMediaPicker } from "../media/MediaWorkspaceShell";
 import { useLeaveGuard } from "../shell/navigation";
 import { useSettleAutosave } from "./form";
 import { HistoryTab } from "./HistoryTab";
+import { StoryNotes } from "./StoryNotes";
 import { StoryHeader } from "./StoryHeader";
 import { WriteTab } from "./WriteTab";
 
@@ -30,6 +32,7 @@ export type StoryScreenContext = {
   role: string;
   userId: string | number | undefined;
   readOnly: boolean;
+  shellQueries: QueryClient;
 };
 
 /**
@@ -53,7 +56,9 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   const { user } = useAuth();
   const { id } = useDocumentInfo();
   const custom = (config.admin?.custom ?? {}) as { newsroomTimeZone?: string };
+  const shellQueries = useQueryClient();
   const context: StoryScreenContext = {
+    shellQueries,
     api: config.routes.api,
     admin: config.routes.admin,
     timeZone: custom.newsroomTimeZone ?? "America/New_York",
@@ -68,7 +73,9 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   const childPaths = { fields: field.fields, parentPath: parentPath ?? "", parentSchemaPath: parentSchemaPath ?? "stories", parentIndexPath: indexPath ?? "", permissions };
   const storyId = Number(id);
   // `?appointment=<id>` opens that appointment's scheduler, as in the WordPress workspace.
-  const appointmentId = typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("appointment") ?? "");
+  const location = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
+  const appointmentId = location?.get("appointment") ?? "";
+  const defaultTab = appointmentId || location?.get("tab") === "plan" ? "plan" : "write";
 
   const screen = (
     // Write spans the whole canvas (wide and full photographs measure against it);
@@ -78,7 +85,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
       <div className="mx-auto w-full max-w-5xl px-4 md:px-8">
         <StoryHeader context={context} />
       </div>
-      <Tabs defaultValue={appointmentId ? "plan" : "write"} className="gap-4">
+      <Tabs defaultValue={defaultTab} className="gap-4">
         <div className="mx-auto w-full max-w-5xl px-4 md:px-8">
           <TabsList>
             <TabsTrigger value="write">Write</TabsTrigger>
@@ -103,6 +110,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
               <aside aria-label="Story context" className="flex min-w-0 flex-col gap-4">
                 <DetailsSection />
                 <ResourcesSection />
+                <StoryNotes context={context} />
                 <ActivitySection />
               </aside>
             </div>

@@ -86,9 +86,17 @@ export async function resolveBodyRecords(payload: Payload, body: unknown, option
 /** One line per problem a publication cannot ship with. */
 export function blockingBodyProblems(issues: NormalizeIssue[]): string[] {
   return issues.flatMap((issue) => {
+    if (issue.kind === "unsupported-node") return [`Remove or replace unsupported content (${issue.nodeType}).`];
+    if (issue.kind === "unsupported-format") return [`Remove unsupported formatting (${issue.format}).`];
+    if (issue.kind === "unsafe-link") return ["Replace the unsafe link in the story body."];
     if (issue.kind !== "block" || !isBlockingIssue(issue.issue)) return [];
     return [`${blockLabel(issue.issue.type)}: ${issue.issue.message}`];
   });
+}
+
+export async function storyBodyProblems(req: PayloadRequest, body: unknown, storyId: string | number | null): Promise<string[]> {
+  const { media, references } = await resolveBodyRecords(req.payload, body, { storyId, req });
+  return blockingBodyProblems(normalizePayloadArticleBody(body, { media, references }).issues);
 }
 
 export const requireCompleteBody: CollectionBeforeChangeHook = async ({ data, originalDoc, req }) => {
@@ -96,9 +104,7 @@ export const requireCompleteBody: CollectionBeforeChangeHook = async ({ data, or
   const contentFormat = data.contentFormat ?? originalDoc?.contentFormat;
   if (contentFormat === "legacy-html") return data;
   const body = data.body !== undefined ? data.body : originalDoc?.body;
-  const { media, references } = await resolveBodyRecords(req.payload, body, { storyId: originalDoc?.id ?? null, req });
-  const { issues } = normalizePayloadArticleBody(body, { media, references });
-  const problems = blockingBodyProblems(issues);
+  const problems = await storyBodyProblems(req, body, originalDoc?.id ?? null);
   if (!problems.length) return data;
   throw new ValidationError({ collection: "stories", req, errors: problems.map((message) => ({ path: "body", message })) });
 };

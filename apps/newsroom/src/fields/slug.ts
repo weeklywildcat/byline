@@ -13,7 +13,7 @@ export function slugField(from: string, collection: CollectionSlug, overrides: P
     required: true,
     unique: true,
     index: true,
-    admin: { position: "sidebar", description: "Part of the public URL. Changing it after publication breaks links." },
+    admin: { position: "sidebar", description: "Part of the public URL. Changing a published Story, Page or Section path preserves the old address with a redirect." },
     validate: (value: unknown) => (isSlug(value) ? true : "Use lowercase letters, numbers and hyphens."),
     hooks: {
       beforeValidate: [

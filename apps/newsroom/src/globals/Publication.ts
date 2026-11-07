@@ -3,6 +3,8 @@ import type { Field, GlobalConfig } from "payload";
 import { administratorsOnly, atLeast, newsroomUser } from "../access/user";
 import { isSlug } from "../domain/slug";
 import { publicationGlobalSlice } from "../public/slices";
+import { publicationConfigFromGlobal, readPublishedPublication } from "../public/publication-config";
+import { applyPublicPathMoves, lockPublicPaths, readPublicPaths } from "../public/url-changes";
 import { trackPublicGlobalChanges } from "../public/revision";
 
 /**
@@ -10,7 +12,7 @@ import { trackPublicGlobalChanges } from "../public/revision";
  * `@byline/core`): identity, location, locale, timezone, public URLs,
  * branding, appearance, sections, navigation, social profiles, feature
  * switches, licensing and SEO defaults. Administrators only; edited through
- * the raw System screen until a Byline Publication Settings screen exists.
+ * Site → Publication.
  *
  * Versions and drafts let an administrator stage a change. Only the
  * published Global is public: the snapshot reads the main row, a draft never
@@ -59,7 +61,23 @@ export const Publication: GlobalConfig = {
   admin: { group: "System", hidden: ({ user }) => !atLeast(newsroomUser(user), "administrator") },
   access: { read: administratorsOnly, readVersions: administratorsOnly, update: administratorsOnly },
   versions: { max: 50, drafts: { autosave: false, validate: true } },
-  hooks: { beforeChange: [tracking.beforeChange], afterChange: [tracking.afterChange] },
+  hooks: {
+    beforeChange: [async ({ data, req }) => {
+      if (data._status === "published" && typeof data.timezone === "string") {
+        await lockPublicPaths(req);
+        if (publicationConfigFromGlobal(await readPublishedPublication(req.payload, req), 0).timezone === data.timezone) return data;
+        const paths = await readPublicPaths(req, "stories");
+        req.context.bylinePriorPublicationPaths = paths;
+      }
+      return data;
+    }, tracking.beforeChange],
+    afterChange: [async ({ doc, req }) => {
+      const before = req.context.bylinePriorPublicationPaths as Map<number, string> | undefined;
+      delete req.context.bylinePriorPublicationPaths;
+      if (before?.size) await applyPublicPathMoves(req, "stories", before, await readPublicPaths(req, "stories"));
+      return doc;
+    }, tracking.afterChange]
+  },
   fields: [
     {
       name: "identity",

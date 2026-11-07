@@ -262,3 +262,126 @@ describe("Story Workspace endpoints", () => {
   });
 });
 
+
+describe("native publication and History actions", () => {
+  it("checks scheduling permissions, reschedules, cancels and runs Payload's publication job", async () => {
+    const section = await payload.create({ collection: "sections", data: { name: "Schedule test section", slug: "schedule-test-section" } });
+    const story = await payload.create({ collection: "stories", draft: true, data: { headline: "Scheduled original", section: section.id }, req: await reqAs("alice"), overrideAccess: false });
+    const params = { id: String(story.id) };
+    const route = "/byline/stories/:id/schedule-publication";
+    expect((await call("post", route, "alice", { at: "2028-01-03T23:30", expected: null }, params)).status).toBe(403);
+    const scheduled = await call("post", route, "editor", { at: "2028-01-03T23:30", expected: null }, params);
+    expect(scheduled).toEqual({ status: 200, body: { scheduledAt: "2028-01-04T04:30:00.000Z" } });
+    expect((await call("get", "/byline/stories/:id/workspace", "alice", undefined, params)).body.story.publicationState.id).toBe("scheduled");
+    const stale = await call("post", route, "editor", { at: "2028-01-03T23:31", expected: null }, params);
+    expect(stale.status).toBe(409);
+    const rescheduled = await call("post", route, "editor", { at: "2028-01-03T23:31", expected: scheduled.body.scheduledAt }, params);
+    expect(rescheduled).toEqual({ status: 200, body: { scheduledAt: "2028-01-04T04:31:00.000Z" } });
+    expect((await call("post", route, "editor", { at: null, expected: rescheduled.body.scheduledAt }, params)).status).toBe(200);
+    expect((await call("get", "/byline/stories/:id/workspace", "alice", undefined, params)).body.story.publicationState.id).toBe("draft");
+
+    await payload.update({ collection: "stories", id: story.id, draft: true, data: { headline: "Latest scheduled draft", publishedAt: "2026-11-08T04:30:00.000Z" }, req: await reqAs("editor"), overrideAccess: false });
+    expect((await call("post", route, "editor", { at: "2028-01-03T23:32", expected: null }, params)).status).toBe(200);
+    await payload.update({ collection: "payload-jobs", where: { and: [{ taskSlug: { equals: "schedulePublish" } }, { waitUntil: { equals: "2028-01-04T04:32:00.000Z" } }] }, data: { waitUntil: "2020-01-01T00:00:00.000Z" } });
+    await payload.jobs.run({ queue: "default", limit: 20 });
+    const published = await payload.findByID({ collection: "stories", id: story.id });
+    expect(published).toMatchObject({ headline: "Latest scheduled draft", _status: "published", publishedAt: "2026-11-08T04:30:00.000Z" });
+    await expect(payload.update({ collection: "stories", id: story.id, data: { _status: "draft" }, req: await reqAs("alice"), overrideAccess: false })).rejects.toThrow();
+    const unpublish = await payload.update({ collection: "stories", id: story.id, data: { _status: "draft" }, req: await reqAs("editor"), overrideAccess: false });
+    expect(unpublish.publishedAt).toBe(published.publishedAt);
+    expect((await payload.update({ collection: "stories", id: story.id, data: { _status: "published" }, req: await reqAs("editor"), overrideAccess: false })).publishedAt).toBe(published.publishedAt);
+  });
+
+  it("lists native versions, records their authors and restores a draft without publishing it", async () => {
+    const section = await payload.create({ collection: "sections", data: { name: "History test section", slug: "history-test-section" } });
+    const story = await payload.create({ collection: "stories", draft: true, data: { headline: "First version", section: section.id }, req: await reqAs("alice"), overrideAccess: false });
+    await payload.update({ collection: "stories", id: story.id, data: { _status: "published" }, req: await reqAs("editor"), overrideAccess: false });
+    await payload.update({ collection: "stories", id: story.id, draft: true, autosave: true, data: { headline: "Autosaved copy" }, req: await reqAs("alice"), overrideAccess: false });
+    const params = { id: String(story.id) };
+    const route = "/byline/stories/:id/versions";
+    expect((await call("get", route, "carol", undefined, params)).body.versions ?? []).toEqual([]);
+    const history = await call("get", route, "editor", undefined, params);
+    expect(history.status).toBe(200);
+    expect(history.body.versions[0]).toMatchObject({ kind: "Autosave", actor: "alice Account" });
+    const restored = await call("post", "/byline/stories/:id/restore-version", "editor", { version: history.body.current, expected: history.body.latest }, params);
+    expect(restored.status).toBe(200);
+    expect(restored.body.doc).toMatchObject({ headline: "First version", _status: "draft" });
+    expect((await payload.findByID({ collection: "stories", id: story.id, draft: false }))._status).toBe("published");
+    const after = await call("get", route, "editor", undefined, params);
+    expect(after.body.versions[0]).toMatchObject({ kind: "Restored", actor: "editor Account" });
+  });
+
+  it("creates canonical correction types, schedules future visibility and refuses stale edits", async () => {
+    const story = await payload.create({ collection: "stories", draft: true, data: { headline: "Corrections fixture" }, req: await reqAs("alice"), overrideAccess: false });
+    const params = { id: String(story.id) };
+    const route = "/byline/stories/:id/corrections";
+    const input = { type: "editor-note", text: "We added a note on the reporting.", date: "2026-11-07T15:00", publishedAt: "2028-01-03T13:00" };
+    expect((await call("post", route, "alice", input, params)).status).toBe(403);
+    const created = await call("post", route, "editor", input, params);
+    expect(created.status).toBe(200);
+    const [notice] = created.body.corrections;
+    expect(notice).toMatchObject({ type: "editor-note", createdBy: accounts.editor.id, publishedAt: "2028-01-03T18:00:00.000Z" });
+    const record = `${route}/:correction`;
+    const target = { ...params, correction: String(notice.id) };
+    expect((await call("patch", record, "editor", { ...input, expected: "stale" }, target)).status).toBe(409);
+    const edited = await call("patch", record, "editor", { ...input, text: "Updated note.", expected: notice.updatedAt }, target);
+    expect(edited.body.corrections[0].text).toBe("Updated note.");
+    expect((await call("delete", record, "editor", { expected: edited.body.corrections[0].updatedAt }, target)).body.corrections).toEqual([]);
+  });
+});
+
+describe("protected newsroom workflows", () => {
+  it("shows meaningful activity, skips ordinary autosaves and keeps notes on the team", async () => {
+    const story = await payload.create({ collection: "stories", draft: true, data: { headline: "Private reporting notes fixture" }, req: await reqAs("alice"), overrideAccess: false });
+    const params = { id: String(story.id) };
+    await payload.update({ collection: "stories", id: story.id, draft: true, autosave: true, data: { headline: "Changed private reporting notes fixture" }, req: await reqAs("alice"), overrideAccess: false });
+    const path = "/byline/stories/:id";
+    await call("post", `${path}/workflow`, "alice", { status: "writing" }, params);
+    const { body } = await call("get", `${path}/activity`, "alice", undefined, params);
+    expect(body.activity.map((row: { action: string }) => row.action)).toEqual(["workflow-changed", "story-created"]);
+    expect((await call("get", `${path}/activity`, "erin", undefined, params)).status).toBe(403);
+
+    expect((await call("post", `${path}/notes`, "erin", { text: "Denied" }, params)).status).toBe(403);
+    expect((await call("post", `${path}/notes`, "alice", { text: "Verify the quote." }, params)).status).toBe(200);
+    const notes = await call("get", `${path}/notes`, "alice", undefined, params);
+    expect(notes.body.summary).toMatchObject({ openCount: 1, kind: "story" });
+    const [note] = notes.body.threads;
+    const noteParams = { ...params, note: String(note.id) };
+    await call("patch", `${path}/notes/:note`, "editor", { text: "Confirmed against the recording." }, noteParams);
+    const next = await call("get", `${path}/notes`, "alice", undefined, params);
+    expect(next.body.threads[0].replies[0].author.name).toBe("editor Account");
+    expect((await call("patch", `${path}/notes/:note`, "alice", { resolved: true, expected: next.body.threads[0].updatedAt }, noteParams)).status).toBe(200);
+    expect((await call("get", `${path}/notes`, "alice", undefined, params)).body.summary).toMatchObject({ openCount: 0, resolvedCount: 1 });
+  });
+
+  it("lets administrators link and disable sign-in accounts without changing People", async () => {
+    const endpoint = "/byline/accounts";
+    const data = { name: "Access fixture", email: "access-fixture@example.test", role: "staff", enabled: true, linkedPerson: people.alice };
+    expect((await call("post", endpoint, "editor", data)).status).toBe(403);
+    const result = await call("post", endpoint, "root", data);
+    expect(result).toMatchObject({ status: 200, body: { ...data, googleConnected: false } });
+    expect(Object.keys(result.body)).not.toContain("password");
+    const id = String(result.body.id);
+    expect((await call("patch", `${endpoint}/:id`, "root", { ...data, role: "editor", enabled: false, expected: "stale" }, { id })).status).toBe(409);
+    const changed = await call("patch", `${endpoint}/:id`, "root", { ...data, role: "editor", enabled: false, linkedPerson: null, expected: result.body.revision }, { id });
+    expect(changed.body).toMatchObject({ role: "editor", enabled: false, linkedPerson: null });
+    expect((await payload.findByID({ collection: "people", id: people.alice })).name).toBe("alice Writer");
+    const root = await payload.findByID({ collection: "users", id: accounts.root.id });
+    expect((await call("patch", `${endpoint}/:id`, "root", { ...data, enabled: false, linkedPerson: null, expected: root.updatedAt }, { id: String(root.id) })).status).toBe(400);
+  });
+
+  it("stages Publication settings before publishing and protects Site administration", async () => {
+    const endpoint = "/byline/site/publication";
+    expect((await call("get", endpoint, "editor")).status).toBe(403);
+    const original = await call("get", endpoint, "root");
+    expect(original.status).toBe(200);
+    expect(original.body.fields.map((field: { name: string }) => field.name)).toEqual(expect.arrayContaining(["identity", "location", "timezone", "urls", "branding", "sections", "navigation", "social", "features", "licensing", "seo"]));
+    const values = { ...original.body.values, identity: { ...original.body.values.identity, tagline: "A new newsroom tagline" } };
+    const draft = await call("post", endpoint, "root", { expected: original.body.revision, values, publish: false });
+    expect(draft).toMatchObject({ status: 200, body: { hasDraft: true } });
+    expect((await payload.findGlobal({ slug: "publication", draft: false })).identity.tagline).not.toBe("A new newsroom tagline");
+    const published = await call("post", endpoint, "root", { expected: draft.body.revision, values, publish: true });
+    expect(published).toMatchObject({ status: 200, body: { hasPublished: true, hasDraft: false } });
+    expect((await payload.findGlobal({ slug: "publication", draft: false })).identity.tagline).toBe("A new newsroom tagline");
+  });
+});

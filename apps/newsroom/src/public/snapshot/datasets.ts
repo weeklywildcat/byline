@@ -1,3 +1,4 @@
+import { publicPagePaths } from "../page-paths";
 import type { PublicBuildSnapshotV2, PublicCorrectionSnapshot } from "@byline/content";
 import { escapeHtml } from "@byline/content/story";
 import type { Payload } from "payload";
@@ -54,16 +55,15 @@ export async function collectCorrections(payload: Payload, storyIds: number[], n
 export async function collectPages(payload: Payload): Promise<PublicBuildSnapshotV2["datasets"]["pages"]> {
   const { docs } = await payload.find({ collection: "pages", draft: false, where: published, ...publicRead, sort: "id",
     select: { title: true, slug: true, parent: true, summary: true, body: true, noindex: true, publishedAt: true, createdAt: true, updatedAt: true, deletedAt: true } });
-  const pages = new Map(docs.filter((row) => !row.deletedAt).map((row) => [row.id, row]));
-  function pagePath(page: Page, seen: Set<number>): string {
-    const parentId = id(page.parent);
-    if (!parentId) return `/${page.slug}/`;
-    if (seen.has(page.id) || !pages.has(parentId)) throw new PublicSnapshotError("invalid-projection", `Page ${page.id} has no valid published parent path.`);
-    seen.add(page.id);
-    return `${pagePath(pages.get(parentId)!, seen)}${page.slug}/`;
+  const pages = docs.filter((row) => !row.deletedAt);
+  let paths: Map<number, string>;
+  try {
+    paths = publicPagePaths(pages);
+  } catch (error) {
+    throw new PublicSnapshotError("invalid-projection", (error as Error).message);
   }
-  return [...pages.values()].map((row) => ({
-    id: row.id, title: text(row.title), slug: row.slug, href: pagePath(row, new Set()), summary: text(row.summary),
+  return pages.map((row) => ({
+    id: row.id, title: text(row.title), slug: row.slug, href: paths.get(row.id)!, summary: text(row.summary),
     bodyHtml: pageBodyHtml(row.body, row), indexing: row.noindex ? "noindex" : "public",
     publishedAt: iso(row.publishedAt ?? row.createdAt), modifiedAt: iso(row.updatedAt)
   }));
