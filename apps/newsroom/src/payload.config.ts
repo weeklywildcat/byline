@@ -21,6 +21,7 @@ import { proseEditor } from "./editor/prose";
 import { dropClientIds } from "./hooks/imported-ids";
 import { newsroomTimeZone } from "./domain/dates";
 import { newsroomEndpoints } from "./newsroom/endpoints";
+import { COLLECTIONS_VIEW_PATH } from "./domain/navigation";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -120,6 +121,9 @@ export default buildConfig({
         calendar: { Component: "/components/BylineCalendar#BylineCalendar", path: "/calendar" },
         // Byline Media: the asset Library (Payload Media, folders) and production Work. Raw Media stays an administrator fallback.
         media: { Component: "/components/BylineMedia#BylineMedia", path: "/media", meta: { title: "Media" } },
+        // Byline Collections: reporting projects, served at exactly /admin/collections by app/(payload)/admin/collections/page.tsx
+        // (Payload refuses a custom view there); Payload's raw /collections/<slug> screens are untouched.
+        collections: { Component: "/components/BylineCollections#BylineCollections", path: COLLECTIONS_VIEW_PATH, exact: true, meta: { title: "Collections" } },
         // Administrators only: the entry to Payload's raw collection screens.
         system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system" }
       }

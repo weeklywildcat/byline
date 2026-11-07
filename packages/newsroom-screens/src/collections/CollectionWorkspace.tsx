@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { CalendarDays, Plus } from "lucide-react";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
-import { Button } from "@byline/newsroom-ui/ui/button";
+import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -176,24 +176,19 @@ export function CollectionWorkspace({
             />
             {c.members.length || c.lead ? <PeopleAvatars people={[...(c.lead ? [c.lead] : []), ...c.members]} /> : null}
             {calendar ? (
-              <Button
-                variant="outline"
-                className="pointer-coarse:min-h-11"
-                render={
-                  <a
-                    href={calendar}
-                    onClick={(event) => {
-                      if (!host.openCalendar || event.metaKey || event.ctrlKey || event.shiftKey) return;
-                      event.preventDefault();
-                      guard(() => host.openCalendar!(c.id));
-                    }}
-                  />
-                }
+              <a
+                href={calendar}
+                className={buttonVariants({ variant: "outline", className: "pointer-coarse:min-h-11" })}
+                onClick={(event) => {
+                  if (!host.openCalendar || event.metaKey || event.ctrlKey || event.shiftKey) return;
+                  event.preventDefault();
+                  guard(() => host.openCalendar!(c.id));
+                }}
               >
                 <CalendarDays data-icon="inline-start" aria-hidden="true" />
                 <span className="hidden @min-[640px]/collection:inline">View in Calendar</span>
                 <span className="sr-only @min-[640px]/collection:hidden">View in Calendar</span>
-              </Button>
+              </a>
             ) : null}
             {c.canEdit ? (
               <DropdownMenu>

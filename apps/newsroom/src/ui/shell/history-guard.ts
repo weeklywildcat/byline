@@ -53,6 +53,29 @@ export type HistoryGuard = {
   useGuard: (options: { dirty: () => boolean; ask: (proceed: () => void) => void; location: string }) => void;
 };
 
+/**
+ * The guards' one `popstate` listener, installed when this module first loads
+ * (with the shell, before Next hydrates). Next's app router adds its own
+ * listener after hydration, and listeners on `window` run in the order they
+ * were added: a guard that subscribed later, from an effect, would run after
+ * Next had already rendered the traversal (React flushes its update between
+ * listeners), with the unsaved editor already gone. Mounted guards subscribe
+ * here instead, and swallowing the event keeps it from Next.
+ */
+const traversalHandlers = new Set<(event: PopStateEvent) => void>();
+if (typeof window !== "undefined") {
+  window.addEventListener(
+    "popstate",
+    (event) => {
+      for (const handler of [...traversalHandlers]) {
+        handler(event);
+        if (event.cancelBubble) return;
+      }
+    },
+    { capture: true }
+  );
+}
+
 export function createHistoryGuard(KEY: string): HistoryGuard {
   let settled: Position | null = null;
 
@@ -165,8 +188,8 @@ export function createHistoryGuard(KEY: string): HistoryGuard {
         window.history.go(-delta);
       };
 
-      window.addEventListener("popstate", onPopState, { capture: true });
-      return () => window.removeEventListener("popstate", onPopState, { capture: true });
+      traversalHandlers.add(onPopState);
+      return () => { traversalHandlers.delete(onPopState); };
     }, []);
   }
 

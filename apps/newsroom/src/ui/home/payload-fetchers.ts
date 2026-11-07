@@ -8,6 +8,7 @@ import type { HomeBootstrap } from "@byline/newsroom-screens/home/newsroom-model
 import type { WorkspaceClient } from "@byline/newsroom-screens/workspace/workspace-api";
 import type { MediaAssignmentsResponse, ReportingResponse, ResourcePurpose, ScheduleResponse, StoryResource, StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 import { queryPath } from "@byline/newsroom-screens/planning/planning-api";
+import { createPayloadCollectionApi } from "../collections/payload-collection-api";
 
 /**
  * The Payload newsroom's fetchers for the shared Byline screens
@@ -50,6 +51,7 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
   const notYet = (what: string) => () => Promise.reject<never>({ message: `${what} isn't available in the newsroom yet.`, code: "byline_not_ported", data: { status: 501 } } satisfies ScreenError);
 
   const getWorkspace = (storyId: number) => request<StoryWorkspace>(`/stories/${storyId}/workspace`);
+  const collections = createPayloadCollectionApi(api);
   const link = (storyId: number, input: { label: string; url: string; purpose?: ResourcePurpose }) => request<{ resources: StoryResource[] }>(`/stories/${storyId}/resources`, "POST", input);
 
   const editorial: EditorialRestClient = {
@@ -75,8 +77,8 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
   };
 
   const workspace: WorkspaceClient = {
-    // WordPress story collections are not part of the Payload model; nothing on Home calls this.
-    collections: new Proxy({}, { get: (_target, key) => (typeof key === "string" && key !== "then" ? notYet("Collections") : undefined) }) as WorkspaceClient["collections"],
+    // The Story workspace's Collections, interviews and resources.
+    collections,
     getWorkspace,
     saveBrief: (storyId, brief, expectedBrief) => request<{ brief: string }>(`/stories/${storyId}/brief`, "POST", { brief, ...(expectedBrief !== undefined ? { expectedBrief } : {}) }),
     // Format and video are article fields: they are edited in the Story screen's form, never here.
@@ -95,7 +97,8 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
   };
 
   return {
-    // Collections (WordPress story collections) are not part of the Payload model; screens hide them when absent.
+    // Story Peek's Collections, and ⌘K's Collection search.
+    collections,
     getWorkspace,
     workspace,
     editorial,

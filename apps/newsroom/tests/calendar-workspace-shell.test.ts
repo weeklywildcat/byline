@@ -14,7 +14,7 @@ describe("the shell's compositions", () => {
   const narrow = { storyWorkspace: false, calendarWorkspace: false };
 
   it("the Calendar is a workspace only on its own screen, on a wide enough screen", () => {
-    expect(shellLayoutFor("/admin/calendar", "/admin", wide)).toEqual({ storyId: null, calendar: true, media: false, composition: "calendar-workspace" });
+    expect(shellLayoutFor("/admin/calendar", "/admin", wide)).toEqual({ storyId: null, calendar: true, media: false, collections: false, collectionId: null, composition: "calendar-workspace" });
     expect(shellLayoutFor("/admin/calendar/", "/admin", wide).composition).toBe("calendar-workspace");
     expect(shellLayoutFor("/admin/calendar", "/admin", narrow).composition).toBe("default");
     for (const path of ["/admin", "/admin/stories", "/admin/calendars", "/admin/collections/calendar"]) {
@@ -78,8 +78,8 @@ describe("the Calendar breakpoint", () => {
 });
 
 describe("Calendar navigation", () => {
-  it("is Home, Stories, Calendar, Media: a destination of its own, with no generic Planning", () => {
-    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar", "media"]);
+  it("is Home, Stories, Calendar, Media, Collections: a destination of its own, with no generic Planning", () => {
+    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections"]);
     expect(NAVIGATION.find((item) => item.key === "calendar")).toEqual({ key: "calendar", label: "Calendar", path: "/calendar", minimumRole: "staff" });
     expect(NAVIGATION.map((item) => item.key)).not.toContain("planning");
   });

@@ -13,14 +13,15 @@ import { BylineSearchProvider } from "./search";
 import { StorySwitcherProvider } from "./StorySwitcher";
 import { CalendarWorkspaceShell } from "../calendar/CalendarWorkspaceShell";
 import { MediaWorkspaceShell } from "../media/MediaWorkspaceShell";
+import { CollectionsWorkspaceShell } from "../collections/CollectionsWorkspaceShell";
 import { SIDEBAR_COOKIE, SIDEBAR_SHORTCUT } from "./shell-config";
 
 /**
  * The Byline application shell's state, above every admin view: one query
  * cache for all Byline screens, the one shadcn Sidebar state (shared by the
  * Nav, the app header and any screen that needs it), guarded navigation, the
- * Create controller, the command palette, the Story switcher, the Calendar
- * and Media workspaces and the newsroom's one toaster (screens inside the shell render none of their own,
+ * Create controller, the command palette, the Story switcher, the Calendar,
+ * Media and Collections workspaces and the newsroom's one toaster (screens inside the shell render none of their own,
  * so a toast never appears twice).
  *
  * It adds no layout of its own: Payload's template still places the Nav and
@@ -45,15 +46,18 @@ export function BylineShell({ defaultOpen, children }: { defaultOpen: boolean; c
         <ShellLayoutProvider value={layout}>
           <SidebarWidthSyncProvider value={width.sync}>
             <ShellNavigationProvider>
-              <BylineCreateProvider>
-                <BylineSearchProvider>
-                  <StorySwitcherProvider>
-                    <CalendarWorkspaceShell>
-                      <MediaWorkspaceShell>{children}</MediaWorkspaceShell>
-                    </CalendarWorkspaceShell>
-                  </StorySwitcherProvider>
-                </BylineSearchProvider>
-              </BylineCreateProvider>
+              {/* Collections sits above Create and Search: ⌘K and every shared screen reach a Collection through it. */}
+              <CollectionsWorkspaceShell>
+                <BylineCreateProvider>
+                  <BylineSearchProvider>
+                    <StorySwitcherProvider>
+                      <CalendarWorkspaceShell>
+                        <MediaWorkspaceShell>{children}</MediaWorkspaceShell>
+                      </CalendarWorkspaceShell>
+                    </StorySwitcherProvider>
+                  </BylineSearchProvider>
+                </BylineCreateProvider>
+              </CollectionsWorkspaceShell>
             </ShellNavigationProvider>
           </SidebarWidthSyncProvider>
         </ShellLayoutProvider>

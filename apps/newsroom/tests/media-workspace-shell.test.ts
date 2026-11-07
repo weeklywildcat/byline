@@ -11,7 +11,7 @@ const src = (file: string) => readFileSync(path.join(root, "src", file), "utf8")
 
 describe("Media in the newsroom", () => {
   it("is a destination after Calendar, for everyone, with no Planning and no raw Media collection", () => {
-    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar", "media"]);
+    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections"]);
     expect(NAVIGATION.find((item) => item.key === "media")).toEqual({ key: "media", label: "Media", path: "/media", minimumRole: "staff" });
     expect(navigationFor("staff").some((item) => item.path.startsWith("/collections/"))).toBe(false);
     expect(locationFor("/admin/media", "/admin")).toEqual([{ label: "Media" }]);
@@ -38,7 +38,7 @@ describe("the Media workspace composition", () => {
   const narrow = { storyWorkspace: false, calendarWorkspace: false, mediaWorkspace: false };
 
   it("is the rail plus the Media navigator on a wide enough Media screen, and the ordinary sidebar otherwise", () => {
-    expect(shellLayoutFor("/admin/media", "/admin", wide)).toEqual({ storyId: null, calendar: false, media: true, composition: "media-workspace" });
+    expect(shellLayoutFor("/admin/media", "/admin", wide)).toEqual({ storyId: null, calendar: false, media: true, collections: false, collectionId: null, composition: "media-workspace" });
     expect(shellLayoutFor("/admin/media", "/admin", narrow).composition).toBe("default");
     for (const address of ["/admin", "/admin/stories", "/admin/collections/media"]) expect(shellLayoutFor(address, "/admin", wide).composition).toBe("default");
   });

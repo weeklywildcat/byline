@@ -60,7 +60,7 @@ These do not change at any phase.
 | Contributors | Byline contributor relationship (users + guests) and the WordPress post author | `stories.contributors` → `people` (ordered) |
 | People | WordPress users + author profile meta (role, pronouns, photo, directory flag, socials, Discord/Google linkage); `byline_guest` posts | `users` (accounts) + `people` (public identities) |
 | Sections / topics | `category` / `post_tag` | `sections` / `topics` |
-| Coverages / series | `byline_coverage` (`includes/editorial/coverage.php`), ordered story list | `coverages` with ordered `stories` relationship |
+| Collections (reporting projects) and their optional public coverage / series | `byline_collection` + relationship edges (`includes/editorial/collection-workspaces.php`, `collection-public.php`); legacy `byline_coverage` already migrated into Collections | `collections` (ordered `stories` membership, nested `publicPresentation`), `collection-interviews`, `collection-resources`, `tasks.collection` ([collections-workspace.md](collections-workspace.md)) |
 | Corrections | `byline_correction` + legacy inline notices (`includes/editorial/corrections.php`) | `corrections` |
 | Live coverage | `byline_live_update` child posts + coverage state meta (`includes/editorial/live-coverage.php`) | `live-updates` + `stories.liveCoverage` group |
 | Pages | `page` + page blocks (`includes/content/pages.php`, `page-blocks.php`) | `pages` (Versions + Drafts) |
@@ -102,7 +102,7 @@ is why `apps/web/lib/article-presentation.ts` is typed around `WordPressPost`.
 | `categories` / `tags` | id, name, slug, description, count | terms | `sections` / `topics` |
 | `pages` | rendered page, slug, parent, template/noindex | `page` | published `pages` |
 | `corrections` | id, type, text, date, storyId, story summary | `byline_correction` | `corrections` on published stories |
-| `coverages` | slug, title, format, description, overview, start/end, status, artwork, ordered stories | `byline_coverage` | `coverages` |
+| `coverages` (public dataset name, unchanged) | slug, title, format, description, overview, overviewParagraphs, start/end, status, artwork, published stories in reading order | public Collections (`byline_collection_public_coverage()`) | public Collections (`src/newsroom/public-coverage.ts`) |
 | `schoolEvents` | canonical event records | `ww_school_event` | `events` |
 | `attachments` | referenced public metadata, sizes, `bylineImage.artDirection` | attachments | materialized `media` (public URLs only) |
 
@@ -231,7 +231,7 @@ legacy adapter), `copy-wordpress-media-to-out.mjs` for new media, and the
 ```text
 apps/newsroom  (Payload 3 + Next.js 16, private)
   ├── Payload admin with Byline custom views (Home, Stories, Calendar,
-  │   Media, Coverage, Search; Polls/Feedback/People for editors;
+  │   Media, Collections, Search; Polls/Feedback/People for editors;
   │   Pages/Publication/System for administrators)
   ├── collections + access control + hooks  (src/collections, src/access)
   ├── domain rules                           (src/domain: workflow, schedule, presets, readiness)
@@ -414,7 +414,7 @@ REST.
 
 **Byline supplies every staff-facing surface**, in the one Nova design system
 (`packages/newsroom-ui`, moved out of the WordPress plugin so both admins use
-the same components): Home, Stories, Calendar, Media Desk, Coverage,
+the same components): Home, Stories, Calendar, Media Desk, Collections,
 the Story screen (Write / Plan / Production / History), the article editor's
 interface, Preview, People, Polls, Feedback, search and the command palette.
 Buttons, menus, Command, Dialog/AlertDialog, Popover, Tooltip, ContextMenu,
@@ -427,7 +427,7 @@ integration, styled so they do not dictate how Byline looks.
 
 1. **Dashboard** (`admin.components.views.dashboard`) → Byline Home.
 2. **List views** (`collection.admin.components.views.list.Component`) →
-   Byline Stories, Media Desk, People, Coverage, Polls, Feedback.
+   Byline Stories, Media Desk, People, Collections, Polls, Feedback.
 3. **Story screen.** Payload's `DefaultEditView` owns the `Form`, autosave, the
    lock/take-over/read-only handling, leave-without-saving, stale-data
    detection and the Live Preview window. Replacing it (or the document root)
@@ -500,7 +500,6 @@ Still Payload's own UI, each with its replacement planned:
 
 | Surface | Interim | Replacement |
 | --- | --- | --- |
-| Coverage | not in staff navigation | Coverage workspace (Stories, Calendar and Media are ported) |
 | Lead image picker | Payload upload field | `MediaPickerDialog` (built for production files) + drag-and-drop (Phase 5) |
 | Body editing chrome | Payload Lexical toolbar/slash menu | `@byline/editor` Nova interface (Phase 3/6) |
 | Lock / take-over / read-only modals | Payload modals | Byline treatment of the same `useDocumentInfo` lock state |
@@ -565,16 +564,17 @@ same workspace data.
 **Stories is ported (Phase 1e).** `/admin/stories` (`components/BylineStories`,
 a custom root view in `DefaultTemplate`, account checked on the server) mounts
 the shared `StoriesPage` with Board and List; Payload's raw list at
-`/admin/collections/stories` stays the administrators' fallback, reached from
-System administration.
+`/admin/collections/stories` stays the fallback linked from administrators'
+System administration. Editors can still access that raw Story route directly;
+the Collections workspace route does not intercept it.
 
 - **Read model:** `GET /api/byline/planning` (`src/newsroom/planning.ts`) returns
   the shared `PlanningResponse`, never Payload documents. The collection is the
   stories whose plans the reader may read (editors: all; staff: managed and
   assigned work), read in full: Payload applies `limit` even with
   `pagination: false`, so complete reads give none. Every Planning filter runs on
-  the server, dates in the newsroom timezone; coverage membership comes from
-  `coverages.stories`.
+  the server, dates in the newsroom timezone; Collection membership
+  (`collectionId`) comes from `collections.stories`.
 - **Privacy:** reads are the user's (`overrideAccess: false`). A published
   story's unpublished rewrite is shown only to its managers; a participant reads
   the published story, and the rewrite never makes the story read as
@@ -596,7 +596,7 @@ System administration.
 
 Tested: `tests/integration/planning.test.ts` (24 tests: response shape, a
 124-story collection, staff/editor/participant scopes, drafts and rewrites,
-every filter, coverage, moves and inline edits, Preferences per account),
+every filter, Collection membership, moves and inline edits, Preferences per account),
 `tests/stories-saved-views.test.ts`, the plugin's `stories-page-host.test.tsx`,
 and in the browser at the six shell widths (rail/picker, Save, Edited, Delete +
 Undo through Preferences, Story Peek, `?view=list`).
@@ -612,7 +612,8 @@ publication, Published. Schedule-X, `temporal-polyfill` and `react-day-picker`
 are declared by `@byline/newsroom-screens` and `@byline/newsroom-ui`, not by the
 plugin.
 
-- **Read model:** `GET /api/byline/schedule?from&to[&tasks=1][&coverage=]`
+- **Read model:** `GET /api/byline/schedule?from&to[&tasks=1][&collectionId=]`
+  (`coverage=` and `collection=` are still accepted at the boundary)
   (`src/newsroom/schedule.ts`) returns the shared `ScheduleResponse`, built from
   Appointments, Production assignments and Tasks; story dates still come from
   Stories. There is no calendar collection. `from`/`to` are newsroom days, a
@@ -664,7 +665,30 @@ several, one read, the Stories filter and the Calendar event),
 `apps/newsroom/tests/calendar-workspace-shell.test.ts`, and the plugin's
 `calendar-host.test.ts`; in the browser at 1920/1440/1366/1300/1180/820/390.
 
-**Next slice: the rest of the screens.** Home's whole closure (44 files) touches
+**Collections (done): `/admin/collections`.** The canonical newsroom object is
+`collections`, with ordered story membership, a private reporting brief/team,
+`collection-interviews`, `collection-resources` and the existing `tasks` engine.
+Coverage/Series is optional `publicPresentation`, not another record or staff
+destination. The shared workspace exposes Overview / Stories / Reporting /
+Tasks / Resources / Public; Payload does not offer Activity. Editors can duplicate
+a Planning shell without copying reporting, membership, work or public settings.
+The list uses the normal sidebar. At ≥1280px an open workspace uses the rail
+plus flat Collection switcher (340px); below that, Switch collection opens a
+Sheet. Query state keeps the Collection, section and interview; explicit-save
+edits are guarded on section/shell/history navigation. Creation uses the shell's
+one dialog and requires name and type. Calendar, Home and Media integrations,
+permissions and raw Payload fallback routes are specified in
+[collections-workspace.md](collections-workspace.md).
+
+The old thin Payload `coverages` collection is removed. Migration
+`20261106_233140_collections` preserves IDs, public slugs/settings and membership
+in the new Collections model. `src/newsroom/public-coverage.ts` projects enabled
+public Collections into the existing `coverages` shape, with published stories
+only and complete reading order. It is tested build-input logic; wiring the
+snapshot/public renditions and importing WordPress remain later phases. It does
+not publish Payload-only settings to the production site.
+
+**Remaining screens.** Home's whole closure (44 files) touches
 WordPress only through an injected request function, `@wordpress/i18n` in one
 file and a wp-admin URL default. Planning (board, list, Schedule-X calendar), the Media Desk and
 the full Story Workspace sections moved into `packages/newsroom-screens` the same
@@ -673,13 +697,15 @@ Gutenberg panels that stay in the plugin). Each host
 then supplies its adapter: the plugin keeps its `wp-api-fetch` fetchers, and the
 newsroom implements the same `HomeFetchers`/`StoryFetchers` contracts over
 Payload REST with the plan and workspace collections. Each destination joins the
-staff navigation only once its screen is ported (Home and Stories have).
+staff navigation only once its screen is ported (Home, Stories, Calendar, Media
+and Collections have).
 
 ### 7.2 The Byline shell
 
 **Rule.** Payload owns infrastructure and the form/document lifecycle.
 `@byline/newsroom-ui` owns the staff-facing component system. The canonical app
-shell is shadcn/Base Nova. Raw Payload UI is administrator fallback only.
+shell is shadcn/Base Nova. Raw Payload navigation is administrator fallback;
+Story routes also host the native form lifecycle and remain accessible to editors.
 
 It is built from Payload's supported extension points; the template, the
 document root and the Edit view are untouched, so forms, autosave, validation,
@@ -687,17 +713,20 @@ drafts, versions, locks and publishing are exactly Payload's:
 
 | Extension point | Byline piece (`apps/newsroom/src/ui/shell`) | Role |
 | --- | --- | --- |
-| `admin.components.providers` | `BylineShellProvider` → `BylineShell` | One query cache; the one shadcn `SidebarProvider` (`display: contents`, ⌘\ toggles, state in the `byline_sidebar` cookie read on the server, width by layout); guarded navigation; the Create controller; the command palette; the Story switcher |
-| `admin.components.Nav` | `BylineNav` → `BylineSidebar` | One `Sidebar collapsible="icon"` whose contents are contextual (below): the global sidebar, the Story workspace's icon rail + Story list, or the Calendar workspace's icon rail + Calendar controls; a Sheet on phones |
+| `admin.components.providers` | `BylineShellProvider` → `BylineShell` | One query cache; the one shadcn `SidebarProvider` (`display: contents`, ⌘\ toggles, state in the `byline_sidebar` cookie read on the server, width by layout); guarded navigation; Create/Search; Story, Calendar, Media and Collections controllers |
+| `admin.components.Nav` | `BylineNav` → `BylineSidebar` | One `Sidebar collapsible="icon"` with global or contextual contents: the icon rail plus Story list, Calendar controls, Media navigator or Collection switcher; exact nav matching preserved |
 | `admin.components.header` | `BylineAppHeader` | Sticky header beside the sidebar: trigger, location, Search (⌘K) |
 | `admin.components.views.stories` | `BylineStories` (`/admin/stories`) | Byline Stories (Board, List, story views), account checked on the server |
 | `admin.components.views.calendar` | `BylineCalendar` (`/admin/calendar`) | Byline Calendar (Schedule-X over `GET /api/byline/schedule`), account checked on the server |
+| `admin.components.views.collections` + exact Next page | `BylineCollections` (`/admin/collections`; internal view `/byline-collections`) | Byline Collections; raw `/admin/collections/<slug>` routes keep Payload's catch-all |
 | `admin.components.views.system` | `SystemAdministration` (`/admin/system`) | Administrators' list of raw collection screens, role-checked on the server |
 
 - **Navigation** (`domain/navigation.ts` `NAVIGATION`): only destinations whose
-  Byline screen exists. Today that is Home, Stories and Calendar. Planned
-  order: Home, Stories, Calendar, Media, Coverage, then the editor tools
-  (People, Polls, Feedback). Never a generic Payload collection to fill the
+  Byline screen exists: Home, Stories, Calendar, Media, Collections, then the
+  editor tools (People, Polls, Feedback) as they are ported. A Collection is
+  the private newsroom project; public coverage or a series is only an
+  optional presentation of one, so there is no Coverage destination (the
+  public site keeps `/coverage/`). Never a generic Payload collection to fill the
   list. **There is no generic Planning destination.** WordPress's Planning page
   is an umbrella (tabs for Stories, Calendar, Media Desk, Collections, Content
   Health and Feedback); in Payload each of those is a first-class Byline
@@ -711,15 +740,18 @@ drafts, versions, locks and publishing are exactly Payload's:
   (expanded: "Create" makes a story, the chevron lists every kind; collapsed:
   "+" opens the list), Home's My Work "Task", the palette. A task created on a
   Story screen starts linked to that story; a new story opens its Byline Story
-  screen. **A future kind** (Coverage, Poll, Upload media) is added to
+  screen. Collection (editors) is one of them, after Story and Task: global
+  Create and the Collections screen's New collection open the same dialog.
+  **A future kind** (Poll) is added to
   `CREATE_ACTIONS` with its minimum role and gets its dialog in
   `create.tsx`, only when its Byline flow exists. No disabled "coming soon"
   entries.
 - **Search** (`ui/shell/search.tsx`): the shared `HomeCommands` palette on
   every screen (⌘K / Ctrl-K or the header). A screen that can show a story in
   place registers `useBylineSearch().setStoryOpener` (Home's Story Peek);
-  otherwise a chosen story opens its Story screen. People, Media and Coverage
-  join its results with their screens.
+  otherwise a chosen story opens its Story screen. Collections are in its
+  results by name only (never a brief, contact or resource address). People
+  and Media join with their screens.
 - **Home in the shell**: the shared `HomeApp` takes an optional `shell`
   (`HomeShell`: query client, `openCreate`, `setStoryOpener`). With it, Home
   drops its own New story, Search, ⌘K listener, dialogs, toaster and wp-admin
@@ -736,10 +768,12 @@ drafts, versions, locks and publishing are exactly Payload's:
 
 **One SidebarProvider, contextual composition.** Byline has one
 `SidebarProvider` and one outer `Sidebar`; what it contains is the shell's
-**composition** (`ShellComposition`: `default`, `story-workspace` or
-`calendar-workspace`, `ui/shell/layout.tsx`). It is chosen from the route
+**composition** (`ShellComposition`: `default`, `story-workspace`,
+`calendar-workspace`, `media-workspace` or `collection-workspace`,
+`ui/shell/layout.tsx`). It is chosen from the route
 (`ShellRoute`: `storyIdFromPath`, a saved story's `/collections/stories/:id`,
-never `/create` or a list; and `isCalendarPath`) and from which workspaces the
+never `/create` or a list; Calendar/Media paths; or an open Collection query)
+and from which workspaces the
 viewport is wide enough for (`ShellViewport`). Each workspace has its own
 breakpoint, measured for its own content:
 
@@ -748,9 +782,12 @@ breakpoint, measured for its own content:
 | Normal screens | Global app sidebar (`DefaultSidebar`), 256px |
 | Wide Story workspace (≥1300px) | Global icon rail + contextual Story list, 350px |
 | Wide Calendar workspace (≥1320px) | Global icon rail + the Calendar's controls, 350px |
-| Collapsed workspace (either) | Global icon rail, 48px |
+| Wide Media workspace (≥1024px) | Global icon rail + Media navigator, 320px |
+| Wide open Collection (≥1280px) | Global icon rail + Collection switcher, 340px |
+| Collapsed workspace | Global icon rail, 48px |
 | Narrow Story workspace (<1300px) | Normal global sidebar + a temporary Story switcher sheet |
 | Narrow Calendar (<1320px) | Normal global sidebar + the same Calendar controls in a temporary right-hand sheet |
+| Narrow open Collection (<1280px) | Normal global sidebar + Switch collection Sheet |
 
 - The wide Story workspace follows shadcn **`sidebar-09`** closely: the outer
   `Sidebar collapsible="icon" className="overflow-hidden
@@ -853,10 +890,10 @@ navigation:
 | Block | Byline use | When |
 | --- | --- | --- |
 | `dashboard-01` | Shell structure: sidebar + sticky header + content | Now |
-| `sidebar-09` (nested) | A contextual pane inside the one sidebar, beside the global icon rail. The Story workspace (Story switcher), the Calendar workspace (Calendar controls) and the Media workspace (Media navigator) have it. Coverage may get its own when its screen exists | Story, Calendar, Media: done. Others: with their screens |
-| `sidebar-13` (sidebar in a dialog) | The narrow-screen Story switcher Sheet and Calendar controls Sheet (same content as the workspace pane, no second provider) | Done |
+| `sidebar-09` (nested) | A contextual pane inside the one sidebar, beside the global icon rail. The Story workspace (Story switcher), the Calendar workspace (Calendar controls), the Media workspace (Media navigator) and the Collection workspace (Collection switcher) have it | Story, Calendar, Media, Collections: done. Others: with their screens |
+| `sidebar-13` (sidebar in a dialog) | The narrow-screen Story switcher, Calendar controls and Collection switcher Sheets (same content as the workspace pane, no second provider) | Done |
 | `sidebar-10` (popover) | Compact contextual actions; universal actions stay in the Command palette | As needed |
-| `sidebar-11` (file tree) | Only for really hierarchical data: Payload's Media folders (folders only; files stay in the content browser). Library scopes and Work views are plain menu items, never fake folders | Media: done |
+| `sidebar-11` (file tree) | Only for really hierarchical data: Payload's Media folders (folders only; files stay in the content browser). Library scopes and Work views are plain menu items, never fake folders. Never Collections: they are a flat set of projects | Media: done |
 | `sidebar-12` (calendar) | Calendar's contextual pane: mini calendar plus the newsroom's real categories (above) | Done |
 | `sidebar-14` / `sidebar-15` (right inspector) | Visual reference only for Media's asset inspector, which is a page-level `ResizablePanelGroup` panel (or a Sheet), not a second sidebar. The Story screen's inspector for workflow, deadline, editor, presentation, format, readiness and Preview controls not already edited inline; a Sheet on narrow screens | With the editor / Live Preview phase |
 
@@ -958,7 +995,7 @@ The torture-test story covers scrollytelling with a repository visual story.
 | 0 | This inventory | reviewed | done |
 | 1 | `apps/newsroom`, Postgres, migrations, auth skeleton, roles, storage skeleton, Byline nav/dashboard | boots; migration applies to an empty DB; access tests | **done** (see §13) |
 | 1b | Google sign-in strategy | invited-only sign-in test | — |
-| 2 | People, Stories, Sections, Topics, Coverages, Corrections, Pages, Workspace collections, canonical public model | access/privacy tests | collections + access **done**; canonical public model, `events`, YouTube metadata job pending |
+| 2 | People, Stories, Sections, Topics, Collections and optional public presentations, Corrections, Pages, Workspace records, canonical public model | access/privacy tests | collections + access **done**; Collections workspace and public compatibility projection done; full snapshot integration, `events`, YouTube metadata job pending |
 | 3 | Story view (Write/Plan/Production/History), Lexical, first blocks, autosave, locking, history | writer acceptance steps 1–6 | — |
 | 4 | Extract `@byline/story-presentations`, canonical normalization, exact Live Preview | §5 parity suite green | — |
 | 5 | Media: private storage, metadata, crops, materialization, drag and drop | media privacy + public availability tests | — |
@@ -993,7 +1030,9 @@ What exists in `apps/newsroom` (branch `feature/payload-newsroom`):
   `noindex` on every response, jobs restricted to administrators.
 - Collections: `users`, `people`, `stories` (Versions, Drafts, Autosave 1.2 s,
   schedulePublish, locking, trash), `story-plans`, `sections`, `topics`,
-  `coverages`, `corrections`, `pages` (Versions/Drafts), `media` (private,
+  `coverages` (since replaced by `collections`, `collection-interviews` and
+  `collection-resources`; see the Collections record above), `corrections`,
+  `pages` (Versions/Drafts), `media` (private,
   focal point, no destructive crop, no synchronous renditions), `live-updates`,
   `tasks`, `sources` (no contact fields), `appointments` (timing normalized
   server-side), `production-assignments`, `polls`; `byline_poll_votes` table.

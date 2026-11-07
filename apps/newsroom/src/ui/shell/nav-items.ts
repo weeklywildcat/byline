@@ -1,7 +1,7 @@
-import { CalendarDays, FileText, House, Images, KanbanSquare, MessageSquareText, Radio, Users, Vote, type LucideIcon } from "lucide-react";
+import { CalendarDays, FileText, House, Images, KanbanSquare, Layers, MessageSquareText, Users, Vote, type LucideIcon } from "lucide-react";
 import type { ShellUser } from "./NavUser";
 
-export type ShellNavLink = { key: string; label: string; path: string; href: string };
+export type ShellNavLink = { key: string; label: string; path: string; href: string; exact?: boolean };
 
 /** Everything both sidebar compositions show: destinations, the account, and its menu's addresses. */
 export type ShellSidebarProps = {
@@ -21,7 +21,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   planning: KanbanSquare,
   calendar: CalendarDays,
   media: Images,
-  coverage: Radio,
+  collections: Layers,
   people: Users,
   polls: Vote,
   feedback: MessageSquareText

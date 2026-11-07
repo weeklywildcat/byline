@@ -8,8 +8,13 @@ import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, 
 import { toast } from "sonner";
 import { ShellLayer } from "./layer";
 
-/** What a screen with a document open reports about it: edited since the last save, or a save in flight. */
-export type DocumentWorkState = { modified: boolean; saving: boolean };
+/**
+ * What a screen with a document open reports about it: edited since the last
+ * save, or a save in flight. `explicit`: the screen saves only when asked
+ * (a Collection's brief or interview), so there is no autosave to wait for
+ * and leaving asks at once, in the screen's own words (`description`).
+ */
+export type DocumentWorkState = { modified: boolean; saving: boolean; explicit?: boolean; description?: string };
 export type LeaveGuard = () => DocumentWorkState;
 
 /**
@@ -67,6 +72,7 @@ export function ShellNavigationProvider({ children }: { children: ReactNode }) {
   const guard = useRef<LeaveGuard | null>(null);
   const waiting = useRef(false);
   const [unsavedHref, setUnsavedHref] = useState<string | null>(null);
+  const [unsavedText, setUnsavedText] = useState("");
 
   const go = useCallback((href: string) => startRouteTransition(() => router.push(href)), [router, startRouteTransition]);
   const hasPendingWork = useCallback(() => {
@@ -77,6 +83,11 @@ export function ShellNavigationProvider({ children }: { children: ReactNode }) {
   const navigate = useCallback((href: string) => {
     const read = guard.current;
     if (!read || !hasPendingWork()) return go(href);
+    const state = read();
+    if (state.explicit) {
+      setUnsavedText(state.description ?? "");
+      return setUnsavedHref(href);
+    }
     if (waiting.current) return;
     waiting.current = true;
     const notice = toast.loading("Saving your changes…");
@@ -84,7 +95,10 @@ export function ShellNavigationProvider({ children }: { children: ReactNode }) {
       waiting.current = false;
       toast.dismiss(notice);
       if (saved) go(href);
-      else setUnsavedHref(href);
+      else {
+        setUnsavedText("");
+        setUnsavedHref(href);
+      }
     });
   }, [go, hasPendingWork]);
 
@@ -99,10 +113,10 @@ export function ShellNavigationProvider({ children }: { children: ReactNode }) {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
-              <AlertDialogDescription>Your latest changes to this story haven&apos;t been saved. If you leave now, they will be lost.</AlertDialogDescription>
+              <AlertDialogDescription>{unsavedText ? `${unsavedText} If you leave now, they will be lost.` : "Your latest changes to this story haven’t been saved. If you leave now, they will be lost."}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Stay on this story</AlertDialogCancel>
+              <AlertDialogCancel>{unsavedText ? "Stay" : "Stay on this story"}</AlertDialogCancel>
               <AlertDialogAction variant="destructive" onClick={() => { const href = unsavedHref; setUnsavedHref(null); if (href) go(href); }}>Leave anyway</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

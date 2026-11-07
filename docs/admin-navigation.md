@@ -5,7 +5,7 @@ WordPress owns the sidebar. Byline does not add a second global navigation shell
 ## Destinations
 
 - Posts, Media, Pages, and Users remain native WordPress screens.
-- Byline is the first sidebar menu, above Dashboard. It contains Home, Today, Stories, Calendar, Media Desk, Coverage, Performance, Content Health, Feedback, and Settings, in that order. The Planning destinations retain their existing `admin.php?page=byline-planning&tab=...` URLs; Planning no longer has a separate top-level menu.
+- Byline is the first sidebar menu, above Dashboard. It contains Home, Today, Stories, Calendar, Media Desk, Collections, Content Health, Feedback, and Settings, in that order. The Planning destinations retain their existing `admin.php?page=byline-planning&tab=...` URLs; Planning no longer has a separate top-level menu. Old Coverage bookmarks resolve to Collections; Performance bookmarks resolve to Today. Public `/coverage/` routes are unchanged.
 - Polls is a native post type with its own capability family and menu.
 - School Events retains its native post type, editor, and menu when enabled.
 - Newsletters provides Issues when the module is enabled and the user has publishing or editorial permissions. Provider settings live in Byline Settings.

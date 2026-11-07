@@ -34,8 +34,9 @@ right).
   icons or tree nodes. Work views (My assignments, All, Due soon, Needs files,
   Unassigned for editors) are query presets over the assignments the account
   may already see. Nothing is a persisted "smart folder". A future
-  **Collections** group (reference/smart collections) has a slot between Work
-  and Folders (`extraGroups`); it is deliberately not built yet.
+  Media reference/smart-group slot exists between Work and Folders
+  (`extraGroups`); it is not built yet and does not implement reporting
+  [Collections](collections-workspace.md) in the Media navigator.
 - **Folders are logical.** A Media document's `folder` is a relationship.
   Filing or moving a file never changes its URL or moves its object in R2.
 - **Search and folders are complementary.** Search covers filename, alt text,
@@ -75,7 +76,7 @@ own subtree is refused (Payload would silently re-parent). Sibling names are
 distinct, ignoring case.
 
 **File deletion is conservative.** A file still linked from a story,
-assignment, coverage or profile can't be deleted (409).
+assignment, Collection artwork/resource or profile can't be deleted (409).
 
 ## API (`/api/byline/media/*`, `apps/newsroom/src/newsroom/media-library.ts`)
 
@@ -99,7 +100,8 @@ No storage credentials, keys, hashes, renditions or art direction leave the
 server.
 
 **Linked uses** come from relationships: story `featuredMedia` (live or
-draft), production-assignment `media`, coverage `artwork`, live-update
+draft), production-assignment `media`, Collection `publicPresentation.artwork`
+and resource `media`, live-update
 `photo`, person `portrait`. Images inside rich text are not scanned yet, so the
 inspector says *Linked uses*, never "every use", and counts records the account
 can't open.
@@ -195,7 +197,8 @@ preview of 13 KB. A Library page of 48 tiles requested 48 previews, about
 
 ## Not in this slice
 
-Coverage workspace, Content Health, Feedback, People, Polls, public media
+The Collections workspace is documented in [collections-workspace.md](collections-workspace.md).
+Content Health, Feedback, People, Polls, public media
 materialization, smart collections or saved searches, AI tagging, face
 recognition, automatic classification, video storage. A backfill of the
 `library` preview for files imported before this migration (they show a

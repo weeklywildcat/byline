@@ -243,8 +243,17 @@ and every assignment row also has a right-click menu for Quick view, Workspace
 and status changes.
 
 Collections own reporting coordination and an optional public coverage presentation.
-The Overview keeps public controls behind a compact row and dialog. See
-[Collections](collections.md) for persistence, migration and compatibility.
+The shared workspace has Overview, Stories, Reporting, Tasks, Resources and
+Public; Activity is host-capability dependent (off in Payload). Public controls
+live in their own section, separate from the private brief and reporting.
+Creation requires a name and type. In Payload, Collections is its own
+`/admin/collections` destination, with an open project, section and interview
+in the query. A wide open workspace gets the global rail plus Collection
+switcher; narrow screens offer Switch collection in a Sheet. Tabs scroll within
+their strip on phones. Calendar remains the existing destination, scoped with
+`?collectionId=`. See [Collections workspace](collections-workspace.md) for the
+implemented Payload schema, shell, permissions and public projection, and
+[Collections](collections.md) for WordPress persistence and legacy compatibility.
 
 Feedback is an inbox-like `ItemGroup`, not a grid of cards: each note is one
 scannable item with its status action attached. Status changes are optimistic

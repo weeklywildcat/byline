@@ -12,6 +12,7 @@ import { workspaceQueryClient } from "@byline/newsroom-screens/workspace/workspa
 
 const env = vi.hoisted(() => ({
   pathname: "/admin",
+  search: "",
   wide: true,
   role: "editor" as string,
   push: (() => {}) as (href: string) => void,
@@ -29,6 +30,7 @@ vi.mock("@payloadcms/ui", () => ({
 }));
 vi.mock("next/navigation", () => ({
   usePathname: () => env.pathname,
+  useSearchParams: () => new URLSearchParams(env.search),
   useRouter: () => ({ push: (href: string) => env.push(href) })
 }));
 vi.mock("next/link", () => ({
@@ -163,8 +165,8 @@ describe("the contextual sidebar's layout", () => {
   const narrow = { storyWorkspace: false, calendarWorkspace: false };
 
   it("is a Story workspace only on a saved story's Story screen, on a wide screen", () => {
-    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", wide)).toEqual({ storyId: 12, calendar: false, media: false, composition: "story-workspace" });
-    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", narrow)).toEqual({ storyId: 12, calendar: false, media: false, composition: "default" });
+    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", wide)).toEqual({ storyId: 12, calendar: false, media: false, collections: false, collectionId: null, composition: "story-workspace" });
+    expect(shellLayoutFor("/admin/collections/stories/12", "/admin", narrow)).toEqual({ storyId: 12, calendar: false, media: false, collections: false, collectionId: null, composition: "default" });
     for (const path of ["/admin", "/admin/stories", "/admin/collections/stories", "/admin/collections/stories/create"]) {
       expect(shellLayoutFor(path, "/admin", wide).composition).toBe("default");
     }

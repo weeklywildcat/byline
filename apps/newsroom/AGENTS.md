@@ -35,7 +35,8 @@ snapshot; nothing in this app serves public reading.
 - **Byline UI, Payload underneath.** Payload owns infrastructure and the
   form/document lifecycle. `@byline/newsroom-ui` owns the staff-facing
   component system. The canonical app shell is shadcn/Base Nova. Raw Payload
-  UI is administrator fallback only. Use Payload's extension points
+  navigation is administrator fallback; raw Story routes also serve the native
+  Story form and remain accessible to editors. Use Payload's extension points
   (providers, `Nav`, `header`, dashboard, list and custom views, custom Field
   components) and its hooks (`useField`, `useForm`, `useDocumentInfo`) so
   form state stays Payload's. Do not replace the template, the Edit view or
@@ -57,6 +58,27 @@ snapshot; nothing in this app serves public reading.
   state; never let a screen own sidebar state; the viewport is never a
   collapsed preference. New contextual modes join `ShellLayout` only when
   their screen exists.
+- **Collections** (`/admin/collections`,
+  [docs/collections-workspace.md](../../docs/collections-workspace.md)) are the
+  canonical private reporting projects. Coverage/Series is only optional
+  `collections.publicPresentation`; never restore a separate `coverages`
+  authority or a staff Coverage destination. `collections.stories` owns ordered
+  membership; interviews/resources are shared records and work uses `tasks`.
+  Collection membership grants no Story access. Use `access/collection-context.ts`
+  for decisions; contacts and tasks retain their narrower access.
+- **Collection shell:** the list keeps the global sidebar; an open Collection
+  (`?collection=`, `&tab=`, `&interview=`) gets the rail plus flat project
+  switcher at ≥1280px (340px total), otherwise Switch collection opens the same
+  content in a Sheet. `CollectionsWorkspaceShell` owns the switcher, preferences
+  and guarded history; never a second sidebar provider or folder hierarchy.
+  Preserve `exact` when mapping navigation: `/admin/collections/<slug>` is raw
+  Payload, not this destination. The exact Next page renders Payload's RootPage
+  with the internally registered `/byline-collections` view; keep raw routes intact.
+- **Collection saves** are explicit, including brief/interview/public settings.
+  Route all moves through the existing dirty guard and shell leave guard. Do not
+  treat these like Story autosave. The public projection in
+  `newsroom/public-coverage.ts` is allowlisted and published-only; full snapshot
+  delivery/materialization and WordPress cutover remain later work.
 - **Media** (`/admin/media`, [docs/media-workspace.md](../../docs/media-workspace.md))
   is Library (Payload Media + Payload-native folders) and Work (the shared
   production desk), kept apart. The wide Media workspace is the rail plus
@@ -71,7 +93,8 @@ snapshot; nothing in this app serves public reading.
 - **Leave through the shell.** Payload disables its leave prompt for
   autosaving documents. Shell links use `ShellLink`/`useShellNavigation()`,
   which wait for the Story screen's own autosave (reported by `useLeaveGuard`)
-  or ask. Never `window.location.assign` to another Byline screen, and never a
+  or ask. Explicit-save Collection edits ask through the same shell's guard.
+  Never `window.location.assign` to another Byline screen, and never a
   second save path.
 - **Navigation** lists a destination (`src/domain/navigation.ts`) only once its
   Byline screen exists; never a generic Payload collection. Raw collections are
@@ -105,8 +128,9 @@ snapshot; nothing in this app serves public reading.
   `.byline-ui-root`; hide with the `hidden` class.
 - **Custom root views** (`admin.components.views`) render without Payload's
   template; wrap them in `DefaultTemplate` so they get the shell.
-- **Byline screens own their routes** (`/admin/stories`); Payload's raw
-  collection lists stay administrator fallbacks. Wrap a screen's client root in
+- **Byline screens own their routes** (`/admin/stories`); raw collection links
+  stay in administrator fallback navigation, with Story-route access as above.
+  Wrap a screen's client root in
   `AdminRoot toaster={false}` (the scoped Nova styles; the shell owns the toaster).
 - **Complete reads:** Payload applies `limit` even with `pagination: false`. A
   read that must be complete (a collection, people, a story's work) passes

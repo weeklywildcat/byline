@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, ImageIcon } from "lucide-react";
-import { Button } from "@byline/newsroom-ui/ui/button";
+import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
@@ -84,9 +84,9 @@ export function CollectionPublicPresentation({ detail, actions }: { detail: Coll
           </p>
         </div>
         {c.publicUrl ? (
-          <Button variant="outline" size="sm" render={<a href={c.publicUrl} target="_blank" rel="noopener noreferrer" />}>
+          <a href={c.publicUrl} target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: "outline", size: "sm" })}>
             View coverage ↗
-          </Button>
+          </a>
         ) : null}
       </header>
       {!canEdit ? (

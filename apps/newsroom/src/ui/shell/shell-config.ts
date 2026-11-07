@@ -12,7 +12,7 @@ export const SIDEBAR_SHORTCUT = "\\";
  * rem→px compile, and Payload's root font is not 16px). The icon width is the
  * collapsed sidebar and, in a workspace, the global rail.
  */
-export const SIDEBAR_WIDTH = { default: 256, storyWorkspace: 350, calendarWorkspace: 350, mediaWorkspace: 320, icon: 48, mobile: 288 } as const;
+export const SIDEBAR_WIDTH = { default: 256, storyWorkspace: 350, calendarWorkspace: 350, mediaWorkspace: 320, collectionWorkspace: 340, icon: 48, mobile: 288 } as const;
 
 /**
  * The narrowest viewport that gets the Story workspace sidebar (shadcn's
@@ -81,3 +81,17 @@ export const MEDIA_WORKSPACE_QUERY = `(min-width: ${MEDIA_WORKSPACE_MIN_WIDTH}px
  */
 export const MEDIA_INSPECTOR_MIN_WIDTH = 1440;
 export const MEDIA_INSPECTOR_QUERY = `(min-width: ${MEDIA_INSPECTOR_MIN_WIDTH}px)`;
+
+/**
+ * Collections' own geometry. The Collection workspace sidebar is the icon
+ * rail plus the Collection switcher, 340px in all (a 292px pane: two-line
+ * rows, a name of about 32 characters before it wraps). The screen has 48px
+ * of side padding (lg:px-6), so the workspace's content is viewport - 388.
+ * See COLLECTION_WORKSPACE_MIN_WIDTH for the measurement.
+ */
+export const COLLECTION_GEOMETRY = { sidebar: 340, sidePadding: 48, contentMin: 880, propertiesAt: 960 } as const;
+export const COLLECTION_WORKSPACE_MIN_WIDTH = 1280;
+export const COLLECTION_WORKSPACE_QUERY = `(min-width: ${COLLECTION_WORKSPACE_MIN_WIDTH}px)`;
+
+/** The Collection switcher's remembered view (Payload Preferences, never a schema field). */
+export const COLLECTION_SWITCHER_VIEW_PREFERENCE = "byline:collections:switcher-view:v1";

@@ -24,7 +24,7 @@ export async function BylineNav({ user, payload }: ServerProps) {
   };
   return (
     <BylineSidebar
-      items={navigationFor(account.role).map((item) => ({ key: item.key, label: item.label, path: item.path, href: `${admin}${item.path}` || "/" }))}
+      items={navigationFor(account.role).map((item) => ({ key: item.key, label: item.label, path: item.path, ...(item.exact ? { exact: true } : {}), href: `${admin}${item.path}` || "/" }))}
       adminRoute={admin}
       homeHref={admin || "/"}
       user={shellUser}

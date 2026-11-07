@@ -368,3 +368,62 @@ describe("Shared resources", () => {
     expect((await call("delete", "/byline/collection-resources/:id", "editor", { params: { id: file } })).status).toBe(204);
   });
 });
+
+describe("Public coverage: a projection of public Collections", () => {
+  it("is only public Collections, with only published stories, in public reading order", async () => {
+    const { publicCoverages } = await import("../../src/newsroom/public-coverage");
+    const photo = await sharp({ create: { width: 120, height: 80, channels: 3, background: "#135" } }).jpeg().toBuffer();
+    const art = await call("post", "/byline/media/upload", "editor", { data: {}, file: { data: photo, mimetype: "image/jpeg", name: "finals-art.jpg", size: photo.length } });
+    await payload.update({ collection: "media", id: art.body.id, data: { alt: "The band at finals" }, overrideAccess: true });
+    const saved = await patch("editor", band, {
+      publicPresentation: {
+        publicEnabled: true,
+        publicFormat: "series",
+        publicTitle: "  Road to   State ",
+        publicSlug: "Road to State!",
+        publicDescription: "Six weeks with the band.",
+        publicOverview: "The band has practiced since July.\r\n\r\n\r\nFollow every step <b>to state</b>.",
+        artworkAttachmentId: art.body.id,
+        featuredStoryId: story.results,
+        storyOrder: [story.results, story.extra0, story.leadDraft, story.preview]
+      }
+    });
+    expect(saved.status).toBe(200);
+    const coverages = await publicCoverages(payload);
+    expect(coverages.map((c) => c.id)).toEqual([band]);
+    const [coverage] = coverages;
+    expect(coverage).toMatchObject({
+      slug: "road-to-state",
+      title: "Road to State",
+      format: "series",
+      description: "Six weeks with the band.",
+      status: "active",
+      artwork: { id: art.body.id, alt: "The band at finals" }
+    });
+    // Plain text, never HTML: the angle brackets are the text, and paragraphs are what Astro renders as <p>.
+    expect(coverage.overviewParagraphs).toEqual(["The band has practiced since July.", "Follow every step <b>to state</b>."]);
+    // Unpublished stories (the lead's draft, the writer's) keep their place internally but never appear.
+    const order = coverage.stories.map((s) => s.id);
+    expect(order.slice(0, 3)).toEqual([story.results, story.extra0, story.preview]);
+    expect(order).not.toContain(story.leadDraft);
+    expect(order).not.toContain(story.secret);
+    expect(order).toHaveLength(10);
+    expect(coverage.stories.map((s) => s.part)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    // Nothing private leaves: no brief, team, interviews, tasks, resources or contacts.
+    const text = JSON.stringify(coverages);
+    for (const secret of ["Angles", "555-0100", "Bus schedule", "Book the bus", "Drum major", "collections-lead"]) expect(text).not.toContain(secret);
+  });
+
+  it("maps the newsroom status to the public one, and a newsroom-only Collection has no public face", async () => {
+    const { publicCoverages } = await import("../../src/newsroom/public-coverage");
+    const expected = { planning: "upcoming", active: "active", "wrapping-up": "past", archived: "archived" } as const;
+    for (const [status, publicStatus] of Object.entries(expected)) {
+      await payload.update({ collection: "collections", id: band, data: { status: status as never }, req: await reqAs("editor"), overrideAccess: false });
+      expect((await publicCoverages(payload))[0].status).toBe(publicStatus);
+    }
+    await payload.update({ collection: "collections", id: band, data: { status: "active" }, req: await reqAs("editor"), overrideAccess: false });
+    const off = await patch("editor", band, { publicPresentation: { ...(await detail("editor", band)).body.collection.publicPresentation, publicEnabled: false } });
+    expect(off.status).toBe(200);
+    expect(await publicCoverages(payload)).toEqual([]);
+  });
+});

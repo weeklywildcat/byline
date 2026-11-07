@@ -3,9 +3,12 @@
 import { HomeCreate } from "@byline/newsroom-screens/home/HomeCreate";
 import { mediaRouteSearch, DEFAULT_MEDIA_ROUTE } from "@byline/newsroom-screens/media/media-library-model";
 import { MediaUploadDialog } from "@byline/newsroom-screens/media/MediaUploadDialog";
+import { CollectionDialog } from "@byline/newsroom-screens/collections/CollectionDialog";
+import { collectionsKey } from "@byline/newsroom-screens/collections/collection-api";
+import { createPayloadCollectionApi } from "../collections/payload-collection-api";
 import { homeKey } from "@byline/newsroom-screens/home/home-query";
 import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import { createContext, use, useCallback, useMemo, useState, type ReactNode } from "react";
 import { createActionsFor, storyIdFromPath, type CreateAction, type CreateKind } from "../../domain/navigation";
@@ -53,12 +56,14 @@ export function BylineCreateProvider({ children }: { children: ReactNode }) {
   const { navigate } = useShellNavigation();
   const fetchers = useMemo(() => createPayloadHomeFetchers(routes.api), [routes.api]);
   const media = useMemo(() => createPayloadMediaFetchers(routes.api), [routes.api]);
+  const collections = useMemo(() => createPayloadCollectionApi(routes.api), [routes.api]);
+  const client = useQueryClient();
   const [request, setRequest] = useState<{ kind: CreateKind; storyId: number | null; folderId: number | null } | null>(null);
   // Uploads keep running after the dialog closes; its root stays mounted until they finish.
   const [uploading, setUploading] = useState(false);
   const actions = useMemo(() => (account ? createActionsFor(account.role) : []), [account?.role]);
   // Task needs the newsroom's stories and people; Home has usually loaded them already.
-  const home = useQuery({ queryKey: homeKey, queryFn: () => fetchers.getHome!(), enabled: request !== null && request.kind !== "media" && Boolean(account) });
+  const home = useQuery({ queryKey: homeKey, queryFn: () => fetchers.getHome!(), enabled: request !== null && (request.kind === "story" || request.kind === "task") && Boolean(account) });
 
   const openCreate = useCallback((kind: CreateKind, options?: CreateOptions) => {
     if (!actions.some((action) => action.kind === kind)) return;
@@ -77,8 +82,22 @@ export function BylineCreateProvider({ children }: { children: ReactNode }) {
       {children}
       {account ? (
         <>
-          <ShellLayer active={request !== null && request.kind !== "media"}>
-            <HomeCreate kind={request?.kind === "media" ? null : (request?.kind ?? null)} storyId={request?.storyId} onClose={() => setRequest(null)} onStoryCreated={openStory} fetchers={fetchers} data={home.data} />
+          <ShellLayer active={request?.kind === "story" || request?.kind === "task"}>
+            <HomeCreate kind={request?.kind === "story" || request?.kind === "task" ? request.kind : null} storyId={request?.storyId} onClose={() => setRequest(null)} onStoryCreated={openStory} fetchers={fetchers} data={home.data} />
+          </ShellLayer>
+          {/* One New collection flow: global Create and the Collections screen's button both open it. */}
+          <ShellLayer active={request?.kind === "collection"}>
+            {request?.kind === "collection" ? (
+              <CollectionDialog
+                api={collections}
+                onClose={() => setRequest(null)}
+                onSaved={(created) => {
+                  setRequest(null);
+                  void client.invalidateQueries({ queryKey: collectionsKey });
+                  navigate(`${routes.admin}/collections?collection=${created.id}`);
+                }}
+              />
+            ) : null}
           </ShellLayer>
           <ShellLayer active={request?.kind === "media" || uploading}>
             <MediaUploadDialog

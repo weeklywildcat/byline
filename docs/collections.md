@@ -1,5 +1,9 @@
 # Collections
 
+This document covers WordPress persistence and compatibility. The shared
+workspace also runs in Payload; see [Collections workspace](collections-workspace.md)
+for that implementation, its current capabilities and the migration boundary.
+
 Collections live inside Planning (`admin.php?page=byline-planning&tab=collections`).
 A workspace uses `&collection=<id>`; an interview can be opened directly with
 `&interview=<id>`. Collections are the single newsroom grouping primitive. They coordinate independent stories; membership never moves,
@@ -9,11 +13,12 @@ copies, or changes publication of a story.
 
 The compact list supports search, status, lead/member, archived state, and sorting.
 Overflow and context menus consume the same action definition. Creation requires
-only a name and immediately opens the workspace. Duplication creates a Planning
-shell with the existing brief, dates, type, and lead; it deliberately does not
+name and type and immediately opens the workspace. WordPress duplication creates
+a Planning shell with the existing brief, dates, type, and lead; it deliberately does not
 copy reporting, people assignments, tasks, files, or story relationships.
 
-The workspace has Overview, Stories, Interviews, Tasks, Resources, and Activity.
+The shared workspace has Overview, Stories, Reporting, Tasks, Resources and Public,
+plus Activity when the host provides it (WordPress does; Payload does not).
 The brief includes lightweight key-angle notes. Large screens place editable
 properties beside the reporting; narrower screens put properties after the brief.
 There is no Collection calendar tab: View in Calendar scopes the existing calendar.
@@ -107,10 +112,10 @@ at 1440, 1280, 1024, 768, and 390px, including popup geometry and document overf
 
 ## Optional public coverage
 
-The Overview ends with a compact Public coverage section. A Collection remains
+The Public section holds the optional public presentation. A Collection remains
 newsroom-only until a user with both Collection edit access and `publish_posts`
-explicitly saves its public presentation. Publish as coverage opens a dialog;
-public controls do not compete with reporting coordination on the overview.
+explicitly saves its public presentation. Public controls are separate from
+reporting coordination on the overview.
 
 The private `_byline_collection_public` meta object contains `publicEnabled`,
 `publicFormat`, `publicTitle`, `publicSlug`, `publicDescription`, `publicOverview`,

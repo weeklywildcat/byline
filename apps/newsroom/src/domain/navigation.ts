@@ -6,6 +6,8 @@ export type NavItem = {
   /** Path below the admin route. */
   readonly path: string;
   readonly minimumRole: Role;
+  /** Active only on exactly its path (Collections: Payload's raw `/collections/<slug>` screens are not it). */
+  readonly exact?: boolean;
 };
 
 const RANK: Record<Role, number> = { staff: 1, editor: 2, administrator: 3 };
@@ -18,12 +20,28 @@ export const CALENDAR_PATH = "/calendar";
 export const MEDIA_PATH = "/media";
 
 /**
+ * Collections' address below the admin route: exactly `/collections` (a
+ * Collection, its section and an open interview are the query). Payload's
+ * raw collection screens live below it (`/collections/<slug>`) and are never
+ * this destination.
+ */
+export const COLLECTIONS_PATH = "/collections";
+
+/**
+ * The Collections view's internal Payload path. Payload refuses a custom view
+ * at exactly `/collections`, so `app/(payload)/admin/collections/page.tsx`
+ * serves that address by rendering the view registered here.
+ */
+export const COLLECTIONS_VIEW_PATH = "/byline-collections";
+
+/**
  * Byline's newsroom navigation: the only primary navigation anyone sees.
  *
  * A destination appears here only once its Byline screen exists; staff are
- * never sent to a generic Payload collection screen. The planned order is
- * Home, Stories, Calendar, Media, Coverage, then the editor tools (People,
- * Polls, Feedback…); each joins as its screen is ported
+ * never sent to a generic Payload collection screen. The order is Home,
+ * Stories, Calendar, Media, Collections (reporting projects; public coverage
+ * is only an optional presentation of a Collection, never a destination),
+ * then the editor tools (People, Polls, Feedback…), each as its screen is ported
  * (docs/payload-migration.md §7.2). There is no generic Planning
  * destination: WordPress's Planning page was an umbrella over these screens,
  * and here each is first-class. Visibility is a convenience; every
@@ -33,7 +51,8 @@ export const NAVIGATION: readonly NavItem[] = [
   { key: "home", label: "Home", path: "", minimumRole: "staff" },
   { key: "stories", label: "Stories", path: "/stories", minimumRole: "staff" },
   { key: "calendar", label: "Calendar", path: CALENDAR_PATH, minimumRole: "staff" },
-  { key: "media", label: "Media", path: MEDIA_PATH, minimumRole: "staff" }
+  { key: "media", label: "Media", path: MEDIA_PATH, minimumRole: "staff" },
+  { key: "collections", label: "Collections", path: COLLECTIONS_PATH, minimumRole: "staff", exact: true }
 ];
 
 export function navigationFor(role: Role): NavItem[] {
@@ -44,18 +63,18 @@ export function navigationFor(role: Role): NavItem[] {
  * The navigation entry a path belongs to, if any. Home matches only itself;
  * a story's Story screen belongs to Stories.
  */
-export function activeNavKey(items: readonly Pick<NavItem, "key" | "path">[], pathname: string, adminRoute: string): string | null {
+export function activeNavKey(items: readonly Pick<NavItem, "key" | "path" | "exact">[], pathname: string, adminRoute: string): string | null {
   if (storyIdFromPath(pathname, adminRoute) !== null && items.some((item) => item.key === "stories")) return "stories";
   const path = stripAdmin(pathname, adminRoute);
   const match = items
-    .filter((item) => (item.path === "" ? path === "" : path === item.path || path.startsWith(`${item.path}/`)))
+    .filter((item) => (item.path === "" || item.exact ? path === item.path : path === item.path || path.startsWith(`${item.path}/`)))
     .sort((a, b) => b.path.length - a.path.length)[0];
   return match?.key ?? null;
 }
 
 /* ---------------------------------------------------------------- Create */
 
-export type CreateKind = "story" | "task" | "media";
+export type CreateKind = "story" | "task" | "collection" | "media";
 
 export type CreateAction = {
   readonly kind: CreateKind;
@@ -65,13 +84,14 @@ export type CreateAction = {
 
 /**
  * What the global Create control offers, in menu order. The first allowed
- * entry is the primary action. An entry is added only when its Byline flow
- * exists (Coverage and Poll join with their screens); the server enforces
- * each create regardless.
+ * entry is the primary action, and the order follows how often each is
+ * made. An entry is added only when its Byline flow exists (Poll joins with
+ * its screen); the server enforces each create regardless.
  */
 export const CREATE_ACTIONS: readonly CreateAction[] = [
   { kind: "story", label: "Story", minimumRole: "staff" },
   { kind: "task", label: "Task", minimumRole: "staff" },
+  { kind: "collection", label: "Collection", minimumRole: "editor" },
   { kind: "media", label: "Upload media", minimumRole: "staff" }
 ];
 
@@ -147,6 +167,11 @@ export function storyIdFromPath(pathname: string, adminRoute: string): number | 
 /** Whether a path is the Calendar (with or without a trailing slash or query). */
 export function isCalendarPath(pathname: string, adminRoute: string): boolean {
   return stripAdmin(pathname, adminRoute) === CALENDAR_PATH;
+}
+
+/** Whether a path is the Collections screen (the list or an open Collection: that is its query). */
+export function isCollectionsPath(pathname: string, adminRoute: string): boolean {
+  return stripAdmin(pathname, adminRoute) === COLLECTIONS_PATH;
 }
 
 /** Whether a path is the Media screen (any view, folder or asset: those are its query). */

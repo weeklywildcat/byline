@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
-import { Button } from "@byline/newsroom-ui/ui/button";
+import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { ItemGroup, ItemContent, ItemTitle, ItemDescription, ItemActions } from "@byline/newsroom-ui/ui/item";
 import { ItemButton } from "@byline/newsroom-ui/components/item-button";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
@@ -85,22 +85,17 @@ export function CollectionOverview({
             <p className="text-sm text-muted-foreground">Nothing dated yet. Schedule an interview, a story deadline or a task.</p>
           )}
           {host.calendarHref ? (
-            <Button
-              variant="link"
-              className="h-auto px-0"
-              render={
-                <a
-                  href={host.calendarHref(c.id)}
-                  onClick={(event) => {
-                    if (!host.openCalendar || event.metaKey || event.ctrlKey || event.shiftKey) return;
-                    event.preventDefault();
-                    host.openCalendar(c.id);
-                  }}
-                />
-              }
+            <a
+              href={host.calendarHref(c.id)}
+              className={buttonVariants({ variant: "link", className: "h-auto px-0" })}
+              onClick={(event) => {
+                if (!host.openCalendar || event.metaKey || event.ctrlKey || event.shiftKey) return;
+                event.preventDefault();
+                host.openCalendar(c.id);
+              }}
             >
               View in Calendar
-            </Button>
+            </a>
           ) : null}
         </section>
         <section className="order-4 @min-[960px]/collection:order-none" aria-labelledby="collection-progress">
