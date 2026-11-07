@@ -25,7 +25,10 @@
       "@byline/design": ["../../packages/design/src/index.ts"],
       "@byline/theme-contract": ["../../packages/theme-contract/src/index.ts"],
       "@byline/theme-weekly-wildcat": ["../../packages/theme-weekly-wildcat/src/index.ts"],
-      "@byline/ui": ["../../packages/ui/src/index.ts"]
+      "@byline/ui": ["../../packages/ui/src/index.ts"],
+      "@byline/ui/article-body": ["../../packages/ui/src/article-body/index.ts"],
+      "@byline/article-body": ["../../packages/article-body/src/index.ts"],
+      "@byline/article-body/fixtures": ["../../packages/article-body/src/fixtures.ts"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,

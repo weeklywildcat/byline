@@ -1,0 +1,58 @@
+/*
+ * The article body: the reading measure, prose typography and the Byline story
+ * blocks, exactly as readers see them.
+ *
+ * One stylesheet, three hosts. article.css imports it for the public site and
+ * Preview as Byline; the Payload newsroom imports it for the Story editor's
+ * canvas (docs/article-editor.md). The editor adds controls around this
+ * article; it never restyles it. Supporting partials (captions, credits,
+ * labels, context, timeline, layout breakouts) are in newsroom-blocks.css,
+ * which every host loads first.
+ *
+ * Scope: rules apply inside `.byline-article-view .article-body`. Theme rules
+ * apply under `data-byline-theme` on <html> (the public site) or on an
+ * ancestor element (an editor canvas inside an application).
+ */
+:root { --article-width: 760px; --article-wide-width: 1040px; --article-full-width: 1440px; }
+
+/* Prose. */
+.byline-article-view .article-body figcaption { color: var(--muted); display: grid; gap: 4px; font-family: var(--font-ui); font-size: .8rem; line-height: 1.45; margin-top: 8px; }
+.byline-article-view .article-body figcaption p { margin: 0; }
+.byline-article-view .article-body figcaption .photo-credit { max-width: none; text-align: left; }
+.byline-article-view .article-body { font-size: 1.17rem; line-height: 1.72; }
+.byline-article-view .article-body p { text-wrap: pretty; }
+.byline-article-view .article-body > *:first-child { margin-top: 0; }
+.byline-article-view .article-body a { color: var(--link); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.byline-article-view .article-body p, .byline-article-view .article-body ul, .byline-article-view .article-body ol, .byline-article-view .article-body blockquote, .byline-article-view .article-body figure, .byline-article-view .article-body .wp-block-image, .byline-article-view .article-body .wp-block-embed { margin: 0 0 1.35em; }
+.byline-article-view .article-body ul, .byline-article-view .article-body ol { padding-left: 1.3em; }
+.byline-article-view .article-body li + li { margin-top: .35em; }
+.byline-article-view .article-body h2, .byline-article-view .article-body h3, .byline-article-view .article-body h4 { font-family: var(--font-ui); font-weight: 600; line-height: 1.1; margin: 1.5em 0 .55em; }
+.byline-article-view .article-body h2 { font-size: 1.75rem; }
+.byline-article-view .article-body h3 { font-size: 1.42rem; }
+.byline-article-view .article-body blockquote, .byline-article-view .article-body .wp-block-quote { border-left: 4px solid var(--accent); color: #33302c; font-size: 1.28rem; line-height: 1.45; padding-left: 18px; }
+.byline-article-view .article-body .wp-block-pullquote { border-bottom: 1px solid var(--rule); border-top: 1px solid var(--rule); font-size: 1.45rem; line-height: 1.35; margin: 2em 0; padding: 20px 0; text-align: left; }
+.byline-article-view .article-body .wp-block-pullquote blockquote { border-left: 0; margin-bottom: 0; padding-left: 0; }
+.byline-article-view .article-body .wp-block-image img, .byline-article-view .article-body figure img { border: 0; }
+.byline-article-view .article-body .wp-block-embed__wrapper { width: 100%; }
+.byline-article-view .article-body iframe, .byline-article-view .article-body video { max-width: 100%; }
+:is(html[data-byline-theme="weekly-wildcat"], [data-byline-theme="weekly-wildcat"]) .byline-article-view .article-body { font-family: var(--font-serif); }
+:is(html[data-byline-theme="weekly-wildcat"], [data-byline-theme="weekly-wildcat"]) .byline-article-view .article-body h2, :is(html[data-byline-theme="weekly-wildcat"], [data-byline-theme="weekly-wildcat"]) .byline-article-view .article-body h3, :is(html[data-byline-theme="weekly-wildcat"], [data-byline-theme="weekly-wildcat"]) .byline-article-view .article-body h4 { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.012em; }
+@media (max-width: 640px) {
+  .byline-article-view .article-body { font-size: 1.08rem; }
+}
+/* Captions set in the serif reading face; credits are figure.css's ("Photo: Name"). */
+.byline-article-view .article-body figcaption { font-family: var(--font-serif); font-size: .9rem; line-height: 1.4; }
+
+/*
+ * Byline story blocks (byline-v1). Each block's outermost element is a frame:
+ * `.byline-block.byline-block-<type>`, plus `alignwide` / `alignfull` for a
+ * wider placement, so the breakout geometry in newsroom-blocks.css applies
+ * as it does to every other wide element. On the public page the frame is a
+ * <div> from ArticleBody; in the editor it is the editor's own block element.
+ * Inside the frame, each block draws the same structure in both places, and
+ * its own margins collapse through the frame as if it were the frame. The
+ * feature partials (figure, context, timeline, story-base) own the visual
+ * rules for these classes beside the legacy WordPress selectors.
+ */
+.byline-article-view .article-body > .byline-block { margin: 0; min-width: 0; }
+.byline-article-view .article-body > .byline-block:is(.alignwide, .alignfull) { margin-block: var(--story-moment-space, 2.25rem); }

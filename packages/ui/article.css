@@ -1,5 +1,6 @@
-/* Shared article presentation styles. Hosts provide theme variables. */
-:root { --article-width: 760px; --article-wide-width: 1040px; --article-full-width: 1440px; }
+/* Shared article presentation styles. Hosts provide theme variables.
+   The article body (measure, prose, story blocks) is article-body.css, shared with the newsroom editor. */
+@import "./article-body.css";
 .byline-article-view.article-shell { margin: 0 auto; max-width: calc(var(--article-full-width) + 40px); container: byline-content / inline-size; padding: 38px 20px 72px; }
 .byline-article-view .article-story { margin: 0 auto; max-width: var(--article-width, 760px); }
 .byline-article-view .article-header { border-bottom: 1px solid var(--rule); margin-bottom: 24px; padding-bottom: 20px; }
@@ -36,26 +37,9 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 .byline-article-view .featured-image img { background: #ede8e2; border: 1px solid var(--rule); width: 100%; }
 .byline-article-view .featured-image-caption-row { align-items: start; display: flex; gap: 12px; justify-content: space-between; }
 .byline-article-view .featured-image-caption { min-width: 0; }
-.byline-article-view .featured-image figcaption, .byline-article-view .article-body figcaption { color: var(--muted); display: grid; gap: 4px; font-family: var(--font-ui); font-size: .8rem; line-height: 1.45; margin-top: 8px; }
-.byline-article-view .featured-image figcaption p, .byline-article-view .article-body figcaption p { margin: 0; }
+.byline-article-view .featured-image figcaption { color: var(--muted); display: grid; gap: 4px; font-family: var(--font-ui); font-size: .8rem; line-height: 1.45; margin-top: 8px; }
+.byline-article-view .featured-image figcaption p { margin: 0; }
 .byline-article-view .photo-credit { color: var(--soft-muted); flex: 0 0 auto; font-weight: 800; max-width: 40%; text-align: right; text-transform: uppercase; }
-.byline-article-view .article-body figcaption .photo-credit { max-width: none; text-align: left; }
-.byline-article-view .article-body { font-size: 1.17rem; line-height: 1.72; }
-.byline-article-view .article-body p { text-wrap: pretty; }
-.byline-article-view .article-body > *:first-child { margin-top: 0; }
-.byline-article-view .article-body a { color: var(--link); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-.byline-article-view .article-body p, .byline-article-view .article-body ul, .byline-article-view .article-body ol, .byline-article-view .article-body blockquote, .byline-article-view .article-body figure, .byline-article-view .article-body .wp-block-image, .byline-article-view .article-body .wp-block-embed { margin: 0 0 1.35em; }
-.byline-article-view .article-body ul, .byline-article-view .article-body ol { padding-left: 1.3em; }
-.byline-article-view .article-body li + li { margin-top: .35em; }
-.byline-article-view .article-body h2, .byline-article-view .article-body h3, .byline-article-view .article-body h4 { font-family: var(--font-ui); font-weight: 600; line-height: 1.1; margin: 1.5em 0 .55em; }
-.byline-article-view .article-body h2 { font-size: 1.75rem; }
-.byline-article-view .article-body h3 { font-size: 1.42rem; }
-.byline-article-view .article-body blockquote, .byline-article-view .article-body .wp-block-quote { border-left: 4px solid var(--accent); color: #33302c; font-size: 1.28rem; line-height: 1.45; padding-left: 18px; }
-.byline-article-view .article-body .wp-block-pullquote { border-bottom: 1px solid var(--rule); border-top: 1px solid var(--rule); font-size: 1.45rem; line-height: 1.35; margin: 2em 0; padding: 20px 0; text-align: left; }
-.byline-article-view .article-body .wp-block-pullquote blockquote { border-left: 0; margin-bottom: 0; padding-left: 0; }
-.byline-article-view .article-body .wp-block-image img, .byline-article-view .article-body figure img { border: 0; }
-.byline-article-view .article-body .wp-block-embed__wrapper { width: 100%; }
-.byline-article-view .article-body iframe, .byline-article-view .article-body video { max-width: 100%; }
 .byline-article-view .article-tags { border-top: 1px solid var(--rule); margin-top: 36px; padding-top: 16px; }
 .byline-article-view .article-tags h2, .byline-article-view .article-update-notice h2 { color: var(--soft-muted); font-family: var(--font-ui); font-size: .72rem; font-weight: 800; margin: 0 0 10px; text-transform: uppercase; }
 .byline-article-view .article-tags span { border: 1px solid var(--rule); color: var(--muted); font-family: var(--font-ui); font-size: .72rem; font-weight: 800; padding: 7px 9px; text-transform: uppercase; }
@@ -175,8 +159,6 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1
 html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-header h1 { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; text-wrap: balance; }
 html[data-byline-theme="weekly-wildcat"] .byline-article-view.article-shell-opinion .article-header h1 { font-family: "Libre Caslon Condensed", Georgia, "Times New Roman", serif; font-size: 3.2rem; font-weight: 500; letter-spacing: 0; line-height: 1.04; }
 html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-excerpt { font-family: var(--font-serif); font-size: 1.1rem; line-height: 1.45; }
-html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body { font-family: var(--font-serif); }
-html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body h2, html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body h3, html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-body h4 { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.012em; }
 html[data-byline-theme="weekly-wildcat"] .byline-article-view .story-teaser h2, html[data-byline-theme="weekly-wildcat"] .byline-article-view .about-writer-body h3, html[data-byline-theme="weekly-wildcat"] .byline-article-view .article-tip-callout h2 { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.01em; }
 @media (max-width: 640px) {
   .byline-article-view { padding-left: 16px; padding-right: 16px; }
@@ -188,7 +170,6 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .story-teaser h2, 
   .byline-article-view .article-byline-avatar { height: 36px; width: 36px; }
   .byline-article-view .article-byline-avatar + .article-byline-avatar { margin-left: -12px; }
   .byline-article-view .article-share-actions button { height: 34px; width: 34px; }
-  .byline-article-view .article-body { font-size: 1.08rem; }
   .byline-article-view .about-writer-layout { gap: 12px; }
   .byline-article-view .about-writer-avatar { height: 64px; width: 64px; }
 }
@@ -196,8 +177,7 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .story-teaser h2, 
 /* Photo credits are set in Libre Franklin under every image, as "Photo: Name"
    rather than shouting capitals, and a portrait lead photo
    is cropped to a landscape frame so it doesn't run past the first screen. */
-.byline-article-view .featured-image figcaption,
-.byline-article-view .article-body figcaption { font-family: var(--font-serif); font-size: .9rem; line-height: 1.4; }
+.byline-article-view .featured-image figcaption { font-family: var(--font-serif); font-size: .9rem; line-height: 1.4; }
 .byline-article-view .photo-credit { color: var(--soft-muted); font-family: var(--font-ui); font-size: .78rem; font-style: normal; font-weight: 500; letter-spacing: 0; text-transform: none; }
 .byline-article-view .featured-image-portrait img { aspect-ratio: 4 / 3; height: auto; object-fit: cover; object-position: center 38%; }
 @media (max-width: 640px) {

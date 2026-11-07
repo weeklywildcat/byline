@@ -57,7 +57,8 @@
 }
 /* A caption sits under the edge of what it describes; under a full-bleed
    figure it joins the reading column instead of hugging the window. */
-:where(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) :is(.alignfull) > figcaption {
+:where(.byline-article-view .article-body, .editor-styles-wrapper .is-root-container) :is(.alignfull) > figcaption,
+:where(.byline-article-view .article-body) .byline-block.alignfull > .byline-photo > figcaption {
   box-sizing: border-box;
   margin-inline: auto;
   max-width: var(--article-width, 760px);
