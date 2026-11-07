@@ -6,6 +6,25 @@ import { privateMediaDir } from "./paths";
 import { preparePublicationMedia, PreparationError } from "./prepare";
 import { MEDIA_QUEUE, PREPARE_PUBLICATION_MEDIA_TASK, preparationConcurrencyKey, type PreparePublicationMediaInput } from "./queue";
 import { markPreparationFailed, markPreparationStarted, promotePreparedGeneration } from "./state";
+import { readCurrentRevision } from "../db/publication-state";
+import { queuePublicSnapshot } from "../public/queue";
+
+/**
+ * A newly ready generation may be exactly what the current public snapshot was
+ * waiting for (a published photo whose crop changed advances the public
+ * revision, and that revision's snapshot cannot complete until the media is
+ * ready). Re-queue snapshot preparation for the CURRENT revision without
+ * advancing it; when nothing references the asset, or the snapshot is
+ * already current, the snapshot job no-ops. A failure to queue is logged, not
+ * fatal: the media itself is ready, and `publication:snapshot:prepare` recovers.
+ */
+async function requeuePublicSnapshot(payload: Payload, mediaId: number) {
+  try {
+    await queuePublicSnapshot(payload, { revision: await readCurrentRevision(payload), reason: `media ${mediaId} prepared` });
+  } catch (error) {
+    payload.logger.error({ err: error, msg: `Media ${mediaId} is ready, but the public snapshot could not be re-queued. Run publication:snapshot:prepare.` });
+  }
+}
 
 export type PreparationOutcome = "ready" | "failed" | "stale" | "missing" | "worker-outdated";
 
@@ -58,7 +77,9 @@ export async function runPublicationMediaPreparation(payload: Payload, input: Pr
   const after = await currentMedia(payload, input.mediaId);
   if (!after || after.publicationRevision !== input.revision) return "stale";
   const promoted = await promotePreparedGeneration(payload, { id: input.mediaId, revision: input.revision, recipeVersion: PUBLICATION_MEDIA_RECIPE_VERSION, sourceHash: result.sourceHash, manifest: result.manifest });
-  return promoted ? "ready" : "stale";
+  if (!promoted) return "stale";
+  await requeuePublicSnapshot(payload, input.mediaId);
+  return "ready";
 }
 
 /**

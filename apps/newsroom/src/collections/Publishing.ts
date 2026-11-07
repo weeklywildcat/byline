@@ -4,6 +4,7 @@ import { administratorsOnly, editorsOnly, relationId, requestUser, signedIn } fr
 import { proseEditor } from "../editor/prose";
 import { CORRECTION_TYPE_OPTIONS } from "../domain/vocabulary";
 import { legacyIdField, slugField } from "../fields/slug";
+import { scheduleFutureCorrection } from "../public/scheduled";
 
 /** Corrections, clarifications, editor's notes and substantive updates: first-class records on a story. */
 export const Corrections: CollectionConfig = {
@@ -21,7 +22,9 @@ export const Corrections: CollectionConfig = {
         if (operation === "create" && !data.createdBy) data.createdBy = requestUser(req)?.id ?? null;
         return data;
       }
-    ]
+    ],
+    // A correction shown publicly from a future time becomes a public change at that time.
+    afterChange: [scheduleFutureCorrection]
   },
   fields: [
     { name: "story", type: "relationship", relationTo: "stories", required: true, index: true },
@@ -46,6 +49,13 @@ export const Pages: CollectionConfig = {
   lockDocuments: { duration: 300 },
   trash: true,
   access: { read: signedIn, create: administratorsOnly, update: administratorsOnly, delete: administratorsOnly },
+  hooks: {
+    // The first publication time is the public page's date (WordPress `date`); set once and kept.
+    beforeChange: [({ data, originalDoc }) => {
+      if (data._status === "published" && !data.publishedAt && !originalDoc?.publishedAt) data.publishedAt = new Date().toISOString();
+      return data;
+    }]
+  },
   fields: [
     { name: "title", type: "text", required: true, maxLength: 200 },
     slugField("title", "pages"),
@@ -53,6 +63,7 @@ export const Pages: CollectionConfig = {
     { name: "summary", type: "textarea", maxLength: 600 },
     { name: "body", type: "richText", editor: proseEditor },
     { name: "noindex", label: "Hide from search engines", type: "checkbox", defaultValue: false, admin: { position: "sidebar" } },
+    { name: "publishedAt", type: "date", index: true, admin: { position: "sidebar", readOnly: true, description: "First publication." } },
     legacyIdField()
   ]
 };

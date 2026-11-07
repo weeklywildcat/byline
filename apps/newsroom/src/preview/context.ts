@@ -6,6 +6,7 @@ import { plainPublicText } from "../collections/Collections";
 import { publicReadingOrder } from "../newsroom/public-coverage";
 import type { ScreenContext } from "../newsroom/screen-models";
 import { payloadStorySummary, type PayloadImage } from "./payload-story";
+import { loadPreviewPublication } from "./publication";
 
 /**
  * The small authenticated read model behind Live Preview's article: what a
@@ -100,7 +101,9 @@ export async function storyPreviewContext(ctx: ScreenContext, storyId: number, q
     })
     .map((correction) => ({ id: String(correction.id), type: correction.type, date: correction.date ?? null, text: correction.text }));
 
-  const summary = (doc: unknown) => payloadStorySummary(doc as Record<string, unknown>);
+  // Article URLs are dated in the publication's timezone (the published Global), exactly as the public snapshot dates them.
+  const publication = await loadPreviewPublication(payload);
+  const summary = (doc: unknown) => payloadStorySummary(doc as Record<string, unknown>, publication);
   const series: PreviewSeriesContext[] = [];
   for (const collection of collections.docs) {
     const presentation = collection.publicPresentation;

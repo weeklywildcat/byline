@@ -78,6 +78,7 @@ export interface Config {
     'collection-resources': CollectionResource;
     corrections: Correction;
     pages: Page;
+    events: Event;
     'live-updates': LiveUpdate;
     tasks: Task;
     sources: Source;
@@ -115,6 +116,7 @@ export interface Config {
     'collection-resources': CollectionResourcesSelect<false> | CollectionResourcesSelect<true>;
     corrections: CorrectionsSelect<false> | CorrectionsSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
+    events: EventsSelect<false> | EventsSelect<true>;
     'live-updates': LiveUpdatesSelect<false> | LiveUpdatesSelect<true>;
     tasks: TasksSelect<false> | TasksSelect<true>;
     sources: SourcesSelect<false> | SourcesSelect<true>;
@@ -133,8 +135,12 @@ export interface Config {
     defaultIDType: number;
   };
   fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    publication: Publication;
+  };
+  globalsSelect: {
+    publication: PublicationSelect<false> | PublicationSelect<true>;
+  };
   locale: null;
   widgets: {
     collections: CollectionsWidget;
@@ -143,6 +149,8 @@ export interface Config {
   jobs: {
     tasks: {
       'prepare-publication-media': TaskPreparePublicationMedia;
+      'prepare-public-snapshot': TaskPreparePublicSnapshot;
+      'advance-public-revision': TaskAdvancePublicRevision;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -664,6 +672,35 @@ export interface Page {
     [k: string]: unknown;
   } | null;
   noindex?: boolean | null;
+  /**
+   * First publication.
+   */
+  publishedAt?: string | null;
+  legacyWordPressId?: number | null;
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "events".
+ */
+export interface Event {
+  id: number;
+  title: string;
+  /**
+   * Part of the public URL. Changing it after publication breaks links.
+   */
+  slug: string;
+  eventType?: string | null;
+  startAt: string;
+  endAt?: string | null;
+  allDay?: boolean | null;
+  location?: string | null;
+  description?: string | null;
+  externalUrl?: string | null;
+  eventStatus: 'scheduled' | 'canceled';
   legacyWordPressId?: number | null;
   updatedAt: string;
   createdAt: string;
@@ -893,7 +930,12 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'prepare-publication-media' | 'schedulePublish';
+        taskSlug:
+          | 'inline'
+          | 'prepare-publication-media'
+          | 'prepare-public-snapshot'
+          | 'advance-public-revision'
+          | 'schedulePublish';
         taskID: string;
         input?:
           | {
@@ -926,7 +968,15 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'prepare-publication-media' | 'schedulePublish') | null;
+  taskSlug?:
+    | (
+        | 'inline'
+        | 'prepare-publication-media'
+        | 'prepare-public-snapshot'
+        | 'advance-public-revision'
+        | 'schedulePublish'
+      )
+    | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -987,6 +1037,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'pages';
         value: number | Page;
+      } | null)
+    | ({
+        relationTo: 'events';
+        value: number | Event;
       } | null)
     | ({
         relationTo: 'live-updates';
@@ -1339,6 +1393,28 @@ export interface PagesSelect<T extends boolean = true> {
   summary?: T;
   body?: T;
   noindex?: T;
+  publishedAt?: T;
+  legacyWordPressId?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "events_select".
+ */
+export interface EventsSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  eventType?: T;
+  startAt?: T;
+  endAt?: T;
+  allDay?: T;
+  location?: T;
+  description?: T;
+  externalUrl?: T;
+  eventStatus?: T;
   legacyWordPressId?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -1575,6 +1651,271 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "publication".
+ */
+export interface Publication {
+  id: number;
+  identity: {
+    name: string;
+    shortName: string;
+    description: string;
+    organizationName: string;
+    tagline: string;
+  };
+  location: {
+    display: string;
+    city: string;
+    region: string;
+    /**
+     * ISO 3166-1 alpha-2, e.g. US.
+     */
+    country: string;
+    address: string;
+  };
+  locale: string;
+  /**
+   * IANA timezone. Article dates and URLs use it.
+   */
+  timezone: string;
+  urls: {
+    publicSite: string;
+    /**
+     * The publication's public CMS address as readers' tools know it. Not the private newsroom.
+     */
+    cms: string;
+    contact: string;
+  };
+  branding: {
+    masthead: {
+      url: string;
+      alt?: string | null;
+      width?: number | null;
+      height?: number | null;
+    };
+    logo: {
+      url: string;
+      alt?: string | null;
+      width?: number | null;
+      height?: number | null;
+    };
+    organizationLogo: {
+      url: string;
+      alt?: string | null;
+      width?: number | null;
+      height?: number | null;
+    };
+    icons?:
+      | {
+          url: string;
+          alt?: string | null;
+          width?: number | null;
+          height?: number | null;
+          id?: string | null;
+        }[]
+      | null;
+    defaultSocialImage: {
+      url: string;
+      alt?: string | null;
+      width?: number | null;
+      height?: number | null;
+    };
+  };
+  /**
+   * Byline uses the Weekly Wildcat theme only; there are no generic themes or token overrides.
+   */
+  appearance: {
+    theme: 'weekly-wildcat';
+  };
+  sections?:
+    | {
+        name: string;
+        slug: string;
+        active?: boolean | null;
+        description?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  navigation?:
+    | {
+        label: string;
+        url: string;
+        locations: ('header' | 'footer')[];
+        group?: string | null;
+        /**
+         * Hidden when this feature is off.
+         */
+        feature?: ('sports' | 'events' | 'polls' | 'newsletter' | 'discord') | null;
+        id?: string | null;
+      }[]
+    | null;
+  social?:
+    | {
+        service: string;
+        label: string;
+        url: string;
+        id?: string | null;
+      }[]
+    | null;
+  features?: {
+    sports?: boolean | null;
+    events?: boolean | null;
+    polls?: boolean | null;
+    newsletter?: boolean | null;
+    discord?: boolean | null;
+  };
+  licensing: {
+    copyrightNotice: string;
+    imageLicenseUrl: string;
+    acquireLicensePage: string;
+  };
+  seo: {
+    defaultTitle: string;
+    defaultDescription: string;
+    organizationType: 'NewsMediaOrganization' | 'Organization';
+  };
+  _status?: ('draft' | 'published') | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "publication_select".
+ */
+export interface PublicationSelect<T extends boolean = true> {
+  identity?:
+    | T
+    | {
+        name?: T;
+        shortName?: T;
+        description?: T;
+        organizationName?: T;
+        tagline?: T;
+      };
+  location?:
+    | T
+    | {
+        display?: T;
+        city?: T;
+        region?: T;
+        country?: T;
+        address?: T;
+      };
+  locale?: T;
+  timezone?: T;
+  urls?:
+    | T
+    | {
+        publicSite?: T;
+        cms?: T;
+        contact?: T;
+      };
+  branding?:
+    | T
+    | {
+        masthead?:
+          | T
+          | {
+              url?: T;
+              alt?: T;
+              width?: T;
+              height?: T;
+            };
+        logo?:
+          | T
+          | {
+              url?: T;
+              alt?: T;
+              width?: T;
+              height?: T;
+            };
+        organizationLogo?:
+          | T
+          | {
+              url?: T;
+              alt?: T;
+              width?: T;
+              height?: T;
+            };
+        icons?:
+          | T
+          | {
+              url?: T;
+              alt?: T;
+              width?: T;
+              height?: T;
+              id?: T;
+            };
+        defaultSocialImage?:
+          | T
+          | {
+              url?: T;
+              alt?: T;
+              width?: T;
+              height?: T;
+            };
+      };
+  appearance?:
+    | T
+    | {
+        theme?: T;
+      };
+  sections?:
+    | T
+    | {
+        name?: T;
+        slug?: T;
+        active?: T;
+        description?: T;
+        id?: T;
+      };
+  navigation?:
+    | T
+    | {
+        label?: T;
+        url?: T;
+        locations?: T;
+        group?: T;
+        feature?: T;
+        id?: T;
+      };
+  social?:
+    | T
+    | {
+        service?: T;
+        label?: T;
+        url?: T;
+        id?: T;
+      };
+  features?:
+    | T
+    | {
+        sports?: T;
+        events?: T;
+        polls?: T;
+        newsletter?: T;
+        discord?: T;
+      };
+  licensing?:
+    | T
+    | {
+        copyrightNotice?: T;
+        imageLicenseUrl?: T;
+        acquireLicensePage?: T;
+      };
+  seo?:
+    | T
+    | {
+        defaultTitle?: T;
+        defaultDescription?: T;
+        organizationType?: T;
+      };
+  _status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "collections_widget".
  */
 export interface CollectionsWidget {
@@ -1596,6 +1937,32 @@ export interface TaskPreparePublicationMedia {
   output: {
     outcome?: string | null;
   };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskPrepare-public-snapshot".
+ */
+export interface TaskPreparePublicSnapshot {
+  input: {
+    revision: number;
+    reason?: string | null;
+  };
+  output: {
+    outcome?: string | null;
+    revision?: number | null;
+    sha256?: string | null;
+    message?: string | null;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskAdvance-public-revision".
+ */
+export interface TaskAdvancePublicRevision {
+  input: {
+    reason?: string | null;
+  };
+  output?: unknown;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

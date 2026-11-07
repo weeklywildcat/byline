@@ -86,7 +86,7 @@ type Built = { ok: true; presentation: ArticlePresentation } | { ok: false; erro
 function build(doc: StoryDoc, context: StoryPreviewContext | null, publication: PreviewPublication): Built {
   try {
     const { story } = payloadPublicStory(doc, { publication, corrections: context?.corrections });
-    const self = { ...payloadStorySummary(doc), listed: true };
+    const self = { ...payloadStorySummary(doc, publication), listed: true };
     const series: PublicSeriesInput<PayloadImage>[] = (context?.series ?? []).map((entry) => ({
       id: entry.id,
       title: entry.title,

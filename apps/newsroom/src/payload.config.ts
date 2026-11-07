@@ -18,6 +18,12 @@ import { Appointments, ProductionAssignments, Sources, Tasks } from "./collectio
 import { Sections, Topics } from "./collections/Taxonomies";
 import { Users } from "./collections/Users";
 import { addPollVotesTable } from "./db/poll-votes";
+import { addPublicationStateTable } from "./db/publication-state";
+import { Events } from "./collections/Events";
+import { Publication } from "./globals/Publication";
+import { withPublicTracking } from "./public/tracking";
+import { preparePublicSnapshotTask } from "./public/snapshot/task";
+import { advancePublicRevisionTask } from "./public/scheduled";
 import { proseEditor } from "./editor/prose";
 import { dropClientIds } from "./hooks/imported-ids";
 import { newsroomTimeZone } from "./domain/dates";
@@ -33,7 +39,10 @@ function required(name: string): string {
   return value;
 }
 
-/** Every collection refuses client-chosen IDs; only the controlled import may keep WordPress IDs. */
+/**
+ * Every collection refuses client-chosen IDs; only the controlled import may keep WordPress IDs.
+ * Collections that reach the public site also record public mutations (`public/tracking.ts`).
+ */
 function withImportIdGuard(collection: CollectionConfig): CollectionConfig {
   return { ...collection, hooks: { ...collection.hooks, beforeValidate: [dropClientIds, ...(collection.hooks?.beforeValidate ?? [])] } };
 }
@@ -58,6 +67,7 @@ const collections: CollectionConfig[] = [
   CollectionResources,
   Corrections,
   Pages,
+  Events,
   LiveUpdates,
   Tasks,
   Sources,
@@ -72,7 +82,9 @@ export default buildConfig({
   secret: required("PAYLOAD_SECRET"),
   editor: proseEditor,
   sharp,
-  collections: collections.map(withImportIdGuard),
+  collections: collections.map((collection) => withImportIdGuard(withPublicTracking(collection))),
+  // The publication's public configuration (administrators; drafts stage changes, only the published Global is public).
+  globals: [Publication],
   // Camera originals are larger than Payload's 20 MB multipart default.
   upload: { limits: { fileSize: MEDIA_UPLOAD_MAX_BYTES } },
   // Payload's native folders, for Media (logical organization, never storage paths).
@@ -84,7 +96,7 @@ export default buildConfig({
     migrationDir: path.resolve(dirname, "migrations"),
     // The WordPress import keeps existing IDs; `dropClientIds` stops anyone else choosing one.
     allowIDOnCreate: true,
-    beforeSchemaInit: [addPollVotesTable]
+    beforeSchemaInit: [addPollVotesTable, addPublicationStateTable]
   }),
   graphQL: { disable: true },
   // The newsroom screens' API (/api/byline/...); every handler re-checks the account.
@@ -129,7 +141,8 @@ export default buildConfig({
     }
   },
   jobs: {
-    // Per-asset exclusive keys with `supersedes` (prepare-publication-media): one preparation per asset at a time.
+    // Per-asset exclusive keys with `supersedes` (prepare-publication-media): one preparation per asset at a time;
+    // one exclusive, superseding key for the public snapshot (prepare-public-snapshot).
     enableConcurrencyControl: true,
     // Job API access stays administrator-only; Byline queues its own work as the system.
     access: {
@@ -141,7 +154,9 @@ export default buildConfig({
       ...defaultJobsCollection,
       admin: { ...defaultJobsCollection.admin, group: "System", hidden: ({ user }) => !atLeast(newsroomUser(user), "administrator") }
     }),
-    tasks: [preparePublicationMediaTask]
+    // Queue ownership: `media` → `jobs:media` (Phase 5), `publication` → `jobs:publication`
+    // (public snapshots), `default` → `jobs:scheduled` (Payload's scheduled publish).
+    tasks: [preparePublicationMediaTask, preparePublicSnapshotTask, advancePublicRevisionTask]
   },
   typescript: { outputFile: path.resolve(dirname, "payload-types.ts") },
   telemetry: false

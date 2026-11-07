@@ -15,6 +15,7 @@ import { mediaWork } from "./media-work";
 import { artDirectionView, retryPublication, saveArtDirection } from "../publication-media/media-publication";
 import { publicationMediaReport, type MediaRequirement } from "../publication-media/readiness";
 import { buildMediaEndpoint } from "../publication-media/build-endpoint";
+import { buildSnapshotEndpoints } from "../public/snapshot/endpoints";
 
 /** `?lead=12&ids=3,4`: the lead image and every other Media a story references (at most 200). */
 function readinessQuery(params: URLSearchParams): MediaRequirement[] {
@@ -542,5 +543,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/tasks/:id", method: "delete", handler: handle(deleteTask) },
   ...collectionEndpoints,
   // Build-only (BYLINE_BUILD_TOKEN), never the signed-in newsroom: prepared publication blobs by SHA-256.
-  buildMediaEndpoint
+  buildMediaEndpoint,
+  // Build-only public snapshot discovery, artifacts and direct-source recovery (BYLINE_BUILD_TOKEN).
+  ...buildSnapshotEndpoints
 ];

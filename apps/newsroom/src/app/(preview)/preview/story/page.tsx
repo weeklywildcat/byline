@@ -2,7 +2,7 @@ import config from "@payload-config";
 import { headers } from "next/headers";
 import { getPayload } from "payload";
 import { newsroomUser } from "../../../../access/user";
-import { previewPublication } from "../../../../preview/publication";
+import { loadPreviewPublication } from "../../../../preview/publication";
 import { StoryPreview } from "../../../../preview/StoryPreview";
 
 /**
@@ -25,7 +25,7 @@ export default async function StoryPreviewPage() {
   return (
     <StoryPreview
       signedIn={signedIn}
-      publication={previewPublication()}
+      publication={await loadPreviewPublication(payload)}
       fixtures={process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.NODE_ENV !== "production"}
     />
   );

@@ -1,9 +1,9 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { isSha256 } from "@byline/content";
 import type { Endpoint, PayloadRequest } from "payload";
+import { authenticateBuildRequest, BUILD_NO_STORE, buildRefusal, buildTokenMatches } from "../build/auth";
 import { publicationStore } from "./blob-store";
 
 /**
@@ -21,29 +21,15 @@ import { publicationStore } from "./blob-store";
  * The build verifies the hash, size and type itself.
  */
 export const BUILD_MEDIA_PATH = "/byline/build/media/:sha256";
-const MIN_TOKEN_LENGTH = 32;
-const NO_STORE = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
 
-const digest = (value: string) => createHash("sha256").update(value, "utf8").digest();
+/** Kept for existing callers; the shared build-auth module owns the comparison. */
+export { buildTokenMatches };
 
-/** Constant-time comparison of a presented bearer credential with the configured one. */
-export function buildTokenMatches(presented: string | null | undefined, configured: string | undefined): boolean {
-  if (!configured || configured.length < MIN_TOKEN_LENGTH || !presented) return false;
-  return timingSafeEqual(digest(presented), digest(configured));
-}
-
-function bearer(req: PayloadRequest): string | null {
-  const header = req.headers.get("authorization") ?? "";
-  const match = /^Bearer\s+(\S+)$/i.exec(header.trim());
-  return match ? match[1] : null;
-}
-
-const refuse = (status: number, message: string) => Response.json({ message }, { status, headers: NO_STORE });
+const refuse = (status: number, message: string) => buildRefusal(status, { message });
 
 export async function serveBuildMedia(req: PayloadRequest, env: Record<string, string | undefined> = process.env): Promise<Response> {
-  const configured = env.BYLINE_BUILD_TOKEN;
-  if (!configured || configured.length < MIN_TOKEN_LENGTH) return refuse(404, "Not found.");
-  if (!buildTokenMatches(bearer(req), configured)) return refuse(401, "A build credential is required.");
+  const refused = authenticateBuildRequest(req, env);
+  if (refused) return refused;
   const sha256 = String(req.routeParams?.sha256 ?? "");
   if (!isSha256(sha256)) return refuse(400, "Expected a SHA-256.");
   const file = publicationStore().objectPath(sha256);
@@ -59,7 +45,7 @@ export async function serveBuildMedia(req: PayloadRequest, env: Record<string, s
   const body = Readable.toWeb(createReadStream(file)) as ReadableStream<Uint8Array>;
   return new Response(body, {
     status: 200,
-    headers: { ...NO_STORE, "Content-Type": "application/octet-stream", "Content-Length": String(size), "X-Byline-Sha256": sha256 }
+    headers: { ...BUILD_NO_STORE, "Content-Type": "application/octet-stream", "Content-Length": String(size), "X-Byline-Sha256": sha256 }
   });
 }
 

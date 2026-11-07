@@ -15,6 +15,7 @@ import {
   type StoryImageUsage
 } from "@byline/content/story";
 import { formatVideoDuration, parseYouTubeVideoId, youTubeEmbedUrl } from "@byline/core";
+import { publicStoryPath } from "@byline/content";
 import { articleMediaFromPayload, normalizePayloadStoryBody, type NormalizeIssue } from "@byline/editor/normalize";
 import type { PreviewPublication } from "./publication";
 
@@ -124,11 +125,13 @@ function contributor(person: Doc): PublicStoryContributor<PayloadImage> {
   };
 }
 
-/** `/<yyyy>/<mm>/<dd>/<section>/<slug>/`, the public article route, once it can be known. */
-function storyHref(slug: string, section: Doc | null, publishedAt: string): string {
-  const day = publishedAt.slice(0, 10).split("-");
-  const sectionSlug = section ? text(section.slug) : "";
-  return slug && sectionSlug && day.length === 3 ? `/${day[0]}/${day[1]}/${day[2]}/${sectionSlug}/${slug}/` : "";
+/**
+ * `/<yyyy>/<mm>/<dd>/<section>/<slug>/`, the public article route, once it can
+ * be known: dated by the publication's calendar day (the shared
+ * `publicStoryPath`, the same helper the public snapshot uses).
+ */
+function storyHref(slug: string, section: Doc | null, publishedAt: string, timeZone: string): string {
+  return publicStoryPath({ slug, sectionSlug: section ? text(section.slug) : "", publishedAt, timeZone });
 }
 
 function deckHtml(deck: string) {
@@ -194,7 +197,7 @@ export function payloadPublicStory(doc: Doc, options: PayloadStoryOptions): Payl
       return media ? previewMediaAsset(media) : null;
     } }
   );
-  const href = storyHref(text(doc.slug), section, publishedAt);
+  const href = storyHref(text(doc.slug), section, publishedAt, options.publication.timeZone);
   const topics = populatedList(doc.topics).map(topicTerm).filter((term): term is PublicTerm => term !== null);
   const primarySection = sectionTerm(section);
   const people = populatedList(doc.contributors);
@@ -233,7 +236,7 @@ export function payloadPublicStory(doc: Doc, options: PayloadStoryOptions): Payl
 }
 
 /** Another (published) Story as a card, relatedness and coverage facts. */
-export function payloadStorySummary(doc: Doc): PublicStorySummary<PayloadImage> {
+export function payloadStorySummary(doc: Doc, publication: Pick<PreviewPublication, "timeZone">): PublicStorySummary<PayloadImage> {
   const section = populated(doc.section as Relation);
   const featured = populated(doc.featuredMedia as Relation);
   const publishedAt = text(doc.publishedAt) || text(doc.updatedAt);
@@ -244,7 +247,7 @@ export function payloadStorySummary(doc: Doc): PublicStorySummary<PayloadImage> 
   return {
     id: doc.id as number,
     title: text(doc.headline) || "Untitled story",
-    href: storyHref(text(doc.slug), section, publishedAt) || "#",
+    href: storyHref(text(doc.slug), section, publishedAt, publication.timeZone) || "#",
     excerptHtml: deckHtml(text(doc.deck)),
     image: featured && isImage(featured) ? { media: featured } : null,
     section: term,
