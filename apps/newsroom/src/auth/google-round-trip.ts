@@ -36,14 +36,14 @@ export function readGoogleRoundTrip(cookie: string | undefined, state: string | 
   }
 }
 
-export function googleCookieName(secure: boolean) {
-  return secure ? "__Host-byline-google" : "byline-google";
+export function googleCookieName(secure: boolean, flow: "code" | "button" = "code") {
+  return `${secure ? "__Host-" : ""}byline-google${flow === "button" ? "-button" : ""}`;
 }
 
 /** The short-lived OAuth transaction cookie is separate from Payload's auth cookie. */
-export function googleCookie(secure: boolean, value?: string) {
+export function googleCookie(secure: boolean, value?: string, flow: "code" | "button" = "code") {
   return generateCookie<false>({
-    name: googleCookieName(secure), value, httpOnly: true, sameSite: "Lax", secure,
+    name: googleCookieName(secure, flow), value, httpOnly: true, sameSite: "Lax", secure,
     path: "/", expires: new Date(value ? Date.now() + lifetime * 1000 : 0),
     returnCookieAsObject: false,
   });

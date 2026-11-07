@@ -1,8 +1,57 @@
 import { expect, test, type Page } from "@playwright/test";
+import { sign } from "node:crypto";
 
 const staff = "staff@weeklywildcat.com";
+const buttonAccount = "other@weeklywildcat.com";
 const password = "byline-browser-password";
 const configured = process.env.BYLINE_LOGIN_GOOGLE_DISABLED !== "1";
+const googleScript = "https://accounts.google.com/gsi/client";
+const buttonChallenge = "/api/byline/auth/google/button";
+
+test.beforeEach(async ({ page }) => {
+  // Keep the redirect tests deterministic and off Google's real services.
+  await page.route(googleScript, route => route.abort());
+});
+
+async function googleButton(page: Page, wrongNonce = false) {
+  await page.unroute(googleScript);
+  await page.route(googleScript, route => route.fulfill({
+    contentType: "application/javascript",
+    body: `
+      let options;
+      window.google = { accounts: { id: {
+        initialize(value) { options = value; },
+        renderButton(host, appearance) {
+          if (options.ux_mode !== "popup" || !options.use_fedcm_for_button || appearance.size !== "large" ||
+              appearance.type !== "standard" || appearance.width < 200) throw Error("Not personalizable");
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = "Continue as Staff";
+          button.addEventListener("click", () => options.callback({ credential: window.bylineTestCredential }));
+          host.append(button);
+        }
+      } } };
+    `,
+  }));
+  const response = page.waitForResponse(res => new URL(res.url()).pathname === buttonChallenge);
+  await page.goto("/admin/login?redirect=%2Fadmin%2Fstories");
+  const { nonce, state } = await (await response).json();
+  expect(nonce).toMatch(/^[\w-]{43}$/);
+  const b64 = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64({ alg: "RS256", kid: "byline-playwright-key" });
+  const claims = b64({
+    iss: "https://accounts.google.com", aud: "byline-test.apps.googleusercontent.com",
+    exp: now + 120, iat: now, hd: "weeklywildcat.com", email_verified: true,
+    email: buttonAccount, sub: "button-subject", nonce: wrongNonce ? "other-browser" : nonce,
+  });
+  const jwt = `${header}.${claims}`;
+  const credential = `${jwt}.${sign("sha256", Buffer.from(jwt), process.env.BYLINE_LOGIN_TEST_SIGNING_KEY!).toString("base64url")}`;
+  await page.evaluate(credential => Object.assign(window, { bylineTestCredential: credential }), credential);
+  await expect(page.getByRole("link", { name: "Continue with Google" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Continue as Staff" }).click();
+  return { state, credential };
+}
 
 async function signIn(page: Page, email: string, value: string) {
   await page.getByLabel("Email", { exact: true }).fill(email);
@@ -46,6 +95,36 @@ async function google(page: Page, mode: string) {
 
 test.describe("Google configured", () => {
   test.skip(!configured);
+
+  test("Google's button creates a native session and consumes the browser challenge", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 760 });
+    const credential = await googleButton(page);
+    await expect(page).toHaveURL(/\/admin\/stories$/);
+    expect(await currentAccount(page)).toMatchObject({ email: buttonAccount, role: "staff" });
+    expect((await page.context().cookies()).some(cookie => cookie.name === "byline-google-button")).toBe(false);
+    await signOut(page);
+    const replay = await page.evaluate(async credential => (await fetch("/api/byline/auth/google/button/credential", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(credential),
+    })).status, credential);
+    expect(replay).toBe(401);
+  });
+
+  test("rejects a signed button credential from a different browser challenge", async ({ page }) => {
+    await googleButton(page, true);
+    await expect(page.getByRole("alert").filter({ hasText: "Google sign-in didn’t complete" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Continue with Google" })).toBeVisible();
+    await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
+    expect(await currentAccount(page)).toBeNull();
+  });
+
+  test("does not issue or redeem button challenges for another origin", async ({ request }) => {
+    for (const path of [buttonChallenge, `${buttonChallenge}/credential`]) {
+      const result = await request.post(path, { headers: { Origin: "https://example.test" }, data: {} });
+      expect(result.status()).toBe(403);
+    }
+  });
 
   for (const width of [375, 390, 820, 1366]) {
     test(`shows Google first and keeps keyboard access to passwords at ${width}px`, async ({ page }) => {

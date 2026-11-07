@@ -1,8 +1,8 @@
 import { CodeChallengeMethod } from "google-auth-library";
 import type { Endpoint } from "payload";
 import { parseCookies } from "payload/shared";
-import { GOOGLE_CALLBACK, GOOGLE_START, googleConfig, newsroomReturnTo } from "./config";
-import { googleClient, verifyGoogleCode } from "./google-identity";
+import { GOOGLE_BUTTON, GOOGLE_CALLBACK, GOOGLE_CREDENTIAL, GOOGLE_START, googleConfig, newsroomReturnTo } from "./config";
+import { googleClient, verifyGoogleCode, verifyGoogleCredential } from "./google-identity";
 import { beginGoogleRoundTrip, googleCookie, googleCookieName, readGoogleRoundTrip } from "./google-round-trip";
 import { createGoogleSession } from "./google-session";
 
@@ -16,7 +16,61 @@ function redirect(location: string, ...cookies: string[]) {
   return new Response(null, { status: 303, headers });
 }
 
+function buttonResponse(status: number, body: object, ...cookies: string[]) {
+  const headers = new Headers({ "Cache-Control": "private, no-store" });
+  for (const cookie of cookies) headers.append("Set-Cookie", cookie);
+  return Response.json(body, { status, headers });
+}
+
+// GIS popup callbacks submit from the newsroom page itself. Require that
+// origin for both steps and bind the signed credential to this browser.
+function buttonConfig(api: string, origin: string | null) {
+  const config = googleConfig(api);
+  return config && origin === new URL(config.callback).origin ? config : null;
+}
+
+const buttonSecret = (secret: string) => `byline-google-button:${secret}`;
+
 export const googleEndpoints: Endpoint[] = [
+  {
+    path: GOOGLE_BUTTON,
+    method: "post",
+    handler: req => {
+      const { routes } = req.payload.config;
+      const config = buttonConfig(routes.api, req.headers.get("origin"));
+      if (!config) return buttonResponse(403, {});
+      const returnTo = newsroomReturnTo(req.searchParams.get("returnTo"), routes.admin);
+      const trip = beginGoogleRoundTrip(returnTo, buttonSecret(req.payload.secret));
+      return buttonResponse(200, { state: trip.state, nonce: trip.nonce }, googleCookie(config.secure, trip.value, "button"));
+    },
+  },
+  {
+    path: GOOGLE_CREDENTIAL,
+    method: "post",
+    handler: async req => {
+      const { routes } = req.payload.config;
+      const config = buttonConfig(routes.api, req.headers.get("origin"));
+      if (!config || req.headers.get("content-type") !== "application/json") return buttonResponse(403, {});
+      const cookie = parseCookies(req.headers).get(googleCookieName(config.secure, "button"));
+      const clear = googleCookie(config.secure, undefined, "button");
+      const failure = () => buttonResponse(401, {}, clear);
+      if (!cookie) return failure();
+      try {
+        const data = await req.json?.();
+        if (typeof data?.credential !== "string" || data.credential.length > 8192 || typeof data.state !== "string") return failure();
+        const trip = readGoogleRoundTrip(cookie, data.state, buttonSecret(req.payload.secret));
+        if (!trip) return failure();
+        const identity = await verifyGoogleCredential(config, data.credential, trip.nonce);
+        if (!identity) return failure();
+        const session = await createGoogleSession(req, identity);
+        if (!session) return failure();
+        return buttonResponse(200, { returnTo: newsroomReturnTo(trip.returnTo, routes.admin) }, clear, session);
+      } catch {
+        // Neither malformed credentials nor verification failures belong in logs.
+        return failure();
+      }
+    },
+  },
   {
     path: GOOGLE_START,
     method: "get",

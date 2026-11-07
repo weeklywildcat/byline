@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type SubmitEvent } from "react";
-import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
+import { useCallback, useEffect, useRef, useState, type SubmitEvent } from "react";
+import { Button } from "@byline/newsroom-ui/ui/button";
 import { Input } from "@byline/newsroom-ui/ui/input";
+import { GoogleRedirectLink, GoogleSignInButton, type GoogleSignIn } from "./GoogleSignInButton";
 
 type Props = {
-  google: { href: string; domain: string } | null;
+  google: GoogleSignIn | null;
   googleFailed: boolean;
   endpoint: string;
   returnTo: string;
@@ -16,12 +17,18 @@ export function LoginForm({ google, googleFailed, endpoint, returnTo, forgotHref
   const [expanded, setExpanded] = useState(!google || googleFailed);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [buttonFailed, setButtonFailed] = useState(false);
   const email = useRef<HTMLInputElement>(null);
   const googleError = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
-    if (googleFailed) googleError.current?.focus();
-  }, [googleFailed]);
+    if (googleFailed || buttonFailed) googleError.current?.focus();
+  }, [googleFailed, buttonFailed]);
+
+  const onGoogleFailure = useCallback(() => {
+    setButtonFailed(true);
+    setExpanded(true);
+  }, []);
 
   async function signIn(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,11 +56,12 @@ export function LoginForm({ google, googleFailed, endpoint, returnTo, forgotHref
   }
 
   return <>
-    {googleFailed && <p className="byline-login-error" role="alert" tabIndex={-1} ref={googleError}>
+    {(googleFailed || buttonFailed) && <p className="byline-login-error" role="alert" tabIndex={-1} ref={googleError}>
       Google sign-in didn’t complete. You can use your email and password below.
     </p>}
     {google && <div className="byline-login-options">
-      <a href={google.href} className={buttonVariants({ size: "lg" })}>Continue with Google</a>
+      {googleFailed || buttonFailed ? <GoogleRedirectLink href={google.href} /> :
+        <GoogleSignInButton google={google} onFailure={onGoogleFailure} />}
       <p>Use your @{google.domain} account.</p>
       <button type="button" className="byline-login-toggle" aria-controls="byline-password-form" aria-expanded={expanded}
         onClick={() => {

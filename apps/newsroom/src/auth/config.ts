@@ -1,5 +1,7 @@
 export const GOOGLE_START = "/byline/auth/google";
 export const GOOGLE_CALLBACK = `${GOOGLE_START}/callback`;
+export const GOOGLE_BUTTON = `${GOOGLE_START}/button`;
+export const GOOGLE_CREDENTIAL = `${GOOGLE_BUTTON}/credential`;
 
 export function googleConfig(apiPath: string, env = process.env) {
   const clientId = env.BYLINE_GOOGLE_CLIENT_ID?.trim();

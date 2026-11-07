@@ -1,8 +1,11 @@
 // Loaded only by the Playwright web server. Stub Google's wire responses, not
 // Byline's verifier: the actual library must check an RSA-signed ID token.
-import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
 
-const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const privateKey = process.env.BYLINE_LOGIN_TEST_SIGNING_KEY
+  ? createPrivateKey(process.env.BYLINE_LOGIN_TEST_SIGNING_KEY)
+  : generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey;
+const publicKey = createPublicKey(privateKey);
 const kid = "byline-playwright-key";
 const audience = "byline-test.apps.googleusercontent.com";
 const originalFetch = globalThis.fetch;

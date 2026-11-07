@@ -6,7 +6,7 @@ import type { AdminViewServerProps } from "payload";
 import logo from "../../../web/public/brand/weekly-wildcat-wide-logo.svg";
 import { requestUser } from "../access/user";
 import "../ui/login.css";
-import { GOOGLE_START, googleConfig, newsroomReturnTo } from "./config";
+import { GOOGLE_BUTTON, GOOGLE_CREDENTIAL, GOOGLE_START, googleConfig, newsroomReturnTo } from "./config";
 import { LoginForm } from "./LoginForm";
 import { loginPhoto } from "./unsplash";
 
@@ -30,8 +30,11 @@ export function BylineLogin({ initPageResult: { req }, searchParams }: AdminView
           <LoginForm
             key={failed ? "google-failed" : "login"}
             google={google && {
+              clientId: google.clientId,
               href: `${routes.api}${GOOGLE_START}?${new URLSearchParams({ returnTo })}`,
               domain: google.hostedDomain,
+              challengeUrl: `${routes.api}${GOOGLE_BUTTON}?${new URLSearchParams({ returnTo })}`,
+              credentialUrl: `${routes.api}${GOOGLE_CREDENTIAL}`,
             }}
             googleFailed={failed}
             endpoint={`${routes.api}/${admin.user}/login`}

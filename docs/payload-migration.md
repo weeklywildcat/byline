@@ -279,9 +279,13 @@ media microservice is required.
   The first account ever created is forced to an enabled
   administrator (Payload's create-first-user form would otherwise make Staff),
   and the last enabled administrator cannot be demoted or disabled.
-- Google Workspace sign-in (Phase 1b) uses Payload custom endpoints and its
-  native session helpers. The server starts an OpenID Connect code exchange
-  with state, nonce and S256 PKCE and requests only `openid email profile`.
+- Google Workspace sign-in (Phase 1b) uses Google's rendered button with FedCM
+  where supported. Google may personalize it for a returning account. The
+  button's callback posts an ID token from the newsroom origin and binds it to
+  a short-lived, signed browser challenge with state and nonce. When the button
+  cannot load, the redirect link starts an OpenID Connect code exchange with
+  state, nonce and S256 PKCE and requests only `openid email profile`.
+  Both paths use Payload custom endpoints and native session helpers.
   Google's Node library verifies signature, issuer and audience. Byline also
   requires a current expiry, matching nonce and hosted domain, verified email
   and a valid subject. An existing subject binding takes precedence. Otherwise
@@ -303,11 +307,11 @@ Configure Phase 1b on the newsroom server:
   `BYLINE_GOOGLE_CLIENT_ID`, `BYLINE_GOOGLE_CLIENT_SECRET` and
   `BYLINE_GOOGLE_HOSTED_DOMAIN=weeklywildcat.com` for the Weekly Wildcat
   Workspace. In Google Cloud, create a **Web application** OAuth client and
-  register the exact authorized redirect URI
-  `https://<newsroom-host>/api/byline/auth/google/callback`. For development
-  at the default port, register
-  `http://localhost:3010/api/byline/auth/google/callback` separately. No
-  authorized JavaScript origin is required for this server-side flow. Configure
+  register `https://<newsroom-host>` as an authorized JavaScript origin for
+  Google's button and `https://<newsroom-host>/api/byline/auth/google/callback`
+  as an authorized redirect URI for the redirect fallback. For development at
+  the default port, register `http://localhost` and `http://localhost:3010` as origins and
+  `http://localhost:3010/api/byline/auth/google/callback` as a redirect URI. Configure
   the consent screen and Workspace app access for staff. Confirm a real
   Workspace account can sign in after configuration.
 - Set `BYLINE_UNSPLASH_ACCESS_KEY` to enable landscape login photos. The server

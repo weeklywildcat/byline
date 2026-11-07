@@ -32,9 +32,11 @@ export function googleIdentity(claims: TokenPayload | undefined, nonce: string, 
 }
 
 export async function verifyGoogleCode(config: GoogleConfig, code: string, verifier: string, nonce: string) {
-  const client = googleClient(config);
-  const { tokens } = await client.getToken({ code, codeVerifier: verifier });
-  if (!tokens.id_token) return null;
-  const ticket = await client.verifyIdToken({ idToken: tokens.id_token, audience: config.clientId });
+  const { tokens } = await googleClient(config).getToken({ code, codeVerifier: verifier });
+  return tokens.id_token ? verifyGoogleCredential(config, tokens.id_token, nonce) : null;
+}
+
+export async function verifyGoogleCredential(config: GoogleConfig, idToken: string, nonce: string) {
+  const ticket = await googleClient(config).verifyIdToken({ idToken, audience: config.clientId });
   return googleIdentity(ticket.getPayload(), nonce, config.hostedDomain);
 }
