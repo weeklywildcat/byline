@@ -1,14 +1,26 @@
 import {
   ARTICLE_BLOCK_LIMITS as LIMITS,
+  CHAPTER_ALIGNS,
+  CHAPTER_PLACEMENTS,
   DEFAULT_HEADINGS,
   PLACEMENTS,
   paragraphsFromText,
+  squareRows,
+  visualizationHeights,
   type ArticleBlockOf,
   type ArticleBlockType,
+  type BeforeAfterFit,
+  type ChapterAlign,
+  type ChapterPlacement,
+  type ChartMapHeight,
+  type ChartMapMode,
+  type DataTablePresentation,
   type GalleryFit,
   type MediaId,
-  type Placement
+  type Placement,
+  type PortraitSide
 } from "@byline/article-body";
+import { parseYouTubeVideoId } from "@byline/core";
 
 /**
  * The fields a Byline block stores in Payload's Lexical document, and the
@@ -28,6 +40,22 @@ export type BylineBlockFields = {
   context: { heading: string; body: string };
   document: { media: MediaId | null; title: string; context: string; source: string; pages: Array<{ id: string; page: number | null; label: string }> };
   timeline: { items: Array<{ id: string; label: string; title: string; body: string; current: boolean }> };
+  portraitText: { media: MediaId | null; altOverride: string; heading: string; body: string; caption: string; side: PortraitSide };
+  visualChapter: { media: MediaId | null; altOverride: string; eyebrow: string; heading: string; dek: string; placement: ChapterPlacement; align: ChapterAlign };
+  video: { url: string; title: string; caption: string; captionsConfirmed: boolean };
+  audio: { media: MediaId | null; title: string; caption: string; transcript: string };
+  editorsNote: { body: string };
+  marginNote: { heading: string; body: string };
+  expandable: { heading: string; body: string };
+  chartMap: { mode: ChartMapMode; url: string; image: MediaId | null; altOverride: string; title: string; dek: string; summary: string; source: string; notes: string; credit: string; height: ChartMapHeight };
+  dataTable: { title: string; description: string; columns: Array<{ id: string; label: string }>; rows: Array<{ id: string; cells: string[] }>; presentation: DataTablePresentation; rowHeaders: boolean; source: string; notes: string };
+  comparison: { heading: string; leftLabel: string; leftTitle: string; leftBody: string; rightLabel: string; rightTitle: string; rightBody: string };
+  keyNumbers: { heading: string; source: string; items: Array<{ id: string; value: string; label: string; context: string }> };
+  annotatedImage: { media: MediaId | null; altOverride: string; caption: string; placement: ChapterPlacement; markers: Array<{ id: string; x: number; y: number; title: string; body: string }> };
+  beforeAfter: { before: MediaId | null; after: MediaId | null; beforeLabel: string; afterLabel: string; fit: BeforeAfterFit; caption: string; placement: ChapterPlacement };
+  relatedCoverage: { heading: string; stories: Array<{ id: string; story: MediaId | null }> };
+  poll: { poll: MediaId | null };
+  repositoryInteractive: { key: string; title: string; description: string };
 };
 
 type Raw = Record<string, unknown>;
@@ -90,7 +118,110 @@ export const BLOCK_FIELD_READERS: { [K in ArticleBlockType]: (raw: unknown) => B
     // A new timeline starts with two events to fill: a chronology needs at least two.
     while (items.length < LIMITS.timelineMin) items.push({ id: `draft-${items.length}`, label: "", title: "", body: "", current: false });
     return { items };
-  }
+  },
+  portraitText: (raw) => {
+    const fields = record(raw);
+    return { media: mediaIdOf(fields.media), altOverride: text(fields.altOverride), heading: text(fields.heading), body: text(fields.body), caption: text(fields.caption), side: fields.side === "right" ? "right" : "left" };
+  },
+  visualChapter: (raw) => {
+    const fields = record(raw);
+    return {
+      media: mediaIdOf(fields.media),
+      altOverride: text(fields.altOverride),
+      eyebrow: text(fields.eyebrow),
+      heading: text(fields.heading),
+      dek: text(fields.dek),
+      placement: CHAPTER_PLACEMENTS.includes(fields.placement as ChapterPlacement) ? (fields.placement as ChapterPlacement) : "full",
+      align: CHAPTER_ALIGNS.includes(fields.align as ChapterAlign) ? (fields.align as ChapterAlign) : "bottom-left"
+    };
+  },
+  video: (raw) => {
+    const fields = record(raw);
+    return { url: text(fields.url), title: text(fields.title), caption: text(fields.caption), captionsConfirmed: fields.captionsConfirmed === true };
+  },
+  audio: (raw) => {
+    const fields = record(raw);
+    return { media: mediaIdOf(fields.media), title: text(fields.title), caption: text(fields.caption), transcript: text(fields.transcript) };
+  },
+  editorsNote: (raw) => ({ body: text(record(raw).body) }),
+  marginNote: (raw) => ({ heading: text(record(raw).heading), body: text(record(raw).body) }),
+  expandable: (raw) => ({ heading: text(record(raw).heading), body: text(record(raw).body) }),
+  chartMap: (raw) => {
+    const fields = record(raw);
+    return {
+      mode: fields.mode === "static" ? "static" : "interactive",
+      url: text(fields.url),
+      image: mediaIdOf(fields.image),
+      altOverride: text(fields.altOverride),
+      title: text(fields.title),
+      dek: text(fields.dek),
+      summary: text(fields.summary),
+      source: text(fields.source),
+      notes: text(fields.notes),
+      credit: text(fields.credit),
+      height: typeof fields.height === "string" && fields.height in visualizationHeights ? (fields.height as ChartMapHeight) : "standard"
+    };
+  },
+  dataTable: (raw) => {
+    const fields = record(raw);
+    const columns = rows(fields.columns).map((row, index) => ({ id: rowId(row, index), label: text(row.label) }));
+    // A new table is a small grid to fill: three columns, three rows.
+    while (columns.length < 3 && !Array.isArray(fields.columns)) columns.push({ id: `draft-c${columns.length}`, label: "" });
+    while (columns.length < LIMITS.tableColumnsMin) columns.push({ id: `draft-c${columns.length}`, label: "" });
+    const stored = rows(fields.rows).map((row, index) => ({ id: rowId(row, index), cells: Array.isArray(row.cells) ? row.cells.map(text) : [] }));
+    while (stored.length < 3 && !Array.isArray(fields.rows)) stored.push({ id: `draft-r${stored.length}`, cells: [] });
+    if (!stored.length) stored.push({ id: "draft-r0", cells: [] });
+    return {
+      title: text(fields.title),
+      description: text(fields.description),
+      columns,
+      rows: squareRows(columns, stored),
+      presentation: fields.presentation === "comparison" ? "comparison" : "standard",
+      rowHeaders: fields.rowHeaders === undefined ? true : fields.rowHeaders === true,
+      source: text(fields.source),
+      notes: text(fields.notes)
+    };
+  },
+  comparison: (raw) => {
+    const fields = record(raw);
+    return { heading: text(fields.heading), leftLabel: text(fields.leftLabel), leftTitle: text(fields.leftTitle), leftBody: text(fields.leftBody), rightLabel: text(fields.rightLabel), rightTitle: text(fields.rightTitle), rightBody: text(fields.rightBody) };
+  },
+  keyNumbers: (raw) => {
+    const fields = record(raw);
+    const items = rows(fields.items).map((row, index) => ({ id: rowId(row, index), value: text(row.value), label: text(row.label), context: text(row.context) }));
+    while (items.length < LIMITS.keyNumbersMin) items.push({ id: `draft-${items.length}`, value: "", label: "", context: "" });
+    return { heading: text(fields.heading), source: text(fields.source), items };
+  },
+  annotatedImage: (raw) => {
+    const fields = record(raw);
+    const percent = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 50);
+    return {
+      media: mediaIdOf(fields.media),
+      altOverride: text(fields.altOverride),
+      caption: text(fields.caption),
+      placement: fields.placement === "wide" ? "wide" : "full",
+      markers: rows(fields.markers).map((row, index) => ({ id: rowId(row, index), x: percent(row.x), y: percent(row.y), title: text(row.title), body: text(row.body) }))
+    };
+  },
+  beforeAfter: (raw) => {
+    const fields = record(raw);
+    return {
+      before: mediaIdOf(fields.before),
+      after: mediaIdOf(fields.after),
+      beforeLabel: typeof fields.beforeLabel === "string" ? fields.beforeLabel : "Before",
+      afterLabel: typeof fields.afterLabel === "string" ? fields.afterLabel : "After",
+      fit: fields.fit === "contain" ? "contain" : "cover",
+      caption: text(fields.caption),
+      placement: fields.placement === "full" ? "full" : "wide"
+    };
+  },
+  relatedCoverage: (raw) => {
+    const fields = record(raw);
+    const stories = rows(fields.stories).map((row, index) => ({ id: rowId(row, index), story: mediaIdOf(row.story) }));
+    return { heading: typeof fields.heading === "string" ? fields.heading : DEFAULT_HEADINGS.relatedCoverage, stories: stories.length ? stories : [{ id: "draft-0", story: null }] };
+  },
+  poll: (raw) => ({ poll: mediaIdOf(record(raw).poll) }),
+  repositoryInteractive: (raw) => ({ key: text(record(raw).key), title: text(record(raw).title), description: text(record(raw).description) })
 };
 
 /** Stored fields → the semantic block (unfinalized: readiness decides what publishes). */
@@ -110,7 +241,87 @@ export const BLOCK_TO_ARTICLE: { [K in ArticleBlockType]: (id: string, fields: B
     ...(fields.source.trim() ? { source: fields.source } : {}),
     pages: fields.pages.map((ref) => ({ id: ref.id, page: ref.page ?? 0, label: ref.label }))
   }),
-  timeline: (id, fields) => ({ type: "timeline", id, items: fields.items.map((item) => ({ id: item.id, label: item.label, title: item.title, body: item.body, current: item.current })) })
+  timeline: (id, fields) => ({ type: "timeline", id, items: fields.items.map((item) => ({ id: item.id, label: item.label, title: item.title, body: item.body, current: item.current })) }),
+  portraitText: (id, fields) => ({
+    type: "portraitText",
+    id,
+    media: fields.media,
+    ...(fields.altOverride.trim() ? { altOverride: fields.altOverride } : {}),
+    ...(fields.heading.trim() ? { heading: fields.heading } : {}),
+    body: paragraphsFromText(fields.body, LIMITS.portraitBody),
+    ...(fields.caption.trim() ? { caption: fields.caption } : {}),
+    side: fields.side
+  }),
+  visualChapter: (id, fields) => ({
+    type: "visualChapter",
+    id,
+    media: fields.media,
+    ...(fields.altOverride.trim() ? { altOverride: fields.altOverride } : {}),
+    ...(fields.eyebrow.trim() ? { eyebrow: fields.eyebrow } : {}),
+    heading: fields.heading,
+    ...(fields.dek.trim() ? { dek: fields.dek } : {}),
+    placement: fields.placement,
+    align: fields.align
+  }),
+  video: (id, fields) => ({ type: "video", id, videoId: parseYouTubeVideoId(fields.url), title: fields.title, ...(fields.caption.trim() ? { caption: fields.caption } : {}), captionsConfirmed: fields.captionsConfirmed }),
+  audio: (id, fields) => ({ type: "audio", id, media: fields.media, title: fields.title, ...(fields.caption.trim() ? { caption: fields.caption } : {}), transcript: fields.transcript }),
+  editorsNote: (id, fields) => ({ type: "editorsNote", id, body: paragraphsFromText(fields.body, LIMITS.noteBody) }),
+  marginNote: (id, fields) => ({ type: "marginNote", id, ...(fields.heading.trim() ? { heading: fields.heading } : {}), body: paragraphsFromText(fields.body, LIMITS.noteBody) }),
+  expandable: (id, fields) => ({ type: "expandable", id, heading: fields.heading, body: paragraphsFromText(fields.body, LIMITS.expandableBody) }),
+  chartMap: (id, fields) => ({
+    type: "chartMap",
+    id,
+    mode: fields.mode,
+    ...(fields.mode === "interactive" ? { url: fields.url } : {}),
+    image: fields.image,
+    ...(fields.altOverride.trim() ? { altOverride: fields.altOverride } : {}),
+    title: fields.title,
+    ...(fields.dek.trim() ? { dek: fields.dek } : {}),
+    summary: fields.summary,
+    ...(fields.source.trim() ? { source: fields.source } : {}),
+    ...(fields.notes.trim() ? { notes: fields.notes } : {}),
+    ...(fields.credit.trim() ? { credit: fields.credit } : {}),
+    height: fields.height
+  }),
+  dataTable: (id, fields) => ({
+    type: "dataTable",
+    id,
+    title: fields.title,
+    ...(fields.description.trim() ? { description: fields.description } : {}),
+    columns: fields.columns.map((column) => ({ id: column.id, label: column.label })),
+    rows: fields.rows.map((row) => ({ id: row.id, cells: [...row.cells] })),
+    presentation: fields.presentation,
+    rowHeaders: fields.rowHeaders,
+    ...(fields.source.trim() ? { source: fields.source } : {}),
+    ...(fields.notes.trim() ? { notes: fields.notes } : {})
+  }),
+  comparison: (id, fields) => ({
+    type: "comparison",
+    id,
+    ...(fields.heading.trim() ? { heading: fields.heading } : {}),
+    left: { label: fields.leftLabel, title: fields.leftTitle, body: paragraphsFromText(fields.leftBody, LIMITS.comparisonBody) },
+    right: { label: fields.rightLabel, title: fields.rightTitle, body: paragraphsFromText(fields.rightBody, LIMITS.comparisonBody) }
+  }),
+  keyNumbers: (id, fields) => ({
+    type: "keyNumbers",
+    id,
+    ...(fields.heading.trim() ? { heading: fields.heading } : {}),
+    ...(fields.source.trim() ? { source: fields.source } : {}),
+    items: fields.items.map((item) => ({ id: item.id, value: item.value, label: item.label, ...(item.context.trim() ? { context: item.context } : {}) }))
+  }),
+  annotatedImage: (id, fields) => ({
+    type: "annotatedImage",
+    id,
+    media: fields.media,
+    ...(fields.altOverride.trim() ? { altOverride: fields.altOverride } : {}),
+    caption: fields.caption,
+    placement: fields.placement,
+    markers: fields.markers.map((marker) => ({ id: marker.id, x: marker.x, y: marker.y, title: marker.title, body: marker.body }))
+  }),
+  beforeAfter: (id, fields) => ({ type: "beforeAfter", id, before: fields.before, after: fields.after, beforeLabel: fields.beforeLabel, afterLabel: fields.afterLabel, fit: fields.fit, caption: fields.caption, placement: fields.placement }),
+  relatedCoverage: (id, fields) => ({ type: "relatedCoverage", id, heading: fields.heading, stories: fields.stories.map((item) => ({ id: item.id, story: item.story })) }),
+  poll: (id, fields) => ({ type: "poll", id, poll: fields.poll }),
+  repositoryInteractive: (id, fields) => ({ type: "repositoryInteractive", id, key: fields.key, title: fields.title, description: fields.description })
 };
 
 /** A stored block node's fields as the semantic block. */

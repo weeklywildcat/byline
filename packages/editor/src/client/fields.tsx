@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, type KeyboardEvent, type Ref } from "react";
+import { useLayoutEffect, useRef, type ClipboardEvent, type KeyboardEvent, type Ref } from "react";
 
 const supportsFieldSizing = typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("field-sizing", "content");
 
@@ -21,6 +21,7 @@ export function InlineText({
   maxLength,
   onEnter,
   onKeyDown,
+  onPaste,
   inputRef,
   id,
   invalid
@@ -38,6 +39,7 @@ export function InlineText({
   /** Enter moves on (to the next field, the next row). With it, Shift+Enter breaks a line in a multi-line field. */
   onEnter?: () => void;
   onKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  onPaste?: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
   inputRef?: Ref<HTMLTextAreaElement>;
   id?: string;
   invalid?: boolean;
@@ -69,6 +71,7 @@ export function InlineText({
       readOnly={readOnly}
       spellCheck
       onChange={(event) => onChange(multiline ? event.target.value : event.target.value.replace(/\s*\n\s*/g, " "))}
+      onPaste={onPaste}
       onKeyDown={(event) => {
         onKeyDown?.(event);
         if (event.defaultPrevented) return;

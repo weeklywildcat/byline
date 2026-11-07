@@ -2,9 +2,15 @@ import { normalizeArtDirectionIntent } from "@byline/core";
 import {
   ARTICLE_BODY_FORMAT,
   ARTICLE_BODY_VERSION,
+  ARTICLE_BLOCK_LIMITS,
+  blockPollIds,
+  blockStoryIds,
+  bodyMediaIds,
+  cleanText,
   compactInline,
   finalizeBlock,
   hasInlineText,
+  isArticleBlock,
   isArticleBlockType,
   mediaCredit,
   mediaKey,
@@ -14,12 +20,14 @@ import {
   type ArticleBody,
   type ArticleBodyNode,
   type ArticleMediaAsset,
+  type ArticleReferences,
   type BlockIssue,
   type Inline,
   type ListItemNode,
   type ListNode,
   type MediaId,
   type PublicArticleBody,
+  type ReferenceLookup,
   type TextRun
 } from "@byline/article-body";
 import { articleBlockFromFields, mediaIdOf } from "./fields";
@@ -42,6 +50,7 @@ export type NormalizeIssue =
   | { kind: "unsupported-node"; nodeType: string; path: string }
   | { kind: "unsupported-format"; format: string; path: string }
   | { kind: "unsafe-link"; href: string; path: string }
+  | { kind: "footnote"; code: "footnote-empty" | "footnote-duplicate"; path: string }
   | { kind: "block"; issue: BlockIssue };
 
 export type MediaResolver = (id: MediaId) => ArticleMediaAsset | null | undefined;
@@ -63,20 +72,29 @@ function rootChildren(state: unknown): LexicalNode[] {
   return childrenOf(root);
 }
 
-/** Every Media ID a body references, for the host to resolve before normalizing. */
-export function collectMediaIds(state: unknown): MediaId[] {
-  const ids = new Map<string, MediaId>();
-  const add = (value: unknown) => {
-    const id = mediaIdOf(value);
-    if (id !== null) ids.set(mediaKey(id), id);
-  };
-  for (const node of rootChildren(state)) {
-    if (node.type !== "block") continue;
+/** The stored blocks of a body as semantic (unfinalized) blocks, in order. */
+function storedBlocks(state: unknown): ArticleBlock[] {
+  const blocks: ArticleBlock[] = [];
+  rootChildren(state).forEach((node, index) => {
+    if (node.type !== "block") return;
     const fields = asNode(node.fields);
-    add(fields.media);
-    for (const item of Array.isArray(fields.items) ? fields.items : []) add(asNode(item).media);
-  }
-  return [...ids.values()];
+    if (!isArticleBlockType(fields.blockType)) return;
+    const id = typeof fields.id === "string" && fields.id ? fields.id : `block-${index}`;
+    blocks.push(articleBlockFromFields(fields.blockType, id, fields) as ArticleBlock);
+  });
+  return blocks;
+}
+
+/** Every Media ID a body references (every block that names Media), for the host to resolve before normalizing. */
+export function collectMediaIds(state: unknown): MediaId[] {
+  return bodyMediaIds(storedBlocks(state));
+}
+
+/** Every Story and Poll a body names, for the host to resolve into public-safe references before normalizing. */
+export function collectReferenceIds(state: unknown): { stories: MediaId[]; polls: MediaId[] } {
+  const blocks = storedBlocks(state);
+  const unique = (ids: MediaId[]) => [...new Map(ids.map((id) => [mediaKey(id), id])).values()];
+  return { stories: unique(blocks.flatMap(blockStoryIds)), polls: unique(blocks.flatMap(blockPollIds)) };
 }
 
 /** A Payload Media document as the renderer's media record. `src` is the host's choice of URL. */
@@ -108,13 +126,21 @@ export function articleMediaFromPayload(doc: Record<string, unknown>, src: (doc:
  * forever and never pass through the Lexical normalizer, whatever else the
  * record holds.
  */
-export function normalizePayloadStoryBody(story: { contentFormat?: unknown; body?: unknown; legacyHtml?: unknown }, options: { media: MediaResolver }): { body: PublicArticleBody; issues: NormalizeIssue[] } {
+export type NormalizeOptions = {
+  media: MediaResolver;
+  /** Public-safe Story and Poll facts, and the registered repository interactives. Without it, blocks that need them are left out. */
+  references?: ReferenceLookup;
+};
+
+export function normalizePayloadStoryBody(story: { contentFormat?: unknown; body?: unknown; legacyHtml?: unknown }, options: NormalizeOptions): { body: PublicArticleBody; issues: NormalizeIssue[] } {
   if (story.contentFormat === "legacy-html") return { body: { format: "legacy-html", html: typeof story.legacyHtml === "string" ? story.legacyHtml : "" }, issues: [] };
   return normalizePayloadArticleBody(story.body, options);
 }
 
-export function normalizePayloadArticleBody(state: unknown, options: { media: MediaResolver }): { body: ArticleBody; issues: NormalizeIssue[] } {
+export function normalizePayloadArticleBody(state: unknown, options: NormalizeOptions): { body: ArticleBody; issues: NormalizeIssue[] } {
   const issues: NormalizeIssue[] = [];
+  const references: ArticleReferences = {};
+  const footnoteIds = new Set<string>();
   const media: ArticleBody["media"] = {};
   const resolve = (id: MediaId): ArticleMediaAsset | null => {
     const asset = options.media(id) ?? null;
@@ -141,6 +167,29 @@ export function normalizePayloadArticleBody(state: unknown, options: { media: Me
         case "linebreak":
           out.push({ type: "lineBreak" });
           break;
+        case "inlineBlock": {
+          const fields = asNode(node.fields);
+          if (fields.blockType !== "footnote") {
+            issues.push({ kind: "unsupported-node", nodeType: `inlineBlock:${String(fields.blockType)}`, path: here });
+            break;
+          }
+          const note = cleanText(fields.text, ARTICLE_BLOCK_LIMITS.footnote);
+          if (!note) {
+            issues.push({ kind: "footnote", code: "footnote-empty", path: here });
+            break;
+          }
+          let id = typeof fields.id === "string" && fields.id ? fields.id : `footnote-${here}`;
+          // A copied reference keeps its id in the editor; an anchor id must be unique.
+          if (footnoteIds.has(id)) {
+            issues.push({ kind: "footnote", code: "footnote-duplicate", path: here });
+            let suffix = 2;
+            while (footnoteIds.has(`${id}-${suffix}`)) suffix += 1;
+            id = `${id}-${suffix}`;
+          }
+          footnoteIds.add(id);
+          out.push({ type: "footnote", id, text: note });
+          break;
+        }
         case "link":
         case "autolink": {
           const fields = asNode(node.fields);
@@ -181,6 +230,21 @@ export function normalizePayloadArticleBody(state: unknown, options: { media: Me
     return { type: "list", ordered: node.listType === "number" || node.tag === "ol", items };
   };
 
+  // Story and Poll facts a finalized block names, resolved once and kept for the body's reference table.
+  const lookup: ReferenceLookup = {
+    story: (id) => {
+      const story = options.references?.story?.(id) ?? null;
+      if (story) (references.stories ??= {})[mediaKey(id)] = story;
+      return story;
+    },
+    poll: (id) => {
+      const poll = options.references?.poll?.(id) ?? null;
+      if (poll) (references.polls ??= {})[mediaKey(id)] = poll;
+      return poll;
+    },
+    interactive: (key) => options.references?.interactive?.(key) === true
+  };
+
   const nodes: ArticleBodyNode[] = [];
   rootChildren(state).forEach((node, index) => {
     const path = `root.${index}`;
@@ -216,7 +280,7 @@ export function normalizePayloadArticleBody(state: unknown, options: { media: Me
         }
         const id = typeof fields.id === "string" && fields.id ? fields.id : `block-${index}`;
         const draft = articleBlockFromFields(type, id, fields) as ArticleBlock;
-        const { block, issues: blockIssues } = finalizeBlock(draft, resolve);
+        const { block, issues: blockIssues } = finalizeBlock(draft, resolve, lookup);
         for (const issue of blockIssues) issues.push({ kind: "block", issue });
         if (block) nodes.push(block);
         return;
@@ -226,21 +290,19 @@ export function normalizePayloadArticleBody(state: unknown, options: { media: Me
     }
   });
 
-  // Only media the published nodes still reference stays in the table.
-  const used = new Set(collectReferencedMedia(nodes));
-  for (const key of Object.keys(media)) if (!used.has(key)) delete media[key];
-
-  return { body: { format: ARTICLE_BODY_FORMAT, version: ARTICLE_BODY_VERSION, nodes, media }, issues };
-}
-
-function collectReferencedMedia(nodes: ArticleBodyNode[]): string[] {
-  const keys: string[] = [];
-  for (const node of nodes) {
-    if (node.type === "photo" || node.type === "document") {
-      if (node.media !== null) keys.push(mediaKey(node.media));
-    } else if (node.type === "gallery") {
-      for (const item of node.items) if (item.media !== null) keys.push(mediaKey(item.media));
-    }
+  // Only references the published nodes still name stay in the table (a dropped related story leaves none behind).
+  const kept = { stories: new Set(nodes.flatMap((node) => (isArticleBlock(node) ? blockStoryIds(node) : [])).map(mediaKey)), polls: new Set(nodes.flatMap((node) => (isArticleBlock(node) ? blockPollIds(node) : [])).map(mediaKey)) };
+  for (const key of Object.keys(references.stories ?? {})) if (!kept.stories.has(key)) delete references.stories![key];
+  for (const key of Object.keys(references.polls ?? {})) if (!kept.polls.has(key)) delete references.polls![key];
+  // A related story's thumbnail is Media too: resolved like any other, or left off.
+  for (const [key, story] of Object.entries(references.stories ?? {})) {
+    if (story.thumbnail !== undefined && !resolve(story.thumbnail)) references.stories![key] = { ...story, thumbnail: undefined };
   }
-  return keys;
+
+  // Only media the published nodes (and kept thumbnails) still reference stays in the table.
+  const used = new Set([...bodyMediaIds(nodes), ...Object.values(references.stories ?? {}).flatMap((story) => (story.thumbnail === undefined ? [] : [story.thumbnail]))].map(mediaKey));
+  for (const key of Object.keys(media)) if (!used.has(key)) delete media[key];
+  const hasReferences = Boolean(Object.keys(references.stories ?? {}).length || Object.keys(references.polls ?? {}).length);
+  const body: ArticleBody = { format: ARTICLE_BODY_FORMAT, version: ARTICLE_BODY_VERSION, nodes, media, ...(hasReferences ? { references } : {}) };
+  return { body, issues };
 }

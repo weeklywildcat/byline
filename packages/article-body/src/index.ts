@@ -4,3 +4,8 @@ export * from "./text";
 export * from "./media";
 export * from "./timeline";
 export * from "./readiness";
+export * from "./visualization";
+export * from "./data-table";
+export * from "./references";
+export * from "./footnotes";
+export * from "./validate";

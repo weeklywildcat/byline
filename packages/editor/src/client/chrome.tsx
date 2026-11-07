@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
 import { UNDO_COMMAND } from "@payloadcms/richtext-lexical/lexical";
 import { ArrowDown, ArrowUp, Ellipsis, Trash2 } from "lucide-react";
-import { useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
+import { cloneElement, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useAnnounce } from "./host";
 import { BlockIcon } from "./icons";
@@ -135,25 +135,27 @@ export function ToolTextButton({ label, onClick, disabled, icon }: { label: stri
 export { ButtonGroup };
 
 /**
- * A compact secondary setting (alt text, page references): a Popover beside
- * the button with a mouse, a bottom Sheet on touch or a narrow screen. Nothing
- * needed to finish a block lives only here.
+ * A compact surface for secondary options: a Popover beside its trigger with a
+ * mouse, a bottom Sheet on touch or a narrow screen. Controlled, so the caller
+ * can open it itself (a new footnote opens its note straight away).
  */
-export function SecondarySetting({ label, title, description, icon, children }: { label: string; title: string; description?: string; icon: ReactNode; children: ReactNode }) {
+export function SettingsSurface({ open, onOpenChange, trigger, title, description, align = "start", children }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** The element that opens it. On touch it is given an `onClick` that opens the Sheet. */
+  trigger: ReactElement;
+  title: string;
+  description?: string;
+  align?: "start" | "center" | "end";
+  children: ReactNode;
+}) {
   const coarse = useCoarseLayout();
-  const [open, setOpen] = useState(false);
-  const trigger = (
-    <Button type="button" variant="ghost" size="sm" aria-label={label} onClick={coarse ? () => setOpen(true) : undefined}>
-      {icon}
-      {label}
-    </Button>
-  );
   if (coarse) {
     return (
       <>
-        {trigger}
-        <Sheet open={open} onOpenChange={setOpen}>
-          <SheetContent side="bottom" className="gap-3 p-4">
+        {cloneElement(trigger as ReactElement<{ onClick?: () => void }>, { onClick: () => onOpenChange(true) })}
+        <Sheet open={open} onOpenChange={onOpenChange}>
+          <SheetContent side="bottom" className="gap-3 p-4" data-byline-chrome="">
             <SheetHeader className="p-0">
               <SheetTitle>{title}</SheetTitle>
               {description ? <SheetDescription>{description}</SheetDescription> : null}
@@ -165,9 +167,9 @@ export function SecondarySetting({ label, title, description, icon, children }: 
     );
   }
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger render={trigger} />
-      <PopoverContent align="start" className="w-80">
+      <PopoverContent align={align} className="w-80" data-byline-chrome="">
         <PopoverHeader>
           <PopoverTitle>{title}</PopoverTitle>
           {description ? <PopoverDescription>{description}</PopoverDescription> : null}
@@ -175,5 +177,29 @@ export function SecondarySetting({ label, title, description, icon, children }: 
         {children}
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * A compact secondary setting (alt text, page references): a labelled button
+ * that opens a SettingsSurface. Nothing needed to finish a block lives only here.
+ */
+export function SecondarySetting({ label, title, description, icon, children }: { label: string; title: string; description?: string; icon: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <SettingsSurface
+      open={open}
+      onOpenChange={setOpen}
+      title={title}
+      description={description}
+      trigger={
+        <Button type="button" variant="ghost" size="sm" aria-label={label}>
+          {icon}
+          {label}
+        </Button>
+      }
+    >
+      {children}
+    </SettingsSurface>
   );
 }

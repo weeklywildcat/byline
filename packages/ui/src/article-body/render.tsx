@@ -1,34 +1,59 @@
 import {
   altFor,
+  collectFootnotes,
+  footnoteAnchor,
+  footnoteRefAnchor,
   isArticleBlock,
   mediaKey,
   paragraphsFromText,
   periodStarts,
   safeHref,
+  visualizationPieceName,
+  EDITORS_NOTE_LABEL,
   type ArticleBlockOf,
   type ArticleBlockType,
   type ArticleBody,
   type ArticleBodyNode,
   type ArticleMediaAsset,
+  type ArticleReferences,
   type Inline,
   type ListNode,
-  type ProseNode
+  type ParagraphNode,
+  type ProseNode,
+  type PublicPollReference
 } from "@byline/article-body";
 import { Fragment, type ReactNode } from "react";
 import {
+  AnnotatedImageFigure,
+  annotationAnchor,
   ArticleBlockFrame,
   articleBlockPlacement,
   ArticleImage,
+  AudioFigure,
+  BeforeAfterFigure,
   CaptionText,
+  ChartMapFigure,
+  ComparisonView,
+  DataTableView,
   DocumentFigure,
   documentFileFacts,
+  EditorsNoteView,
+  ExpandableView,
   GalleryLayout,
+  KeyNumbersView,
+  MarginNoteView,
+  PortraitTextFigure,
   PullQuoteView,
+  RelatedCoverageView,
+  RepositoryInteractiveFigure,
   ReportedQuoteView,
   StoryFigure,
   SupportingContext,
   TimelineItem,
-  TimelineList
+  TimelineList,
+  VideoFigure,
+  VisualChapterView,
+  YouTubePlayer
 } from "./primitives";
 
 /**
@@ -41,12 +66,36 @@ import {
 
 export type MediaTable = ArticleBody["media"];
 
+/**
+ * What a host may add to rendering without the renderer knowing the host:
+ * how dates read in this publication, and how a registered repository
+ * interactive draws its static fallback (the public site and the newsroom
+ * supply their own registry; the renderer never imports one).
+ */
+export type ArticleRenderHost = {
+  formatDate?: (iso: string) => string;
+  renderInteractive?: (block: ArticleBlockOf<"repositoryInteractive">) => ReactNode;
+};
+
+type BlockContext = { references: ArticleReferences; footnotes: Record<string, number>; host: ArticleRenderHost };
+
+const defaultFormatDate = (iso: string): string => new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(iso));
+
 const lookup = (media: MediaTable, id: unknown): ArticleMediaAsset | null => (id === null || id === undefined ? null : media[mediaKey(id as string | number)] ?? null);
 
-/** Inline text: bold, italic, links and line breaks. Nothing else exists. */
-export function InlineContent({ children }: { children: readonly Inline[] }): ReactNode {
+/** Inline text: bold, italic, links, line breaks and footnote references. Nothing else exists. */
+export function InlineContent({ children, footnotes = {} }: { children: readonly Inline[]; footnotes?: Record<string, number> }): ReactNode {
   return children.map((child, index) => {
     if (child.type === "lineBreak") return <br key={index} />;
+    if (child.type === "footnote") {
+      const number = footnotes[child.id];
+      if (number === undefined) return null;
+      return (
+        <sup key={index} className="byline-footnote-ref">
+          <a id={footnoteRefAnchor(child.id)} href={`#${footnoteAnchor(child.id)}`} aria-label={`Footnote ${number}`}>{number}</a>
+        </sup>
+      );
+    }
     if (child.type === "link") {
       const href = safeHref(child.href);
       const text = <InlineContent>{child.children}</InlineContent>;
@@ -59,39 +108,90 @@ export function InlineContent({ children }: { children: readonly Inline[] }): Re
   });
 }
 
-function ListView({ list }: { list: ListNode }): ReactNode {
+function ListView({ list, footnotes }: { list: ListNode; footnotes: Record<string, number> }): ReactNode {
   const Tag = list.ordered ? "ol" : "ul";
   return (
     <Tag>
       {list.items.map((item, index) => (
         <li key={index}>
-          <InlineContent>{item.children}</InlineContent>
-          {item.list ? <ListView list={item.list} /> : null}
+          <InlineContent footnotes={footnotes}>{item.children}</InlineContent>
+          {item.list ? <ListView list={item.list} footnotes={footnotes} /> : null}
         </li>
       ))}
     </Tag>
   );
 }
 
-export function ProseView({ node }: { node: ProseNode }): ReactNode {
+export function ProseView({ node, footnotes = {} }: { node: ProseNode; footnotes?: Record<string, number> }): ReactNode {
   switch (node.type) {
     case "paragraph":
-      return <p><InlineContent>{node.children}</InlineContent></p>;
+      return <p><InlineContent footnotes={footnotes}>{node.children}</InlineContent></p>;
     case "heading": {
       const Tag = node.level === 3 ? "h3" : "h2";
-      return <Tag><InlineContent>{node.children}</InlineContent></Tag>;
+      return <Tag><InlineContent footnotes={footnotes}>{node.children}</InlineContent></Tag>;
     }
     case "list":
-      return <ListView list={node} />;
+      return <ListView list={node} footnotes={footnotes} />;
   }
 }
 
 /** Plain block text as paragraphs (quotes keep the writer's paragraph breaks). */
-function TextParagraphs({ text }: { text: string }): ReactNode {
+export function TextParagraphs({ text }: { text: string }): ReactNode {
   return paragraphsFromText(text).map((paragraph, index) => <p key={index}><InlineContent>{paragraph.children}</InlineContent></p>);
 }
 
-type BlockRenderer<T extends ArticleBlockType> = (props: { block: ArticleBlockOf<T>; media: MediaTable }) => ReactNode;
+/** A block's stored paragraphs. */
+export function BodyParagraphs({ body }: { body: readonly ParagraphNode[] }): ReactNode {
+  return body.map((paragraph, index) => <p key={index}><InlineContent>{paragraph.children}</InlineContent></p>);
+}
+
+
+/** A poll as the page draws it before any script runs: its question and answers, or its results once closed. */
+export function PollBlockView({ blockId, poll }: { blockId: string; poll: PublicPollReference }): ReactNode {
+  const id = `${blockId}-heading`;
+  const total = poll.results?.totalVotes ?? 0;
+  // The payload the site's poll widget reads. Counts exist only when the poll is closed and releasable.
+  const payload = {
+    id: poll.id,
+    question: poll.question,
+    options: poll.options.map((option) => ({ id: option.id, label: option.label, votes: poll.results?.votes[option.id] ?? 0 })),
+    totalVotes: total,
+    resultsAvailable: Boolean(poll.results),
+    votingOpen: poll.votingOpen
+  };
+  return (
+    <section className="byline-poll-block" id={`poll-${blockId}`} data-byline-poll-id={poll.id} aria-labelledby={id}>
+      <h2 id={id}>Reader poll</h2>
+      <p className="byline-poll-question">{poll.question}</p>
+      {poll.votingOpen ? (
+        <>
+          <ul className="byline-poll-options">
+            {poll.options.map((option) => <li key={option.id} className="byline-poll-option">{option.label}</li>)}
+          </ul>
+          <p className="byline-poll-note">Voting opens when the page finishes loading.</p>
+        </>
+      ) : poll.results ? (
+        <ol className="byline-poll-results">
+          {poll.options.map((option) => {
+            const votes = poll.results?.votes[option.id] ?? 0;
+            const percent = total > 0 ? Math.round((votes / total) * 100) : 0;
+            return (
+              <li key={option.id} className="byline-poll-result">
+                <span className="byline-poll-result-label">{option.label}: {percent}%</span>
+                <span className="byline-poll-result-bar" aria-hidden="true"><span style={{ width: `${percent}%` }} /></span>
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="byline-poll-note">Voting is closed.</p>
+      )}
+      <script type="application/json" className="byline-poll-data" dangerouslySetInnerHTML={{ __html: JSON.stringify(payload).replace(/</g, "\\u003c") }} />
+    </section>
+  );
+}
+
+type BlockRenderer<T extends ArticleBlockType> = (props: { block: ArticleBlockOf<T>; media: MediaTable; context: BlockContext }) => ReactNode;
 
 /**
  * One renderer per registered block type. The `{ [K in ArticleBlockType] }`
@@ -121,6 +221,46 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
       </ArticleBlockFrame>
     );
   },
+  portraitText: ({ block, media }) => {
+    const asset = lookup(media, block.media);
+    if (!asset) return null;
+    return (
+      <ArticleBlockFrame type="portraitText" placement="wide">
+        <PortraitTextFigure
+          side={block.side}
+          media={<ArticleImage asset={asset} alt={altFor(asset, block.altOverride)} sizes="(min-width: 1080px) 416px, (min-width: 640px) 40vw, 100vw" />}
+          caption={block.caption ? <CaptionText text={block.caption} /> : undefined}
+          credit={asset.credit}
+          heading={block.heading ? <h3>{block.heading}</h3> : undefined}
+        >
+          <BodyParagraphs body={block.body} />
+        </PortraitTextFigure>
+      </ArticleBlockFrame>
+    );
+  },
+  video: ({ block }) => (
+    <ArticleBlockFrame type="video" placement="wide">
+      <VideoFigure videoId={block.videoId as string} title={block.title} player={<YouTubePlayer videoId={block.videoId as string} title={block.title} />} caption={block.caption ? <CaptionText text={block.caption} /> : undefined} />
+    </ArticleBlockFrame>
+  ),
+  audio: ({ block, media }) => {
+    const asset = lookup(media, block.media);
+    if (!asset) return null;
+    return (
+      <ArticleBlockFrame type="audio">
+        <AudioFigure
+          title={block.title}
+          caption={block.caption ? <CaptionText text={block.caption} /> : undefined}
+          player={
+            <audio controls preload="metadata" src={asset.src}>
+              <a href={asset.src}>Download the audio ({asset.filename})</a>
+            </audio>
+          }
+          transcript={<TextParagraphs text={block.transcript} />}
+        />
+      </ArticleBlockFrame>
+    );
+  },
   reportedQuote: ({ block }) => (
     <ArticleBlockFrame type="reportedQuote">
       <ReportedQuoteView text={<TextParagraphs text={block.text} />} attribution={block.attribution} />
@@ -143,8 +283,29 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
   context: ({ block }) => (
     <ArticleBlockFrame type="context">
       <SupportingContext kind="context" headingId={`${block.id}-heading`} heading={block.heading}>
-        {block.body.map((paragraph, index) => <p key={index}><InlineContent>{paragraph.children}</InlineContent></p>)}
+        <BodyParagraphs body={block.body} />
       </SupportingContext>
+    </ArticleBlockFrame>
+  ),
+  editorsNote: ({ block }) => (
+    <ArticleBlockFrame type="editorsNote">
+      <EditorsNoteView label={EDITORS_NOTE_LABEL}>
+        <BodyParagraphs body={block.body} />
+      </EditorsNoteView>
+    </ArticleBlockFrame>
+  ),
+  marginNote: ({ block }) => (
+    <ArticleBlockFrame type="marginNote">
+      <MarginNoteView heading={block.heading}>
+        <BodyParagraphs body={block.body} />
+      </MarginNoteView>
+    </ArticleBlockFrame>
+  ),
+  expandable: ({ block }) => (
+    <ArticleBlockFrame type="expandable">
+      <ExpandableView heading={block.heading}>
+        <BodyParagraphs body={block.body} />
+      </ExpandableView>
     </ArticleBlockFrame>
   ),
   document: ({ block, media }) => {
@@ -182,6 +343,136 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
       </ArticleBlockFrame>
     );
   },
+  chartMap: ({ block, media }) => {
+    const asset = lookup(media, block.image);
+    if (block.mode === "static" && !asset) return null;
+    const graphic = asset ? (
+      <div className="byline-visualization-fallback-image">
+        <ArticleImage asset={asset} alt={altFor(asset, block.altOverride)} sizes="(min-width: 1080px) 1040px, 100vw" />
+      </div>
+    ) : null;
+    return (
+      <ArticleBlockFrame type="chartMap" placement="wide">
+        <ChartMapFigure
+          mode={block.mode}
+          provider={block.provider}
+          src={block.url}
+          height={block.height}
+          title={block.title}
+          dek={block.dek}
+          media={graphic}
+          link={block.mode === "interactive" && block.url ? <p className="byline-visualization-link"><a href={block.url} target="_blank" rel="noopener noreferrer">Open the {visualizationPieceName(block.provider ?? "")} in a new window</a></p> : undefined}
+          summary={<TextParagraphs text={block.summary} />}
+          source={block.source ? `Source: ${block.source}` : undefined}
+          notes={block.notes}
+          credit={block.credit ? `Credit: ${block.credit}` : asset?.credit ? `Photo: ${asset.credit}` : undefined}
+        />
+      </ArticleBlockFrame>
+    );
+  },
+  dataTable: ({ block }) => (
+    <ArticleBlockFrame type="dataTable">
+      <DataTableView
+        title={block.title}
+        description={block.description}
+        presentation={block.presentation}
+        rowHeaders={block.rowHeaders}
+        columns={block.columns.map((column) => ({ key: column.id, header: column.label }))}
+        rows={block.rows.map((row) => ({ key: row.id, cells: row.cells }))}
+        footer={block.source || block.notes ? (
+          <>
+            {block.source ? <p>Source: {block.source}</p> : null}
+            {block.notes ? <p>{block.notes}</p> : null}
+          </>
+        ) : undefined}
+      />
+    </ArticleBlockFrame>
+  ),
+  comparison: ({ block }) => (
+    <ArticleBlockFrame type="comparison">
+      <ComparisonView
+        headingId={`${block.id}-heading`}
+        heading={block.heading}
+        left={<ComparisonSideView side={block.left} />}
+        right={<ComparisonSideView side={block.right} />}
+      />
+    </ArticleBlockFrame>
+  ),
+  keyNumbers: ({ block }) => (
+    <ArticleBlockFrame type="keyNumbers">
+      <KeyNumbersView
+        headingId={`${block.id}-heading`}
+        heading={block.heading}
+        items={block.items.map((item) => ({ key: item.id, value: item.value, label: item.label, context: item.context }))}
+        source={block.source ? `Source: ${block.source}` : undefined}
+      />
+    </ArticleBlockFrame>
+  ),
+  annotatedImage: ({ block, media }) => {
+    const asset = lookup(media, block.media);
+    if (!asset) return null;
+    return (
+      <ArticleBlockFrame type="annotatedImage" placement={articleBlockPlacement(block)}>
+        <AnnotatedImageFigure
+          image={<ArticleImage asset={asset} alt={altFor(asset, block.altOverride)} sizes="(min-width: 1080px) 700px, 100vw" />}
+          markers={block.markers.map((marker, index) => (
+            <a key={marker.id} className="byline-annotation-marker" href={`#${annotationAnchor(block.id, marker.id)}`} style={{ left: `${marker.x}%`, top: `${marker.y}%` }} aria-label={`Note ${index + 1}: ${marker.title}`}>{index + 1}</a>
+          ))}
+          notes={
+            <ol className="byline-annotations">
+              {block.markers.map((marker) => (
+                <li key={marker.id} id={annotationAnchor(block.id, marker.id)} tabIndex={-1}>
+                  {marker.title ? <h3>{marker.title}</h3> : null}
+                  {marker.body ? <p>{marker.body}</p> : null}
+                </li>
+              ))}
+            </ol>
+          }
+          caption={block.caption ? <CaptionText text={block.caption} /> : undefined}
+          credit={asset.credit}
+        />
+      </ArticleBlockFrame>
+    );
+  },
+  beforeAfter: ({ block, media }) => {
+    const before = lookup(media, block.before);
+    const after = lookup(media, block.after);
+    if (!before || !after) return null;
+    const aspect = before.width && before.height ? Math.round((before.width / before.height) * 1000) / 1000 : undefined;
+    const credits = [...new Set([before.credit, after.credit].filter(Boolean))].join(", ");
+    return (
+      <ArticleBlockFrame type="beforeAfter" placement={articleBlockPlacement(block)}>
+        <BeforeAfterFigure
+          fit={block.fit}
+          aspect={aspect}
+          before={<ArticleImage asset={before} alt={altFor(before)} sizes="(min-width: 1080px) 520px, 100vw" />}
+          after={<ArticleImage asset={after} alt={altFor(after)} sizes="(min-width: 1080px) 520px, 100vw" />}
+          beforeLabel={block.beforeLabel}
+          afterLabel={block.afterLabel}
+          caption={block.caption ? <CaptionText text={block.caption} /> : undefined}
+          credit={credits}
+        />
+      </ArticleBlockFrame>
+    );
+  },
+  visualChapter: ({ block, media }) => {
+    const asset = lookup(media, block.media);
+    if (!asset) return null;
+    return (
+      <ArticleBlockFrame type="visualChapter" placement={articleBlockPlacement(block)}>
+        <VisualChapterView
+          id={`chapter-${block.id}`}
+          align={block.align}
+          headingId={`${block.id}-heading`}
+          media={<ArticleImage asset={asset} alt={altFor(asset, block.altOverride)} sizes="100vw" />}
+          eyebrow={block.eyebrow ? <p className="byline-kicker byline-visual-chapter-eyebrow">{block.eyebrow}</p> : undefined}
+          heading={block.heading}
+          dek={block.dek ? <p className="byline-visual-chapter-dek">{block.dek}</p> : undefined}
+          credit={asset.credit}
+        />
+      </ArticleBlockFrame>
+    );
+  },
   timeline: ({ block }) => {
     const starts = periodStarts(block.items);
     return (
@@ -200,25 +491,104 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
         </TimelineList>
       </ArticleBlockFrame>
     );
-  }
+  },
+  relatedCoverage: ({ block, media, context }) => {
+    const formatDate = context.host.formatDate ?? defaultFormatDate;
+    const stories = block.stories.map((item) => ({ item, story: context.references.stories?.[mediaKey(item.story as string | number)] })).filter((entry): entry is { item: typeof entry.item; story: NonNullable<typeof entry.story> } => Boolean(entry.story));
+    if (!stories.length) return null;
+    return (
+      <ArticleBlockFrame type="relatedCoverage">
+        <RelatedCoverageView headingId={`${block.id}-heading`} heading={block.heading}>
+          {stories.map(({ item, story }) => {
+            const thumb = story.thumbnail === undefined ? null : lookup(media, story.thumbnail);
+            return (
+              <li key={item.id} className="byline-related-item">
+                <a href={story.href}>
+                  {thumb ? <span className="byline-related-thumb"><ArticleImage asset={{ ...thumb, src: thumb.previewSrc ?? thumb.src }} alt="" sizes="96px" /></span> : null}
+                  <span className="byline-related-text">
+                    <span className="byline-related-meta">
+                      {story.section ? <span>{story.section}</span> : null}
+                      <time dateTime={story.publishedAt}>{formatDate(story.publishedAt)}</time>
+                    </span>
+                    <span className="byline-related-headline">{story.headline}</span>
+                  </span>
+                </a>
+              </li>
+            );
+          })}
+        </RelatedCoverageView>
+      </ArticleBlockFrame>
+    );
+  },
+  poll: ({ block, context }) => {
+    const poll = block.poll === null ? null : context.references.polls?.[mediaKey(block.poll)];
+    if (!poll) return null;
+    return (
+      <ArticleBlockFrame type="poll">
+        <PollBlockView blockId={block.id} poll={poll} />
+      </ArticleBlockFrame>
+    );
+  },
+  repositoryInteractive: ({ block, context }) => (
+    <ArticleBlockFrame type="repositoryInteractive" placement="wide">
+      <RepositoryInteractiveFigure interactiveKey={block.key} title={block.title} description={block.description}>
+        {context.host.renderInteractive?.(block)}
+      </RepositoryInteractiveFigure>
+    </ArticleBlockFrame>
+  )
 };
 
-export function ArticleBodyNodeView({ node, media }: { node: ArticleBodyNode; media: MediaTable }): ReactNode {
-  if (!isArticleBlock(node)) return <ProseView node={node} />;
+function ComparisonSideView({ side }: { side: { label: string; title: string; body: readonly ParagraphNode[] } }): ReactNode {
+  return (
+    <>
+      {side.label ? <p className="byline-kicker">{side.label}</p> : null}
+      <h3>{side.title}</h3>
+      <BodyParagraphs body={side.body} />
+    </>
+  );
+}
+
+export function ArticleBodyNodeView({ node, media, references = {}, footnotes = {}, host = {} }: { node: ArticleBodyNode; media: MediaTable; references?: ArticleReferences; footnotes?: Record<string, number>; host?: ArticleRenderHost }): ReactNode {
+  if (!isArticleBlock(node)) return <ProseView node={node} footnotes={footnotes} />;
   const Render = ARTICLE_BLOCK_RENDERERS[node.type] as BlockRenderer<typeof node.type>;
-  return <Render block={node as never} media={media} />;
+  return <Render block={node as never} media={media} context={{ references, footnotes, host }} />;
+}
+
+/** The end-of-story notes: one ordered list, each with a link back to its reference. */
+export function FootnotesSection({ nodes }: { nodes: readonly ArticleBodyNode[] }): ReactNode {
+  const notes = collectFootnotes(nodes);
+  if (!notes.length) return null;
+  return (
+    <section className="byline-footnotes" aria-labelledby="byline-footnotes-heading">
+      <h2 id="byline-footnotes-heading" className="byline-kicker">Footnotes</h2>
+      <ol>
+        {notes.map((note) => (
+          <li key={note.id} id={footnoteAnchor(note.id)}>
+            <span>{note.text}</span>{" "}
+            <a className="byline-footnote-back" href={`#${footnoteRefAnchor(note.id)}`} aria-label={`Back to reference ${note.number}`}>↩</a>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
 }
 
 /** The nodes of a body, for a host that supplies its own `.article-body` element. */
-export function ArticleBodyContent({ body }: { body: ArticleBody }): ReactNode {
-  return body.nodes.map((node, index) => <ArticleBodyNodeView key={isArticleBlock(node) ? node.id : `n${index}`} node={node} media={body.media} />);
+export function ArticleBodyContent({ body, host }: { body: ArticleBody; host?: ArticleRenderHost }): ReactNode {
+  const footnotes = Object.fromEntries(collectFootnotes(body.nodes).map((note) => [note.id, note.number]));
+  return (
+    <>
+      {body.nodes.map((node, index) => <ArticleBodyNodeView key={isArticleBlock(node) ? node.id : `n${index}`} node={node} media={body.media} references={body.references} footnotes={footnotes} host={host} />)}
+      <FootnotesSection nodes={body.nodes} />
+    </>
+  );
 }
 
 /** A whole structured body in its `.article-body` element. Place it inside `.byline-article-view`. */
-export function StructuredArticleBody({ body }: { body: ArticleBody }): ReactNode {
+export function StructuredArticleBody({ body, host }: { body: ArticleBody; host?: ArticleRenderHost }): ReactNode {
   return (
     <div className="article-body">
-      <ArticleBodyContent body={body} />
+      <ArticleBodyContent body={body} host={host} />
     </div>
   );
 }

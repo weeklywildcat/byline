@@ -9,7 +9,8 @@
     "./client": "./src/client/index.ts",
     "./normalize": "./src/normalize.ts",
     "./fields": "./src/fields.ts",
-    "./canvas.css": "./src/canvas.css"
+    "./canvas.css": "./src/canvas.css",
+    "./permissions": "./src/permissions.ts"
   },
   "scripts": {
     "test": "vitest run"

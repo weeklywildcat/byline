@@ -24,3 +24,8 @@ export function useFocusWhenCreated(nodeKey: string, target: RefObject<HTMLEleme
     element.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [nodeKey, ready, target]);
 }
+
+/** Whether this node was just created (and clears the mark): a new footnote opens its note at once. */
+export function consumeCreated(nodeKey: string): boolean {
+  return justCreated.delete(nodeKey);
+}

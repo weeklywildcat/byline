@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ARTICLE_BLOCK_TYPES, ARTICLE_BLOCKS, type ArticleBlock, type ArticleMediaAsset } from "@byline/article-body";
-import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_MEDIA } from "@byline/article-body/fixtures";
+import { ARTICLE_BLOCK_TYPES, ARTICLE_BLOCKS, finalizeBlock, type ArticleBlock, type ArticleMediaAsset } from "@byline/article-body";
+import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_REFERENCES } from "@byline/article-body/fixtures";
 import { ARTICLE_BLOCK_RENDERERS } from "@byline/ui/article-body";
 import { articleBlockFromFields, BLOCK_FIELD_READERS, BLOCK_TO_ARTICLE, mediaIdOf } from "../src/fields";
 import { duplicateItem, insertItem, moveDirection, moveItem, removeItem, setOnlyCurrent } from "../src/items";
@@ -11,6 +11,7 @@ import { BYLINE_BLOCK_COMPONENT, BYLINE_BODY_BLOCKS } from "../src/schema";
 import { blockFields, lexicalFromArticleBody } from "./lexical-fixture";
 
 const media = (id: string | number) => FIXTURE_MEDIA[String(id)] ?? null;
+const references = { story: (id: string | number) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: string | number) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY };
 const sourceFiles = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
   const path = join(dir, name);
   return statSync(path).isDirectory() ? sourceFiles(path) : [path];
@@ -52,8 +53,9 @@ describe("the media contract", () => {
     for (const type of ["photo", "gallery", "document"] as const) {
       expect(fieldNames(BYLINE_BODY_BLOCKS[type].fields)).not.toContain("credit");
     }
-    const { body } = normalizePayloadArticleBody(lexicalFromArticleBody(FIXTURE_ARTICLE_BODY), { media });
-    expect(JSON.stringify(body.nodes)).not.toContain("credit");
+    const { body } = normalizePayloadArticleBody(lexicalFromArticleBody(FIXTURE_ARTICLE_BODY), { media, references });
+    // A graphic's own credit line belongs to Chart / Map (an embed has no Media); photographs' credits never do.
+    expect(JSON.stringify(body.nodes.filter((node) => node.type !== "chartMap"))).not.toContain("credit");
   });
 
   it("relates block media to the Media collection, images for photos and PDFs for documents", () => {
@@ -69,16 +71,16 @@ describe("the media contract", () => {
 
   it("collects referenced media IDs, populated or not", () => {
     const state = lexicalFromArticleBody(FIXTURE_ARTICLE_BODY);
-    expect(collectMediaIds(state).sort()).toEqual([101, 103, 104, 201].sort());
+    expect(collectMediaIds(state).map(Number).sort((a, b) => a - b)).toEqual([101, 103, 104, 105, 106, 107, 108, 201, 202]);
     expect(mediaIdOf({ id: "12", filename: "x.jpg" })).toBe(12);
   });
 });
 
 describe("Payload Lexical → byline-v1", () => {
   it("round-trips the fixture story exactly, in order", () => {
-    const { body, issues } = normalizePayloadArticleBody(lexicalFromArticleBody(FIXTURE_ARTICLE_BODY), { media });
+    const { body, issues } = normalizePayloadArticleBody(lexicalFromArticleBody(FIXTURE_ARTICLE_BODY), { media, references });
     expect(issues).toEqual([]);
-    expect(body).toEqual({ ...FIXTURE_ARTICLE_BODY, media: Object.fromEntries(Object.entries(FIXTURE_MEDIA).filter(([key]) => key !== "102" && key !== "105")) });
+    expect(body).toEqual({ ...FIXTURE_ARTICLE_BODY, media: Object.fromEntries(Object.entries(FIXTURE_MEDIA).filter(([key]) => key !== "102")) });
   });
 
   it("emits no editor or Payload metadata", () => {
@@ -86,7 +88,7 @@ describe("Payload Lexical → byline-v1", () => {
     // Payload may add these to a stored block; none is article content.
     const block = (state.root.children as Array<{ type: string; fields?: Record<string, unknown> }>).find((node) => node.type === "block");
     Object.assign(block!.fields!, { blockName: "Lead photo", _components: { Block: "x" }, media: { id: 101, filename: "private.jpg", createdAt: "2026-01-01" } });
-    const json = JSON.stringify(normalizePayloadArticleBody(state, { media }).body);
+    const json = JSON.stringify(normalizePayloadArticleBody(state, { media, references }).body);
     for (const leak of ["blockName", "_components", "private.jpg", "createdAt", "blockType"]) expect(json).not.toContain(leak);
   });
 
@@ -140,10 +142,11 @@ describe("stored fields", () => {
     expect(BLOCK_FIELD_READERS.timeline({}).items.map((item) => item.id)).toEqual(BLOCK_FIELD_READERS.timeline({}).items.map((item) => item.id));
   });
 
-  it("map back to the same semantic block", () => {
+  it("map back to the same published block", () => {
     for (const type of ARTICLE_BLOCK_TYPES) {
       const block = FIXTURE_BLOCKS[type];
-      expect(articleBlockFromFields(type, block.id, blockFields(block)), type).toEqual(block);
+      const draft = articleBlockFromFields(type, block.id, blockFields(block)) as ArticleBlock;
+      expect(finalizeBlock(draft, media, references).block, type).toEqual(block);
     }
   });
 });
@@ -164,7 +167,12 @@ describe("native slash discovery", () => {
     ["context", ["Context"]],
     ["doc", ["Document (PDF)"]],
     ["pdf", ["Document (PDF)"]],
-    ["timeline", ["Timeline"]]
+    ["timeline", ["Timeline"]],
+    ["chart", ["Chart / Map"]],
+    ["table", ["Data Table"]],
+    ["video", ["Video"]],
+    ["poll", ["Poll"]],
+    ["interactive", ["Repository Interactive"]]
   ])("/%s finds %j", (query, expected) => {
     expect(find(query)).toEqual(expected);
   });
@@ -191,7 +199,7 @@ describe("package boundaries", () => {
       // @byline/core is pure (no React, CMS or runtime): the art-direction intent is read from it.
       for (const specifier of importsOf(join(SRC, file))) expect(specifier, file).toMatch(/^(?:\.\/|@byline\/article-body$|@byline\/core$)/);
     }
-    for (const specifier of importsOf(join(SRC, "schema.ts"))) expect(specifier).toMatch(/^(?:\.\/|@byline\/article-body$|payload$)/);
+    for (const specifier of importsOf(join(SRC, "schema.ts"))) expect(specifier).toMatch(/^(?:\.\/|@byline\/article-body$|@byline\/core$|payload$)/);
   });
 
   it("never imports Payload's private source paths, Views or JSX converters", () => {

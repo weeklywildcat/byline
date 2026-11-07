@@ -13,6 +13,7 @@ import { BlockShell, ToolButton, ToolTextButton } from "../chrome";
 import { InlineText } from "../fields";
 import { useFocusWhenCreated } from "../focus";
 import { useAnnounce } from "../host";
+import { ParagraphFields } from "./parts";
 import { focusIn, useReadiness, useTypedFields, type BlockEditorProps } from "./shared";
 
 export function ReportedQuoteEditor({ node, id, nodeKey }: BlockEditorProps) {
@@ -108,54 +109,6 @@ export function KeyFactsEditor({ node, id, nodeKey }: BlockEditorProps) {
         </ul>
       </SupportingContext>
     </BlockShell>
-  );
-}
-
-/**
- * The Context body as paragraphs, each typed in its own paragraph slot so it
- * keeps the article's paragraph spacing. Enter starts a new paragraph;
- * Backspace at the start of one joins it to the one before. Stored as plain
- * text with blank lines between paragraphs.
- */
-function ParagraphFields({ value, readOnly, onChange, label, placeholder, inputRef }: { value: string; readOnly: boolean; onChange: (value: string) => void; label: string; placeholder: string; inputRef?: React.Ref<HTMLTextAreaElement> }) {
-  const paragraphs = value.split(/\n\s*\n/);
-  const write = (next: string[]) => onChange(next.join("\n\n"));
-  // The paragraphs are direct children of the context element, as in the article.
-  const focusAt = (from: HTMLElement, index: number, caret: number) => window.requestAnimationFrame(() => {
-    const element = from.closest("aside")?.querySelectorAll<HTMLTextAreaElement>(":scope > p > .byline-field")[index];
-    element?.focus();
-    element?.setSelectionRange(caret, caret);
-  });
-  return (
-    <>
-      {paragraphs.map((paragraph, index) => (
-        <p key={index}>
-          <InlineText
-            inputRef={index === 0 ? inputRef : undefined}
-            label={paragraphs.length > 1 ? `${label}, paragraph ${index + 1}` : label}
-            placeholder={index === 0 ? placeholder : ""}
-            value={paragraph}
-            readOnly={readOnly}
-            onChange={(text) => write(paragraphs.map((current, i) => (i === index ? text : current)))}
-            onKeyDown={(event) => {
-              const field = event.currentTarget;
-              if (event.key === "Enter" && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
-                event.preventDefault();
-                const before = field.value.slice(0, field.selectionStart).trimEnd();
-                const after = field.value.slice(field.selectionEnd).trimStart();
-                write([...paragraphs.slice(0, index), before, after, ...paragraphs.slice(index + 1)]);
-                focusAt(field, index + 1, 0);
-              } else if (event.key === "Backspace" && index > 0 && field.selectionStart === 0 && field.selectionEnd === 0) {
-                event.preventDefault();
-                const previous = paragraphs[index - 1] ?? "";
-                write([...paragraphs.slice(0, index - 1), previous + paragraph, ...paragraphs.slice(index + 1)]);
-                focusAt(field, index - 1, previous.length);
-              }
-            }}
-          />
-        </p>
-      ))}
-    </>
   );
 }
 

@@ -20,14 +20,14 @@ import { useAnnounce, useBylineEditorHost, useMediaAsset, usePickMedia, useUploa
 import { BlockIcon } from "../icons";
 import { focusIn, useReadiness, useTypedFields, type BlockEditorProps } from "./shared";
 
-const ACCEPT = { image: "image/*", document: "application/pdf" } as const;
+const ACCEPT = { image: "image/*", document: "application/pdf", audio: "audio/*" } as const;
 
 /**
  * An unfinished media slot, drawn where the media will be: choose from Byline
  * Media, upload, or drop a file. One sentence says what is needed.
  */
 export function MediaPlaceholder({ kind, title, description, multiple = false, readOnly, onChosen, chooseRef }: {
-  kind: "image" | "document";
+  kind: "image" | "document" | "audio";
   title: string;
   description: string;
   multiple?: boolean;
@@ -42,14 +42,14 @@ export function MediaPlaceholder({ kind, title, description, multiple = false, r
   const [dragging, setDragging] = useState(false);
 
   const choose = async () => {
-    const assets = await pick({ kind, multiple, title: kind === "image" ? (multiple ? "Choose photographs" : "Choose a photograph") : "Choose a PDF", confirmLabel: multiple ? "Add to gallery" : "Use this file" });
+    const assets = await pick({ kind, multiple, title: kind === "image" ? (multiple ? "Choose photographs" : "Choose a photograph") : kind === "audio" ? "Choose an audio file" : "Choose a PDF", confirmLabel: multiple ? "Add to gallery" : "Use this file" });
     if (assets.length) onChosen(assets);
   };
   const send = async (files: File[]) => {
     if (!upload || readOnly) return;
-    const accepted = files.filter((file) => (kind === "image" ? file.type.startsWith("image/") : file.type === "application/pdf"));
+    const accepted = files.filter((file) => (kind === "image" ? file.type.startsWith("image/") : kind === "audio" ? file.type.startsWith("audio/") : file.type === "application/pdf"));
     if (!accepted.length) {
-      toast.error(kind === "image" ? "That file is not an image." : "That file is not a PDF.");
+      toast.error(kind === "image" ? "That file is not an image." : kind === "audio" ? "That file is not audio." : "That file is not a PDF.");
       return;
     }
     const uploaded: ArticleMediaAsset[] = [];
@@ -81,7 +81,7 @@ export function MediaPlaceholder({ kind, title, description, multiple = false, r
       onDrop={upload && !readOnly ? onDrop : undefined}
     >
       <EmptyHeader>
-        <EmptyMedia variant="icon">{progress !== null ? <Spinner /> : <BlockIcon icon={kind === "image" ? (multiple ? "gallery" : "photo") : "document"} />}</EmptyMedia>
+        <EmptyMedia variant="icon">{progress !== null ? <Spinner /> : <BlockIcon icon={kind === "image" ? (multiple ? "gallery" : "photo") : kind === "audio" ? "audio" : "document"} />}</EmptyMedia>
         <EmptyTitle>{progress !== null ? `Uploading… ${Math.round(progress * 100)}%` : title}</EmptyTitle>
         <EmptyDescription>{description}</EmptyDescription>
       </EmptyHeader>
@@ -107,7 +107,7 @@ export function MediaPlaceholder({ kind, title, description, multiple = false, r
 }
 
 /** An asset that is loading, or that Media no longer has. */
-function MediaStatus({ status, kind }: { status: "loading" | "missing"; kind: "image" | "document" }) {
+export function MediaStatus({ status, kind }: { status: "loading" | "missing"; kind: "image" | "document" | "audio" }) {
   return (
     <div className="byline-media-status" data-status={status} role={status === "missing" ? "alert" : undefined}>
       {status === "loading" ? <Spinner /> : null}
@@ -116,7 +116,7 @@ function MediaStatus({ status, kind }: { status: "loading" | "missing"; kind: "i
   );
 }
 
-function AltTextSetting({ asset, value, onChange, readOnly }: { asset: ArticleMediaAsset | null; value: string; onChange: (value: string) => void; readOnly: boolean }) {
+export function AltTextSetting({ asset, value, onChange, readOnly }: { asset: ArticleMediaAsset | null; value: string; onChange: (value: string) => void; readOnly: boolean }) {
   return (
     <SecondarySetting label="Alt text" title="Alt text for this story" description={asset?.alt ? `Media's alt text: "${asset.alt}". Write here only if this story needs different words.` : "Media has no alt text for this photograph. Describe what a reader who cannot see it needs to know."} icon={null}>
       <Textarea aria-label="Alt text for this story" rows={3} maxLength={LIMITS.altText} value={value} readOnly={readOnly} placeholder={asset?.alt || "Describe the photograph"} onChange={(event) => onChange(event.target.value)} />

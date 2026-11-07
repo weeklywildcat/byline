@@ -1,12 +1,13 @@
 "use client";
 
-import { $isBlockNode, INSERT_BLOCK_COMMAND } from "@payloadcms/richtext-lexical/client";
+import { $isBlockNode, $isInlineBlockNode, INSERT_BLOCK_COMMAND } from "@payloadcms/richtext-lexical/client";
 import {
   $createParagraphNode,
   $getNodeByKey,
   $getPreviousSelection,
   $getRoot,
   $getSelection,
+  $isElementNode,
   $isNodeSelection,
   $isRangeSelection,
   SKIP_DOM_SELECTION_TAG,
@@ -131,4 +132,55 @@ export function insertStoryBlock(editor: LexicalEditor, type: ArticleBlockType):
 /** Whether the editor is editable now (false while another user holds the story's lock). */
 export function useCanvasEditable(): boolean {
   return useLexicalEditable();
+}
+
+/** Every footnote reference in reading order. Numbers are never stored: they are positions in this list. */
+function $footnoteKeys(): string[] {
+  const keys: string[] = [];
+  const visit = (node: LexicalNode) => {
+    if ($isInlineBlockNode(node)) {
+      if ((node.getFields() as Fields).blockType === "footnote") keys.push(node.getKey());
+      return;
+    }
+    if ($isElementNode(node)) node.getChildren().forEach(visit);
+  };
+  visit($getRoot());
+  return keys;
+}
+
+/**
+ * One footnote reference: its note, its derived number (the position among all
+ * references in the story) and the edits it makes. Like a block, the node is
+ * the only copy of its content and writes are ordinary Lexical updates, so
+ * undo, autosave and history cover footnotes too.
+ */
+export function useFootnote(nodeKey: string) {
+  const [editor] = useLexicalComposerContext();
+  const editable = useLexicalEditable();
+  const subscribe = useCallback((listener: () => void) => editor.registerUpdateListener(listener), [editor]);
+  const read = useCallback(() => editor.getEditorState().read(() => {
+    const node = $getNodeByKey(nodeKey);
+    if (!$isInlineBlockNode(node)) return "null";
+    const keys = $footnoteKeys();
+    return JSON.stringify({ text: ((node.getFields() as Fields).text as string) ?? "", number: keys.indexOf(nodeKey) + 1 });
+  }), [editor, nodeKey]);
+  const json = useSyncExternalStore(subscribe, read, read);
+  const state = json === "null" ? null : (JSON.parse(json) as { text: string; number: number });
+
+  const write = useCallback((text: string) => {
+    if (!editor.isEditable()) return;
+    editor.update(() => {
+      const node = $getNodeByKey(nodeKey);
+      if ($isInlineBlockNode(node)) node.setFields({ ...(node.getFields() as Fields), text } as never, true);
+    }, { discrete: true, tag: [SKIP_DOM_SELECTION_TAG] });
+  }, [editor, nodeKey]);
+
+  const remove = useCallback(() => {
+    if (!editor.isEditable()) return;
+    editor.update(() => {
+      $getNodeByKey(nodeKey)?.remove();
+    });
+  }, [editor, nodeKey]);
+
+  return { editor, editable, text: state?.text ?? "", number: state?.number ?? 0, write, remove };
 }

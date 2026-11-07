@@ -1,6 +1,6 @@
 "use client";
 
-import type { ArticleMediaAsset, MediaId } from "@byline/article-body";
+import type { ArticleMediaAsset, MediaId, PublicPollReference, PublicStoryReference } from "@byline/article-body";
 import { mediaKey } from "@byline/article-body";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
@@ -11,7 +11,7 @@ import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, 
  */
 export type BylineEditorHost = {
   /** Byline's Media picker. Resolves with the chosen assets, or [] when dismissed. */
-  pickMedia: (options: { kind: "image" | "document"; multiple: boolean; title: string; confirmLabel: string }) => Promise<ArticleMediaAsset[]>;
+  pickMedia: (options: { kind: "image" | "document" | "audio"; multiple: boolean; title: string; confirmLabel: string }) => Promise<ArticleMediaAsset[]>;
   /** One asset by ID, or null when it is gone or not readable. Credit comes resolved from Media. */
   loadMedia: (id: MediaId) => Promise<ArticleMediaAsset | null>;
   /** Uploads a file into Media (when the host supports it here). */
@@ -24,56 +24,85 @@ export type BylineEditorHost = {
    * CMS endpoint behind it.
    */
   editArtDirection?: (id: MediaId) => Promise<boolean>;
+  /**
+   * May this writer insert, change and remove the privileged blocks (Editor's
+   * Note, Repository Interactive)? The server enforces it; this only shapes the
+   * interface so nobody is offered a tool the server would put back.
+   */
+  canUsePrivilegedBlocks?: boolean;
+  /** Published Stories to link from Related Coverage: searchable, never the story being edited. */
+  searchStories?: (query: string) => Promise<StoryChoice[]>;
+  /** One Story's public facts, or null when it is not published or is gone. */
+  loadStory?: (id: MediaId) => Promise<StoryChoice | null>;
+  /** The Polls a writer may place in a story (open or closed). */
+  searchPolls?: (query: string) => Promise<PollChoice[]>;
+  loadPoll?: (id: MediaId) => Promise<PollChoice | null>;
+  /** The repository's registered interactives, as plain data (never their code). */
+  interactives?: ReadonlyArray<{ key: string; name: string; description: string }>;
 };
 
-type Entry = { status: "loading" | "ready" | "missing"; asset: ArticleMediaAsset | null };
+/** A published Story as the picker and the canvas show it. Facts come from the Story, never from the block. */
+export type StoryChoice = PublicStoryReference & { thumbnailAsset?: ArticleMediaAsset | null };
+export type PollChoice = PublicPollReference & { status: "draft" | "open" | "closed" };
 
-type MediaStore = {
-  get: (id: MediaId) => Entry;
-  prime: (assets: ArticleMediaAsset[]) => void;
+type Entry<T = ArticleMediaAsset> = { status: "loading" | "ready" | "missing"; asset: T | null };
+
+/** One small cache per kind of record (Media, Stories, Polls): one request per record, primed by pickers. */
+type RecordStore<T> = {
+  get: (id: MediaId) => Entry<T>;
+  prime: (items: Array<{ id: MediaId; value: T }>) => void;
   subscribe: (listener: () => void) => () => void;
 };
 
-type EditorHostContext = BylineEditorHost & { store: MediaStore; announce: (message: string) => void };
+type MediaStore = RecordStore<ArticleMediaAsset> & { primeAssets: (assets: ArticleMediaAsset[]) => void };
+
+type EditorHostContext = BylineEditorHost & { store: MediaStore; stories: RecordStore<StoryChoice>; polls: RecordStore<PollChoice>; announce: (message: string) => void };
 
 const HostContext = createContext<EditorHostContext | null>(null);
 
-const LOADING: Entry = { status: "loading", asset: null };
+const LOADING: Entry<never> = { status: "loading", asset: null };
+
+function createRecordStore<T>(load: (id: MediaId) => Promise<T | null>): RecordStore<T> {
+  const entries = new Map<string, Entry<T>>();
+  const listeners = new Set<() => void>();
+  const emit = () => listeners.forEach((listener) => listener());
+  const set = (key: string, entry: Entry<T>) => {
+    entries.set(key, entry);
+    emit();
+  };
+  return {
+    get: (id) => {
+      const key = mediaKey(id);
+      const entry = entries.get(key);
+      if (entry) return entry;
+      entries.set(key, LOADING);
+      void load(id).then(
+        (value) => set(key, value ? { status: "ready", asset: value } : { status: "missing", asset: null }),
+        () => set(key, { status: "missing", asset: null })
+      );
+      return LOADING;
+    },
+    prime: (items) => {
+      for (const item of items) entries.set(mediaKey(item.id), { status: "ready", asset: item.value });
+      emit();
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    }
+  };
+}
 
 /** Provides the host and a small Media cache (one request per asset, primed by the picker). */
 export function BylineEditorHostProvider({ host, children }: { host: BylineEditorHost; children: ReactNode }) {
   const hostRef = useRef(host);
   hostRef.current = host;
   const store = useMemo<MediaStore>(() => {
-    const entries = new Map<string, Entry>();
-    const listeners = new Set<() => void>();
-    const emit = () => listeners.forEach((listener) => listener());
-    const set = (key: string, entry: Entry) => {
-      entries.set(key, entry);
-      emit();
-    };
-    return {
-      get: (id) => {
-        const key = mediaKey(id);
-        const entry = entries.get(key);
-        if (entry) return entry;
-        entries.set(key, LOADING);
-        void hostRef.current.loadMedia(id).then(
-          (asset) => set(key, asset ? { status: "ready", asset } : { status: "missing", asset: null }),
-          () => set(key, { status: "missing", asset: null })
-        );
-        return LOADING;
-      },
-      prime: (assets) => {
-        for (const asset of assets) entries.set(mediaKey(asset.id), { status: "ready", asset });
-        emit();
-      },
-      subscribe: (listener) => {
-        listeners.add(listener);
-        return () => listeners.delete(listener);
-      }
-    };
+    const base = createRecordStore<ArticleMediaAsset>((id) => hostRef.current.loadMedia(id));
+    return { ...base, primeAssets: (assets) => base.prime(assets.map((asset) => ({ id: asset.id, value: asset }))) };
   }, []);
+  const stories = useMemo(() => createRecordStore<StoryChoice>(async (id) => (await hostRef.current.loadStory?.(id)) ?? null), []);
+  const polls = useMemo(() => createRecordStore<PollChoice>(async (id) => (await hostRef.current.loadPoll?.(id)) ?? null), []);
   // One polite live region for block edits (added, moved, removed): decorators render
   // through portals, so the announcer lives here, above the editor.
   const [message, setMessage] = useState("");
@@ -81,7 +110,7 @@ export function BylineEditorHostProvider({ host, children }: { host: BylineEdito
     setMessage("");
     window.requestAnimationFrame(() => setMessage(next));
   }, []);
-  const value = useMemo<EditorHostContext>(() => ({ ...host, store, announce }), [announce, host, store]);
+  const value = useMemo<EditorHostContext>(() => ({ ...host, store, stories, polls, announce }), [announce, host, polls, stories, store]);
   return (
     <HostContext value={value}>
       {children}
@@ -107,14 +136,28 @@ export function useMediaAsset(id: MediaId | null): Entry {
   return useSyncExternalStore(store.subscribe, read, read);
 }
 
-const MISSING_NONE: Entry = { status: "missing", asset: null };
+const MISSING_NONE: Entry<never> = { status: "missing", asset: null };
+
+/** One Story's public facts for display, loaded once. */
+export function useStoryChoice(id: MediaId | null): Entry<StoryChoice> {
+  const { stories } = useBylineEditorHost();
+  const read = useCallback(() => (id === null ? MISSING_NONE : stories.get(id)), [id, stories]);
+  return useSyncExternalStore(stories.subscribe, read, read);
+}
+
+/** One Poll's public definition for display, loaded once. */
+export function usePollChoice(id: MediaId | null): Entry<PollChoice> {
+  const { polls } = useBylineEditorHost();
+  const read = useCallback(() => (id === null ? MISSING_NONE : polls.get(id)), [id, polls]);
+  return useSyncExternalStore(polls.subscribe, read, read);
+}
 
 /** Picks media through Byline's picker and primes the cache with what was chosen. */
 export function usePickMedia() {
   const { pickMedia, store } = useBylineEditorHost();
   return useCallback(async (options: Parameters<BylineEditorHost["pickMedia"]>[0]) => {
     const assets = await pickMedia(options);
-    store.prime(assets);
+    store.primeAssets(assets);
     return assets;
   }, [pickMedia, store]);
 }
@@ -124,7 +167,7 @@ export function useUploadMedia() {
   const { uploadMedia, store } = useBylineEditorHost();
   return useMemo(() => (uploadMedia ? async (file: File, onProgress?: (fraction: number) => void) => {
     const asset = await uploadMedia(file, onProgress);
-    store.prime([asset]);
+    store.primeAssets([asset]);
     return asset;
   } : null), [store, uploadMedia]);
 }

@@ -4,6 +4,11 @@ import { isArticleBlockType, type ArticleBlockType } from "@byline/article-body"
 import { useBlockComponentContext } from "@payloadcms/richtext-lexical/client";
 import type { ComponentType } from "react";
 import { DocumentEditor } from "./blocks/document";
+import { AudioEditor, ChartMapEditor, RepositoryInteractiveEditor, VideoEditor } from "./blocks/embeds";
+import { ComparisonEditor, EditorsNoteEditor, ExpandableEditor, KeyNumbersEditor, MarginNoteEditor } from "./blocks/explain";
+import { PollEditor, RelatedCoverageEditor } from "./blocks/relations";
+import { DataTableEditor } from "./blocks/table";
+import { AnnotatedImageEditor, BeforeAfterEditor, PortraitTextEditor, VisualChapterEditor } from "./blocks/visual";
 import { GalleryEditor, PhotoEditor } from "./blocks/media";
 import type { BlockEditorProps } from "./blocks/shared";
 import { ContextEditor, KeyFactsEditor, PullQuoteEditor, ReportedQuoteEditor } from "./blocks/text";
@@ -23,7 +28,23 @@ export const BLOCK_EDITORS: { readonly [K in ArticleBlockType]: ComponentType<Bl
   keyFacts: KeyFactsEditor,
   context: ContextEditor,
   document: DocumentEditor,
-  timeline: TimelineEditor
+  timeline: TimelineEditor,
+  portraitText: PortraitTextEditor,
+  visualChapter: VisualChapterEditor,
+  video: VideoEditor,
+  audio: AudioEditor,
+  editorsNote: EditorsNoteEditor,
+  marginNote: MarginNoteEditor,
+  expandable: ExpandableEditor,
+  chartMap: ChartMapEditor,
+  dataTable: DataTableEditor,
+  comparison: ComparisonEditor,
+  keyNumbers: KeyNumbersEditor,
+  annotatedImage: AnnotatedImageEditor,
+  beforeAfter: BeforeAfterEditor,
+  relatedCoverage: RelatedCoverageEditor,
+  poll: PollEditor,
+  repositoryInteractive: RepositoryInteractiveEditor
 };
 
 /**

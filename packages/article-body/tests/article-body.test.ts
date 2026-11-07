@@ -16,9 +16,10 @@ import {
   type ArticleBlock,
   type MediaLookup
 } from "../src";
-import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_MEDIA } from "../src/fixtures";
+import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_REFERENCES } from "../src/fixtures";
 
 const lookup: MediaLookup = (id) => FIXTURE_MEDIA[String(id)];
+const refs = { story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: number | string) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY };
 const sourceDir = join(import.meta.dirname, "../src");
 
 describe("the contract stays provider-neutral", () => {
@@ -44,10 +45,12 @@ describe("the contract stays provider-neutral", () => {
     }
     expect(isArticleBlockType("scrollytelling")).toBe(false);
     expect(isArticleBlockType("interactive")).toBe(false);
+    expect(isArticleBlockType("footnotes")).toBe(false);
+    expect(isArticleBlockType("photoEssay")).toBe(false);
   });
 
-  it("never stores a credit in photo or gallery data", () => {
-    const blocks = [FIXTURE_BLOCKS.photo, FIXTURE_BLOCKS.gallery, ...FIXTURE_ARTICLE_BODY.nodes];
+  it("never stores a photograph's credit in a block (Chart / Map has its own graphic credit line)", () => {
+    const blocks = [FIXTURE_BLOCKS.photo, FIXTURE_BLOCKS.gallery, FIXTURE_BLOCKS.portraitText, FIXTURE_BLOCKS.visualChapter, FIXTURE_BLOCKS.annotatedImage, FIXTURE_BLOCKS.beforeAfter, FIXTURE_BLOCKS.audio, FIXTURE_BLOCKS.document];
     expect(JSON.stringify(blocks)).not.toMatch(/"credit"/);
   });
 });
@@ -90,7 +93,9 @@ describe("text helpers", () => {
 describe("publishing keeps only complete blocks", () => {
   it("passes every fixture block unchanged", () => {
     for (const type of ARTICLE_BLOCK_TYPES) {
-      const { block, issues } = finalizeBlock(FIXTURE_BLOCKS[type], lookup);
+      // A draft Video carries the editors' captions flag; publishing removes it.
+      const draft = type === "video" ? { ...FIXTURE_BLOCKS.video, captionsConfirmed: true } : FIXTURE_BLOCKS[type];
+      const { block, issues } = finalizeBlock(draft, lookup, refs);
       expect(issues, type).toEqual([]);
       expect(block, type).toEqual(FIXTURE_BLOCKS[type]);
     }

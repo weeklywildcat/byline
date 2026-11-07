@@ -1,6 +1,6 @@
 "use client";
 
-import { ARTICLE_BLOCK_FAMILIES, ARTICLE_BLOCK_TYPES, ARTICLE_BLOCKS, type ArticleBlockType } from "@byline/article-body";
+import { ARTICLE_BLOCK_FAMILIES, ARTICLE_BLOCK_TYPES, ARTICLE_BLOCKS, isPrivilegedBlockType, type ArticleBlockType } from "@byline/article-body";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@byline/newsroom-ui/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
@@ -9,7 +9,7 @@ import type { LexicalEditor } from "@payloadcms/richtext-lexical/lexical";
 import { Plus } from "lucide-react";
 import { cloneElement, useState, type ReactElement } from "react";
 import { useCoarseLayout } from "./chrome";
-import { useAnnounce } from "./host";
+import { useAnnounce, useOptionalEditorHost } from "./host";
 import { BlockIcon } from "./icons";
 import { insertStoryBlock } from "./lexical";
 
@@ -20,13 +20,15 @@ import { insertStoryBlock } from "./lexical";
  * writers use. On touch or a narrow screen it opens in a bottom Sheet.
  */
 export function BlockInserterCommand({ onChoose }: { onChoose: (type: ArticleBlockType) => void }) {
+  // Hiding a tool is not security (the server restores what a writer may not change); it only avoids offering it.
+  const allowed = useOptionalEditorHost()?.canUsePrivilegedBlocks === true;
   return (
     <Command loop className="byline-inserter">
-      <CommandInput placeholder="Find a tool: photo, quote, timeline…" aria-label="Find a story tool" />
+      <CommandInput placeholder="Find a tool: photo, chart, quote, timeline…" aria-label="Find a story tool" />
       <CommandList className="max-h-[min(60dvh,26rem)]">
         <CommandEmpty>No tool by that name.</CommandEmpty>
         {ARTICLE_BLOCK_FAMILIES.map((family) => {
-          const types = ARTICLE_BLOCK_TYPES.filter((type) => ARTICLE_BLOCKS[type].family === family.id);
+          const types = ARTICLE_BLOCK_TYPES.filter((type) => ARTICLE_BLOCKS[type].family === family.id && (allowed || !isPrivilegedBlockType(type)));
           if (!types.length) return null;
           return (
             <CommandGroup key={family.id} heading={family.label}>

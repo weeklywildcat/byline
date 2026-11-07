@@ -1,0 +1,158 @@
+/*
+ * The semantic story blocks added after the first eight (byline-v1): Portrait +
+ * Text, Visual Chapter, Video, Audio, Expandable, Data Table, Comparison, Key
+ * Numbers, Related Coverage, Repository Interactive and footnotes. Chart / Map,
+ * Annotated Image and Before / After reuse visualization.css,
+ * annotated-image.css and before-after.css; Poll reuses page-blocks.css;
+ * Editor's Note and Margin Note are in context.css. Same language as the rest:
+ * a rule and a small label for supporting material, space and no boxes for
+ * major moments (docs/editorial-design-system.md).
+ *
+ * One scope, shared by the public article, Live Preview and the newsroom
+ * editor canvas, which all draw `.byline-article-view .article-body`.
+ */
+.byline-article-view .article-body {
+  /* Portrait + Text: a wide editorial moment, about 40% portrait and 60% passage, stacked (portrait first) when narrow. */
+  & .byline-portrait-text { align-items: start; display: grid; gap: clamp(1.25rem, 3vw, 2.5rem); grid-template-columns: minmax(0, 1fr); margin-block: var(--story-space); }
+  & .byline-portrait-text-figure { margin: 0; min-width: 0; }
+  & .byline-portrait-text-figure img { display: block; height: auto; width: 100%; }
+  & .byline-portrait-text-body { min-width: 0; }
+  & .byline-portrait-text-body > h3 { font-size: clamp(1.4rem, 1.15rem + 1vw, 1.8rem); margin: 0 0 .5em; text-wrap: balance; }
+  & .byline-portrait-text-body > :last-child { margin-bottom: 0; }
+
+  /* Visual Chapter: a deliberate break. The scrim keeps the heading legible over any photograph. */
+  & .byline-visual-chapter { color: #fff; display: grid; isolation: isolate; margin: 0; min-height: clamp(22rem, 62svh, 44rem); overflow: hidden; position: relative; }
+  & .byline-visual-chapter-media { inset: 0; position: absolute; z-index: -2; }
+  & .byline-visual-chapter-media img { display: block; height: 100%; object-fit: cover; width: 100%; }
+  & .byline-visual-chapter::before { background: linear-gradient(to top, rgb(0 0 0 / .78), rgb(0 0 0 / .3) 55%, rgb(0 0 0 / .12)); content: ""; inset: 0; position: absolute; z-index: -1; }
+  & .byline-visual-chapter-text { align-self: end; box-sizing: border-box; max-width: 52rem; padding: clamp(1.25rem, 4vw, 3rem); }
+  & .byline-visual-chapter[data-align="center"] .byline-visual-chapter-text { align-self: center; justify-self: center; text-align: center; }
+  & .byline-visual-chapter h2 { color: #fff; font-family: var(--story-headline); font-size: clamp(2rem, 5vw, 3.6rem); font-weight: 600; letter-spacing: -.015em; line-height: 1.05; margin: 0; text-wrap: balance; }
+  & .byline-visual-chapter .byline-visual-chapter-eyebrow { color: rgb(255 255 255 / .88); margin: 0 0 .75em; }
+  & .byline-visual-chapter .byline-visual-chapter-dek { color: rgb(255 255 255 / .92); font-family: var(--story-serif); font-size: clamp(1.05rem, 1rem + .4vw, 1.3rem); line-height: 1.4; margin: .75em 0 0; text-wrap: pretty; }
+  & .byline-visual-chapter .byline-visual-chapter-credit { bottom: .75rem; color: rgb(255 255 255 / .82); margin: 0; position: absolute; right: 1rem; }
+
+  /* Video: the 16:9 player, then its title, caption and a direct link. */
+  & .byline-video { margin-block: var(--story-moment-space); }
+  & .byline-video-frame { aspect-ratio: 16 / 9; background: #000; position: relative; }
+  & .byline-video-frame iframe, & .byline-video-frame > .byline-video-placeholder { border: 0; height: 100%; inset: 0; position: absolute; width: 100%; }
+  & .byline-video-placeholder { align-items: center; color: #fff; display: flex; flex-direction: column; font-family: var(--story-sans); font-size: .9rem; gap: 8px; justify-content: center; }
+  & .byline-video-title { color: var(--ink, #121212); font-family: var(--story-sans); font-size: .9rem; font-weight: 700; margin: 0; }
+  & .byline-video-link { font-family: var(--story-sans); font-size: .85rem; margin: 0; }
+  & .byline-video-link a { align-items: center; display: inline-flex; min-height: 44px; }
+
+  /* Audio: a quiet, supporting figure with the transcript one click away. */
+  & .byline-audio { border-block-start: var(--story-rule-strong); display: grid; gap: 10px; margin-block: var(--story-space); padding-block-start: 14px; }
+  & .byline-audio-details { margin: 0; }
+  & .byline-audio-title { color: var(--ink, #121212); font-family: var(--story-headline); font-size: 1.3rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.2; margin: 0; text-wrap: balance; }
+  & .byline-audio audio { display: block; width: 100%; }
+  & .byline-audio-transcript > summary, & .byline-expandable > summary { align-items: center; cursor: pointer; display: flex; font-family: var(--story-sans); gap: .6rem; list-style: none; min-height: 44px; }
+  & .byline-audio-transcript > summary { color: var(--story-muted); font-size: .85rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  & :is(.byline-audio-transcript, .byline-expandable) > summary::-webkit-details-marker { display: none; }
+  & :is(.byline-audio-transcript, .byline-expandable) > summary::before { border-bottom: 2px solid currentcolor; border-right: 2px solid currentcolor; content: ""; flex: none; height: .45rem; transform: rotate(-45deg); transition: transform var(--story-motion); width: .45rem; }
+  & :is(.byline-audio-transcript, .byline-expandable)[open] > summary::before { transform: rotate(45deg); }
+  & .byline-audio-transcript-text { font-size: 1rem; line-height: 1.6; padding-block-end: .5rem; }
+  & .byline-audio-transcript-text > p { margin-bottom: .9em; }
+
+  /* Expandable: native <details>; detail, never what a reader needs to follow the story. */
+  & .byline-expandable { border-block: var(--story-rule); margin-block: var(--story-space); }
+  & .byline-expandable > summary { color: var(--ink, #121212); font-size: 1rem; font-weight: 600; }
+  & .byline-expandable-summary { align-items: center; display: flex; font-family: var(--story-sans); font-size: 1rem; font-weight: 600; min-height: 44px; }
+  & .byline-expandable-body { font-size: 1rem; line-height: 1.6; padding-block: .25rem 1rem; }
+  & .byline-expandable-body > :last-child { margin-bottom: 0; }
+
+  /* Data Table: a real table, scrolling sideways when the screen is narrower than its columns. */
+  & .byline-data-table { margin-block: var(--story-space); }
+  & .byline-data-table-scroll { overflow-x: auto; }
+  & .byline-data-table table { border-collapse: collapse; font-family: var(--story-sans); font-size: .95rem; font-variant-numeric: tabular-nums; line-height: 1.4; min-width: 30rem; width: 100%; }
+  & .byline-data-table caption { caption-side: top; display: grid; gap: 3px; padding-block-end: 10px; text-align: left; }
+  & .byline-data-table-title { color: var(--ink, #121212); font-family: var(--story-headline); font-size: 1.3rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.2; }
+  & .byline-data-table-description { color: var(--story-muted); font-family: var(--story-serif); font-size: 1rem; }
+  & .byline-data-table thead th { border-block-end: var(--story-rule-strong); color: var(--story-muted); font-size: .72rem; font-weight: 700; letter-spacing: .08em; padding: .5em .9em .5em 0; text-align: left; text-transform: uppercase; vertical-align: bottom; }
+  & .byline-data-table tbody :is(th, td) { border-block-end: var(--story-rule); padding: .6em .9em .6em 0; text-align: left; vertical-align: top; }
+  & .byline-data-table tbody th[scope="row"] { color: var(--ink, #121212); font-weight: 700; }
+  /* Comparison presentation: the same table, with the columns set apart by hairlines and the row headers weightier. */
+  & .byline-data-table[data-presentation="comparison"] :is(th, td) { padding-inline: .9em; }
+  & .byline-data-table[data-presentation="comparison"] :is(th, td):not(:first-child) { border-inline-start: var(--story-rule); }
+  & .byline-data-table[data-presentation="comparison"] :is(th, td):first-child { padding-inline-start: 0; }
+  & .byline-data-table[data-presentation="comparison"] tbody th[scope="row"] { font-family: var(--story-headline); font-size: 1.05rem; }
+  & .byline-data-table-scroll:focus-visible { outline: 2px solid var(--story-accent); outline-offset: 3px; }
+  & .byline-data-table figcaption p { margin: 0; }
+
+  /* Comparison: two sides, left then right in reading order on every width. */
+  & .byline-compare { border-block-start: var(--story-rule-strong); margin-block: var(--story-moment-space); padding-block-start: 14px; }
+  & .byline-compare > .byline-kicker { margin: 0 0 1em; }
+  & .byline-compare-sides { display: grid; gap: 1.5rem; grid-template-columns: minmax(0, 1fr); }
+  & .byline-compare-side { min-width: 0; }
+  & .byline-compare-side > .byline-kicker { margin: 0 0 .5em; }
+  & .byline-compare-side h3 { font-size: clamp(1.3rem, 1.1rem + .8vw, 1.65rem); margin: 0 0 .5em; text-wrap: balance; }
+  & .byline-compare-side > :last-child { margin-bottom: 0; }
+  & .byline-compare-side p { font-size: 1.05rem; }
+
+  /* Key Numbers: the figures themselves are the layout. The renderer owns the scale. */
+  & .byline-key-numbers { border-block-start: var(--story-rule-strong); margin-block: var(--story-moment-space); padding-block-start: 14px; }
+  & .byline-key-numbers > .byline-kicker { margin: 0 0 1em; }
+  & .byline-key-numbers dl { display: grid; gap: 1.75rem 2rem; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); margin: 0; }
+  & .byline-key-number { border-block-start: var(--story-rule); display: flex; flex-direction: column; min-width: 0; padding-block-start: .75rem; }
+  & .byline-key-number dt { color: var(--ink, #121212); font-family: var(--story-sans); font-size: .95rem; font-weight: 600; line-height: 1.35; margin: .35em 0 0; order: 1; }
+  & .byline-key-number dd { margin: 0; }
+  & .byline-key-number-value { color: var(--ink, #121212); font-family: var(--story-headline); font-size: clamp(2.2rem, 1.4rem + 3vw, 3.4rem); font-variant-numeric: tabular-nums; font-weight: 600; letter-spacing: -.02em; line-height: 1; order: 0; overflow-wrap: anywhere; }
+  & .byline-key-number-context { color: var(--story-muted); font-family: var(--story-serif); font-size: .92rem; line-height: 1.4; margin-top: .35em; order: 2; }
+  & .byline-key-numbers-source { color: var(--story-soft); font-family: var(--story-sans); font-size: .78rem; margin: 1.25rem 0 0; }
+
+  /* Related Coverage: a compact, ruled list of our own stories. */
+  & .byline-related { border-block-start: var(--story-rule-strong); margin-block: var(--story-moment-space); padding-block-start: 14px; }
+  & .byline-related > .byline-kicker { margin: 0 0 .75em; }
+  & .byline-related ul { list-style: none; margin: 0; padding: 0; }
+  & .byline-related-item { border-block-start: var(--story-rule); margin: 0; }
+  & .byline-related-item:first-child { border-block-start: 0; }
+  & .byline-related-item a { align-items: center; color: inherit; display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); min-height: 44px; padding-block: .8rem; text-decoration: none; }
+  & .byline-related-item a:has(.byline-related-thumb) { grid-template-columns: 6rem minmax(0, 1fr); }
+  & .byline-related-thumb img { aspect-ratio: 4 / 3; display: block; height: auto; object-fit: cover; width: 100%; }
+  & .byline-related-text { display: grid; gap: .25rem; min-width: 0; }
+  & .byline-related-meta { color: var(--story-muted); display: flex; font-family: var(--story-sans); font-size: .72rem; font-weight: 700; gap: .6em; letter-spacing: .08em; text-transform: uppercase; }
+  & .byline-related-meta > span + time::before { content: "·"; margin-right: .6em; }
+  & .byline-related-headline { font-family: var(--story-headline); font-size: 1.2rem; font-weight: 600; line-height: 1.2; text-wrap: balance; }
+  & .byline-related-item a:is(:hover, :focus-visible) .byline-related-headline { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+
+  /* Repository Interactive: the title and text alternative are real content; the registry fills the root. */
+  & .byline-repository-interactive { border-block-start: var(--story-rule); margin-block: var(--story-moment-space); padding-block-start: 18px; }
+  & .byline-repository-interactive-title { font-family: var(--story-headline); font-size: clamp(1.4rem, 1.15rem + 1vw, 1.8rem); font-weight: 600; letter-spacing: -.012em; line-height: 1.14; margin: 0 0 .3em; text-wrap: balance; }
+  & .byline-repository-interactive-description { color: var(--story-muted); font-family: var(--story-serif); font-size: 1.05rem; line-height: 1.45; margin: 0 0 1.1rem; max-width: var(--article-width, 760px); text-wrap: pretty; }
+  & .byline-repository-interactive-root:empty { display: none; }
+
+  /* Footnotes: superscript references in the prose; one ordered list at the end. */
+  & .byline-footnote-ref { font-family: var(--story-sans); font-size: .7em; font-weight: 700; line-height: 0; }
+  & .byline-footnote-ref a { padding: 0 .12em; text-decoration: none; }
+  & .byline-footnotes { border-block-start: var(--story-rule-strong); font-size: .95rem; line-height: 1.5; margin-block: 3rem 0; padding-block-start: 14px; }
+  & .byline-footnotes > .byline-kicker { margin: 0 0 .75em; }
+  & .byline-footnotes ol { margin: 0; padding-left: 1.4em; }
+  & .byline-footnotes li { margin: 0 0 .5em; scroll-margin-block: 5rem; }
+  & .byline-footnotes li:target { outline: 2px solid var(--story-accent); outline-offset: 4px; }
+  & .byline-footnote-back { display: inline-block; min-height: 24px; padding: .35em .5em; text-decoration: none; }
+
+  /* Every control is reachable and visibly focused. */
+  & :is(.byline-video-link a, .byline-related-item a, .byline-footnote-back, .byline-footnote-ref a, .byline-audio-transcript > summary, .byline-expandable > summary):focus-visible { outline: 2px solid var(--story-accent); outline-offset: 3px; }
+}
+
+/* Side by side is for a canvas wide enough to read both. */
+@container byline-content (min-width: 700px) {
+  .byline-article-view .article-body {
+    & .byline-portrait-text { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+    & .byline-portrait-text[data-side="right"] { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+    & .byline-portrait-text[data-side="right"] .byline-portrait-text-figure { order: 2; }
+    & .byline-compare-sides { column-gap: 2.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    & .byline-compare-side[data-side="right"] { border-inline-start: var(--story-rule); padding-inline-start: 2.5rem; }
+  }
+}
+@container byline-content (max-width: 520px) {
+  .byline-article-view .article-body .byline-visual-chapter { min-height: 26rem; }
+}
+
+@media (forced-colors: active) {
+  .byline-article-view .article-body {
+    & .byline-visual-chapter::before { background: none; }
+    & .byline-visual-chapter-text { background: Canvas; color: CanvasText; }
+    & .byline-visual-chapter h2, & .byline-visual-chapter .byline-visual-chapter-dek, & .byline-visual-chapter .byline-visual-chapter-eyebrow { color: CanvasText; }
+  }
+}

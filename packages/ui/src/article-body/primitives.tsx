@@ -21,8 +21,22 @@ export function articleBlockFrameClassName(type: ArticleBlockType, placement: Pl
 
 /** Where a block sits: a Photo's own choice; a Gallery is a visual moment; everything else reads in the column. */
 export function articleBlockPlacement(block: { type: ArticleBlockType; placement?: Placement }): Placement {
-  if (block.type === "photo") return block.placement ?? "column";
-  return block.type === "gallery" ? "wide" : "column";
+  switch (block.type) {
+    case "photo":
+    case "visualChapter":
+    case "annotatedImage":
+    case "beforeAfter":
+      return block.placement ?? "column";
+    // Major visual moments break out of the reading column; everything else reads in it.
+    case "gallery":
+    case "portraitText":
+    case "video":
+    case "chartMap":
+    case "repositoryInteractive":
+      return "wide";
+    default:
+      return "column";
+  }
 }
 
 /** The public frame. The editor uses its own block element with the same classes. */
@@ -150,5 +164,305 @@ export function TimelineItem({ current, newPeriod, label, title, body, ...rest }
       {title}
       {body}
     </li>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Blocks added after the first eight. Each primitive draws the element tree and
+// classes the shared CSS styles and takes content as slots, exactly as above.
+// ---------------------------------------------------------------------------
+
+/** A portrait and the passage that goes with it. The CSS owns the 40/60 split and the stacking. */
+export function PortraitTextFigure({ side, media, caption, credit, heading, children }: { side: "left" | "right"; media: ReactNode; caption?: ReactNode; credit?: string; heading?: ReactNode; children: ReactNode }): ReactNode {
+  return (
+    <div className="byline-portrait-text" data-side={side}>
+      <StoryFigure className="byline-portrait-text-figure" media={media} caption={caption} credit={credit} />
+      <div className="byline-portrait-text-body">
+        {heading}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** A chapter opener: a photograph with its heading over a scrim. The heading is an H2 of the story. */
+export function VisualChapterView({ id, align, headingId, media, eyebrow, heading, dek, credit }: { id?: string; align: "bottom-left" | "center"; headingId: string; media: ReactNode; eyebrow?: ReactNode; heading: ReactNode; dek?: ReactNode; credit?: string }): ReactNode {
+  return (
+    <section className="byline-visual-chapter" id={id} data-align={align} aria-labelledby={headingId}>
+      <div className="byline-visual-chapter-media">{media}</div>
+      <div className="byline-visual-chapter-text">
+        {eyebrow}
+        <h2 id={headingId}>{heading}</h2>
+        {dek}
+      </div>
+      {credit ? <p className="photo-credit byline-visual-chapter-credit">Photo: {credit}</p> : null}
+    </section>
+  );
+}
+
+export const youTubeNoCookieEmbed = (videoId: string): string => `https://www.youtube-nocookie.com/embed/${videoId}`;
+export const youTubeWatch = (videoId: string): string => `https://www.youtube.com/watch?v=${videoId}`;
+
+/** A YouTube video. `player` is the privacy-enhanced iframe on the public page; the editor passes a placeholder. */
+export function VideoFigure({ videoId, title, player, caption }: { videoId: string; title: ReactNode; player: ReactNode; caption?: ReactNode }): ReactNode {
+  return (
+    <figure className="byline-video" data-video-id={videoId}>
+      <div className="byline-video-frame">{player}</div>
+      <figcaption>
+        <p className="byline-video-title">{title}</p>
+        {caption}
+        <p className="byline-video-link"><a href={youTubeWatch(videoId)} rel="noopener">Watch on YouTube</a></p>
+      </figcaption>
+    </figure>
+  );
+}
+
+/** The privacy-enhanced player: lazy, no autoplay, no looping, ordinary controls, fullscreen allowed. */
+export function YouTubePlayer({ videoId, title }: { videoId: string; title: string }): ReactNode {
+  return (
+    <iframe
+      src={youTubeNoCookieEmbed(videoId)}
+      title={title}
+      loading="lazy"
+      referrerPolicy="strict-origin-when-cross-origin"
+      allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+      allowFullScreen
+    />
+  );
+}
+
+/** A recording: title and context above, the native player, the transcript in a native disclosure. */
+export function AudioFigure({ title, caption, player, transcript, editing = false }: { title: ReactNode; caption?: ReactNode; player: ReactNode; transcript: ReactNode; editing?: boolean }): ReactNode {
+  return (
+    <figure className="byline-audio">
+      <figcaption className="byline-audio-details">
+        <p className="byline-kicker">Audio</p>
+        <p className="byline-audio-title">{title}</p>
+        {caption}
+      </figcaption>
+      {player}
+      <details className="byline-audio-transcript" open={editing || undefined}>
+        <summary>Transcript</summary>
+        <div className="byline-audio-transcript-text">{transcript}</div>
+      </details>
+    </figure>
+  );
+}
+
+/** The editors' voice: a rule, the fixed label "Editor's note", the note. */
+export function EditorsNoteView({ label, children }: { label: string; children: ReactNode }): ReactNode {
+  return (
+    <aside className="byline-editors-note" aria-label={label}>
+      <p className="byline-kicker">{label}</p>
+      {children}
+    </aside>
+  );
+}
+
+/** Supplementary information that sits in the margin on wide layouts and in order on narrow ones. */
+export function MarginNoteView({ heading, children }: { heading?: ReactNode; children: ReactNode }): ReactNode {
+  return (
+    <aside className="byline-margin-note" aria-label={typeof heading === "string" && heading ? heading : "Margin note"}>
+      {heading ? <h3 className="byline-kicker">{heading}</h3> : null}
+      {children}
+    </aside>
+  );
+}
+
+/** Detail a reader opens. The public page is a native `<details>`; the editor keeps it open and typeable. */
+export function ExpandableView({ heading, children, editing = false }: { heading: ReactNode; children: ReactNode; editing?: boolean }): ReactNode {
+  if (editing) {
+    return (
+      <div className="byline-expandable is-editing">
+        <div className="byline-expandable-summary">{heading}</div>
+        <div className="byline-expandable-body">{children}</div>
+      </div>
+    );
+  }
+  return (
+    <details className="byline-expandable">
+      <summary><span>{heading}</span></summary>
+      <div className="byline-expandable-body">{children}</div>
+    </details>
+  );
+}
+
+/** A chart or map: title, dek, the graphic or its slot, the summary in words, then source, notes and credit. */
+export function ChartMapFigure({ mode, provider, src, height, title, dek, media, link, summary, source, notes, credit }: {
+  mode: "interactive" | "static";
+  provider?: string;
+  src?: string;
+  height: string;
+  title: ReactNode;
+  dek?: ReactNode;
+  media: ReactNode;
+  link?: ReactNode;
+  summary: ReactNode;
+  source?: ReactNode;
+  notes?: ReactNode;
+  credit?: ReactNode;
+}): ReactNode {
+  return (
+    <figure className="byline-visualization" data-mode={mode === "interactive" ? "embed" : "static"} data-provider={provider} data-src={mode === "interactive" ? src : undefined} data-height={height}>
+      <h3 className="byline-visualization-title">{title}</h3>
+      {dek ? <p className="byline-visualization-dek">{dek}</p> : null}
+      <div className="byline-visualization-media">{media}</div>
+      {link}
+      <figcaption>
+        <div className="byline-visualization-summary">{summary}</div>
+        {source ? <p className="byline-visualization-source">{source}</p> : null}
+        {notes ? <p className="byline-visualization-notes">{notes}</p> : null}
+        {credit ? <p className="photo-credit">{credit}</p> : null}
+      </figcaption>
+    </figure>
+  );
+}
+
+/** Real table markup: caption, header row, optional row headers, horizontal scrolling on a narrow screen. */
+export function DataTableView({ title, description, presentation, rowHeaders, columns, rows, footer, ...rest }: {
+  title: ReactNode;
+  description?: ReactNode;
+  presentation: "standard" | "comparison";
+  rowHeaders: boolean;
+  columns: Array<{ key: string; header: ReactNode }>;
+  rows: Array<{ key: string; cells: ReactNode[]; actions?: ReactNode }>;
+  footer?: ReactNode;
+} & Omit<ComponentPropsWithoutRef<"table">, "className" | "children" | "title">): ReactNode {
+  return (
+    <figure className="byline-data-table" data-presentation={presentation}>
+      <div className="byline-data-table-scroll" role="region" aria-label={typeof title === "string" ? title : "Data table"} tabIndex={0}>
+        <table {...rest}>
+          <caption>
+            <span className="byline-data-table-title">{title}</span>
+            {description ? <span className="byline-data-table-description">{description}</span> : null}
+          </caption>
+          <thead>
+            <tr>
+              {columns.map((column) => <th key={column.key} scope="col">{column.header}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key}>
+                {row.cells.map((cell, index) => (rowHeaders && index === 0 ? <th key={index} scope="row">{cell}</th> : <td key={index}>{cell}</td>))}
+                {row.actions}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {footer ? <figcaption>{footer}</figcaption> : null}
+    </figure>
+  );
+}
+
+/** Two sides explained next to each other. Logical order is left, then right, on every width. */
+export function ComparisonView({ headingId, heading, left, right }: { headingId: string; heading?: ReactNode; left: ReactNode; right: ReactNode }): ReactNode {
+  return (
+    <section className="byline-compare" aria-labelledby={heading ? headingId : undefined} aria-label={heading ? undefined : "Comparison"}>
+      {heading ? <h2 id={headingId} className="byline-kicker">{heading}</h2> : null}
+      <div className="byline-compare-sides">
+        <div className="byline-compare-side" data-side="left">{left}</div>
+        <div className="byline-compare-side" data-side="right">{right}</div>
+      </div>
+    </section>
+  );
+}
+
+/** The few figures a reader should remember. The renderer owns the scale. */
+export function KeyNumbersView({ headingId, heading, items, source }: { headingId: string; heading?: ReactNode; items: Array<{ key: string; value: ReactNode; label: ReactNode; context?: ReactNode; actions?: ReactNode }>; source?: ReactNode }): ReactNode {
+  return (
+    <section className="byline-key-numbers" data-count={items.length} aria-labelledby={heading ? headingId : undefined} aria-label={heading ? undefined : "Key numbers"}>
+      {heading ? <h2 id={headingId} className="byline-kicker">{heading}</h2> : null}
+      <dl>
+        {items.map((item) => (
+          <div key={item.key} className="byline-key-number">
+            <dt>{item.label}</dt>
+            <dd className="byline-key-number-value">{item.value}</dd>
+            {item.context ? <dd className="byline-key-number-context">{item.context}</dd> : null}
+            {item.actions}
+          </div>
+        ))}
+      </dl>
+      {source ? <p className="byline-key-numbers-source">{source}</p> : null}
+    </section>
+  );
+}
+
+export const annotationAnchor = (blockId: string, markerId: string): string => `annotation-${blockId}-${markerId}`;
+
+/** A photograph with numbered markers and the notes they point to. Markers are links, so it works without script. */
+export function AnnotatedImageFigure({ image, markers, notes, caption, credit, canvasRef, ...rest }: { image: ReactNode; markers: ReactNode; notes: ReactNode; caption?: ReactNode; credit?: string; canvasRef?: React.Ref<HTMLDivElement> } & Omit<ComponentPropsWithoutRef<"figure">, "className" | "children">): ReactNode {
+  return (
+    <figure className="byline-annotated-image" {...rest}>
+      <div className="byline-annotation-layout">
+        <div className="byline-annotation-canvas" ref={canvasRef}>
+          {image}
+          {markers}
+        </div>
+        {notes}
+      </div>
+      {caption || credit ? (
+        <figcaption>
+          {caption}
+          {credit ? <PhotoCredit credit={credit} /> : null}
+        </figcaption>
+      ) : null}
+    </figure>
+  );
+}
+
+/** Two photographs under labels. Without script they sit side by side (stacked when narrow); the enhancer adds the range input. */
+export function BeforeAfterFigure({ fit, aspect, before, after, beforeLabel, afterLabel, caption, credit, figureRef }: {
+  fit: "cover" | "contain";
+  aspect?: number;
+  before: ReactNode;
+  after: ReactNode;
+  beforeLabel: ReactNode;
+  afterLabel: ReactNode;
+  caption?: ReactNode;
+  credit?: string;
+  figureRef?: React.Ref<HTMLElement>;
+}): ReactNode {
+  return (
+    <figure className="byline-before-after" data-fit={fit} style={aspect ? ({ "--comparison-aspect": String(aspect) } as React.CSSProperties) : undefined} ref={figureRef}>
+      <div className="byline-comparison-images">
+        <figure className="byline-comparison-image">
+          <strong data-before="">{beforeLabel}</strong>
+          {before}
+        </figure>
+        <figure className="byline-comparison-image">
+          <strong data-after="">{afterLabel}</strong>
+          {after}
+        </figure>
+      </div>
+      {caption || credit ? (
+        <figcaption>
+          {caption}
+          {credit ? <PhotoCredit credit={credit} /> : null}
+        </figcaption>
+      ) : null}
+    </figure>
+  );
+}
+
+/** Mid-story links to our own stories. */
+export function RelatedCoverageView({ headingId, heading, children }: { headingId: string; heading: ReactNode; children: ReactNode }): ReactNode {
+  return (
+    <section className="byline-related" aria-labelledby={headingId}>
+      <h2 id={headingId} className="byline-kicker">{heading}</h2>
+      <ul>{children}</ul>
+    </section>
+  );
+}
+
+/** One repository interactive: its title and text alternative are real content; the host fills the root. */
+export function RepositoryInteractiveFigure({ interactiveKey, title, description, children }: { interactiveKey: string; title: ReactNode; description: ReactNode; children?: ReactNode }): ReactNode {
+  return (
+    <figure className="byline-repository-interactive" data-repository-interactive={interactiveKey}>
+      <h3 className="byline-repository-interactive-title">{title}</h3>
+      <p className="byline-repository-interactive-description">{description}</p>
+      <div className="byline-repository-interactive-root" data-interactive-root="">{children}</div>
+    </figure>
   );
 }

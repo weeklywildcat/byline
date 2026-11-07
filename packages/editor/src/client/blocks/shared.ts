@@ -1,6 +1,6 @@
 "use client";
 
-import { blockIssues, mediaKey, type ArticleBlock, type ArticleBlockType, type ArticleMediaAsset, type BlockIssue, type MediaId } from "@byline/article-body";
+import { blockIssues, blockMediaIds, blockPollIds, blockStoryIds, mediaKey, type ArticleBlock, type ArticleBlockType, type ArticleMediaAsset, type BlockIssue, type PublicPollReference, type PublicStoryReference } from "@byline/article-body";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { articleBlockFromFields, BLOCK_FIELD_READERS, type BylineBlockFields } from "../../fields";
 import { useBylineEditorHost } from "../host";
@@ -23,25 +23,44 @@ const NONE: readonly BlockIssue[] = [];
 
 /**
  * What keeps this block (or part of it) out of the published story, by the
- * same rules publishing uses. While a referenced asset is still loading
- * nothing is reported, so a block never flashes a false warning.
+ * same rules publishing uses. While a record the block names (Media, a Story, a
+ * Poll) is still loading nothing is reported, so a block never flashes a false
+ * warning.
  */
 export function useReadiness<K extends ArticleBlockType>(type: K, id: string, raw: unknown): readonly BlockIssue[] {
-  const { store } = useBylineEditorHost();
+  const { store, stories, polls, interactives } = useBylineEditorHost();
+  const subscribe = useCallback((listener: () => void) => {
+    const stops = [store.subscribe(listener), stories.subscribe(listener), polls.subscribe(listener)];
+    return () => stops.forEach((stop) => stop());
+  }, [polls, stories, store]);
   const snapshot = useCallback(() => {
     const block = articleBlockFromFields(type, id, raw) as ArticleBlock;
-    const ids: MediaId[] = [];
-    if ("media" in block && block.media !== null) ids.push(block.media);
-    if (block.type === "gallery") for (const item of block.items) if (item.media !== null) ids.push(item.media);
-    const entries = new Map<string, ArticleMediaAsset | null>();
-    for (const mediaId of ids) {
+    const media = new Map<string, ArticleMediaAsset | null>();
+    const storyFacts = new Map<string, PublicStoryReference | null>();
+    const pollFacts = new Map<string, PublicPollReference | null>();
+    for (const mediaId of blockMediaIds(block)) {
       const entry = store.get(mediaId);
       if (entry.status === "loading") return "[]";
-      entries.set(mediaKey(mediaId), entry.asset);
+      media.set(mediaKey(mediaId), entry.asset);
     }
-    return JSON.stringify(blockIssues(block, (mediaId) => entries.get(mediaKey(mediaId)) ?? null));
-  }, [id, raw, store, type]);
-  const json = useSyncExternalStore(store.subscribe, snapshot, snapshot);
+    for (const storyId of blockStoryIds(block)) {
+      const entry = stories.get(storyId);
+      if (entry.status === "loading") return "[]";
+      storyFacts.set(mediaKey(storyId), entry.asset);
+    }
+    for (const pollId of blockPollIds(block)) {
+      const entry = polls.get(pollId);
+      if (entry.status === "loading") return "[]";
+      // A draft poll is not public: it never counts as chosen.
+      pollFacts.set(mediaKey(pollId), entry.asset && entry.asset.status !== "draft" ? entry.asset : null);
+    }
+    return JSON.stringify(blockIssues(block, (mediaId) => media.get(mediaKey(mediaId)) ?? null, {
+      story: (storyId) => storyFacts.get(mediaKey(storyId)) ?? null,
+      poll: (pollId) => pollFacts.get(mediaKey(pollId)) ?? null,
+      interactive: (key) => Boolean(interactives?.some((entry) => entry.key === key))
+    }));
+  }, [id, interactives, polls, raw, stories, store, type]);
+  const json = useSyncExternalStore(subscribe, snapshot, snapshot);
   return useMemo(() => (json === "[]" ? NONE : (JSON.parse(json) as BlockIssue[])), [json]);
 }
 

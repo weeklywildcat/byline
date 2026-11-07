@@ -3,7 +3,7 @@
 import { articleBlockFrameClassName, articleBlockPlacement } from "@byline/ui/article-body";
 import { isArticleBlockType, type Placement } from "@byline/article-body";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { BlockNode, createClientFeature, INSERT_BLOCK_COMMAND } from "@payloadcms/richtext-lexical/client";
+import { BlockNode, createClientFeature, INSERT_BLOCK_COMMAND, INSERT_INLINE_BLOCK_COMMAND, InlineBlockNode } from "@payloadcms/richtext-lexical/client";
 import {
   $getNodeByKey,
   $getSelection,
@@ -65,6 +65,10 @@ function BylineCanvasPlugin() {
       }
     }, { skipInitialization: false }),
     editor.registerMutationListener(BlockNode, (mutations) => {
+      for (const [key, mutation] of mutations) if (mutation === "created") markCreated(key);
+    }, { skipInitialization: true }),
+    // A new footnote reference opens its note at once.
+    editor.registerMutationListener(InlineBlockNode, (mutations) => {
       for (const [key, mutation] of mutations) if (mutation === "created") markCreated(key);
     }, { skipInitialization: true }),
     // Runs before Payload's own handler (higher priority) and lets it insert (returns false).
@@ -143,7 +147,31 @@ function AddBarPlugin() {
   return editable ? <AddBlockBar editor={editor} /> : null;
 }
 
+const FootnoteIcon = () => <span aria-hidden="true" style={{ fontWeight: 700 }}>1</span>;
+
 export const BylineCanvasFeatureClient = createClientFeature({
+  // "Footnote" beside Bold, Italic and Link in the selection toolbar. The reference goes where the caret is.
+  toolbarInline: {
+    groups: [
+      {
+        type: "buttons",
+        key: "bylineFootnote",
+        order: 70,
+        items: [
+          {
+            key: "footnote",
+            label: "Footnote",
+            ChildComponent: FootnoteIcon,
+            isActive: () => false,
+            onSelect: ({ editor }) => {
+              editor.dispatchCommand(INSERT_INLINE_BLOCK_COMMAND, { blockName: "", blockType: "footnote" });
+            },
+            order: 1
+          }
+        ]
+      }
+    ]
+  },
   plugins: [
     { Component: BylineCanvasPlugin, position: "normal" },
     // Hidden on touch by canvas.css: touch writers use the Add bar.

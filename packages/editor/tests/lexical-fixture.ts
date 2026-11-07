@@ -12,6 +12,7 @@ const text = (value: string, format = 0): Json => ({ type: "text", text: value, 
 
 function inline(children: readonly Inline[]): Json[] {
   return children.map((child) => {
+    if (child.type === "footnote") return { type: "inlineBlock", version: 1, fields: { id: child.id, blockType: "footnote", blockName: "", text: child.text } };
     if (child.type === "lineBreak") return { type: "linebreak", version: 1 };
     if (child.type === "link") return { type: "link", version: 3, direction: "ltr", format: "", indent: 0, fields: { url: child.href, linkType: "custom", newTab: false }, children: child.children.map((run) => text(run.text, (run.bold ? 1 : 0) | (run.italic ? 2 : 0))) };
     return text(child.text, (child.bold ? 1 : 0) | (child.italic ? 2 : 0));
@@ -23,6 +24,9 @@ const element = (type: string, children: Json[], extra: Json = {}): Json => ({ t
 function list(node: ListNode): Json {
   return element("list", node.items.map((item, index) => element("listitem", [...inline(item.children), ...(item.list ? [list(item.list)] : [])], { value: index + 1 })), { listType: node.ordered ? "number" : "bullet", tag: node.ordered ? "ol" : "ul", start: 1 });
 }
+
+/** Block paragraphs as the plain text a block stores (blank lines between paragraphs). */
+const bodyText = (body: readonly { children: readonly Inline[] }[]): string => body.map((paragraph) => paragraph.children.map((child) => (child.type === "text" ? child.text : child.type === "lineBreak" ? "\n" : "")).join("")).join("\n\n");
 
 export function blockFields(block: ArticleBlock): Json {
   const base = { id: block.id, blockType: block.type, blockName: "" };
@@ -38,11 +42,43 @@ export function blockFields(block: ArticleBlock): Json {
     case "keyFacts":
       return { ...base, heading: block.heading, facts: block.facts.map((fact) => ({ ...fact })) };
     case "context":
-      return { ...base, heading: block.heading, body: block.body.map((paragraph) => paragraph.children.map((child) => (child.type === "text" ? child.text : child.type === "lineBreak" ? "\n" : "")).join("")).join("\n\n") };
+      return { ...base, heading: block.heading, body: bodyText(block.body) };
     case "document":
       return { ...base, media: block.media, title: block.title ?? "", context: block.context ?? "", source: block.source ?? "", pages: block.pages.map((ref) => ({ ...ref })) };
     case "timeline":
       return { ...base, items: block.items.map((item) => ({ ...item })) };
+    case "portraitText":
+      return { ...base, media: block.media, altOverride: block.altOverride ?? "", heading: block.heading ?? "", body: bodyText(block.body), caption: block.caption ?? "", side: block.side };
+    case "visualChapter":
+      return { ...base, media: block.media, altOverride: block.altOverride ?? "", eyebrow: block.eyebrow ?? "", heading: block.heading, dek: block.dek ?? "", placement: block.placement, align: block.align };
+    case "video":
+      return { ...base, url: block.videoId ? `https://www.youtube.com/watch?v=${block.videoId}` : "", title: block.title, caption: block.caption ?? "", captionsConfirmed: block.captionsConfirmed ?? true };
+    case "audio":
+      return { ...base, media: block.media, title: block.title, caption: block.caption ?? "", transcript: block.transcript };
+    case "editorsNote":
+      return { ...base, body: bodyText(block.body) };
+    case "marginNote":
+      return { ...base, heading: block.heading ?? "", body: bodyText(block.body) };
+    case "expandable":
+      return { ...base, heading: block.heading, body: bodyText(block.body) };
+    case "chartMap":
+      return { ...base, mode: block.mode, url: block.url ?? "", image: block.image, altOverride: block.altOverride ?? "", title: block.title, dek: block.dek ?? "", summary: block.summary, source: block.source ?? "", notes: block.notes ?? "", credit: block.credit ?? "", height: block.height };
+    case "dataTable":
+      return { ...base, title: block.title, description: block.description ?? "", columns: block.columns.map((column) => ({ ...column })), rows: block.rows.map((row) => ({ id: row.id, cells: [...row.cells] })), presentation: block.presentation, rowHeaders: block.rowHeaders, source: block.source ?? "", notes: block.notes ?? "" };
+    case "comparison":
+      return { ...base, heading: block.heading ?? "", leftLabel: block.left.label, leftTitle: block.left.title, leftBody: bodyText(block.left.body), rightLabel: block.right.label, rightTitle: block.right.title, rightBody: bodyText(block.right.body) };
+    case "keyNumbers":
+      return { ...base, heading: block.heading ?? "", source: block.source ?? "", items: block.items.map((item) => ({ id: item.id, value: item.value, label: item.label, context: item.context ?? "" })) };
+    case "annotatedImage":
+      return { ...base, media: block.media, altOverride: block.altOverride ?? "", caption: block.caption, placement: block.placement, markers: block.markers.map((marker) => ({ ...marker })) };
+    case "beforeAfter":
+      return { ...base, before: block.before, after: block.after, beforeLabel: block.beforeLabel, afterLabel: block.afterLabel, fit: block.fit, caption: block.caption, placement: block.placement };
+    case "relatedCoverage":
+      return { ...base, heading: block.heading, stories: block.stories.map((item) => ({ id: item.id, story: item.story })) };
+    case "poll":
+      return { ...base, poll: block.poll };
+    case "repositoryInteractive":
+      return { ...base, key: block.key, title: block.title, description: block.description };
   }
 }
 

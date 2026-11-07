@@ -29,7 +29,7 @@ export function paragraphsFromText(value: unknown, max?: number): ParagraphNode[
 
 /** The reading text of inline content (for search, readiness and accessible names). */
 export function inlineText(children: readonly Inline[]): string {
-  return children.map((child) => (child.type === "text" ? child.text : child.type === "link" ? child.children.map((run) => run.text).join("") : "\n")).join("");
+  return children.map((child) => (child.type === "text" ? child.text : child.type === "link" ? child.children.map((run) => run.text).join("") : child.type === "footnote" ? "" : "\n")).join("");
 }
 
 export function hasInlineText(children: readonly Inline[]): boolean {
