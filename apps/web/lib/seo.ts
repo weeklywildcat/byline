@@ -128,8 +128,18 @@ function isWordPressMedia(image: SeoImage): image is WordPressMedia {
   return "source_url" in image;
 }
 
-// The 1200×630 social card WordPress cut from the editor's crop or focal point.
+/** The Phase 5 prepared image manifest of a Payload attachment, or null (every WordPress attachment). */
+function preparedImageManifest(image: SeoImage | null | undefined) {
+  if (!image || !isWordPressMedia(image)) return null;
+  const manifest = image.bylinePublication?.manifest;
+  return manifest?.kind === "image" ? manifest : null;
+}
+
+// The 1200×630 social card: Phase 5's prepared social image for a Payload attachment;
+// otherwise the one WordPress cut from the editor's crop or focal point.
 function getSocialCrop(image: SeoImage) {
+  const prepared = preparedImageManifest(image);
+  if (prepared) return { src: prepared.social.publicPath, width: prepared.social.width, height: prepared.social.height };
   return isWordPressMedia(image) ? artDirectedSource(getMediaArtDirection(image), "social") : null;
 }
 
@@ -383,6 +393,18 @@ type ImageCandidate = { url: string; width: number; height: number };
  * yields 16:9 variants only. No crops are generated here.
  */
 export function getArticleImageCandidates(image: WordPressMedia): ImageCandidate[] {
+  // Payload: Phase 5 already prepared one crawlable file per ratio. Use exactly those (the
+  // largest natural file leads), never derived again here.
+  const prepared = preparedImageManifest(image);
+  if (prepared) {
+    const largest = prepared.natural[prepared.natural.length - 1];
+    const candidates: ImageCandidate[] = [{ url: largest.publicPath, width: largest.width, height: largest.height }];
+    for (const ratio of ["16x9", "4x3", "1x1"] as const) {
+      const file = prepared.seo[ratio];
+      if (!candidates.some((existing) => existing.url === file.publicPath)) candidates.push({ url: file.publicPath, width: file.width, height: file.height });
+    }
+    return candidates;
+  }
   const original: ImageCandidate | null = image.source_url && image.media_details?.width && image.media_details?.height
     ? { url: image.source_url, width: image.media_details.width, height: image.media_details.height }
     : null;

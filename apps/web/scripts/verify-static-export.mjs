@@ -125,7 +125,13 @@ export async function verifyPublicationMedia(root) {
 export async function verifyNoPrivateNewsroomReferences(root, env = process.env) {
   const token = env.BYLINE_BUILD_TOKEN && env.BYLINE_BUILD_TOKEN.length >= 16 ? env.BYLINE_BUILD_TOKEN : null;
   const newsroom = env.BYLINE_NEWSROOM_URL ? env.BYLINE_NEWSROOM_URL.replace(/\/+$/, "") : null;
-  const forbidden = ["/api/byline/build/", "/api/media/file/", ...(newsroom ? [`${newsroom}/api/`, `${newsroom}/admin`] : [])];
+  let buildOrigin = null;
+  try {
+    buildOrigin = env.BYLINE_NEWSROOM_BUILD_URL ? new URL(env.BYLINE_NEWSROOM_BUILD_URL).origin : null;
+  } catch {
+    buildOrigin = null;
+  }
+  const forbidden = ["/api/byline/build/", "/api/media/file/", ...(newsroom ? [`${newsroom}/api/`, `${newsroom}/admin`] : []), ...(buildOrigin ? [`${buildOrigin}/api/`, `${buildOrigin}/admin`] : [])];
   for await (const file of walk(root)) {
     if (!/\.(html?|json|xml|txt|js|mjs|css|webmanifest|svg|rss|atom|map)$/i.test(file) && path.basename(file) !== "_headers" && path.basename(file) !== "_redirects") continue;
     const text = await readFile(file, "utf8");

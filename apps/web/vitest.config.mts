@@ -9,6 +9,7 @@ export default defineConfig({
       "@byline/content": fileURLToPath(new URL("../../packages/content/src/index.ts", import.meta.url)),
       "@byline/design": fileURLToPath(new URL("../../packages/design/src/index.ts", import.meta.url)),
       "@byline/theme-contract": fileURLToPath(new URL("../../packages/theme-contract/src/index.ts", import.meta.url)),
+      "@byline/theme-weekly-wildcat/publication": fileURLToPath(new URL("../../packages/theme-weekly-wildcat/src/publication.ts", import.meta.url)),
       "@byline/theme-weekly-wildcat": fileURLToPath(
         new URL("../../packages/theme-weekly-wildcat/src/index.ts", import.meta.url)
       ),

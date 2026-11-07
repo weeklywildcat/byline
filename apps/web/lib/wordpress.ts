@@ -1,4 +1,5 @@
 import { normalizeArtDirection, normalizeLiveCoverage, normalizePrimaryVideo, normalizeStoryFormat, type ImageArtDirection, type LiveCoverage as WordPressLiveCoverage, type PrimaryVideo } from "@byline/core";
+import type { BylinePublicationAttachment } from "@byline/content";
 import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
 import { REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
@@ -203,6 +204,12 @@ export type WordPressMedia = {
   };
   bylineImage?: WordPressImageCredit;
   weeklyWildcatImage?: WordPressImageCredit;
+  /**
+   * Payload snapshots only: the Phase 5 prepared-media manifest this
+   * attachment's files come from (build metadata; the build acquires exactly
+   * these files). Absent on WordPress attachments.
+   */
+  bylinePublication?: BylinePublicationAttachment;
   source_url: string;
 };
 

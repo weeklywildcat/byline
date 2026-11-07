@@ -143,6 +143,8 @@ export * from "./digests";
 export * from "./indexes";
 export * from "./media";
 export * from "./publication-media";
+export * from "./publication-dates";
+export * from "./public-snapshot-v1";
 export * from "./redirects";
 export * from "./routing";
 export * from "./snapshot";

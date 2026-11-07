@@ -5,7 +5,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createHash, randomUUID } from "node:crypto";
-import { parseBuildSnapshot } from "../lib/prepared-snapshot.ts";
+import { tsImport } from "tsx/esm/api";
+
+// The snapshot contract, acquisition and media materializer are TypeScript modules shared with
+// Astro and the tests; tsx loads them here without registering a loader for the Astro child.
+const { parseBuildSnapshot } = await tsImport("../lib/prepared-snapshot.ts", import.meta.url);
 
 const totalStartedAt = Date.now();
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -88,13 +92,36 @@ let cmsRequests = 0;
 let snapshotBytes = 0;
 let downloadMs = 0;
 let parseMs = 0;
-if (isBuild && (!fixture || process.env.BYLINE_BUILD_SNAPSHOT_FILE || process.env.BYLINE_BUILD_SNAPSHOT_URL) && process.env.BYLINE_LEGACY_REST_BUILD !== "1") {
+// Acquisition source, in precedence order (docs/payload-build-snapshots.md#the-build):
+//   1. BYLINE_BUILD_SNAPSHOT_FILE: a deliberate local/offline snapshot.
+//   2. BYLINE_NEWSROOM_BUILD_URL: the Payload newsroom's build-only API (completed snapshot, or
+//      direct-source recovery only when discovery reports the current revision not ready).
+//   3. The existing WordPress pointer + artifact (BYLINE_BUILD_SNAPSHOT_URL or derived).
+//   4. BYLINE_LEGACY_REST_BUILD=1: the explicit legacy REST compatibility mode.
+// A deployed newsroom never turns a WordPress build into a Payload build on its own.
+let snapshotSource = null;
+let acquisitionMode = null;
+const payloadBuildUrl = process.env.BYLINE_NEWSROOM_BUILD_URL?.trim();
+if (isBuild && process.env.BYLINE_LEGACY_REST_BUILD !== "1" && !process.env.BYLINE_BUILD_SNAPSHOT_FILE && payloadBuildUrl) {
+  const { acquirePayloadSnapshot } = await tsImport("../lib/build-acquisition.ts", import.meta.url);
+  const acquired = await acquirePayloadSnapshot({ baseUrl: payloadBuildUrl, token: process.env.BYLINE_BUILD_TOKEN ?? "", minimumRevision: Number(process.env.BYLINE_EXPECTED_REVISION || 0) });
+  snapshot = acquired.snapshot;
+  snapshotSource = "payload";
+  acquisitionMode = acquired.mode;
+  cmsRequests = acquired.requests;
+  snapshotBytes = acquired.bytes.byteLength;
+  downloadMs = acquired.downloadMs;
+  snapshotIdentity = { schemaVersion: snapshot.schemaVersion, revision: snapshot.revision, generatedAt: snapshot.generatedAt, artifactDigest: acquired.digest, bytes: snapshotBytes, attempts: acquired.attempts };
+  console.log(`[byline] Payload snapshot acquired by ${acquired.mode}: revision ${acquired.revision}, ${snapshotBytes} bytes, ${acquired.digest.slice(0, 12)}…`);
+} else if (isBuild && (!fixture || process.env.BYLINE_BUILD_SNAPSHOT_FILE || process.env.BYLINE_BUILD_SNAPSHOT_URL) && process.env.BYLINE_LEGACY_REST_BUILD !== "1") {
   let bytes;
   let pointer;
   if (process.env.BYLINE_BUILD_SNAPSHOT_FILE) {
     // Deliberate offline fixture/benchmark input; still enforce the contract.
     bytes = await readFile(path.resolve(projectRoot, process.env.BYLINE_BUILD_SNAPSHOT_FILE));
+    snapshotSource = "file";
   } else {
+    snapshotSource = "wordpress";
     const endpoint = new URL(process.env.BYLINE_BUILD_SNAPSHOT_URL || publicationEndpoint().replace(/\/publication\/?$/, "/build-snapshot"));
     endpoint.searchParams.set("_byline_build", buildIdentity);
     const response = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(30000) });
@@ -111,11 +138,20 @@ if (isBuild && (!fixture || process.env.BYLINE_BUILD_SNAPSHOT_FILE || process.en
     bytes = Buffer.from(await artifactResponse.arrayBuffer());
     downloadMs = performance.now() - downloadStarted;
   }
+  acquisitionMode = "prepared-snapshot";
   snapshotBytes = bytes.byteLength;
   const parseStarted = performance.now();
   snapshot = parseBuildSnapshot(bytes, pointer, Number(process.env.BYLINE_EXPECTED_REVISION || 0));
   parseMs = performance.now() - parseStarted;
   snapshotIdentity = { schemaVersion: snapshot.schemaVersion, revision: snapshot.revision, generatedAt: snapshot.generatedAt, artifactDigest: createHash("sha256").update(bytes).digest("hex"), bytes: snapshotBytes };
+}
+// Prepared publication media named by the accepted snapshot (Payload manifests): a closed,
+// validated descriptor set, acquired after Astro renders. WordPress snapshots have none.
+let publicationMediaDescriptors = [];
+if (snapshot) {
+  const { snapshotPublicationManifests } = await tsImport("@byline/content", import.meta.url);
+  const { descriptorsFromManifests, closedDescriptorSet } = await tsImport("./publication-media.ts", import.meta.url);
+  publicationMediaDescriptors = closedDescriptorSet(descriptorsFromManifests(snapshotPublicationManifests(snapshot)));
 }
 const publication = snapshot?.publication ?? await loadPublication();
 if (publication) publication.appearance = { theme: "weekly-wildcat", tokenOverrides: {} };
@@ -128,9 +164,11 @@ if (astroArguments[0] === "build") {
   if (snapshot) await rm(path.join(projectRoot, "public/_wordpress-media"), { recursive: true, force: true });
 }
 if (snapshot) {
+  // The one local contract every acquisition mode converges on; from here there is one code path.
   const file = path.join(projectRoot, ".byline-build", "public-snapshot.json");
   await writeFile(file, JSON.stringify(snapshot));
   process.env.BYLINE_PREPARED_SNAPSHOT_FILE = file;
+  if (publicationMediaDescriptors.length) await writeFile(path.join(projectRoot, ".byline-build", "publication-media-descriptors.json"), JSON.stringify(publicationMediaDescriptors));
 }
 const buildStarted = performance.now();
 let buildOutput = "";
@@ -149,13 +187,35 @@ child.stdout.on("data", (chunk) => { buildOutput += chunk.toString(); process.st
 const status = await new Promise((resolve, reject) => { child.on("error", reject); child.on("close", resolve); });
 if (status !== 0) process.exit(Number(status) || 1);
 
+// After Astro succeeds and before npm's postbuild verification: acquire exactly the prepared
+// files the snapshot names into out/_byline/media through the Phase 5 materializer (verified
+// SHA-256, size and type; atomic writes). Never a copy of the newsroom volume.
+let publicationMediaMetrics = null;
+if (isBuild && publicationMediaDescriptors.length) {
+  const started = performance.now();
+  const { materializePublicationMedia } = await tsImport("./publication-media.ts", import.meta.url);
+  const { buildMediaEndpoint } = await tsImport("../lib/build-acquisition.ts", import.meta.url);
+  const endpoint = process.env.BYLINE_NEWSROOM_BUILD_MEDIA_URL?.trim() || (payloadBuildUrl ? buildMediaEndpoint(payloadBuildUrl) : "");
+  if (!endpoint) throw new Error("This snapshot names prepared publication media: set BYLINE_NEWSROOM_BUILD_URL (or BYLINE_NEWSROOM_BUILD_MEDIA_URL) and BYLINE_BUILD_TOKEN.");
+  const result = await materializePublicationMedia({
+    descriptors: publicationMediaDescriptors,
+    endpoint,
+    token: process.env.BYLINE_BUILD_TOKEN ?? "",
+    outDir: path.join(projectRoot, "out"),
+    concurrency: Math.min(16, Math.max(1, Number(process.env.BYLINE_MEDIA_CONCURRENCY) || 8))
+  });
+  publicationMediaMetrics = { descriptors: publicationMediaDescriptors.length, ...result, ms: performance.now() - started };
+  console.log(`[byline] Publication media: ${result.written} written, ${result.unchanged} unchanged, ${(result.bytes / 1024 / 1024).toFixed(1)} MB in ${publicationMediaDescriptors.length} files.`);
+}
+
 if (astroArguments[0] === "build") {
   const cleanLog = buildOutput.replace(/\x1b\[[0-9;]*m/g, "");
   const restored = (cleanLog.match(/\((?:restored|cached)\)/g) || []).length;
   const emitted = (cleanLog.match(/[├└]─ /g) || []).length;
   await writeFile(path.join(projectRoot, ".byline-build", "frontend-phases.json"), JSON.stringify({
     totalStartedAt, acquisitionMs, downloadMs, parseMs, snapshotBytes, snapshotIdentity, cmsRequests: snapshot ? cmsRequests : fixture ? 0 : null,
-    dataMode: snapshot ? "prepared-snapshot" : fixture ? "fixture" : "legacy-rest-compatibility",
+    dataMode: snapshot ? acquisitionMode : fixture ? "fixture" : "legacy-rest-compatibility",
+    snapshotSource, publicationMedia: publicationMediaMetrics,
     buildIdentity, commit: process.env.WORKERS_CI_COMMIT_SHA || process.env.CF_PAGES_COMMIT_SHA || null,
     branch: process.env.WORKERS_CI_BRANCH || process.env.CF_PAGES_BRANCH || null,
     astroMs: performance.now() - buildStarted, routes: { rendered: emitted - restored, restored, emitted },
