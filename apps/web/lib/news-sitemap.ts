@@ -1,3 +1,4 @@
+import { nativeStory } from "./native-snapshot";
 import { getWordPressInstant } from "@/lib/dates";
 import { stripHtml } from "@/lib/format";
 import { getPostHref, getPostRouteParts, type WordPressPost } from "@/lib/wordpress";
@@ -26,6 +27,8 @@ type NewsSitemapOptions = {
 };
 
 function publishedAt(post: WordPressPost, timeZone: string) {
+  const native = nativeStory(post.id);
+  if (native) return new Date(native.publishedAt);
   return getWordPressInstant({ gmt: post.date_gmt, local: post.date }, timeZone);
 }
 

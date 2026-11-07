@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mediaFormToInput, mediaReadinessHints, mediaToForm, emptyMediaForm } from "./media-form";
-import type { StoryMediaAssignment } from "./workspace-types";
+import { mediaFormToInput, mediaReadinessHints, mediaToForm, emptyMediaForm } from "@byline/newsroom-screens/workspace/media-form";
+import type { StoryMediaAssignment } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const timezone = "America/New_York";
 const assignment: StoryMediaAssignment = {

@@ -7,7 +7,9 @@ WordPress post
       ↓
 ArticlePresentation                   (apps/web/lib/article-presentation.ts)
       ↓
-1. repo override registered for the post ID?  → custom TSX            (developers)
+1. repo entry registered for the post ID?     → custom TSX            (developers)
+      │   a presentation arranges the WordPress body;
+      │   a flagship visual story replaces it with its own narrative
       ↓ no
 2. author chose Immersive in WordPress?       → ImmersiveArticleView  (authors)
       ↓ no
@@ -15,8 +17,22 @@ ArticlePresentation                   (apps/web/lib/article-presentation.ts)
 ```
 
 A repository override always wins over the author's choice. `StoryArticle`
-(`apps/web/story-presentations/StoryArticle.tsx`) makes this decision for both
+(`packages/story-presentations/src/StoryArticle.tsx`) makes this decision for both
 article routes.
+
+Where each kind of work belongs:
+
+| The story needs | Use |
+| --- | --- |
+| Ordinary reporting, photos, quotes, embeds | WordPress |
+| A Datawrapper or Flourish chart, Google or OpenStreetMap map | Chart / Map block |
+| A small self-contained interactive (calculator, quiz, custom chart) | Interactive block ([newsroom-blocks.md](newsroom-blocks.md#interactive)) |
+| The standard fullscreen photo opening | WordPress **Story presentation → Immersive** |
+| A bespoke layout around the WordPress text | A presentation (below) |
+| Scrollytelling, an immersive narrative, a major visual feature | A [flagship visual story](#flagship-visual-stories) |
+
+There is no WordPress scrollytelling tool: scroll-driven storytelling is always a
+flagship visual story's own code.
 
 ## The author option: Immersive
 
@@ -56,7 +72,7 @@ normal publishing path.
 
 Everything editorial: headline, excerpt/deck, contributors and bylines, featured
 image with its caption and credit, the Gutenberg body (galleries, Visual
-Chapters, scrollytelling, quotes), corrections, topics, publish and update
+Chapters, charts, quotes), corrections, topics, publish and update
 dates. Authors write, publish and correct exactly as they do now. There is no
 checkbox, template, shortcode, block, tag or setting for this feature, and
 WordPress does not know it exists.
@@ -73,7 +89,7 @@ By its **WordPress post ID**, never its slug or headline (those change; the ID
 does not). It is the number in the editor URL (`post.php?post=384&action=edit`) or
 `id` in `/wp-json/wp/v2/posts?slug=...`. `ArticlePresentation.id` carries it.
 
-The registry, `apps/web/story-presentations/registry.ts`, is an explicit map:
+The registry, `packages/story-presentations/src/registry.ts`, is an explicit map:
 
 ```ts
 export const storyPresentations: StoryPresentationRegistry = {
@@ -105,7 +121,7 @@ WordPress post.
 npm run story-presentation -- create 384 need-a-lift
 ```
 
-This creates `apps/web/story-presentations/stories/need-a-lift/` with `index.tsx`
+This creates `packages/story-presentations/src/stories/need-a-lift/` with `index.tsx`
 and `styles.css`, imports the component in `registry.ts` and adds the
 `384: NeedALift,` line. (If the registry has been reshaped and cannot be edited
 safely, the command prints the two lines to add.) The generated component is a
@@ -153,7 +169,10 @@ sits in an `ArticleShell`.
 - **Never hard-code article reporting.** No headline, deck, byline, caption or
   paragraph in a presentation. Render `presentation` through the primitives; if
   WordPress is edited, the page must change with it. (The framework test fails on
-  JSX text in the example.)
+  JSX text in the example.) The one exception is a
+  [flagship visual story](#flagship-visual-stories), whose narrative is
+  deliberately in the repository; its headline, deck, byline and captions of the
+  lead image still come from WordPress.
 - **Do not duplicate the article body.** Render it once with `ArticleBody`.
 - **Preserve the standard article systems:** corrections, the update notice,
   topics, authors, share actions, the poll, reader feedback, the newsletter,
@@ -185,12 +204,78 @@ sits in an `ArticleShell`.
 Run `npm run story-presentation -- create 384 <name>`; the generated component is
 already that layout, so the work is the typography, spacing and any decoration.
 
+## Flagship visual stories
+
+For the rare story whose reporting, data, photography, graphics and scrolling
+work as one piece (closer to an NYT visual feature than an article with
+pictures), a registry entry can opt into owning the body as well:
+
+```sh
+npm run story-presentation -- create <wordpress-post-id> <kebab-case-name> --visual
+```
+
+The scaffold writes `stories/<name>/index.tsx`, `styles.css` and `client.ts` and
+registers `defineVisualStory({ name, Component })`. Only that helper makes a
+visual story, so it is always a deliberate choice; a plain component in the
+registry is still a presentation.
+
+### Who owns what
+
+| WordPress (the publishing record) | The story folder |
+| --- | --- |
+| Headline, deck, contributors, dates, category and series | The narrative: text, figures, graphics, data |
+| Featured image, caption and credit; Open Graph and search image | Layout, styles and the scroll behavior (`client.ts`) |
+| Corrections, update notice, topics, "How we reported this" | |
+| Canonical URL, route, SEO, NewsArticle structured data | |
+| The text edition in the body (feeds, site search) | |
+
+`StoryArticle` gives the component the normal `presentation` and slots, with
+`contentHtml` emptied: the WordPress body is never printed on a visual story's
+page, so it cannot appear twice. Render the header and the standard footer and
+ending with the shared primitives, exactly as a presentation does.
+
+**The WordPress body** is the story's text edition. It still feeds RSS, site
+search and the reading time Byline would compute, and it is what the story falls
+back to if the registry line is removed. Put a summary or text version there.
+Because the page's words are the narrative, the route omits `articleBody` from
+the NewsArticle structured data for a visual story; everything else (headline,
+description, dates, authors, image) is unchanged. A visual story whose WordPress
+body is short can pass `readingTime: "12 min read"` to `defineVisualStory`.
+
+### Writing the narrative
+
+- **Static first.** The narrative is JSX rendered to HTML at build time, so every
+  word, figure, caption and credit is in the page without JavaScript, in reading
+  order. The scaffold's narrative carries `article-body`, which gives it the
+  article's prose, figure and `alignwide` / `alignfull` styles.
+- **`client.ts` only enhances.** It is loaded as its own chunk, on this story's
+  page alone (each host's loader finds it by folder name (`apps/web/lib/story-presentation-client.ts`)), and
+  receives the story's root element. Use ordinary document scrolling: observe,
+  never listen to `scroll` or move the reader. Honour
+  `prefers-reduced-motion`: no animation, and nothing that only works in motion.
+  The scaffold's sticky graphic and reading-line steps are a starting point, not
+  a model: design the scroll experience the story needs.
+- **Accessibility.** One `<h1>` (the WordPress headline), semantic sections and
+  headings below it, real `alt` text and captions with credits, text equivalents
+  for graphics (`role="img"` with a title, or a table), keyboard-reachable
+  controls with visible focus, no traps.
+- **Assets.** Import images and data from the story folder so they ship with
+  that story only; give photographs `width`, `height` and real alt text, and
+  credit them in a caption.
+- **Corrections to the narrative** are code changes and a deploy. Record them in
+  WordPress as usual (the correction notice prints on the story), then fix the
+  text in the folder.
+
+The fixture `stories/visual-fixture/` (post 10) is exactly what `--visual`
+generates, and a test keeps it that way.
+
 ## Tests and the fixtures
 
 The fixture build (`BYLINE_CONTENT_MODE=weekly-wildcat-fixture`) marks fixture posts
 8 (bottom left), 7 (centered) and 6 as Immersive in WordPress. Post 6 also has the
-fixture-only override `stories/override-fixture/`, registered in
-`fixtureStoryPresentations`, so production can never match it. Coverage:
+fixture-only override `stories/override-fixture/`, and post 10 the fixture-only
+visual story `stories/visual-fixture/`, both registered in
+`fixtureStoryPresentations`, so production can never match them. Coverage:
 
 - `apps/web/tests/story-presentations.test.tsx`: registry resolution; the standard
   article unchanged; the settings normalized and carried into the model; both
@@ -205,7 +290,16 @@ fixture-only override `stories/override-fixture/`, registered in
   sanitizing, REST schema), `tests-js/story-presentation-settings.test.ts` (the
   editor controls' model), and the build-snapshot integration test (the choice
   reaches the snapshot).
-- `scripts/story-presentation.test.mjs`: the scaffold command.
+- `apps/web/tests/story-presentations.test.tsx` also covers visual stories: the
+  opt-in, the WordPress body never printed, the publishing record and standard
+  systems kept, structured data without `articleBody`, and the fallback to the
+  WordPress body when the registry line is removed.
+- `apps/web/tests/browser/visual-story.spec.ts`: the narrative complete without
+  JavaScript, the reading-line enhancement in both directions, the sticky graphic,
+  reduced motion, phone width, and the story's code and CSS loading on its page
+  only.
+- `scripts/story-presentation.test.mjs`: the scaffold command, with and without
+  `--visual`, and the fixture matching the `--visual` output.
 
 When you add a real override, add a test for anything specific to it.
 
@@ -216,6 +310,9 @@ When you add a real override, add a test for anything specific to it.
   imports, and Astro's incremental build hashes imported modules, so expect article
   pages to be re-rendered (not restored) after such a change.
 - The Story presentation panel is in the block editor only. The classic editor
-  keeps whatever was saved. "Preview as Byline" still renders the standard article.
-- Presentations are static HTML. Anything interactive needs its own island, as the
-  existing slots do.
+  keeps whatever was saved. "Preview as Byline" still renders the standard article,
+  with the WordPress body, for both presentations and visual stories.
+- A presentation is static HTML; anything interactive needs its own island, as the
+  existing slots do. A visual story can add its own `client.ts`.
+- A visual story's narrative is not in WordPress: writers cannot edit it there,
+  and site search indexes the WordPress text edition, not the narrative.

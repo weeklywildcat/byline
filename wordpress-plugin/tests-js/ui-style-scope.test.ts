@@ -3,7 +3,7 @@ import postcss from "postcss";
 import { describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
-const uiScope = require("../loaders/ui-scope-postcss.js");
+const uiScope = require("@byline/newsroom-ui/postcss-scope");
 
 describe("The admin UI's WordPress stylesheet boundary", () => {
   it("scopes theme, utilities, generated property resets and media rules without a global reset", async () => {

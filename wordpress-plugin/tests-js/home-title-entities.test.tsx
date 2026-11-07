@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { AgendaItem, AttentionRow, MediaAssignmentRow, ReviewRow, StoryRow } from "../src/home/components/rows";
-import { ActivityRow, TaskRow } from "../src/story/rows";
-import type { PlanningStory } from "../src/planning/planning-model";
+import { AgendaItem, AttentionRow, MediaAssignmentRow, ReviewRow, StoryRow } from "@byline/newsroom-screens/home/components/rows";
+import { ActivityRow, TaskRow } from "@byline/newsroom-screens/story/rows";
+import type { PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 
 const now = new Date("2026-10-20T12:00:00Z");
 const timezone = "America/New_York";
@@ -19,7 +19,7 @@ function story(): PlanningStory {
     writer: null,
     editor: null,
     workflow: { id: "reporting", label: "Reporting", group: "main", selectable: true },
-    wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
+    publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
     deadline: "2026-10-21",
     plannedPublication: null,
     modifiedAt: "2026-10-20T10:00:00Z",

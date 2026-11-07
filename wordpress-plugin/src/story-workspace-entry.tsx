@@ -1,11 +1,14 @@
 import apiFetch from "@wordpress/api-fetch";
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { InlineAlert } from "./admin-ui/components/inline-alert";
-import { buttonVariants } from "./admin-ui/ui/button";
-import { createEditorialRestClient } from "./editorial/editorial-rest";
-import { StoryWorkspaceApp } from "./workspace/StoryWorkspace";
-import { createWorkspaceClient } from "./workspace/workspace-api";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { buttonVariants } from "@byline/newsroom-ui/ui/button";
+import { createEditorialRestClient } from "@byline/newsroom-screens/editorial/editorial-rest";
+import { StoryWorkspaceApp } from "@byline/newsroom-screens/workspace/StoryWorkspace";
+import { wordpressMediaPicker } from "./workspace/media-library";
+import { createWorkspaceClient } from "@byline/newsroom-screens/workspace/workspace-api";
+import { createWordPressCollectionApi } from "./collections/wordpress-collection-api";
+import { WordPressCollectionLinks } from "./collections/WordPressCollections";
 import "./workspace/style.css";
 
 type WorkspaceConfig = {
@@ -35,6 +38,6 @@ if (root && config && config.storyId > 0) {
   const request = <T,>(options: Parameters<typeof apiFetch>[0]) => apiFetch(options) as Promise<T>;
   const storiesUrl = config.urls?.planning?.stories || "admin.php?page=byline-planning&tab=stories";
   createRoot(root).render(<WorkspaceBoundary storiesUrl={storiesUrl}>
-    <StoryWorkspaceApp storyId={config.storyId} appointmentId={config.appointmentId || ""} currentUserId={config.currentUserId} storiesUrl={storiesUrl} client={createWorkspaceClient(request)} editorial={createEditorialRestClient(request)} />
+    <WordPressCollectionLinks><StoryWorkspaceApp storyId={config.storyId} appointmentId={config.appointmentId || ""} currentUserId={config.currentUserId} storiesUrl={storiesUrl} client={createWorkspaceClient(request, { collections: createWordPressCollectionApi(request, config.currentUserId) })} editorial={createEditorialRestClient(request)} media={wordpressMediaPicker} /></WordPressCollectionLinks>
   </WorkspaceBoundary>);
 }

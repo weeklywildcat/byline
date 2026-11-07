@@ -1,12 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { decodeEntities } from "../src/admin-ui/lib/text";
-import { StoryBoard } from "../src/planning/StoryBoard";
-import { StoryList, type StoryListProps } from "../src/planning/StoryList";
-import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, hideFinishedPublished, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "../src/planning/planning-model";
+import { decodeEntities } from "@byline/newsroom-ui/lib/text";
+import { StoryBoard } from "@byline/newsroom-screens/planning/StoryBoard";
+import { StoryList, type StoryListProps } from "@byline/newsroom-screens/planning/StoryList";
+import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, hideFinishedPublished, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 import { destinationForTab, initialStoriesView, storiesViewHref } from "../src/planning/planning-routing";
-import { ProductionSummary, productionSignal, storySignals, workflowBadgeSpec, WorkflowBadge } from "../src/story/story-parts";
-import { sectionNames } from "../src/workspace/workspace-model";
+import { ProductionSummary, productionSignal, storySignals, workflowBadgeSpec, WorkflowBadge } from "@byline/newsroom-screens/story/story-parts";
+import { sectionNames } from "@byline/newsroom-screens/workspace/workspace-model";
 
 const now = new Date("2026-10-20T12:00:00Z");
 const person = (id: number, name: string) => ({ id, name });
@@ -15,7 +15,7 @@ function story(patch: Partial<PlanningStory> & { id: number }): PlanningStory {
   const workflow = patch.workflow || DEFAULT_WORKFLOW_STATUSES.find((status) => status.id === "reporting")!;
   return {
     title: `Story ${patch.id}`, editUrl: `/wp-admin/post.php?post=${patch.id}&action=edit`, previewUrl: `/?p=${patch.id}&preview=true`, authors: [], writer: null, editor: null, workflow,
-    wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: null, plannedPublication: null, modifiedAt: null,
+    publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: null, plannedPublication: null, modifiedAt: null,
     visual: { type: "none", status: "needed" }, openTaskCount: 0, featuredImage: null, ...patch
   };
 }
@@ -109,7 +109,7 @@ describe("StoryBoard", () => {
 describe("StoryList", () => {
   const stories = [
     story({ id: 1, title: "Canteen could return", workflow: stage("reporting"), authors: [person(1, "Caroline Elrod")], editor: person(2, "Gibson Bell"), deadline: "2026-10-21", plannedPublication: "2026-10-24T12:00:00", modifiedAt: "2026-10-20T11:30:00Z", openTaskCount: 3, visual: { type: "photo", status: "assigned" } }),
-    story({ id: 2, title: "Winter concert", workflow: stage("ready"), wordpressState: { id: "future", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-10-26T13:00:00Z" } })
+    story({ id: 2, title: "Winter concert", workflow: stage("ready"), publicationState: { id: "scheduled", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-10-26T13:00:00Z" } })
   ];
   const html = renderToStaticMarkup(<StoryList {...props(stories)} sort={DEFAULT_PLANNING_SORT} onSortChange={vi.fn()} />);
 
@@ -172,7 +172,7 @@ describe("StoryList", () => {
   });
 
   it("removes redundant Draft/Published lines while distinguishing scheduled and planned dates", () => {
-    const published = story({ id: 3, workflow: stage("published"), wordpressState: { id: "publish", label: "Published", isPublished: true, isScheduled: false, publishedAt: "2026-10-19T18:15:00Z" } });
+    const published = story({ id: 3, workflow: stage("published"), publicationState: { id: "published", label: "Published", isPublished: true, isScheduled: false, publishedAt: "2026-10-19T18:15:00Z" } });
     for (const editable of [true, false]) {
       const markup = renderToStaticMarkup(<StoryList {...props([...stories, published, story({ id: 4 })])} canUpdateStories={editable} sort={DEFAULT_PLANNING_SORT} onSortChange={vi.fn()} />);
       const cells = [...markup.matchAll(/<td[^>]*>(.*?)<\/td>/g)].map((match) => match[1]!);
@@ -266,12 +266,12 @@ describe("text and dates from WordPress", () => {
 });
 
 describe("published stories in the List", () => {
-  const published = { id: "publish", label: "Published", isPublished: true, isScheduled: false };
-  const done = story({ id: 1, title: "Done", wordpressState: published });
-  const withTask = story({ id: 2, title: "Open task", wordpressState: published, openTaskCount: 1 });
-  const withPhoto = story({ id: 3, title: "Open photo", wordpressState: published, visual: { type: "photo", status: "assigned" } });
-  const photoDone = story({ id: 4, title: "Photo done", wordpressState: published, visual: { type: "photo", status: "done" } });
-  const toSchedule = story({ id: 5, title: "Needs a time", wordpressState: published, reporting: { sources: 0, interviewed: 0, needsScheduling: 1, toSchedule: 1, nextAppointment: null } });
+  const published = { id: "published", label: "Published", isPublished: true, isScheduled: false };
+  const done = story({ id: 1, title: "Done", publicationState: published });
+  const withTask = story({ id: 2, title: "Open task", publicationState: published, openTaskCount: 1 });
+  const withPhoto = story({ id: 3, title: "Open photo", publicationState: published, visual: { type: "photo", status: "assigned" } });
+  const photoDone = story({ id: 4, title: "Photo done", publicationState: published, visual: { type: "photo", status: "done" } });
+  const toSchedule = story({ id: 5, title: "Needs a time", publicationState: published, reporting: { sources: 0, interviewed: 0, needsScheduling: 1, toSchedule: 1, nextAppointment: null } });
   const draft = story({ id: 6, title: "Draft" });
 
   it("knows when something is not done", () => {
@@ -284,7 +284,7 @@ describe("published stories in the List", () => {
 
   it("shows them when asked for, or when a WordPress state is chosen", () => {
     expect(hideFinishedPublished([done, draft], { showPublished: true })).toHaveLength(2);
-    expect(hideFinishedPublished([done, draft], { wordpressState: "publish" })).toHaveLength(2);
+    expect(hideFinishedPublished([done, draft], { publicationState: "published" })).toHaveLength(2);
   });
 
   it("says what it left out", () => {

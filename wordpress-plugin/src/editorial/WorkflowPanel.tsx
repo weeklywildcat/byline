@@ -1,6 +1,6 @@
 import { Button, Notice, SelectControl, Spinner, TextControl } from "@wordpress/components";
 import { useEffect, useMemo, useState } from "@wordpress/element";
-import type { ContributorRef, EditorialWorkflowPayload, WorkflowDateChanges, WorkflowStatusDefinition, WorkflowStory } from "./editorial-model";
+import type { ContributorRef, EditorialWorkflowPayload, WorkflowDateChanges, WorkflowStatusDefinition, WorkflowStory } from "@byline/newsroom-screens/editorial/editorial-model";
 import {
   DEFAULT_WORKFLOW_STATUSES,
   describeDeadline,
@@ -13,7 +13,7 @@ import {
   workflowDateFields,
   type NotesAvailability,
   type WorkflowCapabilities
-} from "./editorial-model";
+} from "@byline/newsroom-screens/editorial/editorial-model";
 import "./editorial.css";
 
 export type WorkflowPanelProps = {

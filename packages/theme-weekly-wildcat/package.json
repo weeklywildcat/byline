@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./publication": "./src/publication.ts"
   },
   "dependencies": {
     "@byline/core": "0.1.0",

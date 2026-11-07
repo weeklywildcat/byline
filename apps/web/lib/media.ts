@@ -414,6 +414,7 @@ async function getAttachmentMediaUrls(attachmentId: string) {
   let request = attachmentUrlPromises.get(attachmentId);
 
   if (!request && process.env.BYLINE_PREPARED_SNAPSHOT_FILE) {
+    if (process.env.BYLINE_PREPARED_SNAPSHOT_PROVIDER === "payload") return [];
     const media = getLocalBuildSnapshot()!.datasets.attachments.find((item) => String(item.id) === attachmentId);
     return media ? [...Object.values(media.media_details?.sizes ?? {}).map((size) => size.source_url), media.source_url].filter((url) => Boolean(normalizeWordPressMediaUrl(url))) : [];
   }

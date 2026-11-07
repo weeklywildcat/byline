@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getLocalBuildSnapshot, type PublicBuildDatasets } from "./prepared-snapshot";
+import { getNativeSnapshot } from "./native-snapshot";
+import { nativeArchiveViews } from "./native-archive-views";
 import { materializeSnapshotMedia } from "./media";
 let prepared: Promise<PublicBuildDatasets> | undefined;
 export function assertPreparedBuildMode() {
@@ -10,6 +12,8 @@ export function assertPreparedBuildMode() {
 export function hasPreparedSnapshot() { return Boolean(process.env.BYLINE_PREPARED_SNAPSHOT_FILE); }
 export function getPreparedDatasets(): Promise<PublicBuildDatasets> {
   return prepared ??= (async () => {
+    const native = getNativeSnapshot();
+    if (native) return nativeArchiveViews(native);
     const snapshot = getLocalBuildSnapshot();
     if (!snapshot) throw new Error("Production requires a prepared Byline build snapshot.");
     const started = performance.now();

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { StoryTitleButton } from "../src/story/story-parts";
+import { StoryTitleButton } from "@byline/newsroom-screens/story/story-parts";
 
 /**
  * A StoryHoverCard wraps the title and, while its preview is open, hands the

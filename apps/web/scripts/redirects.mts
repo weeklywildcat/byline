@@ -6,24 +6,25 @@
  * https://developers.cloudflare.com/workers/static-assets/redirects/
  */
 
+import { isCanonicalRedirectPath, redirectSourceVariants } from "@byline/content/redirect-path";
+
 export type EdgeRedirect = { from: string; to: string };
 
 /** Cloudflare's limit for static (non-splat) rules in one `_redirects` file. */
 export const MAX_STATIC_REDIRECTS = 2000;
 
-const SOURCE = /^\/(?:[a-z0-9._~-]+\/)*$/i;
 const DESTINATION = /^\/(?!\/)[a-z0-9._~/-]*(?:#[a-z0-9_-]+)?$/i;
 
 /**
- * One rule per path, plus the same rule without the trailing slash: the asset
+ * One rule per path, plus the slashless form for directories: the asset
  * layer only redirects `/x` to `/x/` when a file exists there, and none does.
  */
 export function buildRedirectsFile(redirects: EdgeRedirect[]) {
   const rules = new Map<string, string>();
 
   for (const { from, to } of redirects) {
-    if (!SOURCE.test(from) || !DESTINATION.test(to)) throw new Error(`Unsafe redirect rule: ${from} -> ${to}`);
-    for (const source of from === "/" ? [from] : [from, from.slice(0, -1)]) {
+    if (!isCanonicalRedirectPath(from) || !DESTINATION.test(to)) throw new Error(`Unsafe redirect rule: ${from} -> ${to}`);
+    for (const source of redirectSourceVariants(from)) {
       if (rules.has(source) && rules.get(source) !== to) throw new Error(`Conflicting redirects for ${source}`);
       rules.set(source, to);
     }

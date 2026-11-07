@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readSource } from "./source-files";
 
 const src = path.resolve(__dirname, "../src/planning");
 const read = (name: string) => readFileSync(path.join(src, name), "utf8");
 
 describe("secondary Planning shadcn patterns", () => {
   it("uses InputGroup for Media Desk search instead of a standalone search input", () => {
-    const source = read("MediaDesk.tsx");
+    const source = readSource("media/MediaWork.tsx");
     expect(source).toContain("InputGroupInput type=\"search\"");
     expect(source).toContain("<InputGroupAddon><Search");
     expect(source).not.toContain("<Input type=\"search\"");
@@ -21,15 +22,15 @@ describe("secondary Planning shadcn patterns", () => {
   });
 
   it("builds Content Health triage with shared queue and disclosure primitives", () => {
-    const source = read("ContentHealth.tsx");
+    const source = readSource("planning/ContentHealth.tsx");
     for (const primitive of ["<ItemGroup", "<Collapsible", '<TabsList variant="line">', "<InputGroup", "<InlineAlert", "<StoryHoverCard", "<DropdownMenu"]) expect(source).toContain(primitive);
     expect(source).not.toContain("<Card");
     expect(source).not.toContain("<Accordion");
   });
 
   it("shows an actual shadcn Spinner while Content Health work is pending", () => {
-    const source = read("ContentHealth.tsx");
-    expect(source).toContain('from "../admin-ui/ui/spinner"');
+    const source = readSource("planning/ContentHealth.tsx");
+    expect(source).toContain('from "@byline/newsroom-ui/ui/spinner"');
     expect(source.match(/<Spinner data-icon="inline-start" \/>/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });

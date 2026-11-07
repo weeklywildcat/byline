@@ -1,0 +1,313 @@
+/*
+ * The Byline editor canvas: editor-only chrome around the shared article.
+ *
+ * The article itself (measure, prose, blocks) is article-body.css and
+ * newsroom-blocks.css, loaded as they are on the public site. This file only
+ * (1) neutralises Payload's own editor styling where it would change the
+ * article, and (2) draws the editing chrome: selection, toolbars, inline
+ * fields, insertion and notes. If a rule here changes how published content
+ * looks, it belongs in the shared CSS instead.
+ *
+ * Payload's admin CSS is in @layer payload-default, so these unlayered rules
+ * win without !important. `.byline-article-canvas` is the canvas element
+ * (also `.byline-article-view.article-shell`).
+ */
+
+.byline-article-canvas {
+  --byline-selection: var(--ring, #a1a1aa);
+  --byline-chrome-font: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  background: var(--page, #fff);
+  color: var(--ink, #121212);
+  padding-top: 8px;
+}
+
+/* Editor chrome inside the article uses Nova's surface colours, not the article's same-named tokens. */
+.byline-article-canvas :is(.byline-block-chrome, .byline-row-actions, .byline-item-actions, .byline-media-empty, .byline-media-status, .byline-add-bar, .byline-gutter-inserter, .byline-document-attachment, .byline-block-note, .byline-list-footer, .byline-credit-missing, .byline-timeline-hint, .byline-confirm) {
+  --accent: var(--byline-ui-accent);
+  --muted: var(--byline-ui-muted);
+}
+
+/* 1. Payload's editor wrappers inherit the article instead of setting their own type. */
+.byline-article-canvas .rich-text-lexical,
+.byline-article-canvas .rich-text-lexical .editor-container,
+.byline-article-canvas .rich-text-lexical .editor {
+  color: inherit;
+  font: inherit;
+  letter-spacing: normal;
+}
+.byline-article-canvas .rich-text-lexical .editor { animation: none; }
+.byline-article-canvas .rich-text-lexical__label-row { display: none; }
+.byline-article-canvas .article-body.ContentEditable__root { padding: 0; min-height: 8em; }
+.byline-article-canvas .article-body.ContentEditable__root::before { content: none; }
+.byline-article-canvas .LexicalEditorTheme__placeholder { color: var(--soft-muted, #737373); font-family: var(--font-serif); font-size: inherit; left: 0; top: 0; }
+
+/*
+ * Payload's Lexical theme gives prose its own sizes, colours and list indents.
+ * The article inherits those values from `.article-body` instead, so here they
+ * inherit again. `:where()` keeps these at the lowest specificity: they beat
+ * Payload's layered theme, never the shared article rules.
+ */
+:where(.byline-article-canvas .article-body) :is(.LexicalEditorTheme__paragraph, .LexicalEditorTheme__listItem) {
+  color: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  margin: 0;
+}
+:where(.byline-article-canvas .article-body) :is(.LexicalEditorTheme__h2, .LexicalEditorTheme__h3) { color: inherit; }
+:where(.byline-article-canvas .article-body) .LexicalEditorTheme__link { border-bottom: 0; }
+
+/* Block frames: Payload's block element is the frame; it takes the article's type. */
+.byline-article-canvas .article-body > .byline-block {
+  --theme-success-500: transparent; /* Payload's selection ring colour; Byline draws its own below. */
+  color: inherit;
+  font: inherit;
+  position: relative;
+  z-index: auto;
+}
+
+/* 2. Selection: a quiet outline beside the block, never a card around it. */
+.byline-article-canvas .byline-block::after {
+  border: 2px solid transparent;
+  border-radius: 6px;
+  content: "";
+  inset: -10px;
+  pointer-events: none;
+  position: absolute;
+  transition: border-color 120ms ease-out;
+}
+.byline-article-canvas .byline-block:focus-within::after { border-color: color-mix(in srgb, var(--byline-selection) 55%, transparent); }
+.byline-article-canvas .byline-block.decorator-selected::after { border-color: var(--byline-selection); }
+
+/* The block toolbar: above the selected block, over the margin, never over the content. */
+.byline-block-chrome {
+  align-items: center;
+  background: var(--popover, #fff);
+  border: 1px solid var(--border, #e4e4e7);
+  border-radius: 10px;
+  bottom: calc(100% + 8px);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .06), 0 4px 12px rgb(0 0 0 / .06);
+  color: var(--foreground, #18181b);
+  display: flex;
+  flex-wrap: wrap;
+  font-family: var(--byline-chrome-font);
+  font-size: 13px;
+  font-weight: 400;
+  gap: 4px;
+  left: -4px;
+  letter-spacing: normal;
+  line-height: 1.2;
+  max-width: calc(100% + 8px);
+  opacity: 0;
+  padding: 2px;
+  pointer-events: none;
+  position: absolute;
+  text-transform: none;
+  transition: opacity 120ms ease-out;
+  z-index: 6;
+}
+.byline-block-chrome-label { align-items: center; color: var(--muted-foreground, #71717a); display: inline-flex; font-weight: 500; gap: 6px; padding: 0 6px 0 4px; white-space: nowrap; }
+.byline-block-chrome-context { color: var(--muted-foreground, #71717a); padding: 0 4px; white-space: nowrap; }
+.byline-block:is(.decorator-selected, :focus-within) .byline-block-chrome,
+.byline-block-chrome[data-open] { opacity: 1; pointer-events: auto; }
+/* The selected block makes room for its toolbar, so the toolbar never covers the text above. */
+@media (pointer: fine) and (min-width: 768px) {
+  .byline-article-canvas .article-body > .byline-block:is(.decorator-selected, :focus-within, :has(.byline-block-chrome[data-open])) { margin-top: max(46px, var(--story-moment-space, 36px)); }
+}
+
+/* Unfinished: one calm sentence under the selected block. */
+.byline-block-note {
+  align-items: center;
+  color: var(--muted-foreground, #71717a);
+  display: none;
+  font-family: var(--byline-chrome-font);
+  font-size: 13px;
+  gap: 8px;
+  line-height: 1.4;
+  margin: 10px 0 0;
+}
+.byline-block:is(.decorator-selected, :focus-within) .byline-block-note { display: flex; }
+.byline-credit-missing { color: var(--muted-foreground, #71717a); font-family: var(--byline-chrome-font); font-size: 12px; margin: 4px 0 0; }
+.byline-credit-missing a { color: inherit; text-decoration: underline; }
+
+/* Inline fields: borderless, in the typography of the slot they sit in. */
+.byline-article-canvas .byline-field {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  box-sizing: border-box;
+  color: inherit;
+  display: block;
+  field-sizing: content;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  margin: 0;
+  min-height: 1lh;
+  outline: none;
+  overflow: hidden;
+  padding: 0;
+  resize: none;
+  text-align: inherit;
+  text-transform: inherit;
+  text-wrap: inherit;
+  width: 100%;
+}
+.byline-article-canvas .byline-field::placeholder { color: var(--soft-muted, #737373); opacity: .85; }
+.byline-article-canvas .byline-field:focus-visible { outline: 1px dashed var(--story-soft, #737373); outline-offset: 3px; }
+.byline-article-canvas .byline-field[readonly] { cursor: default; }
+.byline-article-canvas input.byline-field[type="number"] { -moz-appearance: textfield; display: inline-block; width: 4ch; }
+.byline-article-canvas input.byline-field::-webkit-inner-spin-button { appearance: none; }
+
+/* A field stands where the article prints a paragraph, so it takes that paragraph's spacing. */
+.byline-article-canvas .byline-reported-quote > .byline-quote-text { margin-bottom: .35em; }
+.byline-article-canvas .byline-pull-quote blockquote > .byline-quote-text { margin-bottom: .5em; }
+.byline-article-canvas .byline-document-source-field { align-items: baseline; display: flex; gap: .3em; }
+.byline-article-canvas .byline-page-number { align-items: baseline; display: inline-flex; gap: .3em; }
+
+/* Timeline: the hint and the list footer sit in the reporting column. */
+.byline-article-canvas .byline-timeline-hint { color: var(--muted-foreground, #71717a); font-family: var(--byline-chrome-font); font-size: 12px; grid-column: 2; margin: .3em 0 0; }
+.byline-article-canvas .byline-timeline-item[data-active] .byline-timeline-label { text-decoration: underline 1px dotted; text-underline-offset: 4px; }
+
+/* Lists of rows (facts, pages): row actions appear for the row being edited. */
+.byline-article-canvas .byline-editable-row { position: relative; }
+.byline-article-canvas .byline-row-actions,
+.byline-article-canvas .byline-item-actions {
+  background: var(--popover, #fff);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 2px 8px rgb(0 0 0 / .08);
+  font-family: var(--byline-chrome-font);
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 120ms ease-out;
+  z-index: 3;
+}
+.byline-article-canvas .byline-row-actions { inset-inline-end: -8px; top: 50%; translate: 100% -50%; }
+.byline-article-canvas .byline-editable-row:focus-within > .byline-row-actions { opacity: 1; pointer-events: auto; }
+.byline-article-canvas .byline-gallery-item-media { position: relative; }
+.byline-article-canvas .byline-item-actions { right: 8px; top: 8px; }
+.byline-article-canvas .byline-gallery-item:focus-within .byline-item-actions { opacity: 1; pointer-events: auto; }
+@media (hover: hover) and (pointer: fine) {
+  .byline-article-canvas .byline-editable-row:hover > .byline-row-actions,
+  .byline-article-canvas .byline-gallery-item:hover .byline-item-actions { opacity: 1; pointer-events: auto; }
+}
+/* The newer tools' rows (numbers, notes, related stories) show their actions the same way, inside the row they act on. */
+.byline-article-canvas :is(.byline-key-number, .byline-annotations > li, .byline-related-item) { position: relative; }
+.byline-article-canvas :is(.byline-key-number, .byline-annotations > li, .byline-related-item):focus-within > .byline-row-actions { opacity: 1; pointer-events: auto; }
+.byline-article-canvas :is(.byline-key-number, .byline-annotations > li) > .byline-row-actions { inset-inline-end: 0; top: 0; translate: none; }
+.byline-article-canvas .byline-related-item > .byline-row-actions { inset-inline-end: 0; translate: 0 -50%; }
+@media (hover: hover) and (pointer: fine) {
+  .byline-article-canvas :is(.byline-key-number, .byline-annotations > li, .byline-related-item):hover > .byline-row-actions { opacity: 1; pointer-events: auto; }
+}
+
+/* Data Table: header menus and row actions sit with the cells they act on; a footnote reference is a quiet superscript. */
+.byline-article-canvas .byline-table-header { align-items: center; display: flex; gap: 2px; }
+.byline-article-canvas .byline-table-header .byline-field { min-width: 6ch; }
+.byline-article-canvas .byline-table-row-actions { opacity: 0; padding: 0; text-align: right; white-space: nowrap; width: 1%; }
+.byline-article-canvas tr:is(:focus-within, :hover) > .byline-table-row-actions { opacity: 1; }
+.byline-article-canvas .byline-confirm { align-items: center; color: var(--muted-foreground, #71717a); display: flex; font-family: var(--byline-chrome-font); font-size: 13px; gap: 10px; min-height: 44px; }
+.byline-article-canvas .byline-footnote-edit { background: transparent; border: 0; color: var(--link, #356875); cursor: pointer; font: inherit; line-height: 1; padding: 2px 3px; }
+.byline-article-canvas .byline-footnote-edit[data-empty] { outline: 1px dashed var(--muted-foreground, #71717a); }
+.byline-article-canvas .byline-footnote-edit:focus-visible { outline: 2px solid var(--byline-selection); outline-offset: 2px; }
+.byline-article-canvas .byline-annotation-empty, .byline-article-canvas .byline-related-empty { color: var(--muted-foreground, #71717a); font-family: var(--byline-chrome-font); font-size: 13px; padding: .75rem 0; }
+.byline-article-canvas .byline-annotation-marker { cursor: grab; }
+.byline-article-canvas .byline-video-placeholder .byline-field { color: #fff; max-width: 32rem; text-align: center; }
+.byline-article-canvas .byline-visual-chapter .byline-field { color: inherit; }
+.byline-article-canvas .byline-visualization-link .byline-field { font-family: var(--byline-chrome-font); font-size: 13px; }
+
+/* A narrow column has no margin for row actions: they sit over the end of the row. */
+@container byline-content (max-width: 1000px) {
+  .byline-article-canvas .byline-row-actions { inset-inline-end: 0; translate: 0 -50%; }
+}
+
+.byline-list-footer {
+  align-items: center;
+  color: var(--muted-foreground, #71717a);
+  display: none;
+  flex-wrap: wrap;
+  font-family: var(--byline-chrome-font);
+  font-size: 12px;
+  gap: 4px 12px;
+  margin-top: 12px;
+}
+.byline-block:is(.decorator-selected, :focus-within) .byline-list-footer { display: flex; }
+
+/* Unfinished media: drawn in the media's own place and proportion. */
+.byline-article-canvas .byline-media-empty {
+  aspect-ratio: 3 / 2;
+  background: color-mix(in srgb, var(--ink, #121212) 3%, transparent);
+  border: 1px dashed var(--rule-strong, #aab2bb);
+  border-radius: 0;
+  font-family: var(--byline-chrome-font);
+  gap: 12px;
+  line-height: 1.4;
+  padding: 24px;
+}
+.byline-article-canvas .byline-media-empty[data-kind="document"] { aspect-ratio: auto; min-height: 220px; }
+.byline-article-canvas .byline-media-empty[data-dragging] { background: color-mix(in srgb, var(--accent, #73192a) 6%, transparent); border-color: var(--accent, #73192a); }
+.byline-article-canvas .byline-media-status {
+  align-items: center;
+  aspect-ratio: 3 / 2;
+  background: color-mix(in srgb, var(--ink, #121212) 4%, transparent);
+  color: var(--muted-foreground, #71717a);
+  display: flex;
+  font-family: var(--byline-chrome-font);
+  font-size: 13px;
+  gap: 8px;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+}
+.byline-article-canvas .byline-document-attachment { font-family: var(--byline-chrome-font); }
+.byline-article-canvas .byline-document-preview object { pointer-events: none; }
+
+/* Insertion: "+" beside the paragraph being written (pointer), Add bar under the story (always). */
+.byline-gutter-inserter { left: -46px; position: absolute; translate: 0 -50%; z-index: 4; }
+.byline-gutter-inserter:not([data-empty]) { opacity: .45; }
+.byline-gutter-inserter:is(:hover, :focus-within) { opacity: 1; }
+.byline-add-bar {
+  align-items: center;
+  color: var(--muted-foreground, #71717a);
+  display: flex;
+  flex-wrap: wrap;
+  font-family: var(--byline-chrome-font);
+  font-size: 13px;
+  gap: 8px 12px;
+  margin-top: 28px;
+}
+.byline-add-bar kbd { border: 1px solid var(--border, #e4e4e7); border-radius: 4px; font: inherit; padding: 0 5px; }
+
+/* Payload's drag handle for moving whole blocks, in Byline's quieter style. */
+.byline-article-canvas .draggable-block-menu { background: transparent; border-radius: 6px; }
+.byline-article-canvas .draggable-block-target-line { background: var(--byline-selection); left: 0; }
+
+/* Touch and narrow screens: no hover, no gutter; chrome in the flow, 44px targets, a sticky Add. */
+@media (pointer: coarse), (max-width: 767px) {
+  .byline-gutter-inserter { display: none; }
+  .byline-block-chrome { display: none; margin: 0 0 10px; max-width: none; position: static; }
+  .byline-block:is(.decorator-selected, :focus-within) .byline-block-chrome,
+  .byline-block-chrome[data-open] { display: flex; }
+  .byline-block-chrome :is(button, [role="radio"], [role="button"]) { min-height: 44px; min-width: 44px; }
+  .byline-article-canvas .byline-row-actions,
+  .byline-article-canvas .byline-item-actions { opacity: 1; pointer-events: auto; position: static; translate: none; box-shadow: none; display: inline-flex; margin-top: 6px; }
+  .byline-article-canvas :is(.byline-editable-row, .byline-key-number, .byline-annotations > li, .byline-related-item):not(:focus-within) > .byline-row-actions { display: none; }
+  .byline-article-canvas :is(.byline-key-number, .byline-annotations > li) > .byline-row-actions { position: static; }
+  .byline-article-canvas .byline-table-row-actions { opacity: 1; }
+  .byline-article-canvas .byline-row-actions button,
+  .byline-article-canvas .byline-item-actions button,
+  .byline-add-bar-button { min-height: 44px; min-width: 44px; }
+  .byline-add-bar { background: color-mix(in srgb, var(--page, #fff) 92%, transparent); bottom: 12px; justify-content: center; padding: 8px 0; position: sticky; z-index: 8; }
+  .byline-add-bar-hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .byline-block-chrome, .byline-article-canvas .byline-block::after, .byline-article-canvas .byline-row-actions, .byline-article-canvas .byline-item-actions { transition: none; }
+}
+@media (forced-colors: active) {
+  .byline-article-canvas .byline-block.decorator-selected::after { border-color: Highlight; }
+  .byline-article-canvas .byline-block:focus-within::after { border-color: Highlight; }
+  .byline-block-chrome { border-color: CanvasText; }
+}

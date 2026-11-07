@@ -1,0 +1,29 @@
+---
+import { getNativeSnapshot } from "@/lib/native-snapshot";
+import { buildPageMetadata } from "@/lib/seo";
+import { stripHtml } from "@/lib/format";
+import { routeCacheKey } from "@/lib/route-cache";
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { getMetadata, PublicProsePage } from "@/views/[segment]/page";
+import { getBuildSnapshot } from "@/lib/build-snapshot";
+import { CODE_ROUTED_PAGE_SLUGS } from "@/lib/code-routes";
+import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
+export async function getStaticPaths() {
+  const snapshot = await getBuildSnapshot();
+  const native = getNativeSnapshot();
+  if (native) return native.datasets.pages.filter((page) => !CODE_ROUTED_PAGE_SLUGS.includes(page.slug)).map((page) => ({
+    params: { segment: page.href.slice(1, -1) }, props: { page }, cacheKey: routeCacheKey(snapshot, "page", page.slug)
+  }));
+  return snapshot.pages.filter((page) => !CODE_ROUTED_PAGE_SLUGS.includes(page.slug)).map((page) => ({ params: { segment: page.slug }, cacheKey: routeCacheKey(snapshot, "page", page.slug) }));
+}
+const params = { segment: Astro.params.segment! };
+const page = (Astro.props as { page?: NonNullable<ReturnType<typeof getNativeSnapshot>>["datasets"]["pages"][number] }).page;
+const description = page ? page.summary || stripHtml(page.bodyHtml) : "";
+const metadata = page ? buildPageMetadata({ title: page.title, description, path: page.href, noIndex: page.indexing === "noindex" })
+  : await getMetadata({ params: Promise.resolve(params) });
+---
+<BaseLayout metadata={metadata}>
+  {page
+    ? <PublicProsePage title={page.title} description={description} href={page.href} bodyHtml={page.bodyHtml} />
+    : <><Page params={Promise.resolve(params)} /><NewsroomPollHydrator client:load /></>}
+</BaseLayout>

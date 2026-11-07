@@ -10,7 +10,7 @@ import {
   readStoryVideoMeta,
   storyVideoMetaPatch,
   videoStoryProblem
-} from '../src/editorial/story-video-model';
+} from '@byline/newsroom-screens/editorial/story-video-model';
 
 const ID = 'dQw4w9WgXcQ';
 

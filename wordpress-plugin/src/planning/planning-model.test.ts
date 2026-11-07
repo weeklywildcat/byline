@@ -1,18 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   applyPlanningMove,
-  deserializeSavedPlanningView,
   EMPTY_PLANNING_FILTERS,
   filterPlanningStories,
-  filterSavedViewsForUser,
   planningCalendarEvents,
   replacePlanningStory,
-  serializeSavedPlanningView,
   sortPlanningStories,
   storyDateSemantics,
-  type PlanningStory,
-  type SavedPlanningView
-} from "./planning-model";
+  type PlanningStory
+} from "@byline/newsroom-screens/planning/planning-model";
+import { normalizeSavedPlanningViews, SAVED_VIEW_LIMIT, SAVED_VIEW_NAME_MAX_LENGTH } from "@byline/newsroom-screens/planning/story-views";
 
 function story(overrides: Partial<PlanningStory> = {}): PlanningStory {
   return {
@@ -23,7 +20,7 @@ function story(overrides: Partial<PlanningStory> = {}): PlanningStory {
     writer: { id: 2, name: "Writer" },
     editor: null,
     workflow: { id: "writing", label: "Writing", group: "main", selectable: true },
-    wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
+    publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
     deadline: "2026-08-28",
     plannedPublication: "2026-08-30",
     modifiedAt: "2026-08-27T12:00:00Z",
@@ -37,8 +34,8 @@ function story(overrides: Partial<PlanningStory> = {}): PlanningStory {
 describe("planning model", () => {
   it("keeps deadline, planned, scheduled, and published dates distinct", () => {
     const value = story({
-      wordpressState: {
-        id: "future",
+      publicationState: {
+        id: "scheduled",
         label: "Scheduled",
         isPublished: false,
         isScheduled: true,
@@ -71,7 +68,7 @@ describe("planning model", () => {
     const draft = story();
     expect(applyPlanningMove(draft, "ready", statuses).story.workflow.id).toBe("ready");
     expect(applyPlanningMove(draft, "published", statuses).moved).toBe(false);
-    expect(applyPlanningMove(story({ wordpressState: { ...draft.wordpressState, isPublished: true } }), "ready", statuses).moved).toBe(false);
+    expect(applyPlanningMove(story({ publicationState: { ...draft.publicationState, isPublished: true } }), "ready", statuses).moved).toBe(false);
   });
 
   it("rolls back only the failed story and ignores a late response for a newer story state", () => {
@@ -84,18 +81,29 @@ describe("planning model", () => {
     expect(replacePlanningStory([{ ...optimisticTarget, deadline: "2026-09-02" }, updatedSibling], target.id, target, optimisticTarget)).toEqual([{ ...optimisticTarget, deadline: "2026-09-02" }, updatedSibling]);
   });
 
-  it("isolates saved views by owner and round-trips their normalized payload", () => {
-    const views: SavedPlanningView[] = [
-      { id: "mine", name: "Mine", ownerId: 7, filters: { ...EMPTY_PLANNING_FILTERS }, sort: { key: "deadline" as const, direction: "asc" as const } },
-      { id: "other", name: "Other", ownerId: 8, filters: { ...EMPTY_PLANNING_FILTERS }, sort: { key: "story" as const, direction: "desc" as const } }
-    ];
-    expect(filterSavedViewsForUser(views, 7).map((item) => item.id)).toEqual(["mine"]);
-    expect(deserializeSavedPlanningView(serializeSavedPlanningView(views[0]), 7)?.name).toBe("Mine");
-    expect(deserializeSavedPlanningView(serializeSavedPlanningView(views[1]), 7)).toBeNull();
+  it("normalizes stored saved views: drops malformed records, sanitizes filters and sort, enforces the limits", () => {
+    const sort = { key: "story" as const, direction: "desc" as const };
+    expect(normalizeSavedPlanningViews(null)).toEqual([]);
+    expect(normalizeSavedPlanningViews({ id: "a" })).toEqual([]);
+    const views = normalizeSavedPlanningViews([
+      { id: "a", name: "  Mine  ", filters: { mine: "1", workflow: "<b>", writerId: "-4", deadlineFrom: "2026-13-40", publicationState: "publish" }, sort, ownerId: 8 },
+      { id: "a", name: "Duplicate id", filters: {}, sort },
+      { id: "../b", name: "Unsafe id", filters: {}, sort },
+      { id: "c", name: "   ", filters: {}, sort },
+      { id: "d", name: "No filters", sort },
+      { id: "e", name: "x".repeat(200), filters: {}, sort: { key: "secret", direction: "sideways" } },
+      "not a view"
+    ]);
+    expect(views.map((view) => view.id)).toEqual(["a", "e"]);
+    expect(views[0]).toEqual({ id: "a", name: "Mine", filters: { ...EMPTY_PLANNING_FILTERS, mine: true }, sort });
+    expect(views[1].name).toHaveLength(SAVED_VIEW_NAME_MAX_LENGTH);
+    expect(views[1].sort).toEqual({ key: "deadline", direction: "asc" });
+    const many = Array.from({ length: SAVED_VIEW_LIMIT + 5 }, (_, index) => ({ id: `v${index}`, name: `View ${index}`, filters: {}, sort }));
+    expect(normalizeSavedPlanningViews(many)).toHaveLength(SAVED_VIEW_LIMIT);
   });
 
   it("emits separate calendar events for editorial and WordPress dates", () => {
-    const events = planningCalendarEvents([story({ wordpressState: { id: "future", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-08-31T12:00:00Z", publishedAt: null } })]);
+    const events = planningCalendarEvents([story({ publicationState: { id: "scheduled", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-08-31T12:00:00Z", publishedAt: null } })]);
     expect(events.map((event) => event.type)).toEqual(["deadline", "planned", "scheduled"]);
   });
 });

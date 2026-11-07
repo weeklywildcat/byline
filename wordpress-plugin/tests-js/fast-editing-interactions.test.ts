@@ -1,21 +1,22 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readSource } from "./source-files";
 
 const src = path.resolve(__dirname, "../src");
-const read = (relative: string) => readFileSync(path.join(src, relative), "utf8");
+const read = readSource;
 
 describe("fast editing interactions", () => {
   it("keeps right-click actions available across story and production queues", () => {
     expect(read("planning/StoryBoard.tsx")).toContain("<StoryContextMenu");
-    expect(read("planning/MediaDesk.tsx")).toContain("<MediaRowContext");
+    expect(read("media/MediaWork.tsx")).toContain("<MediaRowContext");
     expect(read("planning/ContentHealth.tsx")).toContain("<ContextMenu");
     expect(read("planning/Feedback.tsx")).toContain("<ContextMenu");
-    expect(read("planning/NeedsScheduling.tsx")).toContain("<ContextMenu");
+    expect(read("calendar/NeedsScheduling.tsx")).toContain("<ContextMenu");
   });
 
   it("makes low-risk queue edits optimistic instead of waiting for a refetch", () => {
-    expect(read("planning/MediaDesk.tsx")).toContain("onMutate: async ({ row, changes })");
+    expect(read("media/MediaWork.tsx")).toContain("onMutate: async ({ row, changes })");
     expect(read("planning/Feedback.tsx")).toContain("onMutate: async (next)");
     expect(read("workspace/ReportingPlan.tsx")).toContain("onMutate: async ({ kind, id, status })");
     expect(read("workspace/MediaSection.tsx")).toContain("onMutate: async ({ assignment, status })");
@@ -32,11 +33,15 @@ describe("fast editing interactions", () => {
   });
 
   it("keeps public coverage subordinate to Collection coordination", () => {
-    const source = read("collections/CollectionPublicCoverage.tsx");
-    expect(source).toContain("Newsroom-only Collection");
-    expect(source).toContain("Publish as coverage");
-    expect(source).toContain("<WorkspaceDialog");
-    expect(source).toContain("pickFromMediaLibrary");
+    const source = read("collections/CollectionPublicPresentation.tsx");
+    expect(source).toContain("Newsroom only");
+    expect(source).toContain("Save public presentation");
+    // The host's media picker (WordPress Media Library, Byline Media), never a CMS API in the shared screen.
+    expect(source).toContain("host.media!.pick(");
+    expect(source).not.toContain("wp.media");
+    // The overview is plain text; there is no HTML escape hatch.
+    expect(source).toContain("Plain text. Separate paragraphs with a blank line.");
+    expect(source).not.toContain("Basic HTML");
   });
 
   it("lets existing workspace tasks be edited without recreating them", () => {

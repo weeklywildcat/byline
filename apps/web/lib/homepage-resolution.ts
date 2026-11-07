@@ -8,7 +8,7 @@ import {
 import {
   resolveHomepageDocument as resolveSharedHomepageDocument,
   type ResolvedHomepageDocument
-} from "@byline/content";
+} from "@byline/ui/homepage";
 import type { BylinePublicationConfig } from "@byline/core";
 import type { SchoolEvent, SportsGame } from "@/lib/headless";
 import { toHomepageCoverageInputs, toHomepagePublicationInput, toHomepageStoryInputs } from "@/lib/homepage-story-input";
@@ -81,7 +81,7 @@ export type ResolvedHomepage = ResolvedHomepageDocument;
  *
  * Everything ordering-related -- pin reservation, the one compatibility
  * selection pass, the page-wide used-story set and the package order -- lives
- * in `@byline/content` and is shared byte-for-byte with Studio. This function
+ * in `@byline/ui/homepage` and is shared byte-for-byte with Studio. This function
  * only adapts build-time WordPress records into that resolver's inputs.
  */
 export function resolveHomepageDocument(input: HomepageResolutionInput): ResolvedHomepage {

@@ -2,19 +2,19 @@ import { describe, expect, it, vi } from "vitest";
 import {
   groupHealthIssues,
   groupHealthStories,
-} from "../src/planning/content-health-model";
+} from "@byline/newsroom-screens/planning/content-health-model";
 import {
-  createPlanningFetchers,
   normalizeContentHealthResponse,
   type PlanningRequestOptions,
-} from "../src/planning/planning-api";
+} from "@byline/newsroom-screens/planning/planning-api";
+import { createPlanningFetchers } from "../src/planning/planning-rest";
 import {
   PLANNING_TABS,
   legacyHashDestination,
   legacyHashHref,
   normalizeAdminTab,
 } from "../src/admin-routing";
-import type { ContentHealthIssue } from "../src/planning/planning-model";
+import type { ContentHealthIssue } from "@byline/newsroom-screens/planning/planning-model";
 const issue = (
   id: string,
   storyId: number,

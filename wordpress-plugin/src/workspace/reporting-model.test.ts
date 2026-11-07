@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { sourceFormToInput, sourceNextAppointment, sourceTimingLine, validateSourceForm, windowSummary, emptySourceForm, sourceToForm } from "./reporting-model";
-import type { StoryAppointment, StorySource } from "./workspace-types";
+import { sourceFormToInput, sourceNextAppointment, sourceTimingLine, validateSourceForm, windowSummary, emptySourceForm, sourceToForm } from "@byline/newsroom-screens/workspace/reporting-model";
+import type { StoryAppointment, StorySource } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const timezone = "America/New_York";
 const source: StorySource = { id: "s1", label: "Mrs. Hamby", role: "Principal", organization: "Central High", status: "needs-scheduling", assigneeIds: [2], assignees: [{ id: 2, name: "Gibson Bell" }], notes: "", createdAt: "", updatedAt: "2026-10-02T12:00:00Z" };

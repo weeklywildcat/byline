@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { StoryPeekContent, type StoryPeekContentProps } from "../src/story/StoryPeek";
-import { FileAttachment } from "../src/workspace/MediaDialog";
-import type { StoryWorkspace } from "../src/workspace/workspace-types";
+import { StoryPeekContent, type StoryPeekContentProps } from "@byline/newsroom-screens/story/StoryPeek";
+import { FileAttachment } from "@byline/newsroom-screens/workspace/MediaDialog";
+import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 
 const now = new Date("2026-10-20T12:00:00Z");
 const admin = { id: 1, kind: "user" as const, name: "admin", imageUrl: "https://example.test/admin.jpg" };
@@ -11,7 +11,7 @@ const capabilities = { role: "manager", editArticle: true, changeStatus: false, 
 /** The sparse Canteen story: one writer, two tasks, one assigned photo request, nothing else. */
 function canteen(patch: Record<string, unknown> = {}): StoryWorkspace {
   return {
-    story: { id: 7, title: "Canteen", editUrl: "/wp-admin/post.php?post=7&action=edit", authors: [admin], editor: null, workflow: { id: "reporting", label: "Reporting" }, wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null },
+    story: { id: 7, title: "Canteen", editUrl: "/wp-admin/post.php?post=7&action=edit", authors: [admin], editor: null, workflow: { id: "reporting", label: "Reporting" }, publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null },
     revision: 1, timezone: "America/New_York", now: now.toISOString(), currentUser: admin, brief: "", sections: ["News"],
     contributors: { canEdit: false, contributors: [admin], available: [] }, statuses: [],
     tasks: [

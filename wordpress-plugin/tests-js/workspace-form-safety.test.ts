@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readSource } from "./source-files";
 
 const src = path.resolve(__dirname, "../src");
-const read = (relative: string) => readFileSync(path.join(src, relative), "utf8");
+const read = readSource;
 
 describe("workspace form safety", () => {
   it("guards dirty WorkspaceDialog closes and page unloads with a specific discard choice", () => {

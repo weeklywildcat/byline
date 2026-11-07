@@ -88,12 +88,14 @@ describe("the custom article hero is gone", () => {
     // The route supplies data and slots; the shared renderer owns the one
     // canonical header and article structure used by production and preview.
     // A story gets a different arrangement only by a developer registering its
-    // WordPress post ID (story-presentations/registry.ts); otherwise the route
+    // story ID (@byline/story-presentations registry); otherwise the route
     // renders the shared ArticleView.
     expect(articleRoute).toContain("<StoryArticle");
     expect(astroArticleRoute).toContain("<StoryArticle");
-    // The shared PresentedArticleView renders the normal ArticleView unless the author chose Immersive.
-    expect(readSource("../story-presentations/StoryArticle.tsx")).toContain("<PresentedArticleView");
+    // The one resolver picks ArticleView unless the author chose Immersive (and it is valid) or a repository entry exists.
+    const storyArticle = readSource("../../../packages/story-presentations/src/StoryArticle.tsx");
+    expect(storyArticle).toContain("resolveStoryPresentation(presentation, registry)");
+    expect(storyArticle).toContain("<ArticleView");
     expect(articleRenderer.match(/className="article-header"/g)).toHaveLength(1);
     expect(articleRenderer.match(/<article className="article-story"/g)).toHaveLength(1);
   });

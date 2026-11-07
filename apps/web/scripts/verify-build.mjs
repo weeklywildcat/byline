@@ -1,6 +1,7 @@
 import { access, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isCanonicalRedirectPath, redirectSourceVariants } from "@byline/content/redirect-path";
 import { MAX_STATIC_REDIRECTS, parseRedirectsFile } from "./redirects.mts";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -126,11 +127,11 @@ if (redirectRules.size > MAX_STATIC_REDIRECTS) throw new Error(`_redirects has $
 for (const entry of edgeRedirects) {
   const target = entry.redirectTo;
   const targetRoute = typeof target === "string" ? target.split("#")[0] : "";
-  for (const source of entry.path === "/" ? [entry.path] : [entry.path, entry.path.slice(0, -1)]) {
+  for (const source of redirectSourceVariants(entry.path)) {
     const rule = redirectRules.get(source);
     if (rule?.to !== target || rule.status !== 301) throw new Error(`_redirects is missing a 301 from ${source} to ${String(target)}.`);
   }
-  if (!/^\/(?!\/)[a-z0-9/#_-]+$/i.test(String(target)) || !expectedFileRoutes.includes(targetRoute)) {
+  if (!isCanonicalRedirectPath(targetRoute) || (target !== targetRoute && !/^[a-z0-9_-]+$/i.test(target.slice(targetRoute.length + 1))) || !expectedFileRoutes.includes(targetRoute)) {
     throw new Error(`Edge redirect from ${entry.path} points at ${String(target)}, which is not a generated page.`);
   }
   if (actualRoutes.includes(entry.path)) throw new Error(`Edge redirect source ${entry.path} was generated as a file.`);

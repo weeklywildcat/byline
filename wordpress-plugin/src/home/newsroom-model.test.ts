@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { EditorialTask } from "../editorial/editorial-model";
-import type { PlanningStory } from "../planning/planning-model";
-import type { HomeAppointment } from "../workspace/workspace-types";
-import { activeStory, dayDistance, homeAgenda, myActiveStories, myOpenTasks, myStory, myWork, reviewStories, siteDay, waitingForMe, workspaceUrlFor, type HomeBootstrap, type HomeVisualWork } from "./newsroom-model";
-import { replaceHomeTask } from "./home-query";
+import type { EditorialTask } from "@byline/newsroom-screens/editorial/editorial-model";
+import type { PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
+import type { HomeAppointment } from "@byline/newsroom-screens/workspace/workspace-types";
+import { activeStory, dayDistance, homeAgenda, myActiveStories, myOpenTasks, myStory, myWork, reviewStories, siteDay, waitingForMe, workspaceUrlFor, type HomeBootstrap, type HomeVisualWork } from "@byline/newsroom-screens/home/newsroom-model";
+import { replaceHomeTask } from "@byline/newsroom-screens/home/home-query";
 
 const now = new Date("2026-10-20T12:00:00Z");
 const timezone = "America/New_York";
 function story(patch: Partial<PlanningStory> = {}): PlanningStory {
-  return { id: 1, title: "Canteen", editUrl: "post.php?post=1&action=edit", authors: [{ id: 7, name: "Caroline", kind: "user" }], writer: { id: 8, name: "Gibson" }, editor: null, workflow: { id: "reporting", label: "Reporting", group: "main", selectable: true }, wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null, modifiedAt: "2026-10-20T11:00:00Z", visual: { type: "none", status: "needed" }, openTaskCount: 2, featuredImage: null, ...patch };
+  return { id: 1, title: "Canteen", editUrl: "post.php?post=1&action=edit", authors: [{ id: 7, name: "Caroline", kind: "user" }], writer: { id: 8, name: "Gibson" }, editor: null, workflow: { id: "reporting", label: "Reporting", group: "main", selectable: true }, publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null, modifiedAt: "2026-10-20T11:00:00Z", visual: { type: "none", status: "needed" }, openTaskCount: 2, featuredImage: null, ...patch };
 }
 function task(id: number, dueAt: string | null, patch: Partial<EditorialTask> = {}): EditorialTask {
   return { id, title: `Task ${id}`, state: "open", assigneeId: 7, dueAt, priority: "normal", storyId: 1, order: id, ...patch };
@@ -40,7 +40,7 @@ describe("personal newsroom work", () => {
   });
   it("excludes published and dropped work and sorts active stories by deadline", () => {
     const dropped = story({ id: 4, workflow: { id: "dropped", label: "Dropped", group: "sidelined", selectable: true } });
-    const published = story({ id: 5, wordpressState: { id: "publish", label: "Published", isPublished: true, isScheduled: false } });
+    const published = story({ id: 5, publicationState: { id: "published", label: "Published", isPublished: true, isScheduled: false } });
     expect(activeStory(dropped)).toBe(false);
     expect(myActiveStories([story({ id: 2, deadline: null }), published, story({ id: 3, deadline: "2026-10-19" }), dropped, story()], 7, timezone, now).map((s) => s.id)).toEqual([3, 1, 2]);
   });
@@ -64,7 +64,7 @@ describe("site dates and role-relevant attention", () => {
     expect(siteDay("2026-10-20T22:00:00Z", "+05:30")).toBe("2026-10-21");
   });
   it("keeps Coming Up focused on calendar commitments and deduplicates identical publication instants", () => {
-    const data = bootstrap({ stories: [story({ deadline: "2026-10-20", plannedPublication: "2026-10-22T10:00:00-04:00", wordpressState: { id: "future", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-10-22T14:00:00Z" } })], tasks: [task(1, "2026-10-21T12:00:00Z")], visualWork: [visual()] });
+    const data = bootstrap({ stories: [story({ deadline: "2026-10-20", plannedPublication: "2026-10-22T10:00:00-04:00", publicationState: { id: "scheduled", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: "2026-10-22T14:00:00Z" } })], tasks: [task(1, "2026-10-21T12:00:00Z")], visualWork: [visual()] });
     expect(homeAgenda(data, now).map((e) => e.id)).toEqual(["deadline-1", "scheduled-1"]);
     expect(homeAgenda(data, now).some((event) => event.id.startsWith("task-") || event.id.startsWith("media-"))).toBe(false);
     expect(homeAgenda(bootstrap({ stories: [story({ authors: [], writer: { id: 9, name: "Other" } })] }), now)).toEqual([]);

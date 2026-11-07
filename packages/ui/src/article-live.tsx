@@ -9,46 +9,8 @@ import type { ReactNode } from "react";
  * ends. While live, `@byline/ui/live-updates` re-reads `feedUrl` and inserts
  * new updates rendered by the same `ArticleLiveUpdate` component.
  */
-export type ArticleLiveImageView = {
-  src: string;
-  alt: string;
-  width?: number | null;
-  height?: number | null;
-  credit?: string;
-};
-
-export type ArticleLiveUpdateView = {
-  id: number;
-  title: string;
-  /** Server-built HTML from a fixed set of tags (p, br, ul, li, a). */
-  html: string;
-  /** ISO instant. */
-  date: string;
-  /** "Nov. 2, 4:12 PM" in the publication's timezone. */
-  dateLabel: string;
-  author?: string;
-  /** The author's profile page; the name is plain text without one. */
-  authorHref?: string | null;
-  /** "Sports editor", "Reporting from the stadium" and the like. */
-  authorRole?: string | null;
-  authorPhoto?: { src: string; width?: number | null; height?: number | null } | null;
-  image?: ArticleLiveImageView | null;
-};
-
-export type ArticleLiveView = {
-  postId: number | string;
-  status: "live" | "ended";
-  startedAt: string;
-  endedAt?: string | null;
-  endedLabel?: string | null;
-  /** The most recent update edit or coverage state change. */
-  updatedAt: string;
-  updatedLabel: string;
-  keyPoints?: ArticleLiveUpdateView | null;
-  updates: ArticleLiveUpdateView[];
-  /** Static JSON the page re-reads while live. */
-  feedUrl: string;
-};
+import type { ArticleLiveImageView, ArticleLiveUpdateView, ArticleLiveView } from "@byline/content/story";
+export type { ArticleLiveImageView, ArticleLiveUpdateView, ArticleLiveView } from "@byline/content/story";
 
 /** One update, using the same renderer as the live feed. */
 export function ArticleLiveUpdate({ update }: { update: ArticleLiveUpdateView }): ReactNode {

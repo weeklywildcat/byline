@@ -1,57 +1,16 @@
 /*
  * Planning has no design system of its own: the theme, resets and overlay rules
  * live in the shared admin UI, and layout is Tailwind utilities on the
- * components. This file adds only Schedule-X's shadcn theme, which the scoping
- * loader prefixes with `.byline-ui-root` like everything else, plus the few
- * rules Schedule-X's own geometry needs. Must be named style.css so wp-scripts
- * emits style-planning.css.
+ * components. The Calendar's Schedule-X theme comes with the shared Calendar
+ * (packages/newsroom-screens/src/calendar), which the scoping loader prefixes
+ * with `.byline-ui-root` like everything else. Must be named style.css so
+ * wp-scripts emits style-planning.css.
  */
-@import "../admin-ui/admin-ui.css";
-@import "@schedule-x/theme-shadcn/dist/index.css";
+@import "@byline/newsroom-ui/styles.css";
+@source "../../../packages/newsroom-screens/src"; /* the shared newsroom screens */
+@import "@byline/newsroom-screens/calendar/calendar.css";
 @source "./";
 @source "../story";
 @source "../home";
 @source "../workspace";
-
-/* Schedule-X reads its colours from --sx-* tokens; point them at Nova's, inside the root only. */
-.byline-ui-root {
-  --sx-color-primary: var(--primary);
-  --sx-color-on-primary: var(--primary-foreground);
-  --sx-color-primary-container: var(--accent);
-  --sx-color-on-primary-container: var(--accent-foreground);
-  --sx-color-secondary: var(--muted-foreground);
-  --sx-color-on-secondary: var(--background);
-  --sx-color-secondary-container: var(--secondary);
-  --sx-color-on-secondary-container: var(--secondary-foreground);
-  --sx-color-tertiary: var(--muted-foreground);
-  --sx-color-on-tertiary: var(--background);
-  --sx-color-tertiary-container: var(--muted);
-  --sx-color-on-tertiary-container: var(--foreground);
-  --sx-color-surface: var(--background);
-  --sx-color-surface-dim: var(--muted);
-  --sx-color-surface-bright: var(--background);
-  --sx-color-on-surface: var(--foreground);
-  --sx-color-surface-container: var(--muted);
-  --sx-color-surface-container-low: var(--background);
-  --sx-color-surface-container-high: var(--accent);
-  --sx-color-background: var(--background);
-  --sx-color-on-background: var(--foreground);
-  --sx-color-outline: var(--muted-foreground);
-  --sx-color-outline-variant: var(--border);
-  --sx-color-surface-tint: var(--primary);
-  --sx-internal-color-text: var(--foreground);
-  --sx-internal-color-light-gray: var(--muted);
-  --sx-rounding-extra-small: var(--radius-sm);
-  --sx-rounding-small: var(--radius-md);
-  --sx-font-small: 0.8125rem;
-  --sx-font-extra-small: 0.75rem;
-}
-
-/* The toolbar above the calendar is Byline's (Nova buttons and menus), so Schedule-X's own header is not shown. */
-.byline-ui-root .sx__calendar-header { display: none; }
-
-/* Schedule-X sizes itself to its wrapper: give the wrapper a height, and let it shrink inside flex and grid parents. */
-.byline-ui-root .sx-react-calendar-wrapper { width: 100%; min-width: 0; height: clamp(34rem, 78vh, 60rem); }
-.byline-ui-root .sx__calendar-wrapper { width: 100%; max-width: 100%; border-radius: 0; }
-
 @source "../collections";

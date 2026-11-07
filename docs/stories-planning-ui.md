@@ -40,7 +40,7 @@ fails the release if the planning manifest ever lists a WordPress React or
 component handle.
 
 Everything mounts in `.byline-ui-root` through `AdminRoot` (portals, tooltips,
-toasts). `src/planning/style.css` imports the shared `admin-ui.css` and the
+toasts). `src/planning/style.css` imports the shared `@byline/newsroom-ui/styles.css` and the
 Schedule-X shadcn theme; the PostCSS scoping loader prefixes every selector, and
 `tests-js/admin-style-scope.test.ts` fails if any compiled selector could reach
 wp-admin, Gutenberg, Users or the Media Library. Only on these three screens a
@@ -54,8 +54,10 @@ and `TaskCreateDialog` (Home and Stories share them), `useCompleteTask`, the
 query keys and `invalidateStoryData`, `createStoryFetchers`, shared rows, and
 small presentation pieces (`StoryTitleButton`, `StoryDueLabel`, `StorySignals`,
 `ProductionSummary`, `WorkflowBadge`). Planning keeps `planning-api.ts`,
-`planning-model.ts`, `calendar-model.ts` and `media-desk-model.ts`: React-free
-transport and domain logic.
+`planning-model.ts` and `calendar-model.ts`: React-free transport and domain
+logic. The Media Desk is the shared `@byline/newsroom-screens/media/MediaWork`
+(with `media-desk-model.ts`), which the Payload newsroom also renders as Media
+Work ([media-workspace.md](media-workspace.md)).
 
 Server state is TanStack Query: `["byline","planning",filters]`,
 `["byline","workspace",id]` (shared by Peek and the workspace),
@@ -65,18 +67,68 @@ agree. Selected view, open menus, drag state and form text stay local.
 
 ## Stories
 
-Board, List and Calendar are `Tabs` because they are alternate presentations of
-one filtered collection. The address always names the view
-(`&tab=stories&view=board|list|calendar`); changing a tab uses `pushState`, Back
-works, and a reload restores it. The sidebar's Calendar entry opens Stories on
-Calendar, and a bare Stories link restores the last view (`byline:stories-view`).
+`StoriesPage` lives in `@byline/newsroom-screens` and is shared by the WordPress
+admin and the Payload newsroom. It knows no CMS: what only one host has arrives
+as an optional capability. `renderCalendar` supplies the Calendar view
+(WordPress mounts the shared Schedule-X Calendar from
+`@byline/newsroom-screens/calendar` there; the Payload newsroom passes none,
+offering Board and List only, because its Calendar is its own destination), and
+`viewHref` supplies a view's
+address (WordPress: `planning-routing.ts`; default: `view=` on the current
+address).
 
-The toolbar is search, Workflow, Writer and Editor plus **More filters**
-(WordPress state, visual status, date ranges, Mine, Unassigned, Overdue, Needs
-review). Anything set behind More filters shows as a removable chip. **Saved
-views** are one menu (All stories, My stories, your views, Save current view…,
-Manage views…); saving and renaming use a Dialog, and deleting is reversible so
-it happens at once with an **Undo** toast.
+Three controls, three questions:
+
+- **Which story set?** The built-in views (`story-views.ts`: All stories, My
+  stories, Ready for review, Overdue, Unassigned, Published, On hold) and the
+  reader's saved views. A built-in view is active only while the filters match it
+  exactly; a saved view stays selected while edited and reads as *modified*.
+- **How is it presented?** Board | List (| Calendar), line `Tabs`. The address
+  names the view (`view=board|list|calendar`, plus `&tab=stories` in WordPress);
+  changing a tab uses `pushState`, Back works, and a reload restores it. The
+  WordPress sidebar's Calendar entry opens Stories on Calendar, and a bare
+  Stories link restores the last view (`byline:stories-view`).
+- **How is it refined?** The toolbar: search, Workflow, Writer and Editor plus
+  **More filters** (publication state, visual status, date ranges, Mine,
+  Unassigned, Overdue, Needs review). Anything set behind More filters shows as
+  a removable chip.
+
+One controller (`useStoryViews` in `StoryViews.tsx`) owns the story set: the
+built-in and saved views, Save, Rename, Update, Delete and its **Undo** toast,
+and the dialogs, rendered once. `StoryViewsPicker` presents it as one menu
+above the collection (`[All stories ▾]   Board  List`) with the same views,
+Save current view… and Manage views…. Stories is one column beside the app
+sidebar:
+
+```
+Stories
+Track everything the newsroom is working on.
+
+[ All stories ▾ ]             Board   List
+[Search] [Workflow] [Writer] [Editor] [More filters]
+actual Board/List
+```
+
+There was a `StoryViewsRail` (a `sidebar-09`-style views pane beside the page
+from a 1080px container width). It was removed: collection views did not
+justify a second permanent navigation column next to the app sidebar, and on
+real screens it competed with the List for width. The picker does the same job
+in one control.
+
+`onNewStory` is an optional host capability: WordPress, which has no global
+Create, passes it and shows **New story**; the Payload newsroom omits it,
+because the shell's Create is already beside Stories.
+
+**Switching between stories while writing** is not Stories' job: in the Payload
+newsroom an open story's sidebar becomes a Story workspace with a compact Story
+switcher (My stories, Ready for review, All stories, plus search), built on the
+same Planning API, presets and query cache (docs/payload-migration.md §7.2).
+
+Saved views are the reader's own. WordPress keeps them in user meta behind its
+REST routes; the Payload newsroom keeps them in Payload Preferences
+(`byline:stories:saved-views:v1`). Either way a view has no owner field, and
+stored views are normalized on read (`normalizeSavedPlanningViews`: at most 25,
+names up to 80 characters, sanitized filters and sort).
 
 ### Board: Pragmatic drag and drop
 
@@ -142,43 +194,66 @@ production due date, a planned publication and a WordPress schedule are
 different dates changed in different forms, and dragging a rectangle must not
 change one by accident. Schedule-X's own modal is not used either.
 
+The Calendar is shared (`packages/newsroom-screens/src/calendar`): WordPress and
+the Payload newsroom mount one `NewsroomCalendar`. A host supplies the schedule
+feed, the `CalendarLinks` an item opens, optional client navigation, and where
+view/filter preferences live (WordPress: localStorage, through
+`planning/calendar-host.tsx`; Payload: Payload Preferences). The date, the
+filters and the view belong to one `CalendarWorkspace` store, so a contextual
+sidebar and a Filters sheet read the same state as the toolbar.
+
 Flow: the protected schedule feed → TanStack Query → one adapter
 (`schedule-x-adapter.ts`) → `eventsService.set`. Schedule-X never fetches.
-The Byline toolbar (Today, previous/next, view, Filters) drives it through a
-small controller plugin.
+The Byline toolbar (Today, previous/next, view, Filters) and the mini calendar
+drive it through a small controller plugin (`setDate`, `step`, `today`,
+`setView`).
 
 Date rules, all tested (including DST):
 
-- exact appointment: `ZonedDateTime` in the **WordPress site timezone**;
+- exact appointment: `ZonedDateTime` in the **newsroom timezone** (the WordPress site timezone in WordPress);
 - story deadline, production due date, task due date: `PlainDate` (the stored
   time on production and tasks is a placeholder);
 - planned publication: a `PlainDate` unless it carries a real time; the noon the
   picker stores for a day-only choice (`T12:00`, or the instant for noon in the
-  site timezone) counts as a day;
-- WordPress scheduled and published dates: `ZonedDateTime`;
+  newsroom timezone) counts as a day;
+- scheduled and published dates: `ZonedDateTime`;
 - a fuzzy appointment window is **never** an event. It is listed under
   **Needs scheduling**, whose **Schedule** link opens that appointment's own
   editor in the workspace (`story=<id>&appointment=<uuid>`).
 
 Six fixed categories (appointment, story-deadline, production,
-planned-publication, wordpress-scheduled, task-deadline) each carry an icon and a
+planned-publication, publication, task-deadline) each carry an icon and a
 label, so colour is never the only signal. Clicking an event opens Story Peek;
 the agenda rows also offer Edit appointment. On narrow screens Schedule-X's own
 responsive rules switch to the month agenda (view order in the config decides the
 fallback). Its theme tokens are mapped onto Nova's inside `.byline-ui-root`, and
 its own header is hidden (`.sx__calendar-header`) because the toolbar is Byline's.
+Schedule-X sets the Week/Day grid heights on `<html>` while its theme declares
+them `0` on `:root`; scoped to `.byline-ui-root` that blanked the grids, so
+`calendar/calendar.css` makes them `inherit`.
 
 ## Other destinations
 
-Media Desk is a table of assignments with inline status, assignee and due date,
-a Files popover built on `Attachment`, and a menu. Its search uses
+Media Desk is the shared `MediaWork` screen (`packages/newsroom-screens/src/media`):
+a table of assignments with inline status, assignee and due date,
+a Files popover built on `Attachment`, and a menu. WordPress passes its Media
+Library as the `MediaPicker` and keeps its page header. Its search uses
 `InputGroup`, matching the Stories toolbar. Its inline edits are optimistic,
 and every assignment row also has a right-click menu for Quick view, Workspace
 and status changes.
 
 Collections own reporting coordination and an optional public coverage presentation.
-The Overview keeps public controls behind a compact row and dialog. See
-[Collections](collections.md) for persistence, migration and compatibility.
+The shared workspace has Overview, Stories, Reporting, Tasks, Resources and
+Public; Activity is host-capability dependent (off in Payload). Public controls
+live in their own section, separate from the private brief and reporting.
+Creation requires a name and type. In Payload, Collections is its own
+`/admin/collections` destination, with an open project, section and interview
+in the query. A wide open workspace gets the global rail plus Collection
+switcher; narrow screens offer Switch collection in a Sheet. Tabs scroll within
+their strip on phones. Calendar remains the existing destination, scoped with
+`?collectionId=`. See [Collections workspace](collections-workspace.md) for the
+implemented Payload schema, shell, permissions and public projection, and
+[Collections](collections.md) for WordPress persistence and legacy compatibility.
 
 Feedback is an inbox-like `ItemGroup`, not a grid of cards: each note is one
 scannable item with its status action attached. Status changes are optimistic

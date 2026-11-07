@@ -8,7 +8,7 @@ import {
   mediaIntensity,
   sourceIntensity,
   workBadgeColors
-} from "../src/admin-ui/components/work-status-badge";
+} from "@byline/newsroom-ui/components/work-status-badge";
 
 const badge = (kind: "reporting" | "production", intensity: "action" | "active" | "settled", label: string) =>
   renderToStaticMarkup(<WorkStatusBadge kind={kind} intensity={intensity}>{label}</WorkStatusBadge>);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, appointmentLine, appointmentTiming, formatTimeRange, formatWindow, quickWindow, schedulingNeed, splitAppointments, upcomingConfirmed, windowRelativeLabel, type SchedulableAppointment } from "./schedule-model";
+import { addDays, appointmentLine, appointmentTiming, formatTimeRange, formatWindow, quickWindow, schedulingNeed, splitAppointments, upcomingConfirmed, windowRelativeLabel, type SchedulableAppointment } from "@byline/newsroom-screens/workspace/schedule-model";
 
 const timezone = "America/New_York";
 // Tuesday, Oct 20, 2026, 12:00 UTC (08:00 in New York).

@@ -4,16 +4,16 @@
   "rsc": false,
   "tsx": true,
   "tailwind": {
-    "css": "src/admin-ui/admin-ui.css",
+    "css": "../packages/newsroom-ui/src/styles.css",
     "baseColor": "neutral",
     "cssVariables": true
   },
   "iconLibrary": "lucide",
   "aliases": {
-    "components": "./src/admin-ui/components",
-    "ui": "./src/admin-ui/ui",
-    "utils": "./src/admin-ui/lib/utils",
-    "lib": "./src/admin-ui/lib",
-    "hooks": "./src/admin-ui/hooks"
+    "components": "../packages/newsroom-ui/src/components",
+    "ui": "../packages/newsroom-ui/src/ui",
+    "utils": "../packages/newsroom-ui/src/lib/utils",
+    "lib": "../packages/newsroom-ui/src/lib",
+    "hooks": "../packages/newsroom-ui/src/hooks"
   }
 }

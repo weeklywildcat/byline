@@ -1,8 +1,7 @@
 import { getBuildSnapshot } from "@/lib/build-snapshot";
 import { isVisibleContentPost } from "@/lib/content";
-import { buildLiveFeed } from "@/lib/live-coverage";
+import { buildArticleLiveView, buildLiveFeed } from "@/lib/live-coverage";
 import { createSearchIndexDocument } from "@/lib/search-index";
-import { getPostLiveCoverage } from "@/lib/wordpress";
 import { getSearchPageProps } from "@/views/search/page";
 
 export const prerender = true;
@@ -16,7 +15,7 @@ const LIVE_PREFIX = "_byline/live/";
 export async function getStaticPaths() {
   const snapshot = await getBuildSnapshot();
   const livePaths = snapshot.posts
-    .filter((post) => isVisibleContentPost(post) && getPostLiveCoverage(post))
+    .filter((post) => isVisibleContentPost(post) && buildArticleLiveView(post))
     .map((post) => ({ params: { path: `${LIVE_PREFIX}${post.id}` } }));
   return [{ params: { path: "_byline/search-index" } }, ...livePaths];
 }

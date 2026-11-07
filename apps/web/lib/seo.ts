@@ -128,7 +128,7 @@ function isWordPressMedia(image: SeoImage): image is WordPressMedia {
   return "source_url" in image;
 }
 
-// The 1200×630 social card WordPress cut from the editor's crop or focal point.
+// The WordPress social crop, if the editor prepared one.
 function getSocialCrop(image: SeoImage) {
   return isWordPressMedia(image) ? artDirectedSource(getMediaArtDirection(image), "social") : null;
 }
@@ -556,14 +556,19 @@ export function getProfilePageSchema(contributor: WordPressContributor, posts: W
   };
 }
 
-export function getNewsArticleSchema(post: WordPressPost) {
+/**
+ * `articleBody: false` is for a flagship visual story, whose page text is its
+ * repository narrative rather than the WordPress body: the schema then does not
+ * claim a body the page does not show.
+ */
+export function getNewsArticleSchema(post: WordPressPost, { articleBody: includeBody = true }: { articleBody?: boolean } = {}) {
   const contributors = getPostContributors(post);
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
   const articleUrl = absoluteUrl(getPostHref(post));
   const headline = stripHtml(post.title.rendered);
   const description = getSeoDescription(post.excerpt.rendered || post.content.rendered);
-  const articleBody = stripHtml(post.content.rendered);
+  const articleBody = includeBody ? stripHtml(post.content.rendered) : "";
   const timestamps = getPostTimestamps(post);
   const imageSchema = getArticleImageSchema(image, articleUrl);
   const keywords = post._embedded?.["wp:term"]

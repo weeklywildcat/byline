@@ -1,3 +1,5 @@
+import { nativeMedia, nativeStory } from "./native-snapshot";
+import { nativeArticlePresentation } from "./native-article";
 import { stableDigest } from "@byline/content";
 import { buildArticlePresentation } from "./article-presentation";
 import { buildCoveragePresentation } from "./coverage-presentation";
@@ -36,11 +38,14 @@ export function routeCacheDependency(snapshot: WebBuildSnapshot, kind: DynamicRo
   let data: unknown;
   let dependencies: unknown;
   if (kind === "article") {
-    const post = snapshot.posts.find((entry) => String(entry.id) === String(id));
-    if (!post || !isVisibleContentPost(post)) throw new Error(`No public article ${id} for incremental rendering`);
-    const render = articleRenderInputs(snapshot, post);
-    data = { post, ...render };
-    dependencies = { post: post.id, related: render.presentation.relatedStories.map((entry) => entry.id), moreBy: render.presentation.moreByAuthorStories.map((entry) => entry.id), contributors: render.presentation.contributors.map((entry) => entry.id), series: render.presentation.series?.href ?? null };
+    const story = nativeStory(Number(id));
+    const post = story ? undefined : snapshot.posts.find((entry) => String(entry.id) === String(id));
+    if (!story && (!post || !isVisibleContentPost(post))) throw new Error(`No public article ${id} for incremental rendering`);
+    const render = story ? { presentation: nativeArticlePresentation(story), primaryGame: null } : articleRenderInputs(snapshot, post!);
+    const mediaIds = story?.body.format === "byline-v1" ? Object.values(story.body.media).map(({ id }) => Number(id)) : [];
+    const media = story ? [...new Set([...mediaIds, ...(story.image ? [story.image] : [])])].map(nativeMedia) : undefined;
+    data = { post, story, media, ...render };
+    dependencies = { post: story?.id ?? post!.id, related: render.presentation.relatedStories.map((entry) => entry.id), moreBy: render.presentation.moreByAuthorStories.map((entry) => entry.id), contributors: render.presentation.contributors.map((entry) => entry.id), series: render.presentation.series?.href ?? null };
   } else if (kind === "category") {
     const category = snapshot.categories.find((entry) => String(entry.id) === String(id));
     const posts = snapshot.posts.filter((post) => post.categories.includes(Number(id)) && isGeneralEditorialPost(post));

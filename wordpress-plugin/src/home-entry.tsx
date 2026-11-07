@@ -2,11 +2,13 @@ import { legacyHashHref } from "./admin-routing";
 import apiFetch from "@wordpress/api-fetch";
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { InlineAlert } from "./admin-ui/components/inline-alert";
-import { HomeApp } from "./home/HomeApp";
-import { createHomeFetchers } from "./home/home-api";
-import type { HomeNavigationCapabilities } from "./home/home-model";
-import { workspaceUrlFor } from "./home/newsroom-model";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { HomeApp } from "@byline/newsroom-screens/home/HomeApp";
+import { createHomeFetchers } from "@byline/newsroom-screens/home/home-api";
+import type { HomeNavigationCapabilities } from "@byline/newsroom-screens/home/home-model";
+import { workspaceUrlFor } from "@byline/newsroom-screens/home/newsroom-model";
+import { createWordPressCollectionApi } from "./collections/wordpress-collection-api";
+import { WordPressCollectionLinks } from "./collections/WordPressCollections";
 import "./home/style.css";
 
 type HomeConfig = {
@@ -35,8 +37,8 @@ const legacyTarget = legacyHashHref(window.location.hash, window.location.href);
 if (legacyTarget) window.location.replace(legacyTarget);
 if (root && config && !legacyTarget) {
   apiFetch.use(apiFetch.createNonceMiddleware(config.nonce));
-  const fetchers = createHomeFetchers((options) => apiFetch(options), {}, config.capabilities);
-  createRoot(root).render(<HomeBoundary><HomeApp fetchers={fetchers} currentUserId={config.currentUserId} actionUrls={{
+  const fetchers = createHomeFetchers((options) => apiFetch(options), {}, config.capabilities, { collections: createWordPressCollectionApi((options) => apiFetch(options), config.currentUserId) });
+  createRoot(root).render(<HomeBoundary><WordPressCollectionLinks><HomeApp fetchers={fetchers} currentUserId={config.currentUserId} actionUrls={{
     planning: config.urls.planning.stories,
     calendar: config.urls.planning.calendar,
     media: config.urls.planning.media,
@@ -46,5 +48,5 @@ if (root && config && !legacyTarget) {
     deployment: config.urls.integrations.deployment,
     doctor: config.urls.settings.diagnostics,
     workspace: (storyId) => workspaceUrlFor(config.urls.planning.stories, storyId)
-  }} /></HomeBoundary>);
+  }} /></WordPressCollectionLinks></HomeBoundary>);
 }

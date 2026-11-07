@@ -1,3 +1,4 @@
+import { nativeStory, nativeStoryRoute } from "./native-snapshot";
 import { normalizeArtDirection, normalizeLiveCoverage, normalizePrimaryVideo, normalizeStoryFormat, type ImageArtDirection, type LiveCoverage as WordPressLiveCoverage, type PrimaryVideo } from "@byline/core";
 import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
 import { REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
@@ -1550,6 +1551,8 @@ export function getPostDateParts(post: WordPressPost) {
 }
 
 export function getPostRouteParts(post: WordPressPost): PostRouteParts | null {
+  const native = nativeStory(post.id);
+  if (native) return nativeStoryRoute(native);
   const date = getPostDateParts(post);
   const category = getPrimaryRoutableCategory(post);
 
@@ -1565,6 +1568,8 @@ export function getPostRouteParts(post: WordPressPost): PostRouteParts | null {
 }
 
 export function getPostHref(post: WordPressPost) {
+  const native = nativeStory(post.id);
+  if (native) return native.href;
   const route = getPostRouteParts(post);
 
   if (!route) {

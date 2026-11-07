@@ -313,8 +313,8 @@ function newsroom_assert_no_nested_anchors(string $html, string $message): void
 }
 
 byline_newsroom_register_block_types();
-newsroom_assert(count($newsroom_test['blocks']) === 14, 'All original and six new newsroom blocks should be registered.');
-newsroom_assert(count(array_filter(array_keys($newsroom_test['blocks']), static fn(string $path): bool => strpos($path, '/blocks/') !== false)) === 14, 'Newsroom block registration should be metadata-driven.');
+newsroom_assert(count($newsroom_test['blocks']) === 13, 'All original and five new newsroom blocks should be registered.');
+newsroom_assert(count(array_filter(array_keys($newsroom_test['blocks']), static fn(string $path): bool => strpos($path, '/blocks/') !== false)) === 13, 'Newsroom block registration should be metadata-driven.');
 
 byline_newsroom_register_core_styles();
 $style_names = array_merge(...array_values($newsroom_test['styles']));
@@ -467,7 +467,7 @@ newsroom_assert(strpos($poll, 'News') !== false && strpos($poll, 'Sports') !== f
 echo "Byline newsroom block regression passed.\n";
 
 // Immersive story additions retain the original registration contracts above.
-foreach (['table-of-contents', 'visualization', 'annotated-image', 'before-after', 'scrolly', 'scrolly-step'] as $slug) {
+foreach (['table-of-contents', 'visualization', 'annotated-image', 'before-after'] as $slug) {
     newsroom_assert(isset($newsroom_test['blocks'][dirname(__DIR__) . '/build/blocks/' . $slug]), 'Story block must register: ' . $slug);
 }
 foreach (['qa-interview', 'what-we-know', 'pros-cons', 'three-things', 'source-highlight', 'document-evidence'] as $slug) {

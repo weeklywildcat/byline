@@ -1,3 +1,4 @@
+import { formatEditorialDate } from "@byline/content/story";
 const entities: Record<string, string> = {
   amp: "&",
   apos: "'",
@@ -25,18 +26,7 @@ export function stripHtml(html: string) {
 }
 
 export function formatDisplayDate(value: string) {
-  const [date] = value.split("T");
-  const [year, month, day] = date.split("-").map(Number);
-
-  if (!year || !month || !day) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(publication.locale, {
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  }).format(new Date(year, month - 1, day));
+  return formatEditorialDate(value, publication.locale);
 }
 import { getPublicationConfig } from "@/lib/publication";
 

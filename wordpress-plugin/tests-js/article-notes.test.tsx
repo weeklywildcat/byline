@@ -2,9 +2,10 @@ import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { TooltipProvider } from "../src/admin-ui/ui/tooltip";
-import { StoryPeekContent, type StoryPeekContentProps } from "../src/story/StoryPeek";
-import { ProductionSummary, StoryNotesIndicator, StorySignals } from "../src/story/story-parts";
+import { readSource } from "./source-files";
+import { TooltipProvider } from "@byline/newsroom-ui/ui/tooltip";
+import { StoryPeekContent, type StoryPeekContentProps } from "@byline/newsroom-screens/story/StoryPeek";
+import { ProductionSummary, StoryNotesIndicator, StorySignals } from "@byline/newsroom-screens/story/story-parts";
 import {
   initials,
   moreOpenNotesLabel,
@@ -16,14 +17,14 @@ import {
   visibleNotes,
   type ArticleNotePreview,
   type ArticleNotesSummary
-} from "../src/story/notes-model";
-import type { PlanningStory } from "../src/planning/planning-model";
-import { createWorkspaceClient } from "../src/workspace/workspace-api";
-import { ArticleNotesCard, NotesSection } from "../src/workspace/NotesSection";
-import { WorkspaceContext, type WorkspaceContextValue } from "../src/workspace/workspace-context";
-import type { StoryWorkspace } from "../src/workspace/workspace-types";
+} from "@byline/newsroom-screens/story/notes-model";
+import type { PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
+import { createWorkspaceClient } from "@byline/newsroom-screens/workspace/workspace-api";
+import { ArticleNotesCard, NotesSection } from "@byline/newsroom-screens/workspace/NotesSection";
+import { WorkspaceContext, type WorkspaceContextValue } from "@byline/newsroom-screens/workspace/workspace-context";
+import type { StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 
-const read = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8");
+const read = readSource;
 const now = new Date("2026-10-21T12:00:00Z");
 const timezone = "America/New_York";
 const editUrl = "https://cms.example.test/wp-admin/post.php?post=7&action=edit";
@@ -202,7 +203,7 @@ const admin = { id: 1, kind: "user" as const, name: "admin", imageUrl: "https://
 const capabilities = { role: "manager", editArticle: true, changeStatus: false, assign: false, editContributors: false, editBrief: false, manageReporting: false, addSource: false, addAppointment: false, manageMedia: false, assignMedia: false, addTask: false, manageResources: false, review: false };
 function workspace(notes: ArticleNotesSummary | null | undefined): StoryWorkspace {
   return {
-    story: { id: 7, title: "Canteen", editUrl, authors: [admin], editor: null, workflow: { id: "reporting", label: "Reporting" }, wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null, ...(notes !== undefined ? { notes } : {}) },
+    story: { id: 7, title: "Canteen", editUrl, authors: [admin], editor: null, workflow: { id: "reporting", label: "Reporting" }, publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: "2026-10-21", plannedPublication: null, ...(notes !== undefined ? { notes } : {}) },
     revision: 1, timezone, now: now.toISOString(), currentUser: admin, brief: "", sections: [],
     contributors: { canEdit: false, contributors: [admin], available: [] }, statuses: [], tasks: [], sources: [], appointments: [],
     reporting: { sources: 0, interviewed: 0, needsScheduling: 0, toSchedule: 0, nextAppointment: null }, mediaAssignments: [], resources: [], activity: [],
@@ -249,7 +250,7 @@ function story(notes: ArticleNotesSummary | null | undefined): PlanningStory {
   return {
     id: 7, title: "Canteen", editUrl, authors: [], writer: null, editor: null,
     workflow: { id: "reporting", label: "Reporting", group: "main", selectable: true },
-    wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
+    publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
     deadline: null, plannedPublication: null, modifiedAt: null, visual: { type: "none", status: "needed" }, openTaskCount: 0, featuredImage: null,
     ...(notes !== undefined ? { notes } : {})
   } as PlanningStory;

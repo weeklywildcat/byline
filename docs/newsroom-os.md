@@ -55,7 +55,7 @@ private records and must not mutate state.
    scheduled, what is due and where the draft lives. Record an appointment as soon
    as someone is responsible, even if the date is only "next week".
 2. Use Planning to filter the queue by workflow, editor, deadline, planned
-   publication, coverage, or readiness. Treat the Calendar as the publication
+   publication, Collection, or readiness. Treat the Calendar as the publication
    plan, not as a replacement for WordPress post status.
 3. Review the fixed homepage after the static build. Story placement follows automatic selection rules, including the sticky lead.
 4. Before a public launch, run readiness and Content Health checks, confirm
