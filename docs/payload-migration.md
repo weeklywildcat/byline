@@ -95,27 +95,14 @@ These do not change at any phase.
 | Content health | `includes/content-health/*` | readiness layer (`src/domain/readiness.ts`) |
 | Home / Planning / Workspace UI | React 19 roots in `wordpress-plugin/src/{home,planning,workspace,story,admin-ui}` | ported into Payload custom views (§7) |
 
-### 2.2 Public snapshot v1: field → source
+### 2.2 Public Snapshot v2
 
-Snapshot v1 (`schemas/public-build-snapshot.schema.json`, consumer
-`apps/web/lib/prepared-snapshot.ts`) carries **WordPress REST shapes**
-(`title.rendered`, `_embedded["wp:featuredmedia"]`, `byline.*` settings). That
-is why `apps/web/lib/article-presentation.ts` is typed around `WordPressPost`.
-
-| Dataset | Fields used by the renderer | WordPress source | Payload source |
-| --- | --- | --- | --- |
-| `posts` | id, date(_gmt), modified(_gmt), slug, title/excerpt/content `.rendered`, author, featured_media, categories, tags, sticky, `byline.{presentation, immersiveAlignment, reportingNote, format, video, contributors, corrections, live, primaryGameId, gameScoreGameIds}`, `_embedded` author/media/terms | post + postmeta + embeds | published `stories` version + relations |
-| `authors` | public profile: name, slug, role, pronouns, bios, photo, socials, directory flag, public contact | users + profile meta | `people` with non-guest editorial status (visibility remains explicit) |
-| `guests` | name, slug, bio, role, hasProfilePage, profilePhoto, links | `byline_guest` | `people` with `status=guest`, independent of account linkage |
-| `categories` / `tags` | id, name, slug, description, count | terms | `sections` / `topics` |
-| `pages` | rendered page, slug, parent, template/noindex | `page` | published `pages` |
-| `corrections` | id, type, text, date, storyId, story summary | `byline_correction` | `corrections` on published stories |
-| `coverages` (public dataset name, unchanged) | slug, title, format, description, overview, overviewParagraphs, start/end, status, artwork, published stories in reading order | public Collections (`byline_collection_public_coverage()`) | public Collections (`src/newsroom/public-coverage.ts`) |
-| `schoolEvents` | canonical event records | `ww_school_event` | `events` |
-| `attachments` | referenced public metadata, sizes, `bylineImage.artDirection` | attachments | public-safe `media` projection + prepared rendition descriptors; the build rewrites them to same-origin static asset URLs |
-
-Phase 7 emits this **same v1 shape** from Payload (a compatibility projection,
-so the unchanged Astro build can run shadow builds). Phase 9 adds v2 (§6).
+Payload projects its published records into the native contract in
+`@byline/content` (§6). Stories, People, taxonomy, Pages, Corrections,
+Collections, Events, Polls, prepared Media and Redirects are separate public
+datasets. The article route uses the canonical Story and keeps its ArticleBody
+structured through rendering. Legacy WordPress build inputs remain on the
+WordPress build path until cutover.
 
 ### 2.3 Story tools (Gutenberg) → Lexical blocks
 
@@ -523,41 +510,20 @@ unsaved Payload Story form
 
 ## 6. Snapshot v2
 
-```ts
-type PublicArticleBody =
-  | { format: "legacy-html"; html: string }
-  | { format: "byline-v1"; root: StructuredArticleBody };
-```
+[Payload public build snapshots](payload-build-snapshots.md) defines the
+native v2 artifact, its datasets and its lifecycle. The committed public
+revision is separate from the schema, producer and Media recipe versions.
+The worker validates published main records under the revision fence,
+writes the exact immutable artifact, and conditionally promotes the one
+pointer. Direct recovery uses the same builder and validates the same local
+handoff.
 
-- Imported WordPress stories stay `legacy-html`; new stories are `byline-v1`.
-- `StructuredArticleBody` is a public projection of the Lexical tree with only
-  allowlisted node types and block fields (`@byline/content` schema +
-  runtime validator). Private block fields (none today) are stripped.
-- `ArticleBody` in `@byline/ui` renders both: legacy through the current HTML
-  path, structured through Byline block components.
-- Preferred lifecycle (from the WordPress generator): commit → advance public
-  revision in the same transaction → enqueue `prepare-snapshot` → generate
-  against R → validate → verify R unchanged → bytes + SHA-256 → atomically write
-  the immutable artifact on the newsroom volume → promote the completed pointer
-  → `request-cloudflare-build` → `verify-deployment`. A stale R is never
-  promoted; jobs coalesce to the newest revision. Autosaves, drafts and private
-  collection writes never advance the revision.
-- **No-snapshot recovery path:** if discovery explicitly reports that there is
-  no completed snapshot for the current revision, the build may acquire the same
-  canonical public projection directly from a build-only Payload endpoint. It
-  captures public revision R before acquisition, fetches the allowlisted public
-  datasets and prepared media descriptors, rereads the revision after
-  acquisition, and accepts the result only when it is still R. A revision change
-  causes a bounded retry or a hard build failure; a partial/mixed revision is
-  never deployed. The accepted direct result is written locally in the same
-  snapshot schema so indexing, rendering, media discovery and verification use
-  one downstream path.
-- Direct-source recovery is only for **absence/not-ready** of a completed
-  snapshot. If a snapshot exists but fails schema, digest, byte-count or privacy
-  validation, the build fails instead of hiding corruption by falling back.
-  Likewise, an unreachable or unauthenticated Payload service is a build
-  failure. Snapshot mode remains preferred because it is immutable, faster and
-  requires only pointer + artifact acquisition.
+New Stories carry the semantic ArticleBody from the existing normalizer.
+Imported historical Stories can carry the explicit legacy HTML variant.
+Related Coverage, Polls, footnotes and Repository Interactives remain
+semantic through the shared static and preview renderer. Only declared
+prepared Media blobs are fetched after Astro renders. The completed/direct
+parity gate compares the static site and checks the privacy sentinels.
 
 ## 7. Newsroom UI: Byline on top, Payload underneath
 
@@ -1206,9 +1172,9 @@ The torture-test story covers scrollytelling with a repository visual story.
 | 4 | Extract `@byline/story-presentations`, canonical normalization, exact Live Preview | §5 parity suite green | Built and browser-verified (§14), except the pop-out window (this environment cannot open pop-ups) and automated Playwright coverage of the torture flow. Verified in Chromium on the real Story screen: live typing before autosave, 12 overlapping autosaves with Preview staying open, Standard/Immersive/alignment/lead-image fallback, section, contributors, topics, body prose, all eight block types edited and reordered, lead/Photo/Gallery media swaps, reporting note, repository custom and visual stories, Phone/Tablet/Desktop/Responsive, widths 1920/1440/1366/1180/820/390, reload parity |
 | 5 | Media: private source storage, metadata, crops, prepared publication renditions, static-build materialization, drag and drop | media privacy + static public availability tests | **Done** ([publication-media.md](publication-media.md)): art-direction intent + editor (Media inspector, Story lead image, Photo block), publication revision, Jobs Queue preparation with stale-safe promotion, content-addressed store, recipe v1, Story publish gate, build-only endpoint, verified build materializer, immutable `_headers`, migration `20261107_060841_publication_media_pipeline`. Verified by unit, real-PostgreSQL/Jobs/Sharp integration, Playwright and a live end-to-end acquisition. The materializer is fed from the Payload snapshot in Phase 7. Recipe quality is a conservative default until a representative R7/iPhone fixture set is benchmarked |
 | 6 | Full block set | torture-test story authorable | **Subsumed by Phase 9; blocks built, gate not yet complete.** All 24 tools and inline footnotes are built exhaustively across the contract, Payload configs, readiness, renderer and editors, with server-side privileged-block enforcement and a strict publish gate ([newsroom-blocks.md](newsroom-blocks.md)). The torture-test fixture opens in the real Story editor with all 24 blocks and numbered footnotes. Remaining for the gate: the full browser suite (Add menu, undo, autosave, reload, Live Preview, touch widths) |
-| 7 | Payload → snapshot v1 projection + direct-source fallback | snapshot build and deliberate no-snapshot fallback both pass Astro verification and produce the same canonical routes/content/media set | **Done** ([payload-build-snapshots.md](payload-build-snapshots.md)): monotonic public revision advanced in the same PostgreSQL transaction as every public mutation (Stories, Pages, Events, People, Sections, Topics, public Collections, Corrections, public Media fields, the `publication` Global), `prepare-public-snapshot` job on its own `publication` queue with a revision fence and conditional promotion, immutable content-addressed artifacts with retention, build-only discovery/artifact/direct endpoints, the Astro acquisition state machine (completed snapshot; direct recovery only for the recognized not-ready answer; everything else fails), post-render prepared-media acquisition, publication-timezone article dates shared with Live Preview, `publication` Global, `events` collection, migration `20261107_073047_public_snapshot_v1`. Verified by real-PostgreSQL integration tests, acquisition unit tests, the snapshot-vs-direct parity gate (identical output, full postbuild verification), a WordPress snapshot-build regression and a live run against a running newsroom |
+| 7 | Payload publication revision, artifact and direct recovery | snapshot build and deliberate no-snapshot fallback both pass Astro verification and produce the same canonical routes/content/media set | **Done** ([payload-build-snapshots.md](payload-build-snapshots.md)): monotonic public revision advanced in the same PostgreSQL transaction as every public mutation (Stories, Pages, Events, People, Sections, Topics, public Collections, Corrections, public Media fields, the `publication` Global), `prepare-public-snapshot` job on its own `publication` queue with a revision fence and conditional promotion, immutable content-addressed artifacts with retention, build-only discovery/artifact/direct endpoints, the Astro acquisition state machine (completed snapshot; direct recovery only for the recognized not-ready answer; everything else fails), post-render prepared-media acquisition, publication-timezone article dates shared with Live Preview, `publication` Global, `events` collection, migration `20261107_073047_public_snapshot_v1`. Verified by real-PostgreSQL integration tests, acquisition unit tests, the snapshot-vs-direct parity gate (identical output, full postbuild verification), a WordPress snapshot-build regression and a live run against a running newsroom |
 | 8 | WordPress → Payload import | counts/relations/IDs reconcile; custom presentation still resolves imported ID | **Not built, by decision.** Weekly Wildcat has only a small number of existing stories and will migrate them manually; no generalized importer was necessary |
-| 9 | Snapshot v2 + structured `ArticleBody` | v1/v2 snapshot builds and direct-source recovery both verify through the same downstream contract | **In progress: block system done, snapshot v2 not started.** Complete only when structured snapshot v2 passes its artifact / direct / build parity gate. Until then v1 refuses a Story whose body needs Related Coverage, a Poll or a Repository Interactive (the v1 bridge carries no references) |
+| 9 | Snapshot v2 + structured `ArticleBody` | completed v2 and direct recovery pass the same native static-build, privacy and interactive gate | **Done.** Native v2 replaces the temporary Payload projection. The parity fixture covers all 24 blocks, three inline footnotes, prepared Media, public references and interactive enhancement. |
 | 10 | Shadow builds from both CMSs, diffed | route/URL/SEO/sitemap/RSS/media diffs explained | — |
 | 11 | Live updates, polls + vote table, feedback | Worker parity tests, cookie compatibility | — |
 | 12 | Discord, MCP | contract suites green | — |

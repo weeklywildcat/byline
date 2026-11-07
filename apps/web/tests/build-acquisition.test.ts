@@ -13,12 +13,12 @@ import { acquirePayloadSnapshot, buildMediaEndpoint } from "@/lib/build-acquisit
 const BASE = "https://newsroom.example/api/byline/build";
 const TOKEN = "build-token-for-acquisition-tests-0123456789";
 
-function snapshotBytes(revision: number, extra: { attachments?: unknown[]; schemaVersion?: number } = {}) {
-  const datasets = { posts: [], authors: [], guests: [], categories: [], tags: [], pages: [], corrections: [], coverages: [], schoolEvents: [], attachments: extra.attachments ?? [] };
-  return Buffer.from(JSON.stringify({ schemaVersion: extra.schemaVersion ?? 1, revision, generatedAt: "2026-11-07T12:00:00.000Z", sourceTimezone: "America/New_York", publication: { ...publication, revision }, datasets, counts: Object.fromEntries(Object.entries(datasets).map(([name, rows]) => [name, rows.length])) }));
+function snapshotBytes(revision: number, extra: { media?: unknown[]; schemaVersion?: number } = {}) {
+  const datasets = { stories: [], people: [], sections: [], topics: [], pages: [], corrections: [], collections: [], events: [], polls: [], media: extra.media ?? [], redirects: [] };
+  return Buffer.from(JSON.stringify({ schemaVersion: extra.schemaVersion ?? 2, revision, generatedAt: "2026-11-07T12:00:00.000Z", publication: { ...publication, revision }, datasets, counts: Object.fromEntries(Object.entries(datasets).map(([name, rows]) => [name, rows.length])) }));
 }
 const sha = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
-const pointerFor = (bytes: Buffer, revision: number, overrides: Record<string, unknown> = {}) => ({ schemaVersion: 1, revision, generatedAt: "2026-11-07T12:00:00.000Z", digest: sha(bytes), bytes: bytes.byteLength, url: `${BASE}/snapshot/${sha(bytes)}`, ...overrides });
+const pointerFor = (bytes: Buffer, revision: number, overrides: Record<string, unknown> = {}) => ({ schemaVersion: 2, revision, generatedAt: "2026-11-07T12:00:00.000Z", digest: sha(bytes), bytes: bytes.byteLength, url: `${BASE}/snapshot/${sha(bytes)}`, ...overrides });
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const notReady = (revision: number) => json(503, { code: "byline_snapshot_not_ready", currentRevision: revision, reason: "no-completed-snapshot" });
 
@@ -75,7 +75,7 @@ describe("Payload snapshot acquisition", () => {
 
   const bytes = snapshotBytes(4);
   const advertised = (overrides: Record<string, unknown> = {}) => () => json(200, pointerFor(bytes, 4, overrides));
-  const badManifest = snapshotBytes(4, { attachments: [{ id: 1, source_url: "/_byline/media/images/aa/x--y--aaaaaaaaaaaaaaaa.webp", media_details: {}, title: { rendered: "" }, caption: { rendered: "" }, alt_text: "", bylinePublication: { manifest: { schemaVersion: 1, kind: "image" } } }] });
+  const badManifest = snapshotBytes(4, { media: [{ id: 1, filename: "example.webp", kind: "image", alt: "", creator: "", credit: "", copyright: "", license: "", manifest: { schemaVersion: 1, kind: "image" } }] });
   const neverFallback: Array<[string, Route[], RegExp]> = [
     ["an invalid token", [() => json(401, { code: "byline_build_unauthorized" })], /refused the build credential/],
     ["a forbidden token", [() => json(403, {})], /refused the build credential/],
@@ -84,15 +84,15 @@ describe("Payload snapshot acquisition", () => {
     ["an unrecognized 503", [() => json(503, { code: "maintenance" })], /unrecognized 503/],
     ["a non-JSON 503", [() => new Response("<html>busy</html>", { status: 503 })], /malformed JSON/],
     ["a malformed pointer", [() => new Response("{not json", { status: 200 })], /malformed JSON/],
-    ["an unsupported pointer schema", [advertised({ schemaVersion: 2 })], /unsupported snapshot schema/],
+    ["an unsupported pointer schema", [advertised({ schemaVersion: 1 })], /unsupported snapshot schema/],
     ["a malformed digest", [advertised({ digest: "abc" })], /invalid digest/],
     ["an artifact on another origin", [advertised({ url: `https://evil.example/api/byline/build/snapshot/${sha(bytes)}` })], /outside the configured build API/],
     ["an artifact 404", [advertised(), () => json(404, {})], /answered HTTP 404/],
     ["a digest mismatch", [advertised({ digest: "0".repeat(64), url: `${BASE}/snapshot/${"0".repeat(64)}` }), () => new Response(bytes)], /SHA-256 digest mismatch/],
     ["a byte mismatch", [advertised({ bytes: bytes.byteLength + 1 }), () => new Response(bytes)], /byte length mismatch/],
     ["a malformed snapshot", [() => json(200, pointerFor(Buffer.from("{oops"), 4)), () => new Response(Buffer.from("{oops"))], /is invalid/],
-    ["an unsupported snapshot schema", [() => json(200, pointerFor(snapshotBytes(4, { schemaVersion: 2 }), 4)), () => new Response(snapshotBytes(4, { schemaVersion: 2 }))], /unsupported schemaVersion/],
-    ["an invalid prepared-media manifest", [() => json(200, pointerFor(badManifest, 4)), () => new Response(badManifest)], /invalid prepared-media manifest/]
+    ["an unsupported snapshot schema", [() => json(200, pointerFor(snapshotBytes(4, { schemaVersion: 1 }), 4)), () => new Response(snapshotBytes(4, { schemaVersion: 1 }))], /schemaVersion/],
+    ["an invalid prepared-media manifest", [() => json(200, pointerFor(badManifest, 4)), () => new Response(badManifest)], /Invalid prepared Media manifest/]
   ];
   for (const [name, routes, error] of neverFallback) {
     it(`fails without direct recovery on ${name}`, async () => {
@@ -108,7 +108,7 @@ describe("Payload snapshot acquisition", () => {
       await expect(acquire(fetch)).rejects.toThrow(status === 401 ? /credential/ : new RegExp(`HTTP ${status}`));
     }
     const invalid = scripted([() => notReady(3), () => new Response(badManifest)]);
-    await expect(acquire(invalid.fetch)).rejects.toThrow(/invalid prepared-media manifest/);
+    await expect(acquire(invalid.fetch)).rejects.toThrow(/Invalid prepared Media manifest/);
   });
 
   it("refuses a snapshot older than the expected revision", async () => {

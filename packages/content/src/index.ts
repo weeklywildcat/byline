@@ -150,3 +150,4 @@ export * from "./routing";
 export * from "./snapshot";
 export * from "./versions";
 export * from "./story";
+export * from "./public-snapshot-v2";

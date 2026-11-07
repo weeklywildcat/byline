@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { parseBuildSnapshot, type BuildSnapshotPointer, type PublicBuildSnapshot } from "./prepared-snapshot";
+import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, type PublicBuildSnapshotV2 } from "@byline/content";
+import { parseNativeSnapshot, type NativeSnapshotPointer } from "./native-snapshot";
 
 /**
  * Acquisition of a Payload public snapshot for a static build
@@ -13,14 +14,14 @@ import { parseBuildSnapshot, type BuildSnapshotPointer, type PublicBuildSnapshot
  *                    wrong with it is a HARD FAILURE, never a fallback.
  *   discovery 503 `byline_snapshot_not_ready`
  *                  → direct-source recovery for the advertised current
- *                    revision R: the newsroom builds the same v1 projection
+ *                    revision R: the newsroom builds the same v2 projection
  *                    and returns it only if R is still current. A 409
  *                    (revision changed) rediscovers, at most `maxAttempts`.
  *   anything else  → hard failure: 401/403, unreachable, malformed JSON, an
  *                    unknown 503/5xx, an unsupported schema, a missing or
  *                    mismatched artifact, an invalid snapshot or manifest.
  *
- * Both successful paths return the same validated v1 snapshot; the caller
+ * Both successful paths return the same validated v2 snapshot; the caller
  * writes it to the one local contract (`.byline-build/public-snapshot.json`).
  * Recovery exists for ABSENCE of a completed snapshot only; it never hides
  * corruption or an outage.
@@ -43,7 +44,7 @@ export type PayloadAcquisitionOptions = {
 
 export type AcquiredSnapshot = {
   mode: AcquisitionMode;
-  snapshot: PublicBuildSnapshot;
+  snapshot: PublicBuildSnapshotV2;
   bytes: Buffer;
   revision: number;
   digest: string;
@@ -92,9 +93,9 @@ async function json(response: Response, what: string): Promise<Record<string, un
   }
 }
 
-function validatePointer(value: Record<string, unknown>, base: URL): BuildSnapshotPointer {
-  const pointer = value as BuildSnapshotPointer;
-  if (pointer.schemaVersion !== 1) throw new BuildAcquisitionError("discovery advertised an unsupported snapshot schema.");
+function validatePointer(value: Record<string, unknown>, base: URL): NativeSnapshotPointer {
+  const pointer = value as NativeSnapshotPointer;
+  if (pointer.schemaVersion !== PUBLIC_SNAPSHOT_SCHEMA_VERSION) throw new BuildAcquisitionError("discovery advertised an unsupported snapshot schema.");
   if (!Number.isSafeInteger(pointer.revision) || pointer.revision < 0) throw new BuildAcquisitionError("discovery advertised an invalid revision.");
   if (typeof pointer.digest !== "string" || !/^[a-f0-9]{64}$/.test(pointer.digest)) throw new BuildAcquisitionError("discovery advertised an invalid digest.");
   if (!Number.isSafeInteger(pointer.bytes) || pointer.bytes <= 0) throw new BuildAcquisitionError("discovery advertised an invalid byte count.");
@@ -133,9 +134,9 @@ export async function acquirePayloadSnapshot(options: PayloadAcquisitionOptions)
   const refuseAuth = (response: Response, what: string) => {
     if (response.status === 401 || response.status === 403) throw new BuildAcquisitionError(`the newsroom refused the build credential for ${what} (HTTP ${response.status}).`);
   };
-  const verify = (bytes: Buffer, pointer: BuildSnapshotPointer | undefined, what: string) => {
+  const verify = (bytes: Buffer, pointer: NativeSnapshotPointer | undefined, what: string) => {
     try {
-      return parseBuildSnapshot(bytes, pointer, minimumRevision);
+      return parseNativeSnapshot(bytes, pointer, minimumRevision);
     } catch (error) {
       throw new BuildAcquisitionError(`${what} is invalid: ${(error as Error).message}`);
     }

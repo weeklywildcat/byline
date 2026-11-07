@@ -19,7 +19,7 @@ const pick = (row: Row, fields: readonly string[]) => Object.fromEntries(fields.
 const isPublished = (row: Row) => row._status === "published" && !row.deletedAt;
 const relationId = (value: unknown): number | string | null => (value && typeof value === "object" ? ((value as Row).id as number | string) ?? null : (value as number | string | null) ?? null);
 
-/** Every Story field the v1 post (and its listings, archives, feeds and SEO) can read. */
+/** Every Story field the native snapshot (and its listings, archives, feeds and SEO) can read. */
 export const STORY_PUBLIC_FIELDS = [
   "headline", "deck", "kicker", "section", "topics", "contributors", "featuredMedia", "featuredCaption",
   "contentFormat", "body", "legacyHtml", "format", "video", "presentation", "immersiveAlignment",
@@ -77,4 +77,16 @@ export const publicationGlobalSlice: PublicSlice = (row) => {
   if (row._status !== "published") return null;
   const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, globalType: _globalType, _status, ...fields } = row;
   return fields;
+};
+
+export const pollPublicSlice: PublicSlice = (row) => row.status === "open" || row.status === "closed"
+  ? pick(row, ["pollKey", "question", "options", "status", "opensAt", "closesAt"]) : null;
+
+export const liveUpdatePublicSlice: PublicSlice = async (row, req) => {
+  if (row.state !== "published") return null;
+  const storyId = relationId(row.story);
+  if (storyId === null) return null;
+  const story = await req.payload.db.findOne({ collection: "stories", where: { id: { equals: storyId } }, req }) as Row | null;
+  if (!story || !isPublished(story)) return null;
+  return pick(row, ["story", "headline", "body", "photo", "publishedAt", "pinned", "updatedAt"]);
 };

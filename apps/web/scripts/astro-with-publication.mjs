@@ -119,7 +119,7 @@ if (isBuild && process.env.BYLINE_LEGACY_REST_BUILD !== "1" && !process.env.BYLI
   if (process.env.BYLINE_BUILD_SNAPSHOT_FILE) {
     // Deliberate offline fixture/benchmark input; still enforce the contract.
     bytes = await readFile(path.resolve(projectRoot, process.env.BYLINE_BUILD_SNAPSHOT_FILE));
-    snapshotSource = "file";
+    snapshotSource = payloadBuildUrl ? "payload" : "file";
   } else {
     snapshotSource = "wordpress";
     const endpoint = new URL(process.env.BYLINE_BUILD_SNAPSHOT_URL || publicationEndpoint().replace(/\/publication\/?$/, "/build-snapshot"));
@@ -141,17 +141,22 @@ if (isBuild && process.env.BYLINE_LEGACY_REST_BUILD !== "1" && !process.env.BYLI
   acquisitionMode = "prepared-snapshot";
   snapshotBytes = bytes.byteLength;
   const parseStarted = performance.now();
-  snapshot = parseBuildSnapshot(bytes, pointer, Number(process.env.BYLINE_EXPECTED_REVISION || 0));
+  const minimumRevision = Number(process.env.BYLINE_EXPECTED_REVISION || 0);
+  if (snapshotSource === "payload") {
+    const { parseNativeSnapshot } = await tsImport("../lib/native-snapshot.ts", import.meta.url);
+    snapshot = parseNativeSnapshot(bytes, undefined, minimumRevision);
+  } else {
+    snapshot = parseBuildSnapshot(bytes, pointer, minimumRevision);
+  }
   parseMs = performance.now() - parseStarted;
   snapshotIdentity = { schemaVersion: snapshot.schemaVersion, revision: snapshot.revision, generatedAt: snapshot.generatedAt, artifactDigest: createHash("sha256").update(bytes).digest("hex"), bytes: snapshotBytes };
 }
 // Prepared publication media named by the accepted snapshot (Payload manifests): a closed,
 // validated descriptor set, acquired after Astro renders. WordPress snapshots have none.
 let publicationMediaDescriptors = [];
-if (snapshot) {
-  const { snapshotPublicationManifests } = await tsImport("@byline/content", import.meta.url);
+if (snapshotSource === "payload") {
   const { descriptorsFromManifests, closedDescriptorSet } = await tsImport("./publication-media.ts", import.meta.url);
-  publicationMediaDescriptors = closedDescriptorSet(descriptorsFromManifests(snapshotPublicationManifests(snapshot)));
+  publicationMediaDescriptors = closedDescriptorSet(descriptorsFromManifests(snapshot.datasets.media.map(({ manifest }) => manifest)));
 }
 const publication = snapshot?.publication ?? await loadPublication();
 if (publication) publication.appearance = { theme: "weekly-wildcat", tokenOverrides: {} };
@@ -168,6 +173,7 @@ if (snapshot) {
   const file = path.join(projectRoot, ".byline-build", "public-snapshot.json");
   await writeFile(file, JSON.stringify(snapshot));
   process.env.BYLINE_PREPARED_SNAPSHOT_FILE = file;
+  process.env.BYLINE_PREPARED_SNAPSHOT_PROVIDER = snapshotSource === "payload" ? "payload" : "wordpress";
   if (publicationMediaDescriptors.length) await writeFile(path.join(projectRoot, ".byline-build", "publication-media-descriptors.json"), JSON.stringify(publicationMediaDescriptors));
 }
 const buildStarted = performance.now();

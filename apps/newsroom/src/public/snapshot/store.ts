@@ -10,7 +10,7 @@ import { SNAPSHOT_FILENAME_PATTERN, snapshotFilename } from "./version";
  * Immutable public snapshot artifacts on the publication volume, beside (but
  * separate from) the prepared media object store:
  *
- *   <BYLINE_PUBLICATION_MEDIA_DIR>/snapshots/v1/snapshot-v1-r<R>-<sha256>.json
+ *   <BYLINE_PUBLICATION_MEDIA_DIR>/snapshots/v2/snapshot-v2-r<R>-<sha256>.json
  *
  * The name is the SHA-256 of the exact stored UTF-8 bytes. A write stages a
  * uniquely named temp file in the same directory (created exclusively,
@@ -34,7 +34,7 @@ export const SNAPSHOT_RETENTION = {
 export type StoredSnapshot = { filename: string; sha256: string; bytes: number };
 
 export function snapshotDirectory(env: Record<string, string | undefined> = process.env): string {
-  return path.join(publicationMediaDir(env), "snapshots", "v1");
+  return path.join(publicationMediaDir(env), "snapshots", "v2");
 }
 
 const sha256Of = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");

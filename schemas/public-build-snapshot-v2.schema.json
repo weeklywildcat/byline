@@ -1,0 +1,1282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://byline.pub/schemas/public-build-snapshot-v2.schema.json",
+  "title": "Byline immutable public build snapshot v2",
+  "description": "Native published content for the static Byline build. Runtime validation checks publication revision, dataset counts and cross-record relationships.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {"type":"number","const":2},
+    "revision": {"type":"integer","minimum":0,"maximum":9007199254740991},
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "publication": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {"type":"number","const":1},
+        "revision": {"type":"integer","minimum":0,"maximum":9007199254740991},
+        "identity": {
+          "type": "object",
+          "properties": {
+            "name": {"type":"string","minLength":1},
+            "shortName": {"type":"string","minLength":1},
+            "description": {"type":"string"},
+            "organizationName": {"type":"string","minLength":1},
+            "tagline": {"type":"string"}
+          },
+          "required": ["name","shortName","description","organizationName","tagline"],
+          "additionalProperties": false
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "display": {"type":"string"},
+            "city": {"type":"string"},
+            "region": {"type":"string"},
+            "country": {"type":"string"},
+            "address": {"type":"string"}
+          },
+          "required": ["display","city","region","country","address"],
+          "additionalProperties": false
+        },
+        "locale": {"type":"string","minLength":1},
+        "timezone": {"type":"string","minLength":1},
+        "urls": {
+          "type": "object",
+          "properties": {
+            "publicSite": {"type":"string","format":"uri"},
+            "cms": {"type":"string","format":"uri"},
+            "contact": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]}
+          },
+          "required": ["publicSite","cms","contact"],
+          "additionalProperties": false
+        },
+        "branding": {
+          "type": "object",
+          "properties": {
+            "masthead": {
+              "type": "object",
+              "properties": {
+                "url": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+                "alt": {"type":"string"},
+                "width": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                "height": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]}
+              },
+              "required": ["url","alt","width","height"],
+              "additionalProperties": false
+            },
+            "logo": {
+              "type": "object",
+              "properties": {
+                "url": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+                "alt": {"type":"string"},
+                "width": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                "height": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]}
+              },
+              "required": ["url","alt","width","height"],
+              "additionalProperties": false
+            },
+            "organizationLogo": {
+              "type": "object",
+              "properties": {
+                "url": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+                "alt": {"type":"string"},
+                "width": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                "height": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]}
+              },
+              "required": ["url","alt","width","height"],
+              "additionalProperties": false
+            },
+            "icons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "url": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+                  "alt": {"type":"string"},
+                  "width": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                  "height": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]}
+                },
+                "required": ["url","alt","width","height"],
+                "additionalProperties": false
+              }
+            },
+            "defaultSocialImage": {
+              "type": "object",
+              "properties": {
+                "url": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+                "alt": {"type":"string"},
+                "width": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                "height": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]}
+              },
+              "required": ["url","alt","width","height"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["masthead","logo","organizationLogo","icons","defaultSocialImage"],
+          "additionalProperties": false
+        },
+        "appearance": {
+          "type": "object",
+          "properties": {
+            "theme": {"type":"string","const":"weekly-wildcat"},
+            "tokenOverrides": {"type":"object","propertyNames":{"type":"string"},"additionalProperties":{"type":"string"}}
+          },
+          "required": ["theme","tokenOverrides"],
+          "additionalProperties": false
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slug": {"type":"string","pattern":"^[a-z0-9]+(?:[-_][a-z0-9]+)*$"},
+              "name": {"type":"string","minLength":1},
+              "description": {"type":"string"},
+              "active": {"type":"boolean"}
+            },
+            "required": ["slug","name","description","active"],
+            "additionalProperties": false
+          }
+        },
+        "navigation": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {"type":"string","minLength":1},
+              "url": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+              "locations": {"type":"array","items":{"type":"string","enum":["header","footer"]}},
+              "group": {"type":"string"},
+              "feature": {"type":"string"}
+            },
+            "required": ["label","url","locations"],
+            "additionalProperties": false
+          }
+        },
+        "social": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "service": {"type":"string","minLength":1},
+              "label": {"type":"string","minLength":1},
+              "url": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]}
+            },
+            "required": ["service","label","url"],
+            "additionalProperties": false
+          }
+        },
+        "features": {"type":"object","propertyNames":{"type":"string"},"additionalProperties":{"type":"boolean"}},
+        "licensing": {
+          "type": "object",
+          "properties": {
+            "copyrightNotice": {"type":"string"},
+            "imageLicenseUrl": {
+              "anyOf": [
+                {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+                {"type":"string","const":""}
+              ]
+            },
+            "acquireLicensePage": {
+              "anyOf": [
+                {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+                {"type":"string","const":""}
+              ]
+            }
+          },
+          "required": ["copyrightNotice","imageLicenseUrl","acquireLicensePage"],
+          "additionalProperties": false
+        },
+        "seo": {
+          "type": "object",
+          "properties": {
+            "defaultTitle": {"type":"string","minLength":1},
+            "defaultDescription": {"type":"string"},
+            "organizationType": {"type":"string","enum":["Organization","NewsMediaOrganization"]}
+          },
+          "required": ["defaultTitle","defaultDescription","organizationType"],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "revision",
+        "identity",
+        "location",
+        "locale",
+        "timezone",
+        "urls",
+        "branding",
+        "appearance",
+        "sections",
+        "navigation",
+        "social",
+        "features",
+        "licensing",
+        "seo"
+      ],
+      "additionalProperties": false
+    },
+    "datasets": {
+      "type": "object",
+      "properties": {
+        "stories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+              "slug": {"type":"string","pattern":"^[a-z0-9]+(?:[-_][a-z0-9]+)*$"},
+              "title": {"type":"string","minLength":1},
+              "titleHtml": {"type":"string","minLength":1},
+              "kicker": {"type":"string"},
+              "excerptHtml": {"type":"string"},
+              "href": {"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},
+              "url": {"type":"string","format":"uri"},
+              "publishedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "section": {
+                "type": "object",
+                "properties": {
+                  "key": {"type":"string","minLength":1},
+                  "name": {"type":"string","minLength":1},
+                  "href": {"anyOf":[{"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},{"type":"string","const":""}]}
+                },
+                "required": ["key","name","href"],
+                "additionalProperties": false
+              },
+              "sections": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {"type":"string","minLength":1},
+                    "name": {"type":"string","minLength":1},
+                    "href": {"anyOf":[{"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},{"type":"string","const":""}]}
+                  },
+                  "required": ["key","name","href"],
+                  "additionalProperties": false
+                }
+              },
+              "topics": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {"type":"string","minLength":1},
+                    "name": {"type":"string","minLength":1},
+                    "href": {"anyOf":[{"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},{"type":"string","const":""}]}
+                  },
+                  "required": ["key","name","href"],
+                  "additionalProperties": false
+                }
+              },
+              "sectionKeys": {"type":"array","items":{"type":"string","minLength":1}},
+              "topicKeys": {"type":"array","items":{"type":"string","minLength":1}},
+              "contributorKeys": {"type":"array","items":{"type":"string","minLength":1}},
+              "contributors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type":"string","minLength":1},
+                    "keys": {"type":"array","items":{"type":"string","minLength":1}},
+                    "name": {"type":"string","minLength":1},
+                    "href": {"anyOf":[{"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},{"type":"string","const":""}]},
+                    "role": {"type":"string"},
+                    "bio": {"type":"string"},
+                    "photo": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                    "contactHref": {"type":"string","pattern":"^mailto:[^\\s]+$"}
+                  },
+                  "required": ["id","keys","name","href","role","bio","photo"],
+                  "additionalProperties": false
+                }
+              },
+              "image": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+              "leadCaption": {"type":"string"},
+              "listed": {"type":"boolean"},
+              "athleteMeta": {"type":"array","items":{"type":"string"}},
+              "format": {"type":"string","enum":["standard","audio","video"]},
+              "presentation": {"type":"string","enum":["standard","immersive"]},
+              "immersiveAlignment": {"type":"string","enum":["center","bottom-left"]},
+              "video": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {"duration":{"type":["string","null"]}},
+                    "required": ["duration"],
+                    "additionalProperties": false
+                  },
+                  {"type":"null"}
+                ]
+              },
+              "primaryVideo": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "videoId": {"type":"string","pattern":"^[\\w-]{11}$"},
+                      "title": {"type":"string","minLength":1},
+                      "embedUrl": {"type":"string","format":"uri"},
+                      "duration": {"type":["string","null"]}
+                    },
+                    "required": ["videoId","title","embedUrl"],
+                    "additionalProperties": false
+                  },
+                  {"type":"null"}
+                ]
+              },
+              "videoMetadata": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "provider": {"type":"string","const":"youtube"},
+                      "videoId": {"type":"string","pattern":"^[\\w-]{11}$"},
+                      "url": {"type":"string","format":"uri"},
+                      "title": {"type":"string"},
+                      "description": {"type":"string"},
+                      "thumbnailUrl": {"type":"string","format":"uri"},
+                      "uploadDate": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      },
+                      "duration": {"type":"string"}
+                    },
+                    "required": ["provider","videoId","url"],
+                    "additionalProperties": false
+                  },
+                  {"type":"null"}
+                ]
+              },
+              "corrections": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type":"string","minLength":1},
+                    "type": {"type":"string","enum":["correction","clarification","editor-note","substantive-update"]},
+                    "date": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "text": {"type":"string","minLength":1}
+                  },
+                  "required": ["id","type","date","text"],
+                  "additionalProperties": false
+                }
+              },
+              "reportingNote": {"type":"array","items":{"type":"string"}},
+              "live": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "postId": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+                      "status": {"type":"string","enum":["live","ended"]},
+                      "startedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      },
+                      "endedAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          {"type":"null"}
+                        ]
+                      },
+                      "endedLabel": {"type":["string","null"]},
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      },
+                      "updatedLabel": {"type":"string","minLength":1},
+                      "keyPoints": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "id": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+                              "title": {"type":"string"},
+                              "html": {"type":"string"},
+                              "date": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              "dateLabel": {"type":"string","minLength":1},
+                              "author": {"type":"string"},
+                              "authorHref": {"anyOf":[{"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},{"type":"null"}]},
+                              "authorRole": {"type":["string","null"]},
+                              "authorPhoto": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "src": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+                                      "width": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                                      "height": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]}
+                                    },
+                                    "required": ["src"],
+                                    "additionalProperties": false
+                                  },
+                                  {"type":"null"}
+                                ]
+                              },
+                              "image": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "src": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+                                      "alt": {"type":"string"},
+                                      "width": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                                      "height": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                                      "credit": {"type":"string"}
+                                    },
+                                    "required": ["src","alt"],
+                                    "additionalProperties": false
+                                  },
+                                  {"type":"null"}
+                                ]
+                              }
+                            },
+                            "required": ["id","title","html","date","dateLabel"],
+                            "additionalProperties": false
+                          },
+                          {"type":"null"}
+                        ]
+                      },
+                      "updates": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+                            "title": {"type":"string"},
+                            "html": {"type":"string"},
+                            "date": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            },
+                            "dateLabel": {"type":"string","minLength":1},
+                            "author": {"type":"string"},
+                            "authorHref": {"anyOf":[{"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},{"type":"null"}]},
+                            "authorRole": {"type":["string","null"]},
+                            "authorPhoto": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "src": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+                                    "width": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                                    "height": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]}
+                                  },
+                                  "required": ["src"],
+                                  "additionalProperties": false
+                                },
+                                {"type":"null"}
+                              ]
+                            },
+                            "image": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "src": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]},
+                                    "alt": {"type":"string"},
+                                    "width": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                                    "height": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+                                    "credit": {"type":"string"}
+                                  },
+                                  "required": ["src","alt"],
+                                  "additionalProperties": false
+                                },
+                                {"type":"null"}
+                              ]
+                            }
+                          },
+                          "required": ["id","title","html","date","dateLabel"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "feedUrl": {"type":"string","pattern":"^\\/_byline\\/live\\/\\d+\\.json$"}
+                    },
+                    "required": [
+                      "postId",
+                      "status",
+                      "startedAt",
+                      "endedAt",
+                      "endedLabel",
+                      "updatedAt",
+                      "updatedLabel",
+                      "keyPoints",
+                      "updates",
+                      "feedUrl"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {"type":"null"}
+                ]
+              },
+              "body": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {"format":{"type":"string","const":"legacy-html"},"html":{"type":"string"}},
+                    "required": ["format","html"],
+                    "additionalProperties": false
+                  },
+                  {"$ref":"#/$defs/articleBody"}
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "title",
+              "titleHtml",
+              "excerptHtml",
+              "href",
+              "url",
+              "publishedAt",
+              "modifiedAt",
+              "section",
+              "sections",
+              "topics",
+              "sectionKeys",
+              "topicKeys",
+              "contributorKeys",
+              "contributors",
+              "image",
+              "leadCaption",
+              "listed",
+              "athleteMeta",
+              "format",
+              "presentation",
+              "immersiveAlignment",
+              "video",
+              "primaryVideo",
+              "videoMetadata",
+              "corrections",
+              "reportingNote",
+              "live",
+              "body"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "people": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+              "name": {"type":"string","minLength":1},
+              "slug": {"anyOf":[{"type":"string","pattern":"^[a-z0-9]+(?:[-_][a-z0-9]+)*$"},{"type":"string","const":""}]},
+              "pronouns": {"type":"string"},
+              "newsroomRole": {"type":"string"},
+              "shortBio": {"type":"string"},
+              "bio": {"type":"string"},
+              "status": {"type":"string","enum":["active","alumni","guest"]},
+              "portrait": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+              "directoryVisible": {"type":"boolean"},
+              "hasProfilePage": {"type":"boolean"},
+              "publicEmail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  {"type":"string","const":""}
+                ]
+              },
+              "socials": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {"type":"string","minLength":1},
+                    "url": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","pattern":"^\\/(?!\\/)[^\\s\\\\]*$"}]}
+                  },
+                  "required": ["label","url"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "slug",
+              "pronouns",
+              "newsroomRole",
+              "shortBio",
+              "bio",
+              "status",
+              "portrait",
+              "directoryVisible",
+              "hasProfilePage",
+              "publicEmail",
+              "socials"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+              "slug": {"type":"string","pattern":"^[a-z0-9]+(?:[-_][a-z0-9]+)*$"},
+              "name": {"type":"string","minLength":1},
+              "description": {"type":"string"},
+              "href": {"anyOf":[{"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},{"type":"string","const":""}]}
+            },
+            "required": ["id","slug","name","description","href"],
+            "additionalProperties": false
+          }
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+              "slug": {"type":"string","pattern":"^[a-z0-9]+(?:[-_][a-z0-9]+)*$"},
+              "name": {"type":"string","minLength":1},
+              "description": {"type":"string"},
+              "href": {"anyOf":[{"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},{"type":"string","const":""}]}
+            },
+            "required": ["id","slug","name","description","href"],
+            "additionalProperties": false
+          }
+        },
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+              "slug": {"type":"string","pattern":"^[a-z0-9]+(?:[-_][a-z0-9]+)*$"},
+              "title": {"type":"string","minLength":1},
+              "href": {"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},
+              "summary": {"type":"string"},
+              "bodyHtml": {"type":"string"},
+              "indexing": {"type":"string","enum":["public","noindex"]},
+              "publishedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              }
+            },
+            "required": ["id","slug","title","href","summary","bodyHtml","indexing","publishedAt","modifiedAt"],
+            "additionalProperties": false
+          }
+        },
+        "corrections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type":"string","minLength":1},
+              "type": {"type":"string","enum":["correction","clarification","editor-note","substantive-update"]},
+              "date": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "text": {"type":"string","minLength":1},
+              "storyId": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991}
+            },
+            "required": ["id","type","date","text","storyId"],
+            "additionalProperties": false
+          }
+        },
+        "collections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+              "slug": {"type":"string","pattern":"^[a-z0-9]+(?:[-_][a-z0-9]+)*$"},
+              "title": {"type":"string","minLength":1},
+              "format": {"type":"string","enum":["coverage","series"]},
+              "description": {"type":"string"},
+              "overview": {"type":"string"},
+              "status": {"type":"string","enum":["upcoming","active","past","archived"]},
+              "artwork": {"anyOf":[{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},{"type":"null"}]},
+              "startAt": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              "endAt": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "stories": {"type":"array","items":{"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991}}
+            },
+            "required": ["id","slug","title","format","description","overview","status","artwork","modifiedAt","stories"],
+            "additionalProperties": false
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+              "slug": {"type":"string","pattern":"^[a-z0-9]+(?:[-_][a-z0-9]+)*$"},
+              "title": {"type":"string","minLength":1},
+              "type": {"type":"string"},
+              "startAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "endAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  {"type":"null"}
+                ]
+              },
+              "allDay": {"type":"boolean"},
+              "location": {"type":"string"},
+              "description": {"type":"string"},
+              "externalUrl": {"anyOf":[{"type":"string","format":"uri"},{"type":"string","const":""}]},
+              "status": {"type":"string","enum":["scheduled","canceled"]}
+            },
+            "required": ["id","slug","title","type","startAt","endAt","allDay","location","description","externalUrl","status"],
+            "additionalProperties": false
+          }
+        },
+        "polls": {"type":"array","items":{"$ref":"#/$defs/poll"}},
+        "media": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+              "filename": {"type":"string","minLength":1},
+              "kind": {"type":"string","enum":["image","audio","document"]},
+              "alt": {"type":"string"},
+              "creator": {"type":"string"},
+              "credit": {"type":"string"},
+              "copyright": {"type":"string"},
+              "license": {"type":"string"},
+              "manifest": {"$ref":"#/$defs/mediaManifest"}
+            },
+            "required": ["id","filename","kind","alt","creator","credit","copyright","license","manifest"],
+            "additionalProperties": false
+          }
+        },
+        "redirects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type":"integer","exclusiveMinimum":0,"maximum":9007199254740991},
+              "from": {"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},
+              "to": {"type":"string","pattern":"^\\/(?:[a-z0-9_-]+\\/)*$"},
+              "status": {"type":"number","const":301}
+            },
+            "required": ["id","from","to","status"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "stories",
+        "people",
+        "sections",
+        "topics",
+        "pages",
+        "corrections",
+        "collections",
+        "events",
+        "polls",
+        "media",
+        "redirects"
+      ],
+      "additionalProperties": false
+    },
+    "counts": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "stories",
+          "people",
+          "sections",
+          "topics",
+          "pages",
+          "corrections",
+          "collections",
+          "events",
+          "polls",
+          "media",
+          "redirects"
+        ]
+      },
+      "additionalProperties": {"type":"integer","minimum":0,"maximum":9007199254740991},
+      "required": [
+        "stories",
+        "people",
+        "sections",
+        "topics",
+        "pages",
+        "corrections",
+        "collections",
+        "events",
+        "polls",
+        "media",
+        "redirects"
+      ]
+    }
+  },
+  "required": ["schemaVersion","revision","generatedAt","publication","datasets","counts"],
+  "additionalProperties": false,
+  "$defs": {
+    "poll": {
+      "type": "object",
+      "properties": {
+        "id": {"type":"string","minLength":1,"maxLength":64},
+        "question": {"type":"string","minLength":1,"maxLength":300},
+        "options": {
+          "minItems": 2,
+          "maxItems": 12,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {"id":{"type":"string","minLength":1,"maxLength":64},"label":{"type":"string","minLength":1,"maxLength":200}},
+            "required": ["id","label"],
+            "additionalProperties": false
+          }
+        },
+        "votingOpen": {"type":"boolean"},
+        "results": {
+          "type": "object",
+          "properties": {
+            "totalVotes": {"type":"integer","minimum":0,"maximum":9007199254740991},
+            "votes": {
+              "type": "object",
+              "propertyNames": {"type":"string","minLength":1},
+              "additionalProperties": {"type":"integer","minimum":0,"maximum":9007199254740991}
+            }
+          },
+          "required": ["totalVotes","votes"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["id","question","options","votingOpen"],
+      "additionalProperties": false
+    },
+    "articleBody": {
+      "description": "The semantic ArticleBody from @byline/article-body. Its exhaustive registry and runtime validator define the fields of each node variant.",
+      "type": "object",
+      "properties": {
+        "format": {"const":"byline-v1"},
+        "version": {"const":1},
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": {
+                "enum": [
+                  "paragraph",
+                  "heading",
+                  "list",
+                  "photo",
+                  "gallery",
+                  "portraitText",
+                  "video",
+                  "audio",
+                  "reportedQuote",
+                  "pullQuote",
+                  "keyFacts",
+                  "context",
+                  "editorsNote",
+                  "marginNote",
+                  "expandable",
+                  "document",
+                  "chartMap",
+                  "dataTable",
+                  "comparison",
+                  "keyNumbers",
+                  "annotatedImage",
+                  "beforeAfter",
+                  "visualChapter",
+                  "timeline",
+                  "relatedCoverage",
+                  "poll",
+                  "repositoryInteractive"
+                ]
+              }
+            }
+          }
+        },
+        "media": {"type":"object","additionalProperties":{"$ref":"#/$defs/articleMedia"}},
+        "references": {
+          "type": "object",
+          "properties": {
+            "stories": {"type":"object","additionalProperties":{"$ref":"#/$defs/storyReference"}},
+            "polls": {"type":"object","additionalProperties":{"$ref":"#/$defs/poll"}}
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "required": ["format","version","nodes","media"],
+      "additionalProperties": false
+    },
+    "articleMedia": {
+      "type": "object",
+      "properties": {
+        "id": {"anyOf":[{"type":"integer","minimum":1},{"type":"string","minLength":1}]},
+        "kind": {"enum":["image","document","audio"]},
+        "src": {"type":"string","pattern":"^/_byline/media/(images|documents|audio)/"},
+        "width": {"anyOf":[{"type":"integer","minimum":1},{"type":"null"}]},
+        "height": {"anyOf":[{"type":"integer","minimum":1},{"type":"null"}]},
+        "mimeType": {"type":"string"},
+        "filename": {"type":"string"},
+        "filesize": {"anyOf":[{"type":"integer","minimum":1},{"type":"null"}]},
+        "alt": {"type":"string"},
+        "credit": {"type":"string"},
+        "focalPoint": {
+          "type": "object",
+          "properties": {"x":{"type":"number","minimum":0,"maximum":100},"y":{"type":"number","minimum":0,"maximum":100}},
+          "required": ["x","y"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["id","kind","src","width","height","mimeType","filename","filesize","alt","credit"],
+      "additionalProperties": false
+    },
+    "storyReference": {
+      "type": "object",
+      "properties": {
+        "id": {"anyOf":[{"type":"integer","minimum":1},{"type":"string","minLength":1}]},
+        "headline": {"type":"string"},
+        "href": {"type":"string"},
+        "section": {"type":"string"},
+        "publishedAt": {"type":"string","format":"date-time"},
+        "thumbnail": {"anyOf":[{"type":"integer","minimum":1},{"type":"string","minLength":1}]}
+      },
+      "required": ["id","headline","href","publishedAt"],
+      "additionalProperties": false
+    },
+    "imageFile": {
+      "type": "object",
+      "properties": {
+        "sha256": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+        "bytes": {"type":"integer","minimum":1},
+        "mimeType": {"enum":["image/webp","image/jpeg"]},
+        "publicPath": {"type":"string","pattern":"^/_byline/media/(images|documents|audio)/"},
+        "width": {"type":"integer","minimum":1},
+        "height": {"type":"integer","minimum":1}
+      },
+      "required": ["sha256","bytes","mimeType","publicPath","width","height"],
+      "additionalProperties": false
+    },
+    "mediaManifest": {
+      "description": "Immutable publication Media recipe output. The runtime validator also checks digest-derived paths, file sizes, responsive ladders and crop geometry.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {"const":1},
+            "recipeVersion": {"type":"integer","minimum":1},
+            "kind": {"const":"image"},
+            "source": {
+              "type": "object",
+              "properties": {
+                "width": {"type":"integer","minimum":1},
+                "height": {"type":"integer","minimum":1},
+                "animated": {"type":"boolean"},
+                "hasAlpha": {"type":"boolean"}
+              },
+              "required": ["width","height","animated","hasAlpha"],
+              "additionalProperties": false
+            },
+            "focalPoint": {
+              "type": "object",
+              "properties": {"x":{"type":"number","minimum":0,"maximum":100},"y":{"type":"number","minimum":0,"maximum":100}},
+              "required": ["x","y"],
+              "additionalProperties": false
+            },
+            "natural": {"type":"array","items":{"$ref":"#/$defs/imageFile"},"minItems":1},
+            "crops": {
+              "type": "object",
+              "properties": {
+                "wide": {
+                  "type": "object",
+                  "properties": {
+                    "rect": {
+                      "type": "object",
+                      "properties": {
+                        "x": {"type":"number","minimum":0,"maximum":1},
+                        "y": {"type":"number","minimum":0,"maximum":1},
+                        "w": {"type":"number","minimum":0,"maximum":1},
+                        "h": {"type":"number","minimum":0,"maximum":1}
+                      },
+                      "required": ["x","y","w","h"],
+                      "additionalProperties": false
+                    },
+                    "renditions": {"type":"array","items":{"$ref":"#/$defs/imageFile"},"minItems":1}
+                  },
+                  "required": ["rect","renditions"],
+                  "additionalProperties": false
+                },
+                "card": {
+                  "type": "object",
+                  "properties": {
+                    "rect": {
+                      "type": "object",
+                      "properties": {
+                        "x": {"type":"number","minimum":0,"maximum":1},
+                        "y": {"type":"number","minimum":0,"maximum":1},
+                        "w": {"type":"number","minimum":0,"maximum":1},
+                        "h": {"type":"number","minimum":0,"maximum":1}
+                      },
+                      "required": ["x","y","w","h"],
+                      "additionalProperties": false
+                    },
+                    "renditions": {"type":"array","items":{"$ref":"#/$defs/imageFile"},"minItems":1}
+                  },
+                  "required": ["rect","renditions"],
+                  "additionalProperties": false
+                },
+                "standard": {
+                  "type": "object",
+                  "properties": {
+                    "rect": {
+                      "type": "object",
+                      "properties": {
+                        "x": {"type":"number","minimum":0,"maximum":1},
+                        "y": {"type":"number","minimum":0,"maximum":1},
+                        "w": {"type":"number","minimum":0,"maximum":1},
+                        "h": {"type":"number","minimum":0,"maximum":1}
+                      },
+                      "required": ["x","y","w","h"],
+                      "additionalProperties": false
+                    },
+                    "renditions": {"type":"array","items":{"$ref":"#/$defs/imageFile"},"minItems":1}
+                  },
+                  "required": ["rect","renditions"],
+                  "additionalProperties": false
+                },
+                "square": {
+                  "type": "object",
+                  "properties": {
+                    "rect": {
+                      "type": "object",
+                      "properties": {
+                        "x": {"type":"number","minimum":0,"maximum":1},
+                        "y": {"type":"number","minimum":0,"maximum":1},
+                        "w": {"type":"number","minimum":0,"maximum":1},
+                        "h": {"type":"number","minimum":0,"maximum":1}
+                      },
+                      "required": ["x","y","w","h"],
+                      "additionalProperties": false
+                    },
+                    "renditions": {"type":"array","items":{"$ref":"#/$defs/imageFile"},"minItems":1}
+                  },
+                  "required": ["rect","renditions"],
+                  "additionalProperties": false
+                },
+                "portrait": {
+                  "type": "object",
+                  "properties": {
+                    "rect": {
+                      "type": "object",
+                      "properties": {
+                        "x": {"type":"number","minimum":0,"maximum":1},
+                        "y": {"type":"number","minimum":0,"maximum":1},
+                        "w": {"type":"number","minimum":0,"maximum":1},
+                        "h": {"type":"number","minimum":0,"maximum":1}
+                      },
+                      "required": ["x","y","w","h"],
+                      "additionalProperties": false
+                    },
+                    "renditions": {"type":"array","items":{"$ref":"#/$defs/imageFile"},"minItems":1}
+                  },
+                  "required": ["rect","renditions"],
+                  "additionalProperties": false
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            },
+            "seo": {
+              "type": "object",
+              "properties": {
+                "16x9": {
+                  "type": "object",
+                  "properties": {
+                    "sha256": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+                    "bytes": {"type":"integer","minimum":1},
+                    "mimeType": {"enum":["image/webp","image/jpeg"]},
+                    "publicPath": {"type":"string","pattern":"^/_byline/media/(images|documents|audio)/"},
+                    "width": {"type":"integer","minimum":1},
+                    "height": {"type":"integer","minimum":1},
+                    "origin": {"enum":["custom","auto"]}
+                  },
+                  "required": ["sha256","bytes","mimeType","publicPath","width","height","origin"],
+                  "additionalProperties": false
+                },
+                "4x3": {
+                  "type": "object",
+                  "properties": {
+                    "sha256": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+                    "bytes": {"type":"integer","minimum":1},
+                    "mimeType": {"enum":["image/webp","image/jpeg"]},
+                    "publicPath": {"type":"string","pattern":"^/_byline/media/(images|documents|audio)/"},
+                    "width": {"type":"integer","minimum":1},
+                    "height": {"type":"integer","minimum":1},
+                    "origin": {"enum":["custom","auto"]}
+                  },
+                  "required": ["sha256","bytes","mimeType","publicPath","width","height","origin"],
+                  "additionalProperties": false
+                },
+                "1x1": {
+                  "type": "object",
+                  "properties": {
+                    "sha256": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+                    "bytes": {"type":"integer","minimum":1},
+                    "mimeType": {"enum":["image/webp","image/jpeg"]},
+                    "publicPath": {"type":"string","pattern":"^/_byline/media/(images|documents|audio)/"},
+                    "width": {"type":"integer","minimum":1},
+                    "height": {"type":"integer","minimum":1},
+                    "origin": {"enum":["custom","auto"]}
+                  },
+                  "required": ["sha256","bytes","mimeType","publicPath","width","height","origin"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["16x9","4x3","1x1"],
+              "additionalProperties": false
+            },
+            "social": {
+              "type": "object",
+              "properties": {
+                "sha256": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+                "bytes": {"type":"integer","minimum":1},
+                "mimeType": {"enum":["image/webp","image/jpeg"]},
+                "publicPath": {"type":"string","pattern":"^/_byline/media/(images|documents|audio)/"},
+                "width": {"type":"integer","minimum":1},
+                "height": {"type":"integer","minimum":1},
+                "origin": {"enum":["custom","auto"]}
+              },
+              "required": ["sha256","bytes","mimeType","publicPath","width","height","origin"],
+              "additionalProperties": false
+            },
+            "animation": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "sha256": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+                    "bytes": {"type":"integer","minimum":1},
+                    "mimeType": {"const":"image/webp"},
+                    "publicPath": {"type":"string","pattern":"^/_byline/media/(images|documents|audio)/"},
+                    "width": {"type":"integer","minimum":1},
+                    "height": {"type":"integer","minimum":1},
+                    "frames": {"type":"integer","minimum":1}
+                  },
+                  "required": ["sha256","bytes","mimeType","publicPath","width","height","frames"],
+                  "additionalProperties": false
+                },
+                {"type":"null"}
+              ]
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {"code":{"type":"string"},"message":{"type":"string"},"target":{"type":"string"}},
+                "required": ["code","message"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "recipeVersion",
+            "kind",
+            "source",
+            "focalPoint",
+            "natural",
+            "crops",
+            "seo",
+            "social",
+            "animation",
+            "warnings"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {"const":1},
+            "recipeVersion": {"type":"integer","minimum":1},
+            "kind": {"enum":["document","audio"]},
+            "file": {
+              "type": "object",
+              "properties": {
+                "sha256": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+                "bytes": {"type":"integer","minimum":1},
+                "mimeType": {"enum":["image/webp","image/jpeg","application/pdf","audio/mpeg","audio/mp4","audio/wav"]},
+                "publicPath": {"type":"string","pattern":"^/_byline/media/(images|documents|audio)/"},
+                "width": {"type":"integer","minimum":1},
+                "height": {"type":"integer","minimum":1}
+              },
+              "required": ["sha256","bytes","mimeType","publicPath"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["schemaVersion","recipeVersion","kind","file"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

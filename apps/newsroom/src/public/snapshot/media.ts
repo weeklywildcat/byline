@@ -1,22 +1,17 @@
-import { escapeHtml } from "@byline/content/story";
 import type { ArticleMediaAsset } from "@byline/article-body";
 import { mediaCredit, mediaKindOf } from "@byline/article-body";
 import {
   largestNaturalImage,
-  legacyRenditionsFromManifest,
   publicationManifestBlobs,
   publicationMediaReadiness,
-  publicationMediaStem,
-  type PublicationImageFile,
-  type PublicationImageManifest,
-  type PublicationMediaManifest
+  type PublicMediaSnapshot
 } from "@byline/content";
 import type { Payload } from "payload";
 import { publicationStore, type PublicationStore } from "../../publication-media/blob-store";
 import { PublicSnapshotError } from "./errors";
 
 /**
- * Referenced Media → prepared public media, for the v1 snapshot.
+ * Referenced Media → prepared public media, for the native snapshot.
  *
  * The catalog is a closed set built from public inputs only (Story lead and
  * body media, public portraits, public Collection artwork). Every asset must
@@ -34,7 +29,6 @@ import { PublicSnapshotError } from "./errors";
 type MediaRow = {
   id: number;
   filename?: string | null;
-  mimeType?: string | null;
   alt?: string | null;
   creator?: string | null;
   credit?: string | null;
@@ -44,33 +38,10 @@ type MediaRow = {
   publicationAssets?: { status?: string | null; preparedRevision?: number | null; recipeVersion?: number | null; manifest?: unknown } | null;
 };
 
-export type PreparedMedia = {
-  id: number;
-  filename: string;
-  alt: string;
-  creator: string;
-  credit: string;
-  copyright: string;
-  license: string;
-  manifest: PublicationMediaManifest;
-};
-
-/** A v1 attachment record (WordPress-compatible) plus the prepared-media build extension. */
-export type SnapshotAttachment = Record<string, unknown> & { id: number; source_url: string };
-
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
-const isUrl = (value: string) => /^https?:\/\/\S+$/i.test(value) || (value.startsWith("/") && !value.startsWith("//"));
-
-/** The natural file at or above `width` (or the largest): a sensible single file for a fixed-size use. */
-export function naturalAtLeast(manifest: PublicationImageManifest, width: number): PublicationImageFile {
-  return manifest.natural.find((file) => file.width >= width) ?? largestNaturalImage(manifest);
-}
-
-export const focalPosition = (manifest: PublicationImageManifest): string | undefined =>
-  Math.abs(manifest.focalPoint.x - 50) > 0.5 || Math.abs(manifest.focalPoint.y - 50) > 0.5 ? `${manifest.focalPoint.x}% ${manifest.focalPoint.y}%` : undefined;
 
 export class PreparedMediaCatalog {
-  private readonly prepared = new Map<number, PreparedMedia>();
+  private readonly prepared = new Map<number, PublicMediaSnapshot>();
   private readonly problems: string[] = [];
 
   private constructor(private readonly store: PublicationStore) {}
@@ -80,14 +51,14 @@ export class PreparedMediaCatalog {
    * referenced, for an actionable not-ready message. Throws `media-not-ready`
    * listing every problem at once.
    */
-  static async load(payload: Payload, references: Map<number, { usage: string; kind: "image" | "document" | "any" }>, options: { store?: PublicationStore } = {}): Promise<PreparedMediaCatalog> {
+  static async load(payload: Payload, references: Map<number, { usage: string; kind: "image" | "any" }>, options: { store?: PublicationStore } = {}): Promise<PreparedMediaCatalog> {
     const catalog = new PreparedMediaCatalog(options.store ?? publicationStore());
     const ids = [...references.keys()].sort((a, b) => a - b);
     const found = ids.length
       ? await payload.find({
           collection: "media",
           where: { id: { in: ids } },
-          select: { filename: true, mimeType: true, alt: true, creator: true, credit: true, copyright: true, license: true, publicationRevision: true, publicationAssets: true },
+          select: { filename: true, alt: true, creator: true, credit: true, copyright: true, license: true, publicationRevision: true, publicationAssets: true },
           depth: 0,
           pagination: false,
           overrideAccess: true,
@@ -114,10 +85,6 @@ export class PreparedMediaCatalog {
         catalog.problems.push(`${name}, used by ${reference.usage}: an image is required.`);
         continue;
       }
-      if (reference.kind === "document" && manifest.kind !== "document") {
-        catalog.problems.push(`${name}, used by ${reference.usage}: a PDF document is required.`);
-        continue;
-      }
       const missing: string[] = [];
       for (const blob of publicationManifestBlobs(manifest)) if (!(await catalog.store.has(blob.sha256, blob.bytes))) missing.push(blob.publicPath);
       if (missing.length) {
@@ -126,6 +93,7 @@ export class PreparedMediaCatalog {
       }
       catalog.prepared.set(id, {
         id,
+        kind: manifest.kind,
         filename: text(row.filename),
         alt: text(row.alt),
         creator: text(row.creator),
@@ -141,24 +109,8 @@ export class PreparedMediaCatalog {
     return catalog;
   }
 
-  get(id: number): PreparedMedia | null {
-    return this.prepared.get(id) ?? null;
-  }
-
-  require(id: number): PreparedMedia {
-    const media = this.prepared.get(id);
-    if (!media) throw new PublicSnapshotError("invalid-projection", `Media ${id} was used without being referenced first.`);
-    return media;
-  }
-
-  image(id: number): { media: PreparedMedia; manifest: PublicationImageManifest } {
-    const media = this.require(id);
-    if (media.manifest.kind !== "image") throw new PublicSnapshotError("invalid-projection", `Media ${id} is not an image.`);
-    return { media, manifest: media.manifest };
-  }
-
-  ids(): number[] {
-    return [...this.prepared.keys()].sort((a, b) => a - b);
+  records(): PublicMediaSnapshot[] {
+    return [...this.prepared.values()];
   }
 
   /**
@@ -185,80 +137,5 @@ export class PreparedMediaCatalog {
       };
     }
     return { ...base, kind: mediaKindOf(manifest.file.mimeType), src: manifest.file.publicPath, width: null, height: null, mimeType: manifest.file.mimeType, filesize: manifest.file.bytes };
-  }
-
-  /** The v1 attachment record: WordPress-compatible fields from prepared files only, plus `bylinePublication`. */
-  attachment(id: number, options: { caption?: string } = {}): SnapshotAttachment {
-    const media = this.require(id);
-    const { manifest } = media;
-    const caption = options.caption ? `<p>${escapeHtml(options.caption)}</p>\n` : "";
-    const credit = {
-      creator: media.creator,
-      creditText: media.credit,
-      copyrightNotice: media.copyright,
-      licenseUrl: isUrl(media.license) ? media.license : "",
-      acquireLicensePage: ""
-    };
-    const common = {
-      id,
-      slug: publicationMediaStem(media.filename || `media-${id}`),
-      type: "attachment",
-      title: { rendered: "" },
-      caption: { rendered: caption },
-      alt_text: media.alt
-    };
-    if (manifest.kind === "image") {
-      const largest = largestNaturalImage(manifest);
-      const sizes = Object.fromEntries(manifest.natural.map((file) => [`byline-natural-${file.width}`, {
-        file: file.publicPath.split("/").pop()!,
-        width: file.width,
-        height: file.height,
-        mime_type: file.mimeType,
-        source_url: file.publicPath
-      }]));
-      const crops = Object.fromEntries(Object.entries(manifest.crops).map(([shape, family]) => [shape, family!.rect]));
-      const artDirection = { focalPoint: { ...manifest.focalPoint }, crops, renditions: legacyRenditionsFromManifest(manifest) };
-      return {
-        ...common,
-        media_type: "image",
-        mime_type: largest.mimeType,
-        source_url: largest.publicPath,
-        media_details: {
-          width: largest.width,
-          height: largest.height,
-          sizes,
-          image_meta: { caption: "", copyright: media.copyright, credit: media.credit }
-        },
-        bylineImage: { ...credit, artDirection },
-        weeklyWildcatImage: { ...credit, artDirection },
-        bylinePublication: { manifest }
-      };
-    }
-    return {
-      ...common,
-      media_type: "file",
-      mime_type: manifest.file.mimeType,
-      source_url: manifest.file.publicPath,
-      media_details: { filesize: manifest.file.bytes },
-      bylinePublication: { manifest }
-    };
-  }
-
-  /** A public photo record (`{ id, url, alt, width, height, objectPosition? }`) for portraits and artwork. */
-  photo(id: number, options: { shape?: "square"; minWidth: number }): { id: number; url: string; alt: string; width: number; height: number; objectPosition?: string } {
-    const { media, manifest } = this.image(id);
-    const crop = options.shape ? manifest.crops[options.shape] : undefined;
-    if (crop) {
-      const file = crop.renditions.find((candidate) => candidate.width >= options.minWidth) ?? crop.renditions[crop.renditions.length - 1];
-      return { id, url: file.publicPath, alt: media.alt, width: file.width, height: file.height };
-    }
-    const file = naturalAtLeast(manifest, options.minWidth);
-    const position = focalPosition(manifest);
-    return { id, url: file.publicPath, alt: media.alt, width: file.width, height: file.height, ...(position ? { objectPosition: position } : {}) };
-  }
-
-  /** Every attachment record, by Media ID. */
-  attachments(): SnapshotAttachment[] {
-    return this.ids().map((id) => this.attachment(id));
   }
 }

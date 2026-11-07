@@ -1,3 +1,5 @@
+import { nativeStory } from "./native-snapshot";
+import { publicPageHref } from "./native-archive-views";
 import { CODE_ROUTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
 import { filterGeneralEditorialPosts, getBehindTheScenesPosts } from "@/lib/content";
@@ -84,6 +86,8 @@ export function buildSitemapEntries(input: SitemapInput): SitemapEntry[] {
 
   // A live story's newest update is newer than the post's own modified time.
   const postDates = new Map(posts.map((post) => {
+    const native = nativeStory(post.id);
+    if (native) return [post.id, latest([new Date(native.modifiedAt), native.live ? new Date(native.live.updatedAt) : undefined])];
     const live = getPostLiveCoverage(post);
     const dates = [live?.startedAt, live?.endedAt, ...(live?.updates.map((update) => update.modified) ?? [])]
       .filter((date): date is string => Boolean(date)).map((date) => new Date(date));
@@ -134,7 +138,7 @@ export function buildSitemapEntries(input: SitemapInput): SitemapEntry[] {
   for (const page of input.pages) {
     if (page.slug === BEHIND_THE_SCENES.slug || page.slug === BEHIND_THE_SCENES.pageSlug) continue;
     if (getPageIndexing(page) !== "public") continue;
-    add({ url: url(`/${page.slug}/`), lastModified: modifiedAt(page, timeZone), changeFrequency: "monthly", priority: 0.5 });
+    add({ url: url(publicPageHref(page)), lastModified: modifiedAt(page, timeZone), changeFrequency: "monthly", priority: 0.5 });
   }
 
   for (const post of posts) {

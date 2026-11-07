@@ -16,7 +16,6 @@ export type PublicBuildDatasets = {
   corrections: Array<{ id: number | string; type: string; text: string; date: string; storyId: number; story: { id: number; title: string; url: string; slug: string } }>;
   coverages: Array<{ id: number | string; slug: string; title: string; format?: string; description: string; overview: string; startAt?: string; endAt?: string; status: string; artwork: { id?: number; url: string; alt: string } | null; stories: Array<{ id: number; slug: string; title: string; url: string; excerpt: string; publishedAt: string; modifiedAt: string }> }>;
   schoolEvents: SchoolEvent[];
-  /** Payload snapshots add the prepared-media build extension (`bylinePublication.manifest`). */
   attachments: WordPressMedia[];
 };
 export type PublicBuildSnapshot = {
@@ -34,7 +33,7 @@ export type BuildSnapshotPointer = {
 function requireCondition(condition: unknown, detail: string): asserts condition {
   if (!condition) throw new Error(`Invalid Byline build snapshot: ${detail}`);
 }
-/** The shared v1 validator (@byline/content): the same rules every producer applies before promotion. */
+/** The separate WordPress build contract. Payload acquisition uses native-snapshot. */
 export function validateBuildSnapshot(value: unknown): PublicBuildSnapshot {
   return validatePublicBuildSnapshotV1<PublicBuildSnapshot>(value);
 }

@@ -314,7 +314,7 @@ BYLINE_BUILD_TOKEN=… npm run materialize:publication-media --workspace @byline
 
 It runs inside the Astro build wrapper for a Payload snapshot (Phase 7): after
 Astro succeeds and before `postbuild`, the closed descriptor set named by the
-snapshot's attachment manifests is acquired from
+native snapshot's Media manifests is acquired from
 `<BYLINE_NEWSROOM_BUILD_URL>/media`. It is not part of the WordPress path:
 WordPress snapshots keep the WordPress media materializers.
 
@@ -350,7 +350,7 @@ automatically.
 > prepared generations in an immutable public snapshot and the static build
 > acquires those exact bytes. ([payload-build-snapshots.md](payload-build-snapshots.md))
 
-A snapshot's attachment carries `bylinePublication.manifest`, validated with
+Each native snapshot Media record carries a `PublicationMediaManifest`, validated with
 `validatePublicationMediaManifest`; a referenced asset without a current
 generation (or with a file missing from the store) stops the snapshot as
 `media-not-ready`. A successful preparation promotion re-queues
@@ -420,4 +420,4 @@ After deploying Phase 5, run `payload migrate`, start the worker, then
 Visual Chapter, Audio, Document, Chart / Map (fallback or static image),
 Annotated Image and Before / After (both photographs). Video is external
 YouTube and never enters preparation. A related Story's thumbnail is Media in the
-body's table once references resolve; its preparation belongs to snapshot v2.
+body's table once references resolve. Snapshot v2 stores the full manifest in its Media dataset.

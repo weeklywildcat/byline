@@ -1,3 +1,5 @@
+import { getNativeSnapshot } from "./native-snapshot";
+import { nativeUpcomingEvents } from "./native-archive-views";
 import { getLocalBuildSnapshot } from "./prepared-snapshot";
 import { upcomingSnapshotEvents } from "./snapshot-events";
 import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
@@ -374,6 +376,8 @@ async function headlessFetch<T>(path: string, query: Record<string, QueryValue> 
 async function headlessFetchPage<T>(path: string, query: Record<string, QueryValue> = {}) {
   assertPreparedBuildMode();
   if (hasPreparedSnapshot()) {
+    const native = getNativeSnapshot();
+    if (native && path === "/school-events") return { data: nativeUpcomingEvents(native, Number(query.per_page) || 20) as T, totalPages: 1 };
     const data = await getPreparedDatasets();
     if (path === "/school-events") return { data: upcomingSnapshotEvents(data.schoolEvents, getLocalBuildSnapshot()!.sourceTimezone, Number(query.per_page) || 20) as T, totalPages: 1 };
     // Sports source records are frozen into native Pages. A future route must

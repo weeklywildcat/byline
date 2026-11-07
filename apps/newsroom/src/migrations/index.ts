@@ -6,6 +6,7 @@ import * as migration_20261107_060721_remove_break_glass from './20261107_060721
 import * as migration_20261107_060841_publication_media_pipeline from './20261107_060841_publication_media_pipeline';
 import * as migration_20261107_073047_public_snapshot_v1 from './20261107_073047_public_snapshot_v1';
 import * as migration_20261107_171524_presence_sessions from './20261107_171524_presence_sessions';
+import * as migration_20261107_203133_public_collection_modified_at from './20261107_203133_public_collection_modified_at';
 
 export const migrations = [
   {
@@ -46,6 +47,11 @@ export const migrations = [
   {
     up: migration_20261107_171524_presence_sessions.up,
     down: migration_20261107_171524_presence_sessions.down,
-    name: '20261107_171524_presence_sessions'
+    name: '20261107_171524_presence_sessions',
+  },
+  {
+    up: migration_20261107_203133_public_collection_modified_at.up,
+    down: migration_20261107_203133_public_collection_modified_at.down,
+    name: '20261107_203133_public_collection_modified_at'
   },
 ];

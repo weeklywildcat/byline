@@ -27,7 +27,7 @@ export function createArticleLiveView(live: LiveCoverage, options: {
     authorHref: update.authorSlug && options.authorHref ? options.authorHref(update.authorSlug) : null,
     authorRole: update.authorRole || null,
     authorPhoto: update.authorPhoto ? { src: update.authorPhoto.url, width: update.authorPhoto.width, height: update.authorPhoto.height } : null,
-    image: update.image ? { ...update.image, src: update.image.url } : null
+    image: update.image ? { src: update.image.url, alt: update.image.alt, width: update.image.width, height: update.image.height, credit: update.image.credit } : null
   }));
   const pinned = live.updates.find((update) => update.pinned);
   const updatedAt = [live.startedAt, live.endedAt, ...live.updates.map((update) => update.modified)]

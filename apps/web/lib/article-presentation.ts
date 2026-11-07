@@ -1,3 +1,5 @@
+import { nativeStory } from "./native-snapshot";
+import { nativeArticleCard } from "./native-article";
 import type { ImageCropShape } from "@byline/core";
 import {
   buildArticlePresentation as buildCanonicalArticlePresentation,
@@ -33,6 +35,8 @@ import { getPostContributors, isGuestContributor, type WordPressAuthor, type Wor
 export { isCoverageComplete };
 
 export function getArticleReadingTime(post: WordPressPost) {
+  const native = nativeStory(post.id);
+  if (native) return storyReadingTime(native);
   return storyReadingTime({ body: { format: "legacy-html", html: post.content.rendered }, excerptHtml: post.excerpt.rendered });
 }
 
@@ -44,6 +48,8 @@ export function hasArticleUpdatedDate(post: WordPressPost) {
 const COMPACT_CARD_IMAGE = { shape: "square", sizes: "(max-width: 900px) 100vw, 360px" } as const;
 
 export function articleStoryCard(post: WordPressPost, imageOptions: { shape: ImageCropShape; sizes: string } = COMPACT_CARD_IMAGE): ArticleStoryCardView {
+  const native = nativeStory(post.id);
+  if (native) return nativeArticleCard(native, imageOptions);
   return storyCardView(wordpressStorySummary(post), {
     image: (image) => wordpressImage(image, imageOptions.sizes, false, "presentation", imageOptions.shape),
     formatDate: formatDisplayDate

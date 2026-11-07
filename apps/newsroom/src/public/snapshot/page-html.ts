@@ -5,7 +5,7 @@ import { PublicSnapshotError } from "./errors";
 
 /**
  * A published Page's bounded prose (`proseEditor`: paragraph, H2/H3, bold,
- * italic, web links, bulleted and numbered lists) as v1 `content.rendered`,
+ * italic, web links, bulleted and numbered lists) as public HTML,
  * converted on demand with Payload's supported Lexical HTML converter and
  * never stored. Only those nodes and formats are converted; anything else in
  * a published Page fails preparation rather than being dropped or emitted as
@@ -59,14 +59,14 @@ const converters: HTMLConverters = {
   }
 };
 
-/** HTML for a Page body, or a `unsupported-story-content` error naming the page and node. */
+/** HTML for a Page body, or a `invalid-projection` error naming the page and node. */
 export function pageBodyHtml(body: unknown, page: { id: number; title: string }): string {
   if (!body || typeof body !== "object" || !(body as { root?: unknown }).root) return "";
   const root = (body as { root: Node }).root;
   const problems: string[] = [];
   check(root, "root", problems);
   if (problems.length) {
-    throw new PublicSnapshotError("unsupported-story-content", `Page ${page.id} (“${page.title.slice(0, 80)}”) has content the public site cannot carry: ${problems[0]}${problems.length > 1 ? ` (+${problems.length - 1} more)` : ""}.`, problems.slice(0, 10));
+    throw new PublicSnapshotError("invalid-projection", `Page ${page.id} (“${page.title.slice(0, 80)}”) has content the public site cannot carry: ${problems[0]}${problems.length > 1 ? ` (+${problems.length - 1} more)` : ""}.`, problems.slice(0, 10));
   }
   return convertLexicalToHTML({ data: body as never, converters, disableContainer: true, disableIndent: true, disableTextAlign: true });
 }

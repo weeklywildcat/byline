@@ -1,36 +1,14 @@
 import type { Payload } from "payload";
 import { relationId } from "../access/user";
-import type { Person } from "../payload-types";
+import type { PublicPersonSnapshot } from "@byline/content";
 
-/** A build input, not a public media URL. Phase 7 materializes public renditions. */
-export type PublicPerson = {
-  id: number;
-  name: string;
-  slug: string;
-  pronouns: string;
-  newsroomRole: string;
-  shortBio: string;
-  bio: string;
-  status: Person["status"];
-  portrait: {
-    id: number;
-    alt: string;
-    width: number | null;
-    height: number | null;
-  } | null;
-  directoryVisible: boolean;
-  hasProfilePage: boolean;
+/** Public facts with portrait dimensions for callers that use the newsroom projection. */
+export type PublicPerson = Omit<PublicPersonSnapshot, "portrait"> & {
+  portrait: { id: number; alt: string; width: number | null; height: number | null } | null;
   href: string | null;
-  publicEmail: string;
-  socials: { label: string; url: string }[];
 };
 
-/**
- * The future authors/guests compatibility datasets share one Person authority.
- * Classification follows editorial status, NEVER account linkage. No Users
- * query, join, private image URL or spread of a CMS record is allowed here.
- * Not connected to Snapshot v1/v2 or production delivery in this phase.
- */
+/** Classification uses editorial status. Account linkage never participates. */
 export async function publicPeople(
   payload: Payload,
 ): Promise<{ authors: PublicPerson[]; guests: PublicPerson[] }> {

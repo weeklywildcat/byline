@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "@byline/article-body": "0.1.0",
-    "@byline/core": "0.1.0"
+    "@byline/core": "0.1.0",
+    "zod": "4.6.7"
   },
   "description": "Provider-neutral Byline content: the canonical public Story and article presentation model, the rules that build it, snapshot/index/routing helpers. No React, CMS or Astro dependencies."
 }

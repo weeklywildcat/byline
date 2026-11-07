@@ -144,6 +144,10 @@ export function isPublicationMediaPath(path: unknown, sha256?: string, mimeType?
 const positiveInt = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
+function unexpectedFields(value: Record<string, unknown>, allowed: readonly string[], where: string): string[] {
+  return Object.keys(value).filter((key) => !allowed.includes(key)).map((key) => `${where}: unexpected field ${key}`);
+}
+
 function blobErrors(value: unknown, where: string, options: { image: boolean }): string[] {
   if (!isRecord(value)) return [`${where}: not a file descriptor`];
   const errors: string[] = [];
@@ -196,14 +200,18 @@ export function validatePublicationMediaManifest(value: unknown): PublicationMan
   } else if (value.kind === "image") {
     const source = value.source;
     if (!isRecord(source) || !positiveInt(source.width) || !positiveInt(source.height) || typeof source.animated !== "boolean" || typeof source.hasAlpha !== "boolean") errors.push("source: needs width, height, animated and hasAlpha");
+    if (isRecord(source)) errors.push(...unexpectedFields(source, ["width", "height", "animated", "hasAlpha"], "source"));
     const focal = value.focalPoint;
     if (!isRecord(focal) || typeof focal.x !== "number" || typeof focal.y !== "number" || !(focal.x >= 0 && focal.x <= 100 && focal.y >= 0 && focal.y <= 100)) errors.push("focalPoint: must be 0–100");
+    if (isRecord(focal)) errors.push(...unexpectedFields(focal, ["x", "y"], "focalPoint"));
     errors.push(...ladderErrors(value.natural, "natural"));
     if (!isRecord(value.crops)) errors.push("crops: must be an object");
     else {
       for (const [shape, family] of Object.entries(value.crops)) {
         if (!isImageCropShape(shape) || shape === "social") { errors.push(`crops: unknown shape ${shape}`); continue; }
         if (!isRecord(family) || !rectValid(family.rect)) { errors.push(`crops.${shape}: needs a crop rectangle`); continue; }
+        errors.push(...unexpectedFields(family, ["rect", "renditions"], `crops.${shape}`));
+        if (isRecord(family.rect)) errors.push(...unexpectedFields(family.rect, ["x", "y", "w", "h"], `crops.${shape}.rect`));
         errors.push(...ladderErrors(family.renditions, `crops.${shape}.renditions`));
       }
     }
@@ -223,7 +231,7 @@ export function validatePublicationMediaManifest(value: unknown): PublicationMan
       if (isRecord(value.animation) && (!positiveInt(value.animation.frames) || value.animation.mimeType !== "image/webp")) errors.push("animation: needs a frame count and WebP");
       if (isRecord(source) && source.animated !== true) errors.push("animation: present for a still source");
     } else if (isRecord(source) && source.animated === true) errors.push("animation: missing for an animated source");
-    if (!Array.isArray(value.warnings) || !value.warnings.every((warning) => isRecord(warning) && typeof warning.code === "string" && typeof warning.message === "string")) errors.push("warnings: must be a list of {code, message}");
+    if (!Array.isArray(value.warnings) || !value.warnings.every((warning) => isRecord(warning) && typeof warning.code === "string" && typeof warning.message === "string" && (warning.target === undefined || typeof warning.target === "string") && Object.keys(warning).every((key) => key === "code" || key === "target" || key === "message"))) errors.push("warnings: must be a list of {code, message}");
     const allowed = ["schemaVersion", "recipeVersion", "kind", "source", "focalPoint", "natural", "crops", "seo", "social", "animation", "warnings"];
     for (const key of Object.keys(value)) if (!allowed.includes(key)) errors.push(`manifest: unexpected field ${key}`);
   } else {

@@ -11,8 +11,8 @@ import { PublicSnapshotError } from "./errors";
 export const FORBIDDEN_SNAPSHOT_KEYS = new Set([
   "brief", "resources", "createdBy", "uploadedBy", "linkedPerson", "accounts", "googleSubject", "discordUserId",
   "sessions", "hash", "salt", "resetPasswordToken", "publicationAssets", "sourceHash", "failureMessage", "legacySource",
-  "plan", "workflow", "deadline", "editor", "members", "lead", "interviews", "tasks", "notes", "phone",
-  "folder", "previewSrc"
+  "plan", "workflow", "deadline", "editor", "members", "lead", "interviews", "tasks", "phone",
+  "folder", "previewSrc", "sourceNotes", "storagePath", "originalUrl", "previewUrl", "lexical", "blockType", "blockName", "root", "editorialNotes", "assignedEditor", "appointments", "sources", "storyPlan", "voterKey", "buildToken", "accountPreferences"
 ]);
 
 const FORBIDDEN_TEXT = ["/api/media/file/", "/api/byline/", "/admin/collections/", "/preview/story"];
@@ -36,6 +36,6 @@ export function assertPublicSafe(snapshot: unknown, json: string, env: Record<st
   const token = env.BYLINE_BUILD_TOKEN;
   if (token && token.length >= 16) needles.push(token);
   const newsroom = env.BYLINE_NEWSROOM_URL?.replace(/\/+$/, "");
-  if (newsroom) needles.push(`${newsroom}/api/`, `${newsroom}/admin`);
+  if (newsroom) needles.push(newsroom);
   for (const needle of needles) if (needle && json.includes(needle)) fail(needle === token ? "the build credential" : `a private reference (${needle.startsWith("/") && needle.length > 30 ? "a newsroom storage path" : needle})`);
 }

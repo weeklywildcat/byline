@@ -1,9 +1,8 @@
-import { publicationMediaPath, type PublicationImageManifest } from "@byline/content";
-import { describe, expect, it } from "vitest";
-import { buildSocialImageMetadata, getArticleImageCandidates } from "@/lib/seo";
-import type { WordPressMedia } from "@/lib/wordpress";
+import { publicationMediaPath, type PublicationImageManifest, type PublicStorySnapshot } from "@byline/content";
+import { describe, expect, it, vi } from "vitest";
+import { nativeArticleJsonLd, nativeArticleMetadata } from "@/lib/native-article-seo";
 
-/** Phase 5 prepared files drive a Payload attachment's SEO and social images; Astro never derives crops. */
+/** Phase 5 prepared files drive a native Story's SEO and social images; Astro never derives crops. */
 const file = (label: string, width: number, height: number, mimeType: "image/webp" | "image/jpeg" = "image/webp") => {
   const sha256 = createSha(label);
   return { sha256, bytes: 1000, mimeType, width, height, publicPath: publicationMediaPath({ kind: "image", filename: "board.jpg", label, sha256, mimeType }) };
@@ -24,32 +23,34 @@ const manifest: PublicationImageManifest = {
   animation: null,
   warnings: []
 };
-const attachment = (prepared: boolean): WordPressMedia => ({
-  id: 5, date: "", slug: "board", type: "attachment", link: "", author: 0, title: { rendered: "" }, caption: { rendered: "" }, alt_text: "The board meets.", media_type: "image", mime_type: "image/webp",
-  source_url: manifest.natural[1].publicPath,
-  media_details: { width: 2560, height: 1707, sizes: { a: { file: "a", width: 1440, height: 960, source_url: manifest.natural[0].publicPath } } },
-  ...(prepared ? { bylinePublication: { manifest } } : {})
-});
+vi.mock("@/lib/native-snapshot", () => ({
+  nativeMedia: (id: number) => id === 5 ? { id, kind: "image", filename: "board.jpg", alt: "The board meets.", manifest } : undefined
+}));
 
-describe("SEO images from prepared publication media", () => {
+const section = { key: "section-1", name: "News", href: "/category/news/" };
+const story: PublicStorySnapshot = {
+  id: 1, slug: "board", title: "Board meets", titleHtml: "Board meets", excerptHtml: "", href: "/2026/10/14/news/board/",
+  url: "https://weeklywildcat.com/2026/10/14/news/board/", publishedAt: "2026-10-14T14:05:00.000Z", modifiedAt: "2026-10-14T14:05:00.000Z",
+  body: { format: "byline-v1", version: 1, nodes: [{ type: "paragraph", children: [{ type: "text", text: "The board voted." }] }], media: {} },
+  image: 5, leadCaption: "A public meeting.", section, sections: [section], sectionKeys: [section.key], topics: [], topicKeys: [],
+  contributors: [], contributorKeys: [], athleteMeta: [], corrections: [], reportingNote: [], live: null,
+  format: "standard", presentation: "standard", immersiveAlignment: "bottom-left", primaryVideo: null, videoMetadata: null, video: null, listed: true
+};
+
+describe("SEO images from native prepared publication media", () => {
   it("uses the prepared 16:9, 4:3 and 1:1 files after the largest natural file", () => {
-    expect(getArticleImageCandidates(attachment(true))).toEqual([
-      { url: manifest.natural[1].publicPath, width: 2560, height: 1707 },
-      { url: manifest.seo["16x9"].publicPath, width: 2560, height: 1440 },
-      { url: manifest.seo["4x3"].publicPath, width: 2560, height: 1920 },
-      { url: manifest.seo["1x1"].publicPath, width: 2000, height: 2000 }
-    ]);
+    const schema = nativeArticleJsonLd(story, true);
+    expect(schema).toMatchObject({
+      articleBody: "The board voted.",
+      image: [manifest.natural[1], manifest.seo["16x9"], manifest.seo["4x3"], manifest.seo["1x1"]].map((file) => ({
+        url: `https://weeklywildcat.com${file.publicPath}`, width: file.width, height: file.height, caption: "A public meeting."
+      }))
+    });
   });
 
   it("uses the prepared social image for Open Graph", () => {
-    const [social] = buildSocialImageMetadata(attachment(true));
-    expect(social).toMatchObject({ width: 1200, height: 630 });
-    expect(social.url.endsWith(manifest.social.publicPath)).toBe(true);
-  });
-
-  it("keeps WordPress attachments on their existing behaviour", () => {
-    const candidates = getArticleImageCandidates(attachment(false));
-    expect(candidates.some((candidate) => candidate.url === manifest.seo["16x9"].publicPath)).toBe(false);
-    expect(buildSocialImageMetadata(attachment(false))[0].url.endsWith(manifest.natural[1].publicPath)).toBe(true);
+    expect(nativeArticleMetadata(story).openGraph.images).toEqual([
+      expect.objectContaining({ url: `https://weeklywildcat.com${manifest.social.publicPath}`, width: 1200, height: 630 })
+    ]);
   });
 });

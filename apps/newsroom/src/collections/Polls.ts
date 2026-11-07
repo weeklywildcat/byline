@@ -1,6 +1,7 @@
 import { APIError, type CollectionConfig } from "payload";
 import { editorsOnly, signedIn } from "../access/user";
 import { legacyIdField } from "../fields/slug";
+import { schedulePollWindow } from "../public/scheduled";
 
 const KEY = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
@@ -16,6 +17,7 @@ export const Polls: CollectionConfig = {
   admin: { useAsTitle: "question", defaultColumns: ["question", "status", "opensAt", "closesAt"], group: false },
   access: { read: signedIn, create: editorsOnly, update: editorsOnly, delete: editorsOnly },
   hooks: {
+    afterChange: [schedulePollWindow],
     beforeChange: [
       ({ data, originalDoc }) => {
         if (originalDoc?.pollKey && data.pollKey !== undefined && data.pollKey !== originalDoc.pollKey) {

@@ -7,7 +7,7 @@ import { readCurrentRevision, readPublicationState } from "../../db/publication-
 import { isPublicSnapshotError } from "./errors";
 import { buildPublicSnapshotBytes, usableCompletedPointer } from "./prepare";
 import { SnapshotStore } from "./store";
-import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION } from "./version";
+import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_PRODUCER_VERSION } from "./version";
 
 /**
  * Build-only snapshot API (docs/payload-build-snapshots.md#build-endpoint-contract).
@@ -24,7 +24,7 @@ import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION } f
  * - `GET /api/byline/build/snapshot/:sha256`: streams exactly that immutable
  *   artifact. 404 when it is gone; never regenerates.
  * - `GET /api/byline/build/direct?revision=R`: recovery only. Refuses unless R
- *   is current and has no completed snapshot; builds the same v1 projection
+ *   is current and has no completed snapshot; builds the same native projection
  *   with the job's collector, validates it, and returns its exact bytes only
  *   if the revision is still R afterwards (409 otherwise).
  */
@@ -52,7 +52,7 @@ export async function serveSnapshotDiscovery(req: PayloadRequest): Promise<Respo
   const usable = usableCompletedPointer(state);
   if (!usable) {
     const completed = state.completed;
-    const reason = !completed ? "no-completed-snapshot" : completed.schemaVersion !== PUBLIC_SNAPSHOT_SCHEMA_VERSION ? "unsupported-schema" : completed.producerVersion !== PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION ? "outdated-producer" : "older-revision";
+    const reason = !completed ? "no-completed-snapshot" : completed.schemaVersion !== PUBLIC_SNAPSHOT_SCHEMA_VERSION ? "unsupported-schema" : completed.producerVersion !== PUBLIC_SNAPSHOT_PRODUCER_VERSION ? "outdated-producer" : "older-revision";
     return buildRefusal(503, {
       code: NOT_READY_CODE,
       message: "No completed snapshot exists for the current public revision.",

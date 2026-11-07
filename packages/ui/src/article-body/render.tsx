@@ -73,6 +73,7 @@ export type MediaTable = ArticleBody["media"];
  * supply their own registry; the renderer never imports one).
  */
 export type ArticleRenderHost = {
+  imageSources?: (asset: ArticleMediaAsset, sizes?: string) => { src: string; srcSet?: string } | undefined;
   formatDate?: (iso: string) => string;
   renderInteractive?: (block: ArticleBlockOf<"repositoryInteractive">) => ReactNode;
 };
@@ -82,6 +83,11 @@ type BlockContext = { references: ArticleReferences; footnotes: Record<string, n
 const defaultFormatDate = (iso: string): string => new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(iso));
 
 const lookup = (media: MediaTable, id: unknown): ArticleMediaAsset | null => (id === null || id === undefined ? null : media[mediaKey(id as string | number)] ?? null);
+
+function BodyImage({ asset, host, alt, sizes }: { asset: ArticleMediaAsset; host: ArticleRenderHost; alt: string; sizes?: string }) {
+  const sources = host.imageSources?.(asset, sizes);
+  return <ArticleImage asset={sources ? { ...asset, src: sources.src } : asset} srcSet={sources?.srcSet} alt={alt} sizes={sizes} />;
+}
 
 /** Inline text: bold, italic, links, line breaks and footnote references. Nothing else exists. */
 export function InlineContent({ children, footnotes = {} }: { children: readonly Inline[]; footnotes?: Record<string, number> }): ReactNode {
@@ -199,36 +205,36 @@ type BlockRenderer<T extends ArticleBlockType> = (props: { block: ArticleBlockOf
  * and tests check the map against the contract's registry.
  */
 export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K> } = {
-  photo: ({ block, media }) => {
+  photo: ({ block, media, context }) => {
     const asset = lookup(media, block.media);
     if (!asset) return null;
     return (
       <ArticleBlockFrame type="photo" placement={articleBlockPlacement(block)}>
-        <StoryFigure className="byline-photo" media={<ArticleImage asset={asset} alt={altFor(asset, block.altOverride)} sizes={block.placement === "column" ? "(min-width: 800px) 760px, 100vw" : block.placement === "wide" ? "(min-width: 1080px) 1040px, 100vw" : "100vw"} />} caption={<CaptionText text={block.caption} />} credit={asset.credit} />
+        <StoryFigure className="byline-photo" media={<BodyImage host={context.host} asset={asset} alt={altFor(asset, block.altOverride)} sizes={block.placement === "column" ? "(min-width: 800px) 760px, 100vw" : block.placement === "wide" ? "(min-width: 1080px) 1040px, 100vw" : "100vw"} />} caption={<CaptionText text={block.caption} />} credit={asset.credit} />
       </ArticleBlockFrame>
     );
   },
-  gallery: ({ block, media }) => {
+  gallery: ({ block, media, context }) => {
     const items = block.items.map((item) => ({ item, asset: lookup(media, item.media) })).filter((entry): entry is { item: typeof entry.item; asset: ArticleMediaAsset } => entry.asset !== null);
     if (!items.length) return null;
     return (
       <ArticleBlockFrame type="gallery" placement={articleBlockPlacement(block)}>
         <GalleryLayout count={items.length} fit={block.fit}>
           {items.map(({ item, asset }) => (
-            <StoryFigure key={item.id} className="byline-gallery-item" media={<ArticleImage asset={asset} alt={altFor(asset, item.altOverride)} sizes="(min-width: 1080px) 520px, 100vw" />} caption={<CaptionText text={item.caption} />} credit={asset.credit} />
+            <StoryFigure key={item.id} className="byline-gallery-item" media={<BodyImage host={context.host} asset={asset} alt={altFor(asset, item.altOverride)} sizes="(min-width: 1080px) 520px, 100vw" />} caption={<CaptionText text={item.caption} />} credit={asset.credit} />
           ))}
         </GalleryLayout>
       </ArticleBlockFrame>
     );
   },
-  portraitText: ({ block, media }) => {
+  portraitText: ({ block, media, context }) => {
     const asset = lookup(media, block.media);
     if (!asset) return null;
     return (
       <ArticleBlockFrame type="portraitText" placement="wide">
         <PortraitTextFigure
           side={block.side}
-          media={<ArticleImage asset={asset} alt={altFor(asset, block.altOverride)} sizes="(min-width: 1080px) 416px, (min-width: 640px) 40vw, 100vw" />}
+          media={<BodyImage host={context.host} asset={asset} alt={altFor(asset, block.altOverride)} sizes="(min-width: 1080px) 416px, (min-width: 640px) 40vw, 100vw" />}
           caption={block.caption ? <CaptionText text={block.caption} /> : undefined}
           credit={asset.credit}
           heading={block.heading ? <h3>{block.heading}</h3> : undefined}
@@ -343,12 +349,12 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
       </ArticleBlockFrame>
     );
   },
-  chartMap: ({ block, media }) => {
+  chartMap: ({ block, media, context }) => {
     const asset = lookup(media, block.image);
     if (block.mode === "static" && !asset) return null;
     const graphic = asset ? (
       <div className="byline-visualization-fallback-image">
-        <ArticleImage asset={asset} alt={altFor(asset, block.altOverride)} sizes="(min-width: 1080px) 1040px, 100vw" />
+        <BodyImage host={context.host} asset={asset} alt={altFor(asset, block.altOverride)} sizes="(min-width: 1080px) 1040px, 100vw" />
       </div>
     ) : null;
     return (
@@ -408,13 +414,13 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
       />
     </ArticleBlockFrame>
   ),
-  annotatedImage: ({ block, media }) => {
+  annotatedImage: ({ block, media, context }) => {
     const asset = lookup(media, block.media);
     if (!asset) return null;
     return (
       <ArticleBlockFrame type="annotatedImage" placement={articleBlockPlacement(block)}>
         <AnnotatedImageFigure
-          image={<ArticleImage asset={asset} alt={altFor(asset, block.altOverride)} sizes="(min-width: 1080px) 700px, 100vw" />}
+          image={<BodyImage host={context.host} asset={asset} alt={altFor(asset, block.altOverride)} sizes="(min-width: 1080px) 700px, 100vw" />}
           markers={block.markers.map((marker, index) => (
             <a key={marker.id} className="byline-annotation-marker" href={`#${annotationAnchor(block.id, marker.id)}`} style={{ left: `${marker.x}%`, top: `${marker.y}%` }} aria-label={`Note ${index + 1}: ${marker.title}`}>{index + 1}</a>
           ))}
@@ -434,7 +440,7 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
       </ArticleBlockFrame>
     );
   },
-  beforeAfter: ({ block, media }) => {
+  beforeAfter: ({ block, media, context }) => {
     const before = lookup(media, block.before);
     const after = lookup(media, block.after);
     if (!before || !after) return null;
@@ -445,8 +451,8 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
         <BeforeAfterFigure
           fit={block.fit}
           aspect={aspect}
-          before={<ArticleImage asset={before} alt={altFor(before)} sizes="(min-width: 1080px) 520px, 100vw" />}
-          after={<ArticleImage asset={after} alt={altFor(after)} sizes="(min-width: 1080px) 520px, 100vw" />}
+          before={<BodyImage host={context.host} asset={before} alt={altFor(before)} sizes="(min-width: 1080px) 520px, 100vw" />}
+          after={<BodyImage host={context.host} asset={after} alt={altFor(after)} sizes="(min-width: 1080px) 520px, 100vw" />}
           beforeLabel={block.beforeLabel}
           afterLabel={block.afterLabel}
           caption={block.caption ? <CaptionText text={block.caption} /> : undefined}
@@ -455,7 +461,7 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
       </ArticleBlockFrame>
     );
   },
-  visualChapter: ({ block, media }) => {
+  visualChapter: ({ block, media, context }) => {
     const asset = lookup(media, block.media);
     if (!asset) return null;
     return (
@@ -464,7 +470,7 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
           id={`chapter-${block.id}`}
           align={block.align}
           headingId={`${block.id}-heading`}
-          media={<ArticleImage asset={asset} alt={altFor(asset, block.altOverride)} sizes="100vw" />}
+          media={<BodyImage host={context.host} asset={asset} alt={altFor(asset, block.altOverride)} sizes="100vw" />}
           eyebrow={block.eyebrow ? <p className="byline-kicker byline-visual-chapter-eyebrow">{block.eyebrow}</p> : undefined}
           heading={block.heading}
           dek={block.dek ? <p className="byline-visual-chapter-dek">{block.dek}</p> : undefined}
@@ -504,7 +510,7 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
             return (
               <li key={item.id} className="byline-related-item">
                 <a href={story.href}>
-                  {thumb ? <span className="byline-related-thumb"><ArticleImage asset={{ ...thumb, src: thumb.previewSrc ?? thumb.src }} alt="" sizes="96px" /></span> : null}
+                  {thumb ? <span className="byline-related-thumb"><BodyImage host={context.host} asset={{ ...thumb, src: thumb.previewSrc ?? thumb.src }} alt="" sizes="96px" /></span> : null}
                   <span className="byline-related-text">
                     <span className="byline-related-meta">
                       {story.section ? <span>{story.section}</span> : null}

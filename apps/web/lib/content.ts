@@ -1,3 +1,4 @@
+import { nativeStory } from "./native-snapshot";
 import { stripHtml } from "@/lib/format";
 import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
 import { FOCUS_SECTION_SLUGS, PUBLIC_SECTION_SLUGS } from "@/lib/sections";
@@ -105,6 +106,7 @@ export function getAthleteSportLabel(post: WordPressPost) {
 }
 
 export function isVisibleContentPost(post: WordPressPost) {
+  if (nativeStory(post.id)) return true;
   if (post.status !== "publish") {
     return false;
   }

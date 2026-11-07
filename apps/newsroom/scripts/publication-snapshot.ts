@@ -18,9 +18,9 @@ import config from "../src/payload.config";
 import { readPublicationState } from "../src/db/publication-state";
 import { isPublicSnapshotError } from "../src/public/snapshot/errors";
 import { runPublicSnapshotPreparation, usableCompletedPointer } from "../src/public/snapshot/prepare";
-import { PREPARE_PUBLIC_SNAPSHOT_TASK } from "../src/public/queue";
+import { PREPARE_PUBLIC_SNAPSHOT_TASK, queuePublicSnapshot } from "../src/public/queue";
 import { SnapshotStore } from "../src/public/snapshot/store";
-import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION } from "../src/public/snapshot/version";
+import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_PRODUCER_VERSION } from "../src/public/snapshot/version";
 
 const command = process.argv[2];
 const payload = await getPayload({ config });
@@ -44,7 +44,7 @@ async function status() {
     currentRevision: state.currentRevision,
     ready: Boolean(usable && present),
     schemaVersion: PUBLIC_SNAPSHOT_SCHEMA_VERSION,
-    producerVersion: PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION,
+    producerVersion: PUBLIC_SNAPSHOT_PRODUCER_VERSION,
     completed: completed
       ? { revision: completed.revision, schemaVersion: completed.schemaVersion, producerVersion: completed.producerVersion, digest: completed.sha256, bytes: completed.bytes, generatedAt: completed.generatedAt, filename: completed.filename, artifactPresent: present }
       : null,
@@ -57,13 +57,16 @@ async function status() {
 try {
   if (command === "status") {
     console.log(JSON.stringify(await status(), null, 2));
+  } else if (command === "queue") {
+    const state = await readPublicationState(payload);
+    if (!usableCompletedPointer(state)) await queuePublicSnapshot(payload, { revision: state.currentRevision, reason: "publication worker startup" });
   } else if (command === "prepare") {
     const result = await runPublicSnapshotPreparation(payload, { store });
     console.log(JSON.stringify(result, null, 2));
     if (result.outcome === "not-ready") process.exitCode = 2;
     if (result.outcome === "stale") process.exitCode = 3;
   } else {
-    console.error("Usage: publication-snapshot.ts <status|prepare>");
+    console.error("Usage: publication-snapshot.ts <status|prepare|queue>");
     process.exitCode = 64;
   }
 } catch (error) {

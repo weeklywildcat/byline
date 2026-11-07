@@ -5,7 +5,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { ARTICLE_BLOCK_TYPES, type ArticleBody, type ArticleBodyNode } from "@byline/article-body";
 import { FIXTURE_FIRST_PHASE_BODY as FIXTURE_ARTICLE_BODY } from "@byline/article-body/fixtures";
-import { validatePublicationMediaManifest, largestNaturalImage, publicationManifestBlobs, type PublicationImageManifest } from "@byline/content";
+import { validatePublicationMediaManifest, largestNaturalImage, publicationManifestBlobs, validatePublicBuildSnapshotV2, type PublicBuildSnapshotV2 } from "@byline/content";
 import { commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction, type Payload, type PayloadRequest } from "payload";
 import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -14,10 +14,10 @@ import { readCurrentRevision, readPublicationState } from "../../src/db/publicat
 import { drizzleFor } from "../../src/publication-media/state";
 import { serveBuildMedia } from "../../src/publication-media/build-endpoint";
 import { PREPARE_PUBLIC_SNAPSHOT_TASK } from "../../src/public/queue";
-import { collectPublicSnapshot, type PublicSnapshotV1 } from "../../src/public/snapshot/collect";
+import { collectPublicSnapshot } from "../../src/public/snapshot/collect";
 import { serveDirectSnapshot, serveSnapshotArtifact, serveSnapshotDiscovery } from "../../src/public/snapshot/endpoints";
 import { runPublicSnapshotPreparation } from "../../src/public/snapshot/prepare";
-import { PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION } from "../../src/public/snapshot/version";
+import { PUBLIC_SNAPSHOT_PRODUCER_VERSION } from "../../src/public/snapshot/version";
 import { sql } from "@payloadcms/db-postgres";
 
 /**
@@ -32,7 +32,7 @@ let payload: Payload;
 const ids: Record<string, number> = {};
 // The static build's own acquisition client (apps/web), loaded at run time: its module graph
 // uses the web app's path aliases, which this package's typecheck does not resolve.
-type Acquired = { mode: string; revision: number; digest: string; requests: number; attempts: number; snapshot: PublicSnapshotV1 & { datasets: { attachments: unknown[] } } };
+type Acquired = { mode: string; revision: number; digest: string; requests: number; attempts: number; snapshot: PublicBuildSnapshotV2 };
 const webAcquisition = pathToFileURL(path.resolve(__dirname, "../../../web/lib/build-acquisition.ts")).href;
 const acquirePayloadSnapshot = async (options: { baseUrl: string; token: string; maxAttempts?: number }): Promise<Acquired> =>
   ((await import(/* @vite-ignore */ webAcquisition)) as { acquirePayloadSnapshot: (options: unknown) => Promise<Acquired> }).acquirePayloadSnapshot(options);
@@ -65,7 +65,7 @@ async function upload(file: { data: Buffer; mimetype: string; name: string; size
   const created = await payload.create({ collection: "media", data: { alt: "A described photograph", credit: "The Weekly Wildcat", copyright: "© 2026 The Weekly Wildcat" }, file, overrideAccess: true });
   return created.id as number;
 }
-/** The v1 gate seeds the first eight blocks: the rest need snapshot v2 (references). */
+/** The smaller fixture isolates projection, Media and revision assertions. */
 const FIRST_PHASE_TYPES = ["photo", "gallery", "reportedQuote", "pullQuote", "keyFacts", "context", "document", "timeline"];
 const runMedia = () => payload.jobs.run({ queue: "media", limit: 50 });
 
@@ -281,6 +281,21 @@ describe("public revision", () => {
     expect(await snapshotJobs()).toHaveLength(0);
   });
 
+  it("advances for public Poll definitions and queues their future windows", async () => {
+    const start = await rev();
+    const opensAt = new Date(Date.now() + 60_000).toISOString();
+    const closesAt = new Date(Date.now() + 120_000).toISOString();
+    const poll = await payload.create({ collection: "polls", data: { pollKey: "snapshot-test-window", question: "Open more windows?", status: "draft",
+      options: [{ optionId: "yes", label: "Yes" }, { optionId: "no", label: "No" }], opensAt, closesAt } });
+    expect(await rev()).toBe(start);
+    await payload.update({ collection: "polls", id: poll.id, data: { status: "open" } });
+    expect(await rev()).toBe(start + 1);
+    const jobs = await payload.find({ collection: "payload-jobs", where: { taskSlug: { equals: "advance-public-revision" } }, depth: 0, pagination: false });
+    expect(jobs.docs.map(({ waitUntil }) => waitUntil)).toEqual(expect.arrayContaining([opensAt, closesAt]));
+    await payload.delete({ collection: "polls", id: poll.id });
+    expect(await rev()).toBe(start + 2);
+  });
+
   it("advances for public Media fields only, never for an upload or preparation", async () => {
     const before = await rev();
     await upload(await image("snapshot-new-upload.jpg", 640, 480));
@@ -341,12 +356,12 @@ describe("snapshot preparation", () => {
     await runPublicSnapshotPreparation(payload);
     const state = await readPublicationState(payload);
     const db = await drizzleFor(payload);
-    await db.execute(sql`update byline_publication_state set completed_producer_version = ${PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION - 1} where id = 1`);
+    await db.execute(sql`update byline_publication_state set completed_producer_version = ${PUBLIC_SNAPSHOT_PRODUCER_VERSION - 1} where id = 1`);
     const result = await runPublicSnapshotPreparation(payload);
     expect(result.outcome).toBe("ready");
     const after = await readPublicationState(payload);
     expect(after.currentRevision).toBe(state.currentRevision);
-    expect(after.completed?.producerVersion).toBe(PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION);
+    expect(after.completed?.producerVersion).toBe(PUBLIC_SNAPSHOT_PRODUCER_VERSION);
   });
 
   it("runs as the real Jobs Queue task", async () => {
@@ -358,7 +373,7 @@ describe("snapshot preparation", () => {
 });
 
 describe("the projection", () => {
-  let snap: PublicSnapshotV1;
+  let snap: PublicBuildSnapshotV2;
   let structuredId: number;
   let lateId: number;
 
@@ -397,11 +412,11 @@ describe("the projection", () => {
   it("is the published main state only", () => {
     const json = JSON.stringify(snap);
     for (const sentinel of ["SENTINEL-NEWER-DRAFT", "SENTINEL-DRAFT-BODY", "SENTINEL-PAGE-DRAFT", "SENTINEL-DRAFT-EVENT", "SENTINEL-GLOBAL-DRAFT", "SENTINEL-FUTURE-CORRECTION", "Unpublished page", "Internal memo"]) expect(json).not.toContain(sentinel);
-    const post = snap.datasets.posts.find((entry) => entry.id === structuredId)!;
-    expect(post.title.rendered).toBe("Every block");
+    const post = snap.datasets.stories.find((entry) => entry.id === structuredId)!;
+    expect(post.title).toBe("Every block");
     expect(snap.publication.identity.name).toBe("The Weekly Wildcat");
     expect(snap.publication.revision).toBe(snap.revision);
-    expect(snap.sourceTimezone).toBe("America/New_York");
+    expect(snap.publication.timezone).toBe("America/New_York");
   });
 
   it("contains no private newsroom data", () => {
@@ -416,82 +431,89 @@ describe("the projection", () => {
     };
     visit(snap.datasets);
     // `socials.email` is the Person's explicit public email; the account email is checked as a value above.
-    for (const key of ["brief", "notes", "tasks", "team", "members", "lead", "googleSubject", "linkedPerson", "workflow", "deadline", "plan", "_status", "updatedAt", "createdAt", "library", "thumbnailURL", "filename", "folder"]) expect(keys.has(key), key).toBe(false);
-    const post = snap.datasets.posts.find((entry) => entry.id === structuredId)!;
-    expect(Object.keys(post).sort()).toEqual(["_embedded", "author", "byline", "categories", "content", "contributors", "corrections", "date", "date_gmt", "excerpt", "featured_media", "id", "link", "modified", "modified_gmt", "slug", "status", "sticky", "tags", "title", "type", "weeklyWildcat"]);
-    expect(Object.keys(snap.datasets.authors[0]).sort()).toEqual(["bylineProfile", "description", "id", "link", "name", "slug", "url", "weeklyWildcatProfile"]);
+    for (const key of ["brief", "notes", "tasks", "team", "members", "lead", "googleSubject", "linkedPerson", "workflow", "deadline", "plan", "_status", "updatedAt", "createdAt", "library", "thumbnailURL", "folder", "_embedded", "blockType", "root"]) expect(keys.has(key), key).toBe(false);
   });
 
-  it("projects Stories into the v1 post the Astro consumer reads", () => {
-    const post = snap.datasets.posts.find((entry) => entry.id === structuredId)!;
-    expect(post).toMatchObject({ status: "publish", type: "post", sticky: false, categories: [ids.news], tags: [ids.topic], featured_media: ids.photo, author: ids.author });
-    expect(post.byline).toMatchObject({ presentation: "immersive", format: "standard" });
-    // Displayed byline order is Payload's; `author` is the first staff author with a profile.
-    expect(post.contributors.map((entry: { id: number; type: string }) => [entry.type, entry.id])).toEqual([["guest", ids.guest], ["user", ids.author], ["guest", ids.oneOff]]);
-    expect(post.contributors[2]).toMatchObject({ hasProfilePage: false });
-    expect(post._embedded.author.map((entry: { id: number }) => entry.id)).toEqual([ids.author]);
-    expect(post._embedded["wp:featuredmedia"][0].caption.rendered).toContain("The board meets.");
-    expect(post._embedded["wp:term"][0][0]).toMatchObject({ id: ids.news, slug: "news", taxonomy: "category" });
-    expect(post.corrections).toEqual([expect.objectContaining({ type: "editor-note", text: "Updated with the vote." })]);
-    expect(snap.datasets.corrections.some((entry) => entry.storyId === structuredId && entry.story.url === post.link)).toBe(true);
-    // Counts only from included published posts.
-    expect(snap.datasets.categories.find((term) => term.id === ids.news)!.count).toBe(snap.datasets.posts.length);
-    expect(snap.datasets.tags.find((term) => term.id === ids.unusedTopic)!.count).toBe(0);
-    expect(snap.datasets.categories.some((term) => term.id === ids.internal)).toBe(false);
-    expect(snap.datasets.authors.map((author) => author.id)).toEqual([ids.author]);
-    expect(snap.datasets.guests.map((guest) => guest.id)).toEqual([ids.guest]);
-    expect(snap.datasets.authors[0].bylineProfile).toMatchObject({ role: "Staff Writer", socials: { email: "ada@weeklywildcat.com", instagram: "https://instagram.com/ada" } });
+  it("projects the canonical Story, Person, taxonomy and Correction facts", () => {
+    const story = snap.datasets.stories.find((entry) => entry.id === structuredId)!;
+    expect(story).toMatchObject({ section: { key: `section-${ids.news}`, href: "/category/news/" }, topicKeys: [`topic-${ids.topic}`],
+      image: ids.photo, leadCaption: "The board meets.", presentation: "immersive", format: "standard" });
+    expect(story.contributorKeys).toEqual([ids.guest, ids.author, ids.oneOff].map((id) => `person:${id}`));
+    expect(story.contributors[2].href).toBe("");
+    expect(story.corrections).toEqual([expect.objectContaining({ type: "editor-note", text: "Updated with the vote." })]);
+    expect(snap.datasets.corrections.some((entry) => entry.storyId === structuredId && entry.id === story.corrections[0].id)).toBe(true);
+    expect(snap.datasets.topics.find((term) => term.id === ids.unusedTopic)?.href).toBe("");
+    expect(snap.datasets.sections.some((term) => term.id === ids.internal)).toBe(false);
+    expect(snap.datasets.people.find((entry) => entry.id === ids.author)).toMatchObject({ newsroomRole: "Staff Writer",
+      publicEmail: "ada@weeklywildcat.com", socials: [{ label: "Instagram", url: "https://instagram.com/ada" }], portrait: ids.portrait });
   });
 
   it("dates article URLs by the publication's local day", () => {
-    const late = snap.datasets.posts.find((entry) => entry.id === lateId)!;
-    expect(late.date).toBe("2026-11-07T23:30:00");
-    expect(late.date_gmt).toBe("2026-11-08T04:30:00");
-    expect(late.link).toBe("https://weeklywildcat.com/2026/11/07/news/late-game/");
+    const late = snap.datasets.stories.find((entry) => entry.id === lateId)!;
+    expect(late.publishedAt).toBe("2026-11-08T04:30:00.000Z");
+    expect(late.href).toBe("/2026/11/07/news/late-game/");
+    expect(late.url).toBe("https://weeklywildcat.com/2026/11/07/news/late-game/");
   });
 
-  it("renders the structured body through the canonical renderer, with prepared media", () => {
-    const post = snap.datasets.posts.find((entry) => entry.id === structuredId)!;
-    const html: string = post.content.rendered;
-    expect(html).not.toContain('"root"');
-    expect(html.startsWith('<div class="article-body"')).toBe(false);
-    for (const type of FIRST_PHASE_TYPES) expect(html, type).toContain(`byline-block-${type}`);
-    const paths = [...html.matchAll(/\/_byline\/media\/[^"'\s)]+/g)].map((match) => match[0]);
-    expect(paths.length).toBeGreaterThan(0);
-    expect(html).not.toMatch(/\/api\/media\/file\//);
+  it("carries semantic ArticleBody nodes and a small prepared Media table", () => {
+    const { body } = snap.datasets.stories.find((entry) => entry.id === structuredId)!;
+    expect(body.format).toBe("byline-v1");
+    if (body.format !== "byline-v1") throw new Error("Expected structured content");
+    for (const type of FIRST_PHASE_TYPES) expect(body.nodes.some((node) => node.type === type), type).toBe(true);
+    expect(Object.values(body.media).length).toBeGreaterThan(0);
+    for (const asset of Object.values(body.media)) {
+      expect(asset.src).toMatch(/^\/_byline\/media\//);
+      expect(asset).not.toHaveProperty("manifest");
+    }
   });
 
   it("names only referenced, prepared media", () => {
-    const attachments = new Map(snap.datasets.attachments.map((attachment) => [attachment.id, attachment]));
-    expect([...attachments.keys()].sort((a, b) => a - b)).toEqual([ids.photo, ids.photo2, ids.portrait, ids.pdf].sort((a, b) => a - b));
-    expect(attachments.has(ids.unreferenced)).toBe(false);
-    const lead = attachments.get(ids.photo)! as Record<string, any>;
-    const manifest = lead.bylinePublication.manifest as PublicationImageManifest;
+    const media = new Map(snap.datasets.media.map((entry) => [entry.id, entry]));
+    expect([...media.keys()].sort((a, b) => a - b)).toEqual([ids.photo, ids.photo2, ids.portrait, ids.pdf].sort((a, b) => a - b));
+    expect(media.has(ids.unreferenced)).toBe(false);
+    const { manifest } = media.get(ids.photo)!;
     expect(validatePublicationMediaManifest(manifest).ok).toBe(true);
-    expect(lead.source_url).toBe(largestNaturalImage(manifest).publicPath);
-    expect(lead.source_url).toMatch(/^\/_byline\/media\/images\//);
-    expect(Object.values(lead.media_details.sizes).map((size: any) => size.source_url).sort()).toEqual(manifest.natural.map((file) => file.publicPath).sort());
-    expect(lead.bylineImage.artDirection.focalPoint).toEqual(manifest.focalPoint);
-    expect(lead.bylineImage.artDirection.renditions.social[0].url).toBe(manifest.social.publicPath);
-    const document = attachments.get(ids.pdf)! as Record<string, any>;
-    expect(document.bylinePublication.manifest.kind).toBe("document");
-    expect(document.source_url).toBe(document.bylinePublication.manifest.file.publicPath);
-    expect(snap.datasets.authors[0].bylineProfile.profilePhoto.url).toMatch(/^\/_byline\/media\/images\//);
+    if (manifest.kind !== "image") throw new Error("Expected image manifest");
+    expect(largestNaturalImage(manifest).publicPath).toMatch(/^\/_byline\/media\/images\//);
+    expect(media.get(ids.pdf)!.manifest.kind).toBe("document");
   });
 
-  it("carries canonical events with publication-local times across DST", () => {
-    const [homecoming, fieldDay] = snap.datasets.schoolEvents;
-    expect(homecoming).toMatchObject({ title: "Homecoming", startDate: "2026-10-31T19:00", endDate: "2026-10-31T21:30", allDay: false, status: "scheduled", display: { date: "Oct 31, 2026 7:00 PM", time: "7:00 PM-9:30 PM", status: "Scheduled" } });
-    expect(fieldDay).toMatchObject({ title: "Field day", startDate: "2026-11-02T09:00", endDate: "", allDay: true, status: "canceled", display: { time: "All day", status: "Canceled" } });
+  it("rejects a malformed record or broken cross-reference before rendering", () => {
+    const wrongRoute = structuredClone(snap);
+    wrongRoute.datasets.stories[0].href = "/elsewhere/";
+    expect(() => validatePublicBuildSnapshotV2(wrongRoute)).toThrow(/canonical route/);
+    const missingMedia = structuredClone(snap);
+    missingMedia.datasets.media = missingMedia.datasets.media.filter((entry) => entry.id !== ids.photo);
+    missingMedia.counts.media--;
+    expect(() => validatePublicBuildSnapshotV2(missingMedia)).toThrow(/missing image Media/);
+    const privateKey = structuredClone(snap);
+    Object.assign(privateKey.datasets.stories[0], { workflow: "private" });
+    expect(() => validatePublicBuildSnapshotV2(privateKey)).toThrow(/workflow/);
+  });
+
+  it("carries Event instants without preformatted presentation strings", () => {
+    const [homecoming, fieldDay] = snap.datasets.events;
+    expect(homecoming).toMatchObject({ title: "Homecoming", startAt: "2026-10-31T23:00:00.000Z", endAt: "2026-11-01T01:30:00.000Z", allDay: false, status: "scheduled" });
+    expect(fieldDay).toMatchObject({ title: "Field day", startAt: "2026-11-02T14:00:00.000Z", endAt: null, allDay: true, status: "canceled" });
+    expect(homecoming).not.toHaveProperty("display");
   });
 
   it("projects published Pages from their bounded prose", () => {
-    expect(snap.datasets.pages).toEqual([expect.objectContaining({ slug: "about-us", status: "publish", title: { rendered: "About us" }, content: { rendered: "<p>We are student journalists.</p>" }, bylinePage: { indexing: "public" } })]);
+    expect(snap.datasets.pages).toEqual([expect.objectContaining({ slug: "about-us", href: "/about-us/", title: "About us", bodyHtml: "<p>We are student journalists.</p>", indexing: "public" })]);
   });
 
   it("projects the public Collection only", () => {
-    expect(snap.datasets.coverages).toEqual([expect.objectContaining({ slug: "budget-season", title: "Budget season" })]);
-    expect(Object.keys(snap.datasets.coverages[0]).sort()).toEqual(["artwork", "description", "format", "id", "overview", "slug", "status", "stories", "title"]);
+    expect(snap.datasets.collections).toEqual([expect.objectContaining({ slug: "budget-season", title: "Budget season", modifiedAt: expect.any(String) })]);
+    expect(Object.keys(snap.datasets.collections[0]).sort()).toEqual(["artwork", "description", "format", "id", "modifiedAt", "overview", "slug", "status", "stories", "title"]);
+  });
+
+  it("keeps the public Collection date and revision stable through private edits", async () => {
+    const before = await snapshot();
+    const publicCollection = before.datasets.collections[0];
+    await payload.update({ collection: "collections", id: publicCollection.id, data: { brief: "SENTINEL-PRIVATE-EDIT" }, context: { bylineSystem: true } });
+    const after = await snapshot();
+    expect(after.revision).toBe(before.revision);
+    expect(after.datasets.collections).toEqual(before.datasets.collections);
   });
 
   it("fails on unsupported story content instead of dropping it", async () => {
@@ -502,8 +524,8 @@ describe("the projection", () => {
     const db = await drizzleFor(payload);
     const body = { root: { type: "root", version: 1, children: [{ type: "block", version: 2, fields: { id: "x", blockType: "scrollytelling", blockName: "" } }, { type: "quote", version: 1, children: [] }] } };
     await db.execute(sql`update stories set body = ${JSON.stringify(body)}::jsonb where id = ${bad}`);
-    await expect(collectPublicSnapshot(payload, { revision: await rev() })).rejects.toMatchObject({ code: "unsupported-story-content", message: expect.stringContaining("1 published story") });
-    await expect(collectPublicSnapshot(payload, { revision: await rev() })).rejects.toMatchObject({ details: [expect.stringContaining(`Story ${bad}`)] });
+    await expect(collectPublicSnapshot(payload, { revision: await rev() })).rejects.toMatchObject({ code: "invalid-projection", message: expect.stringContaining(`Story ${bad}`) });
+    await expect(collectPublicSnapshot(payload, { revision: await rev() })).rejects.toMatchObject({ details: expect.arrayContaining([expect.stringContaining("unsupported")]) });
     await payload.update({ collection: "stories", id: bad, data: { _status: "draft" } });
   });
 
@@ -519,8 +541,8 @@ describe("the projection", () => {
     expect(await snapshotJobs()).toHaveLength(1);
     expect((await runPublicSnapshotPreparation(payload)).outcome).toBe("ready");
     snap = await snapshot();
-    const lead = snap.datasets.attachments.find((attachment) => attachment.id === ids.photo) as Record<string, any>;
-    expect(lead.bylineImage.artDirection.focalPoint).toEqual({ x: 30, y: 40 });
+    const manifest = snap.datasets.media.find((entry) => entry.id === ids.photo)?.manifest;
+    expect(manifest).toMatchObject({ focalPoint: { x: 30, y: 40 } });
   });
 });
 
@@ -576,7 +598,7 @@ describe("build-only API and the static build's acquisition", () => {
     const discovery = await get("/snapshot");
     expect(discovery.status).toBe(200);
     const pointer = await discovery.json();
-    expect(pointer).toMatchObject({ schemaVersion: 1, revision: await rev(), url: `${base}/snapshot/${pointer.digest}` });
+    expect(pointer).toMatchObject({ schemaVersion: 2, revision: await rev(), url: `${base}/snapshot/${pointer.digest}` });
     const artifact = Buffer.from(await (await get(`/snapshot/${pointer.digest}`)).arrayBuffer());
     expect(artifact.byteLength).toBe(pointer.bytes);
     expect(createHash("sha256").update(artifact).digest("hex")).toBe(pointer.digest);
@@ -587,8 +609,20 @@ describe("build-only API and the static build's acquisition", () => {
     // Direct recovery is refused while a completed snapshot exists.
     expect((await get(`/direct?revision=${pointer.revision}`)).status).toBe(409);
     // Every advertised prepared file is downloadable by hash.
-    const blobs = acquired.snapshot.datasets.attachments.flatMap((attachment) => publicationManifestBlobs((attachment as unknown as { bylinePublication: { manifest: never } }).bylinePublication.manifest));
+    const blobs = acquired.snapshot.datasets.media.flatMap(({ manifest }) => publicationManifestBlobs(manifest));
     for (const blob of blobs.slice(0, 3)) expect((await get(`/media/${blob.sha256}`)).status).toBe(200);
+  });
+
+  it("ignores a completed schema 1 pointer and promotes v2 for the same content revision", async () => {
+    const state = await readPublicationState(payload);
+    const db = await drizzleFor(payload);
+    const v1Filename = `snapshot-v1-r${state.currentRevision}-${"b".repeat(64)}.json`;
+    await db.execute(sql`update byline_publication_state set completed_schema_version = 1, completed_sha256 = ${"b".repeat(64)}, completed_filename = ${v1Filename} where id = 1`);
+    const response = await get("/snapshot");
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: "byline_snapshot_not_ready", reason: "unsupported-schema" });
+    expect((await get(`/snapshot/${"b".repeat(64)}`)).status).toBe(404);
+    expect(await runPublicSnapshotPreparation(payload)).toMatchObject({ outcome: "ready", revision: state.currentRevision, pointer: { schemaVersion: 2 } });
   });
 
   it("reports not-ready precisely and recovers directly into the same snapshot contract", async () => {
@@ -601,7 +635,7 @@ describe("build-only API and the static build's acquisition", () => {
     const direct = await acquirePayloadSnapshot({ baseUrl: base, token: TOKEN });
     expect(direct).toMatchObject({ mode: "direct-source-recovery", revision: prepared.revision, requests: 2 });
     // Two acquisition paths, one content model: identical apart from generation metadata.
-    const strip = (value: PublicSnapshotV1 | typeof direct.snapshot) => ({ ...value, generatedAt: "" });
+    const strip = (value: PublicBuildSnapshotV2 | typeof direct.snapshot) => ({ ...value, generatedAt: "" });
     expect(strip(direct.snapshot)).toEqual(strip(prepared.snapshot));
   });
 

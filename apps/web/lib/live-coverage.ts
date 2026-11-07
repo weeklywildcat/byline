@@ -1,3 +1,4 @@
+import { nativeStory } from "./native-snapshot";
 import { createArticleLiveView, createLiveFeed, formatLiveTime as formatTime } from "@byline/ui/live-feed";
 import { getPublicationConfig } from "@/lib/publication";
 import { getContributorHref, getPostLiveCoverage, type WordPressContributor, type WordPressPost } from "@/lib/wordpress";
@@ -12,6 +13,8 @@ export function liveFeedPath(postId: number | string) {
 export const formatLiveTime = (iso: string) => formatTime(iso, publication.locale, publication.timezone);
 
 export function buildArticleLiveView(post: WordPressPost) {
+  const native = nativeStory(post.id);
+  if (native) return native.live;
   const live = getPostLiveCoverage(post);
   return live ? createArticleLiveView(live, {
     postId: post.id, locale: publication.locale, timeZone: publication.timezone,

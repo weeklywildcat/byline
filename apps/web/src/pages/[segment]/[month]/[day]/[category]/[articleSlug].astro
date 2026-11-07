@@ -1,4 +1,9 @@
 ---
+import { renderRepositoryInteractive } from "@byline/story-presentations/interactives";
+import { getNativeSnapshot, publicInteractiveRegistry, nativeStory, nativeStoryRoute } from "@/lib/native-snapshot";
+import { hasInteractiveClient } from "@/lib/repository-interactive-client";
+import { nativeArticleJsonLd, nativeArticleMetadata } from "@/lib/native-article-seo";
+import { nativeArticleDate, nativeArticlePresentation, nativeBodyImage } from "@/lib/native-article";
 import { articleRenderInputs, routeCacheKey } from "@/lib/route-cache";
 import BaseLayout from "@/src/layouts/BaseLayout.astro";
 import React from "react";
@@ -20,43 +25,67 @@ import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
 export async function getStaticPaths() {
   const snapshot = await getBuildSnapshot();
+  const native = getNativeSnapshot();
+  if (native) return native.datasets.stories.map((story) => {
+    const { year, month, day, category, slug } = nativeStoryRoute(story);
+    return { params: { segment: year, month, day, category, articleSlug: slug }, props: { storyId: story.id }, cacheKey: routeCacheKey(snapshot, "article", story.id) };
+  });
   return snapshot.posts.filter(isVisibleContentPost).flatMap((post) => {
     const route = getPostRouteParts(post);
     return route ? [{ params: { segment: route.year, month: route.month, day: route.day, category: route.category, articleSlug: route.slug }, cacheKey: routeCacheKey(snapshot, "article", post.id) }] : [];
   });
 }
 const params = { segment: Astro.params.segment!, month: Astro.params.month!, day: Astro.params.day!, category: Astro.params.category!, articleSlug: Astro.params.articleSlug! };
-const metadata = await getMetadata({ params: Promise.resolve(params) });
-const snapshot = await getBuildSnapshot();
-const post = snapshot.indexes.postsBySlug.get(params.articleSlug)!;
-const { presentation, primaryGame } = articleRenderInputs(snapshot, post);
-const showPrimaryGame = Boolean(primaryGame && !getPostGameScoreGameIds(post).includes(primaryGame.id));
-const title = stripHtml(post.title.rendered);
-const articleUrl = absoluteUrl(getPostHref(post));
-const category = getPrimaryVisibleCategory(post);
+const storyId = (Astro.props as { storyId?: number }).storyId;
+const story = storyId ? nativeStory(storyId) : undefined;
+const snapshot = story ? undefined : await getBuildSnapshot();
+const post = snapshot?.indexes.postsBySlug.get(params.articleSlug);
+if (!story && !post) throw new Error(`Missing public article ${params.articleSlug}`);
+const id = story?.id ?? post!.id;
+const { presentation, primaryGame } = story ? { presentation: nativeArticlePresentation(story), primaryGame: null } : articleRenderInputs(snapshot!, post!);
+const metadata = story ? nativeArticleMetadata(story) : await getMetadata({ params: Promise.resolve(params) });
+const interactiveRegistry = publicInteractiveRegistry();
+if (presentation.body.format === "byline-v1") {
+  for (const node of presentation.body.nodes) {
+    if (node.type !== "repositoryInteractive") continue;
+    const entry = interactiveRegistry[node.key];
+    if (!entry || (entry.client && !hasInteractiveClient(node.key))) throw new Error(`Story ${id} has no public host for Repository Interactive ${node.key}`);
+  }
+}
+const showPrimaryGame = Boolean(primaryGame && post && !getPostGameScoreGameIds(post).includes(primaryGame.id));
+const title = story?.title ?? stripHtml(post!.title.rendered);
+const articleUrl = story?.url ?? absoluteUrl(getPostHref(post!));
+const category = post ? getPrimaryVisibleCategory(post) : null;
+const section = story ? { name: story.section.name, href: story.section.href, slug: params.category }
+  : category ? { name: decodeHtml(category.name), href: `/category/${category.slug}/`, slug: category.slug } : null;
 const publication = getPublicationConfig();
-const visualStory = isVisualStory(getStoryPresentation(post.id));
+const visualStory = isVisualStory(getStoryPresentation(id));
 const slots = {
   shareActions: React.createElement("div", { id: "article-share-island-slot" }),
   primaryGame: showPrimaryGame && primaryGame ? React.createElement(ArticleGameCard, { game: primaryGame, className: "article-primary-game-card" }) : null,
-  poll: React.createElement("div", { id: "article-poll-island-slot" }),
+  bodyHost: story ? { imageSources: nativeBodyImage, formatDate: nativeArticleDate, renderInteractive: renderRepositoryInteractive(interactiveRegistry) } : undefined,
+  poll: story ? null : React.createElement("div", { id: "article-poll-island-slot" }),
   feedback: publication.features.readerFeedback !== false ? React.createElement("div", { id: "article-feedback-island-slot" }) : null,
   newsletter: React.createElement("div", { id: "article-newsletter-island-slot" })
 };
 ---
 <BaseLayout metadata={metadata} themeColor="#fbfaf7" stickyLogo hideMastheadDate>
-  <script id="newsarticle-json-ld" type="application/ld+json" set:html={serializeJsonLd(getArticleJsonLd(post, { articleBody: !visualStory }))}></script>
+  <script id="newsarticle-json-ld" type="application/ld+json" set:html={serializeJsonLd(story ? nativeArticleJsonLd(story, !visualStory) : getArticleJsonLd(post!, { articleBody: !visualStory }))}></script>
   <script id="article-breadcrumb-json-ld" type="application/ld+json" set:html={serializeJsonLd(getBreadcrumbSchema([
     { name: "Home", path: "/" },
-    ...(category ? [{ name: decodeHtml(category.name), path: `/category/${category.slug}/` }] : []),
-    { name: title, path: getPostHref(post) }
+    ...(section ? [{ name: section.name, path: section.href }] : []),
+    { name: title, path: story?.href ?? getPostHref(post!) }
   ]))}></script>
-  <StoryArticle presentation={presentation} slots={slots} className={category?.slug === "opinion" ? "article-shell-opinion" : ""} />
+  <StoryArticle presentation={presentation} slots={slots} className={section?.slug === "opinion" ? "article-shell-opinion" : ""} />
   <script>
     import { articleEnhancementSelector } from "@byline/ui/article-enhancement-selector";
     const body = document.querySelector<HTMLElement>(".article-body");
     if (body?.querySelector(articleEnhancementSelector)) {
       import("@byline/ui/article-enhancements").then(({ enhanceArticleStory }) => enhanceArticleStory(body));
+    }
+    const interactives = body?.querySelectorAll<HTMLElement>("[data-repository-interactive]");
+    if (interactives?.length) {
+      import("@/lib/repository-interactive-client").then(({ startRepositoryInteractives }) => startRepositoryInteractives(interactives));
     }
     // A flagship visual story's own client code, if it has any, downloads on its page alone.
     const visualStory = document.querySelector<HTMLElement>("[data-visual-story]");
@@ -74,8 +103,8 @@ const slots = {
     }
   </script>
   <div class="astro-island-relocation" data-target="article-share-island-slot"><ArticleShareActions title={title} url={articleUrl} client:idle /></div>
-  <div class="astro-island-relocation" data-target="article-poll-island-slot"><NewsroomPollHydrator client:load /></div>
-  {publication.features.readerFeedback !== false && <div class="astro-island-relocation" data-target="article-feedback-island-slot"><ReaderFeedbackForm postId={post.id} articleTitle={title} articleUrl={articleUrl} endpointCandidates={[getBylineRestUrl("/feedback"), getBylineRestUrl("/feedback", true)]} client:visible /></div>}
+  {!story && <div class="astro-island-relocation" data-target="article-poll-island-slot"><NewsroomPollHydrator client:load /></div>}
+  {publication.features.readerFeedback !== false && <div class="astro-island-relocation" data-target="article-feedback-island-slot"><ReaderFeedbackForm postId={id} articleTitle={title} articleUrl={articleUrl} endpointCandidates={[getBylineRestUrl("/feedback"), getBylineRestUrl("/feedback", true)]} client:visible /></div>}
   <div class="astro-island-relocation" data-target="article-newsletter-island-slot"><NewsletterSignupForm client:visible /></div>
   <script is:inline>
     document.querySelectorAll('.astro-island-relocation[data-target]').forEach((source) => {

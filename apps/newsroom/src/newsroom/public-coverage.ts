@@ -54,10 +54,10 @@ export async function publicCoverages(payload: Payload): Promise<PublicCoverage[
   const found = await payload.find({
     collection: "collections",
     where: { and: [{ "publicPresentation.enabled": { equals: true } }, { "publicPresentation.slug": { exists: true } }] },
-    select: { status: true, startDate: true, endDate: true, updatedAt: true, stories: true, publicPresentation: true },
+    select: { status: true, startDate: true, endDate: true, createdAt: true, publicModifiedAt: true, stories: true, publicPresentation: true },
     depth: 0,
     pagination: false,
-    sort: "-updatedAt",
+    sort: "id",
     overrideAccess: true
   });
   const docs = found.docs as Collection[];
@@ -93,7 +93,7 @@ export async function publicCoverages(payload: Payload): Promise<PublicCoverage[
         artwork: art && art.mimeType?.startsWith("image/") ? { id: art.id, alt: art.alt ?? "", width: art.width ?? null, height: art.height ?? null } : null,
         ...(doc.startDate ? { startDate: doc.startDate } : {}),
         ...(doc.endDate ? { endDate: doc.endDate } : {}),
-        modified: doc.updatedAt,
+        modified: doc.publicModifiedAt ?? doc.createdAt,
         stories: order.map((id, index) => {
           const story = published.get(id)!;
           return { id, slug: story.slug ?? "", title: story.headline?.trim() ?? "", publishedAt: story.publishedAt ?? null, part: index + 1 };

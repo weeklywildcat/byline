@@ -114,6 +114,8 @@ async function sliceDigest(req: PayloadRequest, slice: PublicSlice, row: Record<
 export type PublicTrackingOptions = {
   /** A new record cannot be referenced by public content yet (Media uploads): its creation is not a public change. */
   ignoreCreate?: boolean;
+  /** Store public-only bookkeeping on the row, inside the same transaction. */
+  onPublicWrite?: (req: PayloadRequest, id: number | string) => Promise<void>;
 };
 
 export type PublicChangeHooks = {
@@ -149,7 +151,10 @@ export function trackPublicChanges(collection: CollectionSlug, slice: PublicSlic
       delete digests[id];
       const after = await sliceDigest(req, slice, await mainRow(req, collection, doc.id));
       // An update whose before-state was never captured is treated as changed when it is public now.
-      if (before === undefined ? after !== null : before !== after) await recordPublicMutation(req, `${collection} ${operation} ${String(doc.id)}`);
+      if (before === undefined ? after !== null : before !== after) {
+        if (after !== null) await options.onPublicWrite?.(req, doc.id);
+        await recordPublicMutation(req, `${collection} ${operation} ${String(doc.id)}`);
+      }
       return doc;
     },
     beforeDelete: async ({ id, req }) => {

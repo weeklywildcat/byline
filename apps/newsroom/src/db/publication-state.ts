@@ -67,12 +67,13 @@ export type PublicationStateRow = {
   completed: CompletedSnapshotPointer | null;
   /** A pointer row exists but is structurally unusable: never treated as ordinary absence. */
   pointerCorrupt: string | null;
+  /** Clock of the latest public content revision. */
   updatedAt: string | null;
 };
 
 export class PublicRevisionRangeError extends Error {}
 
-/** A Postgres bigint as a JavaScript number, refusing anything beyond the safe-integer range snapshot v1 can carry. */
+/** A Postgres bigint as a JavaScript number, refusing anything beyond the safe-integer range the snapshot can carry. */
 export function safeRevision(value: unknown, label = "public revision"): number {
   if (value === null || value === undefined) throw new PublicRevisionRangeError(`${label} is missing.`);
   const big = typeof value === "bigint" ? value : BigInt(String(value));
@@ -81,7 +82,7 @@ export function safeRevision(value: unknown, label = "public revision"): number 
 }
 
 const SHA256 = /^[0-9a-f]{64}$/;
-const FILENAME = /^snapshot-v1-r(\d+)-([0-9a-f]{64})\.json$/;
+const FILENAME = /^snapshot-v(\d+)-r(\d+)-([0-9a-f]{64})\.json$/;
 
 function readPointer(row: Record<string, unknown>): { pointer: CompletedSnapshotPointer | null; corrupt: string | null } {
   const fields = ["completed_revision", "completed_schema_version", "completed_sha256", "completed_bytes", "completed_generated_at", "completed_filename", "completed_producer_version"];
@@ -100,7 +101,7 @@ function readPointer(row: Record<string, unknown>): { pointer: CompletedSnapshot
     };
     const name = FILENAME.exec(pointer.filename);
     if (!SHA256.test(pointer.sha256)) return { pointer: null, corrupt: "the recorded SHA-256 is malformed" };
-    if (!name || Number(name[1]) !== pointer.revision || name[2] !== pointer.sha256) return { pointer: null, corrupt: "the recorded filename does not match its revision and digest" };
+    if (!name || Number(name[1]) !== pointer.schemaVersion || Number(name[2]) !== pointer.revision || name[3] !== pointer.sha256) return { pointer: null, corrupt: "the recorded filename does not match its revision and digest" };
     if (pointer.bytes <= 0 || !Number.isSafeInteger(pointer.schemaVersion) || !Number.isSafeInteger(pointer.producerVersion)) return { pointer: null, corrupt: "the recorded size or versions are invalid" };
     return { pointer, corrupt: null };
   } catch (error) {
@@ -133,8 +134,8 @@ export async function readCurrentRevision(payload: Payload, req?: Partial<Payloa
 export async function advancePublicRevision(payload: Payload, req?: Partial<PayloadRequest>): Promise<number> {
   const db = await drizzleFor(payload, req);
   const result = await db.execute(sql`
-    insert into byline_publication_state (id, current_revision, updated_at) values (1, 1, now())
-    on conflict (id) do update set current_revision = byline_publication_state.current_revision + 1, updated_at = now()
+    insert into byline_publication_state (id, current_revision, updated_at) values (1, 1, clock_timestamp())
+    on conflict (id) do update set current_revision = byline_publication_state.current_revision + 1, updated_at = greatest(byline_publication_state.updated_at, clock_timestamp())
     returning current_revision`);
   return safeRevision(result.rows[0]?.current_revision);
 }
@@ -156,8 +157,7 @@ export async function promoteCompletedSnapshot(payload: Payload, pointer: Comple
       completed_bytes = ${pointer.bytes},
       completed_generated_at = ${pointer.generatedAt},
       completed_filename = ${pointer.filename},
-      completed_producer_version = ${pointer.producerVersion},
-      updated_at = now()
+      completed_producer_version = ${pointer.producerVersion}
     where id = 1 and current_revision = ${pointer.revision}
     returning id`);
   return (result.rowCount ?? result.rows.length) > 0;

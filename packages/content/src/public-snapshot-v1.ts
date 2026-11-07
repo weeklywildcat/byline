@@ -1,25 +1,11 @@
-import { largestNaturalImage, validatePublicationMediaManifest, type PublicationMediaManifest } from "./publication-media";
-
 /**
- * The provider-neutral validator for the immutable public build snapshot v1
- * (`schemas/public-build-snapshot.schema.json`). One validator, used by every
- * producer before an artifact may become current (the Payload newsroom) and by
- * the static build before it accepts one (`apps/web/lib/prepared-snapshot.ts`).
- *
- * v1 carries WordPress-compatible shapes. Attachments may carry one namespaced
- * build extension, `bylinePublication: { manifest }`: the Phase 5 prepared
- * publication-media manifest of that attachment, so a build can acquire the
- * exact immutable files it names. It is validated with
- * `validatePublicationMediaManifest`, never trusted as raw JSON.
+ * The existing WordPress build input used by the WordPress static build.
+ * The Payload newsroom has a separate native public snapshot contract.
  */
-
 export const PUBLIC_BUILD_SNAPSHOT_SCHEMA_VERSION = 1;
 
 export const PUBLIC_BUILD_SNAPSHOT_DATASETS = ["posts", "authors", "guests", "categories", "tags", "pages", "corrections", "coverages", "schoolEvents", "attachments"] as const;
 export type PublicBuildSnapshotDataset = (typeof PUBLIC_BUILD_SNAPSHOT_DATASETS)[number];
-
-/** The build-only extension an attachment may carry. */
-export type BylinePublicationAttachment = { manifest: PublicationMediaManifest };
 
 export class InvalidBuildSnapshotError extends Error {
   constructor(detail: string) {
@@ -38,34 +24,9 @@ function rendered(value: unknown) {
   return record(value) && typeof value.rendered === "string";
 }
 
-/** The validated prepared-media manifest of an attachment's build extension, or null when it has none. */
-export function attachmentPublicationManifest(attachment: unknown): PublicationMediaManifest | null {
-  if (!record(attachment) || attachment.bylinePublication === undefined) return null;
-  const extension = attachment.bylinePublication;
-  requireCondition(record(extension) && Object.keys(extension).every((key) => key === "manifest"), `attachments: ${String(attachment.id)} has a malformed bylinePublication extension`);
-  const validation = validatePublicationMediaManifest(extension.manifest);
-  requireCondition(validation.ok, `attachments: ${String(attachment.id)} has an invalid prepared-media manifest (${validation.ok ? "" : validation.errors.slice(0, 3).join("; ")})`);
-  return validation.manifest;
-}
-
-function validateAttachmentExtension(row: Record<string, any>) {
-  const manifest = attachmentPublicationManifest(row);
-  if (!manifest) return;
-  // A prepared attachment's compatibility URLs are the prepared files themselves.
-  if (manifest.kind === "image") {
-    requireCondition(row.source_url === largestNaturalImage(manifest).publicPath, `attachments: ${String(row.id)} source_url is not its largest prepared natural file`);
-    for (const size of Object.values(record(row.media_details?.sizes) ? row.media_details.sizes : {})) {
-      requireCondition(record(size) && manifest.natural.some((file) => file.publicPath === size.source_url), `attachments: ${String(row.id)} has a responsive size that is not a prepared natural file`);
-    }
-  } else {
-    requireCondition(row.source_url === manifest.file.publicPath, `attachments: ${String(row.id)} source_url is not its prepared file`);
-  }
-}
-
 /**
  * Validates a v1 snapshot's envelope, publication, every required dataset,
- * counts, IDs, public status, required shapes and attachment build
- * extensions. Throws `InvalidBuildSnapshotError`; returns the value unchanged.
+ * counts, IDs, public status, and required shapes. Throws `InvalidBuildSnapshotError`; returns the value unchanged.
  */
 export function validatePublicBuildSnapshotV1<T = unknown>(value: unknown): T {
   requireCondition(record(value), "expected an object");
@@ -114,7 +75,6 @@ export function validatePublicBuildSnapshotV1<T = unknown>(value: unknown): T {
       if (name === "attachments") {
         requireCondition(typeof row.source_url === "string" && record(row.media_details), "attachments: missing media metadata");
         requireCondition(row.bylineImage?.artDirection == null || record(row.bylineImage.artDirection), "attachments: invalid art direction");
-        validateAttachmentExtension(row);
       }
       if (name === "schoolEvents") requireCondition(typeof row.startDate === "string" && typeof row.endDate === "string" && typeof row.title === "string" && typeof row.allDay === "boolean" && record(row.display) && typeof row.display.date === "string" && typeof row.display.time === "string", "schoolEvents: incomplete event");
       if (name === "coverages") requireCondition(typeof row.slug === "string" && typeof row.title === "string" && Array.isArray(row.stories), "coverages: incomplete collection");
@@ -122,12 +82,4 @@ export function validatePublicBuildSnapshotV1<T = unknown>(value: unknown): T {
     }
   }
   return value as T;
-}
-
-/** Every distinct prepared-media manifest a validated v1 snapshot names, in attachment order. */
-export function snapshotPublicationManifests(snapshot: { datasets: { attachments: unknown[] } }): PublicationMediaManifest[] {
-  return snapshot.datasets.attachments.flatMap((attachment) => {
-    const manifest = attachmentPublicationManifest(attachment);
-    return manifest ? [manifest] : [];
-  });
 }

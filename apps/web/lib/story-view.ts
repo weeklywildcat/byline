@@ -1,3 +1,5 @@
+import { articleBodyPlainText } from "@byline/content/story";
+import { nativeStory } from "./native-snapshot";
 import { IMAGE_CROP_SHAPES, type ImageCropShape } from "@byline/core";
 import { cleanDeckText, stripBracketedEllipsis, type AthleteSpotlightView, type StoryImageCrop, type StoryImageView, type StoryView } from "@byline/ui";
 import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory } from "@/lib/content";
@@ -43,11 +45,13 @@ function toStoryImageView(image: WordPressMedia | null, credit: string): StoryIm
 }
 
 function getCleanDeck(post: WordPressPost) {
-  return cleanDeckText(stripHtml(post.content.rendered || post.excerpt.rendered));
+  const native = nativeStory(post.id);
+  return cleanDeckText((native ? articleBodyPlainText(native.body) : stripHtml(post.content.rendered)) || stripHtml(post.excerpt.rendered));
 }
 
 function getReadingTime(post: WordPressPost) {
-  const words = stripHtml(post.content.rendered || post.excerpt.rendered).split(/\s+/).filter(Boolean).length;
+  const native = nativeStory(post.id);
+  const words = ((native ? articleBodyPlainText(native.body) : stripHtml(post.content.rendered)) || stripHtml(post.excerpt.rendered)).split(/\s+/).filter(Boolean).length;
 
   return `${Math.max(1, Math.ceil(words / 225))} min read`;
 }
@@ -96,7 +100,8 @@ function getAthleteBlurb(post: WordPressPost) {
   // Shares the linear excerpt-marker strip rather than repeating the regex it
   // replaced: the same publication text reaches both, and the same
   // backtracking hazard would come with it.
-  const text = stripBracketedEllipsis(stripHtml(post.excerpt.rendered || post.content.rendered));
+  const native = nativeStory(post.id);
+  const text = stripBracketedEllipsis(stripHtml(post.excerpt.rendered) || (native ? articleBodyPlainText(native.body) : stripHtml(post.content.rendered)));
 
   if (text.length <= 120) return text;
 

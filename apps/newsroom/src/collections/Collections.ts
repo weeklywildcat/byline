@@ -34,7 +34,7 @@ import { validResourceUrl } from "./StoryPlans";
  *
  * Public coverage or a series is only an optional presentation of a
  * Collection (`publicPresentation`), projected for the public site as the
- * existing `coverages` dataset. There is no second, public "Coverage" record.
+ * native public Collections dataset. There is no second, public "Coverage" record.
  */
 
 const system = (req: PayloadRequest) => req.context?.bylineImport === true || req.context?.bylineSystem === true;
@@ -237,6 +237,7 @@ export const Collections: CollectionConfig = {
         { name: "storyOrder", label: "Public story order", type: "relationship", relationTo: "stories", hasMany: true }
       ]
     },
+    { name: "publicModifiedAt", type: "date", admin: { hidden: true }, access: { create: () => false, update: () => false } },
     { name: "createdBy", type: "relationship", relationTo: "users", admin: { readOnly: true }, access: { update: () => false } },
     legacyIdField()
   ]

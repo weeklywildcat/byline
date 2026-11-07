@@ -39,3 +39,5 @@ export function renderRepositoryInteractive(registry: RepositoryInteractiveRegis
 }
 
 export { FixtureLunchLine };
+
+export type { RepositoryInteractiveClient } from "./types";

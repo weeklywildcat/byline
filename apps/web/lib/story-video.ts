@@ -1,3 +1,5 @@
+import { nativeStory } from "./native-snapshot";
+import { nativeVideoMetadata } from "./native-article-seo";
 import { formatVideoDuration, youTubeDefaultThumbnailUrl, youTubeEmbedUrl } from "@byline/core";
 import type { ArticleVideoView, StoryVideoBadgeView } from "@byline/ui";
 import { stripHtml } from "@/lib/format";
@@ -40,6 +42,8 @@ function limit(value: string) {
 
 /** Null for an article, including one with YouTube embeds in its body. */
 export function getVideoStoryMetadata(post: WordPressPost): VideoStoryMetadata | null {
+  const native = nativeStory(post.id);
+  if (native) return nativeVideoMetadata(native);
   const video = getPostPrimaryVideo(post);
   if (!video) return null;
   const headline = plainText(post.title.rendered);

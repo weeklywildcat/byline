@@ -1,3 +1,5 @@
+import { getNativeSnapshot, nativeStoryIndex } from "@/lib/native-snapshot";
+import { nativeImage } from "@/lib/native-article";
 import { ContributorDirectoryCard } from "@byline/ui/contributor-profile";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
@@ -46,6 +48,24 @@ type AuthorDirectoryProps = {
 };
 
 export async function AuthorDirectory({ className, showDescriptions = true }: AuthorDirectoryProps) {
+  const native = getNativeSnapshot();
+  if (native) {
+    const { byContributor } = nativeStoryIndex()!;
+    const people = native.datasets.people.filter((person) => person.directoryVisible).map((person) => ({
+      person, storyCount: byContributor.get(`person:${person.id}`)?.length ?? 0
+    })).sort((a, b) => b.storyCount - a.storyCount || a.person.name.localeCompare(b.person.name));
+    return (
+      <div className={className ? `author-card-grid ${className}` : "author-card-grid"}>
+        {people.map(({ person, storyCount }) => {
+          const image = person.portrait ? nativeImage(person.portrait, { role: "contributor", shape: "square", sizes: "96px", priority: false, searchVisibility: "presentation" }) : null;
+          const photo = image ? { ...image, url: image.src } : null;
+          const description = showDescriptions ? person.bio || person.shortBio || `${native.publication.identity.shortName} contributor` : undefined;
+          return <ContributorDirectoryCard key={person.id} person={{ name: person.name, role: person.newsroomRole, photo }}
+            href={person.hasProfilePage ? `/author/${person.slug}/` : null} description={description} storyCount={storyCount} />;
+        })}
+      </div>
+    );
+  }
   const authorCards = await getAuthorCards();
 
   return (

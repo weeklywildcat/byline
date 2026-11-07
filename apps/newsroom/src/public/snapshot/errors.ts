@@ -13,8 +13,6 @@ export type PublicSnapshotErrorCode =
   | "media-not-ready"
   /** The projection failed validation (a bug or bad data, never published). */
   | "invalid-projection"
-  /** A published Story has content the normalizer cannot carry without losing it. */
-  | "unsupported-story-content"
   /** Writing or reading the immutable artifact failed. */
   | "storage-failure"
   /** The conditional pointer promotion lost to a newer public revision. */

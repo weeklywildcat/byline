@@ -1,10 +1,11 @@
 import type { Payload } from "payload";
 import { promoteCompletedSnapshot, readCurrentRevision, readPublicationState, type CompletedSnapshotPointer, type PublicationStateRow } from "../../db/publication-state";
-import { collectPublicSnapshot, type PublicSnapshotV1 } from "./collect";
+import type { PublicBuildSnapshotV2 } from "@byline/content";
+import { collectPublicSnapshot } from "./collect";
 import { isPublicSnapshotError, PublicSnapshotError } from "./errors";
 import { assertPublicSafe } from "./privacy";
 import { SnapshotStore } from "./store";
-import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION } from "./version";
+import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_PRODUCER_VERSION } from "./version";
 
 /**
  * Snapshot preparation with a revision fence instead of a global lock
@@ -28,11 +29,11 @@ import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION } f
  */
 
 /** Exact UTF-8 bytes of a snapshot: the one serialization the digest, the store and the endpoints share. */
-export function serializePublicSnapshot(snapshot: PublicSnapshotV1): Buffer {
+export function serializePublicSnapshot(snapshot: PublicBuildSnapshotV2): Buffer {
   return Buffer.from(JSON.stringify(snapshot), "utf8");
 }
 
-export type SnapshotBuildResult = { snapshot: PublicSnapshotV1; bytes: Buffer };
+export type SnapshotBuildResult = { snapshot: PublicBuildSnapshotV2; bytes: Buffer };
 
 /**
  * Collects, validates, privacy-checks and serializes the projection for
@@ -40,9 +41,14 @@ export type SnapshotBuildResult = { snapshot: PublicSnapshotV1; bytes: Buffer };
  * the job and the direct-source recovery endpoint: one projection.
  */
 export async function buildPublicSnapshotBytes(payload: Payload, revision: number, options: { afterCollect?: () => Promise<void>; afterRead?: () => Promise<void>; now?: () => Date } = {}): Promise<SnapshotBuildResult> {
-  let snapshot: PublicSnapshotV1;
+  const state = await readPublicationState(payload);
+  if (state.currentRevision !== revision) throw new PublicSnapshotError("stale-revision", `Public revision moved from ${revision} to ${state.currentRevision} before collection.`);
+  let snapshot: PublicBuildSnapshotV2;
   try {
-    snapshot = await collectPublicSnapshot(payload, { revision, afterRead: options.afterRead, now: options.now });
+    // Scheduled facts are evaluated at the revision's clock so direct recovery
+    // at R can reproduce the completed artifact even across a time boundary.
+    const asOf = state.updatedAt ? new Date(state.updatedAt) : undefined;
+    snapshot = await collectPublicSnapshot(payload, { revision, asOf, afterRead: options.afterRead, now: options.now });
   } catch (error) {
     // A collector that raced a public change can see inconsistent inputs; that is staleness, not a fault.
     if ((await readCurrentRevision(payload)) !== revision) throw new PublicSnapshotError("stale-revision", `Public revision moved past ${revision} while collecting.`);
@@ -60,7 +66,7 @@ export async function buildPublicSnapshotBytes(payload: Payload, revision: numbe
 export function usableCompletedPointer(state: PublicationStateRow): CompletedSnapshotPointer | null {
   const pointer = state.completed;
   if (!pointer || state.pointerCorrupt) return null;
-  return pointer.revision === state.currentRevision && pointer.schemaVersion === PUBLIC_SNAPSHOT_SCHEMA_VERSION && pointer.producerVersion === PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION ? pointer : null;
+  return pointer.revision === state.currentRevision && pointer.schemaVersion === PUBLIC_SNAPSHOT_SCHEMA_VERSION && pointer.producerVersion === PUBLIC_SNAPSHOT_PRODUCER_VERSION ? pointer : null;
 }
 
 export type PreparationOutcome =
@@ -80,7 +86,7 @@ export type PreparationHooks = {
 /**
  * Prepares (or confirms) the completed snapshot for the CURRENT public
  * revision. Throws `PublicSnapshotError` for problems a person or the
- * infrastructure must fix (invalid projection, unsupported story content,
+ * infrastructure must fix (invalid projection,
  * storage); returns `stale` and `not-ready` outcomes, which resolve on their
  * own (a newer job, a finished media preparation re-queues this task).
  */
@@ -111,7 +117,7 @@ export async function runPublicSnapshotPreparation(payload: Payload, options: { 
     bytes: stored.bytes,
     generatedAt: built.snapshot.generatedAt,
     filename: stored.filename,
-    producerVersion: PUBLIC_SNAPSHOT_V1_PRODUCER_VERSION
+    producerVersion: PUBLIC_SNAPSHOT_PRODUCER_VERSION
   };
   // The orphaned artifact of a lost promotion is harmless; retention removes it later.
   if (!(await promoteCompletedSnapshot(payload, pointer))) return { outcome: "stale", revision, code: "promotion-lost", message: `Public revision moved past ${revision} before promotion.` };

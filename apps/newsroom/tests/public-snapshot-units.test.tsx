@@ -1,15 +1,10 @@
 import { mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ARTICLE_BLOCK_TYPES } from "@byline/article-body";
-import { FIXTURE_ARTICLE_BODY } from "@byline/article-body/fixtures";
 import { publicationLocalDate, publicationLocalMinute, publicStoryPath, wordpressGmtDateTime, wordpressLocalDateTime } from "@byline/content";
-import { StructuredArticleBody } from "@byline/ui/article-body";
-import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import { payloadPublicStory } from "../src/preview/payload-story";
 import { DEFAULT_PREVIEW_PUBLICATION } from "../src/preview/publication";
-import { articleBodyCompatibilityHtml } from "../src/public/snapshot/article-html";
 import { PublicSnapshotError } from "../src/public/snapshot/errors";
 import { pageBodyHtml } from "../src/public/snapshot/page-html";
 import { assertPublicSafe } from "../src/public/snapshot/privacy";
@@ -63,18 +58,6 @@ describe("publication-local dates and the article path", () => {
   });
 });
 
-describe("snapshot v1 structured-body compatibility bridge", () => {
-  it("renders through the canonical renderer: wrapped once, it is exactly StructuredArticleBody", async () => {
-    const present = new Set(FIXTURE_ARTICLE_BODY.nodes.map((node) => node.type));
-    for (const type of ARTICLE_BLOCK_TYPES) expect(present.has(type)).toBe(true);
-    const inner = await articleBodyCompatibilityHtml(FIXTURE_ARTICLE_BODY);
-    expect(inner.startsWith('<div class="article-body"')).toBe(false);
-    expect(`<div class="article-body">${inner}</div>`).toBe(renderToStaticMarkup(<StructuredArticleBody body={FIXTURE_ARTICLE_BODY} />));
-    expect(inner).not.toContain('"root"');
-    expect(inner).not.toContain("blockType");
-  });
-});
-
 describe("Page bodies", () => {
   const text = (value: string, format = 0) => ({ type: "text", text: value, format, version: 1 });
   const node = (type: string, children: unknown[], extra: Record<string, unknown> = {}) => ({ type, children, version: 1, ...extra });
@@ -112,7 +95,7 @@ describe("immutable snapshot artifacts and retention", () => {
     const snapshots = store();
     const bytes = Buffer.from('{"schemaVersion":1}', "utf8");
     const first = await snapshots.write(bytes, 4);
-    expect(first.filename).toMatch(/^snapshot-v1-r4-[0-9a-f]{64}\.json$/);
+    expect(first.filename).toMatch(/^snapshot-v2-r4-[0-9a-f]{64}\.json$/);
     expect(await snapshots.verify(first.filename, first.sha256, first.bytes)).toBe(true);
     // Identical bytes are reused.
     expect(await snapshots.write(bytes, 4)).toEqual(first);

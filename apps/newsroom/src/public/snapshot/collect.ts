@@ -1,472 +1,161 @@
-import { mediaKey, type MediaId } from "@byline/article-body";
+import { isBlockingIssue, type MediaId } from "@byline/article-body";
 import {
-  publicationDateParts,
-  publicationLocalMinute,
-  publicStoryPath,
-  validatePublicBuildSnapshotV1,
-  wordpressGmtDateTime,
-  wordpressLocalDateTime
+  PUBLIC_SNAPSHOT_SCHEMA_VERSION, publicSnapshotContributor, publicStoryPath, snapshotStoryReference,
+  validatePublicBuildSnapshotV2, type PublicBuildSnapshotV2, type PublicStorySnapshot
 } from "@byline/content";
-import { escapeHtml } from "@byline/content/story";
+import { escapeHtml, type PublicTerm } from "@byline/content/story";
 import type { BylinePublicationConfig } from "@byline/core";
-import { normalizePrimaryVideo, parseYouTubeVideoId } from "@byline/core";
-import { collectMediaIds, normalizePayloadStoryBody, type NormalizeIssue } from "@byline/editor/normalize";
+import { formatVideoDuration, normalizePrimaryVideo, parseYouTubeVideoId, youTubeEmbedUrl } from "@byline/core";
+import { collectMediaIds, collectReferenceIds, normalizePayloadStoryBody, type NormalizeIssue } from "@byline/editor/normalize";
 import type { Payload } from "payload";
-import { relationId, relationIds } from "../../access/user";
-import { publicCoverages } from "../../newsroom/public-coverage";
-import { publicPeople, type PublicPerson } from "../../newsroom/public-people";
+import { relationIds } from "../../access/user";
+import { repositoryInteractivesForServer } from "../../hooks/story-body";
+import type { Story } from "../../payload-types";
 import { publicationConfigFromGlobal, readPublishedPublication } from "../publication-config";
-import { articleBodyCompatibilityHtml } from "./article-html";
+import { collectCollections, collectCorrections, collectEvents, collectPages, collectPeople, id, iso, prose, publicRead, published, taxonomy, text } from "./datasets";
 import { PublicSnapshotError } from "./errors";
-import { PreparedMediaCatalog, type SnapshotAttachment } from "./media";
-import { pageBodyHtml } from "./page-html";
-import { correctionPublicFrom } from "../scheduled";
-import { PUBLIC_SNAPSHOT_SCHEMA_VERSION } from "./version";
+import { PreparedMediaCatalog } from "./media";
+import { collectLiveCoverage, hasLiveCoverage, readLiveUpdates } from "./live";
+import { collectPolls } from "./polls";
 
-/**
- * The Payload public projection as snapshot v1 (docs/payload-build-snapshots.md).
- *
- * Every dataset is an explicit allowlist built from published MAIN documents
- * (never `draft: true`, never the versions table) and the existing public
- * projections (`publicPeople`, `publicCoverages`). Nothing is spread from a
- * Payload document; Users, plans, tasks, sources, appointments, production,
- * interviews, resources and briefs are never read.
- *
- * v1 deliberately looks like WordPress so the unchanged Astro consumer
- * (`apps/web/lib/wordpress.ts`) can render it and WordPress/Payload builds can
- * be compared. The same function serves the snapshot job and the
- * direct-source recovery endpoint: there is one public projection.
- */
+type Datasets = PublicBuildSnapshotV2["datasets"];
+type StoryFacts = Omit<PublicStorySnapshot, "body">;
+const ids = (value: unknown) => [...new Set(relationIds(value).map(Number))];
+const term = (row: Datasets["sections"][number], prefix: string): PublicTerm => ({ key: `${prefix}-${row.id}`, name: row.name, href: row.href });
 
-type Row = Record<string, any>;
-
-export type PublicSnapshotV1 = {
-  schemaVersion: 1;
-  revision: number;
-  generatedAt: string;
-  sourceTimezone: string;
-  publication: BylinePublicationConfig;
-  datasets: {
-    posts: Row[];
-    authors: Row[];
-    guests: Row[];
-    categories: Row[];
-    tags: Row[];
-    pages: Row[];
-    corrections: Row[];
-    coverages: Row[];
-    schoolEvents: Row[];
-    attachments: SnapshotAttachment[];
-  };
-  counts: Record<string, number>;
-};
-
-export type CollectOptions = {
-  revision: number;
-  /** For tests: the moment `generatedAt` records. */
-  now?: () => Date;
-  /** For tests: a barrier between reading the public inputs and building the projection. */
-  afterRead?: () => Promise<void>;
-};
-
-const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
-const ids = (value: unknown) => relationIds(value).map(Number).filter((id) => Number.isSafeInteger(id) && id > 0);
-const id = (value: unknown) => {
-  const found = Number(relationId(value));
-  return Number.isSafeInteger(found) && found > 0 ? found : null;
-};
-
-function paragraphsHtml(value: string): string {
-  return value ? value.split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean).map((paragraph) => `<p>${escapeHtml(paragraph)}</p>\n`).join("") : "";
+async function readStories(payload: Payload) {
+  const { docs } = await payload.find({
+    collection: "stories", draft: false, where: published, ...publicRead,
+    select: { headline: true, kicker: true, deck: true, section: true, topics: true, contributors: true, featuredMedia: true,
+      featuredCaption: true, contentFormat: true, body: true, legacyHtml: true, format: true, video: true, presentation: true,
+      immersiveAlignment: true, reportingNote: true, liveCoverage: true, slug: true, publishedAt: true, updatedAt: true, deletedAt: true }
+  });
+  return docs.filter((row) => !row.deletedAt).sort((a, b) => Date.parse(b.publishedAt ?? "") - Date.parse(a.publishedAt ?? "") || b.id - a.id);
 }
 
-/** WordPress's `M j, Y g:i A` and `g:i A` in the publication's timezone. */
-function eventDisplay(start: string | null, end: string | null, allDay: boolean, timeZone: string) {
-  const clock = (value: string) => {
-    const { hour, minute } = publicationDateParts(value, timeZone);
-    const h = Number(hour);
-    return `${h % 12 === 0 ? 12 : h % 12}:${minute} ${h < 12 ? "AM" : "PM"}`;
-  };
-  const day = (value: string) => {
-    const { year, month, day: date } = publicationDateParts(value, timeZone);
-    const name = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(Number(year), Number(month) - 1, 1)));
-    return `${name} ${Number(date)}, ${year} ${clock(value)}`;
-  };
+function collectStoryFacts(row: Omit<Story, "createdAt">, sectionRow: Datasets["sections"][number], topics: Map<number, Datasets["topics"][number]>, people: Map<number, Datasets["people"][number]>, corrections: StoryFacts["corrections"], publication: BylinePublicationConfig): StoryFacts {
+  const title = text(row.headline);
+  const href = publicStoryPath({ slug: row.slug, sectionSlug: sectionRow.slug, publishedAt: row.publishedAt, timeZone: publication.timezone });
+  if (!href || !row.publishedAt) throw new PublicSnapshotError("invalid-projection", `Story ${row.id} has no canonical public route.`);
+  const section = term(sectionRow, "section");
+  const storyTopics = ids(row.topics).map((id) => {
+    const topic = topics.get(id);
+    if (!topic) throw new PublicSnapshotError("invalid-projection", `Story ${row.id} has missing Topic ${id}.`);
+    return term(topic, "topic");
+  });
+  const contributors = ids(row.contributors).map((id) => {
+    const person = people.get(id);
+    if (!person) throw new PublicSnapshotError("invalid-projection", `Story ${row.id} has missing Person ${id}.`);
+    return publicSnapshotContributor(person);
+  });
+  const videoId = row.format === "video" ? parseYouTubeVideoId(row.video?.url) : null;
+  const metadata = row.video?.metadata;
+  const videoMetadata = videoId ? normalizePrimaryVideo({ ...(typeof metadata === "object" && metadata && !Array.isArray(metadata) ? metadata : {}), provider: "youtube", videoId }) : null;
+  const primaryVideo = videoMetadata ? { videoId: videoMetadata.videoId, embedUrl: youTubeEmbedUrl(videoMetadata.videoId), title: videoMetadata.title || title, duration: formatVideoDuration(videoMetadata.duration) } : null;
   return {
-    date: start ? day(start) : "",
-    time: allDay ? "All day" : start ? (end ? `${clock(start)}-${clock(end)}` : clock(start)) : ""
+    id: row.id, slug: row.slug, title, titleHtml: escapeHtml(title), kicker: text(row.kicker), excerptHtml: prose(text(row.deck)),
+    href, url: publication.urls.publicSite.replace(/\/+$/, "") + href, publishedAt: iso(row.publishedAt), modifiedAt: iso(row.updatedAt),
+    section, sections: [section], sectionKeys: [section.key], topics: storyTopics, topicKeys: storyTopics.map((topic) => topic.key),
+    contributors, contributorKeys: contributors.flatMap((person) => person.keys), corrections,
+    image: id(row.featuredMedia), leadCaption: text(row.featuredCaption), listed: true, athleteMeta: [], format: row.format,
+    presentation: row.presentation, immersiveAlignment: row.immersiveAlignment ?? "bottom-left",
+    primaryVideo, video: row.format === "video" ? { duration: primaryVideo?.duration ?? null } : null, videoMetadata,
+    reportingNote: text(row.reportingNote).split(/\n\s*\n/).filter(Boolean), live: null
   };
 }
 
-/** Lexical/normalizer issues that mean published content would be lost or changed. */
 function contentLosingIssues(issues: NormalizeIssue[]): string[] {
   return issues.flatMap((issue) => {
     if (issue.kind === "unsupported-node") return [`unsupported ${issue.nodeType} at ${issue.path}`];
     if (issue.kind === "unsupported-format") return [`unsupported ${issue.format} formatting at ${issue.path}`];
     if (issue.kind === "unsafe-link") return [`unsafe link at ${issue.path}`];
-    // Footnotes with no text are left out by design.
-    if (issue.kind === "footnote") return [];
-    // A block's unfinished parts are left out by design (`finalizeBlock`), exactly as Live Preview
-    // and the publish readiness rules show them. Media that disappeared is not unfinished. Related
-    // Coverage, Poll and Repository Interactive need public references and the interactive registry,
-    // which only snapshot v2 carries: v1 refuses such a story rather than quietly leaving them out.
-    const { code } = issue.issue;
-    if (code.endsWith("-unavailable") || code === "interactive-unregistered" || code === "related-none") return [`${issue.issue.type} block ${issue.issue.blockId}: ${issue.issue.message}`];
+    if (issue.kind === "block" && isBlockingIssue(issue.issue)) return [`${issue.issue.type} block ${issue.issue.blockId}: ${issue.issue.message}`];
     return [];
   });
 }
 
-/** Known public social services on a staff profile; other labels stay in a guest's link list only. */
-function profileSocials(person: PublicPerson) {
-  const socials = { website: "", email: person.publicEmail, instagram: "", tiktok: "", linkedin: "", x: "" };
-  for (const { label, url } of person.socials) {
-    const key = label.trim().toLowerCase().replace(/[^a-z]/g, "");
-    const target = ["website", "site", "web", "homepage"].includes(key) ? "website" : key === "twitter" ? "x" : key;
-    if (target in socials && target !== "email" && !socials[target as keyof typeof socials]) socials[target as keyof typeof socials] = url;
-  }
-  return socials;
-}
-
-export async function collectPublicSnapshot(payload: Payload, options: CollectOptions): Promise<PublicSnapshotV1> {
-  const revision = options.revision;
-
-  /* ------------------------------------------------------------ read public inputs */
-  const publicationRow = await readPublishedPublication(payload);
-  const publication = publicationConfigFromGlobal(publicationRow, revision);
-  const timeZone = publication.timezone;
-  const site = publication.urls.publicSite.replace(/\/+$/, "");
-
-  const [sectionsFound, topicsFound, storiesFound, pagesFound, eventsFound, people, coverages] = await Promise.all([
-    payload.find({ collection: "sections", select: { name: true, slug: true, description: true, hidden: true }, depth: 0, pagination: false, sort: "name", overrideAccess: true }),
-    payload.find({ collection: "topics", select: { name: true, slug: true, description: true }, depth: 0, pagination: false, sort: "name", overrideAccess: true }),
-    // Published MAIN documents only. Never `draft: true`: a newer unpublished rewrite stays private.
-    payload.find({
-      collection: "stories",
-      where: { _status: { equals: "published" } },
-      select: { headline: true, deck: true, section: true, topics: true, contributors: true, featuredMedia: true, featuredCaption: true, contentFormat: true, body: true, legacyHtml: true, format: true, video: true, presentation: true, immersiveAlignment: true, reportingNote: true, slug: true, publishedAt: true, updatedAt: true, _status: true },
-      depth: 0,
-      pagination: false,
-      overrideAccess: true
-    }),
-    payload.find({ collection: "pages", where: { _status: { equals: "published" } }, select: { title: true, slug: true, summary: true, body: true, noindex: true, publishedAt: true, createdAt: true, updatedAt: true, _status: true }, depth: 0, pagination: false, overrideAccess: true }),
-    payload.find({ collection: "events", where: { _status: { equals: "published" } }, select: { title: true, slug: true, eventType: true, startAt: true, endAt: true, allDay: true, location: true, description: true, externalUrl: true, eventStatus: true, _status: true }, depth: 0, pagination: false, sort: "startAt", overrideAccess: true }),
-    publicPeople(payload),
-    publicCoverages(payload)
+export async function collectPublicSnapshot(payload: Payload, options: { revision: number; now?: () => Date; asOf?: Date; afterRead?: () => Promise<void> }): Promise<PublicBuildSnapshotV2> {
+  const { revision } = options;
+  const now = options.now?.() ?? new Date();
+  const [publicationRow, sectionRows, topicRows, storyRows, pages, events] = await Promise.all([
+    readPublishedPublication(payload), payload.find({ collection: "sections", ...publicRead, sort: "id", select: { name: true, slug: true, description: true, hidden: true } }),
+    payload.find({ collection: "topics", ...publicRead, sort: "id", select: { name: true, slug: true, description: true } }),
+    readStories(payload), collectPages(payload), collectEvents(payload)
   ]);
-  const storyIds = (storiesFound.docs as Row[]).filter((story) => story._status === "published").map((story) => story.id as number);
-  const correctionsFound = storyIds.length
-    ? await payload.find({ collection: "corrections", where: { story: { in: storyIds } }, select: { story: true, type: true, text: true, date: true, publishedAt: true }, depth: 0, pagination: false, overrideAccess: true })
-    : { docs: [] as Row[] };
+  const publication = publicationConfigFromGlobal(publicationRow, revision);
+  const sections = sectionRows.docs.filter((row) => !row.hidden).map((row) => taxonomy(row, "category"));
+  const topics = topicRows.docs.map((row) => taxonomy(row, "tag"));
+  const sectionById = new Map(sections.map((row) => [row.id, row]));
+  const topicById = new Map(topics.map((row) => [row.id, row]));
+  const hiddenSections = new Set(sectionRows.docs.filter((row) => row.hidden).map((row) => row.id));
+  const rows = storyRows.filter((row) => !hiddenSections.has(id(row.section) ?? -1));
+  const storyIds = rows.map((row) => row.id);
+  const pollIds = [...new Set(rows.flatMap((row) => row.contentFormat === "legacy-html" ? [] : collectReferenceIds(row.body).polls.map(Number)))];
+  const [people, corrections, collections, polls, liveUpdates] = await Promise.all([
+    collectPeople(payload, new Set(rows.flatMap((row) => ids(row.contributors)))),
+    collectCorrections(payload, storyIds, options.asOf ?? now),
+    collectCollections(payload, new Set(storyIds)),
+    collectPolls(payload, pollIds, options.asOf ?? now),
+    readLiveUpdates(payload, rows.filter(hasLiveCoverage).map(({ id }) => id))
+  ]);
   await options.afterRead?.();
-
-  /* ------------------------------------------------------------ sections, stories */
-  const sections = new Map((sectionsFound.docs as Row[]).map((row) => [row.id as number, row]));
-  const topics = new Map((topicsFound.docs as Row[]).map((row) => [row.id as number, row]));
-  const problems: string[] = [];
-  const stories = (storiesFound.docs as Row[])
-    .filter((story) => story._status === "published")
-    .filter((story) => {
-      const section = sections.get(id(story.section) ?? -1);
-      // Stories only in an internal section never reach the public site (Sections.hidden).
-      if (section?.hidden === true) return false;
-      if (!section) problems.push(`Story ${story.id} (“${text(story.headline).slice(0, 80)}”) is published without a Section, so it has no public URL. Give it a Section.`);
-      if (!text(story.slug) || !story.publishedAt) problems.push(`Story ${story.id} is published without a slug or first-publication time.`);
-      return Boolean(section);
-    })
-    .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt) || b.id - a.id);
-  if (problems.length) throw new PublicSnapshotError("invalid-projection", "Published stories cannot be given public URLs.", problems);
-
-  /* ------------------------------------------------------------ people */
-  const everyone = new Map<number, PublicPerson>([...people.authors, ...people.guests].map((person) => [person.id, person]));
-  // Staff with a profile page are `authors`; guests with one are `guests`. Byline-only people appear only inside stories.
-  const authorPeople = people.authors.filter((person) => person.hasProfilePage && person.slug);
-  const authorIds = new Set(authorPeople.map((person) => person.id));
-  const guestPeople = people.guests.filter((person) => person.hasProfilePage && person.slug);
-  const credited = new Set(stories.flatMap((story) => ids(story.contributors)));
-
-  /* ------------------------------------------------------------ media references */
-  const references = new Map<number, { usage: string; kind: "image" | "document" | "any" }>();
-  const reference = (mediaId: number | null, usage: string, kind: "image" | "document" | "any") => {
-    if (mediaId !== null && !references.has(mediaId)) references.set(mediaId, { usage, kind });
-  };
-  for (const story of stories) {
-    reference(id(story.featuredMedia), `the lead image of Story ${story.id}`, "image");
-    if (story.contentFormat !== "legacy-html") for (const mediaId of collectMediaIds(story.body)) reference(Number(mediaId), `the body of Story ${story.id}`, "any");
+  const personById = new Map(people.map((row) => [row.id, row]));
+  const correctionByStory = new Map<number, StoryFacts["corrections"]>();
+  for (const { storyId, ...entry } of corrections) {
+    const list = correctionByStory.get(storyId) ?? [];
+    list.push(entry);
+    correctionByStory.set(storyId, list);
   }
-  for (const person of [...authorPeople, ...guestPeople, ...[...credited].map((personId) => everyone.get(personId)).filter((person): person is PublicPerson => Boolean(person))]) {
-    if (person.portrait) reference(person.portrait.id, `the portrait of ${person.name} (Person ${person.id})`, "image");
+  const facts = new Map(rows.map((row) => {
+    const section = sectionById.get(id(row.section) ?? -1);
+    if (!section) throw new PublicSnapshotError("invalid-projection", `Story ${row.id} is published without a Section.`);
+    return [row.id, collectStoryFacts(row, section, topicById, personById, correctionByStory.get(row.id) ?? [], publication)];
+  }));
+
+  const mediaRefs = new Map<number, { usage: string; kind: "image" | "any" }>();
+  const mediaRef = (id: number | null, usage: string, kind: "image" | "any") => {
+    if (id && (kind === "image" || !mediaRefs.has(id))) mediaRefs.set(id, { usage, kind });
+  };
+  for (const row of rows) {
+    mediaRef(id(row.featuredMedia), `the lead image of Story ${row.id}`, "image");
+    if (row.contentFormat !== "legacy-html") for (const mediaId of collectMediaIds(row.body)) mediaRef(Number(mediaId), `the body of Story ${row.id}`, "any");
   }
-  const publishedStoryIds = new Set(stories.map((story) => story.id as number));
-  const publicCoveragesList = coverages.filter((coverage) => coverage.slug && coverage.title);
-  for (const coverage of publicCoveragesList) if (coverage.artwork) reference(coverage.artwork.id, `the artwork of Collection ${coverage.id}`, "image");
-  const catalog = await PreparedMediaCatalog.load(payload, references);
-
-  /* ------------------------------------------------------------ people records */
-  const portrait = (person: PublicPerson) => (person.portrait ? catalog.photo(person.portrait.id, { shape: "square", minWidth: 640 }) : undefined);
-  const authorRecord = (person: PublicPerson) => {
-    const photo = portrait(person);
-    const profile = {
-      pronouns: person.pronouns,
-      role: person.newsroomRole,
-      shortBio: person.shortBio,
-      showInDirectory: person.directoryVisible,
-      ...(photo ? { profilePhoto: photo } : {}),
-      socials: profileSocials(person)
-    };
-    return { id: person.id, name: person.name, slug: person.slug, description: person.bio || person.shortBio, url: "", link: `${site}/author/${person.slug}/`, bylineProfile: profile, weeklyWildcatProfile: profile };
-  };
-  const guestRecord = (person: PublicPerson, hasProfilePage: boolean, roleFallback: string) => {
-    const photo = portrait(person);
-    return {
-      type: "guest",
-      id: person.id,
-      name: person.name,
-      slug: person.slug,
-      hasProfilePage,
-      bio: person.bio || person.shortBio,
-      role: person.newsroomRole || roleFallback,
-      ...(photo ? { profilePhoto: photo } : {}),
-      ...(person.socials.length ? { links: person.socials.map(({ label, url }) => ({ label, url })) } : {})
-    };
-  };
-  const authors = authorPeople.map(authorRecord);
-  const authorsById = new Map(authors.map((author) => [author.id, author]));
-  const guests = guestPeople.map((person) => guestRecord(person, true, "Guest contributor"));
-  const contributorRecord = (personId: number) => {
-    const person = everyone.get(personId);
-    if (!person) return null;
-    if (authorIds.has(personId)) return { type: "user", id: person.id, name: person.name, slug: person.slug, link: `${site}/author/${person.slug}/` };
-    // A staff member without a profile page, or a byline-only guest: credited by name (and photo), no archive.
-    if (person.status !== "guest") return guestRecord(person, false, "Contributor");
-    return guestRecord(person, person.hasProfilePage && Boolean(person.slug), "Guest contributor");
-  };
-
-  /* ------------------------------------------------------------ corrections */
-  const correctionsByStory = new Map<number, Row[]>();
-  const collectedAt = (options.now?.() ?? new Date()).getTime();
-  for (const correction of correctionsFound.docs as Row[]) {
-    const storyId = id(correction.story);
-    if (storyId === null || !publishedStoryIds.has(storyId) || !text(correction.text)) continue;
-    // "Shown publicly from" a future time: hidden until then (a delayed job advances the revision at that moment).
-    const from = correctionPublicFrom(correction);
-    if (from !== null && from > collectedAt) continue;
-    const list = correctionsByStory.get(storyId) ?? [];
-    list.push(correction);
-    correctionsByStory.set(storyId, list);
+  for (const person of people) mediaRef(person.portrait, `the portrait of Person ${person.id}`, "image");
+  for (const collection of collections) mediaRef(collection.artwork, `the artwork of Collection ${collection.id}`, "image");
+  const updatesByStory = new Map<number, typeof liveUpdates>();
+  for (const row of liveUpdates) {
+    const storyId = id(row.story);
+    if (storyId === null) continue;
+    const list = updatesByStory.get(storyId) ?? [];
+    list.push(row);
+    updatesByStory.set(storyId, list);
+    mediaRef(id(row.photo), `live update ${row.id}`, "image");
   }
-  for (const list of correctionsByStory.values()) list.sort((a, b) => Date.parse(a.date) - Date.parse(b.date) || a.id - b.id);
-  const correctionRecord = (correction: Row) => ({ id: correction.id as number, type: String(correction.type ?? "correction"), text: text(correction.text), date: new Date(correction.date).toISOString() });
-
-  /* ------------------------------------------------------------ posts */
-  const contentProblems: string[] = [];
-  const categoryCounts = new Map<number, number>();
-  const tagCounts = new Map<number, number>();
-  const sectionTerm = (section: Row) => ({ id: section.id as number, count: 0, description: text(section.description), link: `${site}/category/${section.slug}/`, name: text(section.name), slug: String(section.slug), taxonomy: "category", parent: 0 });
-  const topicTerm = (topic: Row) => ({ id: topic.id as number, count: 0, description: text(topic.description), link: `${site}/tag/${topic.slug}/`, name: text(topic.name), slug: String(topic.slug), taxonomy: "post_tag" });
-
-  const posts = await Promise.all(stories.map(async (story) => {
-    const section = sections.get(id(story.section)!)!;
-    const storyTopics = ids(story.topics).map((topicId) => topics.get(topicId)).filter((topic): topic is Row => Boolean(topic));
-    const path = publicStoryPath({ slug: story.slug, sectionSlug: section.slug, publishedAt: story.publishedAt, timeZone });
-    const headline = text(story.headline);
-
-    let html: string;
-    if (story.contentFormat === "legacy-html") {
-      html = typeof story.legacyHtml === "string" ? story.legacyHtml.trim() : "";
-    } else {
-      const { body, issues } = normalizePayloadStoryBody(
-        { contentFormat: story.contentFormat, body: story.body },
-        { media: (mediaId: MediaId) => catalog.articleAsset(Number(mediaKey(mediaId))) }
-      );
-      const losing = contentLosingIssues(issues);
-      if (losing.length) contentProblems.push(`Story ${story.id} (“${headline.slice(0, 80)}”): ${losing.slice(0, 5).join("; ")}`);
-      html = body.format === "byline-v1" ? await articleBodyCompatibilityHtml(body) : body.html;
-    }
-
-    const contributorIds = ids(story.contributors);
-    const contributors = contributorIds.map(contributorRecord).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-    // `author` exists only for WordPress compatibility: the first credited staff author with a profile.
-    const primary = contributorIds.find((personId) => authorIds.has(personId)) ?? null;
-    const featuredId = id(story.featuredMedia);
-    const featured = featuredId !== null ? catalog.attachment(featuredId, { caption: text(story.featuredCaption) }) : null;
-    const videoId = story.format === "video" ? parseYouTubeVideoId(story.video?.url) : null;
-    const metadata = story.video?.metadata && typeof story.video.metadata === "object" ? story.video.metadata : {};
-    const video = videoId ? normalizePrimaryVideo({ provider: "youtube", videoId, title: metadata.title, description: metadata.description, thumbnailUrl: metadata.thumbnailUrl, uploadDate: metadata.uploadDate, duration: metadata.duration }) : null;
-    const settings = {
-      presentation: story.presentation === "immersive" ? "immersive" : "standard",
-      immersiveAlignment: story.immersiveAlignment === "center" ? "center" : "bottom-left",
-      reportingNote: typeof story.reportingNote === "string" ? story.reportingNote : "",
-      format: story.format === "video" || story.format === "audio" ? story.format : "standard",
-      ...(video ? { video } : {})
-    };
-    categoryCounts.set(section.id, (categoryCounts.get(section.id) ?? 0) + 1);
-    for (const topic of storyTopics) tagCounts.set(topic.id, (tagCounts.get(topic.id) ?? 0) + 1);
-    return {
-      id: story.id as number,
-      date: wordpressLocalDateTime(story.publishedAt, timeZone),
-      date_gmt: wordpressGmtDateTime(story.publishedAt),
-      modified: wordpressLocalDateTime(story.updatedAt ?? story.publishedAt, timeZone),
-      modified_gmt: wordpressGmtDateTime(story.updatedAt ?? story.publishedAt),
-      slug: String(story.slug),
-      status: "publish",
-      type: "post",
-      link: `${site}${path}`,
-      title: { rendered: escapeHtml(headline) },
-      excerpt: { rendered: paragraphsHtml(text(story.deck)) },
-      content: { rendered: html },
-      author: primary ?? 0,
-      featured_media: featuredId ?? 0,
-      categories: [section.id as number],
-      tags: storyTopics.map((topic) => topic.id as number),
-      sticky: false,
-      byline: settings,
-      weeklyWildcat: settings,
-      contributors,
-      corrections: (correctionsByStory.get(story.id) ?? []).map(correctionRecord),
-      _embedded: {
-        author: primary !== null ? [authorsById.get(primary)!] : [],
-        "wp:featuredmedia": featured ? [featured] : [],
-        "wp:term": [[sectionTerm(section)], storyTopics.map(topicTerm)]
+  const catalog = await PreparedMediaCatalog.load(payload, mediaRefs);
+  const registry = repositoryInteractivesForServer();
+  const interactive = (key: string) => Object.hasOwn(registry, key);
+  const stories = rows.map((row): PublicStorySnapshot => {
+    const { body, issues } = normalizePayloadStoryBody(row, {
+      media: (id) => catalog.articleAsset(Number(id)),
+      references: {
+        story: (id: MediaId) => {
+          const story = facts.get(Number(id));
+          return story && story.id !== row.id ? snapshotStoryReference(story) : null;
+        },
+        poll: (id) => polls.get(Number(id)),
+        interactive
       }
-    };
-  }));
-  if (contentProblems.length) throw new PublicSnapshotError("unsupported-story-content", `${contentProblems.length} published story body/bodies contain content the public snapshot cannot carry without losing it.`, contentProblems);
-
-  // Counts come only from the included published posts.
-  for (const post of posts) {
-    for (const term of post._embedded["wp:term"][0]) term.count = categoryCounts.get(term.id) ?? 0;
-    for (const term of post._embedded["wp:term"][1]) term.count = tagCounts.get(term.id) ?? 0;
-  }
-  const categories = [...sections.values()].filter((section) => section.hidden !== true && section.slug).map((section) => ({ ...sectionTerm(section), count: categoryCounts.get(section.id) ?? 0 }));
-  const tags = [...topics.values()].filter((topic) => topic.slug).map((topic) => ({ ...topicTerm(topic), count: tagCounts.get(topic.id) ?? 0 }));
-
-  /* ------------------------------------------------------------ corrections dataset */
-  const postById = new Map(posts.map((post) => [post.id, post]));
-  const corrections = [...correctionsByStory.entries()]
-    .flatMap(([storyId, list]) => list.map((correction) => {
-      const post = postById.get(storyId);
-      return post ? { ...correctionRecord(correction), storyId, story: { id: storyId, title: text(stories.find((story) => story.id === storyId)?.headline), url: post.link, slug: post.slug } } : null;
-    }))
-    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-    .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
-
-  /* ------------------------------------------------------------ pages */
-  const pages = (pagesFound.docs as Row[])
-    .filter((page) => page._status === "published")
-    .sort((a, b) => String(a.slug).localeCompare(String(b.slug)))
-    .map((page) => {
-      const published = page.publishedAt ?? page.createdAt;
-      return {
-        id: page.id as number,
-        date: wordpressLocalDateTime(published, timeZone),
-        date_gmt: wordpressGmtDateTime(published),
-        modified: wordpressLocalDateTime(page.updatedAt ?? published, timeZone),
-        modified_gmt: wordpressGmtDateTime(page.updatedAt ?? published),
-        slug: String(page.slug),
-        status: "publish",
-        type: "page",
-        link: `${site}/${page.slug}/`,
-        title: { rendered: escapeHtml(text(page.title)) },
-        excerpt: { rendered: paragraphsHtml(text(page.summary)) },
-        content: { rendered: pageBodyHtml(page.body, { id: page.id, title: text(page.title) }) },
-        bylinePage: { indexing: page.noindex === true ? "noindex" : "public" }
-      };
     });
-
-  /* ------------------------------------------------------------ coverages */
-  const coverageRecords = publicCoveragesList.map((coverage) => ({
-    id: coverage.id,
-    slug: coverage.slug,
-    title: coverage.title,
-    format: coverage.format,
-    description: coverage.description,
-    overview: coverage.overview,
-    ...(coverage.startDate ? { startAt: coverage.startDate } : {}),
-    ...(coverage.endDate ? { endAt: coverage.endDate } : {}),
-    status: coverage.status,
-    artwork: coverage.artwork ? catalog.photo(coverage.artwork.id, { shape: "square", minWidth: 960 }) : null,
-    stories: coverage.stories.flatMap((entry) => {
-      const post = postById.get(entry.id);
-      return post ? [{ id: post.id, slug: post.slug, title: text(stories.find((story) => story.id === post.id)?.headline), url: post.link, excerpt: post.excerpt.rendered, publishedAt: post.date, modifiedAt: post.modified }] : [];
-    })
-  }));
-
-  /* ------------------------------------------------------------ events */
-  const schoolEvents = (eventsFound.docs as Row[])
-    .filter((event) => event._status === "published" && event.startAt)
-    .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt) || a.id - b.id)
-    .map((event) => {
-      const status = event.eventStatus === "canceled" ? "canceled" : "scheduled";
-      const display = eventDisplay(event.startAt, event.endAt ?? null, event.allDay === true, timeZone);
-      return {
-        id: event.id as number,
-        title: text(event.title),
-        slug: String(event.slug),
-        eventType: text(event.eventType),
-        startDate: publicationLocalMinute(event.startAt, timeZone),
-        endDate: event.endAt ? publicationLocalMinute(event.endAt, timeZone) : "",
-        allDay: event.allDay === true,
-        location: text(event.location),
-        description: typeof event.description === "string" ? event.description : "",
-        externalUrl: text(event.externalUrl),
-        status,
-        display: { ...display, status: status === "canceled" ? "Canceled" : "Scheduled" }
-      };
-    });
-
-  /* ------------------------------------------------------------ envelope */
-  const datasets = {
-    posts,
-    authors,
-    guests,
-    categories,
-    tags,
-    pages,
-    corrections,
-    coverages: coverageRecords,
-    schoolEvents,
-    attachments: catalog.attachments()
-  };
-  const snapshot: PublicSnapshotV1 = {
-    schemaVersion: PUBLIC_SNAPSHOT_SCHEMA_VERSION,
-    revision,
-    generatedAt: (options.now?.() ?? new Date()).toISOString(),
-    sourceTimezone: timeZone,
-    publication,
-    datasets,
-    counts: Object.fromEntries(Object.entries(datasets).map(([name, rows]) => [name, rows.length]))
-  };
-  validatePublicSnapshot(snapshot);
-  return snapshot;
-}
-
-/**
- * The shared v1 validator plus the Payload producer's own guarantees: the
- * publication timezone is the source timezone, every post's canonical link
- * is the route the public site will compute from it, every attachment is a
- * prepared one, and every referenced Media is in the catalog.
- */
-export function validatePublicSnapshot(snapshot: PublicSnapshotV1): void {
+    const problems = contentLosingIssues(issues);
+    if (problems.length) throw new PublicSnapshotError("invalid-projection", `Story ${row.id} cannot be projected without losing article content.`, problems);
+    return { ...facts.get(row.id)!, body, live: collectLiveCoverage(row, updatesByStory.get(row.id) ?? [], catalog, publication) };
+  });
+  const datasets: Datasets = { stories, people, sections, topics, pages, corrections, collections, events, polls: [...polls.values()], media: catalog.records(), redirects: [] };
+  const snapshot = { schemaVersion: PUBLIC_SNAPSHOT_SCHEMA_VERSION, revision, generatedAt: now.toISOString(), publication, datasets,
+    counts: Object.fromEntries(Object.entries(datasets).map(([key, rows]) => [key, rows.length])) };
   try {
-    validatePublicBuildSnapshotV1(snapshot);
+    return validatePublicBuildSnapshotV2(snapshot, { interactive });
   } catch (error) {
     throw new PublicSnapshotError("invalid-projection", (error as Error).message);
-  }
-  const fail = (message: string) => {
-    throw new PublicSnapshotError("invalid-projection", `Invalid Payload snapshot: ${message}`);
-  };
-  if (snapshot.sourceTimezone !== snapshot.publication.timezone) fail("sourceTimezone differs from the publication timezone");
-  const site = snapshot.publication.urls.publicSite.replace(/\/+$/, "");
-  const attachments = new Set(snapshot.datasets.attachments.map((attachment) => attachment.id));
-  for (const attachment of snapshot.datasets.attachments) if (!attachment.bylinePublication) fail(`attachment ${attachment.id} is not a prepared publication asset`);
-  for (const post of snapshot.datasets.posts) {
-    const category = post._embedded["wp:term"][0][0];
-    const [day] = String(post.date).split("T");
-    const [year, month, date] = day.split("-");
-    if (post.link !== `${site}/${year}/${month}/${date}/${category?.slug}/${post.slug}/`) fail(`post ${post.id} link ${post.link} is not its canonical route`);
-    if (post.featured_media && !attachments.has(post.featured_media)) fail(`post ${post.id} featured media ${post.featured_media} is not in the attachment catalog`);
-    for (const match of String(post.content.rendered).matchAll(/\/_byline\/media\/[^"'\s)#?]+/g)) {
-      if (!snapshot.datasets.attachments.some((attachment) => JSON.stringify(attachment.bylinePublication).includes(match[0]))) fail(`post ${post.id} body names ${match[0]}, which no prepared attachment provides`);
-    }
   }
 }

@@ -571,6 +571,7 @@ export interface Collection {
     featuredStory?: (number | null) | Story;
     storyOrder?: (number | Story)[] | null;
   };
+  publicModifiedAt?: string | null;
   createdBy?: (number | null) | User;
   legacyWordPressId?: number | null;
   updatedAt: string;
@@ -1322,6 +1323,7 @@ export interface CollectionsSelect<T extends boolean = true> {
         featuredStory?: T;
         storyOrder?: T;
       };
+  publicModifiedAt?: T;
   createdBy?: T;
   legacyWordPressId?: T;
   updatedAt?: T;
