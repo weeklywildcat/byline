@@ -1,4 +1,5 @@
-import type { StoryPresentationEntry, StoryPresentationRegistry } from "./types";
+import type { StoryPresentationIdentity } from "./resolve";
+import type { StoryPresentationRegistry } from "./types";
 import OverrideFixtureStory from "./stories/override-fixture";
 import VisualFixtureStory from "./stories/visual-fixture";
 
@@ -38,8 +39,12 @@ export function storyPresentationRegistry({ fixtures = false }: { fixtures?: boo
   return fixtures ? { ...fixtureStoryPresentations, ...storyPresentations } : storyPresentations;
 }
 
-/** The entry registered for a story ID, or `null`. Only integer IDs match; never a slug, a prototype key or an empty value. */
-export function findStoryPresentation(registry: StoryPresentationRegistry, storyId: number | string): StoryPresentationEntry | null {
-  const id = Number(storyId);
-  return Number.isInteger(id) && Object.prototype.hasOwnProperty.call(registry, id) ? registry[id] : null;
+/**
+ * The registry's identities as plain data (story ID to kind, name and title),
+ * for a host that must describe presentations without loading any story's
+ * code: the newsroom's server hands this to the Story header, which resolves
+ * with the same `resolveStoryPresentation`.
+ */
+export function describeStoryPresentations(registry: StoryPresentationRegistry): Record<number, StoryPresentationIdentity> {
+  return Object.fromEntries(Object.entries(registry).map(([id, entry]) => [Number(id), { kind: entry.kind, name: entry.name, title: entry.title }]));
 }

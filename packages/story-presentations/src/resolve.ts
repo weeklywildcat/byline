@@ -1,6 +1,4 @@
 import { resolveBuiltInPresentation, type BuiltInPresentationInput, type BuiltInPresentationReason, type StoryPresentationChoice } from "@byline/content/story";
-import { findStoryPresentation } from "./registry";
-import type { StoryPresentationEntry, StoryPresentationRegistry } from "./types";
 
 /**
  * The one presentation resolver. In order:
@@ -13,23 +11,36 @@ import type { StoryPresentationEntry, StoryPresentationRegistry } from "./types"
  * `StoryArticle` renders from this, and the newsroom explains it from the same
  * result ("Previewing as Standard: Immersive requires a lead image", "Custom
  * presentation: Election Results 2026"), so the two cannot disagree.
+ *
+ * It reads only an entry's identity (`kind`, `name`, `title`), never its
+ * component, so the newsroom's Story header can resolve from plain metadata
+ * (`describeStoryPresentations`) without loading any story's React code. This
+ * module imports nothing from the registry for that reason.
  */
 export type StoryPresentationReason = BuiltInPresentationReason | "custom-presentation" | "visual-story";
 
-export type StoryPresentationResolution = {
+export type StoryPresentationIdentity = { readonly kind: "presentation" | "visual-story"; readonly name: string; readonly title: string };
+
+export type StoryPresentationResolution<Entry extends StoryPresentationIdentity = StoryPresentationIdentity> = {
   /** The author's built-in choice. */
   requested: StoryPresentationChoice;
   resolved: "custom" | StoryPresentationChoice;
   reason: StoryPresentationReason;
   /** The repository entry, when one is registered. */
-  custom: { name: string; title: string; kind: StoryPresentationEntry["kind"] } | null;
-  entry: StoryPresentationEntry | null;
+  custom: { name: string; title: string; kind: Entry["kind"] } | null;
+  entry: Entry | null;
 };
 
-export function resolveStoryPresentation(
+/** The entry registered for a story ID, or `null`. Only integer IDs match; never a slug, a prototype key or an empty value. */
+export function findStoryPresentation<Entry>(registry: Readonly<Record<number, Entry>>, storyId: number | string): Entry | null {
+  const id = Number(storyId);
+  return Number.isInteger(id) && Object.prototype.hasOwnProperty.call(registry, id) ? registry[id] : null;
+}
+
+export function resolveStoryPresentation<Entry extends StoryPresentationIdentity>(
   presentation: BuiltInPresentationInput & { id: number | string },
-  registry: StoryPresentationRegistry
-): StoryPresentationResolution {
+  registry: Readonly<Record<number, Entry>>
+): StoryPresentationResolution<Entry> {
   const builtIn = resolveBuiltInPresentation(presentation);
   const entry = findStoryPresentation(registry, presentation.id);
   if (entry) {

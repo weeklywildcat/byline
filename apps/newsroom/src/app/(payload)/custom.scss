@@ -44,3 +44,31 @@
     padding: 0;
   }
 }
+
+// Live Preview on a narrow screen. At Payload's own mid break (1024px) it gives the preview
+// window `width: 100%`, which squeezes the editor column (and the Byline Story header
+// with its Preview button) to nothing. Stack instead: the preview is a sticky panel above the
+// editor, so the same Preview button is always reachable to return to editing. Wider screens
+// keep Payload's side-by-side layout untouched. Between 1024px and 1280px side by side leaves the
+// editor under ~400px, too narrow to write in, so it stacks there too. Only layout properties are set; the pane, its
+// toolbar and its iframe stay Payload's.
+@media (max-width: 1280px) {
+  .collection-edit--stories.collection-edit--is-live-previewing {
+    .collection-edit__main-wrapper {
+      flex-direction: column;
+    }
+
+    .collection-edit__main {
+      width: 100%;
+    }
+
+    .live-preview-window {
+      order: -1;
+      width: 100%;
+      height: 55svh;
+      // Below Byline's sticky app header (48px).
+      top: 48px;
+      z-index: 5;
+    }
+  }
+}

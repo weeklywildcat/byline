@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { describeStoryPresentations, storyPresentationRegistry } from "@byline/story-presentations";
 import { postgresAdapter } from "@payloadcms/db-postgres";
 import { buildConfig, type CollectionConfig } from "payload";
 import sharp from "sharp";
@@ -92,8 +93,9 @@ export default buildConfig({
     // Read by Byline's client screens: dates show in the newsroom's timezone, never the browser's.
     custom: {
       newsroomTimeZone: newsroomTimeZone(),
-      // Development only: also resolve the framework's fixture story presentations (story IDs 6 and 10).
-      storyPresentationFixtures: process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.NODE_ENV !== "production"
+      // The repository's story presentations as plain identities, for the Story header's status (the
+      // components themselves never enter the admin bundle). Fixtures (story IDs 6 and 10) are development only.
+      storyPresentations: describeStoryPresentations(storyPresentationRegistry({ fixtures: process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.NODE_ENV !== "production" }))
     },
     // Byline's Nova surfaces are light; Payload's chrome follows so the two never clash.
     theme: "light",

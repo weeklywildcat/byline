@@ -3,11 +3,13 @@
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
 import { parseYouTubeVideoId } from "@byline/core";
-import { resolveStoryPresentation, storyPresentationRegistry, type StoryPresentationResolution } from "@byline/story-presentations";
-import { useConfig, useDocumentInfo, useLivePreviewContext } from "@payloadcms/ui";
+// The metadata-only resolver: importing the full package here would load every story's React code
+// (and @byline/ui) into the admin bundle, which keeps Payload's Lexical field from mounting.
+import { resolveStoryPresentation, type StoryPresentationIdentity, type StoryPresentationResolution } from "@byline/story-presentations/resolve";
+import { useConfig, useDocumentInfo, useFormFields, useLivePreviewContext } from "@payloadcms/ui";
 import { Eye } from "lucide-react";
 import { useMemo } from "react";
-import { relationIdOf, useStoryField } from "./form";
+import { relationIdOf } from "./form";
 
 /**
  * Byline's entry to Payload's Live Preview. Payload owns the preview itself
@@ -39,12 +41,15 @@ export function PreviewButton() {
 export function useStoryPresentationResolution(): StoryPresentationResolution {
   const { id } = useDocumentInfo();
   const { config } = useConfig();
-  const fixtures = Boolean((config.admin?.custom as { storyPresentationFixtures?: boolean } | undefined)?.storyPresentationFixtures);
-  const registry = useMemo(() => storyPresentationRegistry({ fixtures }), [fixtures]);
-  const { value: presentation } = useStoryField<string>("presentation");
-  const { value: featuredMedia } = useStoryField<unknown>("featuredMedia");
-  const { value: format } = useStoryField<string>("format");
-  const { value: videoUrl } = useStoryField<string>("video.url");
+  // Plain data from the server (payload.config.ts): the registry's identities, never its components.
+  const registry = ((config.admin?.custom as { storyPresentations?: Record<number, StoryPresentationIdentity> } | undefined)?.storyPresentations ?? {}) as Record<number, StoryPresentationIdentity>;
+  // Read-only selectors: this status must never register fields in the form (`useField` on a
+  // path inside a conditional group, such as `video.url`, disturbs the document's field state
+  // and kept the body editor from mounting).
+  const presentation = useFormFields(([fields]) => fields.presentation?.value) as string | undefined;
+  const featuredMedia = useFormFields(([fields]) => fields.featuredMedia?.value);
+  const format = useFormFields(([fields]) => fields.format?.value) as string | undefined;
+  const videoUrl = useFormFields(([fields]) => fields["video.url"]?.value) as string | undefined;
   const isVideo = format === "video" && parseYouTubeVideoId(videoUrl) !== null;
   return useMemo(
     () => resolveStoryPresentation(
@@ -66,8 +71,7 @@ const REASONS: Record<string, string> = {
 };
 
 /** What the story will open as, and why, from the shared resolver (never a second copy of the rule). */
-export function PresentationStatus() {
-  const resolution = useStoryPresentationResolution();
+export function PresentationStatus({ resolution }: { resolution: StoryPresentationResolution }) {
   if (resolution.custom) {
     return (
       <div className="flex flex-wrap items-center gap-x-2" data-presentation-status={resolution.reason}>

@@ -13,7 +13,7 @@ import type { StoryScreenContext } from "./StoryScreen";
 import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { useShellLayout } from "../shell/layout";
 import { useStorySwitcher } from "../shell/StorySwitcher";
-import { PresentationStatus, PreviewButton } from "./StoryPreviewControl";
+import { PresentationStatus, PreviewButton, useStoryPresentationResolution } from "./StoryPreviewControl";
 
 /**
  * The Story header: what the story is, where it is in the newsroom's workflow
@@ -33,6 +33,7 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
   const background = useFormBackgroundProcessing();
   const { value: headline } = useStoryField<string>("headline");
   const [publishing, setPublishing] = useState(false);
+  const presentationResolution = useStoryPresentationResolution();
 
   const newerDraft = hasPublishedDoc && (unpublishedVersionCount > 0 || modified);
   const publication = !hasPublishedDoc ? "Draft" : newerDraft ? "Published · unpublished changes" : "Published";
@@ -92,7 +93,7 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
             <dd>{formatDay(planned.deadline, context.timeZone)}</dd>
           </div>
         ) : null}
-        <PresentationStatus />
+        <PresentationStatus resolution={presentationResolution} />
         {planned?.editor ? (
           <div className="flex items-center gap-1.5">
             <dt className="text-muted-foreground">Editor</dt>
