@@ -28,8 +28,7 @@ export default async function setup() {
   process.env.PAYLOAD_SECRET = "byline-integration-test-secret-not-for-production-0123456789";
   process.env.BYLINE_DB_PUSH = "1";
   process.env.BYLINE_NEWSROOM_URL = "http://localhost:3010";
-  delete process.env.BYLINE_MEDIA_PRIVATE_BUCKET;
-  // Uploaded test files go to a throwaway directory, never the development media folder.
+    // Uploaded test files go to a throwaway directory, never the development media folder.
   const media = mkdtempSync(path.join(tmpdir(), "byline-newsroom-media-"));
   process.env.BYLINE_MEDIA_LOCAL_DIR = media;
   delete process.env.BYLINE_GOOGLE_CLIENT_ID;
