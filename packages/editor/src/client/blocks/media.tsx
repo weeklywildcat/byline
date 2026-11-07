@@ -174,14 +174,14 @@ export function PhotoEditor({ node, id, nodeKey }: BlockEditorProps) {
           }}>
             {(Object.keys(PLACEMENT_LABELS) as Placement[]).map((placement) => <ToggleGroupItem key={placement} value={placement}>{PLACEMENT_LABELS[placement]}</ToggleGroupItem>)}
           </ToggleGroup>
-          <AltTextSetting asset={asset} value={fields.altOverride} readOnly={readOnly} onChange={(altOverride) => set({ altOverride }, "alt")} />
+          <AltTextSetting asset={asset} value={fields.altOverride} readOnly={readOnly} onChange={(altOverride) => set({ altOverride })} />
         </>
       ) : null}
     >
       <StoryFigure
         className="byline-photo"
         media={mediaSlot}
-        caption={<InlineText inputRef={captionRef} className="byline-caption" label="Caption" placeholder="Write a caption: who and what is shown, where and when." value={fields.caption} maxLength={LIMITS.caption} readOnly={readOnly} multiline onChange={(caption) => set({ caption }, "caption")} />}
+        caption={<InlineText inputRef={captionRef} className="byline-caption" label="Caption" placeholder="Write a caption: who and what is shown, where and when." value={fields.caption} maxLength={LIMITS.caption} readOnly={readOnly} multiline onChange={(caption) => set({ caption })} />}
         credit={asset?.credit}
       >
         {asset && !asset.credit ? <MissingCredit id={asset.id} /> : null}
@@ -326,8 +326,8 @@ export function GalleryEditor({ node, id, nodeKey }: BlockEditorProps) {
               index={index}
               count={items.length}
               readOnly={readOnly}
-              onCaption={(caption) => set({ items: items.map((row) => (row.id === item.id ? { ...row, caption } : row)) }, `caption:${item.id}`)}
-              onAlt={(altOverride) => set({ items: items.map((row) => (row.id === item.id ? { ...row, altOverride } : row)) }, `alt:${item.id}`)}
+              onCaption={(caption) => set({ items: items.map((row) => (row.id === item.id ? { ...row, caption } : row)) })}
+              onAlt={(altOverride) => set({ items: items.map((row) => (row.id === item.id ? { ...row, altOverride } : row)) })}
               onMove={(direction) => move(index, direction)}
               onReplace={() => void replace(index)}
               onRemove={() => remove(index)}

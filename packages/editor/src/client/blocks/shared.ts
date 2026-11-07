@@ -13,8 +13,8 @@ export type BlockEditorProps = { node: BlockNodeApi; id: string; nodeKey: string
 export function useTypedFields<K extends ArticleBlockType>(type: K, node: BlockNodeApi) {
   const read = BLOCK_FIELD_READERS[type] as (raw: unknown) => BylineBlockFields[K];
   const fields = useMemo(() => read(node.fields), [node.fields, read]);
-  const set = useCallback((patch: Partial<BylineBlockFields[K]>, mergeKey?: string) => {
-    node.write((raw) => ({ ...raw, ...read(raw), ...patch }), mergeKey);
+  const set = useCallback((patch: Partial<BylineBlockFields[K]>) => {
+    node.write((raw) => ({ ...raw, ...read(raw), ...patch }));
   }, [node, read]);
   return [fields, set] as const;
 }

@@ -93,6 +93,8 @@ test("writes the story: prose, slash insertion and all eight blocks", async ({ p
   await page.keyboard.press("Enter");
   const photo = block(page, "photo");
   await expect(photo.getByText("Add a photograph")).toBeVisible();
+  // It lands where the caret was: right after the second paragraph.
+  await expect(body(page).locator(":scope > *").nth(2)).toHaveClass(/byline-block-photo/);
   await expect(photo.getByRole("button", { name: "Choose from Media" })).toBeFocused();
   await photo.getByRole("button", { name: "Choose from Media" }).click();
   await pickInMedia(page, ["newsroom-panorama.jpg"], /Use this file/);
@@ -101,6 +103,7 @@ test("writes the story: prose, slash insertion and all eight blocks", async ({ p
   await photo.getByRole("textbox", { name: "Caption" }).fill("By 11:42 a.m. on a Tuesday in October, the second-lunch line at Greenwood High stretched from the serving windows past the trophy case and around the corner toward the gym, leaving some students fewer than 12 minutes to eat.");
   await photo.getByRole("radio", { name: "Wide" }).or(photo.getByRole("button", { name: "Wide" })).first().click();
   await expect(photo).toHaveClass(/alignwide/);
+  await expect(body(page).locator(":scope > *").nth(2)).toHaveClass(/byline-block-photo/);
 
   // Reported Quote, from the Add menu.
   await caretAfter(page, ANCHORS.staff);

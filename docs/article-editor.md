@@ -57,8 +57,10 @@ Lexical update. That means:
 
 - the Payload form sees every change, so autosave, drafts, versions, locking and
   publication state are unchanged and there is no second save path;
-- Lexical history undoes block edits, insertions, moves and removals, and
-  consecutive typing in one field merges into one undo step;
+- Lexical history undoes block edits, insertions, moves and removals. Each
+  field edit is its own history entry: Payload feeds its form from Lexical's
+  `OnChangePlugin`, which skips updates tagged `history-merge`, so merging typing
+  into one undo step would stop those edits reaching the form and autosave;
 - when Payload marks the story read-only (another user holds the lock), every
   block field is `readOnly`, toolbars and Add controls are not rendered, and the
   article stays readable.

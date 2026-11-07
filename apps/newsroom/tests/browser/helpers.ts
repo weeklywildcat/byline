@@ -137,7 +137,13 @@ export async function caretAfter(page: Page, text: string): Promise<void> {
   if (!point) throw new Error(`no text "${text}"`);
   await page.mouse.click(point.x, point.y);
   await page.keyboard.press("End");
-  await expect.poll(() => target.evaluate((element) => element.contains(window.getSelection()?.anchorNode ?? null)), { message: `caret in "${text}"` }).toBe(true);
+  // Wait for Lexical's own selection (not just the DOM's), as a person pausing between click and typing would.
+  await expect.poll(() => target.evaluate((element) => {
+    const editor = (element.closest("[data-lexical-editor]") as unknown as { __lexicalEditor?: { getEditorState: () => { _selection?: { anchor?: { key: string } } }; getElementByKey: (key: string) => HTMLElement | null } }).__lexicalEditor;
+    const key = editor?.getEditorState()._selection?.anchor?.key;
+    const anchor = key ? editor?.getElementByKey(key) : null;
+    return Boolean(anchor && element.contains(anchor));
+  }), { message: `Lexical selection in "${text}"` }).toBe(true);
 }
 
 /** Types a slash command and runs the menu item it finds (waiting for Payload's menu, as a writer would). */

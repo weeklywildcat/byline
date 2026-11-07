@@ -62,7 +62,7 @@ export function TimelineEditor({ node, id, nodeKey }: BlockEditorProps) {
   };
   const remove = (index: number) => apply(removeItem(items, index, blank), "label", "Event removed.");
   const duplicate = (index: number) => apply(duplicateItem(items, index, (event) => ({ ...event, id: newRowId(), current: false }), LIMITS.timelineMax), lastField.current, "Event duplicated.");
-  const update = (index: number, field: Field, value: string) => set({ items: items.map((event, i) => (i === index ? { ...event, [field]: value } : event)) }, `${field}:${items[index]?.id}`);
+  const update = (index: number, field: Field, value: string) => set({ items: items.map((event, i) => (i === index ? { ...event, [field]: value } : event)) });
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>, index: number, field: Field) => {
     const direction = moveDirection(event);

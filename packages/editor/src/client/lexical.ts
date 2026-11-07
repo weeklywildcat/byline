@@ -9,7 +9,6 @@ import {
   $getSelection,
   $isNodeSelection,
   $isRangeSelection,
-  HISTORY_MERGE_TAG,
   SKIP_DOM_SELECTION_TAG,
   type LexicalEditor,
   type LexicalNode
@@ -29,16 +28,13 @@ import { useCallback, useSyncExternalStore } from "react";
 
 type Fields = Record<string, unknown>;
 
-// Typing in one field is one undo step, not one per keystroke: consecutive edits
-// to the same field within a second merge into the history entry the first made.
-let lastEdit: { key: string; at: number } | null = null;
-const MERGE_WINDOW_MS = 1000;
-
-export function writeBlockFields(editor: LexicalEditor, nodeKey: string, update: (fields: Fields) => Fields, mergeKey?: string): void {
-  const now = Date.now();
-  const key = mergeKey ? `${nodeKey}:${mergeKey}` : null;
-  const merge = key !== null && lastEdit?.key === key && now - lastEdit.at < MERGE_WINDOW_MS;
-  lastEdit = key ? { key, at: now } : null;
+/**
+ * Never tag these updates `history-merge`: Payload feeds its form from
+ * Lexical's OnChangePlugin, which skips history-merge updates, so a merged
+ * edit would never reach the form (and never autosave). Every write is an
+ * ordinary update; undo is therefore per edit, not per typing burst.
+ */
+export function writeBlockFields(editor: LexicalEditor, nodeKey: string, update: (fields: Fields) => Fields): void {
   editor.update(
     () => {
       const node = $getNodeByKey(nodeKey);
@@ -47,7 +43,7 @@ export function writeBlockFields(editor: LexicalEditor, nodeKey: string, update:
     },
     // Discrete: the input's value is the node's value, committed before React re-renders it.
     // SKIP_DOM_SELECTION: the caret stays in the block's own field.
-    { discrete: true, tag: merge ? [HISTORY_MERGE_TAG, SKIP_DOM_SELECTION_TAG] : [SKIP_DOM_SELECTION_TAG] }
+    { discrete: true, tag: [SKIP_DOM_SELECTION_TAG] }
   );
 }
 
@@ -68,9 +64,9 @@ export function useBlockNode(nodeKey: string) {
     return previous && next ? "middle" : previous ? "last" : next ? "first" : "only";
   }), [editor, nodeKey]));
 
-  const write = useCallback((update: (fields: Fields) => Fields, mergeKey?: string) => {
+  const write = useCallback((update: (fields: Fields) => Fields) => {
     if (!editor.isEditable()) return;
-    writeBlockFields(editor, nodeKey, update, mergeKey);
+    writeBlockFields(editor, nodeKey, update);
   }, [editor, nodeKey]);
 
   const remove = useCallback(() => {

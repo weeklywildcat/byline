@@ -25,8 +25,8 @@ export function ReportedQuoteEditor({ node, id, nodeKey }: BlockEditorProps) {
   return (
     <BlockShell type="reportedQuote" node={node} issues={issues}>
       <ReportedQuoteView
-        text={<InlineText inputRef={text} className="byline-quote-text" label="Quote" placeholder="Type the quote exactly as it was said." value={fields.text} maxLength={LIMITS.quote} readOnly={readOnly} multiline onEnter={() => attribution.current?.focus()} onChange={(value) => set({ text: value }, "text")} />}
-        attribution={<InlineText inputRef={attribution} className="byline-quote-attribution" label="Who said it" placeholder="Name, title" value={fields.attribution} maxLength={LIMITS.attribution} readOnly={readOnly} onChange={(value) => set({ attribution: value }, "attribution")} />}
+        text={<InlineText inputRef={text} className="byline-quote-text" label="Quote" placeholder="Type the quote exactly as it was said." value={fields.text} maxLength={LIMITS.quote} readOnly={readOnly} multiline onEnter={() => attribution.current?.focus()} onChange={(value) => set({ text: value })} />}
+        attribution={<InlineText inputRef={attribution} className="byline-quote-attribution" label="Who said it" placeholder="Name, title" value={fields.attribution} maxLength={LIMITS.attribution} readOnly={readOnly} onChange={(value) => set({ attribution: value })} />}
       />
     </BlockShell>
   );
@@ -42,8 +42,8 @@ export function PullQuoteEditor({ node, id, nodeKey }: BlockEditorProps) {
   return (
     <BlockShell type="pullQuote" node={node} issues={issues}>
       <PullQuoteView
-        text={<InlineText inputRef={text} className="byline-quote-text" label="Pull quote" placeholder="A line from the story worth repeating." value={fields.text} maxLength={LIMITS.quote} readOnly={readOnly} multiline onEnter={() => attribution.current?.focus()} onChange={(value) => set({ text: value }, "text")} />}
-        attribution={<InlineText inputRef={attribution} className="byline-quote-attribution" label="Attribution (optional)" placeholder="Who said it (optional)" value={fields.attribution} maxLength={LIMITS.attribution} readOnly={readOnly} onChange={(value) => set({ attribution: value }, "attribution")} />}
+        text={<InlineText inputRef={text} className="byline-quote-text" label="Pull quote" placeholder="A line from the story worth repeating." value={fields.text} maxLength={LIMITS.quote} readOnly={readOnly} multiline onEnter={() => attribution.current?.focus()} onChange={(value) => set({ text: value })} />}
+        attribution={<InlineText inputRef={attribution} className="byline-quote-attribution" label="Attribution (optional)" placeholder="Who said it (optional)" value={fields.attribution} maxLength={LIMITS.attribution} readOnly={readOnly} onChange={(value) => set({ attribution: value })} />}
       />
     </BlockShell>
   );
@@ -85,17 +85,17 @@ export function KeyFactsEditor({ node, id, nodeKey }: BlockEditorProps) {
     // Backspace in an empty fact removes it and returns to the one before.
     if (event.key === "Backspace" && facts[index]?.text === "" && facts.length > 1) {
       event.preventDefault();
-      apply({ ...removeItem(facts, index), focus: Math.max(0, index - 1) }, "Fact removed.");
+      apply({ ...removeItem(facts, index), focus: Math.max(0, index - 1) });
     }
   };
 
   return (
     <BlockShell type="keyFacts" node={node} issues={issues} actions={<ButtonGroup><ToolTextButton label="Add fact" icon={<Plus />} disabled={full} onClick={() => add(facts.length)} /></ButtonGroup>}>
-      <SupportingContext kind="keyFacts" headingId={`${id}-heading`} heading={<ContextHeading value={fields.heading} fallback={DEFAULT_HEADINGS.keyFacts} readOnly={readOnly} onChange={(heading) => set({ heading }, "heading")} onEnter={() => focusFact(0, true)} />}>
+      <SupportingContext kind="keyFacts" headingId={`${id}-heading`} heading={<ContextHeading value={fields.heading} fallback={DEFAULT_HEADINGS.keyFacts} readOnly={readOnly} onChange={(heading) => set({ heading })} onEnter={() => focusFact(0, true)} />}>
         <ul>
           {facts.map((fact, index) => (
             <li key={fact.id} data-fact-index={index} className="byline-editable-row">
-              <InlineText inputRef={index === 0 ? first : undefined} label={`Fact ${index + 1} of ${facts.length}`} placeholder="One verified fact." value={fact.text} maxLength={LIMITS.fact} readOnly={readOnly} onEnter={() => add(index + 1)} onKeyDown={(event) => onKeyDown(event, index)} onChange={(text) => set({ facts: facts.map((row) => (row.id === fact.id ? { ...row, text } : row)) }, `fact:${fact.id}`)} />
+              <InlineText inputRef={index === 0 ? first : undefined} label={`Fact ${index + 1} of ${facts.length}`} placeholder="One verified fact." value={fact.text} maxLength={LIMITS.fact} readOnly={readOnly} onEnter={() => add(index + 1)} onKeyDown={(event) => onKeyDown(event, index)} onChange={(text) => set({ facts: facts.map((row) => (row.id === fact.id ? { ...row, text } : row)) })} />
               {readOnly ? null : (
                 <ButtonGroup className="byline-row-actions" aria-label={`Fact ${index + 1} actions`} data-byline-chrome="">
                   <ToolButton label="Move up" disabled={index === 0} onClick={() => apply(moveItem(facts, index, -1), "Fact moved.")}><ArrowUp /></ToolButton>
@@ -186,8 +186,8 @@ export function ContextEditor({ node, id, nodeKey }: BlockEditorProps) {
         </DropdownMenu>
       }
     >
-      <SupportingContext kind="context" headingId={`${id}-heading`} heading={<ContextHeading inputRef={heading} value={fields.heading} fallback={DEFAULT_HEADINGS.context} readOnly={readOnly} onChange={(value) => set({ heading: value }, "heading")} onEnter={() => body.current?.focus()} />}>
-        <ParagraphFields inputRef={body} label="Context" placeholder="The background a reader needs, in a few sentences." value={fields.body} readOnly={readOnly} onChange={(value) => set({ body: value.slice(0, LIMITS.contextBody) }, "body")} />
+      <SupportingContext kind="context" headingId={`${id}-heading`} heading={<ContextHeading inputRef={heading} value={fields.heading} fallback={DEFAULT_HEADINGS.context} readOnly={readOnly} onChange={(value) => set({ heading: value })} onEnter={() => body.current?.focus()} />}>
+        <ParagraphFields inputRef={body} label="Context" placeholder="The background a reader needs, in a few sentences." value={fields.body} readOnly={readOnly} onChange={(value) => set({ body: value.slice(0, LIMITS.contextBody) })} />
       </SupportingContext>
     </BlockShell>
   );

@@ -72,14 +72,14 @@ export function DocumentEditor({ node, id, nodeKey }: BlockEditorProps) {
         details={
           <>
             <p className="byline-document-title">
-              <InlineText inputRef={titleRef} label="Document title" placeholder="What the document is" value={fields.title} maxLength={LIMITS.documentTitle} readOnly={readOnly} onChange={(title) => set({ title }, "title")} />
+              <InlineText inputRef={titleRef} label="Document title" placeholder="What the document is" value={fields.title} maxLength={LIMITS.documentTitle} readOnly={readOnly} onChange={(title) => set({ title })} />
             </p>
             <p className="byline-document-context">
-              <InlineText label="Why it matters" placeholder="Why a reader should look at it (optional)" value={fields.context} maxLength={LIMITS.documentContext} readOnly={readOnly} multiline onChange={(context) => set({ context }, "context")} />
+              <InlineText label="Why it matters" placeholder="Why a reader should look at it (optional)" value={fields.context} maxLength={LIMITS.documentContext} readOnly={readOnly} multiline onChange={(context) => set({ context })} />
             </p>
             <p className="byline-document-source byline-document-source-field">
               <span aria-hidden="true">Source:</span>
-              <InlineText label="Source" placeholder="Who released it (optional)" value={fields.source} maxLength={LIMITS.documentSource} readOnly={readOnly} onChange={(source) => set({ source }, "source")} />
+              <InlineText label="Source" placeholder="Who released it (optional)" value={fields.source} maxLength={LIMITS.documentSource} readOnly={readOnly} onChange={(source) => set({ source })} />
             </p>
             {pages.length ? (
               <ul className="byline-document-pages" aria-label="Pages to read">
@@ -99,11 +99,11 @@ export function DocumentEditor({ node, id, nodeKey }: BlockEditorProps) {
                         onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}
                         onChange={(event) => {
                           const page = event.target.value === "" ? null : Math.max(1, Math.floor(Number(event.target.value)));
-                          set({ pages: pages.map((row) => (row.id === ref.id ? { ...row, page: Number.isFinite(page) ? page : null } : row)) }, `page:${ref.id}`);
+                          set({ pages: pages.map((row) => (row.id === ref.id ? { ...row, page: Number.isFinite(page) ? page : null } : row)) });
                         }}
                       />
                     </label>
-                    <InlineText label={`What is on page ${ref.page ?? index + 1}`} placeholder="What the reader will find there" value={ref.label} maxLength={LIMITS.documentPageLabel} readOnly={readOnly} onEnter={addPage} onChange={(label) => set({ pages: pages.map((row) => (row.id === ref.id ? { ...row, label } : row)) }, `label:${ref.id}`)} />
+                    <InlineText label={`What is on page ${ref.page ?? index + 1}`} placeholder="What the reader will find there" value={ref.label} maxLength={LIMITS.documentPageLabel} readOnly={readOnly} onEnter={addPage} onChange={(label) => set({ pages: pages.map((row) => (row.id === ref.id ? { ...row, label } : row)) })} />
                     {readOnly ? null : (
                       <ButtonGroup className="byline-row-actions" data-byline-chrome="">
                         <ToolButton label="Remove page reference" onClick={() => { set({ pages: removeItem(pages, index).items }); announce("Page reference removed."); }}><Trash2 /></ToolButton>
