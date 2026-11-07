@@ -2215,7 +2215,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": false,
-          "default": "'private'"
+          "default": "'not-prepared'"
         },
         "publication_assets_source_hash": {
           "name": "publication_assets_source_hash",
