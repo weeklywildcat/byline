@@ -55,7 +55,7 @@ export type MediaLibraryAsset = {
   canDelete: boolean;
 };
 
-export type MediaUsageKind = "story-featured" | "production-assignment" | "collection-artwork" | "collection-resource" | "live-update-photo" | "person-portrait";
+export type MediaUsageKind = "story-featured" | "story-body" | "production-assignment" | "collection-artwork" | "collection-resource" | "live-update-photo" | "person-portrait";
 
 /** A record that links to the asset through a relationship. */
 export type MediaUsage = {
@@ -98,8 +98,8 @@ export type MediaAssetDetail = MediaLibraryAsset & {
   usages: MediaUsage[];
   /**
    * Usages come from relationships (featured images, assignments, coverage
-   * artwork, live-update photos, portraits). Files embedded in rich text are
-   * not scanned yet, so the list is "Linked uses", never "every use".
+   * artwork, live-update photos, portraits) and the canonical Byline article body.
+   * Imported HTML and retained versions are not shown in this list.
    */
   usagesComplete: false;
   /** Records that link to the asset but this account may not read. */

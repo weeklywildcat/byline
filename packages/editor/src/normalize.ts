@@ -3,6 +3,8 @@ import {
   ARTICLE_BODY_FORMAT,
   ARTICLE_BODY_VERSION,
   ARTICLE_BLOCK_LIMITS,
+  blockLabel,
+  blockMediaIds,
   blockPollIds,
   blockStoryIds,
   bodyMediaIds,
@@ -88,6 +90,13 @@ function storedBlocks(state: unknown): ArticleBlock[] {
 /** Every Media ID a body references (every block that names Media), for the host to resolve before normalizing. */
 export function collectMediaIds(state: unknown): MediaId[] {
   return bodyMediaIds(storedBlocks(state));
+}
+
+/** Editorial labels for each block type that uses a Media asset. */
+export function collectMediaUsageLabels(state: unknown, id: MediaId): string[] {
+  return [...new Set(storedBlocks(state)
+    .filter((block) => blockMediaIds(block).some((value) => mediaKey(value) === mediaKey(id)))
+    .map((block) => blockLabel(block.type)))];
 }
 
 /** Every Story and Poll a body names, for the host to resolve into public-safe references before normalizing. */

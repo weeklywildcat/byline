@@ -1,3 +1,4 @@
+import { protectStoryMedia } from "../newsroom/story-media-uses";
 import { artDirectionIntentsEqual, normalizeArtDirectionIntent, type ImageDimensions } from "@byline/core";
 import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionBeforeOperationHook, CollectionConfig, PayloadRequest } from "payload";
 import { atLeast, requestUser, signedIn } from "../access/user";
@@ -176,6 +177,7 @@ export const Media: CollectionConfig = {
     delete: ({ req }) => atLeast(requestUser(req), "editor")
   },
   hooks: {
+    beforeDelete: [protectStoryMedia],
     beforeOperation: [stripNativeFocalEdits],
     beforeChange: [
       ({ data, operation, req }) => {
