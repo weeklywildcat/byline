@@ -74,6 +74,12 @@ export type PublicStory<Image> = PublicStorySummary<Image> & {
   /** Absolute canonical URL. */
   url: string;
   titleHtml: string;
+  /**
+   * A short label above the headline, when the CMS has one (Payload does;
+   * WordPress does not). Part of the canonical record; the public article
+   * design does not print one yet, so neither does Live Preview.
+   */
+  kicker?: string;
   body: PublicArticleBody;
   /** Topics shown on the story; empty falls back to its public sections. */
   topics: PublicTerm[];

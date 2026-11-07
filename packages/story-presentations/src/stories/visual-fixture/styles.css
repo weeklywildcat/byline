@@ -1,4 +1,4 @@
-/* Flagship visual story for WordPress post 10. Keep every selector under .story-visual-fixture. */
+/* Flagship visual story for story 10. Keep every selector under .story-visual-fixture. */
 .story-visual-fixture .story-visual-fixture-sequence {
   /* Where the graphic sticks: clear of the site header. */
   --story-visual-fixture-top: 76px;

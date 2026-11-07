@@ -6,17 +6,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArticleView, HeroReveal, HeroRevealContent, ImmersiveArticleView, type ArticlePresentation, type ArticleViewSlots } from "@byline/ui";
 import { buildArticlePresentation } from "@/lib/article-presentation";
 import { getPostContributors, getPostStoryPresentation, isGuestContributor, type WordPressAuthor, type WordPressPost } from "@/lib/wordpress";
-import { getStoryPresentation, resolveStoryPresentation, storyPresentations, fixtureStoryPresentations } from "@/story-presentations/registry";
-import { defineVisualStory, isVisualStory } from "@/story-presentations/types";
+import { defineStoryPresentation, defineVisualStory, findStoryPresentation, fixtureStoryPresentations, isVisualStory, resolveStoryPresentation, storyPresentationRegistry, storyPresentations } from "@byline/story-presentations";
+import { StoryArticle, getStoryPresentation } from "@/lib/story-presentation-host";
 import { getNewsArticleSchema } from "@/lib/seo";
-import { StoryArticle } from "@/story-presentations/StoryArticle";
-import OverrideFixtureStory from "@/story-presentations/stories/override-fixture";
-import VisualFixtureStory from "@/story-presentations/stories/visual-fixture";
 import { publicEditorialPosts } from "@/tests/fixtures/public-editorial-content";
 
 const OVERRIDE_ID = 6;
 const VISUAL_ID = 10;
 const IMMERSIVE_ID = 8;
+const OverrideFixtureStory = fixtureStoryPresentations[OVERRIDE_ID];
+const VisualFixtureStory = fixtureStoryPresentations[VISUAL_ID];
 
 function basePresentation(overrides: Partial<ArticlePresentation> = {}): ArticlePresentation {
   const post = publicEditorialPosts[0];
@@ -57,20 +56,20 @@ const text = (node: Element | null) => node?.textContent?.replace(/\s+/g, " ").t
 afterEach(() => vi.unstubAllEnvs());
 
 describe("story presentation registry", () => {
-  const Custom = () => null;
+  const Custom = defineStoryPresentation({ name: "need-a-lift", Component: () => null });
   const registry = { 384: Custom };
 
   it("resolves a registered WordPress post ID, as a number or numeric string", () => {
-    expect(resolveStoryPresentation(registry, 384)).toBe(Custom);
-    expect(resolveStoryPresentation(registry, "384")).toBe(Custom);
+    expect(findStoryPresentation(registry, 384)).toBe(Custom);
+    expect(findStoryPresentation(registry, "384")).toBe(Custom);
   });
 
   it("returns null for any other identity, including slugs and inherited keys", () => {
-    expect(resolveStoryPresentation(registry, 385)).toBeNull();
-    expect(resolveStoryPresentation(registry, "need-a-lift")).toBeNull();
-    expect(resolveStoryPresentation(registry, "constructor")).toBeNull();
-    expect(resolveStoryPresentation(registry, "")).toBeNull();
-    expect(resolveStoryPresentation({}, 384)).toBeNull();
+    expect(findStoryPresentation(registry, 385)).toBeNull();
+    expect(findStoryPresentation(registry, "need-a-lift")).toBeNull();
+    expect(findStoryPresentation(registry, "constructor")).toBeNull();
+    expect(findStoryPresentation(registry, "")).toBeNull();
+    expect(findStoryPresentation({}, 384)).toBeNull();
   });
 
   it("ships no production override, and the fixture story only exists in fixture builds", () => {
@@ -286,7 +285,6 @@ describe("a flagship visual story", () => {
     expect(isVisualStory(VisualFixtureStory)).toBe(true);
     expect(VisualFixtureStory).toMatchObject({ kind: "visual-story", name: "visual-fixture" });
     expect(isVisualStory(fixtureStoryPresentations[OVERRIDE_ID])).toBe(false);
-    expect(isVisualStory(() => null)).toBe(false);
     expect(isVisualStory(null)).toBe(false);
     expect(() => defineVisualStory({ name: "Lunch Line", Component: () => null })).toThrow(/kebab-case/);
     expect(getStoryPresentation(VISUAL_ID)).toBeNull();
@@ -402,5 +400,34 @@ describe("HeroReveal", () => {
 
     expect(document.querySelector("img")).toBeNull();
     expect(document.querySelector(".hero-reveal-copy-end")).toBeNull();
+  });
+});
+
+describe("the one presentation resolver", () => {
+  const registry = storyPresentationRegistry({ fixtures: true });
+  const lead = { src: "/lead.jpg", alt: "Lead", width: 1600, height: 1000 };
+
+  it("explains every outcome: custom, then Immersive when valid, then Standard", () => {
+    expect(resolveStoryPresentation({ id: 101, storyPresentation: "standard", image: lead }, registry)).toMatchObject({ requested: "standard", resolved: "standard", reason: "selected", custom: null });
+    expect(resolveStoryPresentation({ id: 101, storyPresentation: "immersive", image: lead }, registry)).toMatchObject({ requested: "immersive", resolved: "immersive", reason: "selected" });
+    expect(resolveStoryPresentation({ id: 101, storyPresentation: "immersive", image: null }, registry)).toMatchObject({ requested: "immersive", resolved: "standard", reason: "missing-lead-image" });
+    expect(resolveStoryPresentation({ id: 101, storyPresentation: "immersive", image: lead, video: { videoId: "x", embedUrl: "https://www.youtube-nocookie.com/embed/x", title: "x" } }, registry)).toMatchObject({ resolved: "standard", reason: "video-story" });
+    expect(resolveStoryPresentation({ id: OVERRIDE_ID, storyPresentation: "immersive", image: lead }, registry)).toMatchObject({ requested: "immersive", resolved: "custom", reason: "custom-presentation", custom: { name: "override-fixture", title: "Override fixture", kind: "presentation" } });
+    expect(resolveStoryPresentation({ id: VISUAL_ID, storyPresentation: "standard", image: null }, registry)).toMatchObject({ resolved: "custom", reason: "visual-story", custom: { name: "visual-fixture", kind: "visual-story" } });
+  });
+
+  it("only includes fixtures when a host opts in", () => {
+    expect(storyPresentationRegistry()).toBe(storyPresentations);
+    expect(findStoryPresentation(storyPresentationRegistry(), OVERRIDE_ID)).toBeNull();
+    expect(findStoryPresentation(registry, OVERRIDE_ID)).toBe(OverrideFixtureStory);
+  });
+
+  it("prints a story's stylesheet through the host, with that story only", () => {
+    vi.stubEnv("BYLINE_CONTENT_MODE", "weekly-wildcat-fixture");
+    const visual = renderToStaticMarkup(<StoryArticle presentation={basePresentation({ id: VISUAL_ID })} slots={slots} />);
+    expect(visual).toContain('data-story-presentation="visual-fixture"');
+    expect(visual).toContain(".story-visual-fixture");
+    const ordinary = renderToStaticMarkup(<StoryArticle presentation={basePresentation({ id: 101 })} slots={slots} />);
+    expect(ordinary).not.toContain("data-story-presentation");
   });
 });

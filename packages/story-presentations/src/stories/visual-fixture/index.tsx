@@ -9,22 +9,21 @@ import {
   ArticleStandardEnding,
   ArticleStoryFooter
 } from "@byline/ui";
-import { StoryStyles } from "../../StoryStyles";
 import { defineVisualStory, type StoryPresentationProps } from "../../types";
-import css from "./styles.css?inline";
 
 /**
- * Flagship visual story for WordPress post 10.
+ * Flagship visual story for story 10.
  *
- * The narrative below is this story's body: WordPress's body is not printed
+ * The narrative below is this story's body: the CMS body is not printed
  * here. Write the reporting as semantic JSX; it is rendered to static HTML at
  * build time, so every word is in the page without JavaScript. client.ts only
  * enhances it. A change to the narrative is a code change and a deploy.
  *
- * WordPress still owns the headline, deck, byline, dates, lead image,
+ * The CMS still owns the headline, deck, byline, dates, lead image,
  * corrections, topics and series: render them from `presentation`, never type
  * them here. Delete the registry line in ../../registry.ts to return the story
- * to its WordPress body.
+ * to its CMS body. Its stylesheet (styles.css) and client.ts are loaded by each
+ * host's asset adapter, on this story only.
  * Guide: docs/custom-story-presentations.md (Flagship visual stories)
  */
 
@@ -66,7 +65,6 @@ function Graphic() {
 function VisualFixture({ presentation, slots }: StoryPresentationProps) {
   return (
     <ArticleShell className="story-visual-fixture">
-      <StoryStyles id="visual-fixture" css={css} />
       <article className="article-story">
         <header className="article-header">
           <div className="article-kicker">
@@ -81,7 +79,7 @@ function VisualFixture({ presentation, slots }: StoryPresentationProps) {
 
         {/* The narrative. `article-body` gives it the article's prose, figure and wide/full layout styles. */}
         <div className="article-body story-visual-fixture-narrative">
-          <p>Open with the reporting. This paragraph and everything in this narrative replace the WordPress body on this page.</p>
+          <p>Open with the reporting. This paragraph and everything in this narrative replace the CMS body on this page.</p>
           <section className="alignwide story-visual-fixture-sequence">
             <div className="story-visual-fixture-stage"><Graphic /></div>
             <div className="story-visual-fixture-steps">

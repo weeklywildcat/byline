@@ -51,7 +51,7 @@ async function loadPublication() {
  */
 async function sourceFingerprint() {
   const hash = createHash("sha256");
-  const roots = ["../../packages", "src", "components", "lib", "views", "story-presentations", "public/fonts"];
+  const roots = ["../../packages", "src", "components", "lib", "views", "public/fonts"];
   async function visit(directory) {
     let entries;
     try { entries = await readdir(directory, { withFileTypes: true }); } catch { return; }

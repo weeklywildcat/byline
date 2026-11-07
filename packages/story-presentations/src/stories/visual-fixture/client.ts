@@ -1,7 +1,7 @@
 import type { VisualStoryClient } from "../../types";
 
 /**
- * Progressive enhancement for WordPress post 10's narrative, loaded on this
+ * Progressive enhancement for story 10's narrative, loaded on this
  * story's page alone. The narrative is complete without it.
  *
  * A step is active while it covers a reading line 40% down the viewport,

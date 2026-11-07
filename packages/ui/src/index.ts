@@ -104,3 +104,4 @@ export function themeTokensToCssVariables(tokens: BylineThemeTokens): Record<`--
     "--radius-medium": tokens.radiusMedium
   };
 }
+export * from "./article-slots";

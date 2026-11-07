@@ -20,8 +20,8 @@ export const fixtureStoryPresentations: StoryPresentationRegistry = {
 
 async function workspace(source = registry) {
   const root = await mkdtemp(path.join(os.tmpdir(), "story-presentation-"));
-  await mkdir(path.join(root, "apps/web/story-presentations"), { recursive: true });
-  await writeFile(path.join(root, "apps/web/story-presentations/registry.ts"), source);
+  await mkdir(path.join(root, "packages/story-presentations/src"), { recursive: true });
+  await writeFile(path.join(root, "packages/story-presentations/src/registry.ts"), source);
   return root;
 }
 
@@ -34,14 +34,14 @@ test("creates the files and registers the post ID without touching the fixture r
   const root = await workspace();
   try {
     const result = await createStoryPresentation({ id: "384", name: "need-a-lift", root });
-    const base = path.join(root, "apps/web/story-presentations");
+    const base = path.join(root, "packages/story-presentations/src");
     const index = await readFile(path.join(base, "stories/need-a-lift/index.tsx"), "utf8");
     const styles = await readFile(path.join(base, "stories/need-a-lift/styles.css"), "utf8");
     const updated = await readFile(path.join(base, "registry.ts"), "utf8");
 
     assert.equal(result.registered, true);
-    assert.match(index, /export default function NeedALift\(/);
-    assert.match(index, /WordPress post 384/);
+    assert.match(index, /function NeedALift\(/);
+    assert.match(index, /story 384/);
     assert.match(index, /<ArticleBody presentation=\{presentation\}/);
     assert.match(styles, /\.story-need-a-lift /);
     assert.match(updated, /import NeedALift from "\.\/stories\/need-a-lift";/);
@@ -61,7 +61,7 @@ test("without --visual, the presentation keeps the WordPress body and gets no cl
   const root = await workspace();
   try {
     await createStoryPresentation({ id: "384", name: "need-a-lift", root });
-    const directory = path.join(root, "apps/web/story-presentations/stories/need-a-lift");
+    const directory = path.join(root, "packages/story-presentations/src/stories/need-a-lift");
     const index = await readFile(path.join(directory, "index.tsx"), "utf8");
     assert.doesNotMatch(index, /defineVisualStory/);
     assert.equal(existsSync(path.join(directory, "client.ts")), false);
@@ -74,7 +74,7 @@ test("--visual creates a flagship visual story: its own narrative, styles and cl
   const root = await workspace();
   try {
     const result = await createStoryPresentation({ id: "402", name: "lunch-line", visual: true, root });
-    const base = path.join(root, "apps/web/story-presentations");
+    const base = path.join(root, "packages/story-presentations/src");
     const index = await readFile(path.join(base, "stories/lunch-line/index.tsx"), "utf8");
     const styles = await readFile(path.join(base, "stories/lunch-line/styles.css"), "utf8");
     const client = await readFile(path.join(base, "stories/lunch-line/client.ts"), "utf8");
@@ -82,7 +82,7 @@ test("--visual creates a flagship visual story: its own narrative, styles and cl
 
     assert.equal(result.registered, true);
     assert.match(index, /export default defineVisualStory\(\{ name: "lunch-line", Component: LunchLine \}\);/);
-    assert.match(index, /WordPress post 402/);
+    assert.match(index, /story 402/);
     // The WordPress body is never printed by a visual story; the standard systems are.
     assert.doesNotMatch(index, /ArticleBody/);
     for (const piece of ["ArticleHeadline", "ArticleMeta", "ArticleFeaturedImage", "ArticleStoryFooter", "ArticleStandardEnding"]) assert.match(index, new RegExp(`<${piece} `));
@@ -99,7 +99,7 @@ test("--visual creates a flagship visual story: its own narrative, styles and cl
 });
 
 test("the fixture visual story is exactly what --visual generates", async () => {
-  const directory = fileURLToPath(new URL("../apps/web/story-presentations/stories/visual-fixture/", import.meta.url));
+  const directory = fileURLToPath(new URL("../packages/story-presentations/src/stories/visual-fixture/", import.meta.url));
   const args = { id: 10, name: "visual-fixture" };
   assert.equal(await readFile(path.join(directory, "index.tsx"), "utf8"), visualIndexSource(args));
   assert.equal(await readFile(path.join(directory, "styles.css"), "utf8"), visualStylesSource(args));
@@ -115,7 +115,7 @@ test("refuses bad input and duplicates before writing anything", async () => {
     await createStoryPresentation({ id: "5", name: "first", root });
     await assert.rejects(createStoryPresentation({ id: "5", name: "other", root }), /already has a presentation/);
     await assert.rejects(createStoryPresentation({ id: "6", name: "first", root }), /already exists/);
-    assert.equal(existsSync(path.join(root, "apps/web/story-presentations/stories/other")), false);
+    assert.equal(existsSync(path.join(root, "packages/story-presentations/src/stories/other")), false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

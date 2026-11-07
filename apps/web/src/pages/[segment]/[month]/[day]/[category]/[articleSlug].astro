@@ -11,9 +11,8 @@ import { absoluteUrl, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getArticleJsonLd } from "@/lib/story-video";
 import { getPostGameScoreGameIds, getPostHref, getPostRouteParts } from "@/lib/wordpress";
 import { stripHtml, decodeHtml } from "@/lib/format";
-import { StoryArticle } from "@/story-presentations/StoryArticle";
-import { getStoryPresentation } from "@/story-presentations/registry";
-import { isVisualStory } from "@/story-presentations/types";
+import { StoryArticle, getStoryPresentation } from "@/lib/story-presentation-host";
+import { isVisualStory } from "@byline/story-presentations";
 import { ArticleGameCard } from "@/components/ArticleGameCard";
 import { ArticleShareActions } from "@/components/ArticleShareActions";
 import { ReaderFeedbackForm } from "@/components/ReaderFeedbackForm";
@@ -62,7 +61,7 @@ const slots = {
     // A flagship visual story's own client code, if it has any, downloads on its page alone.
     const visualStory = document.querySelector<HTMLElement>("[data-visual-story]");
     if (visualStory) {
-      import("@/story-presentations/client").then(({ startVisualStory }) => startVisualStory(visualStory));
+      import("@/lib/story-presentation-client").then(({ startVisualStory }) => startVisualStory(visualStory));
     }
     // Only a story whose coverage is running downloads the live checker.
     const live = document.querySelector<HTMLElement>('[data-byline-live][data-status="live"]');

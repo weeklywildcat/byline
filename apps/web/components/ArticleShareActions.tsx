@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SiteIcon } from "@/components/SiteIcon";
+import { ArticleShareActionsView } from "@byline/ui";
 
 type ArticleShareActionsProps = {
   title: string;
@@ -64,18 +64,12 @@ export function ArticleShareActions({ title, url }: ArticleShareActionsProps) {
     copyStatus === "copied" ? "Copied" : copyStatus === "failed" ? "Copy failed" : "Copy link";
 
   return (
-    <div className="article-share-actions" aria-label="Share this story">
-      <button type="button" onClick={handleShare} title="Share this story" aria-label="Share this story">
-        <SiteIcon name="ph:share-fat" width={18} height={18} />
-      </button>
-      <button type="button" onClick={handleCopy} title={copyLabel} aria-label={copyLabel}>
-        <SiteIcon
-          name={copyStatus === "copied" ? "ph:check" : copyStatus === "failed" ? "ph:warning-circle" : "ph:link"}
-          width={18}
-          height={18}
-        />
-      </button>
-      <span className="article-share-status" role="status">{copyStatus === "idle" ? "" : copyLabel}</span>
-    </div>
+    <ArticleShareActionsView
+      copyLabel={copyLabel}
+      copyIcon={copyStatus === "copied" ? "ph:check" : copyStatus === "failed" ? "ph:warning-circle" : "ph:link"}
+      status={copyStatus === "idle" ? "" : copyLabel}
+      onShare={handleShare}
+      onCopy={handleCopy}
+    />
   );
 }

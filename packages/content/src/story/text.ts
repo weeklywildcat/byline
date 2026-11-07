@@ -64,3 +64,15 @@ export function articleBodyPlainText(body: PublicArticleBody): string {
 export function wordCount(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
 }
+
+/**
+ * "October 19, 2026": the calendar date of an ISO value in the publication's
+ * locale. Only the date part is read, so a stored instant never shifts a day
+ * with the reader's (or the build machine's) timezone.
+ */
+export function formatEditorialDate(value: string, locale: string): string {
+  const [date] = value.split("T");
+  const [year, month, day] = date.split("-").map(Number);
+  if (!year || !month || !day) return value;
+  return new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", year: "numeric" }).format(new Date(year, month - 1, day));
+}
