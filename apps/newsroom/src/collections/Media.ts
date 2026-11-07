@@ -16,7 +16,7 @@ import { legacyIdField } from "../fields/slug";
  *
  * Folders are Payload's native folders (`MediaFolders.ts`): logical
  * organization only, so filing or moving an asset never changes its file URL
- * or moves its object in storage.
+ * or moves or renames its source file on disk.
  *
  * The one image size, `library`, is the newsroom's private browsing preview
  * (at most 640px, WebP), so the Media Library grid never downloads camera
@@ -113,7 +113,7 @@ export const Media: CollectionConfig = {
       // Prepared-asset readiness belongs to the publication pipeline: an upload or metadata edit never marks a file ready.
       access: { create: systemOnly, update: systemOnly },
       fields: [
-        { name: "status", type: "select", defaultValue: "private", options: [{ value: "private", label: "Private" }, { value: "queued", label: "Queued" }, { value: "public", label: "Public" }, { value: "failed", label: "Failed" }] },
+        { name: "status", type: "select", defaultValue: "not-prepared", options: [{ value: "not-prepared", label: "Not prepared" }, { value: "preparing", label: "Preparing" }, { value: "ready", label: "Ready" }, { value: "failed", label: "Failed" }] },
         { name: "sourceHash", type: "text", admin: { hidden: true } },
         { name: "renditions", type: "json", admin: { hidden: true } },
         { name: "preparedAt", type: "date" }
