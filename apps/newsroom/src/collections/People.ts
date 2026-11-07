@@ -1,7 +1,9 @@
-import type { CollectionConfig, FieldAccess } from "payload";
-import { atLeast, editorsOnly, editorsOnlyField, requestUser, sameId, signedIn } from "../access/user";
+import { APIError, type CollectionConfig, type FieldAccess } from "payload";
+import { validPersonSocialUrl } from "@byline/newsroom-screens/people/people-model";
+import { atLeast, editorsOnly, editorsOnlyField, newsroomUser, requestUser, sameId, signedIn } from "../access/user";
 import { PERSON_STATUS_OPTIONS } from "../domain/vocabulary";
 import { legacyIdField, slugField } from "../fields/slug";
+import { lockPersonRow } from "../db/people";
 
 /** Editors manage people; a staff member may edit the public profile of the person their account writes as. */
 const editorOrOwnProfile: FieldAccess = ({ req, id }) => {
@@ -17,8 +19,9 @@ const editorOrOwnProfile: FieldAccess = ({ req, id }) => {
 export const People: CollectionConfig = {
   slug: "people",
   labels: { singular: "Person", plural: "People" },
-  admin: { useAsTitle: "name", defaultColumns: ["name", "newsroomRole", "status", "directoryVisible"], group: false },
+  admin: { useAsTitle: "name", defaultColumns: ["name", "newsroomRole", "status", "directoryVisible"], group: false, hidden: ({ user }) => !atLeast(newsroomUser(user), "administrator") },
   access: {
+    admin: ({ req }) => atLeast(requestUser(req), "administrator"),
     read: signedIn,
     create: editorsOnly,
     update: ({ req }) => {
@@ -28,6 +31,19 @@ export const People: CollectionConfig = {
     },
     // Bylines reference people forever; retire a person with `status` instead.
     delete: ({ req }) => atLeast(requestUser(req), "administrator")
+  },
+  hooks: {
+    beforeDelete: [async ({ req, id }) => {
+      await lockPersonRow(req, id);
+      // This is an integrity check, including drafts, trash and historical
+      // versions the caller may not read. It never returns their contents.
+      const [stories, versions, plans] = await Promise.all([
+        req.payload.find({ collection: "stories", where: { contributors: { contains: id } }, trash: true, depth: 0, limit: 1, select: { headline: true }, overrideAccess: true, req }),
+        req.payload.findVersions({ collection: "stories", where: { "version.contributors": { contains: id } }, depth: 0, limit: 1, overrideAccess: true, req }),
+        req.payload.find({ collection: "story-plans", where: { contributors: { contains: id } }, depth: 0, limit: 1, select: { story: true }, overrideAccess: true, req })
+      ]);
+      if (stories.totalDocs || versions.totalDocs || plans.totalDocs) throw new APIError("This person is credited on stories. Set their status to Alumni instead; historical bylines must stay intact.", 409);
+    }]
   },
   fields: [
     { name: "name", type: "text", required: true, maxLength: 120, access: { update: editorOrOwnProfile } },
@@ -69,7 +85,7 @@ export const People: CollectionConfig = {
       access: { update: editorOrOwnProfile },
       fields: [
         { name: "label", type: "text", required: true, maxLength: 40 },
-        { name: "url", type: "text", required: true, validate: (value: unknown) => (typeof value === "string" && /^https:\/\/[^\s@]+$/.test(value) ? true : "Use an https:// link.") }
+        { name: "url", type: "text", required: true, validate: (value: unknown) => (validPersonSocialUrl(value) ? true : "Use an https:// link.") }
       ]
     },
     {

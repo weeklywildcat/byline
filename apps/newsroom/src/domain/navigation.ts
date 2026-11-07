@@ -52,7 +52,8 @@ export const NAVIGATION: readonly NavItem[] = [
   { key: "stories", label: "Stories", path: "/stories", minimumRole: "staff" },
   { key: "calendar", label: "Calendar", path: CALENDAR_PATH, minimumRole: "staff" },
   { key: "media", label: "Media", path: MEDIA_PATH, minimumRole: "staff" },
-  { key: "collections", label: "Collections", path: COLLECTIONS_PATH, minimumRole: "staff", exact: true }
+  { key: "collections", label: "Collections", path: COLLECTIONS_PATH, minimumRole: "staff", exact: true },
+  { key: "people", label: "People", path: "/people", minimumRole: "editor", exact: true }
 ];
 
 export function navigationFor(role: Role): NavItem[] {
@@ -151,6 +152,7 @@ export function locationFor(pathname: string, adminRoute: string): Crumb[] {
   const raw = ADMINISTRATION.find((item) => path === item.path || path.startsWith(`${item.path}/`));
   if (raw) return [{ label: "System administration", path: SYSTEM_ADMINISTRATION_PATH }, { label: raw.label }];
   if (path === "/account") return [{ label: "Account" }];
+  if (path === "/profile") return [{ label: "My profile" }];
   return [];
 }
 

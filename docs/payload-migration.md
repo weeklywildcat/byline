@@ -97,8 +97,8 @@ is why `apps/web/lib/article-presentation.ts` is typed around `WordPressPost`.
 | Dataset | Fields used by the renderer | WordPress source | Payload source |
 | --- | --- | --- | --- |
 | `posts` | id, date(_gmt), modified(_gmt), slug, title/excerpt/content `.rendered`, author, featured_media, categories, tags, sticky, `byline.{presentation, immersiveAlignment, reportingNote, format, video, contributors, corrections, live, primaryGameId, gameScoreGameIds}`, `_embedded` author/media/terms | post + postmeta + embeds | published `stories` version + relations |
-| `authors` | public profile: name, slug, role, pronouns, bios, photo, socials, directory flag, public contact | users + profile meta | `people` with a linked staff user, or `directoryVisible` |
-| `guests` | name, slug, bio, role, hasProfilePage, profilePhoto, links | `byline_guest` | `people` without a user |
+| `authors` | public profile: name, slug, role, pronouns, bios, photo, socials, directory flag, public contact | users + profile meta | `people` with non-guest editorial status (visibility remains explicit) |
+| `guests` | name, slug, bio, role, hasProfilePage, profilePhoto, links | `byline_guest` | `people` with `status=guest`, independent of account linkage |
 | `categories` / `tags` | id, name, slug, description, count | terms | `sections` / `topics` |
 | `pages` | rendered page, slug, parent, template/noindex | `page` | published `pages` |
 | `corrections` | id, type, text, date, storyId, story summary | `byline_correction` | `corrections` on published stories |
@@ -927,6 +927,26 @@ and creating a task from Create on a Story screen leave the story's versions
 unchanged (no form submit); Production renders; ⌘K works on Home and on the
 Story screen; Sign out ends the session.
 
+### 7.3 People and My profile
+
+[People workspace](people-workspace.md) is the parallel People slice on
+`feature/payload-people`, stacked on the verified `ad1ad5e` foundation. Editors
+get `/admin/people` after Collections; linked accounts get `/admin/profile` from
+the account menu. One CMS-neutral explicit-save Person editor powers both,
+with server-derived capabilities, own-profile field access, image-only Byline
+Media picking, guarded URL navigation and transactional 409 conflicts.
+Person and User stay separate; account administration stays in System.
+
+Guests are People with guest status and sensible byline-only creation defaults.
+Status, staff-directory visibility and profile-page visibility are independent.
+Retirement preserves bylines, and referenced People cannot be deleted through
+the raw fallback. `public-people.ts` is an allowlisted future public input,
+including authors/guests partitions; it has no account data. Stable profile
+presentation/CSS is shared in `@byline/ui` between Astro and the unsaved-draft
+preview. Astro retains routes, metadata, Person JSON-LD and story queries.
+Production snapshot authority, WordPress import and Story picker guest creation
+are deliberately deferred; no semantic editor work is included here.
+
 ## 8. Editor
 
 `packages/editor` (`@byline/editor`) owns the Lexical feature list, the Byline
@@ -995,7 +1015,7 @@ The torture-test story covers scrollytelling with a repository visual story.
 | 0 | This inventory | reviewed | done |
 | 1 | `apps/newsroom`, Postgres, migrations, auth skeleton, roles, storage skeleton, Byline nav/dashboard | boots; migration applies to an empty DB; access tests | **done** (see §13) |
 | 1b | Google sign-in strategy | invited-only sign-in test | — |
-| 2 | People, Stories, Sections, Topics, Collections and optional public presentations, Corrections, Pages, Workspace records, canonical public model | access/privacy tests | collections + access **done**; Collections workspace and public compatibility projection done; full snapshot integration, `events`, YouTube metadata job pending |
+| 2 | People, Stories, Sections, Topics, Collections and optional public presentations, Corrections, Pages, Workspace records, canonical public model | access/privacy tests | collections + access **done**; People workspace, My profile and public-safe projection done in the parallel People slice; Collections workspace and public compatibility projection done; full snapshot integration, `events`, YouTube metadata job pending |
 | 3 | Story view (Write/Plan/Production/History), Lexical, first blocks, autosave, locking, history | writer acceptance steps 1–6 | — |
 | 4 | Extract `@byline/story-presentations`, canonical normalization, exact Live Preview | §5 parity suite green | — |
 | 5 | Media: private storage, metadata, crops, materialization, drag and drop | media privacy + public availability tests | — |

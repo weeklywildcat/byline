@@ -124,6 +124,8 @@ export default buildConfig({
         // Byline Collections: reporting projects, served at exactly /admin/collections by app/(payload)/admin/collections/page.tsx
         // (Payload refuses a custom view there); Payload's raw /collections/<slug> screens are untouched.
         collections: { Component: "/components/BylineCollections#BylineCollections", path: COLLECTIONS_VIEW_PATH, exact: true, meta: { title: "Collections" } },
+        people: { Component: "/components/BylinePeople#BylinePeople", path: "/people", exact: true, meta: { title: "People" } },
+        profile: { Component: "/components/BylineProfile#BylineProfile", path: "/profile", exact: true, meta: { title: "My profile" } },
         // Administrators only: the entry to Payload's raw collection screens.
         system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system" }
       }

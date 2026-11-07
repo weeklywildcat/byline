@@ -15,7 +15,7 @@ import { ShellLayer } from "../shell/layer";
 import { useNewsroomTimeZone } from "../shell/timezone";
 import { createPayloadMediaFetchers, payloadMediaPreferences } from "./payload-media-fetchers";
 
-type PickRequest = { kind: MediaKind | ""; title?: string; confirmLabel?: string; multiple: boolean; resolve: (assets: MediaLibraryAsset[]) => void };
+type PickRequest = { kind: MediaKind | ""; restrictedKind?: MediaKind; title?: string; confirmLabel?: string; multiple: boolean; resolve: (assets: MediaLibraryAsset[]) => void };
 
 type MediaWorkspace = {
   fetchers: MediaLibraryFetchers;
@@ -31,7 +31,7 @@ type MediaWorkspace = {
   folderRequest: MediaFolderRequest | null;
   requestFolderAction: (request: MediaFolderRequest | null) => void;
   /** Byline's file picker (production assignments, and later any asset selector). */
-  pick: (options?: { kind?: MediaKind | ""; title?: string; confirmLabel?: string; multiple?: boolean }) => Promise<MediaLibraryAsset[]>;
+  pick: (options?: { kind?: MediaKind | ""; restrictedKind?: MediaKind; title?: string; confirmLabel?: string; multiple?: boolean }) => Promise<MediaLibraryAsset[]>;
   /** The Media screen's address for a route. */
   href: (route: MediaRoute) => string;
   /**
@@ -105,7 +105,7 @@ export function MediaWorkspaceShell({ children }: { children: ReactNode }) {
   }), []);
   const expandAll = useCallback((folderIds: number[]) => setExpandedSet((current) => (folderIds.every((id) => current.has(id)) ? current : new Set([...current, ...folderIds]))), []);
   const pick = useCallback<MediaWorkspace["pick"]>((options = {}) => new Promise((resolve) => {
-    setPicking({ kind: options.kind ?? "", title: options.title, confirmLabel: options.confirmLabel, multiple: options.multiple !== false, resolve });
+    setPicking({ kind: options.kind ?? "", restrictedKind: options.restrictedKind, title: options.title, confirmLabel: options.confirmLabel, multiple: options.multiple !== false, resolve });
   }), []);
   const href = useCallback((route: MediaRoute) => `${routes.admin}/media${mediaHrefSearch(route)}`, [routes.admin]);
   const navigationGuard = useRef<((proceed: () => void) => void) | null>(null);
@@ -130,6 +130,7 @@ export function MediaWorkspaceShell({ children }: { children: ReactNode }) {
             fetchers={fetchers}
             timezone={timezone}
             kind={picking?.kind ?? ""}
+            restrictedKind={picking?.restrictedKind}
             title={picking?.title}
             confirmLabel={picking?.confirmLabel}
             multiple={picking?.multiple ?? true}

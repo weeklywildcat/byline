@@ -126,7 +126,14 @@
     "./workspace/workspace-errors": "./src/workspace/workspace-errors.ts",
     "./workspace/workspace-model": "./src/workspace/workspace-model.ts",
     "./workspace/workspace-query": "./src/workspace/workspace-query.ts",
-    "./workspace/workspace-types": "./src/workspace/workspace-types.ts"
+    "./workspace/workspace-types": "./src/workspace/workspace-types.ts",
+    "./people/people-model": "./src/people/people-model.ts",
+    "./people/people-api": "./src/people/people-api.ts",
+    "./people/people-query": "./src/people/people-query.ts",
+    "./people/PeoplePage": "./src/people/PeoplePage.tsx",
+    "./people/PersonEditor": "./src/people/PersonEditor.tsx",
+    "./people/PersonPreview": "./src/people/PersonPreview.tsx",
+    "./people/person-form": "./src/people/person-form.ts"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "4.0.0",
@@ -142,7 +149,8 @@
     "lucide-react": "^1.60.0",
     "react-day-picker": "^10.0.1",
     "sonner": "^2.0.8",
-    "temporal-polyfill": "0.3.2"
+    "temporal-polyfill": "0.3.2",
+    "@byline/ui": "0.1.0"
   },
   "peerDependencies": {
     "react": "^19.0.0",

@@ -4,10 +4,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@byline/newsroom-ui/ui/avat
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { cn } from "@byline/newsroom-ui/lib/utils";
-import { ChevronsUpDown, LogOut, Wrench } from "lucide-react";
+import { ChevronsUpDown, LogOut, UserRound, Wrench } from "lucide-react";
 import { useState } from "react";
+import { ShellLink, useShellNavigation } from "./navigation";
 
-export type ShellUser = { name: string; subtitle: string; avatarUrl: string | null };
+export type ShellUser = { name: string; subtitle: string; avatarUrl: string | null; profileHref?: string | null };
 
 export function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
@@ -39,14 +40,15 @@ function Identity({ user, compact = false }: { user: ShellUser; compact?: boolea
 /**
  * The account menu in the sidebar footer. System administration (the raw
  * Payload maintenance screens) lives here, for administrators only, so it
- * never reads as part of the newsroom's navigation. Profile and Preferences
- * join once their Byline screens exist. `compact` (the Story workspace's icon
+ * never reads as part of the newsroom's navigation. My profile uses the same
+ * guarded navigation as the sidebar. `compact` (the Story workspace's icon
  * rail) shows only the avatar, with the name as its tooltip, whatever state
  * the sidebar around it is in; the menu is the same.
  */
 export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = false }: { user: ShellUser; systemHref: string | null; logoutUrl: string; loginHref: string; compact?: boolean }) {
   const { isMobile, state } = useSidebar();
   const [signingOut, setSigningOut] = useState(false);
+  const { runGuarded } = useShellNavigation();
 
   async function signOut() {
     setSigningOut(true);
@@ -72,15 +74,16 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            {user.profileHref ? <><DropdownMenuItem render={<ShellLink href={user.profileHref} />}><UserRound aria-hidden="true" />My profile</DropdownMenuItem><DropdownMenuSeparator /></> : null}
             {systemHref ? (
               <>
                 <DropdownMenuGroup>
-                  <DropdownMenuItem render={<a href={systemHref} />}><Wrench aria-hidden="true" />System administration</DropdownMenuItem>
+                  <DropdownMenuItem render={<ShellLink href={systemHref} />}><Wrench aria-hidden="true" />System administration</DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
               </>
             ) : null}
-            <DropdownMenuItem onClick={() => void signOut()} disabled={signingOut}><LogOut aria-hidden="true" />{signingOut ? "Signing out…" : "Sign out"}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => runGuarded(() => void signOut())} disabled={signingOut}><LogOut aria-hidden="true" />{signingOut ? "Signing out…" : "Sign out"}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

@@ -20,7 +20,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "migrate:check": "node scripts/check-migrations.mjs"
+    "migrate:check": "node scripts/check-migrations.mjs",
+    "seed:people:browser": "node --import tsx scripts/seed-people-browser.ts",
+    "test:people:browser": "playwright test --config playwright.people.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
@@ -41,7 +43,9 @@
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "sharp": "0.35.5",
-    "sonner": "2.0.8"
+    "sonner": "2.0.8",
+    "@byline/ui": "0.1.0",
+    "@byline/theme-weekly-wildcat": "0.1.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",
@@ -52,6 +56,8 @@
     "postcss-nesting": "14.0.3",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "@playwright/test": "1.62.1",
+    "tsx": "4.23.15"
   }
 }

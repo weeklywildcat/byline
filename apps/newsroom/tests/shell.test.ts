@@ -62,7 +62,7 @@ describe("Byline sidebar (admin.components.Nav)", () => {
     payload.findByID.mockResolvedValueOnce({ newsroomRole: " Editor in Chief ", portrait: { id: 4, url: "/api/media/file/gb.jpg", mimeType: "image/jpeg" } });
     const props = (await sidebarFor(account("editor", { linkedPerson: 12 })))!;
     expect(payload.findByID).toHaveBeenLastCalledWith(expect.objectContaining({ collection: "people", id: 12, overrideAccess: false }));
-    expect(props.user).toEqual({ name: "Gibson Bell", subtitle: "Editor in Chief", avatarUrl: "/api/media/file/gb.jpg" });
+    expect(props.user).toEqual({ name: "Gibson Bell", subtitle: "Editor in Chief", avatarUrl: "/api/media/file/gb.jpg", profileHref: "/admin/profile" });
   });
 
   it("falls back to the account role when the person cannot be read", async () => {

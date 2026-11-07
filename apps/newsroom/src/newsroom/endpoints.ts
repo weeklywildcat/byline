@@ -39,6 +39,8 @@ import { contributorEntry, editorialTask, homeBootstrap, loadPeople, mediaFor, p
 import type { AppointmentInput, MediaAssignmentInput, SourceInput } from "@byline/newsroom-screens/workspace/workspace-types";
 import { effectiveWorkflow } from "../domain/workflow";
 import { relationId, sameId } from "../access/user";
+import { createPerson, ownProfile, peopleList, personDetail, updatePerson } from "./people";
+import { peopleQuery, type NewPerson, type PersonPatch } from "@byline/newsroom-screens/people/people-model";
 
 /**
  * The newsroom screens' API (`/api/byline/...`), the Payload side of the
@@ -471,6 +473,11 @@ const collectionEndpoints: Endpoint[] = [
 /* ----------------------------------------------------------- endpoints */
 
 export const newsroomEndpoints: Endpoint[] = [
+  { path: "/byline/people", method: "get", handler: handle((ctx, req) => peopleList(ctx, peopleQuery(req.searchParams))) },
+  { path: "/byline/people", method: "post", handler: handle(async (ctx, req) => createPerson(ctx, await body<NewPerson>(req))) },
+  { path: "/byline/people/:id", method: "get", handler: handle((ctx, req) => personDetail(ctx, idParam(req))) },
+  { path: "/byline/people/:id", method: "patch", handler: handle(async (ctx, req) => updatePerson(ctx, idParam(req), await body<PersonPatch>(req))) },
+  { path: "/byline/profile", method: "get", handler: handle((ctx) => ownProfile(ctx)) },
   { path: "/byline/home", method: "get", handler: handle((ctx) => homeBootstrap(ctx)) },
   { path: "/byline/home/search", method: "get", handler: handle((ctx, req) => searchStories(ctx, String(req.searchParams.get("query") ?? ""))) },
   { path: "/byline/presets", method: "get", handler: handle(async () => presetsPayload()) },
