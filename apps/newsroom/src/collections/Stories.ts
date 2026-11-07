@@ -11,6 +11,7 @@ import {
   STORY_PRESENTATION_OPTIONS
 } from "../domain/vocabulary";
 import { legacyIdField, slugField } from "../fields/slug";
+import { storyLivePreview } from "../preview/config";
 
 /**
  * Keep the story's plan in step: create it with the story, and copy the
@@ -103,7 +104,9 @@ export const Stories: CollectionConfig = {
     useAsTitle: "headline",
     defaultColumns: ["headline", "section", "_status", "updatedAt"],
     group: false,
-    listSearchableFields: ["headline", "slug", "deck"]
+    listSearchableFields: ["headline", "slug", "deck"],
+    // Payload's native Live Preview: its pane, toolbar, devices and pop-out; Byline renders /preview/story.
+    livePreview: storyLivePreview
   },
   versions: {
     maxPerDoc: 200,

@@ -1,4 +1,11 @@
-import type { ArticlePresentation, StoryPresentationChoice } from "./presentation";
+import type { StoryPresentationChoice } from "./presentation";
+
+/** What the resolution rule reads: a story's choice, whether it has a lead image and whether it is a video story. */
+export type BuiltInPresentationInput = {
+  storyPresentation?: StoryPresentationChoice | null;
+  image?: { src?: string | null } | null;
+  video?: unknown;
+};
 
 /**
  * Which built-in opening a story gets, and why. This is the one rule for the
@@ -18,7 +25,7 @@ export type BuiltInPresentationResolution = {
   reason: BuiltInPresentationReason;
 };
 
-export function resolveBuiltInPresentation(presentation: Pick<ArticlePresentation, "storyPresentation" | "image" | "video">): BuiltInPresentationResolution {
+export function resolveBuiltInPresentation(presentation: BuiltInPresentationInput): BuiltInPresentationResolution {
   const requested: StoryPresentationChoice = presentation.storyPresentation === "immersive" ? "immersive" : "standard";
   if (requested === "standard") return { requested, resolved: "standard", reason: "selected" };
   // A video story always opens on its player, never a fullscreen photo.
@@ -28,6 +35,6 @@ export function resolveBuiltInPresentation(presentation: Pick<ArticlePresentatio
 }
 
 /** Whether the story opens Immersive. */
-export function usesImmersivePresentation(presentation: Pick<ArticlePresentation, "storyPresentation" | "image" | "video">): boolean {
+export function usesImmersivePresentation(presentation: BuiltInPresentationInput): boolean {
   return resolveBuiltInPresentation(presentation).resolved === "immersive";
 }

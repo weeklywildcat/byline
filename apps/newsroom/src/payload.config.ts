@@ -90,7 +90,11 @@ export default buildConfig({
     meta: { titleSuffix: " · Byline", robots: "noindex, nofollow" },
     importMap: { baseDir: dirname },
     // Read by Byline's client screens: dates show in the newsroom's timezone, never the browser's.
-    custom: { newsroomTimeZone: newsroomTimeZone() },
+    custom: {
+      newsroomTimeZone: newsroomTimeZone(),
+      // Development only: also resolve the framework's fixture story presentations (story IDs 6 and 10).
+      storyPresentationFixtures: process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.NODE_ENV !== "production"
+    },
     // Byline's Nova surfaces are light; Payload's chrome follows so the two never clash.
     theme: "light",
     components: {

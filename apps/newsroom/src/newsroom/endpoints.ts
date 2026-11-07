@@ -39,6 +39,7 @@ import { contributorEntry, editorialTask, homeBootstrap, loadPeople, mediaFor, p
 import type { AppointmentInput, MediaAssignmentInput, SourceInput } from "@byline/newsroom-screens/workspace/workspace-types";
 import { effectiveWorkflow } from "../domain/workflow";
 import { relationId, sameId } from "../access/user";
+import { parsePreviewContextQuery, storyPreviewContext } from "../preview/context";
 import { createPerson, ownProfile, peopleList, personDetail, updatePerson } from "./people";
 import { peopleQuery, type NewPerson, type PersonPatch } from "@byline/newsroom-screens/people/people-model";
 
@@ -485,6 +486,8 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/planning", method: "get", handler: handle((ctx, req) => planningResponse(ctx, parsePlanningFilterParams(req.searchParams))) },
   { path: "/byline/schedule", method: "get", handler: handle((ctx, req) => scheduleResponse(ctx, parseScheduleQuery(req.searchParams, scheduleToday(ctx)))) },
   { path: "/byline/stories", method: "post", handler: handle(createStory) },
+  // Live Preview's presentation context: corrections, related/More by candidates, series. Not part of the typing loop.
+  { path: "/byline/stories/:id/preview-context", method: "get", handler: handle((ctx, req) => storyPreviewContext(ctx, idParam(req), parsePreviewContextQuery(new URL(req.url ?? "http://x").searchParams))) },
   { path: "/byline/stories/:id/workspace", method: "get", handler: handle((ctx, req) => storyWorkspace(ctx, idParam(req))) },
   { path: "/byline/stories/:id/workflow", method: "post", handler: handle(updateWorkflow) },
   { path: "/byline/stories/:id/contributors", method: "put", handler: handle(saveContributors) },

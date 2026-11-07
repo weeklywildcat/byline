@@ -13,6 +13,7 @@ import type { StoryScreenContext } from "./StoryScreen";
 import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { useShellLayout } from "../shell/layout";
 import { useStorySwitcher } from "../shell/StorySwitcher";
+import { PresentationStatus, PreviewButton } from "./StoryPreviewControl";
 
 /**
  * The Story header: what the story is, where it is in the newsroom's workflow
@@ -63,6 +64,7 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
         <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]">{headline?.trim() || "Untitled story"}</h1>
         <div className="flex items-center gap-2">
           <StorySwitchButton />
+          <PreviewButton />
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
             {saving ? <Spinner className="size-3" /> : saveState === "Saved" ? <Check className="size-3" aria-hidden="true" /> : null}
             {saveState}
@@ -90,6 +92,7 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
             <dd>{formatDay(planned.deadline, context.timeZone)}</dd>
           </div>
         ) : null}
+        <PresentationStatus />
         {planned?.editor ? (
           <div className="flex items-center gap-1.5">
             <dt className="text-muted-foreground">Editor</dt>

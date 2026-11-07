@@ -1,4 +1,4 @@
-import { resolveBuiltInPresentation, type ArticlePresentation, type BuiltInPresentationReason, type StoryPresentationChoice } from "@byline/content/story";
+import { resolveBuiltInPresentation, type BuiltInPresentationInput, type BuiltInPresentationReason, type StoryPresentationChoice } from "@byline/content/story";
 import { findStoryPresentation } from "./registry";
 import type { StoryPresentationEntry, StoryPresentationRegistry } from "./types";
 
@@ -27,7 +27,7 @@ export type StoryPresentationResolution = {
 };
 
 export function resolveStoryPresentation(
-  presentation: Pick<ArticlePresentation, "id" | "storyPresentation" | "image" | "video">,
+  presentation: BuiltInPresentationInput & { id: number | string },
   registry: StoryPresentationRegistry
 ): StoryPresentationResolution {
   const builtIn = resolveBuiltInPresentation(presentation);
