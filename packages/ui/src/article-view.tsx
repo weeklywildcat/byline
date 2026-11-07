@@ -1,159 +1,39 @@
 import type { ReactNode } from "react";
+import type { PublicArticleBody } from "@byline/article-body";
 import { ArticleLiveBadge, ArticleLiveCoverage, type ArticleLiveView } from "./article-live";
+import { StructuredArticleBody } from "./article-body/render";
+
+import type {
+  ArticleImageView,
+  ArticleLinkView,
+  ArticleContributorView,
+  ArticleCorrectionView,
+  ArticleTopicView,
+  ArticleStoryCardView,
+  StoryVideoBadgeView,
+  ArticleVideoView,
+  ArticleSeriesPartView,
+  ArticleSeriesView,
+  ArticlePresentation
+} from "@byline/content/story";
 
 /**
- * The article boundary between a content adapter and a renderer.
- *
- * An adapter may be WordPress, a fixture, or Studio data, but the renderer only
- * receives this normalized presentation model. HTML fields are expected to be
- * sanitized/rendered by the adapter before they cross this boundary.
+ * The article model is plain data owned by `@byline/content/story` (no React);
+ * re-exported here so renderer imports keep working.
  */
-export type ArticleImageView = {
-  src: string;
-  srcSet?: string;
-  sizes?: string;
-  alt: string;
-  width?: number | null;
-  height?: number | null;
-  captionHtml?: string;
-  fallbackCaption?: string;
-  credit?: string;
-  /** CSS object-position from the editor's focal point; absent when centred or already cropped. */
-  objectPosition?: string;
-};
-
-export type ArticleLinkView = {
-  label: string;
-  href: string;
-};
-
-export type ArticleContributorView = {
-  id: string;
-  name: string;
-  /** Empty for one-off guests, who are credited without a profile page. */
-  href: string;
-  role: string;
-  bio: string;
-  photo?: ArticleImageView | null;
-  contactHref?: string;
-  coverage?: ArticleLinkView[];
-};
-
-export type ArticleCorrectionView = {
-  id: string;
-  label: string;
-  date?: string | null;
-  dateLabel?: string | null;
-  text: string;
-};
-
-export type ArticleTopicView = {
-  id: string;
-  name: string;
-};
-
-export type ArticleStoryCardView = {
-  id: number | string;
-  title: string;
-  href: string;
-  excerptHtml?: string;
-  image?: ArticleImageView | null;
-  category?: string | null;
-  date?: string | null;
-  dateLabel?: string | null;
-  /** Present for a video story; the card shows a small Video label. */
-  video?: StoryVideoBadgeView | null;
-};
-
-/** A video story's card treatment: the label and, when known, the running time ("4:13"). */
-export type StoryVideoBadgeView = {
-  duration: string | null;
-};
-
-/**
- * A video story's one primary video. The player is a real iframe in the
- * rendered HTML, and `embedUrl` is the same URL the structured data and the
- * video sitemap name.
- */
-export type ArticleVideoView = {
-  videoId: string;
-  embedUrl: string;
-  /** Accessible name for the player. */
-  title: string;
-  duration?: string | null;
-};
-
-export type ArticleSeriesPartView = {
-  id: number | string;
-  /** 1-based reading order among the published stories. */
-  number: number;
-  title: string;
-  href: string;
-  current: boolean;
-  date?: string | null;
-  dateLabel?: string | null;
-  image?: ArticleImageView | null;
-};
-
-/**
- * The public series or ongoing coverage a story belongs to. A series is read
- * in order (Part 1, Part 2…); coverage is a set of stories on one subject.
- */
-export type ArticleSeriesView = {
-  format: "series" | "coverage";
-  title: string;
-  href: string;
-  description?: string;
-  /** False while more parts may still be published, so no total is promised. */
-  complete: boolean;
-  /** This story's part number among the published stories. */
-  position: number;
-  total: number;
-  previous?: ArticleSeriesPartView | null;
-  next?: ArticleSeriesPartView | null;
-  /** Every published part for a series; the other stories, newest first, for coverage. */
-  parts: ArticleSeriesPartView[];
-};
-
-export type ArticlePresentation = {
-  id: number | string;
-  url: string;
-  title: string;
-  titleHtml: string;
-  excerptHtml: string;
-  contentHtml: string;
-  category?: ArticleLinkView | null;
-  athleteMeta?: string[];
-  /** The author's choice in WordPress. Absent means standard. */
-  storyPresentation?: "standard" | "immersive";
-  /** Headline position for an immersive story. Absent means bottom-left. */
-  immersiveAlignment?: "bottom-left" | "center";
-  /** A video story's primary video; absent for an article, even one with embeds in its body. */
-  video?: ArticleVideoView | null;
-  contributors: ArticleContributorView[];
-  fallbackByline: string;
-  publishedAt: string;
-  publishedLabel: string;
-  modifiedAt?: string | null;
-  modifiedLabel?: string | null;
-  readingTime: string;
-  image?: ArticleImageView | null;
-  corrections: ArticleCorrectionView[];
-  topics: ArticleTopicView[];
-  update?: { modifiedAt: string; label: string } | null;
-  /** Live coverage, while live and after it ends; absent for ordinary stories. */
-  live?: ArticleLiveView | null;
-  relatedStories: ArticleStoryCardView[];
-  moreByAuthorStories: ArticleStoryCardView[];
-  /** "How we reported this", as plain-text paragraphs. Absent or empty prints nothing. */
-  reportingNote?: string[];
-  /** The public series or coverage this story is part of, if any. */
-  series?: ArticleSeriesView | null;
-  publication: {
-    shortName: string;
-    contactHref: string;
-  };
-};
+export type {
+  ArticleImageView,
+  ArticleLinkView,
+  ArticleContributorView,
+  ArticleCorrectionView,
+  ArticleTopicView,
+  ArticleStoryCardView,
+  StoryVideoBadgeView,
+  ArticleVideoView,
+  ArticleSeriesPartView,
+  ArticleSeriesView,
+  ArticlePresentation
+} from "@byline/content/story";
 
 export type ArticleViewSlots = {
   metadata?: ReactNode;
@@ -405,14 +285,29 @@ export function ArticleVideoLabel({ presentation, className }: ArticlePieceProps
   return <span className={joinClassNames("article-video-label", className)}>Video</span>;
 }
 
-/** The WordPress body (with the legacy primary-game card ahead of it), or the empty state. */
+/** Whether a body has anything to print. */
+export function hasArticleBody(body: PublicArticleBody): boolean {
+  return body.format === "legacy-html" ? body.html.trim().length > 0 : body.nodes.length > 0;
+}
+
+/**
+ * The story body (with the legacy primary-game card ahead of it), or the empty
+ * state. An imported body prints its sanitized HTML; a semantic `byline-v1`
+ * body renders through the canonical structured renderer. Both sit in the one
+ * `.article-body` element, so article CSS and enhancements see one shape.
+ */
 export function ArticleBody({ presentation, primaryGame }: { presentation: ArticlePresentation; primaryGame?: ReactNode }): ReactNode {
+  const { body } = presentation;
   return (
     <>
       {primaryGame}
-      {presentation.contentHtml ? (
-        <div className="article-body" dangerouslySetInnerHTML={{ __html: presentation.contentHtml }} />
-      ) : <p className="empty-state">No article body has been published yet.</p>}
+      {!hasArticleBody(body) ? (
+        <p className="empty-state">No article body has been published yet.</p>
+      ) : body.format === "legacy-html" ? (
+        <div className="article-body" dangerouslySetInnerHTML={{ __html: body.html }} />
+      ) : (
+        <StructuredArticleBody body={body} />
+      )}
     </>
   );
 }

@@ -1,4 +1,5 @@
-import type { AthleteSpotlightView, StoryView } from "@byline/ui";
+import type { AthleteSpotlightView } from "../sports-view";
+import type { StoryView } from "../story-view";
 
 /**
  * The presentation-neutral story record the canonical homepage resolver reads.

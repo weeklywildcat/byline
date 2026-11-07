@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@byline/core": fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url)),
+      "@byline/content/story": fileURLToPath(new URL("../../packages/content/src/story/index.ts", import.meta.url)),
       "@byline/content": fileURLToPath(new URL("../../packages/content/src/index.ts", import.meta.url)),
       "@byline/design": fileURLToPath(new URL("../../packages/design/src/index.ts", import.meta.url)),
       "@byline/theme-contract": fileURLToPath(new URL("../../packages/theme-contract/src/index.ts", import.meta.url)),
@@ -15,6 +16,7 @@ export default defineConfig({
       "@byline/ui/contributor-profile": fileURLToPath(new URL("../../packages/ui/src/contributor-profile.tsx", import.meta.url)),
       "@byline/ui/live-feed": fileURLToPath(new URL("../../packages/ui/src/live-feed.ts", import.meta.url)),
       "@byline/ui/live-updates": fileURLToPath(new URL("../../packages/ui/src/live-updates.ts", import.meta.url)),
+      "@byline/ui/homepage": fileURLToPath(new URL("../../packages/ui/src/homepage/index.ts", import.meta.url)),
       "@byline/ui/article-body": fileURLToPath(new URL("../../packages/ui/src/article-body/index.ts", import.meta.url)),
       "@byline/article-body/fixtures": fileURLToPath(new URL("../../packages/article-body/src/fixtures.ts", import.meta.url)),
       "@byline/article-body": fileURLToPath(new URL("../../packages/article-body/src/index.ts", import.meta.url)),

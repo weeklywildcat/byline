@@ -10,7 +10,7 @@ import {
   sourceCandidates as sharedSourceCandidates,
   type HomepagePackageResolutionContext,
   type HomepageStoryInput
-} from "@byline/content";
+} from "@byline/ui/homepage";
 import type {
   CalendarEntryView,
   ResolvedBriefPackage,
@@ -31,7 +31,7 @@ import type { WordPressPost } from "@/lib/wordpress";
 // The build-time host's thin adapter over the canonical resolver.
 //
 // Story selection, de-duplication and package assembly all live in
-// `@byline/content` so Studio runs the identical code. What remains here is the
+// `@byline/ui/homepage` so Studio runs the identical code. What remains here is the
 // WordPress-shaped boundary: view models, the calendar merge, and per-package
 // entry points the static site and its regression tests call directly.
 
@@ -113,7 +113,7 @@ export function toCalendarEntries(
 /**
  * The compatibility story-selection pass, wrapped so its role is explicit.
  *
- * The algorithm now lives in `@byline/content` and is the only one either host
+ * The algorithm now lives in `@byline/ui/homepage` and is the only one either host
  * runs. This remains the build-time entry point into it.
  *
  * `pinnedStoryIds` comes from `collectPinnedStoryIds`. Passing it here rather

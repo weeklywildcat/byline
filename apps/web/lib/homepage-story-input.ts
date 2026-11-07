@@ -1,4 +1,4 @@
-import type { HomepageCoverageInput, HomepagePublicationInput, HomepageStoryInput } from "@byline/content";
+import type { HomepageCoverageInput, HomepagePublicationInput, HomepageStoryInput } from "@byline/ui/homepage";
 import type { BylinePublicationConfig } from "@byline/core";
 import { isAthleteSpotlightPost, isSpecialCoveragePost } from "@/lib/content";
 import { toAthleteSpotlightView, toStoryView } from "@/lib/story-view";
@@ -9,7 +9,7 @@ import { getFeaturedMedia, getPostCategories, type WordPressCoverage, type WordP
  * The static site's adapter into the canonical homepage resolver.
  *
  * The build-time WordPress record is flattened here into the neutral story
- * input `@byline/content` reads. Studio has its own adapter over the REST
+ * input `@byline/ui/homepage` reads. Studio has its own adapter over the REST
  * shape; from this point on both hosts run the identical selection and
  * resolution code.
  */

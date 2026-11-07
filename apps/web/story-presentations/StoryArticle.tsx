@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { PresentedArticleView, type ArticleViewProps } from "@byline/ui";
 import { getStoryPresentation } from "./registry";
 import { isVisualStory } from "./types";
+import { EMPTY_ARTICLE_BODY } from "@byline/content/story";
 
 /**
  * The public article body. Which presentation a story gets, in order:
@@ -24,7 +25,7 @@ export function StoryArticle({ presentation, slots = {}, className }: ArticleVie
   const { metadata, ...rest } = slots;
   if (isVisualStory(entry)) {
     // The WordPress body is withheld, so a visual story cannot print it beside its own narrative.
-    const visual = { ...presentation, contentHtml: "", readingTime: entry.readingTime ?? presentation.readingTime };
+    const visual = { ...presentation, body: EMPTY_ARTICLE_BODY, readingTime: entry.readingTime ?? presentation.readingTime };
     return (
       <>
         {metadata}

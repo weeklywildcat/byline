@@ -16,6 +16,7 @@ import {
   type ArticleViewProps
 } from "./article-view";
 import { HeroReveal, HeroRevealContent } from "./HeroReveal";
+import { usesImmersivePresentation } from "@byline/content/story";
 
 const SURFACE_ID = "immersive-article-surface";
 
@@ -78,17 +79,13 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
 }
 
 /**
- * Whether an article is shown with the Immersive opening. The author's choice
- * only applies when the story has a featured image to open on; otherwise it is
- * a standard story. The public routes and the private Preview as Byline both
- * ask this, so they cannot disagree.
+ * Whether an article is shown with the Immersive opening: the one rule in
+ * `@byline/content/story` (`resolveBuiltInPresentation`), re-exported here.
+ * Custom presentations are resolved in front of it by `@byline/story-presentations`.
  */
-export function usesImmersivePresentation(presentation: Pick<ArticleViewProps["presentation"], "storyPresentation" | "image" | "video">): boolean {
-  // A video story always opens on its player, never a fullscreen photo.
-  return presentation.storyPresentation === "immersive" && Boolean(presentation.image?.src) && !presentation.video;
-}
+export { resolveBuiltInPresentation, usesImmersivePresentation } from "@byline/content/story";
 
-/** The article the author chose in WordPress: Immersive, or the normal `ArticleView`. */
+/** The built-in presentation the author chose: Immersive (when valid), or the normal `ArticleView`. */
 export function PresentedArticleView(props: ArticleViewProps): ReactNode {
   return usesImmersivePresentation(props.presentation) ? <ImmersiveArticleView {...props} /> : <ArticleView {...props} />;
 }

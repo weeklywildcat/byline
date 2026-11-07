@@ -32,7 +32,7 @@ import type {
   ResolvedSportsPackage,
   SportsFixtureView,
   SportsResultView
-} from "@byline/ui";
+} from "../index";
 import { publicationText, type HomepagePublicationInput } from "./publication";
 import {
   resolveCompatibilityHomepageSelection,

@@ -139,7 +139,6 @@ export async function resolveDesignContentBlocks<T extends ResolvableStory>(
   return resolved;
 }
 
-export * from "./homepage";
 export * from "./digests";
 export * from "./indexes";
 export * from "./media";
@@ -147,3 +146,4 @@ export * from "./redirects";
 export * from "./routing";
 export * from "./snapshot";
 export * from "./versions";
+export * from "./story";

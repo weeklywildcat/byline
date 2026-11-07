@@ -175,7 +175,7 @@ describe("an immersive story", () => {
         title: "A headline edited later",
         titleHtml: "A headline edited later",
         excerptHtml: "<p>A deck edited later.</p>",
-        contentHtml: "<p>A body paragraph edited later.</p>"
+        body: { format: "legacy-html", html: "<p>A body paragraph edited later.</p>" }
       }));
 
       expect(document.querySelectorAll("h1")).toHaveLength(1);
@@ -275,7 +275,7 @@ describe("a repository override and WordPress Immersive together", () => {
 
 describe("a flagship visual story", () => {
   const WORDPRESS_BODY = "<p>The WordPress text edition, for feeds and search.</p>";
-  const visual = (overrides: Partial<ArticlePresentation> = {}) => basePresentation({ id: VISUAL_ID, contentHtml: WORDPRESS_BODY, ...overrides });
+  const visual = (overrides: Partial<ArticlePresentation> = {}) => basePresentation({ id: VISUAL_ID, body: { format: "legacy-html", html: WORDPRESS_BODY }, ...overrides });
   const render = (presentation: ArticlePresentation = visual()) => {
     vi.stubEnv("BYLINE_CONTENT_MODE", "weekly-wildcat-fixture");
     return dom(renderToStaticMarkup(<StoryArticle presentation={presentation} slots={slots} />));
@@ -352,7 +352,7 @@ describe("a flagship visual story", () => {
   });
 
   it("can declare its own reading time, since the WordPress body is not its text", () => {
-    const Story = ({ presentation }: { presentation: ArticlePresentation }) => <p data-reading={presentation.readingTime} data-body={presentation.contentHtml} />;
+    const Story = ({ presentation }: { presentation: ArticlePresentation }) => <p data-reading={presentation.readingTime} data-body={presentation.body.format === "legacy-html" ? presentation.body.html : "structured"} />;
     const definition = defineVisualStory({ name: "timed", Component: Story, readingTime: "12 min read" });
     expect(definition.readingTime).toBe("12 min read");
     expect(defineVisualStory({ name: "untimed", Component: Story }).readingTime).toBeUndefined();

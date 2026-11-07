@@ -20,11 +20,14 @@
     "./live-updates": "./src/live-updates.ts",
     "./live-share": "./src/live-share.ts",
     "./contributor-profile": "./src/contributor-profile.tsx",
-    "./contributor-profile.css": "./src/contributor-profile.css"
+    "./contributor-profile.css": "./src/contributor-profile.css",
+    "./homepage": "./src/homepage/index.ts"
   },
   "dependencies": {
     "@byline/article-body": "0.1.0",
+    "@byline/content": "0.1.0",
     "@byline/core": "0.1.0",
+    "@byline/design": "0.1.0",
     "@byline/theme-contract": "0.1.0",
     "@iconify/react": "^6.0.2"
   },

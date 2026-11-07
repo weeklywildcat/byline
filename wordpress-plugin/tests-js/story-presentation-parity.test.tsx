@@ -4,7 +4,7 @@ import { PresentedArticleView, usesImmersivePresentation, type ArticlePresentati
 
 const image = { src: '/lead.jpg', alt: 'Lead', width: 1600, height: 1067 };
 const article = (patch: Partial<ArticlePresentation> = {}) => ({
-  id: 14, url: 'https://example.org/story/', title: 'The lunch squeeze', titleHtml: 'The lunch squeeze', excerptHtml: '<p>Deck.</p>', contentHtml: '<p>Body.</p>',
+  id: 14, url: 'https://example.org/story/', title: 'The lunch squeeze', titleHtml: 'The lunch squeeze', excerptHtml: '<p>Deck.</p>', body: { format: 'legacy-html', html: '<p>Body.</p>' },
   category: { label: 'News', href: '/category/news/' }, athleteMeta: [], contributors: [], fallbackByline: 'Staff', publishedAt: '2026-10-19T09:00:00', publishedLabel: 'October 19, 2026',
   modifiedAt: null, modifiedLabel: null, readingTime: '1 min read', image, corrections: [], topics: [], update: null, relatedStories: [], moreByAuthorStories: [],
   publication: { shortName: 'Wildcat', contactHref: '/contact/' }, ...patch
