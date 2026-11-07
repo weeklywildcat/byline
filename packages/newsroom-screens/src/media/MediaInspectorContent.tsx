@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { siteDay } from "../home/newsroom-model";
 import { mediaAssetKey, type MediaLibraryFetchers } from "./media-library-api";
 import { AssetThumbnail, shortDay } from "./MediaLibraryBrowser";
-import { assetFacts, DELIVERY_LABELS, folderPath, GAP_LABELS, MEDIA_FIELD_LIMITS, type MediaAssetDetail, type MediaMetadataPatch, type MediaNavigatorData } from "./media-library-model";
+import { assetFacts, PUBLICATION_ASSET_LABELS, folderPath, GAP_LABELS, MEDIA_FIELD_LIMITS, type MediaAssetDetail, type MediaMetadataPatch, type MediaNavigatorData } from "./media-library-model";
 import { invalidateMediaLibrary, replaceCachedAsset, useMediaAsset } from "./media-query";
 
 /** What the screen asks the inspector before it shows another asset. */
@@ -67,7 +67,7 @@ export type MediaInspectorContentProps = {
 /**
  * One asset in full: a large private preview, the file's facts, its
  * editable metadata (explicit Save and Cancel, never autosave), its folder
- * and uploader, its publication delivery state and its linked uses. The same
+ * and uploader, its publication-asset readiness and its linked uses. The same
  * component is the wide screen's resizable panel and the narrower screens'
  * sheet. Accounts that may not change the file see the same fields read-only.
  * Hashes, renditions and art direction are never shown as fields.
@@ -250,10 +250,10 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
           <dt className="text-muted-foreground">Uploaded by</dt>
           <dd>{asset.uploadedBy?.name ?? "Unknown"} · {shortDay(asset.createdAt, timezone)}</dd>
-          <dt className="text-muted-foreground">Publication</dt>
-          <dd><Badge variant={asset.publicDelivery === "failed" ? "destructive" : asset.publicDelivery === "public" ? "default" : "secondary"}>{DELIVERY_LABELS[asset.publicDelivery]}</Badge></dd>
+          <dt className="text-muted-foreground">Publication assets</dt>
+          <dd><Badge variant={asset.publicationAssets === "failed" ? "destructive" : asset.publicationAssets === "ready" ? "default" : "secondary"}>{PUBLICATION_ASSET_LABELS[asset.publicationAssets]}</Badge></dd>
         </dl>
-        <p className="-mt-2 text-xs text-muted-foreground">Files stay private in the newsroom. Publishing a story is what makes its images public.</p>
+        <p className="-mt-2 text-xs text-muted-foreground">Ready means Byline has web files prepared for the next static build. It does not mean this file is already live on the site.</p>
 
         <Separator />
         <section aria-labelledby={`media-uses-${asset.id}`} className="flex flex-col gap-2">
