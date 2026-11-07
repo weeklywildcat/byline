@@ -369,9 +369,9 @@ export interface Media {
     | number
     | boolean
     | null;
-  publicDelivery?: {
-    status?: ('private' | 'queued' | 'public' | 'failed') | null;
-    contentHash?: string | null;
+  publicationAssets?: {
+    status?: ('not-prepared' | 'preparing' | 'ready' | 'failed') | null;
+    sourceHash?: string | null;
     renditions?:
       | {
           [k: string]: unknown;
@@ -381,7 +381,7 @@ export interface Media {
       | number
       | boolean
       | null;
-    materializedAt?: string | null;
+    preparedAt?: string | null;
   };
   uploadedBy?: (number | null) | User;
   legacyWordPressId?: number | null;
@@ -1162,13 +1162,13 @@ export interface MediaSelect<T extends boolean = true> {
   sourceUrl?: T;
   capturedAt?: T;
   artDirection?: T;
-  publicDelivery?:
+  publicationAssets?:
     | T
     | {
         status?: T;
-        contentHash?: T;
+        sourceHash?: T;
         renditions?: T;
-        materializedAt?: T;
+        preparedAt?: T;
       };
   uploadedBy?: T;
   legacyWordPressId?: T;
