@@ -1,7 +1,7 @@
 import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionConfig, Where } from "payload";
 import { inIds, storyScope } from "../access/story-context";
 import { atLeast, relationIds, requestUser } from "../access/user";
-import { proseEditor } from "../editor/prose";
+import { articleBodyEditor } from "@byline/editor/server";
 import type { StoryPlan } from "../payload-types";
 import {
   CONTENT_FORMATS,
@@ -175,7 +175,8 @@ export const Stories: CollectionConfig = {
           options: CONTENT_FORMATS.map((value) => ({ value, label: value === "byline-v1" ? "Byline editor" : "Imported WordPress body" })),
           admin: { readOnly: true, position: "sidebar" }
         },
-        { name: "body", type: "richText", editor: proseEditor, admin: { condition: (data) => data?.contentFormat !== "legacy-html" } },
+        // The byline-v1 body: prose plus the Byline story blocks (@byline/editor). Never Payload's generic block forms.
+        { name: "body", label: false, type: "richText", editor: articleBodyEditor, admin: { condition: (data) => data?.contentFormat !== "legacy-html" } },
         {
           name: "legacyHtml",
           label: "Imported body (HTML)",

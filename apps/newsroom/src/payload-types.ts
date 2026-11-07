@@ -1593,6 +1593,124 @@ export interface TaskSchedulePublish {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylinePhotoBlock".
+ */
+export interface BylinePhotoBlock {
+  media: number | Media;
+  caption?: string | null;
+  altOverride?: string | null;
+  placement: 'column' | 'wide' | 'full';
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'photo';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineGalleryBlock".
+ */
+export interface BylineGalleryBlock {
+  items?:
+    | {
+        media: number | Media;
+        caption?: string | null;
+        altOverride?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  fit: 'natural' | 'crop';
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'gallery';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineReportedQuoteBlock".
+ */
+export interface BylineReportedQuoteBlock {
+  text: string;
+  attribution: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'reportedQuote';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylinePullQuoteBlock".
+ */
+export interface BylinePullQuoteBlock {
+  text: string;
+  attribution?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'pullQuote';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineKeyFactsBlock".
+ */
+export interface BylineKeyFactsBlock {
+  heading?: string | null;
+  facts?:
+    | {
+        text?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'keyFacts';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineContextBlock".
+ */
+export interface BylineContextBlock {
+  heading?: string | null;
+  body: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'context';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineDocumentBlock".
+ */
+export interface BylineDocumentBlock {
+  media: number | Media;
+  title?: string | null;
+  context?: string | null;
+  source?: string | null;
+  pages?:
+    | {
+        page: number;
+        label?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'document';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineTimelineBlock".
+ */
+export interface BylineTimelineBlock {
+  items?:
+    | {
+        label?: string | null;
+        title?: string | null;
+        body?: string | null;
+        current?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'timeline';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "auth".
  */
 export interface Auth {

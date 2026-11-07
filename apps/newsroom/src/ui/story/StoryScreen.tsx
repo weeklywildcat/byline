@@ -70,21 +70,27 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   const appointmentId = typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("appointment") ?? "");
 
   const screen = (
-    <div className="@container/story mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6 md:px-8">
+    // Write spans the whole canvas (wide and full photographs measure against it);
+    // the header, tabs and the other tabs keep the screen's reading width.
+    <div className="@container/story flex w-full flex-col gap-4 py-6">
       <StoryLeaveGuard />
-      <StoryHeader context={context} />
+      <div className="mx-auto w-full max-w-5xl px-4 md:px-8">
+        <StoryHeader context={context} />
+      </div>
       <Tabs defaultValue={appointmentId ? "plan" : "write"} className="gap-4">
-        <TabsList>
-          <TabsTrigger value="write">Write</TabsTrigger>
-          <TabsTrigger value="plan">Plan</TabsTrigger>
-          <TabsTrigger value="production">Production</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-        </TabsList>
+        <div className="mx-auto w-full max-w-5xl px-4 md:px-8">
+          <TabsList>
+            <TabsTrigger value="write">Write</TabsTrigger>
+            <TabsTrigger value="plan">Plan</TabsTrigger>
+            <TabsTrigger value="production">Production</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+          </TabsList>
+        </div>
         {/* Write stays mounted so the editor keeps its state while other tabs are open. */}
         <TabsContent value="write" keepMounted>
           <WriteTab context={context} paths={childPaths} />
         </TabsContent>
-        <TabsContent value="plan">
+        <TabsContent value="plan" className="mx-auto w-full max-w-5xl px-4 md:px-8">
           <Workspace storyId={storyId}>
             <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)] lg:items-start lg:gap-5">
               <div className="flex min-w-0 flex-col gap-4">
@@ -101,16 +107,16 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
             </div>
           </Workspace>
         </TabsContent>
-        <TabsContent value="production">
+        <TabsContent value="production" className="mx-auto w-full max-w-5xl px-4 md:px-8">
           <Workspace storyId={storyId}>
             <MediaSection />
           </Workspace>
         </TabsContent>
-        <TabsContent value="history">
+        <TabsContent value="history" className="mx-auto w-full max-w-5xl px-4 md:px-8">
           <HistoryTab context={context} />
         </TabsContent>
       </Tabs>
-      <p className="text-xs text-muted-foreground">Dates shown in {context.timeZone.replace(/_/g, " ")}</p>
+      <p className="mx-auto w-full max-w-5xl px-4 text-xs text-muted-foreground md:px-8">Dates shown in {context.timeZone.replace(/_/g, " ")}</p>
     </div>
   );
 

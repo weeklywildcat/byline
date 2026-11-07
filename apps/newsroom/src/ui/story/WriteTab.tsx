@@ -11,7 +11,11 @@ import { RenderFields } from "@payloadcms/ui";
 import type { ClientField, SanitizedFieldPermissions } from "payload";
 import type { KeyboardEvent } from "react";
 import { IMMERSIVE_ALIGNMENT_OPTIONS, STORY_FORMAT_OPTIONS, STORY_PRESENTATION_OPTIONS } from "../../domain/vocabulary";
+import { BylineEditorHostProvider } from "@byline/editor/client";
+import { ArticleCanvas } from "./ArticleCanvas";
+import { useNewsroomEditorHost } from "./editor-host";
 import { childField, relationIdOf, relationIdsOf, useStoryField } from "./form";
+import { LeadImage } from "./LeadImage";
 import { Property, SectionHeading } from "./parts";
 import { MultiPicker, SinglePicker, useOptions } from "./RelationPickers";
 import type { StoryScreenContext } from "./StoryScreen";
@@ -25,7 +29,7 @@ type ChildPaths = {
   permissions: SanitizedFieldPermissions | Record<string, SanitizedFieldPermissions> | undefined;
 };
 
-/** Renders one story field with Payload's own component, for inputs Payload must own (the Lexical engine, uploads). */
+/** Renders one story field with Payload's own component, for the one input Payload must own: the Lexical engine. */
 function PayloadField({ paths, name, readOnly }: { paths: ChildPaths; name: string; readOnly: boolean }) {
   const field = childField(paths.fields, name);
   if (!field) return null;
@@ -75,7 +79,6 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   const contributors = useStoryField<Id[]>("contributors");
   const section = useStoryField<Id | null>("section");
   const topics = useStoryField<Id[]>("topics");
-  const caption = useStoryField<string>("featuredCaption");
   const contentFormat = useStoryField<string>("contentFormat");
   const format = useStoryField<string>("format");
   const videoUrl = useStoryField<string>("video.url");
@@ -91,9 +94,13 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   const url = videoUrl.value ?? "";
   const videoProblem = format.value === "video" && url.trim() !== "" && !parseYouTubeVideoId(url) ? "That is not a YouTube video link." : null;
 
+  const host = useNewsroomEditorHost();
+
   return (
+    <BylineEditorHostProvider host={host}>
     <div className="flex flex-col gap-8">
-      <article className="mx-auto flex w-full max-w-[760px] flex-col gap-3" aria-label="Article">
+      <article className="flex w-full flex-col gap-6" aria-label="Article">
+      <div className="mx-auto flex w-full max-w-[760px] flex-col gap-3 px-4 md:px-0">
         <Input aria-label="Kicker" onKeyDown={noSubmit} placeholder="Kicker" value={kicker.value ?? ""} onChange={(event) => kicker.setValue(event.target.value)} disabled={readOnly} className="h-7 w-auto max-w-xs border-transparent bg-transparent focus-visible:ring-0 px-0 text-xs font-medium tracking-wide uppercase shadow-none" />
         <Textarea aria-label="Headline" placeholder="Headline" rows={2} value={headline.value ?? ""} onChange={(event) => headline.setValue(event.target.value)} disabled={readOnly} aria-invalid={headline.error ? true : undefined} className="min-h-0 resize-none border-transparent bg-transparent focus-visible:ring-0 px-0 text-3xl leading-tight font-semibold tracking-tight shadow-none md:text-4xl" />
         {headline.error ? <p className="text-xs text-destructive">{headline.error}</p> : null}
@@ -111,22 +118,26 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
         </FieldGroup>
         <Separator />
         <section aria-label="Lead image" className="flex flex-col gap-2">
-          <PayloadField paths={paths} name="featuredMedia" readOnly={readOnly} />
-          <Textarea aria-label="Lead image caption" placeholder="Caption for this story (the credit comes from the photo)" rows={2} value={caption.value ?? ""} onChange={(event) => caption.setValue(event.target.value)} disabled={readOnly} className="min-h-0 resize-none text-sm" />
+          <LeadImage readOnly={readOnly} />
         </section>
         {legacy ? (
           <Alert>
             <AlertTitle>Imported from WordPress</AlertTitle>
             <AlertDescription>This story keeps the body it was published with and renders exactly as before. Converting it to the Byline editor is a separate, reviewed step.</AlertDescription>
           </Alert>
-        ) : (
+        ) : null}
+      </div>
+        {legacy ? null : (
+          // The body is written in the article itself: the public measure, type and story blocks.
           <section aria-label="Story body" className="byline-story-body">
-            <PayloadField paths={paths} name="body" readOnly={readOnly} />
+            <ArticleCanvas>
+              <PayloadField paths={paths} name="body" readOnly={readOnly} />
+            </ArticleCanvas>
           </section>
         )}
       </article>
 
-      <section aria-labelledby="story-presentation" className="mx-auto flex w-full max-w-[760px] flex-col gap-3">
+      <section aria-labelledby="story-presentation" className="mx-auto flex w-full max-w-[760px] flex-col gap-3 px-4 md:px-0">
         <SectionHeading><span id="story-presentation">Presentation</span></SectionHeading>
         <FieldGroup className="gap-1">
           <Property label="Format">
@@ -149,10 +160,11 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
         </FieldGroup>
       </section>
 
-      <section aria-labelledby="story-reporting-note" className="mx-auto flex w-full max-w-[760px] flex-col gap-2">
+      <section aria-labelledby="story-reporting-note" className="mx-auto flex w-full max-w-[760px] flex-col gap-2 px-4 md:px-0">
         <SectionHeading><span id="story-reporting-note">How we reported this</span></SectionHeading>
         <Textarea aria-labelledby="story-reporting-note" rows={3} value={reportingNote.value ?? ""} onChange={(event) => reportingNote.setValue(event.target.value)} disabled={readOnly} placeholder="Optional note to readers about sourcing and methods" />
       </section>
     </div>
+    </BylineEditorHostProvider>
   );
 }

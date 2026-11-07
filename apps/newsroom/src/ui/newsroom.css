@@ -5,9 +5,20 @@
 @import "@byline/newsroom-ui/styles.css";
 /* The shared newsroom Calendar: Schedule-X's shadcn theme on Nova's tokens. */
 @import "@byline/newsroom-screens/calendar/calendar.css";
+/*
+ * The Story editor's canvas: the public article's own stylesheets (fonts,
+ * story blocks, article body), then the editor-only chrome around them.
+ * docs/article-editor.md. The fonts are the site's files (public/fonts links
+ * to apps/web/public/fonts).
+ */
+@import "../../../web/views/fonts.css";
+@import "@byline/ui/newsroom-blocks.css";
+@import "@byline/ui/article-body.css";
+@import "@byline/editor/canvas.css";
 @source "./";
 @source "../components";
 @source "../../../../packages/newsroom-screens/src";
+@source "../../../../packages/editor/src";
 
 /*
  * Nova's `dark:` variants follow Payload's admin theme (`html[data-theme]`),

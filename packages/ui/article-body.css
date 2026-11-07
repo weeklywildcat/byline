@@ -15,6 +15,10 @@
  */
 :root { --article-width: 760px; --article-wide-width: 1040px; --article-full-width: 1440px; }
 
+/* The measure: the shell is the `byline-content` container every breakout and container query measures against; the story column is 760px. */
+.byline-article-view.article-shell { margin: 0 auto; max-width: calc(var(--article-full-width) + 40px); container: byline-content / inline-size; padding: 38px 20px 72px; }
+.byline-article-view .article-story { margin: 0 auto; max-width: var(--article-width, 760px); }
+
 /* Prose. */
 .byline-article-view .article-body figcaption { color: var(--muted); display: grid; gap: 4px; font-family: var(--font-ui); font-size: .8rem; line-height: 1.45; margin-top: 8px; }
 .byline-article-view .article-body figcaption p { margin: 0; }

@@ -24,9 +24,13 @@
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
+    "@byline/article-body": "0.1.0",
     "@byline/core": "0.1.0",
+    "@byline/editor": "0.1.0",
     "@byline/newsroom-screens": "0.1.0",
     "@byline/newsroom-ui": "0.1.0",
+    "@byline/theme-weekly-wildcat": "0.1.0",
+    "@byline/ui": "0.1.0",
     "@payloadcms/db-postgres": "3.92.1",
     "@payloadcms/next": "3.92.1",
     "@payloadcms/richtext-lexical": "3.92.1",
