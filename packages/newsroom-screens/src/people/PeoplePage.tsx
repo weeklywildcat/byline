@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import {
   Avatar,
@@ -93,6 +93,21 @@ export function PeoplePage({
   const result = usePeople(api, query);
   const cache = useQueryClient();
   const [creating, setCreating] = useState(false);
+  // Keep in-progress keystrokes synchronous, as Media does. Next applies
+  // native history updates concurrently; binding the input directly to its
+  // search params can replace fast typing with an older render's value.
+  const [searchText, setSearchText] = useState(query.search);
+  useEffect(() => {
+    setSearchText(query.search);
+  }, [query.search]);
+  useEffect(() => {
+    if (searchText === query.search) return;
+    const timer = window.setTimeout(
+      () => onQueryChange({ ...query, search: searchText, page: 1 }),
+      250,
+    );
+    return () => window.clearTimeout(timer);
+  }, [query, onQueryChange, searchText]);
   return (
     <>
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -146,10 +161,8 @@ export function PeoplePage({
         <InputGroupInput
           aria-label="Search People"
           placeholder="Search name or newsroom role…"
-          value={query.search}
-          onChange={(event) =>
-            onQueryChange({ ...query, search: event.target.value, page: 1 })
-          }
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
         />
       </InputGroup>
       <p
@@ -309,7 +322,7 @@ function NewPersonDialog({
         await api.create({
           ...input,
           name: input.name.trim(),
-          newsroomRole: input.newsroomRole.trim(),
+          newsroomRole: input.newsroomRole?.trim() ?? "",
         }),
       );
     } catch (caught) {
@@ -387,7 +400,7 @@ function NewPersonDialog({
             <TextField
               label="Newsroom role"
               optional
-              value={input.newsroomRole}
+              value={input.newsroomRole ?? ""}
               maxLength={80}
               disabled={saving}
               onChange={(newsroomRole) => setInput({ ...input, newsroomRole })}

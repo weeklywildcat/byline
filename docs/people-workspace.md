@@ -214,9 +214,9 @@ Validation record for this slice:
 | `npm run typecheck` | All monorepo typechecks passed |
 | `npm test` | Full monorepo suite passed; 10 optional live MCP tests retain their default skip |
 | Newsroom unit tests | 138 passed |
-| Shared newsroom screens | 104 passed |
+| Shared newsroom screens | 105 passed |
 | Frontend unit tests | 531 passed, including no-story author noindex, social links, JSON-LD and contributor regressions |
-| `BYLINE_TEST_DATABASE_URL=postgres://localhost:5432/byline_newsroom_test_people_slice npm run test:newsroom:integration` | 189 passed, including 35 People access/privacy/concurrency/integrity tests |
+| `BYLINE_TEST_DATABASE_URL=postgres://localhost:5432/byline_newsroom_test_people_slice npm run test:newsroom:integration` | 190 passed, including 36 People access/privacy/concurrency/integrity tests |
 | `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npm run test:people:browser --workspace @byline/newsroom` | 13 browser tests passed; all six widths, realistic guest/alumni/profile fixtures, explicit save, dirty traversal, stale conflict and sign-out |
 | `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome BYLINE_BROWSER_VIDEO=0 npm run test:browser --workspace @byline/web -- tests/browser/contributor-profile.spec.ts tests/browser/public-site.spec.ts` | 15 passed: Staff/Author, article byline/end-of-story geometry and existing public-site regressions; all six profile widths |
 | `npm run test:frontend:snapshot-build` | Static-export, public routes, media, SEO and two-request acquisition boundary passed |

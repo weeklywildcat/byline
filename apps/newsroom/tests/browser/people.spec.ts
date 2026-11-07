@@ -55,6 +55,15 @@ test("People views, identity search, New guest and staff creation, and URL navig
     .fill("Photographer");
   await expect(row(page, "Jordan Park")).toBeVisible();
   await expect(page.locator("[data-person-row]")).toHaveCount(1);
+  await page.getByRole("textbox", { name: "Search People" }).fill("");
+  await page
+    .getByRole("textbox", { name: "Search People" })
+    .pressSequentially("Gibson Bell");
+  await expect(
+    page.getByRole("textbox", { name: "Search People" }),
+  ).toHaveValue("Gibson Bell");
+  await expect(row(page, "Gibson Bell")).toBeVisible();
+  await expect(page.locator("[data-person-row]")).toHaveCount(1);
   await page
     .getByRole("textbox", { name: "Search People" })
     .fill("Nobody here");

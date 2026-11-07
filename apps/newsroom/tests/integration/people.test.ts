@@ -373,6 +373,29 @@ describe("Creation and public identity management", () => {
       persons[type] = result.body.person.id;
     },
   );
+  it("creates an identity with only name and type, and trims search at the query boundary", async () => {
+    const created = await call("post", "/byline/people", "editor", {
+      name: "Role Optional",
+      type: "guest",
+    });
+    expect(created.status).toBe(200);
+    expect(created.body.person).toMatchObject({
+      name: "Role Optional",
+      newsroomRole: "",
+      status: "guest",
+    });
+    const found = await call(
+      "get",
+      "/byline/people",
+      "editor",
+      undefined,
+      undefined,
+      "view=all&search=+Role+Optional+",
+    );
+    expect(
+      found.body.people.map((person: { id: number }) => person.id),
+    ).toEqual([created.body.person.id]);
+  });
   it("refuses staff creation and invalid creation types/names/account fields", async () => {
     expect(
       (

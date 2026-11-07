@@ -45,9 +45,14 @@ describe("People screen contracts", () => {
     });
     expect(
       peopleQuery(new URLSearchParams("view=unknown&page=-2&search=+Alex+")),
-    ).toEqual({ view: "active", search: "Alex", page: 1 });
+    ).toEqual({ view: "active", search: " Alex ", page: 1 });
     expect(peopleQuery(new URLSearchParams("view=guest&page=2"))).toMatchObject(
       { view: "guest", page: 2 },
+    );
+  });
+  it("preserves the space while typing a full name into URL-backed search", () => {
+    expect(peopleQuery(new URLSearchParams({ search: "Gibson " })).search).toBe(
+      "Gibson ",
     );
   });
   it("keeps sparse identities visible through initials and concise byline-only context", () => {

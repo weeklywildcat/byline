@@ -140,10 +140,11 @@ export async function peopleList(
   editor(ctx);
   const and: Where[] = [];
   if (query.view !== "all") and.push({ status: { equals: query.view } });
-  if (query.search)
+  const search = query.search.trim();
+  if (search)
     and.push({
       or: ["name", "newsroomRole", "slug"].map((key) => ({
-        [key]: { contains: query.search },
+        [key]: { contains: search },
       })),
     });
   const found = await ctx.req.payload.find({
@@ -298,7 +299,7 @@ export async function createPerson(
     );
   const data = {
     name: input.name,
-    newsroomRole: input.newsroomRole,
+    newsroomRole: input.newsroomRole ?? "",
     status: input.type,
     directoryVisible: input.type === "active",
     hasProfilePage: input.type === "active",
@@ -328,9 +329,9 @@ function validate(input: Record<string, unknown>) {
         (key === "name" && !(input[key] as string).trim()))
     )
       throw new APIError(
-        `Use ${
-          key === "name" ? "a name of 1" : "up to"
-        } ${max} characters for ${key}.`,
+        key === "name"
+          ? "Use a name of 1 to 120 characters."
+          : `Use up to ${max} characters for ${key}.`,
         400,
       );
   if ("slug" in input && !isSlug(input.slug))

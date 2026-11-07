@@ -75,7 +75,7 @@ export type PeopleList = {
 export type NewPerson = {
   name: string;
   type: "active" | "guest";
-  newsroomRole: string;
+  newsroomRole?: string;
 };
 export type PersonChanges = Pick<
   PersonProfile,
@@ -96,7 +96,8 @@ export function peopleQuery(params: URLSearchParams): PeopleQuery {
     view: Object.hasOwn(PEOPLE_VIEWS, view)
       ? (view as PeopleQuery["view"])
       : "active",
-    search: (params.get("search") ?? "").trim().slice(0, 120),
+    // Preserve in-progress input, including the space between first/last names.
+    search: (params.get("search") ?? "").slice(0, 120),
     page: Number.isSafeInteger(page) && page > 0 ? page : 1,
   };
 }
