@@ -8,7 +8,7 @@ import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { ArticleImage, GalleryLayout, StoryFigure } from "@byline/ui/article-body";
-import { ArrowLeft, ArrowRight, ImagePlus, Images, ImageUp, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Crop, ImagePlus, Images, ImageUp, Trash2 } from "lucide-react";
 import { useRef, useState, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { moveDirection, moveItem, removeItem } from "../../items";
@@ -137,6 +137,7 @@ export function PhotoEditor({ node, id, nodeKey }: BlockEditorProps) {
   useFocusWhenCreated(nodeKey, fields.media === null ? chooseRef : captionRef);
   const readOnly = !node.editable;
   const asset = media.asset;
+  const { editArtDirection } = useBylineEditorHost();
 
   const use = (assets: ArticleMediaAsset[]) => {
     const chosen = assets[0];
@@ -164,6 +165,7 @@ export function PhotoEditor({ node, id, nodeKey }: BlockEditorProps) {
         <>
           <ButtonGroup>
             <ToolTextButton label="Replace" icon={<ImagePlus />} onClick={() => void replace()} />
+            {editArtDirection && fields.media !== null ? <ToolTextButton label="Crops" icon={<Crop />} onClick={() => void editArtDirection(fields.media!)} /> : null}
           </ButtonGroup>
           <ToggleGroup aria-label="Placement" variant="outline" size="sm" spacing={0} value={[fields.placement]} onValueChange={(next) => {
             const placement = next[0] as Placement | undefined;

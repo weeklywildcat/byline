@@ -23,9 +23,22 @@ export function useMediaLibrary(fetchers: Pick<MediaLibraryFetchers, "getLibrary
   });
 }
 
-/** One asset's inspector detail. Selecting an asset already opened comes from the cache. */
+/** How often an asset still preparing its publication files is re-read (modest; stops when terminal). */
+export const PREPARING_REFRESH_MS = 4000;
+
+/**
+ * One asset's inspector detail. Selecting an asset already opened comes from
+ * the cache. While its publication files are preparing it is re-read every
+ * few seconds, so the inspector moves to Ready or Failed without a reload.
+ */
 export function useMediaAsset(fetchers: Pick<MediaLibraryFetchers, "getAsset">, id: number | null) {
-  return useQuery({ queryKey: mediaAssetKey(id ?? 0), queryFn: () => fetchers.getAsset(id!), enabled: id !== null, staleTime: 30_000 });
+  return useQuery({
+    queryKey: mediaAssetKey(id ?? 0),
+    queryFn: () => fetchers.getAsset(id!),
+    enabled: id !== null,
+    staleTime: 30_000,
+    refetchInterval: (query) => (query.state.data?.publication?.state === "preparing" ? PREPARING_REFRESH_MS : false)
+  });
 }
 
 /** After files change: Library pages and the navigator's counts, never Stories or Home. */
@@ -43,6 +56,6 @@ export function replaceCachedAsset(client: QueryClient, asset: MediaAssetDetail 
 
 function stripDetail(asset: MediaAssetDetail | MediaLibraryAsset): MediaLibraryAsset {
   if (!("usages" in asset)) return asset;
-  const { folderPath: _path, usages: _usages, usagesComplete: _complete, hiddenUsageCount: _hidden, ...row } = asset;
+  const { folderPath: _path, usages: _usages, usagesComplete: _complete, hiddenUsageCount: _hidden, publication: _publication, ...row } = asset;
   return row;
 }

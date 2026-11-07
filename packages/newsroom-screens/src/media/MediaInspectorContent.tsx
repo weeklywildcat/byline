@@ -12,7 +12,7 @@ import { Separator } from "@byline/newsroom-ui/ui/separator";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, Download, ExternalLink, Eye, FileText, Maximize2, Trash2, X } from "lucide-react";
+import { Crop, CircleAlert, Download, ExternalLink, Eye, FileText, Maximize2, RotateCw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useState, type Ref } from "react";
 import { toast } from "sonner";
 import { siteDay } from "../home/newsroom-model";
@@ -20,6 +20,7 @@ import { mediaAssetKey, type MediaLibraryFetchers } from "./media-library-api";
 import { AssetThumbnail, shortDay } from "./MediaLibraryBrowser";
 import { assetFacts, PUBLICATION_ASSET_LABELS, folderPath, GAP_LABELS, MEDIA_FIELD_LIMITS, type MediaAssetDetail, type MediaMetadataPatch, type MediaNavigatorData } from "./media-library-model";
 import { invalidateMediaLibrary, replaceCachedAsset, useMediaAsset } from "./media-query";
+import { rebasedUpdatedAt, type ArtDirectionEditResult } from "./art-direction-model";
 
 /** What the screen asks the inspector before it shows another asset. */
 export type MediaInspectorGuard = { dirty: () => boolean; save: () => Promise<boolean>; discard: () => void };
@@ -50,7 +51,7 @@ function changes(before: Draft, after: Draft): MediaMetadataPatch {
 }
 
 export type MediaInspectorContentProps = {
-  fetchers: Pick<MediaLibraryFetchers, "getAsset" | "updateMedia" | "deleteMedia">;
+  fetchers: Pick<MediaLibraryFetchers, "getAsset" | "updateMedia" | "deleteMedia" | "retryPublication">;
   assetId: number;
   navigator?: MediaNavigatorData;
   timezone: string;
@@ -62,17 +63,23 @@ export type MediaInspectorContentProps = {
   assetHref?: (id: number) => string;
   /** Where the panel's own heading sits (the Sheet has its own title). */
   showHeading?: boolean;
+  /**
+   * Opens the host's art-direction editor (focal point and crops) for an
+   * image. Resolves when it closes, with what that editor saved (null: nothing).
+   */
+  onEditArtDirection?: (id: number) => Promise<ArtDirectionEditResult | null>;
 };
 
 /**
  * One asset in full: a large private preview, the file's facts, its
  * editable metadata (explicit Save and Cancel, never autosave), its folder
- * and uploader, its publication-asset readiness and its linked uses. The same
- * component is the wide screen's resizable panel and the narrower screens'
- * sheet. Accounts that may not change the file see the same fields read-only.
- * Hashes, renditions and art direction are never shown as fields.
+ * and uploader, its publication files' state (with Retry) and its linked
+ * uses. The same component is the wide screen's resizable panel and the
+ * narrower screens' sheet. Accounts that may not change the file see the same
+ * fields read-only. Hashes, storage and raw manifests are never shown; crops
+ * and the focal point are edited in the host's art-direction editor.
  */
-export function MediaInspectorContent({ fetchers, assetId, navigator, timezone, guardRef, onClose, onDeleted, onOpenStory, assetHref, showHeading = true }: MediaInspectorContentProps) {
+export function MediaInspectorContent({ fetchers, assetId, navigator, timezone, guardRef, onClose, onDeleted, onOpenStory, assetHref, showHeading = true, onEditArtDirection }: MediaInspectorContentProps) {
   const query = useMediaAsset(fetchers, assetId);
   const asset = query.data;
   if (query.isError && !asset) {
@@ -84,10 +91,10 @@ export function MediaInspectorContent({ fetchers, assetId, navigator, timezone, 
     );
   }
   if (!asset) return <InspectorSkeleton />;
-  return <InspectorBody key={asset.id} asset={asset} fetchers={fetchers} navigator={navigator} timezone={timezone} guardRef={guardRef} onClose={onClose} onDeleted={onDeleted} onOpenStory={onOpenStory} assetHref={assetHref} showHeading={showHeading} />;
+  return <InspectorBody key={asset.id} asset={asset} fetchers={fetchers} navigator={navigator} timezone={timezone} guardRef={guardRef} onClose={onClose} onDeleted={onDeleted} onOpenStory={onOpenStory} assetHref={assetHref} showHeading={showHeading} onEditArtDirection={onEditArtDirection} />;
 }
 
-function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose, onDeleted, onOpenStory, assetHref, showHeading }: Omit<MediaInspectorContentProps, "assetId"> & { asset: MediaAssetDetail }) {
+function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose, onDeleted, onOpenStory, assetHref, showHeading, onEditArtDirection }: Omit<MediaInspectorContentProps, "assetId"> & { asset: MediaAssetDetail }) {
   const client = useQueryClient();
   // The version the reader started editing from: a newer copy from elsewhere never silently becomes "their" edit.
   const [base, setBase] = useState(asset);
@@ -130,6 +137,31 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
     },
     onError: (failure: { message?: string }) => toast.error(failure?.message || "The file couldn't be deleted.")
   });
+
+  const retry = useMutation({
+    mutationFn: () => fetchers.retryPublication!(asset.id),
+    onSuccess: async (saved) => {
+      replaceCachedAsset(client, saved);
+      await invalidateMediaLibrary(client);
+      toast.success("Preparing publication files again");
+    },
+    onError: (failure: { message?: string }) => toast.error(failure?.message || "Byline couldn't retry this file.")
+  });
+  const [editingArt, setEditingArt] = useState(false);
+  const editArtDirection = async () => {
+    if (!onEditArtDirection) return;
+    setEditingArt(true);
+    try {
+      const result = await onEditArtDirection(asset.id);
+      if (!result) return;
+      // The crop save is this reader's own write: unsaved details keep going, compared against it, not refused by it.
+      setBase((current) => ({ ...current, updatedAt: rebasedUpdatedAt(current.updatedAt, result) }));
+      await client.invalidateQueries({ queryKey: mediaAssetKey(asset.id) });
+      await invalidateMediaLibrary(client);
+    } finally {
+      setEditingArt(false);
+    }
+  };
 
   const saveNow = useCallback(async () => {
     if (!dirty) return true;
@@ -186,6 +218,11 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
           {asset.kind === "image" && asset.previewUrl ? <Button variant="outline" size="sm" onClick={() => setZoom(true)}><Maximize2 data-icon="inline-start" aria-hidden="true" />Larger preview</Button> : null}
           {asset.url ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={asset.url} target="_blank" rel="noreferrer"><ExternalLink data-icon="inline-start" aria-hidden="true" />Open original</a> : null}
           {asset.url ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={asset.url} download={asset.filename}><Download data-icon="inline-start" aria-hidden="true" />Download</a> : null}
+          {asset.kind === "image" && onEditArtDirection ? (
+            <Button variant="outline" size="sm" onClick={() => void editArtDirection()} disabled={editingArt} data-media-art-direction="">
+              <Crop data-icon="inline-start" aria-hidden="true" />{asset.canUpdate ? "Crops & focal point" : "View crops"}
+            </Button>
+          ) : null}
         </div>
 
         {asset.gaps.length ? (
@@ -250,10 +287,8 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
           <dt className="text-muted-foreground">Uploaded by</dt>
           <dd>{asset.uploadedBy?.name ?? "Unknown"} · {shortDay(asset.createdAt, timezone)}</dd>
-          <dt className="text-muted-foreground">Publication assets</dt>
-          <dd><Badge variant={asset.publicationAssets === "failed" ? "destructive" : asset.publicationAssets === "ready" ? "default" : "secondary"}>{PUBLICATION_ASSET_LABELS[asset.publicationAssets]}</Badge></dd>
         </dl>
-        <p className="-mt-2 text-xs text-muted-foreground">Ready means Byline has web files prepared for the next static build. It does not mean this file is already live on the site.</p>
+        <PublicationSection asset={asset} timezone={timezone} retrying={retry.isPending} onRetry={fetchers.retryPublication ? () => retry.mutate() : undefined} />
 
         <Separator />
         <section aria-labelledby={`media-uses-${asset.id}`} className="flex flex-col gap-2">
@@ -312,6 +347,44 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+const PUBLICATION_NOTES: Record<MediaAssetDetail["publication"]["reason"], string> = {
+  ready: "",
+  "not-prepared": "Byline hasn't prepared web files for this version yet.",
+  preparing: "Byline is preparing web files in the background. You can keep working; only publishing waits for this.",
+  failed: "",
+  "stale-revision": "The prepared files are for an earlier version of this file or its crops.",
+  "stale-recipe": "Byline now prepares files differently; this file needs preparing again.",
+  "invalid-manifest": "The prepared files' record is damaged; prepare them again."
+};
+
+/** The asset's publication files: state, which version they're for, problems and Retry. Never storage or hashes. */
+function PublicationSection({ asset, timezone, retrying, onRetry }: { asset: MediaAssetDetail; timezone: string; retrying: boolean; onRetry?: () => void }) {
+  const publication = asset.publication;
+  const state = publication.state;
+  return (
+    <section aria-labelledby={`media-publication-${asset.id}`} className="-mt-2 flex flex-col gap-2" data-media-publication={state}>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 id={`media-publication-${asset.id}`} className="text-sm text-muted-foreground">Publication files</h3>
+        <Badge variant={state === "failed" ? "destructive" : state === "ready" ? "default" : "secondary"}>{state === "preparing" ? <span className="flex items-center gap-1"><RotateCw className="size-3 animate-spin" aria-hidden="true" />Preparing</span> : PUBLICATION_ASSET_LABELS[state]}</Badge>
+      </div>
+      <p className="text-xs text-muted-foreground" role="status" aria-live="polite">
+        {state === "ready"
+          ? `Prepared${publication.preparedAt ? ` ${shortDay(publication.preparedAt, timezone)}` : ""} for version ${publication.currentRevision}. Ready means web files exist for the next static build, not that this file is live yet.`
+          : state === "failed" ? publication.failureMessage : PUBLICATION_NOTES[publication.reason]}
+        {state !== "ready" && publication.preparedRevision !== null && publication.preparedRevision !== publication.currentRevision ? ` (Version ${publication.currentRevision}; last prepared: version ${publication.preparedRevision}.)` : ""}
+      </p>
+      {publication.warnings.length ? (
+        <ul className="list-disc pl-4 text-xs text-amber-900" data-media-publication-warnings="">{publication.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+      ) : null}
+      {publication.canRetry && onRetry && state !== "preparing" ? (
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={onRetry} disabled={retrying} data-media-retry="">
+          <RotateCw data-icon="inline-start" aria-hidden="true" />{retrying ? "Queuing…" : state === "failed" ? "Retry" : "Prepare now"}
+        </Button>
+      ) : null}
+    </section>
   );
 }
 

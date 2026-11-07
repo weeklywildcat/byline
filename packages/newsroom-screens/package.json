@@ -54,6 +54,7 @@
     "./home/home-model": "./src/home/home-model.ts",
     "./home/home-query": "./src/home/home-query.ts",
     "./home/newsroom-model": "./src/home/newsroom-model.ts",
+    "./media/MediaArtDirectionDialog": "./src/media/MediaArtDirectionDialog.tsx",
     "./media/MediaFolderDialogs": "./src/media/MediaFolderDialogs.tsx",
     "./media/MediaInspectorContent": "./src/media/MediaInspectorContent.tsx",
     "./media/MediaLibraryBrowser": "./src/media/MediaLibraryBrowser.tsx",

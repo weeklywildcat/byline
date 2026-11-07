@@ -18,6 +18,12 @@ export type BylineEditorHost = {
   uploadMedia?: (file: File, onProgress?: (fraction: number) => void) => Promise<ArticleMediaAsset>;
   /** Opens the asset in the Media workspace, where its credit and alt text are edited for every story. */
   mediaHref?: (id: MediaId) => string;
+  /**
+   * Opens the host's art-direction editor (focal point, crops) for an image.
+   * Resolves true when the reader saved changes. The editor never knows the
+   * CMS endpoint behind it.
+   */
+  editArtDirection?: (id: MediaId) => Promise<boolean>;
 };
 
 type Entry = { status: "loading" | "ready" | "missing"; asset: ArticleMediaAsset | null };

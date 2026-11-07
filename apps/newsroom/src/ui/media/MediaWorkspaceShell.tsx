@@ -2,6 +2,8 @@
 
 import { mediaHrefSearch } from "./media-route";
 import { MediaPickerDialog } from "@byline/newsroom-screens/media/MediaPickerDialog";
+import { MediaArtDirectionDialog } from "@byline/newsroom-screens/media/MediaArtDirectionDialog";
+import type { ArtDirectionEditResult } from "@byline/newsroom-screens/media/art-direction-model";
 import type { MediaFolderRequest } from "@byline/newsroom-screens/media/MediaFolderDialogs";
 import type { MediaLibraryFetchers } from "@byline/newsroom-screens/media/media-library-api";
 import type { MediaKind, MediaLibraryAsset, MediaRoute } from "@byline/newsroom-screens/media/media-library-model";
@@ -15,6 +17,8 @@ import { ShellLayer } from "../shell/layer";
 import { useNewsroomTimeZone } from "../shell/timezone";
 import { createPayloadMediaFetchers, payloadMediaPreferences } from "./payload-media-fetchers";
 
+export type ArtDirectionContext = { headline?: string; excerpt?: string; host?: string };
+type ArtRequest = { mediaId: number; context?: ArtDirectionContext; resolve: (result: ArtDirectionEditResult | null) => void };
 type PickRequest = { kind: MediaKind | ""; restrictedKind?: MediaKind; title?: string; confirmLabel?: string; multiple: boolean; resolve: (assets: MediaLibraryAsset[]) => void };
 
 type MediaWorkspace = {
@@ -32,6 +36,12 @@ type MediaWorkspace = {
   requestFolderAction: (request: MediaFolderRequest | null) => void;
   /** Byline's file picker (production assignments, and later any asset selector). */
   pick: (options?: { kind?: MediaKind | ""; restrictedKind?: MediaKind; title?: string; confirmLabel?: string; multiple?: boolean }) => Promise<MediaLibraryAsset[]>;
+  /**
+   * Byline's art-direction editor (focal point, crops) for one image, from
+   * the Media inspector, the Story lead image or a block. This shell owns the
+   * one dialog; callers only ask for a Media ID. Resolves when it closes.
+   */
+  editArtDirection: (mediaId: number, context?: ArtDirectionContext) => Promise<ArtDirectionEditResult | null>;
   /** The Media screen's address for a route. */
   href: (route: MediaRoute) => string;
   /**
@@ -95,6 +105,7 @@ export function MediaWorkspaceShell({ children }: { children: ReactNode }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [folderRequest, requestFolderAction] = useState<MediaFolderRequest | null>(null);
   const [picking, setPicking] = useState<PickRequest | null>(null);
+  const [art, setArt] = useState<ArtRequest | null>(null);
 
   const setExpanded = useCallback((folderId: number, open: boolean) => setExpandedSet((current) => {
     if (current.has(folderId) === open) return current;
@@ -107,12 +118,18 @@ export function MediaWorkspaceShell({ children }: { children: ReactNode }) {
   const pick = useCallback<MediaWorkspace["pick"]>((options = {}) => new Promise((resolve) => {
     setPicking({ kind: options.kind ?? "", restrictedKind: options.restrictedKind, title: options.title, confirmLabel: options.confirmLabel, multiple: options.multiple !== false, resolve });
   }), []);
+  const editArtDirection = useCallback<MediaWorkspace["editArtDirection"]>((mediaId, context) => new Promise((resolve) => {
+    setArt((current) => {
+      current?.resolve(null);
+      return { mediaId, context, resolve };
+    });
+  }), []);
   const href = useCallback((route: MediaRoute) => `${routes.admin}/media${mediaHrefSearch(route)}`, [routes.admin]);
   const navigationGuard = useRef<((proceed: () => void) => void) | null>(null);
   const guardNavigation = useCallback((proceed: () => void) => (navigationGuard.current ? navigationGuard.current(proceed) : proceed()), []);
   const setNavigationGuard = useCallback((guard: ((proceed: () => void) => void) | null) => { navigationGuard.current = guard; }, []);
 
-  const value = useMemo<MediaWorkspace>(() => ({ fetchers, preferences, expanded, setExpanded, expandAll, sheetOpen, setSheetOpen, folderRequest, requestFolderAction, pick, href, guardNavigation, setNavigationGuard }), [expandAll, expanded, fetchers, folderRequest, guardNavigation, href, pick, preferences, setExpanded, setNavigationGuard, sheetOpen]);
+  const value = useMemo<MediaWorkspace>(() => ({ fetchers, preferences, expanded, setExpanded, expandAll, sheetOpen, setSheetOpen, folderRequest, requestFolderAction, pick, editArtDirection, href, guardNavigation, setNavigationGuard }), [editArtDirection, expandAll, expanded, fetchers, folderRequest, guardNavigation, href, pick, preferences, setExpanded, setNavigationGuard, sheetOpen]);
   const settle = (assets: MediaLibraryAsset[]) => {
     picking?.resolve(assets);
     setPicking(null);
@@ -135,6 +152,20 @@ export function MediaWorkspaceShell({ children }: { children: ReactNode }) {
             confirmLabel={picking?.confirmLabel}
             multiple={picking?.multiple ?? true}
             onConfirm={(assets) => settle(assets)}
+          />
+        </ShellLayer>
+      ) : null}
+      {account ? (
+        <ShellLayer active={art !== null}>
+          <MediaArtDirectionDialog
+            open={art !== null}
+            mediaId={art?.mediaId ?? null}
+            fetchers={fetchers}
+            context={art?.context}
+            onClose={(result) => {
+              art?.resolve(result);
+              setArt(null);
+            }}
           />
         </ShellLayer>
       ) : null}

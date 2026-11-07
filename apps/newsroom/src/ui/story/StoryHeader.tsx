@@ -14,6 +14,8 @@ import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWo
 import { useShellLayout } from "../shell/layout";
 import { useStorySwitcher } from "../shell/StorySwitcher";
 import { PresentationStatus, PreviewButton, useStoryPresentationResolution } from "./StoryPreviewControl";
+import { StoryMediaReadinessNotice, useStoryMediaReadiness } from "./publication-readiness";
+import { blockingLines } from "./publication-readiness-model";
 
 /**
  * The Story header: what the story is, where it is in the newsroom's workflow
@@ -34,6 +36,7 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
   const { value: headline } = useStoryField<string>("headline");
   const [publishing, setPublishing] = useState(false);
   const presentationResolution = useStoryPresentationResolution();
+  const mediaReadiness = useStoryMediaReadiness(Boolean(hasPublishPermission) && !context.readOnly);
 
   const newerDraft = hasPublishedDoc && (unpublishedVersionCount > 0 || modified);
   const publication = !hasPublishedDoc ? "Draft" : newerDraft ? "Published · unpublished changes" : "Published";
@@ -45,6 +48,12 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
     if (id === undefined) return;
     setPublishing(true);
     try {
+      // The server decides at submit; this asks it first, so a known media problem never becomes a vague form error.
+      const media = await mediaReadiness.check().catch(() => null);
+      if (media && !media.ready) {
+        toast.error(media.preparing && !media.blocked ? "Wait for the media to finish preparing, then publish." : `Can't publish yet: ${blockingLines(media)[0]?.text ?? "a file isn't ready"}.`);
+        return;
+      }
       const result = await submit({ action: `${context.api}/stories/${id}?depth=0`, overrides: { _status: "published" } });
       if (result) {
         setUnpublishedVersionCount(0);
@@ -53,7 +62,10 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
         toast.success(hasPublishedDoc ? "Changes published." : "Story published.");
       }
     } catch {
-      toast.error("The story could not be published. Check the highlighted fields.");
+      // Readiness may have changed between the check and the submit: say what the server refused for, when it was media.
+      const media = await mediaReadiness.check().catch(() => null);
+      const line = media && !media.ready ? blockingLines(media)[0]?.text : null;
+      toast.error(line ? `The story could not be published: ${line}.` : media && media.preparing ? "The story could not be published: its media is still preparing." : "The story could not be published. Check the highlighted fields.");
     } finally {
       setPublishing(false);
     }
@@ -101,6 +113,7 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
           </div>
         ) : null}
       </dl>
+      {hasPublishPermission && !context.readOnly ? <StoryMediaReadinessNotice report={mediaReadiness.report} onChanged={mediaReadiness.refresh} /> : null}
       {context.readOnly ? <p className="text-sm text-muted-foreground">Someone else is editing this story. You are viewing it read-only.</p> : null}
     </header>
   );

@@ -34,7 +34,7 @@ export function articleMediaFromLibrary(asset: MediaLibraryAsset): ArticleMediaA
  * Media workspace address for fixing an asset's credit or alt text.
  */
 export function useNewsroomEditorHost(): BylineEditorHost {
-  const { fetchers, pick, href } = useMediaWorkspace();
+  const { fetchers, pick, href, editArtDirection } = useMediaWorkspace();
   return useMemo<BylineEditorHost>(() => ({
     pickMedia: async ({ kind, multiple, title, confirmLabel }) => (await pick({ kind, multiple, title, confirmLabel })).map(articleMediaFromLibrary),
     loadMedia: async (id) => {
@@ -45,6 +45,8 @@ export function useNewsroomEditorHost(): BylineEditorHost {
       }
     },
     uploadMedia: async (file, onProgress) => articleMediaFromLibrary(await fetchers.uploadMedia(file, { folderId: null, onProgress })),
-    mediaHref: (id) => href({ ...DEFAULT_MEDIA_ROUTE, assetId: Number(id) })
-  }), [fetchers, href, pick]);
+    mediaHref: (id) => href({ ...DEFAULT_MEDIA_ROUTE, assetId: Number(id) }),
+    // The Media shell owns the one art-direction editor; blocks and the lead image only name a Media ID.
+    editArtDirection: async (id) => (await editArtDirection(Number(id))) !== null
+  }), [editArtDirection, fetchers, href, pick]);
 }

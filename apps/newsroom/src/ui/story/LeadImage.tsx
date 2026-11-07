@@ -1,10 +1,10 @@
 "use client";
 
-import { MediaPlaceholder, useMediaAsset, usePickMedia } from "@byline/editor/client";
+import { MediaPlaceholder, useMediaAsset, useOptionalEditorHost, usePickMedia } from "@byline/editor/client";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
-import { ImagePlus, X } from "lucide-react";
+import { Crop, ImagePlus, X } from "lucide-react";
 import { relationIdOf, useStoryField } from "./form";
 
 /**
@@ -19,6 +19,7 @@ export function LeadImage({ readOnly }: { readOnly: boolean }) {
   const id = relationIdOf(media.value);
   const entry = useMediaAsset(id === null ? null : id);
   const pick = usePickMedia();
+  const editArtDirection = useOptionalEditorHost()?.editArtDirection;
   const asset = entry.asset;
 
   const choose = async () => {
@@ -50,6 +51,7 @@ export function LeadImage({ readOnly }: { readOnly: boolean }) {
         {readOnly ? null : (
           <ButtonGroup>
             <Button type="button" variant="outline" size="sm" onClick={() => void choose()}><ImagePlus />Replace</Button>
+            {editArtDirection && asset?.kind === "image" ? <Button type="button" variant="outline" size="sm" onClick={() => void editArtDirection(id)} data-lead-art-direction=""><Crop />Crops & focal point</Button> : null}
             <Button type="button" variant="outline" size="sm" onClick={() => media.setValue(null)}><X />Remove</Button>
           </ButtonGroup>
         )}

@@ -1,5 +1,6 @@
 "use client";
 
+import type { MediaArtDirection } from "@byline/newsroom-screens/media/art-direction-model";
 import type { MediaLibraryFetchers } from "@byline/newsroom-screens/media/media-library-api";
 import { mediaLibraryParams, type MediaAssetDetail, type MediaFolder, type MediaLibraryAsset, type MediaLibraryPage, type MediaNavigatorData } from "@byline/newsroom-screens/media/media-library-model";
 import { createMediaPreferencesStore, type MediaPreferencesStore } from "@byline/newsroom-screens/media/media-preferences";
@@ -27,7 +28,10 @@ export function createPayloadMediaFetchers(api: string): MediaLibraryFetchers {
     uploadMedia: (file, options) => uploadWithProgress(`${api}/byline/media/upload`, file, options),
     createFolder: (input) => request<MediaFolder>("/media/folders", "POST", input),
     updateFolder: (id, input) => request<MediaFolder>(`/media/folders/${id}`, "PATCH", input),
-    deleteFolder: (id) => request<void>(`/media/folders/${id}`, "DELETE")
+    deleteFolder: (id) => request<void>(`/media/folders/${id}`, "DELETE"),
+    getArtDirection: (id) => request<MediaArtDirection>(`/media/${id}/art-direction`),
+    saveArtDirection: (id, save) => request<MediaArtDirection>(`/media/${id}/art-direction`, "PUT", save),
+    retryPublication: (id) => request<MediaAssetDetail>(`/media/${id}/publication/retry`, "POST", {})
   };
 }
 

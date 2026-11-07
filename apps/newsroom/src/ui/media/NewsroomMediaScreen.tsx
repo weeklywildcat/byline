@@ -183,6 +183,7 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
       onOpenStory={openStory}
       assetHref={assetHref}
       showHeading={persistentInspector}
+      onEditArtDirection={(id) => workspace.editArtDirection(id)}
     />
   ) : null;
 
