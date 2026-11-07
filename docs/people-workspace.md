@@ -232,11 +232,7 @@ because its FFmpeg binary was absent. Screenshots and traces were retained under
 `/private/tmp`. WordPress E2E and unrelated public browser specs were intentionally
 not run; no WordPress implementation or Story/editor implementation changed.
 
-PR CI handoff: the newsroom/PostgreSQL, Cloudflare scoped build and PHP matrix
-passed. The full browser job also encountered the foundation's unchanged
-homepage fixture mismatch (three Latest stories after snapshot-build adds its
-video fixture, while public-site.spec expects two). The six new public profile
-checks passed their layout assertions but initially failed writing screenshots
-to a macOS-only /private/tmp path on Linux; they now use Playwright's portable
-`testInfo.outputPath`. The corrected profile suite passes locally. CI must rerun
-on that fix; the existing homepage fixture/test mismatch is outside People.
+The snapshot build adds a video fixture, which changes homepage story selection.
+The public browser test pins the three Latest stories from that same snapshot,
+so CI exercises the snapshot artifact without relying on the standard fixture's
+older two-story count. Profile screenshots use Playwright's portable output path.
