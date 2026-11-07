@@ -20,14 +20,14 @@ import { siteDay } from "../home/newsroom-model";
 import type { MediaLibraryFetchers } from "./media-library-api";
 import {
   activeFilterCount,
-  DELIVERY_LABELS,
+  PUBLICATION_ASSET_LABELS,
   EMPTY_MEDIA_FILTERS,
   GAP_LABELS,
   KIND_LABELS,
   MEDIA_LIBRARY_SOURCES,
   MEDIA_PAGE_SIZE,
   MEDIA_SORTS,
-  type MediaDeliveryState,
+  type MediaPublicationAssetState,
   type MediaKind,
   type MediaLibraryAsset,
   type MediaLibraryFilters,
@@ -336,7 +336,7 @@ function TileSkeletons() {
 }
 
 const TYPE_ITEMS = [{ value: ANY, label: "Any type" }, { value: "image", label: "Images" }, { value: "document", label: "PDFs" }, { value: "audio", label: "Audio" }];
-const DELIVERY_ITEMS = [{ value: ANY, label: "Any state" }, ...(Object.entries(DELIVERY_LABELS) as Array<[MediaDeliveryState, string]>).map(([value, label]) => ({ value, label }))];
+const PUBLICATION_ITEMS = [{ value: ANY, label: "Any state" }, ...(Object.entries(PUBLICATION_ASSET_LABELS) as Array<[MediaPublicationAssetState, string]>).map(([value, label]) => ({ value, label }))];
 
 function MediaFilters({ filters, onChange, navigator, fixedKind }: { filters: MediaLibraryFilters; onChange: (filters: MediaLibraryFilters) => void; navigator?: MediaNavigatorData; fixedKind?: MediaKind }) {
   const count = activeFilterCount(fixedKind ? { ...filters, type: "" } : filters);
@@ -368,10 +368,10 @@ function MediaFilters({ filters, onChange, navigator, fixedKind }: { filters: Me
             <Field><FieldLabel htmlFor="media-captured-to">Captured to</FieldLabel><Input id="media-captured-to" type="date" value={filters.capturedTo} onChange={(event) => set({ capturedTo: event.target.value })} /></Field>
           </div>
           <Field>
-            <FieldLabel>Publication delivery</FieldLabel>
-            <Select items={DELIVERY_ITEMS} value={filters.delivery || ANY} onValueChange={(value) => set({ delivery: !value || value === ANY ? "" : (value as MediaDeliveryState) })}>
-              <SelectTrigger aria-label="Publication delivery" className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>{DELIVERY_ITEMS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+            <FieldLabel>Publication assets</FieldLabel>
+            <Select items={PUBLICATION_ITEMS} value={filters.publication || ANY} onValueChange={(value) => set({ publication: !value || value === ANY ? "" : (value as MediaPublicationAssetState) })}>
+              <SelectTrigger aria-label="Publication assets" className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>{PUBLICATION_ITEMS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
           <Field orientation="horizontal">
