@@ -1,3 +1,5 @@
+import { mediaSearchWhere } from "./media-search";
+import { storyMediaUses } from "./story-media-uses";
 import {
   mediaKind,
   mediaMetadataGaps,
@@ -163,9 +165,7 @@ export function libraryWhere(ctx: ScreenContext, query: MediaLibraryQuery): Wher
     if (query.source === "needs-metadata") and.push(NEEDS_METADATA);
     if (query.source === "recent") and.push({ createdAt: { greater_than_equal: localToInstant(`${addDays(localDay(ctx.now, ctx.timeZone), -MEDIA_RECENT_DAYS)}T00:00`, ctx.timeZone) } });
   }
-  if (search) {
-    and.push({ or: (["filename", ...MEDIA_METADATA_FIELDS] as const).map((field) => ({ [field]: { like: search } })) });
-  }
+  if (search) and.push(mediaSearchWhere(search));
   if (query.type === "image") and.push(isImage);
   if (query.type === "audio") and.push({ mimeType: { in: [...AUDIO_MIME_TYPES] } });
   if (query.type === "document") and.push({ mimeType: { equals: "application/pdf" } });
@@ -249,7 +249,7 @@ export async function linkedUses(ctx: ScreenContext, mediaId: number): Promise<U
   const { payload } = ctx.req;
   const system = { req: ctx.req, overrideAccess: true as const };
   const [stories, assignments, artwork, resources, live, people, totals] = await Promise.all([
-    payload.find({ collection: "stories", where: { featuredMedia: { equals: mediaId } }, draft: true, depth: 0, pagination: false, select: { headline: true }, ...asUser(ctx) }),
+    storyMediaUses(ctx, mediaId),
     payload.find({ collection: "production-assignments", where: { media: { in: [mediaId] } }, depth: 0, pagination: false, select: { title: true, type: true, story: true }, ...asUser(ctx) }),
     payload.find({ collection: "collections", where: { "publicPresentation.artwork": { equals: mediaId } }, depth: 0, pagination: false, select: { name: true }, ...asUser(ctx) }),
     payload.find({ collection: "collection-resources", where: { media: { equals: mediaId } }, depth: 0, pagination: false, select: { label: true, collections: true }, ...asUser(ctx) }),
@@ -257,35 +257,35 @@ export async function linkedUses(ctx: ScreenContext, mediaId: number): Promise<U
     payload.find({ collection: "people", where: { portrait: { equals: mediaId } }, depth: 0, pagination: false, select: { name: true }, ...asUser(ctx) }),
     linkedUseTotal(ctx, mediaId, system)
   ]);
-  const storyIds = [...new Set([...stories.docs.map((story) => story.id), ...assignments.docs.map((row) => num(row.story)), ...live.docs.map((row) => num(row.story))])];
+  const storyIds = [...new Set([...assignments.docs.map((row) => num(row.story)), ...live.docs.map((row) => num(row.story))])];
   const readable = await readableStories(ctx, storyIds, { headline: true });
   const headline = new Map(readable.map((story) => [story.id, story.headline?.trim() || "Untitled story"]));
   const usages: MediaUsage[] = [
-    ...stories.docs.filter((story) => headline.has(story.id)).map((story) => ({ kind: "story-featured" as const, title: headline.get(story.id)!, role: "Featured image", storyId: story.id, recordId: story.id })),
+    ...stories.readable.map((story) => ({
+      kind: story.lead ? "story-featured" as const : "story-body" as const,
+      title: story.title, role: [story.lead ? "Lead image" : "", story.roles.size ? `Story body · ${[...story.roles].join(", ")}` : ""].filter(Boolean).join(" · "),
+      storyId: story.id, recordId: story.id
+    })),
     ...assignments.docs.map((row) => ({ kind: "production-assignment" as const, title: headline.get(num(row.story)) ?? row.title, role: `${TYPE_LABEL.get(row.type) ?? "Production"} assignment · ${row.title}`, storyId: headline.has(num(row.story)) ? num(row.story) : null, recordId: row.id })),
     ...artwork.docs.map((row) => ({ kind: "collection-artwork" as const, title: row.name, role: "Collection public artwork", storyId: null, collectionId: row.id, recordId: row.id })),
     ...resources.docs.map((row) => ({ kind: "collection-resource" as const, title: row.label, role: "Collection resource", storyId: null, collectionId: relationIds(row.collections).map(Number)[0] ?? null, recordId: row.id })),
     ...live.docs.map((row) => ({ kind: "live-update-photo" as const, title: row.headline?.trim() || headline.get(num(row.story)) || "Live update", role: "Live update photo", storyId: headline.has(num(row.story)) ? num(row.story) : null, recordId: row.id })),
     ...people.docs.map((row) => ({ kind: "person-portrait" as const, title: row.name, role: "Portrait", storyId: null, recordId: row.id }))
   ];
-  return { usages, total: totals };
+  return { usages, total: totals + stories.total };
 }
 
 /** Every relationship use, readable or not (for honest counts and for refusing a delete). */
 async function linkedUseTotal(ctx: ScreenContext, mediaId: number, system: { req: ScreenContext["req"]; overrideAccess: true }): Promise<number> {
   const { payload } = ctx.req;
   const counts = await Promise.all([
-    payload.count({ collection: "stories", where: { featuredMedia: { equals: mediaId } }, ...system }),
-    payload.find({ collection: "stories", where: { featuredMedia: { equals: mediaId } }, draft: true, depth: 0, pagination: false, select: { headline: true }, ...system }).then((found) => ({ totalDocs: found.docs.length })),
     payload.count({ collection: "production-assignments", where: { media: { in: [mediaId] } }, ...system }),
     payload.count({ collection: "collections", where: { "publicPresentation.artwork": { equals: mediaId } }, ...system }),
     payload.count({ collection: "collection-resources", where: { media: { equals: mediaId } }, ...system }),
     payload.count({ collection: "live-updates", where: { photo: { equals: mediaId } }, ...system }),
     payload.count({ collection: "people", where: { portrait: { equals: mediaId } }, ...system })
   ]);
-  // A story counts once whether its live or draft version links the asset (the larger of the two).
-  const [live, draft, ...rest] = counts.map((count) => count.totalDocs);
-  return Math.max(live, draft) + rest.reduce((sum, value) => sum + value, 0);
+  return counts.reduce((sum, value) => sum + value.totalDocs, 0);
 }
 
 export async function mediaDetail(ctx: ScreenContext, id: number): Promise<MediaAssetDetail> {
@@ -375,7 +375,11 @@ export async function moveMedia(ctx: ScreenContext, ids: number[], folderId: num
 
 export async function deleteMedia(ctx: ScreenContext, id: number): Promise<void> {
   if (!atLeast(ctx.user, "editor")) throw new APIError("Only editors delete files from Media.", 403);
-  const uses = await linkedUseTotal(ctx, id, { req: ctx.req, overrideAccess: true });
+  const [linked, articles] = await Promise.all([
+    linkedUseTotal(ctx, id, { req: ctx.req, overrideAccess: true }),
+    storyMediaUses(ctx, id)
+  ]);
+  const uses = linked + articles.total;
   if (uses > 0) throw new APIError(`This file is linked from ${uses} ${uses === 1 ? "place" : "places"}. Unlink it before deleting it.`, 409);
   await ctx.req.payload.delete({ collection: "media", id, overrideLock: false, ...asUser(ctx) });
 }

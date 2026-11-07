@@ -33,7 +33,8 @@
 // The Byline Story screen (src/ui/story) presents the whole document. Payload's
 // document header, tabs and controls stay mounted, because autosave, locking and
 // stale-data detection live there, but they are not shown.
-.template-default:has(.byline-story) {
+.template-default:has(.byline-story),
+.template-default:has(.byline-page) {
   .doc-header,
   .doc-controls,
   .collection-edit__sidebar-wrap {

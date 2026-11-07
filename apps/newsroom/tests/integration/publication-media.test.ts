@@ -27,6 +27,7 @@ import { materializePublicationMedia } from "../../../web/scripts/publication-me
  * build-only endpoint and build-time materialization.
  */
 let payload: Payload;
+let publishingSection: number;
 const accounts: Record<string, User> = {};
 const people: Record<string, number> = {};
 const ids: Record<string, number> = {};
@@ -107,6 +108,7 @@ beforeAll(async () => {
   process.env.DATABASE_URL = url.toString();
   const { default: config } = await import("../../src/payload.config");
   payload = await getPayload({ config });
+  publishingSection = (await payload.create({ collection: "sections", data: { name: "Publishing fixture", slug: "publishing-fixture" } })).id;
   await account("editor", "editor");
   await account("alice", "staff");
   await account("bob", "staff");
@@ -356,7 +358,7 @@ describe("preparation", () => {
 });
 
 describe("Story publication readiness", () => {
-  const story = async (media: Record<string, unknown>) => (await payload.create({ collection: "stories", draft: true, data: { headline: "Media readiness", ...media }, req: await reqAs("editor"), overrideAccess: false })).id;
+  const story = async (media: Record<string, unknown>) => (await payload.create({ collection: "stories", draft: true, data: { headline: "Media readiness", section: publishingSection, ...media }, req: await reqAs("editor"), overrideAccess: false })).id;
   const publish = async (id: number) => payload.update({ collection: "stories", id, data: { _status: "published" }, req: await reqAs("editor"), overrideAccess: false });
   /** The field errors Publish was refused with (what Payload's form shows next to the lead image or body). */
   const refusal = async (id: number) => {
@@ -470,7 +472,7 @@ describe("build-only acquisition", () => {
     const record = await media(id);
     const readiness = publicationMediaReadiness(record.publicationAssets, record.publicationRevision);
     expect(readiness.ready).toBe(true);
-    const storyId = (await payload.create({ collection: "stories", draft: true, data: { headline: "Homecoming", featuredMedia: id }, req: await reqAs("editor"), overrideAccess: false })).id;
+    const storyId = (await payload.create({ collection: "stories", draft: true, data: { headline: "Homecoming", section: publishingSection, featuredMedia: id }, req: await reqAs("editor"), overrideAccess: false })).id;
     await payload.update({ collection: "stories", id: storyId, data: { _status: "published" }, req: await reqAs("editor"), overrideAccess: false });
 
     const server: Server = createServer(async (req, res) => {

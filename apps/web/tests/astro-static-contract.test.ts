@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { FIXED_PUBLIC_CONTENT_ROUTES } from "@byline/content";
 import { describe, expect, it } from "vitest";
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,7 +37,7 @@ describe("Astro static frontend contract", () => {
     expect(read("src/layouts/BaseLayout.astro")).toContain('type="application/rss+xml"');
     expect(read("src/pages/feed.xml.ts")).toContain("export const prerender = true");
     expect(read("src/pages/news-sitemap.xml.ts")).toContain("export const prerender = true");
-    expect(read("lib/build-snapshot.ts")).toContain('{ path: "/feed.xml", kind: "feed" }');
+    expect(FIXED_PUBLIC_CONTENT_ROUTES).toContainEqual({ path: "/feed.xml", kind: "feed" });
   });
 
   it("removes the runnable Next route tree after cutover", () => {

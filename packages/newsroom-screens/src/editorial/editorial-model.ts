@@ -401,7 +401,7 @@ export function projectContributorsPublic(entries: ContributorEntry[]): PublicCo
   return orderContributors(entries).map(projectContributorPublic);
 }
 
-export type CorrectionType = "correction" | "clarification" | "editors-note" | "substantive-update";
+export type CorrectionType = "correction" | "clarification" | "editor-note" | "editors-note" | "substantive-update";
 
 export type CorrectionRecord = {
   id: number | string;
@@ -414,12 +414,12 @@ export type CorrectionRecord = {
   legacy?: boolean;
 };
 
-export type CorrectionInput = Pick<CorrectionRecord, "type" | "date" | "publicText">;
+export type CorrectionInput = Pick<CorrectionRecord, "type" | "date" | "publicText"> & { expectedUpdatedAt?: string };
 
 export type { EditorialActivityActor, EditorialActivityPayload, EditorialActivityRecord, EditorialActivityStory } from "./activity-model";
 
 export function correctionTypeLabel(type: CorrectionType): string {
-  if (type === "editors-note") return "Editor's note";
+  if (type === "editor-note" || type === "editors-note") return "Editor's note";
   if (type === "substantive-update") return "Substantive update";
   return type.charAt(0).toUpperCase() + type.slice(1);
 }

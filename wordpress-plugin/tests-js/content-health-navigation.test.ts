@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { contentHealthFixHref, CONTENT_HEALTH_FIX_TARGET_QUERY_PARAM } from "../src/planning/content-health-navigation";
+import { contentHealthFixHref, CONTENT_HEALTH_FIX_TARGET_QUERY_PARAM } from "@byline/newsroom-screens/planning/content-health-navigation";
 import { normalizeContentHealthFixTarget, normalizeContentHealthResponse } from "@byline/newsroom-screens/planning/planning-api";
 import { resolveContentHealthBlockPath, type ContentHealthEditorBlock } from "@byline/newsroom-screens/planning/planning-model";
 import {

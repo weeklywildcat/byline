@@ -16,6 +16,7 @@ import type { PreferenceStore } from "../../src/ui/stories/saved-views";
  * is never returned, and the Calendar's preferences in Payload Preferences.
  */
 let payload: Payload;
+let publishingSection: number;
 const accounts: Record<string, User> = {};
 const people: Record<string, number> = {};
 const story: Record<string, number> = {};
@@ -73,6 +74,7 @@ beforeAll(async () => {
   process.env.DATABASE_URL = url.toString();
   const { default: config } = await import("../../src/payload.config");
   payload = await getPayload({ config });
+  publishingSection = (await payload.create({ collection: "sections", data: { name: "Publishing fixture", slug: "publishing-fixture" } })).id;
   await account("editor", "editor");
   await account("alice", "staff");
   await account("photo", "staff", false);
@@ -81,7 +83,7 @@ beforeAll(async () => {
   story.budget = (await payload.create({ collection: "stories", draft: true, data: { headline: "Budget vote delayed", contributors: [people.alice] }, req: await reqAs("alice"), overrideAccess: false })).id;
   story.private = (await payload.create({ collection: "stories", draft: true, data: { headline: "Editor's private draft" }, req: await reqAs("editor"), overrideAccess: false })).id;
   // A published story with an unpublished (embargoed) rewrite only its managers may read.
-  story.library = (await payload.create({ collection: "stories", data: { headline: "Library hours change", _status: "published" } as never, req: await reqAs("editor"), overrideAccess: false })).id;
+  story.library = (await payload.create({ collection: "stories", data: { headline: "Library hours change", section: publishingSection, _status: "published" } as never, req: await reqAs("editor"), overrideAccess: false })).id;
   await payload.update({ collection: "stories", id: story.library, draft: true, data: { headline: "Library to close (embargoed)" }, req: await reqAs("editor"), overrideAccess: false });
 
   // Alice's story: exact appointments (one evening, one completed, one cancelled), a window and an undated one.

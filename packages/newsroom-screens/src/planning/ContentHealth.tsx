@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, MoreHorizontal, Search } from "lucide-react";
 import { toast } from "sonner";
-import { StoryTitleButton } from "@byline/newsroom-screens/story/story-parts";
-import { StoryHoverCard } from "@byline/newsroom-screens/story/StoryHoverCard";
+import { StoryTitleButton } from "../story/story-parts";
+import { StoryHoverCard } from "../story/StoryHoverCard";
 import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
@@ -55,8 +55,8 @@ import {
 } from "@byline/newsroom-ui/ui/select";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
-import { describeEditorialError } from "@byline/newsroom-screens/editorial/editorial-model";
-import { contentHealthKey } from "@byline/newsroom-screens/story/story-query";
+import { describeEditorialError } from "../editorial/editorial-model";
+import { contentHealthKey } from "../story/story-query";
 import { contentHealthFixHref } from "./content-health-navigation";
 import {
   groupHealthIssues,
@@ -65,14 +65,14 @@ import {
   healthCheckId,
   healthSeverityLabels,
 } from "./content-health-model";
-import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
+import type { PlanningFetchers } from "./planning-api";
 import type {
   ContentHealthIssue,
   ContentHealthResponse,
   ContentHealthSeverity,
-} from "@byline/newsroom-screens/planning/planning-model";
-import { NothingHere, PageHeader, ResourceGate } from "@byline/newsroom-screens/planning/PlanningPage";
-import { useOptionalQuery } from "@byline/newsroom-screens/planning/planning-query";
+} from "./planning-model";
+import { NothingHere, PageHeader, ResourceGate } from "./PlanningPage";
+import { useOptionalQuery } from "./planning-query";
 
 type Filters = {
   search: string;
@@ -152,7 +152,7 @@ export function ContentHealth({
   fetchers,
   onOpenStory,
 }: {
-  fetchers: PlanningFetchers;
+  fetchers: Pick<PlanningFetchers, "getContentHealth" | "runContentHealthScan" | "recheckContentHealth" | "setContentHealthDisposition">;
   onOpenStory: (storyId: number) => void;
 }) {
   const client = useQueryClient();

@@ -62,13 +62,12 @@ test.describe("public Astro site", () => {
     await expect(page.locator(".live-lead")).toContainText("Weekly Wildcat fixture story");
     await expect(page.locator(".top-stories-left-rail")).toHaveCount(0);
     await expect(page.locator(".top-stories-rail")).toBeVisible();
-    // The snapshot-build fixture adds a video story, changing homepage selection.
-    // Pin the actual three Latest stories so this still checks the composition.
+    // The fixture's fourth story is already placed in More, so Latest skips it.
     await expect(page.locator(".right-now-list .home-story")).toContainText([
       "Weekly Wildcat latest fixture story",
-      "Weekly Wildcat browser fixture three",
-      "Weekly Wildcat browser fixture four"
+      "Weekly Wildcat browser fixture three"
     ]);
+    await expect(page.locator(".more-weekly .home-story").filter({ hasText: "Weekly Wildcat browser fixture four" })).toHaveCount(1);
 
     const layout = page.locator("[data-homepage-top-stories]");
     const directChildren = await layout.locator(":scope > *").evaluateAll((elements) => elements.map((element) => ({

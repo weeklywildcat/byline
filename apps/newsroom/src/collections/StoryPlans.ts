@@ -1,3 +1,4 @@
+import { activityFor } from "../newsroom/story-activity";
 import { APIError, type CollectionConfig, type FieldAccess } from "payload";
 import { inIds, scopeManages, storyScope } from "../access/story-context";
 import { atLeast, editorsOnlyField, newsroomUser, requestUser } from "../access/user";
@@ -53,6 +54,7 @@ export const StoryPlans: CollectionConfig = {
     delete: ({ req }) => atLeast(requestUser(req), "administrator")
   },
   hooks: {
+    afterChange: [activityFor("plan")],
     beforeValidate: [
       ({ data }) => {
         if (data && data.deadline !== undefined) {
@@ -67,6 +69,8 @@ export const StoryPlans: CollectionConfig = {
     ]
   },
   fields: [
+    // Routing remembers the last public address even while the Story is offline.
+    { name: "lastPublicPath", type: "text", hidden: true, access: { create: () => false, update: () => false } },
     { name: "story", type: "relationship", relationTo: "stories", required: true, unique: true, index: true, access: { update: () => false } },
     {
       name: "workflow",

@@ -672,3 +672,98 @@ describe("build-only API and the static build's acquisition", () => {
     expect((await runPublicSnapshotPreparation(payload)).outcome).toBe("ready");
   });
 });
+
+
+describe("public URL history", () => {
+  const time = "2026-11-08T04:30:00.000Z"; // Saturday, 11:30 p.m. Eastern.
+  const path = (section: string, slug: string) => `/2026/11/07/${section}/${slug}/`;
+  it("uses the original instant, records only published moves, and collapses prior aliases", async () => {
+    const first = await payload.create({ collection: "sections", data: { name: "URL News", slug: "url-news" } });
+    const second = await payload.create({ collection: "sections", data: { name: "URL Opinion", slug: "url-opinion" } });
+    const id = await draftStory("Draft URL Test", { section: first.id });
+    const before = await payload.count({ collection: "redirects" });
+    await payload.update({ collection: "stories", id, draft: true, autosave: true, data: { slug: "original", publishedAt: time } });
+    expect((await payload.count({ collection: "redirects" })).totalDocs).toBe(before.totalDocs);
+    await publish(id, { slug: "original", publishedAt: time });
+    expect((await snapshot()).datasets.stories.find((row) => row.id === id)?.href).toBe(path("url-news", "original"));
+    await payload.update({ collection: "stories", id, draft: true, autosave: true, data: { slug: "revised" } });
+    expect((await payload.count({ collection: "redirects" })).totalDocs).toBe(before.totalDocs);
+    await publish(id, { slug: "revised" });
+    await publish(id, { section: second.id });
+    await publish(id, { publishedAt: "2026-11-08T05:30:00.000Z" });
+    await payload.update({ collection: "sections", id: second.id, data: { slug: "renamed-opinion" } });
+    const target = "/2026/11/08/renamed-opinion/revised/";
+    const redirects = (await snapshot()).datasets.redirects.filter((row) => row.to === target);
+    expect(redirects.map((row) => row.from)).toEqual([
+      path("url-news", "original"), path("url-news", "revised"), path("url-opinion", "revised"), "/2026/11/08/url-opinion/revised/"
+    ]);
+    expect(redirects.every((row) => row.status === 301)).toBe(true);
+    const persisted = await payload.find({ collection: "redirects", where: { to: { equals: target } } });
+    expect(persisted.totalDocs).toBe(4);
+    expect(persisted.docs.some((row) => row.reason === "section-slug-change")).toBe(true);
+  });
+
+  it("keeps the last live pathname through unpublish, draft edits and Section changes", async () => {
+    const section = await payload.create({ collection: "sections", data: { name: "Return desk", slug: "return-desk" } });
+    const id = await draftStory("Story returning to publication", { section: section.id });
+    const first = path("return-desk", "first-address");
+    const last = path("return-desk", "last-address");
+    const next = path("renamed-return-desk", "new-address");
+    await publish(id, { slug: "first-address", publishedAt: time });
+    await publish(id, { slug: "last-address" });
+    // A Story already live when the new routing metadata is introduced has no stored path yet.
+    await (await drizzleFor(payload)).execute(sql`update story_plans set last_public_path = null where story_id = ${id}`);
+    await payload.update({ collection: "stories", id, data: { _status: "draft" } });
+    expect((await snapshot()).datasets.redirects.some((row) => row.from === first)).toBe(false);
+
+    await payload.update({ collection: "sections", id: section.id, data: { slug: "renamed-return-desk" } });
+    await payload.update({ collection: "stories", id, draft: true, autosave: true, data: { slug: "new-address" } });
+    const republished = await publish(id);
+    expect(republished.publishedAt).toBe(time);
+    expect((await snapshot()).datasets.redirects.filter((row) => row.to === next)).toEqual([
+      expect.objectContaining({ from: first, to: next, status: 301 }),
+      expect.objectContaining({ from: last, to: next, status: 301 })
+    ]);
+  });
+
+  it("projects file-shaped redirect sources and code-owned targets without CMS Pages", async () => {
+    const from = "/old-newsroom.html";
+    await payload.create({ collection: "redirects", data: { from: `${from}/`, to: "/media-kit", reason: "manual" } });
+    await payload.create({ collection: "redirects", data: { from: "/old-about", to: "/about/", reason: "manual" } });
+    await payload.create({ collection: "redirects", data: { from: "/old-feed.xml", to: "/feed.xml", reason: "manual" } });
+    const { datasets } = await snapshot();
+    expect(datasets.pages.some((row) => row.href === "/about/" || row.href === "/media-kit/")).toBe(false);
+    expect(datasets.redirects).toEqual(expect.arrayContaining([
+      expect.objectContaining({ from, to: "/media-kit/", status: 301 }),
+      expect.objectContaining({ from: "/old-about/", to: "/about/", status: 301 }),
+      expect.objectContaining({ from: "/old-feed.xml", to: "/feed.xml", status: 301 })
+    ]));
+  });
+
+  it("moves published descendant pages when a parent changes and rejects cycles", async () => {
+    const page = (title: string, slug: string, parent?: number) => payload.create({ collection: "pages", data: { title, slug, parent, _status: "published" } });
+    const parent = await page("URL Parent", "url-parent");
+    const child = await page("URL Child", "url-child", parent.id);
+    const newParent = await page("URL New Parent", "url-new-parent");
+    await payload.update({ collection: "pages", id: parent.id, data: { parent: newParent.id, slug: "url-moved", _status: "published" } });
+    expect((await snapshot()).datasets.redirects).toEqual(expect.arrayContaining([
+      expect.objectContaining({ from: "/url-parent/", to: "/url-new-parent/url-moved/" }),
+      expect.objectContaining({ from: "/url-parent/url-child/", to: "/url-new-parent/url-moved/url-child/" })
+    ]));
+    await expect(payload.update({ collection: "pages", id: parent.id, data: { parent: child.id, _status: "published" } })).rejects.toThrow(/published parent path/);
+    expect((await payload.findByID({ collection: "pages", id: parent.id, depth: 0 })).parent).toBe(newParent.id);
+  });
+
+  it("rejects unsafe paths, duplicates, loops and editorial writes to redirects", async () => {
+    const create = (from: string, to: string) => payload.create({ collection: "redirects", data: { from, to, reason: "manual" } });
+    await expect(create("/test-url-a", "//example.com")).rejects.toThrow(/literal site path/);
+    await expect(create("/test-url-a", "/test-url-a/")).rejects.toThrow(/identical/);
+    await create("/test-url-a", "/test-url-b");
+    await expect(create("/test-url-a/", "/test-url-c")).rejects.toThrow(/Duplicate/);
+    await expect(create("/test-url-b", "/test-url-a/")).rejects.toThrow(/loop/);
+    const user = await payload.findByID({ collection: "users", id: ids.editor });
+    // The first account fixture is promoted by Payload, so create a genuine editor.
+    const editor = await payload.create({ collection: "users", data: { name: user.name, email: "redirect-editor@example.test", password: "redirect-fixture-password", role: "editor" } });
+    await expect(payload.create({ collection: "redirects", data: { from: "/test-url-b", to: "/test-url-c", reason: "manual" }, user: { ...editor, collection: "users" }, overrideAccess: false })).rejects.toThrow(/not allowed/i);
+  });
+});

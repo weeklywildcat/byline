@@ -22,7 +22,7 @@ async function request<T>(api: string, path: string, init: RequestInit = {}): Pr
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = (body as { errors?: Array<{ message?: string }> }).errors?.[0]?.message ?? "Byline could not save that change.";
+    const message = body.message ?? (body as { errors?: Array<{ message?: string }> }).errors?.[0]?.message ?? "Byline could not save that change.";
     throw new ApiError(message, response.status);
   }
   return body as T;
@@ -35,3 +35,7 @@ export function query(params: Record<string, string | number>): string {
 }
 
 export const getJson = <T,>(api: string, path: string) => request<T>(api, path);
+
+export const postJson = <T,>(api: string, path: string, data: unknown) => request<T>(api, path, { method: "POST", body: JSON.stringify(data) });
+export const patchJson = <T,>(api: string, path: string, data: unknown) => request<T>(api, path, { method: "PATCH", body: JSON.stringify(data) });
+export const deleteJson = <T,>(api: string, path: string, data: unknown) => request<T>(api, path, { method: "DELETE", body: JSON.stringify(data) });

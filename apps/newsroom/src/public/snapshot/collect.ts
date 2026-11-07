@@ -1,6 +1,6 @@
 import { isBlockingIssue, type MediaId } from "@byline/article-body";
 import {
-  PUBLIC_SNAPSHOT_SCHEMA_VERSION, publicSnapshotContributor, publicStoryPath, snapshotStoryReference,
+  FIXED_PUBLIC_CONTENT_ROUTES, collapseRedirects, PUBLIC_SNAPSHOT_SCHEMA_VERSION, publicSnapshotContributor, publicStoryPath, snapshotStoryReference,
   validatePublicBuildSnapshotV2, type PublicBuildSnapshotV2, type PublicStorySnapshot
 } from "@byline/content";
 import { escapeHtml, type PublicTerm } from "@byline/content/story";
@@ -77,10 +77,11 @@ function contentLosingIssues(issues: NormalizeIssue[]): string[] {
 export async function collectPublicSnapshot(payload: Payload, options: { revision: number; now?: () => Date; asOf?: Date; afterRead?: () => Promise<void> }): Promise<PublicBuildSnapshotV2> {
   const { revision } = options;
   const now = options.now?.() ?? new Date();
-  const [publicationRow, sectionRows, topicRows, storyRows, pages, events] = await Promise.all([
+  const [publicationRow, sectionRows, topicRows, storyRows, pages, events, redirectRows] = await Promise.all([
     readPublishedPublication(payload), payload.find({ collection: "sections", ...publicRead, sort: "id", select: { name: true, slug: true, description: true, hidden: true } }),
     payload.find({ collection: "topics", ...publicRead, sort: "id", select: { name: true, slug: true, description: true } }),
-    readStories(payload), collectPages(payload), collectEvents(payload)
+    readStories(payload), collectPages(payload), collectEvents(payload),
+    payload.find({ collection: "redirects", ...publicRead, sort: "id", select: { from: true, to: true } })
   ]);
   const publication = publicationConfigFromGlobal(publicationRow, revision);
   const sections = sectionRows.docs.filter((row) => !row.hidden).map((row) => taxonomy(row, "category"));
@@ -150,7 +151,16 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
     if (problems.length) throw new PublicSnapshotError("invalid-projection", `Story ${row.id} cannot be projected without losing article content.`, problems);
     return { ...facts.get(row.id)!, body, live: collectLiveCoverage(row, updatesByStory.get(row.id) ?? [], catalog, publication) };
   });
-  const datasets: Datasets = { stories, people, sections, topics, pages, corrections, collections, events, polls: [...polls.values()], media: catalog.records(), redirects: [] };
+  const paths = new Set([
+    ...FIXED_PUBLIC_CONTENT_ROUTES.map(({ path }) => path),
+    ...stories.map((row) => row.href), ...pages.map((row) => row.href), ...sections.map((row) => row.href),
+    ...people.filter((row) => row.hasProfilePage).map((row) => `/author/${row.slug}/`),
+    ...collections.map((row) => `/coverage/${row.slug}/`)
+  ]);
+  // Retain historical redirects while a target is offline (unpublish, trash), but
+  // don't deploy a rule that would send readers to a missing public document.
+  const redirects = collapseRedirects(redirectRows.docs).filter((row) => paths.has(row.to)).map(({ id, from, to }) => ({ id, from, to, status: 301 as const }));
+  const datasets: Datasets = { stories, people, sections, topics, pages, corrections, collections, events, polls: [...polls.values()], media: catalog.records(), redirects };
   const snapshot = { schemaVersion: PUBLIC_SNAPSHOT_SCHEMA_VERSION, revision, generatedAt: now.toISOString(), publication, datasets,
     counts: Object.fromEntries(Object.entries(datasets).map(([key, rows]) => [key, rows.length])) };
   try {

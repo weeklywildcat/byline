@@ -7,6 +7,11 @@ import * as migration_20261107_060841_publication_media_pipeline from './2026110
 import * as migration_20261107_073047_public_snapshot_v1 from './20261107_073047_public_snapshot_v1';
 import * as migration_20261107_171524_presence_sessions from './20261107_171524_presence_sessions';
 import * as migration_20261107_203133_public_collection_modified_at from './20261107_203133_public_collection_modified_at';
+import * as migration_20261107_212937_newsroom_redirects from './20261107_212937_newsroom_redirects';
+import * as migration_20261107_214217_newsroom_version_attribution from './20261107_214217_newsroom_version_attribution';
+import * as migration_20261107_215529_newsroom_story_activity from './20261107_215529_newsroom_story_activity';
+import * as migration_20261107_221914_newsroom_notes_and_health from './20261107_221914_newsroom_notes_and_health';
+import * as migration_20261107_224351_remember_story_public_paths from './20261107_224351_remember_story_public_paths';
 
 export const migrations = [
   {
@@ -52,6 +57,31 @@ export const migrations = [
   {
     up: migration_20261107_203133_public_collection_modified_at.up,
     down: migration_20261107_203133_public_collection_modified_at.down,
-    name: '20261107_203133_public_collection_modified_at'
+    name: '20261107_203133_public_collection_modified_at',
+  },
+  {
+    up: migration_20261107_212937_newsroom_redirects.up,
+    down: migration_20261107_212937_newsroom_redirects.down,
+    name: '20261107_212937_newsroom_redirects',
+  },
+  {
+    up: migration_20261107_214217_newsroom_version_attribution.up,
+    down: migration_20261107_214217_newsroom_version_attribution.down,
+    name: '20261107_214217_newsroom_version_attribution',
+  },
+  {
+    up: migration_20261107_215529_newsroom_story_activity.up,
+    down: migration_20261107_215529_newsroom_story_activity.down,
+    name: '20261107_215529_newsroom_story_activity',
+  },
+  {
+    up: migration_20261107_221914_newsroom_notes_and_health.up,
+    down: migration_20261107_221914_newsroom_notes_and_health.down,
+    name: '20261107_221914_newsroom_notes_and_health',
+  },
+  {
+    up: migration_20261107_224351_remember_story_public_paths.up,
+    down: migration_20261107_224351_remember_story_public_paths.down,
+    name: '20261107_224351_remember_story_public_paths'
   },
 ];

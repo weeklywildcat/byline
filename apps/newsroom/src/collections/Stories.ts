@@ -1,7 +1,10 @@
-import { ValidationError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig, type Where } from "payload";
+import { beforeStoryActivity, afterStoryActivity } from "../newsroom/story-activity";
+import { requireStoryFacts } from "../newsroom/story-readiness";
+import { publicURLHooks } from "../public/url-changes";
+import { APIError, ValidationError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig, type Where } from "payload";
 import { publicationMediaReport, storyMediaRequirements } from "../publication-media/readiness";
 import { inIds, storyScope } from "../access/story-context";
-import { atLeast, relationIds, requestUser } from "../access/user";
+import { editorsOnlyField, atLeast, relationIds, requestUser } from "../access/user";
 import { articleBodyEditor } from "@byline/editor/server";
 import { guardPrivilegedBlocks, requireCompleteBody } from "../hooks/story-body";
 import type { StoryPlan } from "../payload-types";
@@ -94,11 +97,10 @@ const requirePublishableMedia: CollectionBeforeChangeHook = async ({ data, origi
   });
 };
 
-/** The first publication time is part of the public URL, so it is set once and kept. */
+/** Preserve the first publication instant on unpublish and ordinary republishes. */
 const stampFirstPublication: CollectionBeforeChangeHook = ({ data, originalDoc }) => {
-  if (data._status === "published" && !data.publishedAt && !originalDoc?.publishedAt) {
-    data.publishedAt = new Date().toISOString();
-  }
+  if (originalDoc?.publishedAt && !data.publishedAt) data.publishedAt = originalDoc.publishedAt;
+  else if (data._status === "published" && !data.publishedAt) data.publishedAt = new Date().toISOString();
   return data;
 };
 
@@ -128,6 +130,8 @@ const pinContentFormat: CollectionBeforeChangeHook = ({ data, originalDoc, opera
  * links live on the story's unversioned plan (`story-plans`): saving copy never
  * moves workflow, and restoring an old version never restores old planning.
  */
+const urlChanges = publicURLHooks("stories");
+
 export const Stories: CollectionConfig = {
   slug: "stories",
   admin: {
@@ -176,8 +180,40 @@ export const Stories: CollectionConfig = {
     delete: ({ req }) => atLeast(requestUser(req), "editor")
   },
   hooks: {
-    beforeChange: [pinContentFormat, guardPrivilegedBlocks, requireCompleteBody, requirePublishableMedia, stampFirstPublication],
-    afterChange: [syncPlan]
+    beforeOperation: [({ args, operation, req, overrideAccess }) => {
+      if ((operation === "update" || operation === "restoreVersion") && !overrideAccess && !args.draft && !atLeast(requestUser(req), "editor")) {
+        throw new APIError("Only editors can change a public story. Save your edits as a draft.", 403);
+      }
+      if (operation === "update" || operation === "restoreVersion") req.context.bylineStoryDraftWrite = args.draft === true;
+      if (operation === "restoreVersion") req.context.bylineVersionRestore = { draft: args.draft === true };
+      return args;
+    }],
+    beforeChange: [({ data, req }) => {
+      const restore = req.context.bylineVersionRestore as { draft: boolean } | undefined;
+      if (restore?.draft) data._status = "draft";
+      data.versionActor = Number(requestUser(req)?.id) || null;
+      data.versionRestored = Boolean(restore);
+      delete req.context.bylineVersionRestore;
+      return data;
+    }, ({ data, originalDoc, req }) => {
+      if (!data.liveCoverage || req.context.bylineImport === true) return data;
+      const previous = originalDoc?.liveCoverage;
+      const state = data.liveCoverage.state ?? previous?.state ?? "off";
+      const now = new Date().toISOString();
+      data.liveCoverage = {
+        state,
+        startedAt: state === "off" ? null : previous?.startedAt ?? now,
+        endedAt: state === "ended" ? previous?.endedAt ?? now : null
+      };
+      return data;
+    }, pinContentFormat, requireStoryFacts, guardPrivilegedBlocks, requireCompleteBody, requirePublishableMedia, stampFirstPublication, urlChanges.beforeChange, beforeStoryActivity],
+    afterChange: [syncPlan, urlChanges.afterChange, afterStoryActivity],
+    beforeDelete: [async ({ id, req }) => {
+      // A hard delete removes private dependents; the ordinary trash update keeps them.
+      const where = { story: { equals: id } };
+      await req.payload.db.deleteMany({ collection: "story-notes", where, req });
+      await req.payload.db.deleteMany({ collection: "story-activity", where, req });
+    }]
   },
   fields: [
     {
@@ -249,16 +285,18 @@ export const Stories: CollectionConfig = {
           type: "group",
           admin: { description: "Live coverage is a timeline of updates on this story, not a story format." },
           fields: [
-            { name: "state", type: "select", defaultValue: "off", options: [...LIVE_COVERAGE_STATE_OPTIONS] },
-            { name: "startedAt", type: "date", admin: { readOnly: true } },
-            { name: "endedAt", type: "date", admin: { readOnly: true } }
+            { name: "state", type: "select", defaultValue: "off", options: [...LIVE_COVERAGE_STATE_OPTIONS], access: { create: editorsOnlyField, update: editorsOnlyField } },
+            { name: "startedAt", type: "date", access: { create: () => false, update: () => false }, admin: { readOnly: true } },
+            { name: "endedAt", type: "date", access: { create: () => false, update: () => false }, admin: { readOnly: true } }
           ]
         },
         slugField("headline", "stories"),
-        { name: "publishedAt", type: "date", index: true, admin: { position: "sidebar", readOnly: true, description: "First publication. Part of the article URL." } },
+        { name: "publishedAt", type: "date", index: true, access: { create: editorsOnlyField, update: editorsOnlyField }, admin: { position: "sidebar", description: "First publication. Part of the article URL." } },
       ]
     },
     { name: "plan", type: "join", collection: "story-plans", on: "story", admin: { hidden: true } },
+    { name: "versionActor", type: "number", admin: { hidden: true }, access: { create: () => false, update: () => false } },
+    { name: "versionRestored", type: "checkbox", admin: { hidden: true }, access: { create: () => false, update: () => false } },
     legacyIdField()
   ]
 };

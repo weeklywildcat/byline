@@ -1,11 +1,20 @@
 "use client";
 
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
+import { invalidateStoryData } from "@byline/newsroom-screens/story/story-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { editorialReadiness } from "../../domain/story-readiness";
+import type { ReadinessPayload } from "@byline/newsroom-screens/editorial/editorial-rest";
+import { getJson } from "./api";
+import { PublicationActions } from "./PublicationActions";
+import { useStoryURL } from "./StoryURL";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { useDocumentInfo, useForm, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import { Check, List } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { formatDay } from "./parts";
 import { useStoryField } from "./form";
@@ -27,6 +36,7 @@ import { blockingLines } from "./publication-readiness-model";
  */
 export function StoryHeader({ context }: { context: StoryScreenContext }) {
   const workspace = useOptionalWorkspace();
+  const workspaceQueries = useQueryClient();
   const planned = workspace?.data.story;
   const { id, hasPublishPermission, hasPublishedDoc, unpublishedVersionCount, lastUpdateTime, setHasPublishedDoc, setUnpublishedVersionCount, setMostRecentVersionIsAutosaved, uploadStatus } = useDocumentInfo();
   const { submit } = useForm();
@@ -34,15 +44,47 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
   const processing = useFormProcessing();
   const background = useFormBackgroundProcessing();
   const { value: headline } = useStoryField<string>("headline");
+  const { value: section } = useStoryField<unknown>("section");
+  const { value: contributors } = useStoryField<unknown>("contributors");
+  const { value: format } = useStoryField<string>("format");
+  const { value: videoUrl } = useStoryField<string>("video.url");
+  const editorial = editorialReadiness({ headline, section, contributors, format, videoUrl });
+  const [readinessOpen, setReadinessOpen] = useState(false);
+  const publishTrigger = useRef<HTMLButtonElement>(null);
+  const readinessTrigger = useRef<HTMLButtonElement>(null);
+  const url = useStoryURL(context);
+  const newPath = url.proposedPath();
+  const [confirmURL, setConfirmURL] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const presentationResolution = useStoryPresentationResolution();
   const mediaReadiness = useStoryMediaReadiness(Boolean(hasPublishPermission) && !context.readOnly);
 
   const newerDraft = hasPublishedDoc && (unpublishedVersionCount > 0 || modified);
+  const scheduledAt = planned?.publicationState.scheduledAt ?? null;
+  const scheduledLabel = scheduledAt ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: context.timeZone }).format(new Date(scheduledAt)) : null;
+  const priorPath = url.config?.path || url.config?.previousPath;
+  const changedPath = priorPath && newPath && newPath !== priorPath ? { old: priorPath, next: newPath } : null;
+  const canEditPublication = Boolean(hasPublishPermission) && !context.readOnly;
   const publication = !hasPublishedDoc ? "Draft" : newerDraft ? "Published · unpublished changes" : "Published";
   const saving = processing || background;
   const saveState = saving ? "Saving…" : modified ? "Unsaved changes" : lastUpdateTime ? "Saved" : "";
   const canPublish = Boolean(hasPublishPermission) && !context.readOnly && uploadStatus !== "uploading" && (!hasPublishedDoc || newerDraft);
+
+  const readiness = useQuery({
+    queryKey: ["story-publication-readiness", id, lastUpdateTime],
+    queryFn: () => getJson<ReadinessPayload>(context.api, `/byline/stories/${id}/readiness`),
+    enabled: canEditPublication && id != null && !modified && !saving && readinessOpen
+  });
+  const bodyProblems = modified ? [] : readiness.data?.checks.filter((line) => line.id.startsWith("body-")) ?? [];
+  const problems = bodyProblems.length + editorial.filter((line) => line.level === "error").length + (mediaReadiness.report?.items.filter((item) => item.state !== "ready").length ?? 0);
+
+  function refresh() {
+    void invalidateStoryData(context.shellQueries, Number(id));
+    if (workspaceQueries !== context.shellQueries) void invalidateStoryData(workspaceQueries, Number(id));
+    void url.result.refetch();
+    void workspaceQueries.invalidateQueries({ queryKey: ["story-versions", id] });
+    void workspaceQueries.invalidateQueries({ queryKey: ["byline", "story-distribution", id] });
+  }
 
   /** Why Media blocks publishing right now, from the server, or null. */
   async function mediaRefusal(): Promise<string | null> {
@@ -54,19 +96,29 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
 
   async function publish() {
     if (id === undefined) return;
+    if (editorial.some((line) => line.level === "error")) { setReadinessOpen(true); return; }
     setPublishing(true);
     try {
       // The server decides at submit; asking it first means a known media problem never becomes a vague form error.
+      if (!modified) {
+        const preflight = await readiness.refetch().catch(() => null);
+        if (preflight?.data?.checks.some((line) => line.state === "error")) {
+          await mediaReadiness.check().catch(() => null);
+          setReadinessOpen(true);
+          return;
+        }
+      }
       const before = await mediaRefusal();
       if (before) {
-        toast.error(`Can't publish yet: ${before}.`);
+        setReadinessOpen(true);
         return;
       }
       const result = await submit({ action: `${context.api}/stories/${id}?depth=0`, overrides: { _status: "published" } });
-      if (result) {
+      if (result?.res.ok) {
         setUnpublishedVersionCount(0);
         setMostRecentVersionIsAutosaved(false);
         setHasPublishedDoc(true);
+        refresh();
         toast.success(hasPublishedDoc ? "Changes published." : "Story published.");
       } else {
         // Payload already showed the refusal; when Media changed between the check and the submit, say which file and why.
@@ -93,13 +145,33 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
             {saveState}
           </span>
           {hasPublishPermission ? (
-            <Button type="button" size="sm" onClick={publish} disabled={!canPublish || publishing}>
+            <Button ref={publishTrigger} type="button" size="sm" onClick={() => {
+              if (changedPath) setConfirmURL(true);
+              else void publish();
+            }} disabled={!canPublish || publishing || saving || Boolean(scheduledAt) || !url.config}>
               {publishing ? <Spinner /> : null}
               {hasPublishedDoc ? "Publish changes" : "Publish"}
             </Button>
           ) : null}
+          {canEditPublication && id != null ? <PublicationActions context={context} scheduledAt={scheduledAt} changedPath={changedPath} saving={saving || modified || publishing} canSchedule={(!hasPublishedDoc || newerDraft) && !modified && !saving} onChanged={refresh} /> : null}
         </div>
       </div>
+      <AlertDialog open={confirmURL} onOpenChange={setConfirmURL}>
+        <AlertDialogContent finalFocus={publishTrigger} className="max-h-[calc(100dvh-2rem)] overflow-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change the published URL?</AlertDialogTitle>
+            <AlertDialogDescription>Byline will preserve the old address with a permanent redirect.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <dl className="grid gap-1 text-sm [overflow-wrap:anywhere]">
+            <dt className="font-medium">Old path</dt><dd>{changedPath?.old}</dd>
+            <dt className="font-medium">New path</dt><dd>{newPath}</dd>
+          </dl>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button type="button" onClick={() => { setConfirmURL(false); void publish(); }}>Publish with redirect</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <div className="flex items-center gap-1.5">
           <dt className="text-muted-foreground">Workflow</dt>
@@ -109,9 +181,15 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
           <dt className="text-muted-foreground">Publication</dt>
           <dd><Badge variant={hasPublishedDoc ? "default" : "outline"}>{publication}</Badge></dd>
         </div>
+        {scheduledLabel ? <div className="flex items-center gap-1.5">
+          <dt className="text-muted-foreground">Scheduled publication</dt><dd>{scheduledLabel} ({context.timeZone})</dd>
+        </div> : null}
+        {planned?.plannedPublication ? <div className="flex items-center gap-1.5">
+          <dt className="text-muted-foreground">Publication target</dt><dd>{formatDay(planned.plannedPublication, context.timeZone)}</dd>
+        </div> : null}
         {planned?.deadline ? (
           <div className="flex items-center gap-1.5">
-            <dt className="text-muted-foreground">Deadline</dt>
+            <dt className="text-muted-foreground">Story deadline</dt>
             <dd>{formatDay(planned.deadline, context.timeZone)}</dd>
           </div>
         ) : null}
@@ -123,7 +201,20 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
           </div>
         ) : null}
       </dl>
-      {hasPublishPermission && !context.readOnly ? <StoryMediaReadinessNotice report={mediaReadiness.report} onChanged={mediaReadiness.refresh} /> : null}
+      {canEditPublication ? <div>
+        <Button ref={readinessTrigger} type="button" size="sm" variant="outline" onClick={() => setReadinessOpen(true)} aria-haspopup="dialog">
+          {problems ? `${problems} publication ${problems === 1 ? "issue" : "issues"}` : editorial.length ? "Publication checks · advisory" : readiness.data?.checks.every((line) => line.state === "pass") ? "Ready to publish" : "Publication checks"}
+        </Button>
+        <Dialog open={readinessOpen} onOpenChange={setReadinessOpen}>
+          <DialogContent finalFocus={readinessTrigger} className="max-h-[calc(100dvh-2rem)] overflow-auto">
+            <DialogHeader><DialogTitle>Publication checks</DialogTitle><DialogDescription>Fix blocking issues before publishing. Editorial advisories are optional.</DialogDescription></DialogHeader>
+            {editorial.length ? <ul className="grid gap-2 text-sm">{editorial.map((line) => <li key={line.path} className={line.level === "error" ? "text-destructive" : "text-muted-foreground"}>{line.level === "warning" ? "Advisory: " : ""}{line.message}</li>)}</ul> : null}
+            {bodyProblems.length ? <ul className="grid gap-2 text-sm text-destructive">{bodyProblems.map((line) => <li key={line.id}>{line.explanation}</li>)}</ul> : null}
+            <StoryMediaReadinessNotice report={mediaReadiness.report} onChanged={mediaReadiness.refresh} />
+            {!editorial.length && !problems ? <p className="text-sm">No known issues. Byline runs final checks when you publish.</p> : null}
+          </DialogContent>
+        </Dialog>
+      </div> : null}
       {context.readOnly ? <p className="text-sm text-muted-foreground">Someone else is editing this story. You are viewing it read-only.</p> : null}
     </header>
   );

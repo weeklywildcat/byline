@@ -10,6 +10,8 @@
 
 /** Thread counts (top-level Notes only: a thread with five replies is one). */
 export type ArticleNotesSummary = {
+  /** Payload general story notes have no inline attachment. */
+  kind?: "story";
   /** Core Notes are usable for this story. When false there is nothing to show. */
   available: boolean;
   canView: boolean;

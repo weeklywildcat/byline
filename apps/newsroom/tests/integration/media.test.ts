@@ -1,3 +1,4 @@
+import { lexicalFromArticleBody } from "../../../../packages/editor/tests/lexical-fixture";
 import { buildFolderTree, EMPTY_MEDIA_FILTERS, MEDIA_PAGE_SIZE, type MediaLibraryQuery } from "@byline/newsroom-screens/media/media-library-model";
 import { createLocalReq, getPayload, type Endpoint, type Payload, type PayloadRequest } from "payload";
 import sharp from "sharp";
@@ -446,4 +447,16 @@ describe("Media Work", () => {
     const raw = await payload.findByID({ collection: "production-assignments", id: Number(council.id), depth: 0 });
     expect(raw.assignees).toEqual([accounts.photo.id]);
   });
+});
+
+it("lists native article-block media without disclosing drafts and refuses deletion through raw Payload", async () => {
+  const item = await payload.create({ collection: "media", data: { alt: "A newsroom photo", creator: "A photographer" }, file: await photo(200, 200, "story-body-use.jpg") });
+  const body = lexicalFromArticleBody({ format: "byline-v1", version: 1, media: {}, nodes: [{ type: "photo", id: "test-photo", media: item.id, caption: "", placement: "column" }] });
+  const story = await payload.create({ collection: "stories", data: { headline: "Private body media", body: body as never }, draft: true, req: await reqAs("alice"), overrideAccess: false });
+  const params = { id: String(item.id) };
+  const editor = await call("get", "/byline/media/:id", "editor", { params });
+  expect(editor.body.usages).toEqual([expect.objectContaining({ kind: "story-body", storyId: story.id, role: "Story body · Photo" })]);
+  const other = await call("get", "/byline/media/:id", "bob", { params });
+  expect(other.body).toMatchObject({ usages: [], hiddenUsageCount: 1 });
+  await expect(payload.delete({ collection: "media", id: item.id, req: await reqAs("editor"), overrideAccess: false })).rejects.toThrow(/retained version/);
 });

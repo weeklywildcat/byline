@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@byline/core": fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url)),
+      "@byline/content/redirect-path": fileURLToPath(new URL("../../packages/content/src/redirect-path.ts", import.meta.url)),
       "@byline/content/story": fileURLToPath(new URL("../../packages/content/src/story/index.ts", import.meta.url)),
       "@byline/content": fileURLToPath(new URL("../../packages/content/src/index.ts", import.meta.url)),
       "@byline/design": fileURLToPath(new URL("../../packages/design/src/index.ts", import.meta.url)),

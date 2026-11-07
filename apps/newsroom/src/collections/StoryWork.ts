@@ -1,3 +1,4 @@
+import { activityFor } from "../newsroom/story-activity";
 import { APIError, type Access, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type PayloadRequest, type Where } from "payload";
 import { collectionCanManage, collectionScope, managedCollections } from "../access/collection-context";
 import { inIds, scopeManages, storyScope, type StoryScope } from "../access/story-context";
@@ -117,7 +118,7 @@ export const Tasks: CollectionConfig = {
     delete: ({ req }) => taskWhere(req, false),
     create: createTask
   },
-  hooks: { beforeChange: [taskContext, (args) => assignedWorkGuard(args, (scope, storyId, record) => taskManager(scope, storyId, record, args.req))] },
+  hooks: { afterChange: [activityFor("task")], beforeChange: [taskContext, (args) => assignedWorkGuard(args, (scope, storyId, record) => taskManager(scope, storyId, record, args.req))] },
   fields: [
     { ...storyField, required: false } as Field,
     { name: "collection", type: "relationship", relationTo: "collections", index: true, access: { update: () => false } },
@@ -139,7 +140,7 @@ export const Sources: CollectionConfig = {
   ...shared,
   admin: { ...shared.admin, useAsTitle: "label", defaultColumns: ["label", "story", "status"] },
   access: { ...shared.access, create: createStoryRecords({ allowParticipants: false }) },
-  hooks: {
+  hooks: { afterChange: [activityFor("source")],
     beforeChange: [guardAssignedWork, limitPerStory("sources", LIMITS.sourcesPerStory, "sources")],
     afterDelete: [
       // Removing a source unlinks its appointments and deletes nothing else.
@@ -189,7 +190,7 @@ export const Appointments: CollectionConfig = {
   admin: { ...shared.admin, useAsTitle: "title", defaultColumns: ["title", "story", "scheduleMode", "startAt", "status"] },
   // Participants who hold only assigned work may create appointments for themselves.
   access: { ...shared.access, create: createStoryRecords({ allowParticipants: true }) },
-  hooks: { beforeChange: [guardAssignedWork, normalizeTiming, limitPerStory("appointments", LIMITS.appointmentsPerStory, "appointments")] },
+  hooks: { afterChange: [activityFor("appointment")], beforeChange: [guardAssignedWork, normalizeTiming, limitPerStory("appointments", LIMITS.appointmentsPerStory, "appointments")] },
   fields: [
     storyField,
     { name: "title", type: "text", required: true, maxLength: LIMITS.line },
@@ -219,7 +220,7 @@ export const ProductionAssignments: CollectionConfig = {
   ...shared,
   admin: { ...shared.admin, useAsTitle: "title", defaultColumns: ["title", "type", "story", "deadline", "status"] },
   access: { ...shared.access, create: createStoryRecords({ allowParticipants: false }) },
-  hooks: { beforeChange: [guardAssignedWork, limitPerStory("production-assignments", LIMITS.productionPerStory, "production assignments")] },
+  hooks: { afterChange: [activityFor("production")], beforeChange: [guardAssignedWork, limitPerStory("production-assignments", LIMITS.productionPerStory, "production assignments")] },
   fields: [
     storyField,
     { name: "type", type: "select", required: true, defaultValue: "photo", options: [...PRODUCTION_TYPE_OPTIONS], access: { update: managersOnlyField } },

@@ -10,11 +10,13 @@ import { parseYouTubeVideoId } from "@byline/core";
 import { RenderFields } from "@payloadcms/ui";
 import type { ClientField, SanitizedFieldPermissions } from "payload";
 import type { KeyboardEvent } from "react";
-import { IMMERSIVE_ALIGNMENT_OPTIONS, STORY_FORMAT_OPTIONS, STORY_PRESENTATION_OPTIONS } from "../../domain/vocabulary";
+import { IMMERSIVE_ALIGNMENT_OPTIONS, LIVE_COVERAGE_STATE_OPTIONS, STORY_FORMAT_OPTIONS, STORY_PRESENTATION_OPTIONS } from "../../domain/vocabulary";
 import { BylineEditorHostProvider } from "@byline/editor/client";
 import { ArticleCanvas } from "./ArticleCanvas";
 import { useNewsroomEditorHost } from "./editor-host";
 import { childField, relationIdOf, relationIdsOf, useStoryField } from "./form";
+import { QuickCreateRelation } from "./QuickCreateRelation";
+import { StoryURL } from "./StoryURL";
 import { LeadImage } from "./LeadImage";
 import { Property, SectionHeading } from "./parts";
 import { MultiPicker, SinglePicker, useOptions } from "./RelationPickers";
@@ -84,6 +86,7 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   const videoUrl = useStoryField<string>("video.url");
   const presentation = useStoryField<string>("presentation");
   const alignment = useStoryField<string>("immersiveAlignment");
+  const live = useStoryField<"off" | "live" | "ended">("liveCoverage.state");
   const reportingNote = useStoryField<string>("reportingNote");
 
   const people = useOptions(context.api, "people", "name");
@@ -107,15 +110,18 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
         <Textarea aria-label="Deck" placeholder="Deck: one or two sentences under the headline" rows={2} value={deck.value ?? ""} onChange={(event) => deck.setValue(event.target.value)} disabled={readOnly} className="min-h-0 resize-none border-transparent bg-transparent focus-visible:ring-0 px-0 text-lg text-muted-foreground shadow-none" />
         <FieldGroup className="gap-1">
           <Property label="Byline">
-            <MultiPicker label="Byline" placeholder="Add contributors" options={people} value={relationIdsOf(contributors.value)} onChange={(ids) => contributors.setValue(ids)} disabled={readOnly} />
+            <div className="flex flex-wrap items-center gap-1"><MultiPicker label="Byline" placeholder="Add contributors" options={people} value={relationIdsOf(contributors.value)} onChange={(ids) => contributors.setValue(ids)} disabled={readOnly} />
+            {!readOnly && (context.role === "editor" || context.role === "administrator") ? <QuickCreateRelation context={context} kind="guest" onCreated={(id) => contributors.setValue([...relationIdsOf(contributors.value), id])} /> : null}</div>
           </Property>
-          <Property label="Section">
+          <div id="byline-story-section"><Property label="Section">
             <SinglePicker label="Section" placeholder="No section" options={sections} value={relationIdOf(section.value)} onChange={(id) => section.setValue(id)} disabled={readOnly} />
-          </Property>
+          </Property></div>
           <Property label="Topics">
-            <MultiPicker label="Topics" placeholder="Add topics" options={topicOptions} value={relationIdsOf(topics.value)} onChange={(ids) => topics.setValue(ids)} disabled={readOnly} />
+            <div className="flex flex-wrap items-center gap-1"><MultiPicker label="Topics" placeholder="Add topics" options={topicOptions} value={relationIdsOf(topics.value)} onChange={(ids) => topics.setValue(ids)} disabled={readOnly} />
+            {!readOnly ? <QuickCreateRelation context={context} kind="topic" onCreated={(id) => topics.setValue([...relationIdsOf(topics.value), id])} /> : null}</div>
           </Property>
         </FieldGroup>
+        <StoryURL context={context} />
         <Separator />
         <section aria-label="Lead image" className="flex flex-col gap-2">
           <LeadImage readOnly={readOnly} />
@@ -160,6 +166,10 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
         </FieldGroup>
       </section>
 
+      {context.role !== "staff" || (live.value && live.value !== "off") ? <section aria-label="Live coverage" className="mx-auto flex w-full max-w-[760px] flex-col gap-2 px-4 md:px-0">
+        <SectionHeading>Live coverage</SectionHeading>
+        <Toggle label="Live coverage status" options={LIVE_COVERAGE_STATE_OPTIONS} value={live.value ?? "off"} onChange={(next) => live.setValue(next)} disabled={readOnly || context.role === "staff"} />
+      </section> : null}
       <section aria-labelledby="story-reporting-note" className="mx-auto flex w-full max-w-[760px] flex-col gap-2 px-4 md:px-0">
         <SectionHeading><span id="story-reporting-note">How we reported this</span></SectionHeading>
         <Textarea aria-labelledby="story-reporting-note" rows={3} value={reportingNote.value ?? ""} onChange={(event) => reportingNote.setValue(event.target.value)} disabled={readOnly} placeholder="Optional note to readers about sourcing and methods" />

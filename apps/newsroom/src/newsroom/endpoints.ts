@@ -1,3 +1,15 @@
+import { storyDistribution } from "./story-distribution";
+import { changeStoryNote, storyNotePreviews, storyNotes } from "./story-notes";
+import { contentHealth, healthDisposition, startHealthScan } from "./health/content-health";
+import { pageContext } from "./site-pages";
+import { publicationSettings, savePublicationSettings, saveSiteRow, sectionImpact, siteGroup, siteRows } from "./site";
+import { accountList, saveAccount } from "./accounts";
+import { commandSearch } from "./command-search";
+import { changeCorrection, storyCorrections } from "./story-corrections";
+import { restoreStoryVersion, storyVersion, storyVersions } from "./story-history";
+import { storyReadiness } from "./story-readiness";
+import { setScheduledPublication } from "./scheduled-publication";
+import { storyURLContext } from "./story-url";
 import type { ContributorEntry, EditorialWorkflowPayload, TaskInput, TaskPatch } from "@byline/newsroom-screens/editorial/editorial-model";
 import type { HomePresetsPayload } from "@byline/newsroom-screens/home/home-model";
 import { addDataAndFileToRequest, APIError, type Endpoint, type PayloadHandler, type PayloadRequest } from "payload";
@@ -241,6 +253,21 @@ async function deleteTask(ctx: ScreenContext, req: PayloadRequest) {
 }
 
 /* ------------------------------------------------- workflow and writers */
+
+async function workflowReadModel(ctx: ScreenContext, id: number): Promise<EditorialWorkflowPayload> {
+  const data = await storyWorkspace(ctx, id);
+  const { story, capabilities, revision } = data;
+  const published = story.publicationState.isPublished;
+  return {
+    story: {
+      postId: id, title: story.title, revision, status: story.workflow.id, postStatus: published ? "publish" : "draft", isPublished: published,
+      editorId: story.editor ? Number(story.editor.id) : null, deadline: story.deadline, plannedPublication: story.plannedPublication,
+      scheduledAt: story.publicationState.scheduledAt
+    },
+    statuses: data.statuses.map((item) => ({ ...item, group: item.group === "sidelined" || item.group === "derived" ? item.group : "main" })),
+    capabilities: { changeStatus: capabilities.changeStatus, assign: capabilities.assign, changeDeadline: capabilities.assign, changePlannedPublication: capabilities.assign }
+  };
+}
 
 async function updateWorkflow(ctx: ScreenContext, req: PayloadRequest): Promise<EditorialWorkflowPayload> {
   const storyId = idParam(req);
@@ -490,14 +517,46 @@ const collectionEndpoints: Endpoint[] = [
 /* ----------------------------------------------------------- endpoints */
 
 export const newsroomEndpoints: Endpoint[] = [
+  { path: "/byline/stories/:id/distribution", method: "get", handler: handle((ctx, req) => storyDistribution(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/notes", method: "get", handler: handle((ctx, req) => storyNotes(ctx, idParam(req), req.searchParams.get("resolved") === "1", Math.max(1, Number(req.searchParams.get("page")) || 1))) },
+  { path: "/byline/stories/:id/notes/previews", method: "get", handler: handle((ctx, req) => storyNotePreviews(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/notes", method: "post", handler: handle(async (ctx, req) => changeStoryNote(ctx, idParam(req), null, await body(req))) },
+  { path: "/byline/stories/:id/notes/:note", method: "patch", handler: handle(async (ctx, req) => changeStoryNote(ctx, idParam(req), idParam(req, "note"), await body(req))) },
+  { path: "/byline/content-health", method: "get", handler: handle((ctx) => contentHealth(ctx)) },
+  { path: "/byline/content-health/scan", method: "post", handler: handle((ctx) => startHealthScan(ctx)) },
+  { path: "/byline/content-health/stories/:id/recheck", method: "post", handler: handle((ctx, req) => startHealthScan(ctx, idParam(req))) },
+  { path: "/byline/content-health/disposition", method: "post", handler: handle(async (ctx, req) => healthDisposition(ctx, await body(req))) },
+  { path: "/byline/pages/:id/context", method: "get", handler: handle((ctx, req) => pageContext(ctx, idParam(req))) },
+  { path: "/byline/pages/:id/schedule-publication", method: "post", handler: handle(async (ctx, req) => setScheduledPublication(ctx, idParam(req), await body(req), "pages")) },
+  { path: "/byline/site/publication", method: "get", handler: handle((ctx) => publicationSettings(ctx)) },
+  { path: "/byline/site/publication", method: "post", handler: handle(async (ctx, req) => savePublicationSettings(ctx, await body(req))) },
+  { path: "/byline/site/sections/:id/impact", method: "get", handler: handle((ctx, req) => sectionImpact(ctx, idParam(req))) },
+  { path: "/byline/site/:group", method: "get", handler: handle((ctx, req) => siteRows(ctx, siteGroup(req.routeParams?.group))) },
+  { path: "/byline/site/:group", method: "post", handler: handle(async (ctx, req) => saveSiteRow(ctx, siteGroup(req.routeParams?.group), await body(req))) },
+  { path: "/byline/site/:group/:id", method: "patch", handler: handle(async (ctx, req) => saveSiteRow(ctx, siteGroup(req.routeParams?.group), await body(req), idParam(req))) },
+  { path: "/byline/site/:group/:id", method: "delete", handler: handle(async (ctx, req) => saveSiteRow(ctx, siteGroup(req.routeParams?.group), await body(req), idParam(req), true)) },
+  { path: "/byline/stories/:id/corrections", method: "get", handler: handle((ctx, req) => storyCorrections(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/corrections", method: "post", handler: handle(async (ctx, req) => changeCorrection(ctx, idParam(req), null, await body(req))) },
+  { path: "/byline/stories/:id/corrections/:correction", method: "patch", handler: handle(async (ctx, req) => changeCorrection(ctx, idParam(req), idParam(req, "correction"), await body(req))) },
+  { path: "/byline/stories/:id/corrections/:correction", method: "delete", handler: handle(async (ctx, req) => changeCorrection(ctx, idParam(req), idParam(req, "correction"), await body(req), true)) },
+  { path: "/byline/stories/:id/versions", method: "get", handler: handle((ctx, req) => storyVersions(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/versions/:version", method: "get", handler: handle((ctx, req) => storyVersion(ctx, idParam(req), idParam(req, "version"))) },
+  { path: "/byline/stories/:id/restore-version", method: "post", handler: handle(async (ctx, req) => restoreStoryVersion(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/readiness", method: "get", handler: handle((ctx, req) => storyReadiness(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/schedule-publication", method: "post", handler: handle(async (ctx, req) => setScheduledPublication(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/public-url", method: "get", handler: handle((ctx, req) => storyURLContext(ctx, idParam(req))) },
   { path: "/byline/presence", method: "get", handler: handle(presenceSnapshot) },
   { path: "/byline/presence", method: "post", handler: handle(presenceHeartbeat) },
+  { path: "/byline/accounts", method: "get", handler: handle((ctx, req) => accountList(ctx, req.searchParams.get("search") ?? "", Number(req.searchParams.get("page") ?? 1))) },
+  { path: "/byline/accounts", method: "post", handler: handle(async (ctx, req) => saveAccount(ctx, await body(req))) },
+  { path: "/byline/accounts/:id", method: "patch", handler: handle(async (ctx, req) => saveAccount(ctx, await body(req), idParam(req))) },
   { path: "/byline/people", method: "get", handler: handle((ctx, req) => peopleList(ctx, peopleQuery(req.searchParams))) },
   { path: "/byline/people", method: "post", handler: handle(async (ctx, req) => createPerson(ctx, await body<NewPerson>(req))) },
   { path: "/byline/people/:id", method: "get", handler: handle((ctx, req) => personDetail(ctx, idParam(req))) },
   { path: "/byline/people/:id", method: "patch", handler: handle(async (ctx, req) => updatePerson(ctx, idParam(req), await body<PersonPatch>(req))) },
   { path: "/byline/profile", method: "get", handler: handle((ctx) => ownProfile(ctx)) },
   { path: "/byline/home", method: "get", handler: handle((ctx) => homeBootstrap(ctx)) },
+  { path: "/byline/command-search", method: "get", handler: handle((ctx, req) => commandSearch(ctx, req.searchParams.get("query") ?? "")) },
   { path: "/byline/home/search", method: "get", handler: handle((ctx, req) => searchStories(ctx, String(req.searchParams.get("query") ?? ""))) },
   { path: "/byline/presets", method: "get", handler: handle(async () => presetsPayload()) },
   // The Stories collection (Board and List). Board moves and inline edits use /stories/:id/workflow.
@@ -506,7 +565,13 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories", method: "post", handler: handle(createStory) },
   // Live Preview's presentation context: corrections, related/More by candidates, series. Not part of the typing loop.
   { path: "/byline/stories/:id/preview-context", method: "get", handler: handle((ctx, req) => storyPreviewContext(ctx, idParam(req), parsePreviewContextQuery(new URL(req.url ?? "http://x").searchParams))) },
+  { path: "/byline/stories/:id/activity", method: "get", handler: handle(async (ctx, req) => {
+    const storyId = idParam(req);
+    const { activity } = await storyWorkspace(ctx, storyId);
+    return { storyId, activity };
+  }) },
   { path: "/byline/stories/:id/workspace", method: "get", handler: handle((ctx, req) => storyWorkspace(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/workflow", method: "get", handler: handle((ctx, req) => workflowReadModel(ctx, idParam(req))) },
   { path: "/byline/stories/:id/workflow", method: "post", handler: handle(updateWorkflow) },
   { path: "/byline/stories/:id/contributors", method: "put", handler: handle(saveContributors) },
   { path: "/byline/stories/:id/resources", method: "post", handler: handle((ctx, req) => saveResources(ctx, req, "add")) },

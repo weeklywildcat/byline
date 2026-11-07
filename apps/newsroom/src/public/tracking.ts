@@ -25,6 +25,7 @@ import {
  * (`globals/Publication.ts`).
  */
 export const PUBLIC_COLLECTIONS: Record<string, { slice: PublicSlice; options?: PublicTrackingOptions }> = {
+  redirects: { slice: (row) => ({ from: row.from, to: row.to }) },
   stories: { slice: storyPublicSlice },
   pages: { slice: pagePublicSlice },
   events: { slice: eventPublicSlice },

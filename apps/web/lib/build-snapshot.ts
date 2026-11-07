@@ -2,6 +2,7 @@ import { getNativeSnapshot } from "./native-snapshot";
 import { publicPageHref } from "./native-archive-views";
 import { routeCacheDependency } from "./route-cache";
 import {
+  FIXED_PUBLIC_CONTENT_ROUTES,
   archiveRouteDigest,
   articleRouteDigest,
   buildSnapshot,
@@ -79,26 +80,11 @@ function routeEntries(input: {
 }): RouteManifestEntry[] {
   const archiveHref = getSportsArchiveHref(input.pages);
   const fixed: RouteManifestEntry[] = [
-    { path: "/", kind: "home" },
-    { path: "/staff/", kind: "author" },
+    ...FIXED_PUBLIC_CONTENT_ROUTES,
     { path: "/authors/", kind: "redirect", redirectTo: "/staff/", delivery: "edge" },
-    { path: "/corrections/", kind: "other" },
-    { path: "/coverage/", kind: "coverage" },
-    ...CODE_ROUTED_PAGE_SLUGS.map((slug): RouteManifestEntry => ({ path: `/${slug}/`, kind: "page" })),
-    { path: "/media-kit/", kind: "page" },
-    { path: "/open-source/", kind: "page" },
-    { path: "/intranet/", kind: "page" },
-    { path: "/search/", kind: "search" },
     { path: "/sports/", kind: "redirect", redirectTo: archiveHref, delivery: "edge" },
     { path: "/sports/schedule/", kind: "redirect", redirectTo: archiveHref, delivery: "edge" },
-    { path: "/stories/", kind: "other" },
-    { path: "/watch/", kind: "other" },
     ...Object.entries(REDIRECTED_PAGE_SLUGS).map(([slug, target]): RouteManifestEntry => ({ path: `/${slug}/`, kind: "redirect", redirectTo: target })),
-    { path: "/feed.xml", kind: "feed" },
-    { path: "/news-sitemap.xml", kind: "feed" },
-    { path: "/video-sitemap.xml", kind: "feed" },
-    { path: "/sitemap.xml", kind: "sitemap" },
-    { path: "/robots.txt", kind: "robots" },
     { path: "/404.html", kind: "not-found" },
     { path: "/404/", kind: "not-found" }
   ];

@@ -1,3 +1,5 @@
+import { storyNoteSummary } from "./story-notes";
+import { storyActivity } from "./story-activity";
 import type { ContributorEntry, EditorialTask } from "@byline/newsroom-screens/editorial/editorial-model";
 import type { HomeBootstrap, HomeVisualWork } from "@byline/newsroom-screens/home/newsroom-model";
 import type { PlanningPerson, PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
@@ -46,7 +48,7 @@ export function screenContext(req: PayloadRequest, timeZone: string, now = new D
 
 const asUser = (ctx: ScreenContext) => ({ req: ctx.req, overrideAccess: false as const });
 const num = (value: unknown) => Number(relationId(value));
-const LIMITS = { stories: 200, tasks: 100, visualWork: 50, appointments: 100, activity: 0 } as const;
+const LIMITS = { stories: 200, tasks: 100, visualWork: 50, appointments: 100, activity: 16 } as const;
 
 export const STATUSES = [
   ...WORKFLOW_OPTIONS.map((option) => ({ id: option.value, label: option.label, group: option.value === "on-hold" || option.value === "dropped" ? "sidelined" : "main", selectable: true })),
@@ -277,7 +279,7 @@ function featured(story: Story): PlanningStory["featuredImage"] {
 
 /** published, then scheduled, then draft: the live story decides first, and none of it depends on the newsroom workflow. */
 export function publicationState(story: Pick<Story, "_status" | "publishedAt">, scheduledAt: string | null): PlanningStory["publicationState"] {
-  if (story._status === "published") return { id: "published", label: "Published", isPublished: true, isScheduled: false, scheduledAt: null, publishedAt: story.publishedAt ?? null };
+  if (story._status === "published") return { id: "published", label: scheduledAt ? "Published · changes scheduled" : "Published", isPublished: true, isScheduled: Boolean(scheduledAt), scheduledAt, publishedAt: story.publishedAt ?? null };
   if (scheduledAt) return { id: "scheduled", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt, publishedAt: null };
   return { id: "draft", label: "Draft", isPublished: false, isScheduled: false, scheduledAt: null, publishedAt: story.publishedAt ?? null };
 }
@@ -355,8 +357,9 @@ export async function storiesWithExtras(ctx: ScreenContext, ids: number[]) {
     ctx.req.payload.find({ collection: "appointments", where: byStory, ...all })
   ]);
   const extras = new Map<number, StoryExtras>(ids.map((id) => [id, { tasks: [], production: [], sources: [], appointments: [], scheduledAt: null }]));
-  // Only unpublished stories the reads above returned: the schedule is looked up for ids already proven readable.
-  const scheduled = await scheduledPublicationsForStories(ctx, stories.filter((story) => story._status !== "published").map((story) => story.id));
+  // A published story's upcoming rewrite is private to its managers, just like the rewrite itself.
+  const scope = await storyScope(ctx.req);
+  const scheduled = await scheduledPublicationsForStories(ctx, stories.filter((story) => story._status !== "published" || scopeManages(scope, story.id)).map((story) => story.id));
   for (const [id, at] of scheduled) {
     const entry = extras.get(id);
     if (entry) entry.scheduledAt = at;
@@ -448,27 +451,30 @@ export async function homeBootstrap(ctx: ScreenContext): Promise<HomeBootstrap> 
         return rest;
       })
     ],
-    // The activity stream is not ported yet; Home shows none rather than inventing any.
-    activity: [],
+    activity: await storyActivity(ctx, new Map(rows.map((row) => [row.id, row.title])), LIMITS.activity),
     errors,
     limits: { ...LIMITS }
   };
 }
 
 export async function searchStories(ctx: ScreenContext, query: string) {
-  const text = query.trim();
-  if (!text) return { stories: [] };
-  const found = await ctx.req.payload.find({
-    collection: "stories",
-    where: { or: [{ headline: { like: text } }, { deck: { like: text } }] },
-    draft: true,
-    depth: 0,
-    limit: 12,
-    sort: "-updatedAt",
-    select: { headline: true },
-    ...asUser(ctx)
-  });
-  return { stories: found.docs.map((story) => ({ id: story.id, title: story.headline?.trim() || "Untitled story" })) };
+  const text = query.trim().slice(0, 120);
+  if (text.length < 2) return { stories: [] };
+  const scope = await storyScope(ctx.req);
+  if (!scope) return { stories: [] };
+  const matches: Where = { or: [{ headline: { like: text } }, { deck: { like: text } }, { slug: { like: text } }] };
+  const search = { collection: "stories", depth: 0, limit: 8, sort: "-updatedAt", select: { headline: true, slug: true, updatedAt: true }, ...asUser(ctx) } as const;
+  const [drafts, publicRows] = await Promise.all([
+    scope.all || scope.managed.length ? ctx.req.payload.find({
+      ...search, draft: true, where: scope.all ? matches : { and: [matches, { id: { in: scope.managed } }] }
+    }) : { docs: [] },
+    scope.all ? { docs: [] } : ctx.req.payload.find({
+      ...search, draft: false, where: { and: [matches, { _status: { equals: "published" } }, ...(scope.managed.length ? [{ id: { not_in: scope.managed } }] : [])] }
+    })
+  ]);
+  return { stories: [...drafts.docs, ...publicRows.docs].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8).map((story) => ({
+    id: story.id, title: story.headline?.trim() || "Untitled story", detail: story.slug
+  })) };
 }
 
 /* ------------------------------------------------------------ Workspace */
@@ -497,7 +503,7 @@ export async function storyWorkspace(ctx: ScreenContext, storyId: number): Promi
   const everyone = [...people.persons.keys()].map((id, order) => contributorEntry(people, id, order)).filter((entry): entry is ContributorEntry => entry !== null);
 
   return {
-    story: row,
+    story: { ...row, notes: await storyNoteSummary(ctx, storyId) },
     // Plans have no counter; their last change time detects stale workflow edits.
     revision: plan ? Date.parse(plan.updatedAt) : 0,
     timezone: ctx.timeZone,
@@ -506,7 +512,7 @@ export async function storyWorkspace(ctx: ScreenContext, storyId: number): Promi
     brief: plan?.brief ?? "",
     format: { format: story.format === "video" ? "video" : "standard", videoUrl: story.video?.url ?? "", video: null },
     sections: row.sections ?? [],
-    contributors: { storyId, contributors, available: manager ? everyone : [], canEdit: manager, canCreateGuests: false },
+    contributors: { storyId, contributors, available: manager ? everyone : [], canEdit: manager, canCreateGuests: manager && editor },
     statuses: STATUSES,
     tasks: work.tasks.map((task) => editorialTask(people, task)),
     sources: sources.docs.map((source) => storySource(people, source)),
@@ -514,7 +520,7 @@ export async function storyWorkspace(ctx: ScreenContext, storyId: number): Promi
     reporting: row.reporting,
     mediaAssignments: production.docs.map((assignment, index) => mediaAssignment(people, assignment, index)),
     resources: storyResources(plan),
-    activity: [],
+    activity: await storyActivity(ctx, new Map([[storyId, row.title]]), 30),
     previewUrl: "",
     people: manager ? assignable(people) : assignable(people).filter((person) => sameId(person.id, ctx.user.id)),
     capabilities,

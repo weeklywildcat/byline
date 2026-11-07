@@ -1,3 +1,5 @@
+import { FIXED_PUBLIC_CONTENT_ROUTES, isCodeOwnedPublicPath } from "./routing";
+import { isCanonicalRedirectPath } from "./redirect-path";
 import { z } from "zod";
 import { mediaCredit, mediaKindOf, validateArticleBody, type ArticleBody, type PublicPollReference } from "@byline/article-body";
 import { youTubeEmbedUrl, type BylinePublicationConfig, type PrimaryVideo } from "@byline/core";
@@ -80,7 +82,8 @@ const poll = obj({
   votingOpen: z.boolean(), results: obj({ totalVotes: count, votes: z.record(name, count) }).optional()
 });
 const media = obj({ id, filename: name, kind: z.enum(["image", "audio", "document"]), alt: text, creator: text, credit: text, copyright: text, license: text, manifest });
-const redirect = obj({ id, from: href, to: href, status: z.literal(301) });
+const redirectPath = text.refine(isCanonicalRedirectPath, "Expected a canonical literal public path");
+const redirect = obj({ id, from: redirectPath, to: redirectPath, status: z.literal(301) });
 
 const publication = obj({
   schemaVersion: z.literal(1), revision: count,
@@ -263,8 +266,10 @@ export function validatePublicBuildSnapshotV2(value: unknown, options: { interac
       if (node.type === "repositoryInteractive" && options.interactive) requireFact(options.interactive(node.key), `Story ${row.id} uses unregistered interactive ${node.key}`);
     }
   }
+  const fixedDestinations = new Set(FIXED_PUBLIC_CONTENT_ROUTES.map(({ path }) => path));
   for (const row of data.redirects) {
-    requireFact(paths.has(row.to), `redirect target ${row.to} has no public record`);
+    requireFact(!isCodeOwnedPublicPath(row.from), `redirect source ${row.from} is reserved`);
+    requireFact(paths.has(row.to) || fixedDestinations.has(row.to), `redirect target ${row.to} has no public record`);
   }
   for (const row of data.redirects) claim(row.from);
   return snapshot;

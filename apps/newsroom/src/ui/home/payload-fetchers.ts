@@ -1,13 +1,14 @@
 "use client";
 
-import type { ContributorEntry, TaskInput, TaskPatch } from "@byline/newsroom-screens/editorial/editorial-model";
-import type { ContributorPayload, EditorialRestClient, TaskPayload } from "@byline/newsroom-screens/editorial/editorial-rest";
+import type { CorrectionInput, ContributorEntry, TaskInput, TaskPatch } from "@byline/newsroom-screens/editorial/editorial-model";
+import type { CorrectionPayload, ContributorPayload, EditorialRestClient, TaskPayload } from "@byline/newsroom-screens/editorial/editorial-rest";
 import type { HomePresetsPayload } from "@byline/newsroom-screens/home/home-model";
 import type { HomeFetchers } from "@byline/newsroom-screens/home/home-api";
 import type { HomeBootstrap } from "@byline/newsroom-screens/home/newsroom-model";
 import type { WorkspaceClient } from "@byline/newsroom-screens/workspace/workspace-api";
 import type { MediaAssignmentsResponse, ReportingResponse, ResourcePurpose, ScheduleResponse, StoryResource, StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 import { queryPath } from "@byline/newsroom-screens/planning/planning-api";
+import type { StoryCorrections } from "../../newsroom/story-corrections";
 import { createPayloadCollectionApi } from "../collections/payload-collection-api";
 
 /**
@@ -54,24 +55,39 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
   const collections = createPayloadCollectionApi(api);
   const link = (storyId: number, input: { label: string; url: string; purpose?: ResourcePurpose }) => request<{ resources: StoryResource[] }>(`/stories/${storyId}/resources`, "POST", input);
 
+  const correctionPath = (storyId: number, id?: string | number) => `/stories/${storyId}/corrections${id === undefined ? "" : `/${encodeURIComponent(String(id))}`}`;
+  const correctionPayload = (storyId: number, response: StoryCorrections): CorrectionPayload => ({
+    storyId, canEdit: true, records: response.corrections.map((row) => ({
+      id: row.id, type: row.type, date: row.date, publicText: row.text, recordedByUserId: Number(row.createdBy) || null, createdAt: row.createdAt, modifiedAt: row.updatedAt
+    }))
+  });
+  const correctionInput = (input: CorrectionInput) => ({
+    type: input.type === "editors-note" ? "editor-note" : input.type,
+    text: input.publicText,
+    date: input.date && /^\d{4}-\d{2}-\d{2}$/.test(input.date) ? `${input.date}T12:00` : input.date,
+    expected: input.expectedUpdatedAt
+  });
+
   const editorial: EditorialRestClient = {
-    getWorkflow: notYet("The workflow panel"),
-    getWorkflowBootstrap: notYet("The workflow panel"),
+    getWorkflow: (id) => request(`/stories/${id}/workflow`),
+    getWorkflowBootstrap: (id) => request(`/stories/${id}/workflow`),
     updateWorkflow: (storyId, changes) => request(`/stories/${storyId}/workflow`, "POST", changes),
-    getReadiness: notYet("Readiness checks"),
+    getReadiness: (id) => request(`/stories/${id}/readiness`),
     listTasks: notYet("The task list"),
     createTask: (input: TaskInput) => request<TaskPayload>("/tasks", "POST", input),
     updateTask: (taskId, patch: TaskPatch) => request(`/tasks/${encodeURIComponent(String(taskId))}`, "PATCH", patch),
     deleteTask: (taskId) => request<void>(`/tasks/${encodeURIComponent(String(taskId))}`, "DELETE"),
     getContributors: async (storyId) => (await getWorkspace(storyId)).contributors,
     saveContributors: (storyId, contributors: ContributorEntry[]) => request<ContributorPayload>(`/stories/${storyId}/contributors`, "PUT", { contributors }),
-    createGuest: notYet("Adding a guest contributor"),
-    getCorrections: notYet("Corrections"),
-    createCorrection: notYet("Corrections"),
-    updateCorrection: notYet("Corrections"),
-    deleteCorrection: notYet("Corrections"),
-    getActivity: notYet("Story activity"),
-    getDistribution: notYet("Distribution"),
+    createGuest: (input) => input.hasProfilePage || input.imageId
+      ? Promise.reject({ message: "Set the portrait or profile page in People after adding the guest.", data: { status: 400 }, code: "byline_guest_profile" } satisfies ScreenError)
+      : request("/people", "POST", { type: "guest", name: input.name, newsroomRole: input.role }),
+    getCorrections: async (id) => correctionPayload(id, await request<StoryCorrections>(correctionPath(id))),
+    createCorrection: async (id, input) => correctionPayload(id, await request<StoryCorrections>(correctionPath(id), "POST", correctionInput(input))),
+    updateCorrection: async (id, correctionId, input) => correctionPayload(id, await request<StoryCorrections>(correctionPath(id, correctionId), "PATCH", correctionInput(input))),
+    deleteCorrection: async (id, correctionId, expected) => correctionPayload(id, await request<StoryCorrections>(correctionPath(id, correctionId), "DELETE", { expected })),
+    getActivity: (id) => request(`/stories/${id}/activity`),
+    getDistribution: (id) => request(`/stories/${id}/distribution`),
     distributionAction: notYet("Distribution"),
     addToNewsletter: notYet("Newsletters")
   };
@@ -92,7 +108,7 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
     addResource: link,
     updateResource: (storyId, resourceId, input) => request(`/stories/${storyId}/resources/${encodeURIComponent(resourceId)}`, "POST", input),
     removeResource: (storyId, resourceId) => request(`/stories/${storyId}/resources/${encodeURIComponent(resourceId)}`, "DELETE"),
-    getNotes: notYet("Article notes"),
+    getNotes: (id) => request(`/stories/${id}/notes/previews`),
     getSchedule: (from: string, to: string, includeTasks = false) => request<ScheduleResponse>(queryPath("/schedule", { from, to, tasks: includeTasks ? 1 : undefined }))
   };
 

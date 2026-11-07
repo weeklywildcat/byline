@@ -7,6 +7,7 @@ import { advanceIdSequences } from "../../src/import/sequences";
 import type { User } from "../../src/payload-types";
 
 let payload: Payload;
+let publishingSection: number;
 const accounts: Record<string, User> = {};
 const people: Record<string, number> = {};
 let storyId: number;
@@ -28,6 +29,7 @@ const as = (key: string) => ({ user: accounts[key], overrideAccess: false as con
 beforeAll(async () => {
   const { default: config } = await import("../../src/payload.config");
   payload = await getPayload({ config });
+  publishingSection = (await payload.create({ collection: "sections", data: { name: "Publishing fixture", slug: "publishing-fixture" } })).id;
   await account("admin", "staff", { enabled: false });
   await account("editor", "editor", { person: true });
   await account("alice", "staff", { person: true });
@@ -117,7 +119,7 @@ describe("stories and their plans", () => {
   });
 
   it("shows published stories, but not their plans, to unrelated staff", async () => {
-    await payload.update({ collection: "stories", id: storyId, data: { _status: "published", section: null }, ...as("editor") });
+    await payload.update({ collection: "stories", id: storyId, data: { _status: "published", section: publishingSection }, ...as("editor") });
     const read = await payload.findByID({ collection: "stories", id: storyId, ...as("erin") });
     expect(read.publishedAt).toBeTruthy();
     const plans = await payload.find({ collection: "story-plans", where: { story: { equals: storyId } }, ...as("erin") });

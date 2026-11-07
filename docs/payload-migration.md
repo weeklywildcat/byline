@@ -8,6 +8,8 @@ is a strangler migration: the WordPress production path stays authoritative and
 fully functional until the parity and cutover gates at the end of this document
 are met. Nothing here deletes WordPress data.
 
+Current editorial field ownership and operating instructions are in [Payload newsroom workflows](newsroom-ux.md).
+
 Status is tracked in [§11](#11-phases-gates-and-status). Branch:
 `feature/payload-newsroom` (stacked on `feature/visual-stories`, PR #226, because
 that PR reshapes the presentation registry Phase 4 extracts). The semantic article
@@ -79,7 +81,7 @@ These do not change at any phase.
 | Appointments | `_byline_story_appointments_v1` (40, serialized) | `appointments` |
 | Production | `_byline_story_media_assignments_v2` (12) + legacy `_byline_story_visual_request_v1` projected as `legacy-v1` | `production-assignments` (import materializes `legacy-v1`) |
 | Resource links | `_byline_story_resources` (24) | `story-plans.resources` bounded array |
-| Activity | `includes/editorial/activity.php` | `story-activity` (later; human summaries + UUIDs only) |
+| Activity | `includes/editorial/activity.php` | `story-activity` (private actions, IDs, actors and times) |
 | Presets | `includes/editorial/presets.php` (five, test-pinned) | code-defined presets: Blank, News, Sports recap, Photo story, Video story, Investigation, plus the existing Opinion and Breaking (Phase 3) |
 | Feedback | `includes/editorial/feedback.php` | `feedback` (Phase 11) |
 | Polls | `byline_poll` + `wp_*_byline_poll_votes` | `polls` + dedicated `byline_poll_votes` table |
@@ -626,21 +628,16 @@ Built in the newsroom Admin:
   lead image + caption, Lexical body, format/video, presentation, headline
   position, reporting note), Plan (workflow, editor and deadline for editors,
   brief, files & links on `story-plans`), Production (production, tasks,
-  sources, appointments, read with the user's access) and History (version
-  summary). Verified in the browser: typing in Byline fields triggers Payload's
+  sources, appointments, read with the user's access) and History (versions,
+  restore, corrections and distribution copy tools). Verified in the browser: typing in Byline fields triggers Payload's
   native autosave; workflow changes save to the plan without a story save.
 - Publishing is an editor's decision, enforced in `stories` access (Payload
   derives `hasPublishPermission` from it), integration-tested.
 
-Still Payload's own UI, each with its replacement planned:
-
-| Surface | Interim | Replacement |
-| --- | --- | --- |
-| Lead image picker | Payload upload field | `MediaPickerDialog` (built for production files) + drag-and-drop (Phase 5) |
-| Body editing chrome | Payload Lexical toolbar/slash menu | `@byline/editor` Nova interface (Phase 3/6) |
-| Lock / take-over / read-only modals | Payload modals | Byline treatment of the same `useDocumentInfo` lock state |
-| History compare/restore | Payload versions view | Byline History view over the same versions |
-| Unpublish, schedule | not offered on the Story screen yet | Byline controls over Payload's unpublish and `schedulePublish` |
+Byline manages public URLs, native publication actions and History on the Story
+screen. The native Payload document lock still handles takeover. Site and
+People → Access provide the normal administrator workflows. See
+[Payload newsroom workflows](newsroom-ux.md) for the remaining fallback surfaces.
 
 **Home is ported (Phase 1c).** `HomeApp`, Story Peek, hover cards, the New
 story / New task / task edit dialogs, the command palette and their models moved,
@@ -659,19 +656,15 @@ Home and Planning CSS stayed byte-identical). The newsroom mounts the same
 - presets (`src/domain/presets.ts`): News, Sports recap, Opinion, Photo story,
   Breaking, plus Video story and Investigation. They seed workflow, starter tasks
   and production, give a deadline only to editors, and never create sources or text;
-- screen methods not ported yet (collections, corrections, distribution,
-  sources/appointments/production editing in Peek, the calendar feed) reject with
-  501 instead of pretending to succeed; Home's links to unported destinations
-  are omitted;
+- Home shows recent editorial activity and, for editors, Content Health
+  attention. Distribution copy tools use the published facts; provider actions
+  are unavailable until a provider is configured;
 - Nova renders at true size: Payload pins the root font to 13px, so the newsroom's
   Byline stylesheet compiles rem to px (WordPress-identical pixels).
 
 Integration-tested (`tests/integration/screens.test.ts`, 17 tests) and exercised in
 the browser: Home, Story Peek, New task, complete + Undo, New story from a template
 landing on the Story screen.
-
-Known gaps: Home's activity stream is empty until activity is ported;
-scheduled publication is not shown (Payload's schedule lives in admin-only jobs).
 
 **The Story Workspace is ported (Phase 1d).** The WordPress workspace page and its
 sections moved to `packages/newsroom-screens` and split into
@@ -777,8 +770,8 @@ plugin.
 - **Scheduled publication (Stories, Home, Workspace, Calendar):** Payload
   schedules publishing as jobs, so Byline adds no `scheduledAt` field and no
   table. `scheduledPublicationsForStories` (`src/newsroom/scheduled-publication.ts`)
-  reads the upcoming `schedulePublish` jobs for *only the unpublished story ids
-  the screen's own access-controlled read returned*, in one query (the same
+  reads the upcoming `schedulePublish` jobs for *only the Story IDs the
+  access-controlled read returned; scheduled rewrites are visible to managers*, in one query (the same
   `taskSlug`, `waitUntil > now`, `input.doc.relationTo`/`value` conditions as
   Payload's Schedule drawer, through the database adapter because no newsroom
   role may read `payload-jobs`). A future `publish` makes the story
@@ -1075,7 +1068,7 @@ get `/admin/people` after Collections; linked accounts get `/admin/profile` from
 the account menu. One CMS-neutral explicit-save Person editor powers both,
 with server-derived capabilities, own-profile field access, image-only Byline
 Media picking, guarded URL navigation and transactional 409 conflicts.
-Person and User stay separate; account administration stays in System.
+Person and User stay separate; administrators manage accounts in People → Access.
 
 Guests are People with guest status and sensible byline-only creation defaults.
 Status, staff-directory visibility and profile-page visibility are independent.
@@ -1084,8 +1077,8 @@ the raw fallback. `public-people.ts` is an allowlisted future public input,
 including authors/guests partitions; it has no account data. Stable profile
 presentation/CSS is shared in `@byline/ui` between Astro and the unsaved-draft
 preview. Astro retains routes, metadata, Person JSON-LD and story queries.
-Production snapshot authority, WordPress import and Story picker guest creation
-are deliberately deferred; no semantic editor work is included here.
+The Story byline picker can create a byline-only guest in place. Manual WordPress
+URL parity uses the live pathname and the original publication instant.
 
 ## 8. Editor
 
