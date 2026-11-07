@@ -18,6 +18,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
     ALTER TABLE "media" RENAME COLUMN "public_delivery_content_hash" TO "publication_assets_source_hash";
     ALTER TABLE "media" RENAME COLUMN "public_delivery_renditions" TO "publication_assets_renditions";
     ALTER TABLE "media" RENAME COLUMN "public_delivery_materialized_at" TO "publication_assets_prepared_at";
+    ALTER TABLE "media" ALTER COLUMN "publication_assets_status" SET DEFAULT 'not-prepared';
   `)
 }
 
@@ -32,5 +33,6 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
     ALTER TYPE "public"."enum_media_publication_assets_status" RENAME VALUE 'preparing' TO 'queued';
     ALTER TYPE "public"."enum_media_publication_assets_status" RENAME VALUE 'ready' TO 'public';
     ALTER TYPE "public"."enum_media_publication_assets_status" RENAME TO "enum_media_public_delivery_status";
+    ALTER TABLE "media" ALTER COLUMN "public_delivery_status" SET DEFAULT 'private';
   `)
 }
