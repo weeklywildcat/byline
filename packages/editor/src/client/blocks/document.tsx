@@ -124,7 +124,7 @@ export function DocumentEditor({ node, id, nodeKey }: BlockEditorProps) {
                 <AttachmentDescription>{pdf ? documentFileFacts(asset) : "Not a PDF. Replace it with a PDF."}</AttachmentDescription>
               </AttachmentContent>
               <AttachmentActions>
-                <Button type="button" variant="ghost" size="icon-sm" aria-label="Open the document in a new tab" render={<a href={asset.src} target="_blank" rel="noreferrer" />}><ExternalLink /></Button>
+                <Button variant="ghost" size="icon-sm" aria-label="Open the document in a new tab" nativeButton={false} render={<a href={asset.src} target="_blank" rel="noreferrer" />}><ExternalLink /></Button>
               </AttachmentActions>
             </Attachment>
           ) : (

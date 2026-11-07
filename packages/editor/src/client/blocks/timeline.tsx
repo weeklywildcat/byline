@@ -42,9 +42,9 @@ export function TimelineEditor({ node, id, nodeKey }: BlockEditorProps) {
   const full = items.length >= LIMITS.timelineMax;
   const root = () => node.editor.getElementByKey(nodeKey);
 
-  const focusField = (index: number, field: Field) => {
+  const focusField = (index: number, field: Field, now = false) => {
     setActive(index);
-    focusIn(root(), `[data-timeline-index="${index}"] .byline-timeline-${field}`);
+    focusIn(root(), `[data-timeline-index="${index}"] .byline-timeline-${field}`, now);
   };
   const apply = (change: ItemChange<Event>, field: Field, message: string) => {
     set({ items: change.items });
@@ -73,9 +73,9 @@ export function TimelineEditor({ node, id, nodeKey }: BlockEditorProps) {
     }
     if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
     event.preventDefault();
-    if (field === "label") focusField(index, "title");
-    else if (field === "title") focusField(index, "body");
-    else if (index < items.length - 1) focusField(index + 1, "label");
+    if (field === "label") focusField(index, "title", true);
+    else if (field === "title") focusField(index, "body", true);
+    else if (index < items.length - 1) focusField(index + 1, "label", true);
     else if (!full) add(items.length);
   };
 

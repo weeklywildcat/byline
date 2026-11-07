@@ -64,7 +64,7 @@ export function KeyFactsEditor({ node, id, nodeKey }: BlockEditorProps) {
   const facts = fields.facts;
   const full = facts.length >= LIMITS.factsMax;
   const root = () => node.editor.getElementByKey(nodeKey);
-  const focusFact = (index: number) => focusIn(root(), `[data-fact-index="${index}"] .byline-field`);
+  const focusFact = (index: number, now = false) => focusIn(root(), `[data-fact-index="${index}"] .byline-field`, now);
 
   const apply = (change: { items: typeof facts; focus: number }, message?: string) => {
     set({ facts: change.items });
@@ -91,7 +91,7 @@ export function KeyFactsEditor({ node, id, nodeKey }: BlockEditorProps) {
 
   return (
     <BlockShell type="keyFacts" node={node} issues={issues} actions={<ButtonGroup><ToolTextButton label="Add fact" icon={<Plus />} disabled={full} onClick={() => add(facts.length)} /></ButtonGroup>}>
-      <SupportingContext kind="keyFacts" headingId={`${id}-heading`} heading={<ContextHeading value={fields.heading} fallback={DEFAULT_HEADINGS.keyFacts} readOnly={readOnly} onChange={(heading) => set({ heading }, "heading")} onEnter={() => focusFact(0)} />}>
+      <SupportingContext kind="keyFacts" headingId={`${id}-heading`} heading={<ContextHeading value={fields.heading} fallback={DEFAULT_HEADINGS.keyFacts} readOnly={readOnly} onChange={(heading) => set({ heading }, "heading")} onEnter={() => focusFact(0, true)} />}>
         <ul>
           {facts.map((fact, index) => (
             <li key={fact.id} data-fact-index={index} className="byline-editable-row">

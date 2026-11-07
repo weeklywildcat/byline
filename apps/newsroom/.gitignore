@@ -4,3 +4,4 @@ next-env.d.ts
 # Local uploads (BYLINE_MEDIA_LOCAL_DIR defaults to ./media); anchored so src/ui/media stays tracked.
 /media/
 *.tsbuildinfo
+test-results/

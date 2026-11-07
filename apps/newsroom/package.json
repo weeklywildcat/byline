@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:browser": "playwright test --config playwright.editor.config.ts",
     "migrate:check": "node scripts/check-migrations.mjs"
   },
   "dependencies": {

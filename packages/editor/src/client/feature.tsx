@@ -3,12 +3,14 @@
 import { articleBlockFrameClassName, articleBlockPlacement } from "@byline/ui/article-body";
 import { isArticleBlockType, type Placement } from "@byline/article-body";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { BlockNode, createClientFeature } from "@payloadcms/richtext-lexical/client";
+import { BlockNode, createClientFeature, INSERT_BLOCK_COMMAND } from "@payloadcms/richtext-lexical/client";
 import {
   $getNodeByKey,
   $getSelection,
   $isRangeSelection,
+  $setSelection,
   COMMAND_PRIORITY_CRITICAL,
+  COMMAND_PRIORITY_HIGH,
   KEY_DOWN_COMMAND,
   type LexicalEditor
 } from "@payloadcms/richtext-lexical/lexical";
@@ -36,7 +38,9 @@ const isHistoryKey = (event: KeyboardEvent) => (event.metaKey || event.ctrlKey) 
  *   so breakouts and spacing are the same rules;
  * - keystrokes in a block's own fields stay with those fields (Lexical keeps
  *   Undo/Redo), so Enter, Backspace or arrows never edit the story around it;
- * - blocks created while writing are marked to take focus.
+ * - blocks created while writing are marked to take focus, and until one
+ *   appears (Payload builds a new block's form state on the server first) the
+ *   story has no caret, so quick typing never lands in the paragraph below.
  */
 function BylineCanvasPlugin() {
   const [editor] = useLexicalComposerContext();
@@ -62,7 +66,15 @@ function BylineCanvasPlugin() {
     }, { skipInitialization: false }),
     editor.registerMutationListener(BlockNode, (mutations) => {
       for (const [key, mutation] of mutations) if (mutation === "created") markCreated(key);
-    }, { skipInitialization: true })
+    }, { skipInitialization: true }),
+    // Runs before Payload's own handler (higher priority) and lets it insert (returns false).
+    editor.registerCommand(INSERT_BLOCK_COMMAND, () => {
+      window.setTimeout(() => {
+        editor.update(() => $setSelection(null));
+        editor.getRootElement()?.blur();
+      });
+      return false;
+    }, COMMAND_PRIORITY_HIGH)
   ), [editor]);
 
   return null;

@@ -45,12 +45,24 @@ export function useReadiness<K extends ArticleBlockType>(type: K, id: string, ra
   return useMemo(() => (json === "[]" ? NONE : (JSON.parse(json) as BlockIssue[])), [json]);
 }
 
-/** Focus a field inside this block on the next frame (after the list has re-rendered). */
-export function focusIn(root: HTMLElement | null, selector: string): void {
+function focusElement(element: HTMLElement): void {
+  element.focus({ preventScroll: false });
+  if (element instanceof HTMLTextAreaElement) element.setSelectionRange(element.value.length, element.value.length);
+}
+
+/**
+ * Focus a field inside this block. After a change to the list (add, move,
+ * remove) it waits a frame for the re-render; moving between fields that are
+ * already there (`now`) happens at once, so the next keystroke lands in the
+ * right field however fast it comes.
+ */
+export function focusIn(root: HTMLElement | null, selector: string, now = false): void {
+  if (now) {
+    const element = root?.querySelector<HTMLElement>(selector);
+    if (element) return focusElement(element);
+  }
   window.requestAnimationFrame(() => {
     const element = root?.querySelector<HTMLElement>(selector);
-    if (!element) return;
-    element.focus({ preventScroll: false });
-    if (element instanceof HTMLTextAreaElement) element.setSelectionRange(element.value.length, element.value.length);
+    if (element) focusElement(element);
   });
 }
