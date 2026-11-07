@@ -5,7 +5,7 @@ import {
   MEDIA_METADATA_FIELDS,
   MEDIA_RECENT_DAYS,
   type MediaAssetDetail,
-  type MediaDeliveryState,
+  type MediaPublicationAssetState,
   type MediaFolder,
   type MediaFolderRef,
   type MediaLibraryAsset,
@@ -71,9 +71,9 @@ function previewUrl(media: Media): string | null {
   return null;
 }
 
-function deliveryState(media: Media): MediaDeliveryState {
-  const status = media.publicDelivery?.status;
-  return status === "queued" || status === "public" || status === "failed" ? status : "private";
+function publicationAssetState(media: Media): MediaPublicationAssetState {
+  const status = media.publicationAssets?.status;
+  return status === "preparing" || status === "ready" || status === "failed" ? status : "not-prepared";
 }
 
 export function libraryAsset(ctx: ScreenContext, media: Media, lookup: Lookup): MediaLibraryAsset {
@@ -106,7 +106,7 @@ export function libraryAsset(ctx: ScreenContext, media: Media, lookup: Lookup): 
     updatedAt: media.updatedAt,
     uploadedBy: uploaderId === null ? null : { id: Number(uploaderId), name: lookup.users.get(String(uploaderId)) ?? "Former account" },
     folder: folder ? { id: folder.id, name: folder.name } : null,
-    publicDelivery: deliveryState(media),
+    publicationAssets: publicationAssetState(media),
     gaps: mediaMetadataGaps(asset),
     canUpdate: editor || sameId(uploaderId, ctx.user.id),
     canDelete: editor
@@ -171,8 +171,8 @@ export function libraryWhere(ctx: ScreenContext, query: MediaLibraryQuery): Wher
   if (query.needsMetadata) and.push(NEEDS_METADATA);
   if (query.capturedFrom) and.push({ capturedAt: { greater_than_equal: localToInstant(`${query.capturedFrom}T00:00`, ctx.timeZone) } });
   if (query.capturedTo) and.push({ capturedAt: { less_than: localToInstant(`${addDays(query.capturedTo, 1)}T00:00`, ctx.timeZone) } });
-  if (query.delivery === "private") and.push({ or: [{ "publicDelivery.status": { equals: "private" } }, { "publicDelivery.status": { exists: false } }] });
-  else if (query.delivery) and.push({ "publicDelivery.status": { equals: query.delivery } });
+  if (query.publication === "not-prepared") and.push({ or: [{ "publicationAssets.status": { equals: "not-prepared" } }, { "publicationAssets.status": { exists: false } }] });
+  else if (query.publication) and.push({ "publicationAssets.status": { equals: query.publication } });
   return and.length ? { and } : {};
 }
 
