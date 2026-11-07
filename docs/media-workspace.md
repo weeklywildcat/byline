@@ -38,7 +38,8 @@ right).
   (`extraGroups`); it is not built yet and does not implement reporting
   [Collections](collections-workspace.md) in the Media navigator.
 - **Folders are logical.** A Media document's `folder` is a relationship.
-  Filing or moving a file never changes its URL or moves its object in R2.
+  Filing or moving a file never changes its URL or moves or renames the source
+  file on the newsroom's persistent media volume.
 - **Search and folders are complementary.** Search covers filename, alt text,
   creator, credit, copyright, licence and source URL. From a folder, a search
   looks across all media by default; a visible toggle keeps it in the folder.
@@ -53,10 +54,12 @@ right).
   size, `library` (≤640px WebP, made by Payload on upload). It is Payload's
   admin thumbnail too, so no raw Payload list loads camera originals either.
   It is served by the same file route under Media's `read` access as the
-  original, and it is never part of `publicDelivery`. Phase 5's public
-  materialization (`publicDelivery.renditions`) remains a separate pipeline;
-  `publicDelivery` and `uploadedBy` are system-only fields, so neither an upload
-  nor a metadata edit can change them.
+  original, and it is never part of `publicationAssets`. Phase 5 separately
+  prepares web-ready renditions for the static publisher. `publicationAssets`
+  and `uploadedBy` are system-only fields, so neither an upload nor a metadata
+  edit can claim that an asset is ready. “Ready” means suitable files exist for
+  a future static build; it does not mean the file is currently live on
+  Cloudflare.
 
 ## Permissions
 
@@ -82,7 +85,7 @@ assignment, Collection artwork/resource or profile can't be deleted (409).
 
 | | |
 | --- | --- |
-| `GET /media` | one Library page: `folder` or `source`, `q` (+ `within=folder`), `type`, `uploader`, `metadata=needs`, `capturedFrom`/`capturedTo` (newsroom days), `delivery`, `sort`, `page`, `limit` (≤100, default 48). Never raw Payload query syntax. |
+| `GET /media` | one Library page: `folder` or `source`, `q` (+ `within=folder`), `type`, `uploader`, `metadata=needs`, `capturedFrom`/`capturedTo` (newsroom days), `publication`, `sort`, `page`, `limit` (≤100, default 48). Never raw Payload query syntax. |
 | `GET /media/navigator` | folders (flat, with file counts), Library counts, capabilities (incl. accepted MIME types and the upload size limit), uploaders |
 | `GET /media/:id` | the inspector's detail: folder path, linked uses, hidden-use count |
 | `PATCH /media/:id` | alt, creator, credit, copyright, licence, source URL, captured day, folder; `expectedUpdatedAt` compare-and-swap (409) |
@@ -94,7 +97,7 @@ assignment, Collection artwork/resource or profile can't be deleted (409).
 
 The browse row (`MediaLibraryAsset`) carries id, filename, kind, size,
 dimensions, the private preview URL, the protected original URL, metadata,
-captured date, uploader, folder, delivery state, concrete gaps and the
+captured date, uploader, folder, publication-asset readiness, concrete gaps and the
 account's `canUpdate`/`canDelete`. Usages are fetched only for the inspector.
 No storage credentials, keys, hashes, renditions or art direction leave the
 server.
@@ -198,8 +201,8 @@ preview of 13 KB. A Library page of 48 tiles requested 48 previews, about
 ## Not in this slice
 
 The Collections workspace is documented in [collections-workspace.md](collections-workspace.md).
-Content Health, Feedback, People, Polls, public media
-materialization, smart collections or saved searches, AI tagging, face
+Content Health, Feedback, People, Polls, publication-rendition preparation and
+static-build media materialization, smart collections or saved searches, AI tagging, face
 recognition, automatic classification, video storage. A backfill of the
 `library` preview for files imported before this migration (they show a
 file-type tile until regenerated; small images use their original).
