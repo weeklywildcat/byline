@@ -54,12 +54,26 @@ right).
   size, `library` (≤640px WebP, made by Payload on upload). It is Payload's
   admin thumbnail too, so no raw Payload list loads camera originals either.
   It is served by the same file route under Media's `read` access as the
-  original, and it is never part of `publicationAssets`. Phase 5 separately
-  prepares web-ready renditions for the static publisher. `publicationAssets`
-  and `uploadedBy` are system-only fields, so neither an upload nor a metadata
-  edit can claim that an asset is ready. “Ready” means suitable files exist for
-  a future static build; it does not mean the file is currently live on
-  Cloudflare.
+  original, and it is never part of `publicationAssets`. Publication files are
+  prepared separately by the media worker
+  ([publication-media.md](publication-media.md)). `publicationAssets`,
+  `publicationRevision` and `uploadedBy` are system-only fields, so neither an
+  upload nor a metadata edit can claim that an asset is ready. “Ready” means
+  suitable files exist for a future static build; it does not mean the file is
+  currently live on Cloudflare.
+- **Crops and focal point** open from the inspector (“Crops & focal point”)
+  in the shared `MediaArtDirectionDialog`, owned by the Media shell
+  (`editArtDirection(id)`); the Story lead image and the Photo block open the
+  same dialog through the editor host. A save moves the asset's publication
+  revision and re-queues preparation; unsaved file details in the inspector
+  are kept and compared against the reader's own crop save, never refused by
+  it.
+- **Publication files** in the inspector: Ready (with the version it was
+  prepared for and any low-resolution warnings), Preparing (re-read every few
+  seconds until it finishes), Not prepared or Failed (with the reason), and
+  Retry for the uploader and editors. Hashes, storage paths and manifests are
+  never shown; Payload's raw reads hide the manifest and source hash from
+  everyone but administrators.
 
 ## Permissions
 
@@ -94,13 +108,19 @@ assignment, Collection artwork/resource or profile can't be deleted (409).
 | `DELETE /media/:id` | editors; refused while linked |
 | `POST/PATCH/DELETE /media/folders(/:id)` | folder management |
 | `GET /media/work` | the shared desk's `MediaDeskResponse` from `production-assignments` read as the account |
+| `GET /media/:id/art-direction` | the crop editor's data: oriented size, private original and preview URLs, `animated`, the intent, `updatedAt`, `canUpdate`, publication detail |
+| `PUT /media/:id/art-direction` | `{ focalPoint, crops, expectedUpdatedAt }`; uploader or editor; validated and canonicalized server-side; row-locked compare-and-swap (409) |
+| `POST /media/:id/publication/retry` | requeue preparation (Media update permission; queued as the system) |
+| `GET /media/publication-readiness` | `?lead=&ids=`: the Story header's readiness report (the same rule Publish enforces) |
 
 The browse row (`MediaLibraryAsset`) carries id, filename, kind, size,
 dimensions, the private preview URL, the protected original URL, metadata,
-captured date, uploader, folder, publication-asset readiness, concrete gaps and the
-account's `canUpdate`/`canDelete`. Usages are fetched only for the inspector.
-No storage credentials, keys, hashes, renditions or art direction leave the
-server.
+captured date, uploader, folder, effective publication status (a stale
+generation reads as not prepared), concrete gaps and the account's
+`canUpdate`/`canDelete`. Usages and the publication detail are fetched only
+for the inspector. No storage credentials, keys, hashes, renditions or
+manifests leave the server; art direction is read and written only through
+its own endpoints.
 
 **Linked uses** come from relationships: story `featuredMedia` (live or
 draft), production-assignment `media`, Collection `publicPresentation.artwork`
@@ -201,8 +221,8 @@ preview of 13 KB. A Library page of 48 tiles requested 48 previews, about
 ## Not in this slice
 
 The Collections workspace is documented in [collections-workspace.md](collections-workspace.md).
-Content Health, Feedback, People, Polls, publication-rendition preparation and
-static-build media materialization, smart collections or saved searches, AI tagging, face
+Content Health, Feedback, People, Polls (publication-file preparation and
+build materialization are in [publication-media.md](publication-media.md)), smart collections or saved searches, AI tagging, face
 recognition, automatic classification, video storage. A backfill of the
 `library` preview for files imported before this migration (they show a
 file-type tile until regenerated; small images use their original).

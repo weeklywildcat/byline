@@ -103,6 +103,18 @@ snapshot; nothing in this app serves public reading.
   size, never originals, and never publication renditions. The address is
   Media's state (`?folder=`, `?source=`, `?view=work&scope=`, `?asset=`), moved
   with `history.pushState` so the shell isn't re-rendered.
+- **Publication media** ([docs/publication-media.md](../../docs/publication-media.md)):
+  `artDirection` is editorial intent only (no URLs/renditions), written through
+  `/api/byline/media/:id/art-direction`; Payload's native focal point stays
+  off. Only source/focal/crop changes move `publicationRevision`. Preparation
+  is the `prepare-publication-media` task on the `media` queue (worker:
+  `jobs:media`), never a Next request; promotion is conditional on the
+  revision. Decide readiness with `publicationMediaReadiness` /
+  `publication-media/readiness.ts`, never `status === "ready"`. Prepared files
+  live only in `BYLINE_PUBLICATION_MEDIA_DIR` (content-addressed, never
+  overwritten, never eagerly deleted); the build reads them only through
+  `/api/byline/build/media/:sha256` with `BYLINE_BUILD_TOKEN`. Recipe numbers
+  live in `recipe.ts`; changing one bumps `PUBLICATION_MEDIA_RECIPE_VERSION`.
 - **Live Preview** (`src/preview`, docs/payload-migration.md §5): Payload owns
   the pane, iframe, toolbar, devices, zoom, pop-out, transport and open state;
   Byline owns the `/preview/story` page and the Preview button

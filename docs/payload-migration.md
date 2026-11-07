@@ -250,8 +250,8 @@ apps/newsroom  (Payload 3 + Next.js 16, private)
   └── /preview/story        private Live Preview page → @byline/story-presentations
 PostgreSQL  (@payloadcms/db-postgres; byline_poll_votes via beforeSchemaInit)
 Persistent newsroom volume
-  ├── private media originals + Library previews
-  ├── prepared publication renditions
+  ├── private media originals + Library previews   (BYLINE_MEDIA_LOCAL_DIR)
+  ├── prepared publication files, content-addressed (BYLINE_PUBLICATION_MEDIA_DIR)
   └── immutable snapshot artifacts
 apps/web    (Astro, unchanged public contract)
   ← preferred snapshot pointer + artifact
@@ -260,8 +260,10 @@ apps/web    (Astro, unchanged public contract)
 Cloudflare Worker Static Assets serves the deployed Astro output + media
 ```
 
-Production topology: one Payload/Next service, one dedicated `payload jobs:run`
-worker (same image), PostgreSQL, a persistent newsroom volume, and the existing
+Production topology: one Payload/Next service, one dedicated media worker
+(`npm run jobs:media`, same image and volumes; see
+[publication-media.md](publication-media.md#deployment)), PostgreSQL, the
+persistent newsroom volumes, and the existing
 Cloudflare site. R2/S3 is not required for runtime or public delivery. Object
 storage may be added later for off-site backup, archival replication or disaster
 recovery without changing public media URLs. No Redis, search service or extra
@@ -393,37 +395,48 @@ private `library` image size (≤640px WebP) keeps browsing fast, and the shared
 production desk uses the same Media records as Story authoring. Credits belong
 to the asset; captions belong to the story's use of it.
 
-Publication assets are **prepared, not uploaded to a public bucket**. A media
-job prepares the bounded web renditions required by Byline after a source or its
-art-direction data changes. Crop shapes and focal point reuse
-`@byline/core/image-crops.ts`; normal image candidates are
-320/640/960/1280/1600/2048 and are never upscaled. Each prepared file records
-its MIME type, dimensions, byte size and content hash. A changed source or crop
-therefore produces different immutable public bytes without cache invalidation.
+Publication assets are **prepared, not uploaded to a public bucket**
+([publication-media.md](publication-media.md) is the detailed contract):
 
-During the Astro build, media discovery walks the canonical public dataset,
-deduplicates referenced assets sitewide, chooses only the renditions required by
-the rendered placements and downloads those files through a narrowly scoped
-build-only Payload media route. The build validates the expected MIME type,
-byte count/content hash, writes content-addressed files under
-`out/_byline/media/`, and records a closed media manifest. Wrangler deploys
-that directory with the rest of `apps/web/out`; normal reader requests are
-served by the existing Cloudflare Worker Static Assets binding with no CMS,
-database or image-proxy request.
+- **Art direction is intent.** `Media.artDirection` is `ImageArtDirectionIntent`
+  (`@byline/core`): a focal point plus only the custom crops (Wide, Card,
+  Standard, Square, Portrait, Social) that differ from the automatic
+  focal-point crop. No URLs or renditions. Payload's native focal point is
+  off (it reprocesses uploads synchronously); the dedicated art-direction API
+  is the only normal write path. WordPress `ImageArtDirection` stays for the
+  production path; its generated renditions are never imported as intent.
+- **Publication revision.** `publicationRevision` moves only when the
+  prepared bytes can change (source, focal point, custom crops), never for
+  metadata. The same write invalidates the prepared generation and queues
+  `prepare-publication-media` on the Jobs Queue's `media` queue (per-asset
+  exclusive key, `supersedes`). Stale work never promotes.
+- **Recipe.** `PUBLICATION_MEDIA_RECIPE_VERSION` versions how files are made:
+  an oriented, metadata-free natural WebP ladder 320/640/960/1440/1920/2560
+  (never upscaled), physical files only for explicit crops, 16:9/4:3/1:1 SEO
+  candidates, a 1200×630 JPEG social image, bounded animated WebP, exact-copy
+  PDF/audio, every output ≤ 25 MiB.
+- **Store.** Prepared files are content-addressed objects on a second volume,
+  `BYLINE_PUBLICATION_MEDIA_DIR`, never inside the private upload directory,
+  never overwritten and not deleted until snapshot retention allows garbage
+  collection.
+- **Readiness.** One rule (`publicationMediaReadiness`): status ready, prepared
+  revision = current revision, current recipe, valid manifest; the newsroom
+  readiness service also checks kind, metadata gaps and stored objects. Story
+  publication (not drafts or autosaves) is refused server-side until every
+  directly referenced Media is ready.
+- **Build.** The static build acquires exactly the descriptors it needs from
+  the build-only `GET /api/byline/build/media/:sha256` (`BYLINE_BUILD_TOKEN`),
+  verifies hash, size and type, and writes fingerprinted files under
+  `out/_byline/media/`, cached `public, max-age=31556952, immutable`. It never
+  copies the Library and never falls back to an original. Wiring it to the
+  canonical Payload dataset is Phase 7; production still uses the WordPress
+  media materializers until cutover.
 
-The build never copies the whole Media Library. Large camera originals can stay
-private even when the publication provider would reject them as static assets.
-Images publish prepared web renditions; PDFs and audio must have a publication
-file within the configured static-asset size limit or readiness fails with an
-actionable error. Video remains externally hosted until a separate delivery
-architecture is deliberately introduced.
-
-The former `publicDelivery` placeholder has been renamed to
-`publicationAssets`. Its states are `not-prepared`, `preparing`, `ready`
-and `failed`; `sourceHash`, the prepared rendition manifest and
-`preparedAt` are system-controlled. “Ready” means suitable files exist for a
-static build, not that the asset is already live on Cloudflare. `uploadedBy`
-remains system-controlled.
+Large camera originals stay private. Video remains externally hosted until a
+separate delivery architecture is deliberately introduced. `uploadedBy` and
+every `publicationAssets` field are system-controlled; “Ready” means suitable
+files exist for a static build, not that the asset is already live on
+Cloudflare.
 
 ### 4.6 Polls
 
@@ -492,8 +505,11 @@ unsaved Payload Story form
   `NewsletterSignupView`) rendered inert; ordinary article links open
   separately instead of navigating the frame.
 - **Media** in Preview uses Payload's authenticated file URLs; the public
-  site uses its static media. Dimensions, alt, credit and focal point come
-  from the same Media record, so geometry matches.
+  site uses its static media. Dimensions, alt, credit and the focal point
+  (from the `artDirection` intent) come from the same Media record, so
+  geometry matches. Preview never uses prepared publication files, so a
+  custom crop still preparing is framed by the focal point, never by an older
+  generation.
 - **Custom and visual stories** come from the one registry in
   `@byline/story-presentations` (`storyPresentationRegistry({ fixtures })`).
   A story's stylesheet and `client.ts` load per bundler: Vite in
@@ -1184,7 +1200,7 @@ The torture-test story covers scrollytelling with a repository visual story.
 | 2 | People, Stories, Sections, Topics, Collections and optional public presentations, Corrections, Pages, Workspace records, canonical public model | access/privacy tests | collections + access **done**; People workspace, My profile and public-safe projection done in the parallel People slice; Collections workspace and public compatibility projection done; full snapshot integration, `events`, YouTube metadata job pending |
 | 3 | Story view (Write/Plan/Production/History), Lexical, first blocks, autosave, locking, history | writer acceptance steps 1–6 | Story screen (Write/Plan/Production/History) done. Semantic editor and the first eight blocks built ([article-editor.md](article-editor.md), part of this PR); the full-story autosave check, the lock/undo/width browser specs and editor/public geometry parity are not yet green |
 | 4 | Extract `@byline/story-presentations`, canonical normalization, exact Live Preview | §5 parity suite green | Built and browser-verified (§14), except the pop-out window (this environment cannot open pop-ups) and automated Playwright coverage of the torture flow. Verified in Chromium on the real Story screen: live typing before autosave, 12 overlapping autosaves with Preview staying open, Standard/Immersive/alignment/lead-image fallback, section, contributors, topics, body prose, all eight block types edited and reordered, lead/Photo/Gallery media swaps, reporting note, repository custom and visual stories, Phone/Tablet/Desktop/Responsive, widths 1920/1440/1366/1180/820/390, reload parity |
-| 5 | Media: private source storage, metadata, crops, prepared publication renditions, static-build materialization, drag and drop | media privacy + static public availability tests | Media workspace (Library, folders, upload, inspector, Work) done ([media-workspace.md](media-workspace.md)); the Story editor uses its picker and uploads. Pending: crop/focal integration, local publication-rendition preparation, build-only media delivery and materialization into the Cloudflare static export. No object storage is required |
+| 5 | Media: private source storage, metadata, crops, prepared publication renditions, static-build materialization, drag and drop | media privacy + static public availability tests | **Done** ([publication-media.md](publication-media.md)): art-direction intent + editor (Media inspector, Story lead image, Photo block), publication revision, Jobs Queue preparation with stale-safe promotion, content-addressed store, recipe v1, Story publish gate, build-only endpoint, verified build materializer, immutable `_headers`, migration `20261107_060841_publication_media_pipeline`. Verified by unit, real-PostgreSQL/Jobs/Sharp integration, Playwright and a live end-to-end acquisition. Remaining for Phase 7: feeding the materializer from the Payload snapshot (it is not in the WordPress `postbuild`). Recipe quality is a conservative default until a representative R7/iPhone fixture set is benchmarked |
 | 6 | Full block set | torture-test story authorable | First eight blocks (Photo, Photo Gallery, Reported Quote, Pull Quote, Key Facts, Context, Document, Timeline) built; the rest follow the same contract |
 | 7 | Payload → snapshot v1 projection + direct-source fallback | snapshot build and deliberate no-snapshot fallback both pass Astro verification and produce the same canonical routes/content/media set | — |
 | 8 | WordPress → Payload import | counts/relations/IDs reconcile; custom presentation still resolves imported ID | — |
@@ -1219,7 +1235,8 @@ What exists in `apps/newsroom` (branch `feature/payload-newsroom`):
   `coverages` (since replaced by `collections`, `collection-interviews` and
   `collection-resources`; see the Collections record above), `corrections`,
   `pages` (Versions/Drafts), `media` (private,
-  focal point, no destructive crop, no synchronous renditions), `live-updates`,
+  no destructive crop, no synchronous renditions; the Phase 1 native focal
+  point was replaced by Byline art-direction intent in Phase 5), `live-updates`,
   `tasks`, `sources` (no contact fields), `appointments` (timing normalized
   server-side), `production-assignments`, `polls`; `byline_poll_votes` table.
 - `src/editor/prose.ts`: the restricted Lexical surface (paragraph, H2/H3,
