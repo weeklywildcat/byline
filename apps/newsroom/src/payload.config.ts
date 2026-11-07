@@ -18,6 +18,7 @@ import { Appointments, ProductionAssignments, Sources, Tasks } from "./collectio
 import { Sections, Topics } from "./collections/Taxonomies";
 import { Users } from "./collections/Users";
 import { addPollVotesTable } from "./db/poll-votes";
+import { addPresenceSessionsTable } from "./db/presence-sessions";
 import { addPublicationStateTable } from "./db/publication-state";
 import { Events } from "./collections/Events";
 import { Publication } from "./globals/Publication";
@@ -96,7 +97,7 @@ export default buildConfig({
     migrationDir: path.resolve(dirname, "migrations"),
     // The WordPress import keeps existing IDs; `dropClientIds` stops anyone else choosing one.
     allowIDOnCreate: true,
-    beforeSchemaInit: [addPollVotesTable, addPublicationStateTable]
+    beforeSchemaInit: [addPollVotesTable, addPublicationStateTable, addPresenceSessionsTable]
   }),
   graphQL: { disable: true },
   // The newsroom screens' API (/api/byline/...); every handler re-checks the account.

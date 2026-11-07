@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { Fragment, useSyncExternalStore } from "react";
 import { locationFor } from "../../domain/navigation";
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
+import { NewsroomPresence } from "./NewsroomPresence";
 import { useBylineSearch } from "./search";
 
 const subscribeNothing = () => () => {};
@@ -24,7 +25,7 @@ function useModifierLabel() {
 /**
  * The Byline app header (`admin.components.header`): sticky above every admin
  * view, offset by the sidebar's current width so it sits beside it as in
- * shadcn's dashboard shell. Sidebar trigger, where you are, and Search (⌘K).
+ * shadcn's dashboard shell. Sidebar trigger, where you are, Search (⌘K) and Presence.
  *
  * View controls stay with their views: Story publishing is StoryHeader's,
  * Home's contextual "Task" is in My Work. Nothing here duplicates them.
@@ -50,7 +51,7 @@ function HeaderBar() {
   return (
     <header
       className={cn(
-        "flex h-12 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur-sm transition-[margin] duration-200 ease-linear supports-backdrop-filter:bg-background/80 lg:px-4",
+        "flex h-12 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur-sm supports-backdrop-filter:bg-background/80 md:motion-safe:transition-[margin] md:duration-200 md:ease-linear lg:px-4",
         !isMobile && (state === "collapsed" ? "md:ml-(--sidebar-width-icon)" : "md:ml-(--sidebar-width)")
       )}
     >
@@ -76,12 +77,13 @@ function HeaderBar() {
           </Breadcrumb>
         </>
       ) : null}
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <Button type="button" variant="outline" size="sm" onClick={openSearch} aria-keyshortcuts="Control+K Meta+K" className="justify-start text-muted-foreground sm:w-56" data-shell-search="">
           <Search data-icon="inline-start" aria-hidden="true" />
           <span className="max-sm:sr-only">Search</span>
           <KbdGroup className="ml-auto max-sm:hidden" aria-hidden="true"><Kbd>{modifier}</Kbd><Kbd>K</Kbd></KbdGroup>
         </Button>
+        <NewsroomPresence isMobile={isMobile} />
       </div>
     </header>
   );

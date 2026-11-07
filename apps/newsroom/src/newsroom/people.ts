@@ -77,9 +77,9 @@ function canOpen(ctx: ScreenContext, id: number) {
     throw new APIError("You can only edit your own public profile.", 403);
 }
 
-async function portraits(
+export async function portraits(
   ctx: ScreenContext,
-  docs: ProfileDoc[],
+  docs: Pick<ProfileDoc, "portrait">[],
 ): Promise<Map<number, PortraitDoc>> {
   const ids = [
     ...new Set(

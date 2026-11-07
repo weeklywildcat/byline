@@ -56,6 +56,7 @@ import { effectiveWorkflow } from "../domain/workflow";
 import { relationId, sameId } from "../access/user";
 import { parsePreviewContextQuery, storyPreviewContext } from "../preview/context";
 import { createPerson, ownProfile, peopleList, personDetail, updatePerson } from "./people";
+import { presenceHeartbeat, presenceSnapshot } from "./presence";
 import { peopleQuery, type NewPerson, type PersonPatch } from "@byline/newsroom-screens/people/people-model";
 
 /**
@@ -489,6 +490,8 @@ const collectionEndpoints: Endpoint[] = [
 /* ----------------------------------------------------------- endpoints */
 
 export const newsroomEndpoints: Endpoint[] = [
+  { path: "/byline/presence", method: "get", handler: handle(presenceSnapshot) },
+  { path: "/byline/presence", method: "post", handler: handle(presenceHeartbeat) },
   { path: "/byline/people", method: "get", handler: handle((ctx, req) => peopleList(ctx, peopleQuery(req.searchParams))) },
   { path: "/byline/people", method: "post", handler: handle(async (ctx, req) => createPerson(ctx, await body<NewPerson>(req))) },
   { path: "/byline/people/:id", method: "get", handler: handle((ctx, req) => personDetail(ctx, idParam(req))) },

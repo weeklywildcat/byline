@@ -15,6 +15,7 @@ import { CalendarWorkspaceShell } from "../calendar/CalendarWorkspaceShell";
 import { MediaWorkspaceShell } from "../media/MediaWorkspaceShell";
 import { CollectionsWorkspaceShell } from "../collections/CollectionsWorkspaceShell";
 import { SIDEBAR_COOKIE, SIDEBAR_SHORTCUT } from "./shell-config";
+import { PresenceProvider } from "./PresenceProvider";
 
 /**
  * The Byline application shell's state, above every admin view: one query
@@ -52,7 +53,7 @@ export function BylineShell({ defaultOpen, children }: { defaultOpen: boolean; c
                   <BylineSearchProvider>
                     <StorySwitcherProvider>
                       <CalendarWorkspaceShell>
-                        <MediaWorkspaceShell>{children}</MediaWorkspaceShell>
+                        <MediaWorkspaceShell><PresenceProvider>{children}</PresenceProvider></MediaWorkspaceShell>
                       </CalendarWorkspaceShell>
                     </StorySwitcherProvider>
                   </BylineSearchProvider>

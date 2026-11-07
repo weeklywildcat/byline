@@ -885,12 +885,16 @@ drafts, versions, locks and publishing are exactly Payload's:
 | --- | --- | --- |
 | `admin.components.providers` | `BylineShellProvider` → `BylineShell` | One query cache; the one shadcn `SidebarProvider` (`display: contents`, ⌘\ toggles, state in the `byline_sidebar` cookie read on the server, width by layout); guarded navigation; Create/Search; Story, Calendar, Media and Collections controllers |
 | `admin.components.Nav` | `BylineNav` → `BylineSidebar` | One `Sidebar collapsible="icon"` with global or contextual contents: the icon rail plus Story list, Calendar controls, Media navigator or Collection switcher; exact nav matching preserved |
-| `admin.components.header` | `BylineAppHeader` | Sticky header beside the sidebar: trigger, location, Search (⌘K) |
+| `admin.components.header` | `BylineAppHeader` | Sticky header beside the sidebar: trigger, location, Search (⌘K), Newsroom Presence |
 | `admin.components.views.stories` | `BylineStories` (`/admin/stories`) | Byline Stories (Board, List, story views), account checked on the server |
 | `admin.components.views.calendar` | `BylineCalendar` (`/admin/calendar`) | Byline Calendar (Schedule-X over `GET /api/byline/schedule`), account checked on the server |
 | `admin.components.views.collections` + exact Next page | `BylineCollections` (`/admin/collections`; internal view `/byline-collections`) | Byline Collections; raw `/admin/collections/<slug>` routes keep Payload's catch-all |
 | `admin.components.views.system` | `SystemAdministration` (`/admin/system`) | Administrators' list of raw collection screens, role-checked on the server |
 
+- **[Newsroom Presence](newsroom-presence.md)** is ported from WordPress. It
+  replaces the old single user-meta value with private, per-tab PostgreSQL
+  sessions, and resolves workspace locations with each viewer's Payload access.
+  Presence does not change Payload document locking.
 - **Navigation** (`domain/navigation.ts` `NAVIGATION`): only destinations whose
   Byline screen exists: Home, Stories, Calendar, Media, Collections, then the
   editor tools (People, Polls, Feedback) as they are ported. A Collection is

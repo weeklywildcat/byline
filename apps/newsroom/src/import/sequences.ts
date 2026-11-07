@@ -9,16 +9,16 @@ import type { Payload } from "payload";
 export async function advanceIdSequences(payload: Payload): Promise<Array<{ table: string; next: number }>> {
   const db = (payload.db as unknown as { drizzle: { execute: (query: ReturnType<typeof sql>) => Promise<{ rows: Array<Record<string, unknown>> }> } }).drizzle;
   const { rows } = await db.execute(sql`
-    SELECT c.relname AS table_name, pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), 'id') AS sequence_name
+    SELECT c.relname AS table_name, pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), a.attname) AS sequence_name
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'id' AND NOT a.attisdropped
     WHERE c.relkind = 'r' AND n.nspname = current_schema()
-      AND pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), 'id') IS NOT NULL
     ORDER BY c.relname
   `);
   const advanced: Array<{ table: string; next: number }> = [];
   for (const row of rows) {
+    if (row.sequence_name === null) continue;
     const table = String(row.table_name);
     const sequence = String(row.sequence_name);
     const { rows: maxRows } = await db.execute(sql`SELECT COALESCE(MAX(id), 0)::bigint AS max_id FROM ${sql.identifier(table)}`);
