@@ -1,0 +1,42 @@
+"use client";
+
+import { isArticleBlockType, type ArticleBlockType } from "@byline/article-body";
+import { useBlockComponentContext } from "@payloadcms/richtext-lexical/client";
+import type { ComponentType } from "react";
+import { DocumentEditor } from "./blocks/document";
+import { GalleryEditor, PhotoEditor } from "./blocks/media";
+import type { BlockEditorProps } from "./blocks/shared";
+import { ContextEditor, KeyFactsEditor, PullQuoteEditor, ReportedQuoteEditor } from "./blocks/text";
+import { TimelineEditor } from "./blocks/timeline";
+import { useBlockNode } from "./lexical";
+
+/**
+ * One editor per registered block type. Typed against the contract's
+ * registry, so a new block type is a compile error here until it has an
+ * editor (and a test checks the map against the registry too).
+ */
+export const BLOCK_EDITORS: { readonly [K in ArticleBlockType]: ComponentType<BlockEditorProps> } = {
+  photo: PhotoEditor,
+  gallery: GalleryEditor,
+  reportedQuote: ReportedQuoteEditor,
+  pullQuote: PullQuoteEditor,
+  keyFacts: KeyFactsEditor,
+  context: ContextEditor,
+  document: DocumentEditor,
+  timeline: TimelineEditor
+};
+
+/**
+ * Payload renders this for every Byline block (`admin.components.Block`)
+ * inside the block's decorator. It finds the Lexical node it belongs to and
+ * hands it to that block's editor; Payload's generic block form never shows.
+ */
+export function BylineStoryBlock() {
+  const { nodeKey } = useBlockComponentContext();
+  const node = useBlockNode(nodeKey);
+  const type = node.fields?.blockType;
+  if (!node.fields || !isArticleBlockType(type)) return null;
+  const Editor = BLOCK_EDITORS[type];
+  const id = typeof node.fields.id === "string" && node.fields.id ? node.fields.id : nodeKey;
+  return <Editor node={node} id={id} nodeKey={nodeKey} />;
+}
