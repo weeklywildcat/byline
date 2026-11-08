@@ -133,7 +133,7 @@ export type PlanningCapabilities = {
   canManageFeedback: boolean;
 };
 
-export type PlanningSortKey = "story" | "workflow" | "writer" | "deadline" | "planned" | "modified";
+export type PlanningSortKey = "story" | "workflow" | "writer" | "deadline" | "planned" | "published" | "modified";
 export type PlanningSortDirection = "asc" | "desc";
 export type PlanningSort = { key: PlanningSortKey; direction: PlanningSortDirection };
 
@@ -149,6 +149,13 @@ export type PlanningFilters = {
   deadlineTo: string;
   plannedFrom: string;
   plannedTo: string;
+  /** The day a story went live (`publishedAt`), unlike `plannedFrom`/`plannedTo`, which are only the plan. */
+  publishedFrom: string;
+  publishedTo: string;
+  /**
+   * Legacy: a saved view or old link may still name a publication state. `published`
+   * is the Published scope (stories-scope.ts promotes it); draft and scheduled stay a refinement.
+   */
   publicationState: string;
   visualStatus: string;
   mine: boolean;
@@ -166,6 +173,8 @@ export const EMPTY_PLANNING_FILTERS: PlanningFilters = {
   deadlineTo: "",
   plannedFrom: "",
   plannedTo: "",
+  publishedFrom: "",
+  publishedTo: "",
   publicationState: "",
   visualStatus: "",
   mine: false,
@@ -623,6 +632,7 @@ export function filterPlanningStories(
     if (applied.editorId !== null && story.editor?.id !== applied.editorId) return false;
     if (!inDateRange(story.deadline, applied.deadlineFrom, applied.deadlineTo)) return false;
     if (!inDateRange(story.plannedPublication, applied.plannedFrom, applied.plannedTo)) return false;
+    if (!inDateRange(story.publicationState.publishedAt, applied.publishedFrom, applied.publishedTo)) return false;
     if (applied.publicationState && story.publicationState.id !== applied.publicationState) return false;
     if (applied.visualStatus && story.visual.status !== applied.visualStatus) return false;
     // The reader's own stories: editor, primary writer or a canonical co-writer, the one membership rule
@@ -652,6 +662,8 @@ function storySortValue(story: PlanningStory, key: PlanningSortKey): string | nu
       return parsePlanningDate(story.deadline)?.getTime() ?? emptyLast();
     case "planned":
       return parsePlanningDate(story.plannedPublication)?.getTime() ?? emptyLast();
+    case "published":
+      return parsePlanningDate(story.publicationState.publishedAt)?.getTime() ?? 0;
     case "modified":
       return parsePlanningDate(story.modifiedAt)?.getTime() ?? 0;
   }
@@ -668,19 +680,15 @@ export function storyHasOpenWork(story: PlanningStory): boolean {
   return (story.reporting?.needsScheduling ?? 0) > 0;
 }
 
-/**
- * A published story is finished news, so the List hides it unless something on
- * it is still open. Choosing a publication state yourself, or asking for published
- * stories, shows them.
- */
-export function hideFinishedPublished(stories: PlanningStory[], options: { showPublished?: boolean; publicationState?: string } = {}): PlanningStory[] {
-  if (options.showPublished || options.publicationState) return stories;
-  return stories.filter((story) => !story.publicationState.isPublished || storyHasOpenWork(story));
-}
-
 export function sortPlanningStories(stories: PlanningStory[], sort: PlanningSort = DEFAULT_PLANNING_SORT): PlanningStory[] {
   const direction = sort.direction === "desc" ? -1 : 1;
   return [...stories].sort((left, right) => {
+    // A story with no publication time (never published) sorts last whichever way the dates run.
+    if (sort.key === "published") {
+      const leftAt = parsePlanningDate(left.publicationState.publishedAt)?.getTime();
+      const rightAt = parsePlanningDate(right.publicationState.publishedAt)?.getTime();
+      if (leftAt === undefined || rightAt === undefined) return leftAt === rightAt ? left.id - right.id : leftAt === undefined ? 1 : -1;
+    }
     const leftValue = storySortValue(left, sort.key);
     const rightValue = storySortValue(right, sort.key);
     if (leftValue < rightValue) return -1 * direction;
@@ -746,7 +754,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isPlanningSort(value: unknown): value is PlanningSort {
   if (!isRecord(value)) return false;
-  return ["story", "workflow", "writer", "deadline", "planned", "modified"].includes(String(value.key))
+  return (SORT_KEYS as readonly string[]).includes(String(value.key))
     && (value.direction === "asc" || value.direction === "desc");
 }
 
@@ -859,7 +867,7 @@ export function optionalApiFallback<T>(error: unknown, fallback: T | null, label
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const VISUAL_STATUSES: readonly PlanningVisualStatus[] = ["needed", "assigned", "in-progress", "uploaded", "selected", "done"];
-const SORT_KEYS: readonly PlanningSortKey[] = ["story", "workflow", "writer", "deadline", "planned", "modified"];
+const SORT_KEYS: readonly PlanningSortKey[] = ["story", "workflow", "writer", "deadline", "planned", "published", "modified"];
 export const PLANNING_QUERY_MAX_LENGTH = 200;
 
 const positiveId = (value: unknown): number | null => {
@@ -891,6 +899,8 @@ export function sanitizePlanningFilters(value: unknown): PlanningFilters {
     deadlineTo: day(source.deadlineTo),
     plannedFrom: day(source.plannedFrom),
     plannedTo: day(source.plannedTo),
+    publishedFrom: day(source.publishedFrom),
+    publishedTo: day(source.publishedTo),
     publicationState: publication,
     visualStatus: visual,
     mine: flag(source.mine),

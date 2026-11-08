@@ -199,6 +199,8 @@ export function planningFilterParams(filters?: Partial<PlanningFilters>): Record
   if (applied.deadlineTo) params.deadline_to = applied.deadlineTo;
   if (applied.plannedFrom) params.planned_from = applied.plannedFrom;
   if (applied.plannedTo) params.planned_to = applied.plannedTo;
+  if (applied.publishedFrom) params.published_from = applied.publishedFrom;
+  if (applied.publishedTo) params.published_to = applied.publishedTo;
   if (applied.publicationState) params.publication_state = applied.publicationState;
   if (applied.visualStatus) params.visual_status = applied.visualStatus;
   if (applied.mine) params.mine = 1;
@@ -222,6 +224,8 @@ export function parsePlanningFilterParams(params: URLSearchParams): PlanningFilt
     deadlineTo: value("deadline_to"),
     plannedFrom: value("planned_from"),
     plannedTo: value("planned_to"),
+    publishedFrom: value("published_from"),
+    publishedTo: value("published_to"),
     publicationState: value("publication_state"),
     visualStatus: value("visual_status"),
     mine: value("mine"),

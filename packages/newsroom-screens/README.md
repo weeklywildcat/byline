@@ -1,7 +1,7 @@
 # @byline/newsroom-screens
 
 Byline's newsroom screens and their models, independent of any CMS: Home,
-Stories (Board and List), the Calendar, Story Peek and hover cards, the Story
+Stories (Working, Published and All; Board and List in Working), the Calendar, Story Peek and hover cards, the Story
 Workspace, the New story / task dialogs, the command palette, and the planning,
 workspace, editorial and collection models they render.
 

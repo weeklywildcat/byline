@@ -1,4 +1,5 @@
-import { DEFAULT_PLANNING_SORT, filterPlanningStories, hideFinishedPublished, normalizePlanningFilters, sortPlanningStories, type PlanningFilters, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
+import { DEFAULT_PLANNING_SORT, filterPlanningStories, normalizePlanningFilters, sortPlanningStories, type PlanningFilters, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
+import { storiesInScope } from "@byline/newsroom-screens/planning/stories-scope";
 import { builtInStoryView, type BuiltInStoryView } from "@byline/newsroom-screens/planning/story-views";
 import type { Role } from "../../domain/vocabulary";
 
@@ -34,13 +35,13 @@ export function storySwitcherFilters(queue: StorySwitcherQueueId, query: string)
 }
 
 /**
- * The stories to list, as Stories' List shows them: the same filtering and
+ * The stories to list, as Stories' Working scope shows them: the same filtering and
  * the default (deadline) order, without finished published stories, which
  * reappear when searched for by name.
  */
 export function storySwitcherRows(stories: PlanningStory[], filters: PlanningFilters, currentUserId: number | null): PlanningStory[] {
   const matching = sortPlanningStories(filterPlanningStories(stories, filters, currentUserId ?? undefined), DEFAULT_PLANNING_SORT);
-  return hideFinishedPublished(matching, { showPublished: Boolean(filters.query) });
+  return filters.query ? matching : storiesInScope(matching, "working");
 }
 
 /** The open story, shown above the queue when the queue does not include it, so it never disappears from the list. */

@@ -69,44 +69,91 @@ agree. Selected view, open menus, drag state and form text stay local.
 
 `StoriesPage` lives in `@byline/newsroom-screens` and is shared by the WordPress
 admin and the Payload newsroom. It knows no CMS: what only one host has arrives
-as an optional capability. `renderCalendar` supplies the Calendar view
+as an optional capability. `renderCalendar` supplies the Calendar presentation
 (WordPress mounts the shared Schedule-X Calendar from
 `@byline/newsroom-screens/calendar` there; the Payload newsroom passes none,
 offering Board and List only, because its Calendar is its own destination), and
-`viewHref` supplies a view's
-address (WordPress: `planning-routing.ts`; default: `view=` on the current
-address).
+`locationHref` supplies a location's address (WordPress: `planning-routing.ts`;
+default: `scope=` or `view=` on the current address).
 
-Three controls, three questions:
+Stories is the one home of **every** story. It is the same Stories collection
+(no second collection, API or sidebar destination); what changes is which stories
+you are looking at. Published work is a first-class part of Stories, not a
+filter you have to discover.
 
-- **Which story set?** The built-in views (`story-views.ts`: All stories, My
-  stories, Ready for review, Overdue, Unassigned, Published, On hold) and the
-  reader's saved views. A built-in view is active only while the filters match it
-  exactly; a saved view stays selected while edited and reads as *modified*.
-- **How is it presented?** Board | List (| Calendar), line `Tabs`. The address
-  names the view (`view=board|list|calendar`, plus `&tab=stories` in WordPress);
-  changing a tab uses `pushState`, Back works, and a reload restores it. The
-  WordPress sidebar's Calendar entry opens Stories on Calendar, and a bare
-  Stories link restores the last view (`byline:stories-view`).
-- **How is it refined?** The toolbar: search, Workflow, Writer and Editor plus
-  **More filters** (publication state, visual status, date ranges, Mine,
-  Unassigned, Overdue, Needs review). Anything set behind More filters shows as
-  a removable chip.
+Four controls, four questions (`stories-scope.ts` holds the rules, free of React):
+
+- **Which stories?** The **scope**, line `Tabs`: **Working · Published · All**,
+  each with a quiet count.
+  - *Working* (the default) is the newsroom work queue: every unpublished story
+    (drafts, scheduled, any workflow stage) plus a published story only while it
+    still has open work (`storyHasOpenWork`: an open task, unfinished production,
+    an appointment to schedule, a review request).
+  - *Published* is the publication record: every published story, finished or
+    not, newest first (`published` sort, on `publishedAt`, never the plan).
+  - *All* is the library: every story the reader may see, most recently
+    updated first.
+  Counts come from the planning response the screen already holds (the server
+  narrows it by the refinements), so they need no request of their own and move
+  with the filters.
+- **How is it presented?** Board | List (| Calendar), a single-choice
+  `ToggleGroup` (outline, `aria-label="Stories presentation"`) shown **only in
+  Working**. Published and All are listed, so they render no presentation control
+  at all. The Working choice is remembered across scope switches and in
+  `byline:stories-view`.
+- **Which of those stories?** The views picker: built-in presets (My stories,
+  Ready for review, Overdue, Unassigned, Art needed, On hold; each scope lists the
+  ones that mean something there, and there is no "Published" preset, because
+  Published is a scope) and the reader's saved views. A built-in view refines
+  the scope you are in; a saved view stays selected while edited and reads as
+  *modified*.
+- **How is it refined?** The toolbar, which follows the scope
+  (`SCOPE_FILTER_CONTROLS`). Working: search, Workflow, Writer, Editor and More
+  filters (visual status, deadline and planned ranges, Mine, Unassigned, Overdue,
+  Needs review). Published: search, Writer, Editor and More filters (published
+  range, Mine). All: search, Workflow, Writer, Editor, published range, Mine,
+  Unassigned. A filter that is still on but not offered in the current scope is
+  shown as a removable chip, never applied unseen. `publishedFrom`/`publishedTo`
+  are a range on the day a story went live (newsroom timezone); WordPress does not
+  query on it, the screen applies it.
+
+**Addresses.** `scope=` and `view=` (plus `&tab=stories` in WordPress). Working is
+implicit: `?view=board|list|calendar`. A library is `?scope=published|all` and
+carries no `view` (`?scope=published&view=board` opens Published as a list).
+Changing scope or presentation uses `pushState`, Back and Forward restore both, and
+a reload lands on the same place. An unknown scope is Working. The earlier
+`publication_state=published` always meant published stories, so an old bookmark
+opens Published (`resolveStoriesRoute`), and that parameter is dropped from the
+address on the next change.
+
+**Saved views and the scope.** Saved views remain filters plus a sort. Published
+is stored the way it always was, as `publicationState: "published"`: saving while
+on Published keeps it, and applying a view with it opens the Published tab
+(`promoteScopeFromFilters`) rather than showing Published stories under a Working
+tab. Draft and Scheduled stay a refinement among unpublished stories (a chip, no
+select) and move a reader off Published. Working and All are not stored.
+
+**Published and All** are rendered by `StoryLibrary`: one table above a measured
+width (shadcn `Table`) and compact `Item` rows below it, over a per-scope column
+list (`libraryColumns`). Published is Story, Section, People, Published, Updated,
+with newsroom-day separators (Today, Yesterday, then the date) while it runs
+newest-first; All is Story, State, Section, People, Publication, Updated. Neither
+edits a workflow stage or a deadline, and a published story is never a Board card
+or movable (`canMoveFromMenu`). Section appears only when the host supplies
+sections (the Payload newsroom does; WordPress does not yet).
 
 One controller (`useStoryViews` in `StoryViews.tsx`) owns the story set: the
 built-in and saved views, Save, Rename, Update, Delete and its **Undo** toast,
 and the dialogs, rendered once. `StoryViewsPicker` presents it as one menu
-above the collection (`[All stories ▾]   Board  List`) with the same views,
-Save current view… and Manage views…. Stories is one column beside the app
-sidebar:
+beside the presentation control. Stories is one column beside the app sidebar:
 
 ```
 Stories
-Track everything the newsroom is working on.
+The newsroom's stories, in progress and published.
 
-[ All stories ▾ ]             Board   List
+Working 8   Published 7   All 14        [ All stories ▾ ]  [Board|List]
 [Search] [Workflow] [Writer] [Editor] [More filters]
-actual Board/List
+the scope's stories
 ```
 
 There was a `StoryViewsRail` (a `sidebar-09`-style views pane beside the page

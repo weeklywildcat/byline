@@ -501,6 +501,12 @@ $editorial_test_current_user = 2;
 editorial_test_assert(byline_editorial_update_saved_view($view['id'], ['name' => 'Updated'], 2)['name'] === 'Updated', 'A user could not update their own saved view.');
 editorial_test_assert(byline_editorial_delete_saved_view($view['id'], 2), 'A user could not delete their own saved view.');
 
+// Published is a Stories scope. A saved view keeps the day range a story went live and the published-time sort.
+$published_view = byline_editorial_save_saved_view(['name' => 'Last week', 'filters' => ['publishedFrom' => '2026-11-01', 'publishedTo' => 'not a day', 'wordpressState' => 'publish'], 'sort' => ['key' => 'published', 'direction' => 'desc']], 2);
+editorial_test_assert(is_array($published_view) && ($published_view['filters']['publishedFrom'] ?? '') === '2026-11-01' && !isset($published_view['filters']['publishedTo']), 'A saved view lost its published range or kept an invalid day.');
+editorial_test_assert(($published_view['sort']['key'] ?? '') === 'published' && ($published_view['sort']['direction'] ?? '') === 'desc', 'A saved view lost the published sort.');
+editorial_test_assert(byline_editorial_delete_saved_view($published_view['id'], 2), 'A user could not delete their published-range view.');
+
 // Structured media preserves the legacy note and sanitizes the structured one.
 $media = byline_get_editorial_media_request(10);
 editorial_test_assert($media['isLegacy'] === true && strpos($media['notes'], '<script>') === false, 'Legacy visual notes were not safely exposed as a fallback.');

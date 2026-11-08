@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import { defaultStoriesViewHref, StoriesPage, type StoriesPageProps } from "@byline/newsroom-screens/planning/StoriesPage";
+import { defaultStoriesLocationHref, StoriesPage, type StoriesPageProps } from "@byline/newsroom-screens/planning/StoriesPage";
 import { availableStoriesViews, supportedStoriesView } from "@byline/newsroom-screens/planning/stories-view";
 import { activeStoryView, activeStoryViewLabel, applyBuiltInView, applySavedView, BUILT_IN_STORY_VIEWS } from "@byline/newsroom-screens/planning/story-views";
 import { StoryViewsPicker, type StoryViewsController } from "@byline/newsroom-screens/planning/StoryViews";
@@ -29,6 +29,8 @@ function render(props: Partial<StoriesPageProps> = {}) {
 }
 
 const tabs = (html: string) => Array.from(html.matchAll(/role="tab"[^>]*>([^<]+)</g), (match) => match[1]);
+/** The Board | List | Calendar choice: a presentation group, not tabs. */
+const presentations = (html: string) => Array.from(html.matchAll(/data-presentation="([a-z]+)"/g), (match) => match[1]);
 
 describe("Stories views a host offers", () => {
   it("offers Calendar only when the host supplies one", () => {
@@ -43,19 +45,32 @@ describe("Stories views a host offers", () => {
   });
 
   it("names the view in the address by default, keeping everything else", () => {
-    expect(defaultStoriesViewHref("http://localhost:3010/stories?collection=4#top", "list")).toBe("/stories?collection=4&view=list#top");
-    expect(defaultStoriesViewHref("http://localhost:3010/stories?view=board", "list")).toBe("/stories?view=list");
+    expect(defaultStoriesLocationHref("http://localhost:3010/stories?collection=4#top", { scope: "working", view: "list" })).toBe("/stories?collection=4&view=list#top");
+    expect(defaultStoriesLocationHref("http://localhost:3010/stories?view=board", { scope: "working", view: "list" })).toBe("/stories?view=list");
+  });
+
+  it("names a library scope instead, and no view", () => {
+    expect(defaultStoriesLocationHref("http://localhost:3010/stories?view=board&collection=4", { scope: "published", view: "list" })).toBe("/stories?collection=4&scope=published");
   });
 });
 
 describe("the shared Stories screen", () => {
-  it("never shows a Calendar tab without a calendar behind it", () => {
-    expect(tabs(render())).toEqual(["Board", "List"]);
-    expect(tabs(render({ initialView: "calendar" }))).toEqual(["Board", "List"]);
+  it("never shows a Calendar presentation without a calendar behind it", () => {
+    expect(presentations(render())).toEqual(["board", "list"]);
+    expect(presentations(render({ initialView: "calendar" }))).toEqual(["board", "list"]);
   });
 
-  it("shows the host's calendar as a third view", () => {
-    expect(tabs(render({ renderCalendar: () => <div>Host calendar</div> }))).toEqual(["Board", "List", "Calendar"]);
+  it("shows the host's calendar as a third presentation", () => {
+    expect(presentations(render({ renderCalendar: () => <div>Host calendar</div> }))).toEqual(["board", "list", "calendar"]);
+  });
+
+  it("offers only Working a presentation: Published and All are listed", () => {
+    expect(presentations(render({ initialScope: "published" }))).toEqual([]);
+    expect(presentations(render({ initialScope: "all", renderCalendar: () => <div /> }))).toEqual([]);
+  });
+
+  it("opens an old publication_state=published link on Published", () => {
+    expect(render({ initialFilters: { publicationState: "published" } })).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*data-scope="published"|data-scope="published"[^>]*aria-selected="true"/);
   });
 
   it("knows no CMS: no WordPress routing, Schedule-X or host calendar code", () => {
@@ -105,11 +120,15 @@ describe("Stories views", () => {
     expect(pickerTag).not.toMatch(/\bhidden\b/);
   });
 
-  it("keeps Board and List as line tabs, apart from the story set", () => {
+  it("keeps the scope as line tabs, and Board and List apart from them as a presentation group", () => {
     const html = render();
-    expect(html).toMatch(/role="tablist"[^>]*aria-label="Stories presentation"/);
+    expect(tabs(html)).toEqual(["Working", "Published", "All"]);
+    expect(html).toMatch(/role="tablist"[^>]*aria-label="Stories scope"/);
+    expect(html).toMatch(/role="group"[^>]*aria-label="Stories presentation"/);
+    expect(html).not.toMatch(/role="tablist"[^>]*aria-label="Stories presentation"/);
     const tablist = /<div[^>]*role="tablist"[\s\S]*?<\/div>/.exec(html)?.[0] ?? "";
     expect(tablist).not.toContain("All stories");
+    expect(tablist).not.toMatch(/Board|List/);
   });
 
   it("offers a page-level New story only when the host has no Create of its own", () => {

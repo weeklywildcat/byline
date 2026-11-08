@@ -13,11 +13,11 @@ import { Feedback } from "./Feedback";
 import { MediaWork } from "@byline/newsroom-screens/media/MediaWork";
 import { PageHeader } from "@byline/newsroom-screens/planning/PlanningPage";
 import { wordpressMediaPicker } from "../workspace/media-library";
-import { StoriesPage, type StoriesCalendarProps } from "@byline/newsroom-screens/planning/StoriesPage";
-import type { StoriesView } from "@byline/newsroom-screens/planning/stories-view";
+import { StoriesPage, type StoriesCalendarProps, type StoriesLocation } from "@byline/newsroom-screens/planning/StoriesPage";
+import { resolveStoriesRoute } from "@byline/newsroom-screens/planning/stories-scope";
 import { createWorkspaceUrlBuilder, StoryCalendar } from "./calendar-host";
 import { storiesRouteFilters, type PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
-import { destinationForTab, initialStoriesView, storiesViewHref } from "./planning-routing";
+import { destinationForTab, initialStoriesView, storiesLocationHref } from "./planning-routing";
 
 export type PlanningAppFetchers = PlanningFetchers & StoryFetchers;
 
@@ -62,9 +62,10 @@ function PlanningBody({ fetchers, tab, view, currentUserId, mine, workspaceUrl }
   // WordPress's Stories calendar is Schedule-X over the protected schedule feed; its events link
   // appointments too, so it takes the full wp-admin workspace builder rather than the story-only one.
   const renderCalendar = useCallback((calendar: StoriesCalendarProps) => <StoryCalendar {...calendar} workspaceUrl={workspaceUrl} getSchedule={fetchers.getSchedule} />, [fetchers.getSchedule, workspaceUrl]);
-  const viewHref = useCallback((next: StoriesView) => storiesViewHref(window.location.href, next), []);
+  const locationHref = useCallback((next: StoriesLocation) => storiesLocationHref(window.location.href, next), []);
+  const initialScope = useMemo(() => resolveStoriesRoute(new URLSearchParams(window.location.search)).scope, []);
   return <main className="@container/planning mx-auto mt-6 mb-8 flex max-w-[1600px] flex-col gap-4 pr-5 pl-1">
-    {destination === "stories" ? <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={{ ...storiesRouteFilters(new URLSearchParams(window.location.search)), ...(mine ? { mine: true } : {}) }} workspaceUrl={workspaceUrl} renderCalendar={renderCalendar} viewHref={viewHref} onNewStory={fetchers.createStory ? () => setCreating(true) : undefined} /> : null}
+    {destination === "stories" ? <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialScope={initialScope} initialFilters={{ ...storiesRouteFilters(new URLSearchParams(window.location.search)), ...(mine ? { mine: true } : {}) }} workspaceUrl={workspaceUrl} renderCalendar={renderCalendar} locationHref={locationHref} onNewStory={fetchers.createStory ? () => setCreating(true) : undefined} /> : null}
     {destination === "collections" ? <WordPressCollections fetchers={fetchers} currentUserId={currentUserId} workspaceUrl={workspaceUrl} /> : null}
     {destination === "media" ? <>
       <PageHeader title="Media Desk" description="Every photo, video, graphic and audio assignment across the newsroom. Files stay in the WordPress Media Library." />

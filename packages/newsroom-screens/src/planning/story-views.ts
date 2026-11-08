@@ -6,15 +6,19 @@
  * it exactly. Saved views are the reader's own presets, stored by the host.
  */
 import { activeStory } from "../home/newsroom-model";
-import { DEFAULT_PLANNING_SORT, EMPTY_PLANNING_FILTERS, filterPlanningStories, normalizePlanningFilters, samePlanningFilters, sanitizePlanningFilters, sanitizePlanningSort, type PlanningFilters, type PlanningSort, type PlanningStory, type SavedPlanningView } from "./planning-model";
+import { EMPTY_PLANNING_FILTERS, filterPlanningStories, normalizePlanningFilters, samePlanningFilters, sanitizePlanningFilters, sanitizePlanningSort, type PlanningFilters, type PlanningSort, type PlanningStory, type SavedPlanningView } from "./planning-model";
+import { defaultScopeSort, scopedViewFilters, type StoryScope } from "./stories-scope";
 
-export type BuiltInStoryViewId = "all" | "mine" | "review" | "overdue" | "unassigned" | "art-needed" | "published" | "on-hold";
+export type BuiltInStoryViewId = "all" | "mine" | "review" | "overdue" | "unassigned" | "art-needed" | "on-hold";
 
 export type BuiltInStoryView = { id: BuiltInStoryViewId; label: string; filters: PlanningFilters };
 
 const preset = (id: BuiltInStoryViewId, label: string, patch: Partial<PlanningFilters>): BuiltInStoryView => ({ id, label, filters: { ...EMPTY_PLANNING_FILTERS, ...patch } });
 
-/** In menu order. Dropped stays reachable through the Workflow filter, never a prominent view. */
+/**
+ * In menu order. Dropped stays reachable through the Workflow filter, never a prominent
+ * view. There is no "Published" view: Published is a Stories scope, not a filter preset.
+ */
 export const BUILT_IN_STORY_VIEWS: readonly BuiltInStoryView[] = [
   preset("all", "All stories", {}),
   preset("mine", "My stories", { mine: true }),
@@ -22,9 +26,19 @@ export const BUILT_IN_STORY_VIEWS: readonly BuiltInStoryView[] = [
   preset("overdue", "Overdue", { overdue: true }),
   preset("unassigned", "Unassigned", { unassigned: true }),
   preset("art-needed", "Art needed", { visualStatus: "needed" }),
-  preset("published", "Published", { publicationState: "published" }),
   preset("on-hold", "On hold", { workflow: "on-hold" })
 ];
+
+/** Which presets answer a question in each scope (no "Overdue" among published stories). In menu order. */
+const SCOPE_BUILT_IN_VIEWS: Record<StoryScope, readonly BuiltInStoryViewId[]> = {
+  working: ["all", "mine", "review", "overdue", "unassigned", "art-needed", "on-hold"],
+  published: ["all", "mine"],
+  all: ["all", "mine", "review", "unassigned", "art-needed", "on-hold"]
+};
+
+export function builtInViewsForScope(scope: StoryScope): BuiltInStoryView[] {
+  return SCOPE_BUILT_IN_VIEWS[scope].map((id) => BUILT_IN_STORY_VIEWS.find((view) => view.id === id)!);
+}
 
 export function builtInStoryView(id: string): BuiltInStoryView | null {
   return BUILT_IN_STORY_VIEWS.find((view) => view.id === id) ?? null;
@@ -46,9 +60,13 @@ export type ActiveStoryView =
 
 const sameSort = (left: PlanningSort, right: PlanningSort) => left.key === right.key && left.direction === right.direction;
 
-export function activeStoryView(filters: Partial<PlanningFilters>, sort: PlanningSort, savedViews: readonly SavedPlanningView[], selectedSavedId: string | null): ActiveStoryView {
+/**
+ * `filters` are the screen's refinements; a saved view also stores Published as a
+ * publication state, so it is compared with the scope put back in.
+ */
+export function activeStoryView(filters: Partial<PlanningFilters>, sort: PlanningSort, savedViews: readonly SavedPlanningView[], selectedSavedId: string | null, scope: StoryScope = "working"): ActiveStoryView {
   const selected = selectedSavedId ? savedViews.find((view) => view.id === selectedSavedId) : undefined;
-  if (selected) return { kind: "saved", view: selected, modified: !samePlanningFilters(selected.filters, filters) || !sameSort(selected.sort, sort) };
+  if (selected) return { kind: "saved", view: selected, modified: !samePlanningFilters(selected.filters, scopedViewFilters(filters, scope)) || !sameSort(selected.sort, sort) };
   const builtIn = BUILT_IN_STORY_VIEWS.find((view) => samePlanningFilters(view.filters, filters));
   return builtIn ? { kind: "built-in", view: builtIn } : { kind: "custom" };
 }
@@ -60,10 +78,15 @@ export function activeStoryViewLabel(active: ActiveStoryView): string {
   return "Custom view";
 }
 
-export type AppliedView = { filters: PlanningFilters; sort: PlanningSort; savedViewId: string | null };
+/**
+ * What choosing a view does to the screen. `scope` is set when the view must stay
+ * where it is (a built-in view refines the scope the reader is in); without it the
+ * scope follows the filters (a saved view for published stories opens Published).
+ */
+export type AppliedView = { filters: PlanningFilters; sort: PlanningSort; savedViewId: string | null; scope?: StoryScope };
 
-export function applyBuiltInView(view: BuiltInStoryView): AppliedView {
-  return { filters: normalizePlanningFilters(view.filters), sort: { ...DEFAULT_PLANNING_SORT }, savedViewId: null };
+export function applyBuiltInView(view: BuiltInStoryView, scope: StoryScope = "working"): AppliedView {
+  return { filters: normalizePlanningFilters(view.filters), sort: defaultScopeSort(scope), savedViewId: null, scope };
 }
 
 export function applySavedView(view: SavedPlanningView): AppliedView {

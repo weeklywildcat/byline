@@ -3,6 +3,7 @@
 import type { PlanningFilters } from "@byline/newsroom-screens/planning/planning-model";
 import { StoriesPage } from "@byline/newsroom-screens/planning/StoriesPage";
 import { preferredStoriesView, storiesViewFromRoute, type StoriesView } from "@byline/newsroom-screens/planning/stories-view";
+import type { StoryScope } from "@byline/newsroom-screens/planning/stories-scope";
 import { StoryHoverProvider } from "@byline/newsroom-screens/story/StoryHoverCard";
 import { StoryPeekHost, useStoryPeek } from "@byline/newsroom-screens/story/StoryPeekHost";
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
@@ -17,19 +18,21 @@ export type NewsroomStoriesProps = {
   currentUserId: number;
   /** `view=` from the address, when it names one. */
   view?: string;
+  /** `scope=` from the address: Working (the default), Published or All. */
+  scope?: StoryScope;
   initialFilters?: Partial<PlanningFilters>;
 };
 
 const subscribeNever = () => () => {};
 
 /**
- * Byline Stories (`/admin/stories`): the shared StoriesPage, Board and List,
- * inside the Byline shell. The shell owns the query cache, Create, Search and
+ * Byline Stories (`/admin/stories`): the shared StoriesPage (Working, Published and
+ * All; Board and List in Working), inside the Byline shell. The shell owns the query cache, Create, Search and
  * toasts (so Stories shows no New story of its own); this host supplies the
  * Payload fetchers, the one Story Peek, and the Story screen's address. No
  * calendar yet, so Stories offers Board and List.
  */
-export function NewsroomStories({ currentUserId, view, initialFilters }: NewsroomStoriesProps) {
+export function NewsroomStories({ currentUserId, view, scope, initialFilters }: NewsroomStoriesProps) {
   const { config } = useConfig();
   const { getPreference, setPreference } = usePreferences();
   const api = config.routes.api;
@@ -46,7 +49,7 @@ export function NewsroomStories({ currentUserId, view, initialFilters }: Newsroo
       <StoryHoverProvider fetchers={fetchers}>
         <StoryPeekHost fetchers={fetchers} workspaceUrl={workspaceUrl}>
           <main className="@container/planning mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-6 lg:px-6">
-            {initialView ? <StoriesBody fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={initialFilters} workspaceUrl={workspaceUrl} /> : <StoriesPlaceholder />}
+            {initialView ? <StoriesBody fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialScope={scope} initialFilters={initialFilters} workspaceUrl={workspaceUrl} /> : <StoriesPlaceholder />}
           </main>
         </StoryPeekHost>
       </StoryHoverProvider>
@@ -54,7 +57,7 @@ export function NewsroomStories({ currentUserId, view, initialFilters }: Newsroo
   );
 }
 
-function StoriesBody({ fetchers, currentUserId, initialView, initialFilters, workspaceUrl }: { fetchers: Parameters<typeof StoriesPage>[0]["fetchers"]; currentUserId: number; initialView: StoriesView; initialFilters?: Partial<PlanningFilters>; workspaceUrl: (storyId: number) => string }) {
+function StoriesBody({ fetchers, currentUserId, initialView, initialScope, initialFilters, workspaceUrl }: { fetchers: Parameters<typeof StoriesPage>[0]["fetchers"]; currentUserId: number; initialView: StoriesView; initialScope?: StoryScope; initialFilters?: Partial<PlanningFilters>; workspaceUrl: (storyId: number) => string }) {
   const { openStory } = useStoryPeek();
   const { setStoryOpener } = useBylineSearch();
   // ⌘K opens a story in this screen's Peek rather than leaving Stories.
@@ -63,7 +66,7 @@ function StoriesBody({ fetchers, currentUserId, initialView, initialFilters, wor
     return () => setStoryOpener(null);
   }, [openStory, setStoryOpener]);
   // No page-level New story: the shell's Create is already beside it.
-  return <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={initialFilters} workspaceUrl={workspaceUrl} />;
+  return <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialScope={initialScope} initialFilters={initialFilters} workspaceUrl={workspaceUrl} />;
 }
 
 function StoriesPlaceholder() {

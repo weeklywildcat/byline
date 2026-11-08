@@ -4,6 +4,7 @@ import type { AdminViewServerProps } from "payload";
 import { redirectIfSignedOut } from "../auth/session";
 import { requestUser } from "../access/user";
 import { storiesRouteFilters } from "@byline/newsroom-screens/planning/planning-api";
+import { resolveStoriesRoute } from "@byline/newsroom-screens/planning/stories-scope";
 import { NewsroomStories } from "../ui/stories/NewsroomStories";
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
@@ -23,15 +24,18 @@ export function BylineStories({ initPageResult, params, searchParams }: AdminVie
   const routeParams = new URLSearchParams();
   Object.entries(searchParams ?? {}).forEach(([key, value]) => { const single = first(value); if (single !== undefined) routeParams.set(key, single); });
   const initialFilters = storiesRouteFilters(routeParams);
+  // `scope=` (Working, Published, All); the earlier `publication_state=published` means Published too.
+  const { scope } = resolveStoriesRoute(routeParams);
   // Payload leaves custom root views bare; its default template brings the Byline shell (Nav, header).
   return (
     <DefaultTemplate i18n={req.i18n} locale={locale} params={params} payload={req.payload} permissions={permissions} req={req} searchParams={searchParams} user={req.user ?? undefined} visibleEntities={visibleEntities}>
       {user ? (
         <NewsroomStories
           // A sidebar view link while Stories is open is a new address with new filters: start from them.
-          key={JSON.stringify(initialFilters)}
+          key={JSON.stringify({ initialFilters, scope })}
           currentUserId={Number(user.id)}
           view={first(searchParams?.view)}
+          scope={scope}
           initialFilters={initialFilters}
         />
       ) : (

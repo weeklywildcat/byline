@@ -3,8 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import { StoryBoard } from "@byline/newsroom-screens/planning/StoryBoard";
 import { StoryList, type StoryListProps } from "@byline/newsroom-screens/planning/StoryList";
-import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, hideFinishedPublished, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
-import { destinationForTab, initialStoriesView, storiesViewHref } from "../src/planning/planning-routing";
+import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, isPlannedDayOnly, storyHasOpenWork, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
+import { storiesInScope } from "@byline/newsroom-screens/planning/stories-scope";
+import { destinationForTab, initialStoriesView, storiesLocationHref } from "../src/planning/planning-routing";
 import { ProductionSummary, productionSignal, storySignals, workflowBadgeSpec, WorkflowBadge } from "@byline/newsroom-screens/story/story-parts";
 import { sectionNames } from "@byline/newsroom-screens/workspace/workspace-model";
 
@@ -244,7 +245,12 @@ describe("Planning addresses", () => {
   });
 
   it("builds a deep link that keeps unrelated parameters and drops the open story", () => {
-    expect(storiesViewHref("http://localhost/wp-admin/admin.php?page=byline-planning&tab=calendar&mine=1&story=5", "list")).toBe("/wp-admin/admin.php?page=byline-planning&tab=stories&mine=1&view=list");
+    expect(storiesLocationHref("http://localhost/wp-admin/admin.php?page=byline-planning&tab=calendar&mine=1&story=5", { scope: "working", view: "list" })).toBe("/wp-admin/admin.php?page=byline-planning&tab=stories&mine=1&view=list");
+  });
+
+  it("names a library scope instead of a view, and forgets the legacy published parameter", () => {
+    expect(storiesLocationHref("http://localhost/wp-admin/admin.php?page=byline-planning&tab=stories&view=list&mine=1", { scope: "published", view: "list" })).toBe("/wp-admin/admin.php?page=byline-planning&tab=stories&mine=1&scope=published");
+    expect(storiesLocationHref("http://localhost/wp-admin/admin.php?page=byline-planning&tab=stories&scope=all&publication_state=published", { scope: "working", view: "board" })).toBe("/wp-admin/admin.php?page=byline-planning&tab=stories&view=board");
   });
 
   it("maps every sidebar tab to a destination", () => {
@@ -268,7 +274,7 @@ describe("text and dates from WordPress", () => {
   });
 });
 
-describe("published stories in the List", () => {
+describe("published stories in Working", () => {
   const published = { id: "published", label: "Published", isPublished: true, isScheduled: false };
   const done = story({ id: 1, title: "Done", publicationState: published });
   const withTask = story({ id: 2, title: "Open task", publicationState: published, openTaskCount: 1 });
@@ -281,18 +287,18 @@ describe("published stories in the List", () => {
     expect([done, withTask, withPhoto, photoDone, toSchedule].map(storyHasOpenWork)).toEqual([false, true, true, false, true]);
   });
 
-  it("hides a published story with nothing open, and keeps drafts and anything with work left", () => {
-    expect(hideFinishedPublished([done, withTask, withPhoto, photoDone, toSchedule, draft]).map((item) => item.title)).toEqual(["Open task", "Open photo", "Needs a time", "Draft"]);
+  it("keeps a published story only while something on it is open, and every draft", () => {
+    expect(storiesInScope([done, withTask, withPhoto, photoDone, toSchedule, draft], "working").map((item) => item.title)).toEqual(["Open task", "Open photo", "Needs a time", "Draft"]);
   });
 
-  it("shows them when asked for, or when a WordPress state is chosen", () => {
-    expect(hideFinishedPublished([done, draft], { showPublished: true })).toHaveLength(2);
-    expect(hideFinishedPublished([done, draft], { publicationState: "published" })).toHaveLength(2);
+  it("leaves none of them out of Published or All", () => {
+    expect(storiesInScope([done, withTask, withPhoto, photoDone, toSchedule, draft], "published")).toHaveLength(5);
+    expect(storiesInScope([done, withTask, withPhoto, photoDone, toSchedule, draft], "all")).toHaveLength(6);
   });
 
-  it("says what it left out", () => {
-    const html = renderToStaticMarkup(<StoryList {...props([draft])} hiddenPublished={2} sort={DEFAULT_PLANNING_SORT} onSortChange={vi.fn()} />);
-    expect(html).toContain("2 published stories with nothing left to do are hidden.");
+  it("the List no longer reports stories it left out", () => {
+    const html = renderToStaticMarkup(<StoryList {...props([draft])} sort={DEFAULT_PLANNING_SORT} onSortChange={vi.fn()} />);
+    expect(html).not.toMatch(/nothing left to do|Use More filters/);
   });
 });
 

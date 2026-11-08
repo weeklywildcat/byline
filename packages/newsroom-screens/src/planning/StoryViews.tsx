@@ -20,13 +20,14 @@ import {
   activeStoryViewLabel,
   applyBuiltInView,
   applySavedView,
-  BUILT_IN_STORY_VIEWS,
+  builtInViewsForScope,
   SAVED_VIEW_LIMIT,
   SAVED_VIEW_NAME_MAX_LENGTH,
   type ActiveStoryView,
   type AppliedView,
   type BuiltInStoryView
 } from "./story-views";
+import { scopedViewFilters, type StoryScope } from "./stories-scope";
 
 export type { AppliedView } from "./story-views";
 
@@ -36,7 +37,10 @@ type ViewsDialog = null | { kind: "save" } | { kind: "rename"; view: SavedPlanni
 
 export type StoryViewsOptions = {
   fetchers: PlanningFetchers;
+  /** The screen's refinements. The scope is not among them; it is passed separately. */
   filters: PlanningFilters;
+  /** Published is stored in a saved view as its publication state; Working and All are not stored. */
+  scope: StoryScope;
   sort: PlanningSort;
   selectedId: string | null;
   onApply: (view: AppliedView) => void;
@@ -70,13 +74,15 @@ export type StoryViewsController = {
   dialogs: ReactNode;
 };
 
-export function useStoryViews({ fetchers, filters, sort, selectedId, onApply, initialViews }: StoryViewsOptions): StoryViewsController {
+export function useStoryViews({ fetchers, filters: refinements, scope, sort, selectedId, onApply, initialViews }: StoryViewsOptions): StoryViewsController {
   const client = useQueryClient();
   const [dialog, setDialog] = useState<ViewsDialog>(null);
   const [error, setError] = useState("");
   const query = useQuery({ queryKey: savedViewsKey, queryFn: () => fetchers.getSavedViews!(), enabled: Boolean(fetchers.getSavedViews), initialData: initialViews, staleTime: 30_000, retry: false });
   const savedViews = useMemo(() => query.data || initialViews || [], [initialViews, query.data]);
-  const active = activeStoryView(filters, sort, savedViews, selectedId);
+  const active = activeStoryView(refinements, sort, savedViews, selectedId, scope);
+  // What a saved view keeps and what an unsaved edit is compared with: the refinements plus Published, when that is the scope.
+  const filters = useMemo(() => scopedViewFilters(refinements, scope), [refinements, scope]);
   const canSave = Boolean(fetchers.saveSavedView);
   const canDelete = Boolean(fetchers.deleteSavedView);
 
@@ -110,7 +116,7 @@ export function useStoryViews({ fetchers, filters, sort, selectedId, onApply, in
     onSuccess: (_result, view) => {
       client.setQueryData<SavedPlanningView[]>(savedViewsKey, (old) => (old || []).filter((item) => item.id !== view.id));
       // The stories stay as they are; they are simply no longer a saved view.
-      if (view.id === selectedId) onApply({ filters, sort, savedViewId: null });
+      if (view.id === selectedId) onApply({ filters, sort, savedViewId: null, scope });
       toast("View deleted.", { duration: 10_000, action: canSave ? { label: "Undo", onClick: () => restore.mutate(view) } : undefined });
     },
     onError: (failure) => toast.error(describeEditorialError(failure, "The view could not be deleted."))
@@ -158,12 +164,12 @@ export function useStoryViews({ fetchers, filters, sort, selectedId, onApply, in
   return {
     active,
     label: activeStoryViewLabel(active),
-    builtIns: BUILT_IN_STORY_VIEWS,
+    builtIns: builtInViewsForScope(scope),
     savedViews,
     canSave,
     canDelete,
     full: savedViews.length >= SAVED_VIEW_LIMIT,
-    chooseBuiltIn: (view) => onApply(applyBuiltInView(view)),
+    chooseBuiltIn: (view) => onApply(applyBuiltInView(view, scope)),
     chooseSaved: (view) => onApply(applySavedView(view)),
     updateSelected: () => { if (active.kind === "saved" && active.modified) save.mutate({ id: active.view.id, name: active.view.name, filters, sort }); },
     openSave: () => { setError(""); setDialog({ kind: "save" }); },

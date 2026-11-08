@@ -32,14 +32,12 @@ export type StoryListProps = {
   onMoveStory: (story: PlanningStory, status: string) => Promise<unknown> | void;
   onUpdateStory: (story: PlanningStory, changes: Record<string, unknown>, patch: Partial<PlanningStory>, label: string) => Promise<unknown> | void;
   onOpenStory: (storyId: number) => void;
-  /** Finished published stories the List left out, so it can say so. */
-  hiddenPublished?: number;
 };
 
 /** Below this width a seven-column table is unreadable, so the list becomes compact rows. */
 const TABLE_MIN_WIDTH = 820;
 
-function SortHead({ label, sortKey, sort, onSortChange, className }: { label: string; sortKey: PlanningSortKey; sort: PlanningSort; onSortChange: (key: PlanningSortKey) => void; className?: string }) {
+export function SortHead({ label, sortKey, sort, onSortChange, className }: { label: string; sortKey: PlanningSortKey; sort: PlanningSort; onSortChange: (key: PlanningSortKey) => void; className?: string }) {
   const current = sort.key === sortKey;
   const Icon = !current ? ArrowUpDown : sort.direction === "asc" ? ArrowUp : ArrowDown;
   return <TableHead className={cn("h-9", className)} aria-sort={current ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
@@ -47,7 +45,8 @@ function SortHead({ label, sortKey, sort, onSortChange, className }: { label: st
   </TableHead>;
 }
 
-function People({ story }: { story: PlanningStory }) {
+/** A story's writers, then its editor. Shared with the Published and All libraries. */
+export function StoryPeople({ story }: { story: PlanningStory }) {
   const writers = story.authors.length ? story.authors : story.writer ? [story.writer] : [];
   return <div className="flex min-w-0 items-center gap-2">
     {anyPicture(writers) ? <span className="flex shrink-0"><PeopleAvatars people={writers} /></span> : null}
@@ -137,17 +136,16 @@ function Publication({ story, timezone, editable, disabled, onChange }: { story:
 }
 
 export function StoryList(props: StoryListProps) {
-  const { stories, statuses, sort, canMoveStories, canAssignStories, canUpdateStories, movingStoryId, updatingStoryId, timezone, now, workspaceUrl, onSortChange, onMoveStory, onUpdateStory, onOpenStory, hiddenPublished = 0 } = props;
+  const { stories, statuses, sort, canMoveStories, canAssignStories, canUpdateStories, movingStoryId, updatingStoryId, timezone, now, workspaceUrl, onSortChange, onMoveStory, onUpdateStory, onOpenStory } = props;
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const busy = (story: PlanningStory) => movingStoryId === story.id || updatingStoryId === story.id;
   const menu = (story: PlanningStory) => <StoryActionsMenu additionalActions={props.additionalActions?.(story)} story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} workspaceUrl={workspaceUrl} />;
   const context = (story: PlanningStory, child: ReactElement) => <StoryContextMenu key={story.id} additionalActions={props.additionalActions?.(story)} story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>{child}</StoryContextMenu>;
 
-  const hidden = hiddenPublished > 0 ? <p className="px-1 text-xs text-muted-foreground">{hiddenPublished === 1 ? "1 published story with nothing left to do is hidden." : `${hiddenPublished} published stories with nothing left to do are hidden.`} {"Use More filters to show them."}</p> : null;
-  if (!stories.length) return <><Empty className="border"><EmptyHeader><EmptyTitle>No stories match</EmptyTitle><EmptyDescription>Try clearing a filter, or choose a different saved view.</EmptyDescription></EmptyHeader></Empty>{hidden}</>;
+  if (!stories.length) return <Empty className="border"><EmptyHeader><EmptyTitle>No stories match</EmptyTitle><EmptyDescription>Try clearing a filter, or choose a different saved view.</EmptyDescription></EmptyHeader></Empty>;
 
   const table = width === 0 || width >= TABLE_MIN_WIDTH;
-  return <div className="flex flex-col gap-2"><div ref={ref} className="overflow-hidden rounded-xl border bg-card shadow-xs">
+  return <div ref={ref} className="overflow-hidden rounded-xl border bg-card shadow-xs">
     {table
       ? <Table className="table-fixed border-collapse" aria-label={"Stories"}>
         <TableHeader className="bg-muted/40">
@@ -171,7 +169,7 @@ export function StoryList(props: StoryListProps) {
           }}>
             <TableCell className="py-2 pl-3 whitespace-normal"><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="line-clamp-2 text-[15px] font-semibold leading-5" /></StoryHoverCard></TableCell>
             <TableCell className="py-2 [&_[data-slot=select-trigger]]:max-w-full [&_[data-slot=badge]]:max-w-full"><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} /></TableCell>
-            <TableCell className="py-2 whitespace-normal"><People story={story} /></TableCell>
+            <TableCell className="py-2 whitespace-normal"><StoryPeople story={story} /></TableCell>
             <TableCell className="py-2"><Deadline story={story} timezone={timezone} now={now} editable={canAssignStories && canUpdateStories && story.canEditPlanning !== false} disabled={busy(story)} onChange={(deadline) => onUpdateStory(story, { deadline: deadline || "" }, { deadline }, "Deadline")} /></TableCell>
             <TableCell className="py-2 whitespace-normal"><Publication story={story} timezone={timezone} editable={canAssignStories && canUpdateStories && story.canEditPlanning !== false} disabled={busy(story)} onChange={(plannedPublication) => onUpdateStory(story, { plannedPublishAt: plannedPublication || "" }, { plannedPublication }, "Planned publication")} /></TableCell>
             <TableCell className="py-2"><ProductionSummary story={story} maxSignals={2} className="flex-row gap-x-1.5 gap-y-1 [&_[data-slot=badge]]:max-w-full" /></TableCell>
@@ -184,7 +182,7 @@ export function StoryList(props: StoryListProps) {
         {stories.map((story) => context(story, <Item key={story.id} size="sm" data-story-id={story.id} className="rounded-none border-0 border-b border-border/70 last:border-b-0" aria-busy={busy(story) || undefined}>
           <ItemContent>
             <ItemTitle><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="line-clamp-2 font-semibold" /></StoryHoverCard></ItemTitle>
-            <div className="text-sm"><People story={story} /></div>
+            <div className="text-sm"><StoryPeople story={story} /></div>
             <div className="flex flex-wrap items-center gap-x-2 text-xs">
               {canAssignStories && canUpdateStories && story.canEditPlanning !== false
                 ? <DatePicker appearance="value" label={"Deadline"} dateOnly value={story.deadline} timezone={timezone} disabled={busy(story)} placeholder={"No deadline"} displayValue={story.deadline ? shortDay(story.deadline, timezone) : undefined} onChange={(deadline) => onUpdateStory(story, { deadline: deadline || "" }, { deadline }, "Deadline")} />
@@ -195,5 +193,5 @@ export function StoryList(props: StoryListProps) {
           <ItemActions><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} />{menu(story)}</ItemActions>
         </Item>))}
       </ItemGroup>}
-  </div>{hidden}</div>;
+  </div>;
 }

@@ -62,13 +62,13 @@ afterEach(async () => {
 });
 
 describe("the board layout control", () => {
-  it("appears beside the tabs only on Board", async () => {
+  it("appears beside the presentation choice only on Board", async () => {
     await mount();
     const picker = $("[data-board-layout-picker]");
     expect(picker?.getAttribute("aria-label")).toBe("Board layout: Lanes");
     expect(picker?.textContent).toBe("Lanes");
-    expect(picker?.parentElement?.querySelector("[role=tablist]")).not.toBeNull();
-    await click($$("[role=tab]").find((tab) => tab.textContent === "List"));
+    expect(picker?.parentElement?.querySelector("[data-slot=toggle-group]")).not.toBeNull();
+    await click($("[data-presentation=list]"));
     expect($("[data-board-layout-picker]")).toBeNull();
   });
 

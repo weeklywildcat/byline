@@ -2,6 +2,9 @@ import { expect, test, type AdminSession } from "./fixtures";
 import { addDays, createPlanningStory, currentUserId, siteToday, token } from "./planning-fixture";
 
 const storiesUrl = "/wp-admin/admin.php?page=byline-planning&tab=stories";
+type AdminPage = Parameters<Parameters<typeof test>[2]>[0]["adminPage"];
+/** Board | List | Calendar: a single-choice presentation group, apart from the Working | Published | All tabs. */
+const presentation = (page: AdminPage, name: string, pressed?: boolean) => page.getByRole("group", { name: "Stories presentation" }).getByRole("button", { name, ...(pressed === undefined ? {} : { pressed }) });
 
 async function status(session: AdminSession, id: number): Promise<string> {
   const response = await session.rest<{ story?: { workflow?: { id?: string } } }>(`/byline/v1/editorial/stories/${id}/workspace`);
@@ -141,18 +144,41 @@ test.describe("Stories board", () => {
     // Published is derived from WordPress, so a published story is not a card on the board at all...
     await expect(card(page, published)).toHaveCount(0);
     // ...and in the List its actions never offer a move.
-    await page.getByRole("tab", { name: "List" }).click();
-    // Finished published stories are left out of the List until asked for.
+    await presentation(page, "List").click();
+    // Working is the work queue: a finished published story is not in it...
     await expect(page.getByRole("button", { name: `${unique} Open`, exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: `${unique} Published`, exact: true })).toHaveCount(0);
-    await expect(page.getByText(/1 published story with nothing left to do is hidden/)).toBeVisible();
-    await page.getByRole("button", { name: /More filters/ }).click();
-    await page.getByRole("checkbox", { name: "Show finished published stories" }).click();
-    await page.keyboard.press("Escape");
+    // ...it is in Published, which is a list and never a board, one obvious click away.
+    await page.getByRole("tab", { name: /^Published/ }).click();
+    await expect(page).toHaveURL(/scope=published/);
+    await expect(page.getByRole("group", { name: "Stories presentation" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: `${unique} Published`, exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: `${unique} Open`, exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: `Actions for ${unique} Published` }).click();
     await expect(page.getByRole("menuitem", { name: "Open story" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Move to" })).toHaveCount(0);
+  });
+
+  test("Working, Published and All are addressable, and an old publication_state link opens Published", async ({ adminPage: page, adminSession: session }) => {
+    const unique = token();
+    await createPlanningStory(session, { title: `${unique} Draft`, status: "writing" });
+    await createPlanningStory(session, { title: `${unique} Live`, published: true });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const story = (name: string) => page.getByRole("button", { name: `${unique} ${name}`, exact: true });
+    await page.goto(storiesUrl + "&scope=all", { waitUntil: "domcontentloaded" });
+    await page.getByRole("searchbox", { name: "Search stories" }).fill(unique);
+    await expect(page.getByRole("tab", { name: /^All/, selected: true })).toBeVisible();
+    await expect(story("Draft")).toBeVisible();
+    await expect(story("Live")).toBeVisible();
+    await page.getByRole("tab", { name: /^Published/ }).click();
+    await expect(story("Live")).toBeVisible();
+    await expect(story("Draft")).toHaveCount(0);
+    await page.goBack();
+    await expect(page.getByRole("tab", { name: /^All/, selected: true })).toBeVisible();
+    await page.goto(storiesUrl + "&publication_state=published", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("tab", { name: /^Published/, selected: true })).toBeVisible();
+    await page.goto(storiesUrl + "&scope=published&view=board", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("[data-board-scroller]")).toHaveCount(0);
   });
 
   test("auto-scrolls the board sideways while a story is dragged to its edge", async ({ adminPage: page, adminSession: session }) => {
@@ -215,7 +241,7 @@ test.describe("Story Peek everywhere", () => {
     const fromBoard = await sections();
     await page.keyboard.press("Escape");
 
-    await page.getByRole("tab", { name: "List" }).click();
+    await presentation(page, "List").click();
     await expect(page).toHaveURL(/view=list/);
     await expect(page.locator("[data-board-scroller]")).toHaveCount(0);
     await page.getByRole("button", { name: title, exact: true }).click();
@@ -223,7 +249,7 @@ test.describe("Story Peek everywhere", () => {
     expect(await sections()).toBe(fromBoard);
     await page.keyboard.press("Escape");
 
-    await page.getByRole("tab", { name: "Calendar" }).click();
+    await presentation(page, "Calendar").click();
     await expect(page).toHaveURL(/view=calendar/);
     await page.locator('[data-event-type="deadline"]', { hasText: title }).first().click();
     await expect(peek).toBeVisible();
@@ -265,19 +291,19 @@ test.describe("Story Peek actions on Stories", () => {
 test.describe("Stories views and saved views", () => {
   test("view tabs deep-link, update the address without reloading, and a reload restores the view", async ({ adminPage: page }) => {
     await page.goto(storiesUrl + "&view=list");
-    await expect(page.getByRole("tab", { name: "List", selected: true })).toBeVisible();
+    await expect(presentation(page, "List", true)).toBeVisible();
     await page.evaluate(() => { (window as unknown as { __marker: number }).__marker = 1; });
-    await page.getByRole("tab", { name: "Board" }).click();
+    await presentation(page, "Board").click();
     await expect(page).toHaveURL(/tab=stories&view=board/);
     expect(await page.evaluate(() => (window as unknown as { __marker?: number }).__marker)).toBe(1);
     await page.goBack();
-    await expect(page.getByRole("tab", { name: "List", selected: true })).toBeVisible();
-    await page.getByRole("tab", { name: "Calendar" }).click();
+    await expect(presentation(page, "List", true)).toBeVisible();
+    await presentation(page, "Calendar").click();
     await page.reload();
-    await expect(page.getByRole("tab", { name: "Calendar", selected: true })).toBeVisible();
+    await expect(presentation(page, "Calendar", true)).toBeVisible();
     // The sidebar's Calendar entry opens Stories on its Calendar view.
     await page.goto("/wp-admin/admin.php?page=byline-planning&tab=calendar");
-    await expect(page.getByRole("tab", { name: "Calendar", selected: true })).toBeVisible();
+    await expect(presentation(page, "Calendar", true)).toBeVisible();
   });
 
   test("saves, renames and deletes a saved view, with Undo bringing a deleted one back", async ({ adminPage: page, adminSession: session }) => {

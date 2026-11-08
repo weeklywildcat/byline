@@ -1,6 +1,7 @@
 import { sanitizePlanningFilters, type PlanningFilters, type PlanningResponse } from "@byline/newsroom-screens/planning/planning-model";
 import { createLocalReq, getPayload, type Endpoint, type Payload, type PayloadRequest } from "payload";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { localDay } from "../../src/domain/dates";
 import { newsroomEndpoints } from "../../src/newsroom/endpoints";
 import { planningResponse } from "../../src/newsroom/planning";
 import { navigationCounts } from "../../src/newsroom/navigation-counts";
@@ -195,6 +196,14 @@ describe("Stories filters", () => {
   it("planned publication range, by the newsroom's day", async () => {
     expect(only(await planning("editor", { plannedFrom: "2026-11-12", plannedTo: "2026-11-12" }))).toEqual(ids("budget", "ready"));
     expect(only(await planning("editor", { plannedFrom: "2026-11-13" }))).toEqual([]);
+  });
+  it("published range, by the newsroom's day", async () => {
+    const publishedAt = (await planning("editor")).stories.find((row) => row.id === story.library)!.publicationState.publishedAt!;
+    const day = localDay(publishedAt, TZ);
+    expect(only(await planning("editor", { publishedFrom: day, publishedTo: day }))).toEqual(ids("library"));
+    expect(only(await planning("editor", { publishedTo: "2000-01-01" }))).toEqual([]);
+    // Unpublished stories have no publication day, so a range never holds them.
+    expect(only(await planning("editor", { publishedFrom: "2000-01-01" }))).toEqual(ids("library"));
   });
   it("publication state", async () => {
     expect(only(await planning("editor", { publicationState: "published" }))).toEqual(ids("library"));

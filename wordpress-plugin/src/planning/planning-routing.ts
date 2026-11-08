@@ -1,9 +1,10 @@
 /**
  * Planning's addresses. Every destination is a WordPress sidebar entry
- * (`page=byline-planning&tab=...`); Board, List and Calendar are three views
- * of Stories and are deep-linkable with `&view=`.
+ * (`page=byline-planning&tab=...`); Stories is deep-linkable with `&scope=`
+ * (Working, Published, All) and, in Working, `&view=` (Board, List, Calendar).
  */
 import { preferredStoriesView, storiesViewFromRoute, type StoriesView } from "@byline/newsroom-screens/planning/stories-view";
+import { applyStoriesLocation, type StoryScope } from "@byline/newsroom-screens/planning/stories-scope";
 
 export const PLANNING_DESTINATIONS = ["stories", "collections", "media", "content-health", "feedback"] as const;
 export type PlanningDestination = (typeof PLANNING_DESTINATIONS)[number];
@@ -26,12 +27,15 @@ export function initialStoriesView(tab: string | undefined, requestedView: strin
   return preferredStoriesView("board", storage);
 }
 
-/** The address of a Stories view, derived from the current one so unrelated parameters survive. */
-export function storiesViewHref(currentHref: string, view: StoriesView): string {
+/**
+ * The address of a Stories location, derived from the current one so unrelated
+ * parameters survive. Working is `view=`, a library scope is `scope=`.
+ */
+export function storiesLocationHref(currentHref: string, location: { scope: StoryScope; view: StoriesView }): string {
   const url = new URL(currentHref, typeof window === "undefined" ? "http://localhost/wp-admin/" : window.location.href);
   url.searchParams.set("page", "byline-planning");
   url.searchParams.set("tab", "stories");
-  url.searchParams.set("view", view);
+  applyStoriesLocation(url, location);
   ["story", "appointment"].forEach((key) => url.searchParams.delete(key));
   return `${url.pathname}${url.search}`;
 }

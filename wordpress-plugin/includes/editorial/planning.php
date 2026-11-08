@@ -231,6 +231,9 @@ function byline_editorial_sanitize_planning_filters(array $filters): array
     $date_aliases = [
         'deadlineFrom' => ['deadlineFrom', 'deadline_from'],
         'deadlineTo' => ['deadlineTo', 'deadline_to'],
+        // The day a story went live. WordPress does not query on it; the Stories screen applies it.
+        'publishedFrom' => ['publishedFrom', 'published_from'],
+        'publishedTo' => ['publishedTo', 'published_to'],
     ];
     foreach ($date_aliases as $key => $aliases) {
         $source_key = null;
@@ -767,7 +770,7 @@ function byline_editorial_saved_view_value(array $view): array
 function byline_editorial_sanitize_saved_view_sort($sort): array
 {
     $sort = is_array($sort) ? $sort : [];
-    $allowed_keys = ['story', 'workflow', 'writer', 'deadline', 'planned', 'modified'];
+    $allowed_keys = ['story', 'workflow', 'writer', 'deadline', 'planned', 'published', 'modified'];
     $key = isset($sort['key']) && is_scalar($sort['key']) ? sanitize_key((string) $sort['key']) : 'deadline';
     $direction = isset($sort['direction']) && is_scalar($sort['direction']) ? strtolower((string) $sort['direction']) : 'asc';
 

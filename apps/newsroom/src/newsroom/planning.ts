@@ -50,14 +50,15 @@ function inDayRange(instant: string | null | undefined, from: string, to: string
 
 /**
  * The shared filter, with the date rules read in the newsroom timezone rather
- * than the server's: a planned publication's day and "overdue" (a deadline
+ * than the server's: a planned or published day and "overdue" (a deadline
  * before today, on a story not yet published).
  */
 export function filterInNewsroomTime(stories: PlanningStory[], filters: PlanningFilters, ctx: ScreenContext): PlanningStory[] {
   const today = localToday(ctx);
-  const shared = filterPlanningStories(stories, { ...filters, plannedFrom: "", plannedTo: "", overdue: false }, Number(ctx.user.id), ctx.now);
+  const shared = filterPlanningStories(stories, { ...filters, plannedFrom: "", plannedTo: "", publishedFrom: "", publishedTo: "", overdue: false }, Number(ctx.user.id), ctx.now);
   return shared.filter((story) => {
     if ((filters.plannedFrom || filters.plannedTo) && !inDayRange(story.plannedPublication, filters.plannedFrom, filters.plannedTo, ctx.timeZone)) return false;
+    if ((filters.publishedFrom || filters.publishedTo) && !inDayRange(story.publicationState.publishedAt, filters.publishedFrom, filters.publishedTo, ctx.timeZone)) return false;
     if (filters.overdue && (story.publicationState.isPublished || !story.deadline || story.deadline >= today)) return false;
     return true;
   });

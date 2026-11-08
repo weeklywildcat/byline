@@ -935,6 +935,8 @@ function byline_editorial_rest_planning_filters(array $filters): array
         'deadlineTo' => (string) ($filters['deadlineTo'] ?? ''),
         'plannedFrom' => (string) ($filters['plannedFrom'] ?? ''),
         'plannedTo' => (string) ($filters['plannedTo'] ?? ''),
+        'publishedFrom' => (string) ($filters['publishedFrom'] ?? ''),
+        'publishedTo' => (string) ($filters['publishedTo'] ?? ''),
         'publicationState' => byline_editorial_rest_publication_state_id((string) ($filters['postStatus'] ?? '')),
         'visualStatus' => (string) ($filters['visualStatus'] ?? ''),
         'mine' => !empty($filters['mine']),
