@@ -17,5 +17,6 @@ export function createPayloadPeopleApi(api: string): PeopleApi {
     profile: () => request("/profile"),
     create: (input) => request("/people", "POST", input),
     update: (id, input) => request(`/people/${id}`, "PATCH", input),
+    saveAccess: (id, input) => request(`/people/${id}/access`, "PUT", input),
   };
 }
