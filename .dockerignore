@@ -1,0 +1,14 @@
+.git
+.github
+**/node_modules
+**/.next
+**/dist
+**/out
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+apps/newsroom/media
+apps/newsroom/publication-media
+wordpress-plugin/release
+.DS_Store
