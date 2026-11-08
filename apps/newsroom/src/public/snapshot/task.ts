@@ -1,6 +1,7 @@
 import type { TaskConfig } from "payload";
 import { PREPARE_PUBLIC_SNAPSHOT_TASK, PUBLIC_SNAPSHOT_CONCURRENCY_KEY, PUBLICATION_QUEUE } from "../queue";
 import { isPublicSnapshotError } from "./errors";
+import { queuePublicDeployment } from "../deployment";
 import { runPublicSnapshotPreparation } from "./prepare";
 
 /**
@@ -32,14 +33,20 @@ export const preparePublicSnapshotTask: TaskConfig = {
   ],
   concurrency: { key: () => PUBLIC_SNAPSHOT_CONCURRENCY_KEY, exclusive: true, supersedes: true },
   retries: { attempts: 2 },
-  handler: async ({ req }) => {
+  handler: async ({ input, req }) => {
     try {
       const result = await runPublicSnapshotPreparation(req.payload);
       switch (result.outcome) {
         case "ready":
-        case "reused":
+        case "reused": {
           req.payload.logger.info({ msg: `Public snapshot ${result.outcome} for revision ${result.revision} (${result.pointer.sha256.slice(0, 12)}…, ${result.pointer.bytes} bytes).` });
+          await queuePublicDeployment(req.payload, {
+            revision: result.revision,
+            sha256: result.pointer.sha256,
+            reason: String((input as { reason?: unknown }).reason ?? "public snapshot")
+          });
           return { output: { outcome: result.outcome, revision: result.revision, sha256: result.pointer.sha256, message: "" } };
+        }
         case "not-ready":
           req.payload.logger.warn({ msg: `Public snapshot for revision ${result.revision} is not ready: ${result.message} ${result.details.slice(0, 10).join(" | ")}` });
           return { output: { outcome: result.outcome, revision: result.revision, sha256: "", message: [result.message, ...result.details.slice(0, 10)].join(" | ").slice(0, 2000) } };
