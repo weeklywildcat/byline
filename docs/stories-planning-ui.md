@@ -139,7 +139,9 @@ button (`LayoutGrid`) just left of the Board | List tabs, shown only on Board:
   (title, one who/when row, signals only when there are any; about 64px). Main
   stages, a thin divider, then the sidelined stages.
 - **Dense**: bordered stages of one-line rows (about 50px; the first signal plus
-  `+N`). Empty or folded stages narrow to a 148px "Drop here" slot. Sidelined
+  `+N`). Empty or folded stages narrow to a 148px "Drop here" slot; stages with
+  stories keep at least 224px, and the board scrolls sideways rather than
+  squeezing them. Sidelined
   stages leave the columns for a footer of chips; each chip is a drop target
   and opens its stories in a popover.
 - **Stacked**: one section per stage, sidelined included, top to bottom, each a
@@ -157,7 +159,8 @@ empty, or when the reader folded it; Dropped starts folded. In Lanes a folded
 stage is a narrow rail (count and a vertical badge) that expands on click. A
 reader's explicit fold or unfold outlasts the empty rule. A folded stage is still
 the drop target for its whole area and shows the same ring while a drag is over
-it.
+it. Moving a story into a folded stage (or a closed sidelined chip) keeps the
+fold: the rail, slot or chip flashes and takes focus instead of the hidden card.
 
 Both are reader preferences in this browser, like `byline:stories-view`, and
 never filters: the layout is `byline:stories-board-layout`

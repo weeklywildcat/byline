@@ -203,3 +203,61 @@ describe("Stacked", () => {
     expect(onMoveStory).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), "assigned");
   });
 });
+
+describe("moving into a folded stage", () => {
+  /** A host that applies the move, as useMoveStory does, so the board re-renders with the story in its new stage. */
+  async function mountApplying(layout: BoardLayout) {
+    let current = stories;
+    const render = (handler: StoryBoardProps["onMoveStory"]) => root!.render(<AdminPortalContext value={document.body}><StoryBoard layout={layout} stories={current} statuses={DEFAULT_WORKFLOW_STATUSES} canMoveStories movingStoryId={null}
+      timezone="America/New_York" now={new Date("2026-10-20T12:00:00Z")} workspaceUrl={(id) => `/stories/${id}`} onOpenStory={vi.fn()} onMoveStory={handler} /></AdminPortalContext>);
+    const apply = vi.fn(async (moved: PlanningStory, status: string) => {
+      current = current.map((item) => item.id === moved.id ? { ...item, workflow: stage(status) } : item);
+      render(apply);
+    });
+    onMoveStory = apply;
+    root = createRoot(host);
+    await act(async () => { render(apply); });
+  }
+  async function moveFromMenu(storyId: number, label: string) {
+    await click($(`[data-story-actions='${storyId}']`));
+    await click($$("[role=menuitem]").find((item) => item.textContent?.includes("Move to")) ?? null);
+    await click($$("[role=menuitemradio]").find((item) => item.textContent === label) ?? null);
+    await act(async () => { await new Promise((resolve) => requestAnimationFrame(() => resolve(null))); });
+  }
+
+  it("keeps Lanes' fold, flashes the rail and gives it focus", async () => {
+    await mountApplying("lanes");
+    await moveFromMenu(2, "Dropped");
+    expect(onMoveStory).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }), "dropped");
+    const rail = $("[data-status='dropped']")!;
+    expect(rail.dataset.collapsed).toBe("true");
+    expect(rail.getAttribute("aria-label")).toBe("Dropped, 2 stories. Expand");
+    expect(rail.dataset.moved).toBe("true");
+    expect(document.activeElement).toBe(rail);
+  });
+
+  it("focuses a Dense sidelined chip when its popover is closed", async () => {
+    await mountApplying("dense");
+    await moveFromMenu(3, "On Hold");
+    const chip = $("[data-board-sidelined] [data-status='on-hold']")!;
+    expect(chip.getAttribute("aria-label")).toBe("On Hold, 2 stories");
+    expect(chip.dataset.moved).toBe("true");
+    expect(document.activeElement).toBe(chip);
+  });
+
+  it("still follows the story itself into an open stage", async () => {
+    await mountApplying("lanes");
+    await moveFromMenu(2, "Writing");
+    expect($("[data-status='writing'] [data-story-id='2']")?.dataset.moved).toBe("true");
+    expect(document.activeElement).toBe($("[data-story-title='2']"));
+  });
+});
+
+describe("Dense column widths", () => {
+  it("keeps populated stages readable beside empty slots and scrolls sideways instead", async () => {
+    await mount("dense");
+    expect($("[data-status='reporting']")!.className).toMatch(/\bmin-w-56\b/);
+    expect($("[data-status='reporting']")!.className).not.toMatch(/\bmin-w-0\b/);
+    expect($("[data-board-scroller]")!.className).toContain("overflow-x-auto");
+  });
+});

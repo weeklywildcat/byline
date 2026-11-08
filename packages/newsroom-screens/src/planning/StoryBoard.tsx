@@ -47,6 +47,8 @@ type StoryItemProps = Pick<StoryBoardProps, "statuses" | "canMoveStories" | "tim
 type StageItems = Omit<StoryItemProps, "story" | "moving" | "moved"> & {
   movingStoryId?: number | null;
   movedId: number | null;
+  /** The stage a story was just moved into: a folded one flashes in place of the hidden card. */
+  movedStatusId: string | null;
 };
 
 const itemProps = (items: StageItems, story: PlanningStory): StoryItemProps => ({
@@ -170,6 +172,7 @@ type StageProps = StageItems & {
 };
 
 const overRing = "transition-colors data-[over=true]:ring-2 data-[over=true]:ring-ring/40";
+const movedFlash = "duration-700 data-[moved=true]:bg-accent";
 /** Below `sm` the board keeps the page scroll and card-width snap columns. */
 const narrowColumn = "max-sm:w-[80vw] max-sm:flex-none max-sm:snap-start";
 
@@ -181,9 +184,9 @@ function LaneColumn({ status, stories, collapsed, onCollapsedChange, ...items }:
   const headingId = `board-column-${status.id}`;
 
   if (collapsed) {
-    return <button ref={setElement} type="button" aria-expanded="false" aria-label={`${status.label}, ${storyCount(stories.length)}. Expand`} data-status={status.id} data-over={over} data-collapsed="true"
+    return <button ref={setElement} type="button" aria-expanded="false" aria-label={`${status.label}, ${storyCount(stories.length)}. Expand`} data-status={status.id} data-over={over} data-collapsed="true" data-moved={items.movedStatusId === status.id}
       onClick={() => onCollapsedChange(status.id, false)}
-      className={cn("flex w-10 shrink-0 flex-col items-center gap-2.5 rounded-xl bg-muted py-3 outline-none hover:bg-muted/70 focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:snap-start", overRing)}>
+      className={cn("flex w-10 shrink-0 flex-col items-center gap-2.5 rounded-xl bg-muted py-3 outline-none hover:bg-muted/70 focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:snap-start", overRing, movedFlash)}>
       <span className="text-xs font-medium text-muted-foreground tabular-nums">{stories.length}</span>
       <WorkflowBadge workflow={status} className="h-auto max-h-48 w-5 max-w-none px-0 py-2 [writing-mode:vertical-rl]" />
     </button>;
@@ -215,15 +218,15 @@ function DenseStage({ status, stories, collapsed, onCollapsedChange, ...items }:
   const header = <header className="flex items-center justify-between gap-1 border-b px-2.5 py-2"><StageHeading id={headingId} status={status} count={stories.length} />{toggle}</header>;
 
   if (collapsed) {
-    return <section ref={setElement} aria-labelledby={headingId} data-status={status.id} data-over={over} data-collapsed="true"
-      className={cn("flex w-37 shrink-0 flex-col overflow-hidden rounded-xl border bg-background max-sm:snap-start", overRing)}>
+    return <section ref={setElement} aria-labelledby={headingId} data-status={status.id} data-over={over} data-collapsed="true" data-moved={items.movedStatusId === status.id}
+      className={cn("flex w-37 shrink-0 flex-col overflow-hidden rounded-xl border bg-background max-sm:snap-start", overRing, movedFlash)}>
       {header}
       <div className="flex-1 p-2"><p className="rounded-lg border border-dashed py-4 text-center text-xs text-muted-foreground">Drop here</p></div>
     </section>;
   }
 
   return <section ref={setElement} aria-labelledby={headingId} data-status={status.id} data-over={over} data-collapsed="false"
-    className={cn("flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden rounded-xl border bg-background", overRing, narrowColumn)}>
+    className={cn("flex min-h-0 min-w-56 flex-1 basis-0 flex-col overflow-hidden rounded-xl border bg-background", overRing, narrowColumn)}>
     {header}
     <div ref={setBody} role="list" aria-labelledby={headingId} className="flex min-h-0 flex-1 flex-col overflow-y-auto max-sm:overflow-visible">
       {stories.map((story) => <DenseRow key={story.id} {...itemProps(items, story)} />)}
@@ -237,7 +240,7 @@ function SidelinedChip({ status, stories, ...items }: StageItems & { status: Pla
   const over = useStageDrop(element, status.id, items.canMoveStories);
   const listId = `board-sidelined-${status.id}`;
   return <Popover>
-    <PopoverTrigger render={<Button ref={setElement} type="button" variant="outline" size="sm" data-status={status.id} data-over={over} aria-label={`${status.label}, ${storyCount(stories.length)}`} className={overRing} />}>
+    <PopoverTrigger render={<Button ref={setElement} type="button" variant="outline" size="sm" data-status={status.id} data-over={over} data-moved={items.movedStatusId === status.id} aria-label={`${status.label}, ${storyCount(stories.length)}`} className={cn(overRing, movedFlash)} />}>
       <WorkflowBadge workflow={status} /><span className="text-xs text-muted-foreground tabular-nums">{stories.length}</span>
     </PopoverTrigger>
     <PopoverContent align="start" className="w-80 gap-0 overflow-hidden p-0">
@@ -297,7 +300,8 @@ export function StoryBoard(props: StoryBoardProps) {
   const { stories, statuses, canMoveStories, onMoveStory, layout = "lanes" } = props;
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
-  const [movedId, setMovedId] = useState<number | null>(null);
+  const [board, setBoard] = useState<HTMLDivElement | null>(null);
+  const [moved, setMoved] = useState<{ storyId: number; statusId: string } | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [choices, setChoices] = useState<BoardCollapsedChoices>(() => readBoardCollapsed(browserStorage()));
   const byId = useRef(new Map<number, PlanningStory>());
@@ -318,16 +322,21 @@ export function StoryBoard(props: StoryBoardProps) {
   }, []);
 
   // One move path: the drop, the menu and the keyboard all end here. A moved card is flashed briefly and focus follows it to its new stage.
+  // A folded destination (a rail, a Dense slot, a sidelined chip) keeps the reader's fold: it flashes instead, and focus lands on its control.
   const move = useCallback(async (story: PlanningStory, status: string) => {
     await onMoveStory(story, status);
-    setMovedId(story.id);
-    window.setTimeout(() => setMovedId((current) => current === story.id ? null : current), 1400);
+    const flash = { storyId: story.id, statusId: status };
+    setMoved(flash);
+    window.setTimeout(() => setMoved((current) => current === flash ? null : current), 1400);
     requestAnimationFrame(() => {
       const focused = document.activeElement;
       if (focused && focused !== document.body && !(focused instanceof HTMLElement && !focused.isConnected)) return;
-      document.querySelector<HTMLElement>(`[data-story-title="${story.id}"]`)?.focus();
+      const title = board?.querySelector<HTMLElement>(`[data-story-title="${story.id}"]`);
+      if (title) { title.focus(); return; }
+      const stage = Array.from(board?.querySelectorAll<HTMLElement>("[data-status]") ?? []).find((element) => element.dataset.status === status);
+      (stage?.matches("button") ? stage : stage?.querySelector<HTMLElement>("button"))?.focus();
     });
-  }, [onMoveStory]);
+  }, [board, onMoveStory]);
 
   useEffect(() => {
     if (!canMoveStories) return undefined;
@@ -356,7 +365,7 @@ export function StoryBoard(props: StoryBoardProps) {
 
   const items: StageItems = {
     statuses, canMoveStories, timezone: props.timezone, now: props.now, workspaceUrl: props.workspaceUrl,
-    onMoveStory: move, onOpenStory: props.onOpenStory, movingStoryId: props.movingStoryId, movedId
+    onMoveStory: move, onOpenStory: props.onOpenStory, movingStoryId: props.movingStoryId, movedId: moved?.storyId ?? null, movedStatusId: moved?.statusId ?? null
   };
   const storiesIn = (status: PlanningWorkflowStatus) => columns.get(status.id) || [];
   const stage = (status: PlanningWorkflowStatus) => {
@@ -366,15 +375,15 @@ export function StoryBoard(props: StoryBoardProps) {
   };
   // The read-only notice sits above the board so a fitted board's measured top already accounts for it.
   const notice = !canMoveStories ? <p className="text-xs text-muted-foreground">You can view this board, but your account cannot move stories.</p> : null;
-  const board = (children: ReactNode) => <div className="flex flex-col gap-2" aria-label={"Stories by workflow stage"} data-board-layout={layout}>{notice}{children}</div>;
+  const boardRoot = (children: ReactNode) => <div ref={setBoard} className="flex flex-col gap-2" aria-label={"Stories by workflow stage"} data-board-layout={layout}>{notice}{children}</div>;
 
   if (layout === "stacked") {
-    return board(<div className="flex flex-col gap-4.5">
+    return boardRoot(<div className="flex flex-col gap-4.5">
       {[...mainStatuses, ...sidelined].map((status) => <StackedSection key={status.id} {...items} status={status} stories={storiesIn(status)} dragActive={dragActive} />)}
     </div>);
   }
 
-  return board(<div ref={setFrame} data-board-frame="" style={{ "--board-top": `${top}px` } as CSSProperties}
+  return boardRoot(<div ref={setFrame} data-board-frame="" style={{ "--board-top": `${top}px` } as CSSProperties}
     className="flex flex-col gap-2 sm:h-[calc(100dvh-var(--board-top)-1.5rem)] sm:min-h-[420px]">
     <div ref={setScroller} data-board-scroller="" className="flex min-h-0 flex-1 snap-x snap-mandatory gap-2 overflow-x-auto max-sm:items-start max-sm:pb-2 sm:snap-none">
       {mainStatuses.map(stage)}
