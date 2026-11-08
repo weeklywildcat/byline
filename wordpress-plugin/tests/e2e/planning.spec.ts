@@ -23,19 +23,17 @@ test.describe("Stories board", () => {
   test("drags a story between stages with an optimistic move, an announcement and a rollback on failure", async ({ adminPage: page, adminSession: session }) => {
     const unique = token();
     const id = await createPlanningStory(session, { title: `${unique} Canteen`, status: "reporting" });
+    // The board can display the previous response while the debounced search loads.
+    // Wait for the query whose cache the move will update before starting the drag.
+    const filtered = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname.endsWith("/byline/v1/editorial/planning") && url.searchParams.get("search") === unique;
+    });
     await openBoard(page, unique);
+    const response = await filtered;
+    expect(response.ok()).toBe(true);
+    expect(await response.finished()).toBeNull();
     await expect(column(page, "reporting").locator(`[data-story-id="${id}"]`)).toBeVisible();
-
-    // The destination column answers while the card is held over it.
-    const source = card(page, id);
-    const box = (await source.boundingBox())!;
-    const target = (await column(page, "writing").boundingBox())!;
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2 + 20, box.y + 20, { steps: 4 });
-    await page.mouse.move(target.x + target.width / 2, target.y + 120, { steps: 12 });
-    await expect(column(page, "writing")).toHaveAttribute("data-over", "true");
-    await expect(source).toHaveAttribute("data-dragging", "true");
 
     // Hold the save so the optimistic state is observable.
     let release!: () => void;
@@ -48,10 +46,24 @@ test.describe("Stories board", () => {
       await held;
       return request.continue();
     });
-    await page.mouse.up();
-    await expect(column(page, "writing").locator(`[data-story-id="${id}"]`)).toBeVisible();
-    await expect(column(page, "reporting").locator(`[data-story-id="${id}"]`)).toHaveCount(0);
-    release();
+    // The destination column answers while the card is held over it.
+    const source = card(page, id);
+    const box = (await source.boundingBox())!;
+    const target = (await column(page, "writing").boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 20, box.y + 20, { steps: 4 });
+    await page.mouse.move(target.x + target.width / 2, target.y + 120, { steps: 12 });
+    await expect(column(page, "writing")).toHaveAttribute("data-over", "true");
+    await expect(source).toHaveAttribute("data-dragging", "true");
+
+    try {
+      await page.mouse.up();
+      await expect(column(page, "writing").locator(`[data-story-id="${id}"]`)).toBeVisible();
+      await expect(column(page, "reporting").locator(`[data-story-id="${id}"]`)).toHaveCount(0);
+    } finally {
+      release();
+    }
     await expect.poll(() => status(session, id)).toBe("writing");
     await page.unroute(route);
     expect(saved).toEqual({ status: "writing" });
