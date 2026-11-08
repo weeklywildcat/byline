@@ -86,6 +86,7 @@
     "./planning/planning-api": "./src/planning/planning-api.ts",
     "./planning/planning-model": "./src/planning/planning-model.ts",
     "./planning/planning-query": "./src/planning/planning-query.ts",
+    "./planning/stories-board-layout": "./src/planning/stories-board-layout.ts",
     "./planning/stories-view": "./src/planning/stories-view.ts",
     "./planning/story-views": "./src/planning/story-views.ts",
     "./story/StoryCreateDialog": "./src/story/StoryCreateDialog.tsx",

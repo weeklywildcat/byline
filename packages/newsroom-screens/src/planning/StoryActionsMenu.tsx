@@ -17,6 +17,8 @@ export type StoryActionsMenuProps = {
   onMove: (story: PlanningStory, status: string) => void;
   workspaceUrl: (storyId: number) => string;
   className?: string;
+  /** Compact surfaces (board cards) use the smaller trigger. */
+  size?: "icon-sm" | "icon-xs";
 };
 
 /**
@@ -51,13 +53,13 @@ export const canMoveFromMenu = (story: PlanningStory, canMove: boolean) => canMo
  * preview it, or move it to another workflow stage. Moving here is the
  * keyboard and touch equivalent of dragging a card.
  */
-export function StoryActionsMenu({ story, statuses, canMove, disabled, onMove, workspaceUrl, className, additionalActions }: StoryActionsMenuProps) {
+export function StoryActionsMenu({ story, statuses, canMove, disabled, onMove, workspaceUrl, className, size = "icon-sm", additionalActions }: StoryActionsMenuProps) {
   const title = story.title || "Untitled story";
   const movable = canMoveFromMenu(story, canMove);
   const stages = movableWorkflowStatuses(statuses);
   const go = storyDestinations(story, workspaceUrl);
   return <DropdownMenu>
-    <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className={cn("shrink-0", className)} disabled={disabled} aria-label={`Actions for ${title}`} data-story-actions={story.id} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
+    <DropdownMenuTrigger render={<Button variant="ghost" size={size} className={cn("shrink-0", className)} disabled={disabled} aria-label={`Actions for ${title}`} data-story-actions={story.id} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="w-52">
       <DropdownMenuGroup>
         <DropdownMenuItem render={<a href={go.open} />}><FileText aria-hidden="true" />Open story</DropdownMenuItem>

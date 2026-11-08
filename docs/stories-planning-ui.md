@@ -132,8 +132,45 @@ names up to 80 characters, sanitized filters and sort).
 
 ### Board: Pragmatic drag and drop
 
+**Layouts.** The board has three layouts, chosen from the **Board layout**
+button (`LayoutGrid`) just left of the Board | List tabs, shown only on Board:
+
+- **Lanes** (the default): one muted column per stage with compact cards
+  (title, one who/when row, signals only when there are any; about 64px). Main
+  stages, a thin divider, then the sidelined stages.
+- **Dense**: bordered stages of one-line rows (about 50px; the first signal plus
+  `+N`). Empty or folded stages narrow to a 148px "Drop here" slot; stages with
+  stories keep at least 224px, and the board scrolls sideways rather than
+  squeezing them. Sidelined
+  stages leave the columns for a footer of chips; each chip is a drop target
+  and opens its stories in a popover.
+- **Stacked**: one section per stage, sidelined included, top to bottom, each a
+  grid of Lanes cards. The page scrolls. An empty section is one line tall, and
+  grows a dashed drop area while a story is being dragged.
+
+Lanes and Dense fit the window: the board measures its own top and takes the
+rest of the viewport height, columns scroll on their own, and auto-scroll is
+registered on every column body as well as the horizontal scroller. Below
+`sm` they keep the page scroll and card-width snap columns. Stacked uses window
+auto-scroll only.
+
+**Folding stages** (Lanes; Dense shares the state). A stage is folded when it is
+empty, or when the reader folded it; Dropped starts folded. In Lanes a folded
+stage is a narrow rail (count and a vertical badge) that expands on click. A
+reader's explicit fold or unfold outlasts the empty rule. A folded stage is still
+the drop target for its whole area and shows the same ring while a drag is over
+it. Moving a story into a folded stage (or a closed sidelined chip) keeps the
+fold: the rail, slot or chip flashes and takes focus instead of the hidden card.
+
+Both are reader preferences in this browser, like `byline:stories-view`, and
+never filters: the layout is `byline:stories-board-layout`
+(`lanes|dense|stacked`, unknown values fall back to Lanes) and the folds are
+`byline:stories-board-collapsed` (`{ [statusId]: boolean }`), both in
+`src/planning/stories-board-layout.ts`. Neither appears in saved views or the
+address.
+
 `@atlaskit/pragmatic-drag-and-drop` owns draggables, drop targets and
-monitoring; `…-auto-scroll` scrolls the horizontal board and the window;
+monitoring; `…-auto-scroll` scrolls the board, its columns and the window;
 `…-live-region` announces results. Nova owns every pixel. The hitbox package is
 deliberately not installed.
 
@@ -150,7 +187,13 @@ Assigned to Reporting."). After a move focus stays on, or returns to, the story'
 title. A story that WordPress has published is not a board card and has no move
 action. On narrow screens columns stay card-width and scroll sideways with snap.
 
-Board cards also use the same native shadcn `ContextMenu` as List rows. Right-click is an accelerator for Quick view, Workspace/article links and **Move to**; dragging, the visible three-dot menu and keyboard/touch paths remain first-class.
+Cards have no visible actions row. The three-dot `StoryActionsMenu` sits in each
+card's or row's top-right corner and appears on hover or keyboard focus within
+it (always on touch pointers), so **Move to** stays reachable by keyboard and
+touch. Board cards also use the same native shadcn `ContextMenu` as List rows,
+unchanged: right-click is an accelerator for Quick view, Workspace/article links
+and **Move to**; dragging, the corner menu and keyboard/touch paths remain
+first-class.
 
 ### List
 
