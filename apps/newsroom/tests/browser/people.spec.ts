@@ -309,6 +309,37 @@ test("staff My profile uses the same editor without editorial or account control
   ).toBeVisible();
 });
 
+test("administrators manage newsroom access from the Person instead of a separate Access screen", async ({
+  page,
+}) => {
+  await login(page, "admin");
+  await page.goto("/admin/people");
+  await expect(page.getByRole("heading", { name: "People", exact: true })).toBeVisible();
+  await expect(row(page, "Alex Morgan")).toContainText("Staff");
+  await row(page, "Alex Morgan").click();
+
+  await expect(page.getByRole("heading", { name: "Newsroom access", exact: true })).toBeVisible();
+  await expect(page.getByText("writer@example.test", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Google not connected/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Access settings", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Newsroom access" })).toBeVisible();
+  await expect(page.getByLabel("Sign-in email")).toHaveValue("writer@example.test");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+
+  await page.getByRole("button", { name: "Disable access", exact: true }).click();
+  const confirm = page.getByRole("alertdialog", { name: "Disable Byline access?" });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "Disable access", exact: true }).click();
+  await expect(page.getByText("Disabled", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Enable access", exact: true }).click();
+  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Back to People" }).click();
+  await row(page, "Jordan Park").click();
+  await expect(page.getByRole("button", { name: "Give newsroom access", exact: true })).toBeVisible();
+});
+
 test("sign-out waits for the dirty guard before changing authentication", async ({
   page,
 }) => {
