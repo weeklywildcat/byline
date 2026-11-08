@@ -170,6 +170,8 @@ for (const story of stories) for (const viewport of viewports) {
     });
 
     test('the scroll cue is a keyboard link to the article, and the page never traps scrolling', async ({ page }) => {
+      // Keep the anchor jump immediate so it cannot overlap the wheel gesture.
+      await page.emulateMedia({ reducedMotion: 'reduce' });
       const cue = page.locator('a.hero-reveal-scroll');
       await expect(cue).toHaveAttribute('href', '#immersive-article-surface');
       await cue.focus();
@@ -180,9 +182,11 @@ for (const story of stories) for (const viewport of viewports) {
       const reserved = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0);
       await expect.poll(async () => Math.abs((await measure(page)).surface.top - reserved)).toBeLessThan(3);
 
-      await page.keyboard.press('End');
+      const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+      await page.mouse.move(page.viewportSize()!.width / 2, page.viewportSize()!.height / 2);
+      await page.mouse.wheel(0, pageHeight);
       await expect.poll(() => page.evaluate(() => Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 1)).toBe(true);
-      await page.keyboard.press('Home');
+      await page.mouse.wheel(0, -2 * pageHeight);
       await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
       await page.goBack();
       await expect(page).not.toHaveURL(/#immersive-article-surface$/);
