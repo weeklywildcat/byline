@@ -70,14 +70,12 @@ const list = (item: Field, min: number, max: number): Field => ({
 });
 
 // Inline content: text, links, line breaks and footnote references.
-const textRun = closed({ type: pick(["text"]), text: str(100000), bold: pick(["true"], true), italic: pick(["true"], true) });
+const trueFlag: Field = { optional: true, check: (value, path, errors) => (value === true ? undefined : fail(errors, path, "must be true when present")) };\nconst textRun = closed({ type: pick(["text"]), text: str(100000), bold: trueFlag, italic: trueFlag });
 const inlineCheck: Check = (value, path, errors) => {
   if (!isRecord(value)) return fail(errors, path, "must be an object");
   switch (value.type) {
     case "text":
-      if (value.bold !== undefined && value.bold !== true) fail(errors, `${path}.bold`, "must be true when present");
-      if (value.italic !== undefined && value.italic !== true) fail(errors, `${path}.italic`, "must be true when present");
-      return closed({ type: pick(["text"]), text: str(100000), bold: { optional: true, check: () => undefined }, italic: { optional: true, check: () => undefined } })(value, path, errors);
+      return textRun(value, path, errors);
     case "lineBreak":
       return closed({ type: pick(["lineBreak"]) })(value, path, errors);
     case "link":
