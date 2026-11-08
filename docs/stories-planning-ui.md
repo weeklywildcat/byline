@@ -189,10 +189,21 @@ while still giving mouse and trackpad users a spreadsheet-style workflow.
 Schedule-X v4 (`@schedule-x/react`, `calendar`, `events-service`,
 `theme-shadcn`, with `temporal-polyfill` pinned to the version `calendar` requires)
 does layout, views and responsiveness. No premium packages are installed.
-Drag-to-reschedule is **intentionally absent**: an interview, a deadline, a
-production due date, a planned publication and a WordPress schedule are
-different dates changed in different forms, and dragging a rectangle must not
-change one by accident. Schedule-X's own modal is not used either.
+Schedule-X's drag-and-drop is premium (the free plugin stops at v3), so it stays
+off. A host may opt in to **Byline's own day-level drag** with the `reschedule`
+prop: Pragmatic drag and drop on the event chips, the day under the pointer read
+from Schedule-X's day markup (`calendar-drag`), and what a drop means decided
+by the pure `calendar-reschedule` model. Events move by whole days only: a time
+of day (newsroom timezone) and a duration are kept, a day-only date stays a day.
+Deadlines, planned publication, scheduled publication, exact appointments and
+production due dates can move, each saved through the record that owns the date
+(never by editing the rectangle); published dates, task due dates and shared
+interviews cannot. The host says which kinds the reader may pick up and the
+server stays authoritative. A move shows at once, is undoable from the toast,
+and a scheduled publication asks for confirmation first. Without `reschedule`
+(WordPress today) the Calendar is read-only. Drag is pointer-only: the date
+fields on the story, appointment and production forms remain the keyboard and
+touch path. Schedule-X's own modal is not used either.
 
 The Calendar is shared (`packages/newsroom-screens/src/calendar`): WordPress and
 the Payload newsroom mount one `NewsroomCalendar`. A host supplies the schedule

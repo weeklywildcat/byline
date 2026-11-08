@@ -3,7 +3,9 @@
  *
  * Byline's schedule models (`calendar-model`, `planning-model`) stay canonical;
  * Schedule-X only presents them. Nothing here is ever written back: dates change
- * through the story, appointment, production and publishing records they belong to.
+ * through the story, appointment, production and publishing records they belong
+ * to. Byline's own drag (`calendar-drag`) saves through those records; Schedule-X's
+ * premium drag-and-drop is not used, so its `_options` stay off.
  *
  * Date rules (see `workspace/schedule-model`):
  * - A `date` event is a newsroom-local calendar day -> `Temporal.PlainDate`.
@@ -105,7 +107,11 @@ export function scheduleXTimes(event: Pick<PlanningCalendarEvent, "timing">, tim
 /** What the custom renderers need beyond Schedule-X's own fields. All plain data. */
 export type BylineEventData = {
   bylineType: CalendarEventType;
+  /** The Byline event's id, for finding it again when it is dropped on a day. */
+  bylineId: string;
   storyId: number;
+  /** The appointment or production item's own id, for events saved through it. */
+  recordId?: string;
   storyTitle: string;
   /** Short label for the kind of date: "Deadline", "Production due"... */
   typeLabel: string;
@@ -129,10 +135,12 @@ export function toScheduleXEvent(event: PlanningCalendarEvent, timezone: string)
     end: times.end,
     title: decodeEntities(event.title || event.storyTitle),
     calendarId: CATEGORY_BY_EVENT_TYPE[event.type],
-    // Presentation only: dragging, resizing and editing a rectangle must never change a newsroom date.
+    // Schedule-X's own dragging stays off: Byline moves events by whole days itself (`calendar-drag`), through their records.
     _options: { disableDND: true, disableResize: true },
     bylineType: event.type,
+    bylineId: event.id,
     storyId: event.storyId,
+    recordId: event.recordId,
     storyTitle: decodeEntities(event.storyTitle),
     typeLabel: event.label,
     editHref: event.href || null,

@@ -19,11 +19,14 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo } from "react";
 import { useCollectionsWorkspace } from "../collections/CollectionsWorkspaceShell";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
+import { atLeast } from "../../access/user";
+import { useNewsroomAccount, useNewsroomRoutes } from "../shell/account";
 import { useShellLayout } from "../shell/layout";
 import { useShellNavigation } from "../shell/navigation";
 import { useBylineSearch } from "../shell/search";
 import { useNewsroomTimeZone } from "../shell/timezone";
 import { createPayloadPlanningFetchers } from "../stories/payload-planning-fetchers";
+import { canReschedule, rescheduleRequest } from "./payload-reschedule";
 
 type Fetchers = ReturnType<typeof createPayloadHomeFetchers> & ReturnType<typeof createPayloadPlanningFetchers>;
 
@@ -65,6 +68,11 @@ function CalendarBody({ fetchers, currentUserId, admin }: { fetchers: Fetchers; 
   const { state, isMobile } = useSidebar();
   const timezone = useNewsroomTimeZone();
   const client = useQueryClient();
+  const account = useNewsroomAccount();
+  const { api } = useNewsroomRoutes();
+  const isEditor = atLeast(account, "editor");
+  // Dragging an event to another day saves through the record that owns the date; the server has the final word.
+  const reschedule = useMemo(() => ({ can: (kind: Parameters<typeof canReschedule>[0]) => canReschedule(kind, isEditor), apply: rescheduleRequest(api) }), [api, isEditor]);
 
   // ⌘K opens a story in this screen's Peek rather than leaving the Calendar.
   useEffect(() => {
@@ -118,6 +126,7 @@ function CalendarBody({ fetchers, currentUserId, admin }: { fetchers: Fetchers; 
         onOpenStory={openStory}
         controls={paneShowing ? "external" : "sheet"}
         navigate={navigate}
+        reschedule={reschedule}
       />
     </>
   );
