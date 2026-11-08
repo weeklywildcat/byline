@@ -4,8 +4,10 @@ import OverrideFixtureStory from "./stories/override-fixture";
 import VisualFixtureStory from "./stories/visual-fixture";
 
 /**
- * Stories with a custom presentation, keyed by stable story ID (the WordPress
- * post ID; imported Payload stories keep it), never slug or headline. A listed
+ * Stories with a custom presentation, keyed by the stable Story ID used by the
+ * current CMS, never slug or headline. A WordPress migration may preserve the
+ * numeric ID or remap it into Payload; register the post-import Payload Story
+ * ID. The original WordPress ID remains import provenance. A listed
  * story always uses its entry, even if the author chose Immersive. A story
  * that is not listed falls through to that choice, then to the normal
  * `ArticleView`; delete a line to put a story back.
