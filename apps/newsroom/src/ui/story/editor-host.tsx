@@ -6,6 +6,7 @@ import { articleMediaFromPayload } from "@byline/editor/normalize";
 import { useAuth, useConfig, useDocumentInfo } from "@payloadcms/ui";
 import { publicPollReference, publicStoryReference } from "../../public/references";
 import { DEFAULT_MEDIA_ROUTE, type MediaLibraryAsset } from "@byline/newsroom-screens/media/media-library-model";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useMediaWorkspace } from "../media/MediaWorkspaceShell";
 
@@ -55,9 +56,10 @@ function pollChoice(doc: Doc): PollChoice | null {
 }
 
 export function useNewsroomEditorHost(): BylineEditorHost {
-  const { fetchers, pick, href, editArtDirection } = useMediaWorkspace();
+  const { fetchers, pick, href, editArtDirection, editDetails } = useMediaWorkspace();
   const { config } = useConfig();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { id: currentStoryId } = useDocumentInfo();
   const api = config.routes.api;
   const custom = (config.admin?.custom ?? {}) as { newsroomTimeZone?: string; repositoryInteractives?: BylineEditorHost["interactives"] };
@@ -106,8 +108,15 @@ export function useNewsroomEditorHost(): BylineEditorHost {
     },
     uploadMedia: async (file, onProgress) => articleMediaFromLibrary(await fetchers.uploadMedia(file, { folderId: null, onProgress })),
     mediaHref: (id) => href({ ...DEFAULT_MEDIA_ROUTE, assetId: Number(id) }),
+    editMediaDetails: async (id) => {
+      const asset = await editDetails(Number(id));
+      // Alt, credit or rights edits can change whether this Story is publishable.
+      // The Media inspector is global, so refresh any open Story preflight after it closes.
+      await queryClient.invalidateQueries({ queryKey: ["byline", "story-media-readiness"] });
+      return asset ? articleMediaFromLibrary(asset) : null;
+    },
     // The Media shell owns the one art-direction editor; blocks and the lead image only name a Media ID.
     editArtDirection: async (id) => (await editArtDirection(Number(id))) !== null
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `get` closes over `api` only
-  }), [api, currentStoryId, custom.repositoryInteractives, editArtDirection, fetchers, href, pick, role, timeZone]);
+  }), [api, currentStoryId, custom.repositoryInteractives, editArtDirection, editDetails, fetchers, href, pick, queryClient, role, timeZone]);
 }

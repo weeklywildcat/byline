@@ -13,6 +13,7 @@ import {
   paragraphsFromText,
   periodStarts,
   safeHref,
+  validateArticleBody,
   type ArticleBlock,
   type MediaLookup
 } from "../src";
@@ -87,6 +88,26 @@ describe("text helpers", () => {
     expect(safeHref("javascript:alert(1)")).toBeNull();
     expect(safeHref("data:text/html,x")).toBeNull();
     expect(safeHref("//evil.example")).toBeNull();
+  });
+
+  it("accepts bold and italic text inside links", () => {
+    const result = validateArticleBody({
+      format: "byline-v1",
+      version: 1,
+      nodes: [{
+        type: "paragraph",
+        children: [{
+          type: "link",
+          href: "https://example.org/story",
+          children: [
+            { type: "text", text: "Bold", bold: true },
+            { type: "text", text: " and italic", italic: true }
+          ]
+        }]
+      }],
+      media: {}
+    });
+    expect(result).toMatchObject({ ok: true });
   });
 });
 

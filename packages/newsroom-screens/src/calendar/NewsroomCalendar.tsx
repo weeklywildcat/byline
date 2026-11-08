@@ -1,21 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, ListFilter } from "lucide-react";
 import { createViewDay, createViewList, createViewMonthAgenda, createViewMonthGrid, createViewWeek, createViewWeekAgenda } from "@schedule-x/calendar";
 import { createEventsServicePlugin } from "@schedule-x/events-service";
 import { ScheduleXCalendar, useCalendarApp } from "@schedule-x/react";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
-import { scheduleKey } from "../story/story-query";
+import { invalidateStoryData, scheduleKey } from "../story/story-query";
 import type { PlanningFetchers } from "../planning/planning-api";
-import { describePlanningError, planningCalendarEvents, type PlanningStory } from "../planning/planning-model";
+import { describePlanningError, planningCalendarEvents, type PlanningCalendarEvent, type PlanningStory } from "../planning/planning-model";
 import { CALENDAR_COMPONENTS, CATEGORY_DOT_CLASSES } from "./calendar-events";
+import { CalendarDragPolicyContext, useCalendarDrop } from "./calendar-drag";
 import { calendarHeading, createCalendarController } from "./calendar-controller";
-import { mergeCalendarEvents, needsSchedulingItems, scheduleCalendarEvents, scheduleRangeFor, type CalendarLinks } from "./calendar-model";
+import { compareCalendarEvents, mergeCalendarEvents, needsSchedulingItems, scheduleCalendarEvents, scheduleRangeFor, type CalendarLinks } from "./calendar-model";
+import { describeReschedule, moveEvent, rescheduleChange, type RescheduleChange, type RescheduleHost } from "./calendar-reschedule";
 import { selectedDay, viewForPreference } from "./calendar-workspace";
 import { useCalendarWorkspace } from "./calendar-workspace-context";
 import { CalendarControls } from "./CalendarControls";
@@ -43,6 +47,12 @@ export type NewsroomCalendarProps = {
   controls?: "sheet" | "external";
   /** Client navigation for a host with its own router. Without it, links are ordinary page loads. */
   navigate?: (href: string) => void;
+  /**
+   * Lets a reader drag events to another day. The host says which kinds the
+   * signed-in reader may move and saves each move through the record it
+   * belongs to. Without it the calendar is read-only.
+   */
+  reschedule?: RescheduleHost;
 };
 
 /**
@@ -50,8 +60,10 @@ export type NewsroomCalendarProps = {
  * responds; Byline decides what an event means. Events come from the host's
  * protected schedule feed through TanStack Query and one adapter, never from
  * Schedule-X's own fetching, and a click opens Story Peek, never Schedule-X's
- * own modal. Dragging is intentionally off: changing a date is a decision made
- * in the story, appointment, production or publishing record it belongs to.
+ * own modal. Schedule-X's own dragging is off (it is premium); when the host
+ * offers `reschedule`, Byline lets a reader drag an event to another day and
+ * saves it through the story, appointment, production or publishing record it
+ * belongs to, never by editing the rectangle.
  *
  * The date, the filters and the view belong to the Calendar workspace
  * (`CalendarWorkspaceProvider`), shared with every presentation of the
@@ -64,8 +76,9 @@ export function NewsroomCalendar(props: NewsroomCalendarProps) {
   return <CalendarNavigateProvider value={props.navigate ?? null}><CalendarSurface {...props} /></CalendarNavigateProvider>;
 }
 
-function CalendarSurface({ collectionId, stories, timezone, getSchedule, currentUserId, links, onOpenStory, controls = "sheet", navigate }: NewsroomCalendarProps) {
+function CalendarSurface({ collectionId, stories, timezone, getSchedule, currentUserId, links, onOpenStory, controls = "sheet", navigate, reschedule }: NewsroomCalendarProps) {
   const { workspace, state } = useCalendarWorkspace();
+  const client = useQueryClient();
   const { filters } = state;
   const [controller] = useState(createCalendarController);
   const [eventsService] = useState(() => createEventsServicePlugin());
@@ -124,10 +137,47 @@ function CalendarSurface({ collectionId, stories, timezone, getSchedule, current
   });
   const feed = schedule.data;
 
-  const events = useMemo(
+  const savedEvents = useMemo(
     () => mergeCalendarEvents(planningCalendarEvents(stories, timezone), scheduleCalendarEvents(feed, links, timezone), filters, currentUserId),
     [currentUserId, feed, filters, stories, timezone, links]
   );
+  // A dropped event sits on its new day while the save is in flight; a failed save puts it back.
+  const [moving, setMoving] = useState<Record<string, string>>({});
+  const events = useMemo(() => {
+    const ids = Object.keys(moving);
+    if (!ids.length) return savedEvents;
+    return savedEvents.map((event) => (moving[event.id] ? moveEvent(event, moving[event.id], timezone) ?? event : event)).sort(compareCalendarEvents);
+  }, [moving, savedEvents, timezone]);
+  const [confirming, setConfirming] = useState<{ event: PlanningCalendarEvent; change: RescheduleChange; toDay: string } | null>(null);
+
+  const move = async (event: PlanningCalendarEvent, change: RescheduleChange, toDay: string, undoable: boolean) => {
+    if (!reschedule) return;
+    const fromDay = event.date;
+    setMoving((current) => ({ ...current, [event.id]: toDay }));
+    try {
+      await reschedule.apply(change);
+      await invalidateStoryData(client, event.storyId);
+      const sentence = describeReschedule(event, fromDay, toDay, typeof navigator === "undefined" ? undefined : navigator.language);
+      const moved = moveEvent(event, toDay, timezone);
+      const back = moved ? rescheduleChange(moved, fromDay, timezone) : null;
+      toast.success("Moved", { description: sentence, ...(undoable && back ? { action: { label: "Undo", onClick: () => { if (moved) void move(moved, back, fromDay, false); } } } : {}) });
+    } catch (error) {
+      toast.error("Could not move it", { description: describePlanningError(error, "The date was not changed.") });
+    } finally {
+      setMoving((current) => { const { [event.id]: _done, ...rest } = current; return rest; });
+    }
+  };
+
+  const frameRef = useRef<HTMLDivElement>(null);
+  useCalendarDrop(frameRef, (eventId, toDay) => {
+    const event = savedEvents.find((candidate) => candidate.id === eventId);
+    const change = event ? rescheduleChange(event, toDay, timezone) : null;
+    if (!event || !change) return;
+    // Moving when something goes live is confirmed; every other date moves at once, with Undo.
+    if (change.kind === "scheduled") setConfirming({ event, change, toDay });
+    else void move(event, change, toDay, true);
+  });
+  const dragPolicy = useMemo(() => (reschedule ? { can: reschedule.can } : null), [reschedule]);
   const needsScheduling = useMemo(() => needsSchedulingItems(feed, links, { mine: filters.mine, currentUserId }), [currentUserId, feed, filters.mine, links]);
   useEffect(() => { workspace.setNeedsScheduling(needsScheduling.length); }, [workspace, needsScheduling.length]);
 
@@ -163,9 +213,24 @@ function CalendarSurface({ collectionId, stories, timezone, getSchedule, current
       {legend.map((category) => <li key={category} className="flex items-center gap-1.5"><span aria-hidden="true" className={`size-2 rounded-full ${CATEGORY_DOT_CLASSES[category]}`} />{CATEGORY_LABELS[category]}</li>)}
     </ul> : null}
 
-    <div className="min-w-0 overflow-hidden rounded-xl border" data-calendar-frame="">
-      <ScheduleXCalendar calendarApp={calendar} customComponents={CALENDAR_COMPONENTS} />
+    <div ref={frameRef} className="min-w-0 overflow-hidden rounded-xl border" data-calendar-frame="">
+      <CalendarDragPolicyContext value={dragPolicy}>
+        <ScheduleXCalendar calendarApp={calendar} customComponents={CALENDAR_COMPONENTS} />
+      </CalendarDragPolicyContext>
     </div>
+
+    <AlertDialog open={Boolean(confirming)} onOpenChange={(open) => { if (!open) setConfirming(null); }}>
+      <AlertDialogContent data-calendar-confirm-move="">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Change when this publishes?</AlertDialogTitle>
+          <AlertDialogDescription>{confirming ? `${describeReschedule(confirming.event, confirming.event.date, confirming.toDay, typeof navigator === "undefined" ? undefined : navigator.language)}. The story will go live on the new day instead.` : ""}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep current time</AlertDialogCancel>
+          <AlertDialogAction onClick={() => { const next = confirming; setConfirming(null); if (next) void move(next.event, next.change, next.toDay, false); }}>Reschedule</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>;
 }
 

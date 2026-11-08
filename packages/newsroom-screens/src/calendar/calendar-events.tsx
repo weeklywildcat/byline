@@ -4,9 +4,11 @@
  * Card per event. Click opens Story Peek (handled by the calendar, not here).
  */
 import { CalendarClock, Camera, CheckCheck, Clock, Flag, ListTodo, Newspaper, type LucideIcon } from "lucide-react";
+import { useRef } from "react";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
 import { StoryHoverCard } from "../story/StoryHoverCard";
+import { useEventDrag } from "./calendar-drag";
 import { CalendarLink } from "./calendar-link";
 import { CATEGORY_BY_EVENT_TYPE, CATEGORY_LABELS, type BylineScheduleXEvent, type ScheduleXCategory } from "./schedule-x-adapter";
 import type { CalendarEventType } from "../planning/planning-model";
@@ -43,7 +45,9 @@ const timeOf = (event: BylineScheduleXEvent) => event.timed && event.start insta
 
 function Chip({ event, children, className }: { event: BylineScheduleXEvent; children: React.ReactNode; className?: string }) {
   const category = CATEGORY_BY_EVENT_TYPE[event.bylineType];
-  const chip = <div data-event-category={category} data-event-type={event.bylineType} aria-label={`${CATEGORY_LABELS[category]}: ${eventText(event).primary}${timeOf(event) ? `, ${timeOf(event)}` : ""}`} className={cn("flex h-full w-full min-w-0 items-center gap-1 rounded-sm border-l-2 px-1.5 py-0.5 text-xs leading-tight", CATEGORY_CLASSES[category], event.completed && "line-through opacity-70", className)}>{children}</div>;
+  const ref = useRef<HTMLDivElement>(null);
+  const { dragging, canDrag } = useEventDrag(ref, event);
+  const chip = <div ref={ref} data-event-category={category} data-event-type={event.bylineType} data-draggable={canDrag ? "" : undefined} data-dragging={dragging ? "" : undefined} aria-label={`${CATEGORY_LABELS[category]}: ${eventText(event).primary}${timeOf(event) ? `, ${timeOf(event)}` : ""}`} className={cn("flex h-full w-full min-w-0 items-center gap-1 rounded-sm border-l-2 px-1.5 py-0.5 text-xs leading-tight", CATEGORY_CLASSES[category], event.completed && "line-through opacity-70", canDrag && "cursor-grab active:cursor-grabbing", dragging && "opacity-40", className)}>{children}</div>;
   return event.storyId > 0
     ? <StoryHoverCard storyId={event.storyId} title={event.storyTitle} note={event.tooltip}>{chip}</StoryHoverCard>
     : <Tooltip><TooltipTrigger render={chip} /><TooltipContent className="max-w-72 whitespace-pre-line">{event.tooltip}</TooltipContent></Tooltip>;

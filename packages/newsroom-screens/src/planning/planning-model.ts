@@ -456,6 +456,8 @@ export type PlanningCalendarEvent = {
   storyTitle: string;
   storyUrl: string;
   type: CalendarEventType;
+  /** The appointment or production item's own id, for events saved through it. */
+  recordId?: string;
   /** Site-local (or, for story dates before the schedule feed loads, browser-local) `YYYY-MM-DD`. */
   date: string;
   exactDate: string;

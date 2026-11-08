@@ -9,7 +9,7 @@ import { commandSearch } from "./command-search";
 import { changeCorrection, storyCorrections } from "./story-corrections";
 import { restoreStoryVersion, storyVersion, storyVersions } from "./story-history";
 import { storyReadiness } from "./story-readiness";
-import { setScheduledPublication } from "./scheduled-publication";
+import { setScheduledPublication, trashStory } from "./scheduled-publication";
 import { storyURLContext } from "./story-url";
 import type { ContributorEntry, EditorialWorkflowPayload, TaskInput, TaskPatch } from "@byline/newsroom-screens/editorial/editorial-model";
 import type { HomePresetsPayload } from "@byline/newsroom-screens/home/home-model";
@@ -30,7 +30,7 @@ import { publicationMediaReport, type MediaRequirement } from "../publication-me
 import { buildMediaEndpoint } from "../publication-media/build-endpoint";
 import { buildSnapshotEndpoints } from "../public/snapshot/endpoints";
 
-/** `?lead=12&ids=3,4`: the lead image and every other Media a story references (at most 200). */
+/** `?lead=12&ids=3,4&alt=4`: referenced Media, plus body uses whose story-specific alt text is already complete. */
 function readinessQuery(params: URLSearchParams): MediaRequirement[] {
   const id = (value: string) => {
     const number = Number(value);
@@ -38,7 +38,11 @@ function readinessQuery(params: URLSearchParams): MediaRequirement[] {
   };
   const lead = id(params.get("lead") ?? "");
   const others = (params.get("ids") ?? "").split(",").map(id).filter((value): value is number => value !== null && value !== lead);
-  return [...(lead ? [{ id: lead, role: "image" as const }] : []), ...[...new Set(others)].map((value) => ({ id: value, role: "file" as const }))].slice(0, 200);
+  const alt = new Set((params.get("alt") ?? "").split(",").map(id).filter((value): value is number => value !== null));
+  return [
+    ...(lead ? [{ id: lead, role: "image" as const, allowMissingAlt: false }] : []),
+    ...[...new Set(others)].map((value) => ({ id: value, role: "file" as const, allowMissingAlt: alt.has(value) }))
+  ].slice(0, 200);
 }
 import { planningResponse } from "./planning";
 import { navigationCounts } from "./navigation-counts";
@@ -568,6 +572,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/restore-version", method: "post", handler: handle(async (ctx, req) => restoreStoryVersion(ctx, idParam(req), await body(req))) },
   { path: "/byline/stories/:id/readiness", method: "get", handler: handle((ctx, req) => storyReadiness(ctx, idParam(req))) },
   { path: "/byline/stories/:id/schedule-publication", method: "post", handler: handle(async (ctx, req) => setScheduledPublication(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/trash", method: "post", handler: handle((ctx, req) => trashStory(ctx, idParam(req))) },
   { path: "/byline/stories/:id/public-url", method: "get", handler: handle((ctx, req) => storyURLContext(ctx, idParam(req))) },
   { path: "/byline/presence", method: "get", handler: handle(presenceSnapshot) },
   { path: "/byline/presence", method: "post", handler: handle(presenceHeartbeat) },

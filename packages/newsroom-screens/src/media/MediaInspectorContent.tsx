@@ -500,7 +500,13 @@ function PublicationSection({ asset, timezone, retrying, onRetry }: { asset: Med
         <ItemTitle id={`media-publication-${asset.id}`} className="text-sm">Publication files: {PUBLICATION_ASSET_LABELS[state]}</ItemTitle>
         <ItemDescription className="line-clamp-none text-xs" role="status" aria-live="polite">{note}</ItemDescription>
         {publication.warnings.length ? (
-          <ul className="mt-1 list-disc pl-4 text-xs text-amber-900 dark:text-amber-200" data-media-publication-warnings="">{publication.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+          <details className="group/warnings mt-1 text-xs text-amber-900 dark:text-amber-200" data-media-publication-warnings="">
+            <summary className="w-fit cursor-pointer select-none rounded-sm outline-none marker:content-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
+              {publication.warnings.length === 1 ? "1 image size note" : `${publication.warnings.length} image size notes`}
+              <span className="text-muted-foreground group-open/warnings:hidden"> · Show</span>
+            </summary>
+            <ul className="mt-1 list-disc pl-4">{publication.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+          </details>
         ) : null}
       </ItemContent>
       {publication.canRetry && onRetry && state !== "preparing" ? (

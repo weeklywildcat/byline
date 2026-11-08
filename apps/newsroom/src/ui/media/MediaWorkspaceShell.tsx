@@ -6,7 +6,7 @@ import { MediaArtDirectionDialog } from "@byline/newsroom-screens/media/MediaArt
 import type { ArtDirectionEditResult } from "@byline/newsroom-screens/media/art-direction-model";
 import type { MediaFolderRequest } from "@byline/newsroom-screens/media/MediaFolderDialogs";
 import type { MediaLibraryFetchers } from "@byline/newsroom-screens/media/media-library-api";
-import type { MediaKind, MediaLibraryAsset, MediaRoute } from "@byline/newsroom-screens/media/media-library-model";
+import { DEFAULT_MEDIA_ROUTE, type MediaKind, type MediaLibraryAsset, type MediaRoute } from "@byline/newsroom-screens/media/media-library-model";
 import type { MediaPreferences, MediaPreferencesStore } from "@byline/newsroom-screens/media/media-preferences";
 import type { MediaPicker, PickedAttachment } from "@byline/newsroom-screens/workspace/media-picker";
 import type { MediaAssignmentType } from "@byline/newsroom-screens/workspace/workspace-types";
@@ -16,9 +16,11 @@ import { useNewsroomAccount, useNewsroomRoutes } from "../shell/account";
 import { ShellLayer } from "../shell/layer";
 import { useNewsroomTimeZone } from "../shell/timezone";
 import { createPayloadMediaFetchers, payloadMediaPreferences } from "./payload-media-fetchers";
+import { InlineMediaDetailsSheet } from "./InlineMediaDetailsSheet";
 
 export type ArtDirectionContext = { headline?: string; excerpt?: string; host?: string };
 type ArtRequest = { mediaId: number; context?: ArtDirectionContext; resolve: (result: ArtDirectionEditResult | null) => void };
+type DetailsRequest = { mediaId: number; resolve: (asset: MediaLibraryAsset | null) => void };
 type PickRequest = { kind: MediaKind | ""; restrictedKind?: MediaKind; title?: string; confirmLabel?: string; multiple: boolean; resolve: (assets: MediaLibraryAsset[]) => void };
 
 type MediaWorkspace = {
@@ -42,6 +44,8 @@ type MediaWorkspace = {
    * one dialog; callers only ask for a Media ID. Resolves when it closes.
    */
   editArtDirection: (mediaId: number, context?: ArtDirectionContext) => Promise<ArtDirectionEditResult | null>;
+  /** Opens the full Media details inspector over the current screen and returns the latest saved asset when it closes. */
+  editDetails: (mediaId: number) => Promise<MediaLibraryAsset | null>;
   /** The Media screen's address for a route. */
   href: (route: MediaRoute) => string;
   /**
@@ -106,6 +110,7 @@ export function MediaWorkspaceShell({ children }: { children: ReactNode }) {
   const [folderRequest, requestFolderAction] = useState<MediaFolderRequest | null>(null);
   const [picking, setPicking] = useState<PickRequest | null>(null);
   const [art, setArt] = useState<ArtRequest | null>(null);
+  const [details, setDetails] = useState<DetailsRequest | null>(null);
 
   const setExpanded = useCallback((folderId: number, open: boolean) => setExpandedSet((current) => {
     if (current.has(folderId) === open) return current;
@@ -124,15 +129,35 @@ export function MediaWorkspaceShell({ children }: { children: ReactNode }) {
       return { mediaId, context, resolve };
     });
   }), []);
+  const editDetails = useCallback<MediaWorkspace["editDetails"]>((mediaId) => new Promise((resolve) => {
+    setDetails((current) => {
+      current?.resolve(null);
+      return { mediaId, resolve };
+    });
+  }), []);
   const href = useCallback((route: MediaRoute) => `${routes.admin}/media${mediaHrefSearch(route)}`, [routes.admin]);
   const navigationGuard = useRef<((proceed: () => void) => void) | null>(null);
   const guardNavigation = useCallback((proceed: () => void) => (navigationGuard.current ? navigationGuard.current(proceed) : proceed()), []);
   const setNavigationGuard = useCallback((guard: ((proceed: () => void) => void) | null) => { navigationGuard.current = guard; }, []);
 
-  const value = useMemo<MediaWorkspace>(() => ({ fetchers, preferences, expanded, setExpanded, expandAll, sheetOpen, setSheetOpen, folderRequest, requestFolderAction, pick, editArtDirection, href, guardNavigation, setNavigationGuard }), [editArtDirection, expandAll, expanded, fetchers, folderRequest, guardNavigation, href, pick, preferences, setExpanded, setNavigationGuard, sheetOpen]);
+  const value = useMemo<MediaWorkspace>(() => ({ fetchers, preferences, expanded, setExpanded, expandAll, sheetOpen, setSheetOpen, folderRequest, requestFolderAction, pick, editArtDirection, editDetails, href, guardNavigation, setNavigationGuard }), [editArtDirection, editDetails, expandAll, expanded, fetchers, folderRequest, guardNavigation, href, pick, preferences, setExpanded, setNavigationGuard, sheetOpen]);
   const settle = (assets: MediaLibraryAsset[]) => {
     picking?.resolve(assets);
     setPicking(null);
+  };
+  const settleDetails = async (deleted = false) => {
+    const current = details;
+    if (!current) return;
+    setDetails(null);
+    if (deleted) {
+      current.resolve(null);
+      return;
+    }
+    try {
+      current.resolve(await fetchers.getAsset(current.mediaId));
+    } catch {
+      current.resolve(null);
+    }
   };
 
   return (
@@ -167,6 +192,20 @@ export function MediaWorkspaceShell({ children }: { children: ReactNode }) {
               setArt(null);
             }}
           />
+        </ShellLayer>
+      ) : null}
+      {account ? (
+        <ShellLayer active={details !== null}>
+          {details ? (
+            <InlineMediaDetailsSheet
+              mediaId={details.mediaId}
+              fetchers={fetchers}
+              timezone={timezone}
+              assetHref={(id) => href({ ...DEFAULT_MEDIA_ROUTE, assetId: id })}
+              onEditArtDirection={(id) => editArtDirection(id)}
+              onClose={(deleted) => { void settleDetails(Boolean(deleted)); }}
+            />
+          ) : null}
         </ShellLayer>
       ) : null}
     </MediaWorkspaceContext>

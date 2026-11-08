@@ -4,11 +4,12 @@ import { altFor, ARTICLE_BLOCK_LIMITS as LIMITS, type ArticleMediaAsset, type Me
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { DropdownMenuItem } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { ArticleImage, GalleryLayout, StoryFigure } from "@byline/ui/article-body";
-import { ArrowLeft, ArrowRight, Crop, ImagePlus, Images, ImageUp, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Crop, ImagePlus, Images, ImageUp, Pencil, Trash2 } from "lucide-react";
 import { useRef, useState, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { moveDirection, moveItem, removeItem } from "../../items";
@@ -16,7 +17,7 @@ import { newRowId } from "../../fields";
 import { BlockShell, SecondarySetting, ToolButton, ToolTextButton } from "../chrome";
 import { InlineText } from "../fields";
 import { useFocusWhenCreated } from "../focus";
-import { useAnnounce, useBylineEditorHost, useMediaAsset, usePickMedia, useUploadMedia } from "../host";
+import { useAnnounce, useBylineEditorHost, useEditMediaDetails, useMediaAsset, usePickMedia, useUploadMedia } from "../host";
 import { BlockIcon } from "../icons";
 import { focusIn, useReadiness, useTypedFields, type BlockEditorProps } from "./shared";
 
@@ -138,6 +139,7 @@ export function PhotoEditor({ node, id, nodeKey }: BlockEditorProps) {
   const readOnly = !node.editable;
   const asset = media.asset;
   const { editArtDirection } = useBylineEditorHost();
+  const editMediaDetails = useEditMediaDetails();
 
   const use = (assets: ArticleMediaAsset[]) => {
     const chosen = assets[0];
@@ -161,6 +163,12 @@ export function PhotoEditor({ node, id, nodeKey }: BlockEditorProps) {
       type="photo"
       node={node}
       issues={issues}
+      menuItems={editMediaDetails && fields.media !== null ? (
+        <DropdownMenuItem onClick={() => void editMediaDetails(fields.media!)}>
+          <Pencil />
+          Edit media details…
+        </DropdownMenuItem>
+      ) : null}
       actions={fields.media !== null ? (
         <>
           <ButtonGroup>
