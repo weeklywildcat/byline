@@ -8,6 +8,9 @@
  *
  * Apply:
  *   npm run import:wordpress --workspace @byline/newsroom -- --file /migration/wordpress-native.json --map-person 1:gibson --apply
+ *
+ * Explicitly omit a permanently lost WordPress media asset:
+ *   --omit-media WP_ATTACHMENT_ID
  */
 import { readFile } from "node:fs/promises";
 import { basename, extname } from "node:path";
@@ -70,7 +73,7 @@ type WordPressExport = {
 };
 
 type Summary = {
-  media: { create: number; reuse: number };
+  media: { create: number; reuse: number; omitted: number };
   people: { create: number; reuse: number; mapped: number };
   sections: { create: number; reuse: number };
   topics: { create: number; reuse: number };
@@ -98,7 +101,7 @@ function repeated(name: string): string[] {
 }
 const file = argument("--file");
 if (!file) {
-  console.error("Usage: import-wordpress-native.ts --file <export.json> [--map-person WP_ID:PAYLOAD_ID_OR_SLUG] [--apply]");
+  console.error("Usage: import-wordpress-native.ts --file <export.json> [--map-person WP_ID:PAYLOAD_ID_OR_SLUG] [--omit-media WP_ATTACHMENT_ID] [--apply]");
   process.exit(64);
 }
 
@@ -110,6 +113,13 @@ for (const value of repeated("--map-person")) {
   mappings.set(id, target);
 }
 
+const omittedMedia = new Set<number>();
+for (const value of repeated("--omit-media")) {
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new Error(`Invalid --omit-media ${value}; expected a positive WordPress attachment ID.`);
+  omittedMedia.add(id);
+}
+
 const raw = JSON.parse(await readFile(file, "utf8")) as WordPressExport;
 if (raw.schemaVersion !== 1) throw new Error(`Unsupported WordPress export schema ${raw.schemaVersion}.`);
 if ((raw.errors ?? []).length) throw new Error(`WordPress export cannot be imported natively:\n- ${raw.errors!.join("\n- ")}`);
@@ -117,7 +127,7 @@ if (!Array.isArray(raw.posts) || !Array.isArray(raw.attachments) || !Array.isArr
 
 const payload = await getPayload({ config });
 const summary: Summary = {
-  media: { create: 0, reuse: 0 },
+  media: { create: 0, reuse: 0, omitted: 0 },
   people: { create: 0, reuse: 0, mapped: 0 },
   sections: { create: 0, reuse: 0 },
   topics: { create: 0, reuse: 0 },
@@ -213,13 +223,31 @@ function normalizeSocials(value: ExportPerson["socials"]) {
     .map((row) => ({ label: text(row.label).slice(0, 40), url: row.url }));
 }
 
-function mapMediaInNode(node: any, media: Map<number, number>): any {
-  const map = (value: unknown) => typeof value === "number" ? (media.get(value) ?? null) : value;
-  if (node.type === "photo") return { ...node, media: map(node.media) };
-  if (node.type === "gallery") return { ...node, items: (node.items ?? []).map((item: any) => ({ ...item, media: map(item.media) })) };
-  if (["document", "portraitText", "visualChapter", "audio", "annotatedImage"].includes(node.type)) return { ...node, media: map(node.media) };
-  if (node.type === "chartMap") return { ...node, image: map(node.image) };
-  if (node.type === "beforeAfter") return { ...node, before: map(node.before), after: map(node.after) };
+function mapMediaInNode(node: any, media: Map<number, number>): any | null {
+  const mapped = (value: unknown) => typeof value === "number" ? (media.get(value) ?? null) : value;
+  const omitted = (value: unknown) => typeof value === "number" && omittedMedia.has(value);
+
+  if (node.type === "photo") {
+    if (omitted(node.media)) return null;
+    return { ...node, media: mapped(node.media) };
+  }
+  if (node.type === "gallery") {
+    const items = (node.items ?? [])
+      .filter((item: any) => !omitted(item.media))
+      .map((item: any) => ({ ...item, media: mapped(item.media) }));
+    return items.length ? { ...node, items } : null;
+  }
+  if (["document", "portraitText", "visualChapter", "audio", "annotatedImage"].includes(node.type)) {
+    if (omitted(node.media)) return null;
+    return { ...node, media: mapped(node.media) };
+  }
+  if (node.type === "chartMap") {
+    return { ...node, image: omitted(node.image) ? null : mapped(node.image) };
+  }
+  if (node.type === "beforeAfter") {
+    if (omitted(node.before) || omitted(node.after)) return null;
+    return { ...node, before: mapped(node.before), after: mapped(node.after) };
+  }
   if (node.type === "video" && typeof node._sourceUrl === "string") {
     const videoId = parseYouTubeVideoId(node._sourceUrl);
     if (!videoId) throw new Error(`Invalid imported YouTube URL: ${node._sourceUrl}`);
@@ -231,41 +259,10 @@ function mapMediaInNode(node: any, media: Map<number, number>): any {
 
 function nativeBody(body: ArticleBody, media: Map<number, number>): ArticleBody {
   if (body?.format !== "byline-v1" || body.version !== 1 || !Array.isArray(body.nodes)) throw new Error("Export contains a non-native article body.");
-  return { ...body, nodes: body.nodes.map((node) => mapMediaInNode(node, media)) as ArticleBodyNode[], media: {} };
-}
-
-function attachmentCandidates(attachment: ExportAttachment) {
-  return [...new Set([...(attachment.candidateUrls ?? []), attachment.url].filter(isHttps))];
-}
-
-async function fetchAttachmentSource(attachment: ExportAttachment, probeOnly: boolean) {
-  if (text(attachment.inlineDataBase64)) {
-    const data = Buffer.from(attachment.inlineDataBase64!, "base64");
-    if (!data.length || (attachment.inlineBytes && data.length !== attachment.inlineBytes)) {
-      throw new Error(`Attachment ${attachment.id} has invalid embedded WordPress source bytes.`);
-    }
-    return { url: "wordpress-upload-volume", data: probeOnly ? null as Buffer | null : data };
-  }
-  const candidates = attachmentCandidates(attachment);
-  if (!candidates.length) throw new Error(`Attachment ${attachment.id} has no HTTPS source URL.`);
-  const failures: string[] = [];
-  for (const url of candidates) {
-    try {
-      const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(30_000) });
-      if (!response.ok) {
-        failures.push(`${url} -> HTTP ${response.status}`);
-        continue;
-      }
-      if (probeOnly) {
-        await response.body?.cancel();
-        return { url, data: null as Buffer | null };
-      }
-      return { url, data: Buffer.from(await response.arrayBuffer()) };
-    } catch (error) {
-      failures.push(`${url} -> ${(error as Error).message}`);
-    }
-  }
-  throw new Error(`Attachment ${attachment.id} has no reachable WordPress source. ${failures.slice(0, 4).join("; ")}`);
+  const nodes = body.nodes
+    .map((node) => mapMediaInNode(node, media))
+    .filter((node): node is ArticleBodyNode => node !== null);
+  return { ...body, nodes, media: {} };
 }
 
 async function download(attachment: ExportAttachment) {
@@ -285,7 +282,17 @@ async function download(attachment: ExportAttachment) {
 }
 
 async function plan() {
+  const exportedAttachmentIds = new Set(raw.attachments.map((attachment) => attachment.id));
+  for (const id of omittedMedia) {
+    if (!exportedAttachmentIds.has(id)) throw new Error(`--omit-media ${id} does not exist in the WordPress export.`);
+  }
+
   for (const attachment of raw.attachments) {
+    if (omittedMedia.has(attachment.id)) {
+      summary.media.omitted++;
+      summary.review.push(`Attachment ${attachment.id}: explicitly omitted because the WordPress source is permanently unavailable; affected Story media blocks/items will be removed.`);
+      continue;
+    }
     const target = importMediaTarget(attachment);
     if (target.convertToJpeg) summary.review.push(`Attachment ${attachment.id}: ${target.sourceMime} will be converted to JPEG for Byline Media.`);
     if (attachment.recoveredFromBlock) {
@@ -298,6 +305,7 @@ async function plan() {
     }
   }
   for (const attachment of raw.attachments) {
+    if (omittedMedia.has(attachment.id)) continue;
     if (await byLegacy("media", attachment.id)) summary.media.reuse++;
     else summary.media.create++;
   }
@@ -344,6 +352,7 @@ async function plan() {
   }
 
   const knownAttachments = new Set(raw.attachments.map((item) => item.id));
+  const referencedOmissions = new Set<number>();
   for (const post of raw.posts) {
     if (!text(post.publishedLocal) || !text(post.modifiedLocal)) {
       throw new Error(`Post ${post.id} is missing WordPress-local publication timestamps; regenerate the export with the current exporter.`);
@@ -358,10 +367,16 @@ async function plan() {
       if (typeof node.before === "number") ids.push(node.before);
       if (typeof node.after === "number") ids.push(node.after);
       for (const item of node.items ?? []) if (typeof item.media === "number") ids.push(item.media);
-      for (const id of ids) if (!knownAttachments.has(id)) throw new Error(`Post ${post.id} references attachment ${id}, which is missing from the export.`);
+      for (const id of ids) {
+        if (!knownAttachments.has(id)) throw new Error(`Post ${post.id} references attachment ${id}, which is missing from the export.`);
+        if (omittedMedia.has(id)) referencedOmissions.add(id);
+      }
     };
     post.body.nodes.forEach(inspect);
-    if (post.featuredMediaId && !knownAttachments.has(post.featuredMediaId)) throw new Error(`Post ${post.id} featured image ${post.featuredMediaId} is missing from the export.`);
+    if (post.featuredMediaId) {
+      if (!knownAttachments.has(post.featuredMediaId)) throw new Error(`Post ${post.id} featured image ${post.featuredMediaId} is missing from the export.`);
+      if (omittedMedia.has(post.featuredMediaId)) referencedOmissions.add(post.featuredMediaId);
+    }
     const sectionId = sectionWordPressId(post);
     const section = sectionId ? categoryById.get(sectionId) : null;
     if (post.status === "publish") {
@@ -380,6 +395,9 @@ async function plan() {
       if (!account) summary.review.push(`Post ${post.id}: old WordPress editor user ${plan.oldEditorUserId} has no mapped Byline sign-in account, so the editor assignment will be left blank.`);
     }
     if (plan.oldVisualNeeds) summary.review.push(`Post ${post.id}: old visual-needs note has no direct Payload field and needs review: ${plan.oldVisualNeeds.slice(0, 180)}`);
+  }
+  for (const id of omittedMedia) {
+    if (!referencedOmissions.has(id)) throw new Error(`--omit-media ${id} is not referenced by any imported Story body or featured image.`);
   }
 }
 
@@ -430,6 +448,7 @@ function importedPlan(post: ExportPost) {
 async function applyImport() {
   const mediaMap = new Map<number, number>();
   for (const attachment of raw.attachments) {
+    if (omittedMedia.has(attachment.id)) continue;
     const mediaData = {
       legacyWordPressId: attachment.id,
       alt: text(attachment.alt).slice(0, 600),
@@ -537,7 +556,7 @@ async function applyImport() {
       section,
       topics: post.tagIds.map((id) => topicMap.get(id)).filter((id): id is number => Boolean(id)),
       contributors,
-      featuredMedia: post.featuredMediaId ? mediaMap.get(post.featuredMediaId) ?? null : null,
+      featuredMedia: post.featuredMediaId && !omittedMedia.has(post.featuredMediaId) ? mediaMap.get(post.featuredMediaId) ?? null : null,
       featuredCaption: text(post.featuredCaption),
       contentFormat: "byline-v1",
       body: lexical,
