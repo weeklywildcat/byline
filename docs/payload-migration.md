@@ -635,8 +635,8 @@ Built in the newsroom Admin:
   derives `hasPublishPermission` from it), integration-tested.
 
 Byline manages public URLs, native publication actions and History on the Story
-screen. The native Payload document lock still handles takeover. Site and
-People → Access provide the normal administrator workflows. See
+screen. The native Payload document lock still handles takeover. Site and the People screen provide the normal administrator workflows, including
+per-Person newsroom access. See
 [Payload newsroom workflows](newsroom-ux.md) for the remaining fallback surfaces.
 
 **Home is ported (Phase 1c).** `HomeApp`, Story Peek, hover cards, the New
@@ -1068,7 +1068,9 @@ get `/admin/people` after Collections; linked accounts get `/admin/profile` from
 the account menu. One CMS-neutral explicit-save Person editor powers both,
 with server-derived capabilities, own-profile field access, image-only Byline
 Media picking, guarded URL navigation and transactional 409 conflicts.
-Person and User stay separate; administrators manage accounts in People → Access.
+Person and User stay separate underneath; administrators manage each Person's
+optional newsroom access from that same Person screen. Raw Accounts are only a
+System-administration fallback.
 
 Guests are People with guest status and sensible byline-only creation defaults.
 Status, staff-directory visibility and profile-page visibility are independent.
