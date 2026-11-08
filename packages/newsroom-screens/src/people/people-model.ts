@@ -149,9 +149,11 @@ export function personSummary(person: PersonRow): string {
     .join(" · ");
 }
 
-/** Canonical links are HTTPS URLs, never handles, credentials or script protocols. */
+/** Canonical links are HTTPS URLs, never bare handles, credentials or script protocols. */
 export function validPersonSocialUrl(value: unknown): boolean {
-  if (typeof value !== "string" || !/^https:\/\/[^\s@]+$/.test(value))
+  // '@' is valid in a URL path/query (for example youtube.com/@weeklywildcat).
+  // Let URL parsing distinguish that from credential syntax in the authority.
+  if (typeof value !== "string" || !/^https:\/\/\S+$/.test(value))
     return false;
   try {
     const url = new URL(value);
