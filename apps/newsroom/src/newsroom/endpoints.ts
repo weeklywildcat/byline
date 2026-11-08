@@ -20,8 +20,8 @@ import { isWorkflowStage } from "../domain/workflow";
 import { validResourceUrl } from "../collections/StoryPlans";
 import { parsePlanningFilterParams } from "@byline/newsroom-screens/planning/planning-api";
 import { parseMediaLibraryParams } from "@byline/newsroom-screens/media/media-library-model";
-import type { MediaMetadataPatch } from "@byline/newsroom-screens/media/media-library-model";
-import { createFolder, deleteFolder, deleteMedia, libraryPage, mediaDetail, mediaNavigator, moveMedia, updateFolder, updateMedia, uploadMedia } from "./media-library";
+import type { MediaBulkPatch, MediaMetadataPatch } from "@byline/newsroom-screens/media/media-library-model";
+import { createFolder, deleteFolder, deleteMedia, deleteMediaMany, libraryPage, mediaDetail, mediaNavigator, moveMedia, renameMedia, updateFolder, updateMedia, updateMediaMany, uploadMedia } from "./media-library";
 import { mediaWork } from "./media-work";
 import { artDirectionView, retryPublication, saveArtDirection } from "../publication-media/media-publication";
 import { publicationMediaReport, type MediaRequirement } from "../publication-media/readiness";
@@ -593,12 +593,15 @@ export const newsroomEndpoints: Endpoint[] = [
   // Story header preflight: the same server rule Publish enforces, for the Media the form currently references.
   { path: "/byline/media/publication-readiness", method: "get", handler: handle((ctx, req) => publicationMediaReport(req.payload, readinessQuery(req.searchParams), { req })) },
   { path: "/byline/media/move", method: "post", handler: handle(moveToFolder) },
+  { path: "/byline/media/bulk-update", method: "post", handler: handle(async (ctx, req) => { const input = await body<{ ids?: unknown; patch?: unknown }>(req); return updateMediaMany(ctx, ids(input.ids), (input.patch ?? {}) as MediaBulkPatch); }) },
+  { path: "/byline/media/bulk-delete", method: "post", handler: handle(async (ctx, req) => deleteMediaMany(ctx, ids((await body<{ ids?: unknown }>(req)).ids))) },
   { path: "/byline/media/folders", method: "post", handler: handle(async (ctx, req) => createFolder(ctx, await body(req))) },
   { path: "/byline/media/folders/:id", method: "patch", handler: handle(async (ctx, req) => updateFolder(ctx, idParam(req), await body(req))) },
   { path: "/byline/media/folders/:id", method: "delete", handler: handle(async (ctx, req) => { await deleteFolder(ctx, idParam(req)); return new Response(null, { status: 204 }); }) },
   // Art direction (focal point, custom crops) and publication Retry: the only normal write paths for that state.
   { path: "/byline/media/:id/art-direction", method: "get", handler: handle((ctx, req) => artDirectionView(ctx, idParam(req))) },
   { path: "/byline/media/:id/art-direction", method: "put", handler: handle(async (ctx, req) => saveArtDirection(ctx, idParam(req), await body<Record<string, unknown>>(req))) },
+  { path: "/byline/media/:id/rename", method: "post", handler: handle(async (ctx, req) => renameMedia(ctx, idParam(req), await body(req))) },
   { path: "/byline/media/:id/publication/retry", method: "post", handler: handle(async (ctx, req) => { await retryPublication(ctx, idParam(req)); return mediaDetail(ctx, idParam(req)); }) },
   { path: "/byline/media/:id", method: "get", handler: handle((ctx, req) => mediaDetail(ctx, idParam(req))) },
   { path: "/byline/media/:id", method: "patch", handler: handle(async (ctx, req) => updateMedia(ctx, idParam(req), await body<MediaMetadataPatch>(req))) },

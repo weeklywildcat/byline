@@ -1,10 +1,13 @@
 import { lexicalFromArticleBody } from "../../../../packages/editor/tests/lexical-fixture";
 import { buildFolderTree, EMPTY_MEDIA_FILTERS, MEDIA_PAGE_SIZE, type MediaLibraryQuery } from "@byline/newsroom-screens/media/media-library-model";
 import { createLocalReq, getPayload, type Endpoint, type Payload, type PayloadRequest } from "payload";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { newsroomEndpoints } from "../../src/newsroom/endpoints";
 import { screenContext } from "../../src/newsroom/screen-models";
+import { privateMediaDir } from "../../src/publication-media/paths";
 import type { Media, User } from "../../src/payload-types";
 
 /**
@@ -362,6 +365,68 @@ describe("one asset", () => {
     expect(linked.body.message).toContain("linked from 4 places");
     expect((await call("delete", "/byline/media/:id", "editor", { params: { id: String(ids.small) } })).status).toBe(204);
     expect((await payload.count({ collection: "media", where: { id: { equals: ids.small } } })).totalDocs).toBe(0);
+  });
+});
+
+describe("rename and bulk actions", () => {
+  const stored = (filename: string | null | undefined) => Boolean(filename) && existsSync(path.join(privateMediaDir(), filename!));
+
+  it("renames the stored original and its preview, keeping its type, links and publication revision", async () => {
+    const id = await upload("alice", await photo(800, 600, "media-rename-source.jpg"), null);
+    const before = await payload.findByID({ collection: "media", id, depth: 0 });
+    const detail = (await call("get", "/byline/media/:id", "alice", { params: { id: String(id) } })).body;
+    const rename = (key: string, data: Record<string, unknown>) => call("post", "/byline/media/:id/rename", key, { params: { id: String(id) }, data });
+    // Someone else's upload, a stale version, and a name with nothing usable left are refused.
+    expect((await rename("bob", { name: "Not mine" })).status).toBe(403);
+    expect((await rename("alice", { name: "Stale", expectedUpdatedAt: "2020-01-01T00:00:00.000Z" })).status).toBe(409);
+    expect((await rename("alice", { name: " ../ ", expectedUpdatedAt: detail.updatedAt })).status).toBe(400);
+
+    // The extension is the file's type: typing it is harmless, changing it is impossible.
+    const renamed = await rename("alice", { name: "Homecoming crowd.jpg", expectedUpdatedAt: detail.updatedAt });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.filename).toBe("Homecoming crowd.jpg");
+    expect(renamed.body.url).toContain(encodeURIComponent("Homecoming crowd.jpg"));
+    const after = await payload.findByID({ collection: "media", id, depth: 0 });
+    expect(after.filename).toBe("Homecoming crowd.jpg");
+    expect(after.sizes?.library?.filename).toMatch(/^Homecoming crowd-\d+x\d+\.webp$/);
+    expect(stored(after.filename) && stored(after.sizes?.library?.filename)).toBe(true);
+    expect(stored(before.filename) || stored(before.sizes?.library?.filename)).toBe(false);
+    // The same bytes: prepared publication files stay valid.
+    expect(after.publicationRevision).toBe(before.publicationRevision);
+    expect(renamed.body.updatedAt).not.toBe(detail.updatedAt);
+
+    // A name another file has gets Payload's numbered suffix.
+    const other = await upload("alice", await photo(300, 200, "media-rename-other.jpg"), null);
+    const clash = await call("post", "/byline/media/:id/rename", "alice", { params: { id: String(other) }, data: { name: "Homecoming crowd" } });
+    expect(clash.body.filename).toBe("Homecoming crowd-1.jpg");
+    // Editors rename anyone's file.
+    expect((await call("post", "/byline/media/:id/rename", "editor", { params: { id: String(other) }, data: { name: "Crowd, second angle" } })).body.filename).toBe("Crowd, second angle.jpg");
+  });
+
+  it("applies the same credit and rights to several files, each checked as the account", async () => {
+    const mine = await upload("alice", await photo(400, 300, "media-bulk-mine.jpg"), null, { alt: "Drum line" });
+    const result = await call("post", "/byline/media/bulk-update", "alice", { data: { ids: [mine, ids.gif], patch: { credit: "Alice W. / The Weekly Wildcat", license: "All rights reserved", alt: "never in bulk", creator: "  " } } });
+    expect(result.status).toBe(200);
+    expect(result.body.done).toEqual([mine]);
+    expect(result.body.failed).toEqual([{ id: ids.gif, message: "You can only change files you uploaded." }]);
+    const saved = await payload.findByID({ collection: "media", id: mine, depth: 0 });
+    expect(saved).toMatchObject({ credit: "Alice W. / The Weekly Wildcat", license: "All rights reserved", alt: "Drum line" });
+    expect(saved.creator ?? "").toBe("");
+    expect((await call("post", "/byline/media/bulk-update", "alice", { data: { ids: [mine], patch: { credit: " " } } })).status).toBe(400);
+    expect((await call("post", "/byline/media/bulk-update", "alice", { data: { ids: [mine], patch: { sourceUrl: "javascript:alert(1)" } } })).status).toBe(400);
+  });
+
+  it("deletes several files for editors, keeping any that something still links to", async () => {
+    const first = await upload("alice", await photo(200, 200, "media-bulk-delete-1.jpg"), null);
+    const second = await upload("bob", await photo(200, 200, "media-bulk-delete-2.jpg"), null);
+    expect((await call("post", "/byline/media/bulk-delete", "alice", { data: { ids: [first] } })).status).toBe(403);
+    const result = await call("post", "/byline/media/bulk-delete", "editor", { data: { ids: [first, second, ids.camera] } });
+    expect(result.status).toBe(200);
+    expect(result.body.done.sort()).toEqual([first, second].sort());
+    expect(result.body.failed).toHaveLength(1);
+    expect(result.body.failed[0]).toMatchObject({ id: ids.camera });
+    expect(result.body.failed[0].message).toContain("linked from");
+    expect((await payload.count({ collection: "media", where: { id: { in: [first, second, ids.camera] } } })).totalDocs).toBe(1);
   });
 });
 

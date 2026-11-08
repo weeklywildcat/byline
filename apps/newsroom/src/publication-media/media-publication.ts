@@ -62,7 +62,7 @@ export async function withPublicationState<T extends Pick<Media, "id">>(ctx: Scr
   return docs.map((doc) => ({ ...doc, publicationAssets: state.get(doc.id)?.publicationAssets ?? undefined, publicationRevision: state.get(doc.id)?.publicationRevision ?? null }));
 }
 
-async function findMedia(ctx: ScreenContext, id: number): Promise<Media> {
+export async function findMedia(ctx: ScreenContext, id: number): Promise<Media> {
   const found = await ctx.req.payload.find({ collection: "media", where: { id: { equals: id } }, depth: 0, limit: 1, ...asUser(ctx) });
   const media = found.docs[0];
   if (!media) throw new APIError("That file is no longer in Media.", 404);

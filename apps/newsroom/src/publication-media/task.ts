@@ -60,8 +60,15 @@ export async function runPublicationMediaPreparation(payload: Payload, input: Pr
   let result;
   try {
     const store = options.store ?? publicationStore();
-    const source = path.join(privateMediaDir(), path.basename(media.filename));
-    result = await preparePublicationMedia({ path: source, mimeType: media.mimeType, filename: media.filename, artDirection: media.artDirection }, store);
+    const prepare = (row: MediaRow & { filename: string; mimeType: string }) => preparePublicationMedia({ path: path.join(privateMediaDir(), path.basename(row.filename)), mimeType: row.mimeType, filename: row.filename, artDirection: row.artDirection }, store);
+    try {
+      result = await prepare({ ...media, filename: media.filename, mimeType: media.mimeType });
+    } catch (error) {
+      // Renamed while this job was starting: the same bytes under the new name (a rename never moves the revision).
+      const renamed = error instanceof PreparationError && error.code === "source-missing" ? await currentMedia(payload, input.mediaId) : null;
+      if (!renamed?.filename || renamed.filename === media.filename || renamed.publicationRevision !== input.revision) throw error;
+      result = await prepare({ ...media, filename: renamed.filename, mimeType: media.mimeType });
+    }
     // Every named object must exist with its exact size before anything is promoted.
     for (const blob of publicationManifestBlobs(result.manifest)) {
       if (!(await store.has(blob.sha256, blob.bytes))) return fail("store-incomplete", "A prepared file is missing from the publication store.");

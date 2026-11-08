@@ -121,6 +121,44 @@ export type MediaMetadataPatch = {
   expectedUpdatedAt?: string;
 };
 
+/**
+ * The metadata the Library edits on several files at once: who made them and
+ * their rights. Alt text describes one picture and is never applied in bulk;
+ * the folder moves through `moveMedia`.
+ */
+export const MEDIA_BULK_FIELDS = ["creator", "credit", "copyright", "license", "sourceUrl"] as const;
+export type MediaBulkField = (typeof MEDIA_BULK_FIELDS)[number];
+export type MediaBulkPatch = Partial<Record<MediaBulkField, string>>;
+
+/** One result per file of a bulk action: each file is checked on its own, so some may be refused. */
+export type MediaBulkResult = { done: number[]; failed: Array<{ id: number; message: string }> };
+
+/** A rename: the new name without its extension (the type never changes), compare-and-swapped. */
+export type MediaRenameInput = { name: string; expectedUpdatedAt?: string };
+
+/** The longest file name a rename may ask for (before the extension). */
+export const MEDIA_NAME_MAX = 160;
+
+/** "band-at-homecoming.final.jpg" → { stem: "band-at-homecoming.final", extension: ".jpg" }. */
+export function splitFilename(filename: string): { stem: string; extension: string } {
+  const dot = filename.lastIndexOf(".");
+  if (dot <= 0 || dot === filename.length - 1) return { stem: filename, extension: "" };
+  return { stem: filename.slice(0, dot), extension: filename.slice(dot) };
+}
+
+/**
+ * What a typed name becomes on disk (before uniqueness): no path separators,
+ * control or reserved characters, no leading dots, whitespace collapsed, and
+ * a repeated extension dropped ("photo.jpg" typed for a JPEG stays "photo").
+ * Empty when nothing usable is left.
+ */
+export function cleanMediaName(input: string, extension: string): string {
+  let name = input.normalize("NFC").replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, " ").replace(/\s+/g, " ").trim();
+  if (extension && name.toLowerCase().endsWith(extension.toLowerCase())) name = name.slice(0, -extension.length).trim();
+  name = name.replace(/^[.\s]+/, "").replace(/[.\s]+$/, "");
+  return name.slice(0, MEDIA_NAME_MAX).trim();
+}
+
 export const MEDIA_METADATA_FIELDS = ["alt", "creator", "credit", "copyright", "license", "sourceUrl"] as const;
 export type MediaMetadataField = (typeof MEDIA_METADATA_FIELDS)[number];
 
