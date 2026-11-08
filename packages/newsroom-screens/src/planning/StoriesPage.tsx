@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { LayoutGrid, Plus } from "lucide-react";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { useDebouncedValue, useNow } from "@byline/newsroom-ui/lib/hooks";
@@ -22,17 +22,12 @@ import { StoryFilters } from "./StoryFilters";
 import { StoryList } from "./StoryList";
 import type { PlanningFetchers } from "./planning-api";
 import { useMoveStory, usePlanningStories, useUpdatePlanningStory } from "./planning-query";
-import { DEFAULT_PLANNING_SORT, DEFAULT_WORKFLOW_STATUSES, filterPlanningStories, hideFinishedPublished, normalizePlanningFilters, sortPlanningStories, type PlanningFilters, type PlanningPerson, type PlanningSort, type PlanningSortKey, type PlanningStory } from "./planning-model";
+import { DEFAULT_WORKFLOW_STATUSES, filterPlanningStories, hideFinishedPublished, mergePeople, normalizePlanningFilters, sortPlanningStories, type PlanningFilters, type PlanningPerson, type PlanningSortKey, type PlanningStory } from "./planning-model";
+import { createStoriesWorkspace, type StoriesWorkspace } from "./stories-workspace";
+import { useStoriesWorkspaceState } from "./stories-workspace-context";
 import { describePlanningError } from "./planning-model";
 
 const VIEW_LABELS: Record<StoriesView, string> = { board: "Board", list: "List", calendar: "Calendar" };
-
-/** Everyone seen so far as a story's people, so a filter's options do not shrink to whoever the current filter left. */
-function mergePeople(known: PlanningPerson[], stories: PlanningStory[], pick: (story: PlanningStory) => Array<PlanningPerson | null>): PlanningPerson[] {
-  const people = new Map(known.map((person) => [person.id, person]));
-  stories.forEach((story) => pick(story).forEach((person) => { if (person) people.set(person.id, person); }));
-  return Array.from(people.values()).sort((left, right) => left.name.localeCompare(right.name));
-}
 
 /**
  * How the board is laid out: a reader preference kept in this browser, never a
@@ -96,6 +91,16 @@ export type StoriesPageProps = {
   renderCalendar?: (props: StoriesCalendarProps) => ReactNode;
   /** The address of a view, so a reload or a shared link lands on it. Defaults to the current address with `view=` set. */
   viewHref?: (view: StoriesView) => string;
+  /**
+   * The host's shared Stories workspace (the Payload shell's), so a sidebar
+   * pane and a sheet read and write the same filters and count the same
+   * stories. Without one (WordPress) the page keeps its own, exactly as before.
+   */
+  workspace?: StoriesWorkspace;
+  /** The views picker above Board and List. A host hides it while a pane shows the views instead. */
+  showViewsPicker?: boolean;
+  /** A host control at the start of the tabs row (the Payload newsroom's Views sheet button on narrow screens). */
+  viewsControl?: ReactNode;
 };
 
 /**
@@ -104,16 +109,23 @@ export type StoriesPageProps = {
  * filtered stories; each opens the one Story Peek, and Peek opens the one
  * Story Workspace.
  */
-export function StoriesPage({ fetchers, currentUserId, initialView, initialFilters, workspaceUrl, onNewStory, renderCalendar, viewHref }: StoriesPageProps) {
+export function StoriesPage({ fetchers, currentUserId, initialView, initialFilters, workspaceUrl, onNewStory, renderCalendar, viewHref, workspace, showViewsPicker = true, viewsControl }: StoriesPageProps) {
   const { openStory } = useStoryPeek();
   const now = useNow();
   const hasCalendar = Boolean(renderCalendar);
   const presentations = useMemo(() => availableStoriesViews(hasCalendar), [hasCalendar]);
   const [requestedView, setView] = useState<StoriesView>(initialView);
   const view = supportedStoriesView(requestedView, hasCalendar);
-  const [filters, setFilters] = useState<PlanningFilters>(() => normalizePlanningFilters(initialFilters));
-  const [sort, setSort] = useState<PlanningSort>(DEFAULT_PLANNING_SORT);
-  const [savedViewId, setSavedViewId] = useState<string | null>(null);
+  // One store either way: the host's shared one, or the page's own (starting from the address's filters).
+  const [ownWorkspace] = useState(() => workspace ? null : createStoriesWorkspace({ filters: initialFilters }));
+  const store = (workspace ?? ownWorkspace)!;
+  const { filters, sort, savedViewId } = useStoriesWorkspaceState(store);
+  // A shared store outlives each visit: an address that names filters (a sidebar shortcut, a shared link) starts that view.
+  useLayoutEffect(() => {
+    if (workspace) workspace.applyInitialFilters(initialFilters);
+    // Once per visit: later changes come from the reader, not the address.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace]);
   const [showPublished, setShowPublished] = useState(false);
   const [boardLayout, setBoardLayout] = useState<BoardLayout>(() => preferredBoardLayout(browserStorage()));
   const changeBoardLayout = useCallback((next: BoardLayout) => { setBoardLayout(next); writeBoardLayoutPreference(next, browserStorage()); }, []);
@@ -128,6 +140,9 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
   const canAssign = data?.capabilities.canAssign ?? false;
   const { move, movingStoryId } = useMoveStory(fetchers, statuses);
   const { update, updatingStoryId, available: canUpdateStories } = useUpdatePlanningStory(fetchers);
+  // The pane counts every story in scope (its Collection), not only the current view's: one more read only while filtered.
+  const countScope = useMemo(() => normalizePlanningFilters({ collectionId: filters.collectionId }), [filters.collectionId]);
+  const counted = usePlanningStories(fetchers, countScope, { enabled: Boolean(workspace) });
   const stories = useMemo(() => sortPlanningStories(filterPlanningStories(data?.stories || [], filters, userId ?? undefined), sort), [data, filters, sort, userId]);
 
   // The List is for work in progress: finished published stories stay out of it until asked for.
@@ -154,11 +169,27 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
     return () => window.removeEventListener("popstate", restore);
   }, []);
 
-  const apply = useCallback((applied: AppliedView) => { setFilters(normalizePlanningFilters(applied.filters)); setSort(applied.sort); setSavedViewId(applied.savedViewId); }, []);
-  const changeFilters = useCallback((next: PlanningFilters) => { setFilters(next); }, []);
-  const changeSort = useCallback((key: PlanningSortKey) => setSort((current) => current.key === key ? { key, direction: current.direction === "asc" ? "desc" : "asc" } : { key, direction: "asc" }), []);
+  const apply = useCallback((applied: AppliedView) => store.applyView(applied), [store]);
+  const changeFilters = useCallback((next: PlanningFilters) => store.setFilters(next), [store]);
+  const changeSort = useCallback((key: PlanningSortKey) => {
+    const current = store.getState().sort;
+    store.setSort(current.key === key ? { key, direction: current.direction === "asc" ? "desc" : "asc" } : { key, direction: "asc" });
+  }, [store]);
   const open = openStory;
-  const storyViews = useStoryViews({ fetchers, filters, sort, selectedId: savedViewId, onApply: apply, initialViews: data?.savedViews });
+  const storyViews = useStoryViews({ fetchers, filters, sort, selectedId: savedViewId, onApply: apply, initialViews: data?.savedViews, timezone: data?.timezone });
+
+  // What a shared workspace's pane counts and offers. Publishing is a no-op unless something changed.
+  const countedStories = counted.data?.stories;
+  const { savedViews, canSave, full, openSave, openManage } = storyViews;
+  useEffect(() => {
+    if (!workspace || !countedStories) return;
+    workspace.publishData({ stories: countedStories, workflowStatuses: statuses, timezone, currentUserId: userId, savedViews, canSaveViews: canSave, savedViewsFull: full });
+  }, [canSave, countedStories, full, savedViews, statuses, timezone, userId, workspace]);
+  useEffect(() => {
+    if (!workspace) return;
+    workspace.setViewCommands({ openSave, openManage });
+    return () => workspace.setViewCommands(null);
+  });
 
   const loading = planning.isPending && !data;
   // Which story set (the views picker), how it is presented (Board | List | Calendar) and how it is
@@ -169,8 +200,11 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
       <PageHeader title={"Stories"} description={"Track everything the newsroom is working on."} actions={onNewStory ? <Button type="button" onClick={onNewStory}><Plus data-icon="inline-start" aria-hidden="true" />New story</Button> : undefined} />
       <Tabs value={view} onValueChange={(next) => changeView(next as StoriesView)} className="gap-3">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <StoryViewsPicker views={storyViews} />
-          <div className="flex items-center gap-2">
+          {showViewsPicker || viewsControl ? <div className="flex items-center gap-2">
+            {viewsControl}
+            {showViewsPicker ? <StoryViewsPicker views={storyViews} /> : null}
+          </div> : null}
+          <div className={showViewsPicker || viewsControl ? "flex items-center gap-2" : "flex flex-1 flex-row-reverse items-center justify-between gap-2"}>
             {view === "board" ? <BoardLayoutPicker value={boardLayout} onChange={changeBoardLayout} /> : null}
             <TabsList variant="line" aria-label={"Stories presentation"}>
               {presentations.map((id) => <TabsTrigger key={id} value={id}>{VIEW_LABELS[id]}</TabsTrigger>)}

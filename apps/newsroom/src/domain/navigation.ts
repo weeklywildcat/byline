@@ -13,6 +13,9 @@ export type NavItem = {
 const RANK: Record<Role, number> = { staff: 1, editor: 2, administrator: 3 };
 const allowed = (role: Role) => (item: { minimumRole: Role }) => RANK[role] >= RANK[item.minimumRole];
 
+/** Stories' address below the admin route: Board, List and the filters are its query. */
+export const STORIES_PATH = "/stories";
+
 /** The Calendar's address below the admin route (a custom root view). */
 export const CALENDAR_PATH = "/calendar";
 
@@ -49,7 +52,7 @@ export const COLLECTIONS_VIEW_PATH = "/byline-collections";
  */
 export const NAVIGATION: readonly NavItem[] = [
   { key: "home", label: "Home", path: "", minimumRole: "staff" },
-  { key: "stories", label: "Stories", path: "/stories", minimumRole: "staff" },
+  { key: "stories", label: "Stories", path: STORIES_PATH, minimumRole: "staff" },
   { key: "calendar", label: "Calendar", path: CALENDAR_PATH, minimumRole: "staff" },
   { key: "media", label: "Media", path: MEDIA_PATH, minimumRole: "staff" },
   { key: "collections", label: "Collections", path: COLLECTIONS_PATH, minimumRole: "staff", exact: true },
@@ -168,6 +171,11 @@ export function locationFor(pathname: string, adminRoute: string): Crumb[] {
 export function storyIdFromPath(pathname: string, adminRoute: string): number | null {
   const match = /^\/collections\/stories\/(\d+)$/.exec(stripAdmin(pathname, adminRoute));
   return match ? Number(match[1]) : null;
+}
+
+/** Whether a path is Stories (any view or filters: those are its query). Never a story's own Story screen. */
+export function isStoriesPath(pathname: string, adminRoute: string): boolean {
+  return stripAdmin(pathname, adminRoute) === STORIES_PATH;
 }
 
 /** Whether a path is the Calendar (with or without a trailing slash or query). */

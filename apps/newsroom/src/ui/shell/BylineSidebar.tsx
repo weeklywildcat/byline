@@ -9,6 +9,7 @@ import { useShellLayout, useSyncSidebarWidthOnMount } from "./layout";
 import type { ShellSidebarProps } from "./nav-items";
 import { CalendarWorkspaceSidebar } from "./CalendarWorkspaceSidebar";
 import { MediaWorkspaceSidebar } from "./MediaWorkspaceSidebar";
+import { StoriesWorkspaceSidebar } from "./StoriesWorkspaceSidebar";
 import { CollectionWorkspaceSidebar } from "../collections/CollectionSwitcher";
 import { StoryWorkspaceSidebar } from "./StoryWorkspaceSidebar";
 
@@ -22,11 +23,11 @@ export const WORKSPACE_SIDEBAR_CLASS = "overflow-hidden *:data-[sidebar=sidebar]
  * There is one sidebar (one SidebarProvider, one expanded/collapsed state);
  * its composition is contextual. Ordinary screens get the global app
  * sidebar; on a wide enough screen a story's Story screen is a Story
- * workspace, the Calendar a Calendar workspace, Media a Media workspace and
+ * workspace, Stories a Stories workspace, the Calendar a Calendar workspace, Media a Media workspace and
  * an open Collection a Collection workspace,
  * shadcn sidebar-09's nested sidebars (the global icon rail plus a
- * contextual pane: the Story list, the Calendar's controls, or the Media
- * navigator). The outer `Sidebar` stays the same element
+ * contextual pane: the Story list, the Stories views, the Calendar's
+ * controls, or the Media navigator). The outer `Sidebar` stays the same element
  * whatever the composition, so moving between them animates the one
  * sidebar's width. Nothing here names Payload.
  */
@@ -48,6 +49,8 @@ function ContextualSidebar(props: ShellSidebarProps) {
     <Sidebar collapsible="icon" className={composition === "default" ? undefined : WORKSPACE_SIDEBAR_CLASS} mobileTitle="Byline" mobileDescription="Newsroom navigation and account" data-composition={composition}>
       {composition === "story-workspace" ? (
         <StoryWorkspaceSidebar {...props} active={active} />
+      ) : composition === "stories-workspace" ? (
+        <StoriesWorkspaceSidebar {...props} active={active} />
       ) : composition === "calendar-workspace" ? (
         <CalendarWorkspaceSidebar {...props} active={active} />
       ) : composition === "media-workspace" ? (

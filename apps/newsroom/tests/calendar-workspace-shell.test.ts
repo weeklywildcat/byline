@@ -14,7 +14,7 @@ describe("the shell's compositions", () => {
   const narrow = { storyWorkspace: false, calendarWorkspace: false };
 
   it("the Calendar is a workspace only on its own screen, on a wide enough screen", () => {
-    expect(shellLayoutFor("/admin/calendar", "/admin", wide)).toEqual({ storyId: null, calendar: true, media: false, collections: false, collectionId: null, composition: "calendar-workspace" });
+    expect(shellLayoutFor("/admin/calendar", "/admin", wide)).toEqual({ storyId: null, stories: false, calendar: true, media: false, collections: false, collectionId: null, composition: "calendar-workspace" });
     expect(shellLayoutFor("/admin/calendar/", "/admin", wide).composition).toBe("calendar-workspace");
     expect(shellLayoutFor("/admin/calendar", "/admin", narrow).composition).toBe("default");
     for (const path of ["/admin", "/admin/stories", "/admin/calendars", "/admin/collections/calendar"]) {

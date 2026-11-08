@@ -689,6 +689,13 @@ export function sortPlanningStories(stories: PlanningStory[], sort: PlanningSort
   });
 }
 
+/** Everyone seen so far as a story's people, so a filter's options do not shrink to whoever the current filter left. */
+export function mergePeople(known: PlanningPerson[], stories: PlanningStory[], pick: (story: PlanningStory) => Array<PlanningPerson | null>): PlanningPerson[] {
+  const people = new Map(known.map((person) => [person.id, person]));
+  stories.forEach((story) => pick(story).forEach((person) => { if (person) people.set(person.id, person); }));
+  return Array.from(people.values()).sort((left, right) => left.name.localeCompare(right.name));
+}
+
 export function boardWorkflowStatuses(statuses: PlanningWorkflowStatus[] = DEFAULT_WORKFLOW_STATUSES): PlanningWorkflowStatus[] {
   return statuses.filter((status) => status.group === "main");
 }
