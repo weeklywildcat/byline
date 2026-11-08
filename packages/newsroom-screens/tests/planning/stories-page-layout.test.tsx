@@ -62,11 +62,11 @@ afterEach(async () => {
 });
 
 describe("the board layout control", () => {
-  it("appears beside the tabs only on Board", async () => {
+  it("turns the active Board tab into the layout control", async () => {
     await mount();
     const picker = $("[data-board-layout-picker]");
-    expect(picker?.getAttribute("aria-label")).toBe("Board layout: Lanes");
-    expect(picker?.textContent).toBe("Lanes");
+    expect(picker?.getAttribute("aria-label")).toBe("Board, Lanes layout");
+    expect(picker?.textContent).toBe("Board");
     expect(picker?.parentElement?.querySelector("[role=tablist]")).not.toBeNull();
     await click($$("[role=tab]").find((tab) => tab.textContent === "List"));
     expect($("[data-board-layout-picker]")).toBeNull();
@@ -84,7 +84,7 @@ describe("the board layout control", () => {
     const options = $$("[role=menuitemradio]");
     expect(options.map((option) => option.textContent)).toEqual(["LanesColumns with compact cards", "DenseOne-line rows", "StackedStages top to bottom"]);
     await click(options.find((option) => option.textContent?.startsWith("Dense")));
-    expect($("[data-board-layout-picker]")?.getAttribute("aria-label")).toBe("Board layout: Dense");
+    expect($("[data-board-layout-picker]")?.getAttribute("aria-label")).toBe("Board, Dense layout");
     expect(window.localStorage.getItem(BOARD_LAYOUT_PREFERENCE_KEY)).toBe("dense");
     expect(window.location.href).toBe(before.href);
     expect(window.history.length).toBe(before.history);
@@ -96,7 +96,7 @@ describe("the board layout control", () => {
   it("opens on the layout this browser remembers", async () => {
     window.localStorage.setItem(BOARD_LAYOUT_PREFERENCE_KEY, "stacked");
     await mount();
-    expect($("[data-board-layout-picker]")?.getAttribute("aria-label")).toBe("Board layout: Stacked");
+    expect($("[data-board-layout-picker]")?.getAttribute("aria-label")).toBe("Board, Stacked layout");
   });
 });
 
