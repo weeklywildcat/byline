@@ -6,7 +6,7 @@ import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_
 import { ARTICLE_BLOCK_RENDERERS } from "@byline/ui/article-body";
 import { articleBlockFromFields, BLOCK_FIELD_READERS, BLOCK_TO_ARTICLE, mediaIdOf } from "../src/fields";
 import { duplicateItem, insertItem, moveDirection, moveItem, removeItem, setOnlyCurrent } from "../src/items";
-import { articleMediaFromPayload, collectMediaIds, normalizePayloadArticleBody, normalizePayloadStoryBody } from "../src/normalize";
+import { articleMediaFromPayload, collectMediaIds, collectMediaUses, normalizePayloadArticleBody, normalizePayloadStoryBody } from "../src/normalize";
 import { BYLINE_BLOCK_COMPONENT, BYLINE_BODY_BLOCKS } from "../src/schema";
 import { blockFields, lexicalFromArticleBody } from "./lexical-fixture";
 
@@ -73,6 +73,30 @@ describe("the media contract", () => {
     const state = lexicalFromArticleBody(FIXTURE_ARTICLE_BODY);
     expect(collectMediaIds(state).map(Number).sort((a, b) => a - b)).toEqual([101, 103, 104, 105, 106, 107, 108, 201, 202]);
     expect(mediaIdOf({ id: "12", filename: "x.jpg" })).toBe(12);
+  });
+
+  it("tracks story-specific alt text for each Media use", () => {
+    const state = {
+      root: {
+        children: [
+          { type: "block", fields: { id: "a", blockType: "photo", media: 12, caption: "", altOverride: "Story-specific description", placement: "column" } },
+          { type: "block", fields: { id: "b", blockType: "photo", media: 12, caption: "", altOverride: "", placement: "column" } },
+          { type: "block", fields: { id: "c", blockType: "gallery", fit: "natural", items: [{ id: "g", media: 13, caption: "", altOverride: "Gallery description" }] } }
+        ]
+      }
+    };
+    expect(collectMediaUses(state)).toEqual([
+      { id: 12, hasAltOverride: true },
+      { id: 12, hasAltOverride: false },
+      { id: 13, hasAltOverride: true }
+    ]);
+  });
+
+  it("offers the full Media details editor from a Photo's More menu", () => {
+    const source = readFileSync(join(SRC, "client/blocks/media.tsx"), "utf8");
+    expect(source).toContain("Edit media details…");
+    expect(source).toContain("useEditMediaDetails()");
+    expect(source).toContain("menuItems={editMediaDetails");
   });
 });
 
