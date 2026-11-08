@@ -312,7 +312,7 @@ function ww_block_media_fallback(array $block, int $id): ?array {
 
     if (($block['blockName'] ?? '') === 'core/file') $push($attrs['href'] ?? '');
 
-    if (preg_match_all("~(?:src|href)=[\"']([^\"']+)[\"']~i", $html, $matches)) {
+    if (preg_match_all("~src=[\"']([^\"']+)[\"']~i", $html, $matches)) {
         foreach ($matches[1] as $url) $push($url);
     }
     if (preg_match_all("~srcset=[\"']([^\"']+)[\"']~i", $html, $matches)) {
