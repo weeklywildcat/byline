@@ -146,6 +146,7 @@ and the generated [tool catalog](docs/mcp-tools.md).
 
 ## Architecture and operations
 
+- [Payload newsroom deployment](docs/newsroom-deployment.md)
 - [Architecture](docs/architecture.md)
 - [Astro frontend operations and rollback](docs/migration/astro.md)
 - [Astro migration benchmark](docs/migration/astro-benchmark.md)
