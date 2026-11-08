@@ -61,3 +61,19 @@ capabilities. Unlinked accounts get an explanation on direct visits. Raw People
 and sign-in Accounts stay administrator-only System administration fallbacks.
 New person belongs on People, never global Create. Account menu navigation and
 sign-out respect the shell's unsaved-work guard. See [People workspace](people-workspace.md).
+
+
+## Payload migration: sidebar compositions
+
+The Payload newsroom has one sidebar whose composition follows the screen
+(`ShellComposition` in `apps/newsroom/src/ui/shell/layout.tsx`); each workspace
+has its own measured breakpoint and, below it, keeps the ordinary 256px sidebar
+and offers its context in a sheet:
+
+- `default`: the ordinary sidebar.
+- `story-workspace`: a saved story's screen: icon rail plus the Story switcher.
+- `stories-workspace`: Stories: icon rail plus Views, Stages and Writers with
+  counts (300px, from 1340px). See [Stories and Planning UI](stories-planning-ui.md).
+- `calendar-workspace`: the Calendar: icon rail plus its controls.
+- `media-workspace`: Media: icon rail plus the Media navigator.
+- `collection-workspace`: an open Collection: icon rail plus the switcher.

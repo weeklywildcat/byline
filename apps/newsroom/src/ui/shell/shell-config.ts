@@ -85,18 +85,20 @@ export const MEDIA_INSPECTOR_QUERY = `(min-width: ${MEDIA_INSPECTOR_MIN_WIDTH}px
 /**
  * Stories' own geometry. The Stories workspace sidebar is the icon rail plus
  * the Stories pane (Views, Stages, Writers), 300px in all: a 48px rail and a
- * 252px pane. The screen has 48px of side padding (lg:px-6). The pane earns
- * its place only while the board's Lanes layout still fits without sideways
- * scrolling for the default workflow: two populated stages expanded at their
- * 240px minimum (min-w-60), four empty stages as 40px rails, the sidelined
- * divider, one populated sidelined lane and the empty one's rail, 8px apart:
- * 300 + 48 + 3 x 240 + 5 x 40 + 8 x 8 = 1332px of content at its minimum.
- * Lanes grow beyond their minimum, so what matters is that nothing scrolls:
- * see STORIES_WORKSPACE_MIN_WIDTH for the measurement. Below it the ordinary
- * 256px sidebar stays and the same pane opens in a sheet.
+ * 252px pane. The screen has 48px of side padding (lg:px-6), so the board's
+ * frame is viewport - 348 (measured in the browser: 932px at 1280).
+ * The pane earns its place only while the board's Lanes layout fits without
+ * sideways scrolling for the default workflow: two populated main stages and
+ * one populated sidelined stage expanded at their 240px minimum (min-w-60),
+ * the five empty stages as 40px rails, the 1px sidelined divider, and eight
+ * 8px gaps between those nine items:
+ * 3 x 240 + 5 x 40 + 1 + 8 x 8 = 985px, so 348 + 985 = 1333px. At 1280 the
+ * board scrolled sideways (932 < 985), so the breakpoint is 1340 (a scrollbar's
+ * margin above 1333). 1366 laptops get the pane; 1280 ones keep the ordinary
+ * 256px sidebar and open the same pane in a Views sheet.
  */
-export const STORIES_GEOMETRY = { sidebar: 300, sidePadding: 48, laneMin: 240, railWidth: 40, gap: 8, expandedLanes: 3, rails: 5 } as const;
-export const STORIES_WORKSPACE_MIN_WIDTH = 1280;
+export const STORIES_GEOMETRY = { sidebar: 300, sidePadding: 48, laneMin: 240, railWidth: 40, divider: 1, gap: 8, expandedLanes: 3, rails: 5 } as const;
+export const STORIES_WORKSPACE_MIN_WIDTH = 1340;
 export const STORIES_WORKSPACE_QUERY = `(min-width: ${STORIES_WORKSPACE_MIN_WIDTH}px)`;
 
 /**

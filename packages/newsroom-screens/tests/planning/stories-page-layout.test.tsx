@@ -99,3 +99,51 @@ describe("the board layout control", () => {
     expect($("[data-board-layout-picker]")?.getAttribute("aria-label")).toBe("Board layout: Stacked");
   });
 });
+
+describe("the Stories workspace", () => {
+  const stage = (id: string, label: string) => ({ id, label, group: "main" as const, selectable: true });
+  const loaded = (workflow: string, id: number) => ({ id, title: `Story ${id}`, editUrl: `/e/${id}`, authors: [], writer: null, editor: null, workflow: stage(workflow, workflow), publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false }, deadline: null, plannedPublication: null, modifiedAt: null, visual: { type: "none", status: "done" }, openTaskCount: 0, featuredImage: null });
+  const response = { stories: [loaded("pitch", 1), loaded("reporting", 2)], workflowStatuses: [stage("pitch", "Pitch"), stage("reporting", "Reporting")], capabilities: { canMoveStories: false, canAssign: false, canManageSavedViews: false, canManageMedia: false, canManageFeedback: false } };
+
+  it("hides the views picker only when the host's pane shows the views", async () => {
+    const { createStoriesWorkspace } = await import("../../src/planning/stories-workspace");
+    await mount({ workspace: createStoriesWorkspace(), showViewsPicker: false });
+    expect($("[aria-label^='Story view:']")).toBeNull();
+  });
+
+  it("keeps the picker when the host passes a workspace but no pane is showing", async () => {
+    const { createStoriesWorkspace } = await import("../../src/planning/stories-workspace");
+    await mount({ workspace: createStoriesWorkspace() });
+    expect($("[aria-label^='Story view:']")).not.toBeNull();
+  });
+
+  it("drives Board from filters set in the pane, and publishes what it loaded", async () => {
+    const { createStoriesWorkspace } = await import("../../src/planning/stories-workspace");
+    const workspace = createStoriesWorkspace();
+    fetchers.getPlanning = vi.fn(async (filters) => ({ ...response, stories: response.stories.filter((item) => !filters?.workflow || item.workflow.id === filters.workflow) })) as never;
+    await mount({ workspace, showViewsPicker: false });
+    expect(workspace.getState().data?.stories).toHaveLength(2);
+    await act(async () => { workspace.toggleWorkflow("reporting"); });
+    await settle();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await settle();
+    expect(workspace.getState().filters.workflow).toBe("reporting");
+    const shown = $$("[role=listitem]").map((item) => item.textContent).join(" ");
+    expect(shown).toContain("Story 2");
+    expect(shown).not.toContain("Story 1");
+    // The pane still counts every story in scope, not only the filtered ones.
+    expect(workspace.getState().data?.stories).toHaveLength(2);
+  });
+
+  it("starts the view an address names", async () => {
+    const { createStoriesWorkspace } = await import("../../src/planning/stories-workspace");
+    const workspace = createStoriesWorkspace();
+    await mount({ workspace, initialFilters: { needsReview: true } });
+    expect(workspace.getState().filters.needsReview).toBe(true);
+  });
+
+  it("keeps its own filters without a workspace (WordPress)", async () => {
+    await mount({ initialFilters: { workflow: "editing" } });
+    expect($("[aria-label='Story view: Custom view']")).not.toBeNull();
+  });
+});
