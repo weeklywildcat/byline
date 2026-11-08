@@ -301,19 +301,31 @@ function ww_convert_blocks(array $blocks, int $postId, int &$sequence, array &$c
 function ww_block_media_fallback(array $block, int $id): ?array {
     $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
     $html = (string) ($block['innerHTML'] ?? '');
-    $url = '';
+    $candidates = [];
 
-    if (($block['blockName'] ?? '') === 'core/file') {
-        $url = ww_text($attrs['href'] ?? '');
-    }
-    if ($url === '' && preg_match("~<(?:img|source)\\b[^>]*\\bsrc=[\"']([^\"']+)[\"']~i", $html, $match)) {
-        $url = html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    }
-    if ($url === '' && preg_match("~<a\\b[^>]*\\bhref=[\"']([^\"']+)[\"']~i", $html, $match)) {
-        $url = html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    }
-    if ($url === '' || !preg_match('~^https?://~i', $url)) return null;
+    $push = static function ($value) use (&$candidates): void {
+        if (!is_string($value)) return;
+        $value = html_entity_decode(trim($value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($value === '' || !preg_match('~^https?://~i', $value)) return;
+        if (!in_array($value, $candidates, true)) $candidates[] = $value;
+    };
 
+    if (($block['blockName'] ?? '') === 'core/file') $push($attrs['href'] ?? '');
+
+    if (preg_match_all("~(?:src|href)=[\"']([^\"']+)[\"']~i", $html, $matches)) {
+        foreach ($matches[1] as $url) $push($url);
+    }
+    if (preg_match_all("~srcset=[\"']([^\"']+)[\"']~i", $html, $matches)) {
+        foreach ($matches[1] as $srcset) {
+            foreach (explode(',', html_entity_decode($srcset, ENT_QUOTES | ENT_HTML5, 'UTF-8')) as $candidate) {
+                $parts = preg_split('/\\s+/', trim($candidate));
+                $push($parts[0] ?? '');
+            }
+        }
+    }
+    if (!$candidates) return null;
+
+    $url = $candidates[0];
     $path = (string) parse_url($url, PHP_URL_PATH);
     $filename = basename($path);
     $filetype = wp_check_filetype($filename);
@@ -326,6 +338,7 @@ function ww_block_media_fallback(array $block, int $id): ?array {
     return [
         'id' => $id,
         'url' => $url,
+        'candidateUrls' => $candidates,
         'filename' => $filename !== '' ? $filename : ('wordpress-media-' . $id),
         'mimeType' => $mime,
         'alt' => ww_text($attrs['alt'] ?? ''),
