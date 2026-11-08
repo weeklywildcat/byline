@@ -3,11 +3,11 @@
 import { Field, FieldContent, FieldTitle } from "@byline/newsroom-ui/ui/field";
 import type { ReactNode } from "react";
 
-/** A story fact as a native horizontal Field: a muted label column, then the value or its control (as in the Story Workspace). */
+/** A quiet property row: stable label column on the left, value/control on the right. */
 export function Property({ label, children, htmlFor }: { label: string; children: ReactNode; htmlFor?: string }) {
   return (
-    <Field orientation="responsive" className="min-h-7 @md/field-group:items-center!">
-      <FieldTitle className="font-normal text-muted-foreground @md/field-group:w-36 @md/field-group:flex-none!">
+    <Field orientation="responsive" className="min-h-8 py-0.5 @md/field-group:items-center!">
+      <FieldTitle className="font-normal text-muted-foreground @md/field-group:w-28 @md/field-group:flex-none!">
         {htmlFor ? <label htmlFor={htmlFor}>{label}</label> : label}
       </FieldTitle>
       <FieldContent className="min-w-0 text-sm [overflow-wrap:anywhere]">{children}</FieldContent>
