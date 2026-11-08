@@ -41,7 +41,7 @@ type ExportPerson = {
 type ExportGuest = ExportPerson & { hasProfilePage?: boolean; status?: string };
 type ExportTerm = { id: number; name: string; slug: string; description?: string };
 type ExportAttachment = {
-  id: number; url: string; candidateUrls?: string[]; filename: string; mimeType: string; alt?: string; caption?: string;
+  id: number; url: string; candidateUrls?: string[]; inlineDataBase64?: string | null; inlineBytes?: number | null; filename: string; mimeType: string; alt?: string; caption?: string;
   creator?: string; credit?: string; copyright?: string; license?: string; sourceUrl?: string;
   capturedAt?: string; artDirection?: unknown; recoveredFromBlock?: boolean;
 };
@@ -239,6 +239,13 @@ function attachmentCandidates(attachment: ExportAttachment) {
 }
 
 async function fetchAttachmentSource(attachment: ExportAttachment, probeOnly: boolean) {
+  if (text(attachment.inlineDataBase64)) {
+    const data = Buffer.from(attachment.inlineDataBase64!, "base64");
+    if (!data.length || (attachment.inlineBytes && data.length !== attachment.inlineBytes)) {
+      throw new Error(`Attachment ${attachment.id} has invalid embedded WordPress source bytes.`);
+    }
+    return { url: "wordpress-upload-volume", data: probeOnly ? null as Buffer | null : data };
+  }
   const candidates = attachmentCandidates(attachment);
   if (!candidates.length) throw new Error(`Attachment ${attachment.id} has no HTTPS source URL.`);
   const failures: string[] = [];
@@ -283,7 +290,11 @@ async function plan() {
     if (target.convertToJpeg) summary.review.push(`Attachment ${attachment.id}: ${target.sourceMime} will be converted to JPEG for Byline Media.`);
     if (attachment.recoveredFromBlock) {
       const source = await fetchAttachmentSource(attachment, true);
-      if (source.url !== attachment.url) summary.review.push(`Attachment ${attachment.id}: stale primary URL is unavailable; a Gutenberg srcset/source candidate will be used instead.`);
+      if (source.url === "wordpress-upload-volume") {
+        summary.review.push(`Attachment ${attachment.id}: orphaned WordPress media will be imported from bytes recovered directly from the uploads volume.`);
+      } else if (source.url !== attachment.url) {
+        summary.review.push(`Attachment ${attachment.id}: stale primary URL is unavailable; a Gutenberg srcset/source candidate will be used instead.`);
+      }
     }
   }
   for (const attachment of raw.attachments) {
