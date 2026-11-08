@@ -452,9 +452,16 @@ foreach ($wpPosts as $post) {
         'slug' => (string) $post->post_name,
         'status' => (string) $post->post_status,
         'publicPath' => $post->post_status === 'publish' ? (string) wp_make_link_relative(get_permalink($post)) : '',
-        'createdAt' => get_post_time('c', true, $post),
-        'publishedAt' => get_post_time('c', true, $post),
-        'modifiedAt' => get_post_modified_time('c', true, $post),
+        // WordPress permalinks and displayed publication dates are anchored to
+        // the local wall-clock fields. Keep those explicitly: post_date_gmt can
+        // diverge after timezone-setting changes and would shift canonical dates.
+        'createdLocal' => str_replace(' ', 'T', (string) $post->post_date),
+        'publishedLocal' => str_replace(' ', 'T', (string) $post->post_date),
+        'modifiedLocal' => str_replace(' ', 'T', (string) $post->post_modified),
+        // Retained only as source-audit facts; Payload publication times below
+        // are derived from the local wall clock in the publication timezone.
+        'publishedGmt' => str_replace(' ', 'T', (string) $post->post_date_gmt) . 'Z',
+        'modifiedGmt' => str_replace(' ', 'T', (string) $post->post_modified_gmt) . 'Z',
         'deck' => trim(wp_strip_all_tags((string) $post->post_excerpt)),
         'featuredMediaId' => $featured ?: null,
         'featuredCaption' => $featured ? (string) wp_get_attachment_caption($featured) : '',
