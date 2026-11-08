@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import {
@@ -102,6 +103,7 @@ export function PersonEditor({
   onSaved,
   onReload,
   onWorkChange,
+  accessPanel,
   previewStyle,
 }: {
   api: PeopleApi;
@@ -113,6 +115,7 @@ export function PersonEditor({
   onSaved: (detail: PersonDetail) => void;
   onReload: () => void;
   onWorkChange: (work: PersonWork | null) => void;
+  accessPanel?: ReactNode;
   previewStyle?: CSSProperties;
 }) {
   const [saved, setSaved] = useState(detail);
@@ -632,36 +635,10 @@ export function PersonEditor({
               </p>
             </section>
           )}
-          {caps.editEditorialIdentity ? (
+          {accessPanel ? (
             <>
               <Separator />
-              <section className="space-y-2">
-                <h2 className="text-base font-medium">Account</h2>
-                <p className="text-sm">
-                  {saved.account.linked
-                    ? "Login linked"
-                    : "No sign-in account linked"}
-                </p>
-                {saved.account.names.length ? (
-                  <p className="break-words text-sm text-muted-foreground">
-                    {saved.account.names.join(", ")}
-                  </p>
-                ) : null}
-                {saved.account.systemHref ? (
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto whitespace-normal p-0 text-left"
-                    onClick={() => onNavigate(saved.account.systemHref!)}
-                  >
-                    Manage account in System administration
-                  </Button>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Administrators manage sign-in accounts separately.
-                  </p>
-                )}
-              </section>
+              {accessPanel}
             </>
           ) : null}
           {caps.editEditorialIdentity ? (

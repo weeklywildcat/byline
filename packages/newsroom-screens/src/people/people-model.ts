@@ -1,4 +1,4 @@
-/** Public/editorial identities. Account administration is deliberately absent. */
+/** Public/editorial identities. Authentication stays separate underneath, but People is the newsroom surface for access. */
 export const PERSON_STATUSES = {
   active: "Current staff",
   guest: "Guest contributor",
@@ -27,6 +27,20 @@ export type PersonProfile = {
   socials: PersonSocial[];
   updatedAt: string;
 };
+export type PersonAccessRole = "staff" | "editor" | "administrator";
+export const PERSON_ACCESS_ROLES: Record<PersonAccessRole, string> = {
+  staff: "Staff",
+  editor: "Editor",
+  administrator: "Administrator",
+};
+export type PersonAccess = {
+  id: number;
+  email: string;
+  role: PersonAccessRole;
+  enabled: boolean;
+  googleConnected: boolean;
+  revision: string;
+};
 export type PersonRow = Pick<
   PersonProfile,
   | "id"
@@ -37,18 +51,22 @@ export type PersonRow = Pick<
   | "status"
   | "directoryVisible"
   | "hasProfilePage"
->;
+> & {
+  /** Omitted when the caller may not administer access; null means this Person has no account. */
+  access?: Pick<PersonAccess, "enabled" | "role"> | null;
+};
 export type PersonCapabilities = {
   editProfile: boolean;
   editEditorialIdentity: boolean;
   changeVisibility: boolean;
-  manageAccount: boolean;
+  manageAccess: boolean;
   delete: false;
 };
 export type PersonDetail = {
   person: PersonProfile;
   capabilities: PersonCapabilities;
-  account: { linked: boolean; names: string[]; systemHref: string | null };
+  /** Present only for administrators. Editors and self-profile never receive private sign-in data. */
+  access: PersonAccess | null;
   usage: {
     total: number;
     stories: { id: number; title: string; state: string; href: string }[];
@@ -81,6 +99,15 @@ export type PersonChanges = Pick<
   PersonProfile,
   "name" | "pronouns" | "shortBio" | "bio" | "publicEmail" | "socials"
 > & { portrait: number | null };
+export type PersonAccessInput = {
+  email: string;
+  role: PersonAccessRole;
+  enabled: boolean;
+  password?: string;
+  /** Null when creating access; the current account revision when editing. */
+  expectedRevision: string | null;
+};
+
 export type PersonPatch = Partial<
   PersonChanges &
     Pick<
@@ -122,9 +149,11 @@ export function personSummary(person: PersonRow): string {
     .join(" · ");
 }
 
-/** Canonical links are HTTPS URLs, never handles, credentials or script protocols. */
+/** Canonical links are HTTPS URLs, never bare handles, credentials or script protocols. */
 export function validPersonSocialUrl(value: unknown): boolean {
-  if (typeof value !== "string" || !/^https:\/\/[^\s@]+$/.test(value))
+  // '@' is valid in a URL path/query (for example youtube.com/@weeklywildcat).
+  // Let URL parsing distinguish that from credential syntax in the authority.
+  if (typeof value !== "string" || !/^https:\/\/\S+$/.test(value))
     return false;
   try {
     const url = new URL(value);

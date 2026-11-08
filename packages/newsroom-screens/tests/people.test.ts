@@ -32,7 +32,7 @@ const staff: PersonCapabilities = {
   editProfile: true,
   editEditorialIdentity: false,
   changeVisibility: false,
-  manageAccount: false,
+  manageAccess: false,
   delete: false,
 };
 
@@ -106,7 +106,10 @@ describe("People screen contracts", () => {
         socials: [{ label: "Custom", url: "https://example.test/me" }],
       }),
     ).toEqual({});
+    expect(validPersonSocialUrl("https://www.youtube.com/@weeklywildcat")).toBe(true);
+    expect(validPersonSocialUrl("https://example.test/watch?creator=@weeklywildcat")).toBe(true);
     expect(validPersonSocialUrl("https://user@example.test/")).toBe(false);
+    expect(validPersonSocialUrl("https://user%40name@example.test/")).toBe(false);
     expect(validPersonSocialUrl("https://")).toBe(false);
   });
 });

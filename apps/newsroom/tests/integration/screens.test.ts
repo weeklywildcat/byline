@@ -354,20 +354,74 @@ describe("protected newsroom workflows", () => {
     expect((await call("get", `${path}/notes`, "alice", undefined, params)).body.summary).toMatchObject({ openCount: 0, resolvedCount: 1 });
   });
 
-  it("lets administrators link and disable sign-in accounts without changing People", async () => {
-    const endpoint = "/byline/accounts";
-    const data = { name: "Access fixture", email: "access-fixture@example.test", role: "staff", enabled: true, linkedPerson: people.alice };
-    expect((await call("post", endpoint, "editor", data)).status).toBe(403);
-    const result = await call("post", endpoint, "root", data);
-    expect(result).toMatchObject({ status: 200, body: { ...data, googleConnected: false } });
-    expect(Object.keys(result.body)).not.toContain("password");
-    const id = String(result.body.id);
-    expect((await call("patch", `${endpoint}/:id`, "root", { ...data, role: "editor", enabled: false, expected: "stale" }, { id })).status).toBe(409);
-    const changed = await call("patch", `${endpoint}/:id`, "root", { ...data, role: "editor", enabled: false, linkedPerson: null, expected: result.body.revision }, { id });
-    expect(changed.body).toMatchObject({ role: "editor", enabled: false, linkedPerson: null });
-    expect((await payload.findByID({ collection: "people", id: people.alice })).name).toBe("alice Writer");
-    const root = await payload.findByID({ collection: "users", id: accounts.root.id });
-    expect((await call("patch", `${endpoint}/:id`, "root", { ...data, enabled: false, linkedPerson: null, expected: root.updatedAt }, { id: String(root.id) })).status).toBe(400);
+  it("lets administrators grant and disable newsroom access from a Person without changing the public identity", async () => {
+    const person = await payload.create({
+      collection: "people",
+      data: { name: "Access fixture", slug: "screens-access-fixture", status: "active" },
+    });
+    const endpoint = "/byline/people/:id/access";
+    const params = { id: String(person.id) };
+    const data = {
+      email: "access-fixture@example.test",
+      role: "staff",
+      enabled: true,
+      password: "access-fixture-123456",
+      expectedRevision: null,
+    };
+
+    expect((await call("put", endpoint, "editor", data, params)).status).toBe(403);
+    const result = await call("put", endpoint, "root", data, params);
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        person: { id: person.id, name: "Access fixture" },
+        access: {
+          email: "access-fixture@example.test",
+          role: "staff",
+          enabled: true,
+          googleConnected: false,
+        },
+      },
+    });
+    expect(Object.keys(result.body.access)).not.toContain("password");
+
+    expect(
+      (
+        await call(
+          "put",
+          endpoint,
+          "root",
+          { ...data, role: "editor", enabled: false, expectedRevision: "stale" },
+          params,
+        )
+      ).status,
+    ).toBe(409);
+
+    const changed = await call(
+      "put",
+      endpoint,
+      "root",
+      {
+        ...data,
+        role: "editor",
+        enabled: false,
+        password: undefined,
+        expectedRevision: result.body.access.revision,
+      },
+      params,
+    );
+    expect(changed.body.access).toMatchObject({ role: "editor", enabled: false });
+    expect((await payload.findByID({ collection: "people", id: person.id })).name).toBe("Access fixture");
+
+    await expect(
+      payload.update({
+        collection: "users",
+        id: accounts.root.id,
+        data: { enabled: false },
+        req: await reqAs("root"),
+        overrideAccess: false,
+      }),
+    ).rejects.toMatchObject({ status: 400 });
   });
 
   it("stages Publication settings before publishing and protects Site administration", async () => {

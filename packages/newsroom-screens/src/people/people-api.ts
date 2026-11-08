@@ -2,6 +2,7 @@ import type {
   NewPerson,
   PeopleList,
   PeopleQuery,
+  PersonAccessInput,
   PersonDetail,
   PersonPatch,
 } from "./people-model";
@@ -12,4 +13,5 @@ export type PeopleApi = {
   profile: () => Promise<PersonDetail | null>;
   create: (input: NewPerson) => Promise<PersonDetail>;
   update: (id: number, input: PersonPatch) => Promise<PersonDetail>;
+  saveAccess: (id: number, input: PersonAccessInput) => Promise<PersonDetail>;
 };

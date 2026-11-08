@@ -2,6 +2,7 @@ import type {
   NewPerson,
   PeopleList,
   PeopleQuery,
+  PersonAccessInput,
   PersonCapabilities,
   PersonDetail,
   PersonPatch,
@@ -20,11 +21,13 @@ import { atLeast, relationId, sameId } from "../access/user";
 import { isSlug } from "../domain/slug";
 import { lockPersonRow } from "../db/people";
 import { workflowLabel } from "../domain/workflow";
-import type { Media, Person } from "../payload-types";
+import type { Media, Person, User } from "../payload-types";
+import { saveAccount } from "./accounts";
 import { readableStories, type ScreenContext } from "./screen-models";
 
 type ProfileDoc = Omit<Person, "createdAt">;
 type PortraitDoc = Pick<Media, "id" | "mimeType" | "sizes">;
+type AccessDoc = Pick<User, "id" | "email" | "role" | "enabled" | "googleSubject" | "updatedAt" | "linkedPerson">;
 
 const asUser = (ctx: ScreenContext) => ({
   req: ctx.req,
@@ -68,7 +71,7 @@ export function personCapabilities(
     editProfile: editorial || sameId(ctx.user.linkedPerson, id),
     editEditorialIdentity: editorial,
     changeVisibility: editorial,
-    manageAccount: atLeast(ctx.user, "administrator"),
+    manageAccess: atLeast(ctx.user, "administrator"),
     delete: false,
   };
 }
@@ -99,7 +102,7 @@ export async function portraits(
   });
   return new Map(found.docs.map((doc) => [doc.id, doc]));
 }
-function row(doc: ProfileDoc, media: Map<number, PortraitDoc>): PersonRow {
+function row(doc: ProfileDoc, media: Map<number, PortraitDoc>, access?: Map<number, AccessDoc>): PersonRow {
   const id = Number(relationId(doc.portrait));
   const asset = media.get(id);
   // Private library rendition only. No original URL or account data enters this screen model.
@@ -115,6 +118,12 @@ function row(doc: ProfileDoc, media: Map<number, PortraitDoc>): PersonRow {
     directoryVisible: doc.directoryVisible === true,
     hasProfilePage: doc.hasProfilePage === true,
     portrait: id ? { id, url, unavailable: !url } : null,
+    ...(access ? {
+      access: (() => {
+        const account = access.get(doc.id);
+        return account ? { enabled: account.enabled === true, role: account.role } : null;
+      })(),
+    } : {}),
   };
 }
 function profile(
@@ -132,7 +141,7 @@ function profile(
   };
 }
 
-/** Two batched reads per list page; no account queries and no per-row story counts. */
+/** Two batched reads for editors; administrators get one additional batched access-status read. */
 export async function peopleList(
   ctx: ScreenContext,
   query: PeopleQuery,
@@ -157,9 +166,24 @@ export async function peopleList(
     page: query.page,
     ...asUser(ctx),
   });
-  const media = await portraits(ctx, found.docs);
+  const [media, accessDocs] = await Promise.all([
+    portraits(ctx, found.docs),
+    atLeast(ctx.user, "administrator") && found.docs.length
+      ? ctx.req.payload.find({
+          collection: "users",
+          where: { linkedPerson: { in: found.docs.map((person) => person.id) } },
+          select: { linkedPerson: true, role: true, enabled: true },
+          depth: 0,
+          pagination: false,
+          ...asUser(ctx),
+        })
+      : Promise.resolve({ docs: [] as AccessDoc[] }),
+  ]);
+  const access = atLeast(ctx.user, "administrator")
+    ? new Map(accessDocs.docs.map((account) => [Number(relationId(account.linkedPerson)), account as AccessDoc]))
+    : undefined;
   return {
-    people: found.docs.map((doc) => row(doc, media)),
+    people: found.docs.map((doc) => row(doc, media, access)),
     total: found.totalDocs,
     page: found.page ?? 1,
     pages: found.totalPages,
@@ -206,17 +230,17 @@ export async function personDetail(
       sort: "-updatedAt",
       ...asUser(ctx),
     }),
-    // Self-service has no need to enumerate accounts, including other accounts linked to the same Person.
-    capabilities.editEditorialIdentity
+    // Private sign-in details are part of People only for administrators.
+    capabilities.manageAccess
       ? ctx.req.payload.find({
           collection: "users",
           where: { linkedPerson: { equals: id } },
-          select: { name: true },
+          select: { email: true, role: true, enabled: true, googleSubject: true, updatedAt: true, linkedPerson: true },
           depth: 0,
-          pagination: false,
+          limit: 2,
           ...asUser(ctx),
         })
-      : Promise.resolve({ docs: [] }),
+      : Promise.resolve({ docs: [] as AccessDoc[] }),
   ]);
   const plans = stories.docs.length
     ? await ctx.req.payload.find({
@@ -237,13 +261,16 @@ export async function personDetail(
   return {
     person: profile(doc, media),
     capabilities,
-    account: {
-      linked: capabilities.editEditorialIdentity
-        ? accounts.docs.length > 0
-        : true,
-      names: accounts.docs.map((account) => account.name),
-      systemHref: capabilities.manageAccount ? `${ctx.admin}/system` : null,
-    },
+    access: capabilities.manageAccess && accounts.docs[0]
+      ? {
+          id: accounts.docs[0].id,
+          email: accounts.docs[0].email,
+          role: accounts.docs[0].role,
+          enabled: accounts.docs[0].enabled === true,
+          googleConnected: Boolean(accounts.docs[0].googleSubject),
+          revision: accounts.docs[0].updatedAt,
+        }
+      : null,
     usage: {
       total: stories.totalDocs,
       stories: stories.docs.flatMap((row) => {
@@ -294,7 +321,7 @@ export async function createPerson(
     )
   )
     throw new APIError(
-      "Create a public identity here. Manage sign-in accounts under People → Access.",
+      "Create the Person first. Newsroom access is managed from that Person.",
       400,
     );
   const data = {
@@ -438,10 +465,107 @@ export async function updatePerson(
       data,
       ...asUser(ctx),
     });
+    if (typeof data.name === "string") {
+      const linked = await ctx.req.payload.find({
+        collection: "users",
+        where: { linkedPerson: { equals: id } },
+        depth: 0,
+        pagination: false,
+        overrideAccess: true,
+        req: ctx.req,
+      });
+      for (const account of linked.docs) {
+        await ctx.req.payload.update({
+          collection: "users",
+          id: account.id,
+          data: { name: data.name },
+          depth: 0,
+          overrideAccess: true,
+          req: ctx.req,
+        });
+      }
+    }
     if (started) await commitTransaction(ctx.req);
   } catch (error) {
     if (started) await killTransaction(ctx.req);
     throw error;
   }
+  return personDetail(ctx, id);
+}
+
+
+/** Administrators grant, edit, enable and disable sign-in without leaving the Person. */
+export async function savePersonAccess(
+  ctx: ScreenContext,
+  id: number,
+  input: PersonAccessInput,
+): Promise<PersonDetail> {
+  if (!atLeast(ctx.user, "administrator"))
+    throw new APIError("Only administrators can manage newsroom access.", 403);
+  if (
+    !input ||
+    typeof input.email !== "string" ||
+    typeof input.enabled !== "boolean" ||
+    !["staff", "editor", "administrator"].includes(String(input.role)) ||
+    !("expectedRevision" in input)
+  )
+    throw new APIError("Enter a valid email, access level and access status.", 400);
+
+  const person = await ctx.req.payload.findByID({
+    collection: "people",
+    id,
+    select: { name: true },
+    depth: 0,
+    ...asUser(ctx),
+  });
+  const linked = await ctx.req.payload.find({
+    collection: "users",
+    where: { linkedPerson: { equals: id } },
+    depth: 0,
+    limit: 2,
+    ...asUser(ctx),
+  });
+  if (linked.totalDocs > 1)
+    throw new APIError("This Person has more than one sign-in account. Resolve it in System administration.", 409);
+
+  let current = linked.docs[0] ?? null;
+  if (current && input.expectedRevision !== current.updatedAt)
+    throw new APIError("This access changed. Reload the Person before saving.", 409);
+  if (!current && input.expectedRevision !== null)
+    throw new APIError("This access changed. Reload the Person before saving.", 409);
+
+  // The bootstrap administrator may exist before People are imported. Reuse an
+  // exactly matching unlinked account instead of creating a second identity.
+  if (!current) {
+    const email = input.email.trim().toLowerCase();
+    const matches = await ctx.req.payload.find({
+      collection: "users",
+      where: { email: { equals: email } },
+      depth: 0,
+      limit: 2,
+      ...asUser(ctx),
+    });
+    const match = matches.docs[0] ?? null;
+    if (match) {
+      const owner = relationId(match.linkedPerson);
+      if (owner !== null && !sameId(owner, id))
+        throw new APIError("That login email already belongs to another Person.", 409);
+      current = match;
+    }
+  }
+
+  await saveAccount(
+    ctx,
+    {
+      name: person.name,
+      email: input.email,
+      role: input.role,
+      enabled: input.enabled,
+      linkedPerson: id,
+      password: input.password ?? "",
+      expected: current?.updatedAt,
+    },
+    current?.id,
+  );
   return personDetail(ctx, id);
 }

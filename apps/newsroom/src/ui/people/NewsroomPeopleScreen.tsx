@@ -38,8 +38,8 @@ import {
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { useMediaWorkspace } from "../media/MediaWorkspaceShell";
 import type { MediaPicker } from "@byline/newsroom-screens/workspace/media-picker";
-import { AccountsView } from "./AccountsView";
-import { useNewsroomAccount, useNewsroomRoutes } from "../shell/account";
+import { PersonAccessPanel } from "./PersonAccessPanel";
+import { useNewsroomRoutes } from "../shell/account";
 import { createHistoryGuard } from "../shell/history-guard";
 import { useLeaveGuard, useShellNavigation } from "../shell/navigation";
 import { createPayloadPeopleApi } from "./payload-people-api";
@@ -51,23 +51,13 @@ const previewStyle = themeTokensToCssVariables(
 
 /** Global sidebar throughout. Person selection and list state live in the URL. */
 export function NewsroomPeopleScreen({ self = false }: { self?: boolean }) {
-  const routes = useNewsroomRoutes();
-  const account = useNewsroomAccount();
-  const params = useSearchParams();
-  const { navigate } = useShellNavigation();
-  const administrator = !self && account?.role === "administrator";
-  const access = administrator && params?.get("tab") === "access";
   return (
     <AdminRoot toaster={false} className="byline-people">
       <main
         className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-5 px-4 py-6 lg:px-6"
         data-byline-people-screen=""
       >
-        {administrator ? <nav className="flex gap-2" aria-label="People views">
-          <Button type="button" size="sm" variant={access ? "ghost" : "secondary"} aria-current={access ? undefined : "page"} onClick={() => navigate(`${routes.admin}/people`)}>People</Button>
-          <Button type="button" size="sm" variant={access ? "secondary" : "ghost"} aria-current={access ? "page" : undefined} onClick={() => navigate(`${routes.admin}/people?tab=access`)}>Access</Button>
-        </nav> : null}
-        {access ? <AccountsView /> : <PeopleBody self={self} />}
+        <PeopleBody self={self} />
       </main>
     </AdminRoot>
   );
@@ -224,6 +214,16 @@ function PeopleBody({ self }: { self: boolean }) {
             onBack={self ? undefined : () => open(null)}
             onNavigate={navigate}
             onReload={reload}
+            accessPanel={!self && detail.data.capabilities.manageAccess ? (
+              <PersonAccessPanel
+                api={api}
+                detail={detail.data}
+                onSaved={(saved) => {
+                  cache.setQueryData(peopleKeys.detail(personId, self), saved);
+                  void cache.invalidateQueries({ queryKey: ["people", "list"] });
+                }}
+              />
+            ) : undefined}
             onSaved={(saved) => {
               cache.setQueryData(peopleKeys.detail(personId, self), saved);
               void cache.invalidateQueries({ queryKey: ["people", "list"] });

@@ -3,7 +3,6 @@ import { changeStoryNote, storyNotePreviews, storyNotes } from "./story-notes";
 import { contentHealth, healthDisposition, startHealthScan } from "./health/content-health";
 import { pageContext } from "./site-pages";
 import { publicationSettings, savePublicationSettings, saveSiteRow, sectionImpact, siteGroup, siteRows } from "./site";
-import { accountList, saveAccount } from "./accounts";
 import { commandSearch } from "./command-search";
 import { changeCorrection, storyCorrections } from "./story-corrections";
 import { restoreStoryVersion, storyVersion, storyVersions } from "./story-history";
@@ -67,9 +66,9 @@ import type { AppointmentInput, MediaAssignmentInput, SourceInput } from "@bylin
 import { effectiveWorkflow } from "../domain/workflow";
 import { relationId, sameId } from "../access/user";
 import { parsePreviewContextQuery, storyPreviewContext } from "../preview/context";
-import { createPerson, ownProfile, peopleList, personDetail, updatePerson } from "./people";
+import { createPerson, ownProfile, peopleList, personDetail, savePersonAccess, updatePerson } from "./people";
 import { presenceHeartbeat, presenceSnapshot } from "./presence";
-import { peopleQuery, type NewPerson, type PersonPatch } from "@byline/newsroom-screens/people/people-model";
+import { peopleQuery, type NewPerson, type PersonAccessInput, type PersonPatch } from "@byline/newsroom-screens/people/people-model";
 
 /**
  * The newsroom screens' API (`/api/byline/...`), the Payload side of the
@@ -547,13 +546,11 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/public-url", method: "get", handler: handle((ctx, req) => storyURLContext(ctx, idParam(req))) },
   { path: "/byline/presence", method: "get", handler: handle(presenceSnapshot) },
   { path: "/byline/presence", method: "post", handler: handle(presenceHeartbeat) },
-  { path: "/byline/accounts", method: "get", handler: handle((ctx, req) => accountList(ctx, req.searchParams.get("search") ?? "", Number(req.searchParams.get("page") ?? 1))) },
-  { path: "/byline/accounts", method: "post", handler: handle(async (ctx, req) => saveAccount(ctx, await body(req))) },
-  { path: "/byline/accounts/:id", method: "patch", handler: handle(async (ctx, req) => saveAccount(ctx, await body(req), idParam(req))) },
   { path: "/byline/people", method: "get", handler: handle((ctx, req) => peopleList(ctx, peopleQuery(req.searchParams))) },
   { path: "/byline/people", method: "post", handler: handle(async (ctx, req) => createPerson(ctx, await body<NewPerson>(req))) },
   { path: "/byline/people/:id", method: "get", handler: handle((ctx, req) => personDetail(ctx, idParam(req))) },
   { path: "/byline/people/:id", method: "patch", handler: handle(async (ctx, req) => updatePerson(ctx, idParam(req), await body<PersonPatch>(req))) },
+  { path: "/byline/people/:id/access", method: "put", handler: handle(async (ctx, req) => savePersonAccess(ctx, idParam(req), await body<PersonAccessInput>(req))) },
   { path: "/byline/profile", method: "get", handler: handle((ctx) => ownProfile(ctx)) },
   { path: "/byline/home", method: "get", handler: handle((ctx) => homeBootstrap(ctx)) },
   { path: "/byline/command-search", method: "get", handler: handle((ctx, req) => commandSearch(ctx, req.searchParams.get("query") ?? "")) },
