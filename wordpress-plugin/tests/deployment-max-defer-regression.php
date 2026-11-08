@@ -80,28 +80,43 @@ function defer_assert(bool $condition, string $message): void
     }
 }
 
-// The first save queues a deploy 60 seconds out.
-$job_id = byline_deployment_enqueue_job('content', 1, time() + 60);
-defer_assert($job_id === 1 && $jobs[1]['dueAt'] === time() + 60, 'The first save queues a deploy one minute out.');
+// The first save queues a deploy 60 seconds out. Capture the exact due time we
+// pass in instead of calling time() again in the assertion: a second boundary
+// between those calls must not make this regression test flaky.
+$first_due = time() + 60;
+$job_id = byline_deployment_enqueue_job('content', 1, $first_due);
+defer_assert($job_id === 1 && $jobs[1]['dueAt'] === $first_due, 'The first save queues a deploy one minute out.');
 
 // A save 30 seconds later still pushes it back (the normal debounce)...
 $jobs[1]['payload']['firstQueuedAt'] = time() - 30;
-byline_deployment_enqueue_job('content', 2, time() + 60);
-defer_assert($jobs[1]['dueAt'] === time() + 60 && $jobs[1]['payload']['expectedRevision'] === 2, 'A later save still coalesces into the queued deploy.');
+$second_due = time() + 60;
+byline_deployment_enqueue_job('content', 2, $second_due);
+defer_assert($jobs[1]['dueAt'] === $second_due && $jobs[1]['payload']['expectedRevision'] === 2, 'A later save still coalesces into the queued deploy.');
 
 // ...but a steady stream cannot push it past the first request + the cap.
-$jobs[1]['payload']['firstQueuedAt'] = time() - 100;
+$first_queued = time() - 100;
+$jobs[1]['payload']['firstQueuedAt'] = $first_queued;
 byline_deployment_enqueue_job('live-update', 3, time() + 60);
-defer_assert($jobs[1]['dueAt'] === time() - 100 + BYLINE_DEPLOYMENT_MAX_DEFER, 'Coalescing must not defer a deploy beyond the cap.');
-$jobs[1]['payload']['firstQueuedAt'] = time() - 500;
-byline_deployment_enqueue_job('live-update', 4, time() + 60);
-defer_assert($jobs[1]['dueAt'] === time() && $jobs[1]['payload']['firstQueuedAt'] === time() - 500, 'A deploy already past the cap runs now and keeps its first-queued time.');
+defer_assert($jobs[1]['dueAt'] === $first_queued + BYLINE_DEPLOYMENT_MAX_DEFER, 'Coalescing must not defer a deploy beyond the cap.');
+
+$old_first_queued = time() - 500;
+$jobs[1]['payload']['firstQueuedAt'] = $old_first_queued;
+$before = time();
+byline_deployment_enqueue_job('live-update', 4, $before + 60);
+$after = time();
+defer_assert(
+    $jobs[1]['dueAt'] >= $before
+    && $jobs[1]['dueAt'] <= $after
+    && $jobs[1]['payload']['firstQueuedAt'] === $old_first_queued,
+    'A deploy already past the cap runs now and keeps its first-queued time.'
+);
 
 // Retry backoff remains a lower bound even after the original debounce cap.
 $jobs[1]['status'] = 'retry_waiting';
-$jobs[1]['nextAttemptAt'] = time() + 90;
+$next_attempt = time() + 90;
+$jobs[1]['nextAttemptAt'] = $next_attempt;
 byline_deployment_enqueue_job('live-update', 5, time() + 60);
-defer_assert($jobs[1]['dueAt'] === $jobs[1]['nextAttemptAt'], 'A new save must preserve retry backoff instead of scheduling an immediate retry storm.');
+defer_assert($jobs[1]['dueAt'] === $next_attempt, 'A new save must preserve retry backoff instead of scheduling an immediate retry storm.');
 defer_assert(count($jobs) === 1 && $jobs[1]['payload']['expectedRevision'] === 5, 'Rapid updates coalesce into one durable job with the newest revision.');
 
 echo "Deployment max-defer regression passed.\n";
