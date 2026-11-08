@@ -2,6 +2,7 @@ import { largestNaturalImage, type PublicStorySnapshot } from "@byline/content";
 import { articleBodyPlainText, plainTextFromHtml } from "@byline/content/story";
 import { youTubeDefaultThumbnailUrl } from "@byline/core";
 import { absoluteUrl, buildPageMetadata, getPublisherSchema, getSeoDescription } from "./seo";
+import { decodeHtml } from "./format";
 import { nativeMedia } from "./native-snapshot";
 
 function description(story: PublicStorySnapshot) {
@@ -12,7 +13,7 @@ export function nativeArticleMetadata(story: PublicStorySnapshot) {
   const asset = story.image ? nativeMedia(story.image) : undefined;
   const social = asset?.manifest.kind === "image" ? asset.manifest.social : null;
   const metadata = buildPageMetadata({
-    title: story.title, description: description(story), path: story.href, type: "article",
+    title: decodeHtml(story.title), description: description(story), path: story.href, type: "article",
     image: social ? { url: social.publicPath, width: social.width, height: social.height, alt: asset?.alt } : null
   });
   return {
@@ -20,7 +21,7 @@ export function nativeArticleMetadata(story: PublicStorySnapshot) {
     openGraph: {
       ...metadata.openGraph, type: "article" as const, publishedTime: story.publishedAt, modifiedTime: latestModification(story),
       authors: story.contributors.flatMap((person) => person.href ? [absoluteUrl(person.href)] : []),
-      section: story.section.name, tags: story.topics.map((topic) => topic.name)
+      section: decodeHtml(story.section.name), tags: story.topics.map((topic) => decodeHtml(topic.name))
     }
   };
 }
@@ -39,14 +40,14 @@ export function nativeArticleJsonLd(story: PublicStorySnapshot, includeBody: boo
     "@type": "ImageObject", ...(index === 0 ? { "@id": `${url}#primaryimage` } : {}),
     contentUrl: absoluteUrl(file.publicPath), url: absoluteUrl(file.publicPath), width: file.width, height: file.height,
     caption: story.leadCaption || undefined, creator: asset?.creator ? { "@type": "Person", name: asset.creator } : undefined,
-    creditText: asset?.credit || asset?.creator || undefined, copyrightNotice: asset?.copyright || undefined, license: asset?.license || undefined
+    creditText: asset?.credit || asset?.creator || undefined, copyrightNotice: asset?.copyright || undefined, license: asset?.license ? absoluteUrl(asset.license) : undefined
   }));
   const publisher = getPublisherSchema();
   const article = {
     "@type": story.live ? ["NewsArticle", "LiveBlogPosting"] : "NewsArticle", "@id": `${url}#article`, mainEntityOfPage: { "@type": "WebPage", "@id": url },
-    headline: title, description: description(story), url, datePublished: publishedAt, dateModified: modifiedAt, publisher,
+    headline: decodeHtml(title), description: description(story), url, datePublished: publishedAt, dateModified: modifiedAt, publisher,
     author: authors.length === 1 ? authors[0] : authors.length ? authors : { "@type": "Organization", name: publisher.name },
-    articleSection: story.section.name, keywords: story.topics.length ? story.topics.map((topic) => topic.name).join(", ") : undefined,
+    articleSection: decodeHtml(story.section.name), keywords: story.topics.length ? story.topics.map((topic) => decodeHtml(topic.name)).join(", ") : undefined,
     image: image.length ? image : undefined, primaryImageOfPage: image.length ? { "@id": image[0]["@id"] } : undefined,
     ...(story.live ? { coverageStartTime: story.live.startedAt, coverageEndTime: story.live.endedAt ?? undefined,
       liveBlogUpdate: story.live.updates.map((update) => ({ "@type": "BlogPosting", headline: update.title, articleBody: plainTextFromHtml(update.html),

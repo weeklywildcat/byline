@@ -1,9 +1,19 @@
 import { mediaCredit } from "@byline/article-body";
-import { buildArticlePresentation, storyCardView, type StoryImageUsage } from "@byline/content/story";
+import { buildArticlePresentation, storyCardView, type PublicTerm, type StoryImageUsage } from "@byline/content/story";
 import type { PublicStorySnapshot } from "@byline/content";
 import { largestNaturalImage } from "@byline/content";
 import type { ArticleRenderHost } from "@byline/ui/article-body";
+import { decodeHtml } from "./format";
 import { getNativeSnapshot, nativeMedia, nativeStory, nativeStoryIndex } from "./native-snapshot";
+
+function displayTerm(term: PublicTerm): PublicTerm {
+  return { ...term, name: decodeHtml(term.name) };
+}
+
+// Imported taxonomy names can still contain WordPress HTML entities.
+function storyWithDisplayTerms(story: PublicStorySnapshot): PublicStorySnapshot {
+  return { ...story, section: displayTerm(story.section), sections: story.sections.map(displayTerm), topics: story.topics.map(displayTerm) };
+}
 
 export function nativeImage(id: number, usage: StoryImageUsage) {
   const asset = nativeMedia(id);
@@ -36,15 +46,15 @@ export const nativeBodyImage: ArticleRenderHost["imageSources"] = (asset) => {
 export function nativeArticlePresentation(story: PublicStorySnapshot) {
   const { publication } = getNativeSnapshot()!;
   const { byTerm, byContributor, collections } = nativeStoryIndex()!;
-  const presentation = buildArticlePresentation(story, {
+  const presentation = buildArticlePresentation(storyWithDisplayTerms(story), {
     image: (id, usage) => {
       const image = nativeImage(id, usage);
       return image && usage.role === "lead" ? { ...image, fallbackCaption: story.leadCaption } : image;
     },
     formatDate: nativeArticleDate,
     publication: { shortName: publication.identity.shortName, contactHref: publication.urls.contact },
-    relatedCandidates: [...new Set([...story.sectionKeys, ...story.topicKeys].flatMap((key) => byTerm.get(key) ?? []))],
-    contributorStories: [...new Set(story.contributorKeys.flatMap((key) => byContributor.get(key) ?? []))],
+    relatedCandidates: [...new Set([...story.sectionKeys, ...story.topicKeys].flatMap((key) => byTerm.get(key) ?? []))].map(storyWithDisplayTerms),
+    contributorStories: [...new Set(story.contributorKeys.flatMap((key) => byContributor.get(key) ?? []))].map(storyWithDisplayTerms),
     series: (collections.get(story.id) ?? []).map((entry) => ({
       id: entry.id, title: entry.title, href: `/coverage/${entry.slug}/`, description: entry.description, format: entry.format,
       complete: entry.status === "past" || entry.status === "archived", stories: entry.stories.map((id) => nativeStory(id)!)
@@ -54,5 +64,5 @@ export function nativeArticlePresentation(story: PublicStorySnapshot) {
 }
 
 export function nativeArticleCard(story: PublicStorySnapshot, usage: Pick<StoryImageUsage, "shape" | "sizes">) {
-  return storyCardView(story, { image: (id) => nativeImage(id, { ...usage, role: "card", priority: false, searchVisibility: "presentation" }), formatDate: nativeArticleDate });
+  return storyCardView(storyWithDisplayTerms(story), { image: (id) => nativeImage(id, { ...usage, role: "card", priority: false, searchVisibility: "presentation" }), formatDate: nativeArticleDate });
 }
