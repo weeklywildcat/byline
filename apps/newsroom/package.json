@@ -34,7 +34,8 @@
     "test:login:browser": "playwright test --config playwright.login.config.ts",
     "migrate:check": "node scripts/check-migrations.mjs",
     "seed:people:browser": "node --import tsx scripts/seed-people-browser.ts",
-    "test:people:browser": "playwright test --config playwright.people.config.ts"
+    "test:people:browser": "playwright test --config playwright.people.config.ts",
+    "provision:wordpress-access": "payload run scripts/provision-wordpress-access.ts --"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
