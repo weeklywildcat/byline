@@ -142,7 +142,14 @@ function sectionWordPressId(post: ExportPost): number | null {
 }
 
 async function one(collection: any, where: Record<string, unknown>) {
-  const result = await payload.find({ collection, where, depth: 0, limit: 2, overrideAccess: true, trash: true } as never);
+  const result = await payload.find({
+    collection,
+    where,
+    depth: 0,
+    limit: 2,
+    overrideAccess: true,
+    ...(collection === "stories" ? { trash: true } : {}),
+  } as never);
   if (result.totalDocs > 1) throw new Error(`Import identity is ambiguous in ${collection}: ${JSON.stringify(where)}`);
   return result.docs[0] as any | undefined;
 }
