@@ -1,6 +1,7 @@
 import { DefaultTemplate } from "@payloadcms/next/templates";
 import { Gutter } from "@payloadcms/ui";
 import type { AdminViewServerProps } from "payload";
+import { redirectIfSignedOut } from "../auth/session";
 import { requestUser } from "../access/user";
 import { administrationFor, canAdministerSystem } from "../domain/navigation";
 import { SystemAdministrationScreen } from "../ui/system/SystemAdministrationScreen";
@@ -14,6 +15,7 @@ import { SystemAdministrationScreen } from "../ui/system/SystemAdministrationScr
  */
 export function SystemAdministration({ initPageResult, params, searchParams }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult;
+  redirectIfSignedOut({ req, params, searchParams });
   const user = requestUser(req);
   const admin = req.payload.config.routes.admin;
   // Payload leaves custom root views bare; its default template brings the Byline shell (Nav, header).

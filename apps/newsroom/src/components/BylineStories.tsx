@@ -1,6 +1,7 @@
 import { DefaultTemplate } from "@payloadcms/next/templates";
 import { Gutter } from "@payloadcms/ui";
 import type { AdminViewServerProps } from "payload";
+import { redirectIfSignedOut } from "../auth/session";
 import { requestUser } from "../access/user";
 import { storiesRouteFilters } from "@byline/newsroom-screens/planning/planning-api";
 import { NewsroomStories } from "../ui/stories/NewsroomStories";
@@ -16,6 +17,7 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
  */
 export function BylineStories({ initPageResult, params, searchParams }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult;
+  redirectIfSignedOut({ req, params, searchParams });
   const user = requestUser(req);
   // The address names its filters (`workflow=`, `needs_review=1`, `collection=`…): Home and the sidebar link views this way.
   const routeParams = new URLSearchParams();
