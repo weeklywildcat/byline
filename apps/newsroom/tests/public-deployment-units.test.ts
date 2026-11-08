@@ -85,6 +85,13 @@ describe("public deploy hook delivery", () => {
     expect(new Headers(init.headers).get("X-Byline-Reason")).toBe(input.reason);
   });
 
+  it("falls back to a safe reason for malformed stored task input", async () => {
+    const fetcher = vi.fn(async () => new Response(null, { status: 204 })) as unknown as typeof fetch;
+    await triggerPublicDeployment(payload, { ...input, reason: undefined as unknown as string }, { env: ENV, fetch: fetcher, readState });
+    const [, init] = (fetcher as unknown as { mock: { calls: Array<[URL, RequestInit]> } }).mock.calls[0];
+    expect(new Headers(init.headers).get("X-Byline-Reason")).toBe("public snapshot");
+  });
+
   it("skips an obsolete deploy when a newer public revision exists", async () => {
     const fetcher = vi.fn(async () => new Response(null, { status: 204 })) as unknown as typeof fetch;
     const result = await triggerPublicDeployment(payload, input, {
