@@ -285,9 +285,16 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
                     <Badge variant={liveState === "live" ? "default" : "outline"}>{liveState === "live" ? "Live" : liveState === "ended" ? "Ended" : "Off"}</Badge>
                   </div>
                   {canManageLive ? (
-                    <Button type="button" size="sm" variant="outline" className="w-fit" onClick={() => live.setValue(liveState === "off" ? "live" : liveState === "live" ? "ended" : "live")}>
-                      {liveState === "off" ? "Start live coverage" : liveState === "live" ? "End live coverage" : "Resume live coverage"}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" variant="outline" className="w-fit" onClick={() => live.setValue(liveState === "off" ? "live" : liveState === "live" ? "ended" : "live")}>
+                        {liveState === "off" ? "Start live coverage" : liveState === "live" ? "End live coverage" : "Resume live coverage"}
+                      </Button>
+                      {liveState !== "off" ? (
+                        <Button type="button" size="sm" variant="ghost" className="w-fit text-muted-foreground" onClick={() => live.setValue("off")}>
+                          Turn off live coverage
+                        </Button>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
               </section>
