@@ -4,7 +4,7 @@ Tags: newsroom, editorial, journalism, headless, student-journalism
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.3.72
+Stable tag: 0.3.73
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,10 @@ WordPress publication state, a fixed Weekly Wildcat homepage, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==
+
+= 0.3.73 =
+
+* Media Library: multi-select, bulk actions, rename and a cleaner inspector (#242)
 
 = 0.3.72 =
 
@@ -589,6 +593,9 @@ makes Studio a real homepage editor.**
   same.
 
 == Upgrade Notice ==
+
+= 0.3.73 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
 
 = 0.3.72 =
 Maintenance and feature update. Nothing needs reconfiguring after updating.
