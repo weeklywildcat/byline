@@ -7,7 +7,7 @@ for maintenance, migration and inspection.
 
 | Records | Editable in Byline | System-owned or deliberately deferred |
 | --- | --- | --- |
-| Stories | Write: headline, deck, kicker, Section, Topics, ordered byline, lead Media and caption, body, format, YouTube URL, presentation, immersive headline position, reporting note and live coverage state (editors). Edit URL: slug and, for editors, first publication instant. History: publication, versions, corrections and copy tools. | IDs, joins, author attribution on versions, timestamps, generated video facts and import provenance are system-owned. Imported HTML stays read-only; reviewed conversion is separate. Live updates themselves use the existing System record UI. |
+| Stories | Write: headline, deck, kicker, Section, Topics, ordered byline, lead Media and caption, body, format, YouTube URL, presentation, immersive headline position, reporting note and live coverage state (editors). Edit URL: slug and, for editors, first publication instant. History: publication, versions, corrections and copy tools. Editors can move a Story to Trash from its publication menu; any scheduled publication is cancelled as part of the same action. | IDs, joins, author attribution on versions, timestamps, generated video facts and import provenance are system-owned. Imported HTML stays read-only; reviewed conversion is separate. Live updates themselves use the existing System record UI. |
 | Pages | Site → Pages: title, slug, published parent, summary, prose body, search indexing, native draft, publish/unpublish and schedule; History lists recent versions. | First publication instant and record metadata are system-owned. Comparing or restoring Page versions still uses the native Payload fallback. Code-owned institutional pages and the sports archive keep their existing public routing. |
 | People | People / My profile: name, slug (editors), pronouns, newsroom role, short and long bios, portrait, status, directory/profile visibility, public email and social profiles. Administrators manage that Person's newsroom access, sign-in email and access level from the same Person screen; editors can create guest contributors without creating accounts. | IDs, the underlying auth record/link, Google subject, legacy IDs and timestamps are system-owned. Raw Accounts remain only in System administration as a maintenance fallback. |
 | Media | Library: upload, filename display, alt text, creator, credit, copyright, license, source URL, capture date, folder, focal point and supported crops. | Filename, MIME, dimensions, original and generated files, uploader, hashes, preparation state and revisions are system-owned. Where used scans native article blocks and other known relationships. Imported HTML references and retained versions are not shown in the inspector; retained native Story versions still protect files from deletion. |
@@ -62,9 +62,12 @@ public Worker does not look up redirects in Payload.
 
 Scheduling is a native job, separate from a Story deadline and publication
 target. Pending drafts and scheduled rewrites remain private to the Story's
-managers. Only editors publish, schedule or unpublish Stories. Readiness
-reports fields, body validation and publication Media issues; warnings are
-advisory. Content Health is independent published-content maintenance.
+managers. Only editors publish, schedule, unpublish or move Stories to Trash.
+Moving a Story to Trash cancels its pending scheduled publication atomically;
+the Story remains recoverable with its drafts, versions and newsroom planning.
+Permanent deletion is administrator-only. Readiness reports fields, body
+validation and publication Media issues; warnings are advisory. Content Health
+is independent published-content maintenance.
 
 ## Operations
 
