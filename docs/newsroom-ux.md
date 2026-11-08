@@ -9,16 +9,18 @@ for maintenance, migration and inspection.
 | --- | --- | --- |
 | Stories | Write: headline, deck, kicker, Section, Topics, ordered byline, lead Media and caption, body, format, YouTube URL, presentation, immersive headline position, reporting note and live coverage state (editors). Edit URL: slug and, for editors, first publication instant. History: publication, versions, corrections and copy tools. | IDs, joins, author attribution on versions, timestamps, generated video facts and import provenance are system-owned. Imported HTML stays read-only; reviewed conversion is separate. Live updates themselves use the existing System record UI. |
 | Pages | Site → Pages: title, slug, published parent, summary, prose body, search indexing, native draft, publish/unpublish and schedule; History lists recent versions. | First publication instant and record metadata are system-owned. Comparing or restoring Page versions still uses the native Payload fallback. Code-owned institutional pages and the sports archive keep their existing public routing. |
-| People | People / My profile: name, slug (editors), pronouns, newsroom role, short and long bios, portrait, status, directory/profile visibility, public email and social profiles. Editors can create a guest from the Story byline picker. | IDs, account joins, legacy IDs and timestamps are system-owned. Login identity and permission changes belong to People → Access. |
+| People | People / My profile: name, slug (editors), pronouns, newsroom role, short and long bios, portrait, status, directory/profile visibility, public email and social profiles. Administrators manage that Person's newsroom access, sign-in email and access level from the same Person screen; editors can create guest contributors without creating accounts. | IDs, the underlying auth record/link, Google subject, legacy IDs and timestamps are system-owned. Raw Accounts remain only in System administration as a maintenance fallback. |
 | Media | Library: upload, filename display, alt text, creator, credit, copyright, license, source URL, capture date, folder, focal point and supported crops. | Filename, MIME, dimensions, original and generated files, uploader, hashes, preparation state and revisions are system-owned. Where used scans native article blocks and other known relationships. Imported HTML references and retained versions are not shown in the inspector; retained native Story versions still protect files from deletion. |
 | Sections | Site → Sections: name, slug, description, internal visibility. | IDs, legacy IDs and timestamps are system-owned. An internal Section has no public Story paths. |
 | Topics | Site → Topics: name, slug, description. Staff can create a Topic while editing a Story. | IDs, legacy IDs and timestamps are system-owned. Topic landing pages are not published; the topic facts are used in Story metadata. |
 | Publication | Site → Publication: identity, location, locale, timezone, public URLs, branding assets and dimensions, section descriptions, ordered navigation and social profiles, feature switches, licensing and SEO defaults. Save draft and Publish settings are separate. | Weekly Wildcat is the sole supported theme. No theme builder, secret management, private newsroom URL or public revision field lives here. Feature switches do not install distribution providers. |
 
-An invited account is a sign-in record for an existing Google Workspace
-address. Byline sends no invitation. Administrators can set a local fallback
-password; if left blank at creation, Byline uses an unknown random credential
-until one is set. Disabling access does not change historical bylines.
+A Person may have zero or one Byline sign-in account. Administrators grant,
+edit, enable and disable that access from the Person; an existing unlinked
+account with the same email is connected instead of duplicated. Byline sends no
+invitation. Administrators can set a local fallback password; if left blank at
+creation, Byline uses an unknown random credential until one is set. Disabling
+access never changes the public profile, historical bylines or story history.
 
 Story notes are private threaded discussions about the entire Story, with
 replies and resolution. They are not attached to a selection of copy. Native
