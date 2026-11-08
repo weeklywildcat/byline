@@ -12775,12 +12775,12 @@
         "inline",
         "prepare-publication-media",
         "prepare-public-snapshot",
+        "deploy-public-site",
         "advance-public-revision",
         "scan-content-health",
         "refresh-video-facts",
         "deliver-notification",
         "send-due-digest",
-        "deploy-public-site",
         "schedulePublish"
       ]
     },
@@ -12799,12 +12799,12 @@
         "inline",
         "prepare-publication-media",
         "prepare-public-snapshot",
+        "deploy-public-site",
         "advance-public-revision",
         "scan-content-health",
         "refresh-video-facts",
         "deliver-notification",
         "send-due-digest",
-        "deploy-public-site",
         "schedulePublish"
       ]
     },
