@@ -21,6 +21,8 @@ import { recordPublicMutation } from "../src/public/revision";
 import { CORRECTION_TYPES } from "../src/domain/vocabulary";
 import { MEDIA_MIME_TYPES, MEDIA_UPLOAD_MAX_BYTES } from "../src/collections/Media";
 import { newsroomTimeZone } from "../src/domain/dates";
+import { isWorkflowStage } from "../src/domain/workflow";
+import { RESOURCE_PURPOSES } from "../src/domain/vocabulary";
 
 type ExportPerson = {
   id: number;
@@ -49,6 +51,14 @@ type ExportPost = {
   contributors: Array<{ type: "user" | "guest"; id: number }>;
   reportingNote?: string; format?: string; videoUrl?: string; presentation?: string; immersiveAlignment?: string;
   body: ArticleBody; corrections?: ExportCorrection[];
+  plan?: {
+    workflow?: string;
+    editorUserId?: number | null;
+    deadline?: string;
+    plannedPublication?: string;
+    brief?: string;
+    resources?: Array<{ label: string; url: string; purpose: string }>;
+  };
 };
 type WordPressExport = {
   schemaVersion: number; generatedAt: string; siteUrl: string;
@@ -260,6 +270,8 @@ async function plan() {
     }
     const editorialTags = post.tagIds.map((id) => raw.tags.find((term) => term.id === id)?.slug).filter((slug): slug is string => Boolean(slug && EDITORIAL_ONLY_TAG_SLUGS.has(slug)));
     if (editorialTags.length) summary.review.push(`Post ${post.id}: editorial-only WordPress tag(s) omitted from public Topics: ${editorialTags.join(", ")}.`);
+    const plan = importedPlan(post);
+    if (plan.oldEditorUserId) summary.review.push(`Post ${post.id}: old WordPress editor user ${plan.oldEditorUserId} is not assigned in Payload; People are imported without login accounts.`);
   }
 }
 
@@ -277,6 +289,33 @@ function correctionInstant(value: string) {
   const time = Date.parse(candidate);
   if (!Number.isFinite(time)) throw new Error(`Invalid correction date ${value}.`);
   return new Date(time).toISOString();
+}
+
+const resourcePurposes = new Set<string>(RESOURCE_PURPOSES);
+function importedPlan(post: ExportPost) {
+  const plan = post.plan ?? {};
+  const workflow = isWorkflowStage(plan.workflow) ? plan.workflow : "pitch";
+  const deadline = text(plan.deadline);
+  if (deadline && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) throw new Error(`Post ${post.id} has invalid deadline ${deadline}.`);
+  const planned = text(plan.plannedPublication);
+  if (planned && !Number.isFinite(Date.parse(planned))) throw new Error(`Post ${post.id} has invalid planned publication ${planned}.`);
+  const resources = (plan.resources ?? []).map((resource) => {
+    const label = text(resource.label).slice(0, 120);
+    const url = text(resource.url);
+    const purpose = resourcePurposes.has(resource.purpose) ? resource.purpose : "other";
+    if (!label || !isHttps(url)) throw new Error(`Post ${post.id} has an invalid private resource link.`);
+    const parsed = new URL(url);
+    if (parsed.username || parsed.password) throw new Error(`Post ${post.id} has a private resource URL with credentials.`);
+    return { label, url, purpose };
+  });
+  return {
+    workflow,
+    deadline: deadline || null,
+    plannedPublication: planned ? new Date(planned).toISOString() : null,
+    brief: text(plan.brief).slice(0, 4000),
+    resources,
+    oldEditorUserId: Number(plan.editorUserId) > 0 ? Number(plan.editorUserId) : null,
+  };
 }
 
 async function applyImport() {
@@ -398,6 +437,30 @@ async function applyImport() {
       story = await payload.create({ collection: "stories", data: data as never, draft: post.status !== "publish", overrideAccess: true, context: importContext });
     }
     storyMap.set(post.id, Number(story.id));
+
+    const planInput = importedPlan(post);
+    const plans = await payload.find({
+      collection: "story-plans",
+      where: { story: { equals: story.id } },
+      depth: 0,
+      limit: 2,
+      overrideAccess: true,
+    });
+    if (plans.totalDocs !== 1) throw new Error(`Story ${post.id} has ${plans.totalDocs} Payload plans after import; expected exactly one.`);
+    await payload.update({
+      collection: "story-plans",
+      id: plans.docs[0].id,
+      data: {
+        workflow: planInput.workflow,
+        editor: null,
+        deadline: planInput.deadline,
+        plannedPublication: planInput.plannedPublication,
+        brief: planInput.brief,
+        resources: planInput.resources,
+      } as never,
+      overrideAccess: true,
+      context: importContext,
+    });
   }
 
   for (const post of raw.posts) {
