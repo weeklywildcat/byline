@@ -24,13 +24,13 @@ const manifest: PublicationImageManifest = {
   warnings: []
 };
 vi.mock("@/lib/native-snapshot", () => ({
-  nativeMedia: (id: number) => id === 5 ? { id, kind: "image", filename: "board.jpg", alt: "The board meets.", manifest } : undefined
+  nativeMedia: (id: number) => id === 5 ? { id, kind: "image", filename: "board.jpg", alt: "The board meets.", license: "/image-license/", manifest } : undefined
 }));
 
-const section = { key: "section-1", name: "News", href: "/category/news/" };
+const section = { key: "section-1", name: "Arts &amp; Culture", href: "/category/culture/" };
 const story: PublicStorySnapshot = {
-  id: 1, slug: "board", title: "Board meets", titleHtml: "Board meets", excerptHtml: "", href: "/2026/10/14/news/board/",
-  url: "https://weeklywildcat.com/2026/10/14/news/board/", publishedAt: "2026-10-14T14:05:00.000Z", modifiedAt: "2026-10-14T14:05:00.000Z",
+  id: 1, slug: "board", title: "Board &amp; arts", titleHtml: "Board &amp; arts", excerptHtml: "", href: "/2026/10/14/culture/board/",
+  url: "https://weeklywildcat.com/2026/10/14/culture/board/", publishedAt: "2026-10-14T14:05:00.000Z", modifiedAt: "2026-10-14T14:05:00.000Z",
   body: { format: "byline-v1", version: 1, nodes: [{ type: "paragraph", children: [{ type: "text", text: "The board voted." }] }], media: {} },
   image: 5, leadCaption: "A public meeting.", section, sections: [section], sectionKeys: [section.key], topics: [], topicKeys: [],
   contributors: [], contributorKeys: [], athleteMeta: [], corrections: [], reportingNote: [], live: null,
@@ -52,5 +52,21 @@ describe("SEO images from native prepared publication media", () => {
     expect(nativeArticleMetadata(story).openGraph.images).toEqual([
       expect.objectContaining({ url: `https://weeklywildcat.com${manifest.social.publicPath}`, width: 1200, height: 630 })
     ]);
+  });
+
+  it("decodes imported entities and makes native image licenses absolute", () => {
+    const metadata = nativeArticleMetadata(story);
+    expect(metadata.openGraph.title).toBe("Board & arts");
+    expect(metadata.openGraph.section).toBe("Arts & Culture");
+
+    const schema = nativeArticleJsonLd(story, true) as {
+      headline: string;
+      articleSection: string;
+      image: Array<{ license?: string }>;
+    };
+    expect(schema.headline).toBe("Board & arts");
+    expect(schema.articleSection).toBe("Arts & Culture");
+    expect(schema.image[0]?.license).toBe("https://weeklywildcat.com/image-license/");
+    expect(JSON.stringify(schema)).not.toContain("&amp;");
   });
 });
