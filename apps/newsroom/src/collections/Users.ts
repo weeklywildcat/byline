@@ -1,5 +1,5 @@
 import { lockAccountChanges, requireOtherAdministrator } from "../newsroom/accounts";
-import { APIError, type CollectionConfig, type PayloadRequest } from "payload";
+import { APIError, type CollectionConfig, type PayloadRequest, type Where } from "payload";
 import { administratorsOnly, administratorsOnlyField, atLeast, newsroomUser, relationId, requestUser, sameId } from "../access/user";
 import { ROLE_OPTIONS } from "../domain/vocabulary";
 
@@ -72,7 +72,7 @@ export const Users: CollectionConfig = {
           ? relationId(data.linkedPerson)
           : relationId(originalDoc?.linkedPerson);
         if (person === null) return data;
-        const where = originalDoc?.id
+        const where: Where = originalDoc?.id
           ? { and: [{ linkedPerson: { equals: person } }, { id: { not_equals: originalDoc.id } }] }
           : { linkedPerson: { equals: person } };
         const existing = await req.payload.find({
