@@ -125,6 +125,7 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
                 placeholder="Label above headline"
                 value={kicker.value ?? ""}
                 onChange={(event) => kicker.setValue(event.target.value)}
+                onFocus={() => setKickerOpen(true)}
                 disabled={readOnly}
                 autoFocus={kickerOpen && !kicker.value}
                 className="h-7 w-auto max-w-sm border-transparent bg-transparent px-0 text-xs font-medium tracking-wide uppercase shadow-none focus-visible:ring-0"
@@ -247,6 +248,7 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
                 rows={3}
                 value={reportingNote.value ?? ""}
                 onChange={(event) => reportingNote.setValue(event.target.value)}
+                onFocus={() => setReportingNoteOpen(true)}
                 disabled={readOnly}
                 placeholder="Explain anything readers should know about how this story was reported."
               />
