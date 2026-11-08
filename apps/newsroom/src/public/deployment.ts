@@ -123,10 +123,10 @@ export async function triggerPublicDeployment(
         "X-Byline-Reason": input.reason.slice(0, 120)
       }
     });
-  } catch (error) {
-    throw new PublicDeployError(`Deploy hook request failed: ${error instanceof Error ? error.message : "network error"}`);
-  } finally {
-    // Never retain or log the credential-like hook URL.
+  } catch {
+    // Fetch errors can contain the requested URL. Never copy an exception
+    // message into a job error because the deploy-hook URL is credential-like.
+    throw new PublicDeployError("Deploy hook request failed.");
   }
 
   await response.body?.cancel().catch(() => undefined);
