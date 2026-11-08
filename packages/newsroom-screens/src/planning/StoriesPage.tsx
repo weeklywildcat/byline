@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Plus } from "lucide-react";
+import { LayoutGrid, Plus } from "lucide-react";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { useDebouncedValue, useNow } from "@byline/newsroom-ui/lib/hooks";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
 import {
@@ -12,6 +13,7 @@ import {
   writeStoriesViewPreference,
   type StoriesView
 } from "./stories-view";
+import { BOARD_LAYOUT_OPTIONS, browserStorage, isBoardLayout, preferredBoardLayout, writeBoardLayoutPreference, type BoardLayout } from "./stories-board-layout";
 import { useStoryPeek } from "../story/StoryPeekHost";
 import { PageHeader } from "./PlanningPage";
 import { StoryViewsPicker, useStoryViews, type AppliedView } from "./StoryViews";
@@ -30,6 +32,29 @@ function mergePeople(known: PlanningPerson[], stories: PlanningStory[], pick: (s
   const people = new Map(known.map((person) => [person.id, person]));
   stories.forEach((story) => pick(story).forEach((person) => { if (person) people.set(person.id, person); }));
   return Array.from(people.values()).sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/**
+ * How the board is laid out: a reader preference kept in this browser, never a
+ * filter, a saved view or part of the address.
+ */
+function BoardLayoutPicker({ value, onChange }: { value: BoardLayout; onChange: (layout: BoardLayout) => void }) {
+  const current = BOARD_LAYOUT_OPTIONS.find((option) => option.id === value) ?? BOARD_LAYOUT_OPTIONS[0]!;
+  return <DropdownMenu>
+    <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" aria-label={`Board layout: ${current.label}`} data-board-layout-picker="" />}>
+      <LayoutGrid data-icon="inline-start" aria-hidden="true" /><span className="sr-only @3xl/stories:not-sr-only">{current.label}</span>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuGroup>
+        <DropdownMenuLabel>Board layout</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={value} onValueChange={(next) => { if (isBoardLayout(next)) onChange(next); }}>
+          {BOARD_LAYOUT_OPTIONS.map((option) => <DropdownMenuRadioItem key={option.id} value={option.id} closeOnClick>
+            <span className="flex flex-col"><span>{option.label}</span><span className="text-xs text-muted-foreground">{option.description}</span></span>
+          </DropdownMenuRadioItem>)}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuGroup>
+    </DropdownMenuContent>
+  </DropdownMenu>;
 }
 
 /** A story's full Story Workspace address. Each host builds its own. */
@@ -90,6 +115,8 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
   const [sort, setSort] = useState<PlanningSort>(DEFAULT_PLANNING_SORT);
   const [savedViewId, setSavedViewId] = useState<string | null>(null);
   const [showPublished, setShowPublished] = useState(false);
+  const [boardLayout, setBoardLayout] = useState<BoardLayout>(() => preferredBoardLayout(browserStorage()));
+  const changeBoardLayout = useCallback((next: BoardLayout) => { setBoardLayout(next); writeBoardLayoutPreference(next, browserStorage()); }, []);
   const [people, setPeople] = useState<{ writers: PlanningPerson[]; editors: PlanningPerson[] }>({ writers: [], editors: [] });
 
   const planning = usePlanningStories(fetchers, useDebouncedValue(filters, 200));
@@ -143,9 +170,12 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
       <Tabs value={view} onValueChange={(next) => changeView(next as StoriesView)} className="gap-3">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <StoryViewsPicker views={storyViews} />
-          <TabsList variant="line" aria-label={"Stories presentation"}>
-            {presentations.map((id) => <TabsTrigger key={id} value={id}>{VIEW_LABELS[id]}</TabsTrigger>)}
-          </TabsList>
+          <div className="flex items-center gap-2">
+            {view === "board" ? <BoardLayoutPicker value={boardLayout} onChange={changeBoardLayout} /> : null}
+            <TabsList variant="line" aria-label={"Stories presentation"}>
+              {presentations.map((id) => <TabsTrigger key={id} value={id}>{VIEW_LABELS[id]}</TabsTrigger>)}
+            </TabsList>
+          </div>
         </div>
         <StoryFilters filters={filters} onChange={changeFilters} showPublished={view === "list" ? { value: showPublished, onChange: setShowPublished } : undefined} statuses={statuses} writers={people.writers} editors={people.editors} />
         {planning.isError && !data ? <InlineAlert onAction={() => void planning.refetch()}>{describePlanningError(planning.error, "Stories are unavailable right now.")}</InlineAlert> : null}
@@ -153,7 +183,7 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
         {loading
           ? <div role="status" aria-label={"Loading stories"} className="grid gap-3 @3xl/stories:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <div key={i} className="flex flex-col gap-2 rounded-xl border p-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>)}</div>
           : <>
-            <TabsContent value="board"><StoryBoard stories={stories} statuses={statuses} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onMoveStory={move} onOpenStory={open} /></TabsContent>
+            <TabsContent value="board"><StoryBoard layout={boardLayout} stories={stories} statuses={statuses} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onMoveStory={move} onOpenStory={open} /></TabsContent>
             <TabsContent value="list"><StoryList stories={listStories} hiddenPublished={stories.length - listStories.length} statuses={statuses} sort={sort} canMoveStories={canMove} canAssignStories={canAssign} canUpdateStories={canUpdateStories} movingStoryId={movingStoryId} updatingStoryId={updatingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onUpdateStory={update} onOpenStory={open} /></TabsContent>
             {renderCalendar ? <TabsContent value="calendar">{renderCalendar({ collectionId: filters.collectionId, stories, timezone, currentUserId: userId, workspaceUrl, onOpenStory: open })}</TabsContent> : null}
           </>}

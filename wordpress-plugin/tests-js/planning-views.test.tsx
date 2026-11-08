@@ -56,21 +56,24 @@ describe("StoryBoard", () => {
   ];
   const html = renderToStaticMarkup(<StoryBoard {...props(stories)} />);
 
-  it("lays out the main stages and keeps sidelined ones apart, with a count on each", () => {
-    for (const label of ["Pitch", "Assigned", "Reporting", "Writing", "Editing", "Ready for Review", "Sidelined", "On Hold", "Dropped"]) expect(html).toContain(label);
-    expect(html).toMatch(/aria-label="3 stories"/);
-    expect(html).toMatch(/aria-label="1 story"/);
+  it("lays out the main stages, then a divider and the sidelined ones, with a count on each", () => {
+    for (const label of ["Pitch", "Assigned", "Reporting", "Writing", "Editing", "Ready for Review", "On Hold", "Dropped"]) expect(html).toContain(label);
+    expect(html.indexOf('data-status="ready"')).toBeLessThan(html.indexOf("data-board-divider"));
+    expect(html.indexOf("data-board-divider")).toBeLessThan(html.indexOf('data-status="on-hold"'));
+    expect(html).toContain(">3 stories<");
+    expect(html).toContain(">1 story<");
   });
 
-  it("keeps empty columns quiet: tiny copy, not an Empty state", () => {
-    expect(html).toContain("No stories");
+  it("folds empty stages into quiet rails that stay drop targets, not an Empty state", () => {
+    expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*aria-label="Assigned, 0 stories. Expand"[^>]*data-status="assigned"/);
     expect(html).not.toContain('data-slot="empty"');
   });
 
   it("answers who, when and what needs attention, and nothing more", () => {
     expect(html).toContain("Canteen could return");
     expect(html).toContain("Caroline Elrod, Gibson Bell");
-    expect(html).toContain("Due tomorrow");
+    expect(html).toContain("Tomorrow");
+    expect(html).not.toContain("Due ");
     expect(html).toContain("2 tasks");
     expect(html).toContain("Photo assigned");
     expect(html).toContain("1d overdue");
