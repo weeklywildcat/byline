@@ -53,8 +53,8 @@ function SettingSelect<T extends string>({ label, options, value, onChange, disa
   );
 }
 
-function DetailsHeading({ children }: { children: string }) {
-  return <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{children}</h3>;
+function DetailsHeading({ id, children }: { id?: string; children: string }) {
+  return <h3 id={id} className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{children}</h3>;
 }
 
 /**
@@ -211,8 +211,8 @@ export function StoryHeader({ context, onOpenHistory }: { context: StoryScreenCo
           </SheetHeader>
           <div className="flex flex-col gap-6 p-4">
             <section className="grid gap-3" aria-labelledby="details-status">
-              <DetailsHeading>Story</DetailsHeading>
-              <dl id="details-status" className="grid gap-2 text-sm">
+              <DetailsHeading id="details-status">Story</DetailsHeading>
+              <dl className="grid gap-2 text-sm">
                 <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Workflow</dt><dd><Badge variant="secondary">{hasPublishedDoc ? "Published" : (planned?.workflow.label ?? "Pitch")}</Badge></dd></div>
                 <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Publication</dt><dd><Badge variant={hasPublishedDoc ? "default" : "outline"}>{publication}</Badge></dd></div>
                 {planned?.editor ? <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Editor</dt><dd>{planned.editor.name}</dd></div> : null}
@@ -224,8 +224,8 @@ export function StoryHeader({ context, onOpenHistory }: { context: StoryScreenCo
             <Separator />
 
             <section className="grid gap-3" aria-labelledby="details-appearance">
-              <DetailsHeading>Appearance</DetailsHeading>
-              <FieldGroup id="details-appearance" className="gap-1">
+              <DetailsHeading id="details-appearance">Appearance</DetailsHeading>
+              <FieldGroup className="gap-1">
                 <Property label="Presentation">
                   <SettingSelect
                     label="Presentation"
@@ -247,14 +247,16 @@ export function StoryHeader({ context, onOpenHistory }: { context: StoryScreenCo
                   </Property>
                 ) : null}
               </FieldGroup>
-              <dl className="text-sm"><PresentationStatus resolution={presentationResolution} /></dl>
+              {presentationResolution.custom || presentationResolution.requested !== presentationResolution.resolved
+                ? <dl className="text-sm"><PresentationStatus resolution={presentationResolution} /></dl>
+                : null}
             </section>
 
             <Separator />
 
             <section className="grid gap-3" aria-labelledby="details-publishing">
-              <DetailsHeading>Publishing</DetailsHeading>
-              <div id="details-publishing" className="grid gap-3">
+              <DetailsHeading id="details-publishing">Publishing</DetailsHeading>
+              <div className="grid gap-3">
                 {scheduledLabel ? <p className="text-sm"><span className="text-muted-foreground">Scheduled for </span>{scheduledLabel} <span className="text-muted-foreground">({context.timeZone})</span></p> : null}
                 <StoryURL context={context} compact />
                 {canEditPublication ? (
@@ -268,8 +270,8 @@ export function StoryHeader({ context, onOpenHistory }: { context: StoryScreenCo
             {(context.role !== "staff" || liveState !== "off") ? <>
               <Separator />
               <section className="grid gap-3" aria-labelledby="details-live">
-                <DetailsHeading>Live coverage</DetailsHeading>
-                <div id="details-live" className="grid gap-2">
+                <DetailsHeading id="details-live">Live coverage</DetailsHeading>
+                <div className="grid gap-2">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium">{liveState === "live" ? "Live now" : liveState === "ended" ? "Coverage ended" : "Off"}</p>
