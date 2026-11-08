@@ -193,8 +193,8 @@ describe("the Collection workspace composition", () => {
   const narrow = { storyWorkspace: false, calendarWorkspace: false, mediaWorkspace: false, collectionWorkspace: false };
 
   it("is only an open Collection on a wide enough screen; the list keeps the ordinary sidebar", () => {
-    expect(shellLayoutFor("/admin/collections", "/admin", wide)).toEqual({ storyId: null, calendar: false, media: false, collections: true, collectionId: null, composition: "default" });
-    expect(shellLayoutFor("/admin/collections", "/admin", wide, "collection=12&tab=stories")).toEqual({ storyId: null, calendar: false, media: false, collections: true, collectionId: 12, composition: "collection-workspace" });
+    expect(shellLayoutFor("/admin/collections", "/admin", wide)).toEqual({ storyId: null, stories: false, calendar: false, media: false, collections: true, collectionId: null, composition: "default" });
+    expect(shellLayoutFor("/admin/collections", "/admin", wide, "collection=12&tab=stories")).toEqual({ storyId: null, stories: false, calendar: false, media: false, collections: true, collectionId: 12, composition: "collection-workspace" });
     expect(shellLayoutFor("/admin/collections", "/admin", narrow, "collection=12").composition).toBe("default");
     expect(shellLayoutFor("/admin/collections", "/admin", wide, "collection=nope").collectionId).toBeNull();
     // A `collection` query anywhere else is not a Collection.

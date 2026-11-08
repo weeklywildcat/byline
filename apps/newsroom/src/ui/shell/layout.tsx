@@ -3,8 +3,8 @@
 import { useIsMobile, useMediaQuery } from "@byline/newsroom-ui/lib/hooks";
 import { usePathname, useSearchParams } from "next/navigation";
 import { createContext, use, useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { isCalendarPath, isCollectionsPath, isMediaPath, storyIdFromPath } from "../../domain/navigation";
-import { CALENDAR_WORKSPACE_QUERY, COLLECTION_WORKSPACE_QUERY, MEDIA_WORKSPACE_QUERY, SIDEBAR_WIDTH, STORY_WORKSPACE_QUERY } from "./shell-config";
+import { isCalendarPath, isCollectionsPath, isMediaPath, isStoriesPath, storyIdFromPath } from "../../domain/navigation";
+import { CALENDAR_WORKSPACE_QUERY, COLLECTION_WORKSPACE_QUERY, MEDIA_WORKSPACE_QUERY, SIDEBAR_WIDTH, STORIES_WORKSPACE_QUERY, STORY_WORKSPACE_QUERY } from "./shell-config";
 
 /**
  * Which composition the one sidebar has on this screen:
@@ -15,6 +15,9 @@ import { CALENDAR_WORKSPACE_QUERY, COLLECTION_WORKSPACE_QUERY, MEDIA_WORKSPACE_Q
  *   plus the Calendar's controls (sidebar-12's mini calendar and categories).
  * - `media-workspace`: Media on a wide enough screen: the icon rail plus the
  *   Media navigator (Library scopes, Work views, sidebar-11's folder tree).
+ * - `stories-workspace`: Stories on a wide enough screen: the icon rail plus
+ *   the Stories pane (Views, Stages and Writers, each with a count). It is
+ *   this one sidebar's composition, never a second column beside it.
  * - `collection-workspace`: an open Collection on a wide enough screen:
  *   sidebar-09's icon rail plus the Collection switcher. The Collections list
  *   itself keeps the ordinary sidebar.
@@ -23,25 +26,26 @@ import { CALENDAR_WORKSPACE_QUERY, COLLECTION_WORKSPACE_QUERY, MEDIA_WORKSPACE_Q
  * temporary sheet. Viewport width is a layout capability, never the reader's
  * expanded/collapsed preference.
  */
-export type ShellComposition = "default" | "story-workspace" | "calendar-workspace" | "media-workspace" | "collection-workspace";
+export type ShellComposition = "default" | "story-workspace" | "calendar-workspace" | "media-workspace" | "stories-workspace" | "collection-workspace";
 
 /**
  * What the address says, apart from width: the story whose screen this is,
- * whether this is the Calendar, Media or Collections, and which Collection
+ * whether this is Stories, the Calendar, Media or Collections, and which Collection
  * is open there (from the query: `?collection=<id>`).
  */
-export type ShellRoute = { storyId: number | null; calendar: boolean; media: boolean; collections: boolean; collectionId: number | null };
+export type ShellRoute = { storyId: number | null; stories: boolean; calendar: boolean; media: boolean; collections: boolean; collectionId: number | null };
 
 export type ShellLayout = ShellRoute & { composition: ShellComposition };
 
 /** Which workspaces the viewport is wide enough for. */
-export type ShellViewport = { storyWorkspace: boolean; calendarWorkspace: boolean; mediaWorkspace?: boolean; collectionWorkspace?: boolean };
+export type ShellViewport = { storyWorkspace: boolean; calendarWorkspace: boolean; mediaWorkspace?: boolean; storiesWorkspace?: boolean; collectionWorkspace?: boolean };
 
 export function shellRouteFor(pathname: string, adminRoute: string, search = ""): ShellRoute {
   const collections = isCollectionsPath(pathname, adminRoute);
   const collection = collections ? Number(new URLSearchParams(search).get("collection")) : NaN;
   return {
     storyId: storyIdFromPath(pathname, adminRoute),
+    stories: isStoriesPath(pathname, adminRoute),
     calendar: isCalendarPath(pathname, adminRoute),
     media: isMediaPath(pathname, adminRoute),
     collections,
@@ -53,6 +57,7 @@ export function shellCompositionFor(route: ShellRoute, viewport: ShellViewport):
   if (route.storyId !== null && viewport.storyWorkspace) return "story-workspace";
   if (route.calendar && viewport.calendarWorkspace) return "calendar-workspace";
   if (route.media && viewport.mediaWorkspace) return "media-workspace";
+  if (route.stories && viewport.storiesWorkspace) return "stories-workspace";
   if (route.collectionId !== null && viewport.collectionWorkspace) return "collection-workspace";
   return "default";
 }
@@ -76,9 +81,9 @@ export function shellSidebarStyle(layout: Pick<ShellLayout, "composition">): CSS
   } as CSSProperties;
 }
 
-const COMPOSITION_WIDTH: Record<ShellComposition, keyof typeof SIDEBAR_WIDTH> = { default: "default", "story-workspace": "storyWorkspace", "calendar-workspace": "calendarWorkspace", "media-workspace": "mediaWorkspace", "collection-workspace": "collectionWorkspace" };
+const COMPOSITION_WIDTH: Record<ShellComposition, keyof typeof SIDEBAR_WIDTH> = { default: "default", "story-workspace": "storyWorkspace", "calendar-workspace": "calendarWorkspace", "media-workspace": "mediaWorkspace", "stories-workspace": "storiesWorkspace", "collection-workspace": "collectionWorkspace" };
 
-const ShellLayoutContext = createContext<ShellLayout>({ storyId: null, calendar: false, media: false, collections: false, collectionId: null, composition: "default" });
+const ShellLayoutContext = createContext<ShellLayout>({ storyId: null, stories: false, calendar: false, media: false, collections: false, collectionId: null, composition: "default" });
 
 export const ShellLayoutProvider = ShellLayoutContext;
 export const useShellLayout = () => use(ShellLayoutContext);
@@ -92,9 +97,10 @@ export function useCurrentShellLayout(adminRoute: string): ShellLayout {
   const storyWorkspace = useMediaQuery(STORY_WORKSPACE_QUERY);
   const calendarWorkspace = useMediaQuery(CALENDAR_WORKSPACE_QUERY);
   const mediaWorkspace = useMediaQuery(MEDIA_WORKSPACE_QUERY);
+  const storiesWorkspace = useMediaQuery(STORIES_WORKSPACE_QUERY);
   const collectionWorkspace = useMediaQuery(COLLECTION_WORKSPACE_QUERY);
-  const { storyId, calendar, media, collections, collectionId, composition } = shellLayoutFor(pathname, adminRoute, { storyWorkspace, calendarWorkspace, mediaWorkspace, collectionWorkspace }, collection ? `collection=${collection}` : "");
-  return useMemo(() => ({ storyId, calendar, media, collections, collectionId, composition }), [storyId, calendar, media, collections, collectionId, composition]);
+  const { storyId, stories, calendar, media, collections, collectionId, composition } = shellLayoutFor(pathname, adminRoute, { storyWorkspace, calendarWorkspace, mediaWorkspace, storiesWorkspace, collectionWorkspace }, collection ? `collection=${collection}` : "");
+  return useMemo(() => ({ storyId, stories, calendar, media, collections, collectionId, composition }), [storyId, stories, calendar, media, collections, collectionId, composition]);
 }
 
 /**

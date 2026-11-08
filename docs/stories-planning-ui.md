@@ -130,6 +130,44 @@ REST routes; the Payload newsroom keeps them in Payload Preferences
 stored views are normalized on read (`normalizeSavedPlanningViews`: at most 25,
 names up to 80 characters, sanitized filters and sort).
 
+### Stories workspace (Payload)
+
+On a wide enough screen the Payload newsroom's Stories screen is a
+`stories-workspace` composition of the one sidebar: the global icon rail plus
+a Stories pane (300px in all) listing **Views**, **Stages** and **Writers**,
+each with a live count. This is not the removed `StoryViewsRail`: that was a
+second permanent column beside the app sidebar; here the one sidebar changes
+what it holds (as it does for the Calendar, Media and an open story), so the
+chrome stays one column.
+
+- **One store.** `stories-workspace.ts` holds the filters, sort and selected
+  saved view, plus the stories the screen last loaded. The Stories screen, the
+  pane and the narrow-screen sheet all read and write it; the shell owns it
+  (`StoriesWorkspaceShell`), so it outlives each visit. `StoriesPage` takes an
+  optional `workspace`; without one (WordPress) it creates its own, so both
+  hosts run the same code. An address that names filters (the older sidebar
+  shortcuts, shared links) starts that view; one that names none keeps the
+  reader's.
+- **Counts.** The pane counts the active (unpublished, not dropped) stories in
+  scope with `storyViewCount`, over the unfiltered stories the screen also
+  reads while a workspace is present, so a count never shrinks to the current
+  filter. Views holding nothing are hidden, except All stories, My stories and
+  the active view; Overdue is coloured only when it holds stories; empty
+  stages stay listed because the pipeline's order means something.
+- **Due this week** is a built-in view whose dates (today through Sunday) are
+  resolved in the newsroom timezone when it is applied or matched
+  (`builtInViewFilters`), never stored as fixed strings.
+- **Breakpoint.** `STORIES_WORKSPACE_MIN_WIDTH` is 1340: the default Lanes
+  board (three expanded lanes at 240px, five 40px rails, the divider and
+  gaps = 985px) needs a 348px frame beyond the 300px sidebar and 48px of
+  padding, and at 1280 it scrolled sideways. Below it the ordinary 256px
+  sidebar stays, the views picker remains, and a **Views** button opens the
+  same `StoriesNavigator` in a left sheet that closes on a choice. The picker
+  hides only while the pane is actually showing (not when the sidebar is
+  collapsed to its rail).
+- Saved-view dialogs stay with the screen (`useStoryViews`); the pane calls
+  them through the workspace.
+
 ### Board: Pragmatic drag and drop
 
 **Layouts.** The board has three layouts, chosen from the **Board layout**
