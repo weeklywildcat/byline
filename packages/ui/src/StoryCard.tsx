@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { ImageCropShape } from "@byline/core";
 import { StoryImage } from "./StoryImage";
+import { StoryVideoBadge } from "./article-view";
 import { storyImageAttributes, type StoryView } from "./story-view";
 
 // Extracted verbatim from apps/web/components/HomepageStory.tsx. The class names
@@ -98,6 +99,8 @@ export function StoryCard({
 
       <div className="home-story-body">
         <div className="home-story-meta">
+          {story.live ? <span className="home-story-live">Live</span> : null}
+          {story.video ? <StoryVideoBadge className="home-story-video" /> : null}
           {showCategory && story.category ? (
             <a className="home-story-category" href={story.category.href}>
               {story.category.name}

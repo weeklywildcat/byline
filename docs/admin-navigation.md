@@ -5,7 +5,7 @@ WordPress owns the sidebar. Byline does not add a second global navigation shell
 ## Destinations
 
 - Posts, Media, Pages, and Users remain native WordPress screens.
-- Byline is the first sidebar menu, above Dashboard. It contains Home, Today, Stories, Calendar, Media Desk, Coverage, Performance, Content Health, Feedback, and Settings, in that order. The Planning destinations retain their existing `admin.php?page=byline-planning&tab=...` URLs; Planning no longer has a separate top-level menu.
+- Byline is the first sidebar menu, above Dashboard. It contains Home, Today, Stories, Calendar, Media Desk, Collections, Content Health, Feedback, and Settings, in that order. The Planning destinations retain their existing `admin.php?page=byline-planning&tab=...` URLs; Planning no longer has a separate top-level menu. Old Coverage bookmarks resolve to Collections; Performance bookmarks resolve to Today. Public `/coverage/` routes are unchanged.
 - Polls is a native post type with its own capability family and menu.
 - School Events retains its native post type, editor, and menu when enabled.
 - Newsletters provides Issues when the module is enabled and the user has publishing or editorial permissions. Provider settings live in Byline Settings.
@@ -44,3 +44,20 @@ Former Byline-owned Polls links redirect to the native Polls list. Former Teams 
 `parent_file` and `submenu_file` keep Byline open and highlight the selected Planning destination or Settings entry, including direct story-workspace links. Unrelated WordPress screens, including those passing `null`, retain their existing values. Feature flags gate optional workflows without changing stored content or legacy identifiers.
 
 Run `npm run test:php` for callback registration, navigation, capability, archive-conversion, and WordPress smoke regressions.
+
+
+## Payload migration: People and My profile
+
+The private Payload newsroom has its own single Nova shell; the WordPress
+navigation above remains unchanged while WordPress is production authority.
+People follows Collections in the editor/administrator primary navigation at
+`/admin/people`; ordinary Staff accounts do not see or list that directory.
+Selected People use `?person=<id>` with URL-based list views and Back/Forward.
+People always keeps the normal global sidebar.
+
+Enabled accounts with a valid linked Person get **My profile** at
+`/admin/profile` in NavUser. It is the same Person editor with actual self-service
+capabilities. Unlinked accounts get an explanation on direct visits. Raw People
+and sign-in Accounts stay administrator-only System administration fallbacks.
+New person belongs on People, never global Create. Account menu navigation and
+sign-out respect the shell's unsaved-work guard. See [People workspace](people-workspace.md).

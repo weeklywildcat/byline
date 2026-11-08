@@ -458,7 +458,13 @@ function byline_editorial_preview_story_card(WP_Post $post): array
         'category' => $category instanceof WP_Term ? byline_editorial_preview_plain_text((string) ($category->name ?? '')) : null,
         'date' => $date,
         'dateLabel' => byline_editorial_preview_date_label($date),
-    ];
+    ] + byline_editorial_preview_video_field(function_exists('byline_story_video_badge') ? byline_story_video_badge((int) $post->ID) : null);
+}
+
+/** Only a video story carries `video`, so an article's preview model is unchanged. */
+function byline_editorial_preview_video_field(?array $video): array
+{
+    return $video === null ? [] : ['video' => $video];
 }
 
 /** @return array<int,WP_Term> */
@@ -764,7 +770,9 @@ function byline_editorial_preview_presentation(int $post_id): array
         ];
     }
 
-    $updated = $has_update && $public_corrections === [];
+    $live = byline_editorial_preview_live($post_id);
+    $updated = !$live && $has_update && $public_corrections === [];
+    $live_updated = $live && $live['updatedAt'] !== $live['startedAt'] ? $live : null;
     $related = byline_editorial_preview_related_stories($post, $all_posts);
     $related_ids = [];
     foreach ($related as $story) {
@@ -803,12 +811,14 @@ function byline_editorial_preview_presentation(int $post_id): array
         'athleteMeta' => byline_editorial_preview_athlete_meta($post),
         'storyPresentation' => $story_presentation['presentation'],
         'immersiveAlignment' => $story_presentation['immersiveAlignment'],
+    ] + byline_editorial_preview_video_field(function_exists('byline_story_video_article_view') ? byline_story_video_article_view($post_id, $title) : null) + [
+        'reportingNote' => function_exists('byline_story_reporting_note') ? byline_story_reporting_note_paragraphs(byline_story_reporting_note($post_id)) : [],
         'contributors' => $contributor_views,
         'fallbackByline' => $short_name . ' Staff',
         'publishedAt' => $published_at,
         'publishedLabel' => byline_editorial_preview_date_label($published_at),
-        'modifiedAt' => $updated ? $modified_at : null,
-        'modifiedLabel' => $updated ? byline_editorial_preview_date_label($modified_at) : null,
+        'modifiedAt' => $live_updated ? $live_updated['updatedAt'] : ($updated ? $modified_at : null),
+        'modifiedLabel' => $live_updated ? $live_updated['updatedLabel'] : ($updated ? byline_editorial_preview_date_label($modified_at) : null),
         'readingTime' => byline_editorial_preview_reading_time($content, $excerpt),
         'image' => byline_editorial_preview_image(absint(get_post_thumbnail_id($post_id))),
         'corrections' => $corrections,
@@ -817,12 +827,74 @@ function byline_editorial_preview_presentation(int $post_id): array
             'modifiedAt' => $modified_at,
             'label' => 'This story was updated after initial publication on ' . byline_editorial_preview_date_label($modified_at) . '.',
         ] : null,
+        'live' => $live,
         'relatedStories' => $related,
         'moreByAuthorStories' => $more_by_author,
         'publication' => [
             'shortName' => $short_name,
             'contactHref' => byline_editorial_preview_public_url((string) ($publication['urls']['contact'] ?? '/contact/'), '/contact/'),
         ],
+    ];
+}
+
+/** "Nov 2, 4:12 PM" in the publication timezone, matching the public site. */
+function byline_editorial_preview_live_time(string $iso): string
+{
+    $timestamp = strtotime($iso);
+    if (!$timestamp) return $iso;
+    $publication = function_exists('byline_get_publication_config') ? byline_get_publication_config() : [];
+    $timezone = new DateTimeZone((string) ($publication['timezone'] ?? 'UTC'));
+    return function_exists('wp_date') ? (string) wp_date('M j, g:i A', $timestamp, $timezone) : gmdate('M j, g:i A', $timestamp);
+}
+
+/**
+ * The live section as apps/web/lib/live-coverage.ts builds it. Unlike the public
+ * projection it also works for a draft story, so editors can preview it.
+ *
+ * @return array<string,mixed>|null
+ */
+function byline_editorial_preview_live(int $post_id): ?array
+{
+    if (!function_exists('byline_live_story_state')) return null;
+    $state = byline_live_story_state($post_id);
+    if ($state['status'] === '') return null;
+    $records = byline_list_live_updates($post_id);
+    $views = array_map(static function (array $update): array {
+        $image = byline_live_update_image((int) $update['imageId']);
+        $profile = byline_live_author_profile((int) $update['authorId']);
+        $photo = $profile['authorPhoto'] ?? null;
+        return [
+            'id' => (int) $update['id'],
+            'title' => (string) $update['title'],
+            'html' => (string) $update['html'],
+            'date' => (string) $update['date'],
+            'dateLabel' => byline_editorial_preview_live_time((string) $update['date']),
+            'author' => (string) $update['author'],
+            'authorHref' => isset($profile['authorSlug']) && function_exists('get_author_posts_url') ? (string) get_author_posts_url((int) $update['authorId'], $profile['authorSlug']) : null,
+            'authorRole' => $profile['authorRole'] ?? null,
+            'authorPhoto' => $photo ? ['src' => $photo['url'], 'width' => $photo['width'], 'height' => $photo['height']] : null,
+            'pinned' => (bool) $update['pinned'],
+            'image' => $image ? ['src' => $image['url'], 'alt' => $image['alt'], 'width' => $image['width'], 'height' => $image['height']] + (isset($image['credit']) ? ['credit' => $image['credit']] : []) : null,
+        ];
+    }, $records);
+    $pinned = null;
+    foreach ($views as $view) if ($view['pinned']) { $pinned = $view; break; }
+    $updates = $views;
+    $dates = array_merge([$state['startedAt'], $state['endedAt']], array_column($records, 'modified'));
+    $dates = array_values(array_filter($dates));
+    sort($dates);
+    $updated_at = end($dates) ?: '';
+    return [
+        'postId' => $post_id,
+        'status' => $state['status'],
+        'startedAt' => $state['startedAt'],
+        'endedAt' => $state['endedAt'] ?: null,
+        'endedLabel' => $state['endedAt'] ? byline_editorial_preview_live_time($state['endedAt']) : null,
+        'updatedAt' => $updated_at,
+        'updatedLabel' => byline_editorial_preview_live_time($updated_at),
+        'keyPoints' => $pinned,
+        'updates' => $updates,
+        'feedUrl' => '/_byline/live/' . $post_id . '.json',
     ];
 }
 

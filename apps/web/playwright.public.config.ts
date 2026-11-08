@@ -13,9 +13,10 @@ export default defineConfig({
   reporter: process.env.CI ? [["github"], ["list"]] : [["list"]],
   use: {
     baseURL,
+    channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: process.env.BYLINE_BROWSER_VIDEO === "0" ? "off" : "retain-on-failure",
     ...devices["Desktop Chrome"]
   },
   webServer: {

@@ -9,8 +9,10 @@
 
 $route = file_get_contents(__DIR__ . '/../includes/editorial/quick-view.php');
 $planning = file_get_contents(__DIR__ . '/../src/planning/PlanningApp.tsx');
-$peek = file_get_contents(__DIR__ . '/../src/story/StoryPeek.tsx');
-$api = file_get_contents(__DIR__ . '/../src/planning/planning-api.ts');
+// Story Peek and the Planning API moved to the shared newsroom screens package.
+$screens = __DIR__ . '/../../packages/newsroom-screens/src';
+$peek = file_get_contents($screens . '/story/StoryPeek.tsx');
+$api = file_get_contents($screens . '/planning/planning-api.ts');
 
 $assert = static function ($condition, string $message): void {
     if (!$condition) {

@@ -419,7 +419,6 @@ require __DIR__ . '/../includes/editorial/feedback.php';
 foreach (['byline_coverage_register_post_type', 'byline_correction_register_post_type', 'byline_feedback_register_post_type'] as $registration) {
     $registration();
 }
-byline_coverage_register_meta();
 byline_correction_register_meta();
 byline_feedback_register_meta();
 byline_feedback_register_privacy_hooks();
@@ -451,27 +450,7 @@ $draft = wp_insert_post([
     'post_name' => 'private-pitch',
 ]);
 
-$coverage_result = byline_create_coverage([
-    'title' => '<b>Election</b> coverage',
-    'description' => 'A public guide.',
-    'overview' => '<p>Safe overview <script>alert(1)</script></p>',
-    'startAt' => '2026-09-01',
-    'endAt' => '2026-09-10',
-    'status' => 'active',
-    'public' => true,
-    'staffIds' => [9],
-    'storyIds' => [$story, $draft],
-]);
-byline_slice_assert(!is_wp_error($coverage_result), 'Coverage could not be created.');
-$coverage_id = (int) $coverage_result['id'];
-$public_coverage = byline_get_public_coverage($coverage_id);
-byline_slice_assert(is_array($public_coverage), 'Public coverage projection was unavailable.');
-byline_slice_assert(count($public_coverage['stories']) === 1 && $public_coverage['stories'][0]['title'] === 'Public Story', 'Unpublished story data leaked into public Coverage.');
-byline_slice_assert(!array_key_exists('staffIds', $public_coverage) && !array_key_exists('storyIds', $public_coverage), 'Private Coverage fields leaked into public projection.');
-byline_slice_assert(strpos($public_coverage['overview'], '<script') === false, 'Coverage overview retained executable markup.');
-byline_slice_assert(in_array($coverage_id, byline_get_story_coverage_ids($story), true), 'Story-facing Coverage index was not maintained.');
-byline_update_coverage($coverage_id, ['storyIds' => [$story]]);
-byline_slice_assert(!in_array($coverage_id, byline_get_story_coverage_ids($draft), true), 'Removing a Coverage story left a stale relationship.');
+// Collection public presentation and legacy migration are covered in coverage-hardening-regression.php.
 
 $correction = byline_create_correction($story, ['type' => 'clarification', 'text' => '<strong>We clarified</strong> the vote count.'], 7);
 byline_slice_assert(!is_wp_error($correction), 'Structured correction could not be created.');
@@ -499,6 +478,28 @@ foreach ($readiness_with_image['checks'] as $check) {
 }
 byline_slice_assert($readiness_with_image['errors'] === 0, 'A good story failed readiness.');
 byline_slice_assert($readiness_by_id['featured-image-alt']['status'] === 'pass' && $readiness_by_id['image-credit']['status'] === 'pass', 'Image alt or credit readiness did not detect existing metadata.');
+
+// A video story needs its YouTube video before publishing; an article is never asked for one.
+require_once __DIR__ . '/../includes/content/story-video.php';
+$readiness_check = static function (int $post_id, string $id): ?array {
+    foreach (byline_get_story_readiness($post_id)['checks'] as $check) {
+        if ($check['id'] === $id) {
+            return $check;
+        }
+    }
+    return null;
+};
+byline_slice_assert($readiness_check($story, 'primary-video') === null, 'An article was asked for a video.');
+update_post_meta($story, BYLINE_STORY_FORMAT_META, 'video');
+$video_check = $readiness_check($story, 'primary-video');
+byline_slice_assert($video_check !== null && $video_check['status'] === 'error' && $video_check['explanation'] === 'Add a YouTube video before publishing.', 'A video story without a video was not blocked.');
+byline_slice_assert(byline_get_story_readiness($story)['canPublish'] === false, 'A video story without a video could publish.');
+update_post_meta($story, BYLINE_STORY_VIDEO_URL_META, byline_story_video_url_value('https://example.test/not-youtube'));
+byline_slice_assert($readiness_check($story, 'primary-video')['status'] === 'error', 'A non-YouTube link satisfied the video check.');
+update_post_meta($story, BYLINE_STORY_VIDEO_URL_META, byline_story_video_url_value('https://youtu.be/dQw4w9WgXcQ?si=share'));
+byline_slice_assert($readiness_check($story, 'primary-video')['status'] === 'pass' && byline_get_story_readiness($story)['errors'] === 0, 'A video story with a YouTube video was not ready.');
+update_post_meta($story, BYLINE_STORY_FORMAT_META, 'standard');
+update_post_meta($story, BYLINE_STORY_VIDEO_URL_META, '');
 
 $honeypot = byline_submit_reader_feedback(['storyId' => $story, 'message' => 'Bot', 'honeypot' => 'filled'], '203.0.113.10', 'https://news.example.test');
 byline_slice_assert(is_wp_error($honeypot) && $honeypot->get_error_code() === 'byline_feedback_spam', 'Feedback honeypot was accepted.');

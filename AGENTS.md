@@ -20,10 +20,11 @@ Do not spend time rediscovering architecture that is documented here or in the r
 
 - `apps/web/` — static Astro public site and public article/page rendering.
 - `wordpress-plugin/` — WordPress control plane, editor UI, REST/meta, publishing tools and authenticated newsroom features.
-  - Home, Planning (Stories, Calendar, Media Desk…) and the Story Workspace are private React 19 roots on one shadcn base-nova system (`src/admin-ui`, shared story code in `src/story`) with exactly one `StoryPeek`. See `docs/stories-planning-ui.md`; do not reintroduce WordPress React/components or a second quick view on those screens.
+  - Home, Planning (Stories, Calendar, Media Desk…) and the Story Workspace are private React 19 roots on one shadcn base-nova system (`packages/newsroom-ui`, shared with the Payload newsroom; shared story code in `src/story`) with exactly one `StoryPeek`. See `docs/stories-planning-ui.md`; do not reintroduce WordPress React/components or a second quick view on those screens.
+- `apps/newsroom/` — the private Payload 3 + PostgreSQL newsroom replacing WordPress as the control plane (strangler migration; WordPress stays authoritative until cutover). Read `apps/newsroom/AGENTS.md` and `docs/payload-migration.md` first.
 - `apps/discord-bot/` — optional separately deployed Discord service.
 - `packages/` — shared contracts, UI, design primitives and Weekly Wildcat theme packages.
-- `apps/web/story-presentations/` — per-story presentation resolver and developer-defined bespoke article layouts. Read its scoped `AGENTS.md` before custom story work.
+- `packages/story-presentations/` — `StoryArticle`, the one presentation resolver, the registry and developer-defined bespoke article layouts, shared by `apps/web` and `apps/newsroom`. Read its scoped `AGENTS.md` before custom story work.
 - `schemas/` — shared machine-readable contracts.
 - `scripts/` — repo/build/release verification and maintenance scripts.
 - `docs/` — architecture and operational documentation.
@@ -38,7 +39,8 @@ Prefer these boundaries:
 - Reusable article/UI behavior used in more than one surface → `packages/ui/` or the appropriate shared package.
 - WordPress editor controls, metadata, REST fields, publishing workflows → `wordpress-plugin/`.
 - Shared content/data contracts → the appropriate package/schema, then adapt both consumers.
-- Story-specific art direction → `apps/web/story-presentations/`, not global CSS or WordPress layout controls.
+- Story-specific art direction, scrollytelling and flagship visual stories → `packages/story-presentations/`, not global CSS, WordPress layout controls or new Gutenberg blocks.
+- Charts and maps from Datawrapper, Flourish, Google Maps or OpenStreetMap → the Chart / Map block; a small self-contained interactive → the Interactive block (sandboxed; see `docs/newsroom-blocks.md`).
 - Build/release invariants → `scripts/`, CI, and the relevant docs.
 
 Avoid parallel implementations. If web and WordPress need the same concept, define the shared contract once and adapt at the edges.
@@ -124,6 +126,20 @@ npm run test:e2e:wp71
 
 Do not start a local WordPress environment for pure unit/model changes.
 
+### Newsroom (Payload) change
+
+```sh
+npm run typecheck:newsroom
+npm run test:newsroom
+```
+
+Access control, hooks or schema changes also need the PostgreSQL integration suite and, for schema changes, a committed migration:
+
+```sh
+npm run test:newsroom:integration   # BYLINE_TEST_DATABASE_URL, default postgres://localhost:5432/byline_newsroom_test
+npm run migrate:create --workspace @byline/newsroom -- <name>
+```
+
 ### Discord-only change
 
 ```sh
@@ -206,7 +222,8 @@ The public site is a static Astro application.
 - Sports records are a fixed archive in native Pages. Do not reintroduce custom games, teams, roster editors, imports, or live sports schedules. Preserve legacy source records and public read aliases; see `docs/sports-archive.md`.
 - Keep homepage composition in code and use only the Weekly Wildcat theme. Do not reintroduce a layout designer, generic themes or design publishing.
 - Public polls remain stored only in WordPress. Keep cookie names `ww_voter_id` and `ww_poll_voted_<pollId>`, their signature format and voter-key derivation. Do not recreate Cloudflare D1 poll storage; see `docs/polls.md`.
-- Story presentation: WordPress owns editorial content. The built-in author control stays intentionally small (Standard/Immersive plus headline position). Bespoke layouts belong in `apps/web/story-presentations/`; read its scoped guide.
+- Story presentation: WordPress owns editorial content. The built-in author control stays intentionally small (Standard/Immersive plus headline position). Bespoke layouts belong in `packages/story-presentations/`; read its scoped guide. The only exception to WordPress-owned body text is a flagship visual story, opted into with `defineVisualStory` (`--visual`). Do not reintroduce a WordPress scrollytelling block.
+- Interactive block: uploaded HTML runs only as the `srcdoc` of an iframe sandboxed with `allow-scripts` and nothing else; never add `allow-same-origin`, render it into the page DOM, or let roles without `unfiltered_html` add or change one.
 - Do not expose deploy hooks, Discord/OAuth secrets, admin nonces, or protected configuration through public endpoints, snapshots or static manifests.
 
 ## Generated and large files

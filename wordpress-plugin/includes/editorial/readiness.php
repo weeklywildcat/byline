@@ -286,6 +286,13 @@ function byline_story_readiness_checks(int $post_id, array $context = []): array
         ? byline_readiness_check('section', 'Section', 'pass', 'A section/category is selected.')
         : byline_readiness_check('section', 'Section', 'warning', 'Choose a section so readers can find this story.', $fix_url);
 
+    // Only a video story needs a video; an ordinary article is never asked for one.
+    if (function_exists('byline_story_format') && byline_story_format($post_id) === 'video') {
+        $checks[] = byline_youtube_video_id(byline_story_video_url($post_id)) !== null
+            ? byline_readiness_check('primary-video', 'YouTube video', 'pass', 'The video story has a YouTube video.')
+            : byline_readiness_check('primary-video', 'YouTube video', 'error', 'Add a YouTube video before publishing.', $fix_url);
+    }
+
     $featured_id = byline_readiness_featured_image_id($post_id);
     $checks[] = $featured_id > 0
         ? byline_readiness_check('featured-image', 'Featured image', 'pass', 'A featured image is selected.')

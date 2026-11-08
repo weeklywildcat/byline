@@ -2,9 +2,15 @@
   "name": "@byline/content",
   "version": "0.1.0",
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./redirect-path": "./src/redirect-path.ts",
+    "./story": "./src/story/index.ts"
+  },
   "dependencies": {
-    "@byline/design": "0.1.0",
-    "@byline/ui": "0.1.0"
-  }
+    "@byline/article-body": "0.1.0",
+    "@byline/core": "0.1.0",
+    "zod": "4.6.7"
+  },
+  "description": "Provider-neutral Byline content: the canonical public Story and article presentation model, the rules that build it, snapshot/index/routing helpers. No React, CMS or Astro dependencies."
 }

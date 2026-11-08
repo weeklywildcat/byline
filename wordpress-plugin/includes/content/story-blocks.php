@@ -205,7 +205,6 @@ function byline_story_responsive_images(string $html, string $sizes): string
 const BYLINE_STORY_IMAGE_SIZES = [
     'annotated-image' => '(max-width: 911px) calc(100vw - 32px), (max-width: 1072px) calc((100vw - 32px) * 0.62), 655px',
     'before-after' => '(max-width: 1072px) calc(100vw - 32px), 1040px',
-    'scrolly-step' => '(max-width: 899px) calc(100vw - 32px), (max-width: 1072px) calc((100vw - 32px) * 0.6), 624px',
     'visualization' => '(max-width: 1072px) calc(100vw - 32px), 1040px',
 ];
 
@@ -262,17 +261,6 @@ function byline_story_render_before_after(string $content, array $block = []): s
     }
     $content = byline_story_responsive_images(byline_story_drop_empty_caption(byline_story_strip_legacy_credit_lines($content)), BYLINE_STORY_IMAGE_SIZES['before-after']);
     return byline_story_add_credit_lines($content, [$line]);
-}
-
-function byline_story_render_scrolly_step(string $content, array $block = []): string
-{
-    $ids = byline_story_image_ids($content);
-    if (!$ids) {
-        return $content;
-    }
-    $content = byline_story_responsive_images(byline_story_drop_empty_caption(byline_story_strip_legacy_credit_lines($content)), BYLINE_STORY_IMAGE_SIZES['scrolly-step']);
-    $credit = byline_story_credit($ids[0]);
-    return (string) preg_replace_callback('#<figure\b[^>]*\bbyline-scrolly-media\b[^>]*>.*?</figure>#is', static fn(array $match): string => byline_story_add_credit_lines($match[0], [$credit !== '' ? 'Photo: ' . $credit : '']), $content, 1);
 }
 
 function byline_story_render_timeline(string $content, array $block = []): string
@@ -335,7 +323,6 @@ function byline_story_render_visualization(string $content, array $block = []): 
 foreach ([
     'annotated-image' => 'byline_story_render_annotated_image',
     'before-after' => 'byline_story_render_before_after',
-    'scrolly-step' => 'byline_story_render_scrolly_step',
     'timeline' => 'byline_story_render_timeline',
     'visualization' => 'byline_story_render_visualization',
 ] as $byline_story_slug => $byline_story_callback) {

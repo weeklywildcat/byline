@@ -1,8 +1,8 @@
 import { Button, CheckboxControl, Notice, SelectControl, Spinner, TextControl } from "@wordpress/components";
 import { useEffect, useMemo, useState } from "@wordpress/element";
 import { arrowDown, arrowUp, trash } from "@wordpress/icons";
-import type { ContributorEntry, GuestInput } from "./editorial-model";
-import { contributorKey, describeEditorialError, moveContributor, orderContributors, projectContributorPublic } from "./editorial-model";
+import type { ContributorEntry, GuestInput } from "@byline/newsroom-screens/editorial/editorial-model";
+import { contributorKey, describeEditorialError, moveContributor, orderContributors, projectContributorPublic } from "@byline/newsroom-screens/editorial/editorial-model";
 import "./editorial.css";
 
 export type ContributorsPanelProps = {
@@ -127,7 +127,7 @@ export function ContributorsPanel({
       {actionError ? <Notice status="error" isDismissible={false}>{actionError}</Notice> : null}
 
       <p className="byline-editorial-muted">
-        Keep the primary WordPress author first. Guest contributors can be ordered alongside users; private account details stay private.
+        Removing the primary writer makes the first remaining WordPress writer the post author. With only guests or no writers, the WordPress owner stays internal.
       </p>
 
       {canEdit ? (

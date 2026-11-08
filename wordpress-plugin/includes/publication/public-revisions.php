@@ -40,12 +40,13 @@ add_action('shutdown', 'byline_flush_public_mutations', PHP_INT_MAX);
 add_filter('wp_insert_post_data', static function ($data, $postarr): array {
     $old = !empty($postarr['ID']) ? get_post((int) $postarr['ID']) : null;
     if (byline_snapshot_public_type((string) ($data['post_type'] ?? '')) && (($data['post_status'] ?? '') === 'publish' || ($old instanceof WP_Post && $old->post_status === 'publish'))) byline_public_mutation('public-content');
+    if ($old instanceof WP_Post && $old->post_type === 'byline_collection' && $old->post_status !== ($data['post_status'] ?? '') && !empty(byline_collection_public_settings((int) $old->ID)['publicEnabled'])) byline_public_mutation('public-coverage');
     return $data;
 }, 20, 2);
 
 function byline_snapshot_public_type(string $type): bool
 {
-    return in_array($type, ['post', 'page', 'byline_guest', 'byline_coverage', 'byline_correction', 'ww_school_event'], true);
+    return in_array($type, ['post', 'page', 'byline_guest', 'byline_coverage', 'byline_correction', 'byline_live_update', 'ww_school_event'], true);
 }
 
 function byline_revision_on_status($new_status, $old_status, $post): void
@@ -59,14 +60,18 @@ add_action('transition_post_status', 'byline_revision_on_status', 20, 3);
 function byline_snapshot_attachment_is_used(int $id): bool
 {
     global $wpdb;
+    foreach (get_posts(['post_type' => 'byline_collection', 'post_status' => 'private', 'numberposts' => -1, 'fields' => 'ids', 'meta_key' => '_byline_collection_public']) as $collection) {
+        $presentation = get_post_meta($collection, '_byline_collection_public', true);
+        if (is_array($presentation) && !empty($presentation['publicEnabled']) && (int) ($presentation['artworkAttachmentId'] ?? 0) === $id) return true;
+    }
     $url = wp_get_attachment_url($id);
     if ($url && strpos(wp_json_encode(byline_get_publication_config()), (string) $url) !== false) return true;
     $like_id = 'wp-image-' . $id . '([^0-9]|$)';
     $like_json = '"(id|mediaId|imageId)"[[:space:]]*:[[:space:]]*' . $id . '([^0-9]|$)';
     $like_url = $url ? '%' . $wpdb->esc_like((string) $url) . '%' : '%__byline_no_attachment_source__%';
-    $public_types = ['post', 'page', 'byline_coverage', 'byline_guest'];
+    $public_types = ['post', 'page', 'byline_coverage', 'byline_guest', 'byline_live_update'];
     $types = "'" . implode("','", $public_types) . "'";
-    $used = $wpdb->get_var($wpdb->prepare("SELECT p.ID FROM {$wpdb->posts} p LEFT JOIN {$wpdb->postmeta} m ON m.post_id = p.ID WHERE p.post_status = 'publish' AND p.post_type IN ($types) AND ((m.meta_key IN ('_thumbnail_id','_byline_guest_image_id') AND m.meta_value = %s) OR p.post_content REGEXP %s OR p.post_content REGEXP %s OR p.post_content LIKE %s) LIMIT 1", (string) $id, $like_id, $like_json, $like_url));
+    $used = $wpdb->get_var($wpdb->prepare("SELECT p.ID FROM {$wpdb->posts} p LEFT JOIN {$wpdb->postmeta} m ON m.post_id = p.ID WHERE p.post_status = 'publish' AND p.post_type IN ($types) AND ((m.meta_key IN ('_thumbnail_id','_byline_guest_image_id','_byline_live_update_image_id') AND m.meta_value = %s) OR p.post_content REGEXP %s OR p.post_content REGEXP %s OR p.post_content LIKE %s) LIMIT 1", (string) $id, $like_id, $like_json, $like_url));
     if ($used) return true;
     return (bool) $wpdb->get_var($wpdb->prepare("SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = '_ww_author_photo_id' AND meta_value = %s LIMIT 1", (string) $id));
 }
@@ -74,6 +79,7 @@ function byline_snapshot_attachment_is_used(int $id): bool
 function byline_revision_on_delete(int $id): void
 {
     $post = get_post($id);
+    if ($post instanceof WP_Post && $post->post_type === 'byline_collection' && !empty(byline_collection_public_settings($id)['publicEnabled'])) byline_public_mutation('public-coverage');
     if ($post instanceof WP_Post && (($post->post_status === 'publish' && byline_snapshot_public_type($post->post_type)) || ($post->post_type === 'attachment' && byline_snapshot_attachment_is_used($id)))) byline_public_mutation('public-delete');
 }
 add_action('before_delete_post', 'byline_revision_on_delete');
@@ -89,15 +95,21 @@ function byline_revision_on_post_meta($meta_id, $id, $key, $value = null): void
             || strpos($key, '_ww_image_') === 0 || strpos($key, '_byline_image_') === 0) byline_public_mutation('public-media');
         return;
     }
+    if ($post->post_type === 'byline_collection') {
+        $presentation = get_post_meta((int) $id, '_byline_collection_public', true);
+        if ($key === '_byline_collection_public' || (!empty($presentation['publicEnabled']) && in_array($key, ['_byline_collection_start', '_byline_collection_end', '_byline_collection_status'], true))) byline_public_mutation('public-coverage');
+        return;
+    }
     if ($post->post_status !== 'publish' || !byline_snapshot_public_type($post->post_type)) return;
     // Only metadata read by public serializers/rendered blocks. Private notes,
     // visual requests, workflow status and editorial tasks are excluded.
     if (in_array($key, [
-        '_thumbnail_id', 'weekly_wildcat_primary_game_id', '_byline_story_contributors', '_byline_story_coverage_ids', '_byline_sports_archive_key', '_byline_sports_archive_routes',
+        '_thumbnail_id', 'weekly_wildcat_primary_game_id', 'byline_reporting_note', 'byline_story_format', 'byline_primary_video_url', '_byline_primary_video', '_byline_story_contributors', '_byline_story_coverage_ids', '_byline_sports_archive_key', '_byline_sports_archive_routes',
         '_byline_page_eyebrow', '_byline_page_indexing',
         '_byline_guest_display_name', '_byline_guest_role', '_byline_guest_bio', '_byline_guest_image_id', '_byline_guest_public_links', '_byline_guest_profile_page',
         '_byline_coverage_description', '_byline_coverage_overview', '_byline_coverage_start_at', '_byline_coverage_end_at', '_byline_coverage_status', '_byline_coverage_public_enabled', '_byline_coverage_story_ids',
         '_byline_correction_type', '_byline_correction_text', '_byline_correction_recorded_at',
+        '_byline_live_status', '_byline_live_started_at', '_byline_live_ended_at', '_byline_live_update_pinned', '_byline_live_update_image_id',
         '_ww_event_start_datetime', '_ww_event_end_datetime', '_ww_event_all_day', '_ww_event_location', '_ww_event_description', '_ww_event_external_url', '_ww_event_status', '_ww_event_type'
     ], true)) byline_public_mutation('public-metadata');
 }

@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readSource } from "./source-files";
 
 const src = path.resolve(__dirname, "../src");
-const read = (relative: string) => readFileSync(path.join(src, relative), "utf8");
+const read = readSource;
 
 describe("direct task editing", () => {
   it("uses one shared quick-field component for assignee, priority and due date", () => {

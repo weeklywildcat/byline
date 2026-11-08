@@ -26,7 +26,7 @@ function story_assert(bool $condition, string $message): void
 
 require __DIR__ . '/../includes/content/story-blocks.php';
 
-foreach (['annotated-image', 'before-after', 'scrolly-step', 'timeline', 'visualization'] as $slug) {
+foreach (['annotated-image', 'before-after', 'timeline', 'visualization'] as $slug) {
     story_assert(isset($story_filters['render_block_byline/' . $slug]), "The $slug block must be filtered at render time.");
 }
 

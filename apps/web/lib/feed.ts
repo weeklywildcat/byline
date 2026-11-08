@@ -1,4 +1,6 @@
-import { getPrimaryVisibleCategory } from "@/lib/content";
+import { articleBodyPlainText } from "@byline/content/story";
+import { nativeStory } from "./native-snapshot";
+import { filterGeneralEditorialPosts, getPrimaryVisibleCategory } from "@/lib/content";
 import { getWordPressInstant } from "@/lib/dates";
 import { stripHtml } from "@/lib/format";
 import { escapeXml } from "@/lib/news-sitemap";
@@ -17,7 +19,8 @@ type FeedOptions = {
 };
 
 function summarize(post: WordPressPost) {
-  const text = stripHtml(post.excerpt.rendered || post.content.rendered);
+  const native = nativeStory(post.id);
+  const text = stripHtml(post.excerpt.rendered) || (native ? articleBodyPlainText(native.body) : stripHtml(post.content.rendered));
 
   if (text.length <= FEED_SUMMARY_LENGTH) return text;
 
@@ -30,9 +33,10 @@ function summarize(post: WordPressPost) {
  * publicly visible stories, newest first.
  */
 export function buildRssFeed(posts: WordPressPost[], { siteUrl, title, description, language, timeZone }: FeedOptions) {
-  const items = posts
+  const items = filterGeneralEditorialPosts(posts)
     .flatMap((post) => {
-      const published = getWordPressInstant({ gmt: post.date_gmt, local: post.date }, timeZone);
+      const native = nativeStory(post.id);
+      const published = native ? new Date(native.publishedAt) : getWordPressInstant({ gmt: post.date_gmt, local: post.date }, timeZone);
       if (!published || !getPostRouteParts(post)) return [];
 
       const link = `${siteUrl}${getPostHref(post)}`;

@@ -1,98 +1,39 @@
 import type { ReactNode } from "react";
+import type { PublicArticleBody } from "@byline/article-body";
+import { ArticleLiveBadge, ArticleLiveCoverage, type ArticleLiveView } from "./article-live";
+import { StructuredArticleBody, type ArticleRenderHost } from "./article-body/render";
+
+import type {
+  ArticleImageView,
+  ArticleLinkView,
+  ArticleContributorView,
+  ArticleCorrectionView,
+  ArticleTopicView,
+  ArticleStoryCardView,
+  StoryVideoBadgeView,
+  ArticleVideoView,
+  ArticleSeriesPartView,
+  ArticleSeriesView,
+  ArticlePresentation
+} from "@byline/content/story";
 
 /**
- * The article boundary between a content adapter and a renderer.
- *
- * An adapter may be WordPress, a fixture, or Studio data, but the renderer only
- * receives this normalized presentation model. HTML fields are expected to be
- * sanitized/rendered by the adapter before they cross this boundary.
+ * The article model is plain data owned by `@byline/content/story` (no React);
+ * re-exported here so renderer imports keep working.
  */
-export type ArticleImageView = {
-  src: string;
-  srcSet?: string;
-  sizes?: string;
-  alt: string;
-  width?: number | null;
-  height?: number | null;
-  captionHtml?: string;
-  fallbackCaption?: string;
-  credit?: string;
-  /** CSS object-position from the editor's focal point; absent when centred or already cropped. */
-  objectPosition?: string;
-};
-
-export type ArticleLinkView = {
-  label: string;
-  href: string;
-};
-
-export type ArticleContributorView = {
-  id: string;
-  name: string;
-  /** Empty for one-off guests, who are credited without a profile page. */
-  href: string;
-  role: string;
-  bio: string;
-  photo?: ArticleImageView | null;
-  contactHref?: string;
-  coverage?: ArticleLinkView[];
-};
-
-export type ArticleCorrectionView = {
-  id: string;
-  label: string;
-  date?: string | null;
-  dateLabel?: string | null;
-  text: string;
-};
-
-export type ArticleTopicView = {
-  id: string;
-  name: string;
-};
-
-export type ArticleStoryCardView = {
-  id: number | string;
-  title: string;
-  href: string;
-  excerptHtml?: string;
-  image?: ArticleImageView | null;
-  category?: string | null;
-  date?: string | null;
-  dateLabel?: string | null;
-};
-
-export type ArticlePresentation = {
-  id: number | string;
-  url: string;
-  title: string;
-  titleHtml: string;
-  excerptHtml: string;
-  contentHtml: string;
-  category?: ArticleLinkView | null;
-  athleteMeta?: string[];
-  /** The author's choice in WordPress. Absent means standard. */
-  storyPresentation?: "standard" | "immersive";
-  /** Headline position for an immersive story. Absent means bottom-left. */
-  immersiveAlignment?: "bottom-left" | "center";
-  contributors: ArticleContributorView[];
-  fallbackByline: string;
-  publishedAt: string;
-  publishedLabel: string;
-  modifiedAt?: string | null;
-  modifiedLabel?: string | null;
-  readingTime: string;
-  image?: ArticleImageView | null;
-  corrections: ArticleCorrectionView[];
-  topics: ArticleTopicView[];
-  update?: { modifiedAt: string; label: string } | null;
-  relatedStories: ArticleStoryCardView[];
-  moreByAuthorStories: ArticleStoryCardView[];
-  publication: {
-    shortName: string;
-    contactHref: string;
-  };
-};
+export type {
+  ArticleImageView,
+  ArticleLinkView,
+  ArticleContributorView,
+  ArticleCorrectionView,
+  ArticleTopicView,
+  ArticleStoryCardView,
+  StoryVideoBadgeView,
+  ArticleVideoView,
+  ArticleSeriesPartView,
+  ArticleSeriesView,
+  ArticlePresentation
+} from "@byline/content/story";
 
 export type ArticleViewSlots = {
   metadata?: ReactNode;
@@ -101,6 +42,8 @@ export type ArticleViewSlots = {
   poll?: ReactNode;
   feedback?: ReactNode;
   newsletter?: ReactNode;
+  /** What a structured body may borrow from its host: date formatting, repository interactives' static fallbacks. */
+  bodyHost?: ArticleRenderHost;
 };
 
 export type ArticleViewProps = {
@@ -187,12 +130,18 @@ function ArticleImage({ image, priority = false, showCaption = true }: { image: 
   );
 }
 
+/** "Video" on a video story's card, in the typography of the kicker it sits in. */
+export function StoryVideoBadge({ className }: { className?: string }): ReactNode {
+  return <span className={joinClassNames("story-video-badge", className)}>Video</span>;
+}
+
 function StoryCard({ story }: { story: ArticleStoryCardView }): ReactNode {
   return (
     <article className={`story-teaser story-teaser-compact${story.image ? "" : " story-teaser-no-image"}`}>
       {story.image ? <ArticleImage image={story.image} showCaption={false} /> : null}
       <div className="story-teaser-body">
         <div className="article-byline">
+          {story.video ? <StoryVideoBadge /> : null}
           {story.category ? <span>{story.category}</span> : null}
           {story.dateLabel ? <time dateTime={story.date ?? undefined}>{story.dateLabel}</time> : null}
         </div>
@@ -223,8 +172,35 @@ export function ArticleShell({ as: Tag = "main", className, children }: { as?: "
 
 /** The section label ("News", "Sports") linking to the category archive. */
 export function ArticleCategory({ presentation, className }: ArticlePieceProps): ReactNode {
-  if (!presentation.category) return null;
-  return <a className={joinClassNames("article-section-label", className)} href={presentation.category.href}>{presentation.category.label}</a>;
+  const badge = <ArticleLiveBadge live={presentation.live} />;
+  if (!presentation.category) return badge;
+  return (
+    <>
+      {badge}
+      <a className={joinClassNames("article-section-label", className)} href={presentation.category.href}>{presentation.category.label}</a>
+    </>
+  );
+}
+
+/** Live updates under the story body; nothing for an ordinary story. */
+export function ArticleLive({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  return <ArticleLiveCoverage live={presentation.live} />;
+}
+
+function seriesPartLabel(series: ArticleSeriesView, number: number) {
+  return series.complete ? `Part ${number} of ${series.total}` : `Part ${number}`;
+}
+
+/** The series kicker beside the section label: "The Lunch Squeeze · Part 2 of 4". */
+export function ArticleSeriesLabel({ presentation, className }: ArticlePieceProps): ReactNode {
+  const series = presentation.series;
+  if (!series) return null;
+  return (
+    <p className={joinClassNames("article-series-label", className)}>
+      <a href={series.href}>{series.title}</a>
+      {series.format === "series" ? <span>{seriesPartLabel(series, series.position)}</span> : null}
+    </p>
+  );
 }
 
 /** The article's only `<h1>`. */
@@ -281,14 +257,59 @@ export function ArticleFeaturedImage({ presentation, priority = true, showCaptio
   return presentation.image?.src ? <ArticleImage image={presentation.image} priority={priority} showCaption={showCaption} /> : null;
 }
 
-/** The WordPress body (with the legacy primary-game card ahead of it), or the empty state. */
-export function ArticleBody({ presentation, primaryGame }: { presentation: ArticlePresentation; primaryGame?: ReactNode }): ReactNode {
+/**
+ * A video story's player: a real YouTube iframe in the rendered HTML, 16:9 and
+ * full article width, with nothing to click before it exists.
+ */
+export function ArticlePrimaryVideo({ presentation, className }: ArticlePieceProps): ReactNode {
+  const video = presentation.video;
+  if (!video) return null;
+  return (
+    <figure className={joinClassNames("article-primary-video", className)} data-video-id={video.videoId}>
+      <div className="article-primary-video-frame">
+        <iframe
+          src={video.embedUrl}
+          title={video.title}
+          width={1280}
+          height={720}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+        />
+      </div>
+    </figure>
+  );
+}
+
+/** The "Video" kicker on a video story. */
+export function ArticleVideoLabel({ presentation, className }: ArticlePieceProps): ReactNode {
+  if (!presentation.video) return null;
+  return <span className={joinClassNames("article-video-label", className)}>Video</span>;
+}
+
+/** Whether a body has anything to print. */
+export function hasArticleBody(body: PublicArticleBody): boolean {
+  return body.format === "legacy-html" ? body.html.trim().length > 0 : body.nodes.length > 0;
+}
+
+/**
+ * The story body (with the legacy primary-game card ahead of it), or the empty
+ * state. An imported body prints its sanitized HTML; a semantic `byline-v1`
+ * body renders through the canonical structured renderer. Both sit in the one
+ * `.article-body` element, so article CSS and enhancements see one shape.
+ */
+export function ArticleBody({ presentation, primaryGame, host }: { presentation: ArticlePresentation; primaryGame?: ReactNode; host?: ArticleRenderHost }): ReactNode {
+  const { body } = presentation;
   return (
     <>
       {primaryGame}
-      {presentation.contentHtml ? (
-        <div className="article-body" dangerouslySetInnerHTML={{ __html: presentation.contentHtml }} />
-      ) : <p className="empty-state">No article body has been published yet.</p>}
+      {!hasArticleBody(body) ? (
+        <p className="empty-state">No article body has been published yet.</p>
+      ) : body.format === "legacy-html" ? (
+        <div className="article-body" dangerouslySetInnerHTML={{ __html: body.html }} />
+      ) : (
+        <StructuredArticleBody body={body} host={host} />
+      )}
     </>
   );
 }
@@ -330,14 +351,118 @@ export function ArticleUpdateNotice({ presentation }: { presentation: ArticlePre
   );
 }
 
+/** "How we reported this": the author's note on how the story was reported. */
+export function ArticleReportingNote({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  const paragraphs = presentation.reportingNote ?? [];
+  if (paragraphs.length === 0) return null;
+  return (
+    <aside className="article-reporting-note" aria-labelledby="article-reporting-note-heading">
+      <h2 id="article-reporting-note-heading">How we reported this</h2>
+      {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+    </aside>
+  );
+}
+
+function SeriesNextLink({ series, part }: { series: ArticleSeriesView; part: ArticleSeriesPartView }): ReactNode {
+  return (
+    <a className={joinClassNames("article-series-next", !part.image && "article-series-next-no-image")} href={part.href}>
+      {part.image ? (
+        <img
+          src={part.image.src}
+          srcSet={part.image.srcSet}
+          sizes={part.image.sizes}
+          alt=""
+          width={part.image.width ?? undefined}
+          height={part.image.height ?? undefined}
+          loading="lazy"
+          decoding="async"
+          style={part.image.objectPosition ? { objectPosition: part.image.objectPosition } : undefined}
+        />
+      ) : null}
+      <span className="article-series-next-text">
+        <span className="article-series-next-label">Next: {seriesPartLabel(series, part.number)}</span>
+        <span className="article-series-next-title">{part.title}</span>
+      </span>
+      <span className="article-series-next-arrow" aria-hidden="true">→</span>
+    </a>
+  );
+}
+
 /**
- * Everything that follows the body inside `<article>`: corrections, the poll,
- * topics, the update notice, reader feedback and the newsletter signup.
+ * Where this story sits in its series (every part, this one marked, and the
+ * next part to read) or, for ongoing coverage, the latest other stories.
+ */
+export function ArticleSeriesGuide({ presentation }: { presentation: ArticlePresentation }): ReactNode {
+  const series = presentation.series;
+  if (!series) return null;
+
+  if (series.format === "coverage") {
+    if (series.parts.length === 0) return null;
+    return (
+      <aside className="article-series-guide article-series-guide-coverage" aria-labelledby="article-series-guide-heading">
+        <header className="article-series-guide-header">
+          <p className="article-series-guide-kicker">More coverage</p>
+          <h2 id="article-series-guide-heading"><a href={series.href}>{series.title}</a></h2>
+        </header>
+        <ul className="article-series-parts">
+          {series.parts.map((part) => (
+            <li key={part.id}>
+              <a href={part.href}>
+                <span className="article-series-part-title">{part.title}</span>
+                {part.dateLabel ? <time dateTime={part.date ?? undefined}>{part.dateLabel}</time> : null}
+              </a>
+            </li>
+          ))}
+        </ul>
+        <a className="article-series-all" href={series.href}>All {series.total} stories <span aria-hidden="true">→</span></a>
+      </aside>
+    );
+  }
+
+  const count = series.complete ? `${series.total} parts` : `${series.total} ${series.total === 1 ? "part" : "parts"} so far`;
+  return (
+    <nav className="article-series-guide" aria-labelledby="article-series-guide-heading">
+      <header className="article-series-guide-header">
+        <p className="article-series-guide-kicker">A series · {count}</p>
+        <h2 id="article-series-guide-heading"><a href={series.href}>{series.title}</a></h2>
+        {series.description ? <p className="article-series-guide-description">{series.description}</p> : null}
+      </header>
+      {series.next ? <SeriesNextLink series={series} part={series.next} /> : (
+        <p className="article-series-end">{series.complete ? "You’ve reached the end of the series." : "This is the latest part. More is on the way."}</p>
+      )}
+      <ol className="article-series-parts">
+        {series.parts.map((part) => (
+          <li key={part.id} className={part.current ? "article-series-part-current" : undefined}>
+            {part.current ? (
+              <span aria-current="page">
+                <span className="article-series-part-number">Part {part.number}</span>
+                <span className="article-series-part-title">{part.title}</span>
+                <span className="article-series-part-status">You’re reading</span>
+              </span>
+            ) : (
+              <a href={part.href}>
+                <span className="article-series-part-number">Part {part.number}</span>
+                <span className="article-series-part-title">{part.title}</span>
+              </a>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+/**
+ * Everything that follows the body inside `<article>`: how it was reported,
+ * corrections, the series guide, the poll, topics, the update notice, reader
+ * feedback and the newsletter signup.
  */
 export function ArticleStoryFooter({ presentation, slots = {} }: { presentation: ArticlePresentation; slots?: ArticleViewSlots }): ReactNode {
   return (
     <>
+      <ArticleReportingNote presentation={presentation} />
       <ArticleCorrections presentation={presentation} />
+      <ArticleSeriesGuide presentation={presentation} />
       {slots.poll}
       <ArticleTopics presentation={presentation} />
       <ArticleUpdateNotice presentation={presentation} />
@@ -454,20 +579,27 @@ export function ArticleStandardEnding({ presentation }: { presentation: ArticleP
 }
 
 export function ArticleView({ presentation, slots = {}, className = "" }: ArticleViewProps): ReactNode {
+  // A video story is a watch page: its player takes the lead image's place, above the body.
+  const video = Boolean(presentation.video);
   return (
     <ArticleShell className={className}>
       {slots.metadata}
-      <article className="article-story">
+      <article className="article-story" data-story-format={video ? "video" : undefined}>
         <header className="article-header">
-          <ArticleCategory presentation={presentation} />
+          <div className="article-kicker">
+            <ArticleVideoLabel presentation={presentation} />
+            <ArticleCategory presentation={presentation} />
+            <ArticleSeriesLabel presentation={presentation} />
+          </div>
           <ArticleHeadline presentation={presentation} />
           <ArticleExcerpt presentation={presentation} />
           <ArticleAthleteMeta presentation={presentation} />
           <ArticleMeta presentation={presentation} shareActions={slots.shareActions} />
-          <ArticleFeaturedImage presentation={presentation} />
+          {video ? <ArticlePrimaryVideo presentation={presentation} /> : <ArticleFeaturedImage presentation={presentation} />}
         </header>
 
-        <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} />
+        <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} host={slots.bodyHost} />
+        <ArticleLive presentation={presentation} />
         <ArticleStoryFooter presentation={presentation} slots={slots} />
       </article>
 

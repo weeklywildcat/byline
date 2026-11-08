@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { createPlanningFetchers, type PlanningRequestOptions } from "../src/planning/planning-api";
-import { describeMediaDeskError, MEDIA_FEATURED_IN_USE_CODE } from "../src/planning/media-desk-errors";
+import type { PlanningRequestOptions } from "@byline/newsroom-screens/planning/planning-api";
+import { createPlanningFetchers } from "../src/planning/planning-rest";
+import { describeMediaDeskError, MEDIA_FEATURED_IN_USE_CODE } from "@byline/newsroom-screens/media/media-desk-errors";
 import {
   mergeMediaAttachmentIds,
   normalizeMediaAttachmentIds,
   removeMediaAttachmentId
-} from "../src/planning/planning-model";
+} from "@byline/newsroom-screens/planning/planning-model";
 
 describe("Media Desk attachment workflow", () => {
   it("normalizes link and unlink selections without duplicating Media IDs", () => {

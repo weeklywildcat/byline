@@ -1,19 +1,24 @@
-# Internal Collections
+# Collections
+
+This document covers WordPress persistence and compatibility. The shared
+workspace also runs in Payload; see [Collections workspace](collections-workspace.md)
+for that implementation, its current capabilities and the migration boundary.
 
 Collections live inside Planning (`admin.php?page=byline-planning&tab=collections`).
 A workspace uses `&collection=<id>`; an interview can be opened directly with
-`&interview=<id>`. They coordinate independent stories; membership never moves,
+`&interview=<id>`. Collections are the single newsroom grouping primitive. They coordinate independent stories; membership never moves,
 copies, or changes publication of a story.
 
 ## Workflow and presentation
 
 The compact list supports search, status, lead/member, archived state, and sorting.
 Overflow and context menus consume the same action definition. Creation requires
-only a name and immediately opens the workspace. Duplication creates a Planning
-shell with the existing brief, dates, type, and lead; it deliberately does not
+name and type and immediately opens the workspace. WordPress duplication creates
+a Planning shell with the existing brief, dates, type, and lead; it deliberately does not
 copy reporting, people assignments, tasks, files, or story relationships.
 
-The workspace has Overview, Stories, Interviews, Tasks, Resources, and Activity.
+The shared workspace has Overview, Stories, Reporting, Tasks, Resources and Public,
+plus Activity when the host provides it (WordPress does; Payload does not).
 The brief includes lightweight key-angle notes. Large screens place editable
 properties beside the reporting; narrower screens put properties after the brief.
 There is no Collection calendar tab: View in Calendar scopes the existing calendar.
@@ -105,18 +110,81 @@ API pagination, and appointment adapters. `tests/e2e/collections.spec.ts` covers
 the reporting workflow and a realistic five-story/four-person/six-interview desk
 at 1440, 1280, 1024, 768, and 390px, including popup geometry and document overflow.
 
-## Deferred public phase
+## Optional public coverage
 
-No public Collection routes, templates, article blocks, or build manifests are
-added. A later phase can use these existing identities and relationships for:
+The Public section holds the optional public presentation. A Collection remains
+newsroom-only until a user with both Collection edit access and `publish_posts`
+explicitly saves its public presentation. Public controls are separate from
+reporting coordination on the overview.
 
-- Public Collection landing pages
-- “Part of our coverage” article treatment
-- Related coverage
-- Public ordering and featured stories
-- Homepage promotion
-- Collection SEO
+The private `_byline_collection_public` meta object contains `publicEnabled`,
+`publicFormat`, `publicTitle`, `publicSlug`, `publicDescription`, `publicOverview`,
+`artworkAttachmentId`, `featuredStoryId` and `storyOrder`. Public wording is
+independent from the internal name/brief. Dates reuse the Collection's existing
+start/end fields. Story order references existing relationship edges; it cannot
+add a second membership. The featured story appears first, followed by the
+selected order and any newly linked stories. Unpublished, private and
+password-protected stories are always excluded. Public settings writes validate
+membership, unique URL slugs, image attachments and publication capability.
+Disabling public coverage preserves its settings for later use.
 
-A newsroom-wide Sources directory UI is also deferred. Public presentation fields
-can be added to the existing Collection identity without migrating membership or
-reporting relationships.
+Reader-facing `/coverage/` and `/coverage/:slug/` routes, SEO, breadcrumbs,
+CollectionPage structured data and static path generation keep their existing
+contracts. `/byline/v1/coverage` and `/byline/v1/coverage/:slug` are allow-list
+adapters backed by public Collections. The build snapshot uses the same
+projection. It never serializes Collection brief, people, interviews, tasks,
+resources, notes, contacts or activity. Public settings/dates/status, membership
+changes and artwork edits invalidate the existing public build revision.
+
+### Series
+
+`publicFormat` is `coverage` (the default, including for settings saved before
+it existed) or `series`. Format changes presentation only: membership and order
+are the same edges and `storyOrder` as above, and the public projection and build
+snapshot carry it as `format`.
+
+- **Series** numbers the published stories in the public order (the lead story
+  is Part 1). Unpublished stories are skipped, so numbering never has gaps. While
+  the Collection is Planning or Active the site says "Part 2" and "3 parts so
+  far"; once it is Wrapping up or Archived it says "Part 2 of 3". Each part shows
+  a kicker linking to the series, and after the story a guide with the next part
+  and every part, the current one marked. Other parts are not repeated as
+  related stories. The series page leads with "Start with Part 1".
+- **Coverage** shows the kicker and, after the story, up to four other stories
+  from the coverage, newest first. The coverage page leads with its first story.
+
+A story in several public Collections reads as part of the first series, else
+the first coverage. Article routes depend on their series in the incremental
+build cache; coverage routes depend on their stories' cards.
+
+## How we reported this
+
+Separately from Collections, a story can carry a short reader-facing
+`byline_reporting_note` (plain text, blank lines between paragraphs, trimmed to
+1,500 characters) from the block editor's **How we reported this** panel. It is
+published in the `byline` post settings and the build snapshot as
+`reportingNote`, renders after the body (and in Preview as Byline), and prints
+nothing when empty.
+
+## Legacy Coverage migration
+
+The upgrade coordinator runs `byline_migrate_coverage_to_collections` after
+installing the existing relationship table. Each legacy `byline_coverage` gets
+its own private Collection; no matching by title or overlapping stories occurs.
+The insertion includes `_byline_collection_legacy_coverage_id`, allowing retries
+to resume an interrupted migration without duplicating the Collection. A lock
+prevents concurrent migrations. Source records remain intact for recovery.
+
+The migration carries title, exact public slug, dek/overview, dates, artwork,
+public visibility, staff memberships and story relationships. Status maps
+Upcoming → Planning, Active → Active, Past → Wrapping up, Archived → Archived.
+Legacy source status remains recoverable. Public URLs resolve under the same
+slugs without redirects. Legacy creation/editing routes and screens are retired;
+only storage readers, the hidden legacy CPT and migration compatibility remain.
+
+Old `tab=coverage` and `#/planning/coverage` bookmarks lead to Collections.
+An old `coverage=<id>` query preserves the migrated Collection when possible.
+Planning Performance bookmarks lead to Today. Analytics provider settings and
+its protected metrics/test endpoints remain available in Settings.
+
+A newsroom-wide Sources directory UI remains deferred.

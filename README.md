@@ -85,7 +85,9 @@ Start from **Planning → Today** for personal tasks, upcoming commitments and
 story context. [Byline Home](docs/byline-home.md) documents Story Peek, search,
 quick draft creation and its isolated shadcn Nova/React 19 implementation.
 [Stories and Planning](docs/stories-planning-ui.md) (Board, List, Calendar, Media Desk,
-Coverage) use the same system and the same Story Peek.
+Collections) use the same system and the same Story Peek. Collections are private
+reporting workspaces; Coverage/Series is their optional public presentation. See
+[Collections workspace](docs/collections-workspace.md) for the Payload migration.
 The fixed homepage follows automatic selection rules, including the sticky lead.
 Sports management is retired; the plugin converts published game and roster records to fixed archive Pages grouped by sport and season. See [sports archive](docs/sports-archive.md).
 There is no layout editor, manual homepage pinning, or design scheduling.
@@ -144,6 +146,8 @@ and the generated [tool catalog](docs/mcp-tools.md).
 
 ## Architecture and operations
 
+- [Native WordPress content import](docs/wordpress-native-import.md)
+- [Payload newsroom deployment](docs/newsroom-deployment.md)
 - [Architecture](docs/architecture.md)
 - [Astro frontend operations and rollback](docs/migration/astro.md)
 - [Astro migration benchmark](docs/migration/astro-benchmark.md)

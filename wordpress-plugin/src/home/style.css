@@ -3,7 +3,8 @@
  * in the shared admin UI, and layout is Tailwind utilities on the components.
  * Must be named style.css so wp-scripts emits style-home.css.
  */
-@import "../admin-ui/admin-ui.css";
+@import "@byline/newsroom-ui/styles.css";
+@source "../../../packages/newsroom-screens/src"; /* the shared newsroom screens */
 @source "./";
 /*
  * Home renders Story Peek, task rows and the hover card from ../story. Tailwind only

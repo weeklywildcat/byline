@@ -1,17 +1,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
+import { WordPressCollectionLinks } from "../src/collections/WordPressCollections";
 import { describe, expect, it } from "vitest";
-import { StoryCollectionContext } from "../src/collections/StoryCollectionContext";
+import { STORY_COLLECTION_OPTIONS, StoryCollectionContext } from "@byline/newsroom-screens/collections/StoryCollectionContext";
 import {
-  collectionsKey,
+  collectionListKey,
   storyCollectionsKey,
   type CollectionApi,
-} from "../src/collections/collection-api";
+} from "@byline/newsroom-screens/collections/collection-api";
 import type {
   Collection,
   Interview,
   StoryCollections,
-} from "../src/collections/collection-model";
+} from "@byline/newsroom-screens/collections/collection-model";
 
 const collection = {
   id: 1,
@@ -36,15 +37,15 @@ const data: StoryCollections = {
 function render(context: StoryCollections, compact = true) {
   const client = new QueryClient();
   client.setQueryData(storyCollectionsKey(7), context);
-  client.setQueryData(collectionsKey, { collections: [collection] });
+  client.setQueryData(collectionListKey(STORY_COLLECTION_OPTIONS), { collections: [collection] });
   return renderToStaticMarkup(
-    <QueryClientProvider client={client}>
+    <QueryClientProvider client={client}><WordPressCollectionLinks>
       <StoryCollectionContext
         storyId={7}
         api={{} as CollectionApi}
         compact={compact}
       />
-    </QueryClientProvider>,
+    </WordPressCollectionLinks></QueryClientProvider>,
   );
 }
 

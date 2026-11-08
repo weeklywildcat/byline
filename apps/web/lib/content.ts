@@ -1,4 +1,6 @@
+import { nativeStory } from "./native-snapshot";
 import { stripHtml } from "@/lib/format";
+import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
 import { FOCUS_SECTION_SLUGS, PUBLIC_SECTION_SLUGS } from "@/lib/sections";
 import {
   getLegacyCorrectionNotices,
@@ -41,7 +43,9 @@ export function getPrimaryPublicCategory(post: WordPressPost) {
 }
 
 export function getPrimaryVisibleCategory(post: WordPressPost) {
-  return getPostCategories(post).find((category) => !isHiddenCategory(category)) ?? null;
+  const categories = getPostCategories(post);
+  return categories.find((category) => category.slug === BEHIND_THE_SCENES.slug)
+    ?? categories.find((category) => !isHiddenCategory(category)) ?? null;
 }
 
 export function hasPostTag(post: WordPressPost, slug: string) {
@@ -102,6 +106,7 @@ export function getAthleteSportLabel(post: WordPressPost) {
 }
 
 export function isVisibleContentPost(post: WordPressPost) {
+  if (nativeStory(post.id)) return true;
   if (post.status !== "publish") {
     return false;
   }
@@ -116,7 +121,26 @@ export function isVisibleContentPost(post: WordPressPost) {
 }
 
 export function isPublicHomepagePost(post: WordPressPost) {
-  return isVisibleContentPost(post) && getPostCategories(post).some((category) => isHomepageSectionCategory(category));
+  return isGeneralEditorialPost(post) && getPostCategories(post).some((category) => isHomepageSectionCategory(category));
+}
+
+export function isBehindTheScenesPost(post: WordPressPost) {
+  return getPostCategories(post).some((category) => category.slug === BEHIND_THE_SCENES.slug);
+}
+
+// Public BTS articles remain searchable, indexable and listed on author pages.
+// Category membership only changes automatic placement in general news lists.
+export function isGeneralEditorialPost(post: WordPressPost) {
+  return isVisibleContentPost(post) && !isBehindTheScenesPost(post);
+}
+
+export function filterGeneralEditorialPosts(posts: WordPressPost[]) {
+  return posts.filter(isGeneralEditorialPost);
+}
+
+export function getBehindTheScenesPosts(posts: WordPressPost[]) {
+  return posts.filter((post) => isVisibleContentPost(post) && isBehindTheScenesPost(post))
+    .sort((left, right) => right.date.localeCompare(left.date) || right.id - left.id);
 }
 
 export function filterVisibleContentPosts(posts: WordPressPost[]) {

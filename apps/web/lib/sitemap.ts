@@ -1,14 +1,21 @@
+import { nativeStory } from "./native-snapshot";
+import { publicPageHref } from "./native-archive-views";
 import { CODE_ROUTED_PAGE_SLUGS } from "@/lib/code-routes";
+import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
+import { filterGeneralEditorialPosts, getBehindTheScenesPosts } from "@/lib/content";
 import { getWordPressInstant } from "@/lib/dates";
 import { getPostSitemapImages } from "@/lib/sitemap-images";
+import { getVideoStories } from "@/lib/story-video";
 import type { SitemapEntry } from "@/lib/metadata";
 import {
   contributorHasProfilePage,
   getContributorHref,
   getCoverageHref,
+  getCategoryHref,
   getPageIndexing,
   getPostContributors,
   getPostHref,
+  getPostLiveCoverage,
   getPostRouteParts,
   isGuestContributor,
   type WordPressCategory,
@@ -44,7 +51,7 @@ const APPLICATION_PAGES: Array<{ path: string; changeFrequency: SitemapEntry["ch
   { path: "/corrections/", changeFrequency: "weekly", priority: 0.5 },
   { path: "/media-kit/", changeFrequency: "monthly", priority: 0.5 },
   { path: "/open-source/", changeFrequency: "monthly", priority: 0.4 },
-  ...CODE_ROUTED_PAGE_SLUGS.map((slug) => ({ path: `/${slug}/`, changeFrequency: "monthly" as const, priority: 0.5 }))
+  ...CODE_ROUTED_PAGE_SLUGS.filter((slug) => slug !== BEHIND_THE_SCENES.pageSlug).map((slug) => ({ path: `/${slug}/`, changeFrequency: "monthly" as const, priority: 0.5 }))
 ];
 
 function modifiedAt(item: { modified?: string; modified_gmt?: string }, timeZone: string) {
@@ -77,8 +84,17 @@ export function buildSitemapEntries(input: SitemapInput): SitemapEntry[] {
     entries.push(entry);
   };
 
-  const postDates = new Map(posts.map((post) => [post.id, modifiedAt(post, timeZone)]));
+  // A live story's newest update is newer than the post's own modified time.
+  const postDates = new Map(posts.map((post) => {
+    const native = nativeStory(post.id);
+    if (native) return [post.id, latest([new Date(native.modifiedAt), native.live ? new Date(native.live.updatedAt) : undefined])];
+    const live = getPostLiveCoverage(post);
+    const dates = [live?.startedAt, live?.endedAt, ...(live?.updates.map((update) => update.modified) ?? [])]
+      .filter((date): date is string => Boolean(date)).map((date) => new Date(date));
+    return [post.id, latest([modifiedAt(post, timeZone), ...dates])];
+  }));
   const latestModified = latest([...postDates.values()]);
+  const generalPosts = filterGeneralEditorialPosts(posts);
 
   add({ url: url("/"), lastModified: latestModified, changeFrequency: "daily", priority: 1 });
 
@@ -88,15 +104,21 @@ export function buildSitemapEntries(input: SitemapInput): SitemapEntry[] {
     ...input.categories.filter((category) => !input.sectionSlugs.includes(category.slug))
   ];
   for (const category of orderedCategories) {
+    if (category.slug === BEHIND_THE_SCENES.slug) continue;
     if (category.slug === "sports" && !input.features.sports) continue;
-    const categoryPosts = posts.filter((post) => post.categories.includes(category.id));
+    const categoryPosts = generalPosts.filter((post) => post.categories.includes(category.id));
     if (categoryPosts.length === 0) continue;
     add({
-      url: url(`/category/${category.slug}/`),
+      url: url(getCategoryHref(category)),
       lastModified: latest(categoryPosts.map((post) => postDates.get(post.id))),
       changeFrequency: "daily",
       priority: 0.7
     });
+  }
+
+  const behindTheScenesPosts = getBehindTheScenesPosts(posts);
+  if (behindTheScenesPosts.length > 0) {
+    add({ url: url(BEHIND_THE_SCENES.path), lastModified: latest(behindTheScenesPosts.map((post) => postDates.get(post.id))), changeFrequency: "weekly", priority: 0.5 });
   }
 
   for (const page of APPLICATION_PAGES) {
@@ -107,9 +129,16 @@ export function buildSitemapEntries(input: SitemapInput): SitemapEntry[] {
     add({ url: url("/coverage/"), lastModified: latestModified, changeFrequency: "weekly", priority: 0.6 });
   }
 
+  // The video hub is listed once there is a video; with none it is noindex.
+  const videoStories = getVideoStories(generalPosts);
+  if (videoStories.length > 0) {
+    add({ url: url("/watch/"), lastModified: latest(videoStories.map((post) => postDates.get(post.id))), changeFrequency: "daily", priority: 0.6 });
+  }
+
   for (const page of input.pages) {
+    if (page.slug === BEHIND_THE_SCENES.slug || page.slug === BEHIND_THE_SCENES.pageSlug) continue;
     if (getPageIndexing(page) !== "public") continue;
-    add({ url: url(`/${page.slug}/`), lastModified: modifiedAt(page, timeZone), changeFrequency: "monthly", priority: 0.5 });
+    add({ url: url(publicPageHref(page)), lastModified: modifiedAt(page, timeZone), changeFrequency: "monthly", priority: 0.5 });
   }
 
   for (const post of posts) {

@@ -1,5 +1,8 @@
+import { getNativeSnapshot } from "./native-snapshot";
+import { publicPageHref } from "./native-archive-views";
 import { routeCacheDependency } from "./route-cache";
 import {
+  FIXED_PUBLIC_CONTENT_ROUTES,
   archiveRouteDigest,
   articleRouteDigest,
   buildSnapshot,
@@ -11,6 +14,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { optionalBuildData, requireBuildData } from "@/lib/build-data";
 import { isHiddenCategory, isVisibleContentPost } from "@/lib/content";
+import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
 import { type SportsGame, type SportsRoster, type SportsTeamMedia } from "@/lib/headless";
 import { CODE_ROUTED_PAGE_SLUGS, REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { getPublicationConfig } from "@/lib/publication";
@@ -76,24 +80,11 @@ function routeEntries(input: {
 }): RouteManifestEntry[] {
   const archiveHref = getSportsArchiveHref(input.pages);
   const fixed: RouteManifestEntry[] = [
-    { path: "/", kind: "home" },
-    { path: "/staff/", kind: "author" },
+    ...FIXED_PUBLIC_CONTENT_ROUTES,
     { path: "/authors/", kind: "redirect", redirectTo: "/staff/", delivery: "edge" },
-    { path: "/corrections/", kind: "other" },
-    { path: "/coverage/", kind: "coverage" },
-    ...CODE_ROUTED_PAGE_SLUGS.map((slug): RouteManifestEntry => ({ path: `/${slug}/`, kind: "page" })),
-    { path: "/media-kit/", kind: "page" },
-    { path: "/open-source/", kind: "page" },
-    { path: "/intranet/", kind: "page" },
-    { path: "/search/", kind: "search" },
     { path: "/sports/", kind: "redirect", redirectTo: archiveHref, delivery: "edge" },
     { path: "/sports/schedule/", kind: "redirect", redirectTo: archiveHref, delivery: "edge" },
-    { path: "/stories/", kind: "other" },
     ...Object.entries(REDIRECTED_PAGE_SLUGS).map(([slug, target]): RouteManifestEntry => ({ path: `/${slug}/`, kind: "redirect", redirectTo: target })),
-    { path: "/feed.xml", kind: "feed" },
-    { path: "/news-sitemap.xml", kind: "feed" },
-    { path: "/sitemap.xml", kind: "sitemap" },
-    { path: "/robots.txt", kind: "robots" },
     { path: "/404.html", kind: "not-found" },
     { path: "/404/", kind: "not-found" }
   ];
@@ -101,10 +92,12 @@ function routeEntries(input: {
     const route = getPostRouteParts(post);
     return route ? [{ path: getPostHref(post), kind: "article" as const, digest: articleRouteDigest(post) }] : [];
   });
-  const pages = input.pages.filter((page) => !CODE_ROUTED_PAGE_SLUGS.includes(page.slug)).map((page) => ({ path: `/${page.slug}/`, kind: "page" as const, digest: archiveRouteDigest(page) }));
+  const pages = input.pages.filter((page) => !CODE_ROUTED_PAGE_SLUGS.includes(page.slug)).map((page) => ({ path: publicPageHref(page), kind: "page" as const, digest: archiveRouteDigest(page) }));
   const categories = input.categories.filter((category) => !isHiddenCategory(category)).map((category) => ({
     path: `/category/${category.slug}/`,
-    kind: "category" as const,
+    ...(category.slug === BEHIND_THE_SCENES.slug
+      ? { kind: "redirect" as const, redirectTo: BEHIND_THE_SCENES.path }
+      : { kind: "category" as const }),
     digest: archiveRouteDigest([category, input.posts.filter((post) => post.categories.includes(category.id)).map((post) => post.id)])
   }));
   const authors = input.contributors.map((contributor) => ({
@@ -116,7 +109,8 @@ function routeEntries(input: {
   const sports: RouteManifestEntry[] = getSportsArchiveRedirects(input.pages)
     .filter(({ path }) => path !== "/sports/" && path !== "/sports/schedule/")
     .map(({ path, target }) => ({ path, kind: "redirect" as const, redirectTo: target, delivery: "edge" as const }));
-  return [...fixed, ...articles, ...pages, ...categories, ...authors, ...coverages, ...sports];
+  const redirects = getNativeSnapshot()?.datasets.redirects.map(({ from, to }): RouteManifestEntry => ({ path: from, redirectTo: to, kind: "redirect", delivery: "edge" })) ?? [];
+  return [...fixed, ...articles, ...pages, ...categories, ...authors, ...coverages, ...sports, ...redirects];
 }
 
 async function loadSnapshot(): Promise<WebBuildSnapshot> {
@@ -168,6 +162,12 @@ async function loadSnapshot(): Promise<WebBuildSnapshot> {
   });
 }
 
+function withNativeRouteDigests(snapshot: WebBuildSnapshot, cacheKeys: Array<{ path: string; key: string }>) {
+  if (!getNativeSnapshot()) return snapshot.routes;
+  const digests = new Map(cacheKeys.map(({ path, key }) => [path, key]));
+  return snapshot.routes.map((route) => route.kind === "article" ? { ...route, digest: digests.get(route.path) ?? route.digest } : route);
+}
+
 export const getBuildSnapshot = memoizeBuildSnapshot(async () => {
   const snapshot = await loadSnapshot();
   const buildDirectory = path.join(process.cwd(), ".byline-build");
@@ -176,12 +176,12 @@ export const getBuildSnapshot = memoizeBuildSnapshot(async () => {
     ...snapshot.posts.filter(isVisibleContentPost).map((post) => ({ path: getPostHref(post), ...routeCacheDependency(snapshot, "article", post.id) })),
     ...snapshot.categories.filter((category) => !isHiddenCategory(category)).map((category) => ({ path: `/category/${category.slug}/`, ...routeCacheDependency(snapshot, "category", category.id) })),
     ...snapshot.contributors.map((person) => ({ path: getContributorHref(person), ...routeCacheDependency(snapshot, "author", contributorIdentity(person)) })),
-    ...snapshot.pages.filter((page) => !CODE_ROUTED_PAGE_SLUGS.includes(page.slug)).map((page) => ({ path: `/${page.slug}/`, ...routeCacheDependency(snapshot, "page", page.slug) })),
+    ...snapshot.pages.filter((page) => !CODE_ROUTED_PAGE_SLUGS.includes(page.slug)).map((page) => ({ path: publicPageHref(page), ...routeCacheDependency(snapshot, "page", page.slug) })),
     ...snapshot.sports.coverages.map((coverage) => ({ path: `/coverage/${coverage.slug}/`, ...routeCacheDependency(snapshot, "coverage", coverage.slug) }))
   ];
   await Promise.all([
     writeFile(path.join(buildDirectory, "route-cache-keys.json"), `${JSON.stringify(cacheKeys, null, 2)}\n`),
-    writeFile(path.join(buildDirectory, "expected-routes.json"), `${JSON.stringify(snapshot.routes, null, 2)}\n`),
+    writeFile(path.join(buildDirectory, "expected-routes.json"), `${JSON.stringify(withNativeRouteDigests(snapshot, cacheKeys), null, 2)}\n`),
     writeFile(path.join(buildDirectory, "snapshot-metrics.json"), `${JSON.stringify(snapshot.metrics, null, 2)}\n`)
   ]);
   return snapshot;

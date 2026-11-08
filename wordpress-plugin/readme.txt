@@ -4,7 +4,7 @@ Tags: newsroom, editorial, journalism, headless, student-journalism
 Requires at least: 6.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.3.62
+Stable tag: 0.3.71
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,42 @@ WordPress publication state, a fixed Weekly Wildcat homepage, sports and events
 modules, native polls, and an optional Discord newsroom integration.
 
 == Changelog ==
+
+= 0.3.71 =
+
+* Import WordPress archive as native Byline content (#235)
+
+= 0.3.70 =
+
+* Unify newsroom access with People (#232)
+
+= 0.3.69 =
+
+* Payload + PostgreSQL newsroom: foundation, Byline UI, Home and Story Workspace (#227)
+
+= 0.3.68 =
+
+* Fix writer deselection and sync the primary WordPress author (#218)
+
+= 0.3.67 =
+
+* Add Off Deadline: stories behind the stories (#228)
+
+= 0.3.66 =
+
+* One Format control, and a Video label that matches the card kicker (#225)
+
+= 0.3.65 =
+
+* First-class video stories for Google video indexing (#224)
+
+= 0.3.64 =
+
+* Add permanent live coverage and newspaper-style updates (#222)
+
+= 0.3.63 =
+
+* Public series from Collections and "How we reported this" (#223)
 
 = 0.3.62 =
 
@@ -548,6 +584,33 @@ makes Studio a real homepage editor.**
   same.
 
 == Upgrade Notice ==
+
+= 0.3.71 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.70 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.69 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.68 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.67 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.66 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.65 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.64 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
+
+= 0.3.63 =
+Maintenance and feature update. Nothing needs reconfiguring after updating.
 
 = 0.3.62 =
 Maintenance and feature update. Nothing needs reconfiguring after updating.

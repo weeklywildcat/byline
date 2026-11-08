@@ -662,3 +662,29 @@
 .byline-editorial-sidebar .byline-story-panel {
   container-type: inline-size;
 }
+
+/* Format panel: a video story's link preview. */
+.byline-story-format {
+  display: grid;
+  gap: 12px;
+}
+
+.byline-story-format-preview {
+  align-items: center;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: inherit;
+  display: flex;
+  gap: 10px;
+  padding: 6px;
+  text-decoration: none;
+}
+
+.byline-story-format-preview img {
+  aspect-ratio: 16 / 9;
+  border-radius: 2px;
+  flex: none;
+  height: auto;
+  object-fit: cover;
+  width: 96px;
+}

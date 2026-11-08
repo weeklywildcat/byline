@@ -3,7 +3,7 @@ const defaultConfig = require('@wordpress/scripts/config/webpack.config');
 const path = require('path');
 const DependencyExtractionWebpackPlugin = require('@wordpress/dependency-extraction-webpack-plugin');
 const homeCss = path.resolve(__dirname, 'src/home/style.css');
-// The Story Workspace shares Home's admin UI (src/admin-ui) and its scoped
+// The Story Workspace shares Home's admin UI (@byline/newsroom-ui) and its scoped
 // Tailwind/PostCSS pipeline. The file is named style.css so wp-scripts emits it
 // as style-story-workspace.css.
 const workspaceCss = path.resolve(__dirname, 'src/workspace/style.css');
@@ -45,7 +45,7 @@ const adminConfig = {
           ...entry,
           options: {
             postcssOptions: {
-              plugins: [require('@tailwindcss/postcss')(), require('postcss-nesting')(), require('./loaders/ui-scope-postcss')],
+              plugins: [require('@tailwindcss/postcss')(), require('postcss-nesting')(), require('@byline/newsroom-ui/postcss-scope')],
             },
           },
         } : entry),
@@ -69,9 +69,8 @@ const adminConfig = {
     'blocks/visualization/index': path.resolve(__dirname, 'src/blocks/visualization/index.tsx'),
     'blocks/annotated-image/index': path.resolve(__dirname, 'src/blocks/annotated-image/index.tsx'),
     'blocks/before-after/index': path.resolve(__dirname, 'src/blocks/before-after/index.tsx'),
-    'blocks/scrolly/index': path.resolve(__dirname, 'src/blocks/scrolly/index.tsx'),
-    'blocks/scrolly-step/index': path.resolve(__dirname, 'src/blocks/scrolly-step/index.tsx'),
     'blocks/timeline/index': path.resolve(__dirname, 'src/blocks/timeline/index.tsx'),
+    'blocks/interactive/index': path.resolve(__dirname, 'src/blocks/interactive/index.tsx'),
     'editor-canvas': path.resolve(__dirname, 'src/editor-canvas/index.ts'),
     'newsroom-blocks': path.resolve(__dirname, 'src/newsroom-blocks.ts'),
     'blocks/page-section/index': path.resolve(__dirname, 'src/blocks/page-section/index.tsx'),

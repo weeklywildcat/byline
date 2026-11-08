@@ -7,13 +7,16 @@ import {
   ArticleExcerpt,
   ArticleHeadline,
   ArticleImageCaption,
+  ArticleLive,
   ArticleMeta,
+  ArticleSeriesLabel,
   ArticleShell,
   ArticleStandardEnding,
   ArticleStoryFooter,
   type ArticleViewProps
 } from "./article-view";
 import { HeroReveal, HeroRevealContent } from "./HeroReveal";
+import { usesImmersivePresentation } from "@byline/content/story";
 
 const SURFACE_ID = "immersive-article-surface";
 
@@ -44,7 +47,10 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
         image={image?.src ? { ...image, sizes: "100vw" } : null}
         imagePosition={image?.objectPosition}
       >
-        <ArticleCategory presentation={presentation} className="immersive-article-category" />
+        <div className="article-kicker immersive-article-kicker">
+          <ArticleCategory presentation={presentation} className="immersive-article-category" />
+          <ArticleSeriesLabel presentation={presentation} className="immersive-article-series" />
+        </div>
         <ArticleHeadline presentation={presentation} className="immersive-article-headline" />
         <ArticleExcerpt presentation={presentation} className="immersive-article-excerpt" />
       </HeroReveal>
@@ -61,7 +67,8 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
                 </div>
               ) : null}
             </div>
-            <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} />
+            <ArticleBody presentation={presentation} primaryGame={slots.primaryGame} host={slots.bodyHost} />
+            <ArticleLive presentation={presentation} />
             <ArticleStoryFooter presentation={presentation} slots={slots} />
           </article>
           <ArticleStandardEnding presentation={presentation} />
@@ -72,16 +79,13 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
 }
 
 /**
- * Whether an article is shown with the Immersive opening. The author's choice
- * only applies when the story has a featured image to open on; otherwise it is
- * a standard story. The public routes and the private Preview as Byline both
- * ask this, so they cannot disagree.
+ * Whether an article is shown with the Immersive opening: the one rule in
+ * `@byline/content/story` (`resolveBuiltInPresentation`), re-exported here.
+ * Custom presentations are resolved in front of it by `@byline/story-presentations`.
  */
-export function usesImmersivePresentation(presentation: Pick<ArticleViewProps["presentation"], "storyPresentation" | "image">): boolean {
-  return presentation.storyPresentation === "immersive" && Boolean(presentation.image?.src);
-}
+export { resolveBuiltInPresentation, usesImmersivePresentation } from "@byline/content/story";
 
-/** The article the author chose in WordPress: Immersive, or the normal `ArticleView`. */
+/** The built-in presentation the author chose: Immersive (when valid), or the normal `ArticleView`. */
 export function PresentedArticleView(props: ArticleViewProps): ReactNode {
   return usesImmersivePresentation(props.presentation) ? <ImmersiveArticleView {...props} /> : <ArticleView {...props} />;
 }

@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PeopleAvatars } from "../src/admin-ui/components/people-avatars";
+import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 
 const people = (count: number) => Array.from({ length: count }, (_, index) => ({ name: ["Caroline Elrod", "Gibson Bell", "Maycie Photographer", "Dana Reyes", "Sam Ortiz", "Lee Park", "Pat Quinn"][index]!, imageUrl: `https://example.test/photo-${index}.jpg` }));
 const render = (count: number, props: Record<string, unknown> = {}) => renderToStaticMarkup(<PeopleAvatars people={people(count)} tooltips={false} {...props} />);

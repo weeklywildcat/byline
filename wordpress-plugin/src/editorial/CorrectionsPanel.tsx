@@ -1,12 +1,12 @@
 import { Button, Notice, SelectControl, Spinner, TextareaControl, TextControl } from "@wordpress/components";
 import { useMemo, useState } from "@wordpress/element";
-import type { CorrectionInput, CorrectionRecord, CorrectionType } from "./editorial-model";
+import type { CorrectionInput, CorrectionRecord, CorrectionType } from "@byline/newsroom-screens/editorial/editorial-model";
 import {
   correctionTypeLabel,
   describeEditorialError,
   formatExactEditorialDate,
   normalizeCorrectionRecords
-} from "./editorial-model";
+} from "@byline/newsroom-screens/editorial/editorial-model";
 import "./editorial.css";
 
 export type CorrectionsPanelProps = {

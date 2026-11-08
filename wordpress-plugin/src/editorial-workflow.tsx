@@ -34,9 +34,14 @@ import type { ComponentType, ReactNode } from 'react';
 import { normalizeBylineError } from '@byline/admin-runtime';
 
 import { CorrectionsPanel } from './editorial/CorrectionsPanel';
+import { LiveCoveragePanel } from './editorial/LiveCoveragePanel';
 import { ContributorsPanel } from './editorial/ContributorsPanel';
 import { DistributionPanel } from './editorial/DistributionPanel';
 import { StoryPresentationPanel } from './editorial/StoryPresentationPanel';
+import { StoryFormatPanel } from './editorial/StoryFormatPanel';
+import { readStoryVideoMeta, storyVideoMetaPatch } from '@byline/newsroom-screens/editorial/story-video-model';
+import { ReportingNotePanel } from './editorial/ReportingNotePanel';
+import { readReportingNote, reportingNoteMetaPatch } from './editorial/reporting-note-model';
 import { OPEN_PHOTO_CROPS_EVENT, PhotoCropsDialog } from './editorial/photo-crops/PhotoCropsDialog';
 import { readStoryPresentation, storyPresentationMetaPatch } from './editorial/story-presentation-model';
 import { TasksPanel } from './editorial/TasksPanel';
@@ -44,7 +49,7 @@ import {
   createEditorialRestClient,
   type ProtectedEditorialFetcher,
   type ProtectedEditorialRequest
-} from './editorial/editorial-rest';
+} from '@byline/newsroom-screens/editorial/editorial-rest';
 import type {
   ContributorEntry,
   CorrectionRecord,
@@ -55,8 +60,8 @@ import type {
   ReadinessCheck,
   TaskInput,
   TaskPatch,
-} from './editorial/editorial-model';
-import { summarizeReadiness } from './editorial/editorial-model';
+} from '@byline/newsroom-screens/editorial/editorial-model';
+import { summarizeReadiness } from '@byline/newsroom-screens/editorial/editorial-model';
 
 import {
   workflowDiscordState,
@@ -76,7 +81,7 @@ import {
   subscribeToStorySidebarNavigation,
   type StorySidebarPanel,
   type StorySidebarPanelOpenState
-} from './editorial/story-sidebar-navigation';
+} from '@byline/newsroom-screens/editorial/story-sidebar-navigation';
 
 import './editorial-workflow.css';
 
@@ -710,7 +715,6 @@ function normalizeWorkflowPayload(value: unknown, fallback: WorkflowPayload | nu
   }).filter((status) => status.id);
   const rawCapabilities = record(raw.capabilities ?? fallback?.capabilities);
   const rawVisual = record(rawStory.visual ?? raw.media);
-  const rawCoverage = arrayValue(rawStory.coverage ?? raw.coverage).map((item) => stringValue(record(item).slug || record(item).title || item)).filter(Boolean);
   const workflowStatus = stringValue(rawStory.status ?? fallbackStory.status, 'pitch');
   const revision = numberValue(rawStory.revision ?? fallbackStory.revision, -1);
 
@@ -736,7 +740,6 @@ function normalizeWorkflowPayload(value: unknown, fallback: WorkflowPayload | nu
       } : null,
       visuals: stringValue(rawStory.visuals ?? fallbackStory.visuals) || null,
       tasksOpen: numberValue(record(raw.tasks).openCount, 0),
-      coverage: rawCoverage,
       modifiedAt: stringValue(rawStory.modifiedAt) || null
     },
     statuses,
@@ -818,7 +821,6 @@ function normalizeTask(value: unknown): EditorialTask | null {
     dueAt: stringValue(item.dueAt) || null,
     priority: (['low', 'normal', 'high', 'urgent'].includes(priority) ? priority : 'normal') as 'low' | 'normal' | 'high' | 'urgent',
     storyId: numberValue(item.storyId, 0) || null,
-    coverageId: numberValue(item.coverageId, 0) || null,
     createdBy: normalizeContributor(item.createdBy),
     completedAt: stringValue(item.completedAt) || null,
     order: numberValue(item.order, 0)
@@ -1387,6 +1389,15 @@ function EditorialNewsroomPanels({
 
       <PanelBody
         className="byline-editorial-sidebar-panel"
+        title={__('Live coverage', 'weekly-wildcat-headless')}
+        icon={<Icon icon={megaphone} aria-hidden="true" />}
+        initialOpen={false}
+      >
+        {({ opened }) => opened ? <LiveCoveragePanel postId={postId} /> : null}
+      </PanelBody>
+
+      <PanelBody
+        className="byline-editorial-sidebar-panel"
         title={__('Activity', 'weekly-wildcat-headless')}
         icon={<Icon icon={time} aria-hidden="true" />}
         initialOpen={false}
@@ -1789,6 +1800,31 @@ function StoryPresentationSettings() {
   );
 }
 
+/** Article or Video, and a video story's YouTube link. Post meta, so it saves with the post. */
+function StoryFormatSettings() {
+  const meta = useSelect((select: any) => select('core/editor')?.getEditedPostAttribute?.('meta') as unknown, []);
+  const { editPost } = useDispatch('core/editor') as { editPost?: (edits: Record<string, unknown>) => void };
+  const { format, videoUrl } = readStoryVideoMeta(meta);
+
+  return (
+    <PluginDocumentSettingPanel name="byline-story-format" title={__('Format', 'weekly-wildcat-headless')} className="byline-story-format-panel">
+      <StoryFormatPanel format={format} videoUrl={videoUrl} onChange={(change) => editPost?.({ meta: storyVideoMetaPatch(change) })} />
+    </PluginDocumentSettingPanel>
+  );
+}
+
+/** "How we reported this". Post meta, so it saves with the post. */
+function ReportingNoteSettings() {
+  const meta = useSelect((select: any) => select('core/editor')?.getEditedPostAttribute?.('meta') as unknown, []);
+  const { editPost } = useDispatch('core/editor') as { editPost?: (edits: Record<string, unknown>) => void };
+
+  return (
+    <PluginDocumentSettingPanel name="byline-reporting-note" title={__('How we reported this', 'weekly-wildcat-headless')} className="byline-reporting-note-panel">
+      <ReportingNotePanel note={readReportingNote(meta)} onChange={(note) => editPost?.({ meta: reportingNoteMetaPatch(note) })} />
+    </PluginDocumentSettingPanel>
+  );
+}
+
 /**
  * Hosts the photo crops dialog for the featured image. It lives at the plugin
  * root because the panels that open it (Story presentation, the pre-publish
@@ -1852,7 +1888,12 @@ function EditorialWorkflowPlugin() {
   // Navigating between stories remounts the lazy newsroom panels, but the
   // workflow PanelBody belongs to this entrypoint. Reset its controlled state
   // so a panel requested for one story cannot remain focused on another.
+  const panelsPostId = useRef(postId);
   useEffect(() => {
+    // An effect replay on the same story must not erase a consumed navigation
+    // command. Reset only when the editor actually changes stories.
+    if (panelsPostId.current === postId) return;
+    panelsPostId.current = postId;
     setOpenPanels(createStorySidebarPanelOpenState());
   }, [postId]);
 
@@ -1878,7 +1919,9 @@ function EditorialWorkflowPlugin() {
 
   return (
     <>
+      <StoryFormatSettings />
       <StoryPresentationSettings />
+      <ReportingNoteSettings />
       <PhotoCropsHost />
       <PluginPostStatusInfo className="byline-workflow-summary-slot">
         <div className="byline-workflow-summary">

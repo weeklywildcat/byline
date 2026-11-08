@@ -167,7 +167,8 @@ describe("public article presentation parity fixture", () => {
     expect(presentation.title).toBe(expected.title);
     expect(presentation.titleHtml).toBe(expected.titleHtml);
     expect(presentation.excerptHtml).toBe(expected.excerptHtml);
-    expect(presentation.contentHtml).toContain(expected.contentIncludes);
+    expect(presentation.body.format).toBe("legacy-html");
+    expect(presentation.body.format === "legacy-html" ? presentation.body.html : "").toContain(expected.contentIncludes);
     expect(presentation.category).toEqual(expected.category);
     const normalizedContributors = presentation.contributors.map((value) => ({
       id: value.id,

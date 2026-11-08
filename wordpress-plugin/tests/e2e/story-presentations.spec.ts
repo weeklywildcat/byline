@@ -66,7 +66,7 @@ test("newsroom presets save valid Core content and match the private preview at 
       if (definition.name === "core/html") return wp.blocks.parse(`<!-- wp:html -->${attributes.content}<!-- /wp:html -->`)[0];
       return wp.blocks.createBlock(definition.name, attributes, (definition.innerBlocks || []).map(make));
     }
-    for (const name of ['byline/table-of-contents','byline/visualization','byline/annotated-image','byline/before-after','byline/scrolly','byline/scrolly-step']) {
+    for (const name of ['byline/table-of-contents','byline/visualization','byline/annotated-image','byline/before-after']) {
       if (!wp.blocks.getBlockType(name)) throw new Error(`Missing block ${name}`);
     }
     const parsedPattern = wp.blocks.parse(essayPattern.content);
@@ -163,8 +163,6 @@ test("newsroom presets save valid Core content and match the private preview at 
       await expect(frame.locator('.article-body .byline-timeline')).toBeVisible();
       await expect(frame.locator('.byline-before-after input[type=range]')).toHaveValue('50');
       await expect(frame.locator('.byline-annotations > li')).toHaveCount(2);
-      if (width >= 900) await expect(frame.locator('.byline-scrolly')).toHaveClass(/is-enhanced/);
-      else await expect(frame.locator('.byline-scrolly')).not.toHaveClass(/is-enhanced/);
       await expect(frame.locator('.byline-visualization iframe')).toHaveCount(0);
       await expect(frame.locator('.byline-visualization-badge').first()).toContainText('Preview: interactive');
       await expect(frame.locator('.byline-visualization[data-mode="embed"] .byline-visualization-media').first()).toHaveCSS('height', '480px');
@@ -182,8 +180,6 @@ test("newsroom presets save valid Core content and match the private preview at 
       await expect(frame.locator('.article-body .byline-timeline')).toBeVisible();
       await expect(frame.locator('.byline-before-after input[type=range]')).toHaveValue('50');
       await expect(frame.locator('.byline-annotations > li')).toHaveCount(2);
-      if (width >= 900) await expect(frame.locator('.byline-scrolly')).toHaveClass(/is-enhanced/);
-      else await expect(frame.locator('.byline-scrolly')).not.toHaveClass(/is-enhanced/);
       await expect(frame.locator('.byline-visualization iframe')).toHaveCount(0);
       await expect(frame.locator('.byline-visualization-badge').first()).toContainText('Preview: interactive');
       await expect(frame.locator('.byline-visualization[data-mode="embed"] .byline-visualization-media').first()).toHaveCSS('height', '480px');
@@ -215,23 +211,10 @@ test("newsroom presets save valid Core content and match the private preview at 
     await expect(markers.nth(1)).toHaveAttribute('aria-current', 'true');
     expect(await frame.locator('body').evaluate((body) => body.ownerDocument.location.href)).toBe('about:srcdoc');
 
-    const scrolly = frame.locator('.byline-scrolly');
-    await expect(scrolly).toHaveClass(/is-enhanced/);
-    const stage = scrolly.locator('.byline-scrolly-stage');
-    await expect(stage).toHaveAttribute('data-step', '0');
-    // Scroll inside the preview document until step 3 crosses the reading line the stage advertises.
-    await scrolly.evaluate((story) => {
-      const view = story.ownerDocument.defaultView!;
-      const line = Number((story.querySelector('.byline-scrolly-stage') as HTMLElement).dataset.activationLine);
-      const step = story.querySelectorAll(':scope > .byline-scrolly-step')[2];
-      view.scrollTo({ top: step.getBoundingClientRect().top + view.scrollY - (view.innerHeight * line) / 100 + 20, behavior: 'instant' });
-    });
-    await expect(stage).toHaveAttribute('data-step', '2');
-    await expect(stage.locator('.byline-scrolly-frame:last-child img')).toHaveAttribute('src', /panorama\.svg/);
   } finally { await preview.close(); }
 });
 
-test('story authoring preserves native anchors, precise annotations and normal step reordering', async ({ adminPage: page, adminSession }) => {
+test('story authoring keeps precise annotations across a save and reload', async ({ adminPage: page, adminSession }) => {
   await createEditorDraft(page, adminSession.registerTestPost, 'story authoring controls');
   const nonce = await page.evaluate(() => (window as any).wpApiSettings.nonce as string);
   const upload = await page.request.post('/wp-json/wp/v2/media', {
@@ -241,7 +224,7 @@ test('story authoring preserves native anchors, precise annotations and normal s
   expect(upload.ok()).toBe(true);
   const media = await upload.json() as { id: number };
   adminSession.addCleanup(async () => { await adminSession.rest(`/wp/v2/media/${media.id}?force=true`, 'DELETE'); });
-  const selected = blocks.filter((block) => ['byline/table-of-contents','byline/annotated-image','byline/scrolly'].includes(block.name));
+  const selected = blocks.filter((block) => ['byline/table-of-contents','byline/annotated-image'].includes(block.name));
   await page.evaluate((definitions) => {
     const wp = (window as any).wp;
     const make = (definition: any): any => wp.blocks.createBlock(definition.name, definition.attributes, (definition.innerBlocks || []).map(make));
@@ -261,29 +244,14 @@ test('story authoring preserves native anchors, precise annotations and normal s
   await page.getByRole('spinbutton', { name: 'Left to right (%)' }).fill('33');
   await page.keyboard.press('Tab');
   await expect.poll(() => page.evaluate(() => (window as any).wp.data.select('core/block-editor').getBlocks().find((block: any) => block.name === 'byline/annotated-image').attributes.annotations[0].x)).toBe(33);
-  await expect.poll(() => page.evaluate(() => (window as any).wp.data.select('core/block-editor').getBlocks().find((block: any) => block.name === 'byline/scrolly').innerBlocks[0].innerBlocks[0].attributes.anchor)).not.toBe('');
-  const initialAnchor = await page.evaluate(() => {
-    const wp = (window as any).wp;
-    const scrolly = wp.data.select('core/block-editor').getBlocks().find((block: any) => block.name === 'byline/scrolly');
-    const heading = scrolly.innerBlocks[0].innerBlocks[0];
-    wp.data.dispatch('core/block-editor').updateBlockAttributes(heading.clientId, { content: 'Edited first scene' });
-    wp.data.dispatch('core/block-editor').selectBlock(scrolly.innerBlocks[1].clientId);
-    return heading.attributes.anchor;
-  });
-  // Use Gutenberg's ordinary mover control; the parent never serializes its
-  // steps as a separate proprietary JSON model.
-  await page.getByRole('button', { name: 'Move up', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).wp.data.select('core/block-editor').getBlocks().find((block: any) => block.name === 'byline/scrolly').innerBlocks[0].attributes.image.url)).toContain('landscape-after.svg');
   await saveEditorDraft(page);
   await page.reload({ waitUntil: 'domcontentloaded' });
   const reopened = await waitForEditorReady(page);
   await expect(reopened.canvas.getByText(/This block contains unexpected or invalid content/)).toHaveCount(0);
   const state = await page.evaluate(() => {
     const nodes = (window as any).wp.data.select('core/block-editor').getBlocks();
-    const story = nodes.find((block: any) => block.name === 'byline/scrolly');
     const image = nodes.find((block: any) => block.name === 'byline/annotated-image');
-    return { x: image.attributes.annotations[0].x, id: image.attributes.image.id, first: story.innerBlocks[0].attributes.image.url, anchor: story.innerBlocks[1].innerBlocks[0].attributes.anchor };
+    return { x: image.attributes.annotations[0].x, id: image.attributes.image.id };
   });
-  expect(state).toMatchObject({ x: 33, id: media.id, anchor: initialAnchor });
-  expect(state.first).toContain('landscape-after.svg');
+  expect(state).toMatchObject({ x: 33, id: media.id });
 });

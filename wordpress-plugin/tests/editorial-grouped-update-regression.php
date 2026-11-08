@@ -4,7 +4,7 @@
  * A grouped editorial update must never leave half of itself behind.
  *
  * The story workflow, the planned publication target, the media request,
- * coverage membership, and contributors live in unrelated WordPress storage.
+ * and contributors live in unrelated WordPress storage.
  * They cannot be wrapped in a real transaction, so this exercises the contract
  * the REST layer actually promises instead:
  *
@@ -182,7 +182,8 @@ function get_post_meta($post_id, $key, $single = false)
 }
 function update_post_meta($post_id, $key, $value): bool
 {
-    global $grouped_meta;
+    global $grouped_meta, $grouped_fail_restore;
+    if (!empty($grouped_fail_restore) && $value === 'ready') { throw new RuntimeException('Storage failed during restoration'); }
     $grouped_meta[(int) $post_id][$key] = $value;
     return true;
 }
@@ -213,9 +214,7 @@ require __DIR__ . '/../includes/editorial/workflow.php';
 require __DIR__ . '/../includes/editorial/rest.php';
 
 $story = new WP_Post(['ID' => 10, 'post_type' => 'post', 'post_author' => 1]);
-$coverage = new WP_Post(['ID' => 20, 'post_type' => BYLINE_COVERAGE_POST_TYPE, 'post_title' => 'Election night']);
-$replacement_coverage = new WP_Post(['ID' => 21, 'post_type' => BYLINE_COVERAGE_POST_TYPE, 'post_title' => 'Budget']);
-$grouped_posts = [10 => $story, 20 => $coverage, 21 => $replacement_coverage];
+$grouped_posts = [10 => $story];
 $grouped_users = [1 => true, 4 => true];
 
 byline_set_editorial_status(10, 'writing');
@@ -228,44 +227,44 @@ grouped_assert($baseline_revision === 1, 'The baseline editorial revision was no
 
 $response = byline_editorial_rest_update_story(new WP_REST_Request(['id' => 10], [
     'status' => 'editing',
-    'coverageIds' => [20],
+    'contributors' => [['type' => 'user', 'id' => 1]],
     'expectedRevision' => $baseline_revision,
 ]));
 grouped_assert(!is_wp_error($response), 'A valid grouped update was rejected.');
 grouped_assert(byline_get_editorial_status(10) === 'editing', 'The grouped update did not apply the workflow stage.');
-grouped_assert(byline_get_story_coverage_ids(10) === [20], 'The grouped update did not apply coverage membership.');
+grouped_assert(byline_get_story_contributor_entries(10, false)[0]['id'] === 1, 'The grouped update did not apply contributors.');
 grouped_assert(byline_get_editorial_revision(10) === $baseline_revision + 1, 'A successful grouped update must bump the editorial revision exactly once.');
 
 $revision_before_failure = byline_get_editorial_revision(10);
 
 // --- a later write that fails must undo the earlier ones ---------------------
 
-// A colleague deletes the coverage object in the moment between validation and
-// the coverage write. The workflow stage has already been stored by then.
+// A colleague deletes the contributor between validation and
+// the contributor write. The workflow stage has already been stored by then.
 $grouped_actions['byline_editorial_story_updated'][] = static function (int $post_id) {
     global $grouped_posts;
-    unset($grouped_posts[21]);
+    global $grouped_users;
+    unset($grouped_users[4]);
 };
 
 $failed = byline_editorial_rest_update_story(new WP_REST_Request(['id' => 10], [
     'status' => 'ready',
     'deadline' => '2026-10-01',
-    'coverageIds' => [21],
+    'contributors' => [['type' => 'user', 'id' => 4]],
     'expectedRevision' => $revision_before_failure,
 ]));
 
-grouped_assert(is_wp_error($failed), 'A grouped update whose coverage write failed must report an error.');
-grouped_assert($failed->get_error_code() === 'byline_coverage_not_found', 'The original, user-readable failure should be preserved when the rollback succeeds. Got: ' . $failed->get_error_code());
+grouped_assert(is_wp_error($failed), 'A grouped update whose contributor write failed must report an error.');
+grouped_assert($failed->get_error_code() === 'byline_unknown_contributor', 'The original, user-readable failure should be preserved when the rollback succeeds. Got: ' . $failed->get_error_code());
 grouped_assert(byline_get_editorial_status(10) === 'editing', 'A failed grouped update left the workflow stage changed.');
 grouped_assert(byline_get_editorial_deadline(10) === '2026-09-10', 'A failed grouped update left the deadline changed.');
-grouped_assert(byline_get_story_coverage_ids(10) === [20], 'A failed grouped update left coverage membership changed.');
+grouped_assert(byline_get_story_contributor_entries(10, false)[0]['id'] === 1, 'A failed grouped update left contributors changed.');
 grouped_assert(byline_get_editorial_revision(10) === $revision_before_failure, 'A fully rolled-back update must not move the editorial revision.');
 grouped_assert(strpos($failed->get_error_message(), 'SQL') === false && strpos($failed->get_error_message(), 'stack') === false, 'The grouped update error exposed backend detail.');
 
 // The client's revision is still authoritative, so its next optimistic write
 // succeeds instead of hitting a phantom conflict.
 $grouped_actions['byline_editorial_story_updated'] = [];
-$grouped_posts[21] = $replacement_coverage;
 $after_rollback = byline_editorial_rest_update_story(new WP_REST_Request(['id' => 10], [
     'status' => 'ready',
     'expectedRevision' => $revision_before_failure,
@@ -273,40 +272,28 @@ $after_rollback = byline_editorial_rest_update_story(new WP_REST_Request(['id' =
 grouped_assert(!is_wp_error($after_rollback), 'The revision the client held was not still authoritative after a rolled-back failure.');
 grouped_assert(byline_get_editorial_status(10) === 'ready', 'The retry after a rolled-back failure did not apply.');
 
-// --- an un-undoable partial write must move the revision and say so ---------
-
+// A rollback setter can fail even after a correctly validated write. Inject a
+// storage error only on restoration to ensure the 409/revision contract stays.
 $revision_before_partial = byline_get_editorial_revision(10);
-
-// Coverage 20 disappears the moment the coverage write completes: the
-// contributor write then fails, and the coverage restore cannot succeed either.
-$grouped_actions['byline_editorial_coverage_changed'][] = static function (int $story_id) {
-    global $grouped_posts, $grouped_users;
-    unset($grouped_posts[20], $grouped_users[4]);
+$grouped_users[4] = true;
+$grouped_actions['byline_editorial_story_updated'][] = static function () {
+    global $grouped_users, $grouped_fail_restore;
+    unset($grouped_users[4]);
+    $grouped_fail_restore = true;
 };
-
 $partial = byline_editorial_rest_update_story(new WP_REST_Request(['id' => 10], [
-    'coverageIds' => [21],
-    'contributors' => [['type' => 'user', 'id' => 4]],
-    'expectedRevision' => $revision_before_partial,
+    'status' => 'editing', 'contributors' => [['type' => 'user', 'id' => 4]], 'expectedRevision' => $revision_before_partial,
 ]));
-
-grouped_assert(is_wp_error($partial), 'An un-undoable partial write must not be reported as success.');
-grouped_assert($partial->get_error_code() === 'byline_editorial_partial_update', 'An un-undoable partial write must report the partial-update state. Got: ' . $partial->get_error_code());
-$partial_data = $partial->get_error_data();
-grouped_assert((int) ($partial_data['status'] ?? 0) === 409, 'A partial write must be reported as a conflict the client has to reconcile.');
-grouped_assert(byline_get_editorial_revision(10) > $revision_before_partial, 'Server state changed, so the editorial revision must move with it.');
-grouped_assert((int) ($partial_data['currentRevision'] ?? 0) === byline_get_editorial_revision(10), 'The partial-update error must carry the revision the client has to reload to.');
-
-// The client's old revision is no longer authoritative, and says so clearly.
-$stale = byline_editorial_rest_update_story(new WP_REST_Request(['id' => 10], [
-    'status' => 'editing',
-    'expectedRevision' => $revision_before_partial,
-]));
-grouped_assert(is_wp_error($stale) && $stale->get_error_code() === 'byline_editorial_conflict', 'A stale revision after a partial write must produce a clear conflict.');
+grouped_assert(is_wp_error($partial) && $partial->get_error_code() === 'byline_editorial_partial_update', 'Failed restoration must report partial-update state.');
+grouped_assert($partial->get_error_data()['status'] === 409, 'Partial write must report conflict.');
+grouped_assert(byline_get_editorial_revision(10) > $revision_before_partial, 'Partial write must advance revision.');
+$stale = byline_editorial_rest_update_story(new WP_REST_Request(['id' => 10], ['status' => 'writing', 'expectedRevision' => $revision_before_partial]));
+grouped_assert(is_wp_error($stale) && $stale->get_error_code() === 'byline_editorial_conflict', 'Partial write must reject the stale client revision.');
+$grouped_fail_restore = false;
+$grouped_actions['byline_editorial_story_updated'] = [];
 
 // --- legacy callers that omit expectedRevision still work --------------------
 
-$grouped_actions['byline_editorial_coverage_changed'] = [];
 $legacy = byline_editorial_rest_update_story(new WP_REST_Request(['id' => 10], ['status' => 'writing']));
 grouped_assert(!is_wp_error($legacy), 'A legacy caller without expectedRevision was rejected.');
 grouped_assert(byline_get_editorial_status(10) === 'writing', 'A legacy grouped update did not apply.');

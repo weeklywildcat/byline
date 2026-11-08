@@ -10,8 +10,20 @@ import "@byline/ui/hero-reveal.css";
 import "@byline/ui/immersive-article.css";
 import "./article-preview.css";
 
+/**
+ * The PHP preview payload (includes/editorial/preview.php) carries the
+ * WordPress body as `contentHtml`; the canonical model carries a
+ * provider-neutral `body`. This is the WordPress edge, so it adapts here.
+ */
+type WordPressPreviewModel = Omit<ArticlePresentation, "body"> & { body?: ArticlePresentation["body"]; contentHtml?: string };
+
+function previewArticleModel(model: WordPressPreviewModel): ArticlePresentation {
+  const { contentHtml, body, ...rest } = model;
+  return { ...rest, body: body ?? { format: "legacy-html", html: contentHtml ?? "" } };
+}
+
 type PreviewConfig = {
-  model?: ArticlePresentation | null;
+  model?: WordPressPreviewModel | null;
   stylesheetUrl?: string;
   themeId?: string;
   tokenOverrides?: Record<string, string>;
@@ -143,7 +155,7 @@ function PreviewFrame({
 
 function PreviewApp({ config }: { config: PreviewConfig }) {
   const [viewport, setViewport] = useState<ViewportId>("desktop");
-  const model = config.model;
+  const model = config.model ? previewArticleModel(config.model) : null;
   const presentationNote = model ? presentationDescription(model) : "";
 
   if (!model) {

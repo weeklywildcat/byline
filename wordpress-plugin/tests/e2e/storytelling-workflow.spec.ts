@@ -48,11 +48,6 @@ function lunchSqueeze(m: Record<Photo, Media>): Spec[] {
     ] } },
     { name: "byline/before-after", attributes: { before: image("meeting-before", "The conference room, muted."), after: image("meeting-after", "The conference room, saturated."), beforeLabel: "Before", afterLabel: "After", caption: "The same room, shown with and without colour correction." } },
     { name: "byline/visualization", attributes: { title: "Lunch period length, by wave", description: "Minutes between the start of a lunch wave and the final bell, before and after the new schedule.", type: "chart", mode: "static", heightPreset: "standard", source: "District bell schedules, 2025–26 and 2026–27", notes: "Passing time not included.", credit: "Weekly Wildcat staff", image: image("panorama", "A wide view of the newsroom.") } },
-    { name: "byline/scrolly", attributes: { fit: "contain" }, inner: [
-      { name: "byline/scrolly-step", attributes: { image: image("laughing", "A student laughs at a desk."), caption: "Seniors gather before the 11:40 bell." }, inner: [h("11:38 a.m. The doors open"), p("Seniors with first-wave lunch cross the quad together; the cafeteria holds the line to the library.")] },
-      { name: "byline/scrolly-step", attributes: { image: image("meeting", "Two students review a draft."), caption: "A table of juniors at 11:51." }, inner: [h("11:51 a.m. Nine minutes left"), p("Students who joined the line at 11:42 sit down with a tray and a countdown.")] },
-      { name: "byline/scrolly-step", attributes: { image: image("tablet", "A student at a laptop."), caption: "The bell, as seen from the hallway." }, inner: [h("12:03 p.m. Back to class"), p("The second wave is already forming outside.")] }
-    ] },
     { name: "core/gallery", attributes: { linkTo: "media", columns: 3, className: "is-style-byline-photo-gallery", align: "wide" }, inner: (["laughing", "meeting", "tablet"] as Photo[]).map((photo) => ({ name: "core/image", attributes: { id: m[photo].id, url: m[photo].url, alt: photo, sizeSlug: "large", linkDestination: "none", caption: "Photo caption long enough to wrap onto two lines at the gallery size." } })) },
     p("The district has said it will publish the results of a survey of families in November.")
   ];
@@ -94,7 +89,7 @@ test("a realistic visual story survives build, save, reload, edit and preview", 
     wp.data.dispatch("core/block-editor").resetBlocks(specs.map(build));
     wp.data.dispatch("core/editor").editPost({ featured_media: featured, meta: { byline_story_presentation: "immersive", byline_story_immersive_alignment: "bottom-left" } });
   }, { specs: lunchSqueeze(media), featured: media.panorama.id });
-  const toolNames = ["byline/timeline", "byline/annotated-image", "byline/before-after", "byline/visualization", "byline/scrolly"];
+  const toolNames = ["byline/timeline", "byline/annotated-image", "byline/before-after", "byline/visualization"];
   expect((await names(page)).filter((name: string) => toolNames.includes(name))).toEqual(toolNames);
 
   // Save and reopen: nothing is invalid, every tool is still there.
@@ -149,7 +144,6 @@ test("a realistic visual story survives build, save, reload, edit and preview", 
     await expect(frame.locator(".article-body .byline-timeline").first()).toBeVisible();
     await expect(frame.locator(".byline-annotated-image")).toBeVisible();
     await expect(frame.locator(".byline-visualization")).toBeVisible();
-    await expect(frame.locator(".byline-scrolly")).toBeVisible();
     const overflow = await frame.locator("body").evaluate((body) => body.ownerDocument.documentElement.scrollWidth - body.ownerDocument.documentElement.clientWidth);
     expect(overflow, `horizontal overflow at ${width}px`).toBeLessThanOrEqual(1);
     await expect(frame.locator('iframe[src^="http"]')).toHaveCount(0);

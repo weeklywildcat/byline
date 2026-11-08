@@ -18,7 +18,7 @@ import {
   type EditorialTask,
   type ReadinessCheck,
   type TaskPermissionContext
-} from "./editorial-model";
+} from "@byline/newsroom-screens/editorial/editorial-model";
 
 describe("editorial status and date semantics", () => {
   const now = new Date(2026, 7, 28, 12, 0, 0);

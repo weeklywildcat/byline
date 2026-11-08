@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Metadata } from "@/lib/metadata";
 import { notFound } from "@/lib/static-not-found";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
@@ -44,19 +45,27 @@ export default async function StaticPage({ params }: StaticPageProps) {
 
   const title = stripHtml(wordpressPage.title.rendered);
   const description = stripHtml(wordpressPage.excerpt.rendered || wordpressPage.content.rendered);
-  const eyebrow = wordpressPage.bylinePage?.eyebrow?.trim() || "";
-  const isSportsArchive = Boolean(wordpressPage.bylinePage?.sportsArchive);
+  return (
+    <PublicProsePage title={title} description={description} href={`/${segment}/`} bodyHtml={wordpressPage.content.rendered}
+      eyebrow={wordpressPage.bylinePage?.eyebrow?.trim() || ""} isSportsArchive={Boolean(wordpressPage.bylinePage?.sportsArchive)}>
+      <NewsroomPollHydrator />
+    </PublicProsePage>
+  );
+}
 
+export function PublicProsePage({ title, description, href, bodyHtml, eyebrow, isSportsArchive, children }: {
+  title: string; description: string; href: string; bodyHtml: string; eyebrow?: string; isSportsArchive?: boolean; children?: ReactNode;
+}) {
   const pageSchema = {
     "@context": "https://schema.org",
     "@type": "WebPage",
     name: title,
     description,
-    url: absoluteUrl(`/${segment}/`)
+    url: absoluteUrl(href)
   };
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", path: "/" },
-    { name: title, path: `/${segment}/` }
+    { name: title, path: href }
   ]);
 
   return (
@@ -89,9 +98,9 @@ export default async function StaticPage({ params }: StaticPageProps) {
 
         <div
           className="static-page-content byline-page-content"
-          dangerouslySetInnerHTML={{ __html: wordpressPage.content.rendered }}
+          dangerouslySetInnerHTML={{ __html: bodyHtml }}
         />
-        <NewsroomPollHydrator />
+        {children}
       </article>
     </main>
   );

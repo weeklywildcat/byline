@@ -58,7 +58,7 @@ describe('article enhancement selector', () => {
     expect(matches(gallery(photo('a')))).toBe(true);
     expect(matches('<figure class="byline-before-after"></figure>')).toBe(true);
     expect(matches('<figure class="byline-annotated-image"></figure>')).toBe(true);
-    expect(matches('<section class="byline-scrolly"></section>')).toBe(true);
+    expect(matches('<figure class="byline-interactive"></figure>')).toBe(true);
     expect(matches('<figure class="byline-visualization" data-mode="embed"></figure>')).toBe(true);
     expect(matches('<figure class="byline-visualization" data-mode="static"></figure>')).toBe(false);
     expect(matches('<p>Text only.</p><figure class="wp-block-image"><img src="/a.jpg" alt=""></figure>')).toBe(false);

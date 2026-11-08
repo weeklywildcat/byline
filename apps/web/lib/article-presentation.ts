@@ -1,99 +1,91 @@
+import { nativeStory } from "./native-snapshot";
+import { nativeArticleCard } from "./native-article";
 import type { ImageCropShape } from "@byline/core";
-import type { ArticleImageView, ArticlePresentation, ArticleStoryCardView } from "@byline/ui";
-import { getResponsiveImageProps, type ImageSearchVisibility } from "@/lib/media";
-import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory, getPublicTopicTags, isAthleteSpotlightPost, isHiddenCategory, isVisibleContentPost } from "@/lib/content";
-import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
-import { absoluteUrl } from "@/lib/seo";
-import { getMediaCredit } from "@/lib/wordpress";
-import { getPublicationConfig } from "@/lib/publication";
 import {
-  getAuthorProfile,
-  contributorHasProfilePage,
-  getContributorHref,
-  getContributorName,
-  getContributorPhoto,
-  getContributorRole,
-  getContributorSocialLinks,
-  getCorrectionTypeLabel,
-  getFeaturedMedia,
-  getPostCategories,
-  getPostContributors,
-  getPostHref,
-  getPostStoryPresentation,
-  getPostTags,
-  getPublicCorrectionsForPost,
-  isGuestContributor,
-  type WordPressAuthor,
-  type WordPressCategory,
-  type WordPressContributor,
-  type WordPressMedia,
-  type WordPressPost
-} from "@/lib/wordpress";
+  buildArticlePresentation as buildCanonicalArticlePresentation,
+  buildSeriesView,
+  findStorySeries,
+  hasMeaningfulUpdate,
+  storyCardView,
+  storyReadingTime,
+  type ArticlePresentation,
+  type ArticleSeriesView,
+  type ArticleStoryCardView
+} from "@byline/content/story";
+import { isGeneralEditorialPost, isVisibleContentPost } from "@/lib/content";
+import { formatDisplayDate } from "@/lib/format";
+import {
+  isCoverageComplete,
+  wordpressImage,
+  wordpressPresentationContext,
+  wordpressPublicStory,
+  wordpressSeriesInput,
+  wordpressStorySummary
+} from "@/lib/adapters/wordpress-story";
+import { getPostContributors, isGuestContributor, type WordPressAuthor, type WordPressContributor, type WordPressCoverage, type WordPressPost } from "@/lib/wordpress";
 
-const WORDS_PER_MINUTE = 225;
-const publication = getPublicationConfig();
+/**
+ * The public article's model from WordPress. WordPress field access is the
+ * adapter (`lib/adapters/wordpress-story.ts`); Byline's rules (reading time,
+ * update notice, related, More by, series, coverage areas) are the shared
+ * builder in `@byline/content/story`, which the newsroom's Live Preview runs
+ * on Payload stories too. This file only gathers the WordPress candidates.
+ */
+
+export { isCoverageComplete };
 
 export function getArticleReadingTime(post: WordPressPost) {
-  const words = stripHtml(post.content.rendered || post.excerpt.rendered).split(/\s+/).filter(Boolean).length;
-  return `${Math.max(1, Math.ceil(words / WORDS_PER_MINUTE))} min read`;
+  const native = nativeStory(post.id);
+  if (native) return storyReadingTime(native);
+  return storyReadingTime({ body: { format: "legacy-html", html: post.content.rendered }, excerptHtml: post.excerpt.rendered });
 }
 
 export function hasArticleUpdatedDate(post: WordPressPost) {
-  const published = new Date(post.date).getTime();
-  const modified = new Date(post.modified).getTime();
-  return Number.isFinite(published) && Number.isFinite(modified) && modified - published > 60 * 60 * 1000;
+  return hasMeaningfulUpdate(post.date, post.modified);
 }
 
-function articleImage(image: WordPressMedia | null, sizes?: string, priority = false, imageSearchVisibility: ImageSearchVisibility = "canonical", shape?: ImageCropShape): ArticleImageView | null {
-  if (!image?.source_url) return null;
-  const responsive = getResponsiveImageProps(image, { sizes, priority, imageSearchVisibility, shape });
-  if (!responsive) return null;
-  const captionHtml = image.caption?.rendered?.trim() || "";
-  const fallbackCaption = stripHtml(image.media_details?.image_meta?.caption ?? "");
-  const credit = getMediaCredit(image);
+// Compact teasers are square (globals.css .story-teaser-compact).
+const COMPACT_CARD_IMAGE = { shape: "square", sizes: "(max-width: 900px) 100vw, 360px" } as const;
 
-  return {
-    src: responsive.src,
-    srcSet: responsive.srcSet,
-    sizes: responsive.sizes,
-    alt: responsive.alt,
-    width: responsive.width ?? null,
-    height: responsive.height ?? null,
-    ...(captionHtml ? { captionHtml } : {}),
-    ...(fallbackCaption ? { fallbackCaption } : {}),
-    ...(credit ? { credit } : {}),
-    ...(responsive.objectPosition ? { objectPosition: responsive.objectPosition } : {})
-  };
-}
-
-function articleStoryCard(post: WordPressPost): ArticleStoryCardView {
-  const category = getPrimaryVisibleCategory(post);
-  // Compact teasers are square (globals.css .story-teaser-compact).
-  const image = articleImage(getFeaturedMedia(post), "(max-width: 900px) 100vw, 360px", false, "presentation", "square");
-  return {
-    id: post.id,
-    title: stripHtml(post.title.rendered),
-    href: getPostHref(post),
-    excerptHtml: post.excerpt.rendered.trim(),
-    image,
-    category: category ? decodeHtml(category.name) : null,
-    date: post.date,
-    dateLabel: formatDisplayDate(post.date)
-  };
-}
-
-function getCoverageAreas(posts: WordPressPost[]) {
-  const counts = new Map<string, { category: WordPressCategory; count: number }>();
-  posts.forEach((post) => {
-    const category = getPrimaryVisibleCategory(post);
-    if (!category) return;
-    const existing = counts.get(category.slug);
-    counts.set(category.slug, { category, count: existing ? existing.count + 1 : 1 });
+export function articleStoryCard(post: WordPressPost, imageOptions: { shape: ImageCropShape; sizes: string } = COMPACT_CARD_IMAGE): ArticleStoryCardView {
+  const native = nativeStory(post.id);
+  if (native) return nativeArticleCard(native, imageOptions);
+  return storyCardView(wordpressStorySummary(post), {
+    image: (image) => wordpressImage(image, imageOptions.sizes, false, "presentation", imageOptions.shape),
+    formatDate: formatDisplayDate
   });
-  return [...counts.values()]
-    .sort((left, right) => right.count - left.count || left.category.name.localeCompare(right.category.name))
-    .slice(0, 3)
-    .map(({ category }) => ({ label: decodeHtml(category.name), href: `/category/${category.slug}/` }));
+}
+
+/**
+ * The public stories of a coverage, in the editor's order, as full posts.
+ * Coverage lists only published stories, but a story can still be hidden
+ * from the public site (e.g. an internal category), so it is dropped here.
+ */
+export function getCoverageStories(coverage: WordPressCoverage, postsById: ReadonlyMap<number, WordPressPost>) {
+  return coverage.stories.flatMap((story) => {
+    const post = postsById.get(story.id);
+    return post && isGeneralEditorialPost(post) ? [post] : [];
+  });
+}
+
+/** Public coverages containing the post, as the builder's series inputs. */
+function seriesInputs(post: WordPressPost, coverages: readonly WordPressCoverage[], allPosts: readonly WordPressPost[]) {
+  const containing = coverages.filter((coverage) => coverage.stories.some((story) => story.id === post.id));
+  if (containing.length === 0) return [];
+  const memberIds = new Set(containing.flatMap((coverage) => coverage.stories.map((story) => story.id)));
+  const postsById = new Map(allPosts.filter((candidate) => memberIds.has(candidate.id)).map((candidate) => [candidate.id, candidate]));
+  return containing.map((coverage) => wordpressSeriesInput(coverage, postsById));
+}
+
+/** A story in more than one public coverage reads as part of the first series, else the first coverage. */
+export function findStoryCoverage(post: WordPressPost, coverages: readonly WordPressCoverage[]) {
+  const chosen = findStorySeries(post.id, seriesInputs(post, coverages, [post]));
+  return chosen ? coverages.find((coverage) => coverage.slug === chosen.id) ?? null : null;
+}
+
+/** Where a story sits in its public series or coverage. */
+export function buildArticleSeries(post: WordPressPost, coverages: readonly WordPressCoverage[], allPosts: readonly WordPressPost[]): ArticleSeriesView | null {
+  return buildSeriesView(post.id, seriesInputs(post, coverages, allPosts), wordpressPresentationContext());
 }
 
 function postHasContributor(post: WordPressPost, contributor: WordPressContributor) {
@@ -105,54 +97,6 @@ function postHasContributor(post: WordPressPost, contributor: WordPressContribut
   });
 }
 
-function contributorView(contributor: WordPressContributor, coverage: ReturnType<typeof getCoverageAreas>) {
-  const profile = !isGuestContributor(contributor) ? getAuthorProfile(contributor) : null;
-  const photo = getContributorPhoto(contributor);
-  const socialLinks = getContributorSocialLinks(contributor);
-  const contactLink = !isGuestContributor(contributor) ? socialLinks.find((link) => link.label === "Email") : undefined;
-  return {
-    id: `${isGuestContributor(contributor) ? "guest" : "user"}-${contributor.id}-${contributor.slug}`,
-    name: getContributorName(contributor),
-    href: contributorHasProfilePage(contributor) ? getContributorHref(contributor) : "",
-    role: getContributorRole(contributor),
-    bio: !isGuestContributor(contributor) ? stripHtml(profile?.shortBio ?? "") : "",
-    photo: photo ? articleImage({
-      id: typeof photo.id === "number" ? photo.id : 0,
-      date: "",
-      slug: "",
-      type: "attachment",
-      link: "",
-      title: { rendered: photo.alt || getContributorName(contributor) },
-      author: 0,
-      caption: { rendered: "" },
-      alt_text: photo.alt || "",
-      media_type: "image",
-      mime_type: "image",
-      media_details: { width: photo.width ?? undefined, height: photo.height ?? undefined },
-      source_url: photo.url
-    }, "132px", false, "presentation") : null,
-    ...(contactLink?.href ? { contactHref: contactLink.href } : {}),
-    coverage
-  };
-}
-
-function relatedPosts(post: WordPressPost, posts: WordPressPost[]) {
-  const categorySlugs = new Set(getPostCategories(post).map((category) => category.slug));
-  const tagSlugs = new Set(getPostTags(post).map((tag) => tag.slug));
-  return posts
-    .filter((candidate) => candidate.id !== post.id)
-    .map((candidate, index) => ({
-      post: candidate,
-      score: getPostCategories(candidate).filter((category) => categorySlugs.has(category.slug)).length +
-        getPostTags(candidate).filter((tag) => tagSlugs.has(tag.slug)).length * 2,
-      index
-    }))
-    .filter((candidate) => candidate.score > 0)
-    .sort((left, right) => right.score - left.score || new Date(right.post.date).getTime() - new Date(left.post.date).getTime() || left.index - right.index)
-    .slice(0, 3)
-    .map(({ post: relatedPost }) => relatedPost);
-}
-
 export type BuildArticlePresentationOptions = {
   post: WordPressPost;
   allPosts: WordPressPost[];
@@ -161,63 +105,21 @@ export type BuildArticlePresentationOptions = {
   visiblePosts?: WordPressPost[];
   authorPosts?: WordPressPost[];
   relatedCandidates?: WordPressPost[];
+  /** Public series and coverage, to place the story in its series. */
+  coverages?: readonly WordPressCoverage[];
 };
 
 /** Build the public route's normalized model without importing any renderer. */
-export function buildArticlePresentation({ post, allPosts, contributors, author, visiblePosts: indexedVisiblePosts, authorPosts: indexedAuthorPosts, relatedCandidates }: BuildArticlePresentationOptions): ArticlePresentation {
-  const category = getPrimaryVisibleCategory(post);
-  const image = articleImage(getFeaturedMedia(post), "(max-width: 900px) 100vw, 900px", true);
-  const topicTags = getPublicTopicTags(post);
-  const topicTerms = topicTags.length > 0 ? topicTags : getPostCategories(post).filter((postCategory) => !isHiddenCategory(postCategory));
-  const title = stripHtml(post.title.rendered);
-  const articleUrl = absoluteUrl(getPostHref(post));
-  const publicCorrections = getPublicCorrectionsForPost(post);
-  const hasPublicCorrectionNotice = publicCorrections.length > 0;
-  const updated = hasArticleUpdatedDate(post) && !hasPublicCorrectionNotice;
+export function buildArticlePresentation({ post, allPosts, contributors, author, visiblePosts: indexedVisiblePosts, authorPosts: indexedAuthorPosts, relatedCandidates, coverages = [] }: BuildArticlePresentationOptions): ArticlePresentation {
   const visiblePosts = indexedVisiblePosts ?? allPosts.filter(isVisibleContentPost);
   const displayContributors = contributors.length > 0 ? contributors : author ? [author] : [];
   const authorPosts = indexedAuthorPosts ?? (displayContributors.length > 0
     ? visiblePosts.filter((candidate) => displayContributors.some((contributor) => postHasContributor(candidate, contributor)))
     : []);
-  const related = relatedPosts(post, relatedCandidates ?? visiblePosts);
-  const relatedIds = new Set(related.map((relatedPost) => relatedPost.id));
-  const moreByAuthor = authorPosts.filter((candidate) => candidate.id !== post.id && !relatedIds.has(candidate.id)).slice(0, 3);
-  const storyPresentation = getPostStoryPresentation(post);
-  const athleteSpotlight = isAthleteSpotlightPost(post);
-  const athleteMeta = athleteSpotlight
-    ? [getAthleteSpotlightLabel(post), getAthleteSportLabel(post)].filter((value): value is string => Boolean(value))
-    : [];
-
-  return {
-    id: post.id,
-    url: articleUrl,
-    title,
-    titleHtml: post.title.rendered,
-    excerptHtml: post.excerpt.rendered.trim(),
-    contentHtml: post.content.rendered.trim(),
-    category: category ? { label: decodeHtml(category.name), href: `/category/${category.slug}/` } : null,
-    athleteMeta,
-    storyPresentation: storyPresentation.presentation,
-    immersiveAlignment: storyPresentation.immersiveAlignment,
-    contributors: displayContributors.map((contributor) => contributorView(contributor, getCoverageAreas(visiblePosts.filter((candidate) => postHasContributor(candidate, contributor))))),
-    fallbackByline: `${publication.identity.shortName} Staff`,
-    publishedAt: post.date,
-    publishedLabel: formatDisplayDate(post.date),
-    modifiedAt: updated ? post.modified : null,
-    modifiedLabel: updated ? formatDisplayDate(post.modified) : null,
-    readingTime: getArticleReadingTime(post),
-    image,
-    corrections: publicCorrections.filter((correction) => !correction.legacy).map((correction) => ({
-      id: correction.id,
-      label: getCorrectionTypeLabel(correction.type),
-      date: correction.date || null,
-      dateLabel: correction.date ? formatDisplayDate(correction.date) : null,
-      text: correction.text
-    })),
-    topics: topicTerms.map((term) => ({ id: `${term.taxonomy}-${term.id}`, name: decodeHtml(term.name) })),
-    update: updated ? { modifiedAt: post.modified, label: `This story was updated after initial publication on ${formatDisplayDate(post.modified)}.` } : null,
-    relatedStories: related.map(articleStoryCard),
-    moreByAuthorStories: moreByAuthor.map(articleStoryCard),
-    publication: { shortName: publication.identity.shortName, contactHref: publication.urls.contact }
-  };
+  return buildCanonicalArticlePresentation(wordpressPublicStory(post, displayContributors), {
+    ...wordpressPresentationContext(),
+    relatedCandidates: (relatedCandidates ?? visiblePosts).map(wordpressStorySummary),
+    contributorStories: authorPosts.map(wordpressStorySummary),
+    series: seriesInputs(post, coverages, allPosts)
+  });
 }

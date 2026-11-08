@@ -2,9 +2,9 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { contentHealthFixHref, CONTENT_HEALTH_FIX_TARGET_QUERY_PARAM } from "../src/planning/content-health-navigation";
-import { normalizeContentHealthFixTarget, normalizeContentHealthResponse } from "../src/planning/planning-api";
-import { resolveContentHealthBlockPath, type ContentHealthEditorBlock } from "../src/planning/planning-model";
+import { contentHealthFixHref, CONTENT_HEALTH_FIX_TARGET_QUERY_PARAM } from "@byline/newsroom-screens/planning/content-health-navigation";
+import { normalizeContentHealthFixTarget, normalizeContentHealthResponse } from "@byline/newsroom-screens/planning/planning-api";
+import { resolveContentHealthBlockPath, type ContentHealthEditorBlock } from "@byline/newsroom-screens/planning/planning-model";
 import {
   consumeStorySidebarNavigation,
   createStorySidebarPanelOpenState,
@@ -16,7 +16,7 @@ import {
   STORY_SIDEBAR_NAVIGATION_EVENT,
   STORY_SIDEBAR_PANEL_IDS,
   subscribeToStorySidebarNavigation
-} from "../src/editorial/story-sidebar-navigation";
+} from "@byline/newsroom-screens/editorial/story-sidebar-navigation";
 
 describe("Content Health navigation", () => {
   it("normalizes structured locators without accepting ephemeral clientIds", () => {

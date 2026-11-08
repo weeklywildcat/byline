@@ -1,8 +1,11 @@
+import { articleBodyPlainText } from "@byline/content/story";
+import { nativeStory } from "./native-snapshot";
 import { IMAGE_CROP_SHAPES, type ImageCropShape } from "@byline/core";
 import { cleanDeckText, stripBracketedEllipsis, type AthleteSpotlightView, type StoryImageCrop, type StoryImageView, type StoryView } from "@byline/ui";
 import { getAthleteSportLabel, getAthleteSpotlightLabel, getPrimaryVisibleCategory } from "@/lib/content";
 import { decodeHtml, formatDisplayDate, stripHtml } from "@/lib/format";
 import { getMeaningfulImageAlt } from "@/lib/image-alt";
+import { getStoryVideoBadge } from "@/lib/story-video";
 import { getCroppedImageSource, getResponsiveImageProps } from "@/lib/media";
 import {
   getAuthorHref,
@@ -10,13 +13,14 @@ import {
   getMediaCredit,
   getPostAuthor,
   getPostHref,
+  getPostLiveCoverage,
   type WordPressMedia,
   type WordPressPost
 } from "@/lib/wordpress";
 
 // Turns build-time WordPress records into the presentation-neutral view models
 // the shared renderers consume. Everything WordPress-shaped stops here; the
-// canonical resolver in @byline/content never sees a WordPressPost.
+// canonical resolver in @byline/ui/homepage never sees a WordPressPost.
 
 // The photo for a card, with its srcset, the editor's focal point and any
 // per-shape crops. The card renderer picks the shape and `sizes` per variant.
@@ -41,11 +45,13 @@ function toStoryImageView(image: WordPressMedia | null, credit: string): StoryIm
 }
 
 function getCleanDeck(post: WordPressPost) {
-  return cleanDeckText(stripHtml(post.content.rendered || post.excerpt.rendered));
+  const native = nativeStory(post.id);
+  return cleanDeckText((native ? articleBodyPlainText(native.body) : stripHtml(post.content.rendered)) || stripHtml(post.excerpt.rendered));
 }
 
 function getReadingTime(post: WordPressPost) {
-  const words = stripHtml(post.content.rendered || post.excerpt.rendered).split(/\s+/).filter(Boolean).length;
+  const native = nativeStory(post.id);
+  const words = ((native ? articleBodyPlainText(native.body) : stripHtml(post.content.rendered)) || stripHtml(post.excerpt.rendered)).split(/\s+/).filter(Boolean).length;
 
   return `${Math.max(1, Math.ceil(words / 225))} min read`;
 }
@@ -61,6 +67,7 @@ export function toStoryView(post: WordPressPost, options: StoryViewOptions = {})
   const image = getFeaturedMedia(post);
   const credit = getMediaCredit(image);
   const cleanDeck = options.cleanDeck ?? false;
+  const video = getStoryVideoBadge(post);
 
   return {
     id: post.id,
@@ -73,6 +80,8 @@ export function toStoryView(post: WordPressPost, options: StoryViewOptions = {})
     readingTime: options.includeReadingTime ? getReadingTime(post) : null,
     category: category ? { name: decodeHtml(category.name), href: `/category/${category.slug}/` } : null,
     author: author ? { name: author.name, href: getAuthorHref(author) } : null,
+    ...(getPostLiveCoverage(post)?.status === "live" ? { live: true } : {}),
+    ...(video ? { video } : {}),
     image: toStoryImageView(image, credit)
   };
 }
@@ -91,7 +100,8 @@ function getAthleteBlurb(post: WordPressPost) {
   // Shares the linear excerpt-marker strip rather than repeating the regex it
   // replaced: the same publication text reaches both, and the same
   // backtracking hazard would come with it.
-  const text = stripBracketedEllipsis(stripHtml(post.excerpt.rendered || post.content.rendered));
+  const native = nativeStory(post.id);
+  const text = stripBracketedEllipsis(stripHtml(post.excerpt.rendered) || (native ? articleBodyPlainText(native.body) : stripHtml(post.content.rendered)));
 
   if (text.length <= 120) return text;
 

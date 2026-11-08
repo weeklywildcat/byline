@@ -18,7 +18,8 @@
   },
 
   // Polls have no database binding. WordPress is the poll datastore and the
-  // Worker only proxies /api/polls/* to its byline/v1 poll routes.
+  // Worker proxies /api/polls/* and read-only /api/live/<storyId> routes.
+  // Live updates use WordPress too; article rendering stays entirely static.
   //
   // The CMS origin is read from the static export's _byline/publication.json
   // (urls.cms), so no configuration is required. Set the optional BYLINE_CMS_URL

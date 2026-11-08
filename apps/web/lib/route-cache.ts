@@ -1,6 +1,9 @@
+import { nativeMedia, nativeStory } from "./native-snapshot";
+import { nativeArticlePresentation } from "./native-article";
 import { stableDigest } from "@byline/content";
 import { buildArticlePresentation } from "./article-presentation";
-import { isVisibleContentPost } from "./content";
+import { buildCoveragePresentation } from "./coverage-presentation";
+import { isGeneralEditorialPost, isVisibleContentPost } from "./content";
 import { getPublicationConfig } from "./publication";
 import { getPostContributors, isGuestContributor, getPostPrimaryGameId, type WordPressAuthor, type WordPressPost } from "./wordpress";
 import type { WebBuildSnapshot } from "./build-snapshot";
@@ -21,7 +24,7 @@ export function articleRenderInputs(snapshot: WebBuildSnapshot, post: WordPressP
     ...post.tags.flatMap((id) => snapshot.indexes.postsByTag.get(id) ?? [])
   ].map((candidate) => [candidate.id, candidate])).values()].filter(isVisibleContentPost);
   return {
-    presentation: buildArticlePresentation({ post, allPosts: snapshot.posts, contributors, author, visiblePosts: snapshot.posts.filter(isVisibleContentPost), authorPosts, relatedCandidates: related }),
+    presentation: buildArticlePresentation({ post, allPosts: snapshot.posts, contributors, author, visiblePosts: snapshot.posts.filter(isVisibleContentPost), authorPosts, relatedCandidates: related, coverages: snapshot.sports.coverages }),
     primaryGame: snapshot.games.find((game) => game.id === getPostPrimaryGameId(post)) ?? null
   };
 }
@@ -35,14 +38,17 @@ export function routeCacheDependency(snapshot: WebBuildSnapshot, kind: DynamicRo
   let data: unknown;
   let dependencies: unknown;
   if (kind === "article") {
-    const post = snapshot.posts.find((entry) => String(entry.id) === String(id));
-    if (!post || !isVisibleContentPost(post)) throw new Error(`No public article ${id} for incremental rendering`);
-    const render = articleRenderInputs(snapshot, post);
-    data = { post, ...render };
-    dependencies = { post: post.id, related: render.presentation.relatedStories.map((entry) => entry.id), moreBy: render.presentation.moreByAuthorStories.map((entry) => entry.id), contributors: render.presentation.contributors.map((entry) => entry.id) };
+    const story = nativeStory(Number(id));
+    const post = story ? undefined : snapshot.posts.find((entry) => String(entry.id) === String(id));
+    if (!story && (!post || !isVisibleContentPost(post))) throw new Error(`No public article ${id} for incremental rendering`);
+    const render = story ? { presentation: nativeArticlePresentation(story), primaryGame: null } : articleRenderInputs(snapshot, post!);
+    const mediaIds = story?.body.format === "byline-v1" ? Object.values(story.body.media).map(({ id }) => Number(id)) : [];
+    const media = story ? [...new Set([...mediaIds, ...(story.image ? [story.image] : [])])].map(nativeMedia) : undefined;
+    data = { post, story, media, ...render };
+    dependencies = { post: story?.id ?? post!.id, related: render.presentation.relatedStories.map((entry) => entry.id), moreBy: render.presentation.moreByAuthorStories.map((entry) => entry.id), contributors: render.presentation.contributors.map((entry) => entry.id), series: render.presentation.series?.href ?? null };
   } else if (kind === "category") {
     const category = snapshot.categories.find((entry) => String(entry.id) === String(id));
-    const posts = snapshot.posts.filter((post) => post.categories.includes(Number(id)) && isVisibleContentPost(post));
+    const posts = snapshot.posts.filter((post) => post.categories.includes(Number(id)) && isGeneralEditorialPost(post));
     data = { category, posts };
     dependencies = { category: id, posts: posts.map((post) => post.id) };
   } else if (kind === "author") {
@@ -54,8 +60,10 @@ export function routeCacheDependency(snapshot: WebBuildSnapshot, kind: DynamicRo
     data = snapshot.pages.find((entry) => entry.slug === id);
     dependencies = { page: id };
   } else {
-    data = snapshot.sports.coverages.find((entry) => entry.slug === id);
-    dependencies = { coverage: id };
+    const coverage = snapshot.sports.coverages.find((entry) => entry.slug === id);
+    // The page shows each story's photo, byline and reading time, not just the coverage record.
+    data = coverage ? buildCoveragePresentation(coverage, snapshot.posts) : undefined;
+    dependencies = { coverage: id, posts: coverage?.stories.map((story) => story.id) ?? [] };
   }
   const environment = {
     publicSite: process.env.NEXT_PUBLIC_SITE_URL || publication.urls.publicSite,

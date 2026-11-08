@@ -1,7 +1,7 @@
 # Public build snapshots and incremental static builds
 
 WordPress owns the complete public build input. Astro remains a fully static
-renderer, and the existing thin Worker serves `apps/web/out` plus its poll proxy.
+renderer, and the existing thin Worker serves `apps/web/out` plus its poll and read-only live-update proxies.
 There is no SSR service, new database, D1 binding, or changed-file uploader.
 
 ## Deployment lifecycle

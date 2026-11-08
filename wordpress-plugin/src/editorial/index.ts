@@ -12,7 +12,7 @@ export { CorrectionsPanel } from "./CorrectionsPanel";
 export type { CorrectionsPanelProps } from "./CorrectionsPanel";
 export { DistributionPanel } from "./DistributionPanel";
 export type { DistributionPanelProps } from "./DistributionPanel";
-export { createEditorialRestClient } from "./editorial-rest";
+export { createEditorialRestClient } from "@byline/newsroom-screens/editorial/editorial-rest";
 export type {
   ContributorPayload,
   CorrectionPayload,
@@ -22,5 +22,5 @@ export type {
   ProtectedEditorialRequest,
   ReadinessPayload,
   TaskPayload
-} from "./editorial-rest";
-export * from "./editorial-model";
+} from "@byline/newsroom-screens/editorial/editorial-rest";
+export * from "@byline/newsroom-screens/editorial/editorial-model";

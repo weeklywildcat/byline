@@ -8,6 +8,7 @@ import { getPublicationConfig } from "@/lib/publication";
 import {
   getFeaturedMedia,
   getMediaArtDirection,
+  getPostLiveCoverage,
   getContributorDescription,
   contributorHasProfilePage,
   getContributorHref,
@@ -127,7 +128,7 @@ function isWordPressMedia(image: SeoImage): image is WordPressMedia {
   return "source_url" in image;
 }
 
-// The 1200×630 social card WordPress cut from the editor's crop or focal point.
+// The WordPress social crop, if the editor prepared one.
 function getSocialCrop(image: SeoImage) {
   return isWordPressMedia(image) ? artDirectedSource(getMediaArtDirection(image), "social") : null;
 }
@@ -462,12 +463,40 @@ function getArticleImageSchema(image: WordPressMedia | null, articleUrl: string)
 }
 
 /** Timezone-aware ISO timestamps for a post, for JSON-LD and Open Graph. */
-export function getPostTimestamps(post: Pick<WordPressPost, "date" | "date_gmt" | "modified" | "modified_gmt">) {
+export function getPostTimestamps(post: Pick<WordPressPost, "date" | "date_gmt" | "modified" | "modified_gmt"> & Partial<Pick<WordPressPost, "live" | "byline" | "weeklyWildcat">>) {
   const published = getWordPressIsoTimestamp({ gmt: post.date_gmt, local: post.date }, publication.timezone);
   const modified = getWordPressIsoTimestamp({ gmt: post.modified_gmt, local: post.modified }, publication.timezone);
+  // Live updates are separate records, so the post's own modified time lags them.
+  const live = getPostLiveCoverage(post as WordPressPost);
+  const latest = [modified ?? published, live?.startedAt, live?.endedAt, ...(live?.updates.map((update) => update.modified) ?? [])]
+    .filter((value): value is string => Boolean(value)).sort((a, b) => Date.parse(a) - Date.parse(b)).at(-1);
 
-  return { published, modified: modified ?? published };
+  return { published, modified: latest ?? published };
 }
+
+/**
+ * Google's LiveBlogPosting fields for a story that has been live: coverage
+ * times and the newest updates, each linking to its anchor on the page.
+ */
+function getLiveBlogFields(post: WordPressPost, articleUrl: string) {
+  const live = getPostLiveCoverage(post);
+  if (!live) return null;
+  return {
+    coverageStartTime: live.startedAt || undefined,
+    coverageEndTime: live.endedAt || undefined,
+    liveBlogUpdate: live.updates.slice(0, LIVE_BLOG_UPDATE_LIMIT).map((update) => ({
+      "@type": "BlogPosting",
+      headline: update.title || stripHtml(update.html).slice(0, 110) || undefined,
+      datePublished: update.date,
+      dateModified: update.modified,
+      url: `${articleUrl}#update-${update.id}`,
+      articleBody: stripHtml(update.html) || undefined,
+      ...(update.author ? { author: { "@type": "Person", name: update.author } } : {})
+    }))
+  };
+}
+
+const LIVE_BLOG_UPDATE_LIMIT = 50;
 
 /** Canonical profile URLs for the contributors who have a public profile page. One-off guests have none. */
 export function getArticleAuthorProfileUrls(post: WordPressPost) {
@@ -527,14 +556,19 @@ export function getProfilePageSchema(contributor: WordPressContributor, posts: W
   };
 }
 
-export function getNewsArticleSchema(post: WordPressPost) {
+/**
+ * `articleBody: false` is for a flagship visual story, whose page text is its
+ * repository narrative rather than the WordPress body: the schema then does not
+ * claim a body the page does not show.
+ */
+export function getNewsArticleSchema(post: WordPressPost, { articleBody: includeBody = true }: { articleBody?: boolean } = {}) {
   const contributors = getPostContributors(post);
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
   const articleUrl = absoluteUrl(getPostHref(post));
   const headline = stripHtml(post.title.rendered);
   const description = getSeoDescription(post.excerpt.rendered || post.content.rendered);
-  const articleBody = stripHtml(post.content.rendered);
+  const articleBody = includeBody ? stripHtml(post.content.rendered) : "";
   const timestamps = getPostTimestamps(post);
   const imageSchema = getArticleImageSchema(image, articleUrl);
   const keywords = post._embedded?.["wp:term"]
@@ -564,9 +598,12 @@ export function getNewsArticleSchema(post: WordPressPost) {
         name: `${publication.identity.shortName} Staff`
       }];
 
+  const liveBlog = getLiveBlogFields(post, articleUrl);
+
   return {
     "@context": "https://schema.org",
-    "@type": "NewsArticle",
+    // A live story is both: NewsArticle for news surfaces, LiveBlogPosting for the LIVE label.
+    "@type": liveBlog ? ["NewsArticle", "LiveBlogPosting"] : "NewsArticle",
     "@id": `${articleUrl}#article`,
     mainEntityOfPage: {
       "@type": "WebPage",
@@ -584,6 +621,7 @@ export function getNewsArticleSchema(post: WordPressPost) {
     image: imageSchema.length > 0 ? imageSchema : undefined,
     primaryImageOfPage: imageSchema[0]?.["@id"] ? { "@id": imageSchema[0]["@id"] } : undefined,
     isAccessibleForFree: true,
-    articleBody: articleBody || undefined
+    articleBody: articleBody || undefined,
+    ...(liveBlog ?? {})
   };
 }

@@ -16,13 +16,13 @@ test("Control+K searches the newsroom from a Story Workspace and jumps straight 
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(fixture.workspaceUrl);
-  await expect(page.getByRole("button", { name: "Search" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Search newsroom", exact: true })).toBeVisible();
 
-  await page.keyboard.press("Control+K");
+  await page.keyboard.press("ControlOrMeta+k");
   const palette = page.getByRole("dialog", { name: "Search Byline" });
   await expect(palette).toBeVisible();
   await palette.getByRole("combobox", { name: "Search stories and actions" }).fill(unique);
-  await palette.getByRole("option", { name: otherTitle, exact: true }).click();
+  await palette.getByRole("option", { name: new RegExp(otherTitle) }).click();
 
   await page.waitForURL(new RegExp(`page=byline-planning&story=${otherId}`));
   await expect(page.getByRole("heading", { level: 1, name: otherTitle })).toBeVisible();

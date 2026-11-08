@@ -1,7 +1,7 @@
 import type { Metadata } from "@/lib/metadata";
 import { AuthorDirectory } from "@/components/AuthorDirectory";
 import { SectionHeader } from "@/components/SectionHeader";
-import { filterVisibleContentPosts } from "@/lib/content";
+import { filterGeneralEditorialPosts, filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
 import { getPresentationMediaUrl } from "@/lib/media";
 import { getPublicationConfig } from "@/lib/publication";
@@ -195,7 +195,7 @@ function getMediaKitImages(posts: WordPressPost[]) {
 
 export default async function MediaKitPage() {
   const posts = filterVisibleContentPosts(await getAllPosts());
-  const mediaImages = getMediaKitImages(posts);
+  const mediaImages = getMediaKitImages(filterGeneralEditorialPosts(posts));
   const pageSchema = {
     "@context": "https://schema.org",
     "@type": "WebPage",

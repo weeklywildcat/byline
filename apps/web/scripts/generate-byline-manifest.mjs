@@ -17,7 +17,10 @@ function positiveInteger(value, fallback = 0) {
 }
 
 let snapshotBacked = false;
-try { snapshotBacked = JSON.parse(await readFile(path.join(projectRoot, ".byline-build/frontend-phases.json"), "utf8")).dataMode === "prepared-snapshot"; } catch {}
+try {
+  const { dataMode } = JSON.parse(await readFile(path.join(projectRoot, ".byline-build/frontend-phases.json"), "utf8"));
+  snapshotBacked = dataMode === "prepared-snapshot" || dataMode === "direct-source-recovery";
+} catch {}
 if (snapshotBacked && process.env.BYLINE_PUBLICATION_REVISION !== undefined && positiveInteger(process.env.BYLINE_PUBLICATION_REVISION) !== builtPublication.revision) {
   throw new Error("BYLINE_PUBLICATION_REVISION cannot override the verified snapshot revision.");
 }

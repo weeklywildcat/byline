@@ -1,9 +1,12 @@
+import { legacyHashHref } from "./admin-routing";
 import apiFetch from "@wordpress/api-fetch";
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { InlineAlert } from "./admin-ui/components/inline-alert";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { PlanningApp, createPlanningFetchers } from "./planning";
-import { createStoryFetchers } from "./story/story-fetchers";
+import { createHomeFetchers } from "@byline/newsroom-screens/home/home-api";
+import { newsroomSearchUrls, type PlanningUrls } from "./newsroom-search";
+import { createWordPressCollectionApi } from "./collections/wordpress-collection-api";
 import "./planning/style.css";
 
 type PlanningConfig = {
@@ -13,7 +16,7 @@ type PlanningConfig = {
   tab: string;
   view: string;
   capabilities: { manage?: boolean; editPosts?: boolean };
-  urls: { planning: { stories: string; calendar?: string; media?: string; coverage?: string; performance?: string; contentHealth?: string; feedback?: string } };
+  urls: { planning: PlanningUrls };
 };
 declare global { interface Window { bylinePlanning?: PlanningConfig } }
 
@@ -27,28 +30,14 @@ class PlanningBoundary extends Component<{ children: ReactNode }, { failed: bool
 
 const root = document.getElementById("byline-admin-root");
 const config = window.bylinePlanning;
-if (root && config) {
+const legacyTarget = legacyHashHref(window.location.hash, window.location.href);
+if (legacyTarget) window.location.replace(legacyTarget);
+if (root && config && !legacyTarget) {
   apiFetch.use(apiFetch.createNonceMiddleware(config.nonce));
   const request = <T,>(options: Parameters<typeof apiFetch>[0]) => apiFetch(options) as Promise<T>;
-  const fetchers = { ...createPlanningFetchers(request), ...createStoryFetchers(request, config.capabilities) };
+  const collections = createWordPressCollectionApi(request, Number(config.currentUserId) || null);
+  const fetchers = { ...createHomeFetchers(request, {}, config.capabilities, { collections }), ...createPlanningFetchers(request) };
   createRoot(root).render(<PlanningBoundary>
-    <PlanningApp
-      fetchers={fetchers}
-      tab={config.tab}
-      view={config.view}
-      currentUserId={Number(config.currentUserId) || null}
-      storiesUrl={config.urls?.planning?.stories || "admin.php?page=byline-planning&tab=stories"}
-      mine={new URLSearchParams(window.location.search).get("mine") === "1"}
-      commandUrls={{
-        stories: config.urls?.planning?.stories,
-        calendar: config.urls?.planning?.calendar,
-        media: config.urls?.planning?.media,
-        coverage: config.urls?.planning?.coverage,
-        performance: config.urls?.planning?.performance,
-        contentHealth: config.urls?.planning?.contentHealth,
-        feedback: config.urls?.planning?.feedback,
-        upload: config.capabilities.editPosts ? "media-new.php" : undefined
-      }}
-    />
+    <PlanningApp fetchers={fetchers} tab={config.tab} view={config.view} currentUserId={Number(config.currentUserId) || null} storiesUrl={config.urls?.planning?.stories || "admin.php?page=byline-planning&tab=stories"} searchUrls={newsroomSearchUrls(config.urls?.planning)} mine={new URLSearchParams(window.location.search).get("mine") === "1"} />
   </PlanningBoundary>);
 }

@@ -8,13 +8,9 @@ import { storyVariations, supportedAttributes } from '../src/story-block-variati
 import { VisualizationSave } from '../src/blocks/visualization/save';
 import { AnnotatedImageSave } from '../src/blocks/annotated-image/save';
 import { BeforeAfterSave } from '../src/blocks/before-after/save';
-import { ScrollySave } from '../src/blocks/scrolly/save';
-import { ScrollyStepSave } from '../src/blocks/scrolly-step/save';
 import visualization from '../src/blocks/visualization/block.json';
 import annotated from '../src/blocks/annotated-image/block.json';
 import comparison from '../src/blocks/before-after/block.json';
-import scrolly from '../src/blocks/scrolly/block.json';
-import step from '../src/blocks/scrolly-step/block.json';
 
 const image = { id: 17, url: '/image.jpg', alt: 'A plan', width: 1200, height: 800, credit: 'Staff' };
 const block = (name: string, content: string, clientId: string, extra = {}, innerBlocks: any[] = []): any => ({ name, clientId, attributes: { content, ...extra }, innerBlocks });
@@ -70,7 +66,7 @@ describe('annotation and comparison models', () => {
 });
 
 function setup() {
-  for (const [metadata, save] of [[visualization, VisualizationSave], [annotated, AnnotatedImageSave], [comparison, BeforeAfterSave], [scrolly, ScrollySave], [step, ScrollyStepSave]] as const) {
+  for (const [metadata, save] of [[visualization, VisualizationSave], [annotated, AnnotatedImageSave], [comparison, BeforeAfterSave]] as const) {
     if (!getBlockType(metadata.name)) registerBlockType(metadata as any, { save: save as any });
   }
   if (!getBlockType('core/paragraph')) registerBlockType('core/paragraph', { apiVersion: 3, title: 'Paragraph', category: 'text', attributes: { content: { type: 'string', source: 'html', selector: 'p' } }, save: ({ attributes }: any) => createElement('p', null, attributes.content) });
@@ -111,15 +107,5 @@ describe('semantic saved story content', () => {
     expect(incomplete.querySelectorAll('img')).toHaveLength(1);
     // The editor's instruction never reaches readers: the figure holds only what was chosen.
     expect(incomplete.textContent).not.toContain('Choose both photographs');
-  });
-  it('keeps every step image and text in order with a constrained parent/child model', () => {
-    setup();
-    expect(step.parent).toEqual(['byline/scrolly']);
-    expect(scrolly.allowedBlocks).toEqual(['byline/scrolly-step']);
-    expect(step.allowedBlocks).not.toContain('core/embed');
-    const steps = [1,2].map((i) => createBlock('byline/scrolly-step', { image: { ...image, url: `/step-${i}.jpg` } }, [createBlock('core/paragraph', { content: `Reporting ${i}` })]));
-    const root = roundtrip('byline/scrolly', {}, steps);
-    expect(Array.from(root.querySelectorAll('img')).map((img) => img.getAttribute('src'))).toEqual(['/step-1.jpg','/step-2.jpg']);
-    expect(root.textContent).toMatch(/Reporting 1.*Reporting 2/s);
   });
 });

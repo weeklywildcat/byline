@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readSource } from "./source-files";
 
 const src = path.resolve(__dirname, "../src");
-const read = (relative: string) => readFileSync(path.join(src, relative), "utf8");
+const read = readSource;
 
 describe("Story Workspace shadcn polish", () => {
   it("uses responsive Fields for story details instead of forcing a narrow horizontal layout", () => {
@@ -32,8 +33,7 @@ describe("Story Workspace shadcn polish", () => {
       "story/StoryPeek.tsx",
       "story/StoryCreateDialog.tsx",
       "story/TaskCreateDialog.tsx",
-      "planning/SavedViews.tsx",
-      "planning/Coverage.tsx"
+      "planning/StoryViews.tsx",
     ]) {
       expect(read(file), file).toContain("<Spinner");
     }

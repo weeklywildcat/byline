@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mediaAssignmentTitle, waitingForMe, type HomeBootstrap, type HomeVisualWork } from "../src/home/newsroom-model";
-import type { PlanningStory } from "../src/planning/planning-model";
+import { mediaAssignmentTitle, waitingForMe, type HomeBootstrap, type HomeVisualWork } from "@byline/newsroom-screens/home/newsroom-model";
+import type { PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 
 const currentUser = { id: 1, name: "Gibson Bell" };
 
@@ -14,13 +14,12 @@ function story(patch: Partial<PlanningStory> = {}): PlanningStory {
     writer: currentUser,
     editor: null,
     workflow: { id: "reporting", label: "Reporting", group: "main", selectable: true },
-    wordpressState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
+    publicationState: { id: "draft", label: "Draft", isPublished: false, isScheduled: false },
     deadline: null,
     plannedPublication: null,
     modifiedAt: "2026-10-20T12:00:00Z",
     visual: { type: "none", status: "needed" },
     openTaskCount: 0,
-    coverage: [],
     featuredImage: null,
     ...patch
   };

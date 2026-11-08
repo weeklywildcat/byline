@@ -1,8 +1,8 @@
 import { Clock3, Minus, Users } from "lucide-react";
-import { Avatar, AvatarBadge, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage } from "../admin-ui/ui/avatar";
-import { Button } from "../admin-ui/ui/button";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../admin-ui/ui/item";
-import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from "../admin-ui/ui/popover";
+import { Avatar, AvatarBadge, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage } from "@byline/newsroom-ui/ui/avatar";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
+import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { groupPresence, initials, presenceActivityLabel, samePresenceLocation, type PresenceLocation, type PresencePerson } from "./presence-model";
 
 const badgeClass = (status: PresencePerson["status"]) => status === "active"

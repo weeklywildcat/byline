@@ -28,6 +28,8 @@ export type SearchIndexItem = {
   sortDate?: string;
   /** Additional searchable tokens not already represented by display fields. */
   searchTokens?: string[];
+  /** A video story's label; absent for an article. */
+  video?: { duration: string | null };
 };
 
 export type SearchUrlState = {
