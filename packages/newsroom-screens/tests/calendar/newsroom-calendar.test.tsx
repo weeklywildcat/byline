@@ -8,6 +8,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { CalendarControls } from "../../src/calendar/CalendarControls";
 import { NewsroomCalendar, type NewsroomCalendarProps } from "../../src/calendar/NewsroomCalendar";
+import { dayAtPoint } from "../../src/calendar/calendar-drag";
 import { createCalendarWorkspace, type CalendarWorkspace } from "../../src/calendar/calendar-workspace";
 import { CalendarWorkspaceProvider } from "../../src/calendar/calendar-workspace-context";
 import type { PlanningStory } from "../../src/planning/planning-model";
@@ -170,6 +171,52 @@ describe("the shared Calendar", () => {
     expect(container.querySelector("[data-calendar-controls-trigger]")).toBeNull();
     await render({ controls: "sheet" });
     expect(container.querySelector("[data-calendar-controls-trigger]")).not.toBeNull();
+  });
+});
+
+describe("dragging events between days", () => {
+  const host = (allowed: string[]) => ({ can: (kind: string) => allowed.includes(kind), apply: vi.fn(async () => ({})) });
+  const chip = (type: string) => container.querySelector<HTMLElement>(`[data-event-type=${type}]`);
+
+  it("is read-only without a host: nothing can be picked up", async () => {
+    await render();
+    expect(chip("deadline")).not.toBeNull();
+    expect(container.querySelector("[data-draggable]")).toBeNull();
+    expect(chip("deadline")!.getAttribute("draggable")).toBeNull();
+  });
+
+  it("lets a reader pick up only the kinds the host allows, and never a published date", async () => {
+    getSchedule.mockImplementation(async (from: string, to: string): Promise<ScheduleResponse> => ({ timezone: TZ, from, to, appointments: [appointment({ storyId: 41, storyTitle: "Cafeteria changes" })], needsScheduling: [], mediaDeadlines: [], taskDeadlines: [] }));
+    await render({ stories: [story({ plannedPublication: "2026-11-19", publicationState: { id: "published", label: "Published", isPublished: true, isScheduled: false, scheduledAt: null, publishedAt: "2026-11-20T15:00:00Z" } })], reschedule: host(["deadline", "appointment"]) as never });
+    expect(chip("deadline")!.hasAttribute("data-draggable")).toBe(true);
+    expect(chip("deadline")!.getAttribute("draggable")).toBe("true");
+    expect(chip("appointment")!.hasAttribute("data-draggable")).toBe(true);
+    // Allowed by no one: the host does not offer planned publication here, and published is history.
+    expect(chip("planned")!.hasAttribute("data-draggable")).toBe(false);
+    expect(chip("published")!.hasAttribute("data-draggable")).toBe(false);
+  });
+
+  it("does not offer a shared interview, which has no story to save through", async () => {
+    await render({ reschedule: host(["appointment"]) as never });
+    expect(chip("appointment")!.hasAttribute("data-draggable")).toBe(false);
+  });
+});
+
+describe("finding the day under the pointer", () => {
+  const cell = (attribute: string, day: string) => { const element = document.createElement("div"); element.setAttribute(attribute, day); return element; };
+  const rootAt = (hit: Element | null) => ({ elementFromPoint: () => hit }) as unknown as Document;
+
+  it("reads a month cell, a week column and an all-day cell", () => {
+    const month = cell("data-date", "2026-11-18"); month.className = "sx__month-grid-day";
+    expect(dayAtPoint(rootAt(month), 0, 0)?.day).toBe("2026-11-18");
+    expect(dayAtPoint(rootAt(cell("data-time-grid-date", "2026-11-19")), 0, 0)?.day).toBe("2026-11-19");
+    expect(dayAtPoint(rootAt(cell("data-date-grid-date", "2026-11-20")), 0, 0)?.day).toBe("2026-11-20");
+  });
+
+  it("ignores anything that is not a day: the week header, an agenda row, empty space", () => {
+    expect(dayAtPoint(rootAt(cell("data-date", "2026-11-18")), 0, 0)).toBeNull();
+    expect(dayAtPoint(rootAt(null), 0, 0)).toBeNull();
+    expect(dayAtPoint(rootAt(cell("data-time-grid-date", "not-a-day")), 0, 0)).toBeNull();
   });
 });
 
