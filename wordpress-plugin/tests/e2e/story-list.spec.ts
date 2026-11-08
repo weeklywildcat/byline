@@ -136,7 +136,7 @@ test("Stories List opens empty cell space and the keyboard title without stealin
   expect({ status: after.status, date: after.date }).toEqual({ status: unchangedPost.status, date: unchangedPost.date });
 
   await row.getByRole("button", { name: `Actions for ${title}` }).click();
-  await expect(page.getByRole("menuitem", { name: "Open workspace", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Open story", exact: true })).toBeVisible();
   await expect(peek).toHaveCount(0);
   await page.keyboard.press("Escape");
   const emptyCell = row.getByRole("cell").nth(6);
