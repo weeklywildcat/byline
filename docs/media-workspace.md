@@ -103,7 +103,10 @@ assignment, Collection artwork/resource or profile can't be deleted (409).
 | `GET /media/navigator` | folders (flat, with file counts), Library counts, capabilities (incl. accepted MIME types and the upload size limit), uploaders |
 | `GET /media/:id` | the inspector's detail: folder path, linked uses, hidden-use count |
 | `PATCH /media/:id` | alt, creator, credit, copyright, licence, source URL, captured day, folder; `expectedUpdatedAt` compare-and-swap (409) |
+| `POST /media/:id/rename` | `{ name, expectedUpdatedAt }`: renames the stored file (see *Renaming*); uploader or editor; row-locked compare-and-swap (409) |
 | `POST /media/move` | file several assets into a folder (each checked on its own) |
+| `POST /media/bulk-update` | `{ ids, patch }`: the same creator, credit, copyright, licence or source URL on several files (≤200), each as the account; empty fields are skipped, never used to clear; returns `{ done, failed }` |
+| `POST /media/bulk-delete` | `{ ids }`: editors; each file still linked anywhere is refused and kept; returns `{ done, failed }` |
 | `POST /media/upload` | multipart (`file`, `_payload` JSON `{ folderId }`), Payload's own upload operation |
 | `DELETE /media/:id` | editors; refused while linked |
 | `POST/PATCH/DELETE /media/folders(/:id)` | folder management |
@@ -147,7 +150,9 @@ Shared, CMS-independent (`packages/newsroom-screens/src/media/`):
   the navigator, never Stories or Home). `media-preferences.ts`: Grid/List,
   sort, inspector width; serialized, coalesced writes.
 - `MediaNavigatorContent` (pane, sheet and picker), `MediaLibraryBrowser`
-  (search, filters, sort, Grid/List, paged lazy thumbnails, context menu),
+  (search, filters, sort, Grid/List, paged lazy thumbnails, context menu,
+  multi-select), `MediaBulkActions` (selection bar, bulk edit and delete),
+  `MediaRename` (the rename dialog, name field and mutation),
   `MediaInspectorContent` (panel and sheet, explicit Save/Cancel, a guard the
   screen asks before leaving unsaved edits), `MediaUploadDialog`,
   `MediaPickerDialog`, `MediaFolderDialogs`.
@@ -167,6 +172,53 @@ picker and the in-Media navigation guard), `MediaNavigator`, `media-route.ts`,
 The picker is the existing `MediaPicker` host capability: the Story screen's
 Production tab and Work both link files through `MediaPickerDialog`, never
 Payload's raw Media list.
+
+## Selecting several files
+
+Every file in Grid and List has a checkbox (shown on hover, and on every file
+once anything is checked). ⌘/Ctrl-click toggles, Shift-click selects the range
+from the last file checked, ⌘A checks every loaded file and Escape clears.
+While anything is checked a plain click toggles too, so a selection is never
+lost to a stray click; the details open from the context menu. A selection
+belongs to the view: changing place, search or filters clears it, and files
+that leave the view drop out of it.
+
+The floating selection bar (and the context menu on a checked file) acts on
+the selection: **Edit details** (creator, credit and rights in one go; alt
+text describes one picture and is never applied in bulk), **Move** (the folder
+dialog), **Download** (one download per file) and **Delete** (editors). Each
+file is checked on its own on the server, so the result names what was
+refused (someone else's upload for staff, a file still linked) and leaves the
+rest done.
+
+## Renaming
+
+Payload has no rename and drops a submitted `filename` on update, so Byline
+renames the stored file itself (`renameMedia` in `media-library.ts`): under
+the Media row lock, the original and its private preview get hard links under
+the new name, the row is pointed at them (a direct row write, after the
+account's Media update access is checked), and only after the commit are the
+old names unlinked. Nothing ever points at a missing file. The extension (the
+file's type) is not editable, the name is cleaned (no paths, reserved or
+control characters), and a name another file has gets Payload's numbered
+suffix (`-1`). Everything links to Media by ID, so stories, assignments and
+portraits keep the file; its private URL changes. The bytes are the same, so
+the publication revision doesn't move and prepared files stay valid; a
+preparation that read the old name just before the rename retries under the
+new one (`publication-media/task.ts`). Rename in place from the inspector's
+header (Enter saves, Escape cancels) or from the context menu.
+
+## The inspector
+
+A DAM details pane: the header holds the name (rename in place), the type and
+facts, and a menu of file actions (open, download, copy link, delete). Below
+it, the preview with the picture's own actions (*Crops & focal point*, larger
+preview, open, download) and the publication files' status row (with Retry).
+Then three tabs: **Details** (alt text; *Credit*; *Rights & source*;
+*Filing*: captured day and folder; each publishing gap is marked on its own
+field and the marker clears as the reader types), **Uses** and **Info**
+(read-only facts). Save and Cancel sit in a bar pinned to the bottom of the
+panel while there are unsaved changes.
 
 ## Layout and breakpoints
 
