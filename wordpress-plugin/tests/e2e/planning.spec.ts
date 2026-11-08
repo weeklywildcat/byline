@@ -189,7 +189,7 @@ test.describe("Stories board", () => {
     await expect.poll(() => status(session, id)).toBe("pitch");
   });
 
-  test("scrolls sideways on a narrow screen instead of squeezing the stages, with no page overflow", async ({ adminPage: page, adminSession: session }) => {
+  test("scrolls sideways on a narrow screen without squeezing the stages or widening Planning", async ({ adminPage: page, adminSession: session }) => {
     const unique = token();
     await createPlanningStory(session, { title: `${unique} Narrow`, status: "reporting" });
     await keepLanesOpen(page, ["pitch"]);
@@ -198,10 +198,18 @@ test.describe("Stories board", () => {
     await page.getByRole("searchbox", { name: "Search stories" }).fill(unique);
     const scroller = page.locator("[data-board-scroller]");
     await expect(scroller).toBeVisible();
-    const metrics = await scroller.evaluate((element) => ({ scrollable: element.scrollWidth > element.clientWidth, firstColumn: element.children[0]!.getBoundingClientRect().width }));
+    const metrics = await scroller.evaluate((element) => {
+      // The WordPress toolbar sits outside Planning and can itself overflow on phones.
+      const planning = element.closest("main")!;
+      return {
+        scrollable: element.scrollWidth > element.clientWidth,
+        firstColumn: element.children[0]!.getBoundingClientRect().width,
+        planningOverflow: planning.scrollWidth > planning.clientWidth || planning.getBoundingClientRect().right > document.documentElement.clientWidth
+      };
+    });
     expect(metrics.scrollable).toBe(true);
     expect(metrics.firstColumn).toBeGreaterThan(240);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    expect(metrics.planningOverflow).toBe(false);
   });
 });
 

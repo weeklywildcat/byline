@@ -77,7 +77,7 @@ test("Story Peek, sparse: calm header, native sections, no dead space, clear foo
     await route.fulfill({ response, json: { ...body, activity: [] } });
   });
   await fs.mkdir(qa, { recursive: true });
-  for (const width of [1440, 1280, 1024, 768, 390]) {
+  for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(homeUrl);
     await expect(page.getByRole("heading", { name: "My Work", exact: true })).toBeVisible();
@@ -104,9 +104,13 @@ test("Story Peek, sparse: calm header, native sections, no dead space, clear foo
     await expect(production.getByText(/Due Oct 21/)).toBeVisible();
     // Empty links are compact.
     await expect(peek.getByRole("region", { name: "Files & links" }).getByRole("button", { name: "Add link" })).toBeVisible();
-    // The footer reads: workspace on the left, Preview then Edit article on the right.
+    // The footer reads Workspace, Preview, Edit article. The second group can wrap on phones.
     const [open, preview, edit] = await Promise.all(["Open workspace", /^Preview/, "Edit article"].map((name) => peek.getByRole("link", { name }).boundingBox()));
-    expect(open!.x).toBeLessThan(preview!.x);
+    if (width < 640 && preview!.y > open!.y) {
+      expect(open!.y + open!.height).toBeLessThanOrEqual(preview!.y);
+    } else {
+      expect(open!.x).toBeLessThan(preview!.x);
+    }
     expect(preview!.x).toBeLessThan(edit!.x);
     await noHorizontalScroll(page);
     await page.screenshot({ path: `${qa}/peek-sparse-${width}.png`, animations: "disabled" });
