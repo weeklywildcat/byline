@@ -1,8 +1,10 @@
 import { createLocalReq, getPayload, type Payload, type PayloadRequest } from "payload";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { newsroomEndpoints } from "../../src/newsroom/endpoints";
 import { homeBootstrap, screenContext, storyWorkspace } from "../../src/newsroom/screen-models";
 import { scheduledPublicationsForStories } from "../../src/newsroom/scheduled-publication";
+import { changeStoryNote, storyNotes } from "../../src/newsroom/story-notes";
 import type { User } from "../../src/payload-types";
 
 /**
@@ -13,6 +15,7 @@ let payload: Payload;
 const accounts: Record<string, User> = {};
 const people: Record<string, number> = {};
 let storyId: number;
+let portraitUrl: string;
 const TZ = "America/New_York";
 
 async function account(key: string, role: User["role"], person = true) {
@@ -47,6 +50,12 @@ beforeAll(async () => {
   await account("erin", "staff");
   people.guest = (await payload.create({ collection: "people", data: { name: "Guest Columnist", slug: "screens-guest", status: "guest" } })).id;
 
+  // Alice and the guest have a profile photo; carol (no byline person) and erin do not.
+  const photo = await sharp({ create: { width: 400, height: 400, channels: 3, background: "#7b2235" } }).jpeg().toBuffer();
+  const portrait = await payload.create({ collection: "media", data: { alt: "Portrait", credit: "Byline" }, file: { data: photo, name: "screens-portrait.jpg", mimetype: "image/jpeg", size: photo.length } });
+  portraitUrl = `/api/media/file/${encodeURIComponent(portrait.sizes!.library!.filename!)}`;
+  for (const person of [people.alice, people.guest]) await payload.update({ collection: "people", id: person, data: { portrait: portrait.id } });
+
   const req = await reqAs("alice");
   const story = await payload.create({ collection: "stories", draft: true, data: { headline: "Bus routes change", contributors: [people.alice, people.guest] }, req, overrideAccess: false });
   storyId = story.id;
@@ -68,8 +77,8 @@ describe("Home read model", () => {
     expect(row.title).toBe("Bus routes change");
     expect(row.workflow.id).toBe("pitch");
     expect(row.authors).toEqual([
-      { id: accounts.alice.id, name: "alice Writer", kind: "user" },
-      { id: people.guest, name: "Guest Columnist", kind: "guest" }
+      { id: accounts.alice.id, name: "alice Writer", kind: "user", avatarUrl: portraitUrl },
+      { id: people.guest, name: "Guest Columnist", kind: "guest", avatarUrl: portraitUrl }
     ]);
     expect(row.writer?.id).toBe(accounts.alice.id);
     expect(row.openTaskCount).toBe(1);
@@ -93,6 +102,25 @@ describe("Home read model", () => {
     const home = await homeBootstrap(await ctxAs("editor"));
     expect(home.capabilities.review).toBe(true);
     expect(home.stories.some((story) => story.id === storyId)).toBe(true);
+  });
+});
+
+describe("Profile photos", () => {
+  it("show beside every name the screens render, and only where there is a photo", async () => {
+    const workspace = await storyWorkspace(await ctxAs("alice"), storyId);
+    expect(workspace.contributors.contributors.map((entry) => entry.imageUrl)).toEqual([portraitUrl, portraitUrl]);
+    const everyone = workspace.people;
+    expect(everyone.find((person) => person.id === accounts.alice.id)?.imageUrl).toBe(portraitUrl);
+    expect(everyone.find((person) => person.id === accounts.carol.id)?.imageUrl).toBeUndefined();
+    expect(workspace.tasks[0]?.assignee?.imageUrl).toBe(portraitUrl);
+    expect(workspace.currentUser?.avatarUrl).toBe(portraitUrl);
+    expect(workspace.mediaAssignments[0]?.assignee?.avatarUrl).toBeNull();
+  });
+
+  it("show on story notes and reply authors", async () => {
+    await changeStoryNote(await ctxAs("alice"), storyId, null, { text: "Check the depot hours." });
+    const { threads } = await storyNotes(await ctxAs("alice"), storyId, false, 1);
+    expect(threads[0]?.author).toMatchObject({ id: accounts.alice.id, avatarUrl: portraitUrl });
   });
 });
 

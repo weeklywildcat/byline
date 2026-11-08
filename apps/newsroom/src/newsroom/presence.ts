@@ -4,7 +4,7 @@ import { relationId } from "../access/user";
 import { maybePrunePresenceSessions, readPresenceSessions, touchPresence } from "../db/presence-sessions";
 import { canAdministerSystem, COLLECTIONS_PATH, navigationFor, SYSTEM_ADMINISTRATION_PATH } from "../domain/navigation";
 import { effectivePresence, parseHeartbeat, type Heartbeat, type PresenceLocation, type PresencePerson, type PresenceSnapshot, type ResolvedPresenceLocation } from "../domain/presence";
-import { portraits } from "./people";
+import { portraits, portraitUrl } from "./portraits";
 import { readableStories, type ScreenContext } from "./screen-models";
 
 const GENERIC = { label: "Working in Byline" } satisfies ResolvedPresenceLocation;
@@ -123,12 +123,10 @@ export async function presenceSnapshot(ctx: ScreenContext): Promise<PresenceSnap
       continue;
     }
     const asset = media.get(personPortraits.get(Number(relationId(account.linkedPerson))) ?? 0);
-    const filename = asset?.mimeType?.startsWith("image/") ? asset.sizes?.library?.filename : null;
     const person: PresencePerson = {
       key: createHmac("sha256", req.payload.secret).update(`byline-presence:${account.id}`).digest("base64url").slice(0, 22),
       name: account.name, state, lastSeen, lastActive, location: resolved,
-      // Construct a same-origin authenticated Media route; never relay a stored URL.
-      avatarUrl: filename && filename !== "." && filename !== ".." ? `${api}/media/file/${encodeURIComponent(filename)}` : null
+      avatarUrl: portraitUrl(api, asset)
     };
     snapshot.people.push(person);
   }

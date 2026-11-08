@@ -32,7 +32,7 @@ import { localToInstant } from "../domain/dates";
 import { COLLECTION_STATUSES, COLLECTION_TYPES, RESOURCE_KIND_OPTIONS, type CollectionStatus, type CollectionType, type ResourceKind } from "../domain/vocabulary";
 import { effectiveWorkflow, workflowLabel } from "../domain/workflow";
 import type { Appointment, Collection as CollectionDoc, CollectionInterview, CollectionResource, Media, StoryPlan, Task } from "../payload-types";
-import { assigneeList, editorialTask, loadPeople, planningStory, readableStories, resourceKindLabel, storiesWithExtras, userPerson, type People, type ScreenContext } from "./screen-models";
+import { assignable, assigneeList, editorialTask, loadPeople, planningStory, readableStories, resourceKindLabel, storiesWithExtras, userPerson, type People, type ScreenContext } from "./screen-models";
 
 /**
  * Collections' read and write models (`/api/byline/collections/...`): the
@@ -188,17 +188,13 @@ export async function collectionList(ctx: ScreenContext, query: CollectionListQu
   const { rows } = await collectionRows(ctx, found.docs as CollectionDoc[], people);
   return {
     collections: rows,
-    people: assignablePeople(people),
+    people: assignable(people),
     timezone: ctx.timeZone,
     canCreate: collectionCanCreate(ctx.user),
     capabilities: { canCreate: collectionCanCreate(ctx.user), activity: false },
     total: found.totalDocs,
     pages: Math.max(1, found.totalPages)
   };
-}
-
-function assignablePeople(people: People): ContributorEntry[] {
-  return [...people.users.values()].map((user, order) => ({ id: user.id, kind: "user" as const, name: user.name, order }));
 }
 
 /* ---------------------------------------------------------------- detail */
