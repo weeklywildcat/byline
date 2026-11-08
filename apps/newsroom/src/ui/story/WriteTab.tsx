@@ -14,6 +14,8 @@ import { Plus } from "lucide-react";
 import type { ClientField, SanitizedFieldPermissions } from "payload";
 import { useState, type KeyboardEvent } from "react";
 import { STORY_FORMAT_OPTIONS } from "../../domain/vocabulary";
+
+const FORMAT_OPTIONS = STORY_FORMAT_OPTIONS.map((option) => option.value === "standard" ? { ...option, label: "Article" } : option);
 import { ArticleCanvas } from "./ArticleCanvas";
 import { useNewsroomEditorHost } from "./editor-host";
 import { childField, relationIdOf, relationIdsOf, useStoryField } from "./form";
@@ -176,7 +178,7 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
               <Property label="Format">
                 <ChoiceSelect
                   label="Story format"
-                  options={STORY_FORMAT_OPTIONS}
+                  options={FORMAT_OPTIONS}
                   value={(format.value ?? "standard") as (typeof STORY_FORMAT_OPTIONS)[number]["value"]}
                   onChange={(next) => format.setValue(next)}
                   disabled={readOnly}
