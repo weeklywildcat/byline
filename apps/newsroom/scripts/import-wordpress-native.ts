@@ -173,6 +173,25 @@ async function resolveMappedPerson(target: string) {
   return person;
 }
 
+async function accountForPerson(personId: number) {
+  const result = await payload.find({
+    collection: "users",
+    where: { linkedPerson: { equals: personId } },
+    depth: 0,
+    limit: 2,
+    overrideAccess: true,
+  });
+  if (result.totalDocs > 1) throw new Error(`Person ${personId} has multiple sign-in accounts; expected at most one.`);
+  return result.docs[0] as any | undefined;
+}
+
+async function mappedEditorAccount(wordPressUserId: number) {
+  const target = mappings.get(wordPressUserId);
+  if (!target) return undefined;
+  const person = await resolveMappedPerson(target);
+  return accountForPerson(Number(person.id));
+}
+
 function normalizeSocials(value: ExportPerson["socials"]) {
   return (value ?? []).filter((row) => row && text(row.label) && isHttps(row.url)).slice(0, 8)
     .map((row) => ({ label: text(row.label).slice(0, 40), url: row.url }));
@@ -288,7 +307,10 @@ async function plan() {
     const editorialTags = post.tagIds.map((id) => raw.tags.find((term) => term.id === id)?.slug).filter((slug): slug is string => Boolean(slug && EDITORIAL_ONLY_TAG_SLUGS.has(slug)));
     if (editorialTags.length) summary.review.push(`Post ${post.id}: editorial-only WordPress tag(s) omitted from public Topics: ${editorialTags.join(", ")}.`);
     const plan = importedPlan(post);
-    if (plan.oldEditorUserId) summary.review.push(`Post ${post.id}: old WordPress editor user ${plan.oldEditorUserId} is not assigned in Payload; People are imported without login accounts.`);
+    if (plan.oldEditorUserId) {
+      const account = await mappedEditorAccount(plan.oldEditorUserId);
+      if (!account) summary.review.push(`Post ${post.id}: old WordPress editor user ${plan.oldEditorUserId} has no mapped Byline sign-in account, so the editor assignment will be left blank.`);
+    }
     if (plan.oldVisualNeeds) summary.review.push(`Post ${post.id}: old visual-needs note has no direct Payload field and needs review: ${plan.oldVisualNeeds.slice(0, 180)}`);
   }
 }
@@ -400,6 +422,14 @@ async function applyImport() {
     peopleMap.set(key, Number(doc.id));
   }
 
+  const editorAccountMap = new Map<number, number>();
+  for (const person of raw.users) {
+    const personId = peopleMap.get(`user:${person.id}`);
+    if (!personId) continue;
+    const account = await accountForPerson(personId);
+    if (account) editorAccountMap.set(person.id, Number(account.id));
+  }
+
   const sectionMap = new Map<number, number>();
   for (const term of raw.categories) {
     let doc = await byLegacy("sections", term.id) ?? await bySlug("sections", term.slug);
@@ -483,7 +513,7 @@ async function applyImport() {
       id: plans.docs[0].id,
       data: {
         workflow: planInput.workflow,
-        editor: null,
+        editor: planInput.oldEditorUserId ? editorAccountMap.get(planInput.oldEditorUserId) ?? null : null,
         deadline: planInput.deadline,
         plannedPublication: planInput.plannedPublication,
         brief: planInput.brief,
