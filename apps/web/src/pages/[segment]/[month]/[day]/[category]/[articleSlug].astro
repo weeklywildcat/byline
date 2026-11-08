@@ -53,10 +53,10 @@ if (presentation.body.format === "byline-v1") {
   }
 }
 const showPrimaryGame = Boolean(primaryGame && post && !getPostGameScoreGameIds(post).includes(primaryGame.id));
-const title = story?.title ?? stripHtml(post!.title.rendered);
+const title = story ? decodeHtml(story.title) : stripHtml(post!.title.rendered);
 const articleUrl = story?.url ?? absoluteUrl(getPostHref(post!));
 const category = post ? getPrimaryVisibleCategory(post) : null;
-const section = story ? { name: story.section.name, href: story.section.href, slug: params.category }
+const section = story ? { name: decodeHtml(story.section.name), href: story.section.href, slug: params.category }
   : category ? { name: decodeHtml(category.name), href: `/category/${category.slug}/`, slug: category.slug } : null;
 const publication = getPublicationConfig();
 const visualStory = isVisualStory(getStoryPresentation(id));
