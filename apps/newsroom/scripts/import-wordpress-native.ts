@@ -12,6 +12,7 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { parseYouTubeVideoId, youTubeWatchUrl } from "@byline/core";
+import { publicStoryPath } from "@byline/content";
 import type { ArticleBody, ArticleBodyNode, ArticleBlock } from "@byline/article-body";
 import { lexicalFromArticleBody } from "@byline/editor/serialize";
 import { commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction } from "payload";
@@ -19,6 +20,7 @@ import config from "../src/payload.config";
 import { recordPublicMutation } from "../src/public/revision";
 import { CORRECTION_TYPES } from "../src/domain/vocabulary";
 import { MEDIA_MIME_TYPES, MEDIA_UPLOAD_MAX_BYTES } from "../src/collections/Media";
+import { newsroomTimeZone } from "../src/domain/dates";
 
 type ExportPerson = {
   id: number;
@@ -42,7 +44,7 @@ type ExportAttachment = {
 };
 type ExportCorrection = { legacyId?: number | null; type: string; text: string; date: string; source?: string };
 type ExportPost = {
-  id: number; title: string; slug: string; status: "publish" | "draft"; publishedAt?: string; modifiedAt?: string;
+  id: number; title: string; slug: string; status: "publish" | "draft"; publicPath?: string; publishedAt?: string; modifiedAt?: string;
   deck?: string; featuredMediaId?: number | null; featuredCaption?: string; categoryIds: number[]; tagIds: number[];
   contributors: Array<{ type: "user" | "guest"; id: number }>;
   reportingNote?: string; format?: string; videoUrl?: string; presentation?: string; immersiveAlignment?: string;
@@ -114,6 +116,18 @@ const summary: Summary = {
 const isHttps = (value: unknown): value is string => typeof value === "string" && /^https:\/\/\S+$/i.test(value);
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const importContext = { bylineImport: true };
+const EDITORIAL_ONLY_TAG_SLUGS = new Set(["special-coverage", "athlete-of-the-week", "athlete-of-the-month"]);
+const publicTopicTerms = raw.tags.filter((term) => !EDITORIAL_ONLY_TAG_SLUGS.has(term.slug));
+const categoryById = new Map(raw.categories.map((term) => [term.id, term]));
+function sectionWordPressId(post: ExportPost): number | null {
+  const candidates = post.categoryIds.filter((id) => categoryById.get(id)?.slug !== "uncategorized");
+  const match = text(post.publicPath).match(/^\/\d{4}\/\d{2}\/\d{2}\/([^/]+)\/[^/]+\/$/);
+  if (match) {
+    const exact = candidates.find((id) => categoryById.get(id)?.slug === match[1]);
+    if (exact) return exact;
+  }
+  return candidates[0] ?? null;
+}
 
 async function one(collection: any, where: Record<string, unknown>) {
   const result = await payload.find({ collection, where, depth: 0, limit: 2, overrideAccess: true, trash: true } as never);
@@ -205,7 +219,7 @@ async function plan() {
     }
   }
   for (const term of raw.categories) (await byLegacy("sections", term.id) || await bySlug("sections", term.slug)) ? summary.sections.reuse++ : summary.sections.create++;
-  for (const term of raw.tags) (await byLegacy("topics", term.id) || await bySlug("topics", term.slug)) ? summary.topics.reuse++ : summary.topics.create++;
+  for (const term of publicTopicTerms) (await byLegacy("topics", term.id) || await bySlug("topics", term.slug)) ? summary.topics.reuse++ : summary.topics.create++;
   for (const post of raw.posts) (await byLegacy("stories", post.id)) ? summary.stories.update++ : summary.stories.create++;
   for (const post of raw.posts) {
     for (const correction of post.corrections ?? []) {
@@ -235,8 +249,17 @@ async function plan() {
     };
     post.body.nodes.forEach(inspect);
     if (post.featuredMediaId && !knownAttachments.has(post.featuredMediaId)) throw new Error(`Post ${post.id} featured image ${post.featuredMediaId} is missing from the export.`);
-    const sections = post.categoryIds.filter((id) => raw.categories.find((term) => term.id === id)?.slug !== "uncategorized");
-    if (sections.length > 1) summary.review.push(`Post ${post.id}: multiple WordPress categories; importer will use ${sections[0]} as the Section.`);
+    const sectionId = sectionWordPressId(post);
+    const section = sectionId ? categoryById.get(sectionId) : null;
+    if (post.status === "publish") {
+      if (!section) throw new Error(`Published post ${post.id} has no visible WordPress category for its Payload Section.`);
+      const expected = publicStoryPath({ slug: post.slug, sectionSlug: section.slug, publishedAt: post.publishedAt, timeZone: newsroomTimeZone() });
+      if (text(post.publicPath) && expected !== post.publicPath) {
+        throw new Error(`Post ${post.id} URL parity failed: WordPress ${post.publicPath}, Payload would use ${expected || "(no route)"}.`);
+      }
+    }
+    const editorialTags = post.tagIds.map((id) => raw.tags.find((term) => term.id === id)?.slug).filter((slug): slug is string => Boolean(slug && EDITORIAL_ONLY_TAG_SLUGS.has(slug)));
+    if (editorialTags.length) summary.review.push(`Post ${post.id}: editorial-only WordPress tag(s) omitted from public Topics: ${editorialTags.join(", ")}.`);
   }
 }
 
@@ -329,7 +352,7 @@ async function applyImport() {
     sectionMap.set(term.id, Number(doc.id));
   }
   const topicMap = new Map<number, number>();
-  for (const term of raw.tags) {
+  for (const term of publicTopicTerms) {
     let doc = await byLegacy("topics", term.id) ?? await bySlug("topics", term.slug);
     const data = { legacyWordPressId: term.id, name: term.name, slug: term.slug, description: text(term.description) };
     doc = doc
@@ -342,8 +365,8 @@ async function applyImport() {
   for (const post of raw.posts) {
     const body = nativeBody(post.body, mediaMap);
     const lexical = lexicalFromArticleBody(body);
-    const categoryIds = post.categoryIds.filter((id) => raw.categories.find((term) => term.id === id)?.slug !== "uncategorized");
-    const section = categoryIds[0] ? sectionMap.get(categoryIds[0]) ?? null : null;
+    const categoryId = sectionWordPressId(post);
+    const section = categoryId ? sectionMap.get(categoryId) ?? null : null;
     const contributors = post.contributors.map((ref) => peopleMap.get(`${ref.type}:${ref.id}`)).filter((id): id is number => Number.isSafeInteger(id));
     if (contributors.length !== post.contributors.length) throw new Error(`Post ${post.id} has a contributor that was not imported.`);
     const format = post.format === "video" ? "video" : "standard";
