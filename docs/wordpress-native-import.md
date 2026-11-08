@@ -17,7 +17,11 @@ docker exec -i weeklywildcat-wordpress php \
 ```
 
 The PHP script loads WordPress, uses Core's Gutenberg parser and the installed
-Byline helpers, and never writes WordPress. Its JSON contains posts, ordered
+Byline helpers, and never writes WordPress. It exports WordPress's local
+`post_date` / `post_modified` wall-clock values explicitly. Those are the
+source of truth for the date readers saw and for date-based permalinks; the
+importer converts them in Byline's publication timezone instead of trusting a
+possibly stale `post_date_gmt` after historical timezone-setting changes. Its JSON contains posts, ordered
 contributors, People profile facts, taxonomy, corrections and only the Media
 attachments referenced by those records.
 

@@ -8,9 +8,13 @@
  *
  * Apply:
  *   npm run import:wordpress --workspace @byline/newsroom -- --file /migration/wordpress-native.json --map-person 1:gibson --apply
+ *
+ * Explicitly omit a permanently lost WordPress media asset:
+ *   --omit-media WP_ATTACHMENT_ID
  */
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, extname } from "node:path";
+import sharp from "sharp";
 import { parseYouTubeVideoId, youTubeWatchUrl } from "@byline/core";
 import { publicStoryPath } from "@byline/content";
 import type { ArticleBody, ArticleBodyNode, ArticleBlock } from "@byline/article-body";
@@ -20,7 +24,7 @@ import config from "../src/payload.config";
 import { recordPublicMutation } from "../src/public/revision";
 import { CORRECTION_TYPES } from "../src/domain/vocabulary";
 import { MEDIA_MIME_TYPES, MEDIA_UPLOAD_MAX_BYTES } from "../src/collections/Media";
-import { newsroomTimeZone } from "../src/domain/dates";
+import { localToInstant, newsroomTimeZone } from "../src/domain/dates";
 import { isWorkflowStage } from "../src/domain/workflow";
 import { RESOURCE_PURPOSES } from "../src/domain/vocabulary";
 
@@ -40,13 +44,14 @@ type ExportPerson = {
 type ExportGuest = ExportPerson & { hasProfilePage?: boolean; status?: string };
 type ExportTerm = { id: number; name: string; slug: string; description?: string };
 type ExportAttachment = {
-  id: number; url: string; filename: string; mimeType: string; alt?: string; caption?: string;
+  id: number; url: string; candidateUrls?: string[]; inlineDataBase64?: string | null; inlineBytes?: number | null; filename: string; mimeType: string; alt?: string; caption?: string;
   creator?: string; credit?: string; copyright?: string; license?: string; sourceUrl?: string;
-  capturedAt?: string; artDirection?: unknown;
+  capturedAt?: string; artDirection?: unknown; recoveredFromBlock?: boolean;
 };
 type ExportCorrection = { legacyId?: number | null; type: string; text: string; date: string; source?: string };
 type ExportPost = {
-  id: number; title: string; slug: string; status: "publish" | "draft"; publicPath?: string; createdAt?: string; publishedAt?: string; modifiedAt?: string;
+  id: number; title: string; slug: string; status: "publish" | "draft"; publicPath?: string;
+  createdLocal?: string; publishedLocal?: string; modifiedLocal?: string; publishedGmt?: string; modifiedGmt?: string;
   deck?: string; featuredMediaId?: number | null; featuredCaption?: string; categoryIds: number[]; tagIds: number[];
   contributors: Array<{ type: "user" | "guest"; id: number }>;
   reportingNote?: string; format?: string; videoUrl?: string; presentation?: string; immersiveAlignment?: string;
@@ -68,7 +73,7 @@ type WordPressExport = {
 };
 
 type Summary = {
-  media: { create: number; reuse: number };
+  media: { create: number; reuse: number; omitted: number };
   people: { create: number; reuse: number; mapped: number };
   sections: { create: number; reuse: number };
   topics: { create: number; reuse: number };
@@ -96,7 +101,7 @@ function repeated(name: string): string[] {
 }
 const file = argument("--file");
 if (!file) {
-  console.error("Usage: import-wordpress-native.ts --file <export.json> [--map-person WP_ID:PAYLOAD_ID_OR_SLUG] [--apply]");
+  console.error("Usage: import-wordpress-native.ts --file <export.json> [--map-person WP_ID:PAYLOAD_ID_OR_SLUG] [--omit-media WP_ATTACHMENT_ID] [--apply]");
   process.exit(64);
 }
 
@@ -108,6 +113,13 @@ for (const value of repeated("--map-person")) {
   mappings.set(id, target);
 }
 
+const omittedMedia = new Set<number>();
+for (const value of repeated("--omit-media")) {
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new Error(`Invalid --omit-media ${value}; expected a positive WordPress attachment ID.`);
+  omittedMedia.add(id);
+}
+
 const raw = JSON.parse(await readFile(file, "utf8")) as WordPressExport;
 if (raw.schemaVersion !== 1) throw new Error(`Unsupported WordPress export schema ${raw.schemaVersion}.`);
 if ((raw.errors ?? []).length) throw new Error(`WordPress export cannot be imported natively:\n- ${raw.errors!.join("\n- ")}`);
@@ -115,7 +127,7 @@ if (!Array.isArray(raw.posts) || !Array.isArray(raw.attachments) || !Array.isArr
 
 const payload = await getPayload({ config });
 const summary: Summary = {
-  media: { create: 0, reuse: 0 },
+  media: { create: 0, reuse: 0, omitted: 0 },
   people: { create: 0, reuse: 0, mapped: 0 },
   sections: { create: 0, reuse: 0 },
   topics: { create: 0, reuse: 0 },
@@ -128,6 +140,21 @@ const isHttps = (value: unknown): value is string => typeof value === "string" &
 const isHttpUrl = (value: unknown): value is string => typeof value === "string" && /^https?:\/\/\S+$/i.test(value);
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const importContext = { bylineImport: true };
+const CONVERTIBLE_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heif"]);
+function importMediaTarget(attachment: ExportAttachment) {
+  const sourceMime = text(attachment.mimeType).toLowerCase();
+  if ((MEDIA_MIME_TYPES as readonly string[]).includes(sourceMime)) {
+    return { sourceMime, targetMime: sourceMime, filename: attachment.filename || basename(new URL(attachment.url).pathname), convertToJpeg: false };
+  }
+  if (CONVERTIBLE_IMAGE_MIME_TYPES.has(sourceMime)) {
+    const sourceName = attachment.filename || basename(new URL(attachment.url).pathname) || `wordpress-media-${attachment.id}`;
+    const extension = extname(sourceName);
+    const stem = extension ? sourceName.slice(0, -extension.length) : sourceName;
+    return { sourceMime, targetMime: "image/jpeg", filename: `${stem || `wordpress-media-${attachment.id}`}.jpg`, convertToJpeg: true };
+  }
+  throw new Error(`Attachment ${attachment.id} has unsupported MIME type ${attachment.mimeType}.`);
+}
+
 const EDITORIAL_ONLY_TAG_SLUGS = new Set(["special-coverage", "athlete-of-the-week", "athlete-of-the-month"]);
 const publicTopicTerms = raw.tags.filter((term) => !EDITORIAL_ONLY_TAG_SLUGS.has(term.slug));
 const categoryById = new Map(raw.categories.map((term) => [term.id, term]));
@@ -172,18 +199,55 @@ async function resolveMappedPerson(target: string) {
   return person;
 }
 
+async function accountForPerson(personId: number) {
+  const result = await payload.find({
+    collection: "users",
+    where: { linkedPerson: { equals: personId } },
+    depth: 0,
+    limit: 2,
+    overrideAccess: true,
+  });
+  if (result.totalDocs > 1) throw new Error(`Person ${personId} has multiple sign-in accounts; expected at most one.`);
+  return result.docs[0] as any | undefined;
+}
+
+async function mappedEditorAccount(wordPressUserId: number) {
+  const target = mappings.get(wordPressUserId);
+  if (!target) return undefined;
+  const person = await resolveMappedPerson(target);
+  return accountForPerson(Number(person.id));
+}
+
 function normalizeSocials(value: ExportPerson["socials"]) {
   return (value ?? []).filter((row) => row && text(row.label) && isHttps(row.url)).slice(0, 8)
     .map((row) => ({ label: text(row.label).slice(0, 40), url: row.url }));
 }
 
-function mapMediaInNode(node: any, media: Map<number, number>): any {
-  const map = (value: unknown) => typeof value === "number" ? (media.get(value) ?? null) : value;
-  if (node.type === "photo") return { ...node, media: map(node.media) };
-  if (node.type === "gallery") return { ...node, items: (node.items ?? []).map((item: any) => ({ ...item, media: map(item.media) })) };
-  if (["document", "portraitText", "visualChapter", "audio", "annotatedImage"].includes(node.type)) return { ...node, media: map(node.media) };
-  if (node.type === "chartMap") return { ...node, image: map(node.image) };
-  if (node.type === "beforeAfter") return { ...node, before: map(node.before), after: map(node.after) };
+function mapMediaInNode(node: any, media: Map<number, number>): any | null {
+  const mapped = (value: unknown) => typeof value === "number" ? (media.get(value) ?? null) : value;
+  const omitted = (value: unknown) => typeof value === "number" && omittedMedia.has(value);
+
+  if (node.type === "photo") {
+    if (omitted(node.media)) return null;
+    return { ...node, media: mapped(node.media) };
+  }
+  if (node.type === "gallery") {
+    const items = (node.items ?? [])
+      .filter((item: any) => !omitted(item.media))
+      .map((item: any) => ({ ...item, media: mapped(item.media) }));
+    return items.length ? { ...node, items } : null;
+  }
+  if (["document", "portraitText", "visualChapter", "audio", "annotatedImage"].includes(node.type)) {
+    if (omitted(node.media)) return null;
+    return { ...node, media: mapped(node.media) };
+  }
+  if (node.type === "chartMap") {
+    return { ...node, image: omitted(node.image) ? null : mapped(node.image) };
+  }
+  if (node.type === "beforeAfter") {
+    if (omitted(node.before) || omitted(node.after)) return null;
+    return { ...node, before: mapped(node.before), after: mapped(node.after) };
+  }
   if (node.type === "video" && typeof node._sourceUrl === "string") {
     const videoId = parseYouTubeVideoId(node._sourceUrl);
     if (!videoId) throw new Error(`Invalid imported YouTube URL: ${node._sourceUrl}`);
@@ -195,21 +259,90 @@ function mapMediaInNode(node: any, media: Map<number, number>): any {
 
 function nativeBody(body: ArticleBody, media: Map<number, number>): ArticleBody {
   if (body?.format !== "byline-v1" || body.version !== 1 || !Array.isArray(body.nodes)) throw new Error("Export contains a non-native article body.");
-  return { ...body, nodes: body.nodes.map((node) => mapMediaInNode(node, media)) as ArticleBodyNode[], media: {} };
+  const nodes = body.nodes
+    .map((node) => mapMediaInNode(node, media))
+    .filter((node): node is ArticleBodyNode => node !== null);
+  return { ...body, nodes, media: {} };
+}
+
+function attachmentCandidates(attachment: ExportAttachment) {
+  return [...new Set([...(attachment.candidateUrls ?? []), attachment.url].filter(isHttps))];
+}
+
+async function fetchAttachmentSource(attachment: ExportAttachment, probeOnly: boolean) {
+  if (text(attachment.inlineDataBase64)) {
+    const data = Buffer.from(attachment.inlineDataBase64!, "base64");
+    if (!data.length || (attachment.inlineBytes && data.length !== attachment.inlineBytes)) {
+      throw new Error(`Attachment ${attachment.id} has invalid embedded WordPress source bytes.`);
+    }
+    return { url: "wordpress-upload-volume", data: probeOnly ? null as Buffer | null : data };
+  }
+
+  const candidates = attachmentCandidates(attachment);
+  if (!candidates.length) throw new Error(`Attachment ${attachment.id} has no HTTPS source URL.`);
+
+  const failures: string[] = [];
+  for (const url of candidates) {
+    try {
+      const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(30_000) });
+      if (!response.ok) {
+        failures.push(`${url} -> HTTP ${response.status}`);
+        continue;
+      }
+      if (probeOnly) {
+        await response.body?.cancel();
+        return { url, data: null as Buffer | null };
+      }
+      return { url, data: Buffer.from(await response.arrayBuffer()) };
+    } catch (error) {
+      failures.push(`${url} -> ${(error as Error).message}`);
+    }
+  }
+
+  throw new Error(`Attachment ${attachment.id} has no reachable WordPress source. ${failures.slice(0, 4).join("; ")}`);
 }
 
 async function download(attachment: ExportAttachment) {
-  if (!isHttps(attachment.url)) throw new Error(`Attachment ${attachment.id} has no HTTPS source URL.`);
-  if (!(MEDIA_MIME_TYPES as readonly string[]).includes(attachment.mimeType)) throw new Error(`Attachment ${attachment.id} has unsupported MIME type ${attachment.mimeType}.`);
-  const response = await fetch(attachment.url, { redirect: "follow", signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) throw new Error(`Attachment ${attachment.id} download failed: HTTP ${response.status}.`);
-  const data = Buffer.from(await response.arrayBuffer());
-  if (!data.length || data.length > MEDIA_UPLOAD_MAX_BYTES) throw new Error(`Attachment ${attachment.id} is empty or larger than Byline's upload limit.`);
-  return { data, mimetype: attachment.mimeType, name: attachment.filename || basename(new URL(attachment.url).pathname), size: data.length };
+  const target = importMediaTarget(attachment);
+  const source = await fetchAttachmentSource(attachment, false);
+  let data = source.data!;
+  if (!data.length) throw new Error(`Attachment ${attachment.id} is empty.`);
+  if (target.convertToJpeg) {
+    try {
+      data = await sharp(data).autoOrient().jpeg({ quality: 92 }).toBuffer();
+    } catch (error) {
+      throw new Error(`Attachment ${attachment.id} could not be converted from ${target.sourceMime} to JPEG: ${(error as Error).message}`);
+    }
+  }
+  if (data.length > MEDIA_UPLOAD_MAX_BYTES) throw new Error(`Attachment ${attachment.id} is larger than Byline's upload limit after import processing.`);
+  return { data, mimetype: target.targetMime, name: target.filename, size: data.length };
 }
 
 async function plan() {
+  const exportedAttachmentIds = new Set(raw.attachments.map((attachment) => attachment.id));
+  for (const id of omittedMedia) {
+    if (!exportedAttachmentIds.has(id)) throw new Error(`--omit-media ${id} does not exist in the WordPress export.`);
+  }
+
   for (const attachment of raw.attachments) {
+    if (omittedMedia.has(attachment.id)) {
+      summary.media.omitted++;
+      summary.review.push(`Attachment ${attachment.id}: explicitly omitted because the WordPress source is permanently unavailable; affected Story media blocks/items will be removed.`);
+      continue;
+    }
+    const target = importMediaTarget(attachment);
+    if (target.convertToJpeg) summary.review.push(`Attachment ${attachment.id}: ${target.sourceMime} will be converted to JPEG for Byline Media.`);
+    if (attachment.recoveredFromBlock) {
+      const source = await fetchAttachmentSource(attachment, true);
+      if (source.url === "wordpress-upload-volume") {
+        summary.review.push(`Attachment ${attachment.id}: orphaned WordPress media will be imported from bytes recovered directly from the uploads volume.`);
+      } else if (source.url !== attachment.url) {
+        summary.review.push(`Attachment ${attachment.id}: stale primary URL is unavailable; a Gutenberg srcset/source candidate will be used instead.`);
+      }
+    }
+  }
+  for (const attachment of raw.attachments) {
+    if (omittedMedia.has(attachment.id)) continue;
     if (await byLegacy("media", attachment.id)) summary.media.reuse++;
     else summary.media.create++;
   }
@@ -256,7 +389,14 @@ async function plan() {
   }
 
   const knownAttachments = new Set(raw.attachments.map((item) => item.id));
+  const referencedOmissions = new Set<number>();
   for (const post of raw.posts) {
+    if (!text(post.publishedLocal) || !text(post.modifiedLocal)) {
+      throw new Error(`Post ${post.id} is missing WordPress-local publication timestamps; regenerate the export with the current exporter.`);
+    }
+    // Validate conversion now, not during apply.
+    localToInstant(text(post.publishedLocal), newsroomTimeZone());
+    localToInstant(text(post.modifiedLocal), newsroomTimeZone());
     const inspect = (node: any) => {
       const ids: number[] = [];
       if (typeof node.media === "number") ids.push(node.media);
@@ -264,15 +404,22 @@ async function plan() {
       if (typeof node.before === "number") ids.push(node.before);
       if (typeof node.after === "number") ids.push(node.after);
       for (const item of node.items ?? []) if (typeof item.media === "number") ids.push(item.media);
-      for (const id of ids) if (!knownAttachments.has(id)) throw new Error(`Post ${post.id} references attachment ${id}, which is missing from the export.`);
+      for (const id of ids) {
+        if (!knownAttachments.has(id)) throw new Error(`Post ${post.id} references attachment ${id}, which is missing from the export.`);
+        if (omittedMedia.has(id)) referencedOmissions.add(id);
+      }
     };
     post.body.nodes.forEach(inspect);
-    if (post.featuredMediaId && !knownAttachments.has(post.featuredMediaId)) throw new Error(`Post ${post.id} featured image ${post.featuredMediaId} is missing from the export.`);
+    if (post.featuredMediaId) {
+      if (!knownAttachments.has(post.featuredMediaId)) throw new Error(`Post ${post.id} featured image ${post.featuredMediaId} is missing from the export.`);
+      if (omittedMedia.has(post.featuredMediaId)) referencedOmissions.add(post.featuredMediaId);
+    }
     const sectionId = sectionWordPressId(post);
     const section = sectionId ? categoryById.get(sectionId) : null;
     if (post.status === "publish") {
       if (!section) throw new Error(`Published post ${post.id} has no visible WordPress category for its Payload Section.`);
-      const expected = publicStoryPath({ slug: post.slug, sectionSlug: section.slug, publishedAt: post.publishedAt, timeZone: newsroomTimeZone() });
+      const publishedAt = localToInstant(text(post.publishedLocal), newsroomTimeZone());
+      const expected = publicStoryPath({ slug: post.slug, sectionSlug: section.slug, publishedAt, timeZone: newsroomTimeZone() });
       if (text(post.publicPath) && expected !== post.publicPath) {
         throw new Error(`Post ${post.id} URL parity failed: WordPress ${post.publicPath}, Payload would use ${expected || "(no route)"}.`);
       }
@@ -280,8 +427,14 @@ async function plan() {
     const editorialTags = post.tagIds.map((id) => raw.tags.find((term) => term.id === id)?.slug).filter((slug): slug is string => Boolean(slug && EDITORIAL_ONLY_TAG_SLUGS.has(slug)));
     if (editorialTags.length) summary.review.push(`Post ${post.id}: editorial-only WordPress tag(s) omitted from public Topics: ${editorialTags.join(", ")}.`);
     const plan = importedPlan(post);
-    if (plan.oldEditorUserId) summary.review.push(`Post ${post.id}: old WordPress editor user ${plan.oldEditorUserId} is not assigned in Payload; People are imported without login accounts.`);
+    if (plan.oldEditorUserId) {
+      const account = await mappedEditorAccount(plan.oldEditorUserId);
+      if (!account) summary.review.push(`Post ${post.id}: old WordPress editor user ${plan.oldEditorUserId} has no mapped Byline sign-in account, so the editor assignment will be left blank.`);
+    }
     if (plan.oldVisualNeeds) summary.review.push(`Post ${post.id}: old visual-needs note has no direct Payload field and needs review: ${plan.oldVisualNeeds.slice(0, 180)}`);
+  }
+  for (const id of omittedMedia) {
+    if (!referencedOmissions.has(id)) throw new Error(`--omit-media ${id} is not referenced by any imported Story body or featured image.`);
   }
 }
 
@@ -332,6 +485,7 @@ function importedPlan(post: ExportPost) {
 async function applyImport() {
   const mediaMap = new Map<number, number>();
   for (const attachment of raw.attachments) {
+    if (omittedMedia.has(attachment.id)) continue;
     const mediaData = {
       legacyWordPressId: attachment.id,
       alt: text(attachment.alt).slice(0, 600),
@@ -392,6 +546,14 @@ async function applyImport() {
     peopleMap.set(key, Number(doc.id));
   }
 
+  const editorAccountMap = new Map<number, number>();
+  for (const person of raw.users) {
+    const personId = peopleMap.get(`user:${person.id}`);
+    if (!personId) continue;
+    const account = await accountForPerson(personId);
+    if (account) editorAccountMap.set(person.id, Number(account.id));
+  }
+
   const sectionMap = new Map<number, number>();
   for (const term of raw.categories) {
     let doc = await byLegacy("sections", term.id) ?? await bySlug("sections", term.slug);
@@ -427,11 +589,11 @@ async function applyImport() {
       deck: text(post.deck),
       slug: post.slug,
       _status: post.status === "publish" ? "published" : "draft",
-      ...(post.status === "publish" ? { publishedAt: new Date(post.publishedAt || "").toISOString() } : {}),
+      ...(post.status === "publish" ? { publishedAt: localToInstant(text(post.publishedLocal), newsroomTimeZone()) } : {}),
       section,
       topics: post.tagIds.map((id) => topicMap.get(id)).filter((id): id is number => Boolean(id)),
       contributors,
-      featuredMedia: post.featuredMediaId ? mediaMap.get(post.featuredMediaId) ?? null : null,
+      featuredMedia: post.featuredMediaId && !omittedMedia.has(post.featuredMediaId) ? mediaMap.get(post.featuredMediaId) ?? null : null,
       featuredCaption: text(post.featuredCaption),
       contentFormat: "byline-v1",
       body: lexical,
@@ -449,11 +611,8 @@ async function applyImport() {
     }
     storyMap.set(post.id, Number(story.id));
 
-    const createdAt = new Date(post.createdAt || post.publishedAt || "");
-    const modifiedAt = new Date(post.modifiedAt || post.createdAt || post.publishedAt || "");
-    if (!Number.isFinite(createdAt.getTime()) || !Number.isFinite(modifiedAt.getTime())) {
-      throw new Error(`Post ${post.id} has invalid WordPress timestamps.`);
-    }
+    const createdAt = localToInstant(text(post.createdLocal || post.publishedLocal), newsroomTimeZone());
+    const modifiedAt = localToInstant(text(post.modifiedLocal || post.createdLocal || post.publishedLocal), newsroomTimeZone());
     // Payload owns these generated fields for normal writes. The controlled
     // import restores source timestamps directly on the main row so public
     // modifiedAt does not become the migration time. The first ordinary
@@ -461,7 +620,7 @@ async function applyImport() {
     await payload.db.updateOne({
       collection: "stories",
       id: story.id,
-      data: { createdAt: createdAt.toISOString(), updatedAt: modifiedAt.toISOString() } as never,
+      data: { createdAt, updatedAt: modifiedAt } as never,
     });
 
     const planInput = importedPlan(post);
@@ -478,7 +637,7 @@ async function applyImport() {
       id: plans.docs[0].id,
       data: {
         workflow: planInput.workflow,
-        editor: null,
+        editor: planInput.oldEditorUserId ? editorAccountMap.get(planInput.oldEditorUserId) ?? null : null,
         deadline: planInput.deadline,
         plannedPublication: planInput.plannedPublication,
         brief: planInput.brief,

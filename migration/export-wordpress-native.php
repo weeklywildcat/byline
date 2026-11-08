@@ -298,21 +298,105 @@ function ww_convert_blocks(array $blocks, int $postId, int &$sequence, array &$c
     return $nodes;
 }
 
-function ww_collect_attachment_ids(array $blocks, array &$ids): void {
+function ww_block_media_fallback(array $block, int $id): ?array {
+    $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
+    $html = (string) ($block['innerHTML'] ?? '');
+    $candidates = [];
+
+    $push = static function ($value) use (&$candidates): void {
+        if (!is_string($value)) return;
+        $value = html_entity_decode(trim($value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($value === '' || !preg_match('~^https?://~i', $value)) return;
+        if (!in_array($value, $candidates, true)) $candidates[] = $value;
+    };
+
+    if (($block['blockName'] ?? '') === 'core/file') $push($attrs['href'] ?? '');
+
+    if (preg_match_all("~src=[\"']([^\"']+)[\"']~i", $html, $matches)) {
+        foreach ($matches[1] as $url) $push($url);
+    }
+    if (preg_match_all("~srcset=[\"']([^\"']+)[\"']~i", $html, $matches)) {
+        foreach ($matches[1] as $srcset) {
+            foreach (explode(',', html_entity_decode($srcset, ENT_QUOTES | ENT_HTML5, 'UTF-8')) as $candidate) {
+                $parts = preg_split('/\\s+/', trim($candidate));
+                $push($parts[0] ?? '');
+            }
+        }
+    }
+    if (!$candidates) return null;
+
+    $inlineDataBase64 = '';
+    $inlineBytes = 0;
+    $uploads = wp_get_upload_dir();
+    $uploadBase = isset($uploads['basedir']) ? realpath((string) $uploads['basedir']) : false;
+    if ($uploadBase) {
+        foreach ($candidates as $candidateUrl) {
+            $candidatePath = rawurldecode((string) parse_url($candidateUrl, PHP_URL_PATH));
+            if (!preg_match('~/wp-content/uploads/(.+)$~', $candidatePath, $match)) continue;
+            $local = realpath($uploadBase . DIRECTORY_SEPARATOR . ltrim($match[1], '/'));
+            if (!$local || strpos($local, $uploadBase . DIRECTORY_SEPARATOR) !== 0 || !is_file($local)) continue;
+            $size = filesize($local);
+            if ($size === false || $size <= 0 || $size > 50 * 1024 * 1024) continue;
+            $bytes = file_get_contents($local);
+            if ($bytes === false || strlen($bytes) !== $size) continue;
+            $inlineDataBase64 = base64_encode($bytes);
+            $inlineBytes = $size;
+            break;
+        }
+    }
+
+    $url = $candidates[0];
+    $path = (string) parse_url($url, PHP_URL_PATH);
+    $filename = basename($path);
+    $filetype = wp_check_filetype($filename);
+    $mime = ww_text($filetype['type'] ?? '');
+    if ($mime === '') {
+        if (($block['blockName'] ?? '') === 'core/image' || ($attrs['mediaType'] ?? '') === 'image') $mime = 'image/jpeg';
+        else return null;
+    }
+
+    return [
+        'id' => $id,
+        'url' => $url,
+        'candidateUrls' => $candidates,
+        'inlineDataBase64' => $inlineDataBase64 !== '' ? $inlineDataBase64 : null,
+        'inlineBytes' => $inlineBytes ?: null,
+        'filename' => $filename !== '' ? $filename : ('wordpress-media-' . $id),
+        'mimeType' => $mime,
+        'alt' => ww_text($attrs['alt'] ?? ''),
+        'caption' => ww_plain_caption($html),
+        'creator' => '',
+        'credit' => '',
+        'copyright' => '',
+        'license' => '',
+        'sourceUrl' => '',
+        'capturedAt' => '',
+        'artDirection' => null,
+        'recoveredFromBlock' => true,
+    ];
+}
+
+function ww_collect_attachment_ids(array $blocks, array &$ids, array &$fallbacks): void {
     foreach ($blocks as $block) {
         $name = $block['blockName'] ?? null;
         $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
-        foreach (['id', 'mediaId'] as $key) {
+        $keys = $name === 'core/media-text' ? ['mediaId'] : (in_array($name, ['core/image', 'core/file'], true) ? ['id'] : []);
+        foreach ($keys as $key) {
             $id = absint($attrs[$key] ?? 0);
-            if ($id > 0 && get_post_type($id) === 'attachment') $ids[$id] = true;
+            if ($id <= 0) continue;
+            $ids[$id] = true;
+            if (get_post_type($id) !== 'attachment' && !isset($fallbacks[$id])) {
+                $fallback = ww_block_media_fallback($block, $id);
+                if ($fallback) $fallbacks[$id] = $fallback;
+            }
         }
-        ww_collect_attachment_ids((array) ($block['innerBlocks'] ?? []), $ids);
+        ww_collect_attachment_ids((array) ($block['innerBlocks'] ?? []), $ids, $fallbacks);
     }
 }
 
-function ww_attachment(int $id): ?array {
+function ww_attachment(int $id, ?array $fallback = null): ?array {
     $post = get_post($id);
-    if (!$post instanceof WP_Post || $post->post_type !== 'attachment') return null;
+    if (!$post instanceof WP_Post || $post->post_type !== 'attachment') return $fallback;
     $details = function_exists('byline_editorial_media_attachment_details')
         ? byline_editorial_media_attachment_details($id)
         : [];
@@ -330,12 +414,14 @@ function ww_attachment(int $id): ?array {
         'sourceUrl' => '',
         'capturedAt' => '',
         'artDirection' => function_exists('byline_image_art_direction') ? byline_image_art_direction($id) : null,
+        'recoveredFromBlock' => false,
     ];
 }
 
 $warnings = [];
 $errors = [];
 $attachmentIds = [];
+$attachmentFallbacks = [];
 $users = [];
 foreach (get_users() as $user) {
     $photo = absint(get_user_meta($user->ID, '_ww_author_photo_id', true));
@@ -353,6 +439,8 @@ foreach (get_users() as $user) {
         'slug' => (string) $user->user_nicename,
         'pronouns' => ww_text($profile['pronouns'] ?? ''),
         'newsroomRole' => ww_text($profile['role'] ?? (is_array($projected) ? ($projected['role'] ?? '') : '')),
+        'accountEmail' => sanitize_email((string) $user->user_email),
+        'accountRoles' => array_values(array_map('strval', (array) $user->roles)),
         'shortBio' => ww_text($profile['shortBio'] ?? ''),
         'bio' => is_array($projected) ? ww_text($projected['bio'] ?? '') : ww_text(get_user_meta((int) $user->ID, 'description', true)),
         'portraitId' => $photo ?: null,
@@ -401,7 +489,7 @@ $wpPosts = get_posts([
 ]);
 foreach ($wpPosts as $post) {
     $parsed = parse_blocks($post->post_content);
-    ww_collect_attachment_ids($parsed, $attachmentIds);
+    ww_collect_attachment_ids($parsed, $attachmentIds, $attachmentFallbacks);
     $featured = get_post_thumbnail_id($post->ID);
     if ($featured > 0) $attachmentIds[$featured] = true;
 
@@ -452,9 +540,16 @@ foreach ($wpPosts as $post) {
         'slug' => (string) $post->post_name,
         'status' => (string) $post->post_status,
         'publicPath' => $post->post_status === 'publish' ? (string) wp_make_link_relative(get_permalink($post)) : '',
-        'createdAt' => get_post_time('c', true, $post),
-        'publishedAt' => get_post_time('c', true, $post),
-        'modifiedAt' => get_post_modified_time('c', true, $post),
+        // WordPress permalinks and displayed publication dates are anchored to
+        // the local wall-clock fields. Keep those explicitly: post_date_gmt can
+        // diverge after timezone-setting changes and would shift canonical dates.
+        'createdLocal' => str_replace(' ', 'T', (string) $post->post_date),
+        'publishedLocal' => str_replace(' ', 'T', (string) $post->post_date),
+        'modifiedLocal' => str_replace(' ', 'T', (string) $post->post_modified),
+        // Retained only as source-audit facts; Payload publication times below
+        // are derived from the local wall clock in the publication timezone.
+        'publishedGmt' => str_replace(' ', 'T', (string) $post->post_date_gmt) . 'Z',
+        'modifiedGmt' => str_replace(' ', 'T', (string) $post->post_modified_gmt) . 'Z',
         'deck' => trim(wp_strip_all_tags((string) $post->post_excerpt)),
         'featuredMediaId' => $featured ?: null,
         'featuredCaption' => $featured ? (string) wp_get_attachment_caption($featured) : '',
@@ -483,9 +578,17 @@ foreach ($wpPosts as $post) {
 ksort($attachmentIds);
 $attachments = [];
 foreach (array_keys($attachmentIds) as $id) {
-    $attachment = ww_attachment((int) $id);
-    if ($attachment) $attachments[] = $attachment;
-    else $errors[] = "Attachment {$id} is referenced but missing.";
+    $attachment = ww_attachment((int) $id, $attachmentFallbacks[$id] ?? null);
+    if ($attachment) {
+        $attachments[] = $attachment;
+        if (!empty($attachment['recoveredFromBlock'])) {
+            $warnings[] = !empty($attachment['inlineDataBase64'])
+                ? "Attachment {$id} is missing from the WordPress Media Library; recovered from the WordPress uploads filesystem."
+                : "Attachment {$id} is missing from the WordPress Media Library; only Gutenberg URL candidates remain.";
+        }
+    } else {
+        $errors[] = "Attachment {$id} is referenced by migrated content but has no WordPress attachment record or recoverable block URL.";
+    }
 }
 
 $payload = [
