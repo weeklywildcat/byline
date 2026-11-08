@@ -3,10 +3,11 @@ import { collectMediaUses } from "@byline/editor/normalize";
 
 /**
  * The Media a Story's form publishes, as one stable string (`lead=12&ids=3,4`
- * with sorted IDs). The Story header derives it from Payload's own form state
- * with a selector, so typing text never changes it and never sends a request;
- * only adding, removing or swapping Media does. The server applies the same
- * rule (`publication-media/readiness.ts`, `storyMediaRequirements`).
+ * with sorted IDs, plus `alt=` for body uses whose story-specific alt text
+ * satisfies accessibility). The Story header derives it from Payload's form
+ * state; ordinary copy edits keep it stable, while adding/removing Media or
+ * crossing empty/non-empty alt text refreshes readiness. The server applies
+ * the same rule (`publication-media/readiness.ts`, `storyMediaRequirements`).
  */
 export function storyMediaReadinessQuery(input: { featuredMedia: unknown; body: unknown; contentFormat: unknown }): string {
   const lead = mediaIdOf(input.featuredMedia);
