@@ -202,7 +202,10 @@ export function splitFilename(filename: string): { stem: string; extension: stri
 export function cleanMediaName(input: string, extension: string): string {
   let name = input.normalize("NFC").replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, " ").replace(/\s+/g, " ").trim();
   if (extension && name.toLowerCase().endsWith(extension.toLowerCase())) name = name.slice(0, -extension.length).trim();
-  name = name.replace(/^[.\s]+/, "").replace(/[.\s]+$/, "");
+  name = name.replace(/^[. ]+/, "");
+  let end = name.length;
+  while (end > 0 && (name[end - 1] === "." || name[end - 1] === " ")) end -= 1;
+  name = name.slice(0, end);
   return name.slice(0, MEDIA_NAME_MAX).trim();
 }
 

@@ -220,34 +220,33 @@ test.describe("Planning destinations are one design system", () => {
         ).ok,
       ).toBe(true);
     await page.goto(`${planning("collections")}&collection=${id}`);
-    await page.getByRole("button", { name: "Publish as coverage" }).click();
-    const dialog = page.getByRole("dialog", {
-      name: "Public coverage",
-      exact: true,
-    });
-    await dialog
+    await page.getByRole("tab", { name: "Public", exact: true }).click();
+    const presentation = page.getByRole("tabpanel", { name: "Public", exact: true });
+    await presentation.getByLabel("Visibility").click();
+    await page.getByRole("option", { name: "Public", exact: true }).click();
+    await presentation
       .getByLabel("Public title", { exact: true })
       .fill(`${unique} Reader guide`);
     const slug = `${unique.toLowerCase()}-guide`;
-    await dialog.getByLabel("URL slug", { exact: true }).fill(slug);
-    await dialog
-      .getByLabel("Short description / dek")
+    await presentation.getByLabel("URL slug", { exact: true }).fill(slug);
+    await presentation
+      .getByLabel("Short description")
       .fill("A reader-facing introduction.");
-    await dialog
+    await presentation
       .getByLabel("Public overview", { exact: true })
       .fill("Public context.");
-    await dialog.getByLabel("Featured / lead story").click();
+    await presentation.getByLabel("Lead story").click();
     await page
       .getByRole("option", { name: `${unique} Published lead`, exact: true })
       .click();
-    await dialog
+    await presentation
       .getByRole("button", {
         name: `Move ${unique} Published first down`,
         exact: true,
       })
       .click();
-    await dialog.getByRole("button", { name: "Save public coverage" }).click();
-    await expect(dialog).not.toBeVisible();
+    await presentation.getByRole("button", { name: "Save public presentation" }).click();
+    await expect(presentation.getByRole("link", { name: "View coverage" })).toBeVisible();
     const saved = await session.rest<{
       collection: {
         publicPresentation: { storyOrder: number[]; featuredStoryId: number };
@@ -255,8 +254,8 @@ test.describe("Planning destinations are one design system", () => {
     }>(`/byline/v1/editorial/collections/${id}`);
     expect(saved.payload.collection.publicPresentation.storyOrder).toEqual([
       lead,
-      first,
       draft,
+      first,
     ]);
     expect(saved.payload.collection.publicPresentation.featuredStoryId).toBe(
       lead,
@@ -279,13 +278,12 @@ test.describe("Planning destinations are one design system", () => {
     await expect(
       page.getByRole("link", { name: "View coverage" }),
     ).toHaveAttribute("href", new RegExp(`/coverage/${slug}/`));
-    await page.getByRole("button", { name: "Edit public coverage" }).click();
-    await dialog.getByLabel("Visibility").click();
+    await presentation.getByLabel("Visibility").click();
     await page
       .getByRole("option", { name: "Newsroom only", exact: true })
       .click();
-    await dialog.getByRole("button", { name: "Save public coverage" }).click();
-    await expect(dialog).not.toBeVisible();
+    await presentation.getByRole("button", { name: "Save public presentation" }).click();
+    await expect(presentation.getByRole("link", { name: "View coverage" })).toBeHidden();
     expect((await session.rest(`/byline/v1/coverage/${slug}`)).status).toBe(
       404,
     );
