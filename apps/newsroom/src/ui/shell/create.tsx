@@ -19,7 +19,7 @@ import { ShellLayer } from "./layer";
 import { useShellNavigation } from "./navigation";
 
 /** `storyId`: a task starts linked to a story. `folderId`: an upload goes to that folder (null: Unfiled). */
-export type CreateOptions = { storyId?: number | null; folderId?: number | null };
+export type CreateOptions = { storyId?: number | null; folderId?: number | null; showUploadsInPicker?: () => void };
 
 type BylineCreate = {
   /** What this account may create, in menu order; the first is the primary action. */
@@ -58,7 +58,7 @@ export function BylineCreateProvider({ children }: { children: ReactNode }) {
   const media = useMemo(() => createPayloadMediaFetchers(routes.api), [routes.api]);
   const collections = useMemo(() => createPayloadCollectionApi(routes.api), [routes.api]);
   const client = useQueryClient();
-  const [request, setRequest] = useState<{ kind: CreateKind; storyId: number | null; folderId: number | null } | null>(null);
+  const [request, setRequest] = useState<{ kind: CreateKind; storyId: number | null; folderId: number | null; showUploadsInPicker?: () => void } | null>(null);
   // Uploads keep running after the dialog closes; its root stays mounted until they finish.
   const [uploading, setUploading] = useState(false);
   const actions = useMemo(() => (account ? createActionsFor(account.role) : []), [account?.role]);
@@ -69,8 +69,7 @@ export function BylineCreateProvider({ children }: { children: ReactNode }) {
     if (!actions.some((action) => action.kind === kind)) return;
     // On a Story screen, a new task starts linked to that story.
     const storyId = options?.storyId !== undefined ? options.storyId : kind === "task" ? storyIdFromPath(pathname, routes.admin) : null;
-    // An upload from anywhere but Media lands in Unfiled, where it is easy to find and file.
-    setRequest({ kind, storyId, folderId: options?.folderId ?? null });
+    setRequest({ kind, storyId, folderId: options?.folderId ?? null, showUploadsInPicker: options?.showUploadsInPicker });
   }, [actions, pathname, routes.admin]);
 
   const value = useMemo<BylineCreate>(() => ({ actions, openCreate, creating: request !== null }), [actions, openCreate, request]);
@@ -106,7 +105,8 @@ export function BylineCreateProvider({ children }: { children: ReactNode }) {
               fetchers={media}
               folderId={request?.kind === "media" ? request.folderId : null}
               onBusyChange={setUploading}
-              onShow={(folderId) => navigate(`${routes.admin}/media${mediaRouteSearch(folderId === null ? { ...DEFAULT_MEDIA_ROUTE, source: "unfiled" } : { ...DEFAULT_MEDIA_ROUTE, folderId })}`)}
+              showLabel={request?.showUploadsInPicker ? "Show uploads in picker" : undefined}
+              onShow={request?.showUploadsInPicker ?? ((folderId) => navigate(`${routes.admin}/media${mediaRouteSearch(folderId === null ? { ...DEFAULT_MEDIA_ROUTE, source: "unfiled" } : { ...DEFAULT_MEDIA_ROUTE, folderId })}`))}
             />
           </ShellLayer>
         </>

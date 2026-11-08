@@ -13,6 +13,7 @@ import type { MediaAssignmentType } from "@byline/newsroom-screens/workspace/wor
 import { usePreferences } from "@payloadcms/ui";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useNewsroomAccount, useNewsroomRoutes } from "../shell/account";
+import { useBylineCreate } from "../shell/create";
 import { ShellLayer } from "../shell/layer";
 import { useNewsroomTimeZone } from "../shell/timezone";
 import { createPayloadMediaFetchers, payloadMediaPreferences } from "./payload-media-fetchers";
@@ -99,6 +100,7 @@ export function useBylineMediaPicker(): MediaPicker {
 export function MediaWorkspaceShell({ children }: { children: ReactNode }) {
   const routes = useNewsroomRoutes();
   const account = useNewsroomAccount();
+  const { creating, openCreate } = useBylineCreate();
   const timezone = useNewsroomTimeZone();
   const { getPreference, setPreference } = usePreferences();
   const store = useRef({ getPreference, setPreference });
@@ -168,6 +170,7 @@ export function MediaWorkspaceShell({ children }: { children: ReactNode }) {
         <ShellLayer active={picking !== null}>
           <MediaPickerDialog
             open={picking !== null}
+            suspended={creating}
             onOpenChange={(open) => { if (!open) settle([]); }}
             fetchers={fetchers}
             timezone={timezone}
@@ -176,6 +179,7 @@ export function MediaWorkspaceShell({ children }: { children: ReactNode }) {
             title={picking?.title}
             confirmLabel={picking?.confirmLabel}
             multiple={picking?.multiple ?? true}
+            onUpload={(folderId, showUploadsInPicker) => openCreate("media", { folderId, showUploadsInPicker })}
             onConfirm={(assets) => settle(assets)}
           />
         </ShellLayer>
