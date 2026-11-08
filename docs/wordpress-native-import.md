@@ -80,9 +80,9 @@ The importer:
 - creates/reuses Sections and Topics by legacy ID or slug;
 - converts every Story to `contentFormat: byline-v1` and stores native Lexical
   JSON;
-- preserves published/draft state, original published timestamp, slug, deck,
-  ordered byline, featured Media/caption, story format/video, reporting note
-  and presentation;
+- preserves published/draft state, original publication and modification
+  timestamps, slug, deck, ordered byline, featured Media/caption, story
+  format/video, reporting note and presentation;
 - preserves the useful private Story plan: workflow stage, deadline, planned
   publication, brief and resource links; old assigned-editor IDs are reported
   for review instead of creating login accounts, and legacy visual-needs notes
