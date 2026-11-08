@@ -272,6 +272,9 @@ describe("People routes and access", () => {
         ?.library?.url,
     );
     expect(
+      (await payload.findByID({ collection: "users", id: accounts.writer.id, depth: 0 })).name,
+    ).toBe("Alex Writer");
+    expect(
       (await patch("writer", persons.writer, { portrait: null })).body.person
         .portrait,
     ).toBeNull();
