@@ -343,8 +343,10 @@ function ww_block_media_fallback(array $block, int $id): ?array {
 
 function ww_collect_attachment_ids(array $blocks, array &$ids, array &$fallbacks): void {
     foreach ($blocks as $block) {
+        $name = $block['blockName'] ?? null;
         $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
-        foreach (['id', 'mediaId'] as $key) {
+        $keys = $name === 'core/media-text' ? ['mediaId'] : (in_array($name, ['core/image', 'core/file'], true) ? ['id'] : []);
+        foreach ($keys as $key) {
             $id = absint($attrs[$key] ?? 0);
             if ($id <= 0) continue;
             $ids[$id] = true;
