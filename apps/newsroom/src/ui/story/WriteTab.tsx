@@ -15,7 +15,6 @@ import type { ClientField, SanitizedFieldPermissions } from "payload";
 import { useState, type KeyboardEvent } from "react";
 import { STORY_FORMAT_OPTIONS } from "../../domain/vocabulary";
 
-const FORMAT_OPTIONS = STORY_FORMAT_OPTIONS.map((option) => option.value === "standard" ? { ...option, label: "Article" } : option);
 import { ArticleCanvas } from "./ArticleCanvas";
 import { useNewsroomEditorHost } from "./editor-host";
 import { childField, relationIdOf, relationIdsOf, useStoryField } from "./form";
@@ -25,6 +24,8 @@ import { QuickCreateRelation } from "./QuickCreateRelation";
 import { MultiPicker, SinglePicker, useOptions } from "./RelationPickers";
 import type { StoryScreenContext } from "./StoryScreen";
 import type { Id } from "./types";
+
+const FORMAT_OPTIONS = STORY_FORMAT_OPTIONS.map((option) => option.value === "standard" ? { ...option, label: "Article" } : option);
 
 type ChildPaths = {
   fields: ClientField[];
