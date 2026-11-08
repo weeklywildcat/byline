@@ -55,6 +55,7 @@ type ExportPost = {
     workflow?: string;
     editorUserId?: number | null;
     deadline?: string;
+    visuals?: string;
     plannedPublication?: string;
     brief?: string;
     resources?: Array<{ label: string; url: string; purpose: string }>;
@@ -272,6 +273,7 @@ async function plan() {
     if (editorialTags.length) summary.review.push(`Post ${post.id}: editorial-only WordPress tag(s) omitted from public Topics: ${editorialTags.join(", ")}.`);
     const plan = importedPlan(post);
     if (plan.oldEditorUserId) summary.review.push(`Post ${post.id}: old WordPress editor user ${plan.oldEditorUserId} is not assigned in Payload; People are imported without login accounts.`);
+    if (plan.oldVisualNeeds) summary.review.push(`Post ${post.id}: old visual-needs note has no direct Payload field and needs review: ${plan.oldVisualNeeds.slice(0, 180)}`);
   }
 }
 
@@ -315,6 +317,7 @@ function importedPlan(post: ExportPost) {
     brief: text(plan.brief).slice(0, 4000),
     resources,
     oldEditorUserId: Number(plan.editorUserId) > 0 ? Number(plan.editorUserId) : null,
+    oldVisualNeeds: text(plan.visuals),
   };
 }
 
