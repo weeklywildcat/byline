@@ -19,6 +19,7 @@ test("clicking a task opens Story Peek in the side sheet on Today and Stories", 
     const peek = page.getByRole("dialog");
     await expect(peek).toBeVisible();
     await expect(peek).toContainText(title);
+    await expect(peek).toHaveCSS("opacity", "1");
     const box = (await peek.boundingBox())!;
     expect(box.width, "the sheet must not fill the screen").toBeLessThanOrEqual(480);
     expect(box.x + box.width).toBeGreaterThanOrEqual(1440 - 1);
