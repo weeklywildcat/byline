@@ -601,6 +601,15 @@ describe("Creation and public identity management", () => {
       }),
     ).rejects.toThrow("already has a Byline sign-in account");
   });
+  it("accepts social profile URLs whose path contains an @ handle", async () => {
+    const url = "https://www.youtube.com/@weeklywildcat";
+    const result = await patch("writer", persons.writer, {
+      socials: [{ label: "YouTube", url }],
+    });
+    expect(result.status).toBe(200);
+    expect(result.body.person.socials).toEqual([{ label: "YouTube", url }]);
+  });
+
   it.each([
     "javascript:alert(1)",
     "http://example.test",
