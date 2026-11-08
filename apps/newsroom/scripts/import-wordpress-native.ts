@@ -41,9 +41,9 @@ type ExportPerson = {
 type ExportGuest = ExportPerson & { hasProfilePage?: boolean; status?: string };
 type ExportTerm = { id: number; name: string; slug: string; description?: string };
 type ExportAttachment = {
-  id: number; url: string; filename: string; mimeType: string; alt?: string; caption?: string;
+  id: number; url: string; candidateUrls?: string[]; filename: string; mimeType: string; alt?: string; caption?: string;
   creator?: string; credit?: string; copyright?: string; license?: string; sourceUrl?: string;
-  capturedAt?: string; artDirection?: unknown;
+  capturedAt?: string; artDirection?: unknown; recoveredFromBlock?: boolean;
 };
 type ExportCorrection = { legacyId?: number | null; type: string; text: string; date: string; source?: string };
 type ExportPost = {
@@ -234,12 +234,37 @@ function nativeBody(body: ArticleBody, media: Map<number, number>): ArticleBody 
   return { ...body, nodes: body.nodes.map((node) => mapMediaInNode(node, media)) as ArticleBodyNode[], media: {} };
 }
 
+function attachmentCandidates(attachment: ExportAttachment) {
+  return [...new Set([...(attachment.candidateUrls ?? []), attachment.url].filter(isHttps))];
+}
+
+async function fetchAttachmentSource(attachment: ExportAttachment, probeOnly: boolean) {
+  const candidates = attachmentCandidates(attachment);
+  if (!candidates.length) throw new Error(`Attachment ${attachment.id} has no HTTPS source URL.`);
+  const failures: string[] = [];
+  for (const url of candidates) {
+    try {
+      const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(30_000) });
+      if (!response.ok) {
+        failures.push(`${url} -> HTTP ${response.status}`);
+        continue;
+      }
+      if (probeOnly) {
+        await response.body?.cancel();
+        return { url, data: null as Buffer | null };
+      }
+      return { url, data: Buffer.from(await response.arrayBuffer()) };
+    } catch (error) {
+      failures.push(`${url} -> ${(error as Error).message}`);
+    }
+  }
+  throw new Error(`Attachment ${attachment.id} has no reachable WordPress source. ${failures.slice(0, 4).join("; ")}`);
+}
+
 async function download(attachment: ExportAttachment) {
-  if (!isHttps(attachment.url)) throw new Error(`Attachment ${attachment.id} has no HTTPS source URL.`);
   const target = importMediaTarget(attachment);
-  const response = await fetch(attachment.url, { redirect: "follow", signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) throw new Error(`Attachment ${attachment.id} download failed: HTTP ${response.status}.`);
-  let data = Buffer.from(await response.arrayBuffer());
+  const source = await fetchAttachmentSource(attachment, false);
+  let data = source.data!;
   if (!data.length) throw new Error(`Attachment ${attachment.id} is empty.`);
   if (target.convertToJpeg) {
     try {
@@ -254,9 +279,12 @@ async function download(attachment: ExportAttachment) {
 
 async function plan() {
   for (const attachment of raw.attachments) {
-    if (!isHttps(attachment.url)) throw new Error(`Attachment ${attachment.id} has no HTTPS source URL.`);
     const target = importMediaTarget(attachment);
     if (target.convertToJpeg) summary.review.push(`Attachment ${attachment.id}: ${target.sourceMime} will be converted to JPEG for Byline Media.`);
+    if (attachment.recoveredFromBlock) {
+      const source = await fetchAttachmentSource(attachment, true);
+      if (source.url !== attachment.url) summary.review.push(`Attachment ${attachment.id}: stale primary URL is unavailable; a Gutenberg srcset/source candidate will be used instead.`);
+    }
   }
   for (const attachment of raw.attachments) {
     if (await byLegacy("media", attachment.id)) summary.media.reuse++;
