@@ -46,7 +46,7 @@ type ExportAttachment = {
 };
 type ExportCorrection = { legacyId?: number | null; type: string; text: string; date: string; source?: string };
 type ExportPost = {
-  id: number; title: string; slug: string; status: "publish" | "draft"; publicPath?: string; publishedAt?: string; modifiedAt?: string;
+  id: number; title: string; slug: string; status: "publish" | "draft"; publicPath?: string; createdAt?: string; publishedAt?: string; modifiedAt?: string;
   deck?: string; featuredMediaId?: number | null; featuredCaption?: string; categoryIds: number[]; tagIds: number[];
   contributors: Array<{ type: "user" | "guest"; id: number }>;
   reportingNote?: string; format?: string; videoUrl?: string; presentation?: string; immersiveAlignment?: string;
@@ -441,6 +441,21 @@ async function applyImport() {
       story = await payload.create({ collection: "stories", data: data as never, draft: post.status !== "publish", overrideAccess: true, context: importContext });
     }
     storyMap.set(post.id, Number(story.id));
+
+    const createdAt = new Date(post.createdAt || post.publishedAt || "");
+    const modifiedAt = new Date(post.modifiedAt || post.createdAt || post.publishedAt || "");
+    if (!Number.isFinite(createdAt.getTime()) || !Number.isFinite(modifiedAt.getTime())) {
+      throw new Error(`Post ${post.id} has invalid WordPress timestamps.`);
+    }
+    // Payload owns these generated fields for normal writes. The controlled
+    // import restores source timestamps directly on the main row so public
+    // modifiedAt does not become the migration time. The first ordinary
+    // Byline edit will naturally advance updatedAt again.
+    await payload.db.updateOne({
+      collection: "stories",
+      id: story.id,
+      data: { createdAt: createdAt.toISOString(), updatedAt: modifiedAt.toISOString() } as never,
+    });
 
     const planInput = importedPlan(post);
     const plans = await payload.find({
