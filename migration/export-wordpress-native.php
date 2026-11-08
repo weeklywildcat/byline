@@ -431,6 +431,21 @@ foreach ($wpPosts as $post) {
         ? byline_get_story_contributor_entries((int) $post->ID, true)
         : [['type' => 'user', 'id' => (int) $post->post_author]];
 
+    $editorial = function_exists('byline_get_editorial_story_state')
+        ? byline_get_editorial_story_state((int) $post->ID)
+        : [];
+    $resourceRows = get_post_meta((int) $post->ID, '_byline_story_resources', true);
+    $resources = function_exists('byline_story_resources_normalize')
+        ? byline_story_resources_normalize(is_array($resourceRows) ? $resourceRows : [])
+        : [];
+    $resources = array_map(static function (array $resource): array {
+        return [
+            'label' => ww_text($resource['label'] ?? ''),
+            'url' => ww_text($resource['url'] ?? ''),
+            'purpose' => ww_text($resource['purpose'] ?? 'other') ?: 'other',
+        ];
+    }, $resources);
+
     $posts[] = [
         'id' => (int) $post->ID,
         'title' => (string) $post->post_title,
@@ -452,6 +467,14 @@ foreach ($wpPosts as $post) {
         'immersiveAlignment' => function_exists('byline_story_presentation_settings') ? (string) (byline_story_presentation_settings((int) $post->ID)['immersiveAlignment'] ?? 'bottom-left') : 'bottom-left',
         'body' => ['format' => 'byline-v1', 'version' => 1, 'nodes' => $nodes, 'media' => (object) []],
         'corrections' => $corrections,
+        'plan' => [
+            'workflow' => ww_text($editorial['storedStatus'] ?? 'pitch') ?: 'pitch',
+            'editorUserId' => absint($editorial['editorId'] ?? 0) ?: null,
+            'deadline' => ww_text($editorial['deadline'] ?? ''),
+            'plannedPublication' => function_exists('byline_get_editorial_planned_publish_at') ? byline_get_editorial_planned_publish_at((int) $post->ID) : '',
+            'brief' => ww_text(get_post_meta((int) $post->ID, '_byline_story_brief', true)),
+            'resources' => $resources,
+        ],
     ];
 }
 
