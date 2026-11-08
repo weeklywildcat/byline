@@ -19,6 +19,11 @@ export type BylineEditorHost = {
   /** Opens the asset in the Media workspace, where its credit and alt text are edited for every story. */
   mediaHref?: (id: MediaId) => string;
   /**
+   * Opens the host's full Media details inspector without leaving the article.
+   * Returns the latest saved asset when it closes so the canvas can refresh.
+   */
+  editMediaDetails?: (id: MediaId) => Promise<ArticleMediaAsset | null>;
+  /**
    * Opens the host's art-direction editor (focal point, crops) for an image.
    * Resolves true when the reader saved changes. The editor never knows the
    * CMS endpoint behind it.
@@ -170,6 +175,16 @@ export function useUploadMedia() {
     store.primeAssets([asset]);
     return asset;
   } : null), [store, uploadMedia]);
+}
+
+/** Opens the host's Media details inspector and refreshes the editor's asset cache after a save. */
+export function useEditMediaDetails() {
+  const { editMediaDetails, store } = useBylineEditorHost();
+  return useMemo(() => (editMediaDetails ? async (id: MediaId) => {
+    const asset = await editMediaDetails(id);
+    if (asset) store.primeAssets([asset]);
+    return asset;
+  } : null), [editMediaDetails, store]);
 }
 
 /** Polite announcements for block edits (add, move, remove), read by screen readers. */
