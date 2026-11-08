@@ -14,6 +14,7 @@ import * as migration_20261107_221914_newsroom_notes_and_health from './20261107
 import * as migration_20261107_224351_remember_story_public_paths from './20261107_224351_remember_story_public_paths';
 import * as migration_20261108_163507_video_facts from './20261108_163507_video_facts';
 import * as migration_20261108_165129_notifications from './20261108_165129_notifications';
+import * as migration_20261108_173200_public_deploy_hook from './20261108_173200_public_deploy_hook';
 
 export const migrations = [
   {
@@ -95,5 +96,10 @@ export const migrations = [
     up: migration_20261108_165129_notifications.up,
     down: migration_20261108_165129_notifications.down,
     name: '20261108_165129_notifications'
+  },
+  {
+    up: migration_20261108_173200_public_deploy_hook.up,
+    down: migration_20261108_173200_public_deploy_hook.down,
+    name: '20261108_173200_public_deploy_hook'
   },
 ];
