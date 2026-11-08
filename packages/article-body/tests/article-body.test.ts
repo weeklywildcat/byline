@@ -13,6 +13,7 @@ import {
   paragraphsFromText,
   periodStarts,
   safeHref,
+  validateArticleBody,
   type ArticleBlock,
   type MediaLookup
 } from "../src";
