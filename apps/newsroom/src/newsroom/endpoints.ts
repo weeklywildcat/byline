@@ -41,6 +41,7 @@ function readinessQuery(params: URLSearchParams): MediaRequirement[] {
   return [...(lead ? [{ id: lead, role: "image" as const }] : []), ...[...new Set(others)].map((value) => ({ id: value, role: "file" as const }))].slice(0, 200);
 }
 import { planningResponse } from "./planning";
+import { navigationCounts } from "./navigation-counts";
 import { parseScheduleQuery, scheduleResponse, scheduleToday } from "./schedule";
 import {
   addResource,
@@ -582,6 +583,8 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/presets", method: "get", handler: handle(async () => presetsPayload()) },
   // The Stories collection (Board and List). Board moves and inline edits use /stories/:id/workflow.
   { path: "/byline/planning", method: "get", handler: handle((ctx, req) => planningResponse(ctx, parsePlanningFilterParams(req.searchParams))) },
+  // The sidebar's open-work counts (Stories, Media, Collections and the promoted Stories views).
+  { path: "/byline/navigation-counts", method: "get", handler: handle((ctx) => navigationCounts(ctx)) },
   { path: "/byline/schedule", method: "get", handler: handle((ctx, req) => scheduleResponse(ctx, parseScheduleQuery(req.searchParams, scheduleToday(ctx)))) },
   { path: "/byline/stories", method: "post", handler: handle(createStory) },
   // Live Preview's presentation context: corrections, related/More by candidates, series. Not part of the typing loop.

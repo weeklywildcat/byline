@@ -289,7 +289,7 @@ describe("the global icon rail", () => {
 
   it("global destinations leave the workspace for the ordinary screen", async () => {
     await render();
-    expect($("[data-byline-rail] a[aria-label='Byline Home']")!.getAttribute("href")).toBe("/admin");
+    expect($("[data-byline-rail] a[aria-label='Weekly Wildcat Home']")!.getAttribute("href")).toBe("/admin");
   });
 });
 

@@ -7,6 +7,7 @@ import { HomeApp } from "@byline/newsroom-screens/home/HomeApp";
 import { createHomeFetchers } from "@byline/newsroom-screens/home/home-api";
 import type { HomeNavigationCapabilities } from "@byline/newsroom-screens/home/home-model";
 import { workspaceUrlFor } from "@byline/newsroom-screens/home/newsroom-model";
+import { localHomePreferences } from "@byline/newsroom-screens/home/desk-model";
 import { createWordPressCollectionApi } from "./collections/wordpress-collection-api";
 import { WordPressCollectionLinks } from "./collections/WordPressCollections";
 import "./home/style.css";
@@ -38,7 +39,9 @@ if (legacyTarget) window.location.replace(legacyTarget);
 if (root && config && !legacyTarget) {
   apiFetch.use(apiFetch.createNonceMiddleware(config.nonce));
   const fetchers = createHomeFetchers((options) => apiFetch(options), {}, config.capabilities, { collections: createWordPressCollectionApi((options) => apiFetch(options), config.currentUserId) });
-  createRoot(root).render(<HomeBoundary><WordPressCollectionLinks><HomeApp fetchers={fetchers} currentUserId={config.currentUserId} actionUrls={{
+  // The Mine | Newsroom choice is remembered in this browser, as the Calendar view is.
+  const preferences = localHomePreferences(window.localStorage);
+  createRoot(root).render(<HomeBoundary><WordPressCollectionLinks><HomeApp fetchers={fetchers} currentUserId={config.currentUserId} preferences={preferences} actionUrls={{
     planning: config.urls.planning.stories,
     calendar: config.urls.planning.calendar,
     media: config.urls.planning.media,

@@ -14,8 +14,8 @@ import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import { StoryHoverCard } from "./StoryHoverCard";
 import { TaskQuickFields, type TaskQuickUpdate } from "./TaskQuickFields";
 
-/** Opt-in density for work queues; shared Item defaults and other surfaces stay intact. */
-export const denseRowClassName = "min-h-12 flex-nowrap gap-2 rounded-none border-0 border-b border-border/70 px-3 py-2 last:border-b-0 hover:bg-muted/40";
+/** Opt-in density for Home's work queue: quiet top separators between rows; shared Item defaults and other surfaces stay intact. */
+export const denseRowClassName = "min-h-12 flex-nowrap gap-2 rounded-none border-0 border-t border-border/50 px-4.5 py-2 first:border-t-0 hover:bg-muted/40";
 
 export function RowSkeletons({ count = 4 }: { count?: number }) {
   return <div aria-label="Loading newsroom work" aria-busy="true" className="flex flex-col gap-4 px-3 pb-2">{Array.from({ length: count }, (_, i) => <div key={i} className="flex flex-col gap-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/3" /></div>)}</div>;
@@ -36,7 +36,7 @@ export function TaskRow({ task, storyTitle, compact, dense = false, timezone, on
     <ItemContent className={cn("gap-1", dense && "min-w-0 gap-0.5 @xl/work-row:grid @xl/work-row:grid-cols-[minmax(0,1fr)_auto] @xl/work-row:items-center @xl/work-row:gap-x-3")}>
       <ItemTitle className={dense ? "block w-full min-w-0 text-[15px] font-semibold leading-5 @xl/work-row:col-start-1 @xl/work-row:row-start-1" : "line-clamp-2"}>{hoverableTitle}</ItemTitle>
       {!compact && storyTitle ? <ItemDescription className={dense ? "line-clamp-1 text-xs leading-4 @xl/work-row:col-start-1 @xl/work-row:row-start-2" : undefined} title={decodeEntities(storyTitle)}>{decodeEntities(storyTitle)}</ItemDescription> : null}
-      {onUpdate ? <TaskQuickFields task={task} timezone={timezone} now={now} people={people} canAssign={canAssign} disabled={pending} onUpdate={onUpdate} className={dense ? "gap-1 @xl/work-row:max-w-72 @xl/work-row:col-start-2 @xl/work-row:row-span-2 @xl/work-row:row-start-1 [&_button]:h-6 [&_button]:max-w-32 [&_button]:min-h-6 [&_button]:py-0 [&_button]:text-xs [&_button]:leading-4" : undefined} /> : task.priority === "urgent" ? <ItemDescription><span className="font-medium text-warning">Urgent</span></ItemDescription> : null}
+      {onUpdate ? <TaskQuickFields task={task} timezone={timezone} now={now} people={people} canAssign={canAssign} disabled={pending} onUpdate={onUpdate} className={dense ? "gap-1 @max-lg/work-row:[&_[data-task-assignee]]:hidden @xl/work-row:max-w-72 @xl/work-row:col-start-2 @xl/work-row:row-span-2 @xl/work-row:row-start-1 [&_button]:h-6 [&_button]:max-w-32 [&_button]:min-h-6 [&_button]:py-0 [&_button]:text-xs [&_button]:leading-4" : undefined} /> : task.priority === "urgent" ? <ItemDescription><span className="font-medium text-warning">Urgent</span></ItemDescription> : null}
     </ItemContent>
     {onEdit ? <ItemActions><Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit ${task.title}`} disabled={pending} onClick={onEdit}><Pencil aria-hidden="true" /></Button></ItemActions> : !onUpdate ? <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined} title={exactDate(task.dueAt, timezone)}>{dateLabel(task.dueAt, timezone, now)}</time></ItemActions> : null}
   </Item>;

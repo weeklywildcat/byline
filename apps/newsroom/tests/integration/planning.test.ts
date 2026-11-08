@@ -3,6 +3,9 @@ import { createLocalReq, getPayload, type Endpoint, type Payload, type PayloadRe
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { newsroomEndpoints } from "../../src/newsroom/endpoints";
 import { planningResponse } from "../../src/newsroom/planning";
+import { navigationCounts } from "../../src/newsroom/navigation-counts";
+import { activeStory } from "@byline/newsroom-screens/home/newsroom-model";
+import { builtInStoryView, SIDEBAR_STORY_VIEWS, storyViewCount } from "@byline/newsroom-screens/planning/story-views";
 import { homeBootstrap, screenContext } from "../../src/newsroom/screen-models";
 import type { User } from "../../src/payload-types";
 import { createPreferenceSavedViews, SAVED_VIEWS_PREFERENCE_KEY, type PreferenceStore } from "../../src/ui/stories/saved-views";
@@ -108,6 +111,19 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await payload?.db?.destroy?.();
+});
+
+describe("sidebar navigation counts", () => {
+  it("equal the Stories read model and its shared view filters, for each reader's access", async () => {
+    for (const key of ["editor", "alice", "bob"]) {
+      const counts = await navigationCounts(await ctxAs(key));
+      const stories = (await planning(key)).stories;
+      expect(counts.stories).toBe(stories.filter(activeStory).length);
+      for (const id of SIDEBAR_STORY_VIEWS) expect(counts.views[id]).toBe(storyViewCount(stories, builtInStoryView(id)!, Number(accounts[key].id), NOW));
+    }
+    // A story the reader cannot read is never counted.
+    expect((await navigationCounts(await ctxAs("alice"))).stories).toBeLessThan((await navigationCounts(await ctxAs("editor"))).stories);
+  });
 });
 
 describe("the Stories read model", () => {

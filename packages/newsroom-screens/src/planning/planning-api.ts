@@ -231,4 +231,23 @@ export function parsePlanningFilterParams(params: URLSearchParams): PlanningFilt
   });
 }
 
+/**
+ * The filters a Stories address names: the neutral filter parameters
+ * (`workflow=reporting`, `needs_review=1`…) plus `collection=` (and its earlier
+ * name `coverage=`). Home, the sidebar and shared links open Stories this way.
+ */
+export function storiesRouteFilters(params: URLSearchParams): PlanningFilters {
+  const filters = parsePlanningFilterParams(params);
+  if (filters.collectionId) return filters;
+  const collection = Number(params.get("collection") ?? params.get("coverage"));
+  return Number.isSafeInteger(collection) && collection > 0 ? { ...filters, collectionId: collection } : filters;
+}
+
+/** A Stories address narrowed to `filters`. `base` is the host's Stories URL (relative ones resolve against `origin`). */
+export function storiesHref(base: string, filters: Partial<PlanningFilters>, origin = typeof window === "undefined" ? "http://localhost/" : window.location.href): string {
+  const url = new URL(base, origin);
+  Object.entries(planningFilterParams(filters)).forEach(([key, value]) => url.searchParams.set(key, String(value)));
+  return url.origin === new URL(origin).origin ? `${url.pathname}${url.search}${url.hash}` : url.toString();
+}
+
 export { queryPath };

@@ -5,9 +5,10 @@
  * filters, and a view is "active" only while the current filters still match
  * it exactly. Saved views are the reader's own presets, stored by the host.
  */
-import { DEFAULT_PLANNING_SORT, EMPTY_PLANNING_FILTERS, normalizePlanningFilters, samePlanningFilters, sanitizePlanningFilters, sanitizePlanningSort, type PlanningFilters, type PlanningSort, type SavedPlanningView } from "./planning-model";
+import { activeStory } from "../home/newsroom-model";
+import { DEFAULT_PLANNING_SORT, EMPTY_PLANNING_FILTERS, filterPlanningStories, normalizePlanningFilters, samePlanningFilters, sanitizePlanningFilters, sanitizePlanningSort, type PlanningFilters, type PlanningSort, type PlanningStory, type SavedPlanningView } from "./planning-model";
 
-export type BuiltInStoryViewId = "all" | "mine" | "review" | "overdue" | "unassigned" | "published" | "on-hold";
+export type BuiltInStoryViewId = "all" | "mine" | "review" | "overdue" | "unassigned" | "art-needed" | "published" | "on-hold";
 
 export type BuiltInStoryView = { id: BuiltInStoryViewId; label: string; filters: PlanningFilters };
 
@@ -20,12 +21,21 @@ export const BUILT_IN_STORY_VIEWS: readonly BuiltInStoryView[] = [
   preset("review", "Ready for review", { needsReview: true }),
   preset("overdue", "Overdue", { overdue: true }),
   preset("unassigned", "Unassigned", { unassigned: true }),
+  preset("art-needed", "Art needed", { visualStatus: "needed" }),
   preset("published", "Published", { publicationState: "published" }),
   preset("on-hold", "On hold", { workflow: "on-hold" })
 ];
 
 export function builtInStoryView(id: string): BuiltInStoryView | null {
   return BUILT_IN_STORY_VIEWS.find((view) => view.id === id) ?? null;
+}
+
+/** The built-in views the sidebar promotes as shortcuts, each with its count. */
+export const SIDEBAR_STORY_VIEWS: readonly BuiltInStoryViewId[] = ["review", "unassigned", "art-needed"];
+
+/** How many active (unpublished, not dropped) stories a built-in view holds: work still to do. */
+export function storyViewCount(stories: readonly PlanningStory[], view: BuiltInStoryView, currentUserId?: number, now = new Date()): number {
+  return filterPlanningStories([...stories], view.filters, currentUserId, now).filter(activeStory).length;
 }
 
 /** What the reader is looking at. A saved view stays selected while edited ("modified"); a built-in only while it matches. */

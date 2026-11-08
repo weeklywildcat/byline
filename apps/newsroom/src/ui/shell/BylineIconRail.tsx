@@ -31,7 +31,7 @@ export function BylineIconRail({ items, active, homeHref, user, systemHref, logo
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip={{ children: "Byline Home", hidden: false }} render={<ShellLink href={homeHref} aria-label="Byline Home" />} className="md:h-8 md:p-0">
+            <SidebarMenuButton size="lg" tooltip={{ children: "Weekly Wildcat Home", hidden: false }} render={<ShellLink href={homeHref} aria-label="Weekly Wildcat Home" />} className="md:h-8 md:p-0">
               <BylineMark />
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -50,6 +50,8 @@
     "./home/HomeCommands": "./src/home/HomeCommands.tsx",
     "./home/HomeCreate": "./src/home/HomeCreate.tsx",
     "./home/components/rows": "./src/home/components/rows.tsx",
+    "./home/components/sections": "./src/home/components/sections.tsx",
+    "./home/desk-model": "./src/home/desk-model.ts",
     "./home/home-api": "./src/home/home-api.ts",
     "./home/home-model": "./src/home/home-model.ts",
     "./home/home-query": "./src/home/home-query.ts",
