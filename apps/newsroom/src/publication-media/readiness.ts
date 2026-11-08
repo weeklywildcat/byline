@@ -1,6 +1,6 @@
 import { publicationManifestBlobs, publicationMediaReadiness, type PublicationNotReadyReason } from "@byline/content";
 import { mediaIdOf } from "@byline/editor/fields";
-import { collectMediaIds } from "@byline/editor/normalize";
+import { collectMediaUses } from "@byline/editor/normalize";
 import { mediaKind, mediaMetadataGaps, GAP_LABELS } from "@byline/newsroom-screens/media/media-library-model";
 import type { Payload, PayloadRequest } from "payload";
 import type { Media } from "../payload-types";
@@ -31,7 +31,20 @@ export type MediaReadinessItem = {
 
 export type PublicationMediaReport = { ready: boolean; preparing: number; blocked: number; items: MediaReadinessItem[] };
 
-export type MediaRequirement = { id: number; role: PublicationMediaRole };
+export type MediaRequirement = { id: number; role: PublicationMediaRole; /** This story use has its own effective alt text, so the asset-level alt may be empty. */ allowMissingAlt?: boolean };
+
+/** Metadata gaps that matter for this Story use. Alt may come from the block; credit and rights always belong to Media. */
+export function mediaMetadataGapsForRequirement(media: Pick<Media, "alt" | "credit" | "creator" | "copyright" | "license" | "sourceUrl" | "mimeType">, requirement: MediaRequirement) {
+  return mediaMetadataGaps({
+    alt: media.alt ?? "",
+    credit: media.credit ?? "",
+    creator: media.creator ?? "",
+    copyright: media.copyright ?? "",
+    license: media.license ?? "",
+    sourceUrl: media.sourceUrl ?? "",
+    mimeType: media.mimeType
+  }).filter((gap) => gap !== "alt" || !requirement.allowMissingAlt);
+}
 
 const PREPARATION_MESSAGES: Record<PublicationNotReadyReason, { message: string; state: MediaReadinessItem["state"]; retryable: boolean }> = {
   preparing: { message: "Publication files are still being prepared", state: "preparing", retryable: false },
@@ -45,13 +58,27 @@ const PREPARATION_MESSAGES: Record<PublicationNotReadyReason, { message: string;
 /** The Media a Story publishes directly: its lead image and every Media its byline-v1 body blocks reference. */
 export function storyMediaRequirements(story: { featuredMedia?: unknown; body?: unknown; contentFormat?: unknown }): MediaRequirement[] {
   const requirements = new Map<number, MediaRequirement>();
+  const add = (id: number, role: PublicationMediaRole, allowMissingAlt: boolean) => {
+    const current = requirements.get(id);
+    if (!current) {
+      requirements.set(id, { id, role, allowMissingAlt });
+      return;
+    }
+    // One asset can appear more than once. The stricter use wins: a lead image
+    // or any body use without an override still needs the Media record's alt.
+    requirements.set(id, {
+      id,
+      role: current.role === "image" || role === "image" ? "image" : "file",
+      allowMissingAlt: Boolean(current.allowMissingAlt) && allowMissingAlt
+    });
+  };
   const featured = mediaIdOf(story.featuredMedia);
-  if (featured !== null) requirements.set(Number(featured), { id: Number(featured), role: "image" });
+  if (featured !== null) add(Number(featured), "image", false);
   // Imported legacy-html bodies are not reverse-engineered here (Phase 8 migrates their media).
   if (story.contentFormat !== "legacy-html") {
-    for (const id of collectMediaIds(story.body)) {
-      const key = Number(id);
-      if (Number.isSafeInteger(key) && key > 0 && !requirements.has(key)) requirements.set(key, { id: key, role: "file" });
+    for (const use of collectMediaUses(story.body)) {
+      const key = Number(use.id);
+      if (Number.isSafeInteger(key) && key > 0) add(key, "file", use.hasAltOverride);
     }
   }
   return [...requirements.values()].sort((a, b) => a.id - b.id);
@@ -83,7 +110,7 @@ export async function publicationMediaReport(payload: Payload, requirements: Med
       issues.push({ code: "wrong-type", message: requirement.role === "image" ? "The lead image must be a photo or graphic" : "This kind of file can't be published" });
       state = "blocked";
     }
-    for (const gap of mediaMetadataGaps({ alt: media.alt ?? "", credit: media.credit ?? "", creator: media.creator ?? "", copyright: media.copyright ?? "", license: media.license ?? "", sourceUrl: media.sourceUrl ?? "", mimeType: media.mimeType })) {
+    for (const gap of mediaMetadataGapsForRequirement(media, requirement)) {
       issues.push({ code: "metadata", message: GAP_LABELS[gap] });
       state = "blocked";
     }

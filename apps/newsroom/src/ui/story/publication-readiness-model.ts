@@ -1,20 +1,31 @@
 import { mediaIdOf } from "@byline/editor/fields";
-import { collectMediaIds } from "@byline/editor/normalize";
+import { collectMediaUses } from "@byline/editor/normalize";
 
 /**
  * The Media a Story's form publishes, as one stable string (`lead=12&ids=3,4`
- * with sorted IDs). The Story header derives it from Payload's own form state
- * with a selector, so typing text never changes it and never sends a request;
- * only adding, removing or swapping Media does. The server applies the same
- * rule (`publication-media/readiness.ts`, `storyMediaRequirements`).
+ * with sorted IDs, plus `alt=` for body uses whose story-specific alt text
+ * satisfies accessibility). The Story header derives it from Payload's form
+ * state; ordinary copy edits keep it stable, while adding/removing Media or
+ * crossing empty/non-empty alt text refreshes readiness. The server applies
+ * the same rule (`publication-media/readiness.ts`, `storyMediaRequirements`).
  */
 export function storyMediaReadinessQuery(input: { featuredMedia: unknown; body: unknown; contentFormat: unknown }): string {
   const lead = mediaIdOf(input.featuredMedia);
-  const ids = input.contentFormat === "legacy-html" ? [] : collectMediaIds(input.body).map(Number).filter((id) => Number.isSafeInteger(id) && id > 0 && id !== Number(lead));
-  const unique = [...new Set(ids)].sort((a, b) => a - b);
+  const uses = input.contentFormat === "legacy-html" ? [] : collectMediaUses(input.body);
+  const byId = new Map<number, boolean>();
+  for (const use of uses) {
+    const id = Number(use.id);
+    if (!Number.isSafeInteger(id) || id <= 0 || id === Number(lead)) continue;
+    // An asset may be used several times. It is exempt from asset-level alt only
+    // when every use supplies story-specific alt text.
+    byId.set(id, (byId.get(id) ?? true) && use.hasAltOverride);
+  }
+  const unique = [...byId.keys()].sort((a, b) => a - b);
+  const alt = unique.filter((id) => byId.get(id) === true);
   const params = new URLSearchParams();
   if (lead !== null) params.set("lead", String(lead));
   if (unique.length) params.set("ids", unique.join(","));
+  if (alt.length) params.set("alt", alt.join(","));
   return params.toString();
 }
 

@@ -30,7 +30,7 @@ import { publicationMediaReport, type MediaRequirement } from "../publication-me
 import { buildMediaEndpoint } from "../publication-media/build-endpoint";
 import { buildSnapshotEndpoints } from "../public/snapshot/endpoints";
 
-/** `?lead=12&ids=3,4`: the lead image and every other Media a story references (at most 200). */
+/** `?lead=12&ids=3,4&alt=4`: referenced Media, plus body uses whose story-specific alt text is already complete. */
 function readinessQuery(params: URLSearchParams): MediaRequirement[] {
   const id = (value: string) => {
     const number = Number(value);
@@ -38,7 +38,11 @@ function readinessQuery(params: URLSearchParams): MediaRequirement[] {
   };
   const lead = id(params.get("lead") ?? "");
   const others = (params.get("ids") ?? "").split(",").map(id).filter((value): value is number => value !== null && value !== lead);
-  return [...(lead ? [{ id: lead, role: "image" as const }] : []), ...[...new Set(others)].map((value) => ({ id: value, role: "file" as const }))].slice(0, 200);
+  const alt = new Set((params.get("alt") ?? "").split(",").map(id).filter((value): value is number => value !== null));
+  return [
+    ...(lead ? [{ id: lead, role: "image" as const, allowMissingAlt: false }] : []),
+    ...[...new Set(others)].map((value) => ({ id: value, role: "file" as const, allowMissingAlt: alt.has(value) }))
+  ].slice(0, 200);
 }
 import { planningResponse } from "./planning";
 import { navigationCounts } from "./navigation-counts";

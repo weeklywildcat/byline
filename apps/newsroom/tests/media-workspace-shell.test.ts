@@ -98,4 +98,20 @@ describe("the Media workspace composition", () => {
     expect(src("ui/media/NewsroomMediaScreen.tsx")).toContain("media={picker}");
     for (const file of ["ui/media/NewsroomMediaScreen.tsx", "ui/media/MediaWorkspaceShell.tsx", "ui/story/StoryScreen.tsx"]) expect(src(file)).not.toContain("/collections/media");
   });
+
+  it("opens the canonical Media inspector over a Story without leaving the article", () => {
+    const shell = src("ui/media/MediaWorkspaceShell.tsx");
+    expect(shell).toContain("editDetails");
+    expect(shell).toContain("<InlineMediaDetailsSheet");
+    expect(shell).toContain("<MediaArtDirectionDialog");
+
+    const inline = src("ui/media/InlineMediaDetailsSheet.tsx");
+    expect(inline).toContain("<MediaInspectorContent");
+    expect(inline).toContain("guardRef={guard}");
+    expect(inline).toContain("Save your changes to this file?");
+
+    const host = src("ui/story/editor-host.tsx");
+    expect(host).toContain("editMediaDetails:");
+    expect(host).toContain('queryKey: ["byline", "story-media-readiness"]');
+  });
 });

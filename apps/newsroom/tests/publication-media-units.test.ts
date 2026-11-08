@@ -7,6 +7,7 @@ import { publicationStore } from "../src/publication-media/blob-store";
 import { buildTokenMatches } from "../src/publication-media/build-endpoint";
 import { newsroomAppRoot, privateMediaDir, publicationMediaDir } from "../src/publication-media/paths";
 import { widthsWithin } from "../src/publication-media/prepare";
+import { mediaMetadataGapsForRequirement, storyMediaRequirements } from "../src/publication-media/readiness";
 import { blockingLines, preparingLabel, storyMediaReadinessQuery } from "../src/ui/story/publication-readiness-model";
 
 const dirs: string[] = [];
@@ -99,6 +100,46 @@ describe("Story header media readiness", () => {
     expect(a).toBe("lead=9&ids=4%2C12");
     expect(b).toBe(a);
     expect(storyMediaReadinessQuery({ featuredMedia: null, body: body(block({ blockType: "document", media: 9 })), contentFormat: "legacy-html" })).toBe("");
+  });
+
+  it("uses story-specific alt text for that image use, but keeps stricter duplicate and lead-image rules", () => {
+    const overridden = body(
+      block({ blockType: "photo", media: 12, altOverride: "A student speaking at a podium." }),
+      block({ blockType: "gallery", items: [{ media: 4, altOverride: "The band on the field." }] })
+    );
+    expect(storyMediaReadinessQuery({ featuredMedia: null, body: overridden, contentFormat: "byline-v1" })).toBe("ids=4%2C12&alt=4%2C12");
+    expect(storyMediaRequirements({ featuredMedia: null, body: overridden, contentFormat: "byline-v1" })).toEqual([
+      { id: 4, role: "file", allowMissingAlt: true },
+      { id: 12, role: "file", allowMissingAlt: true }
+    ]);
+
+    const mixed = body(
+      block({ blockType: "photo", media: 12, altOverride: "A student speaking at a podium." }),
+      block({ blockType: "photo", media: 12, altOverride: "" })
+    );
+    expect(storyMediaReadinessQuery({ featuredMedia: null, body: mixed, contentFormat: "byline-v1" })).toBe("ids=12");
+    expect(storyMediaRequirements({ featuredMedia: null, body: mixed, contentFormat: "byline-v1" })).toEqual([
+      { id: 12, role: "file", allowMissingAlt: false }
+    ]);
+
+    expect(storyMediaRequirements({ featuredMedia: 12, body: overridden, contentFormat: "byline-v1" })).toContainEqual(
+      { id: 12, role: "image", allowMissingAlt: false }
+    );
+  });
+
+  it("only exempts the asset-level alt gap; credit and rights remain Media metadata", () => {
+    const asset = {
+      alt: "",
+      creator: "",
+      credit: "Weekly Wildcat",
+      copyright: "Weekly Wildcat",
+      license: "",
+      sourceUrl: "",
+      mimeType: "image/jpeg"
+    };
+    expect(mediaMetadataGapsForRequirement(asset as never, { id: 12, role: "file", allowMissingAlt: true })).toEqual([]);
+    expect(mediaMetadataGapsForRequirement(asset as never, { id: 12, role: "file", allowMissingAlt: false })).toEqual(["alt"]);
+    expect(mediaMetadataGapsForRequirement({ ...asset, credit: "", copyright: "" } as never, { id: 12, role: "file", allowMissingAlt: true })).toEqual(["credit", "rights"]);
   });
 
   it("says what is preparing and what blocks publication", () => {

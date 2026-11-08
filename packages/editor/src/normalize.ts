@@ -92,6 +92,33 @@ export function collectMediaIds(state: unknown): MediaId[] {
   return bodyMediaIds(storedBlocks(state));
 }
 
+export type StoredMediaUse = { id: MediaId; hasAltOverride: boolean };
+
+/**
+ * Every stored Media use, before finalization, including whether this story
+ * supplies its own alt text for that particular image use. Publication
+ * readiness uses this instead of treating the asset's global alt as the only
+ * valid source: the public renderer already gives an `altOverride` precedence.
+ */
+export function collectMediaUses(state: unknown): StoredMediaUse[] {
+  return storedBlocks(state).flatMap((block): StoredMediaUse[] => {
+    const use = (id: MediaId | null, altOverride?: string): StoredMediaUse[] => id === null ? [] : [{ id, hasAltOverride: Boolean(altOverride?.trim()) }];
+    switch (block.type) {
+      case "photo":
+      case "portraitText":
+      case "visualChapter":
+      case "annotatedImage":
+        return use(block.media, block.altOverride);
+      case "gallery":
+        return block.items.flatMap((item) => use(item.media, item.altOverride));
+      case "chartMap":
+        return use(block.image, block.altOverride);
+      default:
+        return blockMediaIds(block).map((id) => ({ id, hasAltOverride: false }));
+    }
+  });
+}
+
 /** Editorial labels for each block type that uses a Media asset. */
 export function collectMediaUsageLabels(state: unknown, id: MediaId): string[] {
   return [...new Set(storedBlocks(state)
