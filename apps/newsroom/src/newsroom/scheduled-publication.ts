@@ -88,3 +88,51 @@ export async function setScheduledPublication(ctx: ScreenContext, storyId: numbe
     throw error;
   }
 }
+
+
+/**
+ * Move a Story to Payload Trash as one editor action. The publication-schedule
+ * lock prevents a schedule change racing with deletion; any pending native
+ * schedulePublish job is cancelled before the Story is soft-deleted.
+ */
+export async function trashStory(ctx: ScreenContext, storyId: number) {
+  if (!atLeast(ctx.user, "editor")) throw new APIError("Only editors can move stories to Trash.", 403);
+  const { req } = ctx;
+  const { payload } = req;
+  const started = await initTransaction(req);
+  try {
+    await (await drizzleFor(payload, req)).execute(sql`select pg_advisory_xact_lock(461230119, ${storyId})`);
+    const story = await payload.findByID({
+      collection: "stories",
+      id: storyId,
+      draft: true,
+      depth: 0,
+      overrideAccess: false,
+      req
+    });
+    const scheduled = await scheduledPublicationsForStories(ctx, [storyId]);
+    if (scheduled.has(storyId)) {
+      await payload.jobs.cancel({ req, where: upcomingJobs([String(storyId)], ctx.now) });
+      await recordStoryActivity(req, storyId, "publication-cancelled");
+    }
+    const deletedAt = ctx.now.toISOString();
+    await payload.update({
+      collection: "stories",
+      id: storyId,
+      data: { deletedAt },
+      depth: 0,
+      overrideAccess: false,
+      req
+    });
+    if (started) await commitTransaction(req);
+    return {
+      id: storyId,
+      deletedAt,
+      wasPublished: story._status === "published",
+      cancelledScheduledPublication: scheduled.has(storyId)
+    };
+  } catch (error) {
+    if (started) await killTransaction(req);
+    throw error;
+  }
+}
