@@ -66,7 +66,7 @@ describe("the board layout control", () => {
     await mount();
     const picker = $("[data-board-layout-picker]");
     expect(picker?.getAttribute("aria-label")).toBe("Board, Lanes layout");
-    expect(picker?.textContent).toBe("Lanes");
+    expect(picker?.textContent).toBe("Board");
     expect(picker?.parentElement?.querySelector("[role=tablist]")).not.toBeNull();
     await click($$("[role=tab]").find((tab) => tab.textContent === "List"));
     expect($("[data-board-layout-picker]")).toBeNull();
