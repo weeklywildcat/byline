@@ -71,9 +71,13 @@ test("Home creates real drafts, completes work with rollback, preserves peek con
   await expect(row).toBeFocused();
   await page.keyboard.press("ControlOrMeta+k");
   const command = page.getByRole("dialog", { name: "Search Byline", exact: true });
-  await command.getByRole("combobox").fill(title);
-  await expect(command.getByRole("option", { name: title })).toBeVisible();
-  await page.keyboard.press("Enter");
+  const search = command.getByRole("combobox");
+  await search.fill(title);
+  const result = command.getByRole("option", { name: title });
+  await expect(result).toBeVisible();
+  await search.press("Home");
+  await expect(result).toHaveAttribute("aria-selected", "true");
+  await search.press("Enter");
   await expect(peek).toBeVisible();
   await peek.getByRole("button", { name: "Actions for Interview notes" }).click();
   await page.getByRole("menuitem", { name: "Remove link" }).click();

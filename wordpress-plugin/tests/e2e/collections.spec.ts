@@ -23,7 +23,7 @@ test("Collections coordinates independent reporting with equivalent touch/contex
   await expect(
     page.getByRole("heading", { name: "Collections", exact: true }),
   ).toBeVisible();
-  await page
+  await page.locator("main header")
     .getByRole("button", { name: "New collection", exact: true })
     .click();
   const dialog = page.getByRole("dialog", {
@@ -31,6 +31,8 @@ test("Collections coordinates independent reporting with equivalent touch/contex
     exact: true,
   });
   await dialog.getByLabel("Name", { exact: true }).fill(name);
+  await dialog.getByLabel("Type", { exact: true }).click();
+  await page.getByRole("option", { name: "Event coverage", exact: true }).click();
   await dialog.getByRole("button", { name: "Create collection" }).click();
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
   const id = Number(new URL(page.url()).searchParams.get("collection"));
@@ -55,7 +57,7 @@ test("Collections coordinates independent reporting with equivalent touch/contex
   expect(existing.status).toBe(201);
   session.registerTestPost(existing.payload.story.id);
   await page.getByRole("tab", { name: "Stories", exact: true }).click();
-  await page.getByRole("button", { name: "Add story", exact: true }).click();
+  await page.getByRole("button", { name: "Add existing story", exact: true }).click();
   const picker = page.getByRole("dialog", {
     name: "Add existing story",
     exact: true,
@@ -64,7 +66,7 @@ test("Collections coordinates independent reporting with equivalent touch/contex
   await page.getByLabel("Search stories", { exact: true }).fill(existingTitle);
   await page.getByRole("option", { name: new RegExp(existingTitle) }).click();
   await page.keyboard.press("Escape");
-  await picker.getByRole("button", { name: "Save story links" }).click();
+  await picker.getByRole("button", { name: "Save stories" }).click();
   await expect(picker).not.toBeVisible();
   await page.getByRole("button", { name: "New story", exact: true }).click();
   const createStory = page.getByRole("dialog", {
@@ -91,7 +93,7 @@ test("Collections coordinates independent reporting with equivalent touch/contex
     page.getByRole("region", { name: "Story Collections" }),
   ).toContainText(name);
   await page.goto(`${url}&collection=${id}`);
-  await page.getByRole("tab", { name: "Interviews", exact: true }).click();
+  await page.getByRole("tab", { name: "Reporting", exact: true }).click();
   await page
     .getByRole("button", { name: "Add interview", exact: true })
     .click();
@@ -192,11 +194,13 @@ test("Collections coordinates independent reporting with equivalent touch/contex
   await page.getByLabel("Search collections").fill(name);
   const row = page.locator(`[data-collection-id="${id}"]`);
   await expect(row).toBeVisible();
-  await page.getByLabel("Filter status", { exact: true }).click();
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await page.getByLabel("Filter by status", { exact: true }).click();
   await page.getByRole("option", { name: "Planning", exact: true }).click();
   await expect(row).not.toBeVisible();
-  await page.getByLabel("Filter status", { exact: true }).click();
-  await page.getByRole("option", { name: "All statuses", exact: true }).click();
+  await page.getByLabel("Filter by status", { exact: true }).click();
+  await page.getByRole("option", { name: "Any status", exact: true }).click();
+  await page.keyboard.press("Escape");
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: `Actions for ${name}` }).click();
   const menu = page.locator('[data-slot="dropdown-menu-content"]');
@@ -209,10 +213,7 @@ test("Collections coordinates independent reporting with equivalent touch/contex
   expect(await contextMenu.getByRole("menuitem").allTextContents()).toEqual(overflow);
   await page.getByRole("menuitem", { name: "Archive", exact: true }).click();
   await expect(row).not.toBeVisible();
-  await page.getByLabel("Active or archived").click();
-  await page
-    .getByRole("option", { name: "Archived collections", exact: true })
-    .click();
+  await page.getByRole("tab", { name: "Archived", exact: true }).click();
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: `Actions for ${name}` }).click();
   await page.getByRole("menuitem", { name: "Restore collection" }).click();
@@ -439,7 +440,7 @@ test("realistic Collection remains usable at desktop, iPad, and narrow touch wid
       fullPage: true,
       animations: "disabled",
     });
-    await page.getByRole("tab", { name: "Interviews", exact: true }).click();
+    await page.getByRole("tab", { name: "Reporting", exact: true }).click();
     await page
       .getByRole("button", { name: /Band director · season reflection/ })
       .click();
