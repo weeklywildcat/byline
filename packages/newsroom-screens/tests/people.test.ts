@@ -32,7 +32,7 @@ const staff: PersonCapabilities = {
   editProfile: true,
   editEditorialIdentity: false,
   changeVisibility: false,
-  manageAccount: false,
+  manageAccess: false,
   delete: false,
 };
 
