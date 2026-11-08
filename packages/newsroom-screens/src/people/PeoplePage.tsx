@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import {
   Avatar,
@@ -50,6 +51,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { PeopleApi } from "./people-api";
 import {
   PEOPLE_VIEWS,
+  PERSON_ACCESS_ROLES,
   personInitials,
   personSummary,
   type NewPerson,
@@ -114,8 +116,7 @@ export function PeoplePage({
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">People</h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Public bylines, staff profiles and guest contributors. Sign-in
-            accounts are managed separately.
+            Public bylines, staff profiles, guest contributors and newsroom access in one place.
           </p>
         </div>
         {result.data?.canCreate ? (
@@ -233,6 +234,11 @@ export function PeoplePage({
                 </ItemDescription>
               </ItemContent>
               <ItemActions className="shrink-0">
+                {person.access !== undefined ? (
+                  <Badge variant={person.access?.enabled ? "outline" : "secondary"} className="hidden sm:inline-flex">
+                    {!person.access ? "No access" : person.access.enabled ? PERSON_ACCESS_ROLES[person.access.role] : "Access off"}
+                  </Badge>
+                ) : null}
                 <ChevronRight className="size-4" aria-hidden="true" />
                 <span className="sr-only">Edit {person.name}</span>
               </ItemActions>
@@ -344,7 +350,7 @@ function NewPersonDialog({
         <DialogHeader>
           <DialogTitle>New person</DialogTitle>
           <DialogDescription>
-            This creates a public byline identity, not a sign-in account.
+            Add the Person first. Newsroom access can be granted from their profile.
           </DialogDescription>
         </DialogHeader>
         <form
