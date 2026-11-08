@@ -439,6 +439,8 @@ foreach (get_users() as $user) {
         'slug' => (string) $user->user_nicename,
         'pronouns' => ww_text($profile['pronouns'] ?? ''),
         'newsroomRole' => ww_text($profile['role'] ?? (is_array($projected) ? ($projected['role'] ?? '') : '')),
+        'accountEmail' => sanitize_email((string) $user->user_email),
+        'accountRoles' => array_values(array_map('strval', (array) $user->roles)),
         'shortBio' => ww_text($profile['shortBio'] ?? ''),
         'bio' => is_array($projected) ? ww_text($projected['bio'] ?? '') : ww_text(get_user_meta((int) $user->ID, 'description', true)),
         'portraitId' => $photo ?: null,
