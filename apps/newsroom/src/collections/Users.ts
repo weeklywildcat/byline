@@ -1,6 +1,6 @@
 import { lockAccountChanges, requireOtherAdministrator } from "../newsroom/accounts";
 import { APIError, type CollectionConfig, type PayloadRequest } from "payload";
-import { administratorsOnly, administratorsOnlyField, atLeast, newsroomUser, requestUser, sameId } from "../access/user";
+import { administratorsOnly, administratorsOnlyField, atLeast, newsroomUser, relationId, requestUser, sameId } from "../access/user";
 import { ROLE_OPTIONS } from "../domain/vocabulary";
 
 const selfOrAdministrator = ({ req, id }: { req: PayloadRequest; id?: number | string }) => {
@@ -62,6 +62,29 @@ export const Users: CollectionConfig = {
         if (operation !== "create") return data;
         const { totalDocs } = await req.payload.count({ collection: "users", overrideAccess: true, req });
         if (totalDocs === 0) Object.assign(data, { role: "administrator", enabled: true });
+        return data;
+      },
+      async ({ req, data, originalDoc, operation }) => {
+        // One Person is one newsroom identity. Guests/alumni may have no account,
+        // but normal auth never creates multiple accounts for the same Person.
+        if (operation !== "create" && operation !== "update") return data;
+        const person = data.linkedPerson !== undefined
+          ? relationId(data.linkedPerson)
+          : relationId(originalDoc?.linkedPerson);
+        if (person === null) return data;
+        const where = originalDoc?.id
+          ? { and: [{ linkedPerson: { equals: person } }, { id: { not_equals: originalDoc.id } }] }
+          : { linkedPerson: { equals: person } };
+        const existing = await req.payload.find({
+          collection: "users",
+          where,
+          depth: 0,
+          limit: 1,
+          overrideAccess: true,
+          req,
+        });
+        if (existing.totalDocs)
+          throw new APIError("This Person already has a Byline sign-in account.", 409);
         return data;
       },
       async ({ req, data, originalDoc, operation }) => {
