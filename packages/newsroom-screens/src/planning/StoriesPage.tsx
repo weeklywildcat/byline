@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
-import { LayoutGrid, Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { useDebouncedValue, useNow } from "@byline/newsroom-ui/lib/hooks";
 import { Button } from "@byline/newsroom-ui/ui/button";
@@ -33,13 +33,15 @@ const VIEW_LABELS: Record<StoriesView, string> = { board: "Board", list: "List",
  * How the board is laid out: a reader preference kept in this browser, never a
  * filter, a saved view or part of the address.
  */
-function BoardLayoutPicker({ value, onChange }: { value: BoardLayout; onChange: (layout: BoardLayout) => void }) {
+function BoardTab({ active, value, onChange }: { active: boolean; value: BoardLayout; onChange: (layout: BoardLayout) => void }) {
+  if (!active) return <TabsTrigger value="board">Board</TabsTrigger>;
+
   const current = BOARD_LAYOUT_OPTIONS.find((option) => option.id === value) ?? BOARD_LAYOUT_OPTIONS[0]!;
   return <DropdownMenu>
-    <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" aria-label={`Board layout: ${current.label}`} data-board-layout-picker="" />}>
-      <LayoutGrid data-icon="inline-start" aria-hidden="true" /><span className="sr-only @3xl/stories:not-sr-only">{current.label}</span>
+    <DropdownMenuTrigger render={<TabsTrigger value="board" aria-label={`Board, ${current.label} layout`} data-board-layout-picker="" />}>
+      Board<ChevronDown data-icon="inline-end" aria-hidden="true" className="size-3.5" />
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="w-56">
+    <DropdownMenuContent align="start" className="w-56">
       <DropdownMenuGroup>
         <DropdownMenuLabel>Board layout</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={value} onValueChange={(next) => { if (isBoardLayout(next)) onChange(next); }}>
@@ -205,9 +207,10 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
             {showViewsPicker ? <StoryViewsPicker views={storyViews} /> : null}
           </div> : null}
           <div className={showViewsPicker || viewsControl ? "flex items-center gap-2" : "flex flex-1 flex-row-reverse items-center justify-between gap-2"}>
-            {view === "board" ? <BoardLayoutPicker value={boardLayout} onChange={changeBoardLayout} /> : null}
             <TabsList variant="line" aria-label={"Stories presentation"}>
-              {presentations.map((id) => <TabsTrigger key={id} value={id}>{VIEW_LABELS[id]}</TabsTrigger>)}
+              {presentations.map((id) => id === "board"
+                ? <BoardTab key={id} active={view === "board"} value={boardLayout} onChange={changeBoardLayout} />
+                : <TabsTrigger key={id} value={id}>{VIEW_LABELS[id]}</TabsTrigger>)}
             </TabsList>
           </div>
         </div>
