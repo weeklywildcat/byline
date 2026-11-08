@@ -1,6 +1,7 @@
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
+import { Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import type { MediaLibraryFetchers } from "./media-library-api";
 import { MediaLibraryBrowser, type MediaLayout } from "./MediaLibraryBrowser";
@@ -10,6 +11,8 @@ import { useMediaNavigator } from "./media-query";
 
 export type MediaPickerDialogProps = {
   open: boolean;
+  /** Temporarily hide the dialog while keeping this picker session intact. */
+  suspended?: boolean;
   onOpenChange: (open: boolean) => void;
   fetchers: Pick<MediaLibraryFetchers, "getNavigator" | "getLibrary">;
   timezone: string;
@@ -21,6 +24,7 @@ export type MediaPickerDialogProps = {
   kind?: MediaKind | "";
   /** A relationship that accepts only this file kind (for example a portrait). */
   restrictedKind?: MediaKind;
+  onUpload?: (folderId: number | null, showUploads: () => void) => void;
   onConfirm: (assets: MediaLibraryAsset[]) => void;
 };
 
@@ -31,7 +35,7 @@ export type MediaPickerDialogProps = {
  * production assignments (and, later, any other asset selector). Its
  * browsing state is its own: it never changes the Media screen's address.
  */
-export function MediaPickerDialog({ open, onOpenChange, fetchers, timezone, title = "Choose files", description = "Browse folders or search the Library, then choose one or more files.", confirmLabel = "Link files", multiple = true, kind = "", restrictedKind, onConfirm }: MediaPickerDialogProps) {
+export function MediaPickerDialog({ open, suspended = false, onOpenChange, fetchers, timezone, title = "Choose files", description = "Browse folders or search the Library, then choose one or more files.", confirmLabel = "Link files", multiple = true, kind = "", restrictedKind, onUpload, onConfirm }: MediaPickerDialogProps) {
   const navigator = useMediaNavigator(fetchers);
   const [route, setRoute] = useState<MediaRoute>(DEFAULT_MEDIA_ROUTE);
   const [filters, setFilters] = useState<MediaLibraryFilters>({ ...EMPTY_MEDIA_FILTERS, type: kind });
@@ -67,7 +71,7 @@ export function MediaPickerDialog({ open, onOpenChange, fetchers, timezone, titl
   const place = route.folderId !== null ? `folder:${route.folderId}` : `source:${route.source}`;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open && !suspended} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[min(88dvh,820px)] flex-col gap-0 p-0 sm:max-w-[min(96vw,1100px)]" data-media-picker="">
         <DialogHeader className="border-b p-4">
           <DialogTitle>{title}</DialogTitle>
@@ -102,6 +106,15 @@ export function MediaPickerDialog({ open, onOpenChange, fetchers, timezone, titl
               selectedIds={ids}
               onActivate={toggle}
               onSearchEverywhere={() => setRoute(DEFAULT_MEDIA_ROUTE)}
+              toolbarEnd={onUpload && navigator.data?.capabilities.canUpload ? (
+                <Button type="button" variant="outline" onClick={() => onUpload(route.folderId, () => {
+                  setRoute(DEFAULT_MEDIA_ROUTE);
+                  setFilters({ ...EMPTY_MEDIA_FILTERS, type: restrictedKind ?? "" });
+                  setSort("newest");
+                })}>
+                  <Upload data-icon="inline-start" aria-hidden="true" />Upload
+                </Button>
+              ) : null}
               label="Files to choose from"
               compact
             />

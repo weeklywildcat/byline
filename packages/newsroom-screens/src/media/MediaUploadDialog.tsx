@@ -26,8 +26,9 @@ export type MediaUploadDialogProps = {
   folderId: number | null;
   /** Uploads are running (the host keeps this mounted while they finish). */
   onBusyChange?: (busy: boolean) => void;
-  /** "Show in Media" once files are in. */
+  /** Where to show uploaded files once they're in. */
   onShow?: (folderId: number | null) => void;
+  showLabel?: string;
 };
 
 let sequence = 0;
@@ -40,7 +41,7 @@ let sequence = 0;
  * never required first: gaps show in the Library afterwards. The
  * destination is the folder the reader was browsing, or Unfiled.
  */
-export function MediaUploadDialog({ open, onOpenChange, fetchers, folderId, onBusyChange, onShow }: MediaUploadDialogProps) {
+export function MediaUploadDialog({ open, onOpenChange, fetchers, folderId, onBusyChange, onShow, showLabel = "Show in Media" }: MediaUploadDialogProps) {
   const client = useQueryClient();
   const navigator = useMediaNavigator(fetchers);
   const accepted = navigator.data?.capabilities.acceptedMimeTypes ?? [];
@@ -192,7 +193,7 @@ export function MediaUploadDialog({ open, onOpenChange, fetchers, folderId, onBu
         ) : <div />}
 
         <DialogFooter>
-          {onShow && totals.done ? <Button variant="outline" onClick={() => { onShow(destination); onOpenChange(false); }}>Show in Media</Button> : null}
+          {onShow && totals.done ? <Button variant="outline" onClick={() => { onShow(destination); onOpenChange(false); }}>{showLabel}</Button> : null}
           <Button onClick={() => onOpenChange(false)}>{busy ? "Keep uploading in the background" : "Done"}</Button>
         </DialogFooter>
       </DialogContent>
