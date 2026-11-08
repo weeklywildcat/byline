@@ -42,6 +42,8 @@ export type StoryViewsOptions = {
   onApply: (view: AppliedView) => void;
   /** Saved views that arrived with the stories response, so the menu is complete before its own request returns. */
   initialViews?: SavedPlanningView[];
+  /** The newsroom timezone relative views (Due this week) are resolved in. */
+  timezone?: string;
 };
 
 /**
@@ -70,13 +72,13 @@ export type StoryViewsController = {
   dialogs: ReactNode;
 };
 
-export function useStoryViews({ fetchers, filters, sort, selectedId, onApply, initialViews }: StoryViewsOptions): StoryViewsController {
+export function useStoryViews({ fetchers, filters, sort, selectedId, onApply, initialViews, timezone }: StoryViewsOptions): StoryViewsController {
   const client = useQueryClient();
   const [dialog, setDialog] = useState<ViewsDialog>(null);
   const [error, setError] = useState("");
   const query = useQuery({ queryKey: savedViewsKey, queryFn: () => fetchers.getSavedViews!(), enabled: Boolean(fetchers.getSavedViews), initialData: initialViews, staleTime: 30_000, retry: false });
   const savedViews = useMemo(() => query.data || initialViews || [], [initialViews, query.data]);
-  const active = activeStoryView(filters, sort, savedViews, selectedId);
+  const active = activeStoryView(filters, sort, savedViews, selectedId, { timezone });
   const canSave = Boolean(fetchers.saveSavedView);
   const canDelete = Boolean(fetchers.deleteSavedView);
 
@@ -163,7 +165,7 @@ export function useStoryViews({ fetchers, filters, sort, selectedId, onApply, in
     canSave,
     canDelete,
     full: savedViews.length >= SAVED_VIEW_LIMIT,
-    chooseBuiltIn: (view) => onApply(applyBuiltInView(view)),
+    chooseBuiltIn: (view) => onApply(applyBuiltInView(view, { timezone })),
     chooseSaved: (view) => onApply(applySavedView(view)),
     updateSelected: () => { if (active.kind === "saved" && active.modified) save.mutate({ id: active.view.id, name: active.view.name, filters, sort }); },
     openSave: () => { setError(""); setDialog({ kind: "save" }); },

@@ -20,9 +20,10 @@ import {
   type PlanningWorkflowStatus
 } from "../planning/planning-model";
 
-export function usePlanningStories(fetchers: PlanningFetchers, filters: PlanningFilters) {
+export function usePlanningStories(fetchers: PlanningFetchers, filters: PlanningFilters, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: planningKey(planningFilterParams(filters)),
+    enabled: options.enabled ?? true,
     queryFn: () => fetchers.getPlanning(filters),
     // Typing in search or changing a filter keeps the current stories on screen until the new ones arrive.
     placeholderData: keepPreviousData,

@@ -38,7 +38,7 @@ describe("the Media workspace composition", () => {
   const narrow = { storyWorkspace: false, calendarWorkspace: false, mediaWorkspace: false };
 
   it("is the rail plus the Media navigator on a wide enough Media screen, and the ordinary sidebar otherwise", () => {
-    expect(shellLayoutFor("/admin/media", "/admin", wide)).toEqual({ storyId: null, calendar: false, media: true, collections: false, collectionId: null, composition: "media-workspace" });
+    expect(shellLayoutFor("/admin/media", "/admin", wide)).toEqual({ storyId: null, stories: false, calendar: false, media: true, collections: false, collectionId: null, composition: "media-workspace" });
     expect(shellLayoutFor("/admin/media", "/admin", narrow).composition).toBe("default");
     for (const address of ["/admin", "/admin/stories", "/admin/collections/media"]) expect(shellLayoutFor(address, "/admin", wide).composition).toBe("default");
   });
