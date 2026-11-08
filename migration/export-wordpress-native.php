@@ -436,6 +436,7 @@ foreach ($wpPosts as $post) {
         'title' => (string) $post->post_title,
         'slug' => (string) $post->post_name,
         'status' => (string) $post->post_status,
+        'publicPath' => $post->post_status === 'publish' ? (string) wp_make_link_relative(get_permalink($post)) : '',
         'publishedAt' => get_post_time('c', true, $post),
         'modifiedAt' => get_post_modified_time('c', true, $post),
         'deck' => trim((string) $post->post_excerpt),
