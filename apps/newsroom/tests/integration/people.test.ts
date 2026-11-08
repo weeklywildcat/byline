@@ -60,6 +60,11 @@ const patch = async (
     },
     id,
   );
+const saveAccess = (
+  key: string,
+  id: number,
+  data: Record<string, unknown>,
+) => call("put", "/byline/people/:id/access", key, data, id);
 
 beforeAll(async () => {
   const url = new URL(process.env.DATABASE_URL!);
@@ -224,10 +229,10 @@ describe("People routes and access", () => {
       editProfile: true,
       editEditorialIdentity: false,
       changeVisibility: false,
-      manageAccount: false,
+      manageAccess: false,
       delete: false,
     });
-    expect(result.body.account.names).toEqual([]);
+    expect(result.body.access).toBeNull();
   });
   it("unlinked self-profile returns an empty model without creating a Person", async () => {
     const before = await payload.count({ collection: "people" });
@@ -365,11 +370,7 @@ describe("Creation and public identity management", () => {
         hasProfilePage: visible,
         newsroomRole: "Photographer",
       });
-      expect(result.body.account).toMatchObject({
-        linked: false,
-        names: [],
-        systemHref: null,
-      });
+      expect(result.body.access).toBeNull();
       expect((await payload.count({ collection: "users" })).totalDocs).toBe(
         before,
       );
@@ -490,7 +491,7 @@ describe("Creation and public identity management", () => {
       ).body.total,
     ).toBe(0);
   });
-  it("editors cannot mutate accounts or linkage through the People API", async () => {
+  it("keeps private access inside People for administrators only", async () => {
     for (const changes of [
       { role: "administrator" },
       { enabled: false },
@@ -498,12 +499,104 @@ describe("Creation and public identity management", () => {
       { linkedPerson: persons.other },
     ])
       expect((await patch("editor", persons.writer, changes)).status).toBe(403);
-    expect((await detail("editor", persons.writer)).body.account).toMatchObject(
-      { linked: true, names: ["writer Account"], systemHref: null },
-    );
+
+    expect((await detail("editor", persons.writer)).body.access).toBeNull();
+    const admin = await detail("admin", persons.writer);
+    expect(admin.body.capabilities.manageAccess).toBe(true);
+    expect(admin.body.access).toMatchObject({
+      email: "private-writer@example.test",
+      role: "staff",
+      enabled: true,
+      googleConnected: true,
+    });
     expect(
-      (await detail("admin", persons.writer)).body.account.systemHref,
-    ).toBe("/admin/system");
+      (
+        await saveAccess("editor", persons.writer, {
+          email: "private-writer@example.test",
+          role: "staff",
+          enabled: false,
+          expectedRevision: admin.body.access.revision,
+        })
+      ).status,
+    ).toBe(403);
+  });
+
+  it("grants, disables and re-enables newsroom access from the Person", async () => {
+    const person = await call("post", "/byline/people", "editor", {
+      name: "Access Fixture",
+      type: "active",
+      newsroomRole: "Reporter",
+    });
+    const id = person.body.person.id;
+    const beforeUsers = (await payload.count({ collection: "users" })).totalDocs;
+
+    const granted = await saveAccess("admin", id, {
+      email: "access-fixture@example.test",
+      role: "staff",
+      enabled: true,
+      password: "access-fixture-123456",
+      expectedRevision: null,
+    });
+    expect(granted.status).toBe(200);
+    expect(granted.body.access).toMatchObject({
+      email: "access-fixture@example.test",
+      role: "staff",
+      enabled: true,
+      googleConnected: false,
+    });
+    expect((await payload.count({ collection: "users" })).totalDocs).toBe(beforeUsers + 1);
+
+    const disabled = await saveAccess("admin", id, {
+      email: granted.body.access.email,
+      role: granted.body.access.role,
+      enabled: false,
+      expectedRevision: granted.body.access.revision,
+    });
+    expect(disabled.status).toBe(200);
+    expect(disabled.body.access.enabled).toBe(false);
+
+    const enabled = await saveAccess("admin", id, {
+      email: disabled.body.access.email,
+      role: "editor",
+      enabled: true,
+      expectedRevision: disabled.body.access.revision,
+    });
+    expect(enabled.status).toBe(200);
+    expect(enabled.body.access).toMatchObject({ enabled: true, role: "editor" });
+  });
+
+  it("reuses an existing unlinked account and refuses a second account for one Person", async () => {
+    const guest = persons.guest;
+    const beforeUsers = (await payload.count({ collection: "users" })).totalDocs;
+    const reused = await saveAccess("admin", guest, {
+      email: accounts.unlinked.email,
+      role: "staff",
+      enabled: true,
+      expectedRevision: null,
+    });
+    expect(reused.status).toBe(200);
+    expect(reused.body.access.id).toBe(accounts.unlinked.id);
+    expect((await payload.count({ collection: "users" })).totalDocs).toBe(beforeUsers);
+    expect(
+      Number(
+        (await payload.findByID({ collection: "users", id: accounts.unlinked.id, depth: 0 }))
+          .linkedPerson,
+      ),
+    ).toBe(guest);
+
+    await expect(
+      payload.create({
+        collection: "users",
+        data: {
+          name: "Duplicate",
+          email: "duplicate-person@example.test",
+          password: "duplicate-person-123456",
+          role: "staff",
+          enabled: true,
+          linkedPerson: guest,
+        },
+      }),
+    ).rejects.toThrow("already has a Byline sign-in account");
   });
   it.each([
     "javascript:alert(1)",
@@ -676,7 +769,7 @@ describe("Privacy, accessible usage and historical integrity", () => {
       overrideAccess: false,
     });
   });
-  it("disabling, demoting, relinking and deleting a User preserve the Person and ordered historical bylines", async () => {
+  it("disabling, demoting and deleting a User preserve the Person and ordered historical bylines", async () => {
     const before = await payload.findByID({
       collection: "people",
       id: persons.writer,
@@ -690,7 +783,7 @@ describe("Privacy, accessible usage and historical integrity", () => {
     await payload.update({
       collection: "users",
       id: accounts.writer.id,
-      data: { enabled: false, linkedPerson: persons.other, role: "staff" },
+      data: { enabled: false, role: "staff" },
     });
     await payload.delete({ collection: "users", id: accounts.writer.id });
     const { accounts: _beforeAccounts, ...beforeIdentity } = before;
