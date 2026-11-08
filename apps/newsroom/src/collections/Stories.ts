@@ -300,6 +300,8 @@ export const Stories: CollectionConfig = {
     { name: "plan", type: "join", collection: "story-plans", on: "story", admin: { hidden: true } },
     { name: "versionActor", type: "number", admin: { hidden: true }, access: { create: () => false, update: () => false } },
     { name: "versionRestored", type: "checkbox", admin: { hidden: true }, access: { create: () => false, update: () => false } },
-    legacyIdField()
+    // Migration provenance only. Keep the imported ID in storage, but never let
+    // Payload reserve its document sidebar for a read-only implementation detail.
+    { ...legacyIdField(), admin: { hidden: true } }
   ]
 };
