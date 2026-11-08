@@ -137,6 +137,9 @@ export function NewsroomPresence({ isMobile }: { isMobile: boolean }) {
       </SheetContent>
     </Sheet>
   ) : (
+    <>
+    {/* Everyone active in Byline right now, the reader included. The trigger's label carries the detail. */}
+    {snapshot ? <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums max-lg:hidden" aria-hidden="true" data-presence-online="">{active.length + 1} online</span> : null}
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger render={trigger}>
         {active.length ? (
@@ -154,5 +157,6 @@ export function NewsroomPresence({ isMobile }: { isMobile: boolean }) {
         {body}
       </PopoverContent>
     </Popover>
+    </>
   );
 }

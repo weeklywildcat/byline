@@ -4,6 +4,8 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 plugin_root="$repo_root/wordpress-plugin"
 
+php -l "$repo_root/migration/export-wordpress-native.php"
+
 php_version_id="$(php -r 'echo PHP_VERSION_ID;')"
 runtime_exclusion='*/__no_excluded_mcp_runtime__/*'
 if [[ "$php_version_id" -lt 80200 ]]; then

@@ -27,7 +27,7 @@ test("Home creates real drafts, completes work with rollback, preserves peek con
   expect(story).toBeTruthy();
   session.registerTestPost(story.id);
   expect(story.id).toBe(createdId);
-  // Give it a near deadline so it ranks into "My Stories" however many fixture stories earlier runs left behind.
+  // Give it a near deadline so it ranks into the Budget's "My stories" however many fixture stories earlier runs left behind.
   expect((await session.rest(`/byline/v1/editorial/stories/${story.id}`, "POST", { deadline: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) })).ok).toBe(true);
   const post = await session.rest<{ status: string; content: { raw: string } }>(`/wp/v2/posts/${story.id}?context=edit`);
   expect(post.payload.status).toBe("draft");
@@ -57,7 +57,9 @@ test("Home creates real drafts, completes work with rollback, preserves peek con
   await checkbox.click();
   await expect(checkbox).not.toBeVisible();
   await expect.poll(async () => (await session.rest<{ state: string }>(`/byline/v1/editorial/tasks/${taskId}`)).payload.state).toBe("completed");
-  const row = page.getByRole("region", { name: "My Stories" }).getByRole("button", { name: new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) });
+  const budget = page.getByRole("region", { name: "Budget", exact: true });
+  await budget.getByRole("tab", { name: /^My stories/ }).click();
+  const row = budget.getByRole("table", { name: "Budget: My stories" }).getByRole("button", { name: title, exact: true });
   await row.click();
   await expect(peek).toBeVisible();
   await peek.getByRole("button", { name: "Add link", exact: true }).click();
@@ -111,13 +113,17 @@ test("Home visual QA and independent optional service failures", async ({ adminP
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(homeUrl);
     await expect(page.getByRole("heading", { name: "My Work", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Coming Up", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "My Stories", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "This week", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Budget", exact: true })).toBeVisible();
     await expect(page.getByRole("checkbox", { name: /Complete Interview 3 students/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: `/tmp/byline-home-qa/editor-${width}.png`, fullPage: true, animations: "disabled" });
     if (width === 1440 || width === 390) {
-      await page.getByRole("region", { name: "My Stories" }).getByRole("button", { name: /^Canteen Due/ }).click();
+      // The Budget is a table on a wide Home and rows on a phone; either opens Peek.
+      const budget = page.getByRole("region", { name: "Budget", exact: true });
+      await budget.getByRole("tab", { name: /^My stories/ }).click();
+      const canteen = budget.locator(`[data-story-id="${ids[0]}"]`).filter({ visible: true });
+      await (width === 1440 ? canteen.getByRole("button", { name: "Canteen", exact: true }) : canteen).click();
       const peek = page.getByRole("dialog", { name: "Canteen", exact: true });
       await expect(peek).toBeVisible();
       await expect(peek).toHaveCSS("opacity", "1");

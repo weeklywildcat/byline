@@ -3,6 +3,7 @@ import {
   acceptsFile,
   assetFacts,
   buildFolderTree,
+  cleanMediaName,
   DEFAULT_MEDIA_ROUTE,
   EMPTY_MEDIA_FILTERS,
   folderPath,
@@ -15,6 +16,7 @@ import {
   parseMediaLibraryParams,
   parseMediaRoute,
   searchesEverywhere,
+  splitFilename,
   type MediaFolder,
   type MediaLibraryQuery
 } from "../../src/media/media-library-model";
@@ -117,5 +119,22 @@ describe("files", () => {
   it("describe themselves briefly", () => {
     expect(assetFacts({ mimeType: "image/jpeg", width: 6000, height: 4000, filesize: 17_912_487 })).toBe("JPEG · 6000 × 4000 · 17 MB");
     expect(assetFacts({ mimeType: "audio/mpeg", width: null, height: null, filesize: 481_532 })).toBe("MP3 · 470 KB");
+  });
+});
+
+describe("renaming", () => {
+  it("keeps the extension apart from the editable name", () => {
+    expect(splitFilename("band-at-homecoming.final.jpg")).toEqual({ stem: "band-at-homecoming.final", extension: ".jpg" });
+    expect(splitFilename("README")).toEqual({ stem: "README", extension: "" });
+    expect(splitFilename(".hidden")).toEqual({ stem: ".hidden", extension: "" });
+  });
+  it("cleans a typed name into a safe file name, never a path", () => {
+    expect(cleanMediaName("  Homecoming   crowd ", ".jpg")).toBe("Homecoming crowd");
+    expect(cleanMediaName("Homecoming crowd.JPG", ".jpg")).toBe("Homecoming crowd");
+    expect(cleanMediaName("../../etc/passwd", ".jpg")).toBe("etc passwd");
+    expect(cleanMediaName("a:b*c?d|e<f>g\"h", ".png")).toBe("a b c d e f g h");
+    expect(cleanMediaName(" ../ ", ".jpg")).toBe("");
+    expect(cleanMediaName("...", ".jpg")).toBe("");
+    expect(cleanMediaName("x".repeat(400), ".jpg")).toHaveLength(160);
   });
 });

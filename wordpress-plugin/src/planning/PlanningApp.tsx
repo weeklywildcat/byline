@@ -16,7 +16,7 @@ import { wordpressMediaPicker } from "../workspace/media-library";
 import { StoriesPage, type StoriesCalendarProps } from "@byline/newsroom-screens/planning/StoriesPage";
 import type { StoriesView } from "@byline/newsroom-screens/planning/stories-view";
 import { createWorkspaceUrlBuilder, StoryCalendar } from "./calendar-host";
-import type { PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
+import { storiesRouteFilters, type PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
 import { destinationForTab, initialStoriesView, storiesViewHref } from "./planning-routing";
 
 export type PlanningAppFetchers = PlanningFetchers & StoryFetchers;
@@ -64,7 +64,7 @@ function PlanningBody({ fetchers, tab, view, currentUserId, mine, workspaceUrl }
   const renderCalendar = useCallback((calendar: StoriesCalendarProps) => <StoryCalendar {...calendar} workspaceUrl={workspaceUrl} getSchedule={fetchers.getSchedule} />, [fetchers.getSchedule, workspaceUrl]);
   const viewHref = useCallback((next: StoriesView) => storiesViewHref(window.location.href, next), []);
   return <main className="@container/planning mx-auto mt-6 mb-8 flex max-w-[1600px] flex-col gap-4 pr-5 pl-1">
-    {destination === "stories" ? <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={{ mine: Boolean(mine), collectionId: Number(new URLSearchParams(window.location.search).get("collection")) || undefined }} workspaceUrl={workspaceUrl} renderCalendar={renderCalendar} viewHref={viewHref} onNewStory={fetchers.createStory ? () => setCreating(true) : undefined} /> : null}
+    {destination === "stories" ? <StoriesPage fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={{ ...storiesRouteFilters(new URLSearchParams(window.location.search)), ...(mine ? { mine: true } : {}) }} workspaceUrl={workspaceUrl} renderCalendar={renderCalendar} viewHref={viewHref} onNewStory={fetchers.createStory ? () => setCreating(true) : undefined} /> : null}
     {destination === "collections" ? <WordPressCollections fetchers={fetchers} currentUserId={currentUserId} workspaceUrl={workspaceUrl} /> : null}
     {destination === "media" ? <>
       <PageHeader title="Media Desk" description="Every photo, video, graphic and audio assignment across the newsroom. Files stay in the WordPress Media Library." />

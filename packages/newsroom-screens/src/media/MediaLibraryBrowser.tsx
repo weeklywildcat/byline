@@ -15,7 +15,7 @@ import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@byline/newsroom-ui/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { Check, CircleAlert, FileAudio, FileImage, FileText, LayoutGrid, List, ListFilter, Search, X, type LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactElement, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type KeyboardEvent, type MouseEvent, type ReactElement, type ReactNode } from "react";
 import { siteDay } from "../home/newsroom-model";
 import type { MediaLibraryFetchers } from "./media-library-api";
 import {
@@ -62,6 +62,16 @@ export type MediaLibraryBrowserProps = {
   /** Pick: the assets chosen so far. */
   selectedIds?: ReadonlySet<number>;
   onActivate: (asset: MediaLibraryAsset, event: MouseEvent | null) => void;
+  /**
+   * Browse: the files checked for a bulk action. With these, every file gets
+   * a checkbox; Shift selects a range, ⌘/Ctrl-click toggles, and once anything
+   * is checked a plain click toggles too (the details open from the menu).
+   * ⌘A checks every loaded file, Escape clears.
+   */
+  checkedIds?: ReadonlySet<number>;
+  onCheckedChange?: (ids: Set<number>) => void;
+  /** Shown floating over the results while files are checked (the screen's bulk actions). */
+  selectionBar?: ReactNode;
   /** The browse screen's context-menu items for one asset (desktop shortcut; every action is also visible elsewhere). */
   assetMenu?: (asset: MediaLibraryAsset) => ReactNode;
   /** Controls at the toolbar's end (Upload). */
@@ -83,7 +93,7 @@ export type MediaLibraryBrowserProps = {
  * private previews, loaded lazily; an original is never a thumbnail.
  */
 export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
-  const { fetchers, source, folderId, folderName, navigator, filters, onFiltersChange, sort, onSortChange, layout, onLayoutChange, timezone, selectedId = null, selectedIds, onActivate, assetMenu, toolbarEnd, onSearchEverywhere, onAssetsChange, label = "Media files", compact = false } = props;
+  const { fetchers, source, folderId, folderName, navigator, filters, onFiltersChange, sort, onSortChange, layout, onLayoutChange, timezone, selectedId = null, selectedIds, onActivate, checkedIds, onCheckedChange, selectionBar, assetMenu, toolbarEnd, onSearchEverywhere, onAssetsChange, label = "Media files", compact = false } = props;
   const [text, setText] = useState(filters.search);
   // Typing settles for a moment before the Library is asked again.
   useEffect(() => { setText(filters.search); }, [filters.search]);
@@ -117,8 +127,50 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
   const table = width === 0 || width >= 760;
   const set = (patch: Partial<MediaLibraryFilters>) => onFiltersChange({ ...filters, ...patch });
 
+  /* ------------------------------------------------------- multi-select */
+
+  const checking = Boolean(checkedIds && onCheckedChange);
+  const checkedCount = checkedIds?.size ?? 0;
+  const anchor = useRef<number | null>(null);
+  const check = useCallback((asset: MediaLibraryAsset, event: { shiftKey?: boolean } | null, value?: boolean) => {
+    if (!checkedIds || !onCheckedChange) return;
+    const next = new Set(checkedIds);
+    const from = event?.shiftKey && anchor.current !== null ? assets.findIndex((item) => item.id === anchor.current) : -1;
+    const to = assets.findIndex((item) => item.id === asset.id);
+    if (from >= 0 && to >= 0) {
+      for (const item of assets.slice(Math.min(from, to), Math.max(from, to) + 1)) next.add(item.id);
+    } else if (value ?? !next.has(asset.id)) next.add(asset.id);
+    else next.delete(asset.id);
+    anchor.current = asset.id;
+    onCheckedChange(next);
+  }, [assets, checkedIds, onCheckedChange]);
+  const activate = useCallback((asset: MediaLibraryAsset, event: MouseEvent) => {
+    if (checking && (event.metaKey || event.ctrlKey || event.shiftKey || checkedCount > 0)) {
+      event.preventDefault();
+      check(asset, event);
+      return;
+    }
+    onActivate(asset, event);
+  }, [check, checkedCount, checking, onActivate]);
+  const allChecked = checking && assets.length > 0 && assets.every((asset) => checkedIds!.has(asset.id));
+  const checkAll = (on: boolean) => onCheckedChange?.(on ? new Set([...(checkedIds ?? []), ...assets.map((asset) => asset.id)]) : new Set());
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (!checking) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("input, textarea, select, [contenteditable=true], [role=combobox], [role=menu], [role=dialog]")) return;
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a" && assets.length) {
+      event.preventDefault();
+      checkAll(true);
+    } else if (event.key === "Escape" && checkedCount) {
+      event.preventDefault();
+      onCheckedChange?.(new Set());
+    }
+  };
+  // Shift-click picks a range; it should never also select the page's text.
+  const noTextSelection = (event: MouseEvent) => { if (event.shiftKey && checking && !(event.target as HTMLElement).closest("input, textarea")) event.preventDefault(); };
+
   return (
-    <div className="flex min-w-0 flex-col gap-3" data-media-browser="">
+    <div className="flex min-h-full min-w-0 flex-col gap-3" data-media-browser="" data-media-checking={checkedCount ? "" : undefined} onKeyDown={onKeyDown} onMouseDown={noTextSelection}>
       <div className="flex flex-wrap items-center gap-2" role="search" aria-label="Search media">
         <InputGroup className={cn("min-w-0 flex-1", compact ? "basis-full" : "basis-64")}>
           <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
@@ -189,29 +241,42 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
         <div ref={listRef} className={cn("transition-opacity", library.isPlaceholderData && "opacity-60")} aria-busy={library.isFetching || undefined}>
           {layout === "grid" ? (
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(168px,1fr))] gap-3 max-sm:grid-cols-2 max-sm:gap-2" aria-label={label} data-media-grid="">
-              {assets.map((asset) => (
-                <li key={asset.id} className="min-w-0">
-                  <WithMenu asset={asset} menu={assetMenu}>
-                    <AssetTile asset={asset} timezone={timezone} selected={selectedIds ? selectedIds.has(asset.id) : selectedId === asset.id} onActivate={onActivate} />
-                  </WithMenu>
-                </li>
-              ))}
+              {assets.map((asset) => {
+                const checked = checkedIds?.has(asset.id) ?? false;
+                return (
+                  <li key={asset.id} className="group/item relative min-w-0">
+                    <WithMenu asset={asset} menu={assetMenu}>
+                      <AssetTile asset={asset} timezone={timezone} selected={selectedIds ? selectedIds.has(asset.id) : selectedId === asset.id} picking={Boolean(selectedIds)} checked={checked} onActivate={checking ? activate : onActivate} />
+                    </WithMenu>
+                    {checking ? (
+                      <span className={cn("absolute top-2 left-2 flex size-6 items-center justify-center rounded-md bg-background/90 shadow-xs transition-opacity", checked || checkedCount ? "opacity-100" : "opacity-0 group-hover/item:opacity-100 has-focus-visible:opacity-100")}>
+                        <Checkbox checked={checked} aria-label={`Select ${asset.filename}`} onCheckedChange={(value, details) => check(asset, details.event as { shiftKey?: boolean }, value)} data-media-check={asset.id} />
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           ) : table ? (
             <div className="overflow-hidden rounded-lg border bg-card">
               <Table aria-label={label} data-media-table="">
-                <TableHeader className="bg-muted/20"><TableRow className="hover:bg-transparent"><TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead>Captured</TableHead><TableHead>Uploader</TableHead><TableHead>Credit</TableHead><TableHead>Metadata</TableHead><TableHead>Updated</TableHead></TableRow></TableHeader>
+                <TableHeader className="bg-muted/20"><TableRow className="hover:bg-transparent">{checking ? <TableHead className="w-10"><Checkbox checked={allChecked} indeterminate={!allChecked && checkedCount > 0} aria-label={allChecked ? "Clear selection" : "Select all loaded files"} onCheckedChange={(value) => checkAll(value)} data-media-check-all="" /></TableHead> : null}<TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead>Captured</TableHead><TableHead>Uploader</TableHead><TableHead>Credit</TableHead><TableHead>Metadata</TableHead><TableHead>Updated</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {assets.map((asset) => {
                     const selected = selectedIds ? selectedIds.has(asset.id) : selectedId === asset.id;
+                    const checked = checkedIds?.has(asset.id) ?? false;
+                    const open = checking ? activate : onActivate;
                     return (
                       <WithMenu key={asset.id} asset={asset} menu={assetMenu}>
-                        <TableRow data-state={selected ? "selected" : undefined} className="cursor-pointer" onClick={(event) => { if (!(event.target as HTMLElement).closest("button")) onActivate(asset, event); }}>
+                        <TableRow data-state={selected || checked ? "selected" : undefined} className="cursor-pointer" onClick={(event) => { if (!(event.target as HTMLElement).closest("button, [role=checkbox]")) open(asset, event); }}>
+                          {checking ? (
+                            <TableCell className="w-10 py-2"><Checkbox checked={checked} aria-label={`Select ${asset.filename}`} onCheckedChange={(value, details) => check(asset, details.event as { shiftKey?: boolean }, value)} data-media-check={asset.id} /></TableCell>
+                          ) : null}
                           <TableCell className="max-w-72 py-2">
-                            <button type="button" className="flex min-w-0 items-center gap-2.5 text-left font-medium outline-none focus-visible:underline" aria-pressed={selected} onClick={(event) => onActivate(asset, event)} data-media-asset={asset.id}>
+                            <button type="button" className="flex min-w-0 items-center gap-2.5 text-left font-medium outline-none focus-visible:underline" aria-pressed={selected} onClick={(event) => open(asset, event)} data-media-asset={asset.id}>
                               <AssetThumbnail asset={asset} className="size-9 shrink-0 rounded" />
                               <span className="truncate">{asset.filename}</span>
-                              {selected ? <Check aria-hidden="true" className="size-4 shrink-0 text-primary" /> : null}
+                              {selected && !checking ? <Check aria-hidden="true" className="size-4 shrink-0 text-primary" /> : null}
                             </button>
                           </TableCell>
                           <TableCell className="py-2 text-muted-foreground">{KIND_LABELS[asset.kind]}</TableCell>
@@ -231,17 +296,21 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
             <ItemGroup className="gap-0 overflow-hidden rounded-lg border bg-card" aria-label={label} data-media-items="">
               {assets.map((asset) => {
                 const selected = selectedIds ? selectedIds.has(asset.id) : selectedId === asset.id;
+                const checked = checkedIds?.has(asset.id) ?? false;
                 return (
-                  <WithMenu key={asset.id} asset={asset} menu={assetMenu}>
-                    <Item size="sm" className={cn("rounded-none border-b last:border-b-0", selected && "bg-muted")} render={<button type="button" aria-pressed={selected} onClick={(event) => onActivate(asset, event)} data-media-asset={asset.id} />}>
+                  <div key={asset.id} className="flex items-center border-b last:border-b-0">
+                  {checking ? <span className="flex shrink-0 items-center pl-3"><Checkbox checked={checked} aria-label={`Select ${asset.filename}`} onCheckedChange={(value, details) => check(asset, details.event as { shiftKey?: boolean }, value)} data-media-check={asset.id} /></span> : null}
+                  <WithMenu asset={asset} menu={assetMenu}>
+                    <Item size="sm" className={cn("min-w-0 flex-1 rounded-none", (selected || checked) && "bg-muted")} render={<button type="button" aria-pressed={selected} onClick={(event) => (checking ? activate : onActivate)(asset, event)} data-media-asset={asset.id} />}>
                       <ItemMedia variant="image"><AssetThumbnail asset={asset} className="size-full" /></ItemMedia>
                       <ItemContent className="min-w-0">
                         <ItemTitle className="w-full truncate">{asset.filename}</ItemTitle>
                         <ItemDescription className="truncate">{[KIND_LABELS[asset.kind], asset.capturedAt ? shortDay(asset.capturedAt, timezone) : shortDay(asset.createdAt, timezone), asset.uploadedBy?.name].filter(Boolean).join(" · ")}</ItemDescription>
                       </ItemContent>
-                      {selected ? <Check aria-hidden="true" className="size-4 shrink-0 text-primary" /> : asset.gaps.length ? <CircleAlert aria-label={asset.gaps.map((gap) => GAP_LABELS[gap]).join(", ")} className="size-4 shrink-0 text-amber-600" /> : null}
+                      {selected && !checking ? <Check aria-hidden="true" className="size-4 shrink-0 text-primary" /> : asset.gaps.length ? <CircleAlert aria-label={asset.gaps.map((gap) => GAP_LABELS[gap]).join(", ")} className="size-4 shrink-0 text-amber-600" /> : null}
                     </Item>
                   </WithMenu>
+                  </div>
                 );
               })}
             </ItemGroup>
@@ -251,6 +320,7 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
           </div>
         </div>
       )}
+      {selectionBar && checkedCount ? <div className="pointer-events-none sticky bottom-4 z-10 mt-auto flex justify-center px-2" data-media-selection-dock="">{selectionBar}</div> : null}
     </div>
   );
 }
@@ -288,15 +358,22 @@ export function AssetThumbnail({ asset, className, eager = false }: { asset: Med
   );
 }
 
-function AssetTile({ asset, timezone, selected, onActivate }: { asset: MediaLibraryAsset; timezone: string; selected: boolean; onActivate: MediaLibraryBrowserProps["onActivate"] }) {
+/**
+ * One grid tile. Extra props (the context menu trigger's handlers and ref) go
+ * to the tile's button, so a right-click opens the file's menu.
+ */
+function AssetTile({ asset, timezone, selected, picking, checked, onActivate, className, ...rest }: { asset: MediaLibraryAsset; timezone: string; selected: boolean; picking: boolean; checked: boolean; onActivate: (asset: MediaLibraryAsset, event: MouseEvent) => void } & Omit<ComponentProps<"button">, "onClick">) {
   const when = shortDay(asset.capturedAt ?? asset.createdAt, timezone);
   const gaps = asset.gaps.map((gap) => GAP_LABELS[gap]).join(", ");
   return (
     <button
+      {...rest}
       type="button"
       className={cn(
         "group/tile flex w-full min-w-0 flex-col overflow-hidden rounded-lg border bg-card text-left shadow-xs outline-none transition-[box-shadow,border-color] hover:border-foreground/25 focus-visible:ring-3 focus-visible:ring-ring/50",
-        selected && "border-primary ring-2 ring-primary"
+        className,
+        checked && "border-primary bg-primary/5 ring-2 ring-primary",
+        selected && !checked && (picking ? "border-primary ring-2 ring-primary" : "border-foreground/40 ring-2 ring-foreground/15")
       )}
       aria-pressed={selected}
       aria-label={[asset.filename, KIND_LABELS[asset.kind], when, asset.uploadedBy?.name, gaps].filter(Boolean).join(", ")}
@@ -306,8 +383,8 @@ function AssetTile({ asset, timezone, selected, onActivate }: { asset: MediaLibr
       <span className="relative block aspect-[4/3] w-full overflow-hidden bg-muted">
         <AssetThumbnail asset={asset} className="absolute inset-0 size-full" />
         {!asset.previewUrl ? <span className="absolute bottom-2 left-2 rounded bg-background/90 px-1.5 py-0.5 text-[11px] font-medium text-foreground">{KIND_LABELS[asset.kind]}</span> : null}
-        {selected ? <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow" aria-hidden="true"><Check className="size-4" /></span> : null}
-        {asset.gaps.length ? <span className="absolute top-2 left-2 flex size-6 items-center justify-center rounded-full bg-background/90 text-amber-600 shadow-xs" title={gaps} aria-hidden="true"><CircleAlert className="size-4" /></span> : null}
+        {selected && picking ? <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow" aria-hidden="true"><Check className="size-4" /></span> : null}
+        {asset.gaps.length && !(selected && picking) ? <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-background/90 text-amber-600 shadow-xs" title={gaps} aria-hidden="true"><CircleAlert className="size-4" /></span> : null}
       </span>
       <span className="flex min-w-0 flex-col px-2.5 py-2">
         <span className="truncate text-sm font-medium">{asset.filename}</span>

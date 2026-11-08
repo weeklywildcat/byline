@@ -13,7 +13,8 @@ import {
   pollPublicSlice,
   sectionPublicSlice,
   storyPublicSlice,
-  topicPublicSlice
+  topicPublicSlice,
+  videoFactsPublicSlice
 } from "./slices";
 
 /**
@@ -46,6 +47,7 @@ export const PUBLIC_COLLECTIONS: Record<string, { slice: PublicSlice; options?: 
   corrections: { slice: correctionPublicSlice },
   polls: { slice: pollPublicSlice },
   "live-updates": { slice: liveUpdatePublicSlice },
+  "video-facts": { slice: videoFactsPublicSlice },
   media: { slice: mediaPublicSlice, options: { ignoreCreate: true } }
 };
 

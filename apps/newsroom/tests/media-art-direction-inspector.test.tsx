@@ -21,9 +21,9 @@ const T0 = "2026-11-01T12:00:00.000Z";
 const T1 = "2026-11-01T12:05:00.000Z";
 const T2 = "2026-11-01T12:09:00.000Z";
 const publication = (overrides: Partial<MediaPublicationDetail> = {}): MediaPublicationDetail => ({ state: "ready", reason: "ready", currentRevision: 1, preparedRevision: 1, preparedAt: T0, failureMessage: null, warnings: [], canRetry: false, ...overrides });
-const state = vi.hoisted(() => ({ updatedAt: "", publication: null as unknown, saves: [] as Array<Record<string, unknown>>, retries: 0, reads: 0 }));
+const state = vi.hoisted(() => ({ updatedAt: "", filename: "band.jpg", publication: null as unknown, saves: [] as Array<Record<string, unknown>>, renames: [] as Array<Record<string, unknown>>, retries: 0, reads: 0 }));
 const asset = (): MediaAssetDetail => ({
-  id: 7, filename: "band.jpg", mimeType: "image/jpeg", kind: "image", filesize: 1000, width: 3000, height: 2000, previewUrl: "/p.webp", url: "/o.jpg",
+  id: 7, filename: state.filename, mimeType: "image/jpeg", kind: "image", filesize: 1000, width: 3000, height: 2000, previewUrl: "/p.webp", url: "/o.jpg",
   alt: "Band", creator: "Pat", credit: "Pat", copyright: "©", license: "", sourceUrl: "", capturedAt: null, createdAt: T0, updatedAt: state.updatedAt,
   uploadedBy: null, folder: null, publicationAssets: (state.publication as MediaPublicationDetail).state, gaps: [], canUpdate: true, canDelete: false,
   folderPath: [], usages: [], usagesComplete: false, hiddenUsageCount: 0, publication: state.publication as MediaPublicationDetail
@@ -37,8 +37,15 @@ const fetchers = {
     return { ...asset(), ...patch };
   },
   deleteMedia: async () => undefined,
+  renameMedia: async (_id: number, input: { name: string; expectedUpdatedAt?: string }) => {
+    state.renames.push({ ...input });
+    if (input.expectedUpdatedAt !== state.updatedAt) throw { message: "Someone else changed this file while you were renaming it.", data: { status: 409 } };
+    state.updatedAt = T1;
+    state.filename = `${input.name}.jpg`;
+    return asset();
+  },
   retryPublication: async () => { state.retries += 1; state.publication = publication({ state: "preparing", reason: "preparing" }); return asset(); }
-} as unknown as Pick<MediaLibraryFetchers, "getAsset" | "updateMedia" | "deleteMedia" | "retryPublication">;
+} as unknown as Pick<MediaLibraryFetchers, "getAsset" | "updateMedia" | "deleteMedia" | "retryPublication" | "renameMedia">;
 
 let root: Root;
 let container: HTMLElement;
@@ -47,6 +54,8 @@ beforeEach(() => {
   state.updatedAt = T0;
   state.publication = publication();
   state.saves.length = 0;
+  state.renames.length = 0;
+  state.filename = "band.jpg";
   state.retries = 0;
   state.reads = 0;
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
@@ -130,4 +139,26 @@ describe("art direction from the Media inspector", () => {
     expect(state.reads).toBeGreaterThan(before);
     expect(document.querySelector("[data-media-publication]")?.getAttribute("data-media-publication")).toBe("ready");
   }, 15_000);
+
+  it("renames in place, keeps unsaved details and saves them afterwards without a false conflict", async () => {
+    await mount();
+    await typeAlt("Band on the field");
+    await click("[data-media-rename-button]");
+    const input = document.querySelector<HTMLInputElement>("[data-media-name-input]")!;
+    expect(input.value).toBe("band");
+    expect(document.querySelector("[data-media-rename]")?.textContent).toContain(".jpg");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Homecoming band");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => { document.querySelector<HTMLFormElement>("[data-media-rename]")!.requestSubmit(); });
+    await flush();
+    expect(state.renames).toEqual([{ name: "Homecoming band", expectedUpdatedAt: T0 }]);
+    expect(document.querySelector("[data-media-filename]")?.textContent).toBe("Homecoming band.jpg");
+    expect(altValue()).toBe("Band on the field");
+    await save();
+    await flush();
+    expect(state.saves.at(-1)).toMatchObject({ alt: "Band on the field", expectedUpdatedAt: T1 });
+    expect(document.querySelector("[data-media-inspector] [role='alert']")).toBeNull();
+  });
 });

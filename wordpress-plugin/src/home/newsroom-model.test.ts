@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { EditorialTask } from "@byline/newsroom-screens/editorial/editorial-model";
 import type { PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 import type { HomeAppointment } from "@byline/newsroom-screens/workspace/workspace-types";
-import { activeStory, dayDistance, homeAgenda, myActiveStories, myOpenTasks, myStory, myWork, reviewStories, siteDay, waitingForMe, workspaceUrlFor, type HomeBootstrap, type HomeVisualWork } from "@byline/newsroom-screens/home/newsroom-model";
+import { activeStory, addDays, dayDistance, homeAgenda, homeScope, isoWeek, weekAgenda, myActiveStories, myOpenTasks, myStory, myWork, reviewStories, siteDay, waitingForMe, workspaceUrlFor, type HomeBootstrap, type HomeVisualWork } from "@byline/newsroom-screens/home/newsroom-model";
 import { replaceHomeTask } from "@byline/newsroom-screens/home/home-query";
+import { budgetStories, deskStages, localHomePreferences, normalizeHomePreferences, publishDate, scopedStories } from "@byline/newsroom-screens/home/desk-model";
+import { storiesHref, storiesRouteFilters } from "@byline/newsroom-screens/planning/planning-api";
+import { builtInStoryView, storyViewCount } from "@byline/newsroom-screens/planning/story-views";
 
 const now = new Date("2026-10-20T12:00:00Z");
 const timezone = "America/New_York";
@@ -122,7 +125,7 @@ describe("appointments in Coming Up and My Work attention", () => {
   it("shows a confirmed exact appointment with its real time, and never a target window", () => {
     const data = bootstrap({ stories: [story({ deadline: null })], appointments: [appointment(), appointment({ id: "t1", status: "tentative", startAt: "2026-10-22T14:00:00Z" }), windowAppointment({ status: "confirmed" }), appointment({ id: "u1", scheduleMode: "unscheduled", startAt: null, status: "planned" })] });
     const events = homeAgenda(data, now);
-    expect(events).toEqual([{ id: "appointment-a1", storyId: 1, title: "Interview Mrs. Hamby", detail: "Canteen could return", label: "Interview", date: "2026-10-27T14:15:00Z", day: "2026-10-27" }]);
+    expect(events).toEqual([{ id: "appointment-a1", storyId: 1, title: "Interview Mrs. Hamby", detail: "Canteen could return", label: "Interview", date: "2026-10-27T14:15:00Z", day: "2026-10-27", category: "appointment" }]);
     expect(new Date(events[0].date).toISOString()).toBe("2026-10-27T14:15:00.000Z");
   });
   it("puts an appointment on its site day even when the UTC day is the next one", () => {
@@ -135,7 +138,7 @@ describe("appointments in Coming Up and My Work attention", () => {
   });
   it("turns an upcoming target window into a scheduling action, but not a far-future window or undated idea", () => {
     const near = bootstrap({ stories: [], appointments: [windowAppointment()] });
-    expect(waitingForMe(near, now)).toEqual([{ id: "schedule-w1", storyId: 1, title: "Interview local reporter", detail: "Needs scheduling for next week", urgent: false }]);
+    expect(waitingForMe(near, now)).toEqual([{ id: "schedule-w1", storyId: 1, title: "Interview local reporter", detail: "Needs scheduling for next week", urgent: false, reason: "scheduling" }]);
     const far = bootstrap({ stories: [], appointments: [windowAppointment({ windowStart: "2026-12-07", windowEnd: "2026-12-11" }), appointment({ id: "u1", scheduleMode: "unscheduled", startAt: null, status: "planned" }), appointment()] });
     expect(waitingForMe(far, now)).toEqual([]);
     expect(homeAgenda(near, now).length).toBe(0);
@@ -157,5 +160,124 @@ describe("Story Workspace navigation", () => {
     expect(url.pathname).toBe("/wp-admin/admin.php");
     expect(Object.fromEntries(url.searchParams)).toEqual({ page: "byline-planning", story: "42" });
     expect(new URL(workspaceUrlFor("/wp-admin/admin.php?tab=stories&page=byline-planning", 7, "http://site.test/wp-admin/admin.php")).search).toBe("?page=byline-planning&story=7");
+  });
+});
+
+const stage = (id: string, label: string) => ({ id, label, group: "main" as const, selectable: true });
+const other = { id: 9, name: "Other" };
+const scheduled = (at: string) => ({ id: "scheduled", label: "Scheduled", isPublished: false, isScheduled: true, scheduledAt: at });
+
+describe("the week strip", () => {
+  // `now` is Tuesday, October 20 in New York: the site week runs Sunday 18 to Saturday 24.
+  it("buckets commitments by site day for Sunday to Saturday, including earlier this week", () => {
+    const data = bootstrap({
+      capabilities: { review: true, createStory: true, uploadMedia: true },
+      stories: [
+        story({ id: 1, deadline: "2026-10-19", plannedPublication: "2026-10-21" }),
+        story({ id: 2, authors: [], writer: other, deadline: null, plannedPublication: null, publicationState: scheduled("2026-10-23T01:30:00Z") }),
+        story({ id: 3, deadline: "2026-10-26" })
+      ],
+      appointments: [appointment({ startAt: "2026-10-18T15:00:00Z" }), appointment({ id: "p1", kind: "photo", startAt: "2026-10-24T15:00:00Z" })]
+    });
+    const week = weekAgenda(data, now, "newsroom");
+    expect(week.start).toBe("2026-10-18");
+    expect(week.end).toBe("2026-10-24");
+    expect(week.days.map((day) => day.day)).toEqual(["2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23", "2026-10-24"]);
+    const byDay = Object.fromEntries(week.days.map((day) => [day.day.slice(8), day.events.map((event) => `${event.category}:${event.id}`)]));
+    expect(byDay).toEqual({ "18": ["appointment:appointment-a1"], "19": ["deadline:deadline-1"], "20": [], "21": ["publication:planned-1"], "22": ["publication:scheduled-2"], "23": [], "24": ["photo:appointment-p1"] });
+    expect(week.days.find((day) => day.isToday)?.day).toBe("2026-10-20");
+    expect(week.nextWeekCount).toBe(1);
+  });
+  it("marks weekdays from today on with nothing to publish, never weekends or past days", () => {
+    const week = weekAgenda(bootstrap({ stories: [story({ plannedPublication: "2026-10-21" })] }), now, "mine");
+    expect(week.days.filter((day) => day.nothingPlanned).map((day) => day.day)).toEqual(["2026-10-20", "2026-10-22", "2026-10-23"]);
+    expect(week.days.find((day) => day.day === "2026-10-21")).toMatchObject({ toPublish: 1, nothingPlanned: false });
+  });
+  it("scopes newsroom stories to the reader in Mine, and only editors can choose Newsroom", () => {
+    const data = bootstrap({ capabilities: { review: true, createStory: true, uploadMedia: true }, stories: [story({ authors: [], writer: other, plannedPublication: "2026-10-21" })] });
+    expect(weekAgenda(data, now, "newsroom").days[3].toPublish).toBe(1);
+    expect(weekAgenda(data, now, "mine").days[3].toPublish).toBe(0);
+    expect(homeAgenda(data, now, undefined, "mine")).toEqual([]);
+    expect(homeScope(null, true)).toBe("newsroom");
+    expect(homeScope("mine", true)).toBe("mine");
+    expect(homeScope("newsroom", false)).toBe("mine");
+  });
+  it("moves whole weeks and numbers them by ISO week", () => {
+    expect(weekAgenda(bootstrap(), now, "mine", { offset: 1 }).start).toBe("2026-10-25");
+    expect(weekAgenda(bootstrap(), now, "mine", { offset: -1 }).end).toBe("2026-10-17");
+    expect(isoWeek("2026-11-08")).toBe(45);
+    expect(isoWeek("2027-01-01")).toBe(53);
+    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
+  });
+});
+
+describe("the Desk and the Budget", () => {
+  it("counts active stories by stage in workflow order and warns on stale Reporting and Editing", () => {
+    const stories = [
+      story({ id: 1, workflow: stage("editing", "Editing"), modifiedAt: "2026-10-14T12:00:00Z" }),
+      story({ id: 2, workflow: stage("reporting", "Reporting"), modifiedAt: "2026-10-15T12:00:00Z" }),
+      story({ id: 3, workflow: stage("reporting", "Reporting"), modifiedAt: "2026-10-12T12:00:00Z" }),
+      story({ id: 4, workflow: stage("pitch", "Pitch"), modifiedAt: "2026-09-01T12:00:00Z" }),
+      story({ id: 5, workflow: stage("dropped", "Dropped") })
+    ];
+    expect(deskStages(stories, timezone, now)).toEqual([
+      { id: "pitch", label: "Pitch", count: 1, ageDays: 49, stale: false },
+      { id: "reporting", label: "Reporting", count: 2, ageDays: 8, stale: true },
+      { id: "editing", label: "Editing", count: 1, ageDays: 6, stale: true }
+    ]);
+    expect(deskStages([story({ workflow: stage("reporting", "Reporting"), modifiedAt: "2026-10-13T12:00:00Z" })], timezone, now)[0].stale).toBe(false);
+  });
+  it("lists this week's publications, the reader's stories and undated stories, scoped", () => {
+    const data = bootstrap({
+      capabilities: { review: true, createStory: true, uploadMedia: true },
+      stories: [
+        story({ id: 1, plannedPublication: "2026-10-23" }),
+        story({ id: 2, authors: [], writer: other, plannedPublication: null, publicationState: scheduled("2026-10-21T14:00:00Z") }),
+        story({ id: 3, authors: [], writer: other, plannedPublication: "2026-10-30" }),
+        story({ id: 4, authors: [], writer: other, plannedPublication: null }),
+        story({ id: 5, plannedPublication: null, deadline: "2026-10-19" })
+      ]
+    });
+    const newsroom = budgetStories(data, "newsroom", now);
+    expect(newsroom.week.map((s) => s.id)).toEqual([2, 1]);
+    expect(newsroom.unscheduled.map((s) => s.id)).toEqual([5, 4]);
+    expect(newsroom.mine.map((s) => s.id)).toEqual([5, 1]);
+    const mine = budgetStories(data, "mine", now);
+    expect(mine.week.map((s) => s.id)).toEqual([1]);
+    expect(mine.unscheduled.map((s) => s.id)).toEqual([5]);
+    expect(scopedStories(data, "mine").map((s) => s.id)).toEqual([1, 5]);
+    expect(publishDate(data.stories[1])).toBe("2026-10-21T14:00:00Z");
+  });
+  it("normalizes and remembers the scope preference without trusting stored data", () => {
+    expect(normalizeHomePreferences({ scope: "mine" })).toEqual({ scope: "mine" });
+    expect(normalizeHomePreferences({ scope: "everyone" })).toEqual({ scope: null });
+    expect(normalizeHomePreferences("mine")).toEqual({ scope: null });
+    const values = new Map<string, string>();
+    const local = localHomePreferences({ getItem: (key) => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); } });
+    local.save!({ scope: "mine" });
+    expect(normalizeHomePreferences(local.load!())).toEqual({ scope: "mine" });
+    expect(localHomePreferences({ getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } }).load!()).toBeNull();
+  });
+});
+
+describe("Stories links and view counts", () => {
+  it("names filters in the Stories address and reads them back", () => {
+    const href = storiesHref("/admin/stories", { workflow: "reporting", mine: true }, "http://newsroom.test/admin");
+    expect(href).toBe("/admin/stories?workflow=reporting&mine=1");
+    const wp = storiesHref("admin.php?page=byline-planning&tab=stories", { needsReview: true }, "http://site.test/wp-admin/admin.php?page=byline-planning&tab=today");
+    expect(wp).toBe("/wp-admin/admin.php?page=byline-planning&tab=stories&needs_review=1");
+    expect(storiesRouteFilters(new URL(`http://x${href}&collection=4`).searchParams)).toMatchObject({ workflow: "reporting", mine: true, collectionId: 4 });
+    expect(storiesRouteFilters(new URLSearchParams("coverage=9&visual_status=needed"))).toMatchObject({ collectionId: 9, visualStatus: "needed" });
+  });
+  it("counts only active stories in a promoted view", () => {
+    const stories = [
+      story({ id: 1, workflow: stage("ready", "Ready for Review") }),
+      story({ id: 2, editor: { id: 3, name: "Editor" } }),
+      story({ id: 3, publicationState: { id: "published", label: "Published", isPublished: true, isScheduled: false } }),
+      story({ id: 4, visual: { type: "photo", status: "needed" }, editor: { id: 3, name: "Editor" } })
+    ];
+    expect(storyViewCount(stories, builtInStoryView("review")!, 7, now)).toBe(1);
+    expect(storyViewCount(stories, builtInStoryView("unassigned")!, 7, now)).toBe(1);
+    expect(builtInStoryView("art-needed")?.label).toBe("Art needed");
   });
 });

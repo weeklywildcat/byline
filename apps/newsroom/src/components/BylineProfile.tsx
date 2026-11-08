@@ -1,6 +1,7 @@
 import { DefaultTemplate } from "@payloadcms/next/templates";
 import { Gutter } from "@payloadcms/ui";
 import type { AdminViewServerProps } from "payload";
+import { redirectIfSignedOut } from "../auth/session";
 import { requestUser } from "../access/user";
 import { NewsroomPeopleScreen } from "../ui/people/NewsroomPeopleScreen";
 
@@ -10,6 +11,7 @@ export function BylineProfile({
   searchParams,
 }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult;
+  redirectIfSignedOut({ req, params, searchParams });
   return (
     <DefaultTemplate
       i18n={req.i18n}

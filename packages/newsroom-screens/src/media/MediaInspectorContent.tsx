@@ -1,25 +1,30 @@
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
-import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
-import { Separator } from "@byline/newsroom-ui/ui/separator";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Crop, CircleAlert, Download, ExternalLink, Eye, FileText, Maximize2, RotateCw, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useImperativeHandle, useMemo, useState, type Ref } from "react";
+import { Check, CircleAlert, CircleCheck, CircleDashed, Crop, Download, ExternalLink, Eye, FileText, Link2, Maximize2, MoreHorizontal, Pencil, RotateCw, Trash2, X, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useState, type ReactNode, type Ref } from "react";
 import { toast } from "sonner";
+import { DatePicker } from "../editorial/pickers";
 import { siteDay } from "../home/newsroom-model";
 import { mediaAssetKey, type MediaLibraryFetchers } from "./media-library-api";
 import { AssetThumbnail, shortDay } from "./MediaLibraryBrowser";
-import { assetFacts, PUBLICATION_ASSET_LABELS, folderPath, GAP_LABELS, MEDIA_FIELD_LIMITS, type MediaAssetDetail, type MediaMetadataPatch, type MediaNavigatorData } from "./media-library-model";
+import { assetFacts, cleanMediaName, folderPath, formatFilesize, GAP_LABELS, KIND_LABELS, MEDIA_FIELD_LIMITS, mediaMetadataGaps, PUBLICATION_ASSET_LABELS, splitFilename, type MediaAssetDetail, type MediaMetadataGap, type MediaMetadataPatch, type MediaNavigatorData } from "./media-library-model";
 import { invalidateMediaLibrary, replaceCachedAsset, useMediaAsset } from "./media-query";
+import { MediaNameInput, useRenameMedia } from "./MediaRename";
 import { rebasedUpdatedAt, type ArtDirectionEditResult } from "./art-direction-model";
 
 /** What the screen asks the inspector before it shows another asset. */
@@ -51,7 +56,7 @@ function changes(before: Draft, after: Draft): MediaMetadataPatch {
 }
 
 export type MediaInspectorContentProps = {
-  fetchers: Pick<MediaLibraryFetchers, "getAsset" | "updateMedia" | "deleteMedia" | "retryPublication">;
+  fetchers: Pick<MediaLibraryFetchers, "getAsset" | "updateMedia" | "deleteMedia" | "retryPublication" | "renameMedia">;
   assetId: number;
   navigator?: MediaNavigatorData;
   timezone: string;
@@ -61,7 +66,7 @@ export type MediaInspectorContentProps = {
   onOpenStory?: (storyId: number) => void;
   /** A link to this asset on the Media screen, for "Copy link". */
   assetHref?: (id: number) => string;
-  /** Where the panel's own heading sits (the Sheet has its own title). */
+  /** Whether the panel shows its own header (name, rename, actions, close). */
   showHeading?: boolean;
   /**
    * Opens the host's art-direction editor (focal point and crops) for an
@@ -71,13 +76,20 @@ export type MediaInspectorContentProps = {
 };
 
 /**
- * One asset in full: a large private preview, the file's facts, its
- * editable metadata (explicit Save and Cancel, never autosave), its folder
- * and uploader, its publication files' state (with Retry) and its linked
- * uses. The same component is the wide screen's resizable panel and the
- * narrower screens' sheet. Accounts that may not change the file see the same
- * fields read-only. Hashes, storage and raw manifests are never shown; crops
- * and the focal point are edited in the host's art-direction editor.
+ * One asset in full, laid out like a DAM's details pane:
+ *
+ * - a header with the file's name (renamed in place), its facts and a menu
+ *   of file actions (open, download, copy link, delete);
+ * - a large private preview with the few actions that belong to the picture
+ *   (crops and focal point, larger preview, open, download);
+ * - its publication files' state (with Retry);
+ * - tabs: **Details** (the editable metadata, grouped, each publishing gap
+ *   marked on its own field, explicit Save/Cancel, never autosave), **Uses**
+ *   (linked records) and **Info** (read-only facts).
+ *
+ * The same component is the wide screen's resizable panel and the narrower
+ * screens' sheet. Accounts that may not change the file see the same fields
+ * read-only. Hashes, storage and raw manifests are never shown.
  */
 export function MediaInspectorContent({ fetchers, assetId, navigator, timezone, guardRef, onClose, onDeleted, onOpenStory, assetHref, showHeading = true, onEditArtDirection }: MediaInspectorContentProps) {
   const query = useMediaAsset(fetchers, assetId);
@@ -102,6 +114,8 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
   const [draft, setDraft] = useState(initial);
   const [error, setError] = useState<{ message: string; conflict: boolean } | null>(null);
   const [zoom, setZoom] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const patch = useMemo(() => changes(initial, draft), [draft, initial]);
   const dirty = Object.keys(patch).length > 0;
   // A clean form follows the newest copy; a form with edits keeps its base, so a stale save is refused (409).
@@ -113,6 +127,8 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
   const editable = asset.canUpdate;
   const folders = navigator?.folders ?? [];
   const folderItems = useMemo(() => [{ value: UNFILED, label: "Unfiled" }, ...[...folders].map((folder) => ({ value: String(folder.id), label: folderPath(folders, folder.id).map((item) => item.name).join(" / ") })).sort((a, b) => a.label.localeCompare(b.label))], [folders]);
+  // Gaps follow what the reader has typed, so a marker goes away as soon as the field is filled.
+  const gaps = useMemo(() => new Set<MediaMetadataGap>(mediaMetadataGaps({ ...draft, mimeType: asset.mimeType })), [asset.mimeType, draft]);
 
   const save = useMutation({
     mutationFn: () => fetchers.updateMedia(asset.id, { ...patch, expectedUpdatedAt: base.updatedAt }),
@@ -137,7 +153,6 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
     },
     onError: (failure: { message?: string }) => toast.error(failure?.message || "The file couldn't be deleted.")
   });
-
   const retry = useMutation({
     mutationFn: () => fetchers.retryPublication!(asset.id),
     onSuccess: async (saved) => {
@@ -147,6 +162,19 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
     },
     onError: (failure: { message?: string }) => toast.error(failure?.message || "Byline couldn't retry this file.")
   });
+  // The rename is compared against this reader's version and is their own write: unsaved details keep going, rebased onto it.
+  const rename = useRenameMedia(fetchers, (saved) => {
+    setRenaming(false);
+    setBase((current) => ({ ...current, filename: saved.filename, url: saved.url, previewUrl: saved.previewUrl, updatedAt: saved.updatedAt }));
+  });
+  const submitRename = (name: string) => {
+    const { stem, extension } = splitFilename(asset.filename);
+    const cleaned = cleanMediaName(name, extension);
+    if (!cleaned) return void toast.error("Give the file a name.");
+    if (cleaned === stem) return setRenaming(false);
+    rename.mutate({ asset, name, expectedUpdatedAt: base.updatedAt }, { onError: (failure: { message?: string }) => toast.error(failure?.message || "The file couldn't be renamed.") });
+  };
+
   const [editingArt, setEditingArt] = useState(false);
   const editArtDirection = async () => {
     if (!onEditArtDirection) return;
@@ -186,167 +214,257 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
   }, [dirty]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
-  const field = (key: "alt" | "creator" | "credit" | "copyright" | "license" | "sourceUrl", label: string, options: { multiline?: boolean; placeholder?: string; description?: string; type?: string } = {}) => {
+  const field = (key: "alt" | "creator" | "credit" | "copyright" | "license" | "sourceUrl", label: string, options: { multiline?: boolean; placeholder?: string; type?: string; needed?: boolean } = {}) => {
     const id = `media-${key}-${asset.id}`;
     const common = { id, value: draft[key], readOnly: !editable, maxLength: MEDIA_FIELD_LIMITS[key], placeholder: editable ? options.placeholder : undefined, onChange: (event: { target: { value: string } }) => set(key, event.target.value) };
     return (
       <Field data-readonly={!editable || undefined}>
-        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        <FieldLabel htmlFor={id}>{label}{options.needed ? <NeededBadge /> : null}</FieldLabel>
         {options.multiline ? <Textarea {...common} rows={3} className="min-h-20" /> : <Input {...common} type={options.type ?? "text"} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />}
-        {options.description ? <FieldDescription>{options.description}</FieldDescription> : null}
       </Field>
     );
   };
-  const usagesLabel = asset.usages.length || asset.hiddenUsageCount ? `${asset.usages.length + asset.hiddenUsageCount}` : "";
+  const usageCount = asset.usages.length + asset.hiddenUsageCount;
+  const image = asset.kind === "image";
+  const canRename = editable && Boolean(fetchers.renameMedia);
+  const copyAssetLink = assetHref ? () => void copyLink(new URL(assetHref(asset.id), window.location.href).toString()) : undefined;
 
   return (
-    <div className="@container/inspector flex min-h-0 flex-col" data-media-inspector="" data-asset-id={asset.id}>
+    <div className="@container/inspector flex h-full min-h-0 flex-col" data-media-inspector="" data-asset-id={asset.id}>
       {showHeading ? (
-        <div className="flex items-start gap-2 border-b px-4 py-3">
+        <div className="flex items-start gap-1 border-b px-4 py-3" data-media-inspector-header="">
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-base font-medium" title={asset.filename}>{asset.filename}</h2>
-            <p className="text-xs text-muted-foreground">{assetFacts(asset)}</p>
+            {renaming ? (
+              <RenameForm filename={asset.filename} pending={rename.isPending} onSubmit={submitRename} onCancel={() => setRenaming(false)} />
+            ) : (
+              <div className="group/name flex min-w-0 items-center gap-1">
+                <h2 className="truncate text-base font-medium" title={asset.filename} data-media-filename="">{asset.filename}</h2>
+                {canRename ? (
+                  <Tooltip>
+                    <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-xs" className="shrink-0 text-muted-foreground" aria-label={`Rename ${asset.filename}`} onClick={() => setRenaming(true)} data-media-rename-button="" />}><Pencil aria-hidden="true" /></TooltipTrigger>
+                    <TooltipContent>Rename</TooltipContent>
+                  </Tooltip>
+                ) : null}
+              </div>
+            )}
+            <p className="truncate text-xs text-muted-foreground">{[KIND_LABELS[asset.kind], assetFacts(asset)].filter(Boolean).join(" · ")}</p>
           </div>
-          {onClose ? <Button variant="ghost" size="icon-sm" aria-label="Close details" onClick={onClose}><X aria-hidden="true" /></Button> : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label="File actions" data-media-file-actions="" />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuGroup>
+                {canRename ? <DropdownMenuItem onClick={() => setRenaming(true)}><Pencil aria-hidden="true" />Rename</DropdownMenuItem> : null}
+                {asset.url ? <DropdownMenuItem render={<a href={asset.url} target="_blank" rel="noreferrer" />}><ExternalLink aria-hidden="true" />Open original</DropdownMenuItem> : null}
+                {asset.url ? <DropdownMenuItem render={<a href={asset.url} download={asset.filename} />}><Download aria-hidden="true" />Download</DropdownMenuItem> : null}
+                {copyAssetLink ? <DropdownMenuItem onClick={copyAssetLink}><Link2 aria-hidden="true" />Copy link</DropdownMenuItem> : null}
+              </DropdownMenuGroup>
+              {asset.canDelete ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" disabled={remove.isPending} onClick={() => setConfirmDelete(true)} data-media-delete=""><Trash2 aria-hidden="true" />Delete file…</DropdownMenuItem>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {onClose ? <Button type="button" variant="ghost" size="icon-sm" aria-label="Close details" onClick={onClose}><X aria-hidden="true" /></Button> : null}
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-4 overflow-y-auto p-4">
-        <Preview asset={asset} onZoom={() => setZoom(true)} />
-        {!showHeading ? <p className="-mt-2 text-xs text-muted-foreground">{assetFacts(asset)}</p> : null}
-        <div className="flex flex-wrap gap-2">
-          {asset.kind === "image" && asset.previewUrl ? <Button variant="outline" size="sm" onClick={() => setZoom(true)}><Maximize2 data-icon="inline-start" aria-hidden="true" />Larger preview</Button> : null}
-          {asset.url ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={asset.url} target="_blank" rel="noreferrer"><ExternalLink data-icon="inline-start" aria-hidden="true" />Open original</a> : null}
-          {asset.url ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={asset.url} download={asset.filename}><Download data-icon="inline-start" aria-hidden="true" />Download</a> : null}
-          {asset.kind === "image" && onEditArtDirection ? (
-            <Button variant="outline" size="sm" onClick={() => void editArtDirection()} disabled={editingArt} data-media-art-direction="">
-              <Crop data-icon="inline-start" aria-hidden="true" />{asset.canUpdate ? "Crops & focal point" : "View crops"}
-            </Button>
-          ) : null}
-        </div>
-
-        {asset.gaps.length ? (
-          <Alert className="border-amber-300 bg-amber-50 text-amber-950" data-media-gaps="">
-            <CircleAlert aria-hidden="true" />
-            <AlertTitle>Before this can be published</AlertTitle>
-            <AlertDescription><ul className="list-disc pl-4">{asset.gaps.map((gap) => <li key={gap}>{GAP_LABELS[gap]}</li>)}</ul></AlertDescription>
-          </Alert>
-        ) : null}
-
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            if (dirty && editable) save.mutate();
-          }}
-        >
-          <FieldGroup className="gap-3">
-            {field("alt", "Alt text", { multiline: true, placeholder: "What someone who can't see the image needs to know", description: asset.kind === "image" ? undefined : "Only needed for images." })}
-            <div className="grid gap-3 @min-[22rem]/inspector:grid-cols-2">
-              {field("creator", "Creator", { placeholder: "Photographer or artist" })}
-              {field("credit", "Credit", { placeholder: "Jane Doe / The Weekly Wildcat" })}
-              {field("copyright", "Copyright", { placeholder: "© 2026 The Weekly Wildcat" })}
-              {field("license", "License", { placeholder: "e.g. CC BY 4.0" })}
+      <form
+        className="flex min-h-0 flex-1 flex-col"
+        onSubmit={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (dirty && editable) save.mutate();
+        }}
+      >
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div className="flex flex-col gap-3 p-4 pb-3">
+            <Preview asset={asset} onZoom={() => setZoom(true)} />
+            <div className="flex flex-wrap items-center gap-2">
+              {image && onEditArtDirection ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => void editArtDirection()} disabled={editingArt} data-media-art-direction="">
+                  <Crop data-icon="inline-start" aria-hidden="true" />{asset.canUpdate ? "Crops & focal point" : "View crops"}
+                </Button>
+              ) : null}
+              <ButtonGroup className="ml-auto" aria-label="Preview and file">
+                {image && asset.previewUrl ? <IconAction label="Larger preview" icon={Maximize2} onClick={() => setZoom(true)} /> : null}
+                {asset.url ? <IconAction label="Open original" icon={ExternalLink} href={asset.url} newTab /> : null}
+                {asset.url ? <IconAction label="Download" icon={Download} href={asset.url} download={asset.filename} /> : null}
+              </ButtonGroup>
             </div>
-            {field("sourceUrl", "Source URL", { type: "url", placeholder: "https://" })}
-            <Field>
-              <FieldLabel htmlFor={`media-captured-${asset.id}`}>Captured</FieldLabel>
-              <Input id={`media-captured-${asset.id}`} type="date" value={draft.capturedAt} readOnly={!editable} onChange={(event) => set("capturedAt", event.target.value)} />
-            </Field>
-            <Field>
-              <FieldLabel>Folder</FieldLabel>
-              {editable ? (
-                <Select items={folderItems} value={draft.folderId === null ? UNFILED : String(draft.folderId)} onValueChange={(value) => set("folderId", !value || value === UNFILED ? null : Number(value))}>
-                  <SelectTrigger aria-label="Folder" className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>{folderItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
-                </Select>
-              ) : (
-                <p className="text-sm">{asset.folderPath.length ? asset.folderPath.map((item) => item.name).join(" / ") : "Unfiled"}</p>
+            <PublicationSection asset={asset} timezone={timezone} retrying={retry.isPending} onRetry={fetchers.retryPublication ? () => retry.mutate() : undefined} />
+          </div>
+
+          <Tabs defaultValue="details" className="gap-0">
+            <TabsList variant="line" className="h-9 w-full justify-start gap-4 border-b px-4" aria-label="File details">
+              <TabsTrigger value="details" className="flex-none px-0" data-media-tab="details">
+                Details{gaps.size ? <span className="size-1.5 rounded-full bg-amber-500" role="img" aria-label={`Before publishing: ${[...gaps].map((gap) => GAP_LABELS[gap].replace("Missing ", "")).join(", ")}`} data-media-gaps="" /> : null}
+              </TabsTrigger>
+              <TabsTrigger value="uses" className="flex-none px-0" data-media-tab="uses">Uses{usageCount ? <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">{usageCount}</Badge> : null}</TabsTrigger>
+              <TabsTrigger value="info" className="flex-none px-0" data-media-tab="info">Info</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="details" keepMounted className="p-4" data-media-details="">
+              <FieldGroup className="gap-6">
+                {field("alt", "Alt text", { multiline: true, placeholder: image ? "What someone who can't see the image needs to know" : "Only needed for images", needed: gaps.has("alt") })}
+                <FieldSet className="gap-3">
+                  <FieldLegend variant="label" className="mb-0 flex items-center gap-2 text-xs! tracking-wide text-muted-foreground uppercase">Credit{gaps.has("credit") ? <NeededBadge /> : null}</FieldLegend>
+                  {gaps.has("credit") ? <FieldDescription className="-mt-1.5 text-xs leading-snug">An image needs a creator or a credit line.</FieldDescription> : null}
+                  <div className="grid gap-3 @min-[22rem]/inspector:grid-cols-2">
+                    {field("creator", "Creator", { placeholder: "Photographer or artist" })}
+                    {field("credit", "Credit line", { placeholder: "Jane Doe / The Weekly Wildcat" })}
+                  </div>
+                </FieldSet>
+                <FieldSet className="gap-3">
+                  <FieldLegend variant="label" className="mb-0 flex items-center gap-2 text-xs! tracking-wide text-muted-foreground uppercase">Rights &amp; source{gaps.has("rights") ? <NeededBadge /> : null}</FieldLegend>
+                  {gaps.has("rights") ? <FieldDescription className="-mt-1.5 text-xs leading-snug">Add a copyright, a license or a source URL.</FieldDescription> : null}
+                  <div className="grid gap-3 @min-[22rem]/inspector:grid-cols-2">
+                    {field("copyright", "Copyright", { placeholder: "© 2026 The Weekly Wildcat" })}
+                    {field("license", "License", { placeholder: "e.g. CC BY 4.0" })}
+                  </div>
+                  {field("sourceUrl", "Source URL", { type: "url", placeholder: "https://" })}
+                </FieldSet>
+                <FieldSet className="gap-3">
+                  <FieldLegend variant="label" className="mb-0 text-xs! tracking-wide text-muted-foreground uppercase">Filing</FieldLegend>
+                  <div className="grid gap-3 @min-[22rem]/inspector:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor={`media-captured-${asset.id}`}>Captured</FieldLabel>
+                      <DatePicker id={`media-captured-${asset.id}`} label="Captured date" value={draft.capturedAt || null} timezone={timezone} dateOnly disabled={!editable} placeholder="Not set" onChange={(value) => set("capturedAt", value ?? "")} />
+                    </Field>
+                    <Field>
+                      <FieldLabel>Folder</FieldLabel>
+                      {editable ? (
+                        <Select items={folderItems} value={draft.folderId === null ? UNFILED : String(draft.folderId)} onValueChange={(value) => set("folderId", !value || value === UNFILED ? null : Number(value))}>
+                          <SelectTrigger aria-label="Folder" className="w-full"><SelectValue /></SelectTrigger>
+                          <SelectContent>{folderItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="py-1.5 text-sm">{asset.folderPath.length ? asset.folderPath.map((item) => item.name).join(" / ") : "Unfiled"}</p>
+                      )}
+                    </Field>
+                  </div>
+                </FieldSet>
+                {!editable ? <FieldDescription className="text-xs">Only the person who uploaded this file or an editor can change its details.</FieldDescription> : null}
+                {error ? (
+                  <Alert variant="destructive">
+                    <CircleAlert aria-hidden="true" />
+                    <AlertDescription>{error.message}</AlertDescription>
+                  </Alert>
+                ) : null}
+              </FieldGroup>
+            </TabsContent>
+
+            <TabsContent value="uses" className="flex flex-col gap-2 p-4" data-media-uses="">
+              {asset.usages.length ? (
+                <ItemGroup className="gap-1.5">
+                  {asset.usages.map((use) => (
+                    <Item key={`${use.kind}:${use.recordId}`} size="sm" variant="outline" className="py-2">
+                      <ItemContent className="min-w-0">
+                        <ItemTitle className="w-full truncate">{use.title}</ItemTitle>
+                        <ItemDescription className="truncate">{use.role}</ItemDescription>
+                      </ItemContent>
+                      {use.storyId !== null && onOpenStory ? (
+                        <ItemActions><Button type="button" variant="ghost" size="icon-sm" aria-label={`Quick view ${use.title}`} onClick={() => onOpenStory(use.storyId!)}><Eye aria-hidden="true" /></Button></ItemActions>
+                      ) : null}
+                    </Item>
+                  ))}
+                </ItemGroup>
+              ) : asset.hiddenUsageCount ? null : (
+                <p className="text-sm text-muted-foreground">Not linked from any story, assignment, Collection or profile.</p>
               )}
-            </Field>
-          </FieldGroup>
+              {asset.hiddenUsageCount ? <p className="text-xs text-muted-foreground">{asset.hiddenUsageCount} more {asset.hiddenUsageCount === 1 ? "record you can't open links" : "records you can't open link"} to this file.</p> : null}
+              <p className="text-xs text-muted-foreground">Includes Byline article blocks. Imported HTML and older Story versions are not listed.</p>
+            </TabsContent>
 
-          {!editable ? <p className="text-xs text-muted-foreground">Only the person who uploaded this file or an editor can change its details.</p> : null}
-          {error ? (
-            <Alert variant="destructive">
-              <CircleAlert aria-hidden="true" />
-              <AlertDescription>{error.message}</AlertDescription>
-            </Alert>
-          ) : null}
-          {editable ? (
-            <div className={cn("sticky bottom-0 -mx-4 flex gap-2 border-t bg-background px-4 py-3", !dirty && "hidden")} data-media-save-bar="">
-              <Button type="submit" disabled={!dirty || save.isPending}>{save.isPending ? "Saving…" : "Save"}</Button>
-              <Button type="button" variant="outline" disabled={save.isPending} onClick={() => { setDraft(initial); setError(null); }}>Cancel</Button>
-              {error?.conflict ? <Button type="button" variant="ghost" onClick={() => { setBase(asset); setDraft(draftOf(asset, timezone)); setError(null); void client.invalidateQueries({ queryKey: mediaAssetKey(asset.id) }); }}>Discard and reload</Button> : null}
-            </div>
-          ) : null}
-        </form>
-
-        <Separator />
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-          <dt className="text-muted-foreground">Uploaded by</dt>
-          <dd>{asset.uploadedBy?.name ?? "Unknown"} · {shortDay(asset.createdAt, timezone)}</dd>
-        </dl>
-        <PublicationSection asset={asset} timezone={timezone} retrying={retry.isPending} onRetry={fetchers.retryPublication ? () => retry.mutate() : undefined} />
-
-        <Separator />
-        <section aria-labelledby={`media-uses-${asset.id}`} className="flex flex-col gap-2">
-          <h3 id={`media-uses-${asset.id}`} className="flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Linked uses {usagesLabel ? <Badge variant="secondary">{usagesLabel}</Badge> : null}</h3>
-          {asset.usages.length ? (
-            <ItemGroup className="gap-1">
-              {asset.usages.map((use) => (
-                <Item key={`${use.kind}:${use.recordId}`} size="sm" variant="outline" className="py-2">
-                  <ItemContent className="min-w-0">
-                    <ItemTitle className="w-full truncate">{use.title}</ItemTitle>
-                    <ItemDescription className="truncate">{use.role}</ItemDescription>
-                  </ItemContent>
-                  {use.storyId !== null && onOpenStory ? (
-                    <ItemActions><Button variant="ghost" size="icon-sm" aria-label={`Quick view ${use.title}`} onClick={() => onOpenStory(use.storyId!)}><Eye aria-hidden="true" /></Button></ItemActions>
-                  ) : null}
-                </Item>
-              ))}
-            </ItemGroup>
-          ) : (
-            <p className="text-sm text-muted-foreground">{asset.hiddenUsageCount ? "" : "Not linked from any story, assignment, Collection or profile."}</p>
-          )}
-          {asset.hiddenUsageCount ? <p className="text-xs text-muted-foreground">{asset.hiddenUsageCount} more {asset.hiddenUsageCount === 1 ? "record you can't open links" : "records you can't open link"} to this file.</p> : null}
-          <p className="text-xs text-muted-foreground">Includes Byline article blocks. Imported HTML and older Story versions are not listed.</p>
-        </section>
-
-        {asset.canDelete || assetHref ? <Separator /> : null}
-        <div className="flex flex-wrap gap-2">
-          {assetHref ? (
-            <Button variant="ghost" size="sm" onClick={() => { void copyLink(new URL(assetHref(asset.id), window.location.href).toString()); }}>Copy link</Button>
-          ) : null}
-          {asset.canDelete ? (
-            <AlertDialog>
-              <AlertDialogTrigger render={<Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" disabled={remove.isPending} />}><Trash2 data-icon="inline-start" aria-hidden="true" />Delete file</AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{asset.usages.length || asset.hiddenUsageCount ? "This file is still in use" : `Delete ${asset.filename}?`}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {asset.usages.length || asset.hiddenUsageCount ? "Unlink it from every story, assignment, coverage and profile listed under Linked uses before deleting it." : "The original and its preview are removed from the newsroom. This can't be undone."}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{asset.usages.length || asset.hiddenUsageCount ? "Close" : "Keep file"}</AlertDialogCancel>
-                  {asset.usages.length || asset.hiddenUsageCount ? null : <AlertDialogAction variant="destructive" onClick={() => remove.mutate()}>Delete file</AlertDialogAction>}
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : null}
+            <TabsContent value="info" className="p-4" data-media-info="">
+              <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-sm">
+                <InfoRow label="Name"><span className="[overflow-wrap:anywhere]">{asset.filename}</span></InfoRow>
+                <InfoRow label="Type">{[KIND_LABELS[asset.kind], asset.mimeType].filter(Boolean).join(" · ")}</InfoRow>
+                {asset.width && asset.height ? <InfoRow label="Dimensions">{asset.width} × {asset.height} px</InfoRow> : null}
+                {asset.filesize ? <InfoRow label="Size">{formatFilesize(asset.filesize)}</InfoRow> : null}
+                <InfoRow label="Folder">{asset.folderPath.length ? asset.folderPath.map((item) => item.name).join(" / ") : "Unfiled"}</InfoRow>
+                <InfoRow label="Captured">{asset.capturedAt ? shortDay(asset.capturedAt, timezone) : "Not set"}</InfoRow>
+                <InfoRow label="Uploaded">{[asset.uploadedBy?.name ?? "Unknown", shortDay(asset.createdAt, timezone)].join(" · ")}</InfoRow>
+                <InfoRow label="Last changed">{shortDay(asset.updatedAt, timezone)}</InfoRow>
+              </dl>
+            </TabsContent>
+          </Tabs>
         </div>
-      </div>
+
+        {editable ? (
+          <div className={cn("flex flex-wrap items-center gap-2 border-t bg-background px-4 py-3", !dirty && "hidden")} data-media-save-bar="">
+            <Button type="submit" disabled={!dirty || save.isPending}>{save.isPending ? "Saving…" : "Save"}</Button>
+            <Button type="button" variant="outline" disabled={save.isPending} onClick={() => { setDraft(initial); setError(null); }}>Cancel</Button>
+            {error?.conflict ? <Button type="button" variant="ghost" onClick={() => { setBase(asset); setDraft(draftOf(asset, timezone)); setError(null); void client.invalidateQueries({ queryKey: mediaAssetKey(asset.id) }); }}>Discard and reload</Button> : null}
+            <span className="ml-auto text-xs text-muted-foreground">Unsaved changes</span>
+          </div>
+        ) : null}
+      </form>
 
       <Dialog open={zoom} onOpenChange={setZoom}>
         <DialogContent className="sm:max-w-[min(90vw,900px)]">
           <DialogHeader><DialogTitle className="truncate">{asset.filename}</DialogTitle><DialogDescription>{assetFacts(asset)}</DialogDescription></DialogHeader>
           {asset.previewUrl ? <img src={asset.previewUrl} alt={asset.alt} className="max-h-[70vh] w-full rounded-md bg-muted object-contain" /> : null}
-          {asset.url ? <a className={cn(buttonVariants({ variant: "outline" }), "justify-self-start")} href={asset.url} target="_blank" rel="noreferrer"><ExternalLink data-icon="inline-start" aria-hidden="true" />Open the full-size original</a> : null}
+          {asset.url ? <Button variant="outline" className="justify-self-start" nativeButton={false} render={<a href={asset.url} target="_blank" rel="noreferrer" />}><ExternalLink data-icon="inline-start" aria-hidden="true" />Open the full-size original</Button> : null}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{usageCount ? "This file is still in use" : `Delete ${asset.filename}?`}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {usageCount ? "Unlink it from every story, assignment, Collection and profile listed under Uses before deleting it." : "The original and its preview are removed from the newsroom. This can't be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{usageCount ? "Close" : "Keep file"}</AlertDialogCancel>
+            {usageCount ? null : <AlertDialogAction variant="destructive" onClick={() => remove.mutate()}>Delete file</AlertDialogAction>}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+/** The header's rename in place: Enter saves, Escape cancels. Its own form, outside the details form. */
+function RenameForm({ filename, pending, onSubmit, onCancel }: { filename: string; pending: boolean; onSubmit: (name: string) => void; onCancel: () => void }) {
+  const [value, setValue] = useState(() => splitFilename(filename).stem);
+  return (
+    <form className="flex items-center gap-1" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); onSubmit(value); }} data-media-rename="">
+      <div className="min-w-0 flex-1">
+        <MediaNameInput id="media-inspector-name" filename={filename} value={value} onChange={setValue} autoFocus onEscape={onCancel} />
+      </div>
+      <Button type="submit" variant="ghost" size="icon-sm" aria-label="Save name" disabled={pending || !value.trim()}><Check aria-hidden="true" /></Button>
+      <Button type="button" variant="ghost" size="icon-sm" aria-label="Cancel rename" onClick={onCancel}><X aria-hidden="true" /></Button>
+    </form>
+  );
+}
+
+function NeededBadge() {
+  return <Badge variant="outline" className="h-4 border-amber-300 px-1.5 text-[10px] font-medium tracking-normal normal-case text-amber-800 dark:border-amber-500/40 dark:text-amber-200">Needed to publish</Badge>;
+}
+
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
+    </>
+  );
+}
+
+/** An icon button named by its tooltip; a link when it opens or downloads the file. */
+function IconAction({ label, icon: Icon, onClick, href, download, newTab }: { label: string; icon: LucideIcon; onClick?: () => void; href?: string; download?: string; newTab?: boolean }) {
+  const trigger = href
+    ? <Button variant="outline" size="icon-sm" aria-label={label} nativeButton={false} render={<a href={href} download={download} target={newTab ? "_blank" : undefined} rel={newTab ? "noreferrer" : undefined} />} />
+    : <Button type="button" variant="outline" size="icon-sm" aria-label={label} onClick={onClick} />;
+  return (
+    <Tooltip>
+      <TooltipTrigger render={trigger}><Icon aria-hidden="true" /></TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -360,31 +478,39 @@ const PUBLICATION_NOTES: Record<MediaAssetDetail["publication"]["reason"], strin
   "invalid-manifest": "The prepared files' record is damaged; prepare them again."
 };
 
-/** The asset's publication files: state, which version they're for, problems and Retry. Never storage or hashes. */
+const PUBLICATION_ICONS: Record<MediaAssetDetail["publication"]["state"], { icon: LucideIcon; className: string }> = {
+  ready: { icon: CircleCheck, className: "text-emerald-600" },
+  preparing: { icon: RotateCw, className: "animate-spin text-muted-foreground" },
+  "not-prepared": { icon: CircleDashed, className: "text-muted-foreground" },
+  failed: { icon: CircleAlert, className: "text-destructive" }
+};
+
+/** The asset's publication files as one status row: state, which version, problems and Retry. Never storage or hashes. */
 function PublicationSection({ asset, timezone, retrying, onRetry }: { asset: MediaAssetDetail; timezone: string; retrying: boolean; onRetry?: () => void }) {
   const publication = asset.publication;
   const state = publication.state;
+  const { icon: Icon, className } = PUBLICATION_ICONS[state];
+  const note = state === "ready"
+    ? `Prepared${publication.preparedAt ? ` ${shortDay(publication.preparedAt, timezone)}` : ""} for version ${publication.currentRevision}. Web files exist for the next static build; that doesn't mean it's live yet.`
+    : `${state === "failed" ? publication.failureMessage ?? "" : PUBLICATION_NOTES[publication.reason]}${publication.preparedRevision !== null && publication.preparedRevision !== publication.currentRevision ? ` (Version ${publication.currentRevision}; last prepared: version ${publication.preparedRevision}.)` : ""}`;
   return (
-    <section aria-labelledby={`media-publication-${asset.id}`} className="-mt-2 flex flex-col gap-2" data-media-publication={state}>
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 id={`media-publication-${asset.id}`} className="text-sm text-muted-foreground">Publication files</h3>
-        <Badge variant={state === "failed" ? "destructive" : state === "ready" ? "default" : "secondary"}>{state === "preparing" ? <span className="flex items-center gap-1"><RotateCw className="size-3 animate-spin" aria-hidden="true" />Preparing</span> : PUBLICATION_ASSET_LABELS[state]}</Badge>
-      </div>
-      <p className="text-xs text-muted-foreground" role="status" aria-live="polite">
-        {state === "ready"
-          ? `Prepared${publication.preparedAt ? ` ${shortDay(publication.preparedAt, timezone)}` : ""} for version ${publication.currentRevision}. Ready means web files exist for the next static build, not that this file is live yet.`
-          : state === "failed" ? publication.failureMessage : PUBLICATION_NOTES[publication.reason]}
-        {state !== "ready" && publication.preparedRevision !== null && publication.preparedRevision !== publication.currentRevision ? ` (Version ${publication.currentRevision}; last prepared: version ${publication.preparedRevision}.)` : ""}
-      </p>
-      {publication.warnings.length ? (
-        <ul className="list-disc pl-4 text-xs text-amber-900" data-media-publication-warnings="">{publication.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
-      ) : null}
+    <Item variant="outline" size="sm" className={cn("items-start py-2.5", state === "failed" && "border-destructive/40")} role="group" aria-labelledby={`media-publication-${asset.id}`} data-media-publication={state}>
+      <ItemMedia className="mt-0.5"><Icon aria-hidden="true" className={cn("size-4", className)} /></ItemMedia>
+      <ItemContent className="min-w-0 gap-0.5">
+        <ItemTitle id={`media-publication-${asset.id}`} className="text-sm">Publication files: {PUBLICATION_ASSET_LABELS[state]}</ItemTitle>
+        <ItemDescription className="line-clamp-none text-xs" role="status" aria-live="polite">{note}</ItemDescription>
+        {publication.warnings.length ? (
+          <ul className="mt-1 list-disc pl-4 text-xs text-amber-900 dark:text-amber-200" data-media-publication-warnings="">{publication.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+        ) : null}
+      </ItemContent>
       {publication.canRetry && onRetry && state !== "preparing" ? (
-        <Button type="button" variant="outline" size="sm" className="self-start" onClick={onRetry} disabled={retrying} data-media-retry="">
-          <RotateCw data-icon="inline-start" aria-hidden="true" />{retrying ? "Queuing…" : state === "failed" ? "Retry" : "Prepare now"}
-        </Button>
+        <ItemActions>
+          <Button type="button" variant="outline" size="sm" onClick={onRetry} disabled={retrying} data-media-retry="">
+            <RotateCw data-icon="inline-start" aria-hidden="true" />{retrying ? "Queuing…" : state === "failed" ? "Retry" : "Prepare now"}
+          </Button>
+        </ItemActions>
       ) : null}
-    </section>
+    </Item>
   );
 }
 
@@ -401,7 +527,8 @@ function Preview({ asset, onZoom }: { asset: MediaAssetDetail; onZoom: () => voi
   if (asset.kind === "image" && asset.previewUrl) {
     return (
       <button type="button" className="group/preview relative block overflow-hidden rounded-lg border bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring/50" onClick={onZoom} aria-label={`Larger preview of ${asset.filename}`}>
-        <img src={asset.previewUrl} alt={asset.alt} className="max-h-80 w-full object-contain" decoding="async" />
+        <img src={asset.previewUrl} alt={asset.alt} className="max-h-72 w-full object-contain" decoding="async" />
+        <span className="absolute right-2 bottom-2 flex size-7 items-center justify-center rounded-md bg-background/90 opacity-0 shadow-xs transition-opacity group-hover/preview:opacity-100 group-focus-visible/preview:opacity-100" aria-hidden="true"><Maximize2 className="size-3.5" /></span>
       </button>
     );
   }
@@ -419,7 +546,6 @@ function Preview({ asset, onZoom }: { asset: MediaAssetDetail; onZoom: () => voi
       <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-4">
         <FileText aria-hidden="true" className="size-10 text-muted-foreground" />
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{asset.filename}</p><p className="text-xs text-muted-foreground">PDF document</p></div>
-        {asset.url ? <a className={buttonVariants({ variant: "outline", size: "sm" })} href={asset.url} target="_blank" rel="noreferrer">Open</a> : null}
       </div>
     );
   }

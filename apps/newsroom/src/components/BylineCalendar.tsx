@@ -1,6 +1,7 @@
 import { DefaultTemplate } from "@payloadcms/next/templates";
 import { Gutter } from "@payloadcms/ui";
 import type { AdminViewServerProps } from "payload";
+import { redirectIfSignedOut } from "../auth/session";
 import { requestUser } from "../access/user";
 import { NewsroomCalendarScreen } from "../ui/calendar/NewsroomCalendarScreen";
 
@@ -13,6 +14,7 @@ import { NewsroomCalendarScreen } from "../ui/calendar/NewsroomCalendarScreen";
  */
 export function BylineCalendar({ initPageResult, params, searchParams }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult;
+  redirectIfSignedOut({ req, params, searchParams });
   const user = requestUser(req);
   // Payload leaves custom root views bare; its default template brings the Byline shell (Nav, header).
   return (

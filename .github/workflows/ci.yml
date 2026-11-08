@@ -71,6 +71,12 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Validate production newsroom Dockerfile
+        run: docker build --check -f apps/newsroom/Dockerfile .
+
+      - name: Build production newsroom image
+        run: docker build -f apps/newsroom/Dockerfile -t byline-newsroom:ci .
+
       - name: Install workspace dependencies
         run: npm ci
 

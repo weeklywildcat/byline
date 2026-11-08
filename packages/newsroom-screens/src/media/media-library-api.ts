@@ -1,6 +1,6 @@
 import { mediaDeskKey } from "../story/story-query";
 import type { MediaArtDirection, MediaArtDirectionSave } from "./art-direction-model";
-import type { MediaAssetDetail, MediaFolder, MediaLibraryAsset, MediaLibraryPage, MediaLibraryQuery, MediaMetadataPatch, MediaNavigatorData } from "./media-library-model";
+import type { MediaAssetDetail, MediaBulkPatch, MediaBulkResult, MediaFolder, MediaLibraryAsset, MediaLibraryPage, MediaLibraryQuery, MediaMetadataPatch, MediaNavigatorData, MediaRenameInput } from "./media-library-model";
 
 /**
  * What a host supplies for the Media Library. The screens never know the
@@ -16,6 +16,12 @@ export type MediaLibraryFetchers = {
   /** File several assets into one folder (null: Unfiled). Each is checked on its own. */
   moveMedia: (ids: number[], folderId: number | null) => Promise<MediaMoveResult>;
   deleteMedia: (id: number) => Promise<void>;
+  /** Renames the stored file (its type and links to it stay; its private URL changes). Compare-and-swap (409). */
+  renameMedia?: (id: number, input: MediaRenameInput) => Promise<MediaAssetDetail>;
+  /** Applies the same creator, credit or rights to several files. Each is checked on its own. */
+  updateMediaMany?: (ids: number[], patch: MediaBulkPatch) => Promise<MediaBulkResult>;
+  /** Deletes several files (editors). A file still linked anywhere is refused, the rest go. */
+  deleteMediaMany?: (ids: number[]) => Promise<MediaBulkResult>;
   uploadMedia: (file: File, options: MediaUploadOptions) => Promise<MediaLibraryAsset>;
   createFolder: (input: { name: string; parentId: number | null }) => Promise<MediaFolder>;
   updateFolder: (id: number, input: { name?: string; parentId?: number | null }) => Promise<MediaFolder>;

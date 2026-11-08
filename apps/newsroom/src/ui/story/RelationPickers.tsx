@@ -5,6 +5,7 @@ import { Button } from "@byline/newsroom-ui/ui/button";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger } from "@byline/newsroom-ui/ui/combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { getJson, query, type Paginated } from "./api";
 import type { Id, NamedDoc } from "./types";
 
@@ -26,7 +27,7 @@ export function useOptions(api: string, collection: string, labelField: "name" |
 const triggerClass = "-ml-2 h-auto min-h-7 max-w-full justify-start px-2 py-1 text-left font-normal whitespace-normal";
 const same = (a: Option, b: Option) => String(a.id) === String(b.id);
 
-export function MultiPicker({ label, placeholder, options, value, onChange, disabled }: { label: string; placeholder: string; options: Option[]; value: Id[]; onChange: (ids: Id[]) => void; disabled?: boolean }) {
+export function MultiPicker({ label, placeholder, options, value, onChange, disabled, footer }: { label: string; placeholder: string; options: Option[]; value: Id[]; onChange: (ids: Id[]) => void; disabled?: boolean; footer?: ReactNode }) {
   // Keep selected values that have no loaded option yet (e.g. while options load), in order.
   const selected = value.map((id) => options.find((option) => String(option.id) === String(id)) ?? { id, label: "…" });
   const names = selected.map((option) => option.label).join(", ");
@@ -39,6 +40,7 @@ export function MultiPicker({ label, placeholder, options, value, onChange, disa
         <ComboboxInput showTrigger={false} aria-label={`Search ${label.toLowerCase()}`} placeholder="Search…" />
         <ComboboxEmpty>Nothing found.</ComboboxEmpty>
         <ComboboxList>{(option: Option) => <ComboboxItem key={String(option.id)} value={option}>{option.label}</ComboboxItem>}</ComboboxList>
+        {footer ? <div className="mt-1 border-t border-border pt-1 [&_[data-slot=button]]:w-full [&_[data-slot=button]]:justify-start">{footer}</div> : null}
       </ComboboxContent>
     </Combobox>
   );
@@ -54,7 +56,7 @@ export function SinglePicker({ label, placeholder, options, value, onChange, dis
       const match = options.find((option) => String(option.id) === next);
       onChange(match ? match.id : null);
     }}>
-      <SelectTrigger aria-label={label} className="-ml-2 h-7 w-fit max-w-full border-transparent bg-transparent px-2 hover:bg-muted">
+      <SelectTrigger aria-label={label} size="sm" className="-ml-2 max-w-full border-transparent bg-transparent px-2 hover:bg-muted">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

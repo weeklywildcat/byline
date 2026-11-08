@@ -1,5 +1,7 @@
 import { beforeStoryActivity, afterStoryActivity } from "../newsroom/story-activity";
 import { requireStoryFacts } from "../newsroom/story-readiness";
+import { queueFactsAfterStoryChange } from "../newsroom/video-facts";
+import { notifyAfterStoryChange } from "../newsroom/notification-hooks";
 import { publicURLHooks } from "../public/url-changes";
 import { APIError, ValidationError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig, type Where } from "payload";
 import { publicationMediaReport, storyMediaRequirements } from "../publication-media/readiness";
@@ -212,12 +214,13 @@ export const Stories: CollectionConfig = {
       };
       return data;
     }, pinContentFormat, requireStoryFacts, guardPrivilegedBlocks, requireCompleteBody, requirePublishableMedia, stampFirstPublication, urlChanges.beforeChange, beforeStoryActivity],
-    afterChange: [syncPlan, urlChanges.afterChange, afterStoryActivity],
+    afterChange: [syncPlan, urlChanges.afterChange, afterStoryActivity, queueFactsAfterStoryChange, notifyAfterStoryChange],
     beforeDelete: [async ({ id, req }) => {
       // A hard delete removes private dependents; the ordinary trash update keeps them.
       const where = { story: { equals: id } };
       await req.payload.db.deleteMany({ collection: "story-notes", where, req });
       await req.payload.db.deleteMany({ collection: "story-activity", where, req });
+      await req.payload.db.deleteMany({ collection: "notifications", where, req });
     }]
   },
   fields: [
@@ -302,6 +305,8 @@ export const Stories: CollectionConfig = {
     { name: "plan", type: "join", collection: "story-plans", on: "story", admin: { hidden: true } },
     { name: "versionActor", type: "number", admin: { hidden: true }, access: { create: () => false, update: () => false } },
     { name: "versionRestored", type: "checkbox", admin: { hidden: true }, access: { create: () => false, update: () => false } },
-    legacyIdField()
+    // Migration provenance only. Keep the imported ID in storage, but never let
+    // Payload reserve its document sidebar for a read-only implementation detail.
+    { ...legacyIdField(), admin: { hidden: true } }
   ]
 };

@@ -1,5 +1,7 @@
 import { storyDistribution } from "./story-distribution";
 import { changeStoryNote, storyNotePreviews, storyNotes } from "./story-notes";
+import { inbox, markNotificationsRead } from "./notifications";
+import { changeLiveUpdate, deleteLiveUpdate, liveDesk, postLiveUpdate, publicLiveFeed } from "./live-coverage";
 import { contentHealth, healthDisposition, startHealthScan } from "./health/content-health";
 import { pageContext } from "./site-pages";
 import { publicationSettings, savePublicationSettings, saveSiteRow, sectionImpact, siteGroup, siteRows } from "./site";
@@ -20,8 +22,8 @@ import { isWorkflowStage } from "../domain/workflow";
 import { validResourceUrl } from "../collections/StoryPlans";
 import { parsePlanningFilterParams } from "@byline/newsroom-screens/planning/planning-api";
 import { parseMediaLibraryParams } from "@byline/newsroom-screens/media/media-library-model";
-import type { MediaMetadataPatch } from "@byline/newsroom-screens/media/media-library-model";
-import { createFolder, deleteFolder, deleteMedia, libraryPage, mediaDetail, mediaNavigator, moveMedia, updateFolder, updateMedia, uploadMedia } from "./media-library";
+import type { MediaBulkPatch, MediaMetadataPatch } from "@byline/newsroom-screens/media/media-library-model";
+import { createFolder, deleteFolder, deleteMedia, deleteMediaMany, libraryPage, mediaDetail, mediaNavigator, moveMedia, renameMedia, updateFolder, updateMedia, updateMediaMany, uploadMedia } from "./media-library";
 import { mediaWork } from "./media-work";
 import { artDirectionView, retryPublication, saveArtDirection } from "../publication-media/media-publication";
 import { publicationMediaReport, type MediaRequirement } from "../publication-media/readiness";
@@ -39,6 +41,7 @@ function readinessQuery(params: URLSearchParams): MediaRequirement[] {
   return [...(lead ? [{ id: lead, role: "image" as const }] : []), ...[...new Set(others)].map((value) => ({ id: value, role: "file" as const }))].slice(0, 200);
 }
 import { planningResponse } from "./planning";
+import { navigationCounts } from "./navigation-counts";
 import { parseScheduleQuery, scheduleResponse, scheduleToday } from "./schedule";
 import {
   addResource,
@@ -77,7 +80,7 @@ import { peopleQuery, type NewPerson, type PersonAccessInput, type PersonPatch }
  * user (`overrideAccess: false`), so collection and field access decide.
  */
 
-const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
+const json = (body: unknown, status = 200, headers: Record<string, string> = { "Cache-Control": "private, no-store" }) => Response.json(body, { status, headers });
 
 function handle(run: (ctx: ScreenContext, req: PayloadRequest) => Promise<unknown>): PayloadHandler {
   return async (req) => {
@@ -517,6 +520,28 @@ const collectionEndpoints: Endpoint[] = [
 
 export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/distribution", method: "get", handler: handle((ctx, req) => storyDistribution(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/live", method: "get", handler: handle((ctx, req) => liveDesk(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/live", method: "post", handler: handle(async (ctx, req) => postLiveUpdate(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/live/:update", method: "patch", handler: handle(async (ctx, req) => changeLiveUpdate(ctx, idParam(req), idParam(req, "update"), await body(req))) },
+  { path: "/byline/stories/:id/live/:update", method: "delete", handler: handle((ctx, req) => deleteLiveUpdate(ctx, idParam(req), idParam(req, "update"))) },
+  // Public, read-only, published-only: what the Worker serves at /api/live/<id> between builds. No credentials, no cookies.
+  { path: "/byline/live/:id", method: "get", handler: async (req) => {
+    try {
+      const id = Number((req.routeParams as { id?: string } | undefined)?.id);
+      const feed = Number.isSafeInteger(id) && id > 0 ? await publicLiveFeed(req.payload, id) : null;
+      return feed ? json(feed, 200, { "Cache-Control": "no-store" }) : json({ message: "Coverage not found." }, 404, { "Cache-Control": "no-store" });
+    } catch (error) {
+      req.payload.logger.error({ err: error, msg: "Public live feed failed" });
+      return json({ message: "Live coverage is unavailable." }, 502, { "Cache-Control": "no-store" });
+    }
+  } },
+  { path: "/byline/notifications", method: "get", handler: handle((ctx, req) => inbox(ctx, { unreadOnly: req.searchParams.get("unread") === "1", limit: Number(req.searchParams.get("limit")) || 20 })) },
+  { path: "/byline/notifications/read", method: "post", handler: handle(async (ctx, req) => {
+    const input = await body<{ ids?: unknown; all?: unknown }>(req);
+    if (input.all === true) return markNotificationsRead(ctx, "all");
+    if (!Array.isArray(input.ids)) throw new APIError("Choose notifications to mark read.", 400);
+    return markNotificationsRead(ctx, input.ids.map(Number));
+  }) },
   { path: "/byline/stories/:id/notes", method: "get", handler: handle((ctx, req) => storyNotes(ctx, idParam(req), req.searchParams.get("resolved") === "1", Math.max(1, Number(req.searchParams.get("page")) || 1))) },
   { path: "/byline/stories/:id/notes/previews", method: "get", handler: handle((ctx, req) => storyNotePreviews(ctx, idParam(req))) },
   { path: "/byline/stories/:id/notes", method: "post", handler: handle(async (ctx, req) => changeStoryNote(ctx, idParam(req), null, await body(req))) },
@@ -559,6 +584,8 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/presets", method: "get", handler: handle(async () => presetsPayload()) },
   // The Stories collection (Board and List). Board moves and inline edits use /stories/:id/workflow.
   { path: "/byline/planning", method: "get", handler: handle((ctx, req) => planningResponse(ctx, parsePlanningFilterParams(req.searchParams))) },
+  // The sidebar's open-work counts (Stories, Media, Collections and the promoted Stories views).
+  { path: "/byline/navigation-counts", method: "get", handler: handle((ctx) => navigationCounts(ctx)) },
   { path: "/byline/schedule", method: "get", handler: handle((ctx, req) => scheduleResponse(ctx, parseScheduleQuery(req.searchParams, scheduleToday(ctx)))) },
   { path: "/byline/stories", method: "post", handler: handle(createStory) },
   // Live Preview's presentation context: corrections, related/More by candidates, series. Not part of the typing loop.
@@ -594,12 +621,15 @@ export const newsroomEndpoints: Endpoint[] = [
   // Story header preflight: the same server rule Publish enforces, for the Media the form currently references.
   { path: "/byline/media/publication-readiness", method: "get", handler: handle((ctx, req) => publicationMediaReport(req.payload, readinessQuery(req.searchParams), { req })) },
   { path: "/byline/media/move", method: "post", handler: handle(moveToFolder) },
+  { path: "/byline/media/bulk-update", method: "post", handler: handle(async (ctx, req) => { const input = await body<{ ids?: unknown; patch?: unknown }>(req); return updateMediaMany(ctx, ids(input.ids), (input.patch ?? {}) as MediaBulkPatch); }) },
+  { path: "/byline/media/bulk-delete", method: "post", handler: handle(async (ctx, req) => deleteMediaMany(ctx, ids((await body<{ ids?: unknown }>(req)).ids))) },
   { path: "/byline/media/folders", method: "post", handler: handle(async (ctx, req) => createFolder(ctx, await body(req))) },
   { path: "/byline/media/folders/:id", method: "patch", handler: handle(async (ctx, req) => updateFolder(ctx, idParam(req), await body(req))) },
   { path: "/byline/media/folders/:id", method: "delete", handler: handle(async (ctx, req) => { await deleteFolder(ctx, idParam(req)); return new Response(null, { status: 204 }); }) },
   // Art direction (focal point, custom crops) and publication Retry: the only normal write paths for that state.
   { path: "/byline/media/:id/art-direction", method: "get", handler: handle((ctx, req) => artDirectionView(ctx, idParam(req))) },
   { path: "/byline/media/:id/art-direction", method: "put", handler: handle(async (ctx, req) => saveArtDirection(ctx, idParam(req), await body<Record<string, unknown>>(req))) },
+  { path: "/byline/media/:id/rename", method: "post", handler: handle(async (ctx, req) => renameMedia(ctx, idParam(req), await body(req))) },
   { path: "/byline/media/:id/publication/retry", method: "post", handler: handle(async (ctx, req) => { await retryPublication(ctx, idParam(req)); return mediaDetail(ctx, idParam(req)); }) },
   { path: "/byline/media/:id", method: "get", handler: handle((ctx, req) => mediaDetail(ctx, idParam(req))) },
   { path: "/byline/media/:id", method: "patch", handler: handle(async (ctx, req) => updateMedia(ctx, idParam(req), await body<MediaMetadataPatch>(req))) },

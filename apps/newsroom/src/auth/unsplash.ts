@@ -59,7 +59,7 @@ export function loginPhoto(schedule: (refresh: () => Promise<void>) => void): Lo
 
 async function refreshPool(key: string) {
   try {
-    const response = await fetch("https://api.unsplash.com/photos/random?orientation=landscape&content_filter=high&count=12", {
+    const response = await fetch("https://api.unsplash.com/photos/random?query=scenic%20landscape&orientation=landscape&content_filter=high&count=12", {
       headers: { Authorization: `Client-ID ${key}`, "Accept-Version": "v1" },
       redirect: "error",
       cache: "no-store",

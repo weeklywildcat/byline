@@ -8,9 +8,9 @@ public.
 ## Operating model
 
 - **Home / Today** is the personal starting page: one **My Work** queue unifies
-  actionable tasks, review, reporting/scheduling and assigned production; **Coming
-  Up** is reserved for real calendar commitments; **My Stories** keeps ownership
-  context. System failures stay page-level instead of becoming editorial work.
+  actionable tasks, review, reporting/scheduling and assigned production; **This
+  week** is reserved for real calendar commitments; **Desk** and **Budget** give
+  editors the newsroom's workflow and publication plan (Mine | Newsroom). System failures stay page-level instead of becoming editorial work.
   Story Peek preserves list context; Gutenberg remains the writing environment.
   See [Byline Home](byline-home.md) for the protected read model, private links,
   Nova components and validation.

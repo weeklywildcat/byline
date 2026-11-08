@@ -14,6 +14,7 @@ import { Fragment, useSyncExternalStore } from "react";
 import { locationFor } from "../../domain/navigation";
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { NewsroomPresence } from "./NewsroomPresence";
+import { NotificationsBell } from "./NotificationsBell";
 import { useBylineSearch } from "./search";
 
 const subscribeNothing = () => () => {};
@@ -83,6 +84,7 @@ function HeaderBar() {
           <span className="max-sm:sr-only">Search</span>
           <KbdGroup className="ml-auto max-sm:hidden" aria-hidden="true"><Kbd>{modifier}</Kbd><Kbd>K</Kbd></KbdGroup>
         </Button>
+        <NotificationsBell />
         <NewsroomPresence isMobile={isMobile} />
       </div>
     </header>

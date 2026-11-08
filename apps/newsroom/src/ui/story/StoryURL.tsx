@@ -32,7 +32,7 @@ export function useStoryURL(context: StoryScreenContext) {
   return { config, result, slug, date, currentSection, proposedPath };
 }
 
-export function StoryURL({ context }: { context: StoryScreenContext }) {
+export function StoryURL({ context, compact = false }: { context: StoryScreenContext; compact?: boolean }) {
   const { config, result, slug, date, currentSection, proposedPath } = useStoryURL(context);
   const [open, setOpen] = useState(false);
   const [nextSlug, setNextSlug] = useState("");
@@ -67,7 +67,7 @@ export function StoryURL({ context }: { context: StoryScreenContext }) {
     slug.setValue(normalized);
     setOpen(false);
   }
-  return <section aria-label="Public URL" className="flex flex-col gap-1 border-t border-border pt-2 text-sm">
+  return <section aria-label="Public URL" className={compact ? "flex flex-col gap-2 text-sm" : "flex flex-col gap-1 border-t border-border pt-2 text-sm"}>
     <p className="text-muted-foreground [overflow-wrap:anywhere]">
       <span className="font-medium text-foreground">Public URL: </span>
       {config.path || pending || partial || "Choose a section and slug to see the path."}
@@ -96,10 +96,14 @@ export function StoryURL({ context }: { context: StoryScreenContext }) {
             <div className="grid gap-1"><label htmlFor={slugId}>Story slug</label><Input id={slugId} value={nextSlug} onChange={(event) => setNextSlug(event.target.value)} maxLength={120} required /></div>
             <div className="grid gap-1">
               <p>Section: {currentSection?.name ?? "None selected"}</p>
-              <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => {
-                sectionControl.current = document.querySelector<HTMLElement>("#byline-story-section button");
-                setOpen(false);
-              }}>Go to Section field</Button>
+              {compact ? (
+                <p className="text-xs text-muted-foreground">Change the Section in the story properties above the article.</p>
+              ) : (
+                <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => {
+                  sectionControl.current = document.querySelector<HTMLElement>("#byline-story-section button");
+                  setOpen(false);
+                }}>Go to Section field</Button>
+              )}
             </div>
             {editDate ? <div className="grid gap-1">
               <label htmlFor={dateId}>First publication ({config.timezone})</label>

@@ -1,5 +1,9 @@
 import { StoryNotes } from "./collections/StoryNotes";
 import { ContentHealth } from "./collections/ContentHealth";
+import { VideoFacts } from "./collections/VideoFacts";
+import { Notifications } from "./collections/Notifications";
+import { deliverNotificationTask, sendDueDigestTask, withFailureNotice } from "./newsroom/notifications";
+import { refreshVideoFactsTask } from "./newsroom/video-facts";
 import { contentHealthTask } from "./newsroom/health/content-health";
 import { StoryActivity } from "./collections/StoryActivity";
 import { Redirects } from "./collections/Redirects";
@@ -7,6 +11,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describeRepositoryInteractives, describeStoryPresentations, repositoryInteractiveRegistry, storyPresentationRegistry } from "@byline/story-presentations";
 import { postgresAdapter } from "@payloadcms/db-postgres";
+import { nodemailerAdapter } from "@payloadcms/email-nodemailer";
+import nodemailer from "nodemailer";
 import { buildConfig, type CollectionConfig } from "payload";
 import sharp from "sharp";
 import { atLeast, newsroomUser } from "./access/user";
@@ -67,6 +73,8 @@ const collections: CollectionConfig[] = [
   StoryActivity,
   StoryNotes,
   ContentHealth,
+  VideoFacts,
+  Notifications,
   People,
   Media,
   Sections,
@@ -87,11 +95,22 @@ const collections: CollectionConfig[] = [
   Users
 ];
 
+/** `BYLINE_EMAIL_FROM`: `Name <address>` or a bare address. */
+function emailFrom() {
+  const value = (process.env.BYLINE_EMAIL_FROM ?? "").trim();
+  const match = /^(.*?)\s*<([^<>\s]+)>$/.exec(value);
+  return { name: match ? match[1].replace(/^"|"$/g, "") : "The Weekly Wildcat", address: match ? match[2] : value || "newsroom@localhost" };
+}
+
 export default buildConfig({
   serverURL: process.env.BYLINE_NEWSROOM_URL ?? "",
   secret: required("PAYLOAD_SECRET"),
   editor: proseEditor,
   sharp,
+  // Notification email. Without BYLINE_SMTP_URL no adapter is configured and notifications stay in the Byline inbox.
+  ...(process.env.BYLINE_SMTP_URL?.trim()
+    ? { email: nodemailerAdapter({ defaultFromAddress: emailFrom().address, defaultFromName: emailFrom().name, transport: nodemailer.createTransport(process.env.BYLINE_SMTP_URL.trim()) }) }
+    : {}),
   collections: collections.map((collection) => withImportIdGuard(withPublicTracking(collection))),
   // The publication's public configuration (administrators; drafts stage changes, only the published Global is public).
   globals: [Publication],
@@ -170,7 +189,11 @@ export default buildConfig({
     }),
     // Queue ownership: `media` → `jobs:media` (Phase 5), `publication` → `jobs:publication`
     // (public snapshots), `default` → `jobs:scheduled` (Payload's scheduled publish).
-    tasks: [preparePublicationMediaTask, preparePublicSnapshotTask, advancePublicRevisionTask, contentHealthTask]
+    tasks: [
+      withFailureNotice(preparePublicationMediaTask, "Media preparation"),
+      withFailureNotice(preparePublicSnapshotTask, "Public snapshot preparation"),
+      advancePublicRevisionTask, contentHealthTask, refreshVideoFactsTask, deliverNotificationTask, sendDueDigestTask
+    ]
   },
   typescript: { outputFile: path.resolve(dirname, "payload-types.ts") },
   telemetry: false

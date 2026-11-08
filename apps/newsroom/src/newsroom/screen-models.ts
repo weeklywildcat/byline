@@ -284,6 +284,11 @@ export function publicationState(story: Pick<Story, "_status" | "publishedAt">, 
   return { id: "draft", label: "Draft", isPublished: false, isScheduled: false, scheduledAt: null, publishedAt: story.publishedAt ?? null };
 }
 
+/** The assignment a story's visual summary reports: the first still open (in creation order), else the first. */
+export function primaryProduction<T extends { status?: string | null }>(rows: readonly T[]): T | undefined {
+  return rows.find((row) => row.status !== "done") ?? rows[0];
+}
+
 export function planningStory(ctx: ScreenContext, people: People, story: Story, plan: StoryPlan | null, extras: StoryExtras): PlanningStory & { reporting: ReportingSummary; mediaSummary: MediaSummary } {
   const published = story._status === "published";
   const workflow = effectiveWorkflow(plan?.workflow, story._status);
@@ -293,7 +298,7 @@ export function planningStory(ctx: ScreenContext, people: People, story: Story, 
     .filter((entry): entry is ContributorEntry => entry !== null)
     .map((entry) => ({ id: Number(entry.id), name: entry.name, kind: entry.kind }));
   const writer = userPerson(people, plan?.createdBy) ?? authors.find((author) => author.kind === "user") ?? null;
-  const primary = extras.production.find((row) => row.status !== "done") ?? extras.production[0];
+  const primary = primaryProduction(extras.production);
   const section = story.section && typeof story.section === "object" ? (story.section as Section).name : null;
   const manages = scopeManagesSync(ctx, plan);
   return {
