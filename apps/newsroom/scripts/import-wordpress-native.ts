@@ -265,6 +265,43 @@ function nativeBody(body: ArticleBody, media: Map<number, number>): ArticleBody 
   return { ...body, nodes, media: {} };
 }
 
+function attachmentCandidates(attachment: ExportAttachment) {
+  return [...new Set([...(attachment.candidateUrls ?? []), attachment.url].filter(isHttps))];
+}
+
+async function fetchAttachmentSource(attachment: ExportAttachment, probeOnly: boolean) {
+  if (text(attachment.inlineDataBase64)) {
+    const data = Buffer.from(attachment.inlineDataBase64!, "base64");
+    if (!data.length || (attachment.inlineBytes && data.length !== attachment.inlineBytes)) {
+      throw new Error(`Attachment ${attachment.id} has invalid embedded WordPress source bytes.`);
+    }
+    return { url: "wordpress-upload-volume", data: probeOnly ? null as Buffer | null : data };
+  }
+
+  const candidates = attachmentCandidates(attachment);
+  if (!candidates.length) throw new Error(`Attachment ${attachment.id} has no HTTPS source URL.`);
+
+  const failures: string[] = [];
+  for (const url of candidates) {
+    try {
+      const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(30_000) });
+      if (!response.ok) {
+        failures.push(`${url} -> HTTP ${response.status}`);
+        continue;
+      }
+      if (probeOnly) {
+        await response.body?.cancel();
+        return { url, data: null as Buffer | null };
+      }
+      return { url, data: Buffer.from(await response.arrayBuffer()) };
+    } catch (error) {
+      failures.push(`${url} -> ${(error as Error).message}`);
+    }
+  }
+
+  throw new Error(`Attachment ${attachment.id} has no reachable WordPress source. ${failures.slice(0, 4).join("; ")}`);
+}
+
 async function download(attachment: ExportAttachment) {
   const target = importMediaTarget(attachment);
   const source = await fetchAttachmentSource(attachment, false);
