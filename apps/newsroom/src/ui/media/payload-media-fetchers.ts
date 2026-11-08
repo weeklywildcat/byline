@@ -2,7 +2,7 @@
 
 import type { MediaArtDirection } from "@byline/newsroom-screens/media/art-direction-model";
 import type { MediaLibraryFetchers } from "@byline/newsroom-screens/media/media-library-api";
-import { mediaLibraryParams, type MediaAssetDetail, type MediaBulkResult, type MediaFolder, type MediaLibraryAsset, type MediaLibraryPage, type MediaNavigatorData } from "@byline/newsroom-screens/media/media-library-model";
+import { mediaLibraryParams, type MediaAssetDetail, type MediaBulkResult, type MediaTagCount, type MediaFolder, type MediaLibraryAsset, type MediaLibraryPage, type MediaNavigatorData } from "@byline/newsroom-screens/media/media-library-model";
 import { createMediaPreferencesStore, type MediaPreferencesStore } from "@byline/newsroom-screens/media/media-preferences";
 import { normalizeMediaPreferences } from "@byline/newsroom-screens/media/media-preferences";
 import { queryPath, type PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
@@ -28,7 +28,9 @@ export function createPayloadMediaFetchers(api: string): MediaLibraryFetchers {
     renameMedia: (id, input) => request<MediaAssetDetail>(`/media/${id}/rename`, "POST", input),
     updateMediaMany: (ids, patch) => request<MediaBulkResult>("/media/bulk-update", "POST", { ids, patch }),
     deleteMediaMany: (ids) => request<MediaBulkResult>("/media/bulk-delete", "POST", { ids }),
-    uploadMedia: (file, options) => uploadWithProgress(`${api}/byline/media/upload`, file, options),
+    uploadMedia: (file, options) => uploadWithProgress(`${api}/byline/media/upload`, file, { folderId: options.folderId }, options),
+    replaceMedia: (id, file, options) => uploadWithProgress(`${api}/byline/media/${id}/replace`, file, { expectedUpdatedAt: options.expectedUpdatedAt }, options),
+    getTags: () => request<MediaTagCount[]>("/media/tags"),
     createFolder: (input) => request<MediaFolder>("/media/folders", "POST", input),
     updateFolder: (id, input) => request<MediaFolder>(`/media/folders/${id}`, "PATCH", input),
     deleteFolder: (id) => request<void>(`/media/folders/${id}`, "DELETE"),
@@ -51,19 +53,19 @@ export function createPayloadMediaWorkFetchers(api: string): Pick<PlanningFetche
  * One multipart upload with progress (fetch can't report upload progress).
  * Payload's convention: the file, and the other fields as `_payload` JSON.
  */
-function uploadWithProgress(url: string, file: File, options: { folderId: number | null; onProgress?: (fraction: number) => void; signal?: AbortSignal }): Promise<MediaLibraryAsset> {
+function uploadWithProgress<T = MediaLibraryAsset>(url: string, file: File, fields: Record<string, unknown>, options: { onProgress?: (fraction: number) => void; signal?: AbortSignal }): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const form = new FormData();
     form.append("file", file, file.name);
-    form.append("_payload", JSON.stringify({ folderId: options.folderId }));
+    form.append("_payload", JSON.stringify(fields));
     xhr.open("POST", url);
     xhr.withCredentials = true;
     xhr.responseType = "json";
     xhr.upload.onprogress = (event) => { if (event.lengthComputable) options.onProgress?.(event.loaded / event.total); };
     const fail = (status: number, message?: string) => reject({ message: message || (status === 413 ? "That file is too large to upload." : status === 0 ? "The connection dropped. Retry when you're back online." : "The upload didn't finish."), code: `byline_${status}`, data: { status } } satisfies ScreenError);
     xhr.onload = () => {
-      const body = xhr.response as (MediaLibraryAsset & { message?: string }) | null;
+      const body = xhr.response as (T & { message?: string }) | null;
       if (xhr.status >= 200 && xhr.status < 300 && body) resolve(body);
       else fail(xhr.status, body?.message);
     };

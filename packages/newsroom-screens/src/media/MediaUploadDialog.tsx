@@ -28,6 +28,8 @@ export type MediaUploadDialogProps = {
   onBusyChange?: (busy: boolean) => void;
   /** "Show in Media" once files are in. */
   onShow?: (folderId: number | null) => void;
+  /** Files dropped on the Library before the dialog opened: queued as soon as it opens. */
+  initialFiles?: readonly File[];
 };
 
 let sequence = 0;
@@ -40,7 +42,7 @@ let sequence = 0;
  * never required first: gaps show in the Library afterwards. The
  * destination is the folder the reader was browsing, or Unfiled.
  */
-export function MediaUploadDialog({ open, onOpenChange, fetchers, folderId, onBusyChange, onShow }: MediaUploadDialogProps) {
+export function MediaUploadDialog({ open, onOpenChange, fetchers, folderId, onBusyChange, onShow, initialFiles }: MediaUploadDialogProps) {
   const client = useQueryClient();
   const navigator = useMediaNavigator(fetchers);
   const accepted = navigator.data?.capabilities.acceptedMimeTypes ?? [];
@@ -100,7 +102,7 @@ export function MediaUploadDialog({ open, onOpenChange, fetchers, folderId, onBu
     wasBusy.current = busy;
   }, [busy, client, queue]);
 
-  const add = (files: FileList | File[] | null) => {
+  const add = (files: FileList | readonly File[] | null, into: number | null = destination) => {
     if (!files) return;
     const items: QueueItem[] = Array.from(files).map((file) => {
       const typeOk = accepted.length === 0 || acceptsFile(file, accepted);
@@ -109,10 +111,20 @@ export function MediaUploadDialog({ open, onOpenChange, fetchers, folderId, onBu
       const error = !typeOk
         ? `Media doesn't accept ${file.type || "this kind of file"}. Use JPEG, PNG, WebP, AVIF, GIF, PDF, MP3, M4A or WAV.`
         : !sizeOk ? `${formatFilesize(file.size)} is over the ${formatFilesize(maxBytes)} upload limit.` : undefined;
-      return { key: `upload-${++sequence}`, file, status: error ? "failed" : "queued", progress: 0, error, retryable: false, folderId: destination };
+      return { key: `upload-${++sequence}`, file, status: error ? "failed" : "queued", progress: 0, error, retryable: false, folderId: into };
     });
     setQueue((current) => [...current, ...items]);
   };
+
+  // Dropped files start uploading once the accepted types are known (so wrong ones are caught before sending),
+  // each dropped batch exactly once (effects can run twice).
+  const queuedDrop = useRef<readonly File[] | null>(null);
+  useEffect(() => {
+    if (!open || !initialFiles?.length || !navigator.data || queuedDrop.current === initialFiles) return;
+    queuedDrop.current = initialFiles;
+    add(initialFiles, folderId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, navigator.data, initialFiles]);
 
   const totals = useMemo(() => {
     const live = queue.filter((item) => item.retryable || item.status !== "failed");

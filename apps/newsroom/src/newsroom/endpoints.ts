@@ -21,7 +21,7 @@ import { validResourceUrl } from "../collections/StoryPlans";
 import { parsePlanningFilterParams } from "@byline/newsroom-screens/planning/planning-api";
 import { parseMediaLibraryParams } from "@byline/newsroom-screens/media/media-library-model";
 import type { MediaBulkPatch, MediaMetadataPatch } from "@byline/newsroom-screens/media/media-library-model";
-import { createFolder, deleteFolder, deleteMedia, deleteMediaMany, libraryPage, mediaDetail, mediaNavigator, moveMedia, renameMedia, updateFolder, updateMedia, updateMediaMany, uploadMedia } from "./media-library";
+import { createFolder, deleteFolder, deleteMedia, deleteMediaMany, libraryPage, mediaDetail, mediaNavigator, mediaTags, moveMedia, renameMedia, replaceMedia, updateFolder, updateMedia, updateMediaMany, uploadMedia } from "./media-library";
 import { mediaWork } from "./media-work";
 import { artDirectionView, retryPublication, saveArtDirection } from "../publication-media/media-publication";
 import { publicationMediaReport, type MediaRequirement } from "../publication-media/readiness";
@@ -588,6 +588,7 @@ export const newsroomEndpoints: Endpoint[] = [
   // Fixed paths come before `/byline/media/:id`.
   { path: "/byline/media", method: "get", handler: handle((ctx, req) => libraryPage(ctx, parseMediaLibraryParams(req.searchParams))) },
   { path: "/byline/media/navigator", method: "get", handler: handle((ctx) => mediaNavigator(ctx)) },
+  { path: "/byline/media/tags", method: "get", handler: handle((ctx) => mediaTags(ctx)) },
   { path: "/byline/media/work", method: "get", handler: handle((ctx) => mediaWork(ctx)) },
   { path: "/byline/media/upload", method: "post", handler: handle(uploadToLibrary) },
   // Story header preflight: the same server rule Publish enforces, for the Media the form currently references.
@@ -601,6 +602,7 @@ export const newsroomEndpoints: Endpoint[] = [
   // Art direction (focal point, custom crops) and publication Retry: the only normal write paths for that state.
   { path: "/byline/media/:id/art-direction", method: "get", handler: handle((ctx, req) => artDirectionView(ctx, idParam(req))) },
   { path: "/byline/media/:id/art-direction", method: "put", handler: handle(async (ctx, req) => saveArtDirection(ctx, idParam(req), await body<Record<string, unknown>>(req))) },
+  { path: "/byline/media/:id/replace", method: "post", handler: handle(async (ctx, req) => replaceMedia(ctx, idParam(req), (await body<{ expectedUpdatedAt?: unknown }>(req)).expectedUpdatedAt)) },
   { path: "/byline/media/:id/rename", method: "post", handler: handle(async (ctx, req) => renameMedia(ctx, idParam(req), await body(req))) },
   { path: "/byline/media/:id/publication/retry", method: "post", handler: handle(async (ctx, req) => { await retryPublication(ctx, idParam(req)); return mediaDetail(ctx, idParam(req)); }) },
   { path: "/byline/media/:id", method: "get", handler: handle((ctx, req) => mediaDetail(ctx, idParam(req))) },

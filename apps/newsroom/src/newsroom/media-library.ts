@@ -11,6 +11,8 @@ import {
   type MediaAssetDetail,
   type MediaBulkPatch,
   type MediaBulkResult,
+  type MediaTagCount,
+  normalizeMediaTags,
   type MediaPublicationAssetState,
   type MediaFolder,
   type MediaFolderRef,
@@ -104,6 +106,7 @@ export function libraryAsset(ctx: ScreenContext, media: Media, lookup: Lookup): 
     sourceUrl: text(media.sourceUrl),
     mimeType: media.mimeType ?? ""
   };
+  const tags = normalizeMediaTags((media as { tags?: unknown[] | null }).tags ?? []);
   return {
     id: media.id,
     filename: media.filename ?? `File ${media.id}`,
@@ -114,6 +117,7 @@ export function libraryAsset(ctx: ScreenContext, media: Media, lookup: Lookup): 
     previewUrl: previewUrl(media),
     url: media.url ?? null,
     ...asset,
+    tags,
     capturedAt: media.capturedAt ?? null,
     createdAt: media.createdAt,
     updatedAt: media.updatedAt,
@@ -184,6 +188,7 @@ export function libraryWhere(ctx: ScreenContext, query: MediaLibraryQuery): Wher
   if (query.capturedTo) and.push({ capturedAt: { less_than: localToInstant(`${addDays(query.capturedTo, 1)}T00:00`, ctx.timeZone) } });
   if (query.publication === "not-prepared") and.push({ or: [{ "publicationAssets.status": { equals: "not-prepared" } }, { "publicationAssets.status": { exists: false } }] });
   else if (query.publication) and.push({ "publicationAssets.status": { equals: query.publication } });
+  if (query.tag) and.push({ tags: { in: [query.tag] } });
   return and.length ? { and } : {};
 }
 
@@ -362,6 +367,7 @@ export async function updateMedia(ctx: ScreenContext, id: number, patch: MediaMe
   }
   if (patch.capturedAt !== undefined) data.capturedAt = capturedInstant(ctx, patch.capturedAt);
   if (patch.folderId !== undefined) data.folder = await existingFolder(ctx, patch.folderId);
+  if (patch.tags !== undefined) data.tags = normalizeMediaTags(Array.isArray(patch.tags) ? patch.tags : []);
   if (Object.keys(data).length) await ctx.req.payload.update({ collection: "media", id, data, overrideLock: false, ...asUser(ctx) });
   return mediaDetail(ctx, id);
 }
@@ -396,11 +402,22 @@ export async function updateMediaMany(ctx: ScreenContext, ids: number[], patch: 
     if (text.length > MEDIA_FIELD_LIMITS[field]) throw new APIError(`Keep that under ${MEDIA_FIELD_LIMITS[field]} characters.`, 400);
     data[field] = field === "sourceUrl" ? sourceUrlOrThrow(text) : text;
   }
-  if (!Object.keys(data).length) throw new APIError("Fill in at least one field to apply.", 400);
+  const addTags = normalizeMediaTags(Array.isArray(patch.addTags) ? patch.addTags : []);
+  const removeTags = new Set(normalizeMediaTags(Array.isArray(patch.removeTags) ? patch.removeTags : []));
+  const tagging = addTags.length > 0 || removeTags.size > 0;
+  if (!Object.keys(data).length && !tagging) throw new APIError("Fill in at least one field to apply.", 400);
   const result: MediaBulkResult = { done: [], failed: [] };
   for (const id of [...new Set(ids)].slice(0, 200)) {
     try {
-      await ctx.req.payload.update({ collection: "media", id, data, overrideLock: false, ...asUser(ctx) });
+      const write: Record<string, unknown> = { ...data };
+      if (tagging) {
+        // Each file keeps its own other tags.
+        const found = await ctx.req.payload.find({ collection: "media", where: { id: { equals: id } }, depth: 0, limit: 1, select: { tags: true }, ...asUser(ctx) });
+        if (!found.docs[0]) throw Object.assign(new Error("missing"), { status: 404 });
+        const current = normalizeMediaTags((found.docs[0] as { tags?: unknown[] | null }).tags ?? []);
+        write.tags = normalizeMediaTags([...current.filter((tag) => !removeTags.has(tag)), ...addTags.filter((tag) => !removeTags.has(tag))]);
+      }
+      await ctx.req.payload.update({ collection: "media", id, data: write, overrideLock: false, ...asUser(ctx) });
       result.done.push(id);
     } catch (error) {
       const status = (error as { status?: number }).status;
@@ -502,6 +519,55 @@ export async function renameMedia(ctx: ScreenContext, id: number, input: { name?
   await Promise.all(retired.map((name) => unlink(path.join(dir, path.basename(name))).catch(() => undefined)));
   return mediaDetail(ctx, id);
 }
+
+/** Tags in use with how many files have each, most used first (one grouped query; Media is readable by every account). */
+export async function mediaTags(ctx: ScreenContext): Promise<MediaTagCount[]> {
+  const db = ctx.req.payload.db as unknown as { drizzle: { execute: (query: unknown) => Promise<{ rows: Array<{ tag: string; count: number | string }> }> } };
+  const result = await db.drizzle.execute(sql`select text as tag, count(distinct parent_id) as count from media_texts where path = 'tags' and text is not null group by text order by count(distinct parent_id) desc, text asc limit 300`);
+  return result.rows.map((row) => ({ tag: row.tag, count: Number(row.count) }));
+}
+
+/**
+ * Replaces a file's bytes with a new version (an edited photo, a corrected
+ * PDF) through Payload's own upload operation, so its MIME check, the private
+ * preview and storage are Payload's. The Media record keeps its ID, metadata,
+ * folder, uploader and every link; the publication revision moves (a new
+ * source), so web files are prepared again. The new version must be the same
+ * kind of file. The name stays the reader's: with the same extension the file
+ * is written over its own name; with another (PNG for a JPEG) the stem is
+ * kept and made unique.
+ */
+export async function replaceMedia(ctx: ScreenContext, id: number, expectedUpdatedAt: unknown): Promise<MediaAssetDetail> {
+  const file = ctx.req.file;
+  if (!file) throw new APIError("Choose the new version of the file.", 400);
+  const mimeType = String(file.mimetype).toLowerCase();
+  if (!(MEDIA_MIME_TYPES as readonly string[]).includes(mimeType)) throw new APIError("Media accepts JPEG, PNG, WebP, AVIF and GIF images, PDFs, and MP3, M4A or WAV audio.", 400);
+  const started = await initTransaction(ctx.req);
+  try {
+    await lockMediaRow(ctx.req, id);
+    const media = await findMedia(ctx, id);
+    if (!(await canUpdateMedia(ctx, id))) throw new APIError("Only the person who uploaded this file, or an editor, can replace it.", 403);
+    if (typeof expectedUpdatedAt === "string" && expectedUpdatedAt && Date.parse(expectedUpdatedAt) !== Date.parse(media.updatedAt)) {
+      throw new APIError("Someone else changed this file while you were replacing it. Reload to see the newer version.", 409);
+    }
+    const kind = mediaKind(media.mimeType);
+    if (mediaKind(mimeType) !== kind) throw new APIError(`Replace ${kind === "image" ? "an image with another image" : kind === "audio" ? "audio with other audio" : "a PDF with another PDF"}.`, 400);
+    const current = media.filename ?? `file-${id}`;
+    const { stem, extension: currentExtension } = splitFilename(current);
+    const extension = EXTENSION_FOR[mimeType] ?? splitFilename(file.name).extension.toLowerCase();
+    // Only this record owns its own name; any other name is checked first, so nobody else's file is overwritten.
+    const name = currentExtension.toLowerCase() === extension ? current : await freeFilename(ctx, privateMediaDir(), stem, extension, id);
+    // Payload's own upload: it removes the old original and preview, writes the new ones and makes a new preview.
+    await ctx.req.payload.update({ collection: "media", id, data: {}, file: { ...file, name }, overwriteExistingFiles: true, overrideLock: false, ...asUser(ctx) });
+    if (started) await commitTransaction(ctx.req);
+  } catch (error) {
+    if (started) await killTransaction(ctx.req);
+    throw error;
+  }
+  return mediaDetail(ctx, id);
+}
+
+const EXTENSION_FOR: Record<string, string> = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/avif": ".avif", "image/gif": ".gif", "application/pdf": ".pdf", "audio/mpeg": ".mp3", "audio/mp4": ".m4a", "audio/wav": ".wav" };
 
 export async function deleteMedia(ctx: ScreenContext, id: number): Promise<void> {
   if (!atLeast(ctx.user, "editor")) throw new APIError("Only editors delete files from Media.", 403);

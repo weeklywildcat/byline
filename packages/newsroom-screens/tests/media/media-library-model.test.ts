@@ -4,6 +4,10 @@ import {
   assetFacts,
   buildFolderTree,
   cleanMediaName,
+  draggedMediaIds,
+  MEDIA_DRAG_TYPE,
+  MEDIA_TAGS_MAX,
+  normalizeMediaTags,
   DEFAULT_MEDIA_ROUTE,
   EMPTY_MEDIA_FILTERS,
   folderPath,
@@ -136,5 +140,29 @@ describe("renaming", () => {
     expect(cleanMediaName(" ../ ", ".jpg")).toBe("");
     expect(cleanMediaName("...", ".jpg")).toBe("");
     expect(cleanMediaName("x".repeat(400), ".jpg")).toHaveLength(160);
+  });
+});
+
+describe("tags", () => {
+  it("have one spelling: trimmed, lowercase, no leading #, split on commas, unique", () => {
+    expect(normalizeMediaTags(["Football", " football ", "#Homecoming", "night   game, Stadium", "", 7, null])).toEqual(["football", "homecoming", "night game", "stadium"]);
+    expect(normalizeMediaTags(["x".repeat(80)])[0]).toHaveLength(40);
+    expect(normalizeMediaTags(Array.from({ length: 50 }, (_, index) => `tag ${index}`))).toHaveLength(MEDIA_TAGS_MAX);
+  });
+  it("travel in the Library query and are normalized when parsed", () => {
+    const params = mediaLibraryParams({ ...EMPTY_MEDIA_FILTERS, source: "all", folderId: null, sort: "newest", page: 1, limit: MEDIA_PAGE_SIZE, tag: "football" });
+    expect(params.tag).toBe("football");
+    expect(parseMediaLibraryParams(new URLSearchParams("tag=%23Football%20")).tag).toBe("football");
+    expect(parseMediaLibraryParams(new URLSearchParams("")).tag).toBe("");
+  });
+});
+
+describe("dragging files", () => {
+  const data = (value: string) => ({ getData: (type: string) => (type === MEDIA_DRAG_TYPE ? value : "") });
+  it("carries Media IDs and nothing else", () => {
+    expect(draggedMediaIds(data("[3,4,\"5\"]"))).toEqual([3, 4, 5]);
+    expect(draggedMediaIds(data("[-1,0,1.5,\"x\"]"))).toEqual([]);
+    expect(draggedMediaIds(data("not json"))).toEqual([]);
+    expect(draggedMediaIds(data(""))).toEqual([]);
   });
 });

@@ -380,6 +380,10 @@ export interface Media {
   license?: string | null;
   sourceUrl?: string | null;
   capturedAt?: string | null;
+  /**
+   * Keywords for finding the file: lowercase, one spelling per tag.
+   */
+  tags?: string[] | null;
   artDirection?:
     | {
         [k: string]: unknown;
@@ -1380,6 +1384,7 @@ export interface MediaSelect<T extends boolean = true> {
   license?: T;
   sourceUrl?: T;
   capturedAt?: T;
+  tags?: T;
   artDirection?: T;
   publicationRevision?: T;
   publicationAssets?:

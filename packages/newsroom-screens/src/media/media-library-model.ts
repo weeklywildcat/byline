@@ -42,6 +42,8 @@ export type MediaLibraryAsset = {
   copyright: string;
   license: string;
   sourceUrl: string;
+  /** Keywords for finding the file (normalized: lowercase, trimmed, unique; see `normalizeMediaTags`). */
+  tags: string[];
   /** When the picture or recording was made (an instant; shown as a newsroom day). */
   capturedAt: string | null;
   createdAt: string;
@@ -117,6 +119,8 @@ export type MediaMetadataPatch = {
   /** A newsroom day (`YYYY-MM-DD`) or null. */
   capturedAt?: string | null;
   folderId?: number | null;
+  /** The whole tag list (normalized on the server). */
+  tags?: string[];
   /** Compare-and-swap: a stale edit is refused, never an overwrite. */
   expectedUpdatedAt?: string;
 };
@@ -128,7 +132,50 @@ export type MediaMetadataPatch = {
  */
 export const MEDIA_BULK_FIELDS = ["creator", "credit", "copyright", "license", "sourceUrl"] as const;
 export type MediaBulkField = (typeof MEDIA_BULK_FIELDS)[number];
-export type MediaBulkPatch = Partial<Record<MediaBulkField, string>>;
+export type MediaBulkPatch = Partial<Record<MediaBulkField, string>> & {
+  /** Tags added to every file (each file keeps its other tags). */
+  addTags?: string[];
+  /** Tags removed from every file that has them. */
+  removeTags?: string[];
+};
+
+/** The drag data type for Library files moved inside Byline (JSON array of Media IDs). */
+export const MEDIA_DRAG_TYPE = "application/x-byline-media-ids";
+
+/** The Media IDs a drag carries, or [] when it isn't a Byline files drag. */
+export function draggedMediaIds(data: Pick<DataTransfer, "getData">): number[] {
+  try {
+    const value = JSON.parse(data.getData(MEDIA_DRAG_TYPE) || "[]") as unknown;
+    return Array.isArray(value) ? value.map(Number).filter((id) => Number.isSafeInteger(id) && id > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Tags: short keywords, at most this many per file, each at most this long. */
+export const MEDIA_TAGS_MAX = 30;
+export const MEDIA_TAG_LENGTH = 40;
+
+/**
+ * One way to spell a tag everywhere: trimmed, inner whitespace collapsed,
+ * lowercase (so "Football" and "football" are one tag), a leading "#"
+ * dropped, no commas (they separate tags when typing), unique, in order.
+ */
+export function normalizeMediaTags(input: readonly unknown[] | null | undefined): string[] {
+  const seen = new Set<string>();
+  for (const raw of input ?? []) {
+    if (typeof raw !== "string") continue;
+    for (const part of raw.split(",")) {
+      const tag = part.normalize("NFC").replace(/^#+/, "").replace(/\s+/g, " ").trim().toLowerCase().slice(0, MEDIA_TAG_LENGTH).trim();
+      if (tag) seen.add(tag);
+      if (seen.size >= MEDIA_TAGS_MAX) return [...seen];
+    }
+  }
+  return [...seen];
+}
+
+/** A tag in use, with how many files have it (the tag picker's suggestions). */
+export type MediaTagCount = { tag: string; count: number };
 
 /** One result per file of a bulk action: each file is checked on its own, so some may be refused. */
 export type MediaBulkResult = { done: number[]; failed: Array<{ id: number; message: string }> };
@@ -321,9 +368,11 @@ export type MediaLibraryFilters = {
   capturedFrom: string;
   capturedTo: string;
   publication: MediaPublicationAssetState | "";
+  /** Files with this tag ("" for any). */
+  tag: string;
 };
 
-export const EMPTY_MEDIA_FILTERS: MediaLibraryFilters = { search: "", searchScope: "all", type: "", uploaderId: null, needsMetadata: false, capturedFrom: "", capturedTo: "", publication: "" };
+export const EMPTY_MEDIA_FILTERS: MediaLibraryFilters = { search: "", searchScope: "all", type: "", uploaderId: null, needsMetadata: false, capturedFrom: "", capturedTo: "", publication: "", tag: "" };
 
 /** One page request to the Library read model. */
 export type MediaLibraryQuery = MediaLibraryFilters & {
@@ -346,7 +395,7 @@ export type MediaLibraryPage = {
 };
 
 export function activeFilterCount(filters: MediaLibraryFilters): number {
-  return [filters.type, filters.uploaderId, filters.needsMetadata, filters.capturedFrom || filters.capturedTo, filters.publication].filter(Boolean).length;
+  return [filters.type, filters.uploaderId, filters.needsMetadata, filters.capturedFrom || filters.capturedTo, filters.publication, filters.tag].filter(Boolean).length;
 }
 
 /** Whether a search ignores the open folder (and scope) and looks across all media. */
@@ -373,6 +422,7 @@ export function mediaLibraryParams(query: MediaLibraryQuery): Record<string, str
   if (query.capturedFrom) params.capturedFrom = query.capturedFrom;
   if (query.capturedTo) params.capturedTo = query.capturedTo;
   if (query.publication) params.publication = query.publication;
+  if (query.tag) params.tag = query.tag;
   if (query.sort !== "newest") params.sort = query.sort;
   if (query.page > 1) params.page = String(query.page);
   if (query.limit !== MEDIA_PAGE_SIZE) params.limit = String(query.limit);
@@ -399,6 +449,7 @@ export function parseMediaLibraryParams(params: URLSearchParams): MediaLibraryQu
     capturedFrom: day(params.get("capturedFrom")),
     capturedTo: day(params.get("capturedTo")),
     publication: publication === "not-prepared" || publication === "preparing" || publication === "ready" || publication === "failed" ? publication : "",
+    tag: normalizeMediaTags([params.get("tag") ?? ""])[0] ?? "",
     sort: isMediaSort(sort) ? sort : "newest",
     page: positive(params.get("page")) ?? 1,
     limit: Math.min(limit, MEDIA_PAGE_MAX)

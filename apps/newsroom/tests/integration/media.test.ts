@@ -430,6 +430,68 @@ describe("rename and bulk actions", () => {
   });
 });
 
+describe("tags", () => {
+  it("are normalized, searchable, filterable and counted", async () => {
+    const id = await upload("alice", await photo(300, 200, "media-tags-1.jpg"), null);
+    const other = await upload("alice", await photo(300, 200, "media-tags-2.jpg"), null);
+    const detail = (await call("get", "/byline/media/:id", "alice", { params: { id: String(id) } })).body;
+    const saved = await call("patch", "/byline/media/:id", "alice", { params: { id: String(id) }, data: { tags: ["Football", " football ", "#Homecoming", "night  game, Stadium"], expectedUpdatedAt: detail.updatedAt } });
+    expect(saved.status).toBe(200);
+    expect(saved.body.tags).toEqual(["football", "homecoming", "night game", "stadium"]);
+    // The raw collection keeps one spelling too.
+    await payload.update({ collection: "media", id: other, data: { tags: ["FOOTBALL", "Band"] } as never, overrideAccess: true });
+    expect((await payload.findByID({ collection: "media", id: other, depth: 0 })).tags).toEqual(["football", "band"]);
+
+    expect(names(await library("bob", { tag: "football" }))).toEqual(["media-tags-1.jpg", "media-tags-2.jpg"]);
+    expect(names(await library("bob", { tag: "homecoming" }))).toEqual(["media-tags-1.jpg"]);
+    expect(names(await library("bob", { search: "stadium" }))).toEqual(["media-tags-1.jpg"]);
+    const counts = (await call("get", "/byline/media/tags", "bob")).body as Array<{ tag: string; count: number }>;
+    expect(counts[0]).toEqual({ tag: "football", count: 2 });
+    expect(counts).toContainEqual({ tag: "band", count: 1 });
+  });
+
+  it("are added and removed on several files at once, keeping each file's others", async () => {
+    const first = await upload("alice", await photo(300, 200, "media-tags-bulk-1.jpg"), null, { tags: ["arts"] } as never);
+    const second = await upload("alice", await photo(300, 200, "media-tags-bulk-2.jpg"), null, { tags: ["arts", "draft"] } as never);
+    const result = await call("post", "/byline/media/bulk-update", "alice", { data: { ids: [first, second, ids.gif], patch: { addTags: ["Spring Musical"], removeTags: ["draft"] } } });
+    expect(result.body.done).toEqual([first, second]);
+    expect(result.body.failed.map((failure: { id: number }) => failure.id)).toEqual([ids.gif]);
+    expect((await payload.findByID({ collection: "media", id: first, depth: 0 })).tags).toEqual(["arts", "spring musical"]);
+    expect((await payload.findByID({ collection: "media", id: second, depth: 0 })).tags).toEqual(["arts", "spring musical"]);
+  });
+});
+
+describe("replacing a file", () => {
+  const stored = (filename: string | null | undefined) => Boolean(filename) && existsSync(path.join(privateMediaDir(), filename!));
+  const replace = async (key: string, id: number, file: NonNullable<PayloadRequest["file"]>, expectedUpdatedAt?: string) => call("post", "/byline/media/:id/replace", key, { params: { id: String(id) }, data: { expectedUpdatedAt }, file });
+
+  it("takes a new version of the same kind and keeps the record, its name and metadata", async () => {
+    const id = await upload("alice", await photo(800, 600, "media-replace-me.jpg"), null, { alt: "Crowd", credit: "Alice", tags: ["crowd"] } as never);
+    await call("post", "/byline/media/:id/rename", "alice", { params: { id: String(id) }, data: { name: "Homecoming stands" } });
+    const before = await payload.findByID({ collection: "media", id, depth: 0 });
+    // Someone else's upload, the wrong kind and a stale version are refused.
+    expect((await replace("bob", id, await photo(400, 300, "edit.jpg"))).status).toBe(403);
+    expect((await replace("alice", id, pdf())).status).toBe(400);
+    expect((await replace("alice", id, await photo(400, 300, "edit.jpg"), "2020-01-01T00:00:00.000Z")).status).toBe(409);
+
+    const replaced = await replace("alice", id, await photo(1200, 700, "IMG_9999-edit.jpg"), before.updatedAt);
+    expect(replaced.status).toBe(200);
+    expect(replaced.body).toMatchObject({ id, filename: "Homecoming stands.jpg", width: 1200, height: 700, alt: "Crowd", credit: "Alice", tags: ["crowd"] });
+    const after = await payload.findByID({ collection: "media", id, depth: 0 });
+    expect(after.publicationRevision).toBe((before.publicationRevision ?? 0) + 1);
+    expect(after.uploadedBy).toBe(before.uploadedBy);
+    expect(stored(after.filename) && stored(after.sizes?.library?.filename)).toBe(true);
+    expect(after.sizes?.library?.filename).not.toBe(before.sizes?.library?.filename);
+    expect(stored(before.sizes?.library?.filename)).toBe(false);
+
+    // Another image type keeps the name with its own extension.
+    const png = { data: await sharp({ create: { width: 500, height: 500, channels: 4, background: "#3366ff" } }).png().toBuffer(), mimetype: "image/png", name: "logo.png", size: 0 };
+    const converted = await replace("editor", id, png);
+    expect(converted.body).toMatchObject({ filename: "Homecoming stands.png", mimeType: "image/png" });
+    expect(stored("Homecoming stands.jpg")).toBe(false);
+  });
+});
+
 describe("upload", () => {
   it("needs a signed-in account", async () => {
     expect((await call("post", "/byline/media/upload", null, { data: {}, file: await photo(100, 100, "anon.jpg") })).status).toBe(401);

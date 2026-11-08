@@ -99,13 +99,15 @@ assignment, Collection artwork/resource or profile can't be deleted (409).
 
 | | |
 | --- | --- |
-| `GET /media` | one Library page: `folder` or `source`, `q` (+ `within=folder`), `type`, `uploader`, `metadata=needs`, `capturedFrom`/`capturedTo` (newsroom days), `publication`, `sort`, `page`, `limit` (≤100, default 48). Never raw Payload query syntax. |
+| `GET /media` | one Library page: `folder` or `source`, `q` (+ `within=folder`), `type`, `uploader`, `metadata=needs`, `capturedFrom`/`capturedTo` (newsroom days), `publication`, `tag`, `sort`, `page`, `limit` (≤100, default 48). Never raw Payload query syntax. |
 | `GET /media/navigator` | folders (flat, with file counts), Library counts, capabilities (incl. accepted MIME types and the upload size limit), uploaders |
 | `GET /media/:id` | the inspector's detail: folder path, linked uses, hidden-use count |
 | `PATCH /media/:id` | alt, creator, credit, copyright, licence, source URL, captured day, folder; `expectedUpdatedAt` compare-and-swap (409) |
+| `POST /media/:id/replace` | multipart (`file`, `_payload` JSON `{ expectedUpdatedAt }`): a new version of the same kind through Payload's own upload; uploader or editor; row-locked compare-and-swap (409) |
+| `GET /media/tags` | tags in use with how many files have each, most used first |
 | `POST /media/:id/rename` | `{ name, expectedUpdatedAt }`: renames the stored file (see *Renaming*); uploader or editor; row-locked compare-and-swap (409) |
 | `POST /media/move` | file several assets into a folder (each checked on its own) |
-| `POST /media/bulk-update` | `{ ids, patch }`: the same creator, credit, copyright, licence or source URL on several files (≤200), each as the account; empty fields are skipped, never used to clear; returns `{ done, failed }` |
+| `POST /media/bulk-update` | `{ ids, patch }`: the same creator, credit, copyright, licence or source URL on several files (≤200), and `addTags`/`removeTags`, each as the account; empty fields are skipped, never used to clear; each file keeps its other tags; returns `{ done, failed }` |
 | `POST /media/bulk-delete` | `{ ids }`: editors; each file still linked anywhere is refused and kept; returns `{ done, failed }` |
 | `POST /media/upload` | multipart (`file`, `_payload` JSON `{ folderId }`), Payload's own upload operation |
 | `DELETE /media/:id` | editors; refused while linked |
@@ -190,6 +192,48 @@ dialog), **Download** (one download per file) and **Delete** (editors). Each
 file is checked on its own on the server, so the result names what was
 refused (someone else's upload for staff, a file still linked) and leaves the
 rest done.
+
+## Tags
+
+Free keywords on a file (`tags`, Payload `text` with `hasMany`, at most 30 of
+up to 40 characters; migration `20261108_160324_media_tags`). One spelling
+everywhere: `normalizeMediaTags` (lowercase, trimmed, no leading `#`, commas
+split, unique) runs in the field's own hook, so the Byline API, the raw admin
+and the import all store the same thing. Search covers tags; the Filters
+popover has a Tag filter (with a chip on the results line to clear it); the
+inspector edits them as chips with suggestions from the tags in use (existing
+tags first, so a near-duplicate isn't created by accident; a comma adds
+exactly what was typed); bulk edit adds and removes tags across a selection.
+Tags are not folders or Library scopes and never appear in the navigator.
+
+## Replacing a file
+
+*Replace with new version…* in the inspector's file menu, or a file dropped on
+the inspector's preview, uploads a new version of the same kind (image for an
+image, audio for audio, PDF for a PDF) after a confirmation. It goes through
+Payload's own upload operation (MIME check, the private preview, storage), so
+Payload removes the old original and preview. The record keeps its ID,
+metadata, tags, folder, uploader and every link; the publication revision
+moves (a new source), so web files are prepared again and published pages
+show the new version after their next publish. The name stays the reader's:
+the same extension is written over its own name; another type keeps the stem
+with its own extension, made unique.
+
+## Drag and drop and the keyboard
+
+- Files dragged from the desktop onto the Library open Upload media with them
+  queued, into the open folder (or Unfiled from a Library scope).
+- Files dragged onto a folder (or Unfiled) in the navigator are moved there; a
+  checked file drags the whole selection. The drag carries Media IDs only
+  (`MEDIA_DRAG_TYPE`); every move is checked on the server.
+- Arrow keys move focus between files (by row in Grid), Home and End jump,
+  Enter opens the details, X checks a file, Shift+arrow extends a selection.
+- **Quick Look**: Space on a file opens it large over the grid (← and → step
+  through the loaded files, Enter opens the details, Space or Escape closes and
+  focus returns to the file). Images show the private preview at once and swap
+  in the original when it is 12 MB or smaller.
+- The inspector's header has previous/next buttons that step through the files
+  as the browser shows them.
 
 ## Renaming
 
