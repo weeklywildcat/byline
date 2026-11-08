@@ -306,10 +306,10 @@ function ww_block_media_fallback(array $block, int $id): ?array {
     if (($block['blockName'] ?? '') === 'core/file') {
         $url = ww_text($attrs['href'] ?? '');
     }
-    if ($url === '' && preg_match('~<(?:img|source)\\b[^>]*\\bsrc=["\\']([^"\\']+)["\\']~i', $html, $match)) {
+    if ($url === '' && preg_match("~<(?:img|source)\\b[^>]*\\bsrc=[\"']([^\"']+)[\"']~i", $html, $match)) {
         $url = html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
-    if ($url === '' && preg_match('~<a\\b[^>]*\\bhref=["\\']([^"\\']+)["\\']~i', $html, $match)) {
+    if ($url === '' && preg_match("~<a\\b[^>]*\\bhref=[\"']([^\"']+)[\"']~i", $html, $match)) {
         $url = html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
     if ($url === '' || !preg_match('~^https?://~i', $url)) return null;
