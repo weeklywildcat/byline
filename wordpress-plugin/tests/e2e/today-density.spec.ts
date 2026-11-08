@@ -4,7 +4,7 @@ import type { HomeBootstrap } from "../../src/home/newsroom-model";
 
 const todayUrl = "/wp-admin/admin.php?page=byline-planning&tab=today";
 
-test("Today keeps one compact work queue, profile photos and safe inline task controls", async ({ adminPage: page, adminSession: session }, testInfo) => {
+test("Today is a morning desk: week strip, one compact work queue, Desk and Budget at desktop and phone widths", async ({ adminPage: page, adminSession: session }, testInfo) => {
   const unique = token();
   const me = await currentUserId(session);
   const { day } = await siteToday(session);
@@ -33,8 +33,21 @@ test("Today keeps one compact work queue, profile photos and safe inline task co
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(todayUrl);
+  const week = page.getByRole("region", { name: "This week", exact: true });
   const work = page.getByRole("region", { name: "My Work", exact: true });
-  const stories = page.getByRole("region", { name: "My Stories", exact: true });
+  const desk = page.getByRole("region", { name: "Desk", exact: true });
+  const budget = page.getByRole("region", { name: "Budget", exact: true });
+  // An editor scopes the newsroom cards; Newsroom is the default.
+  const scope = page.getByRole("group", { name: "Show stories for" });
+  await expect(scope.getByRole("button", { name: /^Newsroom/ })).toHaveAttribute("aria-pressed", "true");
+  // Seven site days, today marked, and the legend's four fixed categories.
+  await expect(week.locator("[data-week-day]")).toHaveCount(7);
+  await expect(week.locator(`[data-week-day="${day}"]`)).toHaveAttribute("aria-current", "date");
+  await expect(week.getByText("Story deadline", { exact: true })).toBeVisible();
+  await expect(week.locator('[data-week-event="deadline"]').first()).toBeVisible();
+  // Desk: this fixture's active stories by stage, Reporting before Ready.
+  await expect(desk.locator("[data-desk-stage]")).toHaveText([/Reporting\s*5/, /Ready for Review\s*1/]);
+  await expect(desk.locator("[data-desk-segment]")).toHaveCount(2);
   // The ten-item preview includes the overdue-story action and review alongside tasks.
   await expect(work.getByRole("group", { name: "Needs attention", exact: true })).toContainText("Winter concert");
   const previewRows = work.locator('[data-slot="item-group"] > *');
@@ -47,20 +60,36 @@ test("Today keeps one compact work queue, profile photos and safe inline task co
   const geometry = await first.boundingBox();
   expect(geometry!.height).toBeLessThanOrEqual(66);
   expect((await quickFields.boundingBox())!.x).toBeGreaterThanOrEqual((await taskTitle.boundingBox())!.x + (await taskTitle.boundingBox())!.width);
-  // The unified preview has ten rows plus group headings before My Stories.
-  expect((await stories.boundingBox())!.y).toBeLessThan(1100);
-  const separators = await work.locator("[data-task-id]").evaluateAll((elements) => elements.slice(0, -1).map((element) => getComputedStyle(element).borderBottomWidth));
-  expect(separators).toEqual(Array(7).fill("1px"));
+  // Wide: My Work and the Desk share a row; This week leads and Budget follows.
+  const workBox = (await work.boundingBox())!;
+  const deskBox = (await desk.boundingBox())!;
+  expect(deskBox.x).toBeGreaterThan(workBox.x + workBox.width - 1);
+  expect(Math.abs(deskBox.y - workBox.y)).toBeLessThanOrEqual(1);
+  expect((await week.boundingBox())!.y).toBeLessThan(workBox.y);
+  expect((await budget.boundingBox())!.y).toBeGreaterThan(workBox.y + workBox.height);
+  // Quiet top separators between rows; the first row in a group has none.
+  const separators = await work.locator("[data-task-id]").evaluateAll((elements) => elements.map((element) => getComputedStyle(element).borderTopWidth));
+  expect(separators.filter((width) => width === "1px").length).toBeGreaterThanOrEqual(separators.length - 2);
   const gaps = await work.locator("[data-task-id]").evaluateAll((elements) => elements.slice(1).map((element, index) => element.getBoundingClientRect().top - elements[index]!.getBoundingClientRect().bottom));
   expect(gaps.every((gap) => Math.abs(gap) <= 1)).toBe(true);
-  expect((await work.locator('[data-slot="card-header"]').boundingBox())!.height).toBeLessThanOrEqual(54);
-  // Both queue headers include a compact title and description.
-  expect((await stories.locator('[data-slot="card-header"]').boundingBox())!.height).toBeLessThanOrEqual(54);
-  const portrait = stories.getByRole("img", { name: photoWriter.name, exact: true });
+  // Every card header is one compact icon, title, description and action row.
+  for (const card of [week, work, desk, budget]) expect((await card.locator('[data-slot="card-header"]').boundingBox())!.height).toBeLessThanOrEqual(72);
+  // Budget: This week (nothing planned in this fixture), My stories, Unscheduled, each with its count.
+  const budgetTabs = budget.getByRole("tablist", { name: "Budget" });
+  await expect(budgetTabs.getByRole("tab")).toHaveText([/This week\s*0/, /My stories\s*6/, /Unscheduled\s*6/]);
+  await expect(budget.getByText("Nothing is planned or scheduled to publish this week.")).toBeVisible();
+  await budgetTabs.getByRole("tab", { name: /^Unscheduled/ }).click();
+  await expect(budget.getByRole("table", { name: "Budget: Unscheduled" }).locator("tbody tr")).toHaveCount(6);
+  await budgetTabs.getByRole("tab", { name: /^My stories/ }).click();
+  const budgetTable = budget.getByRole("table", { name: "Budget: My stories" });
+  await expect(budgetTable.locator("tbody tr")).toHaveCount(6);
+  await expect(budgetTable.locator("tbody tr").first().getByText("Not scheduled")).toBeVisible();
+  const portrait = budgetTable.getByRole("img", { name: photoWriter.name, exact: true });
   await expect(portrait).toBeVisible();
   await expect.poll(() => portrait.locator("img").evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true);
-  const longStory = stories.getByRole("button", { name: new RegExp("^The school board") });
-  expect((await longStory.locator('[data-slot="item-title"]').boundingBox())!.height).toBeLessThanOrEqual(40);
+  // A long headline stays one truncated line in the Budget table.
+  const longStory = budgetTable.getByRole("button", { name: new RegExp("^The school board") });
+  expect((await longStory.boundingBox())!.height).toBeLessThanOrEqual(24);
   const background = await first.evaluate((element) => getComputedStyle(element).backgroundColor);
   await first.hover();
   await expect.poll(() => first.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(background);
@@ -94,11 +123,28 @@ test("Today keeps one compact work queue, profile photos and safe inline task co
   for (const width of [1024, 390]) {
     await page.setViewportSize({ width, height: 1000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    expect((await longStory.locator('[data-slot="item-title"]').boundingBox())!.height).toBeLessThanOrEqual(40);
     await expect(first.getByRole("combobox", { name: "Task priority: high" })).toBeVisible();
+    // Narrow: the cards stack and the week strip scrolls sideways inside its card instead of squeezing seven columns.
+    const stackedWork = (await work.boundingBox())!;
+    expect((await desk.boundingBox())!.y).toBeGreaterThan(stackedWork.y + stackedWork.height);
+    if (width === 390) {
+      expect(await week.locator('ol[aria-label="Days"]').evaluate((list) => list.parentElement!.scrollWidth > list.parentElement!.clientWidth)).toBe(true);
+      // Budget lists stories as rows, headline first.
+      const rows = budget.getByRole("list", { name: "Budget: My stories" });
+      await expect(rows.locator("[data-story-id]")).toHaveCount(6);
+      expect((await rows.locator("[data-story-id]").first().locator('[data-slot="item-title"]').boundingBox())!.height).toBeLessThanOrEqual(40);
+    }
     await page.screenshot({ path: testInfo.outputPath(`today-${width}.png`), fullPage: true, animations: "disabled" });
   }
-  await stories.getByRole("button", { name: /^Canteen could return Due/ }).focus();
+  // Mine narrows the newsroom cards to the reader's stories (all of this fixture's), and is remembered.
+  await scope.getByRole("button", { name: /^Mine/ }).click();
+  await expect(scope.getByRole("button", { name: /^Mine/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(desk.locator("[data-desk-stage]")).toHaveCount(2);
+  await page.reload();
+  await expect(page.getByRole("group", { name: "Show stories for" }).getByRole("button", { name: /^Mine/ })).toHaveAttribute("aria-pressed", "true");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await budget.getByRole("tablist", { name: "Budget" }).getByRole("tab", { name: /^My stories/ }).click();
+  await budget.getByRole("table", { name: "Budget: My stories" }).getByRole("button", { name: /^Canteen could return/ }).focus();
   await page.keyboard.press("Enter");
   await expect(peek).toBeVisible();
   expect(data.currentUser.id).toBe(me);

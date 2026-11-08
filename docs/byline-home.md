@@ -6,32 +6,62 @@ Home is a custom React application, independent of the public site.
 
 ## Daily work
 
-Today is intentionally organized around three questions instead of the storage
-type behind each piece of work:
+Today is an editor's morning desk. It is organized around questions instead of
+the storage type behind each piece of work, one Card per question:
 
-1. **My Work — what do I need to do?** One personal queue combines assigned
+1. **This week — what is on the calendar?** Seven site days, Sunday to Saturday
+   in the newsroom timezone (`weekAgenda` in `newsroom-model.ts`). Each day shows
+   its story deadlines, planned publication targets, actual schedules and the
+   reader's confirmed exact appointments, with the calendar's fixed category
+   icons (publication `CalendarCheck`, deadline `Flag`, appointment `Mic`, photo
+   shoot `Camera`); hue only repeats the icon. A weekday from today on with
+   nothing planned or scheduled to publish says **Nothing planned** in the one
+   warning color and offers **Plan a story** (New story). Ordinary task and
+   production due dates stay in My Work instead of appearing twice. A schedule
+   takes precedence over a planned target on the same site day. Previous/next
+   move whole weeks; a legend row counts what is already planned next week.
+   When Home is too narrow for seven readable columns the strip scrolls
+   sideways and opens on today.
+2. **My Work — what do I need to do?** One personal queue combines assigned
    tasks, reviews an editor can act on, reporting appointments that need
    scheduling, the signed-in user's production assignments, missed personal
    story deadlines, and urgent unassigned production that needs an editor.
    Underlying objects stay separate — a production assignment does not become a
    task — but Today normalizes their urgency into **Needs attention**, **Today**,
-   **Tomorrow**, **This week**, and **Later**. Overdue work and urgent blockers
-   lead; nonurgent scheduling reminders cannot outrank already overdue work.
-   The first ten rows are shown and **View all work** opens the rest of the
-   bounded feed. Ordinary task completion/editing still uses the canonical task
-   APIs and optimistic rollback.
-2. **Coming Up — what commitments are on the calendar?** The next two weeks show
-   confirmed exact appointments, story deadlines, planned publication targets,
-   and actual WordPress schedules. Ordinary task and production due dates stay
-   in My Work instead of appearing twice. A WordPress schedule takes precedence
-   over a planned target on the same site day. Editors can still see visible
-   newsroom story/publication commitments; writers see their own.
-3. **My Stories — what am I responsible for overall?** Canonical co-writers,
-   assigned editors, and the legacy primary author determine membership.
-   Published and dropped stories are excluded. Six stories are shown, ordered by
-   overdue status, deadline, planned target and recent activity.
+   **Tomorrow**, **This week**, and **Later**, each with its count. Overdue work
+   and urgent blockers lead; nonurgent scheduling reminders cannot outrank
+   already overdue work. Due dates are right-aligned and overdue ones use the
+   warning color; an appointment still needing a time carries a reporting
+   **Needs scheduling** badge. The first ten rows are shown and **View all
+   work** opens the rest of the bounded feed. Ordinary task completion/editing
+   still uses the canonical task APIs and optimistic rollback. My Work is always
+   personal.
+3. **Desk — where do stories stand?** A stacked bar and a Stage · Stories · Last
+   change table of active stories by workflow stage, in workflow order and
+   colored by the workflow badge spec. Each stage links to Stories filtered to
+   it. The planning feed carries no time-in-stage, so the age is days since the
+   least recently changed story in the stage last changed; Reporting over seven
+   days and Editing over five use the warning color.
+4. **Site — is the public site healthy?** The website's publication state
+   (where the host reports deployments), the next real schedule in the agenda,
+   and content-health warnings linking to Content health. A failed publication
+   remains a page-level alert as well.
+5. **Budget — what publishes when?** A table (stacked rows on a narrow Home) with
+   three tabs: **This week** (planned or scheduled this site week),
+   **My stories** (the reader's active stories: canonical co-writers, assigned
+   editors and the legacy primary author) and **Unscheduled** (active stories
+   with no planned or scheduled publication). Rows show section, people,
+   workflow, art (`productionSignal`) and the publication date, or its overdue
+   days; they open Story Peek and keep the Stories List's hover preview and
+   context menu. Published and dropped stories are excluded.
 
-Ready-for-review work, production assignments and interview scheduling no longer
+Editors get a **Mine | Newsroom** toggle (default Newsroom). It scopes This
+week, Desk and Budget — Mine is the reader's own stories — and is remembered
+per reader where the host keeps preferences: Payload Preferences
+(`byline:home:preferences:v1`) in the newsroom, this browser in WordPress.
+Writers always see their own stories.
+
+Ready-for-review work, production assignments and interview scheduling do not
 create separate Today cards. They appear in **My Work** with enough story/type
 context to explain why each row is present. Editors do not inherit every
 colleague's ordinary production assignment merely because they can review the
@@ -44,21 +74,42 @@ alert with its direct action. Informational **Recent Activity** is no longer a
 Today section; story activity remains available in Story Peek/Workspace, and a
 future Inbox can own newsroom updates without diluting the daily work queue.
 
-On wide screens **My Work** and **Coming Up** form the first row, with **My
-Stories** as a full-width context section underneath. On smaller screens they
-collapse naturally into one column. Empty states use the compact Nova Empty
-treatment and group headings render only when that group contains work.
+### Layout
 
-Today keeps continuous, separated rows: quiet horizontal rules, subtle row
-hover, compact muted section headers and smaller secondary text. Story and task
-headlines remain prominent and clamp at two lines. Real profile photos appear
-where available; missing photos render no placeholder. Overdue deadlines retain
-warning text and color.
+In the Payload newsroom Home's canvas is `bg-muted`, set on Home's `main` only,
+so the white sidebar, header and Cards separate clearly; WordPress keeps
+wp-admin's own canvas. Every section is a Nova `Card` 20px apart: a muted Lucide
+icon, a title and description, and the section's action in the header, with no
+header fill. Top to bottom: the page header (Today, the site date and ISO week,
+the scope toggle), **This week** full width, then **My Work** beside **Desk**
+above **Site** (7fr/4fr) once Home's container is at least 960px wide — a
+tablet in either orientation stacks them — then **Budget** full width, then the
+timezone line and Refresh. Hosts without Desk or Site data simply omit those
+cards. Empty states use the compact Nova Empty treatment and group headings
+render only when that group contains work.
+
+Rows are continuous with quiet top separators (`border-border/50`), subtle hover
+and plain group headings with a count; cards whose list continues end in a
+muted footer. Story and task headlines remain prominent and clamp at two lines.
+Real profile photos appear where available; missing photos render no
+placeholder. Overdue dates retain warning text and color.
 
 Wide task rows still align title/story context beside assignee, priority and
 due-date controls. A container breakpoint moves those controls below the title
-when a row becomes narrow. Shared rows opt into this density only on Today, so
-Story Peek and Collections retain their existing layouts.
+when a row becomes narrow, and a narrow row leaves out the assignee (always the
+reader in My Work; Edit still changes it). Shared rows opt into this density
+only on Today, so Story Peek and Collections retain their existing layouts.
+
+### Newsroom shell
+
+The Payload newsroom's sidebar shows the Weekly Wildcat logo (the paw alone
+when collapsed to icons), open-work counts on Stories, Media and Collections and
+a **Saved views** group (Ready for review, Unassigned, Art needed — built-in
+Stories views) with counts, from `GET /api/byline/navigation-counts`, read as
+the signed-in user. A Stories address names its filters (`workflow=`,
+`needs_review=1`, `visual_status=`…, see `storiesHref` and
+`storiesRouteFilters`), so these links and Home's open Stories already filtered.
+The header shows "N online" beside newsroom presence.
 
 All dates use the WordPress site timezone, including fixed UTC offsets. A
 date-only story deadline remains a calendar date, independent of the browser's
@@ -205,7 +256,8 @@ in `src/home/newsroom-model.test.ts`, `tests/home-resources-regression.php`,
 `tests/integration/home.php`, `tests/e2e/home.spec.ts` and
 `tests/e2e/today-density.spec.ts`. The density spec checks actual row geometry,
 loaded profile photos, contiguous separators, the task drawer, inline editors,
-and keyboard opening at desktop and phone widths. Set `BYLINE_E2E_PROFILE_PHOTO`
+the week strip, Desk, Budget tabs and keyboard opening at desktop and phone
+widths. Set `BYLINE_E2E_PROFILE_PHOTO`
 to a local PNG to use a headshot in visual captures; CI uses a small image fixture.
 
 ```sh

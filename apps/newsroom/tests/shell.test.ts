@@ -151,7 +151,8 @@ describe("Byline shell composition", () => {
   it("lets Home defer Create, Search and toasts to the shell instead of repeating them", () => {
     expect(src("ui/home/NewsroomHome.tsx")).toContain("shell={shell}");
     const home = screens("home/HomeApp.tsx");
-    expect(home).toContain("{shell ? null : <div className=\"flex items-center gap-2\">");
+    // Home's own Search sits only in the no-shell branch of its header.
+    expect(home).toMatch(/\{shell \? null : <>\s*<Button variant="outline" onClick=\{\(\) => setCommandOpen\(true\)\}/);
     expect(home).toContain("{shell ? null : <>");
     expect(home).toContain("<AdminRoot toaster={!props.shell}>");
     expect(home).toContain('shell.openCreate("task", { storyId })');

@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { AgendaItem, AttentionRow, MediaAssignmentRow, ReviewRow, StoryRow } from "@byline/newsroom-screens/home/components/rows";
+import { AttentionRow, MediaAssignmentRow, ReviewRow } from "@byline/newsroom-screens/home/components/rows";
+import { BudgetTable, WeekStrip } from "@byline/newsroom-screens/home/components/sections";
+import { weekAgenda, type HomeBootstrap } from "@byline/newsroom-screens/home/newsroom-model";
 import { ActivityRow, TaskRow } from "@byline/newsroom-screens/story/rows";
 import type { PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 
@@ -36,13 +38,14 @@ function expectDecoded(html: string) {
 }
 
 describe("Home WordPress title entities", () => {
-  it("decodes titles in My Stories and review rows", () => {
-    expectDecoded(renderToStaticMarkup(<StoryRow story={story()} timezone={timezone} now={now} onOpen={vi.fn()} />));
+  it("decodes titles in the Budget and review rows", () => {
+    expectDecoded(renderToStaticMarkup(<BudgetTable stories={[story()]} label="Budget" timezone={timezone} now={now} onOpen={vi.fn()} />));
     expectDecoded(renderToStaticMarkup(<ReviewRow storyId={17} title={encoded} detail="Ready for review" onOpen={vi.fn()} />));
   });
 
-  it("decodes story titles carried through agenda, attention, and production rows", () => {
-    expectDecoded(renderToStaticMarkup(<AgendaItem event={{ id: "deadline-17", storyId: 17, title: encoded, detail: "", label: "Story deadline", date: "2026-10-21", day: "2026-10-21" }} timezone={timezone} onOpen={vi.fn()} />));
+  it("decodes story titles carried through the week strip, attention, and production rows", () => {
+    const data = { currentUser: { id: 7, name: "Caroline" }, timezone, now: now.toISOString(), capabilities: { review: true, createStory: true, uploadMedia: true }, stories: [story()], tasks: [], visualWork: [], appointments: [], activity: [], errors: {}, limits: { stories: 1, tasks: 1, visualWork: 1, appointments: 1, activity: 1 } } satisfies HomeBootstrap;
+    expectDecoded(renderToStaticMarkup(<WeekStrip week={weekAgenda(data, now)} timezone={timezone} onOpen={() => vi.fn()} />));
     expectDecoded(renderToStaticMarkup(<AttentionRow item={{ id: "late-17", storyId: 17, title: encoded, detail: "Story deadline has passed", urgent: true }} onOpen={vi.fn()} />));
     expectDecoded(renderToStaticMarkup(<MediaAssignmentRow media={{ id: "photo", story: { id: 17, title: encoded, editUrl: story().editUrl }, title: "", type: "photo", status: "assigned", assignee: null, dueAt: "2026-10-21", notes: "", attachmentIds: [] }} timezone={timezone} now={now} onOpen={vi.fn()} />));
   });
@@ -56,33 +59,41 @@ describe("Home WordPress title entities", () => {
 describe("Today work queue density", () => {
   it("keeps separated rows and readable clamped headlines in each Home queue", () => {
     const rows = [
-      <StoryRow story={story()} timezone={timezone} now={now} onOpen={vi.fn()} />,
       <ReviewRow storyId={17} title={encoded} detail="Caroline Elrod" onOpen={vi.fn()} />,
-      <AgendaItem event={{ id: "deadline-17", storyId: 17, title: encoded, detail: "", label: "Story deadline", date: "2026-10-21", day: "2026-10-21" }} timezone={timezone} onOpen={vi.fn()} />,
       <AttentionRow item={{ id: "late-17", storyId: 17, title: encoded, detail: "Story deadline has passed", urgent: true }} onOpen={vi.fn()} />,
       <MediaAssignmentRow media={{ id: "photo", story: { id: 17, title: encoded, editUrl: story().editUrl }, title: "Photos", type: "photo", status: "needed", assignee: null, dueAt: "2026-10-21", notes: "", attachmentIds: [] }} timezone={timezone} now={now} onOpen={vi.fn()} />
     ];
     for (const row of rows) {
       const html = renderToStaticMarkup(row);
-      expect(html).toContain("border-b border-border/70");
+      // Quiet top separators; the first row in a group has none.
+      expect(html).toContain("border-t border-border/50");
+      expect(html).toContain("first:border-t-0");
       expect(html).toContain("hover:bg-muted/40");
       expect(html).toContain("w-full line-clamp-2");
       expectDecoded(html);
     }
   });
 
-  it("shows a single writer's profile photo and preserves overdue text and workflow color", () => {
+  it("shows a single writer's profile photo, overdue publication and workflow color in the Budget", () => {
     const writer = { id: 2, name: "Caroline Elrod", avatarUrl: "https://example.test/caroline.png" };
-    const item = { ...story(), authors: [writer], deadline: "2026-10-19" };
-    const html = renderToStaticMarkup(<StoryRow story={item} timezone={timezone} now={now} onOpen={vi.fn()} />);
+    const item = { ...story(), authors: [writer], plannedPublication: "2026-10-19" };
+    const html = renderToStaticMarkup(<BudgetTable stories={[item]} label="Budget" timezone={timezone} now={now} onOpen={vi.fn()} />);
     expect(html).toContain('data-slot="avatar"');
     expect(html).toContain('aria-label="Caroline Elrod"');
     expect(html).toContain("1d overdue");
     expect(html).toContain("text-warning");
     expect(html).toContain('data-work-kind="reporting"');
-    expect(html).toMatch(/aria-label="Debate team’s streak &amp; more Due/);
     expect(renderToStaticMarkup(<ReviewRow storyId={17} title={encoded} detail={writer.name} people={[writer]} onOpen={vi.fn()} />)).toContain('data-slot="avatar"');
-    expect(renderToStaticMarkup(<StoryRow story={story()} timezone={timezone} now={now} onOpen={vi.fn()} />)).not.toContain('data-slot="avatar"');
+    const unpictured = renderToStaticMarkup(<BudgetTable stories={[story()]} label="Budget" timezone={timezone} now={now} onOpen={vi.fn()} />);
+    expect(unpictured).not.toContain('data-slot="avatar"');
+    expect(unpictured).toContain("Not scheduled");
+  });
+
+  it("shows a reporting appointment that needs scheduling as reporting work waiting on the reader", () => {
+    const html = renderToStaticMarkup(<AttentionRow item={{ id: "schedule-a1", storyId: 17, title: "Interview principal", detail: "Window opens Thursday", reason: "scheduling" }} onOpen={vi.fn()} />);
+    expect(html).toContain('data-work-kind="reporting"');
+    expect(html).toContain('data-work-intensity="action"');
+    expect(html).toContain("Needs scheduling");
   });
 
   it("opts Today tasks into density while retaining the same inline editors and default task layout", () => {
@@ -93,8 +104,8 @@ describe("Today work queue density", () => {
       for (const label of ["Complete Finish draft", "Edit Finish draft", "Task assignee", "Task priority: normal", "Change task due date"]) expect(html).toContain(label);
     }
     expect(dense).toContain("@container/work-row");
-    expect(dense).toContain("border-b border-border/70");
+    expect(dense).toContain("border-t border-border/50");
     expect(normal).not.toContain("@container/work-row");
-    expect(normal).not.toContain("border-border/70");
+    expect(normal).not.toContain("border-border/50");
   });
 });

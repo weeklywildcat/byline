@@ -1,5 +1,5 @@
 import type { ContributorEntry, EditorialTask, TaskPatch, TaskPriority } from "../editorial/editorial-model";
-import { dateLabel } from "../home/newsroom-model";
+import { dateLabel, dayDistance } from "../home/newsroom-model";
 import { AssigneePicker, DatePicker, valueSelectTriggerClass } from "../editorial/pickers";
 import { WorkStatusBadge, type WorkIntensity } from "@byline/newsroom-ui/components/work-status-badge";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@byline/newsroom-ui/ui/select";
@@ -43,7 +43,7 @@ export function TaskQuickFields({
     : null;
 
   return <span className={cn("flex min-w-0 flex-wrap items-center gap-1.5", className)} data-task-quick-fields="">
-    {showAssignee && canAssign ? <AssigneePicker
+    {showAssignee && canAssign ? <span className="contents" data-task-assignee=""><AssigneePicker
       people={people}
       value={assignee}
       appearance="value"
@@ -54,7 +54,7 @@ export function TaskQuickFields({
         { assigneeId: Number(person?.id) || null },
         { assigneeId: Number(person?.id) || null, assignee: person ? { id: person.id, kind: person.kind, name: person.name, imageUrl: person.imageUrl } : null }
       )}
-    /> : null}
+    /></span> : null}
     <Select
       items={TASK_PRIORITY_OPTIONS}
       value={task.priority}
@@ -71,6 +71,8 @@ export function TaskQuickFields({
         {TASK_PRIORITY_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
       </SelectContent>
     </Select>
+    {/* Overdue is the one warning: the due date keeps the warning color wherever the task is listed. */}
+    <span className={task.state === "open" && dayDistance(task.dueAt, timezone, now) < 0 ? "contents [&_button]:text-warning" : "contents"} data-task-overdue={task.state === "open" && dayDistance(task.dueAt, timezone, now) < 0 || undefined}>
     <DatePicker
       appearance="value"
       dateOnly
@@ -82,5 +84,6 @@ export function TaskQuickFields({
       displayValue={task.dueAt ? dateLabel(task.dueAt, timezone, now) : undefined}
       onChange={(dueAt) => onUpdate({ dueAt }, { dueAt })}
     />
+    </span>
   </span>;
 }

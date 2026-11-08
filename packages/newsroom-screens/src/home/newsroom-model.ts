@@ -167,50 +167,126 @@ export function myActiveStories(stories: PlanningStory[], userId: number, timezo
     || (b.modifiedAt || "").localeCompare(a.modifiedAt || "") || a.id - b.id);
 }
 
+/** Which of the calendar's fixed categories an agenda entry belongs to: the icon (and hue) it is shown with. */
+export type AgendaCategory = "publication" | "deadline" | "appointment" | "photo";
 /** `label` is the kind of commitment ("Story deadline", "Interview"); `title`/`detail` identify the work. */
-export type AgendaEvent = { href?: string; id: string; storyId: number | null; title: string; detail: string; label: string; date: string; day: string };
-/** `collectionHref`: the host's Collection address, for shared interviews (absent: no link). */
-export function homeAgenda(data: HomeBootstrap, now = new Date(), collectionHref?: CollectionHref): AgendaEvent[] {
+export type AgendaEvent = { href?: string; id: string; storyId: number | null; title: string; detail: string; label: string; date: string; day: string; category: AgendaCategory };
+
+/**
+ * Whose commitments Home shows: the reader's own stories, or every visible
+ * newsroom story. Only an editor (`capabilities.review`) can choose Newsroom;
+ * everyone else always sees their own. Personal work (My Work) is never scoped.
+ */
+export type HomeScope = "mine" | "newsroom";
+export const homeScope = (preferred: HomeScope | null | undefined, canReview: boolean): HomeScope => canReview ? preferred ?? "newsroom" : "mine";
+
+/** Story commitments and confirmed appointments on the site days `inRange` accepts. */
+function collectAgenda(data: HomeBootstrap, inRange: (day: string) => boolean, appointments: HomeAppointment[], scope?: HomeScope, collectionHref?: CollectionHref): AgendaEvent[] {
   const { timezone, currentUser, capabilities } = data;
-  const today = siteDay(now, timezone);
+  const newsroom = capabilities.review && scope !== "mine";
   const entries: AgendaEvent[] = [];
-  const add = (id: string, storyId: number | null, title: string, detail: string, label: string, date?: string | null, href?: string) => {
+  const add = (id: string, storyId: number | null, title: string, detail: string, label: string, category: AgendaCategory, date?: string | null, href?: string) => {
     if (!date) return;
     const day = siteDay(date, timezone);
-    const delta = dayDistance(date, timezone, now);
-    if (day >= today && delta <= 14) entries.push({ id, storyId, title, detail, label, date, day, ...(href ? { href } : {}) });
+    if (day && inRange(day)) entries.push({ id, storyId, title, detail, label, date, day, category, ...(href ? { href } : {}) });
   };
   data.stories.filter(activeStory).forEach((story) => {
-    if (!capabilities.review && !myStory(story, currentUser.id)) return;
-    add(`deadline-${story.id}`, story.id, story.title, "", "Story deadline", story.deadline);
+    if (!newsroom && !myStory(story, currentUser.id)) return;
+    add(`deadline-${story.id}`, story.id, story.title, "", "Story deadline", "deadline", story.deadline);
     const scheduled = story.publicationState.scheduledAt;
-    if (story.publicationState.isScheduled) add(`scheduled-${story.id}`, story.id, story.title, "", "Scheduled publication", scheduled);
+    if (story.publicationState.isScheduled) add(`scheduled-${story.id}`, story.id, story.title, "", "Scheduled publication", "publication", scheduled);
     // One day's publication commitment appears once. The distinct editorial
     // target and actual schedule remain visible in Story Peek.
     if (!scheduled || !story.plannedPublication || siteDay(scheduled, timezone) !== siteDay(story.plannedPublication, timezone)) {
-      add(`planned-${story.id}`, story.id, story.title, "", "Planned publication", story.plannedPublication);
+      add(`planned-${story.id}`, story.id, story.title, "", "Planned publication", "publication", story.plannedPublication);
     }
   });
-  // Only a confirmed, exact appointment has a day and a time. A target window or
-  // an unscheduled idea is work to schedule, not a calendar commitment.
-  upcomingConfirmed(data.appointments || [], timezone, now).forEach((appointment) => add(`appointment-${appointment.id}`, appointment.storyId, appointment.title, appointment.storyTitle, appointmentKindLabels[appointment.kind] || "Appointment", appointment.startAt, appointment.collectionId && collectionHref ? collectionHref(appointment.collectionId, { interviewId: appointment.interviewId }) : undefined));
+  appointments.forEach((appointment) => add(`appointment-${appointment.id}`, appointment.storyId, appointment.title, appointment.storyTitle, appointmentKindLabels[appointment.kind] || "Appointment", appointment.kind === "photo" ? "photo" : "appointment", appointment.startAt, appointment.collectionId && collectionHref ? collectionHref(appointment.collectionId, { interviewId: appointment.interviewId }) : undefined));
   return entries.sort((a, b) => a.day.localeCompare(b.day) || a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
 
-export type AttentionItem = { href?: string; id: string; storyId: number | null; title: string; detail: string; urgent?: boolean };
+/** `collectionHref`: the host's Collection address, for shared interviews (absent: no link). */
+export function homeAgenda(data: HomeBootstrap, now = new Date(), collectionHref?: CollectionHref, scope?: HomeScope): AgendaEvent[] {
+  const today = siteDay(now, data.timezone);
+  const last = addDays(today, 14);
+  // Only a confirmed, exact appointment has a day and a time. A target window or
+  // an unscheduled idea is work to schedule, not a calendar commitment.
+  return collectAgenda(data, (day) => day >= today && day <= last, upcomingConfirmed(data.appointments || [], data.timezone, now), scope, collectionHref);
+}
+
+/** `YYYY-MM-DD` plus whole days, as a calendar date (never an instant). */
+export function addDays(day: string, days: number): string {
+  const date = new Date(`${day}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** 0 (Sunday) to 6 (Saturday) for a site day. */
+export const weekdayOf = (day: string) => new Date(`${day}T12:00:00Z`).getUTCDay();
+
+/** The ISO 8601 week number of a site day ("Week 45"). */
+export function isoWeek(day: string): number {
+  const date = new Date(`${day}T12:00:00Z`);
+  // The ISO week is the one holding that week's Thursday.
+  date.setUTCDate(date.getUTCDate() + 3 - ((date.getUTCDay() + 6) % 7));
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4, 12));
+  firstThursday.setUTCDate(firstThursday.getUTCDate() + 3 - ((firstThursday.getUTCDay() + 6) % 7));
+  return 1 + Math.round((date.getTime() - firstThursday.getTime()) / (7 * DAY));
+}
+
+export type WeekAgendaDay = {
+  day: string;
+  isToday: boolean;
+  isPast: boolean;
+  /** Monday to Friday: a day the newsroom expects to publish. */
+  isWeekday: boolean;
+  events: AgendaEvent[];
+  /** Planned or scheduled publications that day. */
+  toPublish: number;
+  /** A weekday, today or later, with no planned or scheduled publication. */
+  nothingPlanned: boolean;
+};
+
+export type WeekAgenda = { start: string; end: string; days: WeekAgendaDay[]; nextWeekCount: number };
+
+/**
+ * One site week, Sunday to Saturday, with Home's commitments bucketed by site
+ * day. `offset` moves whole weeks from the current one. Confirmed appointments
+ * earlier this week still show on their day.
+ */
+export function weekAgenda(data: HomeBootstrap, now = new Date(), scope?: HomeScope, options: { offset?: number; collectionHref?: CollectionHref } = {}): WeekAgenda {
+  const { timezone } = data;
+  const today = siteDay(now, timezone);
+  const start = addDays(today, -weekdayOf(today) + 7 * (options.offset ?? 0));
+  const end = addDays(start, 6);
+  const nextEnd = addDays(end, 7);
+  const confirmed = (data.appointments || []).filter((a) => a.status === "confirmed" && a.scheduleMode === "exact" && a.startAt);
+  const events = collectAgenda(data, (day) => day >= start && day <= nextEnd, confirmed, scope, options.collectionHref);
+  const days = Array.from({ length: 7 }, (_, index): WeekAgendaDay => {
+    const day = addDays(start, index);
+    const dayEvents = events.filter((event) => event.day === day);
+    const toPublish = dayEvents.filter((event) => event.category === "publication").length;
+    const weekday = index > 0 && index < 6;
+    return { day, isToday: day === today, isPast: day < today, isWeekday: weekday, events: dayEvents, toPublish, nothingPlanned: weekday && day >= today && toPublish === 0 };
+  });
+  return { start, end, days, nextWeekCount: events.filter((event) => event.day > end).length };
+}
+
+/** `reason`: why it needs attention, so a row can say so with the right badge. */
+export type AttentionItem = { href?: string; id: string; storyId: number | null; title: string; detail: string; urgent?: boolean; reason?: "late-story" | "scheduling" | "unassigned-production" };
 export function waitingForMe(data: HomeBootstrap, now = new Date(), collectionHref?: CollectionHref): AttentionItem[] {
   const items: AttentionItem[] = [];
   // Ordinary tasks are already first-class My Work items. These attention signals
   // are reserved for decisions, assignment or scheduling actions instead of
   // duplicating the same overdue task as a second kind of work.
-  data.stories.filter((s) => activeStory(s) && myStory(s, data.currentUser.id) && dayDistance(s.deadline, data.timezone, now) < 0).slice(0, 2).forEach((s) => items.push({ id: `late-story-${s.id}`, storyId: s.id, title: s.title, detail: "Story deadline has passed", urgent: true }));
+  data.stories.filter((s) => activeStory(s) && myStory(s, data.currentUser.id) && dayDistance(s.deadline, data.timezone, now) < 0).slice(0, 2).forEach((s) => items.push({ id: `late-story-${s.id}`, storyId: s.id, title: s.title, detail: "Story deadline has passed", urgent: true, reason: "late-story" }));
   // A reporting appointment whose target window is about to open, is open, or only just lapsed.
   // An unscheduled idea or a far-off window never appears here.
   (data.appointments || []).flatMap((a) => { const need = schedulingNeed(a, data.timezone, now); return need ? [{ a, need }] : []; })
     .sort((x, y) => Number(y.need.urgent) - Number(x.need.urgent) || (x.a.windowStart || "").localeCompare(y.a.windowStart || "") || x.a.id.localeCompare(y.a.id)).slice(0, 2)
-    .forEach(({ a, need }) => items.push({ id: `schedule-${a.id}`, storyId: a.storyId, title: a.title, detail: need.label, urgent: need.urgent, ...(a.collectionId && collectionHref ? { href: collectionHref(a.collectionId, { interviewId: a.interviewId }) } : {}) }));
+    .forEach(({ a, need }) => items.push({ id: `schedule-${a.id}`, storyId: a.storyId, title: a.title, detail: need.label, urgent: need.urgent, reason: "scheduling", ...(a.collectionId && collectionHref ? { href: collectionHref(a.collectionId, { interviewId: a.interviewId }) } : {}) }));
   if (data.capabilities.review) {
-    data.visualWork.filter((v) => !v.assignee && v.status === "needed" && dayDistance(v.dueAt, data.timezone, now) <= 1).slice(0, 2).forEach((v) => items.push({ id: `unassigned-${v.story.id}-${v.id}`, storyId: v.story.id, title: mediaAssignmentTitle(v), detail: `${v.story.title} · urgent visual work needs an assignee`, urgent: true }));
+    data.visualWork.filter((v) => !v.assignee && v.status === "needed" && dayDistance(v.dueAt, data.timezone, now) <= 1).slice(0, 2).forEach((v) => items.push({ id: `unassigned-${v.story.id}-${v.id}`, storyId: v.story.id, title: mediaAssignmentTitle(v), detail: `${v.story.title} · urgent visual work needs an assignee`, urgent: true, reason: "unassigned-production" }));
   }
   // Urgent items first (stable), so a few scheduling nudges cannot push other decision work out of the bound.
   return [...items.filter((i) => i.urgent), ...items.filter((i) => !i.urgent)].slice(0, 5);

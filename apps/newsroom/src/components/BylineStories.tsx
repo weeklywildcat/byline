@@ -2,6 +2,7 @@ import { DefaultTemplate } from "@payloadcms/next/templates";
 import { Gutter } from "@payloadcms/ui";
 import type { AdminViewServerProps } from "payload";
 import { requestUser } from "../access/user";
+import { storiesRouteFilters } from "@byline/newsroom-screens/planning/planning-api";
 import { NewsroomStories } from "../ui/stories/NewsroomStories";
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
@@ -16,16 +17,20 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
 export function BylineStories({ initPageResult, params, searchParams }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult;
   const user = requestUser(req);
-  // `coverage=` was the earlier name of the Collection scope; still accepted at the boundary.
-  const collection = Number(first(searchParams?.collection) ?? first(searchParams?.coverage));
+  // The address names its filters (`workflow=`, `needs_review=1`, `collection=`…): Home and the sidebar link views this way.
+  const routeParams = new URLSearchParams();
+  Object.entries(searchParams ?? {}).forEach(([key, value]) => { const single = first(value); if (single !== undefined) routeParams.set(key, single); });
+  const initialFilters = storiesRouteFilters(routeParams);
   // Payload leaves custom root views bare; its default template brings the Byline shell (Nav, header).
   return (
     <DefaultTemplate i18n={req.i18n} locale={locale} params={params} payload={req.payload} permissions={permissions} req={req} searchParams={searchParams} user={req.user ?? undefined} visibleEntities={visibleEntities}>
       {user ? (
         <NewsroomStories
+          // A sidebar view link while Stories is open is a new address with new filters: start from them.
+          key={JSON.stringify(initialFilters)}
           currentUserId={Number(user.id)}
           view={first(searchParams?.view)}
-          initialFilters={{ mine: first(searchParams?.mine) === "1", ...(Number.isSafeInteger(collection) && collection > 0 ? { collectionId: collection } : {}) }}
+          initialFilters={initialFilters}
         />
       ) : (
         <Gutter>
