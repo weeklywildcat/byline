@@ -20,7 +20,8 @@ const readinessKey = (query: string) => ["byline", "story-media-readiness", quer
 /**
  * The publication readiness of the Media this Story's form references, from
  * the same server rule Publish enforces. Queried only when the set of Media
- * changes (a form-state selector, never on keystrokes), polled modestly while
+ * changes, or when a story-specific alt override crosses empty/non-empty.
+ * Ordinary text typing leaves the query stable. It is polled modestly while
  * something prepares, and re-checked right before Publish.
  */
 export function useStoryMediaReadiness(enabled: boolean) {
