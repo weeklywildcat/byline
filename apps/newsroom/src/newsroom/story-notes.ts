@@ -4,6 +4,7 @@ import { APIError, commitTransaction, initTransaction, killTransaction } from "p
 import { scopeManages, scopeParticipates, storyScope } from "../access/story-context";
 import { relationId, sameId } from "../access/user";
 import { drizzleFor } from "../publication-media/state";
+import { userAvatarUrls } from "./portraits";
 import type { ScreenContext } from "./screen-models";
 
 const read = (ctx: ScreenContext) => ({ req: ctx.req, overrideAccess: false as const, depth: 0 });
@@ -33,9 +34,13 @@ export async function storyNotes(ctx: ScreenContext, id: number, resolved: boole
     payload.find({ collection: "story-notes", where: { and: [{ story: { equals: id } }, { resolved: resolved ? { equals: true } : { not_equals: true } }] }, limit: 15, page, sort: "-updatedAt", ...read(ctx) })
   ]);
   const ids = [...new Set(notes.docs.flatMap((note) => [note.author, ...(note.replies ?? []).map((reply) => reply.author)]).map(relationId).filter((actor) => actor !== null))];
-  const users = ids.length ? (await payload.find({ collection: "users", where: { id: { in: ids } }, select: { name: true }, pagination: false, ...read(ctx) })).docs : [];
+  const users = ids.length ? (await payload.find({ collection: "users", where: { id: { in: ids } }, select: { name: true, linkedPerson: true }, pagination: false, ...read(ctx) })).docs : [];
   const names = new Map(users.map((user) => [user.id, user.name]));
-  const author = (id: unknown) => ({ id: Number(relationId(id)) || 0, name: names.get(Number(relationId(id))) ?? "Former newsroom member" });
+  const avatars = await userAvatarUrls(ctx, users);
+  const author = (id: unknown) => {
+    const actor = Number(relationId(id)) || 0;
+    return { id: actor, name: names.get(actor) ?? "Former newsroom member", avatarUrl: avatars.get(actor) ?? null };
+  };
   return {
     summary, hasNextPage: notes.hasNextPage,
     threads: notes.docs.map((note) => ({

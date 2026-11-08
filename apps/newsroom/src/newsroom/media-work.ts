@@ -3,7 +3,7 @@ import { mediaMetadataGaps } from "@byline/newsroom-screens/media/media-library-
 import { atLeast, relationIds } from "../access/user";
 import type { Media, ProductionAssignment } from "../payload-types";
 import { libraryAsset } from "./media-library";
-import { loadPeople, readableStories, userPerson, type ScreenContext } from "./screen-models";
+import { loadPeople, readableStories, userAvatar, userPerson, type ScreenContext } from "./screen-models";
 
 /**
  * Media Work (`GET /api/byline/media/work`): the Payload side of the shared
@@ -89,7 +89,7 @@ export async function mediaWork(ctx: ScreenContext): Promise<MediaDeskResponse> 
     requests: [],
     assignments: result,
     timezone: ctx.timeZone,
-    assignees: [...people.users.values()].map((user) => ({ id: user.id, name: user.name, kind: "user" as const, avatarUrl: null })),
+    assignees: [...people.users.values()].map((user) => ({ id: user.id, name: user.name, kind: "user" as const, avatarUrl: userAvatar(people, user.id) })),
     capabilities: { canAssign: editor, canManageMedia: true }
   };
 }

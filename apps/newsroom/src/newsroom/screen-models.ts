@@ -22,6 +22,7 @@ import { effectiveWorkflow, workflowLabel } from "../domain/workflow";
 import type { Appointment, CollectionInterview, Media, Person, ProductionAssignment, Section, Source, Story, StoryPlan, Task, User } from "../payload-types";
 import { scheduledPublicationsForStories } from "./scheduled-publication";
 import { collectionNames } from "./collections";
+import { personAvatarUrls } from "./portraits";
 import { interviewAppointment } from "./schedule";
 
 /**
@@ -61,15 +62,17 @@ export type People = {
   users: Map<string, Pick<User, "id" | "name" | "role" | "linkedPerson">>;
   personToUser: Map<string, number>;
   persons: Map<string, Pick<Person, "id" | "name" | "slug" | "newsroomRole" | "status">>;
+  /** Person id → portrait URL, only for people the viewer can see a picture of. */
+  avatars: Map<number, string>;
 };
 
 export async function loadPeople(ctx: ScreenContext): Promise<People> {
   const [users, persons] = await Promise.all([
     // Everyone, never a first page: a missing account would silently drop someone's name from a byline.
     ctx.req.payload.find({ collection: "users", where: { enabled: { equals: true } }, depth: 0, pagination: false, sort: "name", select: { name: true, role: true, linkedPerson: true }, ...asUser(ctx) }),
-    ctx.req.payload.find({ collection: "people", depth: 0, pagination: false, sort: "name", select: { name: true, slug: true, newsroomRole: true, status: true }, ...asUser(ctx) })
+    ctx.req.payload.find({ collection: "people", depth: 0, pagination: false, sort: "name", select: { name: true, slug: true, newsroomRole: true, status: true, portrait: true }, ...asUser(ctx) })
   ]);
-  const people: People = { users: new Map(), personToUser: new Map(), persons: new Map() };
+  const people: People = { users: new Map(), personToUser: new Map(), persons: new Map(), avatars: await personAvatarUrls(ctx, persons.docs) };
   for (const user of users.docs) {
     people.users.set(String(user.id), user);
     const person = relationId(user.linkedPerson);
@@ -79,9 +82,15 @@ export async function loadPeople(ctx: ScreenContext): Promise<People> {
   return people;
 }
 
+/** The portrait of an account's linked byline person, when there is one to show. */
+export function userAvatar(people: People, userId: unknown): string | null {
+  const person = relationId(people.users.get(String(relationId(userId)))?.linkedPerson);
+  return person === null ? null : people.avatars.get(Number(person)) ?? null;
+}
+
 export function userPerson(people: People, userId: unknown): PlanningPerson | null {
   const user = people.users.get(String(relationId(userId)));
-  return user ? { id: user.id, name: user.name, kind: "user", avatarUrl: null } : null;
+  return user ? { id: user.id, name: user.name, kind: "user", avatarUrl: userAvatar(people, user.id) } : null;
 }
 
 /** A byline person as the screens' contributor entry (account-backed or guest). */
@@ -92,9 +101,11 @@ export function contributorEntry(people: People, personId: unknown, order = 0): 
   const userId = people.personToUser.get(String(id));
   const name = person?.name ?? people.users.get(String(userId))?.name;
   if (!name) return null;
+  const avatar = people.avatars.get(Number(id));
+  const imageUrl = avatar ? { imageUrl: avatar } : {};
   return userId !== undefined
-    ? { id: userId, kind: "user", name, role: person?.newsroomRole ?? undefined, slug: person?.slug, order }
-    : { id: Number(id), kind: "guest", name, role: person?.newsroomRole ?? undefined, slug: person?.slug, status: person?.status, order };
+    ? { id: userId, kind: "user", name, role: person?.newsroomRole ?? undefined, slug: person?.slug, order, ...imageUrl }
+    : { id: Number(id), kind: "guest", name, role: person?.newsroomRole ?? undefined, slug: person?.slug, status: person?.status, order, ...imageUrl };
 }
 
 /** Back from a contributor entry to the person on the byline. */
@@ -105,8 +116,11 @@ export function personIdFor(people: People, entry: Pick<ContributorEntry, "id" |
 }
 
 /** Everyone who can be given work: enabled accounts. */
-function assignable(people: People): ContributorEntry[] {
-  return [...people.users.values()].map((user, order) => ({ id: user.id, kind: "user" as const, name: user.name, order }));
+export function assignable(people: People): ContributorEntry[] {
+  return [...people.users.values()].map((user, order) => {
+    const imageUrl = userAvatar(people, user.id);
+    return { id: user.id, kind: "user" as const, name: user.name, order, ...(imageUrl ? { imageUrl } : {}) };
+  });
 }
 
 /* -------------------------------------------------------------- records */
@@ -144,17 +158,18 @@ export function assigneeList(people: People, value: unknown) {
   return relationIds(value)
     .map((id) => people.users.get(String(id)))
     .filter((user): user is NonNullable<typeof user> => Boolean(user))
-    .map((user) => ({ id: user.id, name: user.name }));
+    .map((user) => ({ id: user.id, name: user.name, avatarUrl: userAvatar(people, user.id) }));
 }
 
 export function editorialTask(people: People, task: Task): EditorialTask {
   const assigneeId = relationIds(task.assignees)[0];
   const assignee = assigneeId !== undefined ? people.users.get(String(assigneeId)) : undefined;
+  const imageUrl = assignee ? userAvatar(people, assignee.id) : null;
   return {
     id: task.id,
     title: task.title,
     state: task.state === "completed" ? "completed" : "open",
-    assignee: assignee ? { id: assignee.id, kind: "user", name: assignee.name } : null,
+    assignee: assignee ? { id: assignee.id, kind: "user", name: assignee.name, ...(imageUrl ? { imageUrl } : {}) } : null,
     assigneeId: assignee ? assignee.id : null,
     dueAt: task.due ?? null,
     priority: (task.priority ?? "normal") as EditorialTask["priority"],
@@ -296,7 +311,7 @@ export function planningStory(ctx: ScreenContext, people: People, story: Story, 
   const authors = relationIds(story.contributors)
     .map((id, order) => contributorEntry(people, id, order))
     .filter((entry): entry is ContributorEntry => entry !== null)
-    .map((entry) => ({ id: Number(entry.id), name: entry.name, kind: entry.kind }));
+    .map((entry) => ({ id: Number(entry.id), name: entry.name, kind: entry.kind, ...(entry.imageUrl ? { avatarUrl: entry.imageUrl } : {}) }));
   const writer = userPerson(people, plan?.createdBy) ?? authors.find((author) => author.kind === "user") ?? null;
   const primary = primaryProduction(extras.production);
   const section = story.section && typeof story.section === "object" ? (story.section as Section).name : null;

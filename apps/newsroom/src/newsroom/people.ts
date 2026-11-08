@@ -21,12 +21,12 @@ import { atLeast, relationId, sameId } from "../access/user";
 import { isSlug } from "../domain/slug";
 import { lockPersonRow } from "../db/people";
 import { workflowLabel } from "../domain/workflow";
-import type { Media, Person, User } from "../payload-types";
+import type { Person, User } from "../payload-types";
 import { saveAccount } from "./accounts";
+import { portraits, type PortraitDoc } from "./portraits";
 import { readableStories, type ScreenContext } from "./screen-models";
 
 type ProfileDoc = Omit<Person, "createdAt">;
-type PortraitDoc = Pick<Media, "id" | "mimeType" | "sizes">;
 type AccessDoc = Pick<User, "id" | "email" | "role" | "enabled" | "googleSubject" | "updatedAt" | "linkedPerson">;
 
 const asUser = (ctx: ScreenContext) => ({
@@ -80,28 +80,6 @@ function canOpen(ctx: ScreenContext, id: number) {
     throw new APIError("You can only edit your own public profile.", 403);
 }
 
-export async function portraits(
-  ctx: ScreenContext,
-  docs: Pick<ProfileDoc, "portrait">[],
-): Promise<Map<number, PortraitDoc>> {
-  const ids = [
-    ...new Set(
-      docs
-        .map((doc) => Number(relationId(doc.portrait)))
-        .filter((id) => id > 0),
-    ),
-  ];
-  if (!ids.length) return new Map();
-  const found = await ctx.req.payload.find({
-    collection: "media",
-    where: { id: { in: ids } },
-    select: { sizes: true, mimeType: true },
-    depth: 0,
-    pagination: false,
-    ...asUser(ctx),
-  });
-  return new Map(found.docs.map((doc) => [doc.id, doc]));
-}
 function row(doc: ProfileDoc, media: Map<number, PortraitDoc>, access?: Map<number, AccessDoc>): PersonRow {
   const id = Number(relationId(doc.portrait));
   const asset = media.get(id);
