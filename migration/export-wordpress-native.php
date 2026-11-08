@@ -325,6 +325,26 @@ function ww_block_media_fallback(array $block, int $id): ?array {
     }
     if (!$candidates) return null;
 
+    $inlineDataBase64 = '';
+    $inlineBytes = 0;
+    $uploads = wp_get_upload_dir();
+    $uploadBase = isset($uploads['basedir']) ? realpath((string) $uploads['basedir']) : false;
+    if ($uploadBase) {
+        foreach ($candidates as $candidateUrl) {
+            $candidatePath = rawurldecode((string) parse_url($candidateUrl, PHP_URL_PATH));
+            if (!preg_match('~/wp-content/uploads/(.+)$~', $candidatePath, $match)) continue;
+            $local = realpath($uploadBase . DIRECTORY_SEPARATOR . ltrim($match[1], '/'));
+            if (!$local || strpos($local, $uploadBase . DIRECTORY_SEPARATOR) !== 0 || !is_file($local)) continue;
+            $size = filesize($local);
+            if ($size === false || $size <= 0 || $size > 50 * 1024 * 1024) continue;
+            $bytes = file_get_contents($local);
+            if ($bytes === false || strlen($bytes) !== $size) continue;
+            $inlineDataBase64 = base64_encode($bytes);
+            $inlineBytes = $size;
+            break;
+        }
+    }
+
     $url = $candidates[0];
     $path = (string) parse_url($url, PHP_URL_PATH);
     $filename = basename($path);
@@ -339,6 +359,8 @@ function ww_block_media_fallback(array $block, int $id): ?array {
         'id' => $id,
         'url' => $url,
         'candidateUrls' => $candidates,
+        'inlineDataBase64' => $inlineDataBase64 !== '' ? $inlineDataBase64 : null,
+        'inlineBytes' => $inlineBytes ?: null,
         'filename' => $filename !== '' ? $filename : ('wordpress-media-' . $id),
         'mimeType' => $mime,
         'alt' => ww_text($attrs['alt'] ?? ''),
@@ -558,7 +580,9 @@ foreach (array_keys($attachmentIds) as $id) {
     if ($attachment) {
         $attachments[] = $attachment;
         if (!empty($attachment['recoveredFromBlock'])) {
-            $warnings[] = "Attachment {$id} is missing from the WordPress Media Library; recovered from its Gutenberg block URL.";
+            $warnings[] = !empty($attachment['inlineDataBase64'])
+                ? "Attachment {$id} is missing from the WordPress Media Library; recovered from the WordPress uploads filesystem."
+                : "Attachment {$id} is missing from the WordPress Media Library; only Gutenberg URL candidates remain.";
         }
     } else {
         $errors[] = "Attachment {$id} is referenced by migrated content but has no WordPress attachment record or recoverable block URL.";
