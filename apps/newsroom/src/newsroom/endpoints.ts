@@ -1,5 +1,7 @@
 import { storyDistribution } from "./story-distribution";
 import { changeStoryNote, storyNotePreviews, storyNotes } from "./story-notes";
+import { inbox, markNotificationsRead } from "./notifications";
+import { changeLiveUpdate, deleteLiveUpdate, liveDesk, postLiveUpdate, publicLiveFeed } from "./live-coverage";
 import { contentHealth, healthDisposition, startHealthScan } from "./health/content-health";
 import { pageContext } from "./site-pages";
 import { publicationSettings, savePublicationSettings, saveSiteRow, sectionImpact, siteGroup, siteRows } from "./site";
@@ -77,7 +79,7 @@ import { peopleQuery, type NewPerson, type PersonAccessInput, type PersonPatch }
  * user (`overrideAccess: false`), so collection and field access decide.
  */
 
-const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
+const json = (body: unknown, status = 200, headers: Record<string, string> = { "Cache-Control": "private, no-store" }) => Response.json(body, { status, headers });
 
 function handle(run: (ctx: ScreenContext, req: PayloadRequest) => Promise<unknown>): PayloadHandler {
   return async (req) => {
@@ -517,6 +519,28 @@ const collectionEndpoints: Endpoint[] = [
 
 export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/distribution", method: "get", handler: handle((ctx, req) => storyDistribution(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/live", method: "get", handler: handle((ctx, req) => liveDesk(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/live", method: "post", handler: handle(async (ctx, req) => postLiveUpdate(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/live/:update", method: "patch", handler: handle(async (ctx, req) => changeLiveUpdate(ctx, idParam(req), idParam(req, "update"), await body(req))) },
+  { path: "/byline/stories/:id/live/:update", method: "delete", handler: handle((ctx, req) => deleteLiveUpdate(ctx, idParam(req), idParam(req, "update"))) },
+  // Public, read-only, published-only: what the Worker serves at /api/live/<id> between builds. No credentials, no cookies.
+  { path: "/byline/live/:id", method: "get", handler: async (req) => {
+    try {
+      const id = Number((req.routeParams as { id?: string } | undefined)?.id);
+      const feed = Number.isSafeInteger(id) && id > 0 ? await publicLiveFeed(req.payload, id) : null;
+      return feed ? json(feed, 200, { "Cache-Control": "no-store" }) : json({ message: "Coverage not found." }, 404, { "Cache-Control": "no-store" });
+    } catch (error) {
+      req.payload.logger.error({ err: error, msg: "Public live feed failed" });
+      return json({ message: "Live coverage is unavailable." }, 502, { "Cache-Control": "no-store" });
+    }
+  } },
+  { path: "/byline/notifications", method: "get", handler: handle((ctx, req) => inbox(ctx, { unreadOnly: req.searchParams.get("unread") === "1", limit: Number(req.searchParams.get("limit")) || 20 })) },
+  { path: "/byline/notifications/read", method: "post", handler: handle(async (ctx, req) => {
+    const input = await body<{ ids?: unknown; all?: unknown }>(req);
+    if (input.all === true) return markNotificationsRead(ctx, "all");
+    if (!Array.isArray(input.ids)) throw new APIError("Choose notifications to mark read.", 400);
+    return markNotificationsRead(ctx, input.ids.map(Number));
+  }) },
   { path: "/byline/stories/:id/notes", method: "get", handler: handle((ctx, req) => storyNotes(ctx, idParam(req), req.searchParams.get("resolved") === "1", Math.max(1, Number(req.searchParams.get("page")) || 1))) },
   { path: "/byline/stories/:id/notes/previews", method: "get", handler: handle((ctx, req) => storyNotePreviews(ctx, idParam(req))) },
   { path: "/byline/stories/:id/notes", method: "post", handler: handle(async (ctx, req) => changeStoryNote(ctx, idParam(req), null, await body(req))) },

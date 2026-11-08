@@ -14,6 +14,7 @@ import {
 } from "../access/workspace-records";
 import { atLeast, newsroomUser, relationChanged, relationId, relationIds, sameId } from "../access/user";
 import { normalizeAppointmentTiming, TimingError } from "../domain/schedule";
+import { notifyAfterAppointmentChange, notifyAfterProductionChange, notifyAfterTaskChange } from "../newsroom/notification-hooks";
 import {
   APPOINTMENT_KIND_OPTIONS,
   APPOINTMENT_STATUS_OPTIONS,
@@ -118,7 +119,7 @@ export const Tasks: CollectionConfig = {
     delete: ({ req }) => taskWhere(req, false),
     create: createTask
   },
-  hooks: { afterChange: [activityFor("task")], beforeChange: [taskContext, (args) => assignedWorkGuard(args, (scope, storyId, record) => taskManager(scope, storyId, record, args.req))] },
+  hooks: { afterChange: [activityFor("task"), notifyAfterTaskChange], beforeChange: [taskContext, (args) => assignedWorkGuard(args, (scope, storyId, record) => taskManager(scope, storyId, record, args.req))] },
   fields: [
     { ...storyField, required: false } as Field,
     { name: "collection", type: "relationship", relationTo: "collections", index: true, access: { update: () => false } },
@@ -190,7 +191,7 @@ export const Appointments: CollectionConfig = {
   admin: { ...shared.admin, useAsTitle: "title", defaultColumns: ["title", "story", "scheduleMode", "startAt", "status"] },
   // Participants who hold only assigned work may create appointments for themselves.
   access: { ...shared.access, create: createStoryRecords({ allowParticipants: true }) },
-  hooks: { afterChange: [activityFor("appointment")], beforeChange: [guardAssignedWork, normalizeTiming, limitPerStory("appointments", LIMITS.appointmentsPerStory, "appointments")] },
+  hooks: { afterChange: [activityFor("appointment"), notifyAfterAppointmentChange], beforeChange: [guardAssignedWork, normalizeTiming, limitPerStory("appointments", LIMITS.appointmentsPerStory, "appointments")] },
   fields: [
     storyField,
     { name: "title", type: "text", required: true, maxLength: LIMITS.line },
@@ -220,7 +221,7 @@ export const ProductionAssignments: CollectionConfig = {
   ...shared,
   admin: { ...shared.admin, useAsTitle: "title", defaultColumns: ["title", "type", "story", "deadline", "status"] },
   access: { ...shared.access, create: createStoryRecords({ allowParticipants: false }) },
-  hooks: { afterChange: [activityFor("production")], beforeChange: [guardAssignedWork, limitPerStory("production-assignments", LIMITS.productionPerStory, "production assignments")] },
+  hooks: { afterChange: [activityFor("production"), notifyAfterProductionChange], beforeChange: [guardAssignedWork, limitPerStory("production-assignments", LIMITS.productionPerStory, "production assignments")] },
   fields: [
     storyField,
     { name: "type", type: "select", required: true, defaultValue: "photo", options: [...PRODUCTION_TYPE_OPTIONS], access: { update: managersOnlyField } },

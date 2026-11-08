@@ -72,6 +72,8 @@ export interface Config {
     'story-activity': StoryActivity;
     'story-notes': StoryNote;
     'content-health': ContentHealth;
+    'video-facts': VideoFact;
+    notifications: Notification;
     people: Person;
     media: Media;
     sections: Section;
@@ -114,6 +116,8 @@ export interface Config {
     'story-activity': StoryActivitySelect<false> | StoryActivitySelect<true>;
     'story-notes': StoryNotesSelect<false> | StoryNotesSelect<true>;
     'content-health': ContentHealthSelect<false> | ContentHealthSelect<true>;
+    'video-facts': VideoFactsSelect<false> | VideoFactsSelect<true>;
+    notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     people: PeopleSelect<false> | PeopleSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     sections: SectionsSelect<false> | SectionsSelect<true>;
@@ -145,9 +149,11 @@ export interface Config {
   fallbackLocale: null;
   globals: {
     publication: Publication;
+    'payload-jobs-stats': PayloadJobsStat;
   };
   globalsSelect: {
     publication: PublicationSelect<false> | PublicationSelect<true>;
+    'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
   };
   locale: null;
   widgets: {
@@ -160,6 +166,9 @@ export interface Config {
       'prepare-public-snapshot': TaskPreparePublicSnapshot;
       'advance-public-revision': TaskAdvancePublicRevision;
       'scan-content-health': TaskScanContentHealth;
+      'refresh-video-facts': TaskRefreshVideoFacts;
+      'deliver-notification': TaskDeliverNotification;
+      'send-due-digest': TaskSendDueDigest;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -622,6 +631,66 @@ export interface ContentHealth {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "video-facts".
+ */
+export interface VideoFact {
+  id: number;
+  videoId: string;
+  status: 'found' | 'unavailable';
+  data?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  fetchedAt: string;
+  attempts?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notifications".
+ */
+export interface Notification {
+  id: number;
+  recipient: number | User;
+  kind:
+    | 'storyAssignments'
+    | 'readyForReview'
+    | 'storyReturned'
+    | 'mediaAssignments'
+    | 'highPriorityTasks'
+    | 'appointments'
+    | 'publishingFailures'
+    | 'dueDigest';
+  story?: (number | null) | Story;
+  actor?: (number | null) | User;
+  detail?: string | null;
+  data?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  dedupeKey?: string | null;
+  /**
+   * Shown in the recipient's Byline inbox.
+   */
+  inbox?: boolean | null;
+  readAt?: string | null;
+  emailState?: ('none' | 'pending' | 'sent' | 'failed' | 'skipped') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "collections".
  */
 export interface Collection {
@@ -1040,6 +1109,9 @@ export interface PayloadJob {
           | 'prepare-public-snapshot'
           | 'advance-public-revision'
           | 'scan-content-health'
+          | 'refresh-video-facts'
+          | 'deliver-notification'
+          | 'send-due-digest'
           | 'schedulePublish';
         taskID: string;
         input?:
@@ -1080,6 +1152,9 @@ export interface PayloadJob {
         | 'prepare-public-snapshot'
         | 'advance-public-revision'
         | 'scan-content-health'
+        | 'refresh-video-facts'
+        | 'deliver-notification'
+        | 'send-due-digest'
         | 'schedulePublish'
       )
     | null;
@@ -1090,6 +1165,15 @@ export interface PayloadJob {
    * Used for concurrency control. Jobs with the same key are subject to exclusive/supersedes rules.
    */
   concurrencyKey?: string | null;
+  meta?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1336,6 +1420,37 @@ export interface ContentHealthSelect<T extends boolean = true> {
   key?: T;
   kind?: T;
   data?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "video-facts_select".
+ */
+export interface VideoFactsSelect<T extends boolean = true> {
+  videoId?: T;
+  status?: T;
+  data?: T;
+  fetchedAt?: T;
+  attempts?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notifications_select".
+ */
+export interface NotificationsSelect<T extends boolean = true> {
+  recipient?: T;
+  kind?: T;
+  story?: T;
+  actor?: T;
+  detail?: T;
+  data?: T;
+  dedupeKey?: T;
+  inbox?: T;
+  readAt?: T;
+  emailState?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1772,6 +1887,7 @@ export interface PayloadJobsSelect<T extends boolean = true> {
   waitUntil?: T;
   processing?: T;
   concurrencyKey?: T;
+  meta?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1948,6 +2064,24 @@ export interface Publication {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs-stats".
+ */
+export interface PayloadJobsStat {
+  id: number;
+  stats?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "publication_select".
  */
 export interface PublicationSelect<T extends boolean = true> {
@@ -2085,6 +2219,16 @@ export interface PublicationSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs-stats_select".
+ */
+export interface PayloadJobsStatsSelect<T extends boolean = true> {
+  stats?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "collections_widget".
  */
 export interface CollectionsWidget {
@@ -2142,6 +2286,34 @@ export interface TaskScanContentHealth {
     revision: number;
     storyId?: number | null;
   };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskRefresh-video-facts".
+ */
+export interface TaskRefreshVideoFacts {
+  input: {
+    videoId: string;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskDeliver-notification".
+ */
+export interface TaskDeliverNotification {
+  input: {
+    notificationId: number;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSend-due-digest".
+ */
+export interface TaskSendDueDigest {
+  input?: unknown;
   output?: unknown;
 }
 /**

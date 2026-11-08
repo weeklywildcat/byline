@@ -7,7 +7,7 @@ for maintenance, migration and inspection.
 
 | Records | Editable in Byline | System-owned or deliberately deferred |
 | --- | --- | --- |
-| Stories | Write: headline, deck, kicker, Section, Topics, ordered byline, lead Media and caption, body, format, YouTube URL, presentation, immersive headline position, reporting note and live coverage state (editors). Edit URL: slug and, for editors, first publication instant. History: publication, versions, corrections and copy tools. | IDs, joins, author attribution on versions, timestamps, generated video facts and import provenance are system-owned. Imported HTML stays read-only; reviewed conversion is separate. Live updates themselves use the existing System record UI. |
+| Stories | Write: headline, deck, kicker, Section, Topics, ordered byline, lead Media and caption, body, format, YouTube URL, presentation, immersive headline position, reporting note and live coverage state (editors). Edit URL: slug and, for editors, first publication instant. History: publication, versions, corrections and copy tools. | IDs, joins, author attribution on versions, timestamps, generated video facts and import provenance are system-owned. Imported HTML stays read-only; reviewed conversion is separate. Live updates are posted from the Story's Live tab ([live coverage](live-coverage.md)). |
 | Pages | Site → Pages: title, slug, published parent, summary, prose body, search indexing, native draft, publish/unpublish and schedule; History lists recent versions. | First publication instant and record metadata are system-owned. Comparing or restoring Page versions still uses the native Payload fallback. Code-owned institutional pages and the sports archive keep their existing public routing. |
 | People | People / My profile: name, slug (editors), pronouns, newsroom role, short and long bios, portrait, status, directory/profile visibility, public email and social profiles. Administrators manage that Person's newsroom access, sign-in email and access level from the same Person screen; editors can create guest contributors without creating accounts. | IDs, the underlying auth record/link, Google subject, legacy IDs and timestamps are system-owned. Raw Accounts remain only in System administration as a maintenance fallback. |
 | Media | Library: upload, filename display, alt text, creator, credit, copyright, license, source URL, capture date, folder, focal point and supported crops. | Filename, MIME, dimensions, original and generated files, uploader, hashes, preparation state and revisions are system-owned. Where used scans native article blocks and other known relationships. Imported HTML references and retained versions are not shown in the inspector; retained native Story versions still protect files from deletion. |
@@ -30,6 +30,42 @@ the published headline, deck and URL. No local channel state or delivery
 provider is configured in Payload, so no send, newsletter or delivery controls
 are offered. The legacy shared adapter still has no standalone task list or
 secondary format write; Tasks and Write own those actions.
+
+## Notifications
+
+The bell in the Byline header is each person's inbox and settings. The same
+eight notifications as WordPress, each on by default, in the inbox and by email:
+
+| Notification | Who is told | When |
+| --- | --- | --- |
+| Story assignments | A new story editor; a person added to a byline | The editor or byline actually changes |
+| Ready for review | The story's editor (every editor when none is assigned) | Workflow moves into Editing or Ready, once per review |
+| Story sent back | The story's writers | Editing or Ready returns to Pitch, Assigned, Reporting or Writing |
+| Media assignments | New assignees of a production assignment | Assigned or reassigned |
+| High-priority tasks | Assignees of a High or Urgent task | Newly assigned, or the task becomes High or Urgent |
+| Appointments | New assignees of an appointment | Assigned or reassigned |
+| Publishing failures | Editors and administrators | Public snapshot or media preparation fails for good |
+| Daily due digest | Anyone with something due | 07:00 on the worker clock: open tasks, media work and story deadlines due today or overdue, and today's appointments |
+
+Nobody is notified of their own change, and imports notify nobody. A
+notification stores only references (story, actor, a short detail); headlines
+and names are read when it is shown or sent, and an inbox shows a headline only
+to someone who can read the story. Notifications are private to their recipient
+and never part of a public projection. Read notices are removed after 60 days
+and unread ones after 120.
+
+Each person chooses In Byline and Email per notification in the bell's settings.
+Choices are the account's own Payload Preferences
+(`byline:notifications:preferences:v1`), not a Users field; editors and
+administrators also see Publishing failures. Email is optional: set
+`BYLINE_SMTP_URL` (a nodemailer connection URL) and `BYLINE_EMAIL_FROM`. Without
+them the checkboxes for email are disabled and every notification stays in the
+inbox. A failed send retries three times, then is recorded as failed on the
+notification; delivery never delays a save. The `deliver-notification` and
+`send-due-digest` jobs run on the `maintenance` queue, and the digest is a
+scheduled job, so that worker must run with `--handle-schedules` (the
+`jobs:maintenance` script does) and with `TZ` set to the newsroom timezone for
+the 07:00 digest.
 
 ## Publication and URL changes
 
@@ -67,6 +103,19 @@ reports fields, body validation and publication Media issues; warnings are
 advisory. Content Health is independent published-content maintenance.
 
 ## Operations
+
+Video stories get their YouTube facts (title, thumbnail, duration, upload date)
+from the `refresh-video-facts` job on the `maintenance` queue, queued whenever a
+video Story with a YouTube URL is saved and its video has no facts yet. Facts
+are stored by video ID in the private `video-facts` collection, not on the
+Story, so a lookup never creates a Story version and is shared by every Story
+using the video. Set `BYLINE_YOUTUBE_API_KEY` for duration and upload date;
+without it the job uses YouTube's keyless oEmbed (title and thumbnail only, no
+`VideoObject.duration`). An unknown, private or deleted video is retried up to
+four times, six hours apart, and the Story still renders with its embed. A
+newly learned fact is a public change only when a published Story uses the
+video. Live Preview shows the embed and headline; the duration badge appears
+once published.
 
 Run `npm run jobs:maintenance --workspace @byline/newsroom` alongside the existing
 workers, with access to the same completed snapshot directory. A Content Health

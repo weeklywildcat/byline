@@ -18,8 +18,9 @@ import { useMemo, type FormEvent, type ReactNode } from "react";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
 import { useBylineMediaPicker } from "../media/MediaWorkspaceShell";
 import { useLeaveGuard } from "../shell/navigation";
-import { useSettleAutosave } from "./form";
+import { useSettleAutosave, useStoryField } from "./form";
 import { HistoryTab } from "./HistoryTab";
+import { LiveTab } from "./LiveTab";
 import { StoryNotes } from "./StoryNotes";
 import { StoryHeader } from "./StoryHeader";
 import { WriteTab } from "./WriteTab";
@@ -57,6 +58,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   const { id } = useDocumentInfo();
   const custom = (config.admin?.custom ?? {}) as { newsroomTimeZone?: string };
   const shellQueries = useQueryClient();
+  const liveState = useStoryField<"off" | "live" | "ended">("liveCoverage.state").value ?? "off";
   const context: StoryScreenContext = {
     shellQueries,
     api: config.routes.api,
@@ -91,6 +93,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
             <TabsTrigger value="write">Write</TabsTrigger>
             <TabsTrigger value="plan">Plan</TabsTrigger>
             <TabsTrigger value="production">Production</TabsTrigger>
+            {liveState === "live" || liveState === "ended" ? <TabsTrigger value="live">Live{liveState === "live" ? <span aria-hidden="true" className="ml-1.5 inline-block size-1.5 rounded-full bg-destructive" /> : null}</TabsTrigger> : null}
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
         </div>
@@ -120,6 +123,9 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
           <Workspace storyId={storyId}>
             <MediaSection />
           </Workspace>
+        </TabsContent>
+        <TabsContent value="live" className="mx-auto w-full max-w-5xl px-4 md:px-8">
+          <LiveTab context={context} />
         </TabsContent>
         <TabsContent value="history" className="mx-auto w-full max-w-5xl px-4 md:px-8">
           <HistoryTab context={context} />

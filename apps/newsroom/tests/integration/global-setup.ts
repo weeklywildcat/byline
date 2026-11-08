@@ -9,7 +9,7 @@ import pg from "pg";
  * PostgreSQL the current user can create databases on; databases named after
  * it are dropped and recreated. Never point it at real data.
  */
-export const TEST_DATABASE_SUFFIXES = ["", "_screens", "_planning", "_schedule", "_publication", "_media", "_collections", "_people", "_publication_media", "_migration", "_snapshot", "_presence", "_story_body", "_health"] as const;
+export const TEST_DATABASE_SUFFIXES = ["", "_screens", "_planning", "_schedule", "_publication", "_media", "_collections", "_people", "_publication_media", "_migration", "_snapshot", "_presence", "_story_body", "_health", "_notifications", "_live"] as const;
 
 export default async function setup() {
   const url = new URL(process.env.BYLINE_TEST_DATABASE_URL ?? "postgres://localhost:5432/byline_newsroom_test");

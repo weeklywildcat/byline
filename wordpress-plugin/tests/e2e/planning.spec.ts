@@ -111,7 +111,7 @@ test.describe("Stories board", () => {
     await page.keyboard.press("Escape");
     // The explicit context-menu route itself must still load the real workspace.
     await storyTitle.click({ button: "right" });
-    await page.getByRole("menuitem", { name: "Open workspace" }).click();
+    await page.getByRole("menuitem", { name: "Open story" }).click();
     await page.waitForURL(new RegExp(`page=byline-planning&story=${id}`));
     await expect(page.getByRole("heading", { name: title, exact: true }).first()).toBeVisible();
   });
@@ -139,7 +139,7 @@ test.describe("Stories board", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByRole("button", { name: `${unique} Published`, exact: true })).toBeVisible();
     await page.getByRole("button", { name: `Actions for ${unique} Published` }).click();
-    await expect(page.getByRole("menuitem", { name: "Open workspace" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Open story" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Move to" })).toHaveCount(0);
   });
 
@@ -278,14 +278,14 @@ test.describe("Stories views and saved views", () => {
     await page.goto(storiesUrl + "&view=board");
     await page.getByRole("combobox", { name: "Writer" }).waitFor({ state: "visible" });
     await page.getByRole("searchbox", { name: "Search stories" }).fill("budget");
-    await page.getByRole("button", { name: /Saved view/ }).click();
+    await page.getByRole("button", { name: /^Story view:/ }).click();
     await page.getByRole("menuitem", { name: "Save current view…" }).click();
     const save = page.getByRole("dialog", { name: "Save view" });
     await save.getByLabel("View name").fill(name);
     await save.getByRole("button", { name: "Save view" }).click();
-    await expect(page.getByRole("button", { name: new RegExp(`Saved view: ${name}`) })).toBeVisible();
+    await expect(page.getByRole("button", { name: new RegExp(`^Story view: ${name}$`) })).toBeVisible();
 
-    await page.getByRole("button", { name: /Saved view/ }).click();
+    await page.getByRole("button", { name: /^Story view:/ }).click();
     await page.getByRole("menuitem", { name: "Manage views…" }).click();
     const manage = page.getByRole("dialog", { name: "Manage views" });
     await manage.getByRole("button", { name: `Actions for view ${name}` }).click();
@@ -295,7 +295,7 @@ test.describe("Stories views and saved views", () => {
     await rename.getByRole("button", { name: "Rename" }).click();
     await page.keyboard.press("Escape");
 
-    await page.getByRole("button", { name: /Saved view/ }).click();
+    await page.getByRole("button", { name: /^Story view:/ }).click();
     await page.getByRole("menuitem", { name: "Manage views…" }).click();
     await page.getByRole("dialog", { name: "Manage views" }).getByRole("button", { name: `Actions for view ${name} renamed` }).click();
     await page.getByRole("menuitem", { name: "Delete" }).click();

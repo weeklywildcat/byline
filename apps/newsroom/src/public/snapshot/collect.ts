@@ -5,10 +5,11 @@ import {
 } from "@byline/content";
 import { escapeHtml, type PublicTerm } from "@byline/content/story";
 import type { BylinePublicationConfig } from "@byline/core";
-import { formatVideoDuration, normalizePrimaryVideo, parseYouTubeVideoId, youTubeEmbedUrl } from "@byline/core";
+import { formatVideoDuration, normalizePrimaryVideo, parseYouTubeVideoId, youTubeEmbedUrl, type PrimaryVideo } from "@byline/core";
 import { collectMediaIds, collectReferenceIds, normalizePayloadStoryBody, type NormalizeIssue } from "@byline/editor/normalize";
 import type { Payload } from "payload";
 import { relationIds } from "../../access/user";
+import { videoFactsFor } from "../../newsroom/video-facts";
 import { repositoryInteractivesForServer } from "../../hooks/story-body";
 import type { Story } from "../../payload-types";
 import { publicationConfigFromGlobal, readPublishedPublication } from "../publication-config";
@@ -33,7 +34,7 @@ async function readStories(payload: Payload) {
   return docs.filter((row) => !row.deletedAt).sort((a, b) => Date.parse(b.publishedAt ?? "") - Date.parse(a.publishedAt ?? "") || b.id - a.id);
 }
 
-function collectStoryFacts(row: Omit<Story, "createdAt">, sectionRow: Datasets["sections"][number], topics: Map<number, Datasets["topics"][number]>, people: Map<number, Datasets["people"][number]>, corrections: StoryFacts["corrections"], publication: BylinePublicationConfig): StoryFacts {
+function collectStoryFacts(row: Omit<Story, "createdAt">, sectionRow: Datasets["sections"][number], topics: Map<number, Datasets["topics"][number]>, people: Map<number, Datasets["people"][number]>, corrections: StoryFacts["corrections"], publication: BylinePublicationConfig, videoFacts: Map<string, PrimaryVideo>): StoryFacts {
   const title = text(row.headline);
   const href = publicStoryPath({ slug: row.slug, sectionSlug: sectionRow.slug, publishedAt: row.publishedAt, timeZone: publication.timezone });
   if (!href || !row.publishedAt) throw new PublicSnapshotError("invalid-projection", `Story ${row.id} has no canonical public route.`);
@@ -50,7 +51,8 @@ function collectStoryFacts(row: Omit<Story, "createdAt">, sectionRow: Datasets["
   });
   const videoId = row.format === "video" ? parseYouTubeVideoId(row.video?.url) : null;
   const metadata = row.video?.metadata;
-  const videoMetadata = videoId ? normalizePrimaryVideo({ ...(typeof metadata === "object" && metadata && !Array.isArray(metadata) ? metadata : {}), provider: "youtube", videoId }) : null;
+  // Imported metadata is the floor; the looked-up facts (newsroom/video-facts.ts) win where they exist.
+  const videoMetadata = videoId ? normalizePrimaryVideo({ ...(typeof metadata === "object" && metadata && !Array.isArray(metadata) ? metadata : {}), ...(videoFacts.get(videoId) ?? {}), provider: "youtube", videoId }) : null;
   const primaryVideo = videoMetadata ? { videoId: videoMetadata.videoId, embedUrl: youTubeEmbedUrl(videoMetadata.videoId), title: videoMetadata.title || title, duration: formatVideoDuration(videoMetadata.duration) } : null;
   return {
     id: row.id, slug: row.slug, title, titleHtml: escapeHtml(title), kicker: text(row.kicker), excerptHtml: prose(text(row.deck)),
@@ -92,12 +94,13 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   const rows = storyRows.filter((row) => !hiddenSections.has(id(row.section) ?? -1));
   const storyIds = rows.map((row) => row.id);
   const pollIds = [...new Set(rows.flatMap((row) => row.contentFormat === "legacy-html" ? [] : collectReferenceIds(row.body).polls.map(Number)))];
-  const [people, corrections, collections, polls, liveUpdates] = await Promise.all([
+  const [people, corrections, collections, polls, liveUpdates, videoFacts] = await Promise.all([
     collectPeople(payload, new Set(rows.flatMap((row) => ids(row.contributors)))),
     collectCorrections(payload, storyIds, options.asOf ?? now),
     collectCollections(payload, new Set(storyIds)),
     collectPolls(payload, pollIds, options.asOf ?? now),
-    readLiveUpdates(payload, rows.filter(hasLiveCoverage).map(({ id }) => id))
+    readLiveUpdates(payload, rows.filter(hasLiveCoverage).map(({ id }) => id)),
+    videoFactsFor(payload, rows.flatMap((row) => { const videoId = row.format === "video" ? parseYouTubeVideoId(row.video?.url) : null; return videoId ? [videoId] : []; }))
   ]);
   await options.afterRead?.();
   const personById = new Map(people.map((row) => [row.id, row]));
@@ -110,7 +113,7 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   const facts = new Map(rows.map((row) => {
     const section = sectionById.get(id(row.section) ?? -1);
     if (!section) throw new PublicSnapshotError("invalid-projection", `Story ${row.id} is published without a Section.`);
-    return [row.id, collectStoryFacts(row, section, topicById, personById, correctionByStory.get(row.id) ?? [], publication)];
+    return [row.id, collectStoryFacts(row, section, topicById, personById, correctionByStory.get(row.id) ?? [], publication, videoFacts)];
   }));
 
   const mediaRefs = new Map<number, { usage: string; kind: "image" | "any" }>();
