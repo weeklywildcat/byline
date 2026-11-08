@@ -770,7 +770,7 @@ function byline_editorial_saved_view_value(array $view): array
 function byline_editorial_sanitize_saved_view_sort($sort): array
 {
     $sort = is_array($sort) ? $sort : [];
-    $allowed_keys = ['story', 'workflow', 'writer', 'deadline', 'planned', 'published', 'modified'];
+    $allowed_keys = ['story', 'workflow', 'writer', 'deadline', 'planned', 'published', 'publication', 'modified'];
     $key = isset($sort['key']) && is_scalar($sort['key']) ? sanitize_key((string) $sort['key']) : 'deadline';
     $direction = isset($sort['direction']) && is_scalar($sort['direction']) ? strtolower((string) $sort['direction']) : 'asc';
 

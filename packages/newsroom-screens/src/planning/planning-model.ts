@@ -133,7 +133,7 @@ export type PlanningCapabilities = {
   canManageFeedback: boolean;
 };
 
-export type PlanningSortKey = "story" | "workflow" | "writer" | "deadline" | "planned" | "published" | "modified";
+export type PlanningSortKey = "story" | "workflow" | "writer" | "deadline" | "planned" | "published" | "publication" | "modified";
 export type PlanningSortDirection = "asc" | "desc";
 export type PlanningSort = { key: PlanningSortKey; direction: PlanningSortDirection };
 
@@ -586,12 +586,12 @@ function normalized(value: string | null | undefined): string {
   return (value || "").trim().toLocaleLowerCase();
 }
 
-function inDateRange(value: string | null | undefined, from: string, to: string): boolean {
+function inDateRange(value: string | null | undefined, from: string, to: string, timezone?: string): boolean {
   if (!from && !to) return true;
-  const date = parsePlanningDate(value);
-  if (!date) return false;
-  const key = planningDateKey(date);
-  return (!from || key >= from) && (!to || key <= to);
+  if (!value) return false;
+  const date = timezone ? null : parsePlanningDate(value);
+  const key = timezone ? siteDay(value, timezone) : date ? planningDateKey(date) : "";
+  return Boolean(key) && (!from || key >= from) && (!to || key <= to);
 }
 
 export function normalizePlanningFilters(filters?: Partial<PlanningFilters>): PlanningFilters {
@@ -613,7 +613,8 @@ export function filterPlanningStories(
   stories: PlanningStory[],
   filters: Partial<PlanningFilters> = {},
   currentUserId?: number,
-  now = new Date()
+  now = new Date(),
+  timezone?: string
 ): PlanningStory[] {
   const applied = normalizePlanningFilters(filters);
   const query = normalized(applied.query);
@@ -631,8 +632,8 @@ export function filterPlanningStories(
     if (applied.writerId !== null && story.writer?.id !== applied.writerId) return false;
     if (applied.editorId !== null && story.editor?.id !== applied.editorId) return false;
     if (!inDateRange(story.deadline, applied.deadlineFrom, applied.deadlineTo)) return false;
-    if (!inDateRange(story.plannedPublication, applied.plannedFrom, applied.plannedTo)) return false;
-    if (!inDateRange(story.publicationState.publishedAt, applied.publishedFrom, applied.publishedTo)) return false;
+    if (!inDateRange(story.plannedPublication, applied.plannedFrom, applied.plannedTo, timezone)) return false;
+    if (!inDateRange(story.publicationState.publishedAt, applied.publishedFrom, applied.publishedTo, timezone)) return false;
     if (applied.publicationState && story.publicationState.id !== applied.publicationState) return false;
     if (applied.visualStatus && story.visual.status !== applied.visualStatus) return false;
     // The reader's own stories: editor, primary writer or a canonical co-writer, the one membership rule
@@ -650,7 +651,16 @@ function emptyLast(): number {
   return Number.MAX_SAFE_INTEGER;
 }
 
-function storySortValue(story: PlanningStory, key: PlanningSortKey): string | number {
+/** When a story went (or goes) live, falling back to its plan. */
+export function publicationWhen(story: PlanningStory): { at: string | null; kind: "published" | "scheduled" | "planned" | "none" } {
+  const state = story.publicationState;
+  if (state.isPublished && state.publishedAt) return { at: state.publishedAt, kind: "published" };
+  if (state.isScheduled && state.scheduledAt) return { at: state.scheduledAt, kind: "scheduled" };
+  if (story.plannedPublication) return { at: story.plannedPublication, kind: "planned" };
+  return { at: null, kind: "none" };
+}
+
+function storySortValue(story: PlanningStory, key: PlanningSortKey): string | number | undefined {
   switch (key) {
     case "story":
       return normalized(story.title);
@@ -663,7 +673,9 @@ function storySortValue(story: PlanningStory, key: PlanningSortKey): string | nu
     case "planned":
       return parsePlanningDate(story.plannedPublication)?.getTime() ?? emptyLast();
     case "published":
-      return parsePlanningDate(story.publicationState.publishedAt)?.getTime() ?? 0;
+      return parsePlanningDate(story.publicationState.publishedAt)?.getTime();
+    case "publication":
+      return parsePlanningDate(publicationWhen(story).at)?.getTime();
     case "modified":
       return parsePlanningDate(story.modifiedAt)?.getTime() ?? 0;
   }
@@ -683,14 +695,11 @@ export function storyHasOpenWork(story: PlanningStory): boolean {
 export function sortPlanningStories(stories: PlanningStory[], sort: PlanningSort = DEFAULT_PLANNING_SORT): PlanningStory[] {
   const direction = sort.direction === "desc" ? -1 : 1;
   return [...stories].sort((left, right) => {
-    // A story with no publication time (never published) sorts last whichever way the dates run.
-    if (sort.key === "published") {
-      const leftAt = parsePlanningDate(left.publicationState.publishedAt)?.getTime();
-      const rightAt = parsePlanningDate(right.publicationState.publishedAt)?.getTime();
-      if (leftAt === undefined || rightAt === undefined) return leftAt === rightAt ? left.id - right.id : leftAt === undefined ? 1 : -1;
-    }
     const leftValue = storySortValue(left, sort.key);
     const rightValue = storySortValue(right, sort.key);
+    // Missing publication dates sort last in either direction.
+    if (leftValue === undefined) return rightValue === undefined ? left.id - right.id : 1;
+    if (rightValue === undefined) return -1;
     if (leftValue < rightValue) return -1 * direction;
     if (leftValue > rightValue) return 1 * direction;
     return left.id - right.id;
@@ -867,7 +876,7 @@ export function optionalApiFallback<T>(error: unknown, fallback: T | null, label
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const VISUAL_STATUSES: readonly PlanningVisualStatus[] = ["needed", "assigned", "in-progress", "uploaded", "selected", "done"];
-const SORT_KEYS: readonly PlanningSortKey[] = ["story", "workflow", "writer", "deadline", "planned", "published", "modified"];
+const SORT_KEYS: readonly PlanningSortKey[] = ["story", "workflow", "writer", "deadline", "planned", "published", "publication", "modified"];
 export const PLANNING_QUERY_MAX_LENGTH = 200;
 
 const positiveId = (value: unknown): number | null => {

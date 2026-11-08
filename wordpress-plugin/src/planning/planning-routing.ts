@@ -4,7 +4,7 @@
  * (Working, Published, All) and, in Working, `&view=` (Board, List, Calendar).
  */
 import { preferredStoriesView, storiesViewFromRoute, type StoriesView } from "@byline/newsroom-screens/planning/stories-view";
-import { applyStoriesLocation, type StoryScope } from "@byline/newsroom-screens/planning/stories-scope";
+import { applyStoriesLocation, type StoriesLocation } from "@byline/newsroom-screens/planning/stories-scope";
 
 export const PLANNING_DESTINATIONS = ["stories", "collections", "media", "content-health", "feedback"] as const;
 export type PlanningDestination = (typeof PLANNING_DESTINATIONS)[number];
@@ -31,7 +31,7 @@ export function initialStoriesView(tab: string | undefined, requestedView: strin
  * The address of a Stories location, derived from the current one so unrelated
  * parameters survive. Working is `view=`, a library scope is `scope=`.
  */
-export function storiesLocationHref(currentHref: string, location: { scope: StoryScope; view: StoriesView }): string {
+export function storiesLocationHref(currentHref: string, location: StoriesLocation): string {
   const url = new URL(currentHref, typeof window === "undefined" ? "http://localhost/wp-admin/" : window.location.href);
   url.searchParams.set("page", "byline-planning");
   url.searchParams.set("tab", "stories");

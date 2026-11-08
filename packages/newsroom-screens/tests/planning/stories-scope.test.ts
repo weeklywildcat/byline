@@ -87,6 +87,11 @@ describe("published ordering", () => {
     expect(sortPlanningStories([undated, early, late], { key: "published", direction: "asc" }).map((item) => item.id)).toEqual([10, 11, 12]);
   });
 
+  it("uses the scheduled time ahead of the plan in the mixed library", () => {
+    const scheduledWithPlan = { ...scheduled, plannedPublication: "2026-09-01" };
+    expect(sortPlanningStories([scheduledWithPlan, late], { key: "publication", direction: "asc" }).map((item) => item.id)).toEqual([late.id, scheduled.id]);
+  });
+
   it("opens each scope in its own order", () => {
     expect(defaultScopeSort("working")).toEqual(DEFAULT_PLANNING_SORT);
     expect(defaultScopeSort("published")).toEqual({ key: "published", direction: "desc" });
@@ -97,6 +102,7 @@ describe("published ordering", () => {
 
   it("is a sort a saved view may keep", () => {
     expect(sanitizePlanningSort({ key: "published", direction: "desc" })).toEqual({ key: "published", direction: "desc" });
+    expect(sanitizePlanningSort({ key: "publication", direction: "asc" })).toEqual({ key: "publication", direction: "asc" });
   });
 });
 
@@ -146,13 +152,15 @@ describe("addresses", () => {
   });
 
   it("writes Working as view=, a library as scope=, and drops the legacy parameter", () => {
-    const write = (href: string, scope: "working" | "published" | "all", view: "board" | "list" | "calendar") => { const url = applyStoriesLocation(new URL(href), { scope, view }); return `${url.pathname}${url.search}`; };
+    const write = (href: string, scope: "working" | "published" | "all", view: "board" | "list" | "calendar", publicationState?: string) => { const url = applyStoriesLocation(new URL(href), { scope, view, publicationState }); return `${url.pathname}${url.search}`; };
     expect(write("http://x/stories", "working", "board")).toBe("/stories?view=board");
     expect(write("http://x/stories?scope=published", "working", "list")).toBe("/stories?view=list");
     expect(write("http://x/stories?view=board", "published", "list")).toBe("/stories?scope=published");
     expect(write("http://x/stories?view=list&collection=4", "all", "list")).toBe("/stories?collection=4&scope=all");
     expect(write("http://x/stories?publication_state=published", "working", "board")).toBe("/stories?view=board");
-    expect(write("http://x/stories?publication_state=draft", "working", "board")).toBe("/stories?publication_state=draft&view=board");
+    expect(write("http://x/stories?publication_state=draft", "working", "board", "draft")).toBe("/stories?publication_state=draft&view=board");
+    expect(write("http://x/stories?publication_state=scheduled", "published", "list")).toBe("/stories?scope=published");
+    expect(write("http://x/stories?publication_state=draft", "all", "list")).toBe("/stories?scope=all");
   });
 
   it("round-trips: what is written is what is read", () => {
@@ -227,6 +235,13 @@ describe("published dates", () => {
     expect(filterPlanningStories([monday, friday], { publishedTo: "2026-11-03" }).map((item) => item.id)).toEqual([20]);
     // A story with no publication time is never in a published range.
     expect(filterPlanningStories([draft, neverDated], { publishedFrom: "2026-01-01" })).toEqual([]);
+  });
+
+  it("filters on the publication day in the supplied newsroom timezone", () => {
+    const overnight = story(22, { publicationState: published("2026-11-10T05:15:00Z") });
+    const day = { publishedFrom: "2026-11-10", publishedTo: "2026-11-10" };
+    expect(filterPlanningStories([overnight], day, undefined, undefined, "America/New_York")).toEqual([overnight]);
+    expect(filterPlanningStories([overnight], day, undefined, undefined, "America/Los_Angeles")).toEqual([]);
   });
 
   it("round-trips through the query string and a saved view", () => {

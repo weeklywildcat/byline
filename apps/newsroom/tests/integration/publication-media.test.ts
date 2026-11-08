@@ -379,10 +379,14 @@ describe("Story publication readiness", () => {
       { type: "paragraph", children: [] }
     ] } };
     expect(storyMediaRequirements({ featuredMedia: { id: 10 }, body, contentFormat: "byline-v1" })).toEqual([
-      { id: 10, role: "image" }, { id: 11, role: "file" }, { id: 12, role: "file" }, { id: 13, role: "file" }, { id: 14, role: "file" }
+      { id: 10, role: "image", allowMissingAlt: false },
+      { id: 11, role: "file", allowMissingAlt: false },
+      { id: 12, role: "file", allowMissingAlt: false },
+      { id: 13, role: "file", allowMissingAlt: false },
+      { id: 14, role: "file", allowMissingAlt: false }
     ]);
     // Imported bodies are not scanned (Phase 8); the lead image still counts.
-    expect(storyMediaRequirements({ featuredMedia: 10, body, contentFormat: "legacy-html" })).toEqual([{ id: 10, role: "image" }]);
+    expect(storyMediaRequirements({ featuredMedia: 10, body, contentFormat: "legacy-html" })).toEqual([{ id: 10, role: "image", allowMissingAlt: false }]);
   });
 
   it("lets drafts save with media still preparing, and refuses to publish until it is ready", async () => {

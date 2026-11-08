@@ -75,6 +75,7 @@ export function presentationForScope(scope: StoryScope, workingView: StoriesView
 /* ------------------------------------------------------------- addresses */
 
 export type StoriesRoute = { scope: StoryScope; view: StoriesView | null };
+export type StoriesLocation = { scope: StoryScope; view: StoriesView; publicationState?: string };
 
 /**
  * What a Stories address names. `scope=` and `view=` are the two parameters;
@@ -91,10 +92,10 @@ export function resolveStoriesRoute(params: URLSearchParams): StoriesRoute {
 /**
  * Write a scope and presentation into an address. Working is implicit
  * (`view=board`); a library scope is `scope=published` with no `view`, since a
- * library has one presentation. The legacy `publication_state=published` is
- * dropped: the scope says it, and leaving it would send Working back to Published on reload.
+ * library has one presentation. Working and All can carry a draft or scheduled
+ * refinement. Published always takes its publication state from the scope.
  */
-export function applyStoriesLocation(url: URL, location: { scope: StoryScope; view: StoriesView }): URL {
+export function applyStoriesLocation(url: URL, location: StoriesLocation): URL {
   if (location.scope === "working") {
     url.searchParams.delete("scope");
     url.searchParams.set("view", location.view);
@@ -102,7 +103,11 @@ export function applyStoriesLocation(url: URL, location: { scope: StoryScope; vi
     url.searchParams.set("scope", location.scope);
     url.searchParams.delete("view");
   }
-  if (url.searchParams.get("publication_state") === "published") url.searchParams.delete("publication_state");
+  if (location.scope !== "published" && (location.publicationState === "draft" || location.publicationState === "scheduled")) {
+    url.searchParams.set("publication_state", location.publicationState);
+  } else {
+    url.searchParams.delete("publication_state");
+  }
   return url;
 }
 

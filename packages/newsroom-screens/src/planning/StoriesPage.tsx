@@ -21,7 +21,8 @@ import {
   storyScopeCounts,
   STORY_SCOPE_IDS,
   STORY_SCOPE_LABELS,
-  type StoryScope
+  type StoryScope,
+  type StoriesLocation
 } from "./stories-scope";
 import { BOARD_LAYOUT_OPTIONS, browserStorage, isBoardLayout, preferredBoardLayout, writeBoardLayoutPreference, type BoardLayout } from "./stories-board-layout";
 import { useStoryPeek } from "../story/StoryPeekHost";
@@ -102,8 +103,7 @@ export type StoriesCalendarProps = {
   onOpenStory: (storyId: number) => void;
 };
 
-/** Where the reader is in Stories: which stories (scope) and, in Working, how they are shown (view). */
-export type StoriesLocation = { scope: StoryScope; view: StoriesView };
+export type { StoriesLocation } from "./stories-scope";
 
 /** The address of a Stories location when the host does not supply one: the current address with `scope=` or `view=` set. */
 export function defaultStoriesLocationHref(currentHref: string, location: StoriesLocation): string {
@@ -172,7 +172,7 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialScope
   const { update, updatingStoryId, available: canUpdateStories } = useUpdatePlanningStory(fetchers);
   // The planning response already carries every story the reader may see (the server narrows it by the refinements),
   // so the scope counts need no request of their own.
-  const refined = useMemo(() => filterPlanningStories(data?.stories || [], filters, userId ?? undefined), [data, filters, userId]);
+  const refined = useMemo(() => filterPlanningStories(data?.stories || [], filters, userId ?? undefined, now, timezone), [data, filters, userId, now, timezone]);
   const counts = useMemo(() => (data ? storyScopeCounts(refined) : null), [data, refined]);
   const stories = useMemo(() => sortPlanningStories(storiesInScope(refined, scope), sort), [refined, scope, sort]);
   // The Calendar plots publications too, so it keeps every refined story, not only the work queue.
@@ -195,13 +195,13 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialScope
     setScope(next);
     // A saved view was chosen for a scope; leaving it abandons the view, so a tab never shows "(modified)" for being clicked.
     setSavedViewId(null);
-    navigate({ scope: next, view: presentationForScope(next, workingView, hasCalendar) });
-  }, [hasCalendar, navigate, scope, workingView]);
+    navigate({ scope: next, view: presentationForScope(next, workingView, hasCalendar), publicationState: filters.publicationState });
+  }, [filters.publicationState, hasCalendar, navigate, scope, workingView]);
   const changeView = useCallback((next: StoriesView) => {
     setWorkingView(next);
     writeStoriesViewPreference(next, typeof window === "undefined" ? null : window.localStorage);
-    navigate({ scope: "working", view: next });
-  }, [navigate]);
+    navigate({ scope: "working", view: next, publicationState: filters.publicationState });
+  }, [filters.publicationState, navigate]);
   useEffect(() => {
     // Back and forward restore the scope and presentation the address names; hosts keep `scope=` and `view=` as the generic parameters.
     const restore = () => {
@@ -221,7 +221,7 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialScope
     setSavedViewId(applied.savedViewId);
     if (promoted.scope !== scope) {
       setScope(promoted.scope);
-      navigate({ scope: promoted.scope, view: presentationForScope(promoted.scope, workingView, hasCalendar) });
+      navigate({ scope: promoted.scope, view: presentationForScope(promoted.scope, workingView, hasCalendar), publicationState: promoted.filters.publicationState });
     }
   }, [hasCalendar, navigate, scope, workingView]);
   const changeFilters = useCallback((next: PlanningFilters) => { setFilters(next); }, []);

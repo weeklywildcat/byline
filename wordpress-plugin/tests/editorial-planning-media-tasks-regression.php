@@ -506,6 +506,7 @@ $published_view = byline_editorial_save_saved_view(['name' => 'Last week', 'filt
 editorial_test_assert(is_array($published_view) && ($published_view['filters']['publishedFrom'] ?? '') === '2026-11-01' && !isset($published_view['filters']['publishedTo']), 'A saved view lost its published range or kept an invalid day.');
 editorial_test_assert(($published_view['sort']['key'] ?? '') === 'published' && ($published_view['sort']['direction'] ?? '') === 'desc', 'A saved view lost the published sort.');
 editorial_test_assert(byline_editorial_delete_saved_view($published_view['id'], 2), 'A user could not delete their published-range view.');
+editorial_test_assert(byline_editorial_sanitize_saved_view_sort(['key' => 'publication', 'direction' => 'asc']) === ['key' => 'publication', 'direction' => 'asc'], 'A saved view lost the All library publication sort.');
 
 // Structured media preserves the legacy note and sanitizes the structured one.
 $media = byline_get_editorial_media_request(10);

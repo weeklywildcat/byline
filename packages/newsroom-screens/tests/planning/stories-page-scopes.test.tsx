@@ -8,7 +8,7 @@ import { StoriesPage, type StoriesPageProps } from "../../src/planning/StoriesPa
 import { DEFAULT_WORKFLOW_STATUSES, EMPTY_PLANNING_FILTERS, type PlanningResponse, type PlanningStory, type SavedPlanningView } from "../../src/planning/planning-model";
 import { STORIES_VIEW_PREFERENCE_KEY } from "../../src/planning/stories-view";
 import { StoryPeekHost } from "../../src/story/StoryPeekHost";
-import type { PlanningFetchers } from "../../src/planning/planning-api";
+import { storiesRouteFilters, type PlanningFetchers } from "../../src/planning/planning-api";
 import type { StoryFetchers } from "../../src/story/story-fetchers";
 
 /**
@@ -29,10 +29,10 @@ const story = (id: number, patch: Partial<PlanningStory> = {}): PlanningStory =>
 });
 
 const stories: PlanningStory[] = [
-  story(1, { title: "Canteen could return", workflow: stage("writing"), deadline: "2026-11-12", writer: gibson, authors: [gibson] }),
+  story(1, { title: "Canteen could return", workflow: stage("writing"), deadline: "2026-11-12", plannedPublication: "2026-11-12", writer: gibson, authors: [gibson] }),
   story(2, { title: "Spring musical casting", workflow: stage("pitch") }),
-  story(3, { title: "Redesigned website launches", workflow: stage("published"), sections: ["News"], writer: gibson, authors: [gibson], editor: matt, publicationState: published("2026-06-29T18:14:00Z") }),
-  story(4, { title: "Football wins homecoming", workflow: stage("published"), sections: ["Sports"], writer: matt, authors: [matt], openTaskCount: 1, publicationState: published("2026-11-03T16:00:00Z") }),
+  story(3, { title: "Redesigned website launches", workflow: stage("published"), sections: ["News"], writer: gibson, authors: [gibson], editor: matt, plannedPublication: "2026-11-15", publicationState: published("2026-06-29T18:14:00Z") }),
+  story(4, { title: "Football wins homecoming", workflow: stage("published"), sections: ["Sports"], writer: matt, authors: [matt], openTaskCount: 1, publicationState: published("2026-11-03T05:15:00Z") }),
   story(5, { title: "Library hours change", workflow: stage("published"), sections: ["News"], publicationState: published("2026-10-20T14:00:00Z") })
 ];
 const response = (patch: Partial<PlanningResponse["capabilities"]> = {}): PlanningResponse => ({
@@ -225,7 +225,7 @@ describe("addresses and history", () => {
     const locationHref = vi.fn(({ scope, view }: { scope: string; view: string }) => `/wp-admin/admin.php?page=byline-planning&tab=stories&${scope === "working" ? `view=${view}` : `scope=${scope}`}`);
     await mount({ locationHref });
     await click(scopeTab("published"));
-    expect(locationHref).toHaveBeenLastCalledWith({ scope: "published", view: "list" });
+    expect(locationHref).toHaveBeenLastCalledWith({ scope: "published", view: "list", publicationState: "" });
     expect(window.location.search).toBe("?page=byline-planning&tab=stories&scope=published");
   });
 
@@ -233,6 +233,15 @@ describe("addresses and history", () => {
     await mount({ initialFilters: { publicationState: "published" } });
     expect(selectedScope()).toBe("published");
     expect($("[aria-label='Active filters']")).toBeNull();
+    expect(titles()).toHaveLength(3);
+  });
+
+  it("drops a cleared legacy publication filter when opening Published", async () => {
+    window.history.replaceState(null, "", "/stories?publication_state=draft");
+    await mount({ initialFilters: storiesRouteFilters(new URLSearchParams(window.location.search)) });
+    await click($("[aria-label='Remove filter: Draft']"));
+    await click(scopeTab("published"));
+    expect(window.location.search).toBe("?scope=published");
     expect(titles()).toHaveLength(3);
   });
 });
@@ -295,6 +304,11 @@ describe("refinements follow the scope", () => {
 });
 
 describe("Published", () => {
+  it("keeps a story that falls on the selected day in the response timezone", async () => {
+    await mount({ initialScope: "published", initialFilters: { publishedFrom: "2026-11-03", publishedTo: "2026-11-03" } });
+    expect(titles()).toEqual(["Football wins homecoming"]);
+  });
+
   it("is a table of Story, Section, People, Published and Updated, grouped by newsroom day", async () => {
     await mount();
     await click(scopeTab("published"));
@@ -341,6 +355,15 @@ describe("Published", () => {
 });
 
 describe("All", () => {
+  it("sorts the Publication column by the dates it displays", async () => {
+    await mount({ initialScope: "all" });
+    const publication = $$("[data-story-library=all] th button").find((button) => text(button) === "Publication");
+    await click(publication);
+    expect(titles()).toEqual(["Redesigned website launches", "Library hours change", "Football wins homecoming", "Canteen could return", "Spring musical casting"]);
+    await click(publication);
+    expect(titles()).toEqual(["Canteen could return", "Football wins homecoming", "Library hours change", "Redesigned website launches", "Spring musical casting"]);
+  });
+
   it("is a table of Story, State, Section, People, Publication and Updated", async () => {
     await mount();
     await click(scopeTab("all"));

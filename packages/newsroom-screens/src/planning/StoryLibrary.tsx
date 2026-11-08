@@ -10,7 +10,7 @@ import { sectionNames } from "../workspace/workspace-model";
 import { StoryActionsMenu, StoryContextMenu } from "./StoryActionsMenu";
 import { SortHead, StoryPeople } from "./StoryList";
 import { groupByPublishedDay, type StoryScope } from "./stories-scope";
-import type { PlanningSort, PlanningSortKey, PlanningStory, PlanningWorkflowStatus } from "./planning-model";
+import { publicationWhen, type PlanningSort, type PlanningSortKey, type PlanningStory, type PlanningWorkflowStatus } from "./planning-model";
 
 export type StoryLibraryScope = Exclude<StoryScope, "working">;
 
@@ -43,15 +43,6 @@ function dayLabel(value: string, timezone: string, now: Date): string {
   if (!day) return "";
   const sameYear = siteDay(now, timezone).slice(0, 4) === day.slice(0, 4);
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }), timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`));
-}
-
-/** When a story went (or goes) live: the actual time if there is one, else what was planned. */
-function publicationWhen(story: PlanningStory): { at: string | null; kind: "published" | "scheduled" | "planned" | "none" } {
-  const state = story.publicationState;
-  if (state.isPublished && state.publishedAt) return { at: state.publishedAt, kind: "published" };
-  if (state.isScheduled && state.scheduledAt) return { at: state.scheduledAt, kind: "scheduled" };
-  if (story.plannedPublication) return { at: story.plannedPublication, kind: "planned" };
-  return { at: null, kind: "none" };
 }
 
 const sectionsOf = (story: PlanningStory) => (story.sections?.length ? sectionNames(story.sections) : "");
@@ -121,7 +112,7 @@ export function libraryColumns(scope: StoryLibraryScope, title: (story: Planning
     { id: "state", label: "State", className: "w-[10%]", cell: (item) => <StateText story={item} /> },
     ...section,
     peopleColumn,
-    { id: "publication", label: "Publication", sortKey: "planned", className: "w-[13%]", cell: (item, cells) => <When story={item} timezone={cells.timezone} now={cells.now} /> },
+    { id: "publication", label: "Publication", sortKey: "publication", className: "w-[13%]", cell: (item, cells) => <When story={item} timezone={cells.timezone} now={cells.now} /> },
     updatedColumn
   ];
 }
