@@ -33,7 +33,7 @@ await mkdir(process.env.BYLINE_MEDIA_LOCAL_DIR, { recursive: true });
 const { default: config } = await import("../src/payload.config");
 const payload = await getPayload({ config });
 try {
-  const root = await payload.create({
+  await payload.create({
     collection: "users",
     data: {
       name: "System administrator",
@@ -121,11 +121,6 @@ try {
     people[entry.slug] = (
       await payload.create({ collection: "people", data: entry })
     ).id;
-  await payload.update({
-    collection: "users",
-    id: root.id,
-    data: { linkedPerson: people["gibson-bell"] },
-  });
   for (const [email, name, role, linkedPerson] of [
     ["editor@example.test", "Gibson Bell", "editor", people["gibson-bell"]],
     ["writer@example.test", "Alex Morgan", "staff", people["alex-morgan"]],
