@@ -140,6 +140,8 @@ describe("privacy sentinel", () => {
     expect(() => assertPublicSafe({ a: { brief: "x" } }, "{}")).toThrow(/brief/);
     expect(() => assertPublicSafe({ a: 1 }, '{"u":"https://n.example/api/media/file/a.jpg"}')).toThrow(/private/);
     expect(() => assertPublicSafe({ a: 1 }, '{"t":"secret-build-token-0123456789-abcdef"}', { BYLINE_BUILD_TOKEN: "secret-build-token-0123456789-abcdef", BYLINE_MEDIA_LOCAL_DIR: "/srv/media", BYLINE_PUBLICATION_MEDIA_DIR: "/srv/pub" })).toThrow(/credential/);
+    const deployHook = "https://api.example.test/deploy/credential-token";
+    expect(() => assertPublicSafe({ a: 1 }, JSON.stringify({ hook: deployHook }), { BYLINE_DEPLOY_HOOK_URL: deployHook, BYLINE_MEDIA_LOCAL_DIR: "/srv/media", BYLINE_PUBLICATION_MEDIA_DIR: "/srv/pub" })).toThrow(/deploy-hook credential/);
     expect(() => assertPublicSafe({ socials: { email: "editor@weeklywildcat.com" }, urls: { contact: "/contact/" } }, "{}", { BYLINE_MEDIA_LOCAL_DIR: "/srv/media", BYLINE_PUBLICATION_MEDIA_DIR: "/srv/pub" })).not.toThrow();
   });
 });
