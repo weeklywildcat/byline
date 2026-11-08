@@ -6,7 +6,7 @@
  * bodies to the planner or make private editorial fields look public.
  */
 
-import { siteDay } from "../home/newsroom-model";
+import { myStory, siteDay } from "../home/newsroom-model";
 import type { ArticleNotesSummary } from "../story/notes-model";
 import type { MediaSummary, ReportingSummary } from "../workspace/workspace-types";
 
@@ -623,7 +623,9 @@ export function filterPlanningStories(
     if (!inDateRange(story.plannedPublication, applied.plannedFrom, applied.plannedTo)) return false;
     if (applied.publicationState && story.publicationState.id !== applied.publicationState) return false;
     if (applied.visualStatus && story.visual.status !== applied.visualStatus) return false;
-    if (applied.mine && (!currentUserId || (story.writer?.id !== currentUserId && story.editor?.id !== currentUserId))) return false;
+    // The reader's own stories: editor, primary writer or a canonical co-writer, the one membership rule
+    // Home and the WordPress server use too (never a guest contributor with a colliding id).
+    if (applied.mine && (!currentUserId || !myStory(story, currentUserId))) return false;
     if (applied.unassigned && story.editor !== null) return false;
     if (applied.overdue && (story.publicationState.isPublished || !isPlanningDateOverdue(story.deadline, now))) return false;
     if (applied.needsReview && !(story.needsReview || story.workflow.id === "ready" || story.workflow.id === "ready-for-review")) return false;

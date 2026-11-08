@@ -50,6 +50,12 @@ describe("planning model", () => {
     expect(dates.published.value).toBeNull();
   });
 
+  it("counts a canonical co-writer as mine, never a guest contributor with a colliding id", () => {
+    const coWritten = story({ id: 3, writer: { id: 8, name: "Primary" }, editor: null, authors: [{ id: 8, name: "Primary", kind: "user" }, { id: 2, name: "Co-writer", kind: "user" }] });
+    const guest = story({ id: 4, writer: { id: 8, name: "Primary" }, editor: null, authors: [{ id: 2, name: "Guest", kind: "guest" }] });
+    expect(filterPlanningStories([coWritten, guest], { mine: true }, 2).map((item) => item.id)).toEqual([3]);
+  });
+
   it("filters by mine and does not mutate the source when sorting", () => {
     const first = story({ id: 1, title: "Zebra" });
     const second = story({ id: 2, title: "Alpha", writer: { id: 8, name: "Other" }, authors: [{ id: 8, name: "Other" }] });

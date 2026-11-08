@@ -96,6 +96,7 @@ function HomeWorkspace({ fetchers, actionUrls, shell, preferences }: HomeAppProp
   const [completedLabel, setCompletedLabel] = useState("");
   const [weekOffset, setWeekOffset] = useState(0);
   const [budgetTab, setBudgetTab] = useState<BudgetTab>("week");
+  const [budgetExpanded, setBudgetExpanded] = useState(false);
   const [storedScope, setStoredScope] = useState<HomeScope | null>(null);
 
   // The remembered Mine | Newsroom choice. A failed read leaves the default (Newsroom for editors).
@@ -230,7 +231,9 @@ function HomeWorkspace({ fetchers, actionUrls, shell, preferences }: HomeAppProp
   const hasMoreWork = work.length > HOME_WORK_PREVIEW_LIMIT || boundedWork;
 
   // Site: the public website's state, the next real schedule and content health. Each row only when its data is there.
-  const nextScheduled = agenda.find((event) => event.id.startsWith("scheduled-") && new Date(event.date).getTime() >= now.getTime());
+  // The site publishes the whole newsroom's work, so its next schedule ignores the Mine scope.
+  const siteAgenda = scope === "mine" && canReview && data ? homeAgenda(data, now, collectionLinks.href) : agenda;
+  const nextScheduled = siteAgenda.find((event) => event.id.startsWith("scheduled-") && new Date(event.date).getTime() >= now.getTime());
   const healthWarnings = contentHealth.data ? contentHealth.data.issues.filter((issue) => !issue.ignored && issue.severity !== "info").length : null;
   const lifecycle = deployment.data ? deployment.data.lifecycle || (deployment.data.pending ? "queued" : "") : null;
   const siteRows: SiteRow[] = [];
@@ -251,7 +254,8 @@ function HomeWorkspace({ fetchers, actionUrls, shell, preferences }: HomeAppProp
   const showSite = siteRows.length > 0;
   const weekTitle = weekOffset === 0 ? "This week" : weekOffset === 1 ? "Next week" : weekOffset === -1 ? "Last week" : week ? `Week of ${shortDay(week.start)}` : "Week";
   const budgetCounts: Record<BudgetTab, number> = { week: budget?.week.length ?? 0, mine: budget?.mine.length ?? 0, unscheduled: budget?.unscheduled.length ?? 0 };
-  const budgetMore: Record<BudgetTab, Partial<PlanningFilters>> = { week: {}, mine: { mine: true }, unscheduled: {} };
+  // A long tab expands in place: Stories has no filter for "this week's publications" or "undated", so it is no continuation.
+  const budgetShown = budget ? (budgetExpanded ? budget[budgetTab] : budget[budgetTab].slice(0, BUDGET_LIMIT)) : [];
 
   // In a host shell, Home's muted canvas fills the content area; in wp-admin it lines up with the admin gutter.
   return <StoryHoverProvider fetchers={fetchers}><main className={cn("@container/home", shell && "min-h-full w-full bg-muted")}>
@@ -310,15 +314,18 @@ function HomeWorkspace({ fetchers, actionUrls, shell, preferences }: HomeAppProp
       </div> : null}
     </div>
 
-    <Tabs value={budgetTab} onValueChange={(value) => setBudgetTab(value as BudgetTab)}>
+    <Tabs value={budgetTab} onValueChange={(value) => { setBudgetTab(value as BudgetTab); setBudgetExpanded(false); }}>
       <HomeCard icon={Newspaper} title="Budget" description={scope === "mine" ? "Your stories: what publishes when" : "What the newsroom publishes when"}
         action={storiesLink() ? cardLink(storiesLink()!, "Stories", "Open Stories") : undefined}
         below={<div className="overflow-x-auto border-b border-border/60 px-4.5 pt-1.5 pb-1 [scrollbar-width:none]"><TabsList variant="line" aria-label="Budget" className="h-8 w-max gap-3">
           {BUDGET_TABS.map((tab) => <TabsTrigger key={tab.id} value={tab.id} className="flex-none px-0">{tab.label}<Badge variant="secondary" className="h-4 min-w-4 px-1.5 text-[11px] tabular-nums">{budgetCounts[tab.id]}</Badge></TabsTrigger>)}
         </TabsList></div>}
-        footer={budget && budgetCounts[budgetTab] > BUDGET_LIMIT ? <><span className="text-xs text-muted-foreground tabular-nums">Showing {BUDGET_LIMIT} of {budgetCounts[budgetTab]}</span>{storiesLink(budgetMore[budgetTab]) ? <a className={buttonVariants({ variant: "link", size: "sm" })} href={storiesLink(budgetMore[budgetTab], "list")}>View in Stories<ChevronRight data-icon="inline-end" aria-hidden="true" /></a> : null}</> : undefined}>
+        footer={budget && budgetCounts[budgetTab] > BUDGET_LIMIT ? <>
+          <Button variant="link" size="sm" className="h-auto px-0" aria-expanded={budgetExpanded} onClick={() => setBudgetExpanded((open) => !open)}>{budgetExpanded ? "Show fewer" : `Show all ${budgetCounts[budgetTab]}`}</Button>
+          {budgetTab === "mine" && storiesLink({ mine: true }) ? <a className={buttonVariants({ variant: "link", size: "sm" })} href={storiesLink({ mine: true }, "list")}>My stories in Stories<ChevronRight data-icon="inline-end" aria-hidden="true" /></a> : <span className="text-xs text-muted-foreground tabular-nums">{budgetExpanded ? budgetCounts[budgetTab] : BUDGET_LIMIT} of {budgetCounts[budgetTab]}</span>}
+        </> : undefined}>
         {BUDGET_TABS.map((tab) => <TabsContent key={tab.id} value={tab.id}>
-          {section("stories", budget && budget[tab.id].length ? <BudgetTable stories={budget[tab.id].slice(0, BUDGET_LIMIT)} label={`Budget: ${tab.label}`} timezone={timezone} now={now} onOpen={openStory} workspaceUrl={actionUrls?.workspace} /> : null, tab.empty)}
+          {section("stories", budget && budget[tab.id].length ? <BudgetTable stories={tab.id === budgetTab ? budgetShown : budget[tab.id].slice(0, BUDGET_LIMIT)} label={`Budget: ${tab.label}`} timezone={timezone} now={now} onOpen={openStory} workspaceUrl={actionUrls?.workspace} /> : null, tab.empty)}
         </TabsContent>)}
       </HomeCard>
     </Tabs>
