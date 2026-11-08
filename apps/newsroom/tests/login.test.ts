@@ -84,6 +84,18 @@ describe("expired session", () => {
     expect(newsroomReturnTo("/admin/stories?view=mine", "/admin")).toBe("/admin/stories?view=mine");
   });
 
+  it("returns to the Collections workspace and preserves the open collection after login", async () => {
+    const { loginRedirectUrl } = await import("../src/auth/session");
+    const login = new URL(loginRedirectUrl({
+      admin: "/admin",
+      login: "/login",
+      segments: ["byline-collections"],
+      searchParams: { collection: "12", tab: "reporting", interview: "34" },
+    }), "https://newsroom.example");
+    const returnTo = login.searchParams.get("redirect");
+    expect(newsroomReturnTo(returnTo, "/admin")).toBe("/admin/collections?collection=12&tab=reporting&interview=34");
+  });
+
   it("redirects only when there is no user, so a disabled account still sees why", async () => {
     const { redirectIfSignedOut } = await import("../src/auth/session");
     const payload = { config: { routes: { admin: "/admin" }, admin: { routes: { login: "/login" } } } } as never;

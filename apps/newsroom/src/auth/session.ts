@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import type { PayloadRequest } from "payload";
+import { COLLECTIONS_PATH, COLLECTIONS_VIEW_PATH } from "../domain/navigation";
 
 type Search = Record<string, string | string[] | undefined> | undefined;
 
@@ -11,7 +12,8 @@ type Search = Record<string, string | string[] | undefined> | undefined;
 export function loginRedirectUrl({
   admin, login, segments, searchParams,
 }: { admin: string; login: string; segments?: string[]; searchParams?: Search }): string {
-  const path = segments?.length ? `${admin}/${segments.map(encodeURIComponent).join("/")}` : admin;
+  const viewPath = segments?.length ? `/${segments.map(encodeURIComponent).join("/")}` : "";
+  const path = admin + (viewPath === COLLECTIONS_VIEW_PATH ? COLLECTIONS_PATH : viewPath);
   const query = new URLSearchParams();
   Object.entries(searchParams ?? {}).forEach(([key, value]) => {
     const single = Array.isArray(value) ? value[0] : value;
