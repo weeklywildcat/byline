@@ -14,7 +14,7 @@ import { invalidateStoryData } from "@byline/newsroom-screens/story/story-query"
 import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { useDocumentInfo, useForm, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, History, List, PanelRight } from "lucide-react";
+import { Check, List, PanelRight } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { IMMERSIVE_ALIGNMENT_OPTIONS, STORY_PRESENTATION_OPTIONS } from "../../domain/vocabulary";
@@ -63,7 +63,7 @@ function DetailsHeading({ id, children }: { id?: string; children: string }) {
  * Details sheet. Payload still owns the form, autosave, versions and publish
  * submit underneath this surface.
  */
-export function StoryHeader({ context, onOpenHistory }: { context: StoryScreenContext; onOpenHistory: () => void }) {
+export function StoryHeader({ context }: { context: StoryScreenContext }) {
   const workspace = useOptionalWorkspace();
   const workspaceQueries = useQueryClient();
   const planned = workspace?.data.story;
@@ -292,16 +292,6 @@ export function StoryHeader({ context, onOpenHistory }: { context: StoryScreenCo
                 </div>
               </section>
             </> : null}
-
-            <Separator />
-
-            <section className="grid gap-3">
-              <DetailsHeading>History</DetailsHeading>
-              <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => { setDetailsOpen(false); onOpenHistory(); }}>
-                <History data-icon="inline-start" aria-hidden="true" />
-                Version history
-              </Button>
-            </section>
           </div>
         </SheetContent>
       </Sheet>
