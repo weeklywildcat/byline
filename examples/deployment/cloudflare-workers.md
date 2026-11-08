@@ -47,24 +47,35 @@ Cloudflare will continue installing the full monorepo, and can even install
 twice if only the build command was changed.
 
 npm workspaces still link internal `@byline/*` packages. Wrangler is installed
-from the frontend workspace's pinned devDependencies. Keep the existing
-production hook targeting the same branch. Install the snapshot-capable
-WordPress plugin and prepare its first artifact before letting the new
-frontend build run.
+from the frontend workspace's pinned devDependencies.
 
-Keep the public CMS endpoint variable if needed:
+For the Payload-backed public build, configure these **Build** values in
+Cloudflare (not Worker runtime variables):
 
 ```env
-NEXT_PUBLIC_WP_API_URL=https://cms.example.edu/wp-json/wp/v2
+BYLINE_NEWSROOM_BUILD_URL=https://byline.example.edu/api/byline/build
+BYLINE_BUILD_TOKEN=<same build-only credential configured on the newsroom>
 ```
 
-Normally no extra snapshot variable is necessary: the wrapper derives
-`/wp-json/byline/v1/build-snapshot` from the existing endpoint. An override is
-`BYLINE_BUILD_SNAPSHOT_URL=https://cms.example.edu/wp-json/byline/v1/build-snapshot`.
-Remove a manually pinned `BYLINE_PUBLICATION_REVISION` (the verified artifact owns
-the revision). Remove any rollout `BYLINE_LEGACY_REST_BUILD=1`; do not configure fixture variables
-or `BYLINE_BUILD_SNAPSHOT_FILE` in production. Publication configuration comes
-from the snapshot. `WORKERS_CI_BUILD_UUID`, `WORKERS_CI_COMMIT_SHA` and
+Store `BYLINE_BUILD_TOKEN` as a Cloudflare build secret. Remove rollout
+`BYLINE_LEGACY_REST_BUILD=1` and do not configure fixture variables or
+`BYLINE_BUILD_SNAPSHOT_FILE` in production. Publication configuration comes
+from Snapshot v2.
+
+Create one production **Deploy Hook** for the Git-connected Workers Builds
+project/branch, then put that private HTTPS URL only in the Payload deployment
+environment:
+
+```env
+BYLINE_DEPLOY_HOOK_URL=https://<cloudflare deploy-hook URL>
+```
+
+After Payload promotes a current snapshot, its publication worker queues a
+coalescing `deploy-public-site` job and POSTs that hook. Cloudflare then
+acquires the promoted snapshot through `BYLINE_NEWSROOM_BUILD_URL`. The hook
+URL is credential-like and must not be committed or exposed to the browser.
+
+`WORKERS_CI_BUILD_UUID`, `WORKERS_CI_COMMIT_SHA` and
 `WORKERS_CI_BRANCH` are supplied by Workers, not manually maintained settings.
 
 Configure **Settings → Build → Build watch paths** using these exact patterns
@@ -101,7 +112,7 @@ Discord-only source pushes do not build the site; a root lockfile change still
 does. Exclusions take precedence. Deploy-hook invocations intentionally still
 build even when there is no relevant Git diff.
 
-The plugin's hook success is not evidence of a live revision. Verify
+Deploy-hook acceptance is not evidence of a live revision. Verify
 `/_byline/manifest.json` through the public hostname. A no-op warm build should
 show restored dynamic routes; absent cache merely produces a correct cold build.
 A cold build always downloads the required media again. Clear cache under
