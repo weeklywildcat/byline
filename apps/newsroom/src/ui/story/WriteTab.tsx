@@ -99,6 +99,7 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   const format = useStoryField<string>("format");
   const videoUrl = useStoryField<string>("video.url");
   const reportingNote = useStoryField<string>("reportingNote");
+  const [kickerOpen, setKickerOpen] = useState(false);
   const [reportingNoteOpen, setReportingNoteOpen] = useState(false);
 
   const people = useOptions(context.api, "people", "name");
@@ -108,6 +109,7 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   const legacy = contentFormat.value === "legacy-html";
   const url = videoUrl.value ?? "";
   const videoProblem = format.value === "video" && url.trim() !== "" && !parseYouTubeVideoId(url) ? "That is not a YouTube video link." : null;
+  const showKicker = kickerOpen || Boolean(kicker.value?.trim());
   const showReportingNote = reportingNoteOpen || Boolean(reportingNote.value?.trim());
   const host = useNewsroomEditorHost();
 
@@ -116,15 +118,23 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
       <div className="flex flex-col gap-8">
         <article className="flex w-full flex-col gap-6" aria-label="Article">
           <div className="mx-auto flex w-full max-w-[760px] flex-col gap-3 px-4 md:px-0">
-            <Input
-              aria-label="Label above headline"
-              onKeyDown={noSubmit}
-              placeholder="Add label above headline"
-              value={kicker.value ?? ""}
-              onChange={(event) => kicker.setValue(event.target.value)}
-              disabled={readOnly}
-              className="h-7 w-auto max-w-sm border-transparent bg-transparent px-0 text-xs font-medium tracking-wide uppercase shadow-none focus-visible:ring-0"
-            />
+            {showKicker ? (
+              <Input
+                aria-label="Label above headline"
+                onKeyDown={noSubmit}
+                placeholder="Label above headline"
+                value={kicker.value ?? ""}
+                onChange={(event) => kicker.setValue(event.target.value)}
+                disabled={readOnly}
+                autoFocus={kickerOpen && !kicker.value}
+                className="h-7 w-auto max-w-sm border-transparent bg-transparent px-0 text-xs font-medium tracking-wide uppercase shadow-none focus-visible:ring-0"
+              />
+            ) : readOnly ? null : (
+              <Button type="button" variant="ghost" size="xs" className="-ml-2 w-fit text-muted-foreground" onClick={() => setKickerOpen(true)}>
+                <Plus />
+                Add label above headline
+              </Button>
+            )}
             <Textarea
               aria-label="Headline"
               placeholder="Headline"
@@ -176,9 +186,9 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
                   footer={!readOnly ? <QuickCreateRelation context={context} kind="topic" onCreated={(id) => topics.setValue([...relationIdsOf(topics.value), id])} /> : null}
                 />
               </Property>
-              <Property label="Format">
+              <Property label="Story type">
                 <ChoiceSelect
-                  label="Story format"
+                  label="Story type"
                   options={FORMAT_OPTIONS}
                   value={(format.value ?? "standard") as (typeof STORY_FORMAT_OPTIONS)[number]["value"]}
                   onChange={(next) => format.setValue(next)}
