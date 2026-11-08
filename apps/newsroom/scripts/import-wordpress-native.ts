@@ -10,7 +10,8 @@
  *   npm run import:wordpress --workspace @byline/newsroom -- --file /migration/wordpress-native.json --map-person 1:gibson --apply
  */
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, extname } from "node:path";
+import sharp from "sharp";
 import { parseYouTubeVideoId, youTubeWatchUrl } from "@byline/core";
 import { publicStoryPath } from "@byline/content";
 import type { ArticleBody, ArticleBodyNode, ArticleBlock } from "@byline/article-body";
@@ -129,6 +130,21 @@ const isHttps = (value: unknown): value is string => typeof value === "string" &
 const isHttpUrl = (value: unknown): value is string => typeof value === "string" && /^https?:\/\/\S+$/i.test(value);
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const importContext = { bylineImport: true };
+const CONVERTIBLE_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heif"]);
+function importMediaTarget(attachment: ExportAttachment) {
+  const sourceMime = text(attachment.mimeType).toLowerCase();
+  if ((MEDIA_MIME_TYPES as readonly string[]).includes(sourceMime)) {
+    return { sourceMime, targetMime: sourceMime, filename: attachment.filename || basename(new URL(attachment.url).pathname), convertToJpeg: false };
+  }
+  if (CONVERTIBLE_IMAGE_MIME_TYPES.has(sourceMime)) {
+    const sourceName = attachment.filename || basename(new URL(attachment.url).pathname) || `wordpress-media-${attachment.id}`;
+    const extension = extname(sourceName);
+    const stem = extension ? sourceName.slice(0, -extension.length) : sourceName;
+    return { sourceMime, targetMime: "image/jpeg", filename: `${stem || `wordpress-media-${attachment.id}`}.jpg`, convertToJpeg: true };
+  }
+  throw new Error(`Attachment ${attachment.id} has unsupported MIME type ${attachment.mimeType}.`);
+}
+
 const EDITORIAL_ONLY_TAG_SLUGS = new Set(["special-coverage", "athlete-of-the-week", "athlete-of-the-month"]);
 const publicTopicTerms = raw.tags.filter((term) => !EDITORIAL_ONLY_TAG_SLUGS.has(term.slug));
 const categoryById = new Map(raw.categories.map((term) => [term.id, term]));
@@ -220,15 +236,28 @@ function nativeBody(body: ArticleBody, media: Map<number, number>): ArticleBody 
 
 async function download(attachment: ExportAttachment) {
   if (!isHttps(attachment.url)) throw new Error(`Attachment ${attachment.id} has no HTTPS source URL.`);
-  if (!(MEDIA_MIME_TYPES as readonly string[]).includes(attachment.mimeType)) throw new Error(`Attachment ${attachment.id} has unsupported MIME type ${attachment.mimeType}.`);
+  const target = importMediaTarget(attachment);
   const response = await fetch(attachment.url, { redirect: "follow", signal: AbortSignal.timeout(30_000) });
   if (!response.ok) throw new Error(`Attachment ${attachment.id} download failed: HTTP ${response.status}.`);
-  const data = Buffer.from(await response.arrayBuffer());
-  if (!data.length || data.length > MEDIA_UPLOAD_MAX_BYTES) throw new Error(`Attachment ${attachment.id} is empty or larger than Byline's upload limit.`);
-  return { data, mimetype: attachment.mimeType, name: attachment.filename || basename(new URL(attachment.url).pathname), size: data.length };
+  let data = Buffer.from(await response.arrayBuffer());
+  if (!data.length) throw new Error(`Attachment ${attachment.id} is empty.`);
+  if (target.convertToJpeg) {
+    try {
+      data = await sharp(data).autoOrient().jpeg({ quality: 92 }).toBuffer();
+    } catch (error) {
+      throw new Error(`Attachment ${attachment.id} could not be converted from ${target.sourceMime} to JPEG: ${(error as Error).message}`);
+    }
+  }
+  if (data.length > MEDIA_UPLOAD_MAX_BYTES) throw new Error(`Attachment ${attachment.id} is larger than Byline's upload limit after import processing.`);
+  return { data, mimetype: target.targetMime, name: target.filename, size: data.length };
 }
 
 async function plan() {
+  for (const attachment of raw.attachments) {
+    if (!isHttps(attachment.url)) throw new Error(`Attachment ${attachment.id} has no HTTPS source URL.`);
+    const target = importMediaTarget(attachment);
+    if (target.convertToJpeg) summary.review.push(`Attachment ${attachment.id}: ${target.sourceMime} will be converted to JPEG for Byline Media.`);
+  }
   for (const attachment of raw.attachments) {
     if (await byLegacy("media", attachment.id)) summary.media.reuse++;
     else summary.media.create++;
