@@ -91,7 +91,7 @@ test("collection context stays compact until expanded at desktop and phone width
     await toggle.focus();
     await page.keyboard.press("Enter");
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await expect(section.getByRole("link", { name: /School principal/ })).toHaveAttribute("href", /collection=90001&interview=90002/);
+    await expect(section.getByRole("link", { name: /School principal/ })).toHaveAttribute("href", /collection=90001&section=reporting&interview=90002/);
     await expect(section.getByRole("link", { name: /Interview recording/ })).toHaveAttribute("target", "_blank");
     await section.getByLabel("Add from Collection", { exact: true }).click();
     await page.getByLabel("Search add from collection", { exact: true }).fill("principal");
