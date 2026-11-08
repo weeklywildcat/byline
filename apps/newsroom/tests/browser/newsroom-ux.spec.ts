@@ -102,8 +102,9 @@ test("moves a Story to Trash from the shadcn publication menu", async ({ page, c
 
   await expect(page).toHaveURL(/\/admin\/stories$/);
   const stored = await request.get(`/api/stories/${id}?trash=true&depth=0`, { headers });
-  expect(stored.ok(), await stored.text()).toBeTruthy();
-  expect((await stored.json()).deletedAt).toEqual(expect.any(String));
+  const storedBody = await stored.json();
+  expect(stored.ok(), JSON.stringify(storedBody)).toBeTruthy();
+  expect(storedBody.deletedAt).toEqual(expect.any(String));
 });
 
 test("keyboard command results open Stories, Collections and Media at their destinations", async ({ page, context, request, baseURL }) => {
