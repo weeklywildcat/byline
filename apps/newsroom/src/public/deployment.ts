@@ -11,6 +11,10 @@ export type DeployPublicSiteInput = {
   reason: string;
 };
 
+function deployReason(value: unknown): string {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, 120) : "public snapshot";
+}
+
 type DeployEnvironment = Record<string, string | undefined>;
 type FetchLike = typeof fetch;
 
@@ -70,7 +74,7 @@ export async function queuePublicDeployment(payload: Payload, input: DeployPubli
     input: {
       revision: input.revision,
       sha256: input.sha256,
-      reason: input.reason.slice(0, 120)
+      reason: deployReason(input.reason)
     } satisfies DeployPublicSiteInput,
     overrideAccess: true
   });
@@ -120,7 +124,7 @@ export async function triggerPublicDeployment(
         "User-Agent": "Byline",
         "X-Byline-Expected-Revision": String(input.revision),
         "X-Byline-Snapshot-Digest": input.sha256,
-        "X-Byline-Reason": input.reason.slice(0, 120)
+        "X-Byline-Reason": deployReason(input.reason)
       }
     });
   } catch {
@@ -146,7 +150,7 @@ export const deployPublicSiteTask: TaskConfig = {
   inputSchema: [
     { name: "revision", type: "number", required: true },
     { name: "sha256", type: "text", required: true },
-    { name: "reason", type: "text" }
+    { name: "reason", type: "text", required: true }
   ],
   outputSchema: [
     { name: "outcome", type: "text" },
