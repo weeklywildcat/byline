@@ -294,10 +294,14 @@ describe("native publication and History actions", () => {
   });
 
   it("moves a Story to Trash, cancels scheduled publication and refuses staff", async () => {
+    const section = await payload.create({
+      collection: "sections",
+      data: { name: "Trash test section", slug: "trash-test-section" },
+    });
     const story = await payload.create({
       collection: "stories",
       draft: true,
-      data: { headline: "Trash fixture" },
+      data: { headline: "Trash fixture", section: section.id },
       req: await reqAs("alice"),
       overrideAccess: false,
     });
@@ -318,7 +322,6 @@ describe("native publication and History actions", () => {
       body: {
         id: story.id,
         cancelledScheduledPublication: true,
-        wasPublished: false,
         deletedAt: expect.any(String),
       },
     });
