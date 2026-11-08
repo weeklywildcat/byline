@@ -61,8 +61,8 @@ export function deployHookUrl(env: DeployEnvironment = process.env): URL | null 
  * the provider. A running job also re-checks publication state immediately
  * before sending its request and skips itself when a newer revision won.
  */
-export async function queuePublicDeployment(payload: Payload, input: DeployPublicSiteInput) {
-  if (!deployHookConfigured()) return null;
+export async function queuePublicDeployment(payload: Payload, input: DeployPublicSiteInput, env: DeployEnvironment = process.env) {
+  if (!deployHookConfigured(env)) return null;
   const jobs = payload.jobs as unknown as { queue: (args: Record<string, unknown>) => Promise<{ id: number | string }> };
   return jobs.queue({
     task: DEPLOY_PUBLIC_SITE_TASK,
@@ -92,13 +92,13 @@ export type DeployHookResult =
 export async function triggerPublicDeployment(
   payload: Payload,
   input: DeployPublicSiteInput,
-  options: { env?: DeployEnvironment; fetch?: FetchLike } = {}
+  options: { env?: DeployEnvironment; fetch?: FetchLike; readState?: typeof readPublicationState } = {}
 ): Promise<DeployHookResult> {
   const env = options.env ?? process.env;
   const hook = deployHookUrl(env);
   if (!hook) return { outcome: "disabled", revision: input.revision, status: 0 };
 
-  const state = await readPublicationState(payload);
+  const state = await (options.readState ?? readPublicationState)(payload);
   // A newer public mutation means this deploy is obsolete. Its own snapshot
   // job will queue a newer deployment after promotion.
   if (state.currentRevision !== input.revision) {
