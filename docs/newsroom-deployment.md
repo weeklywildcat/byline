@@ -43,6 +43,7 @@ Typical commands are:
 ```sh
 docker compose build
 docker compose run --rm migrate
+docker compose stop newsroom
 docker compose run --rm newsroom-build
 docker compose up -d --no-deps --force-recreate \
   newsroom \
@@ -51,6 +52,15 @@ docker compose up -d --no-deps --force-recreate \
   scheduled-worker \
   maintenance-worker
 ```
+
+`newsroom-build` writes into the same shared `.next` volume used by the web
+process, so stop `newsroom` before running it. This creates a brief
+newsroom-only outage, but it prevents the live server from reading files while
+the build replaces them. If the build fails, leave `newsroom` stopped, correct
+the failure and rerun `newsroom-build`; do not restart the web process against
+an incomplete `.next` tree. Deployments that require zero downtime should
+build into a second versioned `.next` volume and switch the web service to it
+only after a successful build.
 
 Production must keep `BYLINE_DB_PUSH=0` and run committed Payload migrations.
 Do not expose PostgreSQL publicly. The newsroom may be published through a
@@ -63,6 +73,7 @@ loopback.
 git pull --ff-only origin main
 docker compose build
 docker compose run --rm migrate
+docker compose stop newsroom
 docker compose run --rm newsroom-build
 docker compose up -d --no-deps --force-recreate \
   newsroom \
