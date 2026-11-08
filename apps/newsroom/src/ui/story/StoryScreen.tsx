@@ -14,7 +14,7 @@ import { TasksSection } from "@byline/newsroom-screens/workspace/TasksSection";
 import { useAuth, useConfig, useDocumentInfo, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import type { CollapsibleFieldClientComponent } from "payload";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useMemo, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
 import { useBylineMediaPicker } from "../media/MediaWorkspaceShell";
 import { useLeaveGuard } from "../shell/navigation";
@@ -76,6 +76,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   const location = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
   const appointmentId = location?.get("appointment") ?? "";
   const defaultTab = appointmentId || location?.get("tab") === "plan" ? "plan" : "write";
+  const [activeTab, setActiveTab] = useState(defaultTab);
 
   const screen = (
     // Write spans the whole canvas (wide and full photographs measure against it);
@@ -83,15 +84,14 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
     <div className="@container/story flex w-full flex-col gap-4 py-6">
       <StoryLeaveGuard />
       <div className="mx-auto w-full max-w-5xl px-4 md:px-8">
-        <StoryHeader context={context} />
+        <StoryHeader context={context} onOpenHistory={() => setActiveTab("history")} />
       </div>
-      <Tabs defaultValue={defaultTab} className="gap-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
         <div className="mx-auto w-full max-w-5xl px-4 md:px-8">
           <TabsList>
             <TabsTrigger value="write">Write</TabsTrigger>
             <TabsTrigger value="plan">Plan</TabsTrigger>
             <TabsTrigger value="production">Production</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
         </div>
         {/* Write stays mounted so the editor keeps its state while other tabs are open. */}
