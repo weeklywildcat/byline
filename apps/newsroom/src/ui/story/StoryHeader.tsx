@@ -173,7 +173,10 @@ export function StoryHeader({ context, onOpenHistory }: { context: StoryScreenCo
         <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-2">
           <StorySwitchButton />
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Story</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Story</p>
+              {liveState === "live" ? <Badge variant="destructive">Live</Badge> : null}
+            </div>
             <p className="truncate text-sm font-medium">{headline.value?.trim() || "Untitled story"}</p>
           </div>
         </div>
