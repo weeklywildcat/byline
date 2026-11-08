@@ -173,7 +173,7 @@ export function StoryHeader({ context, onOpenHistory }: { context: StoryScreenCo
         <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-2">
           <StorySwitchButton />
           <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Story</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Story</p>
             <p className="truncate text-sm font-medium">{headline.value?.trim() || "Untitled story"}</p>
           </div>
         </div>
@@ -182,7 +182,7 @@ export function StoryHeader({ context, onOpenHistory }: { context: StoryScreenCo
           <Button ref={detailsTrigger} type="button" variant="outline" size="sm" aria-haspopup="dialog" onClick={() => setDetailsOpen(true)}>
             <PanelRight data-icon="inline-start" aria-hidden="true" />
             <span className="max-sm:sr-only">Details</span>
-            {problems ? <span className="rounded-full bg-destructive/10 px-1.5 text-[10px] font-medium text-destructive">{problems}</span> : null}
+            {problems ? <Badge variant="destructive">{problems}</Badge> : null}
           </Button>
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
             {saving ? <Spinner className="size-3" /> : saveState === "Saved" ? <Check className="size-3" aria-hidden="true" /> : null}
@@ -204,7 +204,7 @@ export function StoryHeader({ context, onOpenHistory }: { context: StoryScreenCo
       {context.readOnly ? <p className="text-sm text-muted-foreground">Someone else is editing this story. You are viewing it read-only.</p> : null}
 
       <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <SheetContent side="right" className="w-[min(92vw,28rem)] gap-0 overflow-y-auto sm:max-w-md">
+        <SheetContent side="right" className="gap-0 overflow-y-auto sm:max-w-md">
           <SheetHeader className="border-b border-border pr-12">
             <SheetTitle>Story details</SheetTitle>
             <SheetDescription>Appearance, publishing information and special story modes.</SheetDescription>
