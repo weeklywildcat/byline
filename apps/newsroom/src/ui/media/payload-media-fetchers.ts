@@ -2,7 +2,7 @@
 
 import type { MediaArtDirection } from "@byline/newsroom-screens/media/art-direction-model";
 import type { MediaLibraryFetchers } from "@byline/newsroom-screens/media/media-library-api";
-import { mediaLibraryParams, type MediaAssetDetail, type MediaFolder, type MediaLibraryAsset, type MediaLibraryPage, type MediaNavigatorData } from "@byline/newsroom-screens/media/media-library-model";
+import { mediaLibraryParams, type MediaAssetDetail, type MediaBulkResult, type MediaFolder, type MediaLibraryAsset, type MediaLibraryPage, type MediaNavigatorData } from "@byline/newsroom-screens/media/media-library-model";
 import { createMediaPreferencesStore, type MediaPreferencesStore } from "@byline/newsroom-screens/media/media-preferences";
 import { normalizeMediaPreferences } from "@byline/newsroom-screens/media/media-preferences";
 import { queryPath, type PlanningFetchers } from "@byline/newsroom-screens/planning/planning-api";
@@ -25,6 +25,9 @@ export function createPayloadMediaFetchers(api: string): MediaLibraryFetchers {
     updateMedia: (id, patch) => request<MediaAssetDetail>(`/media/${id}`, "PATCH", patch),
     moveMedia: (ids, folderId) => request("/media/move", "POST", { ids, folderId }),
     deleteMedia: (id) => request<void>(`/media/${id}`, "DELETE"),
+    renameMedia: (id, input) => request<MediaAssetDetail>(`/media/${id}/rename`, "POST", input),
+    updateMediaMany: (ids, patch) => request<MediaBulkResult>("/media/bulk-update", "POST", { ids, patch }),
+    deleteMediaMany: (ids) => request<MediaBulkResult>("/media/bulk-delete", "POST", { ids }),
     uploadMedia: (file, options) => uploadWithProgress(`${api}/byline/media/upload`, file, options),
     createFolder: (input) => request<MediaFolder>("/media/folders", "POST", input),
     updateFolder: (id, input) => request<MediaFolder>(`/media/folders/${id}`, "PATCH", input),

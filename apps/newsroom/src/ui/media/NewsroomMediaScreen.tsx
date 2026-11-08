@@ -1,7 +1,9 @@
 "use client";
 
 import { MEDIA_WORK_SCOPES } from "@byline/newsroom-screens/media/media-desk-model";
+import { MediaBulkDeleteDialog, MediaBulkEditDialog, MediaSelectionBar } from "@byline/newsroom-screens/media/MediaBulkActions";
 import { MediaFolderDialogs } from "@byline/newsroom-screens/media/MediaFolderDialogs";
+import { MediaRenameDialog } from "@byline/newsroom-screens/media/MediaRename";
 import { MediaInspectorContent } from "@byline/newsroom-screens/media/MediaInspectorContent";
 import { MediaLibraryBrowser } from "@byline/newsroom-screens/media/MediaLibraryBrowser";
 import { childFolderCount, EMPTY_MEDIA_FILTERS, folderPath, MEDIA_LIBRARY_SOURCES, mediaRouteSearch, type MediaLibraryAsset, type MediaLibraryFilters, type MediaRoute } from "@byline/newsroom-screens/media/media-library-model";
@@ -23,7 +25,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@byline/ne
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
 import { useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { useConfig, usePreferences } from "@payloadcms/ui";
-import { Download, FolderInput, FolderPen, FolderPlus, FolderTree, Info, Link2, MoreHorizontal, PanelLeft, Trash2, Upload } from "lucide-react";
+import { Download, FolderInput, FolderPen, FolderPlus, FolderTree, Info, Link2, MoreHorizontal, PanelLeft, Pencil, PenLine, SquareCheck, Trash2, Upload } from "lucide-react";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { atLeast } from "../../access/user";
@@ -97,7 +99,27 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
   const folders = navigator?.folders ?? [];
   const [filters, setFilters] = useState<MediaLibraryFilters>(EMPTY_MEDIA_FILTERS);
   const [confirmDelete, setConfirmDelete] = useState<MediaLibraryAsset | null>(null);
+  const [renaming, setRenaming] = useState<MediaLibraryAsset | null>(null);
   const client = useQueryClient();
+
+  /* ------------------------------------------------------ multi-select */
+
+  // The loaded files, so a selection can be acted on (and pruned when files leave the view).
+  const [loaded, setLoaded] = useState<MediaLibraryAsset[]>([]);
+  const [checked, setChecked] = useState<Set<number>>(() => new Set());
+  const [bulk, setBulk] = useState<"edit" | "delete" | null>(null);
+  const checkedAssets = useMemo(() => loaded.filter((asset) => checked.has(asset.id)), [checked, loaded]);
+  useEffect(() => {
+    setChecked((current) => {
+      if (!current.size) return current;
+      const present = new Set(loaded.map((asset) => asset.id));
+      const next = new Set([...current].filter((id) => present.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [loaded]);
+  // A new place or a new search is a new selection.
+  const place = `${route.view}:${route.source}:${route.folderId}:${JSON.stringify(filters)}`;
+  useEffect(() => { setChecked((current) => (current.size ? new Set() : current)); }, [place]);
 
   // ⌘K opens a story in this screen's Peek rather than leaving Media.
   useEffect(() => {
@@ -146,12 +168,14 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
 
   /* ---------------------------------------------------- asset shortcuts */
 
-  const assetMenu = (asset: MediaLibraryAsset) => (
+  const assetMenu = (asset: MediaLibraryAsset) => (checked.has(asset.id) && checked.size > 1 ? selectionMenu() : (
     <>
       <ContextMenuGroup>
         <ContextMenuLabel className="max-w-52 truncate">{asset.filename}</ContextMenuLabel>
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => select(asset)}><Info aria-hidden="true" />Details</ContextMenuItem>
+        <ContextMenuItem onClick={() => setChecked((current) => new Set([...current, asset.id]))}><SquareCheck aria-hidden="true" />Select</ContextMenuItem>
+        {asset.canUpdate ? <ContextMenuItem onClick={() => setRenaming(asset)}><Pencil aria-hidden="true" />Rename…</ContextMenuItem> : null}
         {asset.canUpdate ? <ContextMenuItem onClick={() => workspace.requestFolderAction({ kind: "move-assets", assets: [asset] })}><FolderInput aria-hidden="true" />Move to folder…</ContextMenuItem> : null}
         {asset.url ? <ContextMenuItem render={<a href={asset.url} download={asset.filename} />}><Download aria-hidden="true" />Download</ContextMenuItem> : null}
         <ContextMenuItem onClick={() => void copy(new URL(workspace.href(libraryRoute({ ...(route.folderId !== null ? { folderId: route.folderId } : { source: route.source }), assetId: asset.id })), window.location.href).toString())}><Link2 aria-hidden="true" />Copy link</ContextMenuItem>
@@ -163,6 +187,40 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
         </>
       ) : null}
     </>
+  ));
+
+  /* --------------------------------------------------- bulk actions */
+
+  const movable = checkedAssets.filter((asset) => asset.canUpdate);
+  const deletable = checkedAssets.filter((asset) => asset.canDelete);
+  const downloadable = checkedAssets.filter((asset) => asset.url);
+  const moveChecked = () => workspace.requestFolderAction({ kind: "move-assets", assets: movable });
+  // One download per file; browsers may ask once before allowing several.
+  const downloadChecked = () => downloadable.forEach((asset, index) => window.setTimeout(() => download(asset), index * 250));
+  const selectionMenu = () => (
+    <>
+      <ContextMenuGroup>
+        <ContextMenuLabel>{checked.size} selected</ContextMenuLabel>
+        <ContextMenuSeparator />
+        {movable.length ? <ContextMenuItem onClick={() => setBulk("edit")}><PenLine aria-hidden="true" />Edit details…</ContextMenuItem> : null}
+        {movable.length ? <ContextMenuItem onClick={moveChecked}><FolderInput aria-hidden="true" />Move to folder…</ContextMenuItem> : null}
+        {downloadable.length ? <ContextMenuItem onClick={downloadChecked}><Download aria-hidden="true" />Download {downloadable.length}</ContextMenuItem> : null}
+      </ContextMenuGroup>
+      {deletable.length ? (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem variant="destructive" onClick={() => setBulk("delete")}><Trash2 aria-hidden="true" />Delete {deletable.length}…</ContextMenuItem>
+        </>
+      ) : null}
+    </>
+  );
+  const selectionBar = (
+    <MediaSelectionBar count={checked.size} loaded={loaded.length} onSelectAll={() => setChecked(new Set(loaded.map((asset) => asset.id)))} onClear={() => setChecked(new Set())}>
+      <Button variant="ghost" size="sm" disabled={!movable.length} onClick={() => setBulk("edit")} data-media-bulk-action="edit"><PenLine data-icon="inline-start" aria-hidden="true" />Edit details</Button>
+      <Button variant="ghost" size="sm" disabled={!movable.length} onClick={moveChecked} data-media-bulk-action="move"><FolderInput data-icon="inline-start" aria-hidden="true" />Move</Button>
+      <Button variant="ghost" size="sm" disabled={!downloadable.length} onClick={downloadChecked} data-media-bulk-action="download"><Download data-icon="inline-start" aria-hidden="true" />Download</Button>
+      {editor ? <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" disabled={!deletable.length} onClick={() => setBulk("delete")} data-media-bulk-action="delete"><Trash2 data-icon="inline-start" aria-hidden="true" />Delete</Button> : null}
+    </MediaSelectionBar>
   );
 
   const showSheet = route.view === "library" && route.assetId !== null && !persistentInspector;
@@ -178,11 +236,11 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
       navigator={navigator}
       timezone={timezone}
       guardRef={guard}
-      onClose={persistentInspector ? () => select(null) : undefined}
+      onClose={() => select(null)}
       onDeleted={() => navigate({ ...route, assetId: null }, { replace: true })}
       onOpenStory={openStory}
       assetHref={assetHref}
-      showHeading={persistentInspector}
+      showHeading
       onEditArtDirection={(id) => workspace.editArtDirection(id)}
     />
   ) : null;
@@ -203,6 +261,10 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
       timezone={timezone}
       selectedId={route.assetId}
       onActivate={(asset) => select(route.assetId === asset.id && !persistentInspector ? null : asset)}
+      checkedIds={checked}
+      onCheckedChange={setChecked}
+      selectionBar={selectionBar}
+      onAssetsChange={setLoaded}
       assetMenu={assetMenu}
       onSearchEverywhere={() => go(libraryRoute({}))}
       toolbarEnd={<Button onClick={upload} data-media-upload-button=""><Upload data-icon="inline-start" aria-hidden="true" />Upload</Button>}
@@ -267,12 +329,12 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
       <MediaNavigatorSheet />
 
       <Sheet open={showSheet} onOpenChange={(open) => { if (!open) select(null); }}>
-        <SheetContent side="right" className="gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:w-3/4 data-[side=right]:sm:max-w-md" finalFocus={() => (document.querySelector(`[data-media-asset="${lastAsset.current}"]`) as HTMLElement | null) ?? true} data-media-inspector-sheet="">
-          <SheetHeader className="border-b p-4 pr-12">
-            <SheetTitle className="truncate">File details</SheetTitle>
-            <SheetDescription className="sr-only">Preview, metadata, folder and linked uses of the selected file.</SheetDescription>
+        <SheetContent side="right" showCloseButton={false} className="gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:w-3/4 data-[side=right]:sm:max-w-md" finalFocus={() => (document.querySelector(`[data-media-asset="${lastAsset.current}"]`) as HTMLElement | null) ?? true} data-media-inspector-sheet="">
+          <SheetHeader className="sr-only">
+            <SheetTitle>File details</SheetTitle>
+            <SheetDescription>Preview, metadata, folder and linked uses of the selected file.</SheetDescription>
           </SheetHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto">{showSheet ? inspector : null}</div>
+          <div className="flex min-h-0 flex-1 flex-col">{showSheet ? inspector : null}</div>
         </SheetContent>
       </Sheet>
 
@@ -286,6 +348,19 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
       />
 
       {unsavedDialog}
+
+      <MediaRenameDialog asset={renaming} onClose={() => setRenaming(null)} fetchers={workspace.fetchers} />
+      <MediaBulkEditDialog assets={checkedAssets} open={bulk === "edit"} onOpenChange={(open) => { if (!open) setBulk(null); }} fetchers={workspace.fetchers} />
+      <MediaBulkDeleteDialog
+        assets={deletable}
+        open={bulk === "delete"}
+        onOpenChange={(open) => { if (!open) setBulk(null); }}
+        fetchers={workspace.fetchers}
+        onDone={(result) => {
+          setChecked(new Set(result.failed.map((failure) => failure.id)));
+          if (route.assetId !== null && result.done.includes(route.assetId)) navigate({ ...route, assetId: null }, { replace: true });
+        }}
+      />
 
       <AlertDialog open={confirmDelete !== null} onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}>
         <AlertDialogContent>
@@ -314,6 +389,17 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
       </AlertDialog>
     </main>
   );
+}
+
+function download(asset: MediaLibraryAsset) {
+  if (!asset.url) return;
+  const link = document.createElement("a");
+  link.href = asset.url;
+  link.download = asset.filename;
+  link.rel = "noreferrer";
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 
 async function copy(url: string) {

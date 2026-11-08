@@ -1,12 +1,16 @@
 import { mediaSearchWhere } from "./media-search";
 import { storyMediaUses } from "./story-media-uses";
 import {
+  cleanMediaName,
+  MEDIA_BULK_FIELDS,
   mediaKind,
   mediaMetadataGaps,
   MEDIA_FIELD_LIMITS,
   MEDIA_METADATA_FIELDS,
   MEDIA_RECENT_DAYS,
   type MediaAssetDetail,
+  type MediaBulkPatch,
+  type MediaBulkResult,
   type MediaPublicationAssetState,
   type MediaFolder,
   type MediaFolderRef,
@@ -16,11 +20,14 @@ import {
   type MediaMetadataPatch,
   type MediaNavigatorData,
   type MediaPersonRef,
-  type MediaUsage
+  type MediaUsage,
+  splitFilename
 } from "@byline/newsroom-screens/media/media-library-model";
 import type { MediaMoveResult } from "@byline/newsroom-screens/media/media-library-api";
+import { access, link, unlink } from "node:fs/promises";
+import path from "node:path";
 import { sql } from "@payloadcms/db-postgres";
-import { APIError, type Where } from "payload";
+import { APIError, commitTransaction, initTransaction, killTransaction, type Where } from "payload";
 import { atLeast, relationId, relationIds, sameId } from "../access/user";
 import { AUDIO_MIME_TYPES, IMAGE_MIME_TYPES, LIBRARY_PREVIEW_SIZE, MEDIA_MIME_TYPES } from "../collections/Media";
 import { MEDIA_FOLDERS_SLUG } from "../collections/MediaFolders";
@@ -29,7 +36,9 @@ import { PRODUCTION_TYPE_OPTIONS } from "../domain/vocabulary";
 import type { FolderInterface, Media } from "../payload-types";
 import { readableStories, type ScreenContext } from "./screen-models";
 import { effectivePublicationStatus } from "@byline/content";
-import { publicationDetail, withPublicationState } from "../publication-media/media-publication";
+import { canUpdateMedia, findMedia, publicationDetail, withPublicationState } from "../publication-media/media-publication";
+import { privateMediaDir } from "../publication-media/paths";
+import { lockMediaRow } from "../publication-media/state";
 
 /**
  * The Byline Media Library over Payload Media (`/api/byline/media/*`).
@@ -371,6 +380,127 @@ export async function moveMedia(ctx: ScreenContext, ids: number[], folderId: num
     }
   }
   return result;
+}
+
+/**
+ * Applies the same creator, credit or rights to several files, one at a
+ * time as this account: a file someone else uploaded (for staff) is refused
+ * and reported, the rest are changed. Empty values are skipped, never used to
+ * clear a field across many files.
+ */
+export async function updateMediaMany(ctx: ScreenContext, ids: number[], patch: MediaBulkPatch): Promise<MediaBulkResult> {
+  const data: Record<string, string> = {};
+  for (const field of MEDIA_BULK_FIELDS) {
+    const text = typeof patch[field] === "string" ? patch[field]!.trim() : "";
+    if (!text) continue;
+    if (text.length > MEDIA_FIELD_LIMITS[field]) throw new APIError(`Keep that under ${MEDIA_FIELD_LIMITS[field]} characters.`, 400);
+    data[field] = field === "sourceUrl" ? sourceUrlOrThrow(text) : text;
+  }
+  if (!Object.keys(data).length) throw new APIError("Fill in at least one field to apply.", 400);
+  const result: MediaBulkResult = { done: [], failed: [] };
+  for (const id of [...new Set(ids)].slice(0, 200)) {
+    try {
+      await ctx.req.payload.update({ collection: "media", id, data, overrideLock: false, ...asUser(ctx) });
+      result.done.push(id);
+    } catch (error) {
+      const status = (error as { status?: number }).status;
+      result.failed.push({ id, message: status === 403 ? "You can only change files you uploaded." : status === 404 ? "That file is no longer in Media." : status === 423 ? "Someone is editing that file." : "That file couldn't be changed." });
+    }
+  }
+  return result;
+}
+
+/** Deletes several files (editors), each refused on its own while something still links to it. */
+export async function deleteMediaMany(ctx: ScreenContext, ids: number[]): Promise<MediaBulkResult> {
+  if (!atLeast(ctx.user, "editor")) throw new APIError("Only editors delete files from Media.", 403);
+  const result: MediaBulkResult = { done: [], failed: [] };
+  for (const id of [...new Set(ids)].slice(0, 200)) {
+    try {
+      await deleteMedia(ctx, id);
+      result.done.push(id);
+    } catch (error) {
+      const failure = error as { status?: number; message?: string };
+      result.failed.push({ id, message: failure.status === 409 && failure.message ? failure.message : failure.status === 404 ? "That file is no longer in Media." : "That file couldn't be deleted." });
+    }
+  }
+  return result;
+}
+
+/**
+ * Renames the stored file. Payload has no rename, so Byline does it the safe
+ * way round: the original and its private preview get hard links under the
+ * new name first, then the Media row (under its row lock, compare-and-swap)
+ * points at them, and only after the commit do the old names go. Nothing ever
+ * points at a missing file. Links to the file (stories, assignments,
+ * portraits) are by ID and don't change; its private URL does. The bytes are
+ * the same, so the publication revision doesn't move and the prepared files
+ * stay valid; a preparation that started under the old name retries under
+ * the new one (publication-media/task.ts). The extension (the file's type)
+ * never changes, and a name already taken gets Payload's "-1".
+ */
+/** `stem.ext`, or `stem-1.ext`, `stem-2.ext`… (Payload's own convention) when another Media row or a file on disk has it. */
+async function freeFilename(ctx: ScreenContext, dir: string, stem: string, extension: string, id: number): Promise<string> {
+  const exists = (file: string) => access(path.join(dir, file)).then(() => true, () => false);
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    const candidate = `${attempt ? `${stem}-${attempt}` : stem}${extension}`;
+    const taken = await ctx.req.payload.db.findOne({ collection: "media", where: { and: [{ filename: { equals: candidate } }, { id: { not_equals: id } }] }, req: ctx.req });
+    if (!taken && !(await exists(candidate))) return candidate;
+  }
+  throw new APIError("Choose a more distinctive name.", 409);
+}
+
+export async function renameMedia(ctx: ScreenContext, id: number, input: { name?: unknown; expectedUpdatedAt?: unknown }): Promise<MediaAssetDetail> {
+  const dir = privateMediaDir();
+  const created: string[] = [];
+  let retired: string[] = [];
+  const started = await initTransaction(ctx.req);
+  try {
+    await lockMediaRow(ctx.req, id);
+    const media = await findMedia(ctx, id);
+    if (!(await canUpdateMedia(ctx, id))) throw new APIError("Only the person who uploaded this file, or an editor, can rename it.", 403);
+    if (typeof input.expectedUpdatedAt === "string" && input.expectedUpdatedAt && Date.parse(input.expectedUpdatedAt) !== Date.parse(media.updatedAt)) {
+      throw new APIError("Someone else changed this file while you were renaming it. Reload to see the newer version.", 409);
+    }
+    const current = media.filename;
+    if (!current) throw new APIError("This Media record has no stored file to rename.", 409);
+    const { stem: oldStem, extension } = splitFilename(current);
+    const stem = cleanMediaName(typeof input.name === "string" ? input.name : "", extension);
+    if (!stem) throw new APIError("Give the file a name.", 400);
+    if (`${stem}${extension}` !== current) {
+      const filename = await freeFilename(ctx, dir, stem, extension, id);
+      const newStem = splitFilename(filename).stem;
+      const moves: Array<[string, string]> = [[current, filename]];
+      const sizes = structuredClone((media.sizes ?? {}) as Record<string, Record<string, unknown> | undefined>);
+      for (const size of Object.values(sizes)) {
+        const old = typeof size?.filename === "string" ? size.filename : null;
+        if (!size || !old) continue;
+        // Payload names a size `<stem>-<width>x<height>.<ext>`.
+        const renamed = old.startsWith(`${oldStem}-`) ? `${newStem}${old.slice(oldStem.length)}` : `${newStem}-${old}`;
+        moves.push([old, renamed]);
+        size.filename = renamed;
+        delete size.url; // derived from the filename on read
+      }
+      for (const [from, to] of moves) {
+        await link(path.join(dir, path.basename(from)), path.join(dir, path.basename(to))).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT" && from !== current) return; // a missing preview is not worth refusing the rename for
+          throw error.code === "EEXIST" ? new APIError("A file with that name already exists. Try another name.", 409) : error;
+        });
+        created.push(to);
+      }
+      // Payload's update drops a submitted filename (it only takes one from an upload), so the row is written
+      // directly, in this transaction under the row lock, after the access check above. No hooks run: the
+      // bytes are the same, so the publication revision and the prepared files stay as they are.
+      await ctx.req.payload.db.updateOne({ collection: "media", id, data: { filename, sizes, updatedAt: new Date().toISOString() }, req: ctx.req, returning: false });
+      retired = moves.map(([from]) => from);
+    }
+    if (started) await commitTransaction(ctx.req);
+  } catch (error) {
+    if (started) await killTransaction(ctx.req);
+    await Promise.all(created.map((name) => unlink(path.join(dir, path.basename(name))).catch(() => undefined)));
+    throw error;
+  }
+  await Promise.all(retired.map((name) => unlink(path.join(dir, path.basename(name))).catch(() => undefined)));
+  return mediaDetail(ctx, id);
 }
 
 export async function deleteMedia(ctx: ScreenContext, id: number): Promise<void> {
