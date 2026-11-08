@@ -82,6 +82,30 @@ for (const width of [1440, 820, 390]) {
   });
 }
 
+test("moves a Story to Trash from the shadcn publication menu", async ({ page, context, request, baseURL }) => {
+  const token = await login(request, baseURL!, "ADMIN");
+  const headers = { Authorization: `JWT ${token}`, Origin: baseURL! };
+  const id = await createStory(request, baseURL!, token, {
+    headline: "Trash action fixture",
+    slug: `trash-${Date.now()}`,
+  });
+  await signIn(context, baseURL!, token);
+  await page.goto(`/admin/collections/stories/${id}`);
+  await expect(page.getByRole("heading", { name: "Trash action fixture", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Publication actions" }).click();
+  await page.getByRole("menuitem", { name: /Move to trash/i }).click();
+
+  const dialog = page.getByRole("alertdialog", { name: "Move this story to Trash?" });
+  await expect(dialog).toContainText("recoverable");
+  await dialog.getByRole("button", { name: "Move to Trash", exact: true }).click();
+
+  await expect(page).toHaveURL(/\/admin\/stories$/);
+  const stored = await request.get(`/api/stories/${id}?trash=true&depth=0`, { headers });
+  expect(stored.ok(), await stored.text()).toBeTruthy();
+  expect((await stored.json()).deletedAt).toEqual(expect.any(String));
+});
+
 test("keyboard command results open Stories, Collections and Media at their destinations", async ({ page, context, request, baseURL }) => {
   const token = await login(request, baseURL!, "ADMIN");
   const headers = { Authorization: `JWT ${token}`, Origin: baseURL! };
