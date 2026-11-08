@@ -2,6 +2,7 @@ import { createLocalReq, getPayload, type Payload, type PayloadRequest } from "p
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { newsroomEndpoints } from "../../src/newsroom/endpoints";
 import { homeBootstrap, screenContext, storyWorkspace } from "../../src/newsroom/screen-models";
+import { scheduledPublicationsForStories } from "../../src/newsroom/scheduled-publication";
 import type { User } from "../../src/payload-types";
 
 /**
@@ -290,6 +291,61 @@ describe("native publication and History actions", () => {
     const unpublish = await payload.update({ collection: "stories", id: story.id, data: { _status: "draft" }, req: await reqAs("editor"), overrideAccess: false });
     expect(unpublish.publishedAt).toBe(published.publishedAt);
     expect((await payload.update({ collection: "stories", id: story.id, data: { _status: "published" }, req: await reqAs("editor"), overrideAccess: false })).publishedAt).toBe(published.publishedAt);
+  });
+
+  it("moves a Story to Trash, cancels scheduled publication and refuses staff", async () => {
+    const section = await payload.create({
+      collection: "sections",
+      data: { name: "Trash test section", slug: "trash-test-section" },
+    });
+    const story = await payload.create({
+      collection: "stories",
+      draft: true,
+      data: { headline: "Trash fixture", section: section.id },
+      req: await reqAs("alice"),
+      overrideAccess: false,
+    });
+    const params = { id: String(story.id) };
+    const schedule = await call(
+      "post",
+      "/byline/stories/:id/schedule-publication",
+      "editor",
+      { at: "2028-01-03T23:45", expected: null },
+      params,
+    );
+    expect(schedule.status).toBe(200);
+
+    expect((await call("post", "/byline/stories/:id/trash", "alice", {}, params)).status).toBe(403);
+    const trashed = await call("post", "/byline/stories/:id/trash", "editor", {}, params);
+    expect(trashed).toMatchObject({
+      status: 200,
+      body: {
+        id: story.id,
+        cancelledScheduledPublication: true,
+        deletedAt: expect.any(String),
+      },
+    });
+
+    const stored = await payload.findByID({
+      collection: "stories",
+      id: story.id,
+      trash: true,
+      depth: 0,
+      overrideAccess: true,
+    });
+    expect(stored.deletedAt).toBe(trashed.body.deletedAt);
+    expect(
+      (
+        await payload.find({
+          collection: "stories",
+          where: { id: { equals: story.id } },
+          depth: 0,
+          limit: 1,
+          overrideAccess: true,
+        })
+      ).totalDocs,
+    ).toBe(0);
+    expect((await scheduledPublicationsForStories(await ctxAs("editor"), [story.id])).size).toBe(0);
   });
 
   it("lists native versions, records their authors and restores a draft without publishing it", async () => {

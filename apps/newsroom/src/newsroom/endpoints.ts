@@ -9,7 +9,7 @@ import { commandSearch } from "./command-search";
 import { changeCorrection, storyCorrections } from "./story-corrections";
 import { restoreStoryVersion, storyVersion, storyVersions } from "./story-history";
 import { storyReadiness } from "./story-readiness";
-import { setScheduledPublication } from "./scheduled-publication";
+import { setScheduledPublication, trashStory } from "./scheduled-publication";
 import { storyURLContext } from "./story-url";
 import type { ContributorEntry, EditorialWorkflowPayload, TaskInput, TaskPatch } from "@byline/newsroom-screens/editorial/editorial-model";
 import type { HomePresetsPayload } from "@byline/newsroom-screens/home/home-model";
@@ -568,6 +568,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/restore-version", method: "post", handler: handle(async (ctx, req) => restoreStoryVersion(ctx, idParam(req), await body(req))) },
   { path: "/byline/stories/:id/readiness", method: "get", handler: handle((ctx, req) => storyReadiness(ctx, idParam(req))) },
   { path: "/byline/stories/:id/schedule-publication", method: "post", handler: handle(async (ctx, req) => setScheduledPublication(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/trash", method: "post", handler: handle((ctx, req) => trashStory(ctx, idParam(req))) },
   { path: "/byline/stories/:id/public-url", method: "get", handler: handle((ctx, req) => storyURLContext(ctx, idParam(req))) },
   { path: "/byline/presence", method: "get", handler: handle(presenceSnapshot) },
   { path: "/byline/presence", method: "post", handler: handle(presenceHeartbeat) },
