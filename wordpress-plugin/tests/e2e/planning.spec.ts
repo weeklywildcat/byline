@@ -1,5 +1,6 @@
 import { expect, test, type AdminSession } from "./fixtures";
 import { addDays, createPlanningStory, currentUserId, siteToday, token } from "./planning-fixture";
+import { BOARD_COLLAPSED_PREFERENCE_KEY, BOARD_LAYOUT_PREFERENCE_KEY } from "@byline/newsroom-screens/planning/stories-board-layout";
 
 const storiesUrl = "/wp-admin/admin.php?page=byline-planning&tab=stories";
 
@@ -19,6 +20,14 @@ async function openBoard(page: Parameters<Parameters<typeof test>[2]>[0]["adminP
 const column = (page: Parameters<typeof openBoard>[0], id: string) => page.locator(`section[data-status="${id}"]`);
 const card = (page: Parameters<typeof openBoard>[0], id: number) => page.locator(`[data-story-id="${id}"]`);
 
+/** Empty lanes fold by default. Open the lanes whose full geometry the test exercises. */
+async function keepLanesOpen(page: Parameters<typeof openBoard>[0], stages: string[]) {
+  await page.addInitScript(({ layoutKey, collapsedKey, stages }) => {
+    localStorage.setItem(layoutKey, "lanes");
+    localStorage.setItem(collapsedKey, JSON.stringify(Object.fromEntries(stages.map((stage) => [stage, false]))));
+  }, { layoutKey: BOARD_LAYOUT_PREFERENCE_KEY, collapsedKey: BOARD_COLLAPSED_PREFERENCE_KEY, stages });
+}
+
 test.describe("Stories board", () => {
   test("drags a story between stages with an optimistic move, an announcement and a rollback on failure", async ({ adminPage: page, adminSession: session }) => {
     const unique = token();
@@ -29,6 +38,7 @@ test.describe("Stories board", () => {
       const url = new URL(response.url());
       return url.pathname.endsWith("/byline/v1/editorial/planning") && url.searchParams.get("search") === unique;
     });
+    await keepLanesOpen(page, ["writing", "editing"]);
     await openBoard(page, unique);
     const response = await filtered;
     expect(response.ok()).toBe(true);
@@ -132,6 +142,7 @@ test.describe("Stories board", () => {
     const unique = token();
     const open = await createPlanningStory(session, { title: `${unique} Open`, status: "writing" });
     const published = await createPlanningStory(session, { title: `${unique} Published`, published: true });
+    await keepLanesOpen(page, ["on-hold"]);
     await openBoard(page, unique);
     await expect(column(page, "on-hold").locator("[data-story-id]")).toHaveCount(0);
     await expect(column(page, "on-hold").getByText("No stories")).toBeVisible();
@@ -158,6 +169,7 @@ test.describe("Stories board", () => {
   test("auto-scrolls the board sideways while a story is dragged to its edge", async ({ adminPage: page, adminSession: session }) => {
     const unique = token();
     const id = await createPlanningStory(session, { title: `${unique} Edge`, status: "pitch" });
+    await keepLanesOpen(page, ["assigned", "reporting", "writing"]);
     await page.setViewportSize({ width: 900, height: 800 });
     await page.goto(storiesUrl + "&view=board", { waitUntil: "domcontentloaded" });
     await page.getByRole("searchbox", { name: "Search stories" }).fill(unique);
@@ -180,6 +192,7 @@ test.describe("Stories board", () => {
   test("scrolls sideways on a narrow screen instead of squeezing the stages, with no page overflow", async ({ adminPage: page, adminSession: session }) => {
     const unique = token();
     await createPlanningStory(session, { title: `${unique} Narrow`, status: "reporting" });
+    await keepLanesOpen(page, ["pitch"]);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(storiesUrl + "&view=board", { waitUntil: "domcontentloaded" });
     await page.getByRole("searchbox", { name: "Search stories" }).fill(unique);
