@@ -83,6 +83,10 @@ The importer:
 - preserves published/draft state, original published timestamp, slug, deck,
   ordered byline, featured Media/caption, story format/video, reporting note
   and presentation;
+- preserves the useful private Story plan: workflow stage, deadline, planned
+  publication, brief and resource links; old assigned-editor IDs are reported
+  for review instead of creating login accounts, and legacy visual-needs notes
+  are reported because Payload has no direct equivalent field;
 - converts structured and old inline correction notices to first-class
   Corrections;
 - suppresses per-record public revision churn during the controlled import and
