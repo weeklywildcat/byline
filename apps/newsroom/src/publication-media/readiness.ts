@@ -33,6 +33,19 @@ export type PublicationMediaReport = { ready: boolean; preparing: number; blocke
 
 export type MediaRequirement = { id: number; role: PublicationMediaRole; /** This story use has its own effective alt text, so the asset-level alt may be empty. */ allowMissingAlt?: boolean };
 
+/** Metadata gaps that matter for this Story use. Alt may come from the block; credit and rights always belong to Media. */
+export function mediaMetadataGapsForRequirement(media: Pick<Media, "alt" | "credit" | "creator" | "copyright" | "license" | "sourceUrl" | "mimeType">, requirement: MediaRequirement) {
+  return mediaMetadataGaps({
+    alt: media.alt ?? "",
+    credit: media.credit ?? "",
+    creator: media.creator ?? "",
+    copyright: media.copyright ?? "",
+    license: media.license ?? "",
+    sourceUrl: media.sourceUrl ?? "",
+    mimeType: media.mimeType
+  }).filter((gap) => gap !== "alt" || !requirement.allowMissingAlt);
+}
+
 const PREPARATION_MESSAGES: Record<PublicationNotReadyReason, { message: string; state: MediaReadinessItem["state"]; retryable: boolean }> = {
   preparing: { message: "Publication files are still being prepared", state: "preparing", retryable: false },
   "not-prepared": { message: "Publication files haven't been prepared", state: "blocked", retryable: true },
@@ -97,8 +110,7 @@ export async function publicationMediaReport(payload: Payload, requirements: Med
       issues.push({ code: "wrong-type", message: requirement.role === "image" ? "The lead image must be a photo or graphic" : "This kind of file can't be published" });
       state = "blocked";
     }
-    for (const gap of mediaMetadataGaps({ alt: media.alt ?? "", credit: media.credit ?? "", creator: media.creator ?? "", copyright: media.copyright ?? "", license: media.license ?? "", sourceUrl: media.sourceUrl ?? "", mimeType: media.mimeType })) {
-      if (gap === "alt" && requirement.allowMissingAlt) continue;
+    for (const gap of mediaMetadataGapsForRequirement(media, requirement)) {
       issues.push({ code: "metadata", message: GAP_LABELS[gap] });
       state = "blocked";
     }
