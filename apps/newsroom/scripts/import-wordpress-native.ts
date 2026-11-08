@@ -125,6 +125,7 @@ const summary: Summary = {
 };
 
 const isHttps = (value: unknown): value is string => typeof value === "string" && /^https:\/\/\S+$/i.test(value);
+const isHttpUrl = (value: unknown): value is string => typeof value === "string" && /^https?:\/\/\S+$/i.test(value);
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const importContext = { bylineImport: true };
 const EDITORIAL_ONLY_TAG_SLUGS = new Set(["special-coverage", "athlete-of-the-week", "athlete-of-the-month"]);
@@ -305,7 +306,7 @@ function importedPlan(post: ExportPost) {
     const label = text(resource.label).slice(0, 120);
     const url = text(resource.url);
     const purpose = resourcePurposes.has(resource.purpose) ? resource.purpose : "other";
-    if (!label || !isHttps(url)) throw new Error(`Post ${post.id} has an invalid private resource link.`);
+    if (!label || !isHttpUrl(url)) throw new Error(`Post ${post.id} has an invalid private resource link.`);
     const parsed = new URL(url);
     if (parsed.username || parsed.password) throw new Error(`Post ${post.id} has a private resource URL with credentials.`);
     return { label, url, purpose };
