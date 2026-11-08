@@ -177,7 +177,12 @@ export const Stories: CollectionConfig = {
       if (data?._status === "published" && !atLeast(scope.user, "editor")) return false;
       return scope.all ? true : inIds("id", scope.managed);
     },
-    delete: ({ req }) => atLeast(requestUser(req), "editor")
+    // Editors may move Stories to Trash; only administrators may permanently delete.
+    // Payload passes data.deletedAt for a soft-delete and no data for a hard delete.
+    delete: ({ req, data }) => {
+      const user = requestUser(req);
+      return atLeast(user, "administrator") || (atLeast(user, "editor") && Boolean(data?.deletedAt));
+    }
   },
   hooks: {
     beforeOperation: [({ args, operation, req, overrideAccess }) => {
