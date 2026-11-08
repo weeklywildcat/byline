@@ -128,7 +128,6 @@ export async function trashStory(ctx: ScreenContext, storyId: number) {
     return {
       id: storyId,
       deletedAt,
-      wasPublished: story._status === "published",
       cancelledScheduledPublication: scheduled.has(storyId)
     };
   } catch (error) {
