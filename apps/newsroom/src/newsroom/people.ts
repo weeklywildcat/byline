@@ -469,7 +469,6 @@ export async function updatePerson(
       const linked = await ctx.req.payload.find({
         collection: "users",
         where: { linkedPerson: { equals: id } },
-        select: { id: true },
         depth: 0,
         pagination: false,
         overrideAccess: true,
